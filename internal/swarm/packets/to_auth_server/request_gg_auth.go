@@ -7,8 +7,8 @@ package toauthserver
 import (
 	"errors"
 
-	"github.com/melg8/connect/internal/connect/helpers"
-	"github.com/melg8/connect/internal/connect/packets/packet"
+	"github.com/melg8/swarm/internal/swarm/helpers"
+	"github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const packetID = 0x07

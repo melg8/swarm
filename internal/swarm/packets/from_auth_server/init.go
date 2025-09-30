@@ -8,9 +8,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"unsafe"
 
-	"github.com/melg8/connect/internal/connect/helpers"
-	"github.com/melg8/connect/internal/connect/packets/packet"
+	"github.com/melg8/swarm/internal/swarm/helpers"
+	"github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 type InitPacket struct {
@@ -24,44 +25,30 @@ type InitPacket struct {
 	BlowfishKey     []byte
 }
 
+// global sentinel error to avoid allocation
+var errEOF = errors.New("EOF")
+
+//go:nosplit
 func ParseInitPacket(p *InitPacket, data []byte) error {
-	const minPacketSize = 4 + 4 + 128 + 4*4
+	const rsaSize = 128
+	const minPacketSize = 4 + 4 + rsaSize + 4*4
 
 	if len(data) < minPacketSize {
-		return errors.New("EOF")
+		return errEOF
 	}
 
-	offset := 0
+	p.SessionID = *(*int32)(unsafe.Pointer(&data[0]))
+	p.ProtocolVersion = *(*int32)(unsafe.Pointer(&data[4]))
+	p.RsaPublicKey = data[8 : 8+rsaSize]
+	p.GameGuard1 = *(*int32)(unsafe.Pointer(&data[8+rsaSize]))
+	p.GameGuard2 = *(*int32)(unsafe.Pointer(&data[12+rsaSize]))
+	p.GameGuard3 = *(*int32)(unsafe.Pointer(&data[16+rsaSize]))
+	p.GameGuard4 = *(*int32)(unsafe.Pointer(&data[20+rsaSize]))
 
-	// Читаем int32 напрямую из слайса
-	p.SessionID = int32(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-
-	p.ProtocolVersion = int32(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-
-	// Создаем саб-слайс, без аллокации
-	p.RsaPublicKey = data[offset : offset+128]
-	offset += 128
-
-	p.GameGuard1 = int32(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-
-	p.GameGuard2 = int32(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-
-	p.GameGuard3 = int32(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-
-	p.GameGuard4 = int32(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-
-	// Опционально читаем ключ
-	if len(data) > offset {
-		// Также саб-слайс, без аллокации
-		p.BlowfishKey = data[offset:]
+	if len(data) > 24+rsaSize {
+		p.BlowfishKey = data[24+rsaSize:]
 	} else {
-		p.BlowfishKey = nil // Устанавливаем в nil, если данных нет
+		p.BlowfishKey = nil
 	}
 
 	return nil

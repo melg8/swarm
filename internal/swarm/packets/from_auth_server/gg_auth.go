@@ -5,8 +5,8 @@
 package fromauthserver
 
 import (
-	"github.com/melg8/connect/internal/connect/helpers"
-	"github.com/melg8/connect/internal/connect/packets/packet"
+	"github.com/melg8/swarm/internal/swarm/helpers"
+	"github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 type GGAuthPacket struct {

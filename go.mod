@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-module github.com/melg8/connect
+module github.com/melg8/swarm
 
 go 1.23.2
 

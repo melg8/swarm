@@ -8,7 +8,7 @@ import (
 	"errors"
 	"math"
 
-	"github.com/melg8/connect/internal/connect/packets/packet"
+	"github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 type Serializable interface {

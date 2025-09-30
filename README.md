@@ -4,15 +4,14 @@ SPDX-FileCopyrightText: 2024 Melg Eight <public.melg8@gmail.com>
 SPDX-License-Identifier: MIT
 -->
 
-# connect
-Emulate multiple client connections to your game server.
-
+# swarm
+Emulates swarm of characters connected to game world.
 
 # commands
 
 Run main application
 ```bash
-go run .\cmd\connect\main.go
+go run .\cmd\swarm\main.go
 ```
 
 Run unit tests of project:
@@ -37,7 +36,7 @@ golangci-lint run --fix --disable-all --enable=wsl ./...
 
 Run concrete benchmark with profiling:
 ```bash
-E:\Go\bin\go.exe test -benchmem -cpuprofile=cpu_out -memprofile=mem_out  -run=^$ -bench ^BenchmarkEncryptor_Write$ github.com/melg8/connect/internal/connect/crypt
+go test -benchmem -cpuprofile=cpu_out -memprofile=mem_out  -run=^$ -bench ^BenchmarkEncryptor_Write$ github.com/melg8/swarm/internal/swarm/crypt
 ```
 
 Run pprof tool for profiling:

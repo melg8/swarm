@@ -7,7 +7,7 @@ package fromauthserver
 import (
 	"testing"
 
-	"github.com/melg8/connect/internal/connect/packets/packet"
+	"github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 func BenchmarkPlusPlus(b *testing.B) {
@@ -31,12 +31,10 @@ func dataForBenchmark() []byte {
 func BenchmarkInitPacketParsing(b *testing.B) {
 	data := dataForBenchmark()
 	packet := &InitPacket{}
-
 	b.ResetTimer()
 
-	for range b.N {
-		err := ParseInitPacket(packet, data)
-		if err != nil {
+	for i := 0; i < b.N; i++ {
+		if err := ParseInitPacket(packet, data); err != nil {
 			panic(err)
 		}
 		if packet.SessionID != 50462976 {

@@ -7,8 +7,8 @@ package crypt
 import (
 	"testing"
 
-	"github.com/melg8/connect/internal/connect/packets/packet"
-	toauthserver "github.com/melg8/connect/internal/connect/packets/to_auth_server"
+	"github.com/melg8/swarm/internal/swarm/packets/packet"
+	toauthserver "github.com/melg8/swarm/internal/swarm/packets/to_auth_server"
 	"github.com/stretchr/testify/require"
 )
 

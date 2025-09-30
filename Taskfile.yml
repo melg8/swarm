@@ -69,7 +69,7 @@ tasks:
     desc: Runs application
     aliases: [r]
     cmds:
-      - go run ./cmd/connect/main.go
+      - go run ./cmd/swarm/main.go
 
   test:
     desc: Runs test suite

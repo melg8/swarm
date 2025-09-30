@@ -7,7 +7,7 @@ package toauthserver
 import (
 	"testing"
 
-	"github.com/melg8/connect/internal/connect/packets/packet"
+	"github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 func BenchmarkRequestGGAuth_ToBytes(b *testing.B) {

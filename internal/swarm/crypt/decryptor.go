@@ -7,7 +7,7 @@ package crypt
 import (
 	"fmt"
 
-	"github.com/melg8/connect/internal/connect/packets/packet"
+	"github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 type Deserializable interface {
@@ -20,10 +20,7 @@ type Decryptor struct {
 }
 
 func NewDecryptor(reader *packet.Reader, cipher *BlowfishCipher) *Decryptor {
-	return &Decryptor{
-		reader: reader,
-		cipher: cipher,
-	}
+	return &Decryptor{reader: reader, cipher: cipher}
 }
 
 func (d *Decryptor) Read(destination Deserializable) error {

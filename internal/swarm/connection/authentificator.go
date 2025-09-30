@@ -13,11 +13,11 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/melg8/connect/internal/connect/crypt"
-	"github.com/melg8/connect/internal/connect/helpers"
-	fromauthserver "github.com/melg8/connect/internal/connect/packets/from_auth_server"
-	"github.com/melg8/connect/internal/connect/packets/packet"
-	toauthserver "github.com/melg8/connect/internal/connect/packets/to_auth_server"
+	"github.com/melg8/swarm/internal/swarm/crypt"
+	"github.com/melg8/swarm/internal/swarm/helpers"
+	fromauthserver "github.com/melg8/swarm/internal/swarm/packets/from_auth_server"
+	"github.com/melg8/swarm/internal/swarm/packets/packet"
+	toauthserver "github.com/melg8/swarm/internal/swarm/packets/to_auth_server"
 )
 
 func LogRecievedData(data []byte) {
@@ -43,6 +43,9 @@ func ExtractPacketFromRawData(data []byte) (int32, []byte, error) {
 	packetID := int32(data[2])
 	if packetID == 0x00 {
 		return packetID, data[3 : len(data)-4], nil
+	}
+	if packetID == 0x0b {
+		return 0, nil, errors.New("got expected packet 0x0b" + strconv.Itoa(int(packetID)))
 	}
 
 	return 0, nil, errors.New("unexpected packet type " + strconv.Itoa(int(packetID)))
@@ -148,7 +151,6 @@ func RequestGGAuth(conn net.Conn, initResponse *fromauthserver.InitPacket) (int,
 		return 0, err
 	}
 	_ = crypt.NewDecryptor(packet.NewReader(rawResponse), crypt.DefaultAuthKey())
-	// err = decryptor.Read()
 
 	return GGAuth(rawResponse)
 }

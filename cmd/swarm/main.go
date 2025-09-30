@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/melg8/connect/internal/connect/connection"
+	"github.com/melg8/swarm/internal/swarm/connection"
 )
 
 func connectAndAuthenticate() error {
