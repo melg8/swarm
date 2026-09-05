@@ -142,20 +142,25 @@ const MapView = {
 
   onDragStart(event) {
     this.drag = { x: event.clientX, y: event.clientY };
-  },
-
-  // Dragging pans the view: following is switched off and the pan anchor
-  // takes over from the character position without a visual jump. While
-  // follow is off the camera never moves on its own: the map shows the
-  // chosen area even when the bot walks away.
-  onDragMove(event) {
-    if (!this.drag) { return; }
+    // The map is grabbed like a picture: follow is switched off at grab
+    // time so the camera stops tracking the character under the held
+    // point, and the pan anchor takes over without a visual jump.
     if (this.followEnabled()) {
       document.getElementById("follow").checked = false;
       this.syncPanAnchor();
     }
-    this.panAnchor.x += event.clientX - this.drag.x;
-    this.panAnchor.y += event.clientY - this.drag.y;
+  },
+
+  // Dragging pans the view like moving a sheet of paper: the grabbed
+  // world point stays exactly under the cursor. The screen offset of a
+  // world point is (wx - panAnchor) * scale, so the camera must move
+  // opposite to the cursor and in world units of 1/scale per pixel.
+  // While follow is off the camera never moves on its own: the map
+  // shows the chosen area even when the bot walks away.
+  onDragMove(event) {
+    if (!this.drag) { return; }
+    this.panAnchor.x -= (event.clientX - this.drag.x) / this.scale;
+    this.panAnchor.y -= (event.clientY - this.drag.y) / this.scale;
     this.drag = { x: event.clientX, y: event.clientY };
     this.draw();
   },
