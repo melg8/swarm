@@ -41,6 +41,10 @@ function makeElement() {
         style: {},
         value: "",
         checked: true,
+        children: [],
+        append: function (...added) {
+            for (const child of added) { this.children.push(child); }
+        },
         classList: {
             _classes: new Set(),
             contains(cls) { return this._classes.has(cls); },
@@ -56,13 +60,19 @@ function makeElement() {
                 return on;
             }
         },
-        innerHTML: "",
-        append: () => {},
+        _innerHTML: "",
+        get innerHTML() { return this._innerHTML; },
+        set innerHTML(value) {
+            this._innerHTML = value;
+            this.children.length = 0;
+        },
         addEventListener: () => {},
         scrollTop: 0,
         scrollHeight: 0,
-        children: { length: 0 },
-        removeChild: () => {},
+        removeChild: function (child) {
+            const at = this.children.indexOf(child);
+            if (at >= 0) { this.children.splice(at, 1); }
+        },
         firstChild: null
     };
 }
@@ -105,6 +115,8 @@ function loadAppJs(appFile) {
         " ? setVital : undefined," +
         " setExpVital: typeof setExpVital === 'function'" +
         " ? setExpVital : undefined," +
+        " renderChat: typeof renderChat === 'function'" +
+        " ? renderChat : undefined," +
         " renderHUD: typeof renderHUD === 'function'" +
         " ? renderHUD : undefined };",
         sandbox);
@@ -269,6 +281,39 @@ function main() {
         check(results, "renderHUD leaves the target panel to renderTarget",
             elements.get("target-name").textContent === "SENTINEL",
             "renderHUD wrote the target name");
+    }
+
+    // The chat window renders one line per system or social message
+    // and clears when the snapshot carries none.
+    sandbox.document.getElementById("chat-list");
+    if (typeof hud.renderChat !== "function") {
+        check(results, "chat window renders the message lines", false,
+            "renderChat is missing from app.js");
+    } else {
+        hud.renderChat({ chat: [
+            { time: "2026-09-06T10:00:00Z", kind: "system",
+                text: "You picked up 25 adena." },
+            { time: "2026-09-06T10:00:01Z", kind: "social",
+                text: "Gremlin plays social animation 2" }
+        ] });
+        const chatList = elements.get("chat-list");
+        check(results, "chat window renders the message lines",
+            chatList.children.length === 2,
+            "got " + chatList.children.length + " lines");
+        if (chatList.children.length === 2) {
+            check(results, "chat line carries the message text",
+                chatList.children[0].children[1].textContent
+                    === "You picked up 25 adena.",
+                "got " + JSON.stringify(
+                    chatList.children[0].children[1].textContent));
+            check(results, "social lines carry the social class",
+                chatList.children[1].className === "chat-line chat-social",
+                "got " + JSON.stringify(chatList.children[1].className));
+        }
+        hud.renderChat({ chat: [] });
+        check(results, "empty chat clears the window",
+            chatList.children.length === 0,
+            "got " + chatList.children.length + " lines");
     }
 
     let failed = 0;
