@@ -25,7 +25,21 @@ type InitPacket struct {
 	BlowfishKey     []byte
 }
 
-// global sentinel error to avoid allocation
+// NewInitPacket creates a zero valued init packet ready for parsing.
+func NewInitPacket() *InitPacket {
+	return &InitPacket{
+		SessionID:       0,
+		ProtocolVersion: 0,
+		RsaPublicKey:    nil,
+		GameGuard1:      0,
+		GameGuard2:      0,
+		GameGuard3:      0,
+		GameGuard4:      0,
+		BlowfishKey:     nil,
+	}
+}
+
+// global sentinel error to avoid allocation.
 var errEOF = errors.New("EOF")
 
 //go:nosplit

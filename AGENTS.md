@@ -11,21 +11,21 @@ Guidance for AI coding agents (and humans) working on this repository.
 ## What this project is
 
 swarm is an out-of-game (OOG) multi-instance proxy botting tool written in Go.
-It emulates a swarm of characters connected to a Lineage 2 Chronicle 4 game
-world. The target server is a locally hosted
-[l2j-lisvus](https://gitlab.com/TheDnR/l2j-lisvus/) emulator with all
-anticheat/antibot settings enabled in C4-only communication mode. The program
-must run fully autonomously from the console, support many concurrent bots
-(9 minimum, 36 optimistic, up to 100 stretch goal) and a clean graceful
-shutdown.
+It emulates a swarm of characters connected to a Lineage 2 world. The target
+server is a locally hosted
+[L2J Mobius](https://gitlab.com/MobiusDevelopment/L2J_Mobius/) emulator, the
+`L2J_Mobius_C1_HarbingersOfWar` module (Chronicle 1). The program must run
+fully autonomously from the console, support many concurrent bots (9 minimum,
+36 optimistic, up to 100 stretch goal) and a clean graceful shutdown.
+
+The MVP client connects to the login server, authenticates (the server
+auto-creates missing accounts), picks the first available game server, performs
+the game protocol handshake, creates an elven fighter character when needed,
+enters the world and stays online until Ctrl+C (SIGINT/SIGTERM).
 
 Long term design goals, scalability ideas (packet deduplication, "eyes" bot
 concept, synchronized party behavior) are documented in
 `docs/project_description.md`. Read it before making architectural decisions.
-
-The login flow currently implemented: TCP connect to auth server -> receive
-`Init` -> send `RequestGGAuth` -> receive `GGAuth`. Login and game server
-packets are not implemented yet.
 
 ## Tech stack
 
@@ -38,15 +38,20 @@ packets are not implemented yet.
 ## Repository layout
 
 ```
-cmd/swarm/                     Application entry point.
+cmd/swarm/                     Application entry point (flags: login, account,
+                               password, char).
 internal/swarm/
-  connection/                  TCP connect + authentication flow state machine.
-  crypt/                       Blowfish encryptor/decryptor, XOR checksum.
+  connection/                  Login flow (authentificator), game session
+                               (game.go), packet framing (wire.go).
+  crypt/                       Login Blowfish framing (login_crypt.go), game
+                               XOR cipher (game_crypt.go), checksum.
   helpers/                     Hex+ASCII dump helpers for debugging.
   packets/
     packet/                    Binary Reader/Writer primitives (little endian).
-    from_auth_server/          Parsing of auth server -> client packets.
-    to_auth_server/            Serialization of client -> auth server packets.
+    from_auth_server/          Login server -> client packets.
+    to_auth_server/            Client -> login server packets.
+    from_game_server/          Game server -> client packets.
+    to_game_server/            Client -> game server packets.
 docs/                          Project goals and protocol description.
 ```
 
@@ -55,10 +60,11 @@ internal implementation detail of the bot.
 
 ## Commands
 
-Run the application (expects auth server at `127.0.0.1:2106`):
+Run the application (expects the Mobius stack at `127.0.0.1:2106` and
+`127.0.0.1:7777`, account `test1`/`test`, elven fighter `test1`):
 
 ```bash
-task run:app              # or: go run ./cmd/swarm/main.go
+task run:app              # or: go run ./cmd/swarm
 ```
 
 Tests and linters (run both before considering work done):
@@ -101,7 +107,8 @@ Enforced by `.golangci-lint` config (strict, most linters enabled):
 - Format with `gofmt`/`gofumpt`; imports grouped by `gci`/`goimports`.
 - Function length and cyclomatic complexity are limited (`funlen`, `cyclop`,
   `gocyclo`). Split long functions instead of disabling linters.
-- Initialize all struct fields when constructing (`exhaustruct`).
+- Initialize all struct fields when constructing (`exhaustruct`); prefer
+  `NewXxx()` constructors for parsed packet structs.
 - Do not return `nil` error together with a `nil` value (`nilnil`); do not
   create dynamic errors with `fmt.Errorf` without wrapping (`err113` is
   planned to be enabled): prefer `errors.New` for static messages and
@@ -126,33 +133,52 @@ From `docs/readme.md`:
 - Every packet parser/serializer has both a unit test and a benchmark test
   where performance matters (`*_bench_test.go`, `init_bench_v2_test.go`
   pattern).
+- Protocol flows are covered by in-process fake servers (see
+  `connection/game_test.go` for the scripted game session test).
 - Benchmarks report allocations (`-benchmem`) because a core requirement is
   memory-friendly parsing for hundreds of concurrent connections. When
   changing packet code, compare allocations before/after.
 - Use `testify` (`require`/`assert`) with `testifylint`-clean style.
 
-## Protocol notes (auth server)
+## Protocol notes (Mobius C1)
 
-`docs/protocol_description.md` is the source of truth for packet formats.
-Summary:
+`docs/protocol_description.md` plus the Mobius Java sources are the source of
+truth for packet formats (`L2J_Mobius_C1_HarbingersOfWar/java`). Summary:
 
-- Auth protocol revision `c621` (l2j-lisvus).
-- Packet layout: 2 bytes size (includes itself, little endian), 1 byte id,
-  body, 0-7 bytes zero padding to 8 byte alignment, 4 bytes XOR checksum
-  (big endian 4 byte blocks) for auth server communication.
-- Auth server packets are encrypted with Blowfish using a hardcoded 21 byte
-  key (see `crypt.DefaultAuthKey()`); the `Init` packet is sent unencrypted.
+- Game protocol version 419 (`AllowedProtocolRevisions` in
+  `dist/game/config/Server.ini`).
+- Packet framing both directions: 2 byte size header (little endian, includes
+  itself), then the payload `[opcode: 1][body]`. Mobius reads and writes the
+  header little endian (see `commons/network/pool/ResourcePool.java`).
+- Login protocol: payload is padded to 8 byte alignment and ends with a 4
+  byte little endian XOR checksum of all preceding 4 byte words; Blowfish
+  with the static 21 byte key (`crypt.MobiusAuthKey()`, see
+  `loginserver/LoginClient` `NewCrypt`). The `Init` packet is unencrypted.
+- Game protocol: after the unencrypted `ProtocolVersion` <-> `KeyPacket`
+  exchange, every payload is XOR encrypted with the stateful 8 byte cipher
+  (`crypt.GameCrypt`, mirrors `gameserver/network/Encryption.java`): running
+  XOR chain with `key[i&7]`, rolling offset kept in `key[0..3]` (little
+  endian, advanced by the payload size after each packet). No checksum, no
+  padding, no Blowfish on the game connection.
 - Integers in packet bodies are little endian. Strings are null-terminated
-  UTF-8 (UTF-16 in some game server packets).
-- Packet processing order: check length -> concatenate partial reads ->
-  decrypt -> verify checksum -> check expected packet id for current auth
-  state -> deserialize -> advance state.
+  UTF-16LE (see `commons/network/packet/ReadablePacket.readString`).
+- Login flow: `Init` -> `RequestAuthLogin` (fixed 14 byte zero padded
+  account/password fields) -> `LoginOk` -> `RequestServerList` ->
+  `ServerList` -> `RequestServerLogin` -> `PlayOk`.
+- Game flow: `ProtocolVersion` -> `KeyPacket` -> `AuthLogin` (login string +
+  session keys in order playOk2, playOk1, loginOk1, loginOk2) ->
+  `CharSelectionInfo` -> (`CharacterCreate` -> `CharCreateOk` -> updated
+  list) -> `CharacterSelect` -> `CharSelected` -> `EnterWorld` -> world
+  packets; keep alive with `RequestNetPing` (0xA8) and reply `NetPing`
+  (0xEC); leave with `Logout` (0x09).
+- The elven fighter creation values: race 1 (ELF), classId 18
+  (ELVEN_FIGHTER), see `gameserver/entity/actor/enums/player/PlayerClass`.
 
 When adding a new packet: implement the struct in the correct direction
-package (`from_auth_server` / `to_auth_server`), add parsing/serialization
-via `packet.Reader`/`packet.Writer`, cover it with unit tests and a benchmark,
+package (`from_*` / `to_*`), add parsing/serialization via
+`packet.Reader`/`packet.Writer`, cover it with unit tests and a benchmark,
 and document the layout in `docs/protocol_description.md` with a link to the
-reference l2j-lisvus Java class.
+reference Mobius Java class.
 
 ## Git conventions
 
