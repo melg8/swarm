@@ -117,6 +117,9 @@ func (s *huntFlowServer) huntFlow(conn net.Conn, cipher *crypt.GameCrypt) {
 	s.writeEncrypted(conn, cipher,
 		buildValidateLocation(100, 45050, 50050, 16384))
 	s.writeEncrypted(conn, cipher, buildNpcInfo(1, "Keltir", 45100, 50100, 8192))
+	// The vitals of the entered character (the real server sends them
+	// inside the UserInfo packet right after EnterWorld).
+	s.writeEncrypted(conn, cipher, buildSelfVitals(100, 95))
 	close(s.ready)
 
 	currentTarget := int32(0)
@@ -156,6 +159,24 @@ func (s *huntFlowServer) huntFlow(conn net.Conn, cipher *crypt.GameCrypt) {
 			// Net ping and other client packets are ignored.
 		}
 	}
+}
+
+// buildSelfVitals builds a StatusUpdate with the vitals of the entered
+// character: [0x1A][objectId][count][id][value]... (StatusUpdate).
+func buildSelfVitals(objectID int32, curHP int32) []byte {
+	packet := []byte{0x1A}
+	//nolint:gosec // test object ids are small
+	packet = binary.LittleEndian.AppendUint32(packet, uint32(objectID))
+	packet = binary.LittleEndian.AppendUint32(packet, 3)
+	packet = binary.LittleEndian.AppendUint32(packet, 0x09) // cur hp
+	//nolint:gosec // test hp values are small
+	packet = binary.LittleEndian.AppendUint32(packet, uint32(curHP))
+	packet = binary.LittleEndian.AppendUint32(packet, 0x0A) // max hp
+	packet = binary.LittleEndian.AppendUint32(packet, 100)
+	packet = binary.LittleEndian.AppendUint32(packet, 0x0C) // max mp
+	packet = binary.LittleEndian.AppendUint32(packet, 60)
+
+	return packet
 }
 
 // buildCharSelected builds the CharSelected packet of the test character.

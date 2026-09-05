@@ -228,3 +228,71 @@ func TestEffectiveSpeedAppliesMultiplier(t *testing.T) {
 	require.InDelta(t, 88.0, effectiveSpeed(0, 80, 1.1), 0.001)
 	require.InDelta(t, 120.0, effectiveSpeed(0, 0, 0), 0.001)
 }
+
+func TestSelfTargetClearedWhenTargetDies(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 7, X: 100, Y: 100, Name: "Gremlin", Attackable: true,
+	})
+	bot.ApplySelfTarget(7)
+	require.Equal(t, int32(7), bot.SelfTargetID())
+
+	// The killed target is no target anymore: the server keeps the
+	// corpse selected, the tracker drops it so the HUD shows the real
+	// "no target" state.
+	bot.ApplyStatusUpdate(7, []Attribute{{ID: AttrCurHP, Value: 0}})
+	require.Zero(t, bot.SelfTargetID())
+}
+
+func TestSelfTargetClearedWhenTargetRemoved(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 7, X: 100, Y: 100, Name: "Gremlin", Attackable: true,
+	})
+	bot.ApplySelfTarget(7)
+
+	// The corpse despawn removes the object; the selection must not
+	// survive as a dangling "object 7" reference.
+	bot.RemoveObject(7)
+	require.Zero(t, bot.SelfTargetID())
+}
+
+func TestSelfTargetClearedOnOwnTargetUnselected(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 7, X: 100, Y: 100, Name: "Gremlin", Attackable: true,
+	})
+	bot.ApplySelfTarget(7)
+
+	// The own TargetUnselected broadcast the server sends when it
+	// clears the character target (for example on the world removal of
+	// the target).
+	bot.ApplyTargetClear(100)
+	require.Zero(t, bot.SelfTargetID())
+}
+
+func TestObjectTargetTrackedFromTargetSelected(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyPlayerInfo(PlayerInfo{
+		ObjectID: 55, Name: "Other", X: 100, Y: 100,
+	})
+
+	// Another player selects the bot: the map renders the selection
+	// from this reference.
+	bot.ApplyObjectTarget(55, 100)
+	snap := bot.Snapshot()
+	require.Equal(t, int32(100), snap.Objects[0].TargetID)
+
+	// And drops the selection again.
+	bot.ApplyTargetClear(55)
+	snap = bot.Snapshot()
+	require.Zero(t, snap.Objects[0].TargetID)
+}

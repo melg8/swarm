@@ -63,6 +63,12 @@ func (f *fakeGame) DestroyItem(objectID int32, _ int32) error {
 func newTestBot() *state.Bot {
 	bot := state.NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	// A healthy character: the hunt loop engages the next target
+	// immediately when the HP is above the re-engage threshold.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrMaxHP, Value: 100},
+		{ID: state.AttrCurHP, Value: 90},
+	})
 
 	return bot
 }
@@ -223,4 +229,63 @@ func TestLoopAttackErrorIsLoggedNotFatal(t *testing.T) {
 	loop.tick()
 	require.Equal(t, 0, game.selects)
 	require.Equal(t, int32(0), loop.target)
+}
+
+func TestLoopSelectsNextTargetAfterKill(t *testing.T) {
+	bot := newTestBot()
+	spawnMob(bot)
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The first mob is selected, fought and killed. The server never
+	// clears the selection of the corpse: the tracker target stays at
+	// the dead object id (simulated by re-selecting it after death).
+	loop.tick()
+	bot.ApplySelfTarget(7)
+	loop.lastHit = time.Now().Add(-time.Minute)
+	bot.ApplyStatusUpdate(7, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 0},
+	})
+	bot.ApplySelfTarget(7)
+
+	// Loot finishes with no drops on the next ticks: the loop must
+	// select a new target instead of ping-ponging between the engage
+	// and loot phases around the stale dead selection.
+	for range 3 {
+		loop.lastHit = time.Now().Add(-2 * time.Second)
+		loop.tick()
+	}
+	require.Equal(t, 2, game.selects,
+		"the next target must be selected after the kill")
+}
+
+func TestLoopWaitsForHealthWhenHurt(t *testing.T) {
+	bot := newTestBot()
+	spawnMob(bot)
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The character is hurt: no new engagement until regeneration
+	// recovers above the threshold.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 20},
+	})
+	for range 3 {
+		loop.lastHit = time.Now().Add(-2 * time.Second)
+		loop.tick()
+	}
+	require.Zero(t, game.selects, "a hurt character must rest")
+
+	// The regeneration recovers: the next target is selected.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 90},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.selects,
+		"a recovered character engages the next target")
 }

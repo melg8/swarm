@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -497,4 +498,83 @@ func TestSelfMovementTracksDestination(t *testing.T) {
 	snap = bot.Snapshot()
 	require.False(t, snap.Character.Moving)
 	require.Equal(t, int32(300), snap.Character.X)
+}
+
+func TestNearestAttackableUsesProjectedPosition(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+	// A standing mob recorded near the character but the farthest away.
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 7, X: 45300, Y: 50000, Name: "Standing", Attackable: true,
+	})
+
+	// A moving mob whose movement packet started 400 units away but ran
+	// toward the character: the projection must place it next to the
+	// character, the stale packet position must not win.
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 8, X: 46000, Y: 50000, Name: "Runner", Attackable: true,
+		RunSpeed: 200,
+	})
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyMovement(Movement{
+		ObjectID: 8, X: 46000, Y: 50000, DestX: 45050, DestY: 50000,
+	})
+	runner := bot.objects[8]
+	runner.MoveAt = time.Now().Add(-5 * time.Second)
+	bot.objects[8] = runner
+
+	target, ok := bot.NearestAttackable(1500)
+	require.True(t, ok)
+	require.Equal(t, int32(8), target.ObjectID,
+		"the mob that ran toward the character is the nearest now")
+	require.InDelta(t, float64(45050), float64(target.X), 150,
+		"the attack position is the projected current position")
+}
+
+func TestSelfHealthPercent(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+	require.InDelta(t, 100.0, bot.SelfHealthPercent(), 0.001)
+
+	bot.ApplyStatusUpdate(100, []Attribute{
+		{ID: stateAttrMaxHPTest, Value: 200},
+		{ID: stateAttrCurHPTest, Value: 90},
+	})
+	require.InDelta(t, 45.0, bot.SelfHealthPercent(), 0.001)
+}
+
+// Aliases keep the test table above short without exported constants.
+const (
+	stateAttrMaxHPTest = 0x0A
+	stateAttrCurHPTest = 0x09
+)
+
+func TestExpPercent(t *testing.T) {
+	// Level 2 base is 68 exp, level 3 base is 363: halfway between
+	// them is (68+363)/2 = 215.5 -> 50%.
+	require.InDelta(t, 0.0, ExpPercent(2, 68), 0.001)
+	require.InDelta(t, 50.0, ExpPercent(2, 215), 0.5)
+	require.InDelta(t, 100.0, ExpPercent(2, 363), 0.001)
+	require.InDelta(t, 100.0, ExpPercent(2, 1000), 0.001)
+	require.Zero(t, ExpPercent(2, 10))
+	// Level 1 starts at zero experience.
+	require.InDelta(t, 34.0, ExpPercent(1, 23), 0.5)
+	// Out of table bounds clamp: no level yet is zero progress, the
+	// levels past the table are complete.
+	require.InDelta(t, 100.0, ExpPercent(90, 0), 0.001)
+	require.Zero(t, ExpPercent(0, 0))
+}
+
+func TestSnapshotCarriesExpPercent(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyUserInfo(UserInfo{Level: 2, Exp: 215})
+
+	snap := bot.Snapshot()
+	require.InDelta(t, 50.0, snap.Character.ExpPercent, 0.5)
 }
