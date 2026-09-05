@@ -101,6 +101,12 @@ tasks:
     cmds:
       - node tools/repro_movement.js
 
+  generate:system-messages:
+    desc: Regenerates the system message dictionary from the Mobius sources
+    aliases: [gensm]
+    cmds:
+      - bash tools/generate_system_messages.sh
+
   tidy:
     desc: Runs go mod tidy
     cmds:
