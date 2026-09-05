@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,6 +57,7 @@ const (
 	itemListID         = 0x27
 	inventoryUpdateID  = 0x37
 	changeMoveTypeID   = 0x3E
+	changeWaitTypeID   = 0x3F
 	targetSelectedID   = 0x39
 	targetUnselectedID = 0x3A
 	autoAttackStartID  = 0x3B
@@ -95,6 +97,7 @@ type GameClient struct {
 	crypt          *crypt.GameCrypt
 	writeMu        sync.Mutex
 	logger         *log.Logger
+	trace          bool
 	packetCount    atomic.Int64
 	readBuf        []byte
 	tracker        *state.Bot
@@ -116,6 +119,7 @@ type GameClient struct {
 	beginRotation  fromgameserver.BeginRotationPacket
 	stopRotation   fromgameserver.StopRotationPacket
 	changeMoveType fromgameserver.ChangeMoveTypePacket
+	changeWait     fromgameserver.ChangeWaitTypePacket
 	teleport       fromgameserver.TeleportToLocationPacket
 	myTarget       fromgameserver.MyTargetSelectedPacket
 	targetSelected fromgameserver.TargetSelectedPacket
@@ -128,6 +132,10 @@ type GameClient struct {
 
 // statusAttrsCapacity bounds the scratch attributes of status updates.
 const statusAttrsCapacity = 8
+
+// packetTraceEnv enables a one line trace of every received packet id
+// when set, which is the fastest way to follow a protocol flow live.
+const packetTraceEnv = "SWARM_TRACE_PACKETS"
 
 // gameBuffer is the pooled receive buffer of the read loop. A pointer type
 // keeps sync.Pool arguments pointer-like and allocation free.
@@ -151,6 +159,7 @@ func NewGameClient(conn net.Conn) (*GameClient, error) {
 		crypt:          nil,
 		writeMu:        sync.Mutex{},
 		logger:         log.Default(),
+		trace:          os.Getenv(packetTraceEnv) != "",
 		packetCount:    atomic.Int64{},
 		readBuf:        nil,
 		tracker:        nil,
@@ -171,6 +180,7 @@ func NewGameClient(conn net.Conn) (*GameClient, error) {
 		beginRotation:  *fromgameserver.NewBeginRotationPacket(),
 		stopRotation:   *fromgameserver.NewStopRotationPacket(),
 		changeMoveType: *fromgameserver.NewChangeMoveTypePacket(),
+		changeWait:     *fromgameserver.NewChangeWaitTypePacket(),
 		teleport:       *fromgameserver.NewTeleportToLocationPacket(),
 		myTarget:       *fromgameserver.NewMyTargetSelectedPacket(),
 		targetSelected: *fromgameserver.NewTargetSelectedPacket(),
@@ -328,6 +338,59 @@ func (gc *GameClient) DestroyItem(objectID int32, count int32) error {
 func (gc *GameClient) RequestInventory() error {
 	if err := gc.sendPacket(&togameserver.RequestItemList{}); err != nil {
 		return fmt.Errorf("failed to request item list: %w", err)
+	}
+
+	return nil
+}
+
+// ActionSitStand toggles between sitting and standing (RequestActionUse
+// action 0). The hunt loop uses it to rest at low HP: the sitting
+// regeneration is faster. The server refuses the transition while
+// moving, casting or attacking, so the caller sends it only while idle.
+func (gc *GameClient) ActionSitStand() error {
+	request := togameserver.NewRequestActionUsePacket()
+	request.ActionID = togameserver.ActionSitStand
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to send action use: %w", err)
+	}
+
+	return nil
+}
+
+// RestartAtVillage revives a dead character at the nearest village
+// restart point, exactly like the death dialog of the official client
+// (RequestRestartPoint 0x6D type 0). The server refuses the request
+// while the character is alive, so the caller sends it only after death.
+func (gc *GameClient) RestartAtVillage() error {
+	request := togameserver.NewRequestRestartPointPacket()
+	request.PointType = togameserver.RestartTypeVillage
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to send restart point: %w", err)
+	}
+
+	return nil
+}
+
+// WalkTo makes the character walk to a world point, exactly like a
+// ground click of the official client (client MoveToLocation 0x01 in
+// mouse mode). The hunt loop uses it to run toward a drop: this build of
+// the Mobius C1 server has no click handler for ground items, so the
+// character would otherwise never move toward the loot by itself.
+func (gc *GameClient) WalkTo(x int32, y int32, z int32) error {
+	selfX, selfY, selfZ, ok := gc.tracker.SelfPosition()
+	if !ok {
+		return errors.New("failed to walk: own position is unknown")
+	}
+	request := togameserver.NewMoveToLocationRequestPacket()
+	request.TargetX = x
+	request.TargetY = y
+	request.TargetZ = z
+	request.OriginX = selfX
+	request.OriginY = selfY
+	request.OriginZ = selfZ
+	request.Mode = togameserver.MoveModeMouse
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to send move to location: %w", err)
 	}
 
 	return nil
@@ -622,7 +685,9 @@ func (gc *GameClient) run(ctx context.Context, characterName string) error {
 	defer pingTicker.Stop()
 
 	err := gc.runLoop(ctx, packets, pingTicker, characterName)
-	gc.disconnect()
+	// The logout is only announced while the connection is still usable:
+	// after a transport error the packet would fail and only spam the log.
+	gc.disconnect(err == nil)
 
 	// Unblock the reader goroutine and drain pending packets.
 	drainPackets(packets, readerDone)
@@ -660,11 +725,13 @@ func (gc *GameClient) runLoop(
 	}
 }
 
-// disconnect sends the logout packet and closes the connection.
-func (gc *GameClient) disconnect() {
-	err := gc.sendPacket(&togameserver.Logout{})
-	if err != nil {
-		gc.logger.Printf("Failed to send logout: %v", err)
+// disconnect closes the connection, announcing the logout to the server
+// first when the connection is still usable.
+func (gc *GameClient) disconnect(announce bool) {
+	if announce {
+		if err := gc.sendPacket(&togameserver.Logout{}); err != nil {
+			gc.logger.Printf("Failed to send logout: %v", err)
+		}
 	}
 	_ = gc.conn.Close()
 }
@@ -690,6 +757,10 @@ func drainPackets(packets <-chan gamePacket, readerDone <-chan struct{}) {
 func (gc *GameClient) handleServerPacket(payload []byte) {
 	if gc.tracker != nil {
 		gc.tracker.CountPacket()
+	}
+	if gc.trace {
+		gc.logger.Printf("Trace packet id 0x%02x with %d bytes",
+			payload[0], len(payload))
 	}
 
 	switch payload[0] {
@@ -768,8 +839,8 @@ func (gc *GameClient) handlePlacementPacket(payload []byte) bool {
 	return true
 }
 
-// handleRotationPacket dispatches the turn and teleport packets. It
-// reports whether the packet was consumed.
+// handleRotationPacket dispatches the turn, movement mode and wait type
+// packets. It reports whether the packet was consumed.
 func (gc *GameClient) handleRotationPacket(payload []byte) bool {
 	switch payload[0] {
 	case beginRotationID:
@@ -778,6 +849,8 @@ func (gc *GameClient) handleRotationPacket(payload []byte) bool {
 		gc.applyStopRotation(payload)
 	case changeMoveTypeID:
 		gc.applyChangeMoveType(payload)
+	case changeWaitTypeID:
+		gc.applyChangeWaitType(payload)
 	case teleportID:
 		gc.applyTeleport(payload)
 	default:
@@ -1230,6 +1303,22 @@ func (gc *GameClient) applyChangeMoveType(payload []byte) {
 		gc.tracker.ApplyMoveType(state.MoveType{
 			ObjectID: gc.changeMoveType.ObjectID,
 			Running:  gc.changeMoveType.Running,
+		})
+	}
+}
+
+// applyChangeWaitType parses ChangeWaitType and tracks the sit state.
+func (gc *GameClient) applyChangeWaitType(payload []byte) {
+	if err := fromgameserver.ParseChangeWaitTypePacket(
+		&gc.changeWait, payload); err != nil {
+		gc.logger.Printf("Failed to parse change wait type: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		gc.tracker.ApplyWaitType(state.WaitType{
+			ObjectID: gc.changeWait.ObjectID,
+			Sitting:  gc.changeWait.Sitting,
 		})
 	}
 }

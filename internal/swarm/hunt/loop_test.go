@@ -20,13 +20,20 @@ type fakeGame struct {
 	selects   int
 	forces    []int32
 	pickups   []int32
+	walks     [][3]int32
+	sits      int
+	restarts  int
 	destroys  []int32
+	noTargets bool
 	lastError error
 }
 
 func (f *fakeGame) AttackNearest() (int32, error) {
 	if f.lastError != nil {
 		return 0, f.lastError
+	}
+	if f.noTargets {
+		return 0, nil
 	}
 	f.selects++
 
@@ -42,11 +49,38 @@ func (f *fakeGame) AttackTarget(objectID int32) error {
 	return nil
 }
 
+func (f *fakeGame) WalkTo(x int32, y int32, z int32) error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.walks = append(f.walks, [3]int32{x, y, z})
+
+	return nil
+}
+
 func (f *fakeGame) PickupItem(item state.LootItem) error {
 	if f.lastError != nil {
 		return f.lastError
 	}
 	f.pickups = append(f.pickups, item.ObjectID)
+
+	return nil
+}
+
+func (f *fakeGame) ActionSitStand() error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.sits++
+
+	return nil
+}
+
+func (f *fakeGame) RestartAtVillage() error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.restarts++
 
 	return nil
 }
@@ -215,6 +249,183 @@ func TestLoopSkipsUnreachableLoot(t *testing.T) {
 	require.Len(t, loop.skipped, 1)
 	loop.tick()
 	require.Equal(t, phaseEngage, loop.phase)
+}
+
+func TestLoopWalksToFarLoot(t *testing.T) {
+	bot := newTestBot()
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.phase = phaseLoot
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplySpawnItem(state.ItemInfo{
+		ObjectID: 9, TemplateID: 57, X: 45600, Y: 50000, Z: -3500,
+	})
+
+	// 600 units away: the loop walks to the item instead of clicking it.
+	loop.tick()
+	require.Empty(t, game.pickups)
+	require.Equal(t, [][3]int32{{45600, 50000, -3500}}, game.walks)
+
+	// The character arrives (the zero distance MoveToLocation of the
+	// server): the next tick clicks the item.
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 45600, Y: 50000, Z: -3500,
+		DestX: 45600, DestY: 50000, DestZ: -3500,
+	})
+	loop.lootMoveAt = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, []int32{9}, game.pickups)
+}
+
+func TestLoopSitsDownWhenExhausted(t *testing.T) {
+	bot := newTestBot()
+	spawnMob(bot)
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// HP below the sit threshold: the loop sits down to regenerate.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 20},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.sits, "an exhausted character sits down")
+
+	// The server confirms the sit with ChangeWaitType: no repeated
+	// toggles while the regeneration runs.
+	bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: true})
+	for range 3 {
+		loop.lastHit = time.Now().Add(-2 * time.Second)
+		loop.tick()
+	}
+	require.Equal(t, 1, game.sits)
+
+	// Regeneration recovers: the loop stands up and engages.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 95},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 2, game.sits, "a recovered character stands up")
+	bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: false})
+
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.selects, "a standing character hunts again")
+}
+
+func TestLoopDoesNotSitWhileUnderAttack(t *testing.T) {
+	bot := newTestBot()
+	spawnMob(bot)
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// A mob hits the character (Attack broadcast with the bot as target)
+	// while its HP is low: the loop keeps fighting instead of sitting.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 20},
+	})
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyAttack(state.Attack{
+		AttackerID: 7, X: 46000, Y: 50000, Z: -3500,
+		TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+		TargetIDs: [state.AttackTargets]int32{100}, TargetCount: 1,
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Zero(t, game.sits, "no sitting into the blows of a fight")
+
+	// The loop selects the attacker and starts the fight on the next
+	// request instead of resting.
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, []int32{7}, game.forces,
+		"the fight continues instead")
+}
+
+func TestLoopRestartsAfterDeath(t *testing.T) {
+	bot := newTestBot()
+	spawnMob(bot)
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	loop.tick()
+	require.Equal(t, 1, game.selects)
+
+	// The character dies mid fight: the loop stops hunting and requests
+	// the village restart, dropping the stale target.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 0},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.restarts)
+	require.Equal(t, int32(0), loop.target)
+
+	// The request retries until the server revives the character.
+	loop.restartAt = time.Now().Add(-6 * time.Second)
+	loop.tick()
+	require.Equal(t, 2, game.restarts)
+
+	// Revived: the hunt continues with a fresh target selection.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 197},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 2, game.selects)
+	require.Equal(t, 2, game.restarts, "no restart spam after the revival")
+}
+
+func TestLoopReturnsToHuntAfterRevive(t *testing.T) {
+	bot := newTestBot()
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	game.noTargets = true
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The character fights at 45000 50000 and dies there.
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 45000, Y: 50000, Z: -3500,
+		DestX: 45000, DestY: 50000, DestZ: -3500,
+	})
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 0},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.restarts)
+
+	// The server revives the character in the village, nothing
+	// attackable lives there: the loop walks back to the death spot.
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 49308, Y: 44213, Z: -3539,
+		DestX: 49308, DestY: 44213, DestZ: -3539,
+	})
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 197},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, [][3]int32{{45000, 50000, -3500}}, game.walks)
+
+	// Mobs show up on the way back: the return stops and the target is
+	// selected.
+	game.noTargets = false
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.selects)
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Len(t, game.walks, 1, "no return walks once prey is found")
 }
 
 func TestLoopAttackErrorIsLoggedNotFatal(t *testing.T) {

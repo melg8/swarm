@@ -158,8 +158,12 @@ func TestSpawnItemAndPickup(t *testing.T) {
 	})
 	_, ok = bot.NearestGroundItem(500)
 	require.False(t, ok)
+	// The GetItem position is the item position, not the picker one: the
+	// character stays where the movement packets put it instead of
+	// teleporting to the drop (the official client only animates the
+	// item flying into the inventory).
 	snap := bot.Snapshot()
-	require.Equal(t, int32(45040), snap.Character.X)
+	require.Equal(t, int32(45000), snap.Character.X)
 }
 
 func TestNearestGroundItemSkipsBlacklisted(t *testing.T) {
