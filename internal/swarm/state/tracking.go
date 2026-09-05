@@ -41,6 +41,32 @@ type ItemPickup struct {
 	Z        int32
 }
 
+// WaitType describes a ChangeWaitType packet: the server announces the
+// sit/stand transition of a creature with the position it happens at.
+type WaitType struct {
+	ObjectID int32
+	Sitting  bool
+}
+
+// ApplyWaitType tracks the sit/stand state of the played character. The
+// packet is broadcast through Player.broadcastPacket, so the acting
+// client receives its own transitions (see Player.sitDown/standUp).
+func (b *Bot) ApplyWaitType(w WaitType) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if w.ObjectID != b.selfID {
+		return
+	}
+	b.char.Sitting = w.Sitting
+	b.touch()
+	switch {
+	case w.Sitting:
+		b.recordLocked("sat down to rest")
+	default:
+		b.recordLocked("stood up")
+	}
+}
+
 // ApplyRotationStart turns an object to the heading of the rotation start.
 // The server sends the pair of rotation packets when a standing player
 // becomes visible, because CharInfo carries no heading, and on keyboard
@@ -203,8 +229,12 @@ func (b *Bot) ApplySpawnItem(info ItemInfo) {
 	b.recordLocked("item appeared: " + itemName(obj.Name, info.TemplateID))
 }
 
-// ApplyItemPickup removes a picked up ground item and uses the packet
-// position to refresh the picker placement.
+// ApplyItemPickup removes a picked up ground item. The GetItem packet
+// carries the position of the item, not of the picker: the official
+// client only uses it to animate the item flying into the inventory. The
+// picker position is already tracked from the StopMove broadcast of the
+// arrival, so snapping the picker here teleported it across the map on
+// every pickup.
 func (b *Bot) ApplyItemPickup(p ItemPickup) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -216,21 +246,8 @@ func (b *Bot) ApplyItemPickup(p ItemPickup) {
 	delete(b.objects, p.ObjectID)
 	pickerName := ""
 	if p.PlayerID == b.selfID {
-		b.char.X = p.X
-		b.char.Y = p.Y
-		b.char.Z = p.Z
-		b.clearCharMovement()
 		pickerName = "self"
 	} else if picker, found := b.objects[p.PlayerID]; found {
-		picker.X = p.X
-		picker.Y = p.Y
-		picker.Z = p.Z
-		picker.Moving = false
-		picker.DestX = p.X
-		picker.DestY = p.Y
-		picker.DestZ = p.Z
-		picker.UpdatedAt = time.Now()
-		b.objects[p.PlayerID] = picker
 		pickerName = picker.Name
 	}
 	b.touch()

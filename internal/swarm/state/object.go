@@ -56,6 +56,8 @@ type WorldObject struct {
 	MoveAt        time.Time
 	CurHP         float64
 	MaxHP         float64
+	CurMP         float64
+	MaxMP         float64
 	UpdatedAt     time.Time
 }
 
@@ -91,6 +93,8 @@ func newWorldObject(objectID int32, kind ObjectKind) WorldObject {
 		MoveAt:        time.Time{},
 		CurHP:         0,
 		MaxHP:         0,
+		CurMP:         0,
+		MaxMP:         0,
 		UpdatedAt:     time.Time{},
 	}
 }

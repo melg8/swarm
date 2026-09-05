@@ -33,6 +33,17 @@ const (
 	connectTimeout      = 10 * time.Second
 )
 
+// Reconnect backoff of the 24/7 supervisor: a lost session is retried
+// with a growing pause, a long lived session resets the pause so a drop
+// after hours reconnects immediately.
+const (
+	reconnectMinDelay = 2 * time.Second
+	reconnectMaxDelay = 30 * time.Second
+	// A session shorter than this counts as a failed attempt and grows
+	// the backoff; a longer one resets it.
+	stableSessionTime = time.Minute
+)
+
 // Character creation constants for the elven fighter.
 const (
 	elfRaceID     = 1
@@ -103,9 +114,16 @@ func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
 	return conn, nil
 }
 
-// runBot performs the full bot flow: login, game handshake, authentication,
-// character creation and staying in the world until the context is done.
+// runBot performs one bot session: login, game handshake, authentication,
+// character creation, entering the world and staying in it until the
+// context is done or the session fails. The hunt loop of the session is
+// bound to a derived context so it stops with the session.
 func runBot(ctx context.Context, cfg config, tracker *state.Bot) error {
+	sessionCtx, cancelSession := context.WithCancel(ctx)
+	defer cancelSession()
+
+	tracker.ResetSession()
+
 	loginConn, err := connectLoginServer(cfg.loginAddress)
 	if err != nil {
 		return err
@@ -165,10 +183,39 @@ func runBot(ctx context.Context, cfg config, tracker *state.Bot) error {
 	log.Println("Character " + cfg.charName + " entered the world")
 
 	if cfg.hunt {
-		go hunt.NewLoop(game, tracker).Run(ctx)
+		go hunt.NewLoop(game, tracker).Run(sessionCtx)
 	}
 
-	return game.Run(ctx, cfg.charName)
+	return game.Run(sessionCtx, cfg.charName)
+}
+
+// runBotForever keeps the bot in the world around the clock: a lost
+// session (server restart, kicked connection, network failure) is logged
+// and the whole login flow is retried with a growing backoff until the
+// user stops the process with SIGINT/SIGTERM. The process never exits on
+// its own.
+func runBotForever(ctx context.Context, cfg config, tracker *state.Bot) {
+	delay := reconnectMinDelay
+	for {
+		started := time.Now()
+		err := runBot(ctx, cfg, tracker)
+		if ctx.Err() != nil {
+			return
+		}
+		if err != nil {
+			log.Println("Bot failed: " + err.Error())
+		}
+		if time.Since(started) >= stableSessionTime {
+			delay = reconnectMinDelay
+		}
+		log.Printf("Reconnecting in %s", delay)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+		delay = min(delay*2, reconnectMaxDelay)
+	}
 }
 
 func main() {
@@ -185,13 +232,9 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
 
-	err := runBot(ctx, cfg, tracker)
+	runBotForever(ctx, cfg, tracker)
 	stop()
 	shutdownWebInterface(web)
-	if err != nil {
-		log.Println("Bot failed: " + err.Error())
-		os.Exit(1)
-	}
 	log.Println("Bot finished")
 }
 

@@ -35,6 +35,11 @@ const snapshotEvents = 100
 // attack or NpcInfo combat flag.
 const combatWindow = 10 * time.Second
 
+// underAttackWindow is how long a recent hit on the character keeps the
+// rest logic from sitting down: sitting into the blows of a mob that is
+// still swinging would only prolong the fight.
+const underAttackWindow = 3 * time.Second
+
 // CharacterState holds the observed state of the played character.
 type CharacterState struct {
 	Name             string
@@ -68,6 +73,8 @@ type CharacterState struct {
 	CombatUntil      time.Time
 	FightingTargetID int32
 	TargetID         int32
+	Sitting          bool
+	LastHitAt        time.Time
 	CurrentLoad      int32
 	MaxLoad          int32
 }
@@ -106,6 +113,8 @@ func newCharacterState() CharacterState {
 		CombatUntil:      time.Time{},
 		FightingTargetID: 0,
 		TargetID:         0,
+		Sitting:          false,
+		LastHitAt:        time.Time{},
 		CurrentLoad:      0,
 		MaxLoad:          0,
 	}
@@ -292,6 +301,49 @@ func (b *Bot) SelfEngaged(targetID int32) bool {
 	return b.char.FightingTargetID == targetID && b.char.inCombat(time.Now())
 }
 
+// SelfPosition returns the last observed placement of the played
+// character.
+func (b *Bot) SelfPosition() (int32, int32, int32, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if b.selfID == 0 {
+		return 0, 0, 0, false
+	}
+
+	return b.char.X, b.char.Y, b.char.Z, true
+}
+
+// SelfSitting reports whether the character is sitting. The hunt loop
+// gates the rest transitions on it because the sit/stand action is a
+// server side toggle.
+func (b *Bot) SelfSitting() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.Sitting
+}
+
+// SelfUnderAttack reports whether the character was hit within the last
+// seconds. The hunt loop uses it to keep the rest logic from sitting
+// down in the middle of a fight it did not start itself.
+func (b *Bot) SelfUnderAttack() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	last := b.char.LastHitAt
+
+	return !last.IsZero() && time.Since(last) < underAttackWindow
+}
+
+// SelfDead reports whether the character died: a known maximum with a
+// zero current HP only happens on death (the server broadcasts
+// StatusUpdate CUR_HP 0 there).
+func (b *Bot) SelfDead() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.MaxHP > 0 && b.char.CurHP <= 0
+}
+
 // ObjectPosition returns the last observed placement of a known object.
 func (b *Bot) ObjectPosition(objectID int32) (int32, int32, int32, bool) {
 	b.mu.RLock()
@@ -368,6 +420,22 @@ func (b *Bot) SetOffline() {
 	b.status = StatusOffline
 	b.touch()
 	b.recordLocked("left the world")
+}
+
+// ResetSession clears the observed world state before a new login. The
+// server starts a fresh known list on every session, so the objects and
+// inventory of a lost session must not leak into the next one. The event
+// log, the packet counter and the session start time survive so the
+// history and the uptime stay continuous across reconnects.
+func (b *Bot) ResetSession() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.selfID = 0
+	b.char = newCharacterState()
+	b.objects = make(map[int32]WorldObject)
+	b.inventory = make(map[int32]InventoryItem)
+	b.status = StatusConnecting
+	b.touch()
 }
 
 // SetCharacter applies the initial character state from CharSelected.
@@ -553,6 +621,7 @@ func (b *Bot) ApplyPawnMovement(m PawnMovement) {
 		b.char.Y = m.TargetY
 		b.char.Z = m.TargetZ
 		b.char.CombatUntil = now.Add(combatWindow)
+		b.char.LastHitAt = now
 		b.touch()
 	}
 	obj, ok := b.objects[m.ObjectID]
@@ -661,6 +730,7 @@ func (b *Bot) ApplyAttack(a Attack) {
 			b.char.Y = a.TargetY
 			b.char.Z = a.TargetZ
 			b.char.CombatUntil = now.Add(combatWindow)
+			b.char.LastHitAt = now
 			b.touch()
 
 			continue
@@ -845,12 +915,16 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
 		return
 	}
 	for _, attr := range attrs {
-		if attr.ID == AttrCurHP {
+		switch attr.ID {
+		case AttrCurHP:
 			obj.CurHP = float64(attr.Value)
 			obj.Dead = attr.Value <= 0
-		}
-		if attr.ID == AttrMaxHP {
+		case AttrMaxHP:
 			obj.MaxHP = float64(attr.Value)
+		case AttrCurMP:
+			obj.CurMP = float64(attr.Value)
+		case AttrMaxMP:
+			obj.MaxMP = float64(attr.Value)
 		}
 	}
 	obj.UpdatedAt = time.Now()
@@ -1063,6 +1137,7 @@ type CharacterSnapshot struct {
 	MaxHP          float64 `json:"maxHp"`
 	CurMP          float64 `json:"curMp"`
 	MaxMP          float64 `json:"maxMp"`
+	Sitting        bool    `json:"sitting"`
 	STR            int32   `json:"str"`
 	DEX            int32   `json:"dex"`
 	CON            int32   `json:"con"`
@@ -1108,6 +1183,8 @@ type ObjectSnapshot struct {
 	MoveAtMs   int64      `json:"moveAtMs"`
 	CurHP      float64    `json:"curHp"`
 	MaxHP      float64    `json:"maxHp"`
+	CurMP      float64    `json:"curMp"`
+	MaxMP      float64    `json:"maxMp"`
 }
 
 // Snapshot is the JSON view of the whole bot state.
@@ -1154,6 +1231,7 @@ func (b *Bot) Snapshot() Snapshot {
 			MaxHP:    b.char.MaxHP,
 			CurMP:    b.char.CurMP,
 			MaxMP:    b.char.MaxMP,
+			Sitting:  b.char.Sitting,
 			STR:      b.char.STR,
 			DEX:      b.char.DEX,
 			CON:      b.char.CON,
@@ -1202,6 +1280,8 @@ func (b *Bot) Snapshot() Snapshot {
 			MoveAtMs:   obj.MoveAt.UnixMilli(),
 			CurHP:      obj.CurHP,
 			MaxHP:      obj.MaxHP,
+			CurMP:      obj.CurMP,
+			MaxMP:      obj.MaxMP,
 		})
 	}
 	snap.Events = appendEvents(
@@ -1236,12 +1316,21 @@ func appendEvents(dst []Event, events []Event, length int, pos int) []Event {
 	return dst
 }
 
-// BotInfo is the compact JSON view used by the bot list endpoint.
+// BotInfo is the compact JSON view used by the bot list endpoint. The
+// vitals and the combat flag let the sidebar show the mini HP/MP/XP bars
+// and the fighting state of every session at a glance.
 type BotInfo struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Status Status `json:"status"`
-	Level  int32  `json:"level"`
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Status     Status  `json:"status"`
+	Level      int32   `json:"level"`
+	CurHP      float64 `json:"curHp"`
+	MaxHP      float64 `json:"maxHp"`
+	CurMP      float64 `json:"curMp"`
+	MaxMP      float64 `json:"maxMp"`
+	ExpPercent float64 `json:"expPercent"`
+	InCombat   bool    `json:"inCombat"`
+	Sitting    bool    `json:"sitting"`
 }
 
 // Info returns the compact bot description.
@@ -1250,10 +1339,17 @@ func (b *Bot) Info() BotInfo {
 	defer b.mu.RUnlock()
 
 	return BotInfo{
-		ID:     b.id,
-		Name:   b.char.Name,
-		Status: b.status,
-		Level:  b.char.Level,
+		ID:         b.id,
+		Name:       b.char.Name,
+		Status:     b.status,
+		Level:      b.char.Level,
+		CurHP:      b.char.CurHP,
+		MaxHP:      b.char.MaxHP,
+		CurMP:      b.char.CurMP,
+		MaxMP:      b.char.MaxMP,
+		ExpPercent: ExpPercent(b.char.Level, int64(b.char.Exp)),
+		InCombat:   b.char.inCombat(time.Now()),
+		Sitting:    b.char.Sitting,
 	}
 }
 
