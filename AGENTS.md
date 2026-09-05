@@ -281,6 +281,9 @@ the same variables).
   free mode (follow unchecked or a map drag) pins the view to a pan
   anchor captured at the moment follow was disabled and never moves on
   its own, so the map shows the chosen area regardless of bot movement.
+  Dragging grabs the map like a sheet of paper: the camera moves by
+  `-Δcursor / scale` in world units, so the grabbed world point stays
+  exactly under the cursor.
 - Map rendering: every unit (character, mob, player) is a circle with a
   short look direction tick from the center over the edge (L2Bot2.0
   style), colored by threat: friendly gray, passive monster green,
