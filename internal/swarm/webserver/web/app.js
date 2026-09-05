@@ -106,18 +106,69 @@ function renderBotList() {
     const item = document.createElement("li");
     item.className = "bot-item" + (bot.id === App.activeBotId ? " active" : "");
     item.dataset.id = bot.id;
+
+    const row = document.createElement("div");
+    row.className = "bot-row";
     const dot = document.createElement("span");
     dot.className = "dot " + bot.status;
     const name = document.createElement("span");
     name.className = "bot-name";
     name.textContent = bot.name || bot.id;
+    row.append(dot, name);
+    if (bot.inCombat) {
+      row.append(makeChip("bot-chip chip-combat", "combat"));
+    }
+    if (bot.sitting) {
+      row.append(makeChip("bot-chip chip-rest", "rest"));
+    }
     const level = document.createElement("span");
     level.className = "bot-level";
     level.textContent = bot.level > 0 ? "lv " + bot.level : bot.status;
-    item.append(dot, name, level);
+    row.append(level);
+    item.append(row);
+
+    // The mini HP/MP/XP bars share the HUD palette: one look at the
+    // sidebar shows what every session is doing.
+    if (bot.status === "online") {
+      item.append(buildMiniBars(bot));
+    }
+
     item.addEventListener("click", () => selectBot(bot.id));
     list.append(item);
   }
+}
+
+// makeChip renders one small status chip.
+function makeChip(className, label) {
+  const chip = document.createElement("span");
+  chip.className = className;
+  chip.textContent = label;
+
+  return chip;
+}
+
+// buildMiniBars renders the compact HP/MP/XP bar trio of a bot row.
+function buildMiniBars(bot) {
+  const bars = document.createElement("div");
+  bars.className = "bot-bars";
+  const kinds = [
+    ["hp", bot.curHp, bot.maxHp],
+    ["mp", bot.curMp, bot.maxMp],
+    ["xp", bot.expPercent, 100]
+  ];
+  for (const [kind, cur, max] of kinds) {
+    const bar = document.createElement("div");
+    bar.className = "mini-bar";
+    bar.title = kind + " " + Math.round(cur || 0) + "/" + Math.round(max || 0);
+    const fill = document.createElement("div");
+    fill.className = "mini-fill " + kind;
+    const percent = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
+    fill.style.width = percent.toFixed(1) + "%";
+    bar.append(fill);
+    bars.append(bar);
+  }
+
+  return bars;
 }
 
 // Switch the observed bot and reopen the event stream.
@@ -167,13 +218,15 @@ function renderSnapshot() {
   const snap = App.snapshot;
   if (!snap) { return; }
   renderHUD(snap);
+  renderTarget(snap);
   renderLog(snap);
   renderFooter(snap);
   MapView.update(snap);
 }
 
 // Character status rendering on the map HUD: the map is the single source
-// of truth for the bot state.
+// of truth for the bot state. The target lives in its own panel next to
+// the character one, so long target names never break the layout.
 function renderHUD(snap) {
   const c = snap.character;
   document.getElementById("hud-name").textContent = c.name || snap.id;
@@ -186,16 +239,16 @@ function renderHUD(snap) {
   document.getElementById("hud-sp").textContent = formatNumber(c.sp);
   document.getElementById("hud-combat").classList
     .toggle("hidden", !c.inCombat);
+  document.getElementById("hud-rest").classList
+    .toggle("hidden", !c.sitting);
 
-  setVital("hp", c.curHp, c.maxHp);
-  setVital("mp", c.curMp, c.maxMp);
+  setVital("hp", c.curHp, c.maxHp, c.maxHp > 0);
+  setVital("mp", c.curMp, c.maxMp, c.maxMp > 0);
   setExpVital(c.expPercent);
 
   document.getElementById("pos-x").textContent = c.x;
   document.getElementById("pos-y").textContent = c.y;
   document.getElementById("pos-z").textContent = c.z;
-  document.getElementById("hud-target").textContent =
-    targetNameOf(snap, c.targetId);
   document.getElementById("hud-slots").textContent =
     (c.inventorySlots || 0) + "/" + (c.inventoryMax || 80);
   document.getElementById("hud-weight").textContent =
@@ -205,32 +258,49 @@ function renderHUD(snap) {
   document.getElementById("hud-adena").textContent = formatNumber(c.adena);
 }
 
-// targetNameOf resolves the display name of the bot target. A dead,
-// removed or otherwise unresolvable id means the bot has no target
-// anymore (the tracker clears killed targets, the server does not): it
-// must read as a status, not as a dangling object reference.
-function targetNameOf(snap, targetId) {
-  if (!targetId) { return "no target"; }
-  if (targetId === (snap.character && snap.character.objectId)) {
-    return snap.character.name || "self";
-  }
-  const target = (snap.objects || []).find(
-    (obj) => obj.objectId === targetId && !obj.dead);
+// Target panel rendering: resolves the current target object and shows
+// its name, level and vitals. A dead, removed or missing target reads
+// as "no target": the tracker clears killed targets because the server
+// never does.
+function renderTarget(snap) {
+  const panel = document.getElementById("hud-target");
+  const c = snap.character;
+  const targetId = c ? c.targetId : 0;
+  const target = targetId
+    ? (snap.objects || []).find(
+      (obj) => obj.objectId === targetId && !obj.dead)
+    : null;
+  const name = document.getElementById("target-name");
+  const level = document.getElementById("target-level");
+  panel.classList.toggle("no-target", !target);
   if (target) {
-    return target.name
-      + (target.kind === "npc" && target.level > 0
-        ? " (" + target.level + ")" : "");
+    name.textContent = target.name || ("object " + target.objectId);
+    const hasLevel = target.kind === "npc" && target.level > 0;
+    level.textContent = hasLevel ? "lv " + target.level : "";
+    level.classList.toggle("hidden", !hasLevel);
+    setVital("target-hp", target.curHp, target.maxHp, target.maxHp > 0);
+    setVital("target-mp", target.curMp, target.maxMp, target.maxMp > 0);
+  } else {
+    name.textContent = "no target";
+    level.classList.add("hidden");
+    setVital("target-hp", 0, 0, false);
+    setVital("target-mp", 0, 0, false);
   }
-
-  return "no target";
 }
 
-function setVital(kind, cur, max) {
+function setVital(kind, cur, max, known) {
+  const fill = document.getElementById(kind + "-fill");
+  const text = document.getElementById(kind + "-text");
+  if (!known) {
+    fill.style.width = "0%";
+    text.textContent = "—";
+
+    return;
+  }
   const maxN = max > 0 ? max : 1;
   const percent = Math.max(0, Math.min(100, (cur / maxN) * 100));
-  document.getElementById(kind + "-fill").style.width = percent.toFixed(1) + "%";
-  document.getElementById(kind + "-text").textContent =
-    Math.round(cur) + "/" + Math.round(max);
+  fill.style.width = percent.toFixed(1) + "%";
+  text.textContent = Math.round(cur) + "/" + Math.round(max);
 }
 
 // setExpVital renders the experience bar: the fill is the percentage of

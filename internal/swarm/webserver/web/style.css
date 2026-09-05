@@ -30,6 +30,15 @@ SPDX-License-Identifier: MIT
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --shadow: 0 1px 3px rgba(20, 30, 45, 0.12);
+  /* Vital bar palette of the classic L2 C1 client, shared by the HUD
+     bars and the sidebar mini bars: red HP, blue MP and the light
+     silver experience bar (gold is the CP color of later chronicles). */
+  --grad-hp: linear-gradient(to bottom,
+    #f04040 0%, #c00000 45%, #8b0000 100%);
+  --grad-mp: linear-gradient(to bottom,
+    #40a0ff 0%, #2060c0 45%, #103080 100%);
+  --grad-xp: linear-gradient(to bottom,
+    #f4f4f4 0%, #c7cbd1 45%, #9096a0 100%);
 }
 
 html[data-theme="dark"] {
@@ -72,12 +81,12 @@ body {
   height: 100vh;
 }
 
-/* Header */
+/* Header: one compact row with the brand, the tabs and the live state,
+   so the working area keeps as much height as possible. */
 .app-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 42px;
+  height: 34px;
   padding: 0 14px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
@@ -88,14 +97,42 @@ body {
 .brand-mark {
   font-family: var(--mono);
   font-weight: 700;
-  font-size: 16px;
-  letter-spacing: 4px;
+  font-size: 13px;
+  letter-spacing: 2px;
   color: var(--accent);
 }
 
 .brand-sub { color: var(--text-dim); font-size: 11px; }
 
-.header-right { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); }
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: 16px;
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-family: var(--sans);
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.tab:hover { color: var(--text); background: var(--bg-panel-2); }
+
+.tab.active { color: var(--accent); background: var(--bg-panel-2); }
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
 
 .theme-btn {
   width: 28px;
@@ -140,10 +177,7 @@ body {
 .bot-list { list-style: none; overflow-y: auto; flex: 1; }
 
 .bot-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   cursor: pointer;
   border-left: 2px solid transparent;
 }
@@ -153,6 +187,12 @@ body {
 .bot-item.active {
   background: var(--bg-panel-2);
   border-left-color: var(--accent);
+}
+
+.bot-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .bot-item .dot {
@@ -173,6 +213,57 @@ body {
 }
 
 .bot-item .bot-level { color: var(--text-dim); font-size: 11px; }
+
+/* Mini vital bars of the sidebar rows: the same red/blue/silver palette
+   as the HUD bars, so the overview reads in one visual language. */
+.bot-bars {
+  display: flex;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.mini-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+
+.mini-fill { height: 100%; width: 0%; }
+.mini-fill.hp { background: var(--grad-hp); }
+.mini-fill.mp { background: var(--grad-mp); }
+.mini-fill.xp { background: var(--grad-xp); }
+
+/* Status chips: fighting (red) and resting (green) use the same
+   bordered chip style everywhere. */
+.hud-chip {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.chip-combat { color: var(--red); border: 1px solid var(--red); }
+.chip-rest { color: var(--green); border: 1px solid var(--green); }
+.chip-level { color: var(--text); border: 1px solid var(--border); }
+
+.bot-chip {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border-radius: 3px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.bot-chip.chip-combat { color: var(--red); border: 1px solid var(--red); }
+.bot-chip.chip-rest { color: var(--green); border: 1px solid var(--green); }
+
+.hidden { display: none; }
 
 .sidebar-foot { padding: 10px 12px; border-top: 1px solid var(--border-soft); }
 .sidebar-foot .sidebar-title { padding: 0 0 8px; }
@@ -205,36 +296,6 @@ body {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-}
-
-.tabs {
-  display: flex;
-  gap: 2px;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
-  padding: 4px 8px 0;
-}
-
-.tab {
-  background: transparent;
-  border: 1px solid transparent;
-  border-bottom: none;
-  color: var(--text-dim);
-  font-family: var(--sans);
-  font-size: 12px;
-  padding: 6px 16px;
-  cursor: pointer;
-  border-radius: 4px 4px 0 0;
-}
-
-.tab:hover { color: var(--text); }
-
-.tab.active {
-  background: var(--bg);
-  color: var(--accent);
-  border-color: var(--border);
-  position: relative;
-  top: 1px;
 }
 
 .tab-content { display: none; flex: 1; min-height: 0; overflow: auto; }
@@ -302,45 +363,48 @@ body {
   font-weight: 700;
 }
 
-/* Status HUD on the map: the map is the source of truth. */
-.hud {
+/* Status HUD on the map: the map is the source of truth. The character
+   panel and the target panel share one vertical stack on the top left,
+   so the pair reads as a unit and never scatters over the map. */
+.hud-stack {
   position: absolute;
   top: 10px;
   left: 12px;
   width: 252px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 4;
+}
+
+.hud {
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 6px;
   box-shadow: var(--shadow);
   padding: 10px 12px;
-  z-index: 4;
 }
 
 .hud-head { margin-bottom: 10px; }
 
-.hud-name-row { display: flex; align-items: center; gap: 8px; }
+.hud-name-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
 .hud-name {
   font-size: 17px;
   font-weight: 600;
   color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.hud-combat {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--red);
-  border: 1px solid var(--red);
-  border-radius: 3px;
-  padding: 1px 5px;
-}
-
-.hud-combat.hidden { display: none; }
+.hud-name-small { font-size: 14px; }
 
 .hud-class { color: var(--accent); font-size: 12px; margin-top: 2px; }
 
 .vitals { display: grid; gap: 8px; margin-bottom: 10px; }
+
+.vitals-target { margin-bottom: 0; }
 
 .vital-row { display: grid; grid-template-columns: 24px 1fr 64px; align-items: center; gap: 8px; }
 
@@ -356,29 +420,43 @@ body {
   overflow: hidden;
 }
 
-/* Vital bars use the classic L2 C1 palette (HP red, MP blue, EXP gold)
-   with the light-top/dark-bottom cylindrical gradient of the original
-   client; the colors are theme independent, only the track adapts. */
+/* Vital bars reuse the shared classic L2 C1 palette (HP red, MP blue,
+   XP light silver) defined in the theme variables; the colors are theme
+   independent, only the track adapts. */
 .bar-fill {
   height: 100%;
   width: 0%;
   transition: width 0.4s ease;
 }
 
-.bar.hp .bar-fill {
-  background: linear-gradient(to bottom,
-    #f04040 0%, #c00000 45%, #8b0000 100%);
+.bar.hp .bar-fill { background: var(--grad-hp); }
+
+.bar.mp .bar-fill { background: var(--grad-mp); }
+
+.bar.xp .bar-fill { background: var(--grad-xp); }
+
+/* Target panel: shows who the bot currently selected, with its name,
+   level and vitals. Without a target (killed, removed or none) it dims
+   into the explicit "no target" state. */
+.hud-target-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
-.bar.mp .bar-fill {
-  background: linear-gradient(to bottom,
-    #40a0ff 0%, #2060c0 45%, #103080 100%);
+.hud-panel-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
 
-.bar.xp .bar-fill {
-  background: linear-gradient(to bottom,
-    #ffe9a0 0%, #d4af37 45%, #8b6508 100%);
-}
+.hud-target .hud-name-row { flex: 1; min-width: 0; }
+
+.hud-target.no-target .hud-name { color: var(--text-dim); font-style: italic; font-weight: 400; }
+
+.hud-target.no-target .bar-fill { width: 0% !important; }
 
 .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
 

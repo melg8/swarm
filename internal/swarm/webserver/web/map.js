@@ -21,8 +21,7 @@ const MapView = {
   ctx: null,
   tooltip: null,
   scale: 0.12,
-  offsetX: 0,
-  offsetY: 0,
+  panAnchor: { x: 0, y: 0 },
   drag: null,
   hover: null,
   lastSnap: null,
@@ -56,7 +55,12 @@ const MapView = {
       .addEventListener("click", () => this.zoom(1.5));
     document.getElementById("zoom-out")
       .addEventListener("click", () => this.zoom(1 / 1.5));
-    for (const id of ["follow", "show-labels", "show-dest", "show-zone", "show-targets"]) {
+    const follow = document.getElementById("follow");
+    follow.addEventListener("change", () => {
+      if (!follow.checked) { this.syncPanAnchor(); }
+      this.draw();
+    });
+    for (const id of ["show-labels", "show-dest", "show-zone", "show-targets"]) {
       document.getElementById(id).addEventListener("change", () => {
         this.draw();
       });
@@ -140,13 +144,27 @@ const MapView = {
     this.drag = { x: event.clientX, y: event.clientY };
   },
 
+  // Dragging pans the view: following is switched off and the pan anchor
+  // takes over from the character position without a visual jump. While
+  // follow is off the camera never moves on its own: the map shows the
+  // chosen area even when the bot walks away.
   onDragMove(event) {
     if (!this.drag) { return; }
-    document.getElementById("follow").checked = false;
-    this.offsetX += event.clientX - this.drag.x;
-    this.offsetY += event.clientY - this.drag.y;
+    if (this.followEnabled()) {
+      document.getElementById("follow").checked = false;
+      this.syncPanAnchor();
+    }
+    this.panAnchor.x += event.clientX - this.drag.x;
+    this.panAnchor.y += event.clientY - this.drag.y;
     this.drag = { x: event.clientX, y: event.clientY };
     this.draw();
+  },
+
+  // syncPanAnchor anchors the free camera at the current character
+  // position, so disabling follow never jumps the view.
+  syncPanAnchor() {
+    const pos = this.charPos();
+    this.panAnchor = { x: pos.x, y: pos.y };
   },
 
   // ---- movement interpolation ----
@@ -724,30 +742,25 @@ const MapView = {
 
   // ---- transforms ----
 
-  // World to screen transform. Follow mode centers on the character.
+  // World to screen transform. Follow mode centers on the character,
+  // free mode stays pinned to the pan anchor.
   worldToScreen(wx, wy) {
     const rect = this.canvas.getBoundingClientRect();
     const cx = rect.width / 2;
     const cy = rect.height / 2;
-    let originX = cx;
-    let originY = cy;
-    if (!this.followEnabled() && this.lastSnap) {
-      originX += this.offsetX;
-      originY += this.offsetY;
-    }
 
     return {
-      x: originX + (wx - this.centerX()) * this.scale,
-      y: originY + (wy - this.centerY()) * this.scale
+      x: cx + (wx - this.centerX()) * this.scale,
+      y: cy + (wy - this.centerY()) * this.scale
     };
   },
 
   centerX() {
-    return this.followEnabled() ? this.charPos().x : this.panCenterX();
+    return this.followEnabled() ? this.charPos().x : this.panAnchor.x;
   },
 
   centerY() {
-    return this.followEnabled() ? this.charPos().y : this.panCenterY();
+    return this.followEnabled() ? this.charPos().y : this.panAnchor.y;
   },
 
   charPos() {
@@ -756,14 +769,6 @@ const MapView = {
     if (rt) { return { x: rt.drawX, y: rt.drawY }; }
 
     return { x: this.lastSnap.character.x, y: this.lastSnap.character.y };
-  },
-
-  panCenterX() {
-    return this.panAnchor ? this.panAnchor.x : this.charPos().x;
-  },
-
-  panCenterY() {
-    return this.panAnchor ? this.panAnchor.y : this.charPos().y;
   },
 
   followEnabled() {

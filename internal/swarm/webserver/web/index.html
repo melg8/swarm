@@ -18,8 +18,12 @@ SPDX-License-Identifier: MIT
   <header class="app-header">
     <div class="brand">
       <span class="brand-mark">SWARM</span>
-      <span class="brand-sub">bot control center</span>
+      <span class="brand-sub">bot control</span>
     </div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="map">Map</button>
+      <button class="tab" data-tab="log">Log</button>
+    </nav>
     <div class="header-right">
       <span id="live-indicator" class="live-dot offline" title="event stream state"></span>
       <span id="live-label">connecting</span>
@@ -52,11 +56,6 @@ SPDX-License-Identifier: MIT
     </aside>
 
     <main class="main">
-      <nav class="tabs">
-        <button class="tab active" data-tab="map">Map</button>
-        <button class="tab" data-tab="log">Log</button>
-      </nav>
-
       <section id="tab-map" class="tab-content active">
         <div class="map-toolbar">
           <button id="zoom-out" class="btn" title="zoom out">−</button>
@@ -74,43 +73,67 @@ SPDX-License-Identifier: MIT
           <div id="map-tooltip" class="map-tooltip hidden"></div>
           <div class="map-rose"><span class="rose-n">N</span></div>
 
-          <div id="hud" class="hud">
-            <div class="hud-head">
-              <div class="hud-name-row">
-                <span id="hud-name" class="hud-name">—</span>
-                <span id="hud-combat" class="hud-combat hidden">combat</span>
+          <div class="hud-stack">
+            <div id="hud" class="hud">
+              <div class="hud-head">
+                <div class="hud-name-row">
+                  <span id="hud-name" class="hud-name">—</span>
+                  <span id="hud-combat" class="hud-chip chip-combat hidden">combat</span>
+                  <span id="hud-rest" class="hud-chip chip-rest hidden">rest</span>
+                </div>
+                <div id="hud-class" class="hud-class">—</div>
               </div>
-              <div id="hud-class" class="hud-class">—</div>
+              <div class="vitals">
+                <div class="vital-row">
+                  <span class="vital-label">HP</span>
+                  <div class="bar hp"><div id="hp-fill" class="bar-fill"></div></div>
+                  <span id="hp-text" class="vital-text">0/0</span>
+                </div>
+                <div class="vital-row">
+                  <span class="vital-label">MP</span>
+                  <div class="bar mp"><div id="mp-fill" class="bar-fill"></div></div>
+                  <span id="mp-text" class="vital-text">0/0</span>
+                </div>
+                <div class="vital-row">
+                  <span class="vital-label">XP</span>
+                  <div class="bar xp"><div id="xp-fill" class="bar-fill"></div></div>
+                  <span id="xp-text" class="vital-text">0%</span>
+                </div>
+              </div>
+              <div class="kv-grid hud-grid">
+                <div class="kv"><span>level</span><b id="hud-level">—</b></div>
+                <div class="kv"><span>race</span><b id="hud-race">—</b></div>
+                <div class="kv"><span>x</span><b id="pos-x">—</b></div>
+                <div class="kv"><span>y</span><b id="pos-y">—</b></div>
+                <div class="kv"><span>z</span><b id="pos-z">—</b></div>
+                <div class="kv"><span>exp</span><b id="hud-exp">—</b></div>
+                <div class="kv"><span>sp</span><b id="hud-sp">—</b></div>
+                <div class="kv"><span>slots</span><b id="hud-slots">—</b></div>
+                <div class="kv"><span>weight</span><b id="hud-weight">—</b></div>
+                <div class="kv"><span>adena</span><b id="hud-adena">—</b></div>
+              </div>
             </div>
-            <div class="vitals">
-              <div class="vital-row">
-                <span class="vital-label">HP</span>
-                <div class="bar hp"><div id="hp-fill" class="bar-fill"></div></div>
-                <span id="hp-text" class="vital-text">0/0</span>
+
+            <div id="hud-target" class="hud hud-target no-target">
+              <div class="hud-target-head">
+                <span class="hud-panel-label">target</span>
+                <div class="hud-name-row">
+                  <span id="target-name" class="hud-name hud-name-small">no target</span>
+                  <span id="target-level" class="hud-chip chip-level hidden">—</span>
+                </div>
               </div>
-              <div class="vital-row">
-                <span class="vital-label">MP</span>
-                <div class="bar mp"><div id="mp-fill" class="bar-fill"></div></div>
-                <span id="mp-text" class="vital-text">0/0</span>
+              <div class="vitals vitals-target">
+                <div class="vital-row">
+                  <span class="vital-label">HP</span>
+                  <div class="bar hp"><div id="target-hp-fill" class="bar-fill"></div></div>
+                  <span id="target-hp-text" class="vital-text">—</span>
+                </div>
+                <div class="vital-row">
+                  <span class="vital-label">MP</span>
+                  <div class="bar mp"><div id="target-mp-fill" class="bar-fill"></div></div>
+                  <span id="target-mp-text" class="vital-text">—</span>
+                </div>
               </div>
-              <div class="vital-row">
-                <span class="vital-label">XP</span>
-                <div class="bar xp"><div id="xp-fill" class="bar-fill"></div></div>
-                <span id="xp-text" class="vital-text">0%</span>
-              </div>
-            </div>
-            <div class="kv-grid hud-grid">
-              <div class="kv"><span>level</span><b id="hud-level">—</b></div>
-              <div class="kv"><span>race</span><b id="hud-race">—</b></div>
-              <div class="kv"><span>x</span><b id="pos-x">—</b></div>
-              <div class="kv"><span>y</span><b id="pos-y">—</b></div>
-              <div class="kv"><span>z</span><b id="pos-z">—</b></div>
-              <div class="kv"><span>target</span><b id="hud-target">—</b></div>
-              <div class="kv"><span>exp</span><b id="hud-exp">—</b></div>
-              <div class="kv"><span>sp</span><b id="hud-sp">—</b></div>
-              <div class="kv"><span>slots</span><b id="hud-slots">—</b></div>
-              <div class="kv"><span>weight</span><b id="hud-weight">—</b></div>
-              <div class="kv"><span>adena</span><b id="hud-adena">—</b></div>
             </div>
           </div>
         </div>
