@@ -83,6 +83,12 @@ tasks:
     cmds:
       - go test ./... --cover --count=1
 
+  repro:map:
+    desc: Runs the web map target link and marker harness
+    aliases: [repmap]
+    cmds:
+      - node tools/repro_map_render.js
+
   repro:movement:
     desc: Runs the web map movement reproduction harness
     aliases: [repm]

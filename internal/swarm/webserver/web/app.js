@@ -189,13 +189,11 @@ function renderHUD(snap) {
 
   setVital("hp", c.curHp, c.maxHp);
   setVital("mp", c.curMp, c.maxMp);
+  setExpVital(c.expPercent);
 
   document.getElementById("pos-x").textContent = c.x;
   document.getElementById("pos-y").textContent = c.y;
   document.getElementById("pos-z").textContent = c.z;
-  const deg = headingDegrees(c.heading);
-  document.getElementById("pos-heading").textContent =
-    deg + "° " + headingCardinal(c.heading);
   document.getElementById("hud-target").textContent =
     targetNameOf(snap, c.targetId);
   document.getElementById("hud-slots").textContent =
@@ -207,20 +205,24 @@ function renderHUD(snap) {
   document.getElementById("hud-adena").textContent = formatNumber(c.adena);
 }
 
-// targetNameOf resolves the display name of the bot target.
+// targetNameOf resolves the display name of the bot target. A dead,
+// removed or otherwise unresolvable id means the bot has no target
+// anymore (the tracker clears killed targets, the server does not): it
+// must read as a status, not as a dangling object reference.
 function targetNameOf(snap, targetId) {
-  if (!targetId) { return "—"; }
+  if (!targetId) { return "no target"; }
   if (targetId === (snap.character && snap.character.objectId)) {
     return snap.character.name || "self";
   }
-  const target = (snap.objects || []).find((obj) => obj.objectId === targetId);
+  const target = (snap.objects || []).find(
+    (obj) => obj.objectId === targetId && !obj.dead);
   if (target) {
     return target.name
       + (target.kind === "npc" && target.level > 0
         ? " (" + target.level + ")" : "");
   }
 
-  return "object " + targetId;
+  return "no target";
 }
 
 function setVital(kind, cur, max) {
@@ -229,6 +231,16 @@ function setVital(kind, cur, max) {
   document.getElementById(kind + "-fill").style.width = percent.toFixed(1) + "%";
   document.getElementById(kind + "-text").textContent =
     Math.round(cur) + "/" + Math.round(max);
+}
+
+// setExpVital renders the experience bar: the fill is the percentage of
+// the experience gathered toward the next level (computed by the bot
+// from the C1 experience table).
+function setExpVital(expPercent) {
+  const percent = Math.max(0, Math.min(100, expPercent || 0));
+  document.getElementById("xp-fill").style.width = percent.toFixed(1) + "%";
+  document.getElementById("xp-text").textContent =
+    percent >= 99.95 ? "100%" : percent.toFixed(1) + "%";
 }
 
 // Log panel rendering with incremental append.

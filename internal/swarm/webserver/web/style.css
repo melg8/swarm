@@ -356,22 +356,52 @@ body {
   overflow: hidden;
 }
 
+/* Vital bars use the classic L2 C1 palette (HP red, MP blue, EXP gold)
+   with the light-top/dark-bottom cylindrical gradient of the original
+   client; the colors are theme independent, only the track adapts. */
 .bar-fill {
   height: 100%;
   width: 0%;
   transition: width 0.4s ease;
-  background: var(--green);
 }
 
-.bar.mp .bar-fill { background: var(--blue); }
+.bar.hp .bar-fill {
+  background: linear-gradient(to bottom,
+    #f04040 0%, #c00000 45%, #8b0000 100%);
+}
+
+.bar.mp .bar-fill {
+  background: linear-gradient(to bottom,
+    #40a0ff 0%, #2060c0 45%, #103080 100%);
+}
+
+.bar.xp .bar-fill {
+  background: linear-gradient(to bottom,
+    #ffe9a0 0%, #d4af37 45%, #8b6508 100%);
+}
 
 .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
 
-.kv { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dotted var(--border-soft); }
+.kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 0;
+  border-bottom: 1px dotted var(--border-soft);
+}
 
-.kv span { color: var(--text-dim); font-size: 11px; }
+.kv span { color: var(--text-dim); font-size: 11px; flex-shrink: 0; }
 
-.kv b { font-family: var(--mono); font-weight: 400; color: var(--text-bright); }
+.kv b {
+  font-family: var(--mono);
+  font-weight: 400;
+  color: var(--text-bright);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
 
 /* Log tab */
 .log-toolbar {

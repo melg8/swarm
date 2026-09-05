@@ -354,7 +354,7 @@ const MapView = {
 
     this.drawGrid(ctx, rect);
     this.drawZone(ctx, rect);
-    this.drawTargetLink(ctx);
+    this.drawTargetLinks(ctx);
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
     this.updateMapInfo();
@@ -481,24 +481,35 @@ const MapView = {
     return obj.inCombat && c && obj.targetId === c.objectId;
   },
 
-  // drawTargetLink renders the current target of the bot: a line from
-  // the character to the target and a dashed ring around it, like the
-  // target markers of the L2Bot map.
-  drawTargetLink(ctx) {
+  // drawTargetLinks renders the selection links of the map: the own
+  // target of the bot (red dashed line and ring, like the L2Bot target
+  // markers) and the targets of the other visible players (violet
+  // links). The selections of other players matter for the swarm: a
+  // mob already selected by someone else is claimed (attacking it
+  // trains the mob on the wrong character), and a player targeting
+  // the bot itself is worth noticing immediately.
+  drawTargetLinks(ctx) {
     if (!document.getElementById("show-targets").checked) { return; }
     const snap = this.lastSnap;
     const c = snap.character;
-    if (!c || !c.x || !c.targetId) { return; }
-    const target = (snap.objects || []).find(
+    if (!c || !c.x) { return; }
+    this.drawOwnTargetLink(ctx, c);
+    for (const obj of snap.objects || []) {
+      if (obj.kind === "player" && obj.targetId) {
+        this.drawPlayerTargetLink(ctx, obj, c);
+      }
+    }
+  },
+
+  // drawOwnTargetLink renders the target the bot selected: a red
+  // dashed line from the character to the target and a ring around it.
+  drawOwnTargetLink(ctx, c) {
+    if (!c.targetId) { return; }
+    const target = (this.lastSnap.objects || []).find(
       (obj) => obj.objectId === c.targetId);
     if (!target) { return; }
-    const selfRt = this.runtime.get("self");
-    const from = this.worldToScreen(
-      selfRt ? selfRt.drawX : c.x, selfRt ? selfRt.drawY : c.y);
-    const rt = this.runtime.get(target.objectId);
-    const to = this.worldToScreen(
-      rt ? rt.drawX : target.x, rt ? rt.drawY : target.y);
-
+    const from = this.screenPosOf("self", c.x, c.y);
+    const to = this.screenPosOf(target.objectId, target.x, target.y);
     ctx.save();
     ctx.strokeStyle = this.colors.combat;
     ctx.globalAlpha = 0.75;
@@ -520,6 +531,61 @@ const MapView = {
     ctx.arc(to.x, to.y, radius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
+  },
+
+  // drawPlayerTargetLink renders the selection of another visible
+  // player: a violet dashed line to the target and a violet dashed
+  // ring around it. The target may be the bot itself (the ring then
+  // circles the self marker) or any known object; unknown ids (the
+  // target left the loaded zone) are skipped.
+  drawPlayerTargetLink(ctx, player, c) {
+    const snap = this.lastSnap;
+    let target = null;
+    let self = false;
+    if (player.targetId === c.objectId) {
+      target = c;
+      self = true;
+    } else {
+      target = (snap.objects || []).find(
+        (obj) => obj.objectId === player.targetId);
+    }
+    if (!target) { return; }
+    const from = this.screenPosOf(player.objectId, player.x, player.y);
+    const to = this.screenPosOf(
+      self ? "self" : target.objectId, target.x, target.y);
+
+    ctx.save();
+    ctx.strokeStyle = this.colors.player;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1.25;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    const radius = (self ? 7 : radiusOf(target, threatOf(target))) + 5;
+    ctx.save();
+    ctx.strokeStyle = this.colors.player;
+    ctx.globalAlpha = 0.75;
+    ctx.lineWidth = 1.25;
+    ctx.setLineDash([3, 2]);
+    ctx.beginPath();
+    ctx.arc(to.x, to.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  },
+
+  // screenPosOf resolves the screen position of the runtime
+  // interpolated position of an object, falling back to the snapshot
+  // position.
+  screenPosOf(key, x, y) {
+    const rt = this.runtime.get(key);
+
+    return this.worldToScreen(rt ? rt.drawX : x, rt ? rt.drawY : y);
   },
 
   drawSelf(ctx) {
@@ -602,6 +668,7 @@ const MapView = {
       obj.title ? obj.title : "",
       threatLabel(obj, this.isAttackingMe(obj))
         + (obj.kind === "npc" && obj.level > 0 ? " · lv " + obj.level : ""),
+      obj.targetId ? "targets: " + this.displayNameOf(obj.targetId) : "",
       "pos: " + Math.round(obj.x) + " " + Math.round(obj.y) + " " + Math.round(obj.z),
       "facing: " + deg + "° " + cardinalOf(obj.heading),
       obj.kind !== "item" && obj.maxHp > 0
@@ -629,6 +696,25 @@ const MapView = {
     const y = Math.min(my + 14, wrap.height - 130);
     this.tooltip.style.left = x + "px";
     this.tooltip.style.top = y + "px";
+  },
+
+  // displayNameOf resolves the label of a target id for tooltips: the
+  // name of a known object (with the npc level), the own name of the
+  // bot or a plain object reference.
+  displayNameOf(objectId) {
+    if (this.lastSnap.character
+      && objectId === this.lastSnap.character.objectId) {
+      return this.lastSnap.character.name || "self";
+    }
+    const target = (this.lastSnap.objects || []).find(
+      (obj) => obj.objectId === objectId);
+    if (target) {
+      return target.name
+        + (target.kind === "npc" && target.level > 0
+          ? " (" + target.level + ")" : "");
+    }
+
+    return "object " + objectId;
   },
 
   hideTooltip() {
@@ -836,11 +922,11 @@ function drawUnitTick(ctx, x, y, heading, radius, fill, tick, opts) {
     ctx.setLineDash([]);
   }
 
-  // The look direction tick from the center over the edge.
-  const inner = radius * 0.2;
-  const outer = radius + 4;
+  // The look direction tick, drawn only outside the circle: the circle
+  // body is a solid color fill and the heading ray starts at the edge.
+  const outer = radius + 4.5;
   ctx.beginPath();
-  ctx.moveTo(x + Math.cos(angle) * inner, y + Math.sin(angle) * inner);
+  ctx.moveTo(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius);
   ctx.lineTo(x + Math.cos(angle) * outer, y + Math.sin(angle) * outer);
   ctx.lineWidth = 2;
   ctx.lineCap = "round";
