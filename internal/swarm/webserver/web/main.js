@@ -8,6 +8,7 @@ SPDX-License-Identifier: MIT
 
 // Boot the web interface.
 window.addEventListener("DOMContentLoaded", () => {
+  initTheme();
   initTabs();
   MapView.init();
   refreshBots();
@@ -31,6 +32,7 @@ function initTabs() {
         content.classList.toggle("active", content.id === "tab-" + name);
       }
       if (name === "map") {
+        MapView.refreshColors();
         MapView.resize();
       }
     });

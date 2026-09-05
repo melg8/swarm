@@ -212,39 +212,79 @@ connectivity issues:
 The bot embeds a web UI (`internal/swarm/webserver`, files in `web/`)
 served from the bot process itself, so it is reachable exactly while the
 bot runs. It follows the classic bot tool layout (L2Walker/Adrenaline
-style: compact dark window, top tabs, left bot list, bottom status bar)
-and is designed for many bots: the bot registry enumerates every session,
-the sidebar lists them and clicking switches the observed bot.
+style: compact window, top tabs, left bot list, bottom status bar) and is
+designed for many bots: the bot registry enumerates every session, the
+sidebar lists them and clicking switches the observed bot. The light
+theme is the default, a header button toggles to a dark theme (both are
+CSS variable sets on `html[data-theme]`; the canvas reads its colors from
+the same variables).
 
-- Tabs: Status (character card, HP/MP bars, position, compass with the
-  facing direction, stats), Map (canvas world map with a direction arrow
-  and view cone for the character and heading arrows for every npc/player
-  like the L2Bot2.0 map, zoom, follow mode, labels, paths, hover tooltip),
-  Log (rolling event feed with a filter).
+- Tabs: Map is the source of truth: the character status lives as a HUD
+  panel on the canvas (name, class, level, HP/MP bars, position, facing,
+  combat badge, exp/sp) and the world is drawn around it; Log is the
+  rolling event feed with a filter.
+- Map rendering: every unit (character, mob, player) is a circle with a
+  short look direction tick from the center over the edge (L2Bot2.0
+  style), colored by threat: friendly gray, passive monster green,
+  aggressive amber, fighting red, dead gray-faded, players violet, self
+  blue with an accent ring; ground items are gold diamonds. The dashed
+  square is the server loaded zone: the 3x3 world region block (region
+  size 2048, `World.broadcastPacket` reaches exactly these regions)
+  around the character region - the server only spawns/updates objects
+  inside it, and it scales with zoom like every world element.
+- Movement interpolation: the server broadcasts MoveToLocation at most
+  once per second per moving creature, so the client runs a
+  requestAnimationFrame loop that advances every object from its last
+  packet position toward the destination at `runSpd * moveMultiplier`
+  world units per second (both come from NpcInfo; the fallback speed is
+  120), clamps at the destination, corrects the clock against the
+  snapshot `serverTimeMs` and exponentially smooths position jumps.
+  The played character is interpolated the same way from its own
+  movement broadcasts.
+- Heading semantics (Mobius `LocationUtil.calculateHeadingFrom`):
+  `atan2(dy, dx) * 65535 / 2pi`, 0 faces east, the angle grows clockwise
+  because world y points south. The server announces arrival with a zero
+  distance MoveToLocation (current == destination): keep the previous
+  heading in that case, never recompute it (the delta is zero and would
+  point every mob east - this was a real bug).
 - Endpoints: `GET /api/bots` (list), `GET /api/bots/{id}/state` (full JSON
   snapshot), `GET /api/bots/{id}/events` (SSE stream that pushes a
   snapshot whenever the bot state version changes), `GET /` and the
   static assets.
 - The state tracker (`internal/swarm/state`) is fed by the game session
   from these packets: UserInfo (self vitals), CharInfo (players), NpcInfo
-  (npcs with heading and attackable flag), DropItem (ground items),
-  MoveToLocation/StopMove/ValidateLocation (movement and heading),
-  StatusUpdate (vitals changes), DeleteObject (removals). Unknown packets
-  land in the event log.
-- Heading semantics (Mobius `LocationUtil.calculateHeadingFrom`):
-  `atan2(dy, dx) * 65535 / 2pi`, 0 faces east, the angle grows clockwise
-  because world y points south; the map draws arrows rotated by
-  `heading * 2pi / 65536` from an east pointing shape.
+  (npcs with heading, speeds, move multiplier, running/dead/combat flags
+  and the attackable flag), DropItem (ground items), MoveToLocation,
+  MoveToPawn (chasing attackers: stop point at distance from the target,
+  marks combat and the target reference), StopMove/ValidateLocation
+  (placement and heading), Attack 0x06 (attacker position, hit targets:
+  marks combat for both sides), AutoAttackStart 0x3B/AutoAttackStop 0x3C
+  (auto attack flags), StatusUpdate (vitals changes, dead when hp is 0),
+  DeleteObject (removals). Unknown packets land in the event log. The
+  combat window is 10 seconds after the last fight packet.
+- Threat data: the npc level, `aggroRange` and `isAggressive` ai flags
+  come from the generated `internal/swarm/npcdata` maps (the C1 data
+  pack marks every monster `isAggressive=false`: they only defend).
 - The server sends NpcInfo names empty for most npcs (the classic client
   resolves them from NPCName-e.dat by display template id). The bot
   resolves them through `internal/swarm/npcdata`, generated from the
   Mobius data files by `tools/generate_npc_names.sh` (npc: template id
-  - 1000000 -> CT0_to_C4_ids.txt -> stats/npcs/*.xml; item: stats/items).
-  Regenerate after Mobius updates.
+  - 1000000 -> CT0_to_C4_ids.txt -> stats/npcs/*.xml with name, level,
+  ai aggroRange/isAggressive; item: stats/items). Regenerate after
+  Mobius updates.
+- `-attack-nearest` is a debug flag of `cmd/swarm`: it keeps attacking
+  the closest attackable npc (RequestAttack 0x0A) every 3 seconds. It is
+  used to verify the combat visualization live.
 - The web UI is plain HTML/CSS/JS without a build step; keep it that way
   (embedded via go:embed). Watch out: top level `const` declarations are
   not `window` properties, so cross script references must use the bare
   binding name.
+
+Sandbox signal pitfall: non-interactive bash starts background jobs with
+SIGINT/SIGQUIT set to SIG_IGN, and Go cannot catch a signal that was
+ignored on exec - `kill -INT $bgpid` silently does nothing. Run bots
+that must exit gracefully in the foreground behind
+`timeout -s INT Ns ./bot` (that is what `tools/mobius_e2e.sh` does).
 
 ## Code conventions
 

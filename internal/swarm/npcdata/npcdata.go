@@ -23,6 +23,36 @@ func NPCName(templateID int32) string {
 	return npcNames[templateID-npcTemplateOffset]
 }
 
+// NPCLevel resolves the level of an npc by the raw NpcInfo template id.
+// It returns zero when the template is unknown.
+func NPCLevel(templateID int32) int32 {
+	if templateID <= npcTemplateOffset {
+		return 0
+	}
+
+	return npcLevels[templateID-npcTemplateOffset]
+}
+
+// NPCAggroRange resolves the ai aggroRange of an npc by the raw NpcInfo
+// template id. It returns zero when the template is unknown or passive.
+func NPCAggroRange(templateID int32) int32 {
+	if templateID <= npcTemplateOffset {
+		return 0
+	}
+
+	return npcAggroRanges[templateID-npcTemplateOffset]
+}
+
+// NPCIsAggressive resolves the ai isAggressive flag of an npc by the raw
+// NpcInfo template id: aggressive npcs attack players on sight.
+func NPCIsAggressive(templateID int32) bool {
+	if templateID <= npcTemplateOffset {
+		return false
+	}
+
+	return npcAggressives[templateID-npcTemplateOffset]
+}
+
 // ItemName resolves the name of a ground item by its display id. It
 // returns an empty string when the item is unknown.
 func ItemName(displayID int32) string {

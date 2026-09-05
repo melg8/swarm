@@ -61,6 +61,28 @@ function formatDuration(fromISO, untilISO) {
   return pad(hours) + ":" + pad(minutes) + ":" + pad(secs);
 }
 
+// ---- theme ----
+
+// applyTheme switches the color scheme and persists the choice. The light
+// theme is the default.
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  window.localStorage.setItem("swarm.theme", theme);
+  const icon = document.getElementById("theme-icon");
+  if (icon) { icon.textContent = theme === "dark" ? "☾" : "☀"; }
+  window.dispatchEvent(new Event("themechange"));
+}
+
+function initTheme() {
+  const saved = window.localStorage.getItem("swarm.theme");
+  applyTheme(saved === "dark" ? "dark" : "light");
+  document.getElementById("theme-toggle").addEventListener("click", () => {
+    const current = document.documentElement.dataset.theme === "dark"
+      ? "dark" : "light";
+    applyTheme(current === "dark" ? "light" : "dark");
+  });
+}
+
 // Fetch the bot list and keep the sidebar in sync.
 async function refreshBots() {
   try {
@@ -144,23 +166,26 @@ function setLive(live) {
 function renderSnapshot() {
   const snap = App.snapshot;
   if (!snap) { return; }
-  renderStatus(snap);
+  renderHUD(snap);
   renderLog(snap);
   renderFooter(snap);
   MapView.update(snap);
 }
 
-// Status panel rendering.
-function renderStatus(snap) {
+// Character status rendering on the map HUD: the map is the single source
+// of truth for the bot state.
+function renderHUD(snap) {
   const c = snap.character;
-  document.getElementById("char-name").textContent = c.name || snap.id;
-  document.getElementById("char-class").textContent =
+  document.getElementById("hud-name").textContent = c.name || snap.id;
+  document.getElementById("hud-class").textContent =
     CLASS_NAMES[c.classId] || ("class " + c.classId);
-  document.getElementById("char-race").textContent =
+  document.getElementById("hud-race").textContent =
     RACE_NAMES[c.race] || ("race " + c.race);
-  document.getElementById("char-level").textContent = c.level;
-  document.getElementById("char-exp").textContent = formatNumber(c.exp);
-  document.getElementById("char-sp").textContent = formatNumber(c.sp);
+  document.getElementById("hud-level").textContent = c.level;
+  document.getElementById("hud-exp").textContent = formatNumber(c.exp);
+  document.getElementById("hud-sp").textContent = formatNumber(c.sp);
+  document.getElementById("hud-combat").classList
+    .toggle("hidden", !c.inCombat);
 
   setVital("hp", c.curHp, c.maxHp);
   setVital("mp", c.curMp, c.maxMp);
@@ -171,15 +196,6 @@ function renderStatus(snap) {
   const deg = headingDegrees(c.heading);
   document.getElementById("pos-heading").textContent =
     deg + "° " + headingCardinal(c.heading);
-  const arrow = document.getElementById("compass-arrow");
-  arrow.style.transform = "rotate(" + (deg + 90) + "deg)";
-
-  document.getElementById("stat-str").textContent = c.str;
-  document.getElementById("stat-dex").textContent = c.dex;
-  document.getElementById("stat-con").textContent = c.con;
-  document.getElementById("stat-int").textContent = c.int;
-  document.getElementById("stat-wit").textContent = c.wit;
-  document.getElementById("stat-men").textContent = c.men;
 }
 
 function setVital(kind, cur, max) {
@@ -238,6 +254,7 @@ function logLineClass(message) {
     || message.startsWith("item dropped") || message.startsWith("entered")) {
     return "spawn";
   }
+  if (message.includes("combat")) { return "combat"; }
   if (message.startsWith("object removed") || message.startsWith("left")) {
     return "remove";
   }

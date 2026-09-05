@@ -46,11 +46,15 @@ const (
 const (
 	moveToLocationID   = 0x01
 	charInfoID         = 0x03
+	attackID           = 0x06
 	dropItemID         = 0x16
 	statusUpdateID     = 0x1A
 	deleteObjectID     = 0x1E
 	npcInfoID          = 0x22
+	autoAttackStartID  = 0x3B
+	autoAttackStopID   = 0x3C
 	stopMoveID         = 0x59
+	moveToPawnID       = 0x75
 	validateLocationID = 0x76
 )
 
@@ -87,11 +91,15 @@ type GameClient struct {
 	userInfo    fromgameserver.UserInfoPacket
 	charInfo    fromgameserver.CharInfoPacket
 	moveTo      fromgameserver.MoveToLocationPacket
+	moveToPawn  fromgameserver.MoveToPawnPacket
 	stopMove    fromgameserver.StopMovePacket
 	validateLoc fromgameserver.ValidateLocationPacket
 	deleted     fromgameserver.DeleteObjectPacket
 	dropItem    fromgameserver.DropItemPacket
 	statusUpd   fromgameserver.StatusUpdatePacket
+	attack      fromgameserver.AttackPacket
+	attackStart fromgameserver.AutoAttackStartPacket
+	attackStop  fromgameserver.AutoAttackStopPacket
 	statusAttrs [statusAttrsCapacity]state.Attribute
 }
 
@@ -188,6 +196,32 @@ func (gc *GameClient) SetTracker(tracker *state.Bot) {
 // PacketCount returns the number of packets received so far.
 func (gc *GameClient) PacketCount() int {
 	return int(gc.packetCount.Load())
+}
+
+// attackNearestRange bounds the search radius of the attack helper.
+const attackNearestRange = 1500
+
+// AttackNearest sends an attack request against the closest attackable
+// npc around the character. It reports whether a target was attacked.
+func (gc *GameClient) AttackNearest() (bool, error) {
+	if gc.tracker == nil {
+		return false, nil
+	}
+	target, ok := gc.tracker.NearestAttackable(attackNearestRange)
+	if !ok {
+		return false, nil
+	}
+	request := togameserver.NewAttackRequestPacket()
+	request.TargetID = target.ObjectID
+	request.X = target.X
+	request.Y = target.Y
+	request.Z = target.Z
+	if err := gc.sendPacket(request); err != nil {
+		return false, fmt.Errorf("failed to attack: %w", err)
+	}
+	gc.tracker.RecordEvent("attacking " + target.Name)
+
+	return true, nil
 }
 
 // sendPacket serializes, encrypts and sends a game server packet.
@@ -562,9 +596,12 @@ func (gc *GameClient) handleServerPacket(payload []byte) {
 }
 
 // handleWorldPacket dispatches the packets that carry the observed world
-// state: characters, npcs, items and movement.
+// state: characters, npcs, items, movement and combat.
 func (gc *GameClient) handleWorldPacket(payload []byte) {
 	if gc.handleObjectPacket(payload) {
+		return
+	}
+	if gc.handleCombatPacket(payload) {
 		return
 	}
 	gc.handlePlacementPacket(payload)
@@ -596,6 +633,8 @@ func (gc *GameClient) handlePlacementPacket(payload []byte) {
 	switch payload[0] {
 	case moveToLocationID:
 		gc.applyMoveToLocation(payload)
+	case moveToPawnID:
+		gc.applyMoveToPawn(payload)
 	case stopMoveID:
 		gc.applyStopMove(payload)
 	case validateLocationID:
@@ -605,6 +644,23 @@ func (gc *GameClient) handlePlacementPacket(payload []byte) {
 	default:
 		gc.logUnknownPacket(payload)
 	}
+}
+
+// handleCombatPacket dispatches the combat state packets. It reports
+// whether the packet was consumed.
+func (gc *GameClient) handleCombatPacket(payload []byte) bool {
+	switch payload[0] {
+	case attackID:
+		gc.applyAttack(payload)
+	case autoAttackStartID:
+		gc.applyAutoAttackStart(payload)
+	case autoAttackStopID:
+		gc.applyAutoAttackStop(payload)
+	default:
+		return false
+	}
+
+	return true
 }
 
 // logUnknownPacket reports an unobserved packet to the console and the
@@ -677,17 +733,21 @@ func (gc *GameClient) applyNpcInfo(payload []byte) {
 	if gc.tracker != nil {
 		info := gc.npcInfo
 		gc.tracker.ApplyNpcInfo(state.NpcInfo{
-			ObjectID:   info.ObjectID,
-			TemplateID: info.TemplateID,
-			Attackable: info.Attackable,
-			X:          info.X,
-			Y:          info.Y,
-			Z:          info.Z,
-			Heading:    info.Heading,
-			Running:    info.Running,
-			InCombat:   info.InCombat,
-			Name:       info.Name,
-			Title:      info.Title,
+			ObjectID:      info.ObjectID,
+			TemplateID:    info.TemplateID,
+			Attackable:    info.Attackable,
+			X:             info.X,
+			Y:             info.Y,
+			Z:             info.Z,
+			Heading:       info.Heading,
+			RunSpeed:      info.RunSpeed,
+			WalkSpeed:     info.WalkSpeed,
+			MoveSpeedMult: info.MoveSpeedMult,
+			Running:       info.Running,
+			InCombat:      info.InCombat,
+			Dead:          info.Dead,
+			Name:          info.Name,
+			Title:         info.Title,
 		})
 	}
 	gc.logger.Printf("NPC %s spawned at %d %d %d heading %d",
@@ -833,5 +893,78 @@ func (gc *GameClient) applyStatusUpdate(payload []byte) {
 			attrs = append(attrs, state.Attribute{ID: id, Value: value})
 		})
 		gc.tracker.ApplyStatusUpdate(gc.statusUpd.ObjectID, attrs)
+	}
+}
+
+// applyAttack parses Attack and updates the combat state.
+func (gc *GameClient) applyAttack(payload []byte) {
+	if err := fromgameserver.ParseAttackPacket(&gc.attack, payload); err != nil {
+		gc.logger.Printf("Failed to parse attack: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		attack := state.Attack{
+			AttackerID:  gc.attack.AttackerID,
+			X:           gc.attack.X,
+			Y:           gc.attack.Y,
+			Z:           gc.attack.Z,
+			TargetIDs:   [4]int32{},
+			TargetCount: gc.attack.HitCount,
+		}
+		for i := range min(gc.attack.HitCount, state.AttackTargets) {
+			attack.TargetIDs[i] = gc.attack.Hits[i].TargetID
+		}
+		gc.tracker.ApplyAttack(attack)
+	}
+}
+
+// applyAutoAttackStart parses AutoAttackStart and marks combat.
+func (gc *GameClient) applyAutoAttackStart(payload []byte) {
+	if err := fromgameserver.ParseAutoAttackStartPacket(
+		&gc.attackStart, payload); err != nil {
+		gc.logger.Printf("Failed to parse auto attack start: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		gc.tracker.ApplyAutoAttackStart(gc.attackStart.ObjectID)
+	}
+}
+
+// applyAutoAttackStop parses AutoAttackStop and clears combat.
+func (gc *GameClient) applyAutoAttackStop(payload []byte) {
+	if err := fromgameserver.ParseAutoAttackStopPacket(
+		&gc.attackStop, payload); err != nil {
+		gc.logger.Printf("Failed to parse auto attack stop: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		gc.tracker.ApplyAutoAttackStop(gc.attackStop.ObjectID)
+	}
+}
+
+// applyMoveToPawn parses MoveToPawn and updates the chasing object.
+func (gc *GameClient) applyMoveToPawn(payload []byte) {
+	if err := fromgameserver.ParseMoveToPawnPacket(
+		&gc.moveToPawn, payload); err != nil {
+		gc.logger.Printf("Failed to parse move to pawn: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		move := gc.moveToPawn
+		gc.tracker.ApplyPawnMovement(state.PawnMovement{
+			ObjectID: move.ObjectID,
+			TargetID: move.TargetID,
+			Distance: move.Distance,
+			X:        move.X,
+			Y:        move.Y,
+			Z:        move.Z,
+			TargetX:  move.TargetX,
+			TargetY:  move.TargetY,
+			TargetZ:  move.TargetZ,
+		})
 	}
 }

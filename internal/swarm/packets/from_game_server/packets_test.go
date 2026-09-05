@@ -40,6 +40,14 @@ func putFloat64(dst []byte, value float64) []byte {
 	return append(dst, buf[:]...)
 }
 
+// putInt16 appends a little endian int16 value.
+func putInt16(dst []byte, value int16) []byte {
+	var buf [2]byte
+	binary.LittleEndian.PutUint16(buf[:], uint16(value)) //nolint:gosec // test
+
+	return append(dst, buf[:]...)
+}
+
 func TestParseKeyPacket(t *testing.T) {
 	t.Run("accepted protocol", func(t *testing.T) {
 		data := []byte{0x00}

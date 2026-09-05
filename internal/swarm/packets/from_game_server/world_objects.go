@@ -15,6 +15,7 @@ import (
 
 const (
 	moveToLocationPacketID   = 0x01
+	moveToPawnPacketID       = 0x75
 	stopMovePacketID         = 0x59
 	validateLocationPacketID = 0x76
 	deleteObjectPacketID     = 0x1E
@@ -58,6 +59,54 @@ func ParseMoveToLocationPacket(p *MoveToLocationPacket, data []byte) error {
 	if err := readInt32Fields(reader,
 		&p.ObjectID, &p.DestX, &p.DestY, &p.DestZ, &p.X, &p.Y, &p.Z); err != nil {
 		return fmt.Errorf("failed to read movement: %w", err)
+	}
+
+	return nil
+}
+
+// MoveToPawnPacket announces a creature chasing a target to a stop
+// distance, used instead of MoveToLocation by attacking mobs.
+// Wire format (see MoveToPawn.writeImpl): [opcode 0x75][objectId: 4]
+// [targetId: 4][distance: 4][x: 4][y: 4][z: 4][targetX: 4][targetY: 4]
+// [targetZ: 4].
+type MoveToPawnPacket struct {
+	ObjectID int32
+	TargetID int32
+	Distance int32
+	X        int32
+	Y        int32
+	Z        int32
+	TargetX  int32
+	TargetY  int32
+	TargetZ  int32
+}
+
+// NewMoveToPawnPacket creates a zero valued packet ready for parsing.
+func NewMoveToPawnPacket() *MoveToPawnPacket {
+	return &MoveToPawnPacket{
+		ObjectID: 0,
+		TargetID: 0,
+		Distance: 0,
+		X:        0,
+		Y:        0,
+		Z:        0,
+		TargetX:  0,
+		TargetY:  0,
+		TargetZ:  0,
+	}
+}
+
+// ParseMoveToPawnPacket reads the packet from payload bytes.
+func ParseMoveToPawnPacket(p *MoveToPawnPacket, data []byte) error {
+	reader := packet.NewReader(data)
+
+	if err := expectPacketID(reader, moveToPawnPacketID); err != nil {
+		return err
+	}
+	if err := readInt32Fields(reader,
+		&p.ObjectID, &p.TargetID, &p.Distance,
+		&p.X, &p.Y, &p.Z, &p.TargetX, &p.TargetY, &p.TargetZ); err != nil {
+		return fmt.Errorf("failed to read pawn movement: %w", err)
 	}
 
 	return nil

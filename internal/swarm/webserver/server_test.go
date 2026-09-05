@@ -5,6 +5,7 @@
 package webserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -12,12 +13,56 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/stretchr/testify/require"
 )
+
+// syncRecorder is a thread safe response writer: the event stream test
+// reads the body while the stream goroutine keeps writing.
+type syncRecorder struct {
+	mu   sync.Mutex
+	code int
+	buf  bytes.Buffer
+	hdr  http.Header
+}
+
+func newSyncRecorder() *syncRecorder {
+	//nolint:exhaustruct // the zero values are the point
+	return &syncRecorder{hdr: http.Header{}}
+}
+
+// Header implements http.ResponseWriter.
+func (r *syncRecorder) Header() http.Header { return r.hdr }
+
+// Write implements http.ResponseWriter.
+func (r *syncRecorder) Write(p []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.buf.Write(p) //nolint:wrapcheck // test helper
+}
+
+// WriteHeader implements http.ResponseWriter.
+func (r *syncRecorder) WriteHeader(code int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.code = code
+}
+
+// Flush implements http.Flusher.
+func (r *syncRecorder) Flush() {}
+
+// String returns the accumulated body under the lock.
+func (r *syncRecorder) String() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.buf.String()
+}
 
 // newTestServer builds a server with one bot in a known state.
 func newTestServer(t *testing.T) (*Server, *state.Bot) {
@@ -105,7 +150,7 @@ func TestStaticAssetServed(t *testing.T) {
 func TestEventsStreamDeliversSnapshots(t *testing.T) {
 	server, bot := newTestServer(t)
 
-	recorder := httptest.NewRecorder()
+	recorder := newSyncRecorder()
 	request := httptest.NewRequest(
 		http.MethodGet, "/api/bots/test1/events", nil)
 	done := make(chan struct{})
@@ -114,20 +159,24 @@ func TestEventsStreamDeliversSnapshots(t *testing.T) {
 		defer close(done)
 		server.httpServer.Handler.ServeHTTP(recorder, request)
 	}()
+	t.Cleanup(func() {
+		server.shutdown()
+		<-done
+	})
 
 	// Wait for the initial snapshot, then bump the state and read again.
 	require.Eventually(t, func() bool {
-		return recorder.Body.String() != ""
+		return recorder.String() != ""
 	}, 2*time.Second, 20*time.Millisecond)
 
 	//nolint:exhaustruct // spawn fields only
 	bot.ApplyNpcInfo(state.NpcInfo{ObjectID: 8, Name: "Orc"})
 
 	require.Eventually(t, func() bool {
-		return len(recorder.Body.String()) > 100
+		return len(recorder.String()) > 100
 	}, 2*time.Second, 50*time.Millisecond)
 
-	body := recorder.Body.String()
+	body := recorder.String()
 	require.Contains(t, body, "event: snapshot")
 	require.Contains(t, body, "data: ")
 	require.Contains(t, body, `"id":"test1"`)

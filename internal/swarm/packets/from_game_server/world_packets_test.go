@@ -20,8 +20,14 @@ func TestParseNpcInfoPacket(t *testing.T) {
 		data = putInt32(data, 50000)
 		data = putInt32(data, -3500)
 		data = putInt32(data, 16384)
-		data = append(data, make([]byte, npcInfoSkippedBytes)...)
-		data = append(data, 1, 1, 0, 0, 0) // flags
+		// speed lead: unknown int, mAtkSpd, pAtkSpd.
+		data = append(data, make([]byte, npcInfoSpeedLead)...)
+		data = putInt32(data, 165) // run speed
+		data = putInt32(data, 55)  // walk speed
+		data = append(data, make([]byte, npcInfoSpeedTrail)...)
+		data = putFloat64(data, 1.15) // move multiplier
+		data = append(data, make([]byte, npcInfoAppearanceTail)...)
+		data = append(data, 1, 1, 0, 1, 0) // flags: running, dead
 		data = append(data, utf16("Keltir")...)
 		data = append(data, utf16("")...)
 
@@ -35,8 +41,12 @@ func TestParseNpcInfoPacket(t *testing.T) {
 		require.Equal(t, int32(50000), p.Y)
 		require.Equal(t, int32(-3500), p.Z)
 		require.Equal(t, int32(16384), p.Heading)
+		require.Equal(t, int32(165), p.RunSpeed)
+		require.Equal(t, int32(55), p.WalkSpeed)
+		require.InDelta(t, 1.15, p.MoveSpeedMult, 0.0001)
 		require.True(t, p.Running)
 		require.False(t, p.InCombat)
+		require.True(t, p.Dead)
 		require.Equal(t, "Keltir", p.Name)
 	})
 
@@ -53,6 +63,119 @@ func TestParseNpcInfoPacket(t *testing.T) {
 
 		p := NewNpcInfoPacket()
 		err := ParseNpcInfoPacket(p, data)
+		require.Error(t, err)
+	})
+}
+
+func TestParseAttackPacket(t *testing.T) {
+	t.Run("full packet", func(t *testing.T) {
+		data := []byte{0x06}
+		data = putInt32(data, 268473919) // attacker
+		data = putInt32(data, 268473100) // target
+		data = putInt32(data, 42)        // damage
+		data = append(data, 0x01)        // flags
+		data = putInt32(data, 45000)
+		data = putInt32(data, 50000)
+		data = putInt32(data, -3500)
+		data = putInt16(data, 1) // one more hit
+		data = putInt32(data, 268473100)
+		data = putInt32(data, 7)
+		data = append(data, 0x00)
+		data = putInt32(data, 45100)
+		data = putInt32(data, 50100)
+		data = putInt32(data, -3400)
+
+		p := NewAttackPacket()
+		err := ParseAttackPacket(p, data)
+		require.NoError(t, err)
+		require.Equal(t, int32(268473919), p.AttackerID)
+		require.Equal(t, int32(45000), p.X)
+		require.Equal(t, int32(50000), p.Y)
+		require.Equal(t, int32(-3500), p.Z)
+		require.Equal(t, 2, p.HitCount)
+		require.Equal(t, int32(268473100), p.Hits[0].TargetID)
+		require.Equal(t, int32(42), p.Hits[0].Damage)
+		require.Equal(t, int32(7), p.Hits[1].Damage)
+		require.Equal(t, int32(45100), p.TargetX)
+		require.Equal(t, int32(50100), p.TargetY)
+	})
+
+	t.Run("wrong packet id", func(t *testing.T) {
+		p := NewAttackPacket()
+		err := ParseAttackPacket(p, []byte{0x07})
+		require.Error(t, err)
+	})
+
+	t.Run("implausible hit count", func(t *testing.T) {
+		data := []byte{0x06}
+		data = putInt32(data, 1)
+		data = putInt32(data, 2)
+		data = putInt32(data, 3)
+		data = append(data, 0x00)
+		data = putInt32(data, 0)
+		data = putInt32(data, 0)
+		data = putInt32(data, 0)
+		data = putInt16(data, -5)
+		data = putInt32(data, 0)
+		data = putInt32(data, 0)
+		data = putInt32(data, 0)
+
+		p := NewAttackPacket()
+		err := ParseAttackPacket(p, data)
+		require.Error(t, err)
+	})
+}
+
+func TestParseAutoAttackPackets(t *testing.T) {
+	t.Run("start", func(t *testing.T) {
+		p := NewAutoAttackStartPacket()
+		err := ParseAutoAttackStartPacket(
+			p, append([]byte{0x3B}, putInt32(nil, 77)...))
+		require.NoError(t, err)
+		require.Equal(t, int32(77), p.ObjectID)
+	})
+
+	t.Run("stop", func(t *testing.T) {
+		p := NewAutoAttackStopPacket()
+		err := ParseAutoAttackStopPacket(
+			p, append([]byte{0x3C}, putInt32(nil, 77)...))
+		require.NoError(t, err)
+		require.Equal(t, int32(77), p.ObjectID)
+	})
+
+	t.Run("wrong packet id", func(t *testing.T) {
+		p := NewAutoAttackStopPacket()
+		err := ParseAutoAttackStopPacket(p, []byte{0x3B, 0, 0, 0, 0})
+		require.Error(t, err)
+	})
+}
+
+func TestParseMoveToPawnPacket(t *testing.T) {
+	t.Run("full packet", func(t *testing.T) {
+		data := []byte{0x75}
+		data = putInt32(data, 268473919) // attacker
+		data = putInt32(data, 268473100) // target
+		data = putInt32(data, 40)        // distance
+		data = putInt32(data, 45000)
+		data = putInt32(data, 50000)
+		data = putInt32(data, -3500)
+		data = putInt32(data, 45200)
+		data = putInt32(data, 50200)
+		data = putInt32(data, -3400)
+
+		p := NewMoveToPawnPacket()
+		err := ParseMoveToPawnPacket(p, data)
+		require.NoError(t, err)
+		require.Equal(t, int32(268473919), p.ObjectID)
+		require.Equal(t, int32(268473100), p.TargetID)
+		require.Equal(t, int32(40), p.Distance)
+		require.Equal(t, int32(45000), p.X)
+		require.Equal(t, int32(50200), p.TargetY)
+	})
+
+	t.Run("truncated", func(t *testing.T) {
+		p := NewMoveToPawnPacket()
+		err := ParseMoveToPawnPacket(p, []byte{0x75, 1, 2, 3})
 		require.Error(t, err)
 	})
 }
@@ -286,4 +409,33 @@ func TestParseStatusUpdatePacket(t *testing.T) {
 		require.Equal(t, int32(0), p.Attributes[0].ID)
 		require.Equal(t, int32(7), p.Attributes[7].ID)
 	})
+}
+
+func TestParseAttackPacketReuseResetsHits(t *testing.T) {
+	build := func() []byte {
+		data := []byte{0x06}
+		data = putInt32(data, 268473919)
+		data = putInt32(data, 268473100)
+		data = putInt32(data, 42)
+		data = append(data, 0x01)
+		data = putInt32(data, 45000)
+		data = putInt32(data, 50000)
+		data = putInt32(data, -3500)
+		data = putInt16(data, 0)
+		data = putInt32(data, 45100)
+		data = putInt32(data, 50100)
+		data = putInt32(data, -3400)
+
+		return data
+	}
+
+	p := NewAttackPacket()
+	require.NoError(t, ParseAttackPacket(p, build()))
+	require.Equal(t, 1, p.HitCount)
+	// The same scratch packet parses the next attack: the hit count
+	// must not accumulate.
+	require.NoError(t, ParseAttackPacket(p, build()))
+	require.Equal(t, 1, p.HitCount)
+	require.NoError(t, ParseAttackPacket(p, build()))
+	require.Equal(t, 1, p.HitCount)
 }

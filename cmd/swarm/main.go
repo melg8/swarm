@@ -43,20 +43,22 @@ const (
 )
 
 type config struct {
-	loginAddress string
-	account      string
-	password     string
-	charName     string
-	webAddress   string
+	loginAddress  string
+	account       string
+	password      string
+	charName      string
+	webAddress    string
+	attackNearest bool
 }
 
 func parseFlags() config {
 	cfg := config{
-		loginAddress: "",
-		account:      "",
-		password:     "",
-		charName:     "",
-		webAddress:   "",
+		loginAddress:  "",
+		account:       "",
+		password:      "",
+		charName:      "",
+		webAddress:    "",
+		attackNearest: false,
 	}
 	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
 		"login server address")
@@ -65,6 +67,8 @@ func parseFlags() config {
 	flag.StringVar(&cfg.charName, "char", defaultCharName, "character name")
 	flag.StringVar(&cfg.webAddress, "web", defaultWebAddress,
 		"web interface address, empty disables it")
+	flag.BoolVar(&cfg.attackNearest, "attack-nearest", false,
+		"debug helper: keep attacking the nearest attackable npc")
 	flag.Parse()
 
 	return cfg
@@ -156,7 +160,31 @@ func runBot(ctx context.Context, cfg config, tracker *state.Bot) error {
 	}
 	log.Println("Character " + cfg.charName + " entered the world")
 
+	if cfg.attackNearest {
+		go attackNearestLoop(ctx, game)
+	}
+
 	return game.Run(ctx, cfg.charName)
+}
+
+// attackPeriod is the refresh rate of the attack helper loop.
+const attackPeriod = 3 * time.Second
+
+// attackNearestLoop keeps attacking the nearest attackable npc while the
+// context runs.
+func attackNearestLoop(ctx context.Context, game *connection.GameClient) {
+	ticker := time.NewTicker(attackPeriod)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if _, err := game.AttackNearest(); err != nil {
+				log.Printf("Attack nearest failed: %v", err)
+			}
+		}
+	}
 }
 
 func main() {

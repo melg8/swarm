@@ -169,3 +169,16 @@ func utf16(value string) []byte {
 
 	return result
 }
+
+func TestAttackRequestToBytes(t *testing.T) {
+	t.Run("full packet", func(t *testing.T) {
+		writer := packet.NewWriter()
+		req := &AttackRequestPacket{
+			TargetID: 268473919, X: 45000, Y: 50000, Z: -3500, Shift: 0,
+		}
+		err := req.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, byte(0x0A), writer.Bytes()[0])
+		require.Len(t, writer.Bytes(), 1+4*4+1)
+	})
+}

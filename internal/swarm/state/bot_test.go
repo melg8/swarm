@@ -108,6 +108,150 @@ func TestSelfMovementUpdatesCharacter(t *testing.T) {
 	require.Empty(t, snap.Objects)
 }
 
+func TestArrivalMovementKeepsHeading(t *testing.T) {
+	bot := NewBot("acc1")
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 0, Y: 0, Z: 0, Name: "Gremlin"})
+
+	// Movement to the south yields heading 90 degrees.
+	bot.ApplyMovement(Movement{
+		ObjectID: 7, X: 0, Y: 0, Z: 0, DestX: 0, DestY: 100, DestZ: 0,
+	})
+	snap := bot.Snapshot()
+	obj := findObject(snap, 7)
+	require.True(t, obj.Moving)
+	require.Equal(t, int32(16384), obj.Heading)
+
+	// The server broadcasts the arrival as a zero distance movement.
+	// The heading must stay at the movement direction, not reset to east.
+	bot.ApplyMovement(Movement{
+		ObjectID: 7, X: 0, Y: 100, Z: 0, DestX: 0, DestY: 100, DestZ: 0,
+	})
+	snap = bot.Snapshot()
+	obj = findObject(snap, 7)
+	require.False(t, obj.Moving)
+	require.Equal(t, int32(16384), obj.Heading)
+	require.Equal(t, int32(0), obj.X)
+	require.Equal(t, int32(100), obj.Y)
+	require.Equal(t, int32(100), obj.DestY)
+}
+
+func TestNpcInfoCarriesSpeedAndAggro(t *testing.T) {
+	bot := NewBot("acc1")
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 7, TemplateID: 1000533, Attackable: true,
+		X: 0, Y: 0, Name: "Keltir",
+		RunSpeed: 165, WalkSpeed: 55, MoveSpeedMult: 1.2, Running: true,
+	})
+
+	snap := bot.Snapshot()
+	obj := findObject(snap, 7)
+	require.True(t, obj.Running)
+	require.InDelta(t, 165*1.2, obj.Speed, 0.001)
+	require.False(t, obj.Aggressive)
+	require.Equal(t, int32(1000), obj.AggroRange)
+	require.Equal(t, int32(2), obj.Level)
+	//nolint:testifylint // Positive is unavailable in testify 1.4
+	require.True(t, snap.ServerTimeMs > 0)
+	//nolint:testifylint // Positive is unavailable in testify 1.4
+	require.True(t, obj.MoveAtMs > 0)
+}
+
+func TestAttackMarksCombat(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 0, Y: 0, Name: "Gremlin"})
+
+	var targets [4]int32
+	targets[0] = 100
+	//nolint:exhaustruct // partial attack fields for the case
+	bot.ApplyAttack(Attack{
+		AttackerID: 7, X: 10, Y: 10, TargetIDs: targets, TargetCount: 1,
+	})
+
+	snap := bot.Snapshot()
+	obj := findObject(snap, 7)
+	require.True(t, obj.InCombat)
+	require.Equal(t, int32(100), obj.TargetID)
+	require.Equal(t, int32(10), obj.X)
+	require.True(t, snap.Character.InCombat)
+
+	// Attacking an unknown object is a no-op.
+	//nolint:exhaustruct // attacker id only
+	bot.ApplyAttack(Attack{AttackerID: 99, TargetCount: 0})
+	require.Len(t, bot.Snapshot().Objects, 1)
+}
+
+func TestAutoAttackFlags(t *testing.T) {
+	bot := NewBot("acc1")
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 0, Y: 0, Name: "Gremlin"})
+
+	bot.ApplyAutoAttackStart(7)
+	obj := findObject(bot.Snapshot(), 7)
+	require.True(t, obj.InCombat)
+
+	bot.ApplyAutoAttackStop(7)
+	snap := bot.Snapshot()
+	obj = findObject(snap, 7)
+	// The combat window keeps the state warm for a moment.
+	require.True(t, obj.InCombat)
+}
+
+func TestPawnMovementChasesTarget(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 500, 500, 0, 50, 30)
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 300, Y: 300, Name: "Orc"})
+
+	bot.ApplyPawnMovement(PawnMovement{
+		ObjectID: 7, TargetID: 100, Distance: 40,
+		X: 300, Y: 300, Z: 0, TargetX: 500, TargetY: 500, TargetZ: 0,
+	})
+
+	snap := bot.Snapshot()
+	obj := findObject(snap, 7)
+	require.True(t, obj.Moving)
+	require.True(t, obj.InCombat)
+	require.Equal(t, int32(100), obj.TargetID)
+	// The destination keeps the stop distance from the target.
+	require.InDelta(t, 500-28, float64(obj.DestX), 2)
+	require.InDelta(t, 500-28, float64(obj.DestY), 2)
+	// The character position is corrected from the target location.
+	require.Equal(t, int32(500), snap.Character.X)
+	// Facing the target to the south east is 45 degrees.
+	require.Equal(t, int32(8192), obj.Heading)
+}
+
+func TestStatusUpdateMarksDead(t *testing.T) {
+	bot := NewBot("acc1")
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{ObjectID: 9, X: 0, Y: 0, Name: "Orc"})
+	bot.ApplyStatusUpdate(9, []Attribute{{ID: AttrCurHP, Value: 0}})
+	obj := findObject(bot.Snapshot(), 9)
+	require.True(t, obj.Dead)
+
+	bot.ApplyStatusUpdate(9, []Attribute{{ID: AttrCurHP, Value: 30}})
+	obj = findObject(bot.Snapshot(), 9)
+	require.False(t, obj.Dead)
+}
+
+func TestEffectiveSpeedFallbacks(t *testing.T) {
+	obj := newWorldObject(1, KindNPC)
+	require.InDelta(t, defaultRunSpeed, obj.EffectiveSpeed(), 0.001)
+
+	obj.RunSpeed = 200
+	obj.WalkSpeed = 60
+	obj.Running = false
+	obj.MoveSpeedMult = 1.5
+	require.InDelta(t, 60*1.5, obj.EffectiveSpeed(), 0.001)
+
+	obj.Running = true
+	require.InDelta(t, 200*1.5, obj.EffectiveSpeed(), 0.001)
+}
+
 func TestRemoveObject(t *testing.T) {
 	bot := NewBot("acc1")
 	//nolint:exhaustruct // partial fields for the case
@@ -304,4 +448,53 @@ func TestSetOffline(t *testing.T) {
 	bot.SetOnline("test1")
 	bot.SetOffline()
 	require.Equal(t, StatusOffline, bot.Status())
+}
+
+func TestNearestAttackable(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+	//nolint:exhaustruct // partial fields for the case
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 7, X: 100, Y: 0, Name: "Gremlin", Attackable: true,
+	})
+	//nolint:exhaustruct // partial fields for the case
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 8, X: 500, Y: 0, Name: "Far", Attackable: true,
+	})
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{ObjectID: 9, X: 50, Y: 0, Name: "Friendly"})
+	// Dead mobs are not attackable.
+	bot.ApplyStatusUpdate(8, []Attribute{{ID: AttrCurHP, Value: 0}})
+
+	target, ok := bot.NearestAttackable(1500)
+	require.True(t, ok)
+	require.Equal(t, int32(7), target.ObjectID)
+	require.Equal(t, "Gremlin", target.Name)
+
+	_, ok = bot.NearestAttackable(50)
+	require.False(t, ok)
+}
+
+func TestSelfMovementTracksDestination(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+
+	bot.ApplyMovement(Movement{
+		ObjectID: 100, X: 0, Y: 0, Z: 0, DestX: 300, DestY: 400, DestZ: 0,
+	})
+	snap := bot.Snapshot()
+	require.True(t, snap.Character.Moving)
+	require.Equal(t, int32(300), snap.Character.DestX)
+	//nolint:testifylint // Positive is unavailable in testify 1.4
+	require.True(t, snap.Character.MoveAtMs > 0)
+
+	// Arrival clears the movement.
+	bot.ApplyMovement(Movement{
+		ObjectID: 100, X: 300, Y: 400, Z: 0, DestX: 300, DestY: 400, DestZ: 0,
+	})
+	snap = bot.Snapshot()
+	require.False(t, snap.Character.Moving)
+	require.Equal(t, int32(300), snap.Character.X)
 }
