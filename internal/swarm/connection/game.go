@@ -69,6 +69,8 @@ const (
 	beginRotationID    = 0x77
 	stopRotationID     = 0x78
 	myTargetSelectedID = 0xBF
+	systemMessageID    = 0x7A
+	socialActionID     = 0x3D
 )
 
 // GameSessionParams carries the login session keys for the game server.
@@ -124,6 +126,8 @@ type GameClient struct {
 	myTarget       fromgameserver.MyTargetSelectedPacket
 	targetSelected fromgameserver.TargetSelectedPacket
 	targetDropped  fromgameserver.TargetUnselectedPacket
+	systemMessage  fromgameserver.SystemMessagePacket
+	socialAction   fromgameserver.SocialActionPacket
 	itemList       fromgameserver.ItemListPacket
 	invUpdate      fromgameserver.InventoryUpdatePacket
 	invItems       []state.InventoryItem
@@ -185,6 +189,8 @@ func NewGameClient(conn net.Conn) (*GameClient, error) {
 		myTarget:       *fromgameserver.NewMyTargetSelectedPacket(),
 		targetSelected: *fromgameserver.NewTargetSelectedPacket(),
 		targetDropped:  *fromgameserver.NewTargetUnselectedPacket(),
+		systemMessage:  *fromgameserver.NewSystemMessagePacket(),
+		socialAction:   *fromgameserver.NewSocialActionPacket(),
 		itemList:       *fromgameserver.NewItemListPacket(),
 		invUpdate:      *fromgameserver.NewInventoryUpdatePacket(),
 		invItems:       nil,
@@ -770,8 +776,50 @@ func (gc *GameClient) handleServerPacket(payload []byte) {
 		gc.logger.Println("Server confirmed leave world")
 	case serverCloseID:
 		gc.logger.Println("Server is closing the connection")
+	case systemMessageID:
+		gc.applySystemMessage(payload)
+	case socialActionID:
+		gc.applySocialAction(payload)
 	default:
 		gc.handleWorldPacket(payload)
+	}
+}
+
+// applySystemMessage parses SystemMessage and forwards the formatted
+// chat line to the tracker.
+func (gc *GameClient) applySystemMessage(payload []byte) {
+	if err := fromgameserver.ParseSystemMessagePacket(
+		&gc.systemMessage, payload); err != nil {
+		gc.logger.Printf("Failed to parse system message: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		message := state.SystemMessage{ID: gc.systemMessage.MessageID}
+		for _, param := range gc.systemMessage.Params {
+			message.Params = append(message.Params, state.ChatMessageParam{
+				Type: param.Type,
+				Int:  param.Int,
+				Text: param.Text,
+			})
+		}
+		gc.tracker.ApplySystemMessage(message)
+	}
+}
+
+// applySocialAction parses SocialAction and forwards it to the tracker.
+func (gc *GameClient) applySocialAction(payload []byte) {
+	if err := fromgameserver.ParseSocialActionPacket(
+		&gc.socialAction, payload); err != nil {
+		gc.logger.Printf("Failed to parse social action: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		gc.tracker.ApplySocialAction(state.SocialAction{
+			ObjectID: gc.socialAction.ObjectID,
+			ActionID: gc.socialAction.ActionID,
+		})
 	}
 }
 

@@ -256,6 +256,9 @@ type Bot struct {
 	events    []Event
 	eventLen  int
 	eventPos  int
+	chatLog   []ChatEvent
+	chatLen   int
+	chatPos   int
 	packets   int64
 	version   uint64
 	started   time.Time
@@ -275,6 +278,9 @@ func NewBot(id string) *Bot {
 		events:    make([]Event, eventCapacity),
 		eventLen:  0,
 		eventPos:  0,
+		chatLog:   make([]ChatEvent, chatCapacity),
+		chatLen:   0,
+		chatPos:   0,
 		packets:   0,
 		version:   0,
 		started:   time.Now(),
@@ -1207,6 +1213,7 @@ type Snapshot struct {
 	Character    CharacterSnapshot `json:"character"`
 	Objects      []ObjectSnapshot  `json:"objects"`
 	Events       []Event           `json:"events"`
+	Chat         []ChatEvent       `json:"chat"`
 	Packets      int64             `json:"packets"`
 	Version      uint64            `json:"version"`
 	ServerTimeMs int64             `json:"serverTimeMs"`
@@ -1260,6 +1267,7 @@ func (b *Bot) Snapshot() Snapshot {
 		},
 		Objects:      make([]ObjectSnapshot, 0, len(b.objects)),
 		Events:       make([]Event, 0, min(b.eventLen, snapshotEvents)),
+		Chat:         make([]ChatEvent, 0, b.chatLen),
 		Packets:      b.packets,
 		Version:      b.version,
 		ServerTimeMs: now.UnixMilli(),
@@ -1301,6 +1309,7 @@ func (b *Bot) Snapshot() Snapshot {
 	}
 	snap.Events = appendEvents(
 		snap.Events, b.events, b.eventLen, b.eventPos)
+	snap.Chat = appendChat(snap.Chat, b.chatLog, b.chatLen, b.chatPos)
 	b.fillInventorySnapshot(&snap)
 
 	return snap
@@ -1318,6 +1327,18 @@ func (b *Bot) fillInventorySnapshot(snap *Snapshot) {
 			snap.Character.Adena += item.Count
 		}
 	}
+}
+
+// appendChat copies the chat window lines out of the ring buffer in
+// chronological order.
+func appendChat(
+	dst []ChatEvent, chat []ChatEvent, length int, pos int,
+) []ChatEvent {
+	for i := 0; i < length; i++ {
+		dst = append(dst, chat[(pos-length+i+chatCapacity)%chatCapacity])
+	}
+
+	return dst
 }
 
 // appendEvents copies the newest events out of the ring buffer.
