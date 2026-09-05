@@ -55,6 +55,7 @@ type WorldObject struct {
 	DestY           int32
 	DestZ           int32
 	MoveAt          time.Time
+	SocialUntil     time.Time
 	CurHP           float64
 	MaxHP           float64
 	CurMP           float64
@@ -93,6 +94,7 @@ func newWorldObject(objectID int32, kind ObjectKind) WorldObject {
 		DestY:           0,
 		DestZ:           0,
 		MoveAt:          time.Time{},
+		SocialUntil:     time.Time{},
 		CurHP:           0,
 		MaxHP:           0,
 		CurMP:           0,

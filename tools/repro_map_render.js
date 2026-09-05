@@ -400,6 +400,47 @@ function runScenarioTargetingBot(mapFile) {
     return results;
 }
 
+// runScenarioSocialMarker covers the social animation marker: a
+// creature with a fresh socialUntilMs shows the small ring above its
+// marker, and the ring fades out once the window is over.
+function runScenarioSocialMarker(mapFile) {
+    const { MapView, record } = loadMapJs(mapFile);
+    MapView.init();
+    const social = buildSnapshot(0, false);
+    const mob = social.objects.find(
+        (o) => o.objectId === WORLD.playerTargetMob.objectId);
+    mob.socialUntilMs = 2000000000000; // far in the future of the stub clock
+    MapView.update(social);
+    MapView.draw();
+
+    const results = [];
+    const pos = {
+        x: CANVAS_W / 2 + (WORLD.playerTargetMob.x - WORLD.self.x)
+            * WORLD.scale,
+        y: CANVAS_H / 2 + (WORLD.playerTargetMob.y - WORLD.self.y)
+            * WORLD.scale
+    };
+    check(results, "social animation draws the ring above the npc",
+        findArc(record, { x: pos.x, y: pos.y - 5 - 7 }, 3.5, null).length > 0,
+        "expected a ring above " + JSON.stringify(pos));
+
+    // Without the marker window there is no ring.
+    const fresh = loadMapJs(mapFile);
+    fresh.MapView.init();
+    const plain = buildSnapshot(0, false);
+    plain.objects.find(
+        (o) => o.objectId === WORLD.playerTargetMob.objectId
+    ).socialUntilMs = 0;
+    fresh.MapView.update(plain);
+    fresh.MapView.draw();
+    check(results, "no social ring without an animation window",
+        fresh.record.strokes.filter((stroke) => stroke.arcs.some(
+            (arc) => Math.abs(arc[2] - 3.5) < 0.1)).length === 0,
+        "unexpected social ring on a plain snapshot");
+
+    return results;
+}
+
 // runScenarioFollowOff covers the follow checkbox: with follow off the
 // camera stays pinned to the chosen area — a fixed world point keeps its
 // screen position while the bot walks away — and with follow on the view
@@ -501,7 +542,8 @@ function main() {
         ["map targets", runScenario(mapFile, verbose)],
         ["player selects the bot", runScenarioTargetingBot(mapFile)],
         ["follow off keeps the view static", runScenarioFollowOff(mapFile)],
-        ["map drag keeps the grabbed point", runScenarioMapDrag(mapFile)]
+        ["map drag keeps the grabbed point", runScenarioMapDrag(mapFile)],
+        ["social animation marker", runScenarioSocialMarker(mapFile)]
     ];
     let failed = 0;
     for (const [name, results] of scenarios) {

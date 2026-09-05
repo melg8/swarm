@@ -19,6 +19,10 @@ const chatCapacity = 64
 // when a character reaches a new level (SocialAction.LEVEL_UP).
 const socialActionLevelUp = 15
 
+// socialWindow is how long a creature keeps the social animation marker
+// on the map after its SocialAction broadcast.
+const socialWindow = 3 * time.Second
+
 // Parameter types of the SystemMessage packet (SystemMessage.java of
 // the Mobius server) that need special rendering.
 const (
@@ -66,26 +70,30 @@ func (b *Bot) ApplySystemMessage(m SystemMessage) {
 		formatChatText(npcdata.SystemMessageText(m.ID), m.Params))
 }
 
-// ApplySocialAction appends a social animation line to the chat window
-// log: level ups of anyone and the idle animations of the creatures
-// around the bot.
+// ApplySocialAction marks the animating creature with a short lived
+// map marker. The idle gestures of the surrounding npcs would spam the
+// chat window, so only level ups - rare and meaningful - become chat
+// lines; every other social interaction is the marker alone.
 func (b *Bot) ApplySocialAction(a SocialAction) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	name := "unknown"
+	now := time.Now()
+	if a.ObjectID == b.selfID {
+		b.char.SocialUntil = now.Add(socialWindow)
+	} else if obj, ok := b.objects[a.ObjectID]; ok {
+		obj.SocialUntil = now.Add(socialWindow)
+		b.objects[a.ObjectID] = obj
+	}
+	if a.ActionID != socialActionLevelUp {
+		return
+	}
+	name := "someone"
 	if a.ObjectID == b.selfID {
 		name = "You"
 	} else if obj, ok := b.objects[a.ObjectID]; ok && obj.Name != "" {
 		name = obj.Name
 	}
-	var text string
-	if a.ActionID == socialActionLevelUp {
-		text = name + " reached a new level"
-	} else {
-		text = name + " plays social animation " +
-			strconv.Itoa(int(a.ActionID))
-	}
-	b.recordChatLocked("social", text)
+	b.recordChatLocked("social", name+" reached a new level")
 }
 
 // recordChatLocked appends one line to the chat ring buffer. The caller

@@ -472,6 +472,8 @@ const MapView = {
             attackingMe: this.isAttackingMe(obj),
             pulse: performance.now()
           });
+        this.drawSocialMarker(ctx, p.x, p.y,
+          radiusOf(obj, threat), obj.socialUntilMs);
       }
       if (showLabels && obj.name) {
         ctx.fillStyle = labelColor(this.colors, threat);
@@ -618,11 +620,30 @@ const MapView = {
     ctx.stroke();
     ctx.globalAlpha = 1;
 
+    this.drawSocialMarker(ctx, p.x, p.y, 7, c.socialUntilMs);
+
     ctx.fillStyle = this.colors.textBright;
     ctx.font = "600 11px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(c.name || "self", p.x, p.y - 15);
     ctx.textAlign = "left";
+  },
+
+  // drawSocialMarker draws a small fading ring above a creature that is
+  // playing a social animation (the SocialAction broadcast): an
+  // unobtrusive hint of who is gesturing without chat spam.
+  drawSocialMarker(ctx, x, y, radius, socialUntilMs) {
+    const nowMs = Date.now() + this.clockOffsetMs;
+    if (!(socialUntilMs > nowMs)) { return; }
+    const frac = Math.min(1, (socialUntilMs - nowMs) / socialWindowMs);
+    ctx.save();
+    ctx.globalAlpha = 0.2 + 0.4 * frac;
+    ctx.strokeStyle = this.colors.textDim;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y - radius - 7, 3.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   },
 
   updateMapInfo() {
@@ -800,6 +821,10 @@ const chaseFactor = 1.35;
 // chaseFloor is the minimum catch up speed in world units per second so
 // near destination residuals settle quickly for slow units too.
 const chaseFloor = 60;
+
+// socialWindowMs is how long the social animation marker stays visible
+// (the tracker side window in state/chat.go).
+const socialWindowMs = 3000;
 
 // normHeading maps an arbitrary degree value back to the game range.
 function normHeading(deg) {

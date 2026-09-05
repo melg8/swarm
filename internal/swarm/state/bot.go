@@ -75,6 +75,7 @@ type CharacterState struct {
 	WalkSpeed        float64
 	CollisionRadius  float64
 	MoveAt           time.Time
+	SocialUntil      time.Time
 	AutoAttacking    bool
 	CombatUntil      time.Time
 	FightingTargetID int32
@@ -116,6 +117,7 @@ func newCharacterState() CharacterState {
 		WalkSpeed:        defaultWalkSpeed,
 		CollisionRadius:  defaultSelfCollision,
 		MoveAt:           time.Time{},
+		SocialUntil:      time.Time{},
 		AutoAttacking:    false,
 		CombatUntil:      time.Time{},
 		FightingTargetID: 0,
@@ -1143,6 +1145,7 @@ type CharacterSnapshot struct {
 	DestZ           int32   `json:"destZ"`
 	Speed           float64 `json:"speed"`
 	CollisionRadius float64 `json:"collisionRadius"`
+	SocialUntilMs   int64   `json:"socialUntilMs"`
 	MoveAtMs        int64   `json:"moveAtMs"`
 	Level           int32   `json:"level"`
 	Race            int32   `json:"race"`
@@ -1191,6 +1194,7 @@ type ObjectSnapshot struct {
 	Running         bool       `json:"running"`
 	Speed           float64    `json:"speed"`
 	CollisionRadius float64    `json:"collisionRadius"`
+	SocialUntilMs   int64      `json:"socialUntilMs"`
 	Count           int32      `json:"count"`
 	X               int32      `json:"x"`
 	Y               int32      `json:"y"`
@@ -1240,6 +1244,7 @@ func (b *Bot) Snapshot() Snapshot {
 			DestZ:           b.char.DestZ,
 			Speed:           b.char.RunSpeed,
 			CollisionRadius: b.char.CollisionRadius,
+			SocialUntilMs:   b.char.SocialUntil.UnixMilli(),
 			MoveAtMs:        b.char.MoveAt.UnixMilli(),
 			Level:           b.char.Level,
 			Race:            b.char.Race,
@@ -1292,6 +1297,7 @@ func (b *Bot) Snapshot() Snapshot {
 			Running:         obj.Running,
 			Speed:           obj.EffectiveSpeed(),
 			CollisionRadius: obj.CollisionRadius,
+			SocialUntilMs:   obj.SocialUntil.UnixMilli(),
 			Count:           obj.Count,
 			X:               obj.X,
 			Y:               obj.Y,
