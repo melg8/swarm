@@ -423,3 +423,33 @@ master):
   (checked in a real browser at 1440x860) shows the compact header,
   the silver XP bar, the stacked target panel with live HP of the
   claimed mob and the sidebar mini bars with the combat chip.
+
+
+## Round 4: map drag grab semantics (2026-09-06)
+
+User report: dragging the map with the held left button moved it
+asynchronously - like swiping instead of holding the map under the
+cursor.
+
+### Root cause and fix
+
+The drag handler added the raw mouse delta to the world space pan
+anchor of the free camera: the map moved in the same direction as the
+cursor (a grab needs the opposite) and unscaled, so at the default zoom
+0.12 it slid about eight times further than the pointer. The handler
+now moves the camera by `-delta cursor / scale`, which pins the grabbed
+world point to the cursor exactly, and follow is switched off already
+at mousedown so the grab starts without the camera drifting away under
+the held point.
+
+### Reproduction and verification
+
+- `tools/repro_map_render.js` (new scenario "map drag keeps the
+  grabbed point"): fires a real mousedown/mousemove/mouseup sequence
+  through the captured canvas and window listeners and requires every
+  world point's screen position to shift exactly by the cursor delta
+  plus the follow disabling. Validated RED against the pre fix map.js
+  (the map moved the wrong direction and off scale), GREEN now.
+- Live browser check on the local stack (1440x860): a held button drag
+  by (+150, +120) px shifted the self marker, the npc labels and the
+  grid lines by exactly (+150, +120) px and unchecked follow.
