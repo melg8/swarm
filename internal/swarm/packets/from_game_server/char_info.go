@@ -28,39 +28,41 @@ const charInfoPacketID = 0x03
 // standing player through the StartRotation and StopRotation packets (see
 // Player.sendInfo).
 type CharInfoPacket struct {
-	ObjectID      int32
-	Name          string
-	Title         string
-	Race          int32
-	ClassID       int32
-	RunSpeed      int32
-	WalkSpeed     int32
-	MoveSpeedMult float64
-	Running       bool
-	InCombat      bool
-	Dead          bool
-	X             int32
-	Y             int32
-	Z             int32
+	ObjectID        int32
+	Name            string
+	Title           string
+	Race            int32
+	ClassID         int32
+	RunSpeed        int32
+	WalkSpeed       int32
+	MoveSpeedMult   float64
+	CollisionRadius float64
+	Running         bool
+	InCombat        bool
+	Dead            bool
+	X               int32
+	Y               int32
+	Z               int32
 }
 
 // NewCharInfoPacket creates a zero valued packet ready for parsing.
 func NewCharInfoPacket() *CharInfoPacket {
 	return &CharInfoPacket{
-		ObjectID:      0,
-		Name:          "",
-		Title:         "",
-		Race:          0,
-		ClassID:       0,
-		RunSpeed:      0,
-		WalkSpeed:     0,
-		MoveSpeedMult: 0,
-		Running:       false,
-		InCombat:      false,
-		Dead:          false,
-		X:             0,
-		Y:             0,
-		Z:             0,
+		ObjectID:        0,
+		Name:            "",
+		Title:           "",
+		Race:            0,
+		ClassID:         0,
+		RunSpeed:        0,
+		WalkSpeed:       0,
+		MoveSpeedMult:   0,
+		CollisionRadius: 0,
+		Running:         false,
+		InCombat:        false,
+		Dead:            false,
+		X:               0,
+		Y:               0,
+		Z:               0,
 	}
 }
 
@@ -143,9 +145,18 @@ func readCharSpeeds(reader *packet.Reader, p *CharInfoPacket) error {
 		return fmt.Errorf("failed to read char move multiplier: %w", err)
 	}
 	p.MoveSpeedMult = mult
-	// Skip the attack speed multiplier, the collision values and the hair
-	// and face ints between the multiplier and the title string.
-	if err := reader.Skip(charInfoAppearanceTail); err != nil {
+	// Skip the attack speed multiplier between the multiplier and the
+	// collision radius.
+	if err := reader.Skip(charInfoAtkSpeedTail); err != nil {
+		return fmt.Errorf("not enough bytes for char fields: %w", err)
+	}
+	p.CollisionRadius, err = reader.ReadFloat64()
+	if err != nil {
+		return fmt.Errorf("failed to read char collision radius: %w", err)
+	}
+	// Skip the collision height and the hair and face ints between the
+	// collision radius and the title string.
+	if err := reader.Skip(charInfoBodyTail); err != nil {
 		return fmt.Errorf("not enough bytes for char fields: %w", err)
 	}
 
@@ -180,10 +191,12 @@ const (
 	// between the walk speed and the move multiplier (the fly pair is
 	// written twice by the server).
 	charInfoSpeedTrail = 24
-	// charInfoAppearanceTail skips the attack speed multiplier, the
-	// collision values and the hair and face ints between the move
-	// multiplier and the title string.
-	charInfoAppearanceTail = 8 + 8 + 8 + 3*4
+	// charInfoAtkSpeedTail skips the attack speed multiplier between the
+	// move multiplier and the collision radius.
+	charInfoAtkSpeedTail = 8
+	// charInfoBodyTail skips the collision height and the hair and face
+	// ints between the collision radius and the title string.
+	charInfoBodyTail = 8 + 3*4
 	// charInfoClanTail skips the clan and ally ids plus the relation int
 	// between the title string and the state flags.
 	charInfoClanTail = 4 * 5

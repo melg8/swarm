@@ -21,10 +21,12 @@ const (
 	// ints between walkSpd and the move multiplier (the fly pair is
 	// written twice by the server).
 	npcInfoSpeedTrail = 24
-	// npcInfoAppearanceTail skips the attack speed multiplier, the
-	// collision values and the equipment ints between the move
-	// multiplier and the flag bytes.
-	npcInfoAppearanceTail = 36
+	// npcInfoAtkSpeedTail skips the attack speed multiplier between
+	// the move multiplier and the collision radius.
+	npcInfoAtkSpeedTail = 8
+	// npcInfoBodyTail skips the collision height and the equipment
+	// ints between the collision radius and the flag bytes.
+	npcInfoBodyTail = 20
 )
 
 // NpcInfoPacket describes one npc around the character.
@@ -36,41 +38,43 @@ const (
 // [nameAbove: 1][running: 1][inCombat: 1][alikeDead: 1][summoned: 1]
 // [name: str][title: str].
 type NpcInfoPacket struct {
-	ObjectID      int32
-	TemplateID    int32
-	Attackable    bool
-	X             int32
-	Y             int32
-	Z             int32
-	Heading       int32
-	RunSpeed      int32
-	WalkSpeed     int32
-	MoveSpeedMult float64
-	Running       bool
-	InCombat      bool
-	Dead          bool
-	Name          string
-	Title         string
+	ObjectID        int32
+	TemplateID      int32
+	Attackable      bool
+	X               int32
+	Y               int32
+	Z               int32
+	Heading         int32
+	RunSpeed        int32
+	WalkSpeed       int32
+	MoveSpeedMult   float64
+	CollisionRadius float64
+	Running         bool
+	InCombat        bool
+	Dead            bool
+	Name            string
+	Title           string
 }
 
 // NewNpcInfoPacket creates a zero valued packet ready for parsing.
 func NewNpcInfoPacket() *NpcInfoPacket {
 	return &NpcInfoPacket{
-		ObjectID:      0,
-		TemplateID:    0,
-		Attackable:    false,
-		X:             0,
-		Y:             0,
-		Z:             0,
-		Heading:       0,
-		RunSpeed:      0,
-		WalkSpeed:     0,
-		MoveSpeedMult: 0,
-		Running:       false,
-		InCombat:      false,
-		Dead:          false,
-		Name:          "",
-		Title:         "",
+		ObjectID:        0,
+		TemplateID:      0,
+		Attackable:      false,
+		X:               0,
+		Y:               0,
+		Z:               0,
+		Heading:         0,
+		RunSpeed:        0,
+		WalkSpeed:       0,
+		MoveSpeedMult:   0,
+		CollisionRadius: 0,
+		Running:         false,
+		InCombat:        false,
+		Dead:            false,
+		Name:            "",
+		Title:           "",
 	}
 }
 
@@ -107,7 +111,14 @@ func ParseNpcInfoPacket(p *NpcInfoPacket, data []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to read npc move multiplier: %w", err)
 	}
-	if err := reader.Skip(npcInfoAppearanceTail); err != nil {
+	if err := reader.Skip(npcInfoAtkSpeedTail); err != nil {
+		return fmt.Errorf("not enough bytes for npc fields: %w", err)
+	}
+	p.CollisionRadius, err = reader.ReadFloat64()
+	if err != nil {
+		return fmt.Errorf("failed to read npc collision radius: %w", err)
+	}
+	if err := reader.Skip(npcInfoBodyTail); err != nil {
 		return fmt.Errorf("not enough bytes for npc fields: %w", err)
 	}
 
