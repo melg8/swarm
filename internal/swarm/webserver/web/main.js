@@ -10,6 +10,7 @@ SPDX-License-Identifier: MIT
 window.addEventListener("DOMContentLoaded", () => {
   initTheme();
   initTabs();
+  initChat();
   MapView.init();
   refreshBots();
   setInterval(refreshBots, 2000);

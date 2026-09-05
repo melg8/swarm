@@ -485,7 +485,11 @@ the same variables).
   (`--grad-hp/mp/xp`) reused by the sidebar mini bars.
 - Chat window: the bottom left corner of the map shows the parsed
   system messages and the social animations (`snapshot.chat`, a rolling
-  64 line ring fed by ApplySystemMessage/ApplySocialAction).
+  64 line ring fed by ApplySystemMessage/ApplySocialAction). The auto
+  scroll follows the newest line only while the view is at the bottom
+  (`chatAtBottom`, 4 px tolerance): scrolling up detaches the follow to
+  read the history, scrolling back to the bottom resumes it. The list
+  itself is the scroll container (the box clips, the list scrolls).
   SystemMessage texts resolve through the generated
   `npcdata/system_messages.go` dictionary (id -> client text with $sN
   placeholders, substituted positionally with the packet parameters;

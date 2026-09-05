@@ -225,8 +225,28 @@ function renderSnapshot() {
   MapView.update(snap);
 }
 
+// Chat window state: auto scroll follows the newest line while the
+// user stays at the bottom; scrolling up reads the history, scrolling
+// back to the bottom resumes the follow.
+const ChatWindow = { stick: true };
+
+// chatAtBottom reports whether the scroll position of the chat list is
+// within a few pixels of the newest line.
+function chatAtBottom(list) {
+  return list.scrollTop + list.clientHeight >= list.scrollHeight - 4;
+}
+
+// initChat attaches the scroll tracking of the chat window.
+function initChat() {
+  const list = document.getElementById("chat-list");
+  list.addEventListener("scroll", () => {
+    ChatWindow.stick = chatAtBottom(list);
+  });
+}
+
 // Chat window rendering: the parsed system messages and the social
-// animations of the creatures around the bot, oldest at the top.
+// animations of the creatures around the bot, oldest at the top. The
+// view scrolls to the newest line only while the follow is stuck.
 function renderChat(snap) {
   const list = document.getElementById("chat-list");
   const lines = snap.chat || [];
@@ -243,7 +263,9 @@ function renderChat(snap) {
     row.append(time, msg);
     list.append(row);
   }
-  list.scrollTop = list.scrollHeight;
+  if (ChatWindow.stick) {
+    list.scrollTop = list.scrollHeight;
+  }
 }
 
 // Character status rendering on the map HUD: the map is the single source

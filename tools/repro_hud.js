@@ -117,6 +117,10 @@ function loadAppJs(appFile) {
         " ? setExpVital : undefined," +
         " renderChat: typeof renderChat === 'function'" +
         " ? renderChat : undefined," +
+        " chatAtBottom: typeof chatAtBottom === 'function'" +
+        " ? chatAtBottom : undefined," +
+        " ChatWindow: typeof ChatWindow === 'undefined'" +
+        " ? undefined : ChatWindow," +
         " renderHUD: typeof renderHUD === 'function'" +
         " ? renderHUD : undefined };",
         sandbox);
@@ -314,6 +318,42 @@ function main() {
         check(results, "empty chat clears the window",
             chatList.children.length === 0,
             "got " + chatList.children.length + " lines");
+
+        // Auto scroll follows the newest line only while stuck: the
+        // default state scrolls to the bottom, a scrolled up user keeps
+        // the chosen view, reaching the bottom resumes the follow.
+        const scrollList = { scrollTop: 0, clientHeight: 300,
+            scrollHeight: 500,
+            children: [], innerHTML: "",
+            append(child) { this.children.push(child); } };
+        hud.ChatWindow.stick = true;
+        hud.renderChat.call(null, { chat: [
+            { time: "2026-09-06T10:00:00Z", kind: "system", text: "l1" }
+        ] });
+        // renderChat resolves the element by id: point the sandbox at
+        // the scroll probe list.
+        elements.set("chat-list", scrollList);
+        hud.renderChat({ chat: [
+            { time: "2026-09-06T10:00:00Z", kind: "system", text: "l1" }
+        ] });
+        check(results, "stuck chat scrolls to the newest line",
+            scrollList.scrollTop === scrollList.scrollHeight,
+            "scrollTop " + scrollList.scrollTop);
+        hud.ChatWindow.stick = false;
+        scrollList.scrollTop = 120;
+        hud.renderChat({ chat: [
+            { time: "2026-09-06T10:00:01Z", kind: "system", text: "l2" }
+        ] });
+        check(results, "scrolled up chat keeps the chosen view",
+            scrollList.scrollTop === 120,
+            "scrollTop " + scrollList.scrollTop);
+        check(results, "chatAtBottom detects the bottom",
+            hud.chatAtBottom({ scrollTop: 196, clientHeight: 300,
+                scrollHeight: 500 })
+            && !hud.chatAtBottom({ scrollTop: 120, clientHeight: 300,
+                scrollHeight: 500 }),
+            "bottom detection broken");
+        elements.set("chat-list", chatList);
     }
 
     let failed = 0;
