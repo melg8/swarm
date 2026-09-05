@@ -557,3 +557,45 @@ read as a bare percentage, and the combat chip must not crowd the name
 - All three harnesses pass; live screenshot on the local stack (bot in
   the village, no target) shows the target panel absent, the name as
   the heading and the reordered grid.
+
+
+## Round 7: system message and social action chat (2026-09-06)
+
+User request: parse SystemMessage (0x7A) and SocialAction (0x3D) - the
+two unknown packets flooding the log during a hunt - and show them in a
+small chat window in the bottom left corner of the web interface.
+
+### Implementation
+
+- `tools/generate_system_messages.sh` (task `generate:system-messages`)
+  generates `npcdata/system_messages.go` from the @ClientString
+  annotations of SystemMessageId.java: 778 message ids with their client
+  side texts ("You picked up $s1 adena." and so on).
+- Parsers: `from_game_server/system_message.go` reads the message id and
+  the typed parameters (text and player name strings, skill name int
+  pairs, zone name triples, plain ints), `from_game_server/social_action.go`
+  reads the actor object id and the action id (15 = level up). Both
+  leave the unknown packet log, so the hunt log stays clean.
+- Tracker: `state/chat.go` keeps a rolling 64 line chat window per bot
+  (snapshot `chat`), formats the message text by substituting the $sN
+  placeholders positionally and resolves item and npc name parameters
+  through the generated dictionaries. Social actions render as
+  "<name> plays social animation N" or "<name> reached a new level".
+- Web: a translucent chat window sits in the bottom left corner of the
+  map, system lines in the normal text color, social lines violet, auto
+  scrolled to the newest line.
+
+### Verification
+
+- Packet tests: adena message with an int parameter, item name plus
+  text parameter reuse of the scratch buffer, implausible parameter
+  count rejection, social action fields.
+- Tracker tests: adena text formatting, item name resolution through
+  the generated dictionary, unknown id fallback, actor naming
+  (self/npc/unknown) and the 64 line ring roll over.
+- `tools/repro_hud.js`: the chat window renders one line per message
+  with the message text and the social class, an empty snapshot clears
+  it.
+- Live: the bot in the village shows "Welcome to the World of Lineage
+  II." and the idle animations of the surrounding npcs in the chat
+  window; the unknown packet log lines for 0x7A and 0x3D are gone.

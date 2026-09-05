@@ -375,6 +375,11 @@ the same variables).
   other players), ChangeMoveType 0x3E (walk/run switch: mobs walk while
   idle and run when aggroed), ChangeWaitType 0x3F (sit/stand
   transitions, broadcast to the acting player itself too),
+  SystemMessage 0x7A (message id plus typed parameters, resolved to the
+  client text by the generated npcdata.SystemMessageText dictionary -
+  the loot and status lines of the chat window),
+  SocialAction 0x3D (idle animations of npcs, player emotes and level
+  ups - the second chat window source),
   TeleportToLocation 0x38 (position snap),
   StatusUpdate (vitals, weight CUR_LOAD 0x0E / MAX_LOAD 0x0F changes,
   dead when hp is 0; for npcs the server sends only CUR_HP/MAX_HP and
@@ -478,6 +483,15 @@ the same variables).
   the CP color of later chronicles) with light-top/dark-bottom
   cylindrical gradients; the three gradients are shared CSS variables
   (`--grad-hp/mp/xp`) reused by the sidebar mini bars.
+- Chat window: the bottom left corner of the map shows the parsed
+  system messages and the social animations (`snapshot.chat`, a rolling
+  64 line ring fed by ApplySystemMessage/ApplySocialAction).
+  SystemMessage texts resolve through the generated
+  `npcdata/system_messages.go` dictionary (id -> client text with $sN
+  placeholders, substituted positionally with the packet parameters;
+  item and npc name parameters resolve through the item and npc
+  dictionaries). Regenerate with `task generate:system-messages`
+  (tools/generate_system_messages.sh) after Mobius updates.
 - The web UI is plain HTML/CSS/JS without a build step; keep it that way
   (embedded via go:embed). Watch out: top level `const` declarations are
   not `window` properties, so cross script references must use the bare
