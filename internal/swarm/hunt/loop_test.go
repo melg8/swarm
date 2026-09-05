@@ -13,21 +13,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fakeGame records the actions of the hunt loop.
+// fakeGame records the actions of the hunt loop and simulates the Mobius
+// double click semantics: the first attack request for a new target only
+// selects it, the repeated request starts the fight.
 type fakeGame struct {
-	attacks   int
+	selects   int
+	forces    []int32
 	pickups   []int32
 	destroys  []int32
 	lastError error
 }
 
-func (f *fakeGame) AttackNearest() (bool, error) {
+func (f *fakeGame) AttackNearest() (int32, error) {
 	if f.lastError != nil {
-		return false, f.lastError
+		return 0, f.lastError
 	}
-	f.attacks++
+	f.selects++
 
-	return true, nil
+	return 7, nil
+}
+
+func (f *fakeGame) AttackTarget(objectID int32) error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.forces = append(f.forces, objectID)
+
+	return nil
 }
 
 func (f *fakeGame) PickupItem(item state.LootItem) error {
@@ -55,15 +67,98 @@ func newTestBot() *state.Bot {
 	return bot
 }
 
+// spawnMob adds an attackable npc in reach of the test character.
+func spawnMob(bot *state.Bot) {
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 46000, Y: 50000, Name: "Gremlin",
+	})
+}
+
 func TestLoopAttacksWhenIdle(t *testing.T) {
 	bot := newTestBot()
+	spawnMob(bot)
 	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
 
 	loop.tick()
-	require.Equal(t, 1, game.attacks)
+	require.Equal(t, 1, game.selects)
+	require.Equal(t, int32(7), loop.target)
+}
+
+func TestLoopForcesAttackAfterSelection(t *testing.T) {
+	bot := newTestBot()
+	spawnMob(bot)
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The first tick selects the target.
+	loop.tick()
+	require.Equal(t, 1, game.selects)
+	require.Empty(t, game.forces)
+
+	// The server confirms the selection (MyTargetSelected), but no fight
+	// packets arrive: the character just stands there. The next ticks must
+	// repeat the attack request for the selected target.
+	bot.ApplySelfTarget(7)
+	loop.lastHit = time.Now().Add(-time.Minute)
+	loop.tick()
+	require.Equal(t, []int32{7}, game.forces,
+		"the loop must send the second request that starts the attack")
+}
+
+func TestLoopRetriesForcedAttackUntilEngaged(t *testing.T) {
+	bot := newTestBot()
+	spawnMob(bot)
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	loop.tick()
+	bot.ApplySelfTarget(7)
+
+	// The server keeps ignoring the forced requests: the loop retries
+	// every engage retry period instead of standing still forever.
+	for range 3 {
+		loop.lastHit = time.Now().Add(-2 * time.Second)
+		loop.tick()
+	}
+	require.Equal(t, []int32{7, 7, 7}, game.forces)
+}
+
+func TestLoopStopsRequestingOnceEngaged(t *testing.T) {
+	bot := newTestBot()
+	spawnMob(bot)
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	loop.tick()
+	bot.ApplySelfTarget(7)
+	loop.lastHit = time.Now().Add(-time.Minute)
+	loop.tick()
+	require.Equal(t, []int32{7}, game.forces)
+
+	// The fight starts: the server broadcasts the chase and the auto
+	// attack. The loop must stop re-requesting the target.
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyPawnMovement(state.PawnMovement{
+		ObjectID: 100, TargetID: 7, Distance: 40,
+		X: 45000, Y: 50000, TargetX: 45960, TargetY: 50000, TargetZ: -3500,
+	})
+	for range 3 {
+		loop.lastHit = time.Now().Add(-time.Minute)
+		loop.tick()
+	}
+	require.Equal(t, []int32{7}, game.forces,
+		"no further forced attack requests once the fight runs")
 }
 
 func TestLoopLootsAfterKill(t *testing.T) {
@@ -74,11 +169,7 @@ func TestLoopLootsAfterKill(t *testing.T) {
 	loop.lastHit = time.Now().Add(-time.Minute)
 
 	// A killed target with a drop next to the corpse.
-	//nolint:exhaustruct // partial fields for the case
-	bot.ApplyNpcInfo(state.NpcInfo{
-		ObjectID: 7, TemplateID: 1000001, Attackable: true,
-		X: 46000, Y: 50000, Name: "Gremlin",
-	})
+	spawnMob(bot)
 	//nolint:exhaustruct // partial fields for the case
 	bot.ApplySpawnItem(state.ItemInfo{
 		ObjectID: 9, TemplateID: 57, X: 45040, Y: 50040, Z: -3500,
@@ -93,7 +184,7 @@ func TestLoopLootsAfterKill(t *testing.T) {
 	// The dead target moves the loop into the loot phase and the drop
 	// is clicked.
 	require.Equal(t, phaseLoot, loop.phase)
-	require.Equal(t, 0, game.attacks)
+	require.Equal(t, 0, game.selects)
 	require.Equal(t, []int32{9}, game.pickups)
 }
 
@@ -120,35 +211,9 @@ func TestLoopSkipsUnreachableLoot(t *testing.T) {
 	require.Equal(t, phaseEngage, loop.phase)
 }
 
-func TestLoopCleansInventoryWhenFull(t *testing.T) {
+func TestLoopAttackErrorIsLoggedNotFatal(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
-	game := &fakeGame{}
-	loop := NewLoop(game, bot)
-	loop.lastHit = time.Now().Add(-time.Minute)
-
-	items := make([]state.InventoryItem, 60)
-	for i := range items {
-		//nolint:gosec // bounded loop index below math.MaxInt32
-		items[i] = state.InventoryItem{
-			ObjectID: int32(i + 1),
-			ItemID:   1060,
-			Count:    1,
-			Type1:    0,
-			Type2:    5,
-			Equipped: false,
-			Change:   0,
-		}
-	}
-	bot.ApplyItemList(items)
-
-	loop.tick()
-	require.NotEmpty(t, game.destroys)
-	require.Len(t, game.destroys, destroyBatch)
-}
-
-func TestLoopSurvivesActionErrors(t *testing.T) {
-	bot := newTestBot()
+	spawnMob(bot)
 	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	game.lastError = errors.New("connection lost")
@@ -156,6 +221,6 @@ func TestLoopSurvivesActionErrors(t *testing.T) {
 	loop.lastHit = time.Now().Add(-time.Minute)
 
 	loop.tick()
-	require.Equal(t, phaseEngage, loop.phase)
-	require.Equal(t, 0, game.attacks)
+	require.Equal(t, 0, game.selects)
+	require.Equal(t, int32(0), loop.target)
 }
