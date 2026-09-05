@@ -314,6 +314,22 @@ func (b *Bot) ObjectAlive(objectID int32) bool {
 	return ok && !obj.Dead
 }
 
+// SelfHealthPercent returns the current HP of the character as a
+// percentage of the maximum (0..100). An unknown maximum (no UserInfo
+// yet) counts as healthy: resting forever on missing vitals is worse
+// than engaging. The hunt loop uses it to decide whether the character
+// is healthy enough to instantly engage the next target.
+func (b *Bot) SelfHealthPercent() float64 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if b.char.MaxHP <= 0 {
+		return 100
+	}
+	pct := b.char.CurHP / b.char.MaxHP * 100
+
+	return math.Min(100, math.Max(0, pct))
+}
+
 // ID returns the session id of the bot.
 func (b *Bot) ID() string {
 	return b.id
@@ -783,7 +799,9 @@ func (b *Bot) ApplyItemInfo(info ItemInfo) {
 	b.recordLocked("item dropped: " + itemName(obj.Name, info.TemplateID))
 }
 
-// RemoveObject drops an object from the observed set.
+// RemoveObject deletes an object that left the known list. When the
+// bot itself targeted the object, the target is dropped as well: the
+// server answers the removal only with the DeleteObject broadcast.
 func (b *Bot) RemoveObject(objectID int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -792,6 +810,9 @@ func (b *Bot) RemoveObject(objectID int32) {
 		return
 	}
 	delete(b.objects, objectID)
+	if b.char.TargetID == objectID {
+		b.clearSelfTargetLocked("target object removed")
+	}
 	b.touch()
 	b.recordLocked("object removed: " + obj.Name)
 }
@@ -834,6 +855,12 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
 	}
 	obj.UpdatedAt = time.Now()
 	b.objects[objectID] = obj
+	if obj.Dead && b.char.TargetID == objectID {
+		// A killed target is no target anymore: the server keeps
+		// the corpse selected, the tracker drops it so the HUD
+		// and the hunt loop see the actual "no target" state.
+		b.clearSelfTargetLocked("target died")
+	}
 	b.touch()
 }
 
@@ -903,6 +930,21 @@ func (b *Bot) clearCharMovement() {
 	b.char.MoveAt = time.Now()
 }
 
+// clearSelfTargetLocked drops the target of the character and records
+// the transition. The Mobius server keeps a killed or despawned target
+// selected on its side (MyTargetSelected only answers new selections and
+// the own TargetUnselected broadcast is the sole removal notice), so the
+// tracker mirrors the official client: the target is gone once it died
+// or was removed from the world. The caller must hold the write lock.
+func (b *Bot) clearSelfTargetLocked(reason string) {
+	if b.char.TargetID == 0 {
+		return
+	}
+	b.char.TargetID = 0
+	b.touch()
+	b.recordLocked("target cleared: " + reason)
+}
+
 // AttackTarget describes a target the bot can attack.
 type AttackTarget struct {
 	ObjectID int32
@@ -913,7 +955,12 @@ type AttackTarget struct {
 }
 
 // NearestAttackable returns the closest living attackable npc within the
-// given distance of the character.
+// given distance of the character. The distance uses the projected
+// current position of every npc (see projectedPosition), not the raw
+// packet position: the server broadcasts movement at most once per
+// second, so a moving mob is typically tens or hundreds of units away
+// from its last packet start position and a stale "nearest" choice
+// would send the character to a mob that is no longer the closest one.
 func (b *Bot) NearestAttackable(maxDistance float64) (AttackTarget, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -924,25 +971,54 @@ func (b *Bot) NearestAttackable(maxDistance float64) (AttackTarget, bool) {
 	found := false
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
+	now := time.Now()
 	for _, obj := range b.objects {
 		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
 			continue
 		}
-		dist := math.Hypot(float64(obj.X)-selfX, float64(obj.Y)-selfY)
+		x, y := projectedPosition(obj, now)
+		dist := math.Hypot(x-selfX, y-selfY)
 		if dist < bestDist {
 			bestDist = dist
 			found = true
 			best = AttackTarget{
 				ObjectID: obj.ObjectID,
 				Name:     obj.Name,
-				X:        obj.X,
-				Y:        obj.Y,
+				X:        int32(math.Round(x)),
+				Y:        int32(math.Round(y)),
 				Z:        obj.Z,
 			}
 		}
 	}
 
 	return best, found
+}
+
+// projectedPosition estimates where an object is right now: standing
+// objects keep their packet position, moving ones advance from the
+// segment start toward the destination at their effective speed. It is
+// the server side counterpart of the web map interpolation (the Mobius
+// Creature.updatePosition loop steps creatures toward the destination
+// every 100 ms game tick from the last broadcast position).
+func projectedPosition(obj WorldObject, now time.Time) (float64, float64) {
+	if !obj.Moving || obj.MoveAt.IsZero() {
+		return float64(obj.X), float64(obj.Y)
+	}
+	dx := float64(obj.DestX - obj.X)
+	dy := float64(obj.DestY - obj.Y)
+	dist := math.Hypot(dx, dy)
+	speed := obj.EffectiveSpeed()
+	if dist < 1 || speed <= 0 {
+		return float64(obj.X), float64(obj.Y)
+	}
+	elapsed := now.Sub(obj.MoveAt).Seconds()
+	if elapsed <= 0 {
+		return float64(obj.X), float64(obj.Y)
+	}
+	traveled := math.Min(speed*elapsed, dist)
+	frac := traveled / dist
+
+	return float64(obj.X) + dx*frac, float64(obj.Y) + dy*frac
 }
 
 // recordLocked appends an event to the ring buffer. The caller must hold
@@ -994,6 +1070,7 @@ type CharacterSnapshot struct {
 	WIT            int32   `json:"wit"`
 	MEN            int32   `json:"men"`
 	Exp            int32   `json:"exp"`
+	ExpPercent     float64 `json:"expPercent"`
 	Sp             int32   `json:"sp"`
 	InCombat       bool    `json:"inCombat"`
 	CurrentLoad    int32   `json:"load"`
@@ -1084,6 +1161,8 @@ func (b *Bot) Snapshot() Snapshot {
 			WIT:      b.char.WIT,
 			MEN:      b.char.MEN,
 			Exp:      b.char.Exp,
+			ExpPercent: ExpPercent(b.char.Level,
+				int64(b.char.Exp)),
 			Sp:       b.char.Sp,
 			InCombat: b.char.inCombat(now),
 		},

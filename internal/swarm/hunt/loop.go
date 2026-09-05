@@ -35,13 +35,24 @@ type GameAPI interface {
 
 // Timing and threshold constants of the hunt loop.
 const (
-	// tickPeriod is the decision cadence of the loop.
-	tickPeriod = 1 * time.Second
+	// tickPeriod is the decision cadence of the loop. The Mobius
+	// PlayerActionFloodProtector accepts one player action per second,
+	// so the actual requests stay rate limited by the engage periods
+	// below; the short cadence only makes the state transitions (target
+	// died, loot finished, health recovered) act within a quarter
+	// second instead of a full one.
+	tickPeriod = 250 * time.Millisecond
 	// lootRadius is the distance around the character within drops are
 	// picked up after a kill.
 	lootRadius = 900.0
-	// engagePeriod is the minimum pause between two target selections.
-	engagePeriod = 4 * time.Second
+	// selectPeriod is the minimum pause between two nearest target
+	// selections. The server accepts one player action per second
+	// (PlayerActionFloodProtector), so selecting faster is pointless.
+	selectPeriod = 1 * time.Second
+	// reengageHealthPercent is the HP level above which the next target
+	// is engaged immediately after a kill instead of resting. Below it
+	// the loop waits for the natural regeneration to recover.
+	reengageHealthPercent = 50.0
 	// engageRetryPeriod is the pause between repeated forced attack
 	// requests for the selected target. The server accepts one player
 	// action per second (PlayerActionFloodProtector), so one second is
@@ -134,14 +145,21 @@ func (l *Loop) tick() {
 // the fight, which the MoveToPawn/Attack/AutoAttackStart broadcasts
 // confirm.
 func (l *Loop) engage() {
-	// Prefer the server view of the target: the MyTargetSelected answer
-	// of the last attack request arrives asynchronously, so the fresh
-	// value is read every tick.
-	if serverTarget := l.tracker.SelfTargetID(); serverTarget != 0 {
+	// Prefer the server view of the target while it lives: the
+	// MyTargetSelected answer of the last attack request arrives
+	// asynchronously, so the fresh value is read every tick. A stale
+	// id of a dead or removed target must not be re-adopted: the
+	// server never clears the selection of a corpse (only the next
+	// selection replaces it), so blindly trusting it locked the
+	// loop into an engage/loot ping-pong where the next target was
+	// never selected.
+	serverTarget := l.tracker.SelfTargetID()
+	if serverTarget != 0 && l.tracker.ObjectAlive(serverTarget) {
 		l.target = serverTarget
 	}
 	if l.target != 0 && !l.tracker.ObjectAlive(l.target) {
 		l.logger.Printf("Hunt: target %d died, looting", l.target)
+		l.target = 0
 		l.phase = phaseLoot
 		l.lootID = 0
 
@@ -149,7 +167,17 @@ func (l *Loop) engage() {
 	}
 	now := time.Now()
 	if l.target == 0 {
-		if now.Sub(l.lastHit) < engagePeriod {
+		// Rest while the character is hurt: the regeneration is
+		// faster out of combat and engaging with low HP risks
+		// death. Healthy characters chain the next target
+		// immediately (the selectPeriod rate limit keeps the
+		// server flood protector happy).
+		if hp := l.tracker.SelfHealthPercent(); hp < reengageHealthPercent {
+			l.rest()
+
+			return
+		}
+		if now.Sub(l.lastHit) < selectPeriod {
 			return
 		}
 		target, err := l.game.AttackNearest()
@@ -177,6 +205,20 @@ func (l *Loop) engage() {
 		return
 	}
 	l.lastHit = now
+}
+
+// rest logs the regeneration wait once per rest phase so the idle time
+// stays explainable in the bot log instead of silently standing still.
+// It borrows the lastHit timestamp as the log rate limiter because no
+// player action is sent while resting.
+func (l *Loop) rest() {
+	now := time.Now()
+	if now.Sub(l.lastHit) < selectPeriod {
+		return
+	}
+	l.lastHit = now
+	l.logger.Printf("Hunt: resting, HP %.0f%% below %.0f%%",
+		l.tracker.SelfHealthPercent(), reengageHealthPercent)
 }
 
 // loot picks up the ground items around the character until none is left

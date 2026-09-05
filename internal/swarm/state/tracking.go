@@ -117,10 +117,19 @@ func (b *Bot) ApplyObjectTarget(objectID int32, targetID int32) {
 	b.touch()
 }
 
-// ApplyTargetClear drops the target reference of a visible player.
+// ApplyTargetClear drops the target reference of a visible player. The
+// packet also arrives for the played character itself: the server
+// clears the character target (for example when the target object is
+// removed from the world) and notifies everyone including the actor,
+// while never sending MyTargetSelected for the removal.
 func (b *Bot) ApplyTargetClear(objectID int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if objectID == b.selfID {
+		b.clearSelfTargetLocked("target unselected")
+
+		return
+	}
 	obj, ok := b.objects[objectID]
 	if !ok {
 		return
