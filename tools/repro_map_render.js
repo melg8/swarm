@@ -157,8 +157,15 @@ function loadMapJs(mapFile) {
         strokes: [], fills: [], style: "", fillStyle: "", width: 1,
         dash: []
     };
+    const listeners = { canvas: {}, window: {} };
+    const listen = (registry) => (type, fn) => {
+        (registry[type] = registry[type] || []).push(fn);
+    };
+    const fire = (registry, type, event) => {
+        for (const fn of registry[type] || []) { fn(event); }
+    };
     const canvas = {
-        addEventListener: () => {},
+        addEventListener: listen(listeners.canvas),
         getContext: () => makeRecordingContext(record),
         getBoundingClientRect: () => ({
             width: CANVAS_W, height: CANVAS_H, left: 0, top: 0
@@ -191,7 +198,7 @@ function loadMapJs(mapFile) {
                 return elements.get(id);
             }
         },
-        window: { addEventListener: () => {} },
+        window: { addEventListener: listen(listeners.window) },
         getComputedStyle: () => ({
             getPropertyValue: (name) => THEME[name] || ""
         }),
@@ -203,7 +210,11 @@ function loadMapJs(mapFile) {
         { filename: "map.js" });
     vm.runInContext("globalThis.__MapView = MapView;", sandbox);
 
-    return { MapView: sandbox.__MapView, record, elements };
+    return {
+        MapView: sandbox.__MapView, record, elements,
+        fireCanvas: (type, event) => fire(listeners.canvas, type, event),
+        fireWindow: (type, event) => fire(listeners.window, type, event)
+    };
 }
 
 // buildSnapshot assembles a snapshot view with the given target links.
@@ -434,6 +445,48 @@ function runScenarioFollowOff(mapFile) {
     return results;
 }
 
+// runScenarioMapDrag covers the grab semantics of map panning: while the
+// left button is held the map moves exactly with the cursor, so the
+// world point grabbed under it stays pinned (the reported bug: the map
+// slid in the wrong direction and 1/scale times too far, which felt
+// like swiping instead of holding), and grabbing switches follow off.
+function runScenarioMapDrag(mapFile) {
+    const { MapView, elements, fireCanvas, fireWindow } = loadMapJs(mapFile);
+    MapView.init();
+    MapView.update(buildSnapshot(0, false));
+
+    const results = [];
+    const mob = MapView.worldToScreen(
+        WORLD.playerTargetMob.x, WORLD.playerTargetMob.y);
+    const self = MapView.worldToScreen(WORLD.self.x, WORLD.self.y);
+
+    // Grab the map at (300, 200) and drag it to (420, 260).
+    fireCanvas("mousedown", { clientX: 300, clientY: 200 });
+    check(results, "grabbing the map disables follow",
+        elements.get("follow").checked === false,
+        "follow is still " + elements.get("follow").checked);
+    fireWindow("mousemove", { clientX: 420, clientY: 260 });
+    fireWindow("mouseup", { clientX: 420, clientY: 260 });
+
+    const dx = 120;
+    const dy = 60;
+    const mobAfter = MapView.worldToScreen(
+        WORLD.playerTargetMob.x, WORLD.playerTargetMob.y);
+    const selfAfter = MapView.worldToScreen(WORLD.self.x, WORLD.self.y);
+    check(results, "dragged map moves exactly with the cursor",
+        Math.abs(mobAfter.x - (mob.x + dx)) < 2
+        && Math.abs(mobAfter.y - (mob.y + dy)) < 2,
+        "expected (" + (mob.x + dx) + ", " + (mob.y + dy) + "), got "
+        + JSON.stringify(mobAfter));
+    check(results, "dragged map shifts every point by the cursor delta",
+        Math.abs(selfAfter.x - (self.x + dx)) < 2
+        && Math.abs(selfAfter.y - (self.y + dy)) < 2,
+        "expected (" + (self.x + dx) + ", " + (self.y + dy) + "), got "
+        + JSON.stringify(selfAfter));
+
+    return results;
+}
+
 function main() {
     const args = process.argv.slice(2);
     const verbose = args.includes("--verbose");
@@ -447,7 +500,8 @@ function main() {
     const scenarios = [
         ["map targets", runScenario(mapFile, verbose)],
         ["player selects the bot", runScenarioTargetingBot(mapFile)],
-        ["follow off keeps the view static", runScenarioFollowOff(mapFile)]
+        ["follow off keeps the view static", runScenarioFollowOff(mapFile)],
+        ["map drag keeps the grabbed point", runScenarioMapDrag(mapFile)]
     ];
     let failed = 0;
     for (const [name, results] of scenarios) {
