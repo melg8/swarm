@@ -293,40 +293,48 @@ the same variables).
   size 2048, `World.broadcastPacket` reaches exactly these regions)
   around the character region - the server only spawns/updates objects
   inside it, and it scales with zoom like every world element.
-- Movement interpolation: the server broadcasts MoveToLocation at most
-  once per second per moving creature, so the client runs a
-  requestAnimationFrame loop that advances every object from its last
-  packet position toward the destination at `runSpd * moveMultiplier`
-  world units per second (run/walk speeds come from NpcInfo for npcs,
-  CharInfo for players and UserInfo for self; the fallback speed is
-  120), clamps at the destination and corrects the clock against the
-  snapshot `serverTimeMs` (the maximum of the recent samples, because
-  every sample underestimates by the snapshot transport delay).
-  The played character is interpolated the same way from its own
-  movement broadcasts (Player.broadcastPacket sends every broadcast
-  except CharInfo to the acting player itself, unlike the base
-  Creature.broadcastPacket which skips self). The transmitted run and
-  walk speeds are base values: the server divides the real speeds by
-  the move multiplier before writing them, so the effective speed is
-  always `speed * multiplier` (see UserInfo/CharInfo/AbstractNpcInfo
-  writeImpl). MoveToLocation for playables only arrives at move start
-  and arrival, so the whole path is interpolated from one packet.
-  Arrival calibration: the Mobius movement loop (Creature.updatePosition)
-  counts a creature as arrived once one 100 ms game tick step covers
-  the remaining distance minus the collision radius, then snaps it to
-  the exact destination and broadcasts the zero distance
-  MoveToLocation. The map therefore scales the interpolation speed by
-  `distance / (distance - gap)` with a per npc template gap estimate
-  learned from every observed arrival (EMA, bounded 1..60, speed scale
-  capped 1.6), so units complete the path exactly when the arrival
-  packet lands instead of teleporting the last stretch (the official
-  client shows the same snap; the map renders it smoothly). The drawn
-  position is the projection plus a decaying offset that only absorbs
-  real discontinuities (segment resets, arrivals, teleports above 400
-  units snap instantly), so continuous movement has no permanent
-  smoothing lag. Regression check: `task repro:movement`
-  (tools/repro_movement.js) simulates the server semantics and fails
-  when the end of path teleport comes back.
+- Movement interpolation: `web/map.js projectTickwise` reproduces the
+  server movement exactly instead of approximating it. The Mobius
+  movement loop (Creature.updatePosition) runs on 100 ms game ticks and
+  advances a creature by `xAccurate += (dest - xAccurate) * frac` with
+  `frac = speed * ticks / 10 / (remaining - collision)` - a converging
+  geometric walk that is slightly faster than the nominal speed, stops
+  collision units short and snaps to the exact destination once frac
+  exceeds 1. The map replays the same recurrence tick by tick from the
+  packet position, speed and collision radius (NpcInfo and CharInfo
+  carry it; UserInfo does not, the played character uses the constant
+  9) and interpolates linearly between the two surrounding tick
+  positions, because the server truth is a step function of one jump
+  per tick and the official client renders it smoothed the same way.
+  The drawn position chases this projection with a speed cap of 1.35x
+  the unit speed, so delivery latency, retargets and arrival snaps
+  become a slightly faster glide instead of a jump, and in steady
+  motion the drawn position sits on the projection with zero lag. The
+  packet speeds are exact: the server re-reads its move speed every
+  tick (buffs and walk/run switches take effect with the next
+  broadcast), races differ through their base speeds, and the
+  transmitted values divide by the move multiplier which the tracker
+  multiplies back. Snapshots arrive at most every ~300 ms (SSE poll),
+  but the projection is anchored at the packet time, so staleness does
+  not bias the position. The clock is corrected against the snapshot
+  `serverTimeMs` (the maximum of the recent samples, because every
+  sample underestimates by the snapshot transport delay). MoveToLocation
+  for playables only arrives at move start and arrival, non forced
+  broadcasts are throttled to one per second (a re-issued move inside
+  the window stays invisible). The played character is interpolated the
+  same way from its own movement broadcasts (Player.broadcastPacket
+  sends every broadcast except CharInfo to the acting player itself).
+  Position harness: `tools/repro_movement.js` (`task repro:movement`)
+  drives the real map.js with a virtual clock - the simulation mode
+  replays seven patterns (random walk, long run, character walk, chase,
+  pickup hops, retarget approach, npc chase) against a faithful server
+  simulation (100 ms ticks, the exact recurrence, the 1 s broadcast
+  throttle) and measures per frame position error against the simulated
+  truth (threshold 0.25x speed in world units) and frame speed spikes
+  (threshold 2.5x); `--record <seconds> [file] [url] [bot]` captures
+  the live SSE stream and `--replay file [--frames]` replays it at
+  60 fps, printing the drawn position of every moving unit per frame
+  and failing on spikes.
 - Heading semantics (Mobius `LocationUtil.calculateHeadingFrom`):
   `atan2(dy, dx) * 65535 / 2pi`, 0 faces east, the angle grows clockwise
   because world y points south. The server announces arrival with a zero

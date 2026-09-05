@@ -453,3 +453,76 @@ the held point.
 - Live browser check on the local stack (1440x860): a held button drag
   by (+150, +120) px shifted the self marker, the npc labels and the
   grid lines by exactly (+150, +120) px and unchecked follow.
+
+
+## Round 5: exact movement recurrence, jerk free rendering (2026-09-06)
+
+User report: the drawn character and mobs still moved jerkily - constant
+linear speed along a straight line, then a sudden displacement at a much
+higher speed, especially during loot pickup and the approach to mobs.
+
+### Root causes
+
+- The web map scaled the interpolation speed by a learned per template
+  arrival gap. Interrupted segments (the hunt loop re-issuing its walk
+  to the same drop, chase re-targets) poisoned the gap estimate up to
+  the 60 unit bound; the scaled projection then arrived early, stood at
+  the destination and caught up with the next packet in one fast glide:
+  exactly the reported "linear motion, then a sudden jerk". Short
+  pickup hops suffered most because a 30-60 unit gap error is huge
+  relative to a 40-150 unit hop.
+- Nobody modeled what the server actually does. The Mobius
+  Creature.updatePosition recurrence is not a constant speed walk: it
+  advances `xAccurate += (dest - xAccurate) * frac` with
+  `frac = speed * ticks / 10 / (remaining - collision)` on 100 ms game
+  ticks and snaps to the destination once frac exceeds 1 - a converging
+  geometric walk that is slightly faster than the nominal speed and
+  stops collision units short. Any linear model diverges from it by a
+  few percent over a segment, which the old code then "corrected" with
+  the learned gap.
+
+### Fixes
+
+- NpcInfo and CharInfo now parse the collision radius (a writeDouble in
+  both packets, previously skipped) and carry it through the tracker
+  into the snapshots; the played character uses the constant 9 (UserInfo
+  has no collision field).
+- `web/map.js projectTickwise` replays the exact server recurrence tick
+  by tick from the packet position, speed and collision radius and
+  interpolates linearly between the two surrounding tick positions (the
+  server truth is a step function; the official client renders it the
+  same smoothed way). The drawn position chases this projection with a
+  speed cap of 1.35 times the unit speed: delivery latency bursts,
+  retargets and arrival snaps become a slightly faster glide instead of
+  a jump, and in steady motion the drawn position sits exactly on the
+  projection with zero lag. The whole learned arrival gap machinery is
+  gone.
+- Speed semantics verified in the server sources and documented: the
+  move speed is re-read every tick (buffs and debuffs apply immediately
+  with the next broadcast), walk/run is the tracked ChangeMoveType
+  flag, races differ through their base speeds and the move multiplier,
+  and the broadcast values divide by the multiplier which the tracker
+  multiplies back. With PathFinding enabled a long move is a chain of
+  node segments, each announced by its own forced MoveToLocation - the
+  per packet recurrence handles that without extra work.
+
+### Verification
+
+- tools/repro_movement.js was rebuilt as the position tracking harness
+  the user asked for: seven scenarios (npc random walk, npc long run,
+  character walk, character chase, pickup hops, retarget approach, npc
+  chase of the player) run a faithful server simulation (100 ms ticks,
+  the exact recurrence including its geometric advance, the 1 second
+  broadcast throttle) and compare every rendered frame against the
+  simulated truth: max position error <= 0.21x the unit speed in world
+  units (one tick phase plus the step vs linear rendering difference),
+  arrival error <= 6 units, max frame speed spike 1.35x (the chase cap
+  itself). `--frames` prints the per frame position log of every moving
+  unit with the drawn position, the server truth and the error.
+- `--record <seconds> [file] [url] [bot]` captures the live SSE stream
+  to a JSON file; `--replay file [--frames]` replays it through the
+  real map at 60 fps and fails on spikes above 2.5x. Live check: 100
+  seconds of the hunt on the local stack (account test1, level 9, 14
+  kills, 30 moving units) replayed at 6012 frames with zero spikes and
+  the frame log showing the constant per frame displacement of every
+  unit.
