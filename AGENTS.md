@@ -45,6 +45,12 @@ internal/swarm/
                                (game.go), packet framing (wire.go).
   crypt/                       Login Blowfish framing (login_crypt.go), game
                                XOR cipher (game_crypt.go), checksum.
+  state/                       Live bot state tracker: character vitals,
+                               world objects, events, bot registry.
+  npcdata/                     Generated npc/item display id to name maps
+                               (tools/generate_npc_names.sh).
+  webserver/                   Embedded web UI: static files, JSON snapshot
+                               endpoints and the SSE event stream.
   helpers/                     Hex+ASCII dump helpers for debugging.
   packets/
     packet/                    Binary Reader/Writer primitives (little endian).
@@ -64,10 +70,12 @@ only supported way to bring the test server stack up (see below).
 ## Commands
 
 Run the application (expects the Mobius stack at `127.0.0.1:2106` and
-`127.0.0.1:7777`, account `test1`/`test`, elven fighter `test1`):
+`127.0.0.1:7777`, account `test1`/`test`, elven fighter `test1`). The web
+interface is served on `127.0.0.1:8080` by default; pass `-web ""` to
+disable it or `-web 0.0.0.0:9000` to change the address:
 
 ```bash
-task run:app              # or: go run ./cmd/swarm
+task run:app              # or: go run ./cmd/swarm -web 127.0.0.1:8080
 ```
 
 Tests and linters (run both before considering work done):
@@ -198,6 +206,45 @@ connectivity issues:
 - Account auto registration is already enabled by the shipped login
   config (`AutoCreateAccounts = True`), so the bot simply logs in with
   `test1`/`test` and the account is created on first use.
+
+## Web interface
+
+The bot embeds a web UI (`internal/swarm/webserver`, files in `web/`)
+served from the bot process itself, so it is reachable exactly while the
+bot runs. It follows the classic bot tool layout (L2Walker/Adrenaline
+style: compact dark window, top tabs, left bot list, bottom status bar)
+and is designed for many bots: the bot registry enumerates every session,
+the sidebar lists them and clicking switches the observed bot.
+
+- Tabs: Status (character card, HP/MP bars, position, compass with the
+  facing direction, stats), Map (canvas world map with a direction arrow
+  and view cone for the character and heading arrows for every npc/player
+  like the L2Bot2.0 map, zoom, follow mode, labels, paths, hover tooltip),
+  Log (rolling event feed with a filter).
+- Endpoints: `GET /api/bots` (list), `GET /api/bots/{id}/state` (full JSON
+  snapshot), `GET /api/bots/{id}/events` (SSE stream that pushes a
+  snapshot whenever the bot state version changes), `GET /` and the
+  static assets.
+- The state tracker (`internal/swarm/state`) is fed by the game session
+  from these packets: UserInfo (self vitals), CharInfo (players), NpcInfo
+  (npcs with heading and attackable flag), DropItem (ground items),
+  MoveToLocation/StopMove/ValidateLocation (movement and heading),
+  StatusUpdate (vitals changes), DeleteObject (removals). Unknown packets
+  land in the event log.
+- Heading semantics (Mobius `LocationUtil.calculateHeadingFrom`):
+  `atan2(dy, dx) * 65535 / 2pi`, 0 faces east, the angle grows clockwise
+  because world y points south; the map draws arrows rotated by
+  `heading * 2pi / 65536` from an east pointing shape.
+- The server sends NpcInfo names empty for most npcs (the classic client
+  resolves them from NPCName-e.dat by display template id). The bot
+  resolves them through `internal/swarm/npcdata`, generated from the
+  Mobius data files by `tools/generate_npc_names.sh` (npc: template id
+  - 1000000 -> CT0_to_C4_ids.txt -> stats/npcs/*.xml; item: stats/items).
+  Regenerate after Mobius updates.
+- The web UI is plain HTML/CSS/JS without a build step; keep it that way
+  (embedded via go:embed). Watch out: top level `const` declarations are
+  not `window` properties, so cross script references must use the bare
+  binding name.
 
 ## Code conventions
 

@@ -1,0 +1,151 @@
+<!--
+
+SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+
+SPDX-License-Identifier: MIT
+
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>swarm · bot control</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark">SWARM</span>
+      <span class="brand-sub">bot control center</span>
+    </div>
+    <div class="header-right">
+      <span id="live-indicator" class="live-dot offline" title="event stream state"></span>
+      <span id="live-label">connecting</span>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <aside class="sidebar">
+      <div class="sidebar-title">BOTS</div>
+      <ul id="bot-list" class="bot-list"></ul>
+      <div class="sidebar-foot">
+        <div class="legend">
+          <div class="legend-item"><span class="dot self"></span>self</div>
+          <div class="legend-item"><span class="dot npc"></span>monster</div>
+          <div class="legend-item"><span class="dot friendly"></span>npc</div>
+          <div class="legend-item"><span class="dot player"></span>player</div>
+          <div class="legend-item"><span class="dot item"></span>item</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <nav class="tabs">
+        <button class="tab active" data-tab="status">Status</button>
+        <button class="tab" data-tab="map">Map</button>
+        <button class="tab" data-tab="log">Log</button>
+      </nav>
+
+      <section id="tab-status" class="tab-content active">
+        <div class="status-grid">
+          <div class="panel char-panel">
+            <div class="panel-title">Character</div>
+            <div class="char-head">
+              <div id="char-name" class="char-name">—</div>
+              <div id="char-class" class="char-class">—</div>
+            </div>
+            <div class="vitals">
+              <div class="vital-row">
+                <span class="vital-label">HP</span>
+                <div class="bar hp"><div id="hp-fill" class="bar-fill"></div></div>
+                <span id="hp-text" class="vital-text">0/0</span>
+              </div>
+              <div class="vital-row">
+                <span class="vital-label">MP</span>
+                <div class="bar mp"><div id="mp-fill" class="bar-fill"></div></div>
+                <span id="mp-text" class="vital-text">0/0</span>
+              </div>
+            </div>
+            <div class="kv-grid">
+              <div class="kv"><span>race</span><b id="char-race">—</b></div>
+              <div class="kv"><span>level</span><b id="char-level">—</b></div>
+              <div class="kv"><span>exp</span><b id="char-exp">—</b></div>
+              <div class="kv"><span>sp</span><b id="char-sp">—</b></div>
+            </div>
+          </div>
+
+          <div class="panel pos-panel">
+            <div class="panel-title">Position</div>
+            <div class="compass" id="compass">
+              <div class="compass-dial">
+                <span class="n">N</span><span class="e">E</span>
+                <span class="s">S</span><span class="w">W</span>
+                <div id="compass-arrow" class="compass-arrow"></div>
+              </div>
+              <div class="kv-grid">
+                <div class="kv"><span>x</span><b id="pos-x">—</b></div>
+                <div class="kv"><span>y</span><b id="pos-y">—</b></div>
+                <div class="kv"><span>z</span><b id="pos-z">—</b></div>
+                <div class="kv"><span>facing</span><b id="pos-heading">—</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel stats-panel">
+            <div class="panel-title">Stats</div>
+            <div class="kv-grid stats">
+              <div class="kv"><span>STR</span><b id="stat-str">—</b></div>
+              <div class="kv"><span>DEX</span><b id="stat-dex">—</b></div>
+              <div class="kv"><span>CON</span><b id="stat-con">—</b></div>
+              <div class="kv"><span>INT</span><b id="stat-int">—</b></div>
+              <div class="kv"><span>WIT</span><b id="stat-wit">—</b></div>
+              <div class="kv"><span>MEN</span><b id="stat-men">—</b></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-map" class="tab-content">
+        <div class="map-toolbar">
+          <button id="zoom-out" class="btn" title="zoom out">−</button>
+          <button id="zoom-in" class="btn" title="zoom in">+</button>
+          <label class="check"><input type="checkbox" id="follow" checked> follow</label>
+          <label class="check"><input type="checkbox" id="show-labels" checked> labels</label>
+          <label class="check"><input type="checkbox" id="show-dest"> paths</label>
+          <span id="map-scale" class="map-scale"></span>
+          <span id="map-objects" class="map-objects"></span>
+        </div>
+        <div class="map-wrap">
+          <canvas id="map-canvas"></canvas>
+          <div id="map-tooltip" class="map-tooltip hidden"></div>
+          <div class="map-rose"><span class="rose-n">N</span></div>
+        </div>
+      </section>
+
+      <section id="tab-log" class="tab-content">
+        <div class="log-toolbar">
+          <input id="log-filter" type="text" placeholder="filter events…">
+          <label class="check"><input type="checkbox" id="log-scroll" checked> auto scroll</label>
+          <span id="log-count" class="log-count"></span>
+        </div>
+        <div id="log-list" class="log-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="app-footer">
+    <span id="foot-status" class="foot-item">status: —</span>
+    <span id="foot-packets" class="foot-item">packets: —</span>
+    <span id="foot-objects" class="foot-item">objects: —</span>
+    <span id="foot-uptime" class="foot-item">uptime: —</span>
+    <span id="foot-updated" class="foot-item">updated: —</span>
+  </footer>
+</div>
+
+<script src="app.js"></script>
+<script src="map.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

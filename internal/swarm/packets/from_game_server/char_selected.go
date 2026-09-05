@@ -22,11 +22,26 @@ type CharSelectedPacket struct {
 	ObjectID  int32
 	SessionID int32
 	ClassID   int32
+	X         int32
+	Y         int32
+	Z         int32
+	CurrentHP float64
+	CurrentMP float64
 }
 
 // NewCharSelectedPacket creates a zero valued packet ready for parsing.
 func NewCharSelectedPacket() *CharSelectedPacket {
-	return &CharSelectedPacket{Name: "", ObjectID: 0, SessionID: 0, ClassID: 0}
+	return &CharSelectedPacket{
+		Name:      "",
+		ObjectID:  0,
+		SessionID: 0,
+		ClassID:   0,
+		X:         0,
+		Y:         0,
+		Z:         0,
+		CurrentHP: 0,
+		CurrentMP: 0,
+	}
 }
 
 // ParseCharSelectedPacket reads the packet from payload bytes. Fields after
@@ -59,6 +74,23 @@ func ParseCharSelectedPacket(p *CharSelectedPacket, data []byte) error {
 	if p.ClassID, err = reader.ReadInt32(); err != nil {
 		return err
 	}
+	// Skip the active flag before the position.
+	if err := reader.Skip(4); err != nil {
+		return errors.New("not enough bytes for char selected position")
+	}
+	if p.X, err = reader.ReadInt32(); err != nil {
+		return err
+	}
+	if p.Y, err = reader.ReadInt32(); err != nil {
+		return err
+	}
+	if p.Z, err = reader.ReadInt32(); err != nil {
+		return err
+	}
+	if p.CurrentHP, err = reader.ReadFloat64(); err != nil {
+		return err
+	}
+	p.CurrentMP, err = reader.ReadFloat64()
 
-	return nil
+	return err
 }

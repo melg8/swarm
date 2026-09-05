@@ -18,6 +18,7 @@ import (
 	fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
 	"github.com/melg8/swarm/internal/swarm/packets/packet"
 	togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
+	"github.com/melg8/swarm/internal/swarm/state"
 )
 
 // Protocol constants.
@@ -39,6 +40,18 @@ const (
 	leaveWorldID      = 0x96
 	serverCloseID     = 0x36
 	netPingResponseID = 0xEC
+)
+
+// Packet ids of the observed world packets.
+const (
+	moveToLocationID   = 0x01
+	charInfoID         = 0x03
+	dropItemID         = 0x16
+	statusUpdateID     = 0x1A
+	deleteObjectID     = 0x1E
+	npcInfoID          = 0x22
+	stopMoveID         = 0x59
+	validateLocationID = 0x76
 )
 
 // GameSessionParams carries the login session keys for the game server.
@@ -69,7 +82,21 @@ type GameClient struct {
 	logger      *log.Logger
 	packetCount atomic.Int64
 	readBuf     []byte
+	tracker     *state.Bot
+	npcInfo     fromgameserver.NpcInfoPacket
+	userInfo    fromgameserver.UserInfoPacket
+	charInfo    fromgameserver.CharInfoPacket
+	moveTo      fromgameserver.MoveToLocationPacket
+	stopMove    fromgameserver.StopMovePacket
+	validateLoc fromgameserver.ValidateLocationPacket
+	deleted     fromgameserver.DeleteObjectPacket
+	dropItem    fromgameserver.DropItemPacket
+	statusUpd   fromgameserver.StatusUpdatePacket
+	statusAttrs [statusAttrsCapacity]state.Attribute
 }
+
+// statusAttrsCapacity bounds the scratch attributes of status updates.
+const statusAttrsCapacity = 8
 
 // gameBuffer is the pooled receive buffer of the read loop. A pointer type
 // keeps sync.Pool arguments pointer-like and allocation free.
@@ -95,6 +122,17 @@ func NewGameClient(conn net.Conn) (*GameClient, error) {
 		logger:      log.Default(),
 		packetCount: atomic.Int64{},
 		readBuf:     nil,
+		tracker:     nil,
+		npcInfo:     *fromgameserver.NewNpcInfoPacket(),
+		userInfo:    *fromgameserver.NewUserInfoPacket(),
+		charInfo:    *fromgameserver.NewCharInfoPacket(),
+		moveTo:      *fromgameserver.NewMoveToLocationPacket(),
+		stopMove:    *fromgameserver.NewStopMovePacket(),
+		validateLoc: *fromgameserver.NewValidateLocationPacket(),
+		deleted:     *fromgameserver.NewDeleteObjectPacket(),
+		dropItem:    *fromgameserver.NewDropItemPacket(),
+		statusUpd:   *fromgameserver.NewStatusUpdatePacket(),
+		statusAttrs: [statusAttrsCapacity]state.Attribute{},
 	}
 
 	writer := packet.NewWriter()
@@ -139,6 +177,12 @@ func NewGameClient(conn net.Conn) (*GameClient, error) {
 // SetLogger overrides the default logger of the client.
 func (gc *GameClient) SetLogger(logger *log.Logger) {
 	gc.logger = logger
+}
+
+// SetTracker attaches the state tracker that observes the session. The
+// tracker is optional; without it the client only logs packets.
+func (gc *GameClient) SetTracker(tracker *state.Bot) {
+	gc.tracker = tracker
 }
 
 // PacketCount returns the number of packets received so far.
@@ -360,6 +404,7 @@ func (gc *GameClient) EnterWorld(slot int32) error {
 				&selected, payload); err != nil {
 				return fmt.Errorf("failed to parse char selected: %w", err)
 			}
+			gc.trackerApplySelection(&selected)
 
 			break
 		}
@@ -375,6 +420,18 @@ func (gc *GameClient) EnterWorld(slot int32) error {
 	return nil
 }
 
+// trackerApplySelection feeds the selected character state to the tracker.
+func (gc *GameClient) trackerApplySelection(
+	selected *fromgameserver.CharSelectedPacket,
+) {
+	if gc.tracker == nil {
+		return
+	}
+	gc.tracker.SetCharacter(selected.Name, selected.ObjectID, selected.ClassID,
+		selected.X, selected.Y, selected.Z,
+		selected.CurrentHP, selected.CurrentMP)
+}
+
 // gamePacket couples a received payload with its pooled buffer.
 type gamePacket struct {
 	buf     *gameBuffer
@@ -386,6 +443,20 @@ type gamePacket struct {
 // packets in a dedicated goroutine and sends periodic net ping requests.
 // On context cancellation it sends the logout packet and closes.
 func (gc *GameClient) Run(ctx context.Context, characterName string) error {
+	if gc.tracker != nil {
+		gc.tracker.SetOnline(characterName)
+	}
+
+	err := gc.run(ctx, characterName)
+	if gc.tracker != nil {
+		gc.tracker.SetOffline()
+	}
+
+	return err
+}
+
+// run is the implementation of Run without the tracker bookkeeping.
+func (gc *GameClient) run(ctx context.Context, characterName string) error {
 	packets := make(chan gamePacket, packetChanSize)
 	readerDone := make(chan struct{})
 	go func() {
@@ -474,23 +545,293 @@ func drainPackets(packets <-chan gamePacket, readerDone <-chan struct{}) {
 
 // handleServerPacket logs and dispatches known in game packets.
 func (gc *GameClient) handleServerPacket(payload []byte) {
+	if gc.tracker != nil {
+		gc.tracker.CountPacket()
+	}
+
 	switch payload[0] {
 	case netPingResponseID:
-		ping := fromgameserver.NewNetPingPacket()
-		if err := fromgameserver.ParseNetPingPacket(ping, payload); err != nil {
-			gc.logger.Printf("Failed to parse net ping: %v", err)
-
-			return
-		}
-		gc.logger.Printf("Net ping with game time %d", ping.GameTime)
-	case userInfoID:
-		gc.logger.Println("Received user info update")
+		gc.handleNetPing(payload)
 	case leaveWorldID:
 		gc.logger.Println("Server confirmed leave world")
 	case serverCloseID:
 		gc.logger.Println("Server is closing the connection")
 	default:
-		gc.logger.Printf("Received packet id 0x%02x with %d bytes",
-			payload[0], len(payload))
+		gc.handleWorldPacket(payload)
+	}
+}
+
+// handleWorldPacket dispatches the packets that carry the observed world
+// state: characters, npcs, items and movement.
+func (gc *GameClient) handleWorldPacket(payload []byte) {
+	if gc.handleObjectPacket(payload) {
+		return
+	}
+	gc.handlePlacementPacket(payload)
+}
+
+// handleObjectPacket dispatches the spawn and remove packets. It reports
+// whether the packet was consumed.
+func (gc *GameClient) handleObjectPacket(payload []byte) bool {
+	switch payload[0] {
+	case userInfoID:
+		gc.applyUserInfo(payload)
+	case charInfoID:
+		gc.applyCharInfo(payload)
+	case npcInfoID:
+		gc.applyNpcInfo(payload)
+	case dropItemID:
+		gc.applyDropItem(payload)
+	case deleteObjectID:
+		gc.applyDeleteObject(payload)
+	default:
+		return false
+	}
+
+	return true
+}
+
+// handlePlacementPacket dispatches movement and vitals packets.
+func (gc *GameClient) handlePlacementPacket(payload []byte) {
+	switch payload[0] {
+	case moveToLocationID:
+		gc.applyMoveToLocation(payload)
+	case stopMoveID:
+		gc.applyStopMove(payload)
+	case validateLocationID:
+		gc.applyValidateLocation(payload)
+	case statusUpdateID:
+		gc.applyStatusUpdate(payload)
+	default:
+		gc.logUnknownPacket(payload)
+	}
+}
+
+// logUnknownPacket reports an unobserved packet to the console and the
+// tracker event log.
+func (gc *GameClient) logUnknownPacket(payload []byte) {
+	gc.logger.Printf("Received packet id 0x%02x with %d bytes",
+		payload[0], len(payload))
+	if gc.tracker != nil {
+		gc.tracker.RecordEvent(fmt.Sprintf(
+			"packet 0x%02x with %d bytes", payload[0], len(payload)))
+	}
+}
+
+// handleNetPing parses and logs the server net ping response.
+func (gc *GameClient) handleNetPing(payload []byte) {
+	ping := fromgameserver.NewNetPingPacket()
+	if err := fromgameserver.ParseNetPingPacket(ping, payload); err != nil {
+		gc.logger.Printf("Failed to parse net ping: %v", err)
+
+		return
+	}
+	gc.logger.Printf("Net ping with game time %d", ping.GameTime)
+}
+
+// applyUserInfo parses UserInfo and updates the character state.
+func (gc *GameClient) applyUserInfo(payload []byte) {
+	err := fromgameserver.ParseUserInfoPacket(&gc.userInfo, payload)
+	if err != nil {
+		gc.logger.Printf("Failed to parse user info: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		info := gc.userInfo
+		gc.tracker.ApplyUserInfo(state.UserInfo{
+			Name:    info.Name,
+			Level:   info.Level,
+			Race:    info.Race,
+			ClassID: info.ClassID,
+			X:       info.X,
+			Y:       info.Y,
+			Z:       info.Z,
+			STR:     info.STR,
+			DEX:     info.DEX,
+			CON:     info.CON,
+			INT:     info.INT,
+			WIT:     info.WIT,
+			MEN:     info.MEN,
+			Exp:     info.Exp,
+			Sp:      info.Sp,
+			MaxHP:   info.MaxHP,
+			CurHP:   info.CurHP,
+			MaxMP:   info.MaxMP,
+			CurMP:   info.CurMP,
+		})
+	}
+	gc.logger.Printf("User info: %s level %d hp %d/%d mp %d/%d",
+		gc.userInfo.Name, gc.userInfo.Level,
+		gc.userInfo.CurHP, gc.userInfo.MaxHP,
+		gc.userInfo.CurMP, gc.userInfo.MaxMP)
+}
+
+// applyNpcInfo parses NpcInfo and upserts the npc object.
+func (gc *GameClient) applyNpcInfo(payload []byte) {
+	if err := fromgameserver.ParseNpcInfoPacket(&gc.npcInfo, payload); err != nil {
+		gc.logger.Printf("Failed to parse npc info: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		info := gc.npcInfo
+		gc.tracker.ApplyNpcInfo(state.NpcInfo{
+			ObjectID:   info.ObjectID,
+			TemplateID: info.TemplateID,
+			Attackable: info.Attackable,
+			X:          info.X,
+			Y:          info.Y,
+			Z:          info.Z,
+			Heading:    info.Heading,
+			Running:    info.Running,
+			InCombat:   info.InCombat,
+			Name:       info.Name,
+			Title:      info.Title,
+		})
+	}
+	gc.logger.Printf("NPC %s spawned at %d %d %d heading %d",
+		gc.npcInfo.Name, gc.npcInfo.X, gc.npcInfo.Y, gc.npcInfo.Z,
+		gc.npcInfo.Heading)
+}
+
+// applyCharInfo parses CharInfo and upserts the player object.
+func (gc *GameClient) applyCharInfo(payload []byte) {
+	err := fromgameserver.ParseCharInfoPacket(&gc.charInfo, payload)
+	if err != nil {
+		gc.logger.Printf("Failed to parse char info: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		info := gc.charInfo
+		gc.tracker.ApplyPlayerInfo(state.PlayerInfo{
+			ObjectID: info.ObjectID,
+			Name:     info.Name,
+			Title:    info.Title,
+			Race:     info.Race,
+			ClassID:  info.ClassID,
+			X:        info.X,
+			Y:        info.Y,
+			Z:        info.Z,
+		})
+	}
+	gc.logger.Printf("Player %s appeared at %d %d %d",
+		gc.charInfo.Name, gc.charInfo.X, gc.charInfo.Y, gc.charInfo.Z)
+}
+
+// applyDropItem parses DropItem and upserts the ground item object.
+func (gc *GameClient) applyDropItem(payload []byte) {
+	err := fromgameserver.ParseDropItemPacket(&gc.dropItem, payload)
+	if err != nil {
+		gc.logger.Printf("Failed to parse drop item: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		info := gc.dropItem
+		gc.tracker.ApplyItemInfo(state.ItemInfo{
+			ObjectID:   info.ObjectID,
+			TemplateID: info.TemplateID,
+			Stackable:  info.Stackable,
+			Count:      info.Count,
+			X:          info.X,
+			Y:          info.Y,
+			Z:          info.Z,
+		})
+	}
+}
+
+// applyDeleteObject parses DeleteObject and removes the object.
+func (gc *GameClient) applyDeleteObject(payload []byte) {
+	err := fromgameserver.ParseDeleteObjectPacket(&gc.deleted, payload)
+	if err != nil {
+		gc.logger.Printf("Failed to parse delete object: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		gc.tracker.RemoveObject(gc.deleted.ObjectID)
+	}
+}
+
+// applyMoveToLocation parses MoveToLocation and updates the movement.
+func (gc *GameClient) applyMoveToLocation(payload []byte) {
+	err := fromgameserver.ParseMoveToLocationPacket(&gc.moveTo, payload)
+	if err != nil {
+		gc.logger.Printf("Failed to parse movement: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		move := gc.moveTo
+		gc.tracker.ApplyMovement(state.Movement{
+			ObjectID: move.ObjectID,
+			X:        move.X,
+			Y:        move.Y,
+			Z:        move.Z,
+			DestX:    move.DestX,
+			DestY:    move.DestY,
+			DestZ:    move.DestZ,
+		})
+	}
+}
+
+// applyStopMove parses StopMove and updates the object placement.
+func (gc *GameClient) applyStopMove(payload []byte) {
+	err := fromgameserver.ParseStopMovePacket(&gc.stopMove, payload)
+	if err != nil {
+		gc.logger.Printf("Failed to parse stop move: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		stop := gc.stopMove
+		gc.tracker.ApplyPlacement(state.Placement{
+			ObjectID: stop.ObjectID,
+			X:        stop.X,
+			Y:        stop.Y,
+			Z:        stop.Z,
+			Heading:  stop.Heading,
+			Moving:   false,
+		})
+	}
+}
+
+// applyValidateLocation parses ValidateLocation and updates the placement.
+func (gc *GameClient) applyValidateLocation(payload []byte) {
+	if err := fromgameserver.ParseValidateLocationPacket(
+		&gc.validateLoc, payload); err != nil {
+		gc.logger.Printf("Failed to parse validate location: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		place := gc.validateLoc
+		gc.tracker.ApplyPlacement(state.Placement{
+			ObjectID: place.ObjectID,
+			X:        place.X,
+			Y:        place.Y,
+			Z:        place.Z,
+			Heading:  place.Heading,
+			Moving:   false,
+		})
+	}
+}
+
+// applyStatusUpdate parses StatusUpdate and applies the vitals changes.
+func (gc *GameClient) applyStatusUpdate(payload []byte) {
+	if err := fromgameserver.ParseStatusUpdatePacket(
+		&gc.statusUpd, payload); err != nil {
+		gc.logger.Printf("Failed to parse status update: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		attrs := gc.statusAttrs[:0]
+		gc.statusUpd.ForEach(func(id int32, value int32) {
+			attrs = append(attrs, state.Attribute{ID: id, Value: value})
+		})
+		gc.tracker.ApplyStatusUpdate(gc.statusUpd.ObjectID, attrs)
 	}
 }

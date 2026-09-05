@@ -6,16 +6,20 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/connection"
+	"github.com/melg8/swarm/internal/swarm/state"
+	"github.com/melg8/swarm/internal/swarm/webserver"
 )
 
 // Default configuration values.
@@ -24,6 +28,7 @@ const (
 	defaultAccount      = "test1"
 	defaultPassword     = "test"
 	defaultCharName     = "test1"
+	defaultWebAddress   = "127.0.0.1:8080"
 	connectTimeout      = 10 * time.Second
 )
 
@@ -42,6 +47,7 @@ type config struct {
 	account      string
 	password     string
 	charName     string
+	webAddress   string
 }
 
 func parseFlags() config {
@@ -50,12 +56,15 @@ func parseFlags() config {
 		account:      "",
 		password:     "",
 		charName:     "",
+		webAddress:   "",
 	}
 	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
 		"login server address")
 	flag.StringVar(&cfg.account, "account", defaultAccount, "account name")
 	flag.StringVar(&cfg.password, "password", defaultPassword, "account password")
 	flag.StringVar(&cfg.charName, "char", defaultCharName, "character name")
+	flag.StringVar(&cfg.webAddress, "web", defaultWebAddress,
+		"web interface address, empty disables it")
 	flag.Parse()
 
 	return cfg
@@ -89,7 +98,7 @@ func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
 
 // runBot performs the full bot flow: login, game handshake, authentication,
 // character creation and staying in the world until the context is done.
-func runBot(ctx context.Context, cfg config) error {
+func runBot(ctx context.Context, cfg config, tracker *state.Bot) error {
 	loginConn, err := connectLoginServer(cfg.loginAddress)
 	if err != nil {
 		return err
@@ -109,6 +118,7 @@ func runBot(ctx context.Context, cfg config) error {
 	if err != nil {
 		return fmt.Errorf("game handshake failed: %w", err)
 	}
+	game.SetTracker(tracker)
 
 	charList, err := game.Authenticate(connection.GameSessionParams{
 		Account:    auth.Account,
@@ -154,14 +164,52 @@ func main() {
 	log.SetOutput(os.Stdout)
 	log.Println("Starting swarm bot for account " + cfg.account)
 
+	registry := state.NewRegistry()
+	tracker := state.NewBot(cfg.account)
+	registry.Add(tracker)
+
+	web := startWebInterface(cfg, registry)
+
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	err := runBot(ctx, cfg)
+	err := runBot(ctx, cfg, tracker)
 	stop()
+	shutdownWebInterface(web)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Bot finished")
+}
+
+// startWebInterface runs the web server in the background when enabled.
+func startWebInterface(
+	cfg config, registry *state.Registry,
+) *webserver.Server {
+	if cfg.webAddress == "" {
+		return nil
+	}
+	server := webserver.NewServer(registry, cfg.webAddress, log.Default())
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				log.Printf("Web interface stopped: %v", err)
+			}
+		}
+	}()
+
+	return server
+}
+
+// shutdownWebInterface gracefully stops the web server.
+func shutdownWebInterface(server *webserver.Server) {
+	if server == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("Web interface shutdown failed: %v", err)
+	}
 }

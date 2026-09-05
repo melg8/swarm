@@ -274,6 +274,12 @@ func TestParseCharSelectedPacket(t *testing.T) {
 		data = putInt32(data, 0)  // sex
 		data = putInt32(data, 1)  // race
 		data = putInt32(data, 18) // class id
+		data = putInt32(data, 1)  // active
+		data = putInt32(data, 45000)
+		data = putInt32(data, 50000)
+		data = putInt32(data, -3500)
+		data = putFloat64(data, 50)
+		data = putFloat64(data, 30)
 
 		p := NewCharSelectedPacket()
 		err := ParseCharSelectedPacket(p, data)
@@ -282,6 +288,11 @@ func TestParseCharSelectedPacket(t *testing.T) {
 		require.Equal(t, int32(100), p.ObjectID)
 		require.Equal(t, int32(42), p.SessionID)
 		require.Equal(t, int32(18), p.ClassID)
+		require.Equal(t, int32(45000), p.X)
+		require.Equal(t, int32(50000), p.Y)
+		require.Equal(t, int32(-3500), p.Z)
+		require.InDelta(t, 50, p.CurrentHP, 0.001)
+		require.InDelta(t, 30, p.CurrentMP, 0.001)
 	})
 
 	t.Run("invalid packet id", func(t *testing.T) {

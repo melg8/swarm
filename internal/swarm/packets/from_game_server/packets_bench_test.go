@@ -82,3 +82,65 @@ func BenchmarkParseKeyPacket(b *testing.B) {
 		}
 	}
 }
+
+// buildNpcInfoPayload builds a realistic NpcInfo packet.
+func buildNpcInfoPayload() []byte {
+	data := []byte{0x22}
+	data = putInt32(data, 268473919)
+	data = putInt32(data, 1001277)
+	data = putInt32(data, 1)
+	data = putInt32(data, 45000)
+	data = putInt32(data, 50000)
+	data = putInt32(data, -3500)
+	data = putInt32(data, 16384)
+	data = append(data, make([]byte, npcInfoSkippedBytes)...)
+	data = append(data, 1, 1, 0, 0, 0)
+	data = append(data, utf16("Keltir")...)
+	data = append(data, utf16("Lv 1")...)
+
+	return data
+}
+
+// buildUserInfoPayload builds a realistic UserInfo packet tail.
+func buildUserInfoPayload() []byte {
+	data := []byte{0x04}
+	data = putInt32(data, 45000)
+	data = putInt32(data, 50000)
+	data = putInt32(data, -3500)
+	data = putInt32(data, 0)
+	data = putInt32(data, 268473919)
+	data = append(data, utf16("test1")...)
+	for _, value := range []int32{
+		1, 0, 18, 5, 2000, 36, 35, 36, 23, 14, 25, 122, 100, 40, 39,
+	} {
+		data = putInt32(data, value)
+	}
+
+	return data
+}
+
+// BenchmarkParseNpcInfoPacket measures the npc spawn hot path.
+func BenchmarkParseNpcInfoPacket(b *testing.B) {
+	data := buildNpcInfoPayload()
+	packet := NewNpcInfoPacket()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if err := ParseNpcInfoPacket(packet, data); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkParseUserInfoPacket measures the self state refresh path.
+func BenchmarkParseUserInfoPacket(b *testing.B) {
+	data := buildUserInfoPayload()
+	packet := NewUserInfoPacket()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if err := ParseUserInfoPacket(packet, data); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

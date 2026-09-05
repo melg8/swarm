@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/crypt"
+	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/stretchr/testify/require"
 )
 
@@ -124,6 +125,12 @@ func (s *fakeGameServer) worldFlow(conn net.Conn, cipher *crypt.GameCrypt) {
 	for range 5 {
 		selected = binary.LittleEndian.AppendUint32(selected, 0)
 	}
+	selected = binary.LittleEndian.AppendUint32(selected, 1) // active
+	selected = binary.LittleEndian.AppendUint32(selected, 45000)
+	selected = binary.LittleEndian.AppendUint32(selected, 50000)
+	selected = append(selected, 0x68, 0xF2, 0xFF, 0xFF)       // z = -3500
+	selected = binary.LittleEndian.AppendUint64(selected, 50) // cur hp
+	selected = binary.LittleEndian.AppendUint64(selected, 30) // cur mp
 	s.writeEncrypted(conn, cipher, selected)
 
 	payload := s.readEncrypted(conn, cipher)
@@ -131,6 +138,13 @@ func (s *fakeGameServer) worldFlow(conn net.Conn, cipher *crypt.GameCrypt) {
 
 	s.writeEncrypted(conn, cipher,
 		append([]byte{0xEC}, 0x0A, 0x00, 0x00, 0x00))
+
+	// World observation packets exercise the tracker of the client.
+	s.writeEncrypted(conn, cipher, buildNpcInfo(1, "Keltir", 45100, 50100, 8192))
+	s.writeEncrypted(conn, cipher, buildNpcInfo(2, "Gremlin", 44900, 49900, 4096))
+	s.writeEncrypted(conn, cipher, buildValidateLocation(100, 45050, 50050, 16384))
+	s.writeEncrypted(conn, cipher, buildMoveToPacket(1, 45300, 50300))
+	s.writeEncrypted(conn, cipher, buildDeleteObject(2))
 
 	// Expect the logout packet when the client stops.
 	for {
@@ -317,4 +331,142 @@ func TestGameClientFullFlow(t *testing.T) {
 	err = client.Run(ctx, "test1")
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, client.PacketCount(), 1)
+}
+
+// buildNpcInfo builds a minimal NpcInfo packet for tracker tests.
+func buildNpcInfo(
+	objectID int32, name string, x int32, y int32, heading int32,
+) []byte {
+	data := []byte{0x22}
+	data = appendInt32(data, objectID)
+	data = appendInt32(data, 1001277)
+	data = appendInt32(data, 1)
+	data = appendInt32(data, x)
+	data = appendInt32(data, y)
+	data = appendInt32(data, 62172) // z
+	data = appendInt32(data, heading)
+	data = append(data, make([]byte, 88)...)
+	data = append(data, 1, 1, 0, 0, 0)
+	data = append(data, utf16Bytes(name)...)
+	data = append(data, utf16Bytes("")...)
+
+	return data
+}
+
+// buildValidateLocation builds a ValidateLocation packet.
+func buildValidateLocation(
+	objectID int32, x int32, y int32, heading int32,
+) []byte {
+	data := []byte{0x76}
+	data = appendInt32(data, objectID)
+	data = appendInt32(data, x)
+	data = appendInt32(data, y)
+	data = appendInt32(data, 62172) // z
+	data = appendInt32(data, heading)
+
+	return data
+}
+
+// appendInt32 appends a little endian int32 value to the packet.
+func appendInt32(dst []byte, value int32) []byte {
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], uint32(value)) //nolint:gosec // test
+
+	return append(dst, buf[:]...)
+}
+
+// buildMoveToPacket builds a MoveToLocation packet.
+func buildMoveToPacket(objectID int32, destX int32, destY int32) []byte {
+	data := []byte{0x01}
+	data = appendInt32(data, objectID)
+	data = appendInt32(data, destX)
+	data = appendInt32(data, destY)
+	data = appendInt32(data, 0)
+	data = appendInt32(data, destX-100)
+	data = appendInt32(data, destY-100)
+	data = appendInt32(data, 0)
+
+	return data
+}
+
+// buildDeleteObject builds a DeleteObject packet.
+func buildDeleteObject(objectID int32) []byte {
+	data := []byte{0x1E}
+	data = appendInt32(data, objectID)
+
+	return data
+}
+
+// findTrackedObject returns the tracked object with the given id.
+func findTrackedObject(
+	snap state.Snapshot, objectID int32,
+) *state.ObjectSnapshot {
+	for i := range snap.Objects {
+		if snap.Objects[i].ObjectID == objectID {
+			return &snap.Objects[i]
+		}
+	}
+
+	return nil
+}
+
+func TestGameClientTracksWorldState(t *testing.T) {
+	server := startFakeGameServer(t)
+
+	conn, err := net.Dial("tcp", server.Addr())
+	require.NoError(t, err)
+
+	client, err := NewGameClient(conn)
+	require.NoError(t, err)
+
+	tracker := state.NewBot("test1")
+	client.SetTracker(tracker)
+
+	charList, err := client.Authenticate(GameSessionParams{
+		Account:    "test1",
+		LoginOkID1: 1,
+		LoginOkID2: 2,
+		PlayOkID1:  3,
+		PlayOkID2:  4,
+	})
+	require.NoError(t, err)
+
+	updated, err := client.EnsureCharacter(CharacterParams{
+		Name:      "test1",
+		Race:      1,
+		Female:    0,
+		ClassID:   18,
+		HairStyle: 0,
+		HairColor: 0,
+		Face:      0,
+	}, charList)
+	require.NoError(t, err)
+
+	slot, _, found := updated.FindCharacterByName("test1")
+	require.True(t, found)
+	require.NoError(t, client.EnterWorld(int32(slot))) //nolint:gosec // small
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	require.NoError(t, client.Run(ctx, "test1"))
+
+	snapshot := tracker.Snapshot()
+	require.Equal(t, state.StatusOffline, snapshot.Status)
+	require.Equal(t, "test1", snapshot.Character.Name)
+	require.Equal(t, int32(45050), snapshot.Character.X)
+	require.Equal(t, int32(16384), snapshot.Character.Heading)
+
+	// The gremlin was deleted, the keltir remains and moves.
+	require.Len(t, snapshot.Objects, 1)
+	keltir := findTrackedObject(snapshot, 1)
+	require.NotNil(t, keltir)
+	require.Equal(t, state.KindNPC, keltir.Kind)
+	require.True(t, keltir.Attackable)
+	require.True(t, keltir.Moving)
+	require.Equal(t, int32(45300), keltir.DestX)
+	require.Equal(t, int32(45200), keltir.X)
+
+	// Events were recorded for the world observations.
+	require.NotEmpty(t, snapshot.Events)
+	require.GreaterOrEqual(t, snapshot.Packets, int64(6))
 }
