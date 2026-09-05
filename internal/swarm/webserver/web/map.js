@@ -184,10 +184,9 @@ const MapView = {
   // the last ~1/8 of short paths.
   //
   // The rendering compensates in two ways:
-  // - the movement speed is scaled by distance / (distance - gap) where
-  //   gap is a per template estimate of that early arrival distance,
-  //   learned from every observed arrival, so the drawn unit reaches the
-  //   destination exactly when the arrival packet arrives;
+  // - the projection covers the segment minus the packet collision
+  //   radius (NpcInfo/CharInfo carry it) in the time the server needs,
+  //   which is the exact server stop rule without any learned tuning;
   // - the drawn position follows the projection plus a decaying offset
   //   that is only set when the projection itself jumps (a new segment,
   //   an arrival, a teleport), so continuous movement has no permanent
@@ -242,128 +241,116 @@ const MapView = {
   },
 
   // updateRuntime advances the interpolated position of every object.
-  // The drawn position is the pure projection plus a decaying offset that
-  // absorbs packet discontinuities, so steady movement shows no lag.
   updateRuntime(dt) {
     if (!this.lastSnap) { return; }
     const nowMs = Date.now() + this.clockOffsetMs;
-    const decay = Math.exp(-dt * 10);
     const turning = 1 - Math.exp(-dt * 12);
     const c = this.lastSnap.character;
     if (c && c.x) {
-      this.advanceRuntime(c, "self", "self", nowMs, decay, turning);
+      this.advanceRuntime(c, "self", nowMs, dt, turning);
     }
     for (const obj of this.lastSnap.objects || []) {
-      this.advanceRuntime(obj, obj.objectId,
-        obj.kind === "npc" ? "npc-" + obj.templateId
-          : (obj.kind || "object"),
-        nowMs, decay, turning);
+      this.advanceRuntime(obj, obj.objectId, nowMs, dt, turning);
     }
   },
 
   // advanceRuntime drives one snapshot view (the character or a world
-  // object): it projects the current server position, learns the arrival
-  // gap on movement completions and moves the drawn position toward the
-  // projection without a permanent lag.
-  advanceRuntime(view, key, gapKey, nowMs, decay, turning) {
+  // object). The target is the exact reproduction of the server side
+  // movement recurrence (see projectTickwise), so in steady motion the
+  // drawn position sits ON the target with zero lag; when a packet
+  // update moves the target (delivery latency, a retarget, an arrival
+  // snap), the drawn position follows with a speed cap of chaseFactor
+  // times the unit speed - the correction becomes a slightly faster
+  // glide instead of a jump, which is exactly the jerky artifact the
+  // old learned gap model produced.
+  advanceRuntime(view, key, nowMs, dt, turning) {
     let rt = this.runtime.get(key);
-    const target = this.projectObject(view, nowMs, gapKey);
     if (!rt) {
-      this.runtime.set(key, {
-        drawX: target.x, drawY: target.y, drawHeading: view.heading,
-        offX: 0, offY: 0, settled: true, init: true,
-        moving: view.moving, segKey: segmentKey(view), seg: null
-      });
-
-      return;
+      // A view seen for the first time mid move starts at the projected
+      // position (anchored at the packet time), so a mob that walked
+      // into the known list does not pop up at its segment start.
+      const p = this.projectTickwise(view, nowMs);
+      rt = {
+        drawX: p.x, drawY: p.y, drawHeading: view.heading || 0,
+        settled: true, lastV: 0
+      };
+      this.runtime.set(key, rt);
     }
-    const key2 = segmentKey(view);
-    if (!rt.init || rt.segKey !== key2) {
-      rt.segKey = key2;
-      rt.init = true;
-      if (rt.moving && !view.moving) {
-        this.learnArrivalGap(view, rt, gapKey);
-      }
-      if (view.moving) {
-        rt.seg = {
-          x: view.x, y: view.y, destX: view.destX, destY: view.destY,
-          speed: view.speed, moveAtMs: view.moveAtMs
-        };
-      } else {
-        rt.seg = null;
-      }
-      rt.moving = view.moving;
-      // Preserve visual continuity across the discontinuity unless it is
-      // a real teleport: carry the difference as a decaying offset.
-      const jumpX = rt.drawX - target.x;
-      const jumpY = rt.drawY - target.y;
-      if (Math.hypot(jumpX, jumpY) > teleportUnits) {
-        rt.offX = 0;
-        rt.offY = 0;
-        rt.settled = true;
-      } else {
-        rt.offX = jumpX;
-        rt.offY = jumpY;
-      }
+    if (view.speed > 0) {
+      rt.lastV = view.speed;
     }
-    rt.offX *= decay;
-    rt.offY *= decay;
-    if (Math.hypot(rt.offX, rt.offY) < 0.4) {
-      rt.offX = 0;
-      rt.offY = 0;
+    const target = this.projectTickwise(view, nowMs);
+    const dx = target.x - rt.drawX;
+    const dy = target.y - rt.drawY;
+    const dist = Math.hypot(dx, dy);
+    if (dist > teleportUnits) {
+      // A real teleport: render the new place instantly.
+      rt.drawX = target.x;
+      rt.drawY = target.y;
       rt.settled = true;
     } else {
-      rt.settled = false;
+      const chase = Math.max(60, rt.lastV * chaseFactor) * dt;
+      if (dist <= chase) {
+        rt.drawX = target.x;
+        rt.drawY = target.y;
+        rt.settled = true;
+      } else {
+        rt.drawX += dx / dist * chase;
+        rt.drawY += dy / dist * chase;
+        rt.settled = false;
+      }
     }
-    rt.drawX = target.x + rt.offX;
-    rt.drawY = target.y + rt.offY;
     rt.drawHeading = turnHeading(rt.drawHeading, view.heading, turning);
   },
 
-  // learnArrivalGap measures how far the pure projection still was from
-  // the destination when the server announced the arrival, and feeds the
-  // per template estimate. Both moveAtMs values are packet parse times,
-  // so the network latency cancels out of the difference.
-  learnArrivalGap(view, rt, gapKey) {
-    const seg = rt.seg;
-    if (!seg || !(seg.speed > 0) || !seg.moveAtMs) { return; }
-    const dist = Math.hypot(seg.destX - seg.x, seg.destY - seg.y);
-    if (dist < minCalibrationDistance || !view.moveAtMs) { return; }
-    const elapsedS = Math.max(0, (view.moveAtMs - seg.moveAtMs) / 1000);
-    const traveled = Math.min(seg.speed * elapsedS, dist);
-    const gap = dist - traveled;
-    if (gap <= 0 || gap > maxArrivalGap) { return; }
-    const current = arrivalGaps.get(gapKey);
-    const next = current === undefined
-      ? gap
-      : current + (gap - current) * gapLearnRate;
-    arrivalGaps.set(gapKey, Math.min(maxArrivalGap, Math.max(1, next)));
-  },
-
-  // projectObject estimates the current server position of an object:
-  // standing objects keep their last position, moving ones travel from
-  // the packet position toward the destination at a speed scaled so the
-  // path completes when the server is expected to announce the arrival.
-  projectObject(obj, nowMs, gapKey) {
-    if (!obj.moving || !(obj.speed > 0)) {
-      return { x: obj.x, y: obj.y };
+  // projectTickwise reproduces the server movement recurrence exactly:
+  // Creature.updatePosition runs on 100 ms game ticks and advances the
+  // creature by xAccurate += (destination - xAccurate) * distFraction
+  // where distFraction = speed * ticks / 10 / (remaining - collision),
+  // counts it as arrived once distFraction exceeds 1 and snaps it to the
+  // exact destination. Replaying the same recurrence from the packet
+  // position and the packet speed gives the server position without any
+  // learned tuning: the packet speeds are the real ones (the server
+  // re-reads its move speed every tick, so buffs or a walk/run switch
+  // take effect with the next broadcast, and the broadcast values are
+  // divided by the move multiplier which the tracker multiplies back).
+  // The server position is a step function (one jump per tick); the two
+  // positions around the current tick are interpolated linearly, which
+  // renders the same average motion as one straight constant speed move
+  // - exactly what the official client animation does with the ticks.
+  projectTickwise(view, nowMs) {
+    if (!view.moving || !(view.speed > 0)) {
+      return { x: view.x, y: view.y };
     }
-    const dx = obj.destX - obj.x;
-    const dy = obj.destY - obj.y;
-    const dist = Math.hypot(dx, dy);
+    const dist = Math.hypot(view.destX - view.x, view.destY - view.y);
     if (dist < 1) {
-      return { x: obj.destX, y: obj.destY };
+      return { x: view.destX, y: view.destY };
     }
-    const gap = arrivalGapOf(gapKey);
-    let speed = obj.speed;
-    if (gap > 0.5 && dist > gap * 2) {
-      speed = obj.speed * Math.min(maxSpeedScale, dist / (dist - gap));
+    const collision = view.collisionRadius > 0
+      ? view.collisionRadius : defaultCollisionRadius;
+    const step = view.speed / 10;
+    const tickFloat = Math.max(0, nowMs - (view.moveAtMs || 0)) / 100;
+    const whole = Math.floor(tickFloat);
+    const frac = tickFloat - whole;
+    let x = view.x;
+    let y = view.y;
+    for (let k = 0; k <= whole; k++) {
+      const remainingX = view.destX - x;
+      const remainingY = view.destY - y;
+      const remaining = Math.hypot(remainingX, remainingY);
+      const delta = Math.max(0.00001, remaining - collision);
+      const advance = step / delta;
+      const nextX = advance >= 1 ? view.destX : x + remainingX * advance;
+      const nextY = advance >= 1 ? view.destY : y + remainingY * advance;
+      if (k === whole) {
+        // The window between tick k and tick k+1: interpolate.
+        return { x: x + (nextX - x) * frac, y: y + (nextY - y) * frac };
+      }
+      x = nextX;
+      y = nextY;
     }
-    const elapsed = Math.max(0, (nowMs - (obj.moveAtMs || 0)) / 1000);
-    const traveled = Math.min(speed * elapsed, dist);
-    const frac = traveled / dist;
 
-    return { x: obj.x + dx * frac, y: obj.y + dy * frac };
+    return { x, y };
   },
 
   // ---- drawing ----
@@ -801,46 +788,18 @@ const clockSampleWindow = 20;
 // treated as a teleport and rendered instantly instead of glided.
 const teleportUnits = 400;
 
-// defaultArrivalGap is the initial estimate of how far the pure
-// projection is short of the destination when the server announces the
-// arrival (the creature collision radius plus about one 100 ms game tick
-// step at typical speeds).
-const defaultArrivalGap = 14;
+// defaultCollisionRadius is the arrival collision estimate for views
+// whose packets carry no collision radius. The mob and player packets
+// always carry one; only exotic views can fall back to it.
+const defaultCollisionRadius = 9;
 
-// maxArrivalGap bounds the learned gap: larger observed values mean the
-// movement was interrupted (a chase stopped early, a root effect) and
-// must not poison the estimate.
-const maxArrivalGap = 60;
+// chaseFactor bounds how much faster than its unit a drawn position may
+// glide while catching up with the projected server position.
+const chaseFactor = 1.35;
 
-// gapLearnRate is the exponential moving average rate of the estimate.
-const gapLearnRate = 0.35;
-
-// minCalibrationDistance ignores very short segments: their arrival gap
-// is dominated by tick quantization noise.
-const minCalibrationDistance = 80;
-
-// maxSpeedScale caps the interpolation speed correction so a bad gap
-// estimate can never make units dash.
-const maxSpeedScale = 1.6;
-
-// arrivalGaps holds the per template arrival gap estimates (npc template
-// ids, "player", "self").
-const arrivalGaps = new Map();
-
-// arrivalGapOf returns the current gap estimate of a calibration key.
-function arrivalGapOf(key) {
-  const gap = arrivalGaps.get(key);
-
-  return gap === undefined ? defaultArrivalGap : gap;
-}
-
-// segmentKey identifies the movement segment of a snapshot view: any
-// packet that moves the start, the destination or the start timestamp
-// starts a new segment.
-function segmentKey(view) {
-  return view.x + "|" + view.destX + "|" + view.destY + "|"
-    + (view.moveAtMs || 0);
-}
+// chaseFloor is the minimum catch up speed in world units per second so
+// near destination residuals settle quickly for slow units too.
+const chaseFloor = 60;
 
 // normHeading maps an arbitrary degree value back to the game range.
 function normHeading(deg) {
