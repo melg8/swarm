@@ -46,7 +46,7 @@ SPDX-License-Identifier: MIT
           <div class="legend-item"><span class="dot item"></span>ground item</div>
         </div>
         <div class="legend-note">
-          tick = look direction · dashed square = server loaded zone (3×3 regions) · ring = target
+          tick = look direction · dashed square = server loaded zone (3×3 regions) · red ring = own target · violet link/ring = target of another player
         </div>
       </div>
     </aside>
@@ -93,6 +93,11 @@ SPDX-License-Identifier: MIT
                 <div class="bar mp"><div id="mp-fill" class="bar-fill"></div></div>
                 <span id="mp-text" class="vital-text">0/0</span>
               </div>
+              <div class="vital-row">
+                <span class="vital-label">XP</span>
+                <div class="bar xp"><div id="xp-fill" class="bar-fill"></div></div>
+                <span id="xp-text" class="vital-text">0%</span>
+              </div>
             </div>
             <div class="kv-grid hud-grid">
               <div class="kv"><span>level</span><b id="hud-level">—</b></div>
@@ -100,7 +105,6 @@ SPDX-License-Identifier: MIT
               <div class="kv"><span>x</span><b id="pos-x">—</b></div>
               <div class="kv"><span>y</span><b id="pos-y">—</b></div>
               <div class="kv"><span>z</span><b id="pos-z">—</b></div>
-              <div class="kv"><span>facing</span><b id="pos-heading">—</b></div>
               <div class="kv"><span>target</span><b id="hud-target">—</b></div>
               <div class="kv"><span>exp</span><b id="hud-exp">—</b></div>
               <div class="kv"><span>sp</span><b id="hud-sp">—</b></div>
