@@ -19,8 +19,14 @@ import (
 // GameAPI abstracts the game actions the hunt loop needs. The
 // connection.GameClient implements it.
 type GameAPI interface {
-	// AttackNearest attacks the closest attackable npc.
-	AttackNearest() (bool, error)
+	// AttackNearest selects the closest attackable npc and returns its
+	// object id, zero when nothing was attackable. The Mobius server
+	// answers the first request for a new target with MyTargetSelected.
+	AttackNearest() (int32, error)
+	// AttackTarget repeats the attack request for an already selected
+	// target: the server resolves it to a forced attack and starts the
+	// combat.
+	AttackTarget(objectID int32) error
 	// PickupItem clicks a ground item to walk to it and pick it up.
 	PickupItem(item state.LootItem) error
 	// DestroyItem destroys inventory items.
@@ -34,8 +40,13 @@ const (
 	// lootRadius is the distance around the character within drops are
 	// picked up after a kill.
 	lootRadius = 900.0
-	// engagePeriod is the minimum pause between two attack requests.
+	// engagePeriod is the minimum pause between two target selections.
 	engagePeriod = 4 * time.Second
+	// engageRetryPeriod is the pause between repeated forced attack
+	// requests for the selected target. The server accepts one player
+	// action per second (PlayerActionFloodProtector), so one second is
+	// the fastest useful cadence.
+	engageRetryPeriod = 1 * time.Second
 	// pickupTimeout is how long one pickup attempt may take before the
 	// item is skipped.
 	pickupTimeout = 12 * time.Second
@@ -115,7 +126,13 @@ func (l *Loop) tick() {
 }
 
 // engage attacks the nearest attackable npc while the current target
-// lives, then switches to the loot phase.
+// lives, then switches to the loot phase. The Mobius AttackRequest has
+// double click semantics: the first request selects the target (the
+// MyTargetSelected answer), the repeated request for the already
+// selected target triggers the forced attack. The loop therefore keeps
+// re-requesting the target until the character is actually engaged in
+// the fight, which the MoveToPawn/Attack/AutoAttackStart broadcasts
+// confirm.
 func (l *Loop) engage() {
 	// Prefer the server view of the target: the MyTargetSelected answer
 	// of the last attack request arrives asynchronously, so the fresh
@@ -131,18 +148,35 @@ func (l *Loop) engage() {
 		return
 	}
 	now := time.Now()
-	if l.target != 0 || now.Sub(l.lastHit) < engagePeriod {
+	if l.target == 0 {
+		if now.Sub(l.lastHit) < engagePeriod {
+			return
+		}
+		target, err := l.game.AttackNearest()
+		if err != nil {
+			l.logger.Printf("Hunt: attack failed: %v", err)
+
+			return
+		}
+		if target != 0 {
+			l.target = target
+			l.lastHit = now
+		}
+
 		return
 	}
-	attacked, err := l.game.AttackNearest()
-	if err != nil {
+	if l.tracker.SelfEngaged(l.target) {
+		return
+	}
+	if now.Sub(l.lastHit) < engageRetryPeriod {
+		return
+	}
+	if err := l.game.AttackTarget(l.target); err != nil {
 		l.logger.Printf("Hunt: attack failed: %v", err)
 
 		return
 	}
-	if attacked {
-		l.lastHit = now
-	}
+	l.lastHit = now
 }
 
 // loot picks up the ground items around the character until none is left

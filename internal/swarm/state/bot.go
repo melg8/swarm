@@ -37,75 +37,77 @@ const combatWindow = 10 * time.Second
 
 // CharacterState holds the observed state of the played character.
 type CharacterState struct {
-	Name          string
-	Level         int32
-	Race          int32
-	ClassID       int32
-	X             int32
-	Y             int32
-	Z             int32
-	Heading       int32
-	STR           int32
-	DEX           int32
-	CON           int32
-	INT           int32
-	WIT           int32
-	MEN           int32
-	Exp           int32
-	Sp            int32
-	CurHP         float64
-	MaxHP         float64
-	CurMP         float64
-	MaxMP         float64
-	Moving        bool
-	DestX         int32
-	DestY         int32
-	DestZ         int32
-	RunSpeed      float64
-	WalkSpeed     float64
-	MoveAt        time.Time
-	AutoAttacking bool
-	CombatUntil   time.Time
-	TargetID      int32
-	CurrentLoad   int32
-	MaxLoad       int32
+	Name             string
+	Level            int32
+	Race             int32
+	ClassID          int32
+	X                int32
+	Y                int32
+	Z                int32
+	Heading          int32
+	STR              int32
+	DEX              int32
+	CON              int32
+	INT              int32
+	WIT              int32
+	MEN              int32
+	Exp              int32
+	Sp               int32
+	CurHP            float64
+	MaxHP            float64
+	CurMP            float64
+	MaxMP            float64
+	Moving           bool
+	DestX            int32
+	DestY            int32
+	DestZ            int32
+	RunSpeed         float64
+	WalkSpeed        float64
+	MoveAt           time.Time
+	AutoAttacking    bool
+	CombatUntil      time.Time
+	FightingTargetID int32
+	TargetID         int32
+	CurrentLoad      int32
+	MaxLoad          int32
 }
 
 // newCharacterState creates a zero valued character state.
 func newCharacterState() CharacterState {
 	return CharacterState{
-		Name:          "",
-		Level:         0,
-		Race:          0,
-		ClassID:       0,
-		X:             0,
-		Y:             0,
-		Z:             0,
-		Heading:       0,
-		STR:           0,
-		DEX:           0,
-		CON:           0,
-		INT:           0,
-		WIT:           0,
-		MEN:           0,
-		Exp:           0,
-		Sp:            0,
-		CurHP:         0,
-		MaxHP:         0,
-		CurMP:         0,
-		MaxMP:         0,
-		Moving:        false,
-		DestX:         0,
-		DestY:         0,
-		DestZ:         0,
-		RunSpeed:      defaultRunSpeed,
-		WalkSpeed:     defaultWalkSpeed,
-		MoveAt:        time.Time{},
-		AutoAttacking: false,
-		CombatUntil:   time.Time{},
-		TargetID:      0,
-		CurrentLoad:   0,
-		MaxLoad:       0,
+		Name:             "",
+		Level:            0,
+		Race:             0,
+		ClassID:          0,
+		X:                0,
+		Y:                0,
+		Z:                0,
+		Heading:          0,
+		STR:              0,
+		DEX:              0,
+		CON:              0,
+		INT:              0,
+		WIT:              0,
+		MEN:              0,
+		Exp:              0,
+		Sp:               0,
+		CurHP:            0,
+		MaxHP:            0,
+		CurMP:            0,
+		MaxMP:            0,
+		Moving:           false,
+		DestX:            0,
+		DestY:            0,
+		DestZ:            0,
+		RunSpeed:         defaultRunSpeed,
+		WalkSpeed:        defaultWalkSpeed,
+		MoveAt:           time.Time{},
+		AutoAttacking:    false,
+		CombatUntil:      time.Time{},
+		FightingTargetID: 0,
+		TargetID:         0,
+		CurrentLoad:      0,
+		MaxLoad:          0,
 	}
 }
 
@@ -277,6 +279,29 @@ func (b *Bot) SelfTargetID() int32 {
 	defer b.mu.RUnlock()
 
 	return b.char.TargetID
+}
+
+// SelfEngaged reports whether the character is currently fighting the
+// given target: chasing it or attacking it inside the combat window. It
+// is the signal that a forced attack request actually started the fight,
+// so the hunt loop can stop re-requesting it.
+func (b *Bot) SelfEngaged(targetID int32) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.FightingTargetID == targetID && b.char.inCombat(time.Now())
+}
+
+// ObjectPosition returns the last observed placement of a known object.
+func (b *Bot) ObjectPosition(objectID int32) (int32, int32, int32, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	obj, ok := b.objects[objectID]
+	if !ok {
+		return 0, 0, 0, false
+	}
+
+	return obj.X, obj.Y, obj.Z, true
 }
 
 // ObjectAlive reports whether the object is known around the character
@@ -554,6 +579,7 @@ func (b *Bot) applySelfPawnMovementLocked(
 	b.char.Moving = destX != m.X || destY != m.Y
 	b.char.MoveAt = now
 	b.char.TargetID = m.TargetID
+	b.char.FightingTargetID = m.TargetID
 	b.char.CombatUntil = now.Add(combatWindow)
 }
 
@@ -594,6 +620,7 @@ func (b *Bot) ApplyAttack(a Attack) {
 		}
 		if a.TargetCount > 0 {
 			b.char.TargetID = a.TargetIDs[0]
+			b.char.FightingTargetID = a.TargetIDs[0]
 		}
 		b.char.CombatUntil = now.Add(combatWindow)
 		b.touch()

@@ -240,28 +240,59 @@ func (gc *GameClient) PacketCount() int {
 const attackNearestRange = 1500
 
 // AttackNearest sends an attack request against the closest attackable
-// npc around the character. The server selects the target (answer via
-// MyTargetSelected), walks the character into melee range and starts the
-// auto attack. It reports whether a target was attacked.
-func (gc *GameClient) AttackNearest() (bool, error) {
+// npc around the character. Following the Mobius AttackRequest
+// semantics the first request for a new target only selects it (the
+// answer arrives as MyTargetSelected); the attack itself starts when
+// the request is repeated for the already selected target, which is
+// what AttackTarget does. It returns the object id of the chosen target,
+// zero when nothing was attackable.
+func (gc *GameClient) AttackNearest() (int32, error) {
 	if gc.tracker == nil {
-		return false, nil
+		return 0, nil
 	}
 	target, ok := gc.tracker.NearestAttackable(attackNearestRange)
 	if !ok {
-		return false, nil
+		return 0, nil
 	}
-	request := togameserver.NewAttackRequestPacket()
-	request.TargetID = target.ObjectID
-	request.X = target.X
-	request.Y = target.Y
-	request.Z = target.Z
-	if err := gc.sendPacket(request); err != nil {
-		return false, fmt.Errorf("failed to attack: %w", err)
+	if err := gc.sendAttackRequest(
+		target.ObjectID, target.X, target.Y, target.Z); err != nil {
+		return 0, fmt.Errorf("failed to attack: %w", err)
 	}
 	gc.tracker.RecordEvent("attacking " + target.Name)
 
-	return true, nil
+	return target.ObjectID, nil
+}
+
+// AttackTarget repeats the attack request for a target that is already
+// selected. This is the second click of the Mobius semantics: the server
+// resolves it to onForcedAttack and notifies the player AI with the
+// ATTACK intention, which starts the chase and the auto attack.
+func (gc *GameClient) AttackTarget(objectID int32) error {
+	if objectID == 0 {
+		return nil
+	}
+	x, y, z, ok := gc.tracker.ObjectPosition(objectID)
+	if !ok {
+		return fmt.Errorf("failed to attack target %d: object unknown", objectID)
+	}
+	if err := gc.sendAttackRequest(objectID, x, y, z); err != nil {
+		return fmt.Errorf("failed to attack: %w", err)
+	}
+
+	return nil
+}
+
+// sendAttackRequest serializes and sends one AttackRequest packet.
+func (gc *GameClient) sendAttackRequest(
+	targetID int32, x int32, y int32, z int32,
+) error {
+	request := togameserver.NewAttackRequestPacket()
+	request.TargetID = targetID
+	request.X = x
+	request.Y = y
+	request.Z = z
+
+	return gc.sendPacket(request)
 }
 
 // PickupItem clicks a ground item: the server walks the character to it

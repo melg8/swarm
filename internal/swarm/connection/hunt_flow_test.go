@@ -55,6 +55,7 @@ func startHuntFlowServer(t *testing.T) *huntFlowServer {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
+	//nolint:exhaustruct // zero defaults are the intended state
 	server := &huntFlowServer{
 		fakeGameServer: &fakeGameServer{listener: listener, t: t},
 		ready:          make(chan struct{}),
@@ -128,6 +129,7 @@ func (s *huntFlowServer) huntFlow(conn net.Conn, cipher *crypt.GameCrypt) {
 		case 0x09: // Logout
 			return
 		case 0x0A: // AttackRequest
+			//nolint:gosec // test target ids are small
 			target := int32(binary.LittleEndian.Uint32(payload[1:5]))
 			s.mu.Lock()
 			s.attackRequests = append(s.attackRequests, target)
@@ -279,7 +281,7 @@ func TestGameClientHuntFlowStartsAttack(t *testing.T) {
 	}
 
 	cancel()
-	_ = <-done
+	<-done
 
 	t.Logf("attack requests received: %v", server.requests())
 	require.True(t, server.fighting(),
