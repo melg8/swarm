@@ -226,3 +226,73 @@ InitPacket:
 - Packet()
 
 
+
+# Game server packets added by swarm
+
+Reference implementation: the Mobius C1 sources
+(`L2J_Mobius_C1_HarbingersOfWar/java/org/l2jmobius/gameserver`). Game packets
+are framed by a 2 byte little endian size header followed by
+`[opcode: 1][body]`, encrypted with the stateful XOR cipher, integers are
+little endian.
+
+## Client -> game server packets
+
+### RequestActionUse (0x45)
+
+The action button packet. Action id 0 toggles sit/stand; the server refuses
+to sit while moving, casting or attacking (`RequestActionUse.runImpl` case 0,
+`Player.sitDown`/`standUp`). The bot uses it to rest at low HP.
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x45 |
+| 1 | 4 | Action id (0 = sit/stand toggle) |
+| 5 | 4 | Ctrl pressed (0/1) |
+| 9 | 1 | Shift pressed (0/1) |
+
+### MoveToLocation (0x01)
+
+The ground click movement request of the official client: the server walks
+the character to the target point (`MoveToLocation.runImpl`). Mode 1 is the
+mouse click; keyboard mode (0) is ignored unless keyboard movement is
+enabled on the server. The hunt loop walks to a drop with it before
+clicking the item.
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x01 |
+| 1 | 4 | Target X |
+| 5 | 4 | Target Y |
+| 9 | 4 | Target Z |
+| 13 | 4 | Origin X (client side position) |
+| 17 | 4 | Origin Y |
+| 21 | 4 | Origin Z |
+| 25 | 4 | Movement mode (1 = mouse) |
+
+## Game server -> client packets
+
+### ChangeWaitType (0x3F)
+
+Announces the sit/stand transition of a creature
+(`ChangeWaitType.writeImpl`, enum values 0 = sitting, 1 = standing). The
+broadcast goes through `Player.broadcastPacket`, so the acting client
+receives its own transitions; it is the confirmation the hunt loop waits
+for before ever sending the opposite toggle.
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x3F |
+| 1 | 4 | Object id |
+| 5 | 4 | Move type (0 = sitting, 1 = standing) |
+| 9 | 4 | X |
+| 13 | 4 | Y |
+| 17 | 4 | Z |
+
+### GetItem (0x17) position semantics
+
+`GetItem` carries the position of the ITEM, not of the picker
+(`Item.pickupMe` writes the item location; the official client only
+animates the item flying into the inventory). The picker position is
+already known from the StopMove broadcasts of the arrival, so the tracker
+must not snap the picker to these coordinates - it teleported the marker
+across the map on every pickup.

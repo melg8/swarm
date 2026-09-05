@@ -299,3 +299,127 @@ User report after testing the bot with a second account in the world:
   value 23.35 percent at level 3 with 551 exp exactly) and `targetId`
   dropping to 0 right after each kill instead of dangling at the dead
   object id.
+
+## Round 3: 24/7 supervisor, pickup approach, resting and web UI rework (2026-09-05)
+
+User report after the long run on the fresh Windows deployment
+(`E:\work\lineage_workspace_fresh`, server rebuilt from the current gitlab
+master):
+
+1. the process died after a long run (`game connection lost` -> exit 1):
+   it must run 24/7 and never end without the user asking;
+2. when picking up a drop the character did not run toward the adena on
+   the map and teleported at the end;
+3. the HUD needs a target window (name, level, hp, mp) next to the
+   character panel and the `target` row must leave the character card;
+4. the bot list needs mini HP/MP/XP bars and a combat status;
+5. the gold EXP bar color is wrong: gold is the CP color of later
+   chronicles, the C1 experience bar is light silver below HP/MP;
+6. the header wastes vertical space (brand row + tab row before the map);
+7. the bot must sit down at low HP and stand up recovered (sitting
+   regeneration is faster);
+8. unchecking `follow` still moved the map with the character;
+9. the bootstrap installation analysis for the Windows host.
+
+### Root causes and fixes
+
+- Death recovery (found during the verification run): a level 6 hunt
+  session died mid fight (StatusUpdate CUR_HP 0) and the hunt loop sat
+  in the rest gate forever - the server refuses sit requests of a
+  corpse, so the bot stayed a corpse and hunted nothing. A dead
+  character now runs the death dialog choice automatically:
+  `GameClient.RestartAtVillage` sends RequestRestartPoint 0x6D type 0
+  (the server revives the character at the nearest village with
+  restored vitals), the request retries every 5 s until the revival
+  lands and the stale target/loot references are dropped
+  (`state.Bot.SelfDead`, `hunt.recoverFromDeath`).
+- Process exit: `main` ran exactly one session and turned every session
+  error into `os.Exit(1)`. The fresh deployment additionally proved that
+  the server kicks an old session with LeaveWorld 0x96 + a forced socket
+  close on a double login (`World.addPlayer`), so sessions genuinely end
+  from the outside. `cmd/swarm` now runs `runBotForever`: every failed
+  session is logged, the tracker is reset (`state.Bot.ResetSession`,
+  objects and inventory do not leak across sessions, events and uptime
+  survive), the hunt loop of the old session is stopped through a derived
+  context and the full login flow is retried with a 2..30 s backoff that
+  only grows across unstable sessions. `GameClient.run` only announces
+  the Logout packet while the connection is still usable, which removes
+  the misleading `Failed to send logout` after a transport error.
+- Pickup teleport: two independent causes. (a) `ApplyItemPickup` snapped
+  the picker to the GetItem coordinates, but that packet carries the ITEM
+  position (`Item.pickupMe`), so every completed pickup teleported the
+  marker to the drop. The tracker no longer moves the picker on GetItem.
+  (b) The hunt loop clicked the item from any distance and waited: the
+  visible approach depended on the server AI alone. The loop now walks to
+  the item first - `GameClient.WalkTo` sends the client MoveToLocation
+  0x01 packet (the ground click of the official client, mouse mode) -
+  and starts clicking at 60 units, so the map shows a smooth run toward
+  the drop. Live packet trace (SWARM_TRACE_PACKETS=1): DropItem 0x16 ->
+  [walk 0x01] -> StopMove 0x59 (arrival broadcast) -> StopMove 0x59
+  (`doPickupItem` self copy) -> GetItem 0x17.
+- Resting: the hunt loop only paused below 50 percent HP without any
+  action. It now sits down below 30 percent (`GameClient.ActionSitStand`
+  sends RequestActionUse 0x45 action 0) and stands up at 90 percent.
+  The toggle is confirmed by the ChangeWaitType 0x3F broadcast (tracked
+  as `Bot.Sitting`); a repeat is only sent when the flip never happened,
+  so a slow confirmation can never toggle back. `Bot.SelfUnderAttack`
+  (last hit within 3 s via Attack/MoveToPawn broadcasts with the bot as
+  target) keeps the loop fighting instead of sitting into the blows.
+- Target panel: the C1 server sends NPC vitals only to status listeners,
+  that is to whoever targeted the npc (`Player.setTarget` answers with a
+  one shot StatusUpdate MAX_HP/CUR_HP and `broadcastStatusUpdate` sends
+  only those two attributes on damage). The tracker already stored
+  object HP; it now also stores CUR_MP/MAX_MP (players) and the web
+  resolves the target object from the snapshot. The HUD stack grew the
+  TARGET panel (name, level chip, HP bar, MP row that reads "—" for
+  npcs because the server never sends their MP), the `target` row left
+  the character card and both panels share one vertical stack, so long
+  names can no longer break the layout.
+- EXP bar color: light silver `#f4f4f4 -> #c7cbd1 -> #9096a0`
+  (gold is the CP color of later chronicles, per the user's C1
+  screenshot). The three gradients now live in shared CSS variables
+  (`--grad-hp/mp/xp`) reused by the HUD bars and the sidebar mini bars.
+- Header: brand, Map/Log tabs and the live indicator share one 34 px
+  row; the tab strip above the map is gone.
+- Bot list: every row renders the status dot, name, `combat`/`rest`
+  chips and the level, plus three mini bars (HP red, MP blue, XP
+  silver) fed by the extended `/api/bots` payload (`curHp/maxHp/
+  curMp/maxMp/expPercent/inCombat/sitting`).
+- Follow: the free camera was centered on the character unless dragged,
+  so the map still tracked the bot with follow off. The view now pins
+  to a pan anchor that is captured at the moment follow is disabled
+  (checkbox or drag) and never moves on its own.
+- Installation analysis: from this Windows host the fastest working
+  path was BellSoft Liberica JDK 25 (MSI, JAVA_HOME), MariaDB through
+  XAMPP (`C:\xampp`, started by `mysql_start.bat`, database loaded by
+  the dist `DatabaseInstaller`) and a plain gitlab clone built with
+  Apache Ant; the servers start from the dist `.vbs` launchers. The
+  bootstrap script URLs (Adoptium JDK 25, MariaDB 11.8.9 bintar) were
+  re-verified reachable on 2026-09-05 and stay unchanged; the old
+  "gitlab is unreachable" note is obsolete for this environment.
+
+### Reproduction and verification
+
+- `tools/repro_hud.js` (`task repro:hud`): the target panel checks (no
+  target status for zero/dead ids, name + level chip + HP bar for a
+  living target, MP "—" without server data), the unknown-vitals "—"
+  rendering and that `renderHUD` no longer writes the target.
+- `tools/repro_map_render.js` (`task repro:map`): new scenario
+  "follow off keeps the view static" - a fixed world point keeps its
+  screen position while the character moves with follow off, and the
+  view tracks again when follow is re-enabled (RED against the pre fix
+  map.js: the view moved with the character).
+- Hunt unit tests (`internal/swarm/hunt`): `TestLoopWalksToFarLoot`
+  (walk first, click on arrival), `TestLoopSitsDownWhenExhausted`
+  (sit at 20 percent, no toggle spam while confirmed, stand at 95,
+  engage again), `TestLoopDoesNotSitWhileUnderAttack` and
+  `TestLoopRestartsAfterDeath` (restart request on death, retry until
+  the revival, fresh target afterwards). State tests:
+  `TestSpawnItemAndPickup` now asserts the picker does NOT move to the
+  GetItem position.
+- Live run on the local Mobius stack (2026-09-05, account swarmqa,
+  level 5 -> 7 in two sessions): kills chain with zero pickup timeouts,
+  the traced pickup flow matches the packet list above, the web UI
+  (checked in a real browser at 1440x860) shows the compact header,
+  the silver XP bar, the stacked target panel with live HP of the
+  claimed mob and the sidebar mini bars with the combat chip.

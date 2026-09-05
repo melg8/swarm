@@ -25,7 +25,10 @@ read it before reworking movement rendering or the hunt behavior.
 The MVP client connects to the login server, authenticates (the server
 auto-creates missing accounts), picks the first available game server, performs
 the game protocol handshake, creates an elven fighter character when needed,
-enters the world and stays online until Ctrl+C (SIGINT/SIGTERM).
+enters the world and stays online until Ctrl+C (SIGINT/SIGTERM). A lost
+session (server restart, kicked connection) is re-established
+automatically with a growing backoff: the process runs 24/7 and never
+exits on its own.
 
 Long term design goals, scalability ideas (packet deduplication, "eyes" bot
 concept, synchronized party behavior) are documented in
@@ -176,6 +179,46 @@ Local config tweaks applied by bootstrap (both idempotent):
 - The database settings work as shipped (`Database.ini` points to
   `l2jmobiusc1`, root, empty password via the local socket).
 
+### Windows host deployment (the actual dev environment)
+
+The `tools/` scripts are Linux first (mariadbd tarball, `nohup`, `ss`).
+The Windows machine this project is currently developed on runs the stack
+from a manual deployment that was faster to set up; its layout and
+provenance (verified 2026-09-05) are the reference for future work:
+
+- Workspace: `E:\work\lineage_workspace_fresh` with `L2J_Mobius` (full
+  git clone of `https://gitlab.com/MobiusDevelopment/L2J_Mobius.git`,
+  branch `master` - gitlab IS reachable from this host, the older
+  "gitlab unreachable, use a mirror" note is obsolete here), the
+  compiled build output and the extracted runtime dist
+  `L2J_Mobius_C1_HarbingersOfWar` (`libs\GameServer.jar`,
+  `game\`, `login\`, `db_installer\`).
+- JDK: BellSoft Liberica JDK 25 installed from the MSI (fastest path on
+  Windows; Temurin MSI is equivalent). `JAVA_HOME` must be set system
+  wide because the dist launchers read it.
+- MariaDB: XAMPP at `C:\xampp` (bundles MariaDB 10.4), started manually
+  with `C:\xampp\mysql_start.bat` (`mysqld --standalone`), database
+  `l2jmobiusc1` loaded once through the dist `db_installer` (root, empty
+  password, localhost). The datadir holds the live characters - never
+  wipe it; test bots use their own accounts (for example `swarmqa`).
+- Build: Apache Ant (`ant`) inside the C1 module compiles `java/` and
+  produces the dist zip; the servers then run from the dist launchers
+  `login\LoginServer.vbs` and `game\GameServer.vbs` (each reads
+  `java.cfg` and restarts itself on exit code 2).
+- Network: login listens on `0.0.0.0:2106`, game on `0.0.0.0:7777`, DB
+  and inter-server traffic stay on `127.0.0.1`. No active
+  `ipconfig.xml`: the game server auto registers its LAN IP, so bots can
+  connect via `127.0.0.1` or the LAN address.
+- Shipped config differences vs the bootstrap tweaks: `PathFinding = 2`
+  and `AutoPlay.ini` has `EnableAutoPlay = False` on this deployment
+  (ground items must be picked by the bot itself, nothing auto loots).
+- Windows dev tooling caveats: the installed Go (1.27) is newer than
+  `go.mod` (1.23) - fine for building and tests, but golangci-lint v1.x
+  fails with an export data version mismatch; golangci-lint v2 requires
+  a one time `.golangci.yml` migration, and the `task` binary is not
+  installed - run the underlying commands (`go test ./...`,
+  `gofmt -l .`, ...) directly until then.
+
 ## Mobius stack operational notes
 
 Lessons learned while running the stack locally; relevant when debugging
@@ -224,10 +267,20 @@ theme is the default, a header button toggles to a dark theme (both are
 CSS variable sets on `html[data-theme]`; the canvas reads its colors from
 the same variables).
 
+- Header: brand, Map/Log tabs and the live indicator share one compact
+  34 px row - the working area must not lose vertical space to chrome.
 - Tabs: Map is the source of truth: the character status lives as a HUD
-  panel on the canvas (name, class, level, HP/MP bars, position, facing,
-  combat badge, exp/sp) and the world is drawn around it; Log is the
-  rolling event feed with a filter.
+  panel on the canvas (name, class, level, HP/MP bars, position,
+  combat/rest chips, exp/sp) and the world is drawn around it; Log is
+  the rolling event feed with a filter.
+- Bot list: every row shows the status dot, the name, `combat`/`rest`
+  chips, the level and three mini bars (HP red, MP blue, XP silver,
+  same gradients as the HUD) fed by the extended `/api/bots` payload -
+  the overview shows at a glance what every session is doing.
+- Camera: follow mode centers on the interpolated character position;
+  free mode (follow unchecked or a map drag) pins the view to a pan
+  anchor captured at the moment follow was disabled and never moves on
+  its own, so the map shows the chosen area regardless of bot movement.
 - Map rendering: every unit (character, mob, player) is a circle with a
   short look direction tick from the center over the edge (L2Bot2.0
   style), colored by threat: friendly gray, passive monster green,
@@ -297,8 +350,9 @@ the same variables).
   and the attackable flag), DropItem 0x16 (fresh drops) and SpawnItem
   0x15 (items that already exist when they enter the known list - for
   example after a relogin; without it old drops stay invisible), GetItem
-  0x17 (a player picked up an item: removal plus picker position),
-  MoveToLocation, MoveToPawn 0x75 (chasing creatures: stop point at
+  0x17 (a player picked up an item: removal only - the packet position
+  is the item position, not the picker one, so it must never snap the
+  picker), MoveToLocation, MoveToPawn 0x75 (chasing creatures: stop point at
   distance from the target, marks combat and the target reference -
   also for the played character itself when it chases its attack
   target), StopMove/ValidateLocation (placement and heading), Attack
@@ -308,12 +362,19 @@ the same variables).
   AutoAttackStop 0x3C (auto attack flags), MyTargetSelected 0xBF (the
   own target), TargetSelected 0x39 / TargetUnselected 0x3A (targets of
   other players), ChangeMoveType 0x3E (walk/run switch: mobs walk while
-  idle and run when aggroed), TeleportToLocation 0x38 (position snap),
+  idle and run when aggroed), ChangeWaitType 0x3F (sit/stand
+  transitions, broadcast to the acting player itself too),
+  TeleportToLocation 0x38 (position snap),
   StatusUpdate (vitals, weight CUR_LOAD 0x0E / MAX_LOAD 0x0F changes,
-  dead when hp is 0), ItemList 0x27 / InventoryUpdate 0x37 (the
-  inventory: slot tracking for the hunt cleanup), DeleteObject
-  (removals). Unknown packets land in the event log. The combat window
-  is 10 seconds after the last fight packet.
+  dead when hp is 0; for npcs the server sends only CUR_HP/MAX_HP and
+  only to whoever targeted them - npc MP never arrives), ItemList 0x27 /
+  InventoryUpdate 0x37 (the inventory: slot tracking for the hunt
+  cleanup), DeleteObject (removals). Unknown packets land in the event
+  log; setting `SWARM_TRACE_PACKETS=1` logs every received packet id for
+  live protocol debugging. The combat window is 10 seconds after the
+  last fight packet; the last hit on the character is tracked separately
+  (`Bot.SelfUnderAttack`, 3 s) so the rest logic never sits into the
+  blows of a running fight.
 - Threat data: the npc level, `aggroRange` and `isAggressive` ai flags
   come from the generated `internal/swarm/npcdata` maps (the C1 data
   pack marks every monster `isAggressive=false`: they only defend).
@@ -326,14 +387,18 @@ the same variables).
   Mobius updates.
 - `-hunt` is the auto hunt flag of `cmd/swarm`: `internal/swarm/hunt`
   runs a small state machine (engage -> loot -> engage) that attacks the
-  closest attackable npc, picks up the drops around the corpse by
-  clicking them (Action 0x04: the server AI walks the character to the
-  item and picks it up - StopMove to self, GetItem broadcast,
-  InventoryUpdate) and destroys junk inventory items
-  (RequestDestroyItem 0x59) when the slots reach 70% of the 80 slot
-  limit or the weight reaches 75%, so a long living bot never litters
-  the server. Failed pickups (protected or unreachable items) are
-  skipped for 30 seconds. Attack start: the Mobius AttackRequest 0x0A
+  closest attackable npc, picks up the drops around the corpse and
+  destroys junk inventory items (RequestDestroyItem 0x59) when the slots
+  reach 70% of the 80 slot limit or the weight reaches 75%, so a long
+  living bot never litters the server. Loot approach: far items are
+  reached with an explicit walk first (GameClient.WalkTo sends the
+  client MoveToLocation 0x01 packet, the ground click of the official
+  client, in mouse mode) and the click (Action 0x04) starts at 60 units:
+  the server AI covers the last stretch and executes the pickup
+  (StopMove to self, GetItem broadcast, InventoryUpdate), the walk keeps
+  the approach smooth on the map. Failed pickups (protected or
+  unreachable items) are skipped for 30 seconds after a 20 second
+  attempt. Attack start: the Mobius AttackRequest 0x0A
   has double click semantics (AttackRequest.runImpl) - the first
   request for a new target only selects it (NpcClick.onAction ->
   setTarget, answered with MyTargetSelected), the repeated request for
@@ -356,11 +421,24 @@ the same variables).
   a 250 ms cadence, chains the next target immediately while the
   character HP is at or above 50 percent (rate limited to one player
   action per second for the flood protector) and rests with a logged
-  reason below it. The nearest target ranking uses the projected
+  reason below it. Resting sits the character down below 30 percent
+  (RequestActionUse 0x45 action 0, GameClient.ActionSitStand - the
+  sitting regeneration is faster) and stands up at 90 percent; the
+  toggle is confirmed by the ChangeWaitType 0x3F broadcast
+  (state.Bot.SelfSitting) and a repeat is only sent when the flip never
+  happened, so a lost packet can never leave the character toggling
+  between sit and stand. While the character is under attack
+  (Bot.SelfUnderAttack) the loop keeps fighting instead of resting, and
+  a dead character (Bot.SelfDead: CUR_HP 0) restarts at the nearest
+  village automatically (RequestRestartPoint 0x6D type 0,
+  GameClient.RestartAtVillage, retried every 5 s until the server
+  revives it) so a 24/7 session survives a death.
+  The nearest target ranking uses the projected
   current positions of moving npcs (state.projectedPosition), not the
   stale movement packet starts. The hunt chain behavior is covered by
   internal/swarm/hunt/loop_test.go (next target selection after a
-  kill, rest gate) and the tracker clearing by
+  kill, rest gate, walk to far loot, sit/stand transitions, no sitting
+  under attack) and the tracker clearing by
   internal/swarm/state/tracking_test.go.
 - Map target links: the map renders the selection of every visible
   player, not only the own one. The own target is a red dashed line
@@ -371,16 +449,22 @@ the same variables).
   training other players' mobs. The tooltips show what a unit
   targets. Unit markers draw the look direction tick only outside the
   circle; inside the radius the marker is a solid fill.
-- HUD: the character panel shows HP/MP bars plus the experience bar
-  (the third bar, filled from the snapshot `expPercent` that the bot
-  computes via the C1 experience table in
+- HUD: the map top left holds one vertical stack of two panels: the
+  character panel (name, class, level, HP/MP/EXP bars, position,
+  combat/rest chips, exp/sp) and directly below it the target panel of
+  the currently selected object (name, level chip, HP bar, MP row that
+  reads `no data` for npcs - the C1 server never sends their MP; a
+  killed, removed or missing target reads `no target`). The `target`
+  row left the character card: long target names live in their own
+  panel and cannot break the layout. The experience bar is the third
+  bar under HP and MP, filled from the snapshot `expPercent` that the
+  bot computes via the C1 experience table in
   `internal/swarm/state/experience.go`, regenerated by
-  `tools/generate_experience_table.sh`). The bar colors follow the
-  classic L2 C1 palette (HP red, MP blue, EXP gold with light-top/
-  dark-bottom cylindrical gradients). An unresolvable target (killed,
-  removed or none) displays the `no target` status: the tracker clears
-  dead targets because the server never does. There is no facing field
-  in the HUD - the map shows the heading.
+  `tools/generate_experience_table.sh`. The bar colors follow the
+  classic L2 C1 palette (HP red, MP blue, EXP light silver - gold is
+  the CP color of later chronicles) with light-top/dark-bottom
+  cylindrical gradients; the three gradients are shared CSS variables
+  (`--grad-hp/mp/xp`) reused by the sidebar mini bars.
 - The web UI is plain HTML/CSS/JS without a build step; keep it that way
   (embedded via go:embed). Watch out: top level `const` declarations are
   not `window` properties, so cross script references must use the bare
@@ -388,9 +472,9 @@ the same variables).
 - Reproduction harnesses for the web layer (all exit 1 while their bug
   is present): `tools/repro_movement.js` (`task repro:movement`) for
   the movement interpolation, `tools/repro_map_render.js` (`task
-  repro:map`) for the target links and unit markers (recording canvas
-  in a Node vm sandbox), `tools/repro_hud.js` (`task repro:hud`) for
-  the HUD rendering (stub DOM).
+  repro:map`) for the target links, unit markers and the static free
+  camera (recording canvas in a Node vm sandbox), `tools/repro_hud.js`
+  (`task repro:hud`) for the HUD and target panel rendering (stub DOM).
 
 Sandbox signal pitfall: non-interactive bash starts background jobs with
 SIGINT/SIGQUIT set to SIG_IGN, and Go cannot catch a signal that was
