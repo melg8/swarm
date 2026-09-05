@@ -49,8 +49,8 @@ if len(vals) != 81:
     raise SystemExit(f"expected 81 levels, got {len(vals)}")
 
 rows = []
-for i in range(0, len(vals), 4):
-    rows.append("\t" + "\t".join(f"{v:>12}," for v in vals[i:i + 4]))
+for i in range(0, len(vals), 3):
+    rows.append("\t" + "\t".join(f"{v:>11}," for v in vals[i:i + 3]))
 table = "\n".join(rows)
 
 out.write_text(f'''// SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
