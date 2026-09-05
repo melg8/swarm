@@ -71,6 +71,7 @@ const (
 	myTargetSelectedID = 0xBF
 	systemMessageID    = 0x7A
 	socialActionID     = 0x3D
+	actionFailedID     = 0x35
 )
 
 // GameSessionParams carries the login session keys for the game server.
@@ -128,6 +129,7 @@ type GameClient struct {
 	targetDropped  fromgameserver.TargetUnselectedPacket
 	systemMessage  fromgameserver.SystemMessagePacket
 	socialAction   fromgameserver.SocialActionPacket
+	actionFailed   fromgameserver.ActionFailedPacket
 	itemList       fromgameserver.ItemListPacket
 	invUpdate      fromgameserver.InventoryUpdatePacket
 	invItems       []state.InventoryItem
@@ -191,6 +193,7 @@ func NewGameClient(conn net.Conn) (*GameClient, error) {
 		targetDropped:  *fromgameserver.NewTargetUnselectedPacket(),
 		systemMessage:  *fromgameserver.NewSystemMessagePacket(),
 		socialAction:   *fromgameserver.NewSocialActionPacket(),
+		actionFailed:   *fromgameserver.NewActionFailedPacket(),
 		itemList:       *fromgameserver.NewItemListPacket(),
 		invUpdate:      *fromgameserver.NewInventoryUpdatePacket(),
 		invItems:       nil,
@@ -780,9 +783,24 @@ func (gc *GameClient) handleServerPacket(payload []byte) {
 		gc.applySystemMessage(payload)
 	case socialActionID:
 		gc.applySocialAction(payload)
+	case actionFailedID:
+		gc.applyActionFailed(payload)
 	default:
 		gc.handleWorldPacket(payload)
 	}
+}
+
+// applyActionFailed validates and logs the refusal answer of the
+// server. The packet carries no details, so the hunt loop keeps
+// driving its own retry logic without reacting to it.
+func (gc *GameClient) applyActionFailed(payload []byte) {
+	if err := fromgameserver.ParseActionFailedPacket(
+		&gc.actionFailed, payload); err != nil {
+		gc.logger.Printf("Failed to parse action failed: %v", err)
+
+		return
+	}
+	gc.logger.Println("Action failed")
 }
 
 // applySystemMessage parses SystemMessage and forwards the formatted

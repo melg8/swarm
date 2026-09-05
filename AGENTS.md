@@ -381,6 +381,8 @@ the same variables).
   SocialAction 0x3D (idle animations of npcs, player emotes and level
   ups - a short lived ring marker above the animating creature on the
   map; only level ups also become chat lines),
+  ActionFailed 0x35 (the one byte refusal answer of the server, logged
+  as "Action failed" without further reaction),
   TeleportToLocation 0x38 (position snap),
   StatusUpdate (vitals, weight CUR_LOAD 0x0E / MAX_LOAD 0x0F changes,
   dead when hp is 0; for npcs the server sends only CUR_HP/MAX_HP and
