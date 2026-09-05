@@ -18,6 +18,10 @@ server is a locally hosted
 fully autonomously from the console, support many concurrent bots (9 minimum,
 36 optimistic, up to 100 stretch goal) and a clean graceful shutdown.
 
+The development history, root cause analyses and reproduction
+instructions for the fixed bugs live in `docs/development_log.md`:
+read it before reworking movement rendering or the hunt behavior.
+
 The MVP client connects to the login server, authenticates (the server
 auto-creates missing accounts), picks the first available game server, performs
 the game protocol handshake, creates an elven fighter character when needed,
@@ -239,8 +243,9 @@ the same variables).
   packet position toward the destination at `runSpd * moveMultiplier`
   world units per second (run/walk speeds come from NpcInfo for npcs,
   CharInfo for players and UserInfo for self; the fallback speed is
-  120), clamps at the destination, corrects the clock against the
-  snapshot `serverTimeMs` and exponentially smooths position jumps.
+  120), clamps at the destination and corrects the clock against the
+  snapshot `serverTimeMs` (the maximum of the recent samples, because
+  every sample underestimates by the snapshot transport delay).
   The played character is interpolated the same way from its own
   movement broadcasts (Player.broadcastPacket sends every broadcast
   except CharInfo to the acting player itself, unlike the base
@@ -249,8 +254,23 @@ the same variables).
   the move multiplier before writing them, so the effective speed is
   always `speed * multiplier` (see UserInfo/CharInfo/AbstractNpcInfo
   writeImpl). MoveToLocation for playables only arrives at move start
-  and arrival, so the whole path is interpolated from one packet at the
-  exact transmitted speed - exactly what the official client does.
+  and arrival, so the whole path is interpolated from one packet.
+  Arrival calibration: the Mobius movement loop (Creature.updatePosition)
+  counts a creature as arrived once one 100 ms game tick step covers
+  the remaining distance minus the collision radius, then snaps it to
+  the exact destination and broadcasts the zero distance
+  MoveToLocation. The map therefore scales the interpolation speed by
+  `distance / (distance - gap)` with a per npc template gap estimate
+  learned from every observed arrival (EMA, bounded 1..60, speed scale
+  capped 1.6), so units complete the path exactly when the arrival
+  packet lands instead of teleporting the last stretch (the official
+  client shows the same snap; the map renders it smoothly). The drawn
+  position is the projection plus a decaying offset that only absorbs
+  real discontinuities (segment resets, arrivals, teleports above 400
+  units snap instantly), so continuous movement has no permanent
+  smoothing lag. Regression check: `task repro:movement`
+  (tools/repro_movement.js) simulates the server semantics and fails
+  when the end of path teleport comes back.
 - Heading semantics (Mobius `LocationUtil.calculateHeadingFrom`):
   `atan2(dy, dx) * 65535 / 2pi`, 0 faces east, the angle grows clockwise
   because world y points south. The server announces arrival with a zero
@@ -306,14 +326,26 @@ the same variables).
   Mobius updates.
 - `-hunt` is the auto hunt flag of `cmd/swarm`: `internal/swarm/hunt`
   runs a small state machine (engage -> loot -> engage) that attacks the
-  closest attackable npc (AttackRequest 0x0A, the answer arrives as
-  MyTargetSelected), picks up the drops around the corpse by clicking
-  them (Action 0x04: the server AI walks the character to the item and
-  picks it up - StopMove to self, GetItem broadcast, InventoryUpdate)
-  and destroys junk inventory items (RequestDestroyItem 0x59) when the
-  slots reach 70% of the 80 slot limit or the weight reaches 75%, so a
-  long living bot never litters the server. Failed pickups (protected
-  or unreachable items) are skipped for 30 seconds.
+  closest attackable npc, picks up the drops around the corpse by
+  clicking them (Action 0x04: the server AI walks the character to the
+  item and picks it up - StopMove to self, GetItem broadcast,
+  InventoryUpdate) and destroys junk inventory items
+  (RequestDestroyItem 0x59) when the slots reach 70% of the 80 slot
+  limit or the weight reaches 75%, so a long living bot never litters
+  the server. Failed pickups (protected or unreachable items) are
+  skipped for 30 seconds. Attack start: the Mobius AttackRequest 0x0A
+  has double click semantics (AttackRequest.runImpl) - the first
+  request for a new target only selects it (NpcClick.onAction ->
+  setTarget, answered with MyTargetSelected), the repeated request for
+  the already selected target resolves to onForcedAttack and starts
+  the fight. The hunt loop therefore sends the selecting request
+  (GameClient.AttackNearest), then re-sends the target once per second
+  (the PlayerActionFloodProtector interval; GameClient.AttackTarget)
+  until the tracker sees the character engaged with it
+  (state.Bot.SelfEngaged: the chase MoveToPawn, Attack or
+  AutoAttackStart broadcasts set the fighting target). The whole flow
+  is covered end to end by the fake server in
+  internal/swarm/connection/hunt_flow_test.go.
 - The web UI is plain HTML/CSS/JS without a build step; keep it that way
   (embedded via go:embed). Watch out: top level `const` declarations are
   not `window` properties, so cross script references must use the bare
