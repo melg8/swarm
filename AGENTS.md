@@ -379,7 +379,8 @@ the same variables).
   client text by the generated npcdata.SystemMessageText dictionary -
   the loot and status lines of the chat window),
   SocialAction 0x3D (idle animations of npcs, player emotes and level
-  ups - the second chat window source),
+  ups - a short lived ring marker above the animating creature on the
+  map; only level ups also become chat lines),
   TeleportToLocation 0x38 (position snap),
   StatusUpdate (vitals, weight CUR_LOAD 0x0E / MAX_LOAD 0x0F changes,
   dead when hp is 0; for npcs the server sends only CUR_HP/MAX_HP and

@@ -629,3 +629,38 @@ and resume once the view returns to the bottom.
   detached the follow (stick false, scrollTop stayed 0 while new
   social lines arrived), scrolling back to the bottom resumed it
   (stick true, scrollTop pinned at the newest line).
+
+
+## Round 9: social markers instead of chat spam (2026-09-06)
+
+User request: the social interactions spammed the chat window; keep
+them out of the chat and hint them unobtrusively on the animating npc
+instead, widen the chat by 30 percent (long standard messages did not
+fit) and test against the hunting character (test1) instead of the
+village stuck swarmqa.
+
+### Implementation
+
+- ApplySocialAction no longer writes the "plays social animation"
+  lines: every social lights a 3 second marker on the animating
+  creature instead (WorldObject.SocialUntil / the character one, snapshot
+  socialUntilMs), rendered by web/map.js drawSocialMarker as a small
+  fading ring above the unit. Level ups stay in the chat (rare and
+  meaningful). Views without the new field are guarded against the NaN
+  window.
+- The chat window widened 320 -> 416 px.
+
+### Verification
+
+- state tests: idle gestures produce no chat lines but set the marker
+  window on the npc; level ups of self and named npcs stay in the chat.
+- tools/repro_map_render.js scenario "social animation marker": the
+  ring draws above the animating npc and does not draw without the
+  window.
+- Live run against test1 (hunting Gremlins and Red Keltirs): the chat
+  shows only the combat and loot messages ("You did 12 damage.",
+  "Critical hit!", "Earned 10 adena.", "You picked up Apprentice's
+  Shoes.") with zero social lines; the visible side effect of the
+  system messages: the junk destroy requests of the hunt loop hit the
+  server flood protector ("You are destroying items too fast.") - the
+  destroy batch needs a rate limit as a follow up.
