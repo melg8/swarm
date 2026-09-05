@@ -599,3 +599,33 @@ small chat window in the bottom left corner of the web interface.
 - Live: the bot in the village shows "Welcome to the World of Lineage
   II." and the idle animations of the surrounding npcs in the chat
   window; the unknown packet log lines for 0x7A and 0x3D are gone.
+
+
+## Round 8: chat window auto scroll (2026-09-06)
+
+User request: the chat window must follow the newest message by
+default, stop following when the user scrolls up to read the history
+and resume once the view returns to the bottom.
+
+### Implementation and fixes
+
+- `web/app.js`: the chat keeps a `stick` state (ChatWindow), driven by
+  the scroll position (`chatAtBottom`, 4 px tolerance) and consumed by
+  renderChat - the view scrolls to the newest line only while stuck.
+  `main.js` attaches the scroll tracking at boot.
+- Live verification exposed a real rendering bug: the auto scroll set
+  scrollTop on the inner list while the scroll container was the outer
+  box, so the window actually never followed the newest line (it
+  showed the top of the log). The overflow now lives on the list
+  itself (the box only clips).
+- `tools/repro_hud.js` covers the state machine: a stuck window scrolls
+  to the newest line, a scrolled up window keeps the chosen offset and
+  chatAtBottom distinguishes the bottom within the tolerance.
+
+### Verification
+
+- All hud harness checks pass.
+- Live cycle on the local stack: scrolling the list to the top
+  detached the follow (stick false, scrollTop stayed 0 while new
+  social lines arrived), scrolling back to the bottom resumed it
+  (stick true, scrollTop pinned at the newest line).
