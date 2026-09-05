@@ -55,7 +55,7 @@ func TestApplySystemMessageUnknownIdFallsBack(t *testing.T) {
 	require.Equal(t, "system message 99999", lines[0].Text)
 }
 
-func TestApplySocialActionNamesActors(t *testing.T) {
+func TestApplySocialActionMarkerAndLevelUps(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
 	//nolint:exhaustruct // partial fields for the case
@@ -64,15 +64,28 @@ func TestApplySocialActionNamesActors(t *testing.T) {
 		X: 100, Y: 100, Name: "Gremlin",
 	})
 
-	bot.ApplySocialAction(SocialAction{ObjectID: 100, ActionID: 15})
+	// Idle gestures of the surrounding npcs never reach the chat: they
+	// only light the map marker of the animating npc.
 	bot.ApplySocialAction(SocialAction{ObjectID: 7, ActionID: 2})
 	bot.ApplySocialAction(SocialAction{ObjectID: 999, ActionID: 3})
+	require.Empty(t, chatLines(bot))
+	snap := bot.Snapshot()
+	for _, obj := range snap.Objects {
+		if obj.ObjectID == 7 {
+			require.Greater(t, obj.SocialUntilMs, int64(0))
+		}
+	}
+
+	// Level ups are rare and meaningful: they stay in the chat.
+	bot.ApplySocialAction(SocialAction{ObjectID: 100, ActionID: 15})
+	bot.ApplySocialAction(SocialAction{ObjectID: 7, ActionID: 15})
 	lines := chatLines(bot)
-	require.Len(t, lines, 3)
+	require.Len(t, lines, 2)
 	require.Equal(t, "You reached a new level", lines[0].Text)
 	require.Equal(t, "social", lines[0].Kind)
-	require.Equal(t, "Gremlin plays social animation 2", lines[1].Text)
-	require.Equal(t, "unknown plays social animation 3", lines[2].Text)
+	require.Equal(t, "Gremlin reached a new level", lines[1].Text)
+	fresh := bot.Snapshot()
+	require.Greater(t, fresh.Character.SocialUntilMs, int64(0))
 }
 
 func TestChatWindowRollsOver(t *testing.T) {
