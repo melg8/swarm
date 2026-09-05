@@ -452,6 +452,35 @@ body {
    killed, removed or missing target hides it completely. */
 .hud-target .hud-name-row { margin-bottom: 8px; }
 
+/* Chat window in the bottom left corner of the map: the parsed system
+   messages (loot, status) and the social animations of the creatures
+   around the bot. */
+.chat-box {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  width: 320px;
+  height: 150px;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  padding: 6px 10px;
+  z-index: 4;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.chat-line { display: flex; gap: 8px; }
+
+.chat-time { color: var(--text-dim); flex-shrink: 0; }
+
+.chat-msg { color: var(--text); word-break: break-word; }
+
+.chat-line.chat-social .chat-msg { color: var(--violet); }
+
 .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
 
 .kv {

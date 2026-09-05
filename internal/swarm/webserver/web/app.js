@@ -219,9 +219,31 @@ function renderSnapshot() {
   if (!snap) { return; }
   renderHUD(snap);
   renderTarget(snap);
+  renderChat(snap);
   renderLog(snap);
   renderFooter(snap);
   MapView.update(snap);
+}
+
+// Chat window rendering: the parsed system messages and the social
+// animations of the creatures around the bot, oldest at the top.
+function renderChat(snap) {
+  const list = document.getElementById("chat-list");
+  const lines = snap.chat || [];
+  list.innerHTML = "";
+  for (const line of lines) {
+    const row = document.createElement("div");
+    row.className = "chat-line chat-" + line.kind;
+    const time = document.createElement("span");
+    time.className = "chat-time";
+    time.textContent = new Date(line.time).toTimeString().slice(0, 8);
+    const msg = document.createElement("span");
+    msg.className = "chat-msg";
+    msg.textContent = line.text;
+    row.append(time, msg);
+    list.append(row);
+  }
+  list.scrollTop = list.scrollHeight;
 }
 
 // Character status rendering on the map HUD: the map is the single source
