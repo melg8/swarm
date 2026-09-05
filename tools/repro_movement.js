@@ -5,29 +5,45 @@ SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
 SPDX-License-Identifier: MIT
 */
 
-// Reproduction harness for the web map movement interpolation.
+// Movement position harness for the web map.
 //
-// It loads the real internal/swarm/webserver/web/map.js (unchanged) into a
-// sandboxed context, feeds it snapshots produced by a faithful simulation
-// of the Mobius C1 movement semantics, and measures how well the drawn
-// position matches the server arrival:
+// It loads the real internal/swarm/webserver/web/map.js (unchanged) into
+// a sandboxed context with a virtual clock and answers the question "how
+// exactly do the drawn character and mob positions follow the server".
 //
-// - progress at arrival: how much of the packet path the drawn unit had
-//   covered when the server arrival packet reached the web map (the
-//   reported bug shows ~7/8 = 0.875 followed by a fast drag);
-// - end of path jump: the largest frame to frame displacement right after
-//   the arrival, as a multiple of the normal per frame speed.
+// Three modes:
 //
-// Mobius semantics reproduced here (see docs/development_log.md):
-// - game ticks are 100 ms (GameTimeTaskManager.TICKS_PER_SECOND = 10);
-// - the creature advances speed * ticks / 10 world units per tick;
-// - it counts as arrived once the traveled distance covers
-//   distance - collisionRadius (Creature.updatePosition), the position
-//   is snapped to the exact destination and a zero distance
-//   MoveToLocation is broadcast (StopMove ends chases the same way);
-// - chasing creatures re-broadcast MoveToPawn at most once per second.
+//   node tools/repro_movement.js [--frames] [--verbose]
+//       Simulation mode. A faithful simulation of the Mobius C1 server
+//       movement semantics (100 ms game ticks, collision radius stop
+//       rule, 1 s broadcast throttle, MoveToPawn chase re-issue) drives
+//       the map and every frame is compared against the simulated server
+//       truth. Metrics per move: the maximum position error (drawn vs
+//       server, world units), the error at the arrival delivery and the
+//       largest frame speed spike (frame speed as a multiple of the unit
+//       speed). --frames prints the frame log of every tenth frame.
+//       Exit 1 when a threshold breaks.
 //
-// Usage: node tools/repro_movement.js [--verbose]
+//   node tools/repro_movement.js --record <seconds> [outfile] [url] [bot]
+//       Records the live SSE snapshot stream of a running bot to a JSON
+//       file for offline analysis.
+//
+//   node tools/repro_movement.js --replay <file> [--frames]
+//       Replays a recording through the real map at 60 fps virtual time.
+//       Logs the drawn position of every moving unit frame by frame
+//       (--frames prints every frame, the default logs spikes) and
+//       reports speed spikes. Exit 1 on spikes > 2.5x.
+//
+// Mobius semantics reproduced (verified in the server sources):
+// - game ticks are 100 ms; a creature advances speed * ticks per tick
+//   and the speed is re-read every tick (buffs apply immediately);
+// - it counts as arrived once one tick step covers the remaining
+//   distance minus the collision radius, snaps to the exact destination
+//   and broadcasts a zero distance MoveToLocation (forced);
+// - non forced MoveToLocation broadcasts are throttled to one per
+//   second, so a re-issued move inside the window stays invisible;
+// - chasing creatures re-issue their move about once per second.
+//
 // Exit code 0 = movement rendering is correct, 1 = bug reproduced.
 
 "use strict";
@@ -40,18 +56,20 @@ const MAP_JS = path.join(__dirname, "..", "internal", "swarm",
     "webserver", "web", "map.js");
 
 // Harness parameters (calibrated from the Mobius sources and the C1 npc
-// stats: collision radii 5-15, random walk hops below MaxDriftRange=300).
+// stats: collision radii 5-15, chase re-issue ~1 s).
 const HARNESS = {
     parseDelayMs: 1,       // game server -> bot packet processing
     transportMs: 4,        // bot SSE write -> browser event delivery
     pollPeriodMs: 300,     // webserver event stream poll period
     frameMs: 1000 / 60,    // requestAnimationFrame cadence
     idleAfterArrivalMs: 400,
-    movesPerScenario: 8,
-    evaluatedFromMove: 2,  // first moves calibrate the arrival gap
-    progressTolerance: 0.05,
-    absoluteToleranceUnits: 5,
-    maxJumpRatio: 2.5
+    movesPerScenario: 6,
+    // The drawn position may deviate from the server truth by up to one
+    // game tick of movement (the stepwise server position vs the linear
+    // inter tick rendering) plus one tick of phase slack.
+    maxErrFactor: 0.25,
+    maxErrAbsolute: 12,
+    maxSpikeRatio: 2.5
 };
 
 // deterministic pseudo random numbers so runs are comparable
@@ -103,7 +121,10 @@ function loadMapJs() {
     return { MapView: sandbox.__MapView, clock, rafQueue };
 }
 
-// MobiusSim reproduces the server side movement of one creature.
+// MobiusSim reproduces the server side movement of one creature,
+// including the broadcast throttle: a non forced MoveToLocation is
+// suppressed within one second of the previous broadcast, exactly like
+// Creature.broadcastMoveToLocation does.
 class MobiusSim {
     constructor(opts) {
         this.v = opts.speed;
@@ -111,31 +132,36 @@ class MobiusSim {
         this.tickMs = 100; // game ticks are always 100 ms
         this.x = opts.startX;
         this.y = opts.startY;
+        this.destX = opts.startX;
+        this.destY = opts.startY;
         this.moving = false;
-        this.moveStartTick = 0;
         this.lastTickIndex = 0;
-        this.lastStepTick = 0;
+        this.lastBroadcastMs = -1e9;
     }
 
+    // startMove re-points the AI at a destination from the current
+    // position. The returned packet is null when the 1 s broadcast
+    // throttle swallows it (the server silently changes course).
     startMove(destX, destY, nowMs) {
         this.destX = destX;
         this.destY = destY;
+        if (!this.moving) {
+            this.lastTickIndex = Math.floor(nowMs / this.tickMs);
+        }
         this.moving = true;
-        this.moveStartTick = Math.floor(nowMs / this.tickMs);
-        this.lastTickIndex = this.moveStartTick;
-        this.lastStepTick = this.moveStartTick;
+        if (nowMs - this.lastBroadcastMs < 1000) {
+            return null;
+        }
+        this.lastBroadcastMs = nowMs;
 
         return { type: "MoveToLocation", x: this.x, y: this.y, destX, destY };
     }
 
     // tick advances the server position exactly like
     // Creature.updatePosition: one game tick worth of distance per tick,
-    // compared against the REMAINING distance minus the collision radius
-    // (the Java code recomputes dx/dy from the running xAccurate every
-    // update and resets moveTimestamp after each one). Arrival happens
-    // when one tick step covers the remaining distance, so the creature
-    // effectively stops collision + step units short and the server snaps
-    // it to the exact destination.
+    // arrival once the step covers the remaining distance minus the
+    // collision radius, then a snap to the exact destination and a
+    // forced zero distance broadcast.
     tick(nowMs) {
         if (!this.moving) {
             return [];
@@ -150,15 +176,14 @@ class MobiusSim {
         const dy = this.destY - this.y;
         const dist = Math.hypot(dx, dy);
         const delta = Math.max(0.00001, dist - this.collision);
-        // one game tick of movement since the last update
-        const step = this.v * (tickIndex - this.lastStepTick) / 10;
-        this.lastStepTick = tickIndex;
+        const step = this.v / 10;
         if (delta <= 1 || step > delta) {
             this.x = this.destX;
             this.y = this.destY;
             this.moving = false;
+            this.lastBroadcastMs = nowMs;
             packets.push({
-                type: "MoveToLocation", x: this.destX, y: this.destY,
+                type: "MoveToLocation", x: this.x, y: this.y,
                 destX: this.destX, destY: this.destY, arrival: true
             });
         } else {
@@ -177,17 +202,17 @@ class MobiusSim {
         const dy = this.y - targetY;
         const dist = Math.hypot(dx, dy);
         const stop = Math.max(5, dist - offset + 5);
-        this.destX = this.x - dx / dist * stop;
-        this.destY = this.y - dy / dist * stop;
-        this.moving = true;
-        this.moveStartTick = Math.floor(nowMs / this.tickMs);
-        this.lastTickIndex = this.moveStartTick;
-        this.lastStepTick = this.moveStartTick;
+        const destX = this.x - dx / dist * stop;
+        const destY = this.y - dy / dist * stop;
+        const packet = this.startMove(destX, destY, nowMs);
+        if (packet) {
+            packet.type = "MoveToPawn";
+            packet.targetX = targetX;
+            packet.targetY = targetY;
+            packet.distance = offset;
+        }
 
-        return {
-            type: "MoveToPawn", x: this.x, y: this.y,
-            targetX, targetY, distance: offset
-        };
+        return packet;
     }
 
     // stopChase ends a chase in range like Creature.stopMove does.
@@ -202,11 +227,11 @@ class MobiusSim {
 
 // BotState fakes the Go state tracker for one observed npc object.
 class BotState {
-    constructor(objectId, templateId) {
-        this.version = 1;
+    constructor(objectId, templateId, collision) {
         this.obj = {
             objectId, templateId, kind: "npc", name: "sim", dead: false,
             moving: false, running: true, speed: 0,
+            collisionRadius: collision,
             x: 0, y: 0, z: 0, heading: 0,
             destX: 0, destY: 0, destZ: 0, moveAtMs: 0
         };
@@ -239,7 +264,6 @@ class BotState {
             o.destY = packet.targetY + dy / dist * packet.distance;
             o.moving = true;
         }
-        this.version++;
     }
 }
 
@@ -285,14 +309,56 @@ class EventDriver {
     }
 }
 
+// Metrics collects the frame by frame comparison of the drawn position
+// against the simulated server truth. The spike ratio compares the frame
+// displacement with the unit speed over the ACTUAL frame interval, so
+// sparse frame execution does not fake spikes.
+class Metrics {
+    constructor() {
+        this.maxErr = 0;
+        this.maxSpike = 0;
+        this.errAtArrival = null;
+        this.last = null;
+        this.lastTime = 0;
+        this.frames = 0;
+    }
+
+    observe(drawn, truth, speed, timeMs, atArrival) {
+        if (!drawn) {
+            return;
+        }
+        const err = Math.hypot(drawn.x - truth.x, drawn.y - truth.y);
+        if (err > this.maxErr) {
+            this.maxErr = err;
+        }
+        if (this.last && timeMs > this.lastTime) {
+            const delta = Math.hypot(drawn.x - this.last.x,
+                drawn.y - this.last.y);
+            const dtS = (timeMs - this.lastTime) / 1000;
+            const frameSpeed = speed * dtS;
+            if (frameSpeed > 0.01) {
+                this.maxSpike = Math.max(this.maxSpike, delta / frameSpeed);
+            }
+        }
+        this.last = { x: drawn.x, y: drawn.y };
+        this.lastTime = timeMs;
+        this.frames++;
+        if (atArrival) {
+            this.errAtArrival = err;
+        }
+    }
+}
+
 // Scenario drives one movement pattern against a loaded MapView.
 class Scenario {
     constructor(name, opts) {
         this.name = name;
         this.opts = opts;
         this.isSelf = opts.kind === "player";
-        this.results = [];
         this.verbose = process.argv.includes("--verbose");
+        this.frameLog = process.argv.includes("--frames");
+        this.metrics = new Metrics();
+        this.logCounter = 0;
     }
 
     run() {
@@ -301,11 +367,11 @@ class Scenario {
         this.clock = loaded.clock;
         this.rafQueue = loaded.rafQueue;
 
-        const sim = new MobiusSim(this.opts);
-        const state = new BotState(this.opts.objectId,
-            this.opts.templateId);
-        const random = makeRandom(this.opts.seed || 7);
-        const driver = new EventDriver((t) => { this.clock.nowMs = t; });
+        this.sim = new MobiusSim(this.opts);
+        this.state = new BotState(this.opts.objectId,
+            this.opts.templateId, this.opts.collision);
+        this.random = makeRandom(this.opts.seed || 7);
+        this.driver = new EventDriver((t) => { this.clock.nowMs = t; });
 
         // played character snapshot fields (fed by applySelfPacket)
         this.selfX = this.opts.startX;
@@ -315,143 +381,58 @@ class Scenario {
         this.selfDestY = this.opts.startY;
         this.selfMoveAtMs = 0;
         this.selfSpeed = this.opts.speed;
+        this.arrivalFlag = false;
 
-        const snapshotObjects = () => (this.isSelf ? [] : [state.obj]);
+        const snapshotObjects = () => (this.isSelf ? [] : [this.state.obj]);
         const characterSnapshot = () => ({
             objectId: 100, name: "self",
             x: this.selfX, y: this.selfY, z: 0, heading: 0,
             moving: this.selfMoving, speed: this.selfMoving
                 ? this.selfSpeed : 0,
+            collisionRadius: this.opts.collision,
             destX: this.selfDestX, destY: this.selfDestY,
             moveAtMs: this.selfMoveAtMs
         });
 
         // deliverSnapshot models the SSE poll: the snapshot is built at
-        // the poll time (capturing the state at that moment, like
-        // writeSnapshotEvent calls bot.Snapshot() inside the poll tick)
-        // and reaches the browser transportMs later.
-        const deliverSnapshot = (at) => {
-            driver.at(at, (t) => {
+        // the poll time and reaches the browser transportMs later. The
+        // objects are copied like the Go Snapshot does - a live tracker
+        // reference would mutate inside the stored snapshot and feed the
+        // map state that was never sent.
+        this.deliverSnapshot = (at) => {
+            this.driver.at(at, (t) => {
                 const snap = {
                     serverTimeMs: t,
                     character: characterSnapshot(),
-                    objects: snapshotObjects()
+                    objects: snapshotObjects().map((o) => ({ ...o }))
                 };
-                driver.at(t + HARNESS.transportMs, (t2) => {
-                    this.clock.nowMs = t2;
+                this.driver.at(t + HARNESS.transportMs, () => {
                     this.MapView.update(snap);
                 });
             });
         };
 
-        // the frame pump executes queued rAF callbacks without moving the
-        // clock past the given bound.
-        const pumpFrames = (bound) => {
-            const queue = this.rafQueue;
-            let guard = 0;
-            while (queue.length > 0 && guard < 1000) {
-                guard++;
-                const due = queue[0].dueAt;
-                if (due > bound) {
-                    break;
+        this.applyPacket = (packet, at) => {
+            this.driver.at(at, (t) => {
+                if (this.isSelf) {
+                    this.applySelfPacket(packet, t);
+                } else {
+                    this.state.apply(packet, t, this.opts.speed);
                 }
-                this.clock.nowMs = Math.max(this.clock.nowMs, due);
-                const batch = queue.splice(0, queue.length)
-                    .filter((f) => f.dueAt <= bound);
-                if (batch.length === 0) {
-                    break;
+                if (packet.arrival) {
+                    this.arrivalFlag = true;
                 }
-                const before = this.drawnPos();
-                for (const frame of batch) {
-                    frame.cb(this.clock.nowMs);
-                }
-                const after = this.drawnPos();
-                if (before && after) {
-                    this.recordFrame(before, after);
-                }
-            }
+            });
         };
 
-        this.drawnPos = () => {
-            const key = this.isSelf ? "self" : this.opts.objectId;
-            const rt = this.MapView.runtime.get(key);
-            return rt ? { x: rt.drawX, y: rt.drawY } : null;
-        };
-        this.debugFrames = process.argv.includes("--debug-frames");
-        this.frameLogCounter = 0;
-        this.recordFrame = (before, after) => {
-            const delta = Math.hypot(after.x - before.x,
-                after.y - before.y);
-            if (this.currentMove && this.currentMove.arrivalDelivered) {
-                this.currentMove.maxJumpAfterArrival = Math.max(
-                    this.currentMove.maxJumpAfterArrival, delta);
-            }
-            if (this.debugFrames && this.frameLogCounter++ % 30 === 0) {
-                const key = this.isSelf ? "self" : this.opts.objectId;
-                const distToDest = Math.hypot(after.x - this.selfDestX,
-                    after.y - this.selfDestY);
-                console.log("    frame clock=" + Math.round(this.clock.nowMs)
-                    + " drawn=" + key + ":" + Math.round(after.x)
-                    + "," + Math.round(after.y)
-                    + " self(x,y)=(" + Math.round(this.selfX) + ","
-                    + Math.round(this.selfY) + ")"
-                    + " selfDest=(" + Math.round(this.selfDestX) + ","
-                    + Math.round(this.selfDestY) + ")"
-                    + " distToDest=" + Math.round(distToDest)
-                    + " moveAt=" + this.selfMoveAtMs
-                    + " moving=" + this.selfMoving
-                    + " delta=" + delta.toFixed(1));
-            }
-        };
-        // applySelfPacket feeds the character view like the Go tracker.
-        this.applySelfPacket = (packet, nowMs, speed) => {
-            this.selfSpeed = speed;
-            if (packet.type === "MoveToPawn") {
-                const dx = packet.x - packet.targetX;
-                const dy = packet.y - packet.targetY;
-                const dist = Math.hypot(dx, dy);
-                this.selfX = packet.x;
-                this.selfY = packet.y;
-                this.selfDestX = packet.targetX + dx / dist * packet.distance;
-                this.selfDestY = packet.targetY + dy / dist * packet.distance;
-                this.selfMoving = true;
-                this.selfMoveAtMs = nowMs;
-            } else if (packet.type === "MoveToLocation") {
-                this.selfX = packet.x;
-                this.selfY = packet.y;
-                this.selfDestX = packet.destX;
-                this.selfDestY = packet.destY;
-                this.selfMoving = Math.abs(packet.destX - packet.x) > 1
-                    || Math.abs(packet.destY - packet.y) > 1;
-                this.selfMoveAtMs = nowMs;
-            } else if (packet.type === "StopMove") {
-                this.selfX = packet.x;
-                this.selfY = packet.y;
-                this.selfDestX = packet.x;
-                this.selfDestY = packet.y;
-                this.selfMoving = false;
-                this.selfMoveAtMs = nowMs;
-            }
-        };
-        // applyPacket routes a server packet into the fake tracker.
-        this.applyPacket = (packet, at) => {
-            if (this.isSelf) {
-                this.applySelfPacket(packet, at, sim.v);
-            } else {
-                state.apply(packet, at, sim.v);
-            }
-        };
-        // scheduleTicks runs the sim ticks between from and to.
-        this.scheduleTicks = (fromMs, toMs, onPacket) => {
+        this.scheduleTicks = (fromMs, toMs) => {
             let tickAt = Math.floor(fromMs / 100) * 100 + 100;
             while (tickAt <= toMs) {
                 const at = tickAt;
-                driver.at(at, (time) => {
-                    if (!sim.moving) {
-                        return;
-                    }
-                    for (const packet of sim.tick(time)) {
-                        onPacket(packet, time);
+                this.driver.at(at, (time) => {
+                    for (const packet of this.sim.tick(time)) {
+                        this.applyPacket(packet,
+                            time + HARNESS.parseDelayMs);
                     }
                 });
                 tickAt += 100;
@@ -459,176 +440,275 @@ class Scenario {
         };
 
         // seed: a standing snapshot so the runtime entry exists
-        state.obj.x = sim.x;
-        state.obj.y = sim.y;
-        state.obj.speed = this.opts.speed;
-        deliverSnapshot(0);
-        driver.run(10, pumpFrames);
+        this.state.obj.x = this.sim.x;
+        this.state.obj.y = this.sim.y;
+        this.state.obj.speed = this.opts.speed;
+        this.deliverSnapshot(0);
+        this.driver.run(10, (bound) => this.pumpFrames(bound));
 
-        for (let moveIndex = 0; moveIndex < HARNESS.movesPerScenario;
-            moveIndex++) {
-            const angle = random() * Math.PI * 2;
-            const dist = this.opts.chase ? this.opts.chaseDistance
-                : this.opts.minDist + random()
-                    * (this.opts.maxDist - this.opts.minDist);
-            const destX = sim.x + Math.cos(angle) * dist;
-            const destY = sim.y + Math.sin(angle) * dist;
-            const move = {
-                index: moveIndex, dist,
-                progressAtArrival: null, maxJumpAfterArrival: 0,
-                arrivalDelivered: false
-            };
-            this.currentMove = move;
-
-            if (this.opts.chase) {
-                this.runChase(sim, driver, deliverSnapshot, pumpFrames,
-                    move, destX, destY);
-            } else {
-                this.runWalk(sim, driver, deliverSnapshot, pumpFrames,
-                    move, destX, destY);
-            }
-            // settle the visuals between moves
-            driver.at(driver.time + HARNESS.idleAfterArrivalMs, () => {});
-            driver.run(driver.time + HARNESS.idleAfterArrivalMs,
-                pumpFrames);
-            this.results.push(move);
-        }
+        this.runPattern();
+        this.settle(HARNESS.idleAfterArrivalMs);
 
         return this.evaluate();
     }
 
-    // runWalk simulates a plain MoveToLocation walk.
-    runWalk(sim, driver, deliverSnapshot, pumpFrames, move,
-        destX, destY) {
-        const startPacket = sim.startMove(destX, destY, driver.time + 1);
-        driver.at(driver.time + 1, (t) => {
-            this.applyPacket(startPacket, t);
-        });
-        deliverSnapshot(driver.time + 2);
-
-        // remember the segment for the progress measurement
-        const finishMove = (arrivalTime) => {
-            const pollAt = Math.ceil(arrivalTime / HARNESS.pollPeriodMs)
-                * HARNESS.pollPeriodMs;
-            deliverSnapshot(pollAt);
-            driver.at(pollAt + HARNESS.transportMs, (t) => {
-                move.arrivalDelivered = true;
-                const pos = this.drawnPos();
-                if (pos) {
-                    const err = Math.hypot(pos.x - sim.destX,
-                        pos.y - sim.destY);
-                    move.progressAtArrival = 1 - err / move.dist;
+    // pumpFrames executes queued rAF callbacks and measures every frame
+    // against the server truth.
+    pumpFrames(bound) {
+        const queue = this.rafQueue;
+        let guard = 0;
+        while (queue.length > 0 && guard < 5000) {
+            guard++;
+            const due = queue[0].dueAt;
+            if (due > bound) {
+                break;
+            }
+            this.clock.nowMs = Math.max(this.clock.nowMs, due);
+            const batch = queue.splice(0, queue.length)
+                .filter((f) => f.dueAt <= bound);
+            if (batch.length === 0) {
+                break;
+            }
+            const before = this.drawnPos();
+            for (const frame of batch) {
+                frame.cb(this.clock.nowMs);
+            }
+            const after = this.drawnPos();
+            if (after && this.movingNow()) {
+                const atArrival = this.arrivalFlag;
+                this.arrivalFlag = false;
+                this.metrics.observe(after, this.truthPos(), this.opts.speed,
+                    this.clock.nowMs, atArrival);
+                this.logCounter++;
+                if (this.frameLog && this.logCounter % 10 === 0) {
+                    const step = Math.hypot(after.x - (before
+                        ? before.x : after.x), after.y - (before
+                        ? before.y : after.y));
+                    const key = this.isSelf ? "self" : this.opts.objectId;
+                    const rt = this.MapView.runtime.get(key);
+                    const seg = rt && rt.seg ? " segLen=" + rt.seg.len.toFixed(0)
+                        + " durMs=" + rt.seg.durMs.toFixed(0)
+                        + " startMs=" + Math.round(rt.seg.startMs) : " noSeg";
+                    const view = this.isSelf
+                        ? this.MapView.lastSnap.character
+                        : this.MapView.lastSnap.objects.find(
+                            (o) => o.objectId === this.opts.objectId);
+                    const vinfo = view ? " viewX=" + Math.round(view.x)
+                        + "," + Math.round(view.y)
+                        + " viewDest=" + Math.round(view.destX) + ","
+                        + Math.round(view.destY)
+                        + " moveAt=" + view.moveAtMs
+                        + " mv=" + view.moving
+                        + " vSpd=" + view.speed
+                        + " vCol=" + view.collisionRadius : " noView";
+                    console.log("    t=" + Math.round(this.clock.nowMs)
+                        + " drawn=" + Math.round(after.x) + ","
+                        + Math.round(after.y)
+                        + " truth=" + Math.round(this.sim.x) + ","
+                        + Math.round(this.sim.y)
+                        + " err=" + Math.hypot(after.x - this.sim.x,
+                            after.y - this.sim.y).toFixed(1)
+                        + " frameU=" + step.toFixed(2)
+                        + seg + vinfo);
                 }
-            });
-        };
-        this.scheduleTicks(driver.time + 1,
-            driver.time + (move.dist / sim.v) * 1000 + 2000,
-            (packet, time) => {
-                driver.at(time + HARNESS.parseDelayMs, (t) => {
-                    this.applyPacket(packet, t);
-                    if (packet.arrival) {
-                        finishMove(t);
-                    }
-                });
-            });
-        const deadline = driver.time + (move.dist / sim.v) * 1000 + 2000;
-        driver.run(deadline, pumpFrames);
-        // safety: report missing arrival as total miss
-        if (!move.arrivalDelivered) {
-            move.progressAtArrival = -1;
+            }
+        }
+    }
+
+    drawnPos() {
+        const key = this.isSelf ? "self" : this.opts.objectId;
+        const rt = this.MapView.runtime.get(key);
+
+        return rt ? { x: rt.drawX, y: rt.drawY } : null;
+    }
+
+    truthPos() {
+        return { x: this.sim.x, y: this.sim.y };
+    }
+
+    movingNow() {
+        return this.isSelf ? this.selfMoving : this.state.obj.moving;
+    }
+
+    applySelfPacket(packet, nowMs) {
+        this.selfSpeed = this.opts.speed;
+        if (packet.type === "MoveToPawn") {
+            const dx = packet.x - packet.targetX;
+            const dy = packet.y - packet.targetY;
+            const dist = Math.hypot(dx, dy);
+            this.selfX = packet.x;
+            this.selfY = packet.y;
+            this.selfDestX = packet.targetX + dx / dist * packet.distance;
+            this.selfDestY = packet.targetY + dy / dist * packet.distance;
+            this.selfMoving = true;
+            this.selfMoveAtMs = nowMs;
+        } else if (packet.type === "MoveToLocation") {
+            this.selfX = packet.x;
+            this.selfY = packet.y;
+            this.selfDestX = packet.destX;
+            this.selfDestY = packet.destY;
+            this.selfMoving = Math.abs(packet.destX - packet.x) > 1
+                || Math.abs(packet.destY - packet.y) > 1;
+            this.selfMoveAtMs = nowMs;
+        } else if (packet.type === "StopMove") {
+            this.selfX = packet.x;
+            this.selfY = packet.y;
+            this.selfDestX = packet.x;
+            this.selfDestY = packet.y;
+            this.selfMoving = false;
+            this.selfMoveAtMs = nowMs;
+        }
+    }
+
+    // walkTo starts one move and schedules its ticks until arrival.
+    walkTo(destX, destY) {
+        const packet = this.sim.startMove(destX, destY, this.driver.time + 1);
+        if (packet) {
+            this.applyPacket(packet, this.driver.time + 1
+                + HARNESS.parseDelayMs);
+        }
+        this.deliverSnapshot(this.driver.time + 2);
+        const budget = this.driver.time
+            + (Math.hypot(destX - this.sim.x, destY - this.sim.y)
+                / this.sim.v) * 1000 + 2000;
+        this.scheduleTicks(this.driver.time + 1, budget);
+
+        return budget;
+    }
+
+    settle(ms) {
+        this.driver.at(this.driver.time + ms, () => {});
+        this.driver.run(this.driver.time + ms,
+            (bound) => this.pumpFrames(bound));
+    }
+
+    // runPattern runs the scenario specific movement pattern.
+    runPattern() {
+        if (this.opts.chase) {
+            this.runChase();
+
+            return;
+        }
+        if (this.opts.pickupHops) {
+            this.runPickupHops();
+
+            return;
+        }
+        if (this.opts.retarget) {
+            this.runRetarget();
+
+            return;
+        }
+        for (let i = 0; i < HARNESS.movesPerScenario; i++) {
+            const angle = this.random() * Math.PI * 2;
+            const dist = this.opts.minDist + this.random()
+                * (this.opts.maxDist - this.opts.minDist);
+            const budget = this.walkTo(this.sim.x + Math.cos(angle) * dist,
+                this.sim.y + Math.sin(angle) * dist);
+            this.driver.run(budget, (bound) => this.pumpFrames(bound));
+            this.settle(HARNESS.idleAfterArrivalMs);
         }
     }
 
     // runChase simulates the played character chasing a target with
     // MoveToPawn re-broadcasts every second and a final StopMove.
-    runChase(sim, driver, deliverSnapshot, pumpFrames, move,
-        targetX, targetY) {
+    runChase() {
+        const targetX = this.opts.startX + this.opts.chaseDistance;
+        const targetY = this.opts.startY;
         const offset = this.opts.pawnOffset || 40;
         let guard = 0;
         while (guard < 60) {
             guard++;
-            const packet = sim.chaseMove(targetX, targetY, offset,
-                driver.time + 1);
-            driver.at(driver.time + 1, (t) => {
-                this.applyPacket(packet, t);
-            });
-            deliverSnapshot(driver.time + 2);
-
-            const dist = Math.hypot(targetX - sim.x, targetY - sim.y);
-            const segmentMs = 1000;
-            this.scheduleTicks(driver.time + 1, driver.time + segmentMs,
-                (pkt, time) => {
-                    driver.at(time + HARNESS.parseDelayMs, (t) => {
-                        this.applyPacket(pkt, t);
-                    });
-                });
-            driver.run(driver.time + segmentMs, pumpFrames);
-            if (dist < offset + 40) {
+            const packet = this.sim.chaseMove(targetX, targetY, offset,
+                this.driver.time + 1);
+            if (packet) {
+                this.applyPacket(packet, this.driver.time + 1
+                    + HARNESS.parseDelayMs);
+            }
+            this.deliverSnapshot(this.driver.time + 2);
+            this.scheduleTicks(this.driver.time + 1, this.driver.time + 1000);
+            this.driver.run(this.driver.time + 1000,
+                (bound) => this.pumpFrames(bound));
+            if (Math.hypot(targetX - this.sim.x, targetY - this.sim.y)
+                < offset + 40) {
                 break;
             }
         }
-        const stop = sim.stopChase();
-        driver.at(driver.time + 1, (t) => {
-            this.applyPacket(stop, t);
-        });
-        const pollAt = Math.ceil((driver.time + 1) / HARNESS.pollPeriodMs)
-            * HARNESS.pollPeriodMs;
-        deliverSnapshot(pollAt);
-        driver.at(pollAt + HARNESS.transportMs, (t) => {
-            move.arrivalDelivered = true;
-            const pos = this.drawnPos();
-            if (pos) {
-                const err = Math.hypot(pos.x - stop.x, pos.y - stop.y);
-                move.progressAtArrival = 1 - err / move.dist;
-            }
-        });
-        driver.run(pollAt + 1500, pumpFrames);
+        const stop = this.sim.stopChase();
+        this.applyPacket(stop, this.driver.time + 1);
+        this.driver.run(this.driver.time + 1500,
+            (bound) => this.pumpFrames(bound));
+    }
+
+    // runPickupHops mimics the loot phase: many short straight hops with
+    // pauses, where the collision dominated stop rule matters most.
+    runPickupHops() {
+        for (let i = 0; i < 8; i++) {
+            const angle = this.random() * Math.PI * 2;
+            const dist = 40 + this.random() * 110;
+            const budget = this.walkTo(this.sim.x + Math.cos(angle) * dist,
+                this.sim.y + Math.sin(angle) * dist);
+            this.driver.run(budget, (bound) => this.pumpFrames(bound));
+            this.settle(200 + this.random() * 600);
+        }
+    }
+
+    // runRetarget mimics the combat approach: the destination changes
+    // every ~1.05 s (just past the broadcast throttle) before the unit
+    // reaches the final point.
+    runRetarget() {
+        let destX = this.sim.x + 500;
+        let destY = this.sim.y + this.random() * 200 - 100;
+        for (let i = 0; i < 6; i++) {
+            this.walkTo(destX, destY);
+            this.driver.run(this.driver.time + 1050,
+                (bound) => this.pumpFrames(bound));
+            destX += 120 + this.random() * 120;
+            destY += this.random() * 160 - 80;
+        }
+        const finalPacket = this.sim.startMove(destX, destY,
+            this.driver.time + 1);
+        if (finalPacket) {
+            this.applyPacket(finalPacket, this.driver.time + 1
+                + HARNESS.parseDelayMs);
+        }
+        this.deliverSnapshot(this.driver.time + 2);
+        this.scheduleTicks(this.driver.time + 1, this.driver.time + 6000);
+        this.driver.run(this.driver.time + 6000,
+            (bound) => this.pumpFrames(bound));
     }
 
     evaluate() {
         const failures = [];
-        const lines = [];
-        const perFrame = this.opts.speed * HARNESS.frameMs / 1000;
-        for (const move of this.results) {
-            const calibrated = move.index >= HARNESS.evaluatedFromMove;
-            const tolerance = Math.max(
-                HARNESS.absoluteToleranceUnits,
-                HARNESS.progressTolerance * move.dist);
-            const gapUnits = move.progressAtArrival === null
-                ? Infinity : (1 - move.progressAtArrival) * move.dist;
-            const jumpRatio = move.maxJumpAfterArrival / perFrame;
-            const ok = !calibrated || (gapUnits <= tolerance
-                && jumpRatio <= HARNESS.maxJumpRatio);
-            if (calibrated && !ok) {
-                failures.push(move);
-            }
-            lines.push("  move " + move.index
-                + " dist=" + Math.round(move.dist)
-                + " progress@arrival="
-                + (move.progressAtArrival === null
-                    ? "n/a" : move.progressAtArrival.toFixed(3))
-                + " gap=" + (Number.isFinite(gapUnits)
-                    ? Math.round(gapUnits) + "u" : "n/a")
-                + " jump=" + jumpRatio.toFixed(2) + "x"
-                + (calibrated ? (ok ? " [ok]" : " [FAIL]")
-                    : " [warmup]"));
+        const maxErr = Math.max(HARNESS.maxErrAbsolute,
+            HARNESS.maxErrFactor * this.opts.speed);
+        const errOk = this.metrics.maxErr <= maxErr;
+        const spikeOk = this.metrics.maxSpike <= HARNESS.maxSpikeRatio;
+        const arrivalOk = this.metrics.errAtArrival === null
+            || this.metrics.errAtArrival <= maxErr;
+        if (!errOk) {
+            failures.push("max error " + this.metrics.maxErr.toFixed(1)
+                + " > " + maxErr.toFixed(1));
+        }
+        if (!spikeOk) {
+            failures.push("max spike " + this.metrics.maxSpike.toFixed(2)
+                + "x > " + HARNESS.maxSpikeRatio + "x");
+        }
+        if (!arrivalOk) {
+            failures.push("arrival error "
+                + this.metrics.errAtArrival.toFixed(1) + " > "
+                + maxErr.toFixed(1));
         }
         const passed = failures.length === 0;
         console.log((passed ? "PASS " : "FAIL ") + this.name
             + " (" + this.opts.speed + " u/s, collision "
-            + this.opts.collision + ", "
-            + (this.opts.chase ? "chase" : "walk") + ")");
-        for (const line of lines) {
-            if (this.verbose || !line.endsWith("[ok]")) {
-                console.log(line);
-            }
-        }
-        if (!passed) {
-            console.log("  thresholds: gap <= "
-                + HARNESS.absoluteToleranceUnits + " units or "
-                + Math.round(HARNESS.progressTolerance * 100)
-                + "% of distance, jump <= " + HARNESS.maxJumpRatio + "x");
-        }
+            + this.opts.collision + ")");
+        console.log("  maxErr=" + this.metrics.maxErr.toFixed(1) + "u"
+            + " err@arrival=" + (this.metrics.errAtArrival === null
+                ? "n/a" : this.metrics.errAtArrival.toFixed(1) + "u")
+            + " maxSpike=" + this.metrics.maxSpike.toFixed(2) + "x"
+            + " frames=" + this.metrics.frames
+            + (passed ? "" : "  <- " + failures.join("; ")));
 
         return passed;
     }
@@ -660,19 +740,216 @@ function scenarios() {
             speed: 165, collision: 9,
             startX: 45000, startY: 50000, chase: true,
             chaseDistance: 700, pawnOffset: 40, seed: 41
+        }),
+        new Scenario("pickup hops", {
+            kind: "player", objectId: 100, templateId: 0,
+            speed: 165, collision: 9,
+            startX: 45000, startY: 50000, pickupHops: true, seed: 53
+        }),
+        new Scenario("retarget approach", {
+            kind: "player", objectId: 100, templateId: 0,
+            speed: 165, collision: 9,
+            startX: 45000, startY: 50000, retarget: true, seed: 61
+        }),
+        new Scenario("npc chase of the player", {
+            kind: "npc", objectId: 5003, templateId: 1000003,
+            speed: 120, collision: 12,
+            startX: 45200, startY: 50000, chase: true,
+            chaseDistance: 700, pawnOffset: 40, seed: 71
         })
     ];
 }
 
+// ---- live record / replay ----
+
+// parseArgs splits the mode arguments off the flag list.
+function parseArgs() {
+    const args = process.argv.slice(2);
+    const record = args.includes("--record") ? args[args.indexOf("--record")
+        + 1] : null;
+    const replay = args.includes("--replay")
+        ? args[args.indexOf("--replay") + 1] : null;
+    const positional = (name) => {
+        const at = args.indexOf(name);
+
+        return at >= 0 ? args[at + 1] : null;
+    };
+
+    return {
+        record, replay,
+        outfile: positional("--record") ? (args[args.indexOf("--record")
+            + 2] || null) : null,
+        url: positional("--record") ? (args[args.indexOf("--record") + 3]
+            || "http://127.0.0.1:8080") : null,
+        bot: positional("--record") ? (args[args.indexOf("--record") + 4]
+            || null) : null,
+        flags: new Set(args.filter((a) => a.startsWith("--")))
+    };
+}
+
+// record connects to the bot SSE stream and stores every snapshot with
+// its local receive time.
+async function record(seconds, outfile, url, bot) {
+    const base = url.replace(/\/$/, "");
+    let id = bot;
+    if (!id) {
+        const response = await fetch(base + "/api/bots");
+        const bots = await response.json();
+        if (bots.length === 0) {
+            console.error("no bots registered at " + base);
+            process.exit(1);
+        }
+        id = bots[0].id;
+    }
+    console.log("recording bot " + id + " from " + base + " for "
+        + seconds + "s");
+    const response = await fetch(base + "/api/bots/" + id + "/events");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const samples = [];
+    const started = Date.now();
+    let buffer = "";
+    while (Date.now() - started < seconds * 1000) {
+        const chunk = await reader.read();
+        if (chunk.done) {
+            break;
+        }
+        buffer += decoder.decode(chunk.value, { stream: true });
+        let boundary = buffer.indexOf("\n\n");
+        while (boundary >= 0) {
+            const block = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            const dataLine = block.split("\n")
+                .find((line) => line.startsWith("data: "));
+            if (dataLine) {
+                samples.push({
+                    t: Date.now(),
+                    snap: JSON.parse(dataLine.slice(6))
+                });
+            }
+            boundary = buffer.indexOf("\n\n");
+        }
+    }
+    fs.writeFileSync(outfile || "movement_recording.json", JSON.stringify({
+        startedAt: started, bot: id, samples
+    }));
+    console.log("recorded " + samples.length + " snapshots to "
+        + (outfile || "movement_recording.json"));
+}
+
+// replay feeds a recording through the real map at 60 fps and reports
+// the frame log plus speed spikes of every moving unit.
+async function replay(file) {
+    const data = JSON.parse(fs.readFileSync(file, "utf8"));
+    const samples = data.samples;
+    if (samples.length < 2) {
+        console.error("recording has too few samples");
+        process.exit(1);
+    }
+    const loaded = loadMapJs();
+    const MapView = loaded.MapView;
+    const clock = loaded.clock;
+    const verbose = process.argv.includes("--frames");
+    const from = samples[0].t;
+    const to = samples[samples.length - 1].t;
+    let sampleIndex = 0;
+    let maxSpike = 0;
+    let spikeCount = 0;
+    let frames = 0;
+    const lastPos = new Map();
+    console.log("replaying " + samples.length + " snapshots, "
+        + Math.round((to - from) / 1000) + "s");
+    for (let t = from; t <= to; t += HARNESS.frameMs) {
+        clock.nowMs = t;
+        while (sampleIndex < samples.length && samples[sampleIndex].t <= t) {
+            MapView.update(samples[sampleIndex].snap);
+            sampleIndex++;
+        }
+        // drain the frame callbacks that are due
+        let guard = 0;
+        while (loaded.rafQueue.length > 0 && guard < 100
+            && loaded.rafQueue[0].dueAt <= t + HARNESS.frameMs) {
+            guard++;
+            const frame = loaded.rafQueue.shift();
+            clock.nowMs = Math.max(clock.nowMs, frame.dueAt);
+            frame.cb(clock.nowMs);
+        }
+        clock.nowMs = t;
+        frames++;
+        const snap = MapView.lastSnap;
+        if (!snap) {
+            continue;
+        }
+        const views = [{ key: "self", view: snap.character, speed: snap.character ? snap.character.speed : 0 }]
+            .concat((snap.objects || []).filter((o) => o.moving)
+                .map((o) => ({ key: String(o.objectId), view: o, speed: o.speed })));
+        for (const { key, view, speed } of views) {
+            if (!view || !view.moving || !(speed > 0)) {
+                lastPos.delete(key);
+
+                continue;
+            }
+            const rt = MapView.runtime.get(key);
+            if (!rt) {
+                continue;
+            }
+            const prev = lastPos.get(key);
+            lastPos.set(key, { x: rt.drawX, y: rt.drawY });
+            if (!prev) {
+                continue;
+            }
+            const delta = Math.hypot(rt.drawX - prev.x, rt.drawY - prev.y);
+            const perFrame = speed * HARNESS.frameMs / 1000;
+            const ratio = perFrame > 0.01 ? delta / perFrame : 0;
+            if (ratio > maxSpike) {
+                maxSpike = ratio;
+            }
+            if (ratio > HARNESS.maxSpikeRatio) {
+                spikeCount++;
+                console.log("SPIKE t=" + Math.round(t) + " unit " + key
+                    + " moved " + delta.toFixed(1) + "u in one frame ("
+                    + ratio.toFixed(2) + "x of " + speed + " u/s)");
+            }
+            if (verbose && frames % 10 === 0) {
+                console.log("t=" + Math.round(t) + " unit " + key
+                    + " drawn=" + Math.round(rt.drawX) + ","
+                    + Math.round(rt.drawY)
+                    + " seg=" + (view.destX - view.x).toFixed(0) + ","
+                    + (view.destY - view.y).toFixed(0)
+                    + " frameU=" + delta.toFixed(2));
+            }
+        }
+    }
+    console.log("frames=" + frames + " maxSpike=" + maxSpike.toFixed(2)
+        + "x spikes>" + HARNESS.maxSpikeRatio + "x: " + spikeCount);
+    process.exitCode = maxSpike > HARNESS.maxSpikeRatio ? 1 : 0;
+}
+
 function main() {
+    const args = parseArgs();
+    if (args.record) {
+        record(Number(args.record), args.outfile, args.url, args.bot);
+
+        return;
+    }
+    if (args.replay) {
+        replay(args.replay);
+
+        return;
+    }
     let allPassed = true;
+    const only = process.argv.includes("--only")
+        ? process.argv[process.argv.indexOf("--only") + 1] : null;
     for (const scenario of scenarios()) {
+        if (only && !scenario.name.includes(only)) {
+            continue;
+        }
         const passed = scenario.run();
         allPassed = allPassed && passed;
     }
     console.log(allPassed
-        ? "movement reproduction: PASS (no end of path teleport)"
-        : "movement reproduction: FAIL (end of path teleport reproduced)");
+        ? "movement reproduction: PASS (drawn follows the server truth)"
+        : "movement reproduction: FAIL (jerky movement reproduced)");
     process.exitCode = allPassed ? 0 : 1;
 }
 
