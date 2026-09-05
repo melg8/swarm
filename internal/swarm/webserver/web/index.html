@@ -78,10 +78,14 @@ SPDX-License-Identifier: MIT
               <div class="hud-head">
                 <div class="hud-name-row">
                   <span id="hud-name" class="hud-name">—</span>
-                  <span id="hud-combat" class="hud-chip chip-combat hidden">combat</span>
-                  <span id="hud-rest" class="hud-chip chip-rest hidden">rest</span>
                 </div>
-                <div id="hud-class" class="hud-class">—</div>
+                <div class="hud-class-line">
+                  <span id="hud-class" class="hud-class">—</span>
+                  <span class="hud-chips">
+                    <span id="hud-combat" class="hud-chip chip-combat hidden">combat</span>
+                    <span id="hud-rest" class="hud-chip chip-rest hidden">rest</span>
+                  </span>
+                </div>
               </div>
               <div class="vitals">
                 <div class="vital-row">
@@ -104,23 +108,20 @@ SPDX-License-Identifier: MIT
                 <div class="kv"><span>level</span><b id="hud-level">—</b></div>
                 <div class="kv"><span>race</span><b id="hud-race">—</b></div>
                 <div class="kv"><span>x</span><b id="pos-x">—</b></div>
-                <div class="kv"><span>y</span><b id="pos-y">—</b></div>
-                <div class="kv"><span>z</span><b id="pos-z">—</b></div>
                 <div class="kv"><span>exp</span><b id="hud-exp">—</b></div>
+                <div class="kv"><span>y</span><b id="pos-y">—</b></div>
                 <div class="kv"><span>sp</span><b id="hud-sp">—</b></div>
+                <div class="kv"><span>z</span><b id="pos-z">—</b></div>
                 <div class="kv"><span>slots</span><b id="hud-slots">—</b></div>
                 <div class="kv"><span>weight</span><b id="hud-weight">—</b></div>
                 <div class="kv"><span>adena</span><b id="hud-adena">—</b></div>
               </div>
             </div>
 
-            <div id="hud-target" class="hud hud-target no-target">
-              <div class="hud-target-head">
-                <span class="hud-panel-label">target</span>
-                <div class="hud-name-row">
-                  <span id="target-name" class="hud-name hud-name-small">no target</span>
-                  <span id="target-level" class="hud-chip chip-level hidden">—</span>
-                </div>
+            <div id="hud-target" class="hud hud-target hidden">
+              <div class="hud-name-row">
+                <span id="target-name" class="hud-name hud-name-small">—</span>
+                <span id="target-level" class="hud-chip chip-level hidden">—</span>
               </div>
               <div class="vitals vitals-target">
                 <div class="vital-row">

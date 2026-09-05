@@ -526,3 +526,34 @@ higher speed, especially during loot pickup and the approach to mobs.
   kills, 30 moving units) replayed at 6012 frames with zero spikes and
   the frame log showing the constant per frame displacement of every
   unit.
+
+
+## Round 6: HUD polish (2026-09-06)
+
+User requests: the target widget must exist only while there is a
+target, the word `target` on it only distracts, x/y/z belong in the
+left grid column with exp/sp starting the right one, the weight should
+read as a bare percentage, and the combat chip must not crowd the name
+- the name is the heading.
+
+### Changes
+
+- `web/index.html`: the target panel starts hidden and the `target`
+  panel label is gone (the name row carries the level chip directly);
+  the character grid is reordered to level/race, x/exp, y/sp, z/slots,
+  weight/adena; the combat and rest chips moved from the name row into
+  the class line.
+- `web/app.js renderTarget` hides the whole panel instead of rendering
+  a `no target` placeholder; the weight renders as `54%` without the
+  exact load value.
+- `web/style.css`: the class line layout, the panel label and the
+  no-target dimming rules removed.
+- `tools/repro_hud.js` follows: a missing or dead target must hide the
+  panel (hidden class), a living target must show it; the mp no data
+  and renderHUD separation checks stay.
+
+### Verification
+
+- All three harnesses pass; live screenshot on the local stack (bot in
+  the village, no target) shows the target panel absent, the name as
+  the heading and the reordered grid.

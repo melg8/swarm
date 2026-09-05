@@ -11,8 +11,8 @@ SPDX-License-Identifier: MIT
 // sandboxed context with a stub DOM and checks the reported problems:
 //
 // - the target panel shows the current target with its name, level
-//   chip and HP/MP bars, and reads "no target" for a killed, removed
-//   or missing target instead of a dangling "object <id>" reference;
+//   chip and HP/MP bars, and is hidden completely when the target is
+//   killed, removed or missing (no placeholder state);
 // - the experience bar is fed from expPercent (the bot computes it
 //   from the C1 experience table) and renders the fill and the
 //   percentage text;
@@ -149,28 +149,23 @@ function main() {
         process.exit(1);
     }
 
-    // The bot has no target: the panel must read as a status, not as a
-    // dangling id.
+    // The bot has no target: the whole panel must be hidden, not shown
+    // with a placeholder.
     hud.renderTarget(snapshotWith(0));
-    check(results, "no target id shows the no target status",
-        elements.get("target-name").textContent === "no target",
-        "got " + JSON.stringify(
-            elements.get("target-name").textContent));
-    check(results, "no target dims the panel",
-        elements.get("hud-target").classList.contains("no-target"),
-        "no-target class missing");
+    check(results, "no target hides the target panel",
+        elements.get("hud-target").classList.contains("hidden"),
+        "hidden class missing");
 
     // The target died: the tracker cleared it, but a snapshot that
     // still carries the dead id (for example a race between the kill
-    // and the SSE delivery) must not fall back to "object 300".
+    // and the SSE delivery) must not show a stale panel either.
     const deadTarget = [{
         objectId: 300, kind: "npc", name: "Keltir", level: 2, dead: true
     }];
     hud.renderTarget(snapshotWith(300, deadTarget));
-    check(results, "dead target shows the no target status",
-        elements.get("target-name").textContent === "no target",
-        "got " + JSON.stringify(
-            elements.get("target-name").textContent));
+    check(results, "dead target keeps the target panel hidden",
+        elements.get("hud-target").classList.contains("hidden"),
+        "hidden class missing");
 
     // A living target renders with its name, level chip and vitals.
     const liveTarget = [{
@@ -178,6 +173,9 @@ function main() {
         curHp: 40, maxHp: 50
     }];
     hud.renderTarget(snapshotWith(300, liveTarget));
+    check(results, "living target shows the panel",
+        !elements.get("hud-target").classList.contains("hidden"),
+        "hidden class still present");
     check(results, "living target shows the name",
         elements.get("target-name").textContent === "Keltir",
         "got " + JSON.stringify(
