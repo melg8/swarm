@@ -26,7 +26,9 @@ func TestParseNpcInfoPacket(t *testing.T) {
 		data = putInt32(data, 55)  // walk speed
 		data = append(data, make([]byte, npcInfoSpeedTrail)...)
 		data = putFloat64(data, 1.15) // move multiplier
-		data = append(data, make([]byte, npcInfoAppearanceTail)...)
+		data = append(data, make([]byte, npcInfoAtkSpeedTail)...)
+		data = putFloat64(data, 10) // collision radius
+		data = append(data, make([]byte, npcInfoBodyTail)...)
 		data = append(data, 1, 1, 0, 1, 0) // flags: running, dead
 		data = append(data, utf16("Keltir")...)
 		data = append(data, utf16("")...)
@@ -269,8 +271,11 @@ func TestParseCharInfoPacket(t *testing.T) {
 		// swim and fly speeds.
 		data = append(data, make([]byte, charInfoSpeedTrail)...)
 		data = putFloat64(data, 1.0)
-		// attack speed multiplier, collision and hair fields.
-		data = append(data, make([]byte, charInfoAppearanceTail)...)
+		// attack speed multiplier.
+		data = append(data, make([]byte, charInfoAtkSpeedTail)...)
+		// collision radius, collision height and hair fields.
+		data = putFloat64(data, 9)
+		data = append(data, make([]byte, charInfoBodyTail)...)
 		data = append(data, utf16("Title")...)
 		// clan and ally ids plus the relation int.
 		data = append(data, make([]byte, charInfoClanTail)...)
@@ -311,7 +316,9 @@ func TestParseCharInfoPacket(t *testing.T) {
 		data = putInt32(data, 75)
 		data = append(data, make([]byte, charInfoSpeedTrail)...)
 		data = putFloat64(data, 1.0)
-		data = append(data, make([]byte, charInfoAppearanceTail)...)
+		data = append(data, make([]byte, charInfoAtkSpeedTail)...)
+		data = putFloat64(data, 9)
+		data = append(data, make([]byte, charInfoBodyTail)...)
 		data = append(data, utf16("Title")...)
 
 		p := NewCharInfoPacket()

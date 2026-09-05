@@ -35,6 +35,11 @@ const snapshotEvents = 100
 // attack or NpcInfo combat flag.
 const combatWindow = 10 * time.Second
 
+// defaultSelfCollision is the collision radius of the played character
+// when no packet carries it (UserInfo has no collision field). The map
+// uses it for the exact arrival projection of the own moves.
+const defaultSelfCollision = 9.0
+
 // underAttackWindow is how long a recent hit on the character keeps the
 // rest logic from sitting down: sitting into the blows of a mob that is
 // still swinging would only prolong the fight.
@@ -68,6 +73,7 @@ type CharacterState struct {
 	DestZ            int32
 	RunSpeed         float64
 	WalkSpeed        float64
+	CollisionRadius  float64
 	MoveAt           time.Time
 	AutoAttacking    bool
 	CombatUntil      time.Time
@@ -108,6 +114,7 @@ func newCharacterState() CharacterState {
 		DestZ:            0,
 		RunSpeed:         defaultRunSpeed,
 		WalkSpeed:        defaultWalkSpeed,
+		CollisionRadius:  defaultSelfCollision,
 		MoveAt:           time.Time{},
 		AutoAttacking:    false,
 		CombatUntil:      time.Time{},
@@ -133,39 +140,41 @@ type Event struct {
 
 // NpcInfo carries the fields of a parsed NpcInfo packet.
 type NpcInfo struct {
-	ObjectID      int32
-	TemplateID    int32
-	Attackable    bool
-	X             int32
-	Y             int32
-	Z             int32
-	Heading       int32
-	RunSpeed      int32
-	WalkSpeed     int32
-	MoveSpeedMult float64
-	Running       bool
-	InCombat      bool
-	Dead          bool
-	Name          string
-	Title         string
+	ObjectID        int32
+	TemplateID      int32
+	Attackable      bool
+	X               int32
+	Y               int32
+	Z               int32
+	Heading         int32
+	RunSpeed        int32
+	WalkSpeed       int32
+	MoveSpeedMult   float64
+	CollisionRadius float64
+	Running         bool
+	InCombat        bool
+	Dead            bool
+	Name            string
+	Title           string
 }
 
 // PlayerInfo carries the fields of a parsed CharInfo packet.
 type PlayerInfo struct {
-	ObjectID      int32
-	Name          string
-	Title         string
-	Race          int32
-	ClassID       int32
-	RunSpeed      int32
-	WalkSpeed     int32
-	MoveSpeedMult float64
-	Running       bool
-	InCombat      bool
-	Dead          bool
-	X             int32
-	Y             int32
-	Z             int32
+	ObjectID        int32
+	Name            string
+	Title           string
+	Race            int32
+	ClassID         int32
+	RunSpeed        int32
+	WalkSpeed       int32
+	MoveSpeedMult   float64
+	CollisionRadius float64
+	Running         bool
+	InCombat        bool
+	Dead            bool
+	X               int32
+	Y               int32
+	Z               int32
 }
 
 // ItemInfo carries the fields of a parsed DropItem packet.
@@ -803,6 +812,7 @@ func (b *Bot) ApplyNpcInfo(info NpcInfo) {
 	obj.RunSpeed = info.RunSpeed
 	obj.WalkSpeed = info.WalkSpeed
 	obj.MoveSpeedMult = info.MoveSpeedMult
+	obj.CollisionRadius = info.CollisionRadius
 	obj.Running = info.Running
 	obj.Moving = false
 	obj.DestX = info.X
@@ -835,6 +845,7 @@ func (b *Bot) ApplyPlayerInfo(info PlayerInfo) {
 	obj.RunSpeed = info.RunSpeed
 	obj.WalkSpeed = info.WalkSpeed
 	obj.MoveSpeedMult = info.MoveSpeedMult
+	obj.CollisionRadius = info.CollisionRadius
 	obj.Running = info.Running
 	obj.Dead = info.Dead
 	obj.Moving = false
@@ -1117,74 +1128,76 @@ func (b *Bot) markObjectCombatLocked(obj *WorldObject, now time.Time) {
 
 // CharacterSnapshot is the JSON view of the character state.
 type CharacterSnapshot struct {
-	ObjectID       int32   `json:"objectId"`
-	Name           string  `json:"name"`
-	TargetID       int32   `json:"targetId"`
-	Moving         bool    `json:"moving"`
-	DestX          int32   `json:"destX"`
-	DestY          int32   `json:"destY"`
-	DestZ          int32   `json:"destZ"`
-	Speed          float64 `json:"speed"`
-	MoveAtMs       int64   `json:"moveAtMs"`
-	Level          int32   `json:"level"`
-	Race           int32   `json:"race"`
-	ClassID        int32   `json:"classId"`
-	X              int32   `json:"x"`
-	Y              int32   `json:"y"`
-	Z              int32   `json:"z"`
-	Heading        int32   `json:"heading"`
-	CurHP          float64 `json:"curHp"`
-	MaxHP          float64 `json:"maxHp"`
-	CurMP          float64 `json:"curMp"`
-	MaxMP          float64 `json:"maxMp"`
-	Sitting        bool    `json:"sitting"`
-	STR            int32   `json:"str"`
-	DEX            int32   `json:"dex"`
-	CON            int32   `json:"con"`
-	INT            int32   `json:"int"`
-	WIT            int32   `json:"wit"`
-	MEN            int32   `json:"men"`
-	Exp            int32   `json:"exp"`
-	ExpPercent     float64 `json:"expPercent"`
-	Sp             int32   `json:"sp"`
-	InCombat       bool    `json:"inCombat"`
-	CurrentLoad    int32   `json:"load"`
-	MaxLoad        int32   `json:"maxLoad"`
-	InventorySlots int     `json:"inventorySlots"`
-	InventoryMax   int     `json:"inventoryMax"`
-	Adena          int32   `json:"adena"`
+	ObjectID        int32   `json:"objectId"`
+	Name            string  `json:"name"`
+	TargetID        int32   `json:"targetId"`
+	Moving          bool    `json:"moving"`
+	DestX           int32   `json:"destX"`
+	DestY           int32   `json:"destY"`
+	DestZ           int32   `json:"destZ"`
+	Speed           float64 `json:"speed"`
+	CollisionRadius float64 `json:"collisionRadius"`
+	MoveAtMs        int64   `json:"moveAtMs"`
+	Level           int32   `json:"level"`
+	Race            int32   `json:"race"`
+	ClassID         int32   `json:"classId"`
+	X               int32   `json:"x"`
+	Y               int32   `json:"y"`
+	Z               int32   `json:"z"`
+	Heading         int32   `json:"heading"`
+	CurHP           float64 `json:"curHp"`
+	MaxHP           float64 `json:"maxHp"`
+	CurMP           float64 `json:"curMp"`
+	MaxMP           float64 `json:"maxMp"`
+	Sitting         bool    `json:"sitting"`
+	STR             int32   `json:"str"`
+	DEX             int32   `json:"dex"`
+	CON             int32   `json:"con"`
+	INT             int32   `json:"int"`
+	WIT             int32   `json:"wit"`
+	MEN             int32   `json:"men"`
+	Exp             int32   `json:"exp"`
+	ExpPercent      float64 `json:"expPercent"`
+	Sp              int32   `json:"sp"`
+	InCombat        bool    `json:"inCombat"`
+	CurrentLoad     int32   `json:"load"`
+	MaxLoad         int32   `json:"maxLoad"`
+	InventorySlots  int     `json:"inventorySlots"`
+	InventoryMax    int     `json:"inventoryMax"`
+	Adena           int32   `json:"adena"`
 }
 
 // ObjectSnapshot is the JSON view of a world object.
 type ObjectSnapshot struct {
-	ObjectID   int32      `json:"objectId"`
-	Kind       ObjectKind `json:"kind"`
-	Name       string     `json:"name"`
-	Title      string     `json:"title"`
-	TemplateID int32      `json:"templateId"`
-	Attackable bool       `json:"attackable"`
-	Aggressive bool       `json:"aggressive"`
-	AggroRange int32      `json:"aggroRange"`
-	Level      int32      `json:"level"`
-	TargetID   int32      `json:"targetId"`
-	InCombat   bool       `json:"inCombat"`
-	Dead       bool       `json:"dead"`
-	Moving     bool       `json:"moving"`
-	Running    bool       `json:"running"`
-	Speed      float64    `json:"speed"`
-	Count      int32      `json:"count"`
-	X          int32      `json:"x"`
-	Y          int32      `json:"y"`
-	Z          int32      `json:"z"`
-	Heading    int32      `json:"heading"`
-	DestX      int32      `json:"destX"`
-	DestY      int32      `json:"destY"`
-	DestZ      int32      `json:"destZ"`
-	MoveAtMs   int64      `json:"moveAtMs"`
-	CurHP      float64    `json:"curHp"`
-	MaxHP      float64    `json:"maxHp"`
-	CurMP      float64    `json:"curMp"`
-	MaxMP      float64    `json:"maxMp"`
+	ObjectID        int32      `json:"objectId"`
+	Kind            ObjectKind `json:"kind"`
+	Name            string     `json:"name"`
+	Title           string     `json:"title"`
+	TemplateID      int32      `json:"templateId"`
+	Attackable      bool       `json:"attackable"`
+	Aggressive      bool       `json:"aggressive"`
+	AggroRange      int32      `json:"aggroRange"`
+	Level           int32      `json:"level"`
+	TargetID        int32      `json:"targetId"`
+	InCombat        bool       `json:"inCombat"`
+	Dead            bool       `json:"dead"`
+	Moving          bool       `json:"moving"`
+	Running         bool       `json:"running"`
+	Speed           float64    `json:"speed"`
+	CollisionRadius float64    `json:"collisionRadius"`
+	Count           int32      `json:"count"`
+	X               int32      `json:"x"`
+	Y               int32      `json:"y"`
+	Z               int32      `json:"z"`
+	Heading         int32      `json:"heading"`
+	DestX           int32      `json:"destX"`
+	DestY           int32      `json:"destY"`
+	DestZ           int32      `json:"destZ"`
+	MoveAtMs        int64      `json:"moveAtMs"`
+	CurHP           float64    `json:"curHp"`
+	MaxHP           float64    `json:"maxHp"`
+	CurMP           float64    `json:"curMp"`
+	MaxMP           float64    `json:"maxMp"`
 }
 
 // Snapshot is the JSON view of the whole bot state.
@@ -1211,34 +1224,35 @@ func (b *Bot) Snapshot() Snapshot {
 		ID:     b.id,
 		Status: b.status,
 		Character: CharacterSnapshot{
-			ObjectID: b.selfID,
-			Name:     b.char.Name,
-			TargetID: b.char.TargetID,
-			Moving:   b.char.Moving,
-			DestX:    b.char.DestX,
-			DestY:    b.char.DestY,
-			DestZ:    b.char.DestZ,
-			Speed:    b.char.RunSpeed,
-			MoveAtMs: b.char.MoveAt.UnixMilli(),
-			Level:    b.char.Level,
-			Race:     b.char.Race,
-			ClassID:  b.char.ClassID,
-			X:        b.char.X,
-			Y:        b.char.Y,
-			Z:        b.char.Z,
-			Heading:  b.char.Heading,
-			CurHP:    b.char.CurHP,
-			MaxHP:    b.char.MaxHP,
-			CurMP:    b.char.CurMP,
-			MaxMP:    b.char.MaxMP,
-			Sitting:  b.char.Sitting,
-			STR:      b.char.STR,
-			DEX:      b.char.DEX,
-			CON:      b.char.CON,
-			INT:      b.char.INT,
-			WIT:      b.char.WIT,
-			MEN:      b.char.MEN,
-			Exp:      b.char.Exp,
+			ObjectID:        b.selfID,
+			Name:            b.char.Name,
+			TargetID:        b.char.TargetID,
+			Moving:          b.char.Moving,
+			DestX:           b.char.DestX,
+			DestY:           b.char.DestY,
+			DestZ:           b.char.DestZ,
+			Speed:           b.char.RunSpeed,
+			CollisionRadius: b.char.CollisionRadius,
+			MoveAtMs:        b.char.MoveAt.UnixMilli(),
+			Level:           b.char.Level,
+			Race:            b.char.Race,
+			ClassID:         b.char.ClassID,
+			X:               b.char.X,
+			Y:               b.char.Y,
+			Z:               b.char.Z,
+			Heading:         b.char.Heading,
+			CurHP:           b.char.CurHP,
+			MaxHP:           b.char.MaxHP,
+			CurMP:           b.char.CurMP,
+			MaxMP:           b.char.MaxMP,
+			Sitting:         b.char.Sitting,
+			STR:             b.char.STR,
+			DEX:             b.char.DEX,
+			CON:             b.char.CON,
+			INT:             b.char.INT,
+			WIT:             b.char.WIT,
+			MEN:             b.char.MEN,
+			Exp:             b.char.Exp,
 			ExpPercent: ExpPercent(b.char.Level,
 				int64(b.char.Exp)),
 			Sp:       b.char.Sp,
@@ -1254,34 +1268,35 @@ func (b *Bot) Snapshot() Snapshot {
 	}
 	for _, obj := range b.objects {
 		snap.Objects = append(snap.Objects, ObjectSnapshot{
-			ObjectID:   obj.ObjectID,
-			Kind:       obj.Kind,
-			Name:       obj.Name,
-			Title:      obj.Title,
-			TemplateID: obj.TemplateID,
-			Attackable: obj.Attackable,
-			Aggressive: obj.Aggressive,
-			AggroRange: obj.AggroRange,
-			Level:      obj.Level,
-			TargetID:   obj.TargetID,
-			InCombat:   obj.InCombat(now),
-			Dead:       obj.Dead,
-			Moving:     obj.Moving,
-			Running:    obj.Running,
-			Speed:      obj.EffectiveSpeed(),
-			Count:      obj.Count,
-			X:          obj.X,
-			Y:          obj.Y,
-			Z:          obj.Z,
-			Heading:    obj.Heading,
-			DestX:      obj.DestX,
-			DestY:      obj.DestY,
-			DestZ:      obj.DestZ,
-			MoveAtMs:   obj.MoveAt.UnixMilli(),
-			CurHP:      obj.CurHP,
-			MaxHP:      obj.MaxHP,
-			CurMP:      obj.CurMP,
-			MaxMP:      obj.MaxMP,
+			ObjectID:        obj.ObjectID,
+			Kind:            obj.Kind,
+			Name:            obj.Name,
+			Title:           obj.Title,
+			TemplateID:      obj.TemplateID,
+			Attackable:      obj.Attackable,
+			Aggressive:      obj.Aggressive,
+			AggroRange:      obj.AggroRange,
+			Level:           obj.Level,
+			TargetID:        obj.TargetID,
+			InCombat:        obj.InCombat(now),
+			Dead:            obj.Dead,
+			Moving:          obj.Moving,
+			Running:         obj.Running,
+			Speed:           obj.EffectiveSpeed(),
+			CollisionRadius: obj.CollisionRadius,
+			Count:           obj.Count,
+			X:               obj.X,
+			Y:               obj.Y,
+			Z:               obj.Z,
+			Heading:         obj.Heading,
+			DestX:           obj.DestX,
+			DestY:           obj.DestY,
+			DestZ:           obj.DestZ,
+			MoveAtMs:        obj.MoveAt.UnixMilli(),
+			CurHP:           obj.CurHP,
+			MaxHP:           obj.MaxHP,
+			CurMP:           obj.CurMP,
+			MaxMP:           obj.MaxMP,
 		})
 	}
 	snap.Events = appendEvents(
