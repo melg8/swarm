@@ -173,3 +173,129 @@ arrival 0.897-0.940 and jumps up to 2.23x; running it against the fixed
 file reports PASS on all scenarios. Restoring the fixed file afterwards
 keeps the branch clean, and the full suite (`go test ./...`, golangci
 lint on new code, the movement harness) is green.
+
+## Round 2: five hunt and web interface problems (2026-09-05)
+
+User report after testing the bot with a second account in the world:
+
+1. selecting the bot or a mob with the second character showed nothing
+   on the map;
+2. the bot idles for many seconds between mobs instead of chaining the
+   next kill when its HP is high;
+3. the unit direction line is drawn inside the circle marker;
+4. the bot often picks a target that is not the nearest one right now;
+5. HUD issues: a killed target shows `object <id>`, the `target` label
+   visually merges with the value, the `facing` field duplicates the
+   map, the experience is a bare number instead of a progress bar and
+   the HP/MP bar colors are not the classic L2 C1 ones.
+
+### Root causes
+
+- Selections of other players: the tracker already records them
+  (TargetSelected 0x39 -> `ApplyObjectTarget`, TargetUnselected 0x3A ->
+  `ApplyTargetClear`, verified against `Player.setTarget` of the Mobius
+  sources which broadcasts `TargetSelected(getObjectId(),
+  newTarget.getObjectId(), ...)` to every visible player), and the
+  snapshot carries `targetId` - but `web/map.js` only rendered the
+  selection of the bot itself. Pure rendering gap.
+- Hunt idle between mobs: the Mobius server never clears the target
+  selection of a killed target (`Player.setTarget` answers only new
+  selections with MyTargetSelected; the removal path broadcasts
+  TargetUnselected to everyone including the actor, but nothing tells
+  the acting client "you have no target now"). The bot tracker kept the
+  dead object id in `char.TargetID`, the hunt loop re-adopted that
+  stale id every tick ("prefer the server view") and flipped into the
+  loot phase, which immediately flipped back to engage with the target
+  reset: an engage/loot ping-pong in which `AttackNearest` was never
+  called again. Additionally the fixed 4 second `engagePeriod` pause
+  and the 1 second decision cadence added idle time after every loot
+  phase even without the ping-pong.
+- Direction line: `drawUnitTick` drew the heading ray from 20 percent
+  of the radius inside the circle.
+- Nearest target: `NearestAttackable` ranked candidates by their last
+  movement packet start position. The server re-broadcasts
+  MoveToLocation at most once per second per moving creature, so a
+  moving mob is tens or hundreds of units away from its recorded start
+  when the choice is made.
+- HUD: the tracker never cleared `char.TargetID` (same server
+  semantics as above), so a removed corpse left a dangling id that the
+  HUD rendered as `object <id>`; the HUD had no experience bar because
+  the bot never computed the level progress (the C1 experience table
+  lives in the server data pack); the `.kv` grid used
+  `justify-content: space-between` without a gap or overflow handling,
+  so the `target` label and long values merged.
+
+### Fixes
+
+- Tracker (`internal/swarm/state`): the character target is cleared
+  when the target dies (StatusUpdate CUR_HP 0), when the target object
+  is removed (DeleteObject) and on the own TargetUnselected broadcast
+  (`ApplyTargetClear(selfID)`), mirroring what the official client
+  shows. `SelfHealthPercent` exposes the HP level, `ExpPercent` (C1
+  experience table generated from the Mobius data pack by
+  `tools/generate_experience_table.sh` into
+  `internal/swarm/state/experience.go`) feeds the new
+  `expPercent` snapshot field.
+- Hunt loop (`internal/swarm/hunt`): the server target is only adopted
+  while it is alive, the loop resets its own target when the target
+  dies (no ping-pong), decisions run on a 250 ms cadence, a healthy
+  character (HP >= 50 percent) selects the next target immediately
+  (rate limited to one request per second for the flood protector) and
+  a hurt character rests with a logged reason until regeneration
+  recovers.
+- `NearestAttackable` ranks the candidates by their projected current
+  position (moving npcs advance from the segment start toward the
+  destination at their effective speed, the server side counterpart of
+  the web map interpolation).
+- `web/map.js`: every visible player renders its selection as a violet
+  dashed line to the target plus a violet dashed ring around it
+  (including a ring around the bot itself when the bot is the target);
+  the tooltip shows what a unit targets; the direction tick starts at
+  the circle edge and the circle is a solid fill inside.
+- HUD (`web/app.js`, `web/index.html`, `web/style.css`): unresolved or
+  dead targets display `no target`; the `facing` field is gone; the
+  experience is the third bar under HP and MP filled from `expPercent`
+  with the percentage as text; HP/MP/EXP use the classic L2 C1 palette
+  (HP red `#f04040 -> #c00000 -> #8b0000`, MP blue `#40a0ff ->
+  #2060c0 -> #103080`, EXP gold `#ffe9a0 -> #d4af37 -> #8b6508`, light
+  top / dark bottom cylindrical gradients - taken from C1 screenshots
+  of the original client: red HP and blue MP bars in the status window,
+  gold exp bar above the shortcut bar); the `.kv` rows separate label
+  and value with a gap and ellipsize long values.
+
+### Reproduction and verification
+
+- `tools/repro_map_render.js` (`task repro:map`): drives the real
+  `web/map.js` in a Node vm sandbox with a recording canvas. Checks the
+  player target link (violet line + ring), the ring around the bot when
+  it is targeted, the own target regression guard and that every
+  direction tick starts at the circle edge. Validated RED: against the
+  pre fix map.js 8 checks fail; against the fixed file all pass.
+- `tools/repro_hud.js` (`task repro:hud`): drives the real `web/app.js`
+  against a stub DOM. Checks the `no target` status (zero id, dead
+  target, unresolvable id), the living target format, the exp bar fill
+  and text, the HP bar and that `renderHUD` never touches the removed
+  facing field. Validated RED: the pre fix app.js fails 7 checks.
+- Hunt chain behavior: `go test ./internal/swarm/hunt` covers the
+  post-kill target selection (`TestLoopSelectsNextTargetAfterKill`
+  feeds the stale dead server target and requires a new selection),
+  the rest gate (`TestLoopWaitsForHealthWhenHurt`) and the tracker
+  clearing (`TestSelfTargetCleared*` in `internal/swarm/state`).
+- Nearest choice: `TestNearestAttackableUsesProjectedPosition` spawns a
+  standing mob near the character and a moving mob whose stale packet
+  start is far away, and requires the moving one to be chosen at its
+  projected position.
+- Live run against the local Mobius stack (2026-09-05, server rebuilt
+  from the gitee.com mirror of the Mobius repository because gitlab is
+  unreachable from this environment; the AttackRequest double click,
+  Player.setTarget and experience.xml of the mirror were byte compared
+  against the gitlab HEAD analysis sources and carry the same
+  semantics): 15 kills in 200 seconds with no idle gaps (kill, loot,
+  next engagement every 5-11 seconds), the rest gate engaged exactly at
+  HP 45/38 percent below the 50 percent threshold with logged reasons
+  until regeneration recovered, the snapshot polled over the SSE state
+  endpoint showed `expPercent` climbing 34.2 -> 48.6 percent across
+  kills (and matching the hand computed (exp - base)/(next - base)
+  value 23.35 percent at level 3 with 551 exp exactly) and `targetId`
+  dropping to 0 right after each kill instead of dangling at the dead
+  object id.
