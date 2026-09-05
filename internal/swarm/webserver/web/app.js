@@ -196,6 +196,31 @@ function renderHUD(snap) {
   const deg = headingDegrees(c.heading);
   document.getElementById("pos-heading").textContent =
     deg + "° " + headingCardinal(c.heading);
+  document.getElementById("hud-target").textContent =
+    targetNameOf(snap, c.targetId);
+  document.getElementById("hud-slots").textContent =
+    (c.inventorySlots || 0) + "/" + (c.inventoryMax || 80);
+  document.getElementById("hud-weight").textContent =
+    c.maxLoad > 0
+      ? Math.round((c.load / c.maxLoad) * 100) + "% (" + formatNumber(c.load) + ")"
+      : "—";
+  document.getElementById("hud-adena").textContent = formatNumber(c.adena);
+}
+
+// targetNameOf resolves the display name of the bot target.
+function targetNameOf(snap, targetId) {
+  if (!targetId) { return "—"; }
+  if (targetId === (snap.character && snap.character.objectId)) {
+    return snap.character.name || "self";
+  }
+  const target = (snap.objects || []).find((obj) => obj.objectId === targetId);
+  if (target) {
+    return target.name
+      + (target.kind === "npc" && target.level > 0
+        ? " (" + target.level + ")" : "");
+  }
+
+  return "object " + targetId;
 }
 
 function setVital(kind, cur, max) {
@@ -251,14 +276,23 @@ function buildLogLine(event, filter) {
 
 function logLineClass(message) {
   if (message.startsWith("npc spawned") || message.startsWith("player appeared")
-    || message.startsWith("item dropped") || message.startsWith("entered")) {
+    || message.startsWith("item dropped") || message.startsWith("item appeared")
+    || message.startsWith("entered")) {
     return "spawn";
   }
-  if (message.includes("combat")) { return "combat"; }
+  if (message.includes("combat") || message.startsWith("target selected")) {
+    return "combat";
+  }
+  if (message.startsWith("picked up") || message.startsWith("received ")
+    || message.startsWith("lost ")) {
+    return "spawn";
+  }
   if (message.startsWith("object removed") || message.startsWith("left")) {
     return "remove";
   }
-  if (message.startsWith("packet ")) { return "packet"; }
+  if (message.startsWith("packet ") || message.startsWith("inventory ")) {
+    return "packet";
+  }
 
   return "";
 }

@@ -62,9 +62,13 @@ type CharacterState struct {
 	DestY         int32
 	DestZ         int32
 	RunSpeed      float64
+	WalkSpeed     float64
 	MoveAt        time.Time
 	AutoAttacking bool
 	CombatUntil   time.Time
+	TargetID      int32
+	CurrentLoad   int32
+	MaxLoad       int32
 }
 
 // newCharacterState creates a zero valued character state.
@@ -95,9 +99,13 @@ func newCharacterState() CharacterState {
 		DestY:         0,
 		DestZ:         0,
 		RunSpeed:      defaultRunSpeed,
+		WalkSpeed:     defaultWalkSpeed,
 		MoveAt:        time.Time{},
 		AutoAttacking: false,
 		CombatUntil:   time.Time{},
+		TargetID:      0,
+		CurrentLoad:   0,
+		MaxLoad:       0,
 	}
 }
 
@@ -133,14 +141,20 @@ type NpcInfo struct {
 
 // PlayerInfo carries the fields of a parsed CharInfo packet.
 type PlayerInfo struct {
-	ObjectID int32
-	Name     string
-	Title    string
-	Race     int32
-	ClassID  int32
-	X        int32
-	Y        int32
-	Z        int32
+	ObjectID      int32
+	Name          string
+	Title         string
+	Race          int32
+	ClassID       int32
+	RunSpeed      int32
+	WalkSpeed     int32
+	MoveSpeedMult float64
+	Running       bool
+	InCombat      bool
+	Dead          bool
+	X             int32
+	Y             int32
+	Z             int32
 }
 
 // ItemInfo carries the fields of a parsed DropItem packet.
@@ -197,6 +211,9 @@ type Attack struct {
 	X           int32
 	Y           int32
 	Z           int32
+	TargetX     int32
+	TargetY     int32
+	TargetZ     int32
 	TargetIDs   [AttackTargets]int32
 	TargetCount int
 }
@@ -209,37 +226,39 @@ type Attribute struct {
 
 // Bot tracks the observed state of a single bot session.
 type Bot struct {
-	mu       sync.RWMutex
-	id       string
-	status   Status
-	selfID   int32
-	char     CharacterState
-	objects  map[int32]WorldObject
-	events   []Event
-	eventLen int
-	eventPos int
-	packets  int64
-	version  uint64
-	started  time.Time
-	updated  time.Time
+	mu        sync.RWMutex
+	id        string
+	status    Status
+	selfID    int32
+	char      CharacterState
+	objects   map[int32]WorldObject
+	inventory map[int32]InventoryItem
+	events    []Event
+	eventLen  int
+	eventPos  int
+	packets   int64
+	version   uint64
+	started   time.Time
+	updated   time.Time
 }
 
 // NewBot creates a bot tracker for the given session id (account name).
 func NewBot(id string) *Bot {
 	return &Bot{
-		mu:       sync.RWMutex{},
-		id:       id,
-		status:   StatusConnecting,
-		selfID:   0,
-		char:     newCharacterState(),
-		objects:  make(map[int32]WorldObject),
-		events:   make([]Event, eventCapacity),
-		eventLen: 0,
-		eventPos: 0,
-		packets:  0,
-		version:  0,
-		started:  time.Now(),
-		updated:  time.Time{},
+		mu:        sync.RWMutex{},
+		id:        id,
+		status:    StatusConnecting,
+		selfID:    0,
+		char:      newCharacterState(),
+		objects:   make(map[int32]WorldObject),
+		inventory: make(map[int32]InventoryItem),
+		events:    make([]Event, eventCapacity),
+		eventLen:  0,
+		eventPos:  0,
+		packets:   0,
+		version:   0,
+		started:   time.Now(),
+		updated:   time.Time{},
 	}
 }
 
@@ -249,6 +268,25 @@ func (b *Bot) SelfObjectID() int32 {
 	defer b.mu.RUnlock()
 
 	return b.selfID
+}
+
+// SelfTargetID returns the object id of the current target of the
+// character, zero when nothing is targeted.
+func (b *Bot) SelfTargetID() int32 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.TargetID
+}
+
+// ObjectAlive reports whether the object is known around the character
+// and not dead.
+func (b *Bot) ObjectAlive(objectID int32) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	obj, ok := b.objects[objectID]
+
+	return ok && !obj.Dead
 }
 
 // ID returns the session id of the bot.
@@ -312,25 +350,30 @@ func (b *Bot) SetCharacter(
 
 // UserInfo carries the observed self state from a UserInfo packet.
 type UserInfo struct {
-	Name    string
-	Level   int32
-	Race    int32
-	ClassID int32
-	X       int32
-	Y       int32
-	Z       int32
-	STR     int32
-	DEX     int32
-	CON     int32
-	INT     int32
-	WIT     int32
-	MEN     int32
-	Exp     int32
-	Sp      int32
-	MaxHP   int32
-	CurHP   int32
-	MaxMP   int32
-	CurMP   int32
+	Name          string
+	Level         int32
+	Race          int32
+	ClassID       int32
+	X             int32
+	Y             int32
+	Z             int32
+	STR           int32
+	DEX           int32
+	CON           int32
+	INT           int32
+	WIT           int32
+	MEN           int32
+	Exp           int32
+	Sp            int32
+	MaxHP         int32
+	CurHP         int32
+	MaxMP         int32
+	CurMP         int32
+	CurrentLoad   int32
+	MaxLoad       int32
+	RunSpeed      int32
+	WalkSpeed     int32
+	MoveSpeedMult float64
 }
 
 // ApplyUserInfo updates the character state from a UserInfo packet.
@@ -356,6 +399,12 @@ func (b *Bot) ApplyUserInfo(info UserInfo) {
 	b.char.CurHP = float64(info.CurHP)
 	b.char.MaxMP = float64(info.MaxMP)
 	b.char.CurMP = float64(info.CurMP)
+	b.char.CurrentLoad = info.CurrentLoad
+	b.char.MaxLoad = info.MaxLoad
+	b.char.RunSpeed = effectiveSpeed(
+		info.RunSpeed, info.WalkSpeed, info.MoveSpeedMult)
+	b.char.WalkSpeed = effectiveSpeed(
+		info.WalkSpeed, info.WalkSpeed, info.MoveSpeedMult)
 	b.touch()
 }
 
@@ -445,12 +494,19 @@ func (b *Bot) ApplyMovement(m Movement) {
 // ApplyPawnMovement updates a chasing object: it runs toward the point
 // `distance` in front of its target and faces the target. The packet is
 // only sent for attacking creatures, so it also refreshes the combat
-// state and the target reference.
+// state and the target reference. The played character is handled as
+// well because the server broadcasts its own chase to it.
 func (b *Bot) ApplyPawnMovement(m PawnMovement) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	now := time.Now()
 	destX, destY := pawnDestination(m)
+	if m.ObjectID == b.selfID {
+		b.applySelfPawnMovementLocked(m, destX, destY, now)
+		b.touch()
+
+		return
+	}
 	if m.TargetID == b.selfID {
 		b.char.X = m.TargetX
 		b.char.Y = m.TargetY
@@ -481,6 +537,26 @@ func (b *Bot) ApplyPawnMovement(m PawnMovement) {
 	b.touch()
 }
 
+// applySelfPawnMovementLocked tracks the played character chasing its
+// attack target. The caller must hold the state write lock.
+func (b *Bot) applySelfPawnMovementLocked(
+	m PawnMovement, destX int32, destY int32, now time.Time,
+) {
+	b.char.X = m.X
+	b.char.Y = m.Y
+	b.char.Z = m.Z
+	if m.X != m.TargetX || m.Y != m.TargetY {
+		b.char.Heading = HeadingFromDelta(m.TargetX-m.X, m.TargetY-m.Y)
+	}
+	b.char.DestX = destX
+	b.char.DestY = destY
+	b.char.DestZ = m.TargetZ
+	b.char.Moving = destX != m.X || destY != m.Y
+	b.char.MoveAt = now
+	b.char.TargetID = m.TargetID
+	b.char.CombatUntil = now.Add(combatWindow)
+}
+
 // pawnDestination computes the stop point of a chasing object.
 func pawnDestination(m PawnMovement) (int32, int32) {
 	dx := float64(m.X - m.TargetX)
@@ -496,27 +572,40 @@ func pawnDestination(m PawnMovement) (int32, int32) {
 }
 
 // ApplyAttack updates the attacker placement and marks the attacker and
-// every known hit target as fighting.
+// every known hit target as fighting. The attacker faces its first hit
+// target, exactly like the official client renders it: the Attack packet
+// carries the attacker and the target positions but no heading, and the
+// server set the attacker heading toward the target before broadcasting
+// (see Creature.doAttack). When the played character is the target, the
+// trailing target location doubles as a position update of it.
 func (b *Bot) ApplyAttack(a Attack) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	now := time.Now()
+	facing := HeadingFromDelta(a.TargetX-a.X, a.TargetY-a.Y)
+	hasFacing := a.TargetX != a.X || a.TargetY != a.Y
 	if a.AttackerID == b.selfID {
 		b.char.X = a.X
 		b.char.Y = a.Y
 		b.char.Z = a.Z
 		b.clearCharMovement()
+		if hasFacing {
+			b.char.Heading = facing
+		}
+		if a.TargetCount > 0 {
+			b.char.TargetID = a.TargetIDs[0]
+		}
 		b.char.CombatUntil = now.Add(combatWindow)
 		b.touch()
 	} else if obj, ok := b.objects[a.AttackerID]; ok {
 		obj.X = a.X
 		obj.Y = a.Y
 		obj.Z = a.Z
+		if hasFacing {
+			obj.Heading = facing
+		}
 		if a.TargetCount > 0 {
 			obj.TargetID = a.TargetIDs[0]
-			if a.TargetIDs[0] == b.selfID {
-				b.char.CombatUntil = now.Add(combatWindow)
-			}
 		}
 		b.markObjectCombatLocked(&obj, now)
 		obj.UpdatedAt = now
@@ -525,6 +614,9 @@ func (b *Bot) ApplyAttack(a Attack) {
 	}
 	for i := range a.TargetCount {
 		if a.TargetIDs[i] == b.selfID {
+			b.char.X = a.TargetX
+			b.char.Y = a.TargetY
+			b.char.Z = a.TargetZ
 			b.char.CombatUntil = now.Add(combatWindow)
 			b.touch()
 
@@ -627,11 +719,19 @@ func (b *Bot) ApplyPlayerInfo(info PlayerInfo) {
 	obj.X = info.X
 	obj.Y = info.Y
 	obj.Z = info.Z
+	obj.RunSpeed = info.RunSpeed
+	obj.WalkSpeed = info.WalkSpeed
+	obj.MoveSpeedMult = info.MoveSpeedMult
+	obj.Running = info.Running
+	obj.Dead = info.Dead
 	obj.Moving = false
 	obj.DestX = info.X
 	obj.DestY = info.Y
 	obj.DestZ = info.Z
 	now := time.Now()
+	if info.InCombat {
+		b.markObjectCombatLocked(&obj, now)
+	}
 	obj.MoveAt = now
 	obj.UpdatedAt = now
 	b.objects[info.ObjectID] = obj
@@ -671,11 +771,13 @@ func (b *Bot) RemoveObject(objectID int32) {
 
 // Status attribute ids from the Mobius StatusUpdate packet.
 const (
-	AttrLevel = 0x01
-	AttrCurHP = 0x09
-	AttrMaxHP = 0x0A
-	AttrCurMP = 0x0B
-	AttrMaxMP = 0x0C
+	AttrLevel   = 0x01
+	AttrCurHP   = 0x09
+	AttrMaxHP   = 0x0A
+	AttrCurMP   = 0x0B
+	AttrMaxMP   = 0x0C
+	AttrCurLoad = 0x0E
+	AttrMaxLoad = 0x0F
 )
 
 // ApplyStatusUpdate applies vitals attribute changes to self or an object.
@@ -721,6 +823,10 @@ func (b *Bot) applyCharAttr(attr Attribute) {
 		b.char.MaxMP = float64(attr.Value)
 	case AttrLevel:
 		b.char.Level = attr.Value
+	case AttrCurLoad:
+		b.char.CurrentLoad = attr.Value
+	case AttrMaxLoad:
+		b.char.MaxLoad = attr.Value
 	}
 }
 
@@ -834,34 +940,40 @@ func (b *Bot) markObjectCombatLocked(obj *WorldObject, now time.Time) {
 
 // CharacterSnapshot is the JSON view of the character state.
 type CharacterSnapshot struct {
-	ObjectID int32   `json:"objectId"`
-	Name     string  `json:"name"`
-	Moving   bool    `json:"moving"`
-	DestX    int32   `json:"destX"`
-	DestY    int32   `json:"destY"`
-	DestZ    int32   `json:"destZ"`
-	Speed    float64 `json:"speed"`
-	MoveAtMs int64   `json:"moveAtMs"`
-	Level    int32   `json:"level"`
-	Race     int32   `json:"race"`
-	ClassID  int32   `json:"classId"`
-	X        int32   `json:"x"`
-	Y        int32   `json:"y"`
-	Z        int32   `json:"z"`
-	Heading  int32   `json:"heading"`
-	CurHP    float64 `json:"curHp"`
-	MaxHP    float64 `json:"maxHp"`
-	CurMP    float64 `json:"curMp"`
-	MaxMP    float64 `json:"maxMp"`
-	STR      int32   `json:"str"`
-	DEX      int32   `json:"dex"`
-	CON      int32   `json:"con"`
-	INT      int32   `json:"int"`
-	WIT      int32   `json:"wit"`
-	MEN      int32   `json:"men"`
-	Exp      int32   `json:"exp"`
-	Sp       int32   `json:"sp"`
-	InCombat bool    `json:"inCombat"`
+	ObjectID       int32   `json:"objectId"`
+	Name           string  `json:"name"`
+	TargetID       int32   `json:"targetId"`
+	Moving         bool    `json:"moving"`
+	DestX          int32   `json:"destX"`
+	DestY          int32   `json:"destY"`
+	DestZ          int32   `json:"destZ"`
+	Speed          float64 `json:"speed"`
+	MoveAtMs       int64   `json:"moveAtMs"`
+	Level          int32   `json:"level"`
+	Race           int32   `json:"race"`
+	ClassID        int32   `json:"classId"`
+	X              int32   `json:"x"`
+	Y              int32   `json:"y"`
+	Z              int32   `json:"z"`
+	Heading        int32   `json:"heading"`
+	CurHP          float64 `json:"curHp"`
+	MaxHP          float64 `json:"maxHp"`
+	CurMP          float64 `json:"curMp"`
+	MaxMP          float64 `json:"maxMp"`
+	STR            int32   `json:"str"`
+	DEX            int32   `json:"dex"`
+	CON            int32   `json:"con"`
+	INT            int32   `json:"int"`
+	WIT            int32   `json:"wit"`
+	MEN            int32   `json:"men"`
+	Exp            int32   `json:"exp"`
+	Sp             int32   `json:"sp"`
+	InCombat       bool    `json:"inCombat"`
+	CurrentLoad    int32   `json:"load"`
+	MaxLoad        int32   `json:"maxLoad"`
+	InventorySlots int     `json:"inventorySlots"`
+	InventoryMax   int     `json:"inventoryMax"`
+	Adena          int32   `json:"adena"`
 }
 
 // ObjectSnapshot is the JSON view of a world object.
@@ -920,6 +1032,7 @@ func (b *Bot) Snapshot() Snapshot {
 		Character: CharacterSnapshot{
 			ObjectID: b.selfID,
 			Name:     b.char.Name,
+			TargetID: b.char.TargetID,
 			Moving:   b.char.Moving,
 			DestX:    b.char.DestX,
 			DestY:    b.char.DestY,
@@ -987,8 +1100,23 @@ func (b *Bot) Snapshot() Snapshot {
 	}
 	snap.Events = appendEvents(
 		snap.Events, b.events, b.eventLen, b.eventPos)
+	b.fillInventorySnapshot(&snap)
 
 	return snap
+}
+
+// fillInventorySnapshot completes the character view with the inventory
+// usage. The caller must hold the read lock.
+func (b *Bot) fillInventorySnapshot(snap *Snapshot) {
+	snap.Character.CurrentLoad = b.char.CurrentLoad
+	snap.Character.MaxLoad = b.char.MaxLoad
+	snap.Character.InventorySlots = len(b.inventory)
+	snap.Character.InventoryMax = inventorySlotLimit
+	for _, item := range b.inventory {
+		if item.Type2 == itemType2Adena {
+			snap.Character.Adena += item.Count
+		}
+	}
 }
 
 // appendEvents copies the newest events out of the ring buffer.

@@ -46,7 +46,7 @@ SPDX-License-Identifier: MIT
           <div class="legend-item"><span class="dot item"></span>ground item</div>
         </div>
         <div class="legend-note">
-          tick = look direction · dashed square = server loaded zone (3×3 regions)
+          tick = look direction · dashed square = server loaded zone (3×3 regions) · ring = target
         </div>
       </div>
     </aside>
@@ -65,6 +65,7 @@ SPDX-License-Identifier: MIT
           <label class="check"><input type="checkbox" id="show-labels" checked> labels</label>
           <label class="check"><input type="checkbox" id="show-dest"> paths</label>
           <label class="check"><input type="checkbox" id="show-zone" checked> zone</label>
+          <label class="check"><input type="checkbox" id="show-targets" checked> targets</label>
           <span id="map-scale" class="map-scale"></span>
           <span id="map-objects" class="map-objects"></span>
         </div>
@@ -100,8 +101,12 @@ SPDX-License-Identifier: MIT
               <div class="kv"><span>y</span><b id="pos-y">—</b></div>
               <div class="kv"><span>z</span><b id="pos-z">—</b></div>
               <div class="kv"><span>facing</span><b id="pos-heading">—</b></div>
+              <div class="kv"><span>target</span><b id="hud-target">—</b></div>
               <div class="kv"><span>exp</span><b id="hud-exp">—</b></div>
               <div class="kv"><span>sp</span><b id="hud-sp">—</b></div>
+              <div class="kv"><span>slots</span><b id="hud-slots">—</b></div>
+              <div class="kv"><span>weight</span><b id="hud-weight">—</b></div>
+              <div class="kv"><span>adena</span><b id="hud-adena">—</b></div>
             </div>
           </div>
         </div>

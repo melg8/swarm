@@ -8,6 +8,9 @@
 #
 # Usage: tools/mobius_e2e.sh [seconds_in_world] (default 45)
 #
+# Extra bot flags can be passed with the BOT_FLAGS environment variable,
+# for example BOT_FLAGS="-hunt" enables the auto hunt loop.
+#
 # Everything runs inside this single invocation, which also works in
 # restricted sandbox shells where background processes do not survive the
 # invoking shell.
@@ -45,7 +48,7 @@ bash "${SCRIPT_DIR}/mobius_start.sh"
 log "Running the bot for ${SECONDS_IN_WORLD}s, then SIGINT"
 set +e
 timeout -s INT --preserve-status "${SECONDS_IN_WORLD}s" \
-    "${LOGS_DIR}/swarm_bot" 2>&1 | tee "${LOGS_DIR}/bot.log"
+    "${LOGS_DIR}/swarm_bot" ${BOT_FLAGS:-} 2>&1 | tee "${LOGS_DIR}/bot.log"
 BOT_EXIT=$?
 set -e
 

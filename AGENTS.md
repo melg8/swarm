@@ -39,14 +39,15 @@ concept, synchronized party behavior) are documented in
 
 ```
 cmd/swarm/                     Application entry point (flags: login, account,
-                               password, char).
+                               password, char, web, hunt).
 internal/swarm/
   connection/                  Login flow (authentificator), game session
                                (game.go), packet framing (wire.go).
   crypt/                       Login Blowfish framing (login_crypt.go), game
                                XOR cipher (game_crypt.go), checksum.
   state/                       Live bot state tracker: character vitals,
-                               world objects, events, bot registry.
+                               world objects, inventory, events, bot registry.
+  hunt/                        Auto hunt loop: engage, loot, inventory cleanup.
   npcdata/                     Generated npc/item display id to name maps
                                (tools/generate_npc_names.sh).
   webserver/                   Embedded web UI: static files, JSON snapshot
@@ -236,32 +237,63 @@ the same variables).
   once per second per moving creature, so the client runs a
   requestAnimationFrame loop that advances every object from its last
   packet position toward the destination at `runSpd * moveMultiplier`
-  world units per second (both come from NpcInfo; the fallback speed is
+  world units per second (run/walk speeds come from NpcInfo for npcs,
+  CharInfo for players and UserInfo for self; the fallback speed is
   120), clamps at the destination, corrects the clock against the
   snapshot `serverTimeMs` and exponentially smooths position jumps.
   The played character is interpolated the same way from its own
-  movement broadcasts.
+  movement broadcasts (Player.broadcastPacket sends every broadcast
+  except CharInfo to the acting player itself, unlike the base
+  Creature.broadcastPacket which skips self). The transmitted run and
+  walk speeds are base values: the server divides the real speeds by
+  the move multiplier before writing them, so the effective speed is
+  always `speed * multiplier` (see UserInfo/CharInfo/AbstractNpcInfo
+  writeImpl). MoveToLocation for playables only arrives at move start
+  and arrival, so the whole path is interpolated from one packet at the
+  exact transmitted speed - exactly what the official client does.
 - Heading semantics (Mobius `LocationUtil.calculateHeadingFrom`):
   `atan2(dy, dx) * 65535 / 2pi`, 0 faces east, the angle grows clockwise
   because world y points south. The server announces arrival with a zero
   distance MoveToLocation (current == destination): keep the previous
   heading in that case, never recompute it (the delta is zero and would
-  point every mob east - this was a real bug).
+  point every mob east - this was a real bug). CharInfo carries no
+  heading at all: the server announces the facing of a standing player
+  through the StartRotation + StopRotation pair it sends to every new
+  observer (see `Player.sendInfo`), and keyboard rotation of a visible
+  player is broadcast as BeginRotation 0x77 / StopRotation 0x78 (the
+  client sends StartRotating 0x4A / FinishRotating 0x4B which the server
+  relays). The Attack packet carries the attacker and target locations
+  but no heading: the attacker faces its target, so the map computes the
+  heading from the attacker -> first hit target vector (the server sets
+  exactly this heading in `Creature.doAttack` before broadcasting).
 - Endpoints: `GET /api/bots` (list), `GET /api/bots/{id}/state` (full JSON
   snapshot), `GET /api/bots/{id}/events` (SSE stream that pushes a
   snapshot whenever the bot state version changes), `GET /` and the
   static assets.
 - The state tracker (`internal/swarm/state`) is fed by the game session
-  from these packets: UserInfo (self vitals), CharInfo (players), NpcInfo
+  from these packets: UserInfo (self vitals, weight and speeds), CharInfo
+  (players with speeds and running/dead/combat flags), NpcInfo
   (npcs with heading, speeds, move multiplier, running/dead/combat flags
-  and the attackable flag), DropItem (ground items), MoveToLocation,
-  MoveToPawn (chasing attackers: stop point at distance from the target,
-  marks combat and the target reference), StopMove/ValidateLocation
-  (placement and heading), Attack 0x06 (attacker position, hit targets:
-  marks combat for both sides), AutoAttackStart 0x3B/AutoAttackStop 0x3C
-  (auto attack flags), StatusUpdate (vitals changes, dead when hp is 0),
-  DeleteObject (removals). Unknown packets land in the event log. The
-  combat window is 10 seconds after the last fight packet.
+  and the attackable flag), DropItem 0x16 (fresh drops) and SpawnItem
+  0x15 (items that already exist when they enter the known list - for
+  example after a relogin; without it old drops stay invisible), GetItem
+  0x17 (a player picked up an item: removal plus picker position),
+  MoveToLocation, MoveToPawn 0x75 (chasing creatures: stop point at
+  distance from the target, marks combat and the target reference -
+  also for the played character itself when it chases its attack
+  target), StopMove/ValidateLocation (placement and heading), Attack
+  0x06 (attacker position, hit targets: marks combat for both sides,
+  attacker faces the target, target location refreshes the own
+  position when the bot is the target), AutoAttackStart 0x3B /
+  AutoAttackStop 0x3C (auto attack flags), MyTargetSelected 0xBF (the
+  own target), TargetSelected 0x39 / TargetUnselected 0x3A (targets of
+  other players), ChangeMoveType 0x3E (walk/run switch: mobs walk while
+  idle and run when aggroed), TeleportToLocation 0x38 (position snap),
+  StatusUpdate (vitals, weight CUR_LOAD 0x0E / MAX_LOAD 0x0F changes,
+  dead when hp is 0), ItemList 0x27 / InventoryUpdate 0x37 (the
+  inventory: slot tracking for the hunt cleanup), DeleteObject
+  (removals). Unknown packets land in the event log. The combat window
+  is 10 seconds after the last fight packet.
 - Threat data: the npc level, `aggroRange` and `isAggressive` ai flags
   come from the generated `internal/swarm/npcdata` maps (the C1 data
   pack marks every monster `isAggressive=false`: they only defend).
@@ -272,9 +304,16 @@ the same variables).
   - 1000000 -> CT0_to_C4_ids.txt -> stats/npcs/*.xml with name, level,
   ai aggroRange/isAggressive; item: stats/items). Regenerate after
   Mobius updates.
-- `-attack-nearest` is a debug flag of `cmd/swarm`: it keeps attacking
-  the closest attackable npc (RequestAttack 0x0A) every 3 seconds. It is
-  used to verify the combat visualization live.
+- `-hunt` is the auto hunt flag of `cmd/swarm`: `internal/swarm/hunt`
+  runs a small state machine (engage -> loot -> engage) that attacks the
+  closest attackable npc (AttackRequest 0x0A, the answer arrives as
+  MyTargetSelected), picks up the drops around the corpse by clicking
+  them (Action 0x04: the server AI walks the character to the item and
+  picks it up - StopMove to self, GetItem broadcast, InventoryUpdate)
+  and destroys junk inventory items (RequestDestroyItem 0x59) when the
+  slots reach 70% of the 80 slot limit or the weight reaches 75%, so a
+  long living bot never litters the server. Failed pickups (protected
+  or unreachable items) are skipped for 30 seconds.
 - The web UI is plain HTML/CSS/JS without a build step; keep it that way
   (embedded via go:embed). Watch out: top level `const` declarations are
   not `window` properties, so cross script references must use the bare

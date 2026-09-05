@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/connection"
+	"github.com/melg8/swarm/internal/swarm/hunt"
 	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/melg8/swarm/internal/swarm/webserver"
 )
@@ -43,32 +44,32 @@ const (
 )
 
 type config struct {
-	loginAddress  string
-	account       string
-	password      string
-	charName      string
-	webAddress    string
-	attackNearest bool
+	loginAddress string
+	account      string
+	password     string
+	charName     string
+	webAddress   string
+	hunt         bool
 }
 
 func parseFlags() config {
 	cfg := config{
-		loginAddress:  "",
-		account:       "",
-		password:      "",
-		charName:      "",
-		webAddress:    "",
-		attackNearest: false,
+		loginAddress: "",
+		account:      "",
+		password:     "",
+		charName:     "",
+		webAddress:   "",
+		hunt:         false,
 	}
 	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
 		"login server address")
 	flag.StringVar(&cfg.account, "account", defaultAccount, "account name")
-	flag.StringVar(&cfg.password, "password", defaultPassword, "account password")
+	flag.StringVar(&cfg.password, "password", defaultPassword, "password")
 	flag.StringVar(&cfg.charName, "char", defaultCharName, "character name")
 	flag.StringVar(&cfg.webAddress, "web", defaultWebAddress,
 		"web interface address, empty disables it")
-	flag.BoolVar(&cfg.attackNearest, "attack-nearest", false,
-		"debug helper: keep attacking the nearest attackable npc")
+	flag.BoolVar(&cfg.hunt, "hunt", false,
+		"auto hunt: attack, pick up loot and manage inventory")
 	flag.Parse()
 
 	return cfg
@@ -78,7 +79,8 @@ func parseFlags() config {
 func connectLoginServer(address string) (net.Conn, error) {
 	conn, err := net.DialTimeout("tcp", address, connectTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to login server: %w", err)
+		return nil, fmt.Errorf(
+			"failed to connect to login server: %w", err)
 	}
 	log.Println("Connected to login server at " + address)
 
@@ -93,7 +95,8 @@ func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
 		auth.ServerPort)
 	conn, err := net.DialTimeout("tcp", address, connectTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to game server: %w", err)
+		return nil, fmt.Errorf(
+			"failed to connect to game server: %w", err)
 	}
 	log.Println("Connected to game server at " + address)
 
@@ -152,7 +155,8 @@ func runBot(ctx context.Context, cfg config, tracker *state.Bot) error {
 	if !found {
 		return fmt.Errorf("character %s not found", cfg.charName)
 	}
-	log.Printf("Playing character %s of level %d", charInfo.Name, charInfo.Level)
+	log.Printf("Playing character %s of level %d",
+		charInfo.Name, charInfo.Level)
 
 	//nolint:gosec // slot index is bounded by the character list length
 	if err := game.EnterWorld(int32(slot)); err != nil {
@@ -160,31 +164,11 @@ func runBot(ctx context.Context, cfg config, tracker *state.Bot) error {
 	}
 	log.Println("Character " + cfg.charName + " entered the world")
 
-	if cfg.attackNearest {
-		go attackNearestLoop(ctx, game)
+	if cfg.hunt {
+		go hunt.NewLoop(game, tracker).Run(ctx)
 	}
 
 	return game.Run(ctx, cfg.charName)
-}
-
-// attackPeriod is the refresh rate of the attack helper loop.
-const attackPeriod = 3 * time.Second
-
-// attackNearestLoop keeps attacking the nearest attackable npc while the
-// context runs.
-func attackNearestLoop(ctx context.Context, game *connection.GameClient) {
-	ticker := time.NewTicker(attackPeriod)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if _, err := game.AttackNearest(); err != nil {
-				log.Printf("Attack nearest failed: %v", err)
-			}
-		}
-	}
 }
 
 func main() {
@@ -200,13 +184,13 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	err := runBot(ctx, cfg, tracker)
 	stop()
 	shutdownWebInterface(web)
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Bot failed: " + err.Error())
+		os.Exit(1)
 	}
 	log.Println("Bot finished")
 }

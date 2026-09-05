@@ -182,3 +182,50 @@ func TestAttackRequestToBytes(t *testing.T) {
 		require.Len(t, writer.Bytes(), 1+4*4+1)
 	})
 }
+
+func TestActionRequestToBytes(t *testing.T) {
+	t.Run("pickup click", func(t *testing.T) {
+		writer := packet.NewWriter()
+		request := NewActionRequestPacket()
+		request.ObjectID = 9001
+		request.X = 45000
+		request.Y = 50000
+		request.Z = -3500
+		err := request.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, []byte{
+			0x04,                   // opcode
+			0x29, 0x23, 0x00, 0x00, // 9001
+			0xC8, 0xAF, 0x00, 0x00, // 45000
+			0x50, 0xC3, 0x00, 0x00, // 50000
+			0x54, 0xF2, 0xFF, 0xFF, // -3500
+			0x00, // simple click
+		}, writer.Bytes())
+	})
+}
+
+func TestRequestDestroyItemToBytes(t *testing.T) {
+	t.Run("destroy request", func(t *testing.T) {
+		writer := packet.NewWriter()
+		request := NewRequestDestroyItem()
+		request.ObjectID = 17
+		request.Count = 1
+		err := request.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, []byte{
+			0x59,                   // opcode
+			0x11, 0x00, 0x00, 0x00, // object id
+			0x01, 0x00, 0x00, 0x00, // count
+		}, writer.Bytes())
+	})
+}
+
+func TestRequestItemListToBytes(t *testing.T) {
+	t.Run("empty request", func(t *testing.T) {
+		writer := packet.NewWriter()
+		request := &RequestItemList{}
+		err := request.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, []byte{0x0F}, writer.Bytes())
+	})
+}

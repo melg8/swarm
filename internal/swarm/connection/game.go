@@ -47,15 +47,26 @@ const (
 	moveToLocationID   = 0x01
 	charInfoID         = 0x03
 	attackID           = 0x06
+	spawnItemID        = 0x15
 	dropItemID         = 0x16
+	getItemID          = 0x17
 	statusUpdateID     = 0x1A
 	deleteObjectID     = 0x1E
 	npcInfoID          = 0x22
+	itemListID         = 0x27
+	inventoryUpdateID  = 0x37
+	changeMoveTypeID   = 0x3E
+	targetSelectedID   = 0x39
+	targetUnselectedID = 0x3A
 	autoAttackStartID  = 0x3B
 	autoAttackStopID   = 0x3C
+	teleportID         = 0x38
 	stopMoveID         = 0x59
 	moveToPawnID       = 0x75
 	validateLocationID = 0x76
+	beginRotationID    = 0x77
+	stopRotationID     = 0x78
+	myTargetSelectedID = 0xBF
 )
 
 // GameSessionParams carries the login session keys for the game server.
@@ -80,27 +91,39 @@ type CharacterParams struct {
 
 // GameClient drives a game server session of the Mobius C1 protocol.
 type GameClient struct {
-	conn        net.Conn
-	crypt       *crypt.GameCrypt
-	writeMu     sync.Mutex
-	logger      *log.Logger
-	packetCount atomic.Int64
-	readBuf     []byte
-	tracker     *state.Bot
-	npcInfo     fromgameserver.NpcInfoPacket
-	userInfo    fromgameserver.UserInfoPacket
-	charInfo    fromgameserver.CharInfoPacket
-	moveTo      fromgameserver.MoveToLocationPacket
-	moveToPawn  fromgameserver.MoveToPawnPacket
-	stopMove    fromgameserver.StopMovePacket
-	validateLoc fromgameserver.ValidateLocationPacket
-	deleted     fromgameserver.DeleteObjectPacket
-	dropItem    fromgameserver.DropItemPacket
-	statusUpd   fromgameserver.StatusUpdatePacket
-	attack      fromgameserver.AttackPacket
-	attackStart fromgameserver.AutoAttackStartPacket
-	attackStop  fromgameserver.AutoAttackStopPacket
-	statusAttrs [statusAttrsCapacity]state.Attribute
+	conn           net.Conn
+	crypt          *crypt.GameCrypt
+	writeMu        sync.Mutex
+	logger         *log.Logger
+	packetCount    atomic.Int64
+	readBuf        []byte
+	tracker        *state.Bot
+	npcInfo        fromgameserver.NpcInfoPacket
+	userInfo       fromgameserver.UserInfoPacket
+	charInfo       fromgameserver.CharInfoPacket
+	moveTo         fromgameserver.MoveToLocationPacket
+	moveToPawn     fromgameserver.MoveToPawnPacket
+	stopMove       fromgameserver.StopMovePacket
+	validateLoc    fromgameserver.ValidateLocationPacket
+	deleted        fromgameserver.DeleteObjectPacket
+	dropItem       fromgameserver.DropItemPacket
+	spawnItem      fromgameserver.SpawnItemPacket
+	getItem        fromgameserver.GetItemPacket
+	statusUpd      fromgameserver.StatusUpdatePacket
+	attack         fromgameserver.AttackPacket
+	attackStart    fromgameserver.AutoAttackStartPacket
+	attackStop     fromgameserver.AutoAttackStopPacket
+	beginRotation  fromgameserver.BeginRotationPacket
+	stopRotation   fromgameserver.StopRotationPacket
+	changeMoveType fromgameserver.ChangeMoveTypePacket
+	teleport       fromgameserver.TeleportToLocationPacket
+	myTarget       fromgameserver.MyTargetSelectedPacket
+	targetSelected fromgameserver.TargetSelectedPacket
+	targetDropped  fromgameserver.TargetUnselectedPacket
+	itemList       fromgameserver.ItemListPacket
+	invUpdate      fromgameserver.InventoryUpdatePacket
+	invItems       []state.InventoryItem
+	statusAttrs    [statusAttrsCapacity]state.Attribute
 }
 
 // statusAttrsCapacity bounds the scratch attributes of status updates.
@@ -124,23 +147,38 @@ var bufferPool = sync.Pool{
 // unencrypted KeyPacket that enables the XOR cipher.
 func NewGameClient(conn net.Conn) (*GameClient, error) {
 	client := &GameClient{
-		conn:        conn,
-		crypt:       nil,
-		writeMu:     sync.Mutex{},
-		logger:      log.Default(),
-		packetCount: atomic.Int64{},
-		readBuf:     nil,
-		tracker:     nil,
-		npcInfo:     *fromgameserver.NewNpcInfoPacket(),
-		userInfo:    *fromgameserver.NewUserInfoPacket(),
-		charInfo:    *fromgameserver.NewCharInfoPacket(),
-		moveTo:      *fromgameserver.NewMoveToLocationPacket(),
-		stopMove:    *fromgameserver.NewStopMovePacket(),
-		validateLoc: *fromgameserver.NewValidateLocationPacket(),
-		deleted:     *fromgameserver.NewDeleteObjectPacket(),
-		dropItem:    *fromgameserver.NewDropItemPacket(),
-		statusUpd:   *fromgameserver.NewStatusUpdatePacket(),
-		statusAttrs: [statusAttrsCapacity]state.Attribute{},
+		conn:           conn,
+		crypt:          nil,
+		writeMu:        sync.Mutex{},
+		logger:         log.Default(),
+		packetCount:    atomic.Int64{},
+		readBuf:        nil,
+		tracker:        nil,
+		npcInfo:        *fromgameserver.NewNpcInfoPacket(),
+		userInfo:       *fromgameserver.NewUserInfoPacket(),
+		charInfo:       *fromgameserver.NewCharInfoPacket(),
+		moveTo:         *fromgameserver.NewMoveToLocationPacket(),
+		stopMove:       *fromgameserver.NewStopMovePacket(),
+		validateLoc:    *fromgameserver.NewValidateLocationPacket(),
+		deleted:        *fromgameserver.NewDeleteObjectPacket(),
+		dropItem:       *fromgameserver.NewDropItemPacket(),
+		spawnItem:      *fromgameserver.NewSpawnItemPacket(),
+		getItem:        *fromgameserver.NewGetItemPacket(),
+		statusUpd:      *fromgameserver.NewStatusUpdatePacket(),
+		attack:         *fromgameserver.NewAttackPacket(),
+		attackStart:    *fromgameserver.NewAutoAttackStartPacket(),
+		attackStop:     *fromgameserver.NewAutoAttackStopPacket(),
+		beginRotation:  *fromgameserver.NewBeginRotationPacket(),
+		stopRotation:   *fromgameserver.NewStopRotationPacket(),
+		changeMoveType: *fromgameserver.NewChangeMoveTypePacket(),
+		teleport:       *fromgameserver.NewTeleportToLocationPacket(),
+		myTarget:       *fromgameserver.NewMyTargetSelectedPacket(),
+		targetSelected: *fromgameserver.NewTargetSelectedPacket(),
+		targetDropped:  *fromgameserver.NewTargetUnselectedPacket(),
+		itemList:       *fromgameserver.NewItemListPacket(),
+		invUpdate:      *fromgameserver.NewInventoryUpdatePacket(),
+		invItems:       nil,
+		statusAttrs:    [statusAttrsCapacity]state.Attribute{},
 	}
 
 	writer := packet.NewWriter()
@@ -202,7 +240,9 @@ func (gc *GameClient) PacketCount() int {
 const attackNearestRange = 1500
 
 // AttackNearest sends an attack request against the closest attackable
-// npc around the character. It reports whether a target was attacked.
+// npc around the character. The server selects the target (answer via
+// MyTargetSelected), walks the character into melee range and starts the
+// auto attack. It reports whether a target was attacked.
 func (gc *GameClient) AttackNearest() (bool, error) {
 	if gc.tracker == nil {
 		return false, nil
@@ -222,6 +262,44 @@ func (gc *GameClient) AttackNearest() (bool, error) {
 	gc.tracker.RecordEvent("attacking " + target.Name)
 
 	return true, nil
+}
+
+// PickupItem clicks a ground item: the server walks the character to it
+// and adds it to the inventory (the movement is broadcast as
+// MoveToLocation and the pickup as GetItem with a StopMove to self).
+func (gc *GameClient) PickupItem(item state.LootItem) error {
+	request := togameserver.NewActionRequestPacket()
+	request.ObjectID = item.ObjectID
+	request.X = item.X
+	request.Y = item.Y
+	request.Z = item.Z
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to pick up item: %w", err)
+	}
+	gc.tracker.RecordEvent("picking up " + item.Name)
+
+	return nil
+}
+
+// DestroyItem destroys inventory items to free slots or weight.
+func (gc *GameClient) DestroyItem(objectID int32, count int32) error {
+	request := togameserver.NewRequestDestroyItem()
+	request.ObjectID = objectID
+	request.Count = count
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to destroy item: %w", err)
+	}
+
+	return nil
+}
+
+// RequestInventory asks the server for the full inventory list.
+func (gc *GameClient) RequestInventory() error {
+	if err := gc.sendPacket(&togameserver.RequestItemList{}); err != nil {
+		return fmt.Errorf("failed to request item list: %w", err)
+	}
+
+	return nil
 }
 
 // sendPacket serializes, encrypts and sends a game server packet.
@@ -604,7 +682,13 @@ func (gc *GameClient) handleWorldPacket(payload []byte) {
 	if gc.handleCombatPacket(payload) {
 		return
 	}
-	gc.handlePlacementPacket(payload)
+	if gc.handlePlacementPacket(payload) {
+		return
+	}
+	if gc.handleRotationPacket(payload) {
+		return
+	}
+	gc.handleInventoryPacket(payload)
 }
 
 // handleObjectPacket dispatches the spawn and remove packets. It reports
@@ -617,8 +701,12 @@ func (gc *GameClient) handleObjectPacket(payload []byte) bool {
 		gc.applyCharInfo(payload)
 	case npcInfoID:
 		gc.applyNpcInfo(payload)
+	case spawnItemID:
+		gc.applySpawnItem(payload)
 	case dropItemID:
 		gc.applyDropItem(payload)
+	case getItemID:
+		gc.applyGetItem(payload)
 	case deleteObjectID:
 		gc.applyDeleteObject(payload)
 	default:
@@ -628,8 +716,9 @@ func (gc *GameClient) handleObjectPacket(payload []byte) bool {
 	return true
 }
 
-// handlePlacementPacket dispatches movement and vitals packets.
-func (gc *GameClient) handlePlacementPacket(payload []byte) {
+// handlePlacementPacket dispatches movement and vitals packets. It
+// reports whether the packet was consumed.
+func (gc *GameClient) handlePlacementPacket(payload []byte) bool {
 	switch payload[0] {
 	case moveToLocationID:
 		gc.applyMoveToLocation(payload)
@@ -642,12 +731,33 @@ func (gc *GameClient) handlePlacementPacket(payload []byte) {
 	case statusUpdateID:
 		gc.applyStatusUpdate(payload)
 	default:
-		gc.logUnknownPacket(payload)
+		return false
 	}
+
+	return true
 }
 
-// handleCombatPacket dispatches the combat state packets. It reports
-// whether the packet was consumed.
+// handleRotationPacket dispatches the turn and teleport packets. It
+// reports whether the packet was consumed.
+func (gc *GameClient) handleRotationPacket(payload []byte) bool {
+	switch payload[0] {
+	case beginRotationID:
+		gc.applyBeginRotation(payload)
+	case stopRotationID:
+		gc.applyStopRotation(payload)
+	case changeMoveTypeID:
+		gc.applyChangeMoveType(payload)
+	case teleportID:
+		gc.applyTeleport(payload)
+	default:
+		return false
+	}
+
+	return true
+}
+
+// handleCombatPacket dispatches the combat and target packets. It
+// reports whether the packet was consumed.
 func (gc *GameClient) handleCombatPacket(payload []byte) bool {
 	switch payload[0] {
 	case attackID:
@@ -656,11 +766,29 @@ func (gc *GameClient) handleCombatPacket(payload []byte) bool {
 		gc.applyAutoAttackStart(payload)
 	case autoAttackStopID:
 		gc.applyAutoAttackStop(payload)
+	case myTargetSelectedID:
+		gc.applyMyTargetSelected(payload)
+	case targetSelectedID:
+		gc.applyTargetSelected(payload)
+	case targetUnselectedID:
+		gc.applyTargetUnselected(payload)
 	default:
 		return false
 	}
 
 	return true
+}
+
+// handleInventoryPacket dispatches the inventory packets.
+func (gc *GameClient) handleInventoryPacket(payload []byte) {
+	switch payload[0] {
+	case itemListID:
+		gc.applyItemList(payload)
+	case inventoryUpdateID:
+		gc.applyInventoryUpdate(payload)
+	default:
+		gc.logUnknownPacket(payload)
+	}
 }
 
 // logUnknownPacket reports an unobserved packet to the console and the
@@ -696,31 +824,37 @@ func (gc *GameClient) applyUserInfo(payload []byte) {
 	if gc.tracker != nil {
 		info := gc.userInfo
 		gc.tracker.ApplyUserInfo(state.UserInfo{
-			Name:    info.Name,
-			Level:   info.Level,
-			Race:    info.Race,
-			ClassID: info.ClassID,
-			X:       info.X,
-			Y:       info.Y,
-			Z:       info.Z,
-			STR:     info.STR,
-			DEX:     info.DEX,
-			CON:     info.CON,
-			INT:     info.INT,
-			WIT:     info.WIT,
-			MEN:     info.MEN,
-			Exp:     info.Exp,
-			Sp:      info.Sp,
-			MaxHP:   info.MaxHP,
-			CurHP:   info.CurHP,
-			MaxMP:   info.MaxMP,
-			CurMP:   info.CurMP,
+			Name:          info.Name,
+			Level:         info.Level,
+			Race:          info.Race,
+			ClassID:       info.ClassID,
+			X:             info.X,
+			Y:             info.Y,
+			Z:             info.Z,
+			STR:           info.STR,
+			DEX:           info.DEX,
+			CON:           info.CON,
+			INT:           info.INT,
+			WIT:           info.WIT,
+			MEN:           info.MEN,
+			Exp:           info.Exp,
+			Sp:            info.Sp,
+			MaxHP:         info.MaxHP,
+			CurHP:         info.CurHP,
+			MaxMP:         info.MaxMP,
+			CurMP:         info.CurMP,
+			CurrentLoad:   info.CurrentLoad,
+			MaxLoad:       info.MaxLoad,
+			RunSpeed:      info.RunSpeed,
+			WalkSpeed:     info.WalkSpeed,
+			MoveSpeedMult: info.MoveSpeedMult,
 		})
 	}
-	gc.logger.Printf("User info: %s level %d hp %d/%d mp %d/%d",
+	gc.logger.Printf("User info: %s level %d hp %d/%d mp %d/%d speed %d x %d",
 		gc.userInfo.Name, gc.userInfo.Level,
 		gc.userInfo.CurHP, gc.userInfo.MaxHP,
-		gc.userInfo.CurMP, gc.userInfo.MaxMP)
+		gc.userInfo.CurMP, gc.userInfo.MaxMP, gc.userInfo.RunSpeed,
+		gc.userInfo.CurrentLoad)
 }
 
 // applyNpcInfo parses NpcInfo and upserts the npc object.
@@ -766,18 +900,25 @@ func (gc *GameClient) applyCharInfo(payload []byte) {
 	if gc.tracker != nil {
 		info := gc.charInfo
 		gc.tracker.ApplyPlayerInfo(state.PlayerInfo{
-			ObjectID: info.ObjectID,
-			Name:     info.Name,
-			Title:    info.Title,
-			Race:     info.Race,
-			ClassID:  info.ClassID,
-			X:        info.X,
-			Y:        info.Y,
-			Z:        info.Z,
+			ObjectID:      info.ObjectID,
+			Name:          info.Name,
+			Title:         info.Title,
+			Race:          info.Race,
+			ClassID:       info.ClassID,
+			RunSpeed:      info.RunSpeed,
+			WalkSpeed:     info.WalkSpeed,
+			MoveSpeedMult: info.MoveSpeedMult,
+			Running:       info.Running,
+			InCombat:      info.InCombat,
+			Dead:          info.Dead,
+			X:             info.X,
+			Y:             info.Y,
+			Z:             info.Z,
 		})
 	}
-	gc.logger.Printf("Player %s appeared at %d %d %d",
-		gc.charInfo.Name, gc.charInfo.X, gc.charInfo.Y, gc.charInfo.Z)
+	gc.logger.Printf("Player %s appeared at %d %d %d speed %d",
+		gc.charInfo.Name, gc.charInfo.X, gc.charInfo.Y, gc.charInfo.Z,
+		gc.charInfo.RunSpeed)
 }
 
 // applyDropItem parses DropItem and upserts the ground item object.
@@ -909,6 +1050,9 @@ func (gc *GameClient) applyAttack(payload []byte) {
 			X:           gc.attack.X,
 			Y:           gc.attack.Y,
 			Z:           gc.attack.Z,
+			TargetX:     gc.attack.TargetX,
+			TargetY:     gc.attack.TargetY,
+			TargetZ:     gc.attack.TargetZ,
 			TargetIDs:   [4]int32{},
 			TargetCount: gc.attack.HitCount,
 		}
@@ -967,4 +1111,211 @@ func (gc *GameClient) applyMoveToPawn(payload []byte) {
 			TargetZ:  move.TargetZ,
 		})
 	}
+}
+
+// applySpawnItem parses SpawnItem and upserts a ground item that already
+// existed around the character.
+func (gc *GameClient) applySpawnItem(payload []byte) {
+	if err := fromgameserver.ParseSpawnItemPacket(
+		&gc.spawnItem, payload); err != nil {
+		gc.logger.Printf("Failed to parse spawn item: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		info := gc.spawnItem
+		gc.tracker.ApplySpawnItem(state.ItemInfo{
+			ObjectID:   info.ObjectID,
+			TemplateID: info.TemplateID,
+			Stackable:  info.Stackable,
+			Count:      info.Count,
+			X:          info.X,
+			Y:          info.Y,
+			Z:          info.Z,
+		})
+	}
+}
+
+// applyGetItem parses GetItem and removes the picked up ground item.
+func (gc *GameClient) applyGetItem(payload []byte) {
+	if err := fromgameserver.ParseGetItemPacket(&gc.getItem, payload); err != nil {
+		gc.logger.Printf("Failed to parse get item: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		item := gc.getItem
+		gc.tracker.ApplyItemPickup(state.ItemPickup{
+			PlayerID: item.PlayerID,
+			ObjectID: item.ObjectID,
+			X:        item.X,
+			Y:        item.Y,
+			Z:        item.Z,
+		})
+	}
+}
+
+// applyBeginRotation parses BeginRotation and turns the object.
+func (gc *GameClient) applyBeginRotation(payload []byte) {
+	if err := fromgameserver.ParseBeginRotationPacket(
+		&gc.beginRotation, payload); err != nil {
+		gc.logger.Printf("Failed to parse begin rotation: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		gc.tracker.ApplyRotationStart(state.Rotation{
+			ObjectID: gc.beginRotation.ObjectID,
+			Heading:  gc.beginRotation.Heading,
+		})
+	}
+}
+
+// applyStopRotation parses StopRotation and turns the object.
+func (gc *GameClient) applyStopRotation(payload []byte) {
+	if err := fromgameserver.ParseStopRotationPacket(
+		&gc.stopRotation, payload); err != nil {
+		gc.logger.Printf("Failed to parse stop rotation: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		gc.tracker.ApplyRotationStop(state.Rotation{
+			ObjectID: gc.stopRotation.ObjectID,
+			Heading:  gc.stopRotation.Heading,
+		})
+	}
+}
+
+// applyChangeMoveType parses ChangeMoveType and updates the run state.
+func (gc *GameClient) applyChangeMoveType(payload []byte) {
+	if err := fromgameserver.ParseChangeMoveTypePacket(
+		&gc.changeMoveType, payload); err != nil {
+		gc.logger.Printf("Failed to parse change move type: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		gc.tracker.ApplyMoveType(state.MoveType{
+			ObjectID: gc.changeMoveType.ObjectID,
+			Running:  gc.changeMoveType.Running,
+		})
+	}
+}
+
+// applyTeleport parses TeleportToLocation and snaps the object.
+func (gc *GameClient) applyTeleport(payload []byte) {
+	if err := fromgameserver.ParseTeleportToLocationPacket(
+		&gc.teleport, payload); err != nil {
+		gc.logger.Printf("Failed to parse teleport: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		tele := gc.teleport
+		gc.tracker.ApplyTeleport(state.Teleport{
+			ObjectID: tele.ObjectID,
+			X:        tele.X,
+			Y:        tele.Y,
+			Z:        tele.Z,
+			Heading:  tele.Heading,
+		})
+	}
+}
+
+// applyMyTargetSelected parses MyTargetSelected and records the own
+// target of the bot.
+func (gc *GameClient) applyMyTargetSelected(payload []byte) {
+	if err := fromgameserver.ParseMyTargetSelectedPacket(
+		&gc.myTarget, payload); err != nil {
+		gc.logger.Printf("Failed to parse my target selected: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		gc.tracker.ApplySelfTarget(gc.myTarget.ObjectID)
+	}
+}
+
+// applyTargetSelected parses TargetSelected and records the target of
+// another player.
+func (gc *GameClient) applyTargetSelected(payload []byte) {
+	if err := fromgameserver.ParseTargetSelectedPacket(
+		&gc.targetSelected, payload); err != nil {
+		gc.logger.Printf("Failed to parse target selected: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		selected := gc.targetSelected
+		gc.tracker.ApplyObjectTarget(selected.ObjectID, selected.TargetID)
+	}
+}
+
+// applyTargetUnselected parses TargetUnselected and clears the target
+// reference of another player.
+func (gc *GameClient) applyTargetUnselected(payload []byte) {
+	if err := fromgameserver.ParseTargetUnselectedPacket(
+		&gc.targetDropped, payload); err != nil {
+		gc.logger.Printf("Failed to parse target unselected: %v", err)
+
+		return
+	}
+	if gc.tracker != nil {
+		gc.tracker.ApplyTargetClear(gc.targetDropped.ObjectID)
+	}
+}
+
+// applyItemList parses ItemList and replaces the tracked inventory.
+func (gc *GameClient) applyItemList(payload []byte) {
+	err := fromgameserver.ParseItemListPacket(
+		&gc.itemList, payload)
+	if err != nil {
+		gc.logger.Printf("Failed to parse item list: %v", err)
+
+		return
+	}
+	if gc.tracker == nil {
+		return
+	}
+	items := gc.convertInventoryItems(gc.itemList.Items)
+	gc.tracker.ApplyItemList(items)
+	gc.logger.Printf("Inventory listed with %d items", len(items))
+}
+
+// applyInventoryUpdate parses InventoryUpdate and applies the changes.
+func (gc *GameClient) applyInventoryUpdate(payload []byte) {
+	if err := fromgameserver.ParseInventoryUpdatePacket(
+		&gc.invUpdate, payload); err != nil {
+		gc.logger.Printf("Failed to parse inventory update: %v", err)
+
+		return
+	}
+	if gc.tracker == nil {
+		return
+	}
+	items := gc.convertInventoryItems(gc.invUpdate.Items)
+	gc.tracker.ApplyInventoryUpdate(items)
+}
+
+// convertInventoryItems copies the parsed items into state items through
+// the reused conversion buffer. The state layer copies the item values
+// into its own inventory map, so the buffer is not retained.
+func (gc *GameClient) convertInventoryItems(
+	source []fromgameserver.InventoryItem,
+) []state.InventoryItem {
+	gc.invItems = gc.invItems[:0]
+	for _, item := range source {
+		gc.invItems = append(gc.invItems, state.InventoryItem{
+			ObjectID: item.ObjectID,
+			ItemID:   item.ItemID,
+			Count:    item.Count,
+			Type1:    item.Type1,
+			Type2:    item.Type2,
+			Equipped: item.Equipped,
+			Change:   item.Change,
+		})
+	}
+
+	return gc.invItems
 }

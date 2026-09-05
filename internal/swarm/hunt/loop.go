@@ -1,0 +1,199 @@
+// SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+//
+// SPDX-License-Identifier: MIT
+
+// Package hunt drives the automatic hunting behavior of a bot: attack the
+// nearest attackable npc, pick up the loot it drops around the corpse and
+// keep the inventory of the long living session working by destroying
+// junk items when the slots or the weight run out.
+package hunt
+
+import (
+	"context"
+	"log"
+	"time"
+
+	"github.com/melg8/swarm/internal/swarm/state"
+)
+
+// GameAPI abstracts the game actions the hunt loop needs. The
+// connection.GameClient implements it.
+type GameAPI interface {
+	// AttackNearest attacks the closest attackable npc.
+	AttackNearest() (bool, error)
+	// PickupItem clicks a ground item to walk to it and pick it up.
+	PickupItem(item state.LootItem) error
+	// DestroyItem destroys inventory items.
+	DestroyItem(objectID int32, count int32) error
+}
+
+// Timing and threshold constants of the hunt loop.
+const (
+	// tickPeriod is the decision cadence of the loop.
+	tickPeriod = 1 * time.Second
+	// lootRadius is the distance around the character within drops are
+	// picked up after a kill.
+	lootRadius = 900.0
+	// engagePeriod is the minimum pause between two attack requests.
+	engagePeriod = 4 * time.Second
+	// pickupTimeout is how long one pickup attempt may take before the
+	// item is skipped.
+	pickupTimeout = 12 * time.Second
+	// pickupRetryDelay is how long a failed item stays skipped.
+	pickupRetryDelay = 30 * time.Second
+	// cleanupSlotPercent destroys junk at this inventory fill level.
+	cleanupSlotPercent = 70.0
+	// cleanupWeightPercent destroys junk at this weight level.
+	cleanupWeightPercent = 75.0
+	// destroyBatch is the number of junk items destroyed per cleanup.
+	destroyBatch = 4
+)
+
+// phase is the coarse activity of the hunt loop.
+type phase string
+
+const (
+	// phaseEngage walks to and attacks the current or nearest target.
+	phaseEngage phase = "engage"
+	// phaseLoot picks up the drops around the last kill.
+	phaseLoot phase = "loot"
+)
+
+// Loop is the hunt state machine of one bot session.
+type Loop struct {
+	game    GameAPI
+	tracker *state.Bot
+	logger  *log.Logger
+	phase   phase
+	target  int32
+	lastHit time.Time
+	lootID  int32
+	lootAt  time.Time
+	skipped map[int32]time.Time
+}
+
+// NewLoop creates the hunt loop for a connected game client.
+func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
+	return &Loop{
+		game:    game,
+		tracker: tracker,
+		logger:  log.Default(),
+		phase:   phaseEngage,
+		target:  0,
+		lastHit: time.Time{},
+		lootID:  0,
+		lootAt:  time.Time{},
+		skipped: make(map[int32]time.Time),
+	}
+}
+
+// Run drives the hunt loop until the context is done.
+func (l *Loop) Run(ctx context.Context) {
+	ticker := time.NewTicker(tickPeriod)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			l.tick()
+		}
+	}
+}
+
+// tick advances the hunt state machine by one decision. The phase
+// transitions fall through, so a kill switches into looting and the
+// first pickup happens on the same tick.
+func (l *Loop) tick() {
+	l.cleanupInventory()
+	if l.phase == phaseEngage {
+		l.engage()
+	}
+	if l.phase == phaseLoot {
+		l.loot()
+	}
+}
+
+// engage attacks the nearest attackable npc while the current target
+// lives, then switches to the loot phase.
+func (l *Loop) engage() {
+	// Prefer the server view of the target: the MyTargetSelected answer
+	// of the last attack request arrives asynchronously, so the fresh
+	// value is read every tick.
+	if serverTarget := l.tracker.SelfTargetID(); serverTarget != 0 {
+		l.target = serverTarget
+	}
+	if l.target != 0 && !l.tracker.ObjectAlive(l.target) {
+		l.logger.Printf("Hunt: target %d died, looting", l.target)
+		l.phase = phaseLoot
+		l.lootID = 0
+
+		return
+	}
+	now := time.Now()
+	if l.target != 0 || now.Sub(l.lastHit) < engagePeriod {
+		return
+	}
+	attacked, err := l.game.AttackNearest()
+	if err != nil {
+		l.logger.Printf("Hunt: attack failed: %v", err)
+
+		return
+	}
+	if attacked {
+		l.lastHit = now
+	}
+}
+
+// loot picks up the ground items around the character until none is left
+// within the loot radius, then hunts the next target.
+func (l *Loop) loot() {
+	item, ok := l.tracker.NearestGroundItemExcluding(lootRadius, l.skipped)
+	if !ok {
+		l.phase = phaseEngage
+		l.target = 0
+
+		return
+	}
+	now := time.Now()
+	if item.ObjectID != l.lootID {
+		l.lootID = item.ObjectID
+		l.lootAt = now
+		if err := l.game.PickupItem(item); err != nil {
+			l.logger.Printf("Hunt: pickup failed: %v", err)
+		}
+
+		return
+	}
+	if now.Sub(l.lootAt) > pickupTimeout {
+		// The pickup did not finish: the item is protected or the
+		// inventory is full. Skip it for a while and try the next one.
+		l.skipped[item.ObjectID] = now.Add(pickupRetryDelay)
+		l.lootID = 0
+		l.logger.Printf("Hunt: pickup of %d timed out, skipping", item.ObjectID)
+	}
+}
+
+// cleanupInventory destroys junk items when the slots or the weight of
+// the character approach the server limits.
+func (l *Loop) cleanupInventory() {
+	stats := l.tracker.InventoryStats()
+	if stats.SlotPercent < cleanupSlotPercent &&
+		stats.WeightPercent < cleanupWeightPercent {
+		return
+	}
+	junk := l.tracker.DestroyableItems(destroyBatch)
+	if len(junk) == 0 {
+		return
+	}
+	l.logger.Printf("Hunt: inventory at %d slots and %.0f%% weight, "+
+		"destroying %d items", stats.Slots, stats.WeightPercent, len(junk))
+	for _, item := range junk {
+		err := l.game.DestroyItem(item.ObjectID, item.Count)
+		if err != nil {
+			l.logger.Printf("Hunt: destroy failed: %v", err)
+
+			return
+		}
+	}
+}

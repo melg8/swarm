@@ -11,7 +11,7 @@ import (
 )
 
 // Object position and removal packets: MoveToLocation, StopMove,
-// ValidateLocation, DeleteObject and DropItem.
+// ValidateLocation, DeleteObject, DropItem, SpawnItem and GetItem.
 
 const (
 	moveToLocationPacketID   = 0x01
@@ -20,6 +20,8 @@ const (
 	validateLocationPacketID = 0x76
 	deleteObjectPacketID     = 0x1E
 	dropItemPacketID         = 0x16
+	spawnItemPacketID        = 0x15
+	getItemPacketID          = 0x17
 )
 
 // MoveToLocationPacket announces an object movement.
@@ -260,6 +262,96 @@ func ParseDropItemPacket(p *DropItemPacket, data []byte) error {
 	p.Stackable = stackable != 0
 	if err := readInt32Fields(reader, &p.Count); err != nil {
 		return fmt.Errorf("failed to read drop count: %w", err)
+	}
+
+	return nil
+}
+
+// SpawnItemPacket announces an item that already lies on the ground when
+// it enters the known list of the character, unlike the DropItem packet
+// for freshly dropped items. Without it, items that existed before the
+// bot logged in would stay invisible.
+// Wire format (see SpawnItem.writeImpl): [opcode 0x15][objectId: 4]
+// [displayId: 4][x: 4][y: 4][z: 4][stackable: 4][count: 4].
+type SpawnItemPacket struct {
+	ObjectID   int32
+	TemplateID int32
+	Stackable  bool
+	Count      int32
+	X          int32
+	Y          int32
+	Z          int32
+}
+
+// NewSpawnItemPacket creates a zero valued packet ready for parsing.
+func NewSpawnItemPacket() *SpawnItemPacket {
+	return &SpawnItemPacket{
+		ObjectID:   0,
+		TemplateID: 0,
+		Stackable:  false,
+		Count:      0,
+		X:          0,
+		Y:          0,
+		Z:          0,
+	}
+}
+
+// ParseSpawnItemPacket reads the packet from payload bytes.
+func ParseSpawnItemPacket(p *SpawnItemPacket, data []byte) error {
+	reader := packet.NewReader(data)
+
+	if err := expectPacketID(reader, spawnItemPacketID); err != nil {
+		return err
+	}
+	if err := readInt32Fields(reader,
+		&p.ObjectID, &p.TemplateID, &p.X, &p.Y, &p.Z); err != nil {
+		return fmt.Errorf("failed to read spawn item location: %w", err)
+	}
+	stackable, err := reader.ReadInt32()
+	if err != nil {
+		return fmt.Errorf("failed to read spawn item stackable flag: %w", err)
+	}
+	p.Stackable = stackable != 0
+	if err := readInt32Fields(reader, &p.Count); err != nil {
+		return fmt.Errorf("failed to read spawn item count: %w", err)
+	}
+
+	return nil
+}
+
+// GetItemPacket announces that a player picked up a ground item: the item
+// disappears and the picker stands at the given position.
+// Wire format (see GetItem.writeImpl): [opcode 0x17][playerId: 4]
+// [objectId: 4][x: 4][y: 4][z: 4].
+type GetItemPacket struct {
+	PlayerID int32
+	ObjectID int32
+	X        int32
+	Y        int32
+	Z        int32
+}
+
+// NewGetItemPacket creates a zero valued packet ready for parsing.
+func NewGetItemPacket() *GetItemPacket {
+	return &GetItemPacket{
+		PlayerID: 0,
+		ObjectID: 0,
+		X:        0,
+		Y:        0,
+		Z:        0,
+	}
+}
+
+// ParseGetItemPacket reads the packet from payload bytes.
+func ParseGetItemPacket(p *GetItemPacket, data []byte) error {
+	reader := packet.NewReader(data)
+
+	if err := expectPacketID(reader, getItemPacketID); err != nil {
+		return err
+	}
+	if err := readInt32Fields(
+		reader, &p.PlayerID, &p.ObjectID, &p.X, &p.Y, &p.Z); err != nil {
+		return fmt.Errorf("failed to read get item: %w", err)
 	}
 
 	return nil

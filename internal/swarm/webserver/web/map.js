@@ -51,7 +51,7 @@ const MapView = {
       .addEventListener("click", () => this.zoom(1.5));
     document.getElementById("zoom-out")
       .addEventListener("click", () => this.zoom(1 / 1.5));
-    for (const id of ["follow", "show-labels", "show-dest", "show-zone"]) {
+    for (const id of ["follow", "show-labels", "show-dest", "show-zone", "show-targets"]) {
       document.getElementById(id).addEventListener("change", () => {
         this.draw();
       });
@@ -290,6 +290,7 @@ const MapView = {
 
     this.drawGrid(ctx, rect);
     this.drawZone(ctx, rect);
+    this.drawTargetLink(ctx);
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
     this.updateMapInfo();
@@ -414,6 +415,47 @@ const MapView = {
     const c = this.lastSnap.character;
 
     return obj.inCombat && c && obj.targetId === c.objectId;
+  },
+
+  // drawTargetLink renders the current target of the bot: a line from
+  // the character to the target and a dashed ring around it, like the
+  // target markers of the L2Bot map.
+  drawTargetLink(ctx) {
+    if (!document.getElementById("show-targets").checked) { return; }
+    const snap = this.lastSnap;
+    const c = snap.character;
+    if (!c || !c.x || !c.targetId) { return; }
+    const target = (snap.objects || []).find(
+      (obj) => obj.objectId === c.targetId);
+    if (!target) { return; }
+    const selfRt = this.runtime.get("self");
+    const from = this.worldToScreen(
+      selfRt ? selfRt.drawX : c.x, selfRt ? selfRt.drawY : c.y);
+    const rt = this.runtime.get(target.objectId);
+    const to = this.worldToScreen(
+      rt ? rt.drawX : target.x, rt ? rt.drawY : target.y);
+
+    ctx.save();
+    ctx.strokeStyle = this.colors.combat;
+    ctx.globalAlpha = 0.75;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    const radius = radiusOf(target, threatOf(target)) + 6;
+    ctx.save();
+    ctx.strokeStyle = this.colors.combat;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(to.x, to.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   },
 
   drawSelf(ctx) {

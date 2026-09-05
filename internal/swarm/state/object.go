@@ -110,7 +110,9 @@ func (o WorldObject) EffectiveSpeed() float64 {
 	if o.Running || o.WalkSpeed <= 0 {
 		speed = float64(o.RunSpeed)
 	}
-	speed *= o.MoveSpeedMult
+	if o.MoveSpeedMult > 0 {
+		speed *= o.MoveSpeedMult
+	}
 	if speed <= 1 {
 		return defaultRunSpeed
 	}
@@ -121,6 +123,33 @@ func (o WorldObject) EffectiveSpeed() float64 {
 // defaultRunSpeed is the fallback movement speed for objects without
 // transmitted speeds.
 const defaultRunSpeed = 120
+
+// defaultWalkSpeed is the fallback walking speed of the character.
+const defaultWalkSpeed = 60
+
+// effectiveSpeed combines a transmitted base speed with the move
+// multiplier of the spawn packets. The server divides the real speeds by
+// the multiplier before writing them (see UserInfo, CharInfo and
+// AbstractNpcInfo writeImpl of the Mobius server), so the observed
+// movement is speed * multiplier. It falls back to the common monster
+// run speed when the packet carried nothing usable.
+func effectiveSpeed(base int32, walk int32, mult float64) float64 {
+	speed := float64(base)
+	if mult > 0 {
+		speed *= mult
+	}
+	if speed <= 1 {
+		speed = float64(walk)
+		if mult > 0 {
+			speed *= mult
+		}
+	}
+	if speed <= 1 {
+		return defaultRunSpeed
+	}
+
+	return speed
+}
 
 // mathPi is pi as its own constant to keep the hot path allocation free.
 const mathPi = math.Pi

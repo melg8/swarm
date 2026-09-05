@@ -204,6 +204,17 @@ func TestParseUserInfoPacket(t *testing.T) {
 		data = putInt32(data, 100)
 		data = putInt32(data, 40)
 		data = putInt32(data, 39)
+		data = putInt32(data, 10)  // sp
+		data = putInt32(data, 640) // cur load
+		data = putInt32(data, 6400000)
+		// weapon flag, 15 paperdoll object ids, 15 paperdoll display
+		// ids and 12 combat stat ints.
+		data = append(data, make([]byte, userInfoStatsSkip)...)
+		data = putInt32(data, 165) // run speed
+		data = putInt32(data, 80)  // walk speed
+		// swim and fly speeds.
+		data = append(data, make([]byte, userInfoSpeedTrail)...)
+		data = putFloat64(data, 1.1)
 
 		p := NewUserInfoPacket()
 		err := ParseUserInfoPacket(p, data)
@@ -221,6 +232,12 @@ func TestParseUserInfoPacket(t *testing.T) {
 		require.Equal(t, int32(100), p.CurHP)
 		require.Equal(t, int32(40), p.MaxMP)
 		require.Equal(t, int32(39), p.CurMP)
+		require.Equal(t, int32(10), p.Sp)
+		require.Equal(t, int32(640), p.CurrentLoad)
+		require.Equal(t, int32(6400000), p.MaxLoad)
+		require.Equal(t, int32(165), p.RunSpeed)
+		require.Equal(t, int32(80), p.WalkSpeed)
+		require.InDelta(t, 1.1, p.MoveSpeedMult, 0.0001)
 	})
 
 	t.Run("truncated", func(t *testing.T) {
@@ -245,8 +262,21 @@ func TestParseCharInfoPacket(t *testing.T) {
 		data = putInt32(data, 0) // race
 		data = putInt32(data, 0) // female
 		data = putInt32(data, 10)
-		data = append(data, make([]byte, charInfoSkippedBytes)...)
+		// paperdoll ints, attack speed pair, pvp and karma.
+		data = append(data, make([]byte, charInfoSpeedLead)...)
+		data = putInt32(data, 150) // run speed
+		data = putInt32(data, 75)  // walk speed
+		// swim and fly speeds.
+		data = append(data, make([]byte, charInfoSpeedTrail)...)
+		data = putFloat64(data, 1.0)
+		// attack speed multiplier, collision and hair fields.
+		data = append(data, make([]byte, charInfoAppearanceTail)...)
 		data = append(data, utf16("Title")...)
+		// clan and ally ids plus the relation int.
+		data = append(data, make([]byte, charInfoClanTail)...)
+		// standing, running, in combat, alike dead, invisible, mount,
+		// private store.
+		data = append(data, 1, 1, 0, 0, 0, 0, 0)
 
 		p := NewCharInfoPacket()
 		err := ParseCharInfoPacket(p, data)
@@ -257,6 +287,37 @@ func TestParseCharInfoPacket(t *testing.T) {
 		require.Equal(t, int32(50000), p.Y)
 		require.Equal(t, int32(10), p.ClassID)
 		require.Equal(t, "Title", p.Title)
+		require.Equal(t, int32(150), p.RunSpeed)
+		require.Equal(t, int32(75), p.WalkSpeed)
+		require.InDelta(t, 1.0, p.MoveSpeedMult, 0.0001)
+		require.True(t, p.Running)
+		require.False(t, p.InCombat)
+		require.False(t, p.Dead)
+	})
+
+	t.Run("truncated after title keeps flags default", func(t *testing.T) {
+		data := []byte{0x03}
+		data = putInt32(data, 45000)
+		data = putInt32(data, 50000)
+		data = putInt32(data, -3500)
+		data = putInt32(data, 0)
+		data = putInt32(data, 7)
+		data = append(data, utf16("Player2")...)
+		data = putInt32(data, 0)
+		data = putInt32(data, 0)
+		data = putInt32(data, 10)
+		data = append(data, make([]byte, charInfoSpeedLead)...)
+		data = putInt32(data, 150)
+		data = putInt32(data, 75)
+		data = append(data, make([]byte, charInfoSpeedTrail)...)
+		data = putFloat64(data, 1.0)
+		data = append(data, make([]byte, charInfoAppearanceTail)...)
+		data = append(data, utf16("Title")...)
+
+		p := NewCharInfoPacket()
+		err := ParseCharInfoPacket(p, data)
+		require.NoError(t, err)
+		require.False(t, p.Running)
 	})
 }
 
