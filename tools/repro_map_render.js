@@ -173,6 +173,7 @@ function loadMapJs(mapFile) {
         follow: true, "show-labels": false, "show-dest": false,
         "show-zone": false, "show-targets": true
     };
+    const elements = new Map();
     const sandbox = {
         Math, JSON,
         Date: { now: () => 0 },
@@ -181,10 +182,13 @@ function loadMapJs(mapFile) {
         document: {
             getElementById: (id) => {
                 if (id === "map-canvas") { return canvas; }
-                if (Object.prototype.hasOwnProperty.call(checkboxes, id)) {
-                    return makeElementStub(checkboxes[id]);
+                if (!elements.has(id)) {
+                    const checked = Object.prototype.hasOwnProperty.call(
+                        checkboxes, id) ? checkboxes[id] : false;
+                    elements.set(id, makeElementStub(checked));
                 }
-                return makeElementStub(false);
+
+                return elements.get(id);
             }
         },
         window: { addEventListener: () => {} },
@@ -199,7 +203,7 @@ function loadMapJs(mapFile) {
         { filename: "map.js" });
     vm.runInContext("globalThis.__MapView = MapView;", sandbox);
 
-    return { MapView: sandbox.__MapView, record };
+    return { MapView: sandbox.__MapView, record, elements };
 }
 
 // buildSnapshot assembles a snapshot view with the given target links.
@@ -385,6 +389,51 @@ function runScenarioTargetingBot(mapFile) {
     return results;
 }
 
+// runScenarioFollowOff covers the follow checkbox: with follow off the
+// camera stays pinned to the chosen area — a fixed world point keeps its
+// screen position while the bot walks away — and with follow on the view
+// tracks the character again (the reported bug: unchecking follow still
+// moved the map with the character).
+function runScenarioFollowOff(mapFile) {
+    const { MapView, elements } = loadMapJs(mapFile);
+    if (typeof MapView.syncPanAnchor !== "function") {
+        console.log("FAIL  syncPanAnchor is missing from map.js");
+        process.exit(1);
+    }
+    MapView.init();
+    MapView.update(buildSnapshot(0, false));
+
+    const results = [];
+    const pin = { x: WORLD.self.x, y: WORLD.self.y };
+    elements.get("follow").checked = false;
+    MapView.syncPanAnchor();
+    MapView.draw();
+    const before = MapView.worldToScreen(pin.x, pin.y);
+
+    // The character moves 300 units east with follow off: the view must
+    // not shift, the world point stays at its screen position.
+    const moved = buildSnapshot(0, false);
+    moved.character.x = WORLD.self.x + 300;
+    MapView.update(moved);
+    const after = MapView.worldToScreen(pin.x, pin.y);
+    check(results, "follow off keeps the map static while the bot moves",
+        Math.abs(after.x - before.x) < 2 && Math.abs(after.y - before.y) < 2,
+        "fixed point moved from " + JSON.stringify(before) + " to "
+        + JSON.stringify(after));
+
+    // Follow on: the same world point shifts because the camera tracks
+    // the character (300 units at scale 0.12 = 36 px).
+    elements.get("follow").checked = true;
+    MapView.draw();
+    const followed = MapView.worldToScreen(pin.x, pin.y);
+    check(results, "follow on tracks the moving bot",
+        Math.abs(followed.x - (before.x - 36)) < 2,
+        "expected x ≈ " + (before.x - 36) + ", got "
+        + JSON.stringify(followed));
+
+    return results;
+}
+
 function main() {
     const args = process.argv.slice(2);
     const verbose = args.includes("--verbose");
@@ -397,7 +446,8 @@ function main() {
 
     const scenarios = [
         ["map targets", runScenario(mapFile, verbose)],
-        ["player selects the bot", runScenarioTargetingBot(mapFile)]
+        ["player selects the bot", runScenarioTargetingBot(mapFile)],
+        ["follow off keeps the view static", runScenarioFollowOff(mapFile)]
     ];
     let failed = 0;
     for (const [name, results] of scenarios) {
