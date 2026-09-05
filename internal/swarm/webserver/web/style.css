@@ -400,7 +400,19 @@ body {
 
 .hud-name-small { font-size: 14px; }
 
-.hud-class { color: var(--accent); font-size: 12px; margin-top: 2px; }
+/* The class text and the status chips share one line under the name
+   heading, so the chips never crowd the name. */
+.hud-class-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.hud-chips { display: flex; gap: 4px; }
+
+.hud-class { color: var(--accent); font-size: 12px; }
 
 .vitals { display: grid; gap: 8px; margin-bottom: 10px; }
 
@@ -436,27 +448,9 @@ body {
 .bar.xp .bar-fill { background: var(--grad-xp); }
 
 /* Target panel: shows who the bot currently selected, with its name,
-   level and vitals. Without a target (killed, removed or none) it dims
-   into the explicit "no target" state. */
-.hud-target-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.hud-panel-label {
-  font-size: 10px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
-
-.hud-target .hud-name-row { flex: 1; min-width: 0; }
-
-.hud-target.no-target .hud-name { color: var(--text-dim); font-style: italic; font-weight: 400; }
-
-.hud-target.no-target .bar-fill { width: 0% !important; }
+   level and vitals. The panel exists only while there is a target: a
+   killed, removed or missing target hides it completely. */
+.hud-target .hud-name-row { margin-bottom: 8px; }
 
 .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
 

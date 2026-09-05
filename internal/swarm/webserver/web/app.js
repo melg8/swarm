@@ -252,16 +252,14 @@ function renderHUD(snap) {
   document.getElementById("hud-slots").textContent =
     (c.inventorySlots || 0) + "/" + (c.inventoryMax || 80);
   document.getElementById("hud-weight").textContent =
-    c.maxLoad > 0
-      ? Math.round((c.load / c.maxLoad) * 100) + "% (" + formatNumber(c.load) + ")"
-      : "—";
+    c.maxLoad > 0 ? Math.round((c.load / c.maxLoad) * 100) + "%" : "—";
   document.getElementById("hud-adena").textContent = formatNumber(c.adena);
 }
 
 // Target panel rendering: resolves the current target object and shows
-// its name, level and vitals. A dead, removed or missing target reads
-// as "no target": the tracker clears killed targets because the server
-// never does.
+// its name, level and vitals. The panel exists only while there is a
+// target: a killed, removed or missing target (the tracker clears them
+// because the server never does) hides the whole panel.
 function renderTarget(snap) {
   const panel = document.getElementById("hud-target");
   const c = snap.character;
@@ -270,22 +268,18 @@ function renderTarget(snap) {
     ? (snap.objects || []).find(
       (obj) => obj.objectId === targetId && !obj.dead)
     : null;
-  const name = document.getElementById("target-name");
-  const level = document.getElementById("target-level");
-  panel.classList.toggle("no-target", !target);
-  if (target) {
-    name.textContent = target.name || ("object " + target.objectId);
-    const hasLevel = target.kind === "npc" && target.level > 0;
-    level.textContent = hasLevel ? "lv " + target.level : "";
-    level.classList.toggle("hidden", !hasLevel);
-    setVital("target-hp", target.curHp, target.maxHp, target.maxHp > 0);
-    setVital("target-mp", target.curMp, target.maxMp, target.maxMp > 0);
-  } else {
-    name.textContent = "no target";
-    level.classList.add("hidden");
-    setVital("target-hp", 0, 0, false);
-    setVital("target-mp", 0, 0, false);
+  panel.classList.toggle("hidden", !target);
+  if (!target) {
+    return;
   }
+  document.getElementById("target-name").textContent =
+    target.name || ("object " + target.objectId);
+  const level = document.getElementById("target-level");
+  const hasLevel = target.kind === "npc" && target.level > 0;
+  level.textContent = hasLevel ? "lv " + target.level : "";
+  level.classList.toggle("hidden", !hasLevel);
+  setVital("target-hp", target.curHp, target.maxHp, target.maxHp > 0);
+  setVital("target-mp", target.curMp, target.maxMp, target.maxMp > 0);
 }
 
 function setVital(kind, cur, max, known) {
