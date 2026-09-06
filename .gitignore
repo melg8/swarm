@@ -26,3 +26,5 @@ go.work.sum
 # env file
 .env
 .task
+# Local staging of the downloaded geodata pack (not part of the repo)
+.tmp-geodata/
