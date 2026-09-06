@@ -309,8 +309,9 @@ the same variables).
   (mapColors in map.js, also mirrored into the legend css) so the icons
   read identically over the light map imagery and over both theme
   fills; the marker outline and the direction tick use the fixed slate
-  mapColors.tick for the same reason; the labels draw with a dark halo
-  and pass a declutter pass
+  mapColors.tick for the same reason; the labels draw white (gray for
+  the dead, the own target red) with a dark halo and pass a declutter
+  pass
   (priority: hovered, own target, in combat, then the distance to the
   character - overlapping names are dropped, the closest win). The unit
   markers scale with the zoom (a sub linear
