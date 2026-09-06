@@ -14,11 +14,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/connection"
 	"github.com/melg8/swarm/internal/swarm/hunt"
+	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/melg8/swarm/internal/swarm/webserver"
 )
@@ -32,6 +34,15 @@ const (
 	defaultWebAddress   = "127.0.0.1:8080"
 	connectTimeout      = 10 * time.Second
 )
+
+// Candidate geodata directories of the pathfind test mode, checked in
+// order when -geodata is empty: the relative server layout first, then
+// the reference Windows deployment of this project (see AGENTS.md).
+var defaultGeodataCandidates = []string{
+	filepath.Join("data", "geodata"),
+	filepath.Join("E:\\", "work", "lineage_workspace_fresh",
+		"L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
+}
 
 // Reconnect backoff of the 24/7 supervisor: a lost session is retried
 // with a growing pause, a long lived session resets the pause so a drop
@@ -61,6 +72,9 @@ type config struct {
 	charName     string
 	webAddress   string
 	hunt         bool
+	pathfindTest bool
+	geodataDir   string
+	maxPassable  uint
 }
 
 func parseFlags() config {
@@ -71,6 +85,9 @@ func parseFlags() config {
 		charName:     "",
 		webAddress:   "",
 		hunt:         false,
+		pathfindTest: false,
+		geodataDir:   "",
+		maxPassable:  uint(pathfind.DefaultMaxPassableHeight),
 	}
 	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
 		"login server address")
@@ -81,6 +98,15 @@ func parseFlags() config {
 		"web interface address, empty disables it")
 	flag.BoolVar(&cfg.hunt, "hunt", false,
 		"auto hunt: attack, pick up loot and manage inventory")
+	flag.BoolVar(&cfg.pathfindTest, "pathfind-test", false,
+		"map pathfinding test UI instead of the bot: no game connection, "+
+			"draggable start and end markers show the found path")
+	flag.StringVar(&cfg.geodataDir, "geodata", "",
+		"geodata directory with X_Y.l2j region files for the pathfind "+
+			"test (auto detected when empty)")
+	flag.UintVar(&cfg.maxPassable, "max-passable",
+		uint(pathfind.DefaultMaxPassableHeight),
+		"maximum walkable height difference between neighbouring cells")
 	flag.Parse()
 
 	return cfg
@@ -223,13 +249,20 @@ func runBotForever(ctx context.Context, cfg config, tracker *state.Bot) {
 func main() {
 	cfg := parseFlags()
 	log.SetOutput(os.Stdout)
+
+	if cfg.pathfindTest {
+		runPathfindTest(cfg)
+
+		return
+	}
+
 	log.Println("Starting swarm bot for account " + cfg.account)
 
 	registry := state.NewRegistry()
 	tracker := state.NewBot(cfg.account)
 	registry.Add(tracker)
 
-	web := startWebInterface(cfg, registry)
+	web := startWebInterface(cfg, registry, nil)
 
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
@@ -240,14 +273,81 @@ func main() {
 	log.Println("Bot finished")
 }
 
+// runPathfindTest serves the bot less map pathfinding test UI: the geodata
+// engine is loaded from the configured or auto detected directory and the
+// web interface answers path requests until the process is stopped.
+func runPathfindTest(cfg config) {
+	dir := cfg.geodataDir
+	if dir == "" {
+		dir = detectGeodataDir()
+	}
+	engine := pathfind.NewEngine(dir)
+	engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+
+	stats := engine.Stats()
+	if stats.HasData {
+		log.Printf("Pathfind test: %d geodata region files in %s",
+			stats.RegionFiles, stats.Dir)
+	} else {
+		log.Println("Pathfind test: no geodata files found in " + stats.Dir +
+			", pass -geodata with the game server data/geodata directory")
+	}
+
+	web := startWebInterface(cfg, nil, engine)
+	if web == nil {
+		log.Println("Pathfind test needs the web interface, " +
+			"pass a -web address")
+
+		return
+	}
+
+	log.Println("Pathfind test UI is ready")
+
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+	shutdownWebInterface(web)
+	log.Println("Pathfind test finished")
+}
+
+// detectGeodataDir picks the first candidate directory that exists.
+func detectGeodataDir() string {
+	for _, candidate := range defaultGeodataCandidates {
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+	log.Println("No geodata directory found, pass -geodata explicitly")
+
+	return defaultGeodataCandidates[0]
+}
+
 // startWebInterface runs the web server in the background when enabled.
+// A non nil pathfind engine switches the server into the pathfind test
+// mode, otherwise the bot registry is served.
 func startWebInterface(
-	cfg config, registry *state.Registry,
+	cfg config, registry *state.Registry, engine *pathfind.Engine,
 ) *webserver.Server {
 	if cfg.webAddress == "" {
 		return nil
 	}
-	server := webserver.NewServer(registry, cfg.webAddress, log.Default())
+	var server *webserver.Server
+	if engine != nil {
+		// The test opens on the hunting area: that is the terrain the
+		// bot actually walks and the most useful pathfind playground.
+		zoneX, zoneY, _ := hunt.DefaultHuntingZone()
+		server = webserver.NewPathfindServer(engine, cfg.webAddress,
+			log.Default(), webserver.PathfindOptions{
+				ViewCenter: &pathfind.Vec3{
+					X: float64(zoneX),
+					Y: float64(zoneY),
+					Z: 0,
+				},
+			})
+	} else {
+		server = webserver.NewServer(registry, cfg.webAddress, log.Default())
+	}
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
 			if !errors.Is(err, http.ErrServerClosed) {
