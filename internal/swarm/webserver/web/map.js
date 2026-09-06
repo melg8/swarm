@@ -619,10 +619,15 @@ const MapView = {
       if (showLabels && obj.name) {
         const suffix = obj.kind === "npc" && obj.level > 0
           ? " lv" + obj.level : "";
+        // White names with the dark halo read over any terrain; the
+        // threat stays on the marker dot, the own target keeps its red.
+        const isTarget = this.lastSnap.character
+          && this.lastSnap.character.targetId === obj.objectId;
         this.labelCandidates.push({
           x: p.x, y: p.y - labelRadius - 6,
           text: obj.name + suffix,
-          color: labelColor(threat),
+          color: isTarget ? this.mapColors.combat
+            : (obj.dead ? "#9aa0a6" : "#ffffff"),
           priority: this.labelPriority(obj)
         });
       }
@@ -818,7 +823,7 @@ const MapView = {
       this.labelCandidates.push({
         x: p.x, y: p.y - selfRadius - 6,
         text: c.name || "self",
-        color: this.mapColors.self,
+        color: "#ffffff",
         priority: -1
       });
     }
@@ -1063,19 +1068,10 @@ function radiusOf(obj, threat) {
   return 5;
 }
 
-// labelColor picks the label color of a threat class from the fixed
-// map palette.
+// labelColor returns the name text color: white for everything alive
+// (readable over any terrain with the dark halo), gray for the dead.
 function labelColor(threat) {
-  const colors = {
-    dead: "#80868b",
-    combat: "#d93025",
-    aggressive: "#e37400",
-    player: "#9334e6",
-    item: "#f9ab00",
-    passive: "#188038"
-  };
-
-  return colors[threat] || "#3c4043";
+  return threat === "dead" ? "#9aa0a6" : "#ffffff";
 }
 
 // drawUnitTick draws a circle marker with a short look direction tick
