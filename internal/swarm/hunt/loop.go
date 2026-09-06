@@ -183,10 +183,10 @@ func (l *Loop) inZoneSelf() bool {
 }
 
 // DefaultHuntingZone is the configured hunting square of this
-// deployment: 900x900 units centered just below the Newbie Helper of
+// deployment: 1900x1900 units centered just below the Newbie Helper of
 // the Elven village.
 func DefaultHuntingZone() (cx int32, cy int32, half int32) {
-	return 46112, 41500, 450
+	return 46112, 41500, 950
 }
 
 // Run drives the hunt loop until the context is done.
