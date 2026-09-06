@@ -31,11 +31,23 @@ const MapView = {
   animating: false,
   lastFrame: 0,
   colors: null,
+  mapTiles: new Map(),
 
   // The server world region grid: every region is 2048 units and every
   // object within the 3x3 region block around the player is loaded (see
   // World.broadcastPacket of the Mobius server).
   regionSize: 2048,
+
+  // The world map tiles: one tile covers 32768 world units (the Mobius
+  // World.TILE_SIZE) at 1024 source pixels, named BX_BY.jpg with
+  // BX = floor(x / 32768) + 20 and BY = floor(y / 32768) + 18 (the
+  // World.TILE_ZERO_COORD anchors). The pyramid levels 0..3 halve the
+  // resolution per level (1024, 512, 256, 128 px per tile) for the
+  // zoomed out views.
+  mapTileSize: 32768,
+  mapTileZeroX: 20,
+  mapTileZeroY: 18,
+  mapTilePixels: [1024, 512, 256, 128],
 
   init() {
     this.canvas = document.getElementById("map-canvas");
@@ -60,7 +72,7 @@ const MapView = {
       if (!follow.checked) { this.syncPanAnchor(); }
       this.draw();
     });
-    for (const id of ["show-labels", "show-dest", "show-zone", "show-targets"]) {
+    for (const id of ["show-labels", "show-dest", "show-zone", "show-targets", "show-map"]) {
       document.getElementById(id).addEventListener("change", () => {
         this.draw();
       });
@@ -353,6 +365,73 @@ const MapView = {
     return { x, y };
   },
 
+  // ---- world map background ----
+
+  // drawMapBackground paints the game world map tiles under everything
+  // else. The level of detail follows the zoom: the chosen pyramid
+  // level is the smallest one whose native resolution stays within a
+  // factor of two of the drawn tile size, so zoomed in views use the
+  // full tiles and zoomed out views use the small ones without
+  // over-magnifying.
+  drawMapBackground(ctx, rect) {
+    if (!document.getElementById("show-map").checked) { return; }
+    const drawnPx = this.mapTileSize * this.scale;
+    let level = this.mapTilePixels.length - 1;
+    for (let i = 0; i < this.mapTilePixels.length; i++) {
+      // Google maps rule: allow at most a 2x upscale of the tile
+      // pixels, everything smaller goes one level down the pyramid.
+      if (this.mapTilePixels[i] <= drawnPx * 2) { level = i; break; }
+    }
+    const half = rect.width / 2;
+    const worldLeft = this.centerX() - half / this.scale;
+    const worldRight = this.centerX() + half / this.scale;
+    const worldTop = this.centerY() - rect.height / 2 / this.scale;
+    const worldBottom = this.centerY() + rect.height / 2 / this.scale;
+    const tile = this.mapTileSize;
+    const bxMin = Math.floor(worldLeft / tile) + this.mapTileZeroX;
+    const bxMax = Math.floor(worldRight / tile) + this.mapTileZeroX;
+    const byMin = Math.floor(worldTop / tile) + this.mapTileZeroY;
+    const byMax = Math.floor(worldBottom / tile) + this.mapTileZeroY;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    for (let bx = bxMin; bx <= bxMax; bx++) {
+      for (let by = byMin; by <= byMax; by++) {
+        const tileImg = this.mapTile(level, bx, by);
+        if (!tileImg) { continue; }
+        const screen = this.worldToScreen(
+          (bx - this.mapTileZeroX) * tile, (by - this.mapTileZeroY) * tile);
+        ctx.drawImage(tileImg, screen.x, screen.y,
+          tile * this.scale + 1, tile * this.scale + 1);
+      }
+    }
+  },
+
+  // mapTile returns the loaded image of a pyramid tile or null and
+  // starts the background load once. Missing tiles (outside the
+  // shipped world) are remembered to avoid retrying.
+  mapTile(level, bx, by) {
+    const path = "maps/" + level + "/" + bx + "_" + by + ".jpg";
+    let entry = this.mapTiles.get(path);
+    if (entry) {
+      return entry.ready ? entry.img : null;
+    }
+    entry = { img: null, ready: false };
+    this.mapTiles.set(path, entry);
+    if (typeof Image === "undefined") {
+      return null;
+    }
+    const img = new Image();
+    img.onload = () => {
+      entry.ready = true;
+      entry.img = img;
+      this.draw();
+    };
+    img.onerror = () => {};
+    img.src = path;
+
+    return null;
+  },
+
   // ---- drawing ----
 
   draw() {
@@ -362,6 +441,7 @@ const MapView = {
     ctx.clearRect(0, 0, rect.width, rect.height);
     if (!this.lastSnap) { return; }
 
+    this.drawMapBackground(ctx, rect);
     this.drawGrid(ctx, rect);
     this.drawZone(ctx, rect);
     this.drawTargetLinks(ctx);
