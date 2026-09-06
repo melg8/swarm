@@ -317,6 +317,31 @@ func TestLoopSitsDownWhenExhausted(t *testing.T) {
 	require.Equal(t, 1, game.selects, "a standing character hunts again")
 }
 
+func TestLoopSitsAtTheNewThreshold(t *testing.T) {
+	bot := newTestBot()
+	spawnMob(bot)
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// HP 55 sits (the old threshold was 30 and too low to survive the
+	// next fight), HP 65 engages right away.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 55},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.sits, "55 percent sits down")
+
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 65},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.selects, "65 percent engages again")
+}
+
 func TestLoopDoesNotSitWhileUnderAttack(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)

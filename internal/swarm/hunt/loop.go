@@ -63,11 +63,14 @@ const (
 	selectPeriod = 1 * time.Second
 	// reengageHealthPercent is the HP level above which the next target
 	// is engaged immediately after a kill instead of resting. Below it
-	// the loop waits for the natural regeneration to recover.
-	reengageHealthPercent = 50.0
+	// the loop waits for the regeneration - the same threshold as the
+	// sit down, so a hurt character sits right away instead of standing
+	// around: 30 percent may not be enough to kill the next mob and
+	// turns every fight into a death risk.
+	reengageHealthPercent = 60.0
 	// sitDownHealthPercent is the HP level below which the resting
 	// character sits down: the sitting regeneration is much faster.
-	sitDownHealthPercent = 30.0
+	sitDownHealthPercent = 60.0
 	// standUpHealthPercent is the HP level at which a sitting character
 	// stands up again and resumes the hunt.
 	standUpHealthPercent = 90.0
