@@ -767,3 +767,24 @@ ticks keep their length.
   0.02 the median tick length is 1.54 px (unitScale 0.34), at scale
   0.12 it is 4.50 px (unitScale 1.0).
 - All harnesses pass.
+
+
+## Round 14: theme independent marker outlines (2026-09-06)
+
+User report: with the dark theme on the marker outlines and the
+direction ticks turned near white (they followed the theme text bright
+variable) and looked bad over the light map imagery.
+
+### Fix
+
+The outline and the direction tick use the fixed mapColors.tick (a
+middle slate 39424e) instead of the theme variable: the slate reads
+over the light map tiles and over both theme fills, matching the rest
+of the fixed marker palette.
+
+### Verification
+
+Live pixel probe on test1 in both themes: the near white tick pixels of
+the dark theme are gone (the remaining near white pixels are the map
+imagery itself, identical across the themes), the slate tick pixels are
+present at the same count in both themes.
