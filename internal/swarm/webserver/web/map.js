@@ -431,29 +431,47 @@ const MapView = {
     ctx.imageSmoothingQuality = "high";
     for (let bx = bxMin; bx <= bxMax; bx++) {
       for (let by = byMin; by <= byMax; by++) {
-        const tileImg = this.mapTile(level, bx, by);
-        if (!tileImg) { continue; }
+        // The full resolution tiles ship only for the detail window:
+        // outside it the pyramid walks up to the closest existing
+        // level and stretches it over the tile rect, so every panned
+        // to area keeps its map at any zoom.
+        const entry = this.mapTileAncestor(level, bx, by);
+        if (!entry || !entry.ready) { continue; }
         const screen = this.worldToScreen(
           (bx - this.mapTileZeroX) * tile, (by - this.mapTileZeroY) * tile);
-        ctx.drawImage(tileImg, screen.x, screen.y,
+        ctx.drawImage(entry.img, screen.x, screen.y,
           tile * this.scale + 1, tile * this.scale + 1);
       }
     }
   },
 
-  // mapTile returns the loaded image of a pyramid tile or null and
-  // starts the background load once. Missing tiles (outside the
-  // shipped world) are remembered to avoid retrying.
+  // mapTileAncestor returns the deepest available pyramid entry of a
+  // tile: the requested level when it exists, otherwise the next lower
+  // resolution levels (same block, more upscale on draw).
+  mapTileAncestor(level, bx, by) {
+    let entry = this.mapTile(level, bx, by);
+    let lvl = level;
+    while (entry && entry.missing && lvl + 1 < this.mapTilePixels.length) {
+      lvl += 1;
+      entry = this.mapTile(lvl, bx, by);
+    }
+
+    return entry;
+  },
+
+  // mapTile returns the pyramid tile entry and starts the background
+  // load once. Tiles outside the shipped world are remembered as
+  // missing to avoid retrying and to let the ancestor walk skip them.
   mapTile(level, bx, by) {
     const path = "maps/" + level + "/" + bx + "_" + by + ".jpg";
     let entry = this.mapTiles.get(path);
     if (entry) {
-      return entry.ready ? entry.img : null;
+      return entry;
     }
-    entry = { img: null, ready: false };
+    entry = { img: null, ready: false, missing: false };
     this.mapTiles.set(path, entry);
     if (typeof Image === "undefined") {
-      return null;
+      return entry;
     }
     const img = new Image();
     img.onload = () => {
@@ -461,10 +479,13 @@ const MapView = {
       entry.img = img;
       this.draw();
     };
-    img.onerror = () => {};
+    img.onerror = () => {
+      entry.missing = true;
+      this.draw();
+    };
     img.src = path;
 
-    return null;
+    return entry;
   },
 
   // ---- drawing ----

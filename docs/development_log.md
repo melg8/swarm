@@ -788,3 +788,28 @@ Live pixel probe on test1 in both themes: the near white tick pixels of
 the dark theme are gone (the remaining near white pixels are the map
 imagery itself, identical across the themes), the slate tick pixels are
 present at the same count in both themes.
+
+
+## Round 16: map background outside the detail window (2026-09-06)
+
+User report: panning two tiles left of the character and zooming in
+blanked the map background for that area, while the zoomed out views
+showed it fine.
+
+### Root cause and fix
+
+The tile pyramid ships full resolution level 0 only for the detail
+window around the hunting grounds; a zoomed in view outside the window
+requested the missing level 0 tiles and drew nothing (the zoomed out
+views worked because levels 1..3 cover the whole world). The draw walk
+now follows the pyramid upwards: a tile whose own level is missing
+(404 remembered as entry.missing) falls back to the closest existing
+level of the same block and stretches it over the tile rect - the area
+renders at a proportionally softer detail instead of disappearing.
+
+### Verification
+
+- Live reproduction of the user scenario (pan two tiles left, scale
+  0.08): the tile states walk 0/19_19 missing -> 1/19_19 ready and the
+  left half of the canvas paints at 100 percent coverage with ~4800
+  distinct colors.
