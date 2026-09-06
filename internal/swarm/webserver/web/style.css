@@ -577,3 +577,149 @@ body {
 }
 
 .foot-item { white-space: nowrap; }
+
+/* ---- pathfind test mode ---- */
+
+/* The mode is a body class set by main.js from /api/config: everything
+   bot specific is hidden, the pathfind panel and its toolbar controls
+   appear. */
+.pf-only, #pf-panel { display: none; }
+
+body.mode-pathfind .pf-only { display: inline-flex; }
+body.mode-pathfind #pf-panel { display: block; }
+
+body.mode-pathfind #bot-section,
+body.mode-pathfind .sidebar-foot,
+body.mode-pathfind .hud-stack,
+body.mode-pathfind .chat-box,
+body.mode-pathfind .follow-check,
+body.mode-pathfind .bot-only,
+body.mode-pathfind .tab[data-tab="log"],
+body.mode-pathfind #foot-packets,
+body.mode-pathfind #foot-objects,
+body.mode-pathfind #foot-uptime,
+body.mode-pathfind #foot-updated {
+  display: none;
+}
+
+.pf-set-btn.armed {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
+.pf-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.pf-hint { color: var(--text-dim); line-height: 1.45; }
+
+.pf-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+}
+
+.pf-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 10px;
+}
+
+.pf-key-a { background: var(--blue); }
+.pf-key-b { background: var(--red); }
+
+.pf-value { font-size: 11.5px; word-break: break-all; }
+
+.pf-status {
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  word-break: break-word;
+}
+
+.pf-status.ok { color: var(--green); border-color: var(--green); }
+.pf-status.error { color: var(--red); border-color: var(--red); }
+.pf-status.pending { color: var(--text-dim); }
+
+.pf-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+
+.pf-stats .kv { display: flex; justify-content: space-between; gap: 6px; }
+
+.pf-stats .kv span { color: var(--text-dim); }
+
+.pf-stats .kv b { font-family: var(--mono); font-weight: 600; }
+
+.pf-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.pf-legend div { display: flex; align-items: center; gap: 7px; }
+
+.pf-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pf-dot-a { background: var(--blue); }
+.pf-dot-b { background: var(--red); }
+
+.pf-swatch {
+  width: 18px;
+  height: 0;
+  border-top: 2px dashed var(--red);
+  flex-shrink: 0;
+}
+
+.pf-note {
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-family: var(--mono);
+  word-break: break-all;
+}
+
+/* Narrow sidebar: the search statistics stack in one column, the set
+   buttons keep their label on one line and the live indicator has no
+   meaning without a bot. */
+.pf-stats { grid-template-columns: 1fr; }
+
+.pf-set-btn { white-space: nowrap; }
+
+body.mode-pathfind #live-indicator,
+body.mode-pathfind #live-label { display: none; }
+
+/* Geodata visualization mode select of the pathfind toolbar. */
+.geo-select {
+  background: var(--bg-panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 2.5px 4px;
+}

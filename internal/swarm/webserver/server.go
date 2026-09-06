@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: MIT
 
 // Package webserver serves the embedded web interface of the swarm bot:
-// static files, JSON snapshot endpoints and a server sent event stream of
-// the observed bot states.
+// static files, JSON snapshot endpoints and a server sent event stream
+// of the observed bot states. It also hosts the bot less pathfind test
+// mode (NewPathfindServer) that exposes the map path search of the
+// pathfind package.
 package webserver
 
 import (
@@ -18,11 +20,22 @@ import (
 	"sync"
 	"time"
 
+	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/state"
 )
 
 //go:embed web
 var webContent embed.FS
+
+// Server modes reported by GET /api/config.
+const (
+	modeBot      = "bot"
+	modePathfind = "pathfind"
+
+	// defaultPathfindScale is the initial map zoom of the pathfind
+	// test, a bit closer than the bot map default.
+	defaultPathfindScale = 0.06
+)
 
 // Poll intervals of the event stream.
 const (
@@ -33,26 +46,48 @@ const (
 // httpReadHeaderTimeout bounds the header read of the web server.
 const httpReadHeaderTimeout = 5 * time.Second
 
-// Server serves the web interface for a bot registry.
+// Server serves the web interface for a bot registry. In pathfind test
+// mode the registry is empty and the pathfinder answers the map
+// requests instead.
 type Server struct {
-	registry   *state.Registry
-	logger     *log.Logger
-	httpServer *http.Server
-	eventsDone chan struct{}
-	shutdown   func()
+	registry     *state.Registry
+	pathfinder   *pathfind.Engine
+	pathfindView *pathfind.Vec3
+	geodataTiles *geodataTileCache
+	logger       *log.Logger
+	httpServer   *http.Server
+	eventsDone   chan struct{}
+	shutdown     func()
 }
 
 // NewServer creates the web server bound to the given address.
 func NewServer(
 	registry *state.Registry, address string, logger *log.Logger,
 ) *Server {
+	server := newServer(address, logger)
+	server.registry = registry
+
+	mux := server.httpServer.Handler.(*http.ServeMux)
+	mux.HandleFunc("GET /api/bots", server.handleBotList)
+	mux.HandleFunc("GET /api/bots/{id}/state", server.handleBotState)
+	mux.HandleFunc("GET /api/bots/{id}/events", server.handleBotEvents)
+	mux.HandleFunc("GET /api/config", server.handleBotConfig)
+
+	return server
+}
+
+// newServer builds the shared server shell with the static files.
+func newServer(address string, logger *log.Logger) *Server {
 	mux := http.NewServeMux()
 	server := &Server{
-		registry:   registry,
-		logger:     logger,
-		httpServer: nil,
-		eventsDone: make(chan struct{}),
-		shutdown:   nil,
+		registry:     nil,
+		pathfinder:   nil,
+		pathfindView: nil,
+		geodataTiles: newGeodataTileCache(),
+		logger:       logger,
+		httpServer:   nil,
+		eventsDone:   make(chan struct{}),
+		shutdown:     nil,
 	}
 	//nolint:exhaustruct // the zero defaults of http.Server are intended
 	server.httpServer = &http.Server{
@@ -67,11 +102,13 @@ func NewServer(
 		logger.Printf("Error web content unavailable: %v", err)
 	}
 	mux.Handle("GET /", http.FileServerFS(staticFS))
-	mux.HandleFunc("GET /api/bots", server.handleBotList)
-	mux.HandleFunc("GET /api/bots/{id}/state", server.handleBotState)
-	mux.HandleFunc("GET /api/bots/{id}/events", server.handleBotEvents)
 
 	return server
+}
+
+// handleBotConfig reports the bot mode of the web UI.
+func (s *Server) handleBotConfig(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, s.logger, configResponse{Mode: modeBot})
 }
 
 // Address returns the address the server listens on.

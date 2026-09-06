@@ -35,8 +35,41 @@ SPDX-License-Identifier: MIT
 
   <div class="app-body">
     <aside class="sidebar">
-      <div class="sidebar-title">BOTS</div>
-      <ul id="bot-list" class="bot-list"></ul>
+      <div id="bot-section">
+        <div class="sidebar-title">BOTS</div>
+        <ul id="bot-list" class="bot-list"></ul>
+      </div>
+
+      <div id="pf-panel" class="pf-panel">
+        <div class="sidebar-title">PATHFIND TEST</div>
+        <div class="pf-hint">
+          Drag the A and B markers on the map, or arm a set button and
+          click a spot.
+        </div>
+        <div class="pf-line">
+          <span class="pf-key pf-key-a">A</span>
+          <span id="pf-a" class="pf-value">—</span>
+        </div>
+        <div class="pf-line">
+          <span class="pf-key pf-key-b">B</span>
+          <span id="pf-b" class="pf-value">—</span>
+        </div>
+        <div id="pf-status" class="pf-status">—</div>
+        <div class="pf-stats">
+          <div class="kv"><span>search time</span><b id="pf-time">—</b></div>
+          <div class="kv"><span>nodes explored</span><b id="pf-explored">—</b></div>
+          <div class="kv"><span>waypoints</span><b id="pf-waypoints">—</b></div>
+          <div class="kv"><span>path length</span><b id="pf-length">—</b></div>
+          <div class="kv"><span>regions loaded</span><b id="pf-regions">—</b></div>
+        </div>
+        <div class="pf-legend">
+          <div><span class="pf-dot pf-dot-a"></span>start marker</div>
+          <div><span class="pf-dot pf-dot-b"></span>end marker</div>
+          <div><span class="pf-swatch"></span>path · red dashed line, circles at turning points</div>
+        </div>
+        <div class="pf-note" id="pf-geodata">geodata: —</div>
+      </div>
+
       <div class="sidebar-foot">
         <div class="sidebar-title">LEGEND</div>
         <div class="legend">
@@ -60,12 +93,25 @@ SPDX-License-Identifier: MIT
         <div class="map-toolbar">
           <button id="zoom-out" class="btn" title="zoom out">−</button>
           <button id="zoom-in" class="btn" title="zoom in">+</button>
-          <label class="check"><input type="checkbox" id="follow" checked> follow</label>
-          <label class="check"><input type="checkbox" id="show-labels" checked> labels</label>
-          <label class="check"><input type="checkbox" id="show-dest"> paths</label>
-          <label class="check"><input type="checkbox" id="show-zone" checked> zone</label>
+          <label class="check follow-check"><input type="checkbox" id="follow" checked> follow</label>
+          <span class="pf-only">
+            <button id="set-a" class="btn pf-set-btn" title="arm: next click places A">set A</button>
+            <button id="set-b" class="btn pf-set-btn" title="arm: next click places B">set B</button>
+            <label class="check"><input type="checkbox" id="show-raw"> raw path</label>
+            <label class="check"><input type="checkbox" id="show-geo" checked> geodata</label>
+            <select id="geo-mode" class="geo-select" title="geodata visualization mode">
+              <option value="height">height</option>
+              <option value="walls">walls</option>
+              <option value="layers">layers</option>
+            </select>
+          </span>
+          <span class="bot-only">
+            <label class="check"><input type="checkbox" id="show-labels" checked> labels</label>
+            <label class="check"><input type="checkbox" id="show-dest"> paths</label>
+            <label class="check"><input type="checkbox" id="show-zone" checked> zone</label>
+            <label class="check"><input type="checkbox" id="show-targets" checked> targets</label>
+          </span>
           <label class="check"><input type="checkbox" id="show-map" checked> map bg</label>
-          <label class="check"><input type="checkbox" id="show-targets" checked> targets</label>
           <span id="map-scale" class="map-scale"></span>
           <span id="map-objects" class="map-objects"></span>
         </div>
@@ -167,6 +213,7 @@ SPDX-License-Identifier: MIT
 
 <script src="app.js"></script>
 <script src="map.js"></script>
+<script src="pathfind.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

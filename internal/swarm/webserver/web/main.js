@@ -6,10 +6,29 @@ SPDX-License-Identifier: MIT
 
 */
 
-// Boot the web interface.
-window.addEventListener("DOMContentLoaded", () => {
+// Boot the web interface. The server mode decides the shape: the
+// regular bot control boots the bot list and the event streams, the
+// pathfind test mode boots the interactive path search instead.
+window.addEventListener("DOMContentLoaded", async () => {
   initTheme();
   initTabs();
+
+  let config = null;
+  try {
+    const response = await fetch("/api/config");
+    config = await response.json();
+  } catch (err) {
+    config = null;
+  }
+
+  if (config && config.mode === "pathfind") {
+    document.body.classList.add("mode-pathfind");
+    MapView.init();
+    PathfindUI.init(config);
+
+    return;
+  }
+
   initChat();
   MapView.init();
   refreshBots();

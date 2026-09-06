@@ -32,6 +32,14 @@ const MapView = {
   lastFrame: 0,
   colors: null,
   mapTiles: new Map(),
+  // Geodata visualization tiles of the pathfind test mode: rendered
+  // region images (heightmap / walls / layers) served by the bot
+  // process, keyed by url so switching the mode keeps the old tiles.
+  geoTiles: new Map(),
+  // Pathfind test mode state (enabled by PathfindUI): draggable start
+  // and end markers plus the last search result overlay. Null in the
+  // regular bot mode so every hook below stays a no-op.
+  pathfind: null,
 
   // The server world region grid: every region is 2048 units and every
   // object within the 3x3 region block around the player is loaded (see
@@ -48,6 +56,9 @@ const MapView = {
   mapTileZeroX: 20,
   mapTileZeroY: 18,
   mapTilePixels: [1024, 512, 256, 128],
+  // The geodata pyramid adds a full resolution level: one 2048px tile
+  // per region renders exactly one geodata cell per pixel.
+  geoTilePixels: [2048, 1024, 512, 256, 128],
 
   init() {
     this.canvas = document.getElementById("map-canvas");
@@ -60,7 +71,14 @@ const MapView = {
     this.canvas.addEventListener("wheel", (e) => this.onWheel(e));
     this.canvas.addEventListener("mousedown", (e) => this.onDragStart(e));
     window.addEventListener("mousemove", (e) => this.onDragMove(e));
-    window.addEventListener("mouseup", () => { this.drag = null; });
+    window.addEventListener("mouseup", () => {
+      const wasMarker = this.drag && this.drag.marker;
+      this.drag = null;
+      if (wasMarker) {
+        this.canvas.style.cursor = "";
+        this.notifyMarkersChanged(true);
+      }
+    });
     this.canvas.addEventListener("mousemove", (e) => this.onHover(e));
     this.canvas.addEventListener("mouseleave", () => this.hideTooltip());
     document.getElementById("zoom-in")
@@ -72,7 +90,7 @@ const MapView = {
       if (!follow.checked) { this.syncPanAnchor(); }
       this.draw();
     });
-    for (const id of ["show-labels", "show-dest", "show-zone", "show-targets", "show-map"]) {
+    for (const id of ["show-labels", "show-dest", "show-zone", "show-targets", "show-map", "show-geo"]) {
       document.getElementById(id).addEventListener("change", () => {
         this.draw();
       });
@@ -186,6 +204,24 @@ const MapView = {
   },
 
   onDragStart(event) {
+    if (this.pathfindEnabled()) {
+      if (this.pathfind.placeMode) {
+        this.setPathfindMarker(this.pathfind.placeMode,
+          this.eventWorld(event));
+        this.setPlaceMode(null);
+        this.drag = { x: event.clientX, y: event.clientY, inert: true };
+        this.notifyMarkersChanged(true);
+
+        return;
+      }
+      const marker = this.pathfindMarkerAt(event.clientX, event.clientY);
+      if (marker) {
+        this.drag = { marker };
+        this.canvas.style.cursor = "grabbing";
+
+        return;
+      }
+    }
     this.drag = { x: event.clientX, y: event.clientY };
     // The map is grabbed like a picture: follow is switched off at grab
     // time so the camera stops tracking the character under the held
@@ -201,9 +237,17 @@ const MapView = {
   // world point is (wx - panAnchor) * scale, so the camera must move
   // opposite to the cursor and in world units of 1/scale per pixel.
   // While follow is off the camera never moves on its own: the map
-  // shows the chosen area even when the bot walks away.
+  // shows the chosen area even when the bot walks away. A marker drag
+  // moves the marker instead of the camera.
   onDragMove(event) {
     if (!this.drag) { return; }
+    if (this.drag.marker) {
+      this.setPathfindMarker(this.drag.marker, this.eventWorld(event));
+      this.notifyMarkersChanged(false);
+
+      return;
+    }
+    if (this.drag.inert) { return; }
     this.panAnchor.x -= (event.clientX - this.drag.x) / this.scale;
     this.panAnchor.y -= (event.clientY - this.drag.y) / this.scale;
     this.drag = { x: event.clientX, y: event.clientY };
@@ -409,6 +453,13 @@ const MapView = {
   // full tiles and zoomed out views use the small ones without
   // over-magnifying.
   drawMapBackground(ctx, rect) {
+    // The pathfind test can replace the photo imagery with the rendered
+    // geodata view (heightmap / walls / layers).
+    if (this.pathfindEnabled() && this.geoEnabled()) {
+      this.drawGeodataBackground(ctx, rect);
+
+      return;
+    }
     if (!document.getElementById("show-map").checked) { return; }
     const drawnPx = this.mapTileSize * this.scale;
     let level = this.mapTilePixels.length - 1;
@@ -443,6 +494,93 @@ const MapView = {
           tile * this.scale + 1, tile * this.scale + 1);
       }
     }
+  },
+
+  // geoEnabled reports whether the geodata visualization layer is on.
+  geoEnabled() {
+    const box = document.getElementById("show-geo");
+
+    return !!box && box.checked;
+  },
+
+  // drawGeodataBackground paints the rendered geodata tiles under
+  // everything else. The pyramid adds a 2048px level that renders one
+  // geodata cell per pixel, so zoomed in views show cell exact walls
+  // and heights; the region tiles are produced by the bot process on
+  // demand and cached by the browser.
+  drawGeodataBackground(ctx, rect) {
+    const drawnPx = this.mapTileSize * this.scale;
+    let level = this.geoTilePixels.length - 1;
+    for (let i = 0; i < this.geoTilePixels.length; i++) {
+      if (this.geoTilePixels[i] <= drawnPx * 2) { level = i; break; }
+    }
+    const half = rect.width / 2;
+    const worldLeft = this.centerX() - half / this.scale;
+    const worldRight = this.centerX() + half / this.scale;
+    const worldTop = this.centerY() - rect.height / 2 / this.scale;
+    const worldBottom = this.centerY() + rect.height / 2 / this.scale;
+    const tile = this.mapTileSize;
+    const bxMin = Math.floor(worldLeft / tile) + this.mapTileZeroX;
+    const bxMax = Math.floor(worldRight / tile) + this.mapTileZeroX;
+    const byMin = Math.floor(worldTop / tile) + this.mapTileZeroY;
+    const byMax = Math.floor(worldBottom / tile) + this.mapTileZeroY;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    for (let bx = bxMin; bx <= bxMax; bx++) {
+      for (let by = byMin; by <= byMax; by++) {
+        const entry = this.geoTileAncestor(level, bx, by);
+        if (!entry || !entry.ready) { continue; }
+        const screen = this.worldToScreen(
+          (bx - this.mapTileZeroX) * tile, (by - this.mapTileZeroY) * tile);
+        ctx.drawImage(entry.img, screen.x, screen.y,
+          tile * this.scale + 1, tile * this.scale + 1);
+      }
+    }
+  },
+
+  // geoTileAncestor returns the deepest available pyramid entry of a
+  // tile: the requested level when it exists, otherwise the next lower
+  // resolution levels (regions missing from the geodata pack fall
+  // through to the plain background).
+  geoTileAncestor(level, bx, by) {
+    let entry = this.geoTile(level, bx, by);
+    let lvl = level;
+    while (entry && entry.missing && lvl + 1 < this.geoTilePixels.length) {
+      lvl += 1;
+      entry = this.geoTile(lvl, bx, by);
+    }
+
+    return entry;
+  },
+
+  // geoTile returns the geodata tile entry and starts the background
+  // load once.
+  geoTile(level, bx, by) {
+    const mode = (this.pathfind && this.pathfind.geoMode) || "height";
+    const path = "api/geodata/tile/" + level + "/" + bx + "_" + by
+      + ".png?mode=" + mode;
+    let entry = this.geoTiles.get(path);
+    if (entry) {
+      return entry;
+    }
+    entry = { img: null, ready: false, missing: false };
+    this.geoTiles.set(path, entry);
+    if (typeof Image === "undefined") {
+      return entry;
+    }
+    const img = new Image();
+    img.onload = () => {
+      entry.ready = true;
+      entry.img = img;
+      this.draw();
+    };
+    img.onerror = () => {
+      entry.missing = true;
+      this.draw();
+    };
+    img.src = path;
+
+    return entry;
   },
 
   // mapTileAncestor returns the deepest available pyramid entry of a
@@ -488,6 +626,152 @@ const MapView = {
     return entry;
   },
 
+  // ---- pathfind test mode ----
+
+  // enablePathfind switches the map into the bot less pathfind test
+  // mode: markers, place mode and the result overlay, with callbacks
+  // into PathfindUI for the marker and place mode changes.
+  enablePathfind(state) {
+    this.pathfind = {
+      enabled: true,
+      start: state.start,
+      end: state.end,
+      placeMode: null,
+      result: null,
+      onMarkersChanged: state.onMarkersChanged || null,
+      onPlaceModeChanged: state.onPlaceModeChanged || null
+    };
+    this.draw();
+  },
+
+  pathfindEnabled() {
+    return !!(this.pathfind && this.pathfind.enabled);
+  },
+
+  // setPlaceMode arms the click to place mode of a marker (null
+  // disarms) and notifies the UI for the button state.
+  setPlaceMode(key) {
+    this.pathfind.placeMode = key;
+    if (this.pathfind.onPlaceModeChanged) {
+      this.pathfind.onPlaceModeChanged(key);
+    }
+    this.draw();
+  },
+
+  setPathfindMarker(key, world) {
+    this.pathfind[key] = { x: world.x, y: world.y };
+    this.draw();
+  },
+
+  notifyMarkersChanged(immediate) {
+    if (this.pathfind && this.pathfind.onMarkersChanged) {
+      this.pathfind.onMarkersChanged(immediate);
+    }
+  },
+
+  // eventWorld converts a mouse event to world coordinates.
+  eventWorld(event) {
+    const rect = this.canvas.getBoundingClientRect();
+
+    return this.screenToWorld(
+      event.clientX - rect.left, event.clientY - rect.top);
+  },
+
+  // pathfindMarkerAt hit tests the draggable markers in screen space.
+  pathfindMarkerAt(clientX, clientY) {
+    if (!this.pathfindEnabled()) { return null; }
+    const rect = this.canvas.getBoundingClientRect();
+    const mx = clientX - rect.left;
+    const my = clientY - rect.top;
+    for (const key of ["end", "start"]) {
+      const marker = this.pathfind[key];
+      const p = this.worldToScreen(marker.x, marker.y);
+      if (Math.hypot(p.x - mx, p.y - my) <= 12) { return key; }
+    }
+
+    return null;
+  },
+
+  // drawPathfindOverlay paints the search result and the markers: the
+  // optional raw A* cell path as a faint line, the smoothed path as a
+  // red dashed line with a small circle at every turning point (the
+  // route changes the walker follows) and the A/B markers on top.
+  drawPathfindOverlay(ctx) {
+    const pf = this.pathfind;
+    const result = pf.result;
+    if (result && result.found && result.raw
+      && document.getElementById("show-raw").checked) {
+      this.drawWorldPolyline(ctx, result.raw, {
+        color: this.colors.textDim, width: 1, alpha: 0.4, dash: []
+      });
+    }
+    if (result && result.found && result.waypoints) {
+      this.drawWorldPolyline(ctx, result.waypoints, {
+        color: this.mapColors.combat, width: 2, alpha: 0.9, dash: [8, 6]
+      });
+      for (const waypoint of result.waypoints) {
+        const p = this.worldToScreen(waypoint.x, waypoint.y);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = this.mapColors.combat;
+        ctx.fill();
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = "#ffffff";
+        ctx.stroke();
+      }
+    }
+    this.drawPathfindMarker(ctx, "start", this.mapColors.self, "A");
+    this.drawPathfindMarker(ctx, "end", this.mapColors.combat, "B");
+  },
+
+  // drawWorldPolyline strokes a world space polyline with the style.
+  drawWorldPolyline(ctx, points, style) {
+    if (!points || points.length < 2) { return; }
+    ctx.save();
+    ctx.strokeStyle = style.color;
+    ctx.globalAlpha = style.alpha;
+    ctx.lineWidth = style.width;
+    ctx.setLineDash(style.dash);
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      const p = this.worldToScreen(points[i].x, points[i].y);
+      if (i === 0) { ctx.moveTo(p.x, p.y); } else { ctx.lineTo(p.x, p.y); }
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  },
+
+  // drawPathfindMarker renders one draggable marker: a soft halo, the
+  // circle body and the label letter with a dark halo.
+  drawPathfindMarker(ctx, key, color, label) {
+    const marker = this.pathfind[key];
+    const p = this.worldToScreen(marker.x, marker.y);
+    const armed = this.pathfind.placeMode === key;
+    ctx.save();
+    ctx.globalAlpha = armed ? 0.4 : 0.22;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 7.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(15, 18, 22, 0.85)";
+    ctx.stroke();
+    ctx.font = "700 10px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
+    ctx.strokeText(label, p.x, p.y + 0.5);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, p.x, p.y + 0.5);
+    ctx.restore();
+  },
+
   // ---- drawing ----
 
   draw() {
@@ -495,11 +779,19 @@ const MapView = {
     if (!ctx || !this.colors) { return; }
     const rect = this.canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
-    if (!this.lastSnap) { return; }
+    const pathfind = this.pathfindEnabled();
+    if (!this.lastSnap && !pathfind) { return; }
 
     this.unitScale = this.computeUnitScale();
     this.labelCandidates = [];
     this.drawMapBackground(ctx, rect);
+    if (pathfind) {
+      this.drawGrid(ctx, rect);
+      this.drawPathfindOverlay(ctx);
+      this.updateMapInfo();
+
+      return;
+    }
     this.drawHuntingZone(ctx);
     this.drawGrid(ctx, rect);
     this.drawZone(ctx, rect);
@@ -927,6 +1219,11 @@ const MapView = {
     const across = Math.round(rect.width / this.scale);
     document.getElementById("map-scale").textContent =
       "≈ " + across.toLocaleString("en-US") + " units across";
+    if (!this.lastSnap) {
+      document.getElementById("map-objects").textContent = "pathfind test";
+
+      return;
+    }
     const objects = this.lastSnap.objects || [];
     const counts = { passive: 0, aggressive: 0, combat: 0, player: 0, item: 0 };
     for (const obj of objects) {
@@ -939,9 +1236,28 @@ const MapView = {
       + counts.item + " items";
   },
 
+  // updatePathfindCursor keeps the mouse cursor meaningful over the
+  // pathfind map: crosshair while a placement is armed, grab over a
+  // draggable marker, default elsewhere.
+  updatePathfindCursor(event) {
+    if (this.drag && this.drag.marker) { return; }
+    let cursor = "";
+    if (this.pathfind.placeMode) {
+      cursor = "crosshair";
+    } else if (this.pathfindMarkerAt(event.clientX, event.clientY)) {
+      cursor = "grab";
+    }
+    this.canvas.style.cursor = cursor;
+  },
+
   // ---- hovering ----
 
   onHover(event) {
+    if (this.pathfindEnabled()) {
+      this.updatePathfindCursor(event);
+
+      return;
+    }
     if (!this.lastSnap) { return; }
     const rect = this.canvas.getBoundingClientRect();
     const mx = event.clientX - rect.left;
@@ -1061,6 +1377,8 @@ const MapView = {
   },
 
   followEnabled() {
+    if (this.pathfindEnabled()) { return false; }
+
     return document.getElementById("follow").checked;
   }
 };
