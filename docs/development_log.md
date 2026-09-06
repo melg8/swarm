@@ -898,3 +898,9 @@ User request: the 900 unit square turned out too small.
 
 DefaultHuntingZone half moved 450 -> 950 (a 1900x1900 square around the
 same center below the Newbie Helper).
+
+
+## Round 22: hunting zone widened to 2500 (2026-09-06)
+
+User request: the zone grows again - 2500x2500 units (half 950 -> 1250)
+around the same center below the Newbie Helper.
