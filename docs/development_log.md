@@ -664,3 +664,44 @@ village stuck swarmqa.
   system messages: the junk destroy requests of the hunt loop hit the
   server flood protector ("You are destroying items too fast.") - the
   destroy batch needs a rate limit as a follow up.
+
+
+## Round 10: world map background with a tile pyramid (2026-09-06)
+
+User request: the map canvas is a flat fill - use the game map images
+like L2Bot2.0 does (its Client/Assets/maps tiles), ship them in this
+repository, add a background toggle and take care of the far zoom with
+a google maps style level of detail.
+
+### Implementation
+
+- Coordinate anchors (L2Bot2.0 MapImageSelector plus World.java of the
+  Mobius server): one tile covers 32768 world units at 1024x1024
+  source pixels (32 units per pixel), named `BX_BY.jpg` with
+  BX = floor(x / 32768) + 20, BY = floor(y / 32768) + 18. The `_1` and
+  `_2` suffixed source files are dungeon floors, not detail levels, and
+  are skipped.
+- `tools/generate_map_tiles.sh` builds the pyramid into
+  `web/maps/{level}/{bx}_{by}.jpg` (jpeg quality 72, lanczos): level 0
+  full resolution only for the detail window around the hunting
+  grounds (bx 20..22, by 17..20 by default, parameters), levels 1..3
+  (512/256/128 px) for the whole world - 573 tiles, ~11 MB, embedded
+  through the existing go:embed of the web tree (binary grew ~11 MB).
+- `web/map.js drawMapBackground` draws the tiles covering the viewport
+  through the usual world to screen transform (follow and pan work
+  unchanged), picks the pyramid level allowing at most a 2x upscale of
+  the tile pixels (google maps rule), lazy loads the images through
+  the static file server and redraws on arrival. The toggle is the
+  `show-map` toolbar checkbox; the grid, zone, units and links draw on
+  top of the background.
+
+### Verification
+
+- All tile pyramid levels serve through the web server (L0 139 KB,
+  L1 38 KB, L2 12 KB, L3 4 KB for 21_19).
+- Live screenshots on test1 (hunting at the Elven Fortress): the
+  default view shows the fortress courtyard with the units at their
+  real positions; four zoom out steps keep the world continuous and
+  sharp at level 0 (777 px drawn tiles, within the 2x upscale rule);
+  the harnesses run unchanged because the vm sandbox has neither the
+  show-map checkbox nor an Image constructor.

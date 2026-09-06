@@ -284,6 +284,24 @@ the same variables).
   Dragging grabs the map like a sheet of paper: the camera moves by
   `-Δcursor / scale` in world units, so the grabbed world point stays
   exactly under the cursor.
+- World map background: the map draws the game world map tiles under
+  everything (`show-map` toggle in the toolbar, on by default). The
+  tiles come from the L2Bot2.0 assets
+  (`E:\work\L2Bot2.0\Client\Assets\maps`, 32 world units per
+  source pixel, one 1024x1024 tile per 32768 units block named
+  `BX_BY.jpg` with BX = floor(x / 32768) + 20 and
+  BY = floor(y / 32768) + 18 - the same anchors as World.TILE_ZERO_COORD
+  of the Mobius server; the `_1`/`_2` suffixed files are dungeon floors
+  and are not shipped). `tools/generate_map_tiles.sh` builds a google
+  maps style pyramid into `web/maps/{level}/{bx}_{by}.jpg`: level 0
+  (full 1024 px) only for the detail window around the hunting grounds
+  (parameters: detail bx/by range, default bx 20..22, by 17..20),
+  levels 1..3 (512/256/128 px) for the whole world - about 11 MB total.
+  `web/map.js drawMapBackground` picks the pyramid level allowing at
+  most a 2x upscale of the tile pixels, draws the tiles covering the
+  viewport through the usual world to screen transform (follow and pan
+  included) and lazy loads them via the static file server; the grid,
+  the zone square, the units and the links draw on top.
 - Map rendering: every unit (character, mob, player) is a circle with a
   short look direction tick from the center over the edge (L2Bot2.0
   style), colored by threat: friendly gray, passive monster green,
