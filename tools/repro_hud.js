@@ -274,7 +274,16 @@ function main() {
         check(results, "renderHUD leaves the target panel to renderTarget",
             false, "renderHUD is missing from app.js");
     } else {
+        const sittingSnap = snapshotWith(300, liveTarget);
+        sittingSnap.character.sitting = true;
+        hud.renderHUD(sittingSnap);
+        check(results, "renderHUD shows the rest chip while sitting",
+            !elements.get("hud-rest").classList.contains("hidden"),
+            "rest chip hidden while sitting");
         hud.renderHUD(snapshotWith(300, liveTarget));
+        check(results, "renderHUD hides the rest chip while standing",
+            elements.get("hud-rest").classList.contains("hidden"),
+            "rest chip visible while standing");
         check(results, "renderHUD fills the exp bar from expPercent",
             elements.get("xp-fill").style.width === "50.0%",
             "got " + JSON.stringify(

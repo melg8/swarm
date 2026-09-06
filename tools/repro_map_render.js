@@ -130,8 +130,12 @@ function makeRecordingContext(record) {
             current = null;
         },
         fillRect: () => {},
-        fillText: () => {},
-        strokeText: () => {},
+        fillText: (text, x, y) => {
+            record.texts.push({ text, x, y, style: record.fillStyle });
+        },
+        strokeText: (text, x, y) => {
+            record.texts.push({ text, x, y, style: record.strokeStyle });
+        },
         measureText: (text) => ({ width: (text || "").length * 6 }),
         setLineDash: (dash) => { record.dash = dash.slice(); },
         // style properties tracked through the record object
@@ -169,8 +173,8 @@ function makeElementStub(checked) {
 // together with the stroke record.
 function loadMapJs(mapFile) {
     const record = {
-        strokes: [], fills: [], style: "", fillStyle: "", width: 1,
-        dash: []
+        strokes: [], fills: [], texts: [], style: "", fillStyle: "",
+        width: 1, dash: []
     };
     const listeners = { canvas: {}, window: {} };
     const listen = (registry) => (type, fn) => {
@@ -462,6 +466,38 @@ function runScenarioStableOrder(mapFile) {
     return results;
 }
 
+// runScenarioRestMarker covers the resting state of the character: a
+// sitting character draws the breathing zZ above its marker, a standing
+// one does not.
+function runScenarioRestMarker(mapFile) {
+    const { MapView, record } = loadMapJs(mapFile);
+    MapView.init();
+    const snap = buildSnapshot(0, false);
+    snap.character.sitting = true;
+    MapView.update(snap);
+    MapView.draw();
+
+    const results = [];
+    const self = {
+        x: CANVAS_W / 2, y: CANVAS_H / 2
+    };
+    const zTexts = record.texts.filter((t) => t.text === "zZ"
+        && Math.abs(t.x - (self.x + 7 + 4)) < 2);
+    check(results, "sitting character draws the zZ marker",
+        zTexts.length > 0, "no zZ text near the self marker");
+
+    const standing = loadMapJs(mapFile);
+    standing.MapView.init();
+    standing.MapView.update(buildSnapshot(0, false));
+    standing.MapView.draw();
+    const zStanding = standing.record.texts.filter(
+        (t) => t.text === "zZ").length;
+    check(results, "standing character draws no zZ marker",
+        zStanding === 0, "unexpected zZ texts: " + zStanding);
+
+    return results;
+}
+
 // runScenarioSocialMarker covers the social animation marker: a
 // creature with a fresh socialUntilMs shows the small ring above its
 // marker, and the ring fades out once the window is over.
@@ -606,7 +642,8 @@ function main() {
         ["follow off keeps the view static", runScenarioFollowOff(mapFile)],
         ["map drag keeps the grabbed point", runScenarioMapDrag(mapFile)],
         ["social animation marker", runScenarioSocialMarker(mapFile)],
-        ["stable draw order", runScenarioStableOrder(mapFile)]
+        ["stable draw order", runScenarioStableOrder(mapFile)],
+        ["resting marker", runScenarioRestMarker(mapFile)]
     ];
     let failed = 0;
     for (const [name, results] of scenarios) {
