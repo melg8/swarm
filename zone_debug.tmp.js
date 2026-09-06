@@ -91,7 +91,6 @@ function worldToScreen(wx, wy) {
 // style active at stroke time.
 function makeRecordingContext(record) {
     let current = null;
-    let pending = null;
     return {
         canvas: { width: CANVAS_W, height: CANVAS_H },
         clearRect: () => {},
@@ -100,15 +99,12 @@ function makeRecordingContext(record) {
         restore: () => {},
         beginPath: () => { current = { segments: [], arcs: [] }; },
         closePath: () => {},
-        // The path model: every lineTo completes one segment from the
-        // pending point, so multi edge strokes (the hunting zone square)
-        // record their edges faithfully.
-        moveTo: (x, y) => { pending = [x, y]; },
+        moveTo: (x, y) => { current.segments.push([x, y]); },
         lineTo: (x, y) => {
-            if (current && pending) {
-                current.segments.push([pending[0], pending[1], x, y]);
-                pending = [x, y];
-            }
+            if (current.segments.length === 0) { return; }
+            const start = current.segments[current.segments.length - 1];
+            current.segments[current.segments.length - 1] =
+                [start[0], start[1], x, y];
         },
         arc: (x, y, r) => {
             if (current) { current.arcs.push([x, y, r]); }
@@ -718,4 +714,18 @@ function main() {
     process.exit(failed === 0 ? 0 : 1);
 }
 
-main();
+
+const { MapView, record } = loadMapJs(MAP_JS);
+MapView.init();
+const snap = buildSnapshot(0, false);
+snap.huntingZone = { cx: WORLD.self.x, cy: WORLD.self.y, half: 450 };
+MapView.update(snap);
+MapView.draw();
+const itemStrokes = record.strokes.filter((st) => st.style === MARK.item);
+console.log("item strokes:", itemStrokes.length);
+for (const st of itemStrokes.slice(0, 4)) {
+  console.log(JSON.stringify(st.segments.slice(0, 3)), "w=" + st.width,
+    "dash=" + JSON.stringify(st.dash));
+}
+console.log("total strokes:", record.strokes.length);
+

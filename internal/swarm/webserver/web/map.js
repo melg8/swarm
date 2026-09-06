@@ -500,6 +500,7 @@ const MapView = {
     this.unitScale = this.computeUnitScale();
     this.labelCandidates = [];
     this.drawMapBackground(ctx, rect);
+    this.drawHuntingZone(ctx);
     this.drawGrid(ctx, rect);
     this.drawZone(ctx, rect);
     this.drawTargetLinks(ctx);
@@ -520,6 +521,41 @@ const MapView = {
     const factor = Math.pow(this.scale / 0.12, 0.6);
 
     return Math.max(0.3, Math.min(1.6, factor));
+  },
+
+  // drawHuntingZone outlines the hunting square of the bot (the area
+  // it attacks inside and never leaves): a dashed amber rectangle with
+  // a small label, drawn under the units.
+  drawHuntingZone(ctx) {
+    const zone = this.lastSnap.huntingZone;
+    if (!zone) { return; }
+    const p1 = this.worldToScreen(zone.cx - zone.half, zone.cy - zone.half);
+    const size = zone.half * 2 * this.scale;
+    if (p1.x > this.canvas.clientWidth || p1.y > this.canvas.clientHeight
+      || p1.x + size < 0 || p1.y + size < 0) {
+      return;
+    }
+    ctx.save();
+    ctx.strokeStyle = this.mapColors.item;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([10, 6]);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p1.x + size, p1.y);
+    ctx.lineTo(p1.x + size, p1.y + size);
+    ctx.lineTo(p1.x, p1.y + size);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = "600 10.5px " + (getComputedStyle(document.documentElement)
+      .getPropertyValue("--sans").trim() || "sans-serif");
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
+    ctx.strokeText("hunting zone", p1.x + 6, p1.y + 14);
+    ctx.fillStyle = "#f9ab00";
+    ctx.fillText("hunting zone", p1.x + 6, p1.y + 14);
+    ctx.restore();
   },
 
   drawGrid(ctx, rect) {
