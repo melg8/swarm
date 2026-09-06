@@ -580,14 +580,18 @@ the same variables).
 - `-hunt` is the auto hunt flag of `cmd/swarm`: `internal/swarm/hunt`
   runs a small state machine (engage -> loot -> engage) that attacks the
   closest attackable npc inside the hunting square (DefaultHuntingZone:
-  2500x2500 centered just below the Newbie Helper of the Elven village,
+  3300x3300 centered just below the Newbie Helper of the Elven village,
   drawn on the map as a dashed amber square from the snapshot
   huntingZone; targets and drops outside are ignored and a character
   outside walks back to the zone center), picks up the drops around the
   corpse and
   destroys junk inventory items (RequestDestroyItem 0x59) when the slots
   reach 70% of the 80 slot limit or the weight reaches 75%, so a long
-  living bot never litters the server. Loot approach: far items are
+  living bot never litters the server. The destroy cleanup is the last
+  resort only - the normal overflow handling is the town trip below,
+  and the cleanup is suspended while a trip runs so it never destroys
+  what the shop would have paid for.
+  Loot approach: far items are
   reached with an explicit walk first (GameClient.WalkTo sends the
   client MoveToLocation 0x01 packet, the ground click of the official
   client, in mouse mode) and the click (Action 0x04) starts at 60 units:
@@ -637,6 +641,87 @@ the same variables).
   kill, rest gate, walk to far loot, sit/stand transitions, no sitting
   under attack) and the tracker clearing by
   internal/swarm/state/tracking_test.go.
+- Town trips (internal/swarm/hunt/town.go): when the inventory passes
+  50% of the slots or 50% of the maximum weight, the character stops
+  hunting and walks to the nearest town shop over the geodata, sells
+  the junk and walks back to the farm spot (the trip start position
+  inside the zone, the zone center otherwise). The path plan comes
+  from the pathfind engine through the hunt.Navigator interface (set
+  in main.go with hunt.NewNavigator from the auto detected geodata
+  directory; without geodata the bot hunts without trips). A
+  waypoint follower walks the smoothed path with ground click walks
+  (one per 2 s, arrival within 150 units) and re-paths around
+  obstacles after 15 s of standing still (3 re-paths abort the trip);
+  a trip timeout (20 min) and a trigger cooldown (5 min after every
+  trip end) bound the whole feature, and a death mid trip drops the
+  trip state without a cooldown - the village restart lands next to
+  the shops and a full inventory sells right after the revival.
+  Merchants: townMerchants carries the shop npcs of the known towns
+  with their spawn coordinates; the C1 spawn ids map to the client
+  display ids the NpcInfo packets carry (30147..30150 -> 7147..7150
+  through CT0_to_C4_ids.txt). The sell uses RequestSellItem 0x1E with
+  the standard inventory sell list (list id 0, the CUSTOM_CB_SELL_LIST
+  of the official client): the server prices every item itself at
+  referencePrice/2 (no prices in the packet), answers with
+  InventoryUpdate removals, ItemList, a CUR_LOAD StatusUpdate and the
+  "The transaction is complete." SystemMessage, and accepts the
+  transaction even without a targeted merchant - the bot still walks
+  to the merchant and selects it (interaction distance 250, one
+  selecting request per second) like the official client, and falls
+  back to selling without one after a 45 s wait. The transaction
+  flood protector paces the batches (one per 11 s, up to 25 items);
+  every item is offered once per trip, so items the server refuses to
+  sell can not stall the phase. The junk ranking lives in
+  state.Bot.SellableItems: duplicated gear pieces first (every piece
+  of an item id but one), then the lowest sell value per unit weight
+  (the generated npcdata.ItemPrice/ItemWeight dictionaries, see
+  tools/generate_item_stats.sh); equipped gear, adena and quest items
+  never sell. The trip stops selling as soon as the inventory is back
+  below the trigger. Path layer selection: the trip legs navigate
+  with pathfind.Engine.FindPathTo, which resolves the target cell
+  layer against the destination z (the merchant spawn z, the farm z)
+  and strictly requires the arrival on that deck - the plain search
+  would happily end on the water deck below a shop standing over the
+  shore. The deployed geodata pack disconnects the Elven village
+  decks from the hunting fields, so startWalkLeg falls back to the
+  plain search (any deck) when the targeted one reports not found:
+  the sale works from anywhere (list id 0) and only the merchant
+  targeting degrades - approachMerchant also gives up targeting when
+  the merchant stands more than the interaction distance above or
+  below the character. The
+  live verified cycle (2026-09-07): trigger at 55 slots/73% weight,
+  walk to the trader ~18k units in ~60 s, one batch of 25 items sold
+  (55 -> 30 slots, 73% -> 36% weight), walk back and hunting resumed;
+  covered offline by internal/swarm/hunt/town_test.go (trigger,
+  waypoints, merchant selection, batches without a merchant, no
+  destroy during the trip, stuck re-paths, death reset).
+- Deleveling (internal/swarm/hunt/delevel.go): when the character
+  level exceeds the median level of the living attackable npcs inside
+  the zone by 7 or more, the bot walks to the nearest town guard
+  (delevelGuards: the Elven village Sentinels, display ids 7218..7221,
+  spawn coordinates from the C1 data), provokes it with the same
+  select-then-attack flow the hunt uses and dies; every death removes
+  the death penalty XP (see the protocol notes) and the village
+  restart revives the character next to the guards, where the walk to
+  the next death starts again. The deleveling stops at the target
+  level = median zone mob level + 5 (the last level with the full
+  item drop chance; the floor is level 5) and re-triggers after
+  hunting raised the level back above median + 7 - for the level 1
+  gremlins the cycle is die 11 -> 6, hunt to 8, die back to 6, which
+  keeps the item drop chance at 82..100% instead of the 10% floor a
+  level 11 character suffers. The fight stage re-paths when the guard
+  does not fight back within 60 s (another geodata deck, an ignored
+  request) and aborts the deleveling after 3 failed re-paths; the
+  whole deleveling is bounded by a 60 min timeout and a 1 min
+  cooldown after it ends. The walk legs are split into at most 1000
+  unit steps because the server refuses move requests with a target
+  farther than 9900 units (MoveToLocation readImpl); the smoothed
+  geodata routes happily exceed that over open terrain. A death
+  during the deleveling keeps the phase running (the town trip aborts
+  instead) and the destroy cleanup stays suspended like during the
+  town trips. Covered by internal/swarm/hunt/delevel_test.go
+  (trigger, hysteresis, guard fight, death continuation, target
+  exit, fight timeout).
 - Map target links: the map renders the selection of every visible
   player, not only the own one. The own target is a red dashed line
   with a ring; the targets of other players are violet dashed lines
@@ -772,6 +857,25 @@ truth for packet formats (`L2J_Mobius_C1_HarbingersOfWar/java`). Summary:
   list) -> `CharacterSelect` -> `CharSelected` -> `EnterWorld` -> world
   packets; keep alive with `RequestNetPing` (0xA8) and reply `NetPing`
   (0xEC); leave with `Logout` (0x09).
+- After every self `TeleportToLocation` (0x38) the bot answers with the
+  client `Appearing` (0x30) packet: the server holds the character in
+  the teleporting state (`Creature._isTeleporting`) until `Appearing`
+  arrives and silently ignores every move request meanwhile (the
+  character AI checks `isMovementDisabled`). A village revive without
+  the confirmation left the bot permanently stuck - the official client
+  sends Appearing when the teleport screen closes.
+- Death penalty and deleveling (Mobius C1): every death removes
+  `percentLost` of the current level span
+  (`data/stats/players/experienceLoss.xml`, ~9-10% at low levels, the
+  loss is capped at 10% of the span, `Delevel` config enabled, karma
+  multiplies it) - there is no low level death immunity in this data
+  pack. The level gap rules of the drop calculation
+  (`NpcTemplate.calculateGroupDrops`): item drops slide from 100% at
+  mob level + 5 to 10% at + 10 and beyond, adena from 100% at + 8 to
+  10% at + 15; experience and SP stop at + 11
+  (`MonsterExpMaxLevelDifference`). The elven fields mobs are levels
+  1-5, so a level 11 character gets 10% item drops - the deleveling
+  exists to fix that.
 - The elven fighter creation values: race 1 (ELF), classId 18
   (ELVEN_FIGHTER), see `gameserver/entity/actor/enums/player/PlayerClass`.
 
@@ -788,3 +892,57 @@ reference Mobius Java class.
   size`, `add cyclop check`, `make init packet parsing more memory friendly`.
 - Do not push build artifacts (`*.out`, `*out`, binaries are gitignored) or
   `.env`.
+
+## Work in progress: deleveling live validation (handoff 2026-09-07)
+
+The town trips (sell loop) are complete and live verified. The
+deleveling is implemented and partially live verified; the next agent
+should finish the live validation. Facts measured on the deployed
+stack (all in this session, do not re-derive):
+
+- **Appearing fix confirmed working**: after adding the 0x30 reply to
+  the self TeleportToLocation (connection/game.go applyTeleport), the
+  death -> village revive -> walk cycle worked: 9 consecutive
+  provoke -> die -> revive -> walk-to-guard cycles, level dropped
+  11 -> 10 (~20-60 s per cycle). Before the fix every post revive
+  walk was silently ignored (server `_isTeleporting`).
+- **Village peace zone blocks guard retaliation**: after ~10 deaths
+  the char provoked Rayen from inside the village peace zone; the
+  guard never swings at a player standing inside it (guard AI peace
+  zone check), so the death stops happening. Implemented fix (NOT yet
+  live validated): delevel fight timeout (20 s) now walks a step
+  toward the farm spot (`walkToward(l.farmX, ...)`) to leave the zone
+  and provokes again; the guard follows and kills outside. Consider
+  also pre-walking out of the zone BEFORE the first provoke.
+- **CURRENT BLOCKER (live, reproduces at 02:40)**: the char is stuck
+  at Rayen's post (42808 51160 -2992) with every walk request
+  answered "Action failed". Server side the char is still auto
+  attacking Rayen (state API shows inCombat True, target Rayen) from
+  the previous session's provoke: `PlayerAI.setIntentionMoveTo`
+  refuses/defers every move while `isAttackingNow()`, and the guard
+  never kills the char inside the peace zone, so the attack never
+  ends. The bot has no attack-breaking action today. Candidate fixes:
+  select another target (AttackRequest on a different npc aborts the
+  old auto attack), or stop via the wait/other action the official
+  client uses; also make the delevel fight timeout stop feeding the
+  attack. After breaking the attack the leash walk works again (the
+  fresh session walks fine outside fights).
+- **Delevel trigger caveat**: `MedianZoneMobLevel` sees only the
+  known objects around the char; at the village (8000+ units from
+  the fields) the median is 0 and the delevel does not re-trigger -
+  by design the trigger fires only from the farm zone.
+- **Server geodata is NOT loaded**: `game/log/java0.log` shows
+  `GeoEngine: Loaded 0 regions. Pathfinding is disabled` - the
+  geodata pack was copied after the last server start. Direct
+  server-routed walks work because of this (no `isCompletelyBlocked`
+  checks). A game server restart (safe: the MariaDB datadir holds the
+  characters, never wipe it) would load the 215 regions and change
+  the server move validation - retest the walks after any restart.
+- Live process state at handoff: `swarm-bot.exe` (build with the
+  peace zone fix) running from /tmp, log `/tmp/bot_delevel_test7.log`
+  (287 refused leash walks at Rayen's post); char test1 level 10,
+  exp 85.3%, inventory 35 slots / ~42% weight (below the sell
+  trigger). Kill with `taskkill //F //IM swarm-bot.exe`.
+- Offline state: `go vet`, `gofmt` and the full `go test ./...` are
+  clean; golangci-lint v1 cannot run on this host (known export data
+  mismatch, see the Windows caveats above).

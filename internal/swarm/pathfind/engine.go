@@ -284,7 +284,23 @@ func (e *Engine) FindPath(
 ) (*Result, error) {
 	search := newSearch(e, maxPassableHeight)
 
-	return search.run(start, end)
+	return search.run(start, end, int16(start.Z), false)
+}
+
+// FindPathTo searches the walkable path from start to end and resolves
+// the layer of the target cell against the given z instead of the start
+// height. The search is strict about the arrival: the path must end on
+// the resolved layer of the target cell, the first arrival on the cell
+// at any other height (the water deck below the shop) does not count.
+// Use it when the destination names a deck of a multilayer cell; if the
+// deck is unreachable from the start the search reports not found. The
+// town trips of the hunt loop navigate with it.
+func (e *Engine) FindPathTo(
+	start, end Vec3, targetZ int16, maxPassableHeight uint16,
+) (*Result, error) {
+	search := newSearch(e, maxPassableHeight)
+
+	return search.run(start, end, targetZ, true)
 }
 
 // LineOfSight reports whether a straight line between two world

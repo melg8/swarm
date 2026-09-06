@@ -164,3 +164,8 @@ print(
     f"{len(item_names)} item names to {out}"
 )
 PYEOF
+
+# The generated maps must be gofmt clean (aligned columns).
+if command -v gofmt > /dev/null 2>&1; then
+    gofmt -w "${OUT}"
+fi

@@ -220,6 +220,48 @@ func TestRequestDestroyItemToBytes(t *testing.T) {
 	})
 }
 
+func TestAppearingToBytes(t *testing.T) {
+	writer := packet.NewWriter()
+	err := NewAppearingPacket().ToBytes(writer)
+	require.NoError(t, err)
+	require.Equal(t, []byte{0x30}, writer.Bytes())
+}
+
+func TestRequestSellItemToBytes(t *testing.T) {
+	t.Run("two items", func(t *testing.T) {
+		writer := packet.NewWriter()
+		request := NewRequestSellItemPacket()
+		request.Items = []SellItemEntry{
+			{ObjectID: 17, ItemID: 34, Count: 1},
+			{ObjectID: 42, ItemID: 1061, Count: 500},
+		}
+		err := request.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, []byte{
+			0x1E,                   // opcode
+			0x00, 0x00, 0x00, 0x00, // sell list id 0 (inventory sell)
+			0x02, 0x00, 0x00, 0x00, // item count
+			0x11, 0x00, 0x00, 0x00, // object id
+			0x22, 0x00, 0x00, 0x00, // item id
+			0x01, 0x00, 0x00, 0x00, // count
+			0x2A, 0x00, 0x00, 0x00, // object id
+			0x25, 0x04, 0x00, 0x00, // item id
+			0xF4, 0x01, 0x00, 0x00, // count
+		}, writer.Bytes())
+	})
+	t.Run("empty request", func(t *testing.T) {
+		writer := packet.NewWriter()
+		request := NewRequestSellItemPacket()
+		err := request.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, []byte{
+			0x1E,                   // opcode
+			0x00, 0x00, 0x00, 0x00, // sell list id
+			0x00, 0x00, 0x00, 0x00, // item count
+		}, writer.Bytes())
+	})
+}
+
 func TestRequestItemListToBytes(t *testing.T) {
 	t.Run("empty request", func(t *testing.T) {
 		writer := packet.NewWriter()

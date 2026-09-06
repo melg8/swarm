@@ -68,3 +68,38 @@ func BenchmarkCharacterCreateToBytes(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkRequestSellItemToBytes(b *testing.B) {
+	items := make([]SellItemEntry, 0, 80)
+	for i := range 80 {
+		items = append(items, SellItemEntry{
+			ObjectID: int32(1000 + i),
+			ItemID:   int32(34 + i),
+			Count:    int32(i + 1),
+		})
+	}
+	sell := NewRequestSellItemPacket()
+	sell.Items = items
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		writer := packet.NewWriter()
+		if err := sell.ToBytes(writer); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkAppearingToBytes(b *testing.B) {
+	appearing := NewAppearingPacket()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		writer := packet.NewWriter()
+		if err := appearing.ToBytes(writer); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

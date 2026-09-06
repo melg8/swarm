@@ -316,6 +316,28 @@ func (gc *GameClient) DestroyItem(objectID int32, count int32) error {
 	return nil
 }
 
+// SellItems sells inventory items to the targeted merchant. The packet
+// uses the standard inventory sell list of the official client (list id
+// 0): the server prices every item itself at referencePrice/2, answers
+// with InventoryUpdate removals and adds the adena.
+func (gc *GameClient) SellItems(items []state.InventoryItem) error {
+	request := togameserver.NewRequestSellItemPacket()
+	entries := make([]togameserver.SellItemEntry, 0, len(items))
+	for _, item := range items {
+		entries = append(entries, togameserver.SellItemEntry{
+			ObjectID: item.ObjectID,
+			ItemID:   item.ItemID,
+			Count:    item.Count,
+		})
+	}
+	request.Items = entries
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to sell items: %w", err)
+	}
+
+	return nil
+}
+
 // RequestInventory asks the server for the full inventory list.
 func (gc *GameClient) RequestInventory() error {
 	if err := gc.sendPacket(&togameserver.RequestItemList{}); err != nil {
@@ -383,6 +405,9 @@ func (gc *GameClient) sendPacket(data crypt.Serializable) error {
 	writer := packet.NewWriter()
 	if err := data.ToBytes(writer); err != nil {
 		return fmt.Errorf("failed to serialize game packet: %w", err)
+	}
+	if gc.trace {
+		gc.logger.Printf("Sent packet id 0x%02x", writer.Bytes()[0])
 	}
 
 	gc.crypt.Encrypt(writer.Bytes())
@@ -1381,6 +1406,15 @@ func (gc *GameClient) applyTeleport(payload []byte) {
 			Z:        tele.Z,
 			Heading:  tele.Heading,
 		})
+		// The server keeps the character teleporting until the client
+		// confirms the finished teleport with Appearing: without it the
+		// character AI silently ignores every move request (the village
+		// revive left the bot stuck).
+		if gc.tracker.SelfObjectID() == tele.ObjectID {
+			if err := gc.sendPacket(togameserver.NewAppearingPacket()); err != nil {
+				gc.logger.Printf("Failed to send appearing: %v", err)
+			}
+		}
 	}
 }
 

@@ -269,6 +269,42 @@ clicking the item.
 | 21 | 4 | Origin Z |
 | 25 | 4 | Movement mode (1 = mouse) |
 
+### Appearing (0x30)
+
+The teleport confirmation of the official client: the server keeps the
+character in the teleporting state after every self TeleportToLocation
+(`Creature._isTeleporting`) until this packet arrives
+(`Appearing.runImpl` -> `Player.onTeleported`). While the flag is set
+every move request is silently ignored by the character AI
+(`isMovementDisabled`), so a village revive without the confirmation
+leaves the character permanently stuck. The bot sends it right after
+applying its own teleport. No body.
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x30 |
+
+### RequestSellItem (0x1E)
+
+Sells inventory items to a merchant. The bot (like the official client
+selling from the inventory) sends list id 0, the `CUSTOM_CB_SELL_LIST`
+of `RequestSellItem.runImpl`: the server prices every item itself at
+`referencePrice/2`, skips items it refuses to sell, answers with
+InventoryUpdate removals, ItemList, a CUR_LOAD StatusUpdate and the
+"transaction is complete" SystemMessage, and adds the adena. With list
+id 0 the server skips the merchant target and buy list checks
+entirely, so the transaction lands from anywhere; the bot still walks
+to the merchant and selects it like the official client.
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x1E |
+| 1 | 4 | Sell list id (0 = inventory sell) |
+| 5 | 4 | Item count |
+| 9 | 12×n | Entries: object id (4), item id (4), count (4) |
+
+The `TransactionFloodProtector` paces the requests (10 s by default).
+
 ## Game server -> client packets
 
 ### ChangeWaitType (0x3F)

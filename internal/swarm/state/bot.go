@@ -6,6 +6,7 @@ package state
 
 import (
 	"math"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -342,6 +343,15 @@ func (b *Bot) SelfSitting() bool {
 	return b.char.Sitting
 }
 
+// SelfLevel returns the observed level of the played character, zero
+// before the first UserInfo or level StatusUpdate.
+func (b *Bot) SelfLevel() int32 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.Level
+}
+
 // SelfUnderAttack reports whether the character was hit within the last
 // seconds. The hunt loop uses it to keep the rest logic from sitting
 // down in the middle of a fight it did not start itself.
@@ -373,6 +383,19 @@ func (b *Bot) ObjectPosition(objectID int32) (int32, int32, int32, bool) {
 	}
 
 	return obj.X, obj.Y, obj.Z, true
+}
+
+// ObjectName returns the display name of a known object, an empty
+// string when the object is unknown.
+func (b *Bot) ObjectName(objectID int32) string {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	obj, ok := b.objects[objectID]
+	if !ok {
+		return ""
+	}
+
+	return obj.Name
 }
 
 // ObjectAlive reports whether the object is known around the character
@@ -1118,6 +1141,83 @@ func (b *Bot) NearestAttackable(maxDistance float64, zone *Zone) (AttackTarget, 
 	}
 
 	return best, found
+}
+
+// NearestNpcByTemplates returns the closest living npc whose template id
+// is in the given set, within the distance of the character. The town
+// trip uses it to find the shop merchant spawned at the destination
+// coordinates. Merchants never move, so the raw packet position is used.
+func (b *Bot) NearestNpcByTemplates(
+	templates []int32, maxDistance float64,
+) (AttackTarget, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	wanted := make(map[int32]struct{}, len(templates))
+	for _, id := range templates {
+		wanted[id] = struct{}{}
+	}
+
+	//nolint:exhaustruct // zero value grows inside the loop
+	best := AttackTarget{}
+	bestDist := maxDistance
+	found := false
+	selfX := float64(b.char.X)
+	selfY := float64(b.char.Y)
+	for _, obj := range b.objects {
+		if obj.Kind != KindNPC || obj.Dead {
+			continue
+		}
+		if _, ok := wanted[obj.TemplateID]; !ok {
+			continue
+		}
+		dist := math.Hypot(
+			float64(obj.X)-selfX, float64(obj.Y)-selfY)
+		if dist < bestDist {
+			bestDist = dist
+			found = true
+			best = AttackTarget{
+				ObjectID: obj.ObjectID,
+				Name:     obj.Name,
+				X:        obj.X,
+				Y:        obj.Y,
+				Z:        obj.Z,
+			}
+		}
+	}
+
+	return best, found
+}
+
+// MedianZoneMobLevel returns the median level of the living attackable
+// npcs inside the zone, zero when none of them is visible or known: the
+// delevel policy compares the character level against it to detect a
+// hunting ground whose monsters are too low for the character. Nil zones
+// mean no limit and return zero.
+func (b *Bot) MedianZoneMobLevel(zone *Zone) int32 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if zone == nil {
+		return 0
+	}
+	levels := make([]int32, 0, len(b.objects))
+	for _, obj := range b.objects {
+		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead ||
+			obj.Level <= 0 {
+			continue
+		}
+		if !zone.Contains(obj.X, obj.Y) {
+			continue
+		}
+		levels = append(levels, obj.Level)
+	}
+	if len(levels) == 0 {
+		return 0
+	}
+	sort.Slice(levels, func(i, j int) bool {
+		return levels[i] < levels[j]
+	})
+
+	return levels[len(levels)/2]
 }
 
 // projectedPosition estimates where an object is right now: standing
