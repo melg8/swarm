@@ -322,7 +322,8 @@ the same variables).
   factor - and the draw order is deterministic -
   dead units first, then north to south, then the object id - because
   the snapshot objects arrive in random go map order and overlapping
-  units would flicker otherwise.
+  units would flicker otherwise. A sitting character draws the
+  breathing zZ marker above its dot.
 - Map rendering: every unit (character, mob, player) is a circle with a
   short look direction tick from the center over the edge (L2Bot2.0
   style), colored by threat: friendly gray, passive monster green,
