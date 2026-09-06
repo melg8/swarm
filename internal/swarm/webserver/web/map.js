@@ -103,7 +103,11 @@ const MapView = {
       passive: "#188038",
       aggressive: "#e37400",
       combat: "#d93025",
-      dead: "#80868b"
+      dead: "#80868b",
+      // The outline and the direction tick of the markers: a middle
+      // slate that reads over the light map imagery and over both
+      // theme fills alike.
+      tick: "#39424e"
     };
     this.draw();
   },
@@ -602,7 +606,7 @@ const MapView = {
       } else {
         labelRadius = radiusOf(obj, threat) * this.unitScale;
         drawUnitTick(ctx, p.x, p.y, rt.drawHeading,
-          labelRadius, this.mapColors[threat], this.colors.textBright, {
+          labelRadius, this.mapColors[threat], this.mapColors.tick, {
             dead: obj.dead,
             combat: threat === "combat",
             attackingMe: this.isAttackingMe(obj),
@@ -795,7 +799,7 @@ const MapView = {
     // The self marker: bigger circle, accent ring and the look tick.
     const selfRadius = 7 * this.unitScale;
     drawUnitTick(ctx, p.x, p.y, heading, selfRadius,
-      this.mapColors.self, this.colors.textBright, {
+      this.mapColors.self, this.mapColors.tick, {
         self: true, pulse: performance.now(), scale: this.unitScale
       });
     const ring = selfRadius + 3 * this.unitScale
