@@ -813,3 +813,25 @@ renders at a proportionally softer detail instead of disappearing.
   0.08): the tile states walk 0/19_19 missing -> 1/19_19 ready and the
   left half of the canvas paints at 100 percent coverage with ~4800
   distinct colors.
+
+
+## Round 17: full resolution world map everywhere (2026-09-06)
+
+User request: every region must support the full resolution - after
+panning two tiles left of the character and zooming in, the map stayed
+blank even though the zoomed out views showed the area.
+
+### Implementation
+
+- tools/generate_map_tiles.sh drops the detail window: every base tile
+  of the source set ships at all pyramid levels 0..3 (1024/512/256/128
+  px, jpeg quality 65) - 748 tiles, 31.1 MB embedded (the binary grew
+  accordingly). The ancestor fallback of the draw walk stays as the
+  safety net for the blocks that do not exist in the source set.
+
+### Verification
+
+- The user scenario (pan two tiles left, scale 0.08): the left canvas
+  half paints at 100 percent coverage, 10416 distinct colors, the full
+  resolution level 0 tile 19_19 loaded and used directly.
+- /maps/0/19_19.jpg serves 200 with the full 156 KB tile.

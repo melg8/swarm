@@ -8,15 +8,13 @@
 # BY = floor(y / 32768) + 18, see World.java TILE_ZERO_COORD of the
 # Mobius server).
 #
-# The full resolution level 0 is generated only for the detail window
-# around the hunting grounds (the default view of the map magnifies the
-# tiles), the whole world ships at levels 1..3 for the zoomed out views
-# - a google maps style pyramid that keeps the embedded asset weight
-# bounded.
+# Every base tile ships at all pyramid levels 0..3 (full resolution
+# down to the zoomed out variants), so every region of the world keeps
+# its map at any zoom. The dungeon floor variants (_1, _2) and the
+# fallback tile of the source set are skipped.
 #
 # Usage:
-#   tools/generate_map_tiles.sh <path/to/L2Bot2.0/Client/Assets/maps> \
-#       [detailBxMin detailBxMax detailByMin detailByMax]
+#   tools/generate_map_tiles.sh <path/to/L2Bot2.0/Client/Assets/maps>
 # Output: internal/swarm/webserver/web/maps/{level}/{bx}_{by}.jpg
 
 set -euo pipefail
@@ -25,34 +23,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWARM_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SRC="${1:-E:/work/L2Bot2.0/Client/Assets/maps}"
 OUT="${SCRIPT_DIR}/../internal/swarm/webserver/web/maps"
-DETAIL_BX_MIN="${2:-20}"
-DETAIL_BX_MAX="${3:-22}"
-DETAIL_BY_MIN="${4:-17}"
-DETAIL_BY_MAX="${5:-20}"
 
 [ -d "${SRC}" ] || {
     echo "Error map assets not found at ${SRC}"
-    echo "Usage: $0 <path/to/L2Bot2.0/Client/Assets/maps> [detail window]"
+    echo "Usage: $0 <path/to/L2Bot2.0/Client/Assets/maps>"
     exit 1
 }
 
 mkdir -p "${OUT}"
 
-python3 - "${SRC}" "${OUT}" \
-    "${DETAIL_BX_MIN}" "${DETAIL_BX_MAX}" \
-    "${DETAIL_BY_MIN}" "${DETAIL_BY_MAX}" << 'PYEOF'
+python3 - "${SRC}" "${OUT}" << 'PYEOF'
 import os
 import re
 import sys
 from PIL import Image
 
 src, out = sys.argv[1], sys.argv[2]
-detail = (int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]),
-    int(sys.argv[6]))
 
 # Levels of the pyramid: name -> pixels per tile.
 LEVELS = {"0": 1024, "1": 512, "2": 256, "3": 128}
-QUALITY = 72
+QUALITY = 65
 
 tile_pattern = re.compile(r"^(\d+)_(\d+)\.jpg$")
 for name in sorted(os.listdir(src)):
@@ -62,18 +52,6 @@ for name in sorted(os.listdir(src)):
     bx, by = int(match.group(1)), int(match.group(2))
     image = Image.open(os.path.join(src, name)).convert("RGB")
     for level, pixels in LEVELS.items():
-        in_detail = (level == "0"
-            and detail[0] <= bx <= detail[1]
-            and detail[2] <= by <= detail[3])
-        if level != "0" and not in_detail:
-            if level == "1":
-                pass  # level 1 ships for the whole world
-            elif level in ("2", "3"):
-                pass
-            else:
-                continue
-        if level == "0" and not in_detail:
-            continue
         resized = image.resize((pixels, pixels), Image.LANCZOS)
         directory = os.path.join(out, level)
         os.makedirs(directory, exist_ok=True)
