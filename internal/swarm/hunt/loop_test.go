@@ -17,7 +17,6 @@ import (
 // double click semantics: the first attack request for a new target only
 // selects it, the repeated request starts the fight.
 type fakeGame struct {
-	selects   int
 	forces    []int32
 	pickups   []int32
 	walks     [][3]int32
@@ -26,18 +25,6 @@ type fakeGame struct {
 	destroys  []int32
 	noTargets bool
 	lastError error
-}
-
-func (f *fakeGame) AttackNearest() (int32, error) {
-	if f.lastError != nil {
-		return 0, f.lastError
-	}
-	if f.noTargets {
-		return 0, nil
-	}
-	f.selects++
-
-	return 7, nil
 }
 
 func (f *fakeGame) AttackTarget(objectID int32) error {
@@ -125,7 +112,9 @@ func TestLoopAttacksWhenIdle(t *testing.T) {
 	loop.lastHit = time.Now().Add(-time.Minute)
 
 	loop.tick()
-	require.Equal(t, 1, game.selects)
+	// The pick happens through the tracker and the first request goes
+	// out immediately: on the server it only selects the target.
+	require.Equal(t, []int32{7}, game.forces)
 	require.Equal(t, int32(7), loop.target)
 }
 
@@ -137,10 +126,9 @@ func TestLoopForcesAttackAfterSelection(t *testing.T) {
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
 
-	// The first tick selects the target.
+	// The first tick sends the selecting request.
 	loop.tick()
-	require.Equal(t, 1, game.selects)
-	require.Empty(t, game.forces)
+	require.Equal(t, []int32{7}, game.forces)
 
 	// The server confirms the selection (MyTargetSelected), but no fight
 	// packets arrive: the character just stands there. The next ticks must
@@ -148,7 +136,7 @@ func TestLoopForcesAttackAfterSelection(t *testing.T) {
 	bot.ApplySelfTarget(7)
 	loop.lastHit = time.Now().Add(-time.Minute)
 	loop.tick()
-	require.Equal(t, []int32{7}, game.forces,
+	require.Equal(t, []int32{7, 7}, game.forces,
 		"the loop must send the second request that starts the attack")
 }
 
@@ -169,7 +157,7 @@ func TestLoopRetriesForcedAttackUntilEngaged(t *testing.T) {
 		loop.lastHit = time.Now().Add(-2 * time.Second)
 		loop.tick()
 	}
-	require.Equal(t, []int32{7, 7, 7}, game.forces)
+	require.Equal(t, []int32{7, 7, 7, 7}, game.forces)
 }
 
 func TestLoopStopsRequestingOnceEngaged(t *testing.T) {
@@ -184,7 +172,7 @@ func TestLoopStopsRequestingOnceEngaged(t *testing.T) {
 	bot.ApplySelfTarget(7)
 	loop.lastHit = time.Now().Add(-time.Minute)
 	loop.tick()
-	require.Equal(t, []int32{7}, game.forces)
+	require.Equal(t, []int32{7, 7}, game.forces)
 
 	// The fight starts: the server broadcasts the chase and the auto
 	// attack. The loop must stop re-requesting the target.
@@ -197,7 +185,7 @@ func TestLoopStopsRequestingOnceEngaged(t *testing.T) {
 		loop.lastHit = time.Now().Add(-time.Minute)
 		loop.tick()
 	}
-	require.Equal(t, []int32{7}, game.forces,
+	require.Equal(t, []int32{7, 7}, game.forces,
 		"no further forced attack requests once the fight runs")
 }
 
@@ -224,7 +212,7 @@ func TestLoopLootsAfterKill(t *testing.T) {
 	// The dead target moves the loop into the loot phase and the drop
 	// is clicked.
 	require.Equal(t, phaseLoot, loop.phase)
-	require.Equal(t, 0, game.selects)
+	require.Empty(t, game.forces)
 	require.Equal(t, []int32{9}, game.pickups)
 }
 
@@ -278,6 +266,73 @@ func TestLoopWalksToFarLoot(t *testing.T) {
 	require.Equal(t, []int32{9}, game.pickups)
 }
 
+func TestLoopWalksBackIntoTheZone(t *testing.T) {
+	bot := newTestBot()
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	game.noTargets = true
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZone(46112, 41500, 450)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The character respawns far outside the hunting square: the leash
+	// walks it back to the zone center instead of idling.
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 49308, Y: 44213, Z: -3539,
+		DestX: 49308, DestY: 44213, DestZ: -3539,
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, [][3]int32{{46112, 41500, -3539}}, game.walks,
+		"the leash walks to the zone center")
+
+	// Back inside: the zone no longer pushes the walk.
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 46112, Y: 41500, Z: -3539,
+		DestX: 46112, DestY: 41500, DestZ: -3539,
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Len(t, game.walks, 1, "no walk while inside the zone")
+}
+
+func TestLoopIgnoresMobsOutsideTheZone(t *testing.T) {
+	bot := newTestBot()
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZone(46112, 41500, 450)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// A mob outside the hunting square is not attacked even though it
+	// is the closest one.
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 46000, Y: 50000, Name: "Gremlin",
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Empty(t, game.forces,
+		"no attack requests for a mob outside the zone")
+
+	// The character walks back first; once inside the zone a mob of
+	// the zone is attacked.
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 46112, Y: 41500, Z: -3539,
+		DestX: 46112, DestY: 41500, DestZ: -3539,
+	})
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 8, TemplateID: 1000001, Attackable: true,
+		X: 46200, Y: 41800, Name: "Inside Gremlin",
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, []int32{8}, game.forces,
+		"the mob inside the zone is attacked")
+}
+
 func TestLoopSitsDownWhenExhausted(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
@@ -314,7 +369,8 @@ func TestLoopSitsDownWhenExhausted(t *testing.T) {
 
 	loop.lastHit = time.Now().Add(-2 * time.Second)
 	loop.tick()
-	require.Equal(t, 1, game.selects, "a standing character hunts again")
+	require.Equal(t, []int32{7}, game.forces,
+		"a standing character hunts again")
 }
 
 func TestLoopSitsAtTheNewThreshold(t *testing.T) {
@@ -339,7 +395,7 @@ func TestLoopSitsAtTheNewThreshold(t *testing.T) {
 	})
 	loop.lastHit = time.Now().Add(-2 * time.Second)
 	loop.tick()
-	require.Equal(t, 1, game.selects, "65 percent engages again")
+	require.Equal(t, []int32{7}, game.forces, "65 percent engages again")
 }
 
 func TestLoopDoesNotSitWhileUnderAttack(t *testing.T) {
@@ -364,11 +420,6 @@ func TestLoopDoesNotSitWhileUnderAttack(t *testing.T) {
 	loop.lastHit = time.Now().Add(-2 * time.Second)
 	loop.tick()
 	require.Zero(t, game.sits, "no sitting into the blows of a fight")
-
-	// The loop selects the attacker and starts the fight on the next
-	// request instead of resting.
-	loop.lastHit = time.Now().Add(-2 * time.Second)
-	loop.tick()
 	require.Equal(t, []int32{7}, game.forces,
 		"the fight continues instead")
 }
@@ -382,7 +433,7 @@ func TestLoopRestartsAfterDeath(t *testing.T) {
 	loop.lastHit = time.Now().Add(-time.Minute)
 
 	loop.tick()
-	require.Equal(t, 1, game.selects)
+	require.Equal(t, []int32{7}, game.forces)
 
 	// The character dies mid fight: the loop stops hunting and requests
 	// the village restart, dropping the stale target.
@@ -405,52 +456,8 @@ func TestLoopRestartsAfterDeath(t *testing.T) {
 	})
 	loop.lastHit = time.Now().Add(-2 * time.Second)
 	loop.tick()
-	require.Equal(t, 2, game.selects)
+	require.Len(t, game.forces, 2)
 	require.Equal(t, 2, game.restarts, "no restart spam after the revival")
-}
-
-func TestLoopReturnsToHuntAfterRevive(t *testing.T) {
-	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
-	game := &fakeGame{}
-	game.noTargets = true
-	loop := NewLoop(game, bot)
-	loop.lastHit = time.Now().Add(-time.Minute)
-
-	// The character fights at 45000 50000 and dies there.
-	bot.ApplyMovement(state.Movement{
-		ObjectID: 100, X: 45000, Y: 50000, Z: -3500,
-		DestX: 45000, DestY: 50000, DestZ: -3500,
-	})
-	bot.ApplyStatusUpdate(100, []state.Attribute{
-		{ID: state.AttrCurHP, Value: 0},
-	})
-	loop.lastHit = time.Now().Add(-2 * time.Second)
-	loop.tick()
-	require.Equal(t, 1, game.restarts)
-
-	// The server revives the character in the village, nothing
-	// attackable lives there: the loop walks back to the death spot.
-	bot.ApplyMovement(state.Movement{
-		ObjectID: 100, X: 49308, Y: 44213, Z: -3539,
-		DestX: 49308, DestY: 44213, DestZ: -3539,
-	})
-	bot.ApplyStatusUpdate(100, []state.Attribute{
-		{ID: state.AttrCurHP, Value: 197},
-	})
-	loop.lastHit = time.Now().Add(-2 * time.Second)
-	loop.tick()
-	require.Equal(t, [][3]int32{{45000, 50000, -3500}}, game.walks)
-
-	// Mobs show up on the way back: the return stops and the target is
-	// selected.
-	game.noTargets = false
-	loop.lastHit = time.Now().Add(-2 * time.Second)
-	loop.tick()
-	require.Equal(t, 1, game.selects)
-	loop.lastHit = time.Now().Add(-2 * time.Second)
-	loop.tick()
-	require.Len(t, game.walks, 1, "no return walks once prey is found")
 }
 
 func TestLoopAttackErrorIsLoggedNotFatal(t *testing.T) {
@@ -463,8 +470,10 @@ func TestLoopAttackErrorIsLoggedNotFatal(t *testing.T) {
 	loop.lastHit = time.Now().Add(-time.Minute)
 
 	loop.tick()
-	require.Equal(t, 0, game.selects)
-	require.Equal(t, int32(0), loop.target)
+	// The target is picked through the tracker; the request error only
+	// delays the retry.
+	require.Equal(t, int32(7), loop.target)
+	require.Empty(t, game.forces)
 }
 
 func TestLoopSelectsNextTargetAfterKill(t *testing.T) {
@@ -488,12 +497,18 @@ func TestLoopSelectsNextTargetAfterKill(t *testing.T) {
 
 	// Loot finishes with no drops on the next ticks: the loop must
 	// select a new target instead of ping-ponging between the engage
-	// and loot phases around the stale dead selection.
+	// and loot phases around the stale dead selection. A second living
+	// mob stands by for the re-pick.
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 8, TemplateID: 1000001, Attackable: true,
+		X: 45900, Y: 50000, Name: "Second Gremlin",
+	})
 	for range 3 {
 		loop.lastHit = time.Now().Add(-2 * time.Second)
 		loop.tick()
 	}
-	require.Equal(t, 2, game.selects,
+	require.Equal(t, int32(8), loop.target,
 		"the next target must be selected after the kill")
 }
 
@@ -514,7 +529,7 @@ func TestLoopWaitsForHealthWhenHurt(t *testing.T) {
 		loop.lastHit = time.Now().Add(-2 * time.Second)
 		loop.tick()
 	}
-	require.Zero(t, game.selects, "a hurt character must rest")
+	require.Empty(t, game.forces, "a hurt character must rest")
 
 	// The regeneration recovers: the next target is selected.
 	bot.ApplyStatusUpdate(100, []state.Attribute{
@@ -522,6 +537,6 @@ func TestLoopWaitsForHealthWhenHurt(t *testing.T) {
 	})
 	loop.lastHit = time.Now().Add(-2 * time.Second)
 	loop.tick()
-	require.Equal(t, 1, game.selects,
+	require.Equal(t, []int32{7}, game.forces,
 		"a recovered character engages the next target")
 }

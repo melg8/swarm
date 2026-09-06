@@ -255,33 +255,6 @@ func (gc *GameClient) PacketCount() int {
 	return int(gc.packetCount.Load())
 }
 
-// attackNearestRange bounds the search radius of the attack helper.
-const attackNearestRange = 1500
-
-// AttackNearest sends an attack request against the closest attackable
-// npc around the character. Following the Mobius AttackRequest
-// semantics the first request for a new target only selects it (the
-// answer arrives as MyTargetSelected); the attack itself starts when
-// the request is repeated for the already selected target, which is
-// what AttackTarget does. It returns the object id of the chosen target,
-// zero when nothing was attackable.
-func (gc *GameClient) AttackNearest() (int32, error) {
-	if gc.tracker == nil {
-		return 0, nil
-	}
-	target, ok := gc.tracker.NearestAttackable(attackNearestRange)
-	if !ok {
-		return 0, nil
-	}
-	if err := gc.sendAttackRequest(
-		target.ObjectID, target.X, target.Y, target.Z); err != nil {
-		return 0, fmt.Errorf("failed to attack: %w", err)
-	}
-	gc.tracker.RecordEvent("attacking " + target.Name)
-
-	return target.ObjectID, nil
-}
-
 // AttackTarget repeats the attack request for a target that is already
 // selected. This is the second click of the Mobius semantics: the server
 // resolves it to onForcedAttack and notifies the player AI with the

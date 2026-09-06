@@ -850,3 +850,41 @@ to kill the next mob, which turns every engagement into a death risk.
   around, stands up at 90 percent and only then chains the next target.
 - TestLoopSitsAtTheNewThreshold covers the band: 55 percent sits down,
   65 percent engages again.
+
+
+## Round 20: hunting zone (2026-09-06)
+
+User request: a hunting zone concept - an area the bot attacks inside
+and never leaves; a 900 unit square centered just below the Newbie
+Helper for the start.
+
+### Implementation
+
+- state: the Zone type (square center + half, Contains) filters the
+  target selection (NearestAttackable) and the loot selection
+  (NearestGroundItemExcluding); SetHuntingZone stores it on the bot and
+  the snapshot carries it for the map.
+- hunt: SetHuntingZone configures the loop; the engage phase leashes -
+  a character outside the square walks back to the zone center instead
+  of hunting (this also covers the village respawn: the death spot
+  return walk was replaced by the zone walk). The target pick moved
+  from GameClient.AttackNearest into the loop (the tracker pick with
+  the zone filter + the existing AttackTarget request flow), and the
+  drops outside the zone are ignored.
+- cmd/swarm configures the default zone; web/map.js drawHuntingZone
+  draws the dashed amber square with a label under the units.
+
+### Verification
+
+- state tests: the zone filtered loot and target selection.
+- hunt tests: TestLoopWalksBackIntoTheZone (the leash walks to the
+  zone center and stops once inside), TestLoopIgnoresMobsOutsideTheZone
+  (an outside mob is never attacked, an inside mob is), plus the
+  reworked engagement tests for the tracker based target pick.
+- tools/repro_map_render.js scenario "hunting zone": the dashed square
+  edges and the label draw with a configured zone and do not without.
+- Live: the zone renders around the Elven fortress hunt and the
+  character hunted inside it (no leash events needed).
+- tools/repro_map_render.js recorder bug fixed on the way: multi edge
+  strokes recorded their segments from the wrong start point, which
+  misrendered the zone square check.

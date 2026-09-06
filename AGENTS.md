@@ -446,7 +446,12 @@ the same variables).
   Mobius updates.
 - `-hunt` is the auto hunt flag of `cmd/swarm`: `internal/swarm/hunt`
   runs a small state machine (engage -> loot -> engage) that attacks the
-  closest attackable npc, picks up the drops around the corpse and
+  closest attackable npc inside the hunting square (DefaultHuntingZone:
+  900x900 centered just below the Newbie Helper of the Elven village,
+  drawn on the map as a dashed amber square from the snapshot
+  huntingZone; targets and drops outside are ignored and a character
+  outside walks back to the zone center), picks up the drops around the
+  corpse and
   destroys junk inventory items (RequestDestroyItem 0x59) when the slots
   reach 70% of the 80 slot limit or the weight reaches 75%, so a long
   living bot never litters the server. Loot approach: far items are

@@ -469,12 +469,12 @@ func TestNearestAttackable(t *testing.T) {
 	// Dead mobs are not attackable.
 	bot.ApplyStatusUpdate(8, []Attribute{{ID: AttrCurHP, Value: 0}})
 
-	target, ok := bot.NearestAttackable(1500)
+	target, ok := bot.NearestAttackable(1500, nil)
 	require.True(t, ok)
 	require.Equal(t, int32(7), target.ObjectID)
 	require.Equal(t, "Gremlin", target.Name)
 
-	_, ok = bot.NearestAttackable(50)
+	_, ok = bot.NearestAttackable(50, nil)
 	require.False(t, ok)
 }
 
@@ -526,7 +526,7 @@ func TestNearestAttackableUsesProjectedPosition(t *testing.T) {
 	runner.MoveAt = time.Now().Add(-5 * time.Second)
 	bot.objects[8] = runner
 
-	target, ok := bot.NearestAttackable(1500)
+	target, ok := bot.NearestAttackable(1500, nil)
 	require.True(t, ok)
 	require.Equal(t, int32(8), target.ObjectID,
 		"the mob that ran toward the character is the nearest now")

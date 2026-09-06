@@ -183,7 +183,9 @@ func runBot(ctx context.Context, cfg config, tracker *state.Bot) error {
 	log.Println("Character " + cfg.charName + " entered the world")
 
 	if cfg.hunt {
-		go hunt.NewLoop(game, tracker).Run(sessionCtx)
+		loop := hunt.NewLoop(game, tracker)
+		loop.SetHuntingZone(hunt.DefaultHuntingZone())
+		go loop.Run(sessionCtx)
 	}
 
 	return game.Run(sessionCtx, cfg.charName)

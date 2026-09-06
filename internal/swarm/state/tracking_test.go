@@ -176,9 +176,18 @@ func TestNearestGroundItemSkipsBlacklisted(t *testing.T) {
 
 	item, ok := bot.NearestGroundItemExcluding(1000, map[int32]time.Time{
 		1: time.Now().Add(time.Hour),
-	})
+	}, nil)
 	require.True(t, ok)
 	require.Equal(t, int32(2), item.ObjectID)
+
+	// A zone filters the ground items: only the drop inside counts.
+	zone := &Zone{CX: 500, CY: 0, Half: 100}
+	item, ok = bot.NearestGroundItemExcluding(1000, nil, zone)
+	require.True(t, ok)
+	require.Equal(t, int32(2), item.ObjectID)
+	zone = &Zone{CX: 5000, CY: 0, Half: 100}
+	_, ok = bot.NearestGroundItemExcluding(1000, nil, zone)
+	require.False(t, ok)
 }
 
 func TestInventoryTracking(t *testing.T) {

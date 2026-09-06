@@ -170,14 +170,15 @@ type LootItem struct {
 // NearestGroundItem returns the closest ground item within the given
 // distance of the character.
 func (b *Bot) NearestGroundItem(maxDistance float64) (LootItem, bool) {
-	return b.NearestGroundItemExcluding(maxDistance, nil)
+	return b.NearestGroundItemExcluding(maxDistance, nil, nil)
 }
 
 // NearestGroundItemExcluding returns the closest ground item within the
 // given distance, skipping the object ids whose skip deadline is still
-// in the future.
+// in the future and the points outside the zone (nil zone or nil skip
+// map mean no limit).
 func (b *Bot) NearestGroundItemExcluding(
-	maxDistance float64, skipped map[int32]time.Time,
+	maxDistance float64, skipped map[int32]time.Time, zone *Zone,
 ) (LootItem, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -193,6 +194,9 @@ func (b *Bot) NearestGroundItemExcluding(
 			continue
 		}
 		if until, ok := skipped[obj.ObjectID]; ok && until.After(now) {
+			continue
+		}
+		if !zone.Contains(obj.X, obj.Y) {
 			continue
 		}
 		dist := math.Hypot(float64(obj.X)-selfX, float64(obj.Y)-selfY)

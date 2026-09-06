@@ -261,6 +261,7 @@ type Bot struct {
 	chatLog   []ChatEvent
 	chatLen   int
 	chatPos   int
+	zone      *Zone
 	packets   int64
 	version   uint64
 	started   time.Time
@@ -283,6 +284,7 @@ func NewBot(id string) *Bot {
 		chatLog:   make([]ChatEvent, chatCapacity),
 		chatLen:   0,
 		chatPos:   0,
+		zone:      nil,
 		packets:   0,
 		version:   0,
 		started:   time.Now(),
@@ -437,6 +439,16 @@ func (b *Bot) SetOffline() {
 	b.status = StatusOffline
 	b.touch()
 	b.recordLocked("left the world")
+}
+
+// SetHuntingZone configures the hunting square of the bot for the web
+// map display. The zone survives the session resets (it is a policy,
+// not an observation).
+func (b *Bot) SetHuntingZone(cx int32, cy int32, half int32) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.zone = &Zone{CX: cx, CY: cy, Half: half}
+	b.touch()
 }
 
 // ResetSession clears the observed world state before a new login. The
@@ -1047,6 +1059,24 @@ type AttackTarget struct {
 	Z        int32
 }
 
+// Zone is a square world area: the hunting policy of the bot (attack
+// and loot inside it only, never wander out). Nil zones mean no limit.
+type Zone struct {
+	CX   int32 `json:"cx"`
+	CY   int32 `json:"cy"`
+	Half int32 `json:"half"`
+}
+
+// Contains reports whether the world point lies inside the zone.
+func (z *Zone) Contains(x int32, y int32) bool {
+	if z == nil {
+		return true
+	}
+
+	return x >= z.CX-z.Half && x <= z.CX+z.Half &&
+		y >= z.CY-z.Half && y <= z.CY+z.Half
+}
+
 // NearestAttackable returns the closest living attackable npc within the
 // given distance of the character. The distance uses the projected
 // current position of every npc (see projectedPosition), not the raw
@@ -1054,7 +1084,7 @@ type AttackTarget struct {
 // second, so a moving mob is typically tens or hundreds of units away
 // from its last packet start position and a stale "nearest" choice
 // would send the character to a mob that is no longer the closest one.
-func (b *Bot) NearestAttackable(maxDistance float64) (AttackTarget, bool) {
+func (b *Bot) NearestAttackable(maxDistance float64, zone *Zone) (AttackTarget, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -1070,6 +1100,9 @@ func (b *Bot) NearestAttackable(maxDistance float64) (AttackTarget, bool) {
 			continue
 		}
 		x, y := projectedPosition(obj, now)
+		if !zone.Contains(int32(math.Round(x)), int32(math.Round(y))) {
+			continue
+		}
 		dist := math.Hypot(x-selfX, y-selfY)
 		if dist < bestDist {
 			bestDist = dist
@@ -1218,6 +1251,7 @@ type Snapshot struct {
 	Objects      []ObjectSnapshot  `json:"objects"`
 	Events       []Event           `json:"events"`
 	Chat         []ChatEvent       `json:"chat"`
+	HuntingZone  *Zone             `json:"huntingZone"`
 	Packets      int64             `json:"packets"`
 	Version      uint64            `json:"version"`
 	ServerTimeMs int64             `json:"serverTimeMs"`
@@ -1316,6 +1350,7 @@ func (b *Bot) Snapshot() Snapshot {
 	snap.Events = appendEvents(
 		snap.Events, b.events, b.eventLen, b.eventPos)
 	snap.Chat = appendChat(snap.Chat, b.chatLog, b.chatLen, b.chatPos)
+	snap.HuntingZone = b.zone
 	b.fillInventorySnapshot(&snap)
 
 	return snap

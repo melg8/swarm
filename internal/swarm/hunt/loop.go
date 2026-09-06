@@ -20,13 +20,10 @@ import (
 // GameAPI abstracts the game actions the hunt loop needs. The
 // connection.GameClient implements it.
 type GameAPI interface {
-	// AttackNearest selects the closest attackable npc and returns its
-	// object id, zero when nothing was attackable. The Mobius server
-	// answers the first request for a new target with MyTargetSelected.
-	AttackNearest() (int32, error)
-	// AttackTarget repeats the attack request for an already selected
-	// target: the server resolves it to a forced attack and starts the
-	// combat.
+	// AttackTarget sends the attack request for a target: the Mobius
+	// server answers the first request for a new target with
+	// MyTargetSelected (the request only selects it) and resolves the
+	// repeated request to a forced attack.
 	AttackTarget(objectID int32) error
 	// WalkTo makes the character walk to a world point, like a ground
 	// click of the official client.
@@ -53,6 +50,8 @@ const (
 	// lootRadius is the distance around the character within drops are
 	// picked up after a kill.
 	lootRadius = 900.0
+	// attackNearestRange bounds the target search radius.
+	attackNearestRange = 1500.0
 	// lootApproachRadius is the distance within which a ground item is
 	// clicked instead of walked to: the server AI covers the last
 	// stretch and executes the pickup.
@@ -83,10 +82,6 @@ const (
 	// of a dead character: the server keeps a short death delay and
 	// refuses early revives, so the request retries until it lands.
 	deathRestartPeriod = 5 * time.Second
-	// huntReturnDistance is how close to the remembered death spot the
-	// character must walk after a village revive before giving up on
-	// the return (nothing attackable lives around the corpse).
-	huntReturnDistance = 200.0
 	// engageRetryPeriod is the pause between repeated forced attack
 	// requests for the selected target. The server accepts one player
 	// action per second (PlayerActionFloodProtector), so one second is
@@ -131,10 +126,9 @@ type Loop struct {
 	restActionAt  time.Time
 	restActionSit bool
 	restartAt     time.Time
-	deathX        int32
-	deathY        int32
-	deathZ        int32
-	returning     bool
+	zoneCX        int32
+	zoneCY        int32
+	zoneHalf      int32
 }
 
 // NewLoop creates the hunt loop for a connected game client.
@@ -153,11 +147,46 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 		restActionAt:  time.Time{},
 		restActionSit: false,
 		restartAt:     time.Time{},
-		deathX:        0,
-		deathY:        0,
-		deathZ:        0,
-		returning:     false,
+		zoneCX:        0,
+		zoneCY:        0,
+		zoneHalf:      0,
 	}
+}
+
+// SetHuntingZone configures the hunting square: the bot attacks the
+// monsters inside it only and walks back as soon as it leaves. A zero
+// half disables the zone.
+func (l *Loop) SetHuntingZone(cx int32, cy int32, half int32) {
+	l.zoneCX, l.zoneCY, l.zoneHalf = cx, cy, half
+	l.tracker.SetHuntingZone(cx, cy, half)
+}
+
+// zone returns the hunting zone of the loop, nil when disabled.
+func (l *Loop) zone() *state.Zone {
+	if l.zoneHalf == 0 {
+		return nil
+	}
+
+	return &state.Zone{CX: l.zoneCX, CY: l.zoneCY, Half: l.zoneHalf}
+}
+
+// inZoneSelf reports whether the character stands inside the hunting
+// zone (always true when the zone is disabled).
+func (l *Loop) inZoneSelf() bool {
+	zone := l.zone()
+	if zone == nil {
+		return true
+	}
+	x, y, _, ok := l.tracker.SelfPosition()
+
+	return !ok || zone.Contains(x, y)
+}
+
+// DefaultHuntingZone is the configured hunting square of this
+// deployment: 900x900 units centered just below the Newbie Helper of
+// the Elven village.
+func DefaultHuntingZone() (cx int32, cy int32, half int32) {
+	return 46112, 41500, 450
 }
 
 // Run drives the hunt loop until the context is done.
@@ -195,20 +224,11 @@ func (l *Loop) tick() {
 // recoverFromDeath returns a dead character to the hunt: the village
 // restart request is the death dialog choice of the official client and
 // revives the character with restored vitals. The request retries until
-// the revival lands (the server refuses it during the death delay), the
-// stale target and loot references are dropped and the death spot is
-// remembered so the loop can walk back to the hunting grounds.
+// the revival lands (the server refuses it during the death delay) and
+// the stale target and loot references are dropped; the zone leash of
+// the engage phase walks the revived character back afterwards.
 func (l *Loop) recoverFromDeath() {
 	now := time.Now()
-	if l.restartAt.IsZero() {
-		// The position of the first death observation is the corpse
-		// spot; later retries must not overwrite it with the village
-		// coordinates the character was revived at.
-		if x, y, z, ok := l.tracker.SelfPosition(); ok {
-			l.deathX, l.deathY, l.deathZ = x, y, z
-			l.returning = true
-		}
-	}
 	if !l.restartAt.IsZero() && now.Sub(l.restartAt) < deathRestartPeriod {
 		return
 	}
@@ -222,31 +242,6 @@ func (l *Loop) recoverFromDeath() {
 	}
 }
 
-// returnToHunt walks the character back to its death spot after a
-// village revive: the village itself has nothing attackable, so without
-// the return walk a revived bot would idle there forever. The walk
-// stops once attackable npcs show up again or the spot is reached.
-func (l *Loop) returnToHunt(now time.Time) {
-	if now.Sub(l.lastHit) < selectPeriod {
-		return
-	}
-	l.lastHit = now
-	x, y, _, ok := l.tracker.SelfPosition()
-	if !ok {
-		return
-	}
-	if math.Hypot(float64(x-l.deathX), float64(y-l.deathY)) < huntReturnDistance {
-		l.returning = false
-		l.logger.Printf("Hunt: returned to the hunting grounds")
-
-		return
-	}
-	l.logger.Printf("Hunt: no prey in the village, walking back to the death spot")
-	if err := l.game.WalkTo(l.deathX, l.deathY, l.deathZ); err != nil {
-		l.logger.Printf("Hunt: walk back failed: %v", err)
-	}
-}
-
 // engage attacks the nearest attackable npc while the current target
 // lives, then switches to the loot phase. The Mobius AttackRequest has
 // double click semantics: the first request selects the target (the
@@ -256,6 +251,14 @@ func (l *Loop) returnToHunt(now time.Time) {
 // the fight, which the MoveToPawn/Attack/AutoAttackStart broadcasts
 // confirm.
 func (l *Loop) engage() {
+	// The hunting zone leash: attacks happen inside the square only,
+	// and a character outside of it (a long chase, a village respawn)
+	// walks back instead of hunting.
+	if !l.inZoneSelf() {
+		l.returnToZone()
+
+		return
+	}
 	// Prefer the server view of the target while it lives: the
 	// MyTargetSelected answer of the last attack request arrives
 	// asynchronously, so the fresh value is read every tick. A stale
@@ -292,26 +295,11 @@ func (l *Loop) engage() {
 		if now.Sub(l.lastHit) < selectPeriod {
 			return
 		}
-		target, err := l.game.AttackNearest()
-		if err != nil {
-			l.logger.Printf("Hunt: attack failed: %v", err)
-
+		pick, ok := l.tracker.NearestAttackable(attackNearestRange, l.zone())
+		if !ok {
 			return
 		}
-		if target != 0 {
-			l.target = target
-			l.lastHit = now
-			l.returning = false
-
-			return
-		}
-		if l.returning {
-			// Nothing attackable around (the village after a revive):
-			// walk back to the death spot instead of idling.
-			l.returnToHunt(now)
-		}
-
-		return
+		l.target = pick.ObjectID
 	}
 	if l.tracker.SelfEngaged(l.target) {
 		return
@@ -325,6 +313,33 @@ func (l *Loop) engage() {
 		return
 	}
 	l.lastHit = now
+}
+
+// returnToZone walks the character back into the hunting square: the
+// leash keeps the bot from chasing mobs or wandering beyond it, and a
+// village respawn after death lands far outside. The walk rate limits
+// itself to one request per second.
+func (l *Loop) returnToZone() {
+	now := time.Now()
+	if now.Sub(l.lastHit) < selectPeriod {
+		return
+	}
+	l.lastHit = now
+	zone := l.zone()
+	if zone == nil {
+		return
+	}
+	_, _, z, ok := l.tracker.SelfPosition()
+	if !ok {
+		return
+	}
+	l.target = 0
+	l.lootID = 0
+	l.phase = phaseEngage
+	l.logger.Printf("Hunt: outside the hunting zone, walking back")
+	if err := l.game.WalkTo(zone.CX, zone.CY, z); err != nil {
+		l.logger.Printf("Hunt: walk back failed: %v", err)
+	}
 }
 
 // rest brings the resting character back to full health. Sitting
@@ -387,7 +402,8 @@ func (l *Loop) rest() {
 // toward the loot instead of trusting the click to start the whole
 // approach.
 func (l *Loop) loot() {
-	item, ok := l.tracker.NearestGroundItemExcluding(lootRadius, l.skipped)
+	item, ok := l.tracker.NearestGroundItemExcluding(lootRadius, l.skipped,
+		l.zone())
 	if !ok {
 		l.phase = phaseEngage
 		l.target = 0
