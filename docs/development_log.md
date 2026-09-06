@@ -888,3 +888,13 @@ Helper for the start.
 - tools/repro_map_render.js recorder bug fixed on the way: multi edge
   strokes recorded their segments from the wrong start point, which
   misrendered the zone square check.
+
+
+## Round 21: hunting zone widened to 1900 (2026-09-06)
+
+User request: the 900 unit square turned out too small.
+
+### Implementation
+
+DefaultHuntingZone half moved 450 -> 950 (a 1900x1900 square around the
+same center below the Newbie Helper).
