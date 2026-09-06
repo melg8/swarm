@@ -295,8 +295,10 @@ const MapView = {
     const dx = target.x - rt.drawX;
     const dy = target.y - rt.drawY;
     const dist = Math.hypot(dx, dy);
-    if (dist > teleportUnits) {
-      // A real teleport: render the new place instantly.
+    if (!Number.isFinite(dist) || dist > teleportUnits) {
+      // A real teleport - or a poisoned drawn position (a NaN that
+      // would otherwise keep reproducing itself through the chase
+      // arithmetic): render the projection instantly.
       rt.drawX = target.x;
       rt.drawY = target.y;
       rt.settled = true;
@@ -568,7 +570,8 @@ const MapView = {
             dead: obj.dead,
             combat: threat === "combat",
             attackingMe: this.isAttackingMe(obj),
-            pulse: performance.now()
+            pulse: performance.now(),
+            scale: this.unitScale
           });
         this.drawSocialMarker(ctx, p.x, p.y, radius, obj.socialUntilMs);
       }
@@ -710,11 +713,14 @@ const MapView = {
     // The self marker: bigger circle, accent ring and the look tick.
     const selfRadius = 7 * this.unitScale;
     drawUnitTick(ctx, p.x, p.y, heading, selfRadius,
-      this.colors.self, this.colors.textBright, { self: true, pulse: performance.now() });
-    const ring = selfRadius + 3 + 1.5 * Math.sin(performance.now() / 500);
+      this.colors.self, this.colors.textBright, {
+        self: true, pulse: performance.now(), scale: this.unitScale
+      });
+    const ring = selfRadius + 3 * this.unitScale
+      + 1.5 * Math.sin(performance.now() / 500);
     ctx.strokeStyle = this.colors.selfRing;
     ctx.globalAlpha = 0.5;
-    ctx.lineWidth = 1.25;
+    ctx.lineWidth = Math.max(1, 1.25 * this.unitScale);
     ctx.beginPath();
     ctx.arc(p.x, p.y, ring, 0, Math.PI * 2);
     ctx.stroke();
@@ -736,12 +742,13 @@ const MapView = {
     const nowMs = Date.now() + this.clockOffsetMs;
     if (!(socialUntilMs > nowMs)) { return; }
     const frac = Math.min(1, (socialUntilMs - nowMs) / socialWindowMs);
+    const k = this.unitScale;
     ctx.save();
     ctx.globalAlpha = 0.2 + 0.4 * frac;
     ctx.strokeStyle = this.colors.textDim;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = Math.max(0.75, k);
     ctx.beginPath();
-    ctx.arc(x, y - radius - 7, 3.5, 0, Math.PI * 2);
+    ctx.arc(x, y - radius - 7 * k, 3.5 * k, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   },
@@ -978,17 +985,21 @@ function labelColor(colors, threat) {
 
 // drawUnitTick draws a circle marker with a short look direction tick
 // leaving the center and reaching slightly over the circle edge, like the
-// L2Bot2.0 map.
+// L2Bot2.0 map. opts.scale is the zoom factor of the marker (unitScale):
+// the tick length, the ring radii and the line widths shrink with it so
+// a zoomed out marker stays a small circle with a proportionally small
+// tick instead of a dot with a fixed length stick.
 function drawUnitTick(ctx, x, y, heading, radius, fill, tick, opts) {
+  const k = opts.scale || 1;
   const angle = (heading / 65536) * 2 * Math.PI;
   const alpha = opts.dead ? 0.45 : 1;
 
   // Combat pulse ring and self ring for emphasis.
   if (opts.combat || opts.self) {
-    const pulse = opts.self ? 3 : 2.5 * Math.sin(opts.pulse / 220) + 3;
+    const pulse = opts.self ? 3 * k : 2.5 * Math.sin(opts.pulse / 220) + 3 * k;
     ctx.strokeStyle = opts.self ? fill : fill;
     ctx.globalAlpha = 0.35;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = Math.max(1, 1.5 * k);
     ctx.beginPath();
     ctx.arc(x, y, radius + pulse, 0, Math.PI * 2);
     ctx.stroke();
@@ -1001,28 +1012,28 @@ function drawUnitTick(ctx, x, y, heading, radius, fill, tick, opts) {
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fillStyle = fill;
   ctx.fill();
-  ctx.lineWidth = 1.25;
+  ctx.lineWidth = Math.max(0.75, 1.25 * k);
   ctx.strokeStyle = tick;
   ctx.stroke();
 
   // A mob attacking the character gets a thin targeting ring.
   if (opts.attackingMe) {
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = Math.max(1, 1.5 * k);
     ctx.strokeStyle = tick;
-    ctx.setLineDash([3, 2]);
+    ctx.setLineDash([3 * k, 2 * k]);
     ctx.beginPath();
-    ctx.arc(x, y, radius + 5, 0, Math.PI * 2);
+    ctx.arc(x, y, radius + 5 * k, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
   }
 
   // The look direction tick, drawn only outside the circle: the circle
   // body is a solid color fill and the heading ray starts at the edge.
-  const outer = radius + 4.5;
+  const outer = radius + 4.5 * k;
   ctx.beginPath();
   ctx.moveTo(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius);
   ctx.lineTo(x + Math.cos(angle) * outer, y + Math.sin(angle) * outer);
-  ctx.lineWidth = 2;
+  ctx.lineWidth = Math.max(1, 2 * k);
   ctx.lineCap = "round";
   ctx.strokeStyle = tick;
   ctx.stroke();
