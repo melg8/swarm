@@ -301,12 +301,21 @@ the same variables).
   most a 2x upscale of the tile pixels, draws the tiles covering the
   viewport through the usual world to screen transform (follow and pan
   included) and lazy loads them via the static file server; the grid,
-  the zone square, the units and the links draw on top.
-- Map rendering: the unit markers scale with the zoom (a sub linear
+  the zone square, the units and the links draw on top. The wheel zoom
+  anchors at the cursor in the free camera mode (the world point under
+  the cursor stays under it) and centers on the character while follow
+  is on.
+- Map rendering: the unit markers use a fixed theme independent palette
+  (mapColors in map.js, also mirrored into the legend css) so the icons
+  read identically over the light map imagery and over both theme
+  fills; the labels draw with a dark halo and pass a declutter pass
+  (priority: hovered, own target, in combat, then the distance to the
+  character - overlapping names are dropped, the closest win). The unit
+  markers scale with the zoom (a sub linear
   factor of the map scale, clamped 0.3..1.6) so zooming out shrinks
   them together with the map - the direction ticks, the line widths,
-  the link rings and the social marker follow the same factor - and the
-  draw order is deterministic -
+  the link rings, the labels and the social marker follow the same
+  factor - and the draw order is deterministic -
   dead units first, then north to south, then the object id - because
   the snapshot objects arrive in random go map order and overlapping
   units would flicker otherwise.

@@ -79,28 +79,31 @@ const MapView = {
     }
   },
 
-  // Canvas colors follow the active theme variables.
+  // Canvas colors: the UI chrome (grid, text) follows the active theme
+  // variables, while the unit markers use a fixed palette - the icons
+  // must read identically over the light map imagery and over the dark
+  // or light plain fill, so a theme switch never repaints the world.
   refreshColors() {
     const style = getComputedStyle(document.documentElement);
     const read = (name) => style.getPropertyValue(name).trim();
     this.colors = {
       grid: read("--grid"),
       gridText: read("--grid-text"),
-      self: read("--blue"),
-      selfRing: read("--accent"),
-      player: read("--violet"),
-      item: read("--gold"),
-      friendly: read("--gray"),
-      passive: read("--green"),
-      aggressive: read("--accent"),
-      combat: read("--red"),
-      dead: read("--gray"),
       text: read("--text"),
       textBright: read("--text-bright"),
       textDim: read("--text-dim"),
       border: read("--border"),
-      zone: read("--text-dim"),
-      path: read("--accent")
+      zone: read("--text-dim")
+    };
+    this.mapColors = {
+      self: "#1a73e8",
+      player: "#9334e6",
+      item: "#f9ab00",
+      friendly: "#5f6368",
+      passive: "#188038",
+      aggressive: "#e37400",
+      combat: "#d93025",
+      dead: "#80868b"
     };
     this.draw();
   },
@@ -148,8 +151,34 @@ const MapView = {
 
   onWheel(event) {
     event.preventDefault();
+    const rect = this.canvas.getBoundingClientRect();
+    const cursor = {
+      x: event.clientX - rect.left, y: event.clientY - rect.top
+    };
+    // Anchor the zoom at the cursor: the world point under it must
+    // stay under it (like the google maps wheel zoom). While follow is
+    // on the camera is pinned to the character, so the anchor only
+    // applies to the free camera.
+    const before = this.screenToWorld(cursor.x, cursor.y);
     const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
     this.zoom(factor);
+    if (!this.followEnabled()) {
+      const after = this.screenToWorld(cursor.x, cursor.y);
+      this.panAnchor.x += before.x - after.x;
+      this.panAnchor.y += before.y - after.y;
+      this.draw();
+    }
+  },
+
+  // screenToWorld inverts the world to screen transform for a viewport
+  // relative point.
+  screenToWorld(sx, sy) {
+    const rect = this.canvas.getBoundingClientRect();
+
+    return {
+      x: this.centerX() + (sx - rect.width / 2) / this.scale,
+      y: this.centerY() + (sy - rect.height / 2) / this.scale
+    };
   },
 
   onDragStart(event) {
@@ -443,13 +472,18 @@ const MapView = {
     ctx.clearRect(0, 0, rect.width, rect.height);
     if (!this.lastSnap) { return; }
 
-    this.drawMapBackground(ctx, rect);
     this.unitScale = this.computeUnitScale();
+    this.labelCandidates = [];
+    this.drawMapBackground(ctx, rect);
     this.drawGrid(ctx, rect);
     this.drawZone(ctx, rect);
     this.drawTargetLinks(ctx);
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
+    if (this.lastSnap
+      && document.getElementById("show-labels").checked) {
+      this.drawLabels(ctx);
+    }
     this.updateMapInfo();
   },
 
@@ -531,6 +565,7 @@ const MapView = {
   drawObjects(ctx, rect) {
     const showLabels = document.getElementById("show-labels").checked;
     const showDest = document.getElementById("show-dest").checked;
+    this.labelCandidates = [];
     // The snapshot objects come out of a go map in random order: the
     // draw order must be stable or overlapping units swap their z
     // position on every snapshot and flicker (dead units always render
@@ -551,7 +586,7 @@ const MapView = {
       if (showDest && obj.moving) {
         const d = this.worldToScreen(obj.destX, obj.destY);
         ctx.save();
-        ctx.strokeStyle = this.colors.path;
+        ctx.strokeStyle = this.colors.textDim;
         ctx.globalAlpha = obj.dead ? 0.15 : 0.35;
         ctx.setLineDash([4, 3]);
         ctx.lineWidth = 1;
@@ -561,30 +596,77 @@ const MapView = {
         ctx.stroke();
         ctx.restore();
       }
+      let labelRadius = 4;
       if (obj.kind === "item") {
-        drawDiamond(ctx, p.x, p.y, 4, this.colors.item);
+        drawDiamond(ctx, p.x, p.y, 4, this.mapColors.item);
       } else {
-        const radius = radiusOf(obj, threat) * this.unitScale;
+        labelRadius = radiusOf(obj, threat) * this.unitScale;
         drawUnitTick(ctx, p.x, p.y, rt.drawHeading,
-          radius, this.colors[threat], this.colors.textBright, {
+          labelRadius, this.mapColors[threat], this.colors.textBright, {
             dead: obj.dead,
             combat: threat === "combat",
             attackingMe: this.isAttackingMe(obj),
             pulse: performance.now(),
             scale: this.unitScale
           });
-        this.drawSocialMarker(ctx, p.x, p.y, radius, obj.socialUntilMs);
+        this.drawSocialMarker(ctx, p.x, p.y, labelRadius,
+          obj.socialUntilMs);
       }
       if (showLabels && obj.name) {
-        ctx.fillStyle = labelColor(this.colors, threat);
-        ctx.font = "10px sans-serif";
-        ctx.textAlign = "center";
         const suffix = obj.kind === "npc" && obj.level > 0
-          ? " (" + obj.level + ")" : "";
-        ctx.fillText(obj.name + suffix, p.x, p.y - 11);
-        ctx.textAlign = "left";
+          ? " lv" + obj.level : "";
+        this.labelCandidates.push({
+          x: p.x, y: p.y - labelRadius - 6,
+          text: obj.name + suffix,
+          color: labelColor(threat),
+          priority: this.labelPriority(obj)
+        });
       }
     }
+  },
+
+  // labelPriority ranks the labels for the declutter pass: the own
+  // name, the own target and the hovered unit win over the crowd, the
+  // fighting units come next and the rest sort by their distance to
+  // the character (the closest names survive a tight zoom out).
+  labelPriority(obj) {
+    const c = this.lastSnap.character;
+    if (this.hover && this.hover.objectId === obj.objectId) { return 0; }
+    if (c && c.targetId === obj.objectId) { return 1; }
+    if (obj.inCombat) { return 2; }
+    const dist = c ? Math.hypot(obj.x - c.x, obj.y - c.y) : 0;
+
+    return 3 + dist / 10000;
+  },
+
+  // drawLabels runs the declutter pass and paints the surviving names
+  // with a dark halo, which keeps them readable over the light map
+  // imagery and over both theme fills alike.
+  drawLabels(ctx) {
+    ctx.font = "600 10.5px " + getComputedStyle(document.documentElement)
+      .getPropertyValue("--sans").trim() || "sans-serif";
+    ctx.textAlign = "center";
+    const taken = [];
+    const candidates = this.labelCandidates.slice()
+      .sort((a, b) => a.priority - b.priority);
+    for (const cand of candidates) {
+      const width = ctx.measureText(cand.text).width + 6;
+      const rect = {
+        left: cand.x - width / 2, right: cand.x + width / 2,
+        top: cand.y - 12, bottom: cand.y + 2
+      };
+      const overlaps = taken.some((r) => rect.left < r.right
+        && rect.right > r.left && rect.top < r.bottom
+        && rect.bottom > r.top);
+      if (overlaps) { continue; }
+      taken.push(rect);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
+      ctx.strokeText(cand.text, cand.x, cand.y);
+      ctx.fillStyle = cand.color;
+      ctx.fillText(cand.text, cand.x, cand.y);
+    }
+    ctx.textAlign = "left";
   },
 
   isAttackingMe(obj) {
@@ -623,7 +705,7 @@ const MapView = {
     const from = this.screenPosOf("self", c.x, c.y);
     const to = this.screenPosOf(target.objectId, target.x, target.y);
     ctx.save();
-    ctx.strokeStyle = this.colors.combat;
+    ctx.strokeStyle = this.mapColors.combat;
     ctx.globalAlpha = 0.75;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 4]);
@@ -637,7 +719,7 @@ const MapView = {
     const radius = radiusOf(target, threatOf(target))
       * this.unitScale + 6;
     ctx.save();
-    ctx.strokeStyle = this.colors.combat;
+    ctx.strokeStyle = this.mapColors.combat;
     ctx.globalAlpha = 0.85;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -668,7 +750,7 @@ const MapView = {
       self ? "self" : target.objectId, target.x, target.y);
 
     ctx.save();
-    ctx.strokeStyle = this.colors.player;
+    ctx.strokeStyle = this.mapColors.player;
     ctx.globalAlpha = 0.55;
     ctx.lineWidth = 1.25;
     ctx.setLineDash([3, 3]);
@@ -682,7 +764,7 @@ const MapView = {
     const radius = (self ? 7 : radiusOf(target, threatOf(target)))
       * this.unitScale + 5;
     ctx.save();
-    ctx.strokeStyle = this.colors.player;
+    ctx.strokeStyle = this.mapColors.player;
     ctx.globalAlpha = 0.75;
     ctx.lineWidth = 1.25;
     ctx.setLineDash([3, 2]);
@@ -713,12 +795,12 @@ const MapView = {
     // The self marker: bigger circle, accent ring and the look tick.
     const selfRadius = 7 * this.unitScale;
     drawUnitTick(ctx, p.x, p.y, heading, selfRadius,
-      this.colors.self, this.colors.textBright, {
+      this.mapColors.self, this.colors.textBright, {
         self: true, pulse: performance.now(), scale: this.unitScale
       });
     const ring = selfRadius + 3 * this.unitScale
       + 1.5 * Math.sin(performance.now() / 500);
-    ctx.strokeStyle = this.colors.selfRing;
+    ctx.strokeStyle = this.mapColors.self;
     ctx.globalAlpha = 0.5;
     ctx.lineWidth = Math.max(1, 1.25 * this.unitScale);
     ctx.beginPath();
@@ -726,13 +808,16 @@ const MapView = {
     ctx.stroke();
     ctx.globalAlpha = 1;
 
-    this.drawSocialMarker(ctx, p.x, p.y, 7, c.socialUntilMs);
+    this.drawSocialMarker(ctx, p.x, p.y, selfRadius, c.socialUntilMs);
 
-    ctx.fillStyle = this.colors.textBright;
-    ctx.font = "600 11px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(c.name || "self", p.x, p.y - 15);
-    ctx.textAlign = "left";
+    if (document.getElementById("show-labels").checked) {
+      this.labelCandidates.push({
+        x: p.x, y: p.y - selfRadius - 6,
+        text: c.name || "self",
+        color: this.mapColors.self,
+        priority: -1
+      });
+    }
   },
 
   // drawSocialMarker draws a small fading ring above a creature that is
@@ -745,7 +830,7 @@ const MapView = {
     const k = this.unitScale;
     ctx.save();
     ctx.globalAlpha = 0.2 + 0.4 * frac;
-    ctx.strokeStyle = this.colors.textDim;
+    ctx.strokeStyle = this.mapColors.friendly;
     ctx.lineWidth = Math.max(0.75, k);
     ctx.beginPath();
     ctx.arc(x, y - radius - 7 * k, 3.5 * k, 0, Math.PI * 2);
@@ -974,13 +1059,19 @@ function radiusOf(obj, threat) {
   return 5;
 }
 
-// labelColor picks a readable label color for a threat class.
-function labelColor(colors, threat) {
-  if (threat === "dead") { return colors.dead; }
-  if (threat === "combat") { return colors.combat; }
-  if (threat === "aggressive") { return colors.aggressive; }
+// labelColor picks the label color of a threat class from the fixed
+// map palette.
+function labelColor(threat) {
+  const colors = {
+    dead: "#80868b",
+    combat: "#d93025",
+    aggressive: "#e37400",
+    player: "#9334e6",
+    item: "#f9ab00",
+    passive: "#188038"
+  };
 
-  return colors.textDim;
+  return colors[threat] || "#3c4043";
 }
 
 // drawUnitTick draws a circle marker with a short look direction tick
