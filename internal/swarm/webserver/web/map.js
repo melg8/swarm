@@ -840,6 +840,24 @@ const MapView = {
 
     this.drawSocialMarker(ctx, p.x, p.y, selfRadius, c.socialUntilMs);
 
+    // The resting state of the character: a small breathing zZ over the
+    // marker, matching the rest chips of the panels.
+    if (c.sitting) {
+      ctx.save();
+      ctx.font = "700 " + Math.max(8, 10 * this.unitScale)
+        + "px sans-serif";
+      ctx.textAlign = "left";
+      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(performance.now() / 450);
+      const zx = p.x + selfRadius + 4 * this.unitScale;
+      const zy = p.y - selfRadius - 3 * this.unitScale;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
+      ctx.strokeText("zZ", zx, zy);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText("zZ", zx, zy);
+      ctx.restore();
+    }
+
     if (document.getElementById("show-labels").checked) {
       this.labelCandidates.push({
         x: p.x, y: p.y - selfRadius - 6,
