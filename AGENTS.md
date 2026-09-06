@@ -293,17 +293,15 @@ the same variables).
   BY = floor(y / 32768) + 18 - the same anchors as World.TILE_ZERO_COORD
   of the Mobius server; the `_1`/`_2` suffixed files are dungeon floors
   and are not shipped). `tools/generate_map_tiles.sh` builds a google
-  maps style pyramid into `web/maps/{level}/{bx}_{by}.jpg`: level 0
-  (full 1024 px) only for the detail window around the hunting grounds
-  (parameters: detail bx/by range, default bx 20..22, by 17..20),
-  levels 1..3 (512/256/128 px) for the whole world - about 11 MB total.
+  maps style pyramid into `web/maps/{level}/{bx}_{by}.jpg`: every base
+  tile ships at levels 0..3 (1024/512/256/128 px, jpeg quality 65) -
+  the whole world at full resolution, about 31 MB total.
   `web/map.js drawMapBackground` picks the pyramid level allowing at
   most a 2x upscale of the tile pixels, draws the tiles covering the
   viewport through the usual world to screen transform (follow and pan
-  included) and lazy loads them via the static file server; a missing
-  tile (level 0 ships only for the detail window) falls back to the
-  closest existing pyramid level of the same block stretched over the
-  tile rect, so every panned to area keeps its map at any zoom; the
+  included) and lazy loads them via the static file server; a tile
+  missing from the source set falls back to the closest existing
+  pyramid level of the same block stretched over the tile rect; the
   grid, the zone square, the units and the links draw on top. The wheel zoom
   anchors at the cursor in the free camera mode (the world point under
   the cursor stays under it) and centers on the character while follow
