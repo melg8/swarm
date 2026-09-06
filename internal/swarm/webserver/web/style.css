@@ -273,14 +273,16 @@ body {
 .legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 11px; }
 
 .legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid var(--border); flex-shrink: 0; }
-.legend .dot.self { background: var(--blue); }
-.legend .dot.friendly { background: var(--gray); }
-.legend .dot.passive { background: var(--green); }
-.legend .dot.aggressive { background: var(--accent); }
-.legend .dot.combat { background: var(--red); }
-.legend .dot.dead { background: var(--bg-panel-2); border-color: var(--gray); }
-.legend .dot.player { background: var(--violet); }
-.legend .dot.item { background: var(--gold); }
+/* The legend uses the fixed map marker palette - the same colors the
+   canvas draws in both themes, so the legend always matches. */
+.legend .dot.self { background: #1a73e8; border-color: #1a73e8; }
+.legend .dot.friendly { background: #5f6368; border-color: #5f6368; }
+.legend .dot.passive { background: #188038; border-color: #188038; }
+.legend .dot.aggressive { background: #e37400; border-color: #e37400; }
+.legend .dot.combat { background: #d93025; border-color: #d93025; }
+.legend .dot.dead { background: var(--bg-panel-2); border-color: #80868b; }
+.legend .dot.player { background: #9334e6; border-color: #9334e6; }
+.legend .dot.item { background: #f9ab00; border-color: #f9ab00; }
 
 .legend-note {
   margin-top: 8px;

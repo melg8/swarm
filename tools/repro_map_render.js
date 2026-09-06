@@ -34,7 +34,8 @@ const vm = require("node:vm");
 const MAP_JS = path.join(__dirname, "..", "internal", "swarm",
     "webserver", "web", "map.js");
 
-// The light theme palette of style.css so recorded stroke styles are
+// The theme palette of style.css (the ui chrome reads it) plus the
+// fixed map palette of map.js so recorded stroke styles are
 // distinguishable.
 const THEME = {
     "--red": "#cf222e",
@@ -50,6 +51,18 @@ const THEME = {
     "--border": "#d5dbe3",
     "--grid": "rgba(21, 34, 50, 0.10)",
     "--grid-text": "rgba(60, 72, 90, 0.55)"
+};
+
+// The fixed unit marker palette of map.js (theme independent).
+const MARK = {
+    self: "#1a73e8",
+    player: "#9334e6",
+    item: "#f9ab00",
+    friendly: "#5f6368",
+    passive: "#188038",
+    aggressive: "#e37400",
+    combat: "#d93025",
+    dead: "#80868b"
 };
 
 // canvas geometry of the harness
@@ -118,6 +131,8 @@ function makeRecordingContext(record) {
         },
         fillRect: () => {},
         fillText: () => {},
+        strokeText: () => {},
+        measureText: (text) => ({ width: (text || "").length * 6 }),
         setLineDash: (dash) => { record.dash = dash.slice(); },
         // style properties tracked through the record object
         get strokeStyle() { return record.style; },
@@ -310,20 +325,20 @@ function runScenario(mapFile, verbose) {
     // Bug 1: the player target link is drawn from the player to the
     // mob it selected, in the player color.
     check(results, "player target link drawn to the selected mob",
-        findSegment(record, player, mob, THEME["--violet"]).length > 0,
+        findSegment(record, player, mob, MARK.player).length > 0,
         "expected a violet segment " + JSON.stringify(player) + " -> "
         + JSON.stringify(mob));
 
     // Bug 1: the claimed mob gets a violet ring.
     const claimedRadius = markerRadius("npc") + 5;
     check(results, "violet ring around the mob claimed by the player",
-        findArc(record, mob, claimedRadius, THEME["--violet"]).length > 0,
+        findArc(record, mob, claimedRadius, MARK.player).length > 0,
         "expected a violet arc at " + JSON.stringify(mob)
         + " r=" + claimedRadius);
 
     // Bug 1: the own target link (regression guard) stays red.
     check(results, "own target link still drawn",
-        findSegment(record, self, ownTarget, THEME["--red"]).length > 0,
+        findSegment(record, self, ownTarget, MARK.combat).length > 0,
         "expected a red segment " + JSON.stringify(self) + " -> "
         + JSON.stringify(ownTarget));
 
@@ -388,12 +403,12 @@ function runScenarioTargetingBot(mapFile) {
     const self = worldToScreen(WORLD.self.x, WORLD.self.y);
 
     check(results, "player target link drawn to the bot itself",
-        findSegment(record, player, self, THEME["--violet"]).length > 0,
+        findSegment(record, player, self, MARK.player).length > 0,
         "expected a violet segment " + JSON.stringify(player) + " -> "
         + JSON.stringify(self));
     const selfRing = markerRadius("self") + 5;
     check(results, "violet ring around the bot targeted by the player",
-        findArc(record, self, selfRing, THEME["--violet"]).length > 0,
+        findArc(record, self, selfRing, MARK.player).length > 0,
         "expected a violet arc at " + JSON.stringify(self)
         + " r=" + selfRing);
 
