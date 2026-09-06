@@ -131,6 +131,25 @@ checks the graceful shutdown; N defaults to 45):
 tools/mobius_e2e.sh 45
 ```
 
+### Fast deployment inside a z.ai sandbox (tools/mobius_fast_deploy.sh)
+
+When the deployment target is a z.ai-style sandbox (Debian 13, no root/sudo,
+git+curl+gcc+OpenJDK 21 JRE preinstalled, no javac/go/MariaDB server and a
+slow `archive.mariadb.org`), use `tools/mobius_fast_deploy.sh` instead of the
+`mobius_bootstrap.sh` path: it brings the whole stack up from a blank
+sandbox in about 90 seconds. Everything is unpacked from
+`deb.debian.org` packages via `apt-get download` + `dpkg -x` into `~/opt`
+(no root needed): OpenJDK 25 (the Mobius build requires Java 25), MariaDB
+server and Go 1.24; broken Debian JDK symlinks are re-bound to the
+extracted tree, three MariaDB wrapper scripts export the needed
+`LD_LIBRARY_PATH`, Mobius is sparse-cloned (only the C1 module) and
+compiled with plain `javac`. The repo scripts `tools/mobius_start.sh` and
+`tools/mobius_e2e.sh` are then used as is through the `JDK_DIR` and
+`MARIADB_DIR` environment overrides. The script is idempotent: finished
+steps are detected and skipped, so re-running is always safe. Paths can be
+overridden through the same-named environment variables (`BASE`, `SWARM`,
+`MOBIUS_ROOT`, `OPT`, ...).
+
 ## Local test server deployment (tools/)
 
 The `tools/` scripts reproduce the whole test environment from a blank
