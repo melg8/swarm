@@ -58,3 +58,16 @@ func NPCIsAggressive(templateID int32) bool {
 func ItemName(displayID int32) string {
 	return itemNames[displayID]
 }
+
+// ItemPrice resolves the reference price of an item by its display id.
+// The Mobius server sells items at referencePrice/2. It returns zero
+// when the item is unknown.
+func ItemPrice(displayID int32) int64 {
+	return itemPrices[displayID]
+}
+
+// ItemWeight resolves the unit weight of an item by its display id. It
+// returns zero when the item is unknown.
+func ItemWeight(displayID int32) int32 {
+	return itemWeights[displayID]
+}

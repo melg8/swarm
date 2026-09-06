@@ -143,8 +143,11 @@ func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
 // runBot performs one bot session: login, game handshake, authentication,
 // character creation, entering the world and staying in it until the
 // context is done or the session fails. The hunt loop of the session is
-// bound to a derived context so it stops with the session.
-func runBot(ctx context.Context, cfg config, tracker *state.Bot) error {
+// bound to a derived context so it stops with the session. The optional
+// geodata engine serves the town trips of the hunt loop.
+func runBot(
+	ctx context.Context, cfg config, tracker *state.Bot, engine *pathfind.Engine,
+) error {
 	sessionCtx, cancelSession := context.WithCancel(ctx)
 	defer cancelSession()
 
@@ -211,6 +214,11 @@ func runBot(ctx context.Context, cfg config, tracker *state.Bot) error {
 	if cfg.hunt {
 		loop := hunt.NewLoop(game, tracker)
 		loop.SetHuntingZone(hunt.DefaultHuntingZone())
+		if engine != nil {
+			loop.SetNavigator(hunt.NewNavigator(engine))
+		} else {
+			log.Println("Hunt runs without town trips: no geodata available")
+		}
 		go loop.Run(sessionCtx)
 	}
 
@@ -221,12 +229,14 @@ func runBot(ctx context.Context, cfg config, tracker *state.Bot) error {
 // session (server restart, kicked connection, network failure) is logged
 // and the whole login flow is retried with a growing backoff until the
 // user stops the process with SIGINT/SIGTERM. The process never exits on
-// its own.
-func runBotForever(ctx context.Context, cfg config, tracker *state.Bot) {
+// its own. The geodata engine survives the reconnects.
+func runBotForever(
+	ctx context.Context, cfg config, tracker *state.Bot, engine *pathfind.Engine,
+) {
 	delay := reconnectMinDelay
 	for {
 		started := time.Now()
-		err := runBot(ctx, cfg, tracker)
+		err := runBot(ctx, cfg, tracker, engine)
 		if ctx.Err() != nil {
 			return
 		}
@@ -264,10 +274,28 @@ func main() {
 
 	web := startWebInterface(cfg, registry, nil)
 
+	var engine *pathfind.Engine
+	if cfg.hunt {
+		dir := cfg.geodataDir
+		if dir == "" {
+			dir = detectGeodataDir()
+		}
+		engine = pathfind.NewEngine(dir)
+		engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+		stats := engine.Stats()
+		if stats.HasData {
+			log.Printf("Geodata ready: %d region files in %s, town trips enabled",
+				stats.RegionFiles, stats.Dir)
+		} else {
+			log.Println("No geodata files found in " + stats.Dir +
+				", the bot hunts without town trips")
+		}
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
 
-	runBotForever(ctx, cfg, tracker)
+	runBotForever(ctx, cfg, tracker, engine)
 	stop()
 	shutdownWebInterface(web)
 	log.Println("Bot finished")

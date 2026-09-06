@@ -158,6 +158,98 @@ func destroyRank(item InventoryItem) int {
 	}
 }
 
+// isGearFamily reports whether the item type2 belongs to the equipment
+// families that drop as single non stackable pieces.
+func isGearFamily(type2 int16) bool {
+	return type2 == itemType2Weapon || type2 == itemType2Armor ||
+		type2 == itemType2Jewel
+}
+
+// SellableItems returns the inventory items a shop trip sells, sorted
+// most junky first: duplicate gear drops (all pieces of an item id but
+// one) first, then the lowest sell value per unit weight - the cheap
+// heavy items the user of the inventory wants to get rid of first.
+// Equipped gear, adena and quest items are never returned; the server
+// silently skips items it refuses to sell, so the caller must tolerate
+// entries that come back.
+func (b *Bot) SellableItems() []InventoryItem {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	candidates := make([]InventoryItem, 0, len(b.inventory))
+	gearCount := make(map[int32]int)
+	gearKept := make(map[int32]int32)
+	for _, item := range b.inventory {
+		if item.Equipped || item.Type2 == itemType2Adena ||
+			item.Type2 == itemType2Quest {
+			continue
+		}
+		candidates = append(candidates, item)
+		if isGearFamily(item.Type2) {
+			gearCount[item.ItemID]++
+			if kept, ok := gearKept[item.ItemID]; !ok ||
+				item.ObjectID < kept {
+				gearKept[item.ItemID] = item.ObjectID
+			}
+		}
+	}
+	sort.Slice(candidates, func(i int, j int) bool {
+		ri, rj := sellRank(candidates[i], gearCount, gearKept),
+			sellRank(candidates[j], gearCount, gearKept)
+		if ri != rj {
+			return ri < rj
+		}
+		vi, vj := sellValuePerWeight(candidates[i]),
+			sellValuePerWeight(candidates[j])
+		if vi != vj {
+			return vi < vj
+		}
+
+		return candidates[i].ObjectID < candidates[j].ObjectID
+	})
+
+	return candidates
+}
+
+// sellRank orders the sell candidates: duplicated gear pieces first
+// (every piece of an item id but the lowest object id), everything else
+// after. The caller must hold the read lock or own the maps.
+func sellRank(
+	item InventoryItem, gearCount map[int32]int, gearKept map[int32]int32,
+) int {
+	if !isGearFamily(item.Type2) || gearCount[item.ItemID] <= 1 {
+		return 1
+	}
+
+	return boolToInt(item.ObjectID == gearKept[item.ItemID])
+}
+
+// boolToInt maps a boolean to 0/1 without a branch.
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+
+	return 0
+}
+
+// sellValuePerWeight returns the sell value of one unit of the item
+// (reference price / 2, like the Mobius RequestSellItem computes it)
+// divided by its unit weight. Low values are cheap heavy junk that
+// frees the most weight for the least adena lost; unknown items with no
+// price and no weight count as the junkiest.
+func sellValuePerWeight(item InventoryItem) float64 {
+	sell := npcdata.ItemPrice(item.ItemID) / 2
+	weight := npcdata.ItemWeight(item.ItemID)
+	switch {
+	case weight > 0:
+		return float64(sell) / float64(weight)
+	case sell > 0:
+		return math.MaxFloat64
+	default:
+		return 0
+	}
+}
+
 // LootItem describes a ground item the bot can pick up.
 type LootItem struct {
 	ObjectID int32

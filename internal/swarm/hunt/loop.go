@@ -14,6 +14,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/state"
 )
 
@@ -36,6 +37,8 @@ type GameAPI interface {
 	RestartAtVillage() error
 	// DestroyItem destroys inventory items.
 	DestroyItem(objectID int32, count int32) error
+	// SellItems sells inventory items to the shop merchant.
+	SellItems(items []state.InventoryItem) error
 }
 
 // Timing and threshold constants of the hunt loop.
@@ -109,6 +112,15 @@ const (
 	phaseEngage phase = "engage"
 	// phaseLoot picks up the drops around the last kill.
 	phaseLoot phase = "loot"
+	// phaseTownWalk follows the geodata waypoints to the town shop.
+	phaseTownWalk phase = "townWalk"
+	// phaseTownSell sells the inventory junk at the shop merchant.
+	phaseTownSell phase = "townSell"
+	// phaseTownReturn follows the geodata waypoints back to the farm
+	// spot.
+	phaseTownReturn phase = "townReturn"
+	// phaseDelevel dies at the town guards to lose the excess levels.
+	phaseDelevel phase = "delevel"
 )
 
 // Loop is the hunt state machine of one bot session.
@@ -129,6 +141,29 @@ type Loop struct {
 	zoneCX        int32
 	zoneCY        int32
 	zoneHalf      int32
+	navigator     Navigator
+	waypoints     []pathfind.Vec3
+	wpIndex       int
+	legDest       pathfind.Vec3
+	moveAt        time.Time
+	stuckAt       time.Time
+	stuckX        int32
+	stuckY        int32
+	rePaths       int
+	farmX         int32
+	farmY         int32
+	farmZ         int32
+	sellAt        time.Time
+	sellPhaseAt   time.Time
+	merchantID    int32
+	merchantPick  time.Time
+	sold          map[int32]bool
+	tripStart     time.Time
+	tripEndedAt   time.Time
+	delevelTarget int32
+	delevelGuard  int32
+	delevelFight  time.Time
+	delevelEnd    time.Time
 }
 
 // NewLoop creates the hunt loop for a connected game client.
@@ -150,7 +185,37 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 		zoneCX:        0,
 		zoneCY:        0,
 		zoneHalf:      0,
+		navigator:     nil,
+		waypoints:     nil,
+		wpIndex:       0,
+		legDest:       pathfind.Vec3{},
+		moveAt:        time.Time{},
+		stuckAt:       time.Time{},
+		stuckX:        0,
+		stuckY:        0,
+		rePaths:       0,
+		farmX:         0,
+		farmY:         0,
+		farmZ:         0,
+		sellAt:        time.Time{},
+		sellPhaseAt:   time.Time{},
+		merchantID:    0,
+		merchantPick:  time.Time{},
+		sold:          make(map[int32]bool),
+		tripStart:     time.Time{},
+		tripEndedAt:   time.Time{},
+		delevelTarget: 0,
+		delevelGuard:  0,
+		delevelFight:  time.Time{},
+		delevelEnd:    time.Time{},
 	}
+}
+
+// SetNavigator installs the geodata path finder behind the town trips.
+// Without a navigator the trips never trigger and the loop hunts as
+// before.
+func (l *Loop) SetNavigator(navigator Navigator) {
+	l.navigator = navigator
 }
 
 // SetHuntingZone configures the hunting square: the bot attacks the
@@ -183,10 +248,12 @@ func (l *Loop) inZoneSelf() bool {
 }
 
 // DefaultHuntingZone is the configured hunting square of this
-// deployment: 2500x2500 units centered just below the Newbie Helper of
-// the Elven village.
+// deployment: 3300x3300 units centered just below the Newbie Helper of
+// the Elven village. Wide enough to keep the gremlin pack on the east
+// edge (up to x ~47460) and the keltir field south of it (up to
+// y ~42980) inside the square.
 func DefaultHuntingZone() (cx int32, cy int32, half int32) {
-	return 46112, 41500, 1250
+	return 46112, 41500, 1650
 }
 
 // Run drives the hunt loop until the context is done.
@@ -212,6 +279,28 @@ func (l *Loop) tick() {
 
 		return
 	}
+	if l.phase == phaseDelevel {
+		l.tickDelevel()
+
+		return
+	}
+	if l.tripActive() {
+		l.tickTownTrip()
+
+		return
+	}
+	l.maybeStartTownTrip()
+	if l.tripActive() {
+		l.tickTownTrip()
+
+		return
+	}
+	if l.delevelWanted() {
+		l.startDelevel()
+		l.tickDelevel()
+
+		return
+	}
 	l.cleanupInventory()
 	if l.phase == phaseEngage {
 		l.engage()
@@ -226,7 +315,12 @@ func (l *Loop) tick() {
 // revives the character with restored vitals. The request retries until
 // the revival lands (the server refuses it during the death delay) and
 // the stale target and loot references are dropped; the zone leash of
-// the engage phase walks the revived character back afterwards.
+// the engage phase walks the revived character back afterwards. A town
+// trip interrupted by the death is dropped without a cooldown so a full
+// inventory sells right after the revival (the restart lands in the
+// village, next to the shops). A death during the deleveling is the
+// point of the exercise: the phase keeps running and replans the walk
+// to the guard from the restart point.
 func (l *Loop) recoverFromDeath() {
 	now := time.Now()
 	if !l.restartAt.IsZero() && now.Sub(l.restartAt) < deathRestartPeriod {
@@ -235,7 +329,12 @@ func (l *Loop) recoverFromDeath() {
 	l.restartAt = now
 	l.target = 0
 	l.lootID = 0
-	l.phase = phaseEngage
+	if l.phase == phaseDelevel {
+		l.waypoints = nil
+	} else {
+		l.phase = phaseEngage
+		l.resetTownTrip()
+	}
 	l.logger.Printf("Hunt: character died, restarting at the nearest village")
 	if err := l.game.RestartAtVillage(); err != nil {
 		l.logger.Printf("Hunt: village restart failed: %v", err)

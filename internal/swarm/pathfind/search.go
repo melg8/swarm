@@ -56,6 +56,8 @@ type search struct {
 	closed            map[nodeKey]*node
 	queue             nodeQueue
 	target            Point
+	targetKey         nodeKey
+	strictTarget      bool
 	neighborScratch   []*node
 	ringScratch       []*node
 	region            *Region
@@ -76,6 +78,8 @@ func newSearch(engine *Engine, maxPassableHeight uint16) *search {
 		closed:            make(map[nodeKey]*node),
 		queue:             make(nodeQueue, 0, 256),
 		target:            Point{},
+		targetKey:         nodeKey{},
+		strictTarget:      false,
 		neighborScratch:   nil,
 		ringScratch:       nil,
 		region:            nil,
@@ -157,8 +161,15 @@ func (s *search) nextSeq() uint64 {
 	return s.seq
 }
 
-// run executes the whole search and fills the result statistics.
-func (s *search) run(start, end Vec3) (*Result, error) {
+// run executes the whole search and fills the result statistics. The
+// targetResolveZ is the height the target cell resolves its layer
+// against (normally the start z, an explicit deck z for the targeted
+// searches). With strictTarget the search only accepts an arrival on
+// the resolved layer of the target cell; without it the first arrival
+// on the cell wins (the original behavior).
+func (s *search) run(
+	start, end Vec3, targetResolveZ int16, strictTarget bool,
+) (*Result, error) {
 	began := time.Now()
 	from, err := s.nodeAtWorld(start)
 	if err != nil {
@@ -170,11 +181,15 @@ func (s *search) run(start, end Vec3) (*Result, error) {
 	// CreateTargetNode takes the start z). The search terminates on the
 	// target cell with whatever layer the walk arrived on - every hop
 	// of the arrival is height validated by construction.
-	to, err := s.nodeAtWorld(Vec3{X: end.X, Y: end.Y, Z: start.Z})
+	to, err := s.nodeAtWorld(Vec3{
+		X: end.X, Y: end.Y, Z: float64(targetResolveZ),
+	})
 	if err != nil {
 		return nil, err
 	}
 	s.target = to.coords
+	s.targetKey = to.key
+	s.strictTarget = strictTarget
 
 	result := &Result{
 		Found:     false,
@@ -214,7 +229,14 @@ func (s *search) astar(from *node) []*node {
 	for s.queue.Len() > 0 {
 		current := heap.Pop(&s.queue).(*node)
 		delete(s.openSet, current.key)
-		if current.coords == s.target {
+		reached := current.coords == s.target
+		if reached && s.strictTarget {
+			// The targeted searches only accept an arrival on the
+			// resolved layer: reaching the cell on another deck (the
+			// water below the shop) is not reaching the target.
+			reached = current.key == s.targetKey
+		}
+		if reached {
 			return s.reconstruct(current)
 		}
 		if s.explored >= MaxSearchExpansions {
