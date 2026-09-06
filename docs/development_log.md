@@ -741,3 +741,29 @@ together with the map on zoom out.
   fires requestAnimationFrame, so the map canvas stays at its last
   painted state and the runtime map stays empty - a blank canvas in
   the probes means the pane is hidden, not that the rendering broke.
+
+
+## Round 12: direction ticks scale with the zoom (2026-09-06)
+
+User report: on zoom out only the circles shrink, the look direction
+ticks keep their length.
+
+### Fix
+
+- drawUnitTick takes the marker zoom factor (unitScale) as opts.scale:
+  the tick length beyond the circle edge, every line width (body, combat
+  pulse, attack ring, self ring) and the dash pattern scale with it, so
+  a zoomed out marker is a proportionally small circle with a small
+  tick. The social marker ring and the self accent ring scale the same
+  way.
+- advanceRuntime now snaps the drawn position to the projection when
+  the chase distance is not finite: a NaN that reached the drawn
+  position used to reproduce itself through the chase arithmetic
+  forever (dist stays NaN and no branch ever reassigns).
+
+### Verification
+
+- Live measurement on test1 through a patched canvas context: at scale
+  0.02 the median tick length is 1.54 px (unitScale 0.34), at scale
+  0.12 it is 4.50 px (unitScale 1.0).
+- All harnesses pass.

@@ -304,7 +304,9 @@ the same variables).
   the zone square, the units and the links draw on top.
 - Map rendering: the unit markers scale with the zoom (a sub linear
   factor of the map scale, clamped 0.3..1.6) so zooming out shrinks
-  them together with the map, and the draw order is deterministic -
+  them together with the map - the direction ticks, the line widths,
+  the link rings and the social marker follow the same factor - and the
+  draw order is deterministic -
   dead units first, then north to south, then the object id - because
   the snapshot objects arrive in random go map order and overlapping
   units would flicker otherwise.
