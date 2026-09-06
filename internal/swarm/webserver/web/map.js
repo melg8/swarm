@@ -442,12 +442,23 @@ const MapView = {
     if (!this.lastSnap) { return; }
 
     this.drawMapBackground(ctx, rect);
+    this.unitScale = this.computeUnitScale();
     this.drawGrid(ctx, rect);
     this.drawZone(ctx, rect);
     this.drawTargetLinks(ctx);
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
     this.updateMapInfo();
+  },
+
+  // computeUnitScale maps the zoom into a marker size factor: the
+  // markers shrink when the user zooms out and grow (bounded) when
+  // zooming in. The factor follows the zoom sub linearly so far views
+  // keep the units visible while they still shrink clearly.
+  computeUnitScale() {
+    const factor = Math.pow(this.scale / 0.12, 0.6);
+
+    return Math.max(0.3, Math.min(1.6, factor));
   },
 
   drawGrid(ctx, rect) {
@@ -518,7 +529,13 @@ const MapView = {
   drawObjects(ctx, rect) {
     const showLabels = document.getElementById("show-labels").checked;
     const showDest = document.getElementById("show-dest").checked;
-    const objects = this.lastSnap.objects || [];
+    // The snapshot objects come out of a go map in random order: the
+    // draw order must be stable or overlapping units swap their z
+    // position on every snapshot and flicker (dead units always render
+    // below the living ones, then north to south).
+    const objects = (this.lastSnap.objects || []).slice()
+      .sort((a, b) => ((a.dead ? 0 : 1) - (b.dead ? 0 : 1))
+        || (a.y - b.y) || (a.objectId - b.objectId));
     for (const obj of objects) {
       const rt = this.runtime.get(obj.objectId) || {
         drawX: obj.x, drawY: obj.y, drawHeading: obj.heading
@@ -545,15 +562,15 @@ const MapView = {
       if (obj.kind === "item") {
         drawDiamond(ctx, p.x, p.y, 4, this.colors.item);
       } else {
+        const radius = radiusOf(obj, threat) * this.unitScale;
         drawUnitTick(ctx, p.x, p.y, rt.drawHeading,
-          radiusOf(obj, threat), this.colors[threat], this.colors.textBright, {
+          radius, this.colors[threat], this.colors.textBright, {
             dead: obj.dead,
             combat: threat === "combat",
             attackingMe: this.isAttackingMe(obj),
             pulse: performance.now()
           });
-        this.drawSocialMarker(ctx, p.x, p.y,
-          radiusOf(obj, threat), obj.socialUntilMs);
+        this.drawSocialMarker(ctx, p.x, p.y, radius, obj.socialUntilMs);
       }
       if (showLabels && obj.name) {
         ctx.fillStyle = labelColor(this.colors, threat);
@@ -614,7 +631,8 @@ const MapView = {
     ctx.setLineDash([]);
     ctx.restore();
 
-    const radius = radiusOf(target, threatOf(target)) + 6;
+    const radius = radiusOf(target, threatOf(target))
+      * this.unitScale + 6;
     ctx.save();
     ctx.strokeStyle = this.colors.combat;
     ctx.globalAlpha = 0.85;
@@ -658,7 +676,8 @@ const MapView = {
     ctx.setLineDash([]);
     ctx.restore();
 
-    const radius = (self ? 7 : radiusOf(target, threatOf(target))) + 5;
+    const radius = (self ? 7 : radiusOf(target, threatOf(target)))
+      * this.unitScale + 5;
     ctx.save();
     ctx.strokeStyle = this.colors.player;
     ctx.globalAlpha = 0.75;
@@ -689,9 +708,10 @@ const MapView = {
       rt ? rt.drawX : c.x, rt ? rt.drawY : c.y);
 
     // The self marker: bigger circle, accent ring and the look tick.
-    drawUnitTick(ctx, p.x, p.y, heading, 7,
+    const selfRadius = 7 * this.unitScale;
+    drawUnitTick(ctx, p.x, p.y, heading, selfRadius,
       this.colors.self, this.colors.textBright, { self: true, pulse: performance.now() });
-    const ring = 10 + 1.5 * Math.sin(performance.now() / 500);
+    const ring = selfRadius + 3 + 1.5 * Math.sin(performance.now() / 500);
     ctx.strokeStyle = this.colors.selfRing;
     ctx.globalAlpha = 0.5;
     ctx.lineWidth = 1.25;

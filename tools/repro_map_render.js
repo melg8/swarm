@@ -400,6 +400,53 @@ function runScenarioTargetingBot(mapFile) {
     return results;
 }
 
+// runScenarioStableOrder covers the draw order of overlapping units:
+// the snapshot objects arrive in random go map order, the renderer must
+// draw them in one deterministic order (dead first, then north to
+// south) or the overlapping markers swap their z position every
+// snapshot and flicker.
+function runScenarioStableOrder(mapFile) {
+    const results = [];
+    const orders = [];
+    for (let round = 0; round < 3; round++) {
+        const { MapView, record } = loadMapJs(mapFile);
+        MapView.init();
+        const snap = buildSnapshot(0, false);
+        // Two npcs stacked at the same spot, ids and array positions
+        // swapped per round to simulate the random map iteration.
+        const first = snap.objects.find(
+            (o) => o.objectId === WORLD.playerTargetMob.objectId);
+        const second = snap.objects.find(
+            (o) => o.objectId === WORLD.ownTargetMob.objectId);
+        first.x = WORLD.self.x + 100;
+        first.y = WORLD.self.y + 100;
+        second.x = WORLD.self.x + 100;
+        second.y = WORLD.self.y + 100;
+        if (round % 2 === 1) {
+            snap.objects.reverse();
+        }
+        MapView.update(snap);
+        MapView.draw();
+        // The fill centers of the two npcs in draw order.
+        const centers = record.fills
+            .map((fill) => fill.arcs[0])
+            .filter((arc) => arc && Math.hypot(
+                arc[0] - worldToScreen(WORLD.self.x + 100,
+                    WORLD.self.y + 100).x) < 2)
+            .map((arc) => arc[1]);
+        orders.push(centers.join("|"));
+    }
+    check(results, "overlapping units draw in one stable order",
+        orders[0] === orders[1] && orders[1] === orders[2],
+        "draw orders: " + JSON.stringify(orders));
+    check(results, "units draw north to south",
+        orders[0].split("|").every((y, i, all) => i === 0
+            || Number(all[i - 1]) <= Number(y)),
+        "y order: " + orders[0]);
+
+    return results;
+}
+
 // runScenarioSocialMarker covers the social animation marker: a
 // creature with a fresh socialUntilMs shows the small ring above its
 // marker, and the ring fades out once the window is over.
@@ -543,7 +590,8 @@ function main() {
         ["player selects the bot", runScenarioTargetingBot(mapFile)],
         ["follow off keeps the view static", runScenarioFollowOff(mapFile)],
         ["map drag keeps the grabbed point", runScenarioMapDrag(mapFile)],
-        ["social animation marker", runScenarioSocialMarker(mapFile)]
+        ["social animation marker", runScenarioSocialMarker(mapFile)],
+        ["stable draw order", runScenarioStableOrder(mapFile)]
     ];
     let failed = 0;
     for (const [name, results] of scenarios) {
