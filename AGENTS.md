@@ -300,8 +300,11 @@ the same variables).
   `web/map.js drawMapBackground` picks the pyramid level allowing at
   most a 2x upscale of the tile pixels, draws the tiles covering the
   viewport through the usual world to screen transform (follow and pan
-  included) and lazy loads them via the static file server; the grid,
-  the zone square, the units and the links draw on top. The wheel zoom
+  included) and lazy loads them via the static file server; a missing
+  tile (level 0 ships only for the detail window) falls back to the
+  closest existing pyramid level of the same block stretched over the
+  tile rect, so every panned to area keeps its map at any zoom; the
+  grid, the zone square, the units and the links draw on top. The wheel zoom
   anchors at the cursor in the free camera mode (the world point under
   the cursor stays under it) and centers on the character while follow
   is on.
