@@ -478,9 +478,9 @@ the same variables).
   while it is alive - otherwise the stale dead id re-enters the loop
   every tick and the next target is never selected. The loop decides on
   a 250 ms cadence, chains the next target immediately while the
-  character HP is at or above 50 percent (rate limited to one player
+  character HP is at or above 60 percent (rate limited to one player
   action per second for the flood protector) and rests with a logged
-  reason below it. Resting sits the character down below 30 percent
+  reason below it. Resting sits the character down below 60 percent
   (RequestActionUse 0x45 action 0, GameClient.ActionSitStand - the
   sitting regeneration is faster) and stands up at 90 percent; the
   toggle is confirmed by the ChangeWaitType 0x3F broadcast

@@ -835,3 +835,18 @@ blank even though the zoomed out views showed the area.
   half paints at 100 percent coverage, 10416 distinct colors, the full
   resolution level 0 tile 19_19 loaded and used directly.
 - /maps/0/19_19.jpg serves 200 with the full 156 KB tile.
+
+
+## Round 19: rest threshold raised to 60 percent (2026-09-06)
+
+User request: resting should start below 60 percent hp, not 30 - a
+character that leaves a fight at 30 percent may not have enough health
+to kill the next mob, which turns every engagement into a death risk.
+
+### Implementation
+
+- The sit down threshold and the engage gate moved together from 30/50
+  to 60 percent: a hurt character sits right away instead of standing
+  around, stands up at 90 percent and only then chains the next target.
+- TestLoopSitsAtTheNewThreshold covers the band: 55 percent sits down,
+  65 percent engages again.
