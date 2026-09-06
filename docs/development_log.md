@@ -705,3 +705,39 @@ a google maps style level of detail.
   sharp at level 0 (777 px drawn tiles, within the 2x upscale rule);
   the harnesses run unchanged because the vm sandbox has neither the
   show-map checkbox nor an Image constructor.
+
+
+## Round 11: stable draw order and zoom scaled markers (2026-09-06)
+
+User report: when the map is zoomed out the mobs flicker - one draws
+above the other, then swaps - and the unit markers should shrink
+together with the map on zoom out.
+
+### Root cause and implementation
+
+- The flicker: the snapshot objects arrive in the iteration order of a
+  go map, which is random on every snapshot; drawObjects walked them as
+  they came, so the z order of overlapping units changed from frame to
+  frame. The draw order is now deterministic: dead units first, then
+  north to south (a pseudo depth), then the object id.
+- The markers scale with the zoom: the unit radius is multiplied by a
+  sub linear factor of the map scale (`(scale / 0.12) ^ 0.6`, clamped
+  0.3..1.6) - zooming out shrinks the markers together with the map
+  while they stay visible at the far end, zooming in grows them
+  bounded. The self marker, the target link rings and the social
+  marker follow the same factor; the direction tick and the combat
+  pulse scale with the radius inside drawUnitTick.
+
+### Verification
+
+- tools/repro_map_render.js scenario "stable draw order": three draw
+  rounds with the snapshot array reversed between rounds require one
+  stable draw order and the north to south y order (RED against the
+  pre fix map.js, which drew in array order).
+- Live check on test1 at scale 0.0158: the markers render at the
+  0.30 factor, the runtime tracks every unit and the pixel probe finds
+  the map, the mobs and the self marker on the canvas.
+- Diagnostics note: an in app browser pane that is not visible never
+  fires requestAnimationFrame, so the map canvas stays at its last
+  painted state and the runtime map stays empty - a blank canvas in
+  the probes means the pane is hidden, not that the rendering broke.

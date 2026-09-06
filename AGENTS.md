@@ -302,6 +302,12 @@ the same variables).
   viewport through the usual world to screen transform (follow and pan
   included) and lazy loads them via the static file server; the grid,
   the zone square, the units and the links draw on top.
+- Map rendering: the unit markers scale with the zoom (a sub linear
+  factor of the map scale, clamped 0.3..1.6) so zooming out shrinks
+  them together with the map, and the draw order is deterministic -
+  dead units first, then north to south, then the object id - because
+  the snapshot objects arrive in random go map order and overlapping
+  units would flicker otherwise.
 - Map rendering: every unit (character, mob, player) is a circle with a
   short look direction tick from the center over the edge (L2Bot2.0
   style), colored by threat: friendly gray, passive monster green,
