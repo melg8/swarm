@@ -503,6 +503,23 @@ func (b *Bot) SelfHealthPercent() float64 {
 	return math.Min(100, math.Max(0, pct))
 }
 
+// ObjectHealthPercent returns the HP of an observed object as a
+// percentage of its maximum (0..100), -1 when the object or its
+// vitals are unknown. The server refreshes the vitals of the mob the
+// character attacks, so the value is exact where the hunt loop needs
+// it: the current fight.
+func (b *Bot) ObjectHealthPercent(objectID int32) float64 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	obj, ok := b.objects[objectID]
+	if !ok || obj.MaxHP <= 0 {
+		return -1
+	}
+	pct := obj.CurHP / obj.MaxHP * 100
+
+	return math.Min(100, math.Max(0, pct))
+}
+
 // ID returns the session id of the bot.
 func (b *Bot) ID() string {
 	return b.id
@@ -1267,6 +1284,44 @@ func (z *Zone) Contains(x int32, y int32) bool {
 
 	return x >= z.CX-z.Half && x <= z.CX+z.Half &&
 		y >= z.CY-z.Half && y <= z.CY+z.Half
+}
+
+// NearestAttacker returns the closest living attackable npc that
+// currently targets the character: the mob whose blows land, the
+// chase of the flee flow. The projected position of every attacker
+// candidate measures the moving chase.
+func (b *Bot) NearestAttacker() (AttackTarget, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	//nolint:exhaustruct // zero value grows inside the loop
+	best := AttackTarget{}
+	bestDist := math.MaxFloat64
+	found := false
+	selfX := float64(b.char.X)
+	selfY := float64(b.char.Y)
+	now := time.Now()
+	for _, obj := range b.objects {
+		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead ||
+			obj.TargetID != b.selfID {
+			continue
+		}
+		x, y := projectedPosition(obj, now)
+		dist := math.Hypot(x-selfX, y-selfY)
+		if dist < bestDist {
+			bestDist = dist
+			found = true
+			best = AttackTarget{
+				ObjectID: obj.ObjectID,
+				Name:     obj.Name,
+				X:        int32(math.Round(x)),
+				Y:        int32(math.Round(y)),
+				Z:        obj.Z,
+			}
+		}
+	}
+
+	return best, found
 }
 
 // NearestAttackable returns the closest living attackable npc within the

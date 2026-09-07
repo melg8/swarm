@@ -530,15 +530,17 @@ func TestLoopSitsAtTheNewThreshold(t *testing.T) {
 	require.Equal(t, []int32{7}, game.forces, "65 percent engages again")
 }
 
-func TestLoopDoesNotSitWhileUnderAttack(t *testing.T) {
+func TestLoopEscapesWhenHurtUnderAttack(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
 
-	// A mob hits the character (Attack broadcast with the bot as target)
-	// while its HP is low: the loop keeps fighting instead of sitting.
+	// A mob hits the character (Attack broadcast with the bot as
+	// target) while its HP is low: the character keeps moving instead
+	// of sitting into the blows or starting a fight it cannot win -
+	// one escape leg away from the attacker.
 	bot.ApplyStatusUpdate(100, []state.Attribute{
 		{ID: state.AttrCurHP, Value: 20},
 	})
@@ -551,8 +553,28 @@ func TestLoopDoesNotSitWhileUnderAttack(t *testing.T) {
 	loop.lastHit = time.Now().Add(-2 * time.Second)
 	loop.tick()
 	require.Zero(t, game.sits, "no sitting into the blows of a fight")
+	require.Empty(t, game.forces,
+		"a hurt character does not start a losing fight")
+	require.Len(t, game.walks, 1, "one escape leg away from the attacker")
+	require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0])
+
+	// The escape walk is paced: the next ticks do not spam move
+	// requests while the chase holds.
+	for range 3 {
+		loop.lastHit = time.Now().Add(-2 * time.Second)
+		loop.tick()
+	}
+	require.Len(t, game.walks, 1, "the escape legs are paced")
+
+	// The health recovers above the hurt gate: even under the fresh
+	// blows the character stops running and answers the attacker.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 90},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
 	require.Equal(t, []int32{7}, game.forces,
-		"the fight continues instead")
+		"a recovered character engages the attacker")
 }
 
 func TestLoopRestartsAfterDeath(t *testing.T) {
@@ -665,4 +687,145 @@ func TestLoopWaitsForHealthWhenHurt(t *testing.T) {
 	loop.tick()
 	require.Equal(t, []int32{7}, game.forces,
 		"a recovered character engages the next target")
+}
+
+func TestLoopSkipsTooStrongTargets(t *testing.T) {
+	bot := newTestBot()
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrLevel, Value: 3},
+	})
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000006, Attackable: true,
+		X: 45100, Y: 50000, Name: "Orc Archer",
+	})
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 8, TemplateID: 1000001, Attackable: true,
+		X: 45500, Y: 50000, Name: "Gremlin",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The level 3 character never initiates on the level 8 orc (the
+	// two level slack), the level 1 gremlin behind it is the pick.
+	loop.tick()
+	require.Equal(t, int32(8), loop.target,
+		"the level 8 orc stays out of the level 3 slack")
+	require.Equal(t, []int32{8}, game.forces)
+}
+
+func TestLoopEscapesALosingFight(t *testing.T) {
+	bot := newTestBot()
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 45600, Y: 50000, Name: "Gremlin",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+
+	// The fight runs on mob 7 and the health collapses under the
+	// escape threshold (the mob vitals stay unknown - the low own
+	// health alone triggers the escape).
+	loop.target = 7
+	bot.ApplySelfTarget(7)
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 20},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+
+	require.Equal(t, int32(0), loop.target, "the losing fight is dropped")
+	require.Empty(t, game.forces, "no further attack requests")
+	require.Len(t, game.walks, 1, "one escape leg away from the mob")
+	require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0])
+	require.True(t, loop.targetSkipped(7, time.Now().Add(time.Minute)),
+		"the fled target stays out of the search for the long delay")
+}
+
+func TestLoopEscapesTheLevelGapFight(t *testing.T) {
+	bot := newTestBot()
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000006, Attackable: true,
+		X: 45600, Y: 50000, Name: "Orc Archer",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+
+	// The mob keeps 90 percent of its health while the character sank
+	// to 45: the gap fight is a death risk even above the panic
+	// threshold, the escape opens early.
+	loop.target = 7
+	bot.ApplySelfTarget(7)
+	bot.ApplyStatusUpdate(7, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 90},
+		{ID: state.AttrMaxHP, Value: 100},
+	})
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 45},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+
+	require.Equal(t, int32(0), loop.target, "the gap fight is dropped early")
+	require.Len(t, game.walks, 1, "one escape leg away from the mob")
+}
+
+func TestLoopFinishesTheBeatenTarget(t *testing.T) {
+	bot := newTestBot()
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 45600, Y: 50000, Name: "Gremlin",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+
+	// The character is hurt but the target is one swing from dead:
+	// finishing the kill beats fleeing and dropping the loot.
+	loop.target = 7
+	bot.ApplySelfTarget(7)
+	bot.ApplyStatusUpdate(7, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 10},
+		{ID: state.AttrMaxHP, Value: 100},
+	})
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 20},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+
+	require.Equal(t, int32(7), loop.target, "the beaten target stays")
+	require.Equal(t, []int32{7}, game.forces, "the fight continues")
+	require.Empty(t, game.walks, "no escape while the kill is close")
+}
+
+func TestLoopPatrolsTowardTheCenterWithoutTargets(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZone(46500, 50800, 1500)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// No targets around: the first empty search arms the patience, no
+	// walk yet.
+	loop.tick()
+	require.Empty(t, game.walks, "the patience holds the center walk")
+
+	// The patience expires: one paced leg toward the zone center (the
+	// next searches pick up any mob the walk passes).
+	loop.noTargetSince = time.Now().Add(-noTargetPatience - time.Second)
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Len(t, game.walks, 1, "an idle hunter walks toward the center")
+	leg := game.walks[0]
+	dx := float64(46500 - 45000)
+	dy := float64(50800 - 50000)
+	dist := math.Hypot(dx, dy)
+	frac := math.Min(1, returnWalkLeg/dist)
+	require.InDelta(t, float64(45000)+dx*frac, float64(leg[0]), 1)
+	require.InDelta(t, float64(50000)+dy*frac, float64(leg[1]), 1)
 }

@@ -223,7 +223,7 @@ func (l *Loop) maybeStartTownTrip() {
 	}
 	// The walk needs a standing character: a resting one stands up
 	// first and the trip starts on a later tick.
-	if !l.standUpBeforeTrip(time.Now()) {
+	if !l.standUpGuarded(time.Now()) {
 		return
 	}
 	selfX, selfY, _, ok := l.tracker.SelfPosition()
@@ -775,13 +775,14 @@ func (l *Loop) resetTownTrip() {
 	l.tripEndedAt = time.Time{}
 }
 
-// standUpBeforeTrip stands a sitting character up before the trip
-// walk: the server refuses move requests while the character sits, so
-// a walk started sitting would stall into the stuck re-paths. The
-// toggle shares the pending transition gate with the rest logic, so
-// the two never double toggle each other, and the trip starts on a
-// later tick once the ChangeWaitType broadcast confirms the standing.
-func (l *Loop) standUpBeforeTrip(now time.Time) bool {
+// standUpGuarded stands a sitting character up before an action the
+// server refuses while it sits: the trip walks and the escape runs of
+// the combat safety both move the character, and a walk started
+// sitting would stall into the stuck re-paths. The toggle shares the
+// pending transition gate with the rest logic, so the two never
+// double toggle each other, and the walk starts on a later tick once
+// the ChangeWaitType broadcast confirms the standing.
+func (l *Loop) standUpGuarded(now time.Time) bool {
 	if !l.tracker.SelfSitting() {
 		// Standing already: consume a confirmed stand transition of
 		// this guard so it never lingers into the rest logic.
@@ -799,7 +800,7 @@ func (l *Loop) standUpBeforeTrip(now time.Time) bool {
 		return false
 	}
 	if err := l.game.ActionSitStand(); err != nil {
-		l.logger.Printf("Hunt: stand up for the trip failed: %v", err)
+		l.logger.Printf("Hunt: stand up failed: %v", err)
 
 		return false
 	}

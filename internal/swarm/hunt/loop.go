@@ -142,6 +142,40 @@ const (
 	// stale state, the delay only stops the immediate re-pick of the
 	// very same nearest npc.
 	engageSkipDelay = 30 * time.Second
+	// targetMaxLevelSlack bounds the mob level the engage initiates
+	// on above the character level: two levels keep the experience
+	// flow without turning every pull into a death risk (the
+	// observed death ran at half health into a level 10 mob).
+	targetMaxLevelSlack = 2
+	// escapeHealthPercent is the HP level below which a running
+	// fight is dropped and the character runs: pressing on below a
+	// quarter of the health bar dies far more often than it kills.
+	escapeHealthPercent = 25.0
+	// losingFightGap is the health lead a target may hold over the
+	// hurt character before the fight counts as lost (the level
+	// gap pulls, the adds that joined a social pack).
+	losingFightGap = 25.0
+	// escapeTargetBeatenPercent is the target health below which a
+	// hurt character finishes the fight instead of fleeing: the
+	// kill is one swing away.
+	escapeTargetBeatenPercent = 15.0
+	// fleeSkipDelay keeps a fled target out of the search: walking
+	// straight back into the mob the character just ran from
+	// re-creates the same death risk at lower health.
+	fleeSkipDelay = 2 * time.Minute
+	// escapeWalkDistance is one escape leg of the flee flow.
+	escapeWalkDistance = 700.0
+	// escapeThreatRange bounds the nearest mob lookup of the escape
+	// direction: a mob farther than this is not on the character.
+	escapeThreatRange = 900.0
+	// noTargetPatience is the idle time before a targetless hunter
+	// patrols toward the zone center: entering a zone engages the
+	// first mob in reach, and only an empty radius keeps the
+	// character walking toward the middle.
+	noTargetPatience = 6 * time.Second
+	// patrolCenterMinDist suppresses the center patrol when the
+	// character already stands central: the respawns come to it.
+	patrolCenterMinDist = 700.0
 )
 
 // phase is the coarse activity of the hunt loop.
@@ -229,16 +263,24 @@ type Loop struct {
 	delevelCounted    bool
 	engageAt          time.Time
 	targetSkip        map[int32]time.Time
-	userKind          string
-	userX             int32
-	userY             int32
-	userZ             int32
-	userTarget        int32
-	userStart         time.Time
-	userMoveAt        time.Time
-	userWaypoints     []pathfind.Vec3
-	userWpIndex       int
-	userPathTried     bool
+	// noTargetSince tracks when the target search last came up
+	// empty: the patrol toward the zone center waits out the
+	// patience before it walks.
+	noTargetSince time.Time
+	// fleeAt paces the escape walk requests: the escape must not
+	// wait out the attack request pacing of the engage (the last
+	// forced attack fired moments before the threshold crossed).
+	fleeAt        time.Time
+	userKind      string
+	userX         int32
+	userY         int32
+	userZ         int32
+	userTarget    int32
+	userStart     time.Time
+	userMoveAt    time.Time
+	userWaypoints []pathfind.Vec3
+	userWpIndex   int
+	userPathTried bool
 	// userRedirect marks a manual command that replaced a walk
 	// still running on the server: the next walk request fires at
 	// once instead of waiting for the old walk to finish.
@@ -346,6 +388,8 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		delevelCounted:    false,
 		engageAt:          time.Time{},
 		targetSkip:        nil,
+		noTargetSince:     time.Time{},
+		fleeAt:            time.Time{},
 		userKind:          "",
 		userX:             0,
 		userY:             0,
@@ -580,6 +624,8 @@ func (l *Loop) recoverFromDeath() {
 			l.phase = phaseIdle
 		}
 		l.resetTownTrip()
+		l.noTargetSince = time.Time{}
+		l.fleeAt = time.Time{}
 		// The village restart lands next to the shops and the cooldown
 		// a recent finished trip armed must not hold the sale back:
 		// otherwise the revived character walks to the farm spot with
@@ -599,14 +645,28 @@ func (l *Loop) recoverFromDeath() {
 // selected target triggers the forced attack. The loop therefore keeps
 // re-requesting the target until the character is actually engaged in
 // the fight, which the MoveToPawn/Attack/AutoAttackStart broadcasts
-// confirm.
+// confirm. The safety gates run before every attack decision: a
 // Pre-consolidation phase debt; the hunt loop cleanup is planned
 // (docs/quality_review_and_agent_prompts.md P07).
+// losing fight is fled instead of fought to the death, a hurt
+// character under attack keeps running instead of standing in the
+// blows, and the target search never initiates on mobs above the
+// character level slack or on social pulls whose clan mates stand
+// within the help range.
 func (l *Loop) engage() { //nolint:cyclop,funlen
 	// The hunting zone leash: attacks happen inside the square only,
 	// and a character outside of it (a long chase, a village respawn)
-	// walks back instead of hunting.
+	// walks back instead of hunting. A hurt character under attack
+	// flees even outside the square: the leash walk home would drag
+	// it through the chasing pack.
+	now := time.Now()
 	if !l.inZoneSelf() {
+		if l.tracker.SelfUnderAttack() &&
+			l.tracker.SelfHealthPercent() < reengageHealthPercent {
+			l.fleeFromThreat(now)
+
+			return
+		}
 		l.returnToZone()
 
 		return
@@ -626,7 +686,6 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 	// never selected. A target marked stuck (its repeated attack
 	// requests never started the fight) is not re-adopted either
 	// while its skip delay lasts.
-	now := time.Now()
 	serverTarget := l.tracker.SelfTargetID()
 	if serverTarget != 0 && l.tracker.ObjectAlive(serverTarget) &&
 		!l.targetSkipped(serverTarget, now) {
@@ -654,9 +713,20 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		if l.targetSkip == nil {
 			l.targetSkip = make(map[int32]time.Time)
 		}
-		l.targetSkip[l.target] = now
+		l.targetSkip[l.target] = now.Add(engageSkipDelay)
 		l.target = 0
 		l.engageAt = time.Time{}
+
+		return
+	}
+	if l.target != 0 && l.losingFight() {
+		// The fight turned into a death risk: the health fell under
+		// the escape threshold or the target keeps a clear health
+		// lead over a hurt character (the level gap pull of the
+		// observed death, an add that joined a social pack).
+		// Pressing on below that line dies far more often than it
+		// kills, so the fight is dropped and the character runs.
+		l.fleeFromTarget(l.target, now)
 
 		return
 	}
@@ -664,10 +734,25 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		// Rest while the character is hurt: the regeneration is
 		// faster out of combat and engaging with low HP risks
 		// death. A sitting character stands up through the rest
-		// logic once recovered. A character that is being hit right
-		// now keeps fighting instead of sitting into the blows.
+		// logic once recovered. A hurt character under attack ran
+		// out of targets it can win: it keeps fleeing instead of
+		// standing in the blows or sitting into them.
 		hurt := l.tracker.SelfHealthPercent() < reengageHealthPercent
-		if l.tracker.SelfSitting() || (hurt && !l.tracker.SelfUnderAttack()) {
+		if hurt && l.tracker.SelfUnderAttack() {
+			l.fleeFromThreat(now)
+
+			return
+		}
+		if l.tracker.SelfSitting() && l.tracker.SelfUnderAttack() {
+			// A mob reached a resting character above the hurt gate:
+			// stand up - the pick below selects the attacker and
+			// the fight answers itself (the hurt branch above runs
+			// at the low health instead).
+			l.standUpGuarded(now)
+
+			return
+		}
+		if l.tracker.SelfSitting() || hurt {
 			l.rest()
 
 			return
@@ -675,11 +760,15 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		if now.Sub(l.lastHit) < selectPeriod {
 			return
 		}
-		pick, ok := l.tracker.NearestAttackableExcept(
-			attackNearestRange, l.zone(), l.skippedTargets(now))
+		pick, ok := l.tracker.NearestAttackableConstrained(
+			attackNearestRange, l.zone(), l.skippedTargets(now),
+			l.maxTargetLevel(), true)
 		if !ok {
+			l.patrolToCenter(now)
+
 			return
 		}
+		l.noTargetSince = time.Time{}
 		l.target = pick.ObjectID
 		l.engageAt = now
 	}
@@ -726,23 +815,178 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 	l.lastHit = now
 }
 
-// targetSkipped reports whether the object id is currently held out of
-// the engage target search after it refused to start a fight.
-func (l *Loop) targetSkipped(objectID int32, now time.Time) bool {
-	skippedAt, ok := l.targetSkip[objectID]
+// losingFight reports whether the running fight turned into a death
+// risk: the character fell under the escape threshold, or it dropped
+// below the re-engage health while the target keeps a clear health
+// lead (a level gap pull, an add that joined a social pack). A
+// target that is nearly finished does not count as losing - the
+// kill is one swing away and fleeing drops its loot.
+func (l *Loop) losingFight() bool {
+	selfHP := l.tracker.SelfHealthPercent()
+	if selfHP >= reengageHealthPercent {
+		return false
+	}
+	targetHP := l.tracker.ObjectHealthPercent(l.target)
+	if targetHP >= 0 && targetHP < escapeTargetBeatenPercent {
+		return false
+	}
+	if selfHP < escapeHealthPercent {
+		return true
+	}
 
-	return ok && now.Sub(skippedAt) < engageSkipDelay
+	return targetHP >= 0 && targetHP-selfHP > losingFightGap
 }
 
-// skippedTargets collects the object ids currently held out of the
-// target search after they refused to start a fight.
+// maxTargetLevel bounds the mob level the engage initiates on: the
+// character level plus the slack. A fresh spawn whose UserInfo has
+// not arrived yet (level 0) disables the filter instead of fencing
+// every pick out.
+func (l *Loop) maxTargetLevel() int32 {
+	level := l.tracker.SelfLevel()
+	if level <= 0 {
+		return 0
+	}
+
+	return level + targetMaxLevelSlack
+}
+
+// fleeFromTarget drops a fight the character is losing and opens
+// distance: the target lands on the long skip list (the walk back
+// must not re-select it), the pending engage bookkeeping clears and
+// the shared threat walk runs.
+func (l *Loop) fleeFromTarget(targetID int32, now time.Time) {
+	l.logger.Printf("Hunt: HP %.0f%%, fleeing the fight with %d",
+		l.tracker.SelfHealthPercent(), targetID)
+	l.target = 0
+	l.engageAt = time.Time{}
+	l.noTargetSince = time.Time{}
+	if l.targetSkip == nil {
+		l.targetSkip = make(map[int32]time.Time)
+	}
+	l.targetSkip[targetID] = now.Add(fleeSkipDelay)
+	l.fleeFromThreat(now)
+}
+
+// fleeFromThreat walks the character away from the nearest living
+// threat (the chasing mob of a fled fight, an aggressive pull it
+// never selected): one paced leg per call, straight away from the
+// threat when the escape point stays inside the zone and toward
+// the zone center when it does not (the center direction leashes
+// the chasers near their spawns). A sitting character stands up
+// first - the server refuses move requests while it sits.
+func (l *Loop) fleeFromThreat(now time.Time) {
+	if !l.fleeAt.IsZero() && now.Sub(l.fleeAt) < selectPeriod {
+		return
+	}
+	l.fleeAt = now
+	if !l.standUpGuarded(now) {
+		return
+	}
+	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+	if !ok {
+		return
+	}
+	threatX, threatY, hasThreat := l.threatPosition()
+	if !hasThreat {
+		// The blows landed but no mob stands around anymore:
+		// the under attack window closes on its own in seconds.
+		return
+	}
+	moveX, moveY := selfX, selfY
+	dx := float64(selfX - threatX)
+	dy := float64(selfY - threatY)
+	if dist := math.Hypot(dx, dy); dist > 1 {
+		moveX = int32(float64(selfX) + dx/dist*escapeWalkDistance)
+		moveY = int32(float64(selfY) + dy/dist*escapeWalkDistance)
+	}
+	zone := l.zone()
+	if zone != nil && !zone.Contains(moveX, moveY) {
+		// The straight escape leaves the hunting square: run
+		// toward the center instead.
+		l.walkZoneLeg(zone, selfX, selfY, selfZ)
+
+		return
+	}
+	if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
+		l.logger.Printf("Hunt: escape walk failed: %v", err)
+	}
+}
+
+// threatPosition returns the position of the mob the escape runs
+// from: the current target while one is engaged, the nearest
+// attacker around otherwise (the mob whose blows land carries the
+// character as its target), the nearest living attackable npc as
+// the last resort (a hit from a mob that already switched away).
+func (l *Loop) threatPosition() (int32, int32, bool) {
+	if l.target != 0 {
+		if x, y, _, ok := l.tracker.ObjectPosition(l.target); ok {
+			return x, y, true
+		}
+	}
+	if pick, ok := l.tracker.NearestAttacker(); ok {
+		return pick.X, pick.Y, true
+	}
+	pick, ok := l.tracker.NearestAttackable(escapeThreatRange, nil)
+	if !ok {
+		return 0, 0, false
+	}
+
+	return pick.X, pick.Y, true
+}
+
+// patrolToCenter walks a targetless hunter toward the zone center:
+// the pack moved on or the social fence keeps the camps out of
+// reach, and standing still waits for luck. One paced leg at a
+// time, so the per second target search of the engage picks up
+// any mob the leg comes past - the character engages the moment
+// something valid enters the radius instead of marching to the
+// center first.
+func (l *Loop) patrolToCenter(now time.Time) {
+	zone := l.zone()
+	if zone == nil {
+		return
+	}
+	if l.noTargetSince.IsZero() {
+		l.noTargetSince = now
+
+		return
+	}
+	if now.Sub(l.noTargetSince) < noTargetPatience {
+		return
+	}
+	if now.Sub(l.lastHit) < selectPeriod {
+		return
+	}
+	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+	if !ok {
+		return
+	}
+	dist := math.Hypot(float64(zone.CX-selfX), float64(zone.CY-selfY))
+	if dist < patrolCenterMinDist {
+		return
+	}
+	l.lastHit = now
+	l.walkZoneLeg(zone, selfX, selfY, selfZ)
+}
+
+// targetSkipped reports whether the object id is currently held out of
+// the engage target search: a stuck pick keeps its short delay, a
+// fled target its long one (both live in the same expiry map).
+func (l *Loop) targetSkipped(objectID int32, now time.Time) bool {
+	until, ok := l.targetSkip[objectID]
+
+	return ok && now.Before(until)
+}
+
+// skippedTargets collects the object ids whose skip expiry has not
+// passed yet.
 func (l *Loop) skippedTargets(now time.Time) map[int32]bool {
 	if len(l.targetSkip) == 0 {
 		return nil
 	}
 	ids := make(map[int32]bool, len(l.targetSkip))
-	for objectID, skippedAt := range l.targetSkip {
-		if now.Sub(skippedAt) < engageSkipDelay {
+	for objectID, until := range l.targetSkip {
+		if now.Before(until) {
 			ids[objectID] = true
 		}
 	}
