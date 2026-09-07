@@ -1336,6 +1336,23 @@ type CharacterSnapshot struct {
 	Adena           int32   `json:"adena"`
 }
 
+// InventoryItemSnapshot is the JSON view of one inventory item of the
+// equipment widget. BodyPart is the slot mask of the item template
+// (0x80 right hand, 0x400 chest and so on), Icon the file name inside
+// data/icons and Name the resolved display name; both are empty for
+// unknown items.
+type InventoryItemSnapshot struct {
+	ObjectID int32  `json:"objectId"`
+	ItemID   int32  `json:"itemId"`
+	Count    int32  `json:"count"`
+	Type2    int16  `json:"type2"`
+	Equipped bool   `json:"equipped"`
+	BodyPart int32  `json:"bodyPart"`
+	Enchant  int16  `json:"enchant"`
+	Name     string `json:"name"`
+	Icon     string `json:"icon"`
+}
+
 // ObjectSnapshot is the JSON view of a world object.
 type ObjectSnapshot struct {
 	ObjectID        int32      `json:"objectId"`
@@ -1372,18 +1389,19 @@ type ObjectSnapshot struct {
 
 // Snapshot is the JSON view of the whole bot state.
 type Snapshot struct {
-	ID           string            `json:"id"`
-	Status       Status            `json:"status"`
-	Character    CharacterSnapshot `json:"character"`
-	Objects      []ObjectSnapshot  `json:"objects"`
-	Events       []Event           `json:"events"`
-	Chat         []ChatEvent       `json:"chat"`
-	HuntingZone  *Zone             `json:"huntingZone"`
-	Packets      int64             `json:"packets"`
-	Version      uint64            `json:"version"`
-	ServerTimeMs int64             `json:"serverTimeMs"`
-	StartedAt    time.Time         `json:"startedAt"`
-	UpdatedAt    time.Time         `json:"updatedAt"`
+	ID           string                  `json:"id"`
+	Status       Status                  `json:"status"`
+	Character    CharacterSnapshot       `json:"character"`
+	Inventory    []InventoryItemSnapshot `json:"inventory"`
+	Objects      []ObjectSnapshot        `json:"objects"`
+	Events       []Event                 `json:"events"`
+	Chat         []ChatEvent             `json:"chat"`
+	HuntingZone  *Zone                   `json:"huntingZone"`
+	Packets      int64                   `json:"packets"`
+	Version      uint64                  `json:"version"`
+	ServerTimeMs int64                   `json:"serverTimeMs"`
+	StartedAt    time.Time               `json:"startedAt"`
+	UpdatedAt    time.Time               `json:"updatedAt"`
 }
 
 // Snapshot returns a deep copy of the current state for serialization.
@@ -1484,17 +1502,49 @@ func (b *Bot) Snapshot() Snapshot {
 }
 
 // fillInventorySnapshot completes the character view with the inventory
-// usage. The caller must hold the read lock.
+// usage and builds the item list of the equipment widget: every entry
+// carries the resolved display name, the icon file name of the icon
+// pack and the paperdoll slot mask. The caller must hold the read
+// lock.
 func (b *Bot) fillInventorySnapshot(snap *Snapshot) {
 	snap.Character.CurrentLoad = b.char.CurrentLoad
 	snap.Character.MaxLoad = b.char.MaxLoad
 	snap.Character.InventorySlots = len(b.inventory)
 	snap.Character.InventoryMax = inventorySlotLimit
+	snap.Inventory = make([]InventoryItemSnapshot, 0, len(b.inventory))
 	for _, item := range b.inventory {
+		snap.Inventory = append(snap.Inventory, InventoryItemSnapshot{
+			ObjectID: item.ObjectID,
+			ItemID:   item.ItemID,
+			Count:    item.Count,
+			Type2:    item.Type2,
+			Equipped: item.Equipped,
+			BodyPart: item.BodyPart,
+			Enchant:  item.Enchant,
+			Name:     npcdata.ItemName(item.ItemID),
+			Icon:     npcdata.ItemIcon(item.ItemID),
+		})
 		if item.Type2 == itemType2Adena {
 			snap.Character.Adena += item.Count
 		}
 	}
+	sortInventorySnapshot(snap.Inventory)
+}
+
+// sortInventorySnapshot orders the widget item list deterministically:
+// the equipped gear first (the paperdoll anchors the widget), then the
+// plain inventory, both by item id with the object id breaking ties.
+func sortInventorySnapshot(items []InventoryItemSnapshot) {
+	sort.Slice(items, func(i int, j int) bool {
+		if items[i].Equipped != items[j].Equipped {
+			return items[i].Equipped
+		}
+		if items[i].ItemID != items[j].ItemID {
+			return items[i].ItemID < items[j].ItemID
+		}
+
+		return items[i].ObjectID < items[j].ObjectID
+	})
 }
 
 // appendChat copies the chat window lines out of the ring buffer in

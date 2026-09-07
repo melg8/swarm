@@ -30,7 +30,13 @@ const (
 
 // InventoryItem is one entry of the inventory packets. Type2 tells the
 // item family: 0 weapon, 1 armor, 2 jewel, 3 quest item, 4 adena,
-// 5 common item.
+// 5 common item. BodyPart is the slot mask of the item template (see
+// BodyPart: 0x1 underwear, 0x2/0x4/0x6 ears, 0x8 neck, 0x10/0x20/0x30
+// fingers, 0x40 head, 0x80 right hand, 0x100 left hand, 0x200 gloves,
+// 0x400 chest, 0x800 legs, 0x1000 feet, 0x2000 back, 0x4000 two
+// handed weapon, 0x8000 full armor); an unequipped item carries the
+// mask of the slot it would occupy. Enchant is the enchant level.
+// Change carries the InventoryUpdate code: 1 add, 2 modify, 3 remove.
 type InventoryItem struct {
 	ObjectID int32
 	ItemID   int32
@@ -38,6 +44,8 @@ type InventoryItem struct {
 	Type1    int16
 	Type2    int16
 	Equipped bool
+	BodyPart int32
+	Enchant  int16
 	Change   int16
 }
 
@@ -181,8 +189,18 @@ func readInventoryItem(reader *packet.Reader) (InventoryItem, error) {
 		return item, err
 	}
 	item.Equipped = equipped != 0
-	// Skip the body part int and the enchant and custom type2 shorts.
-	if err := reader.Skip(8); err != nil {
+	// The body part mask of the item template and the enchant level,
+	// see AbstractItemPacket.writeItem.
+	if item.BodyPart, err = reader.ReadInt32(); err != nil {
+		//nolint:wrapcheck // the caller wraps with the entry context
+		return item, err
+	}
+	if item.Enchant, err = reader.ReadInt16(); err != nil {
+		//nolint:wrapcheck // the caller wraps with the entry context
+		return item, err
+	}
+	// Skip the custom type2 short.
+	if err := reader.Skip(2); err != nil {
 		//nolint:wrapcheck // the caller wraps with the entry context
 		return item, err
 	}

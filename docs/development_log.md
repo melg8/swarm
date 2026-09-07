@@ -1040,3 +1040,67 @@ the current elven lands hunt); adding every region there would only
 grow the GeoEngine memory for no present need. The bot detects
 data/geodata first and is now self-sufficient for any future hunting
 ground on the old continent.
+
+## Round 25: the equipment widget with the item icon pack (2026-09-07)
+
+User request: show the equipped items and the inventory of the
+character as a separate right side widget, with the item icons from
+the xMlex/l2walker data/l2icons pack added to the project as data -
+but verified against our C1 version first.
+
+What was verified and done:
+
+- C1 compatibility of the icon pack: the Mobius C1 item stats carry
+  the canonical icon name of every item (set name="icon"), so the pack
+  was checked against the server data first: 4044 of the 4222 C1
+  items resolve by the exact icon name. The missing 178 are almost
+  entirely the low grade starter armor (bone/bronze/leather gear of
+  the 20-60 id range) whose icons the later clients renamed to the
+  generic armor_tXX pattern; every one of them resolves through the
+  l2walker Interlude item database (data/db/db.sqlite of the l2walker
+  checkout) by the same item id onto a renamed icon of the same
+  artwork family. Result: 4222/4222 = 100% coverage, documented in
+  data/icons/Readme.txt; the mapping is generated into
+  npcdata/item_icons.go by tools/generate_item_icons.sh (the sqlite
+  path is an argument of the script).
+- The pack itself (3134 PNGs, 32x32, 13 MB) moved into data/icons of
+  the repository; the web server serves it at /icons/<name>.png with
+  a day of cache (webserver/icons.go): the route validates the name
+  against the classic client naming scheme (letters, digits,
+  underscore, hyphen), walks up from the working directory to find
+  the pack like the geodata detection, honors the SWARM_ICONS
+  override for tests, and answers 404 for every name when no pack
+  exists so the widget falls back to its glyphs.
+- The inventory packets now parse the body part mask and the enchant
+  level of every entry (they sat inside the previously skipped 8
+  bytes, see AbstractItemPacket.writeItem), the state snapshot gained
+  the whole inventory as snapshot.inventory - every item with its
+  slot mask, enchant level, resolved display name, icon file name and
+  count, sorted equipped-first - and the connection layer copies the
+  new fields through.
+- The widget (index.html/.app-body third column, app.js renderGear,
+  style.css): a 15 slot paperdoll in the classic three column layout
+  (hair, earrings, neck, rings, head, chest, legs, weapon, shield,
+  cloak, gloves, boots, shirt) where every equipped item lands by its
+  C1 BodyPart mask - two handed weapons and full armor alias onto the
+  weapon/chest slot, the either-or earring and ring masks (0x6/0x30)
+  fill the first free slot of their pair - and a scrollable inventory
+  grid below with one icon cell per bag item, stack count and
+  +enchant badges, hover tooltips and the slots-used counter. Items
+  without an icon (or a 404) fall back to a tinted per type2 glyph so
+  no cell ever renders empty. The pathfind test mode hides the panel.
+- Tests: TestParseInventoryBodyPartAndEnchant (packet layer),
+  TestSnapshotInventoryWidget and TestSnapshotInventoryEnchant
+  (state), TestIconServed/TestIconNotFound/
+  TestIconDisabledWithoutPack/TestDetectIconsDirWalkUp (web server),
+  and the tools/repro_gear.js stub DOM harness (12 checks: masks,
+  aliases, either-or pairs, labels, badges, counter; task repro:gear).
+- Live validation on the running stack: the snapshot of test1
+  (Squire's Shirt/Pants/Sword equipped, dagger, sandals, adena 316 in
+  the bag) renders 15 paperdoll cells with the three equipped icons
+  on the right slots (chest 0x400, legs 0x800, rhand 0x80 straight
+  from the server packets), the inventory grid shows every bag item
+  with its icon - including armor_t01_u_i00, a renamed starter armor
+  icon that only exists through the sqlite resolution - and
+  /icons/etc_adena_i00.png answers 200 image/png. go test ./... green
+  (12 packages).

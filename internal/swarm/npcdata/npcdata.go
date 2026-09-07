@@ -71,3 +71,11 @@ func ItemPrice(displayID int32) int64 {
 func ItemWeight(displayID int32) int32 {
 	return itemWeights[displayID]
 }
+
+// ItemIcon resolves the icon file name (without extension) of an item
+// by its display id, served by the web interface as
+// /icons/<name>.png. It returns an empty string when the item is
+// unknown.
+func ItemIcon(displayID int32) string {
+	return itemIcons[displayID]
+}

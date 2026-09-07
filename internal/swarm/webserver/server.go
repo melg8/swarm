@@ -18,6 +18,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/pathfind"
@@ -54,6 +55,7 @@ type Server struct {
 	pathfinder   *pathfind.Engine
 	pathfindView *pathfind.Vec3
 	geodataTiles *geodataTileCache
+	iconsDir     atomic.Value // string, the icon pack directory or ""
 	logger       *log.Logger
 	httpServer   *http.Server
 	eventsDone   chan struct{}
@@ -96,6 +98,9 @@ func newServer(address string, logger *log.Logger) *Server {
 		ReadHeaderTimeout: httpReadHeaderTimeout,
 	}
 	server.shutdown = sync.OnceFunc(func() { close(server.eventsDone) })
+	server.initIconsDir(logger)
+
+	mux.HandleFunc("GET /icons/{name}", server.serveIcons)
 
 	staticFS, err := fs.Sub(webContent, "web")
 	if err != nil {

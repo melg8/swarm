@@ -106,6 +106,11 @@ data/geodata/                  Geodata region files (X_Y.l2j) the bot
                                pathfinds over: the complete old-world
                                pack (165 regions, 16_10..26_26), see
                                data/geodata/Readme.txt for provenance.
+data/icons/                    Item icon pack (3134 classic client PNGs)
+                               served by the web UI at /icons/<name>.png;
+                               the item id mapping is generated into
+                               npcdata/item_icons.go. C1 compatibility
+                               verified, see data/icons/Readme.txt.
 tools/                         Idempotent bash scripts that deploy and run
                                the local Mobius C1 test server stack.
 docs/                          Project goals and protocol description.
@@ -803,6 +808,25 @@ the same variables).
   item and npc name parameters resolve through the item and npc
   dictionaries). Regenerate with `task generate:system-messages`
   (tools/generate_system_messages.sh) after Mobius updates.
+- Equipment widget: the fixed right column of the app body shows the
+  character paperdoll and the inventory (hidden in the pathfind test
+  mode). The inventory packets now parse the body part mask and the
+  enchant level of every entry (see AbstractItemPacket.writeItem), the
+  snapshot carries the whole inventory as `snapshot.inventory` with
+  the resolved display name and icon file name per item, sorted
+  equipped-first. app.js places the equipped items by the C1 BodyPart
+  mask (two handed weapons and full armor alias onto the weapon/chest
+  slot, the either-or earring/ring masks 0x6/0x30 fill the first free
+  slot of their pair) and renders one icon cell per bag item with
+  stack count and enchant badges; an empty or missing icon falls back
+  to a per type2 glyph. The icon pack lives in `data/icons` (3134
+  PNGs of the classic client naming scheme from the l2walker mirror,
+  C1 compatibility verified 4222/4222 items - see
+  data/icons/Readme.txt), the web server serves it at
+  `/icons/<name>.png` with a day of cache; the item id to icon
+  mapping is generated into `npcdata/item_icons.go`
+  (`tools/generate_item_icons.sh`). Reproduction harness:
+  `tools/repro_gear.js` (`task repro:gear`).
 - The web UI is plain HTML/CSS/JS without a build step; keep it that way
   (embedded via go:embed). Watch out: top level `const` declarations are
   not `window` properties, so cross script references must use the bare
@@ -812,7 +836,9 @@ the same variables).
   the movement interpolation, `tools/repro_map_render.js` (`task
   repro:map`) for the target links, unit markers and the static free
   camera (recording canvas in a Node vm sandbox), `tools/repro_hud.js`
-  (`task repro:hud`) for the HUD and target panel rendering (stub DOM).
+  (`task repro:hud`) for the HUD and target panel rendering (stub DOM),
+  `tools/repro_gear.js` (`task repro:gear`) for the equipment widget
+  (paperdoll masks, either-or slot resolution, badges, slot counter).
 
 Sandbox signal pitfall: non-interactive bash starts background jobs with
 SIGINT/SIGQUIT set to SIG_IGN, and Go cannot catch a signal that was

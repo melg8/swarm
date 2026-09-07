@@ -254,3 +254,43 @@ func TestParseInventoryUpdatePacket(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestParseInventoryBodyPartAndEnchant(t *testing.T) {
+	// One full entry: type1, object id, item id, count, type2,
+	// custom type1, equipped, body part 0x400 (chest), enchant 3,
+	// custom type2, then a second entry with the two handed mask
+	// 0x4000 and no enchant.
+	data := []byte{0x27}
+	data = putInt16(data, 0) // show window
+	data = putInt16(data, 2) // count
+	data = putInt16(data, 0) // type1
+	data = putInt32(data, 11)
+	data = putInt32(data, 1146) // Squire's Shirt
+	data = putInt32(data, 1)
+	data = putInt16(data, 1) // type2 armor
+	data = putInt16(data, 0) // custom type1
+	data = putInt16(data, 1) // equipped
+	data = putInt32(data, 0x400)
+	data = putInt16(data, 3) // enchant
+	data = putInt16(data, 0) // custom type2
+	data = putInt16(data, 0)
+	data = putInt32(data, 12)
+	data = putInt32(data, 70) // Claymore
+	data = putInt32(data, 1)
+	data = putInt16(data, 0)
+	data = putInt16(data, 0)
+	data = putInt16(data, 0) // not equipped
+	data = putInt32(data, 0x4000)
+	data = putInt16(data, 0)
+	data = putInt16(data, 0)
+
+	p := NewItemListPacket()
+	require.NoError(t, ParseItemListPacket(p, data))
+	require.Len(t, p.Items, 2)
+	require.True(t, p.Items[0].Equipped)
+	require.Equal(t, int32(0x400), p.Items[0].BodyPart)
+	require.Equal(t, int16(3), p.Items[0].Enchant)
+	require.False(t, p.Items[1].Equipped)
+	require.Equal(t, int32(0x4000), p.Items[1].BodyPart)
+	require.Equal(t, int16(0), p.Items[1].Enchant)
+}

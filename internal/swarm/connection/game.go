@@ -1508,6 +1508,8 @@ func (gc *GameClient) convertInventoryItems(
 			Type1:    item.Type1,
 			Type2:    item.Type2,
 			Equipped: item.Equipped,
+			BodyPart: item.BodyPart,
+			Enchant:  item.Enchant,
 			Change:   item.Change,
 		})
 	}

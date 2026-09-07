@@ -723,3 +723,127 @@ body.mode-pathfind #live-label { display: none; }
   font-family: var(--mono);
   padding: 2.5px 4px;
 }
+
+/* ---- equipment widget (right side panel) ---- */
+
+/* The equipment widget is the fixed right column of the app body: the
+   paperdoll of the equipped gear on top, the scrollable inventory grid
+   below. The pathfind test mode has no character and hides it. */
+.gear-panel {
+  width: 172px;
+  min-width: 172px;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 8px;
+}
+
+body.mode-pathfind .gear-panel { display: none; }
+
+.inv-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inv-count { color: var(--text-dim); letter-spacing: 0; }
+
+/* Paperdoll: three columns of 44x44 cells, the slot labels live inside
+   the empty cells so the grid reads as one unit. */
+.paperdoll {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  padding: 0 10px 10px;
+}
+
+.pd-cell {
+  position: relative;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pd-cell.pd-empty {
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.pd-cell img, .inv-cell img {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+  position: relative;
+  z-index: 2;
+}
+
+/* Inventory grid below the paperdoll: five columns of icon cells with
+   scroll when the bags grow. */
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  padding: 0 10px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+}
+
+.inv-cell {
+  position: relative;
+  height: 40px;
+  border: 1px solid var(--border-soft);
+  border-radius: 5px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Type glyphs: the fallback under a missing or failed icon, tinted by
+   the item family. */
+.icon-glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  z-index: 1;
+}
+
+.glyph-t0 { color: #a35b3b; }
+.glyph-t1 { color: #6f7f9c; }
+.glyph-t2 { color: #9c7ba6; }
+.glyph-t3 { color: #8d8d5a; }
+.glyph-t4 { color: #b0a244; }
+.glyph-t5 { color: var(--text-dim); }
+
+/* Enchant and stack count badges over the icon corner. */
+.icon-badge {
+  position: absolute;
+  z-index: 3;
+  font-size: 8.5px;
+  font-family: var(--mono);
+  line-height: 1;
+  padding: 1.5px 2.5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #f2f2f2;
+}
+
+.badge-enchant { left: 2px; top: 2px; color: #8ef2a0; }
+
+.badge-count { right: 2px; bottom: 2px; }

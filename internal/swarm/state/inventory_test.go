@@ -63,3 +63,60 @@ func TestSellableItemsEmptyInventory(t *testing.T) {
 	})
 	require.Empty(t, bot.SellableItems())
 }
+
+// TestSnapshotInventoryWidget verifies the equipment widget view of the
+// snapshot: every inventory item carries its slot mask, enchant level,
+// resolved display name and icon file name, the equipped gear sorts
+// before the plain items and the adena counter matches.
+func TestSnapshotInventoryWidget(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	bot.ApplyItemList([]InventoryItem{
+		// Short Sword, equipped on the right hand.
+		{ObjectID: 1, ItemID: 1, Count: 1, Type2: 0, Equipped: true,
+			BodyPart: 0x80, Change: 1},
+		// Leather Shirt on the chest.
+		{ObjectID: 2, ItemID: 1146, Count: 1, Type2: 1, Equipped: true,
+			BodyPart: 0x400, Change: 1},
+		// Adena.
+		{ObjectID: 3, ItemID: 57, Count: 4242, Type2: 4, Change: 1},
+		// Forest Bow in the bag, two handed template mask.
+		{ObjectID: 4, ItemID: 166, Count: 1, Type2: 0,
+			BodyPart: 0x4000, Change: 1},
+	})
+
+	snap := bot.Snapshot()
+	require.NotNil(t, snap.Inventory)
+	require.Len(t, snap.Inventory, 4)
+	// Equipped gear first, then the bag, ordered by item id.
+	require.Equal(t, int32(1), snap.Inventory[0].ItemID)
+	require.True(t, snap.Inventory[0].Equipped)
+	require.Equal(t, int32(0x80), snap.Inventory[0].BodyPart)
+	require.Equal(t, "Short Sword", snap.Inventory[0].Name)
+	require.Equal(t, "weapon_small_sword_i00", snap.Inventory[0].Icon)
+	require.Equal(t, int32(1146), snap.Inventory[1].ItemID)
+	require.Equal(t, int32(0x400), snap.Inventory[1].BodyPart)
+	require.True(t, snap.Inventory[1].Icon != "")
+	require.Equal(t, int32(57), snap.Inventory[2].ItemID)
+	require.Equal(t, int32(4242), snap.Inventory[2].Count)
+	require.Equal(t, "etc_adena_i00", snap.Inventory[2].Icon)
+	require.Equal(t, int32(4242), snap.Character.Adena)
+	require.Equal(t, int32(166), snap.Inventory[3].ItemID)
+	require.False(t, snap.Inventory[3].Equipped)
+	require.Equal(t, int32(0x4000), snap.Inventory[3].BodyPart)
+}
+
+// TestSnapshotInventoryEnchant verifies the enchant level pass-through
+// of the widget view.
+func TestSnapshotInventoryEnchant(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	bot.ApplyItemList([]InventoryItem{
+		{ObjectID: 1, ItemID: 10, Count: 1, Type2: 0, Equipped: true,
+			BodyPart: 0x80, Enchant: 3, Change: 1},
+	})
+
+	snap := bot.Snapshot()
+	require.Len(t, snap.Inventory, 1)
+	require.Equal(t, int16(3), snap.Inventory[0].Enchant)
+}

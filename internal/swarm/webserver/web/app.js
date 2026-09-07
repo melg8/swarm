@@ -219,10 +219,156 @@ function renderSnapshot() {
   if (!snap) { return; }
   renderHUD(snap);
   renderTarget(snap);
+  renderGear(snap);
   renderChat(snap);
   renderLog(snap);
   renderFooter(snap);
   MapView.update(snap);
+}
+
+// ---- equipment widget ----
+
+// Paperdoll slot layout of the equipment widget: three columns of
+// classic character window slots. mask is the body part mask of the
+// inventory packets (see the C1 BodyPart enum), anyOf marks the
+// either-or masks (earrings and rings carry the combined template
+// mask) resolved into the first free slot of the group.
+const PAPERDOLL_SLOTS = [
+  { key: "hair", label: "hair", mask: 0x10000 },
+  { key: "r_ear", label: "r.ear", mask: 0x2, group: "ear" },
+  { key: "l_ear", label: "l.ear", mask: 0x4, group: "ear" },
+  { key: "neck", label: "neck", mask: 0x8 },
+  { key: "r_finger", label: "r.ring", mask: 0x10, group: "finger" },
+  { key: "l_finger", label: "l.ring", mask: 0x20, group: "finger" },
+  { key: "head", label: "head", mask: 0x40 },
+  { key: "chest", label: "chest", mask: 0x400 },
+  { key: "legs", label: "legs", mask: 0x800 },
+  { key: "rhand", label: "weapon", mask: 0x80 },
+  { key: "lhand", label: "shield", mask: 0x100 },
+  { key: "back", label: "cloak", mask: 0x2000 },
+  { key: "gloves", label: "gloves", mask: 0x200 },
+  { key: "feet", label: "boots", mask: 0x1000 },
+  { key: "under", label: "shirt", mask: 0x1 }
+];
+
+// Masks that map onto another slot: two handed weapons and full armor
+// occupy the weapon/chest slot, alldress also lands on the chest. The
+// either-or masks (earrings, rings) carry the combined template mask
+// and resolve into the first free slot of their group.
+const SLOT_MASK_ALIASES = { 0x4000: "rhand", 0x8000: "chest", 0x20000: "chest" };
+const EITHER_OR_MASKS = { 0x6: "ear", 0x30: "finger" };
+
+// Fallback glyph per type2 family when an item has no icon.
+const TYPE2_GLYPH = { 0: "W", 1: "A", 2: "J", 3: "Q", 4: "$", 5: "•" };
+
+// assignPaperdoll places every equipped item on a paperdoll slot.
+// Returns the slot key -> item map.
+function assignPaperdoll(items) {
+  const placed = {};
+  const free = { ear: ["r_ear", "l_ear"], finger: ["r_finger", "l_finger"] };
+  for (const item of items) {
+    if (!item.equipped) { continue; }
+    let key = null;
+    const either = EITHER_OR_MASKS[item.bodyPart];
+    if (either) {
+      key = free[either].shift() || null;
+    } else if (SLOT_MASK_ALIASES[item.bodyPart]) {
+      key = SLOT_MASK_ALIASES[item.bodyPart];
+    } else {
+      const slot = PAPERDOLL_SLOTS.find((s) => s.mask === item.bodyPart);
+      key = slot ? slot.key : null;
+    }
+    if (!key || placed[key]) { continue; }
+    placed[key] = item;
+    for (const group of Object.values(free)) {
+      const idx = group.indexOf(key);
+      if (idx >= 0) { group.splice(idx, 1); }
+    }
+  }
+
+  return placed;
+}
+
+// makeIconCell builds one icon cell: the pack image when the item
+// resolves to an icon, the type glyph otherwise (also the image error
+// fallback - a 404 icon must not leave an empty box).
+function makeIconCell(item, className) {
+  const cell = document.createElement("div");
+  cell.className = className;
+  if (!item) { return cell; }
+
+  const glyph = document.createElement("span");
+  glyph.className = "icon-glyph glyph-t" + (item.type2 || 0);
+  glyph.textContent = TYPE2_GLYPH[item.type2] || "•";
+  cell.append(glyph);
+
+  if (item.icon) {
+    const img = document.createElement("img");
+    img.alt = "";
+    img.loading = "lazy";
+    img.src = "/icons/" + item.icon + ".png";
+    img.addEventListener("error", () => img.remove());
+    cell.append(img);
+  }
+
+  if (item.enchant > 0) {
+    const en = document.createElement("span");
+    en.className = "icon-badge badge-enchant";
+    en.textContent = "+" + item.enchant;
+    cell.append(en);
+  }
+  if (item.count > 1) {
+    const count = document.createElement("span");
+    count.className = "icon-badge badge-count";
+    count.textContent = item.count >= 10000
+      ? Math.round(item.count / 1000) + "k" : item.count;
+    cell.append(count);
+  }
+  cell.title = itemTooltip(item);
+
+  return cell;
+}
+
+// itemTooltip composes the hover title of an item cell.
+function itemTooltip(item) {
+  let tip = item.name || ("item #" + item.itemId);
+  if (item.enchant > 0) { tip = "+" + item.enchant + " " + tip; }
+  if (item.count > 1) { tip += " x" + item.count; }
+  if (item.equipped) { tip += " (equipped)"; }
+
+  return tip;
+}
+
+// renderGear draws the paperdoll and the inventory grid of the right
+// side equipment widget.
+function renderGear(snap) {
+  const paperdoll = document.getElementById("paperdoll");
+  const invGrid = document.getElementById("inv-grid");
+  const invCount = document.getElementById("inv-count");
+  if (!paperdoll || !invGrid) { return; }
+
+  const items = snap.inventory || [];
+  const placed = assignPaperdoll(items);
+
+  paperdoll.innerHTML = "";
+  for (const slot of PAPERDOLL_SLOTS) {
+    const item = placed[slot.key] || null;
+    const cell = makeIconCell(item, "pd-cell" + (item ? "" : " pd-empty"));
+    if (!item) {
+      cell.textContent = slot.label;
+    }
+    paperdoll.append(cell);
+  }
+
+  invGrid.innerHTML = "";
+  let invItems = 0;
+  for (const item of items) {
+    if (item.equipped) { continue; }
+    invItems++;
+    invGrid.append(makeIconCell(item, "inv-cell"));
+  }
+  invCount.textContent = (snap.character.inventorySlots || 0) + "/" +
+    (snap.character.inventoryMax || 80);
 }
 
 // Chat window state: auto scroll follows the newest line while the

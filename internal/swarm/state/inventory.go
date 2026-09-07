@@ -29,8 +29,10 @@ const inventorySlotLimit = 80
 
 // InventoryItem is one entry of the inventory packets. Type2 tells the
 // item family: 0 weapon, 1 armor, 2 jewel, 3 quest item, 4 adena,
-// 5 common item. Change carries the InventoryUpdate code: 1 add,
-// 2 modify, 3 remove.
+// 5 common item. BodyPart is the slot mask of the item template (0x80
+// right hand, 0x400 chest and so on, see the packet layer); an
+// unequipped item carries the mask of the slot it would occupy.
+// Change carries the InventoryUpdate code: 1 add, 2 modify, 3 remove.
 type InventoryItem struct {
 	ObjectID int32
 	ItemID   int32
@@ -38,6 +40,8 @@ type InventoryItem struct {
 	Type1    int16
 	Type2    int16
 	Equipped bool
+	BodyPart int32
+	Enchant  int16
 	Change   int16
 }
 
