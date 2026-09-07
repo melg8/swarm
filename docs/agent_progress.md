@@ -4,7 +4,45 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
-## Active task: gear auto-equip, shop buying strategy, multi-zone hunting
+## Active task: golangci-lint v2 migration (lint toolchain repair)
+
+Started: 2026-09-08. Branch: `mobius-c1-client-1`.
+
+### Goal
+
+Make the strict linter set runnable again on the Windows dev host: the
+installed golangci-lint v1.64.8 cannot read the Go 1.27 standard library
+export data ("export data version 4 is greater than maximum supported
+version 2"), so `golangci-lint run` fails with bogus typechecking errors
+and the repo has no working hygiene gate (the code itself is fine - the
+errors are a tool/format mismatch). Identified in
+`docs/quality_review_and_agent_prompts.md` as P03; the user asked for the
+migration to be performed directly.
+
+### Constraints
+
+- Keep the strict linter set (the review found the config to be a quality
+  asset): migrate, do not slim down.
+- Fix real code findings the newer linters surface instead of disabling
+  the linters, matching the repo conventions.
+- No behavior changes; `go build ./...`, `go vet ./...`,
+  `go test ./... -count=1` must stay green.
+- Update AGENTS.md (Windows tooling caveats) after the migration works.
+
+### Acceptance criteria
+
+- `golangci-lint version` reports v2.x, `golangci-lint run` exits 0 on
+  the whole repository.
+- `.golangci.yml` is in the v2 format; no v1 leftovers.
+- Tests stay green; AGENTS.md and this file updated.
+
+### Progress
+
+- 2026-09-08: committed `docs/quality_review_and_agent_prompts.md` (the
+  architecture/quality review with the P01-P14 agent prompts written in
+  the previous session; it was left uncommitted).
+
+## Task (completed): gear auto-equip, shop buying strategy, multi-zone hunting
 
 Started: 2026-09-08. Branch: `mobius-c1-client-1`.
 
