@@ -210,3 +210,26 @@ func equipZoneWithGear(bot *state.Bot, points int32) {
 	bot.ApplyItemList(items)
 	bot.ApplyPaperdoll(paperdoll)
 }
+
+func TestZoneSwitchDropsTheStaleFarmSpot(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZones(ElvenHuntingZones())
+	setZoneTestLevel(bot, 1)
+	loop.tick()
+	require.Equal(t, "elven-keltirs", loop.zonePickedID)
+
+	// The farm spot of the keltir field (far outside the goblin
+	// square): a zone switch must drop it, a return leg aims at the
+	// new zone center instead of walking to the old square.
+	loop.farmX, loop.farmY, loop.farmZ = 47327, 42632, -3455
+	loop.userZoneSelect(1)
+	require.Equal(t, "elven-goblins", loop.zonePickedID)
+	require.Zero(t, loop.farmX)
+	require.Zero(t, loop.farmY)
+	zone := loop.zone()
+	require.NotNil(t, zone)
+	require.True(t, zone.Contains(
+		zone.CX, zone.CY), "the fallback destination is the new center")
+}

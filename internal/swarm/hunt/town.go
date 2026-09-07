@@ -752,10 +752,17 @@ func (l *Loop) engagesOnZoneEntry() bool {
 // startReturnLeg plans the walk back to the farm spot.
 func (l *Loop) startReturnLeg() {
 	l.phase = phaseTownReturn
+	destX, destY, destZ := l.farmX, l.farmY, l.farmZ
+	if zone := l.zone(); zone != nil &&
+		(!zone.Contains(destX, destY) || (destX == 0 && destY == 0)) {
+		// The farm spot belongs to a previous square (a zone switch
+		// mid trip): return to the new center instead.
+		destX, destY = zone.CX, zone.CY
+	}
 	dest := pathfind.Vec3{
-		X: float64(l.farmX),
-		Y: float64(l.farmY),
-		Z: float64(l.farmZ),
+		X: float64(destX),
+		Y: float64(destY),
+		Z: float64(destZ),
 	}
 	if !l.startWalkLeg(dest) {
 		l.abortTownTrip("no walkable path back to the farm spot")

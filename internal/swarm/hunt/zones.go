@@ -209,10 +209,14 @@ func (l *Loop) maybeSwitchZone() {
 }
 
 // applyHuntingZone switches the hunting square of the loop and the
-// tracker and publishes the zone view of the map.
+// tracker and publishes the zone view of the map. The remembered
+// farm spot belongs to the previous square: the switch drops it, so
+// the returns aim at the new center until the hunt remembers a
+// fresh spot inside it.
 func (l *Loop) applyHuntingZone(zone HuntingZone) {
 	l.zonePickedID = zone.ID
 	l.zoneCX, l.zoneCY, l.zoneHalf = zone.CX, zone.CY, zone.Half
+	l.farmX, l.farmY, l.farmZ = 0, 0, 0
 	l.tracker.SetHuntingZone(zone.CX, zone.CY, zone.Half)
 	l.publishZoneView()
 }

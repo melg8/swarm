@@ -1118,7 +1118,8 @@ func (l *Loop) returnToZone() {
 		Y: float64(zone.CY),
 		Z: float64(selfZ),
 	}
-	if (l.farmX != 0) || (l.farmY != 0) {
+	farmKnown := l.farmX != 0 || l.farmY != 0
+	if farmKnown && zone.Contains(l.farmX, l.farmY) {
 		dest = pathfind.Vec3{
 			X: float64(l.farmX),
 			Y: float64(l.farmY),
