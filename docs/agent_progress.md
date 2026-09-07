@@ -83,6 +83,13 @@ migration to be performed directly.
     own round), the crypt dead Encryptor/Decryptor stack deletion and
     `task` binary install (P03 remainder), `-race` in the test task
     (P01).
+- 2026-09-08: the parallel session pushes kept colliding with this one
+  (two rebase rounds, one real conflict in hunt/shopping.go resolved
+  keeping both sides' behavior). Git conventions in AGENTS.md gained two
+  rules for the multi-agent workflow: rebase before every push (linear
+  history, no merges, no force-push, re-verify after a conflict) and
+  always commit as melg8 <public.melg8@gmail.com> (checked repo-locally
+  before the first commit of a session).
 
 ## Task (completed): gear auto-equip, shop buying strategy, multi-zone hunting
 

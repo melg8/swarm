@@ -1250,6 +1250,24 @@ reference Mobius Java class.
   size`, `add cyclop check`, `make init packet parsing more memory friendly`.
 - Do not push build artifacts (`*.out`, `*out`, binaries are gitignored) or
   `.env`.
+- **Rebase before every push.** Several agent sessions push to the same
+  branch concurrently, so a push can be rejected as non-fast-forward at any
+  moment. The push procedure is: `git fetch origin`, `git rebase
+  origin/<branch>`, then `git push`. Never merge remote commits into the
+  local branch (no "Merge branch" commits - the history stays linear) and
+  never force-push (it would destroy the parallel sessions' work). On a
+  rebase conflict resolve both sides' behavior honestly, re-verify (at
+  least `go build ./...`, the affected package tests and
+  `golangci-lint run`), commit the resolution with `git rebase --continue`
+  and push again; if the push is rejected again, repeat from the fetch.
+- **Always commit as melg8.** The canonical committer identity of this
+  repository is `user.name = melg8`, `user.email =
+  public.melg8@gmail.com`. Check both with `git config user.name` and
+  `git config user.email` before the first commit of a session; if they
+  differ, set them for the repository with `git config user.name melg8`
+  and `git config user.email public.melg8@gmail.com` (repo-local, not
+  `--global`). Never commit as another identity and never amend the
+  identity of commits that are already pushed.
 
 ## Deleveling live validated (2026-09-07, round 3)
 
