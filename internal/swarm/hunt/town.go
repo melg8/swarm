@@ -497,11 +497,11 @@ func (l *Loop) tickTownSell() {
 
 			return
 		}
-		stats := l.tracker.InventoryStats()
-		l.logger.Printf("Hunt: inventory light again (%d slots, %.0f%% "+
-			"weight), planning the purchases", stats.Slots,
-			stats.WeightPercent)
 		if !l.buysPlanned {
+			stats := l.tracker.InventoryStats()
+			l.logger.Printf("Hunt: inventory light again (%d slots, "+
+				"%.0f%% weight), planning the purchases", stats.Slots,
+				stats.WeightPercent)
 			l.planShoppingStops()
 		}
 	}
@@ -614,11 +614,16 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 
 		return true
 	}
-	if l.tracker.SelfTargetID() != l.merchantID &&
-		now.Sub(l.merchantPick) >= selectPeriod {
-		l.merchantPick = now
-		if err := l.game.AttackTarget(l.merchantID); err != nil {
-			l.logger.Printf("Hunt: merchant select failed: %v", err)
+	if l.tracker.SelfTargetID() != l.merchantID {
+		// The transactions need the merchant as the selected target
+		// (RequestBuyItem checks it server side): re-request the
+		// selection once per second until the tracker confirmed it
+		// and only then report ready.
+		if now.Sub(l.merchantPick) >= selectPeriod {
+			l.merchantPick = now
+			if err := l.game.AttackTarget(l.merchantID); err != nil {
+				l.logger.Printf("Hunt: merchant select failed: %v", err)
+			}
 		}
 
 		return false
