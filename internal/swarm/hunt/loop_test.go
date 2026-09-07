@@ -30,6 +30,7 @@ type fakeGame struct {
 	uses      []int32
 	drops     [][5]int32
 	noTargets bool
+	logouts   int
 	lastError error
 }
 
@@ -110,6 +111,15 @@ func (f *fakeGame) UseItem(objectID int32) error {
 		return f.lastError
 	}
 	f.uses = append(f.uses, objectID)
+
+	return nil
+}
+
+func (f *fakeGame) RequestLogout() error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.logouts++
 
 	return nil
 }
@@ -828,4 +838,86 @@ func TestLoopPatrolsTowardTheCenterWithoutTargets(t *testing.T) {
 	frac := math.Min(1, returnWalkLeg/dist)
 	require.InDelta(t, float64(45000)+dx*frac, float64(leg[0]), 1)
 	require.InDelta(t, float64(50000)+dy*frac, float64(leg[1]), 1)
+}
+
+func TestLoopLogsOutAtCriticalHealthUnderAttack(t *testing.T) {
+	bot := newTestBot()
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 45600, Y: 50000, Name: "Gremlin",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The chase cornered the character: critical health, the blows
+	// still landing.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 10},
+	})
+	bot.ApplyAttack(state.Attack{
+		AttackerID: 7, X: 45600, Y: 50000, Z: -3500,
+		TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+		TargetIDs: [state.AttackTargets]int32{100}, TargetCount: 1,
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+
+	require.Equal(t, 1, game.logouts, "the emergency logout fires")
+	require.True(t, bot.LoginCooldownRemaining() > time.Minute,
+		"the login cooldown spans several minutes")
+	require.Len(t, game.walks, 1,
+		"the last escape leg keeps the offline character moving")
+	require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0])
+
+	// The request is one shot: the dying ticks stay quiet while the
+	// session unwinds.
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.logouts)
+	require.Len(t, game.walks, 1)
+}
+
+func TestLoopKeepsFightingAtCriticalHealthWithoutAggro(t *testing.T) {
+	bot := newTestBot()
+	spawnMob(bot)
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// Critical health with nobody landing blows: the panic logout
+	// waits - the character escapes or fights on its own terms.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 10},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Zero(t, game.logouts,
+		"no aggro, no logout - the rest and escape own the case")
+}
+
+func TestLoopDoesNotPanicLogoutWhileDeleveling(t *testing.T) {
+	loop, game, _, _ := newDelevelLoop(11)
+	spawnZoneMobs(loop.tracker)
+
+	// The deleveling starts: level 11 over the level 1 zone mobs.
+	loop.tick()
+	require.Equal(t, phaseDelevel, loop.phase)
+
+	// The guard deaths drive the health to critical with the blows
+	// landing: the panic logout must stay off - the deaths are the
+	// point of the phase.
+	loop.tracker.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 8},
+	})
+	loop.tracker.ApplyAttack(state.Attack{
+		AttackerID: 7, X: 45050, Y: 50050, Z: -3500,
+		TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+		TargetIDs: [state.AttackTargets]int32{100}, TargetCount: 1,
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Zero(t, game.logouts, "the delevel deaths are the point")
+	require.Equal(t, phaseDelevel, loop.phase)
 }

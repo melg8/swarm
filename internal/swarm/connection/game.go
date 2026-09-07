@@ -800,6 +800,25 @@ func (gc *GameClient) runLoop(
 	}
 }
 
+// RequestLogout ends the session from another goroutine (the hunt
+// loop of the emergency logout): the logout packet announces the
+// leave while the server still accepts it (out of combat), the
+// socket close forces the rest - the server stores a character
+// that left mid combat fifteen seconds after the combat ends. The
+// read loop of Run notices the closed socket and unwinds the
+// session.
+func (gc *GameClient) RequestLogout() error {
+	if err := gc.sendPacket(&togameserver.Logout{}); err != nil {
+		gc.logger.Printf("Failed to announce the logout: %v", err)
+	}
+	if err := gc.conn.Close(); err != nil {
+		return fmt.Errorf(
+			"failed to close the game connection: %w", err)
+	}
+
+	return nil
+}
+
 // disconnect closes the connection, announcing the logout to the server
 // first when the connection is still usable.
 func (gc *GameClient) disconnect(announce bool) {

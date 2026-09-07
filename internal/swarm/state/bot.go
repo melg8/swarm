@@ -304,6 +304,10 @@ type Bot struct {
 	// walk, the clicked destination last.
 	walkPath   []WalkPoint
 	walkPathAt time.Time
+	// loginCooldownUntil holds the reconnect pause the supervisor
+	// honors after an emergency logout. The tracker outlives the
+	// sessions, so the cooldown spans them (see SetLoginCooldown).
+	loginCooldownUntil time.Time
 }
 
 // NewBot creates a bot tracker for the given session id (account name).
@@ -579,6 +583,33 @@ func (b *Bot) SetHuntingZones(zones []ZoneView) {
 	b.zoneViews = make([]ZoneView, len(zones))
 	copy(b.zoneViews, zones)
 	b.touch()
+}
+
+// SetLoginCooldown arms the login cooldown of the supervisor: an
+// emergency logout of the hunt loop asks for a pause before the
+// next session starts, so the mobs reset and the character
+// regenerates in peace while it runs.
+func (b *Bot) SetLoginCooldown(pause time.Duration) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.loginCooldownUntil = time.Now().Add(pause)
+	b.touch()
+}
+
+// LoginCooldownRemaining returns the pause left before the next
+// login, zero when no cooldown is armed or it already lapsed.
+func (b *Bot) LoginCooldownRemaining() time.Duration {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if b.loginCooldownUntil.IsZero() {
+		return 0
+	}
+	remaining := time.Until(b.loginCooldownUntil)
+	if remaining < 0 {
+		return 0
+	}
+
+	return remaining
 }
 
 // ResetSession clears the observed world state before a new login. The

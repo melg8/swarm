@@ -50,6 +50,12 @@ type GameAPI interface {
 	// DropItem drops an inventory item on the ground at the given
 	// position (the server accepts drops at the feet only).
 	DropItem(objectID int32, count int32, x int32, y int32, z int32) error
+	// RequestLogout ends the session: the logout packet goes out
+	// first (the server answers it while the combat stance lapsed)
+	// and the connection closes either way (the server stores a
+	// character that left mid combat fifteen seconds after the
+	// combat ends).
+	RequestLogout() error
 }
 
 // Timing and threshold constants of the hunt loop.
@@ -176,6 +182,17 @@ const (
 	// patrolCenterMinDist suppresses the center patrol when the
 	// character already stands central: the respawns come to it.
 	patrolCenterMinDist = 700.0
+	// panicLogoutHealthPercent is the HP level below which a
+	// character under attack logs out for a pause: the escape
+	// could not shake the chase, staying means dying (the
+	// experience loss of a death at level 10+ costs hours of
+	// farming).
+	panicLogoutHealthPercent = 12.0
+	// panicLogoutPause is the login cooldown of the emergency
+	// logout: the supervisor waits it out before the next session,
+	// so the mobs reset around the stored character and it
+	// regenerates sitting instead of logging into the same blows.
+	panicLogoutPause = 3 * time.Minute
 )
 
 // phase is the coarse activity of the hunt loop.
@@ -270,7 +287,11 @@ type Loop struct {
 	// fleeAt paces the escape walk requests: the escape must not
 	// wait out the attack request pacing of the engage (the last
 	// forced attack fired moments before the threshold crossed).
-	fleeAt        time.Time
+	fleeAt time.Time
+	// logoutDone marks the one shot emergency logout: the session
+	// unwinds within a second of the request, the flag keeps the
+	// dying ticks quiet.
+	logoutDone    bool
 	userKind      string
 	userX         int32
 	userY         int32
@@ -390,6 +411,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		targetSkip:        nil,
 		noTargetSince:     time.Time{},
 		fleeAt:            time.Time{},
+		logoutDone:        false,
 		userKind:          "",
 		userX:             0,
 		userY:             0,
@@ -503,6 +525,20 @@ func (l *Loop) tick() {
 	if l.tracker.SelfDead() {
 		l.recoverFromDeath()
 
+		return
+	}
+	// The emergency logout: critical health with the blows still
+	// landing. The deleveling wants the deaths, a manual only
+	// session never decides on its own, and a request already
+	// sent stays one shot while the session unwinds.
+	if !l.logoutDone && l.autonomous && l.phase != phaseDelevel &&
+		l.tracker.SelfHealthPercent() < panicLogoutHealthPercent &&
+		l.tracker.SelfUnderAttack() {
+		l.emergencyLogout()
+
+		return
+	}
+	if l.logoutDone {
 		return
 	}
 	// The manual commands of the web UI arrive asynchronously on the
@@ -882,34 +918,52 @@ func (l *Loop) fleeFromThreat(now time.Time) {
 	if !l.standUpGuarded(now) {
 		return
 	}
-	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+	moveX, moveY, moveZ, ok := l.escapeWalkDestination()
 	if !ok {
-		return
-	}
-	threatX, threatY, hasThreat := l.threatPosition()
-	if !hasThreat {
 		// The blows landed but no mob stands around anymore:
 		// the under attack window closes on its own in seconds.
 		return
 	}
-	moveX, moveY := selfX, selfY
+	if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
+		l.logger.Printf("Hunt: escape walk failed: %v", err)
+	}
+}
+
+// escapeWalkDestination plans one escape leg away from the nearest
+// threat: straight away from it while the point stays inside the
+// zone, toward the zone center when it does not (the center
+// direction leashes the chasers near their spawns).
+func (l *Loop) escapeWalkDestination() (int32, int32, int32, bool) {
+	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+	if !ok {
+		return 0, 0, 0, false
+	}
+	threatX, threatY, hasThreat := l.threatPosition()
+	if !hasThreat {
+		return 0, 0, 0, false
+	}
 	dx := float64(selfX - threatX)
 	dy := float64(selfY - threatY)
-	if dist := math.Hypot(dx, dy); dist > 1 {
-		moveX = int32(float64(selfX) + dx/dist*escapeWalkDistance)
-		moveY = int32(float64(selfY) + dy/dist*escapeWalkDistance)
+	dist := math.Hypot(dx, dy)
+	if dist <= 1 {
+		return 0, 0, 0, false
 	}
+	moveX := int32(float64(selfX) + dx/dist*escapeWalkDistance)
+	moveY := int32(float64(selfY) + dy/dist*escapeWalkDistance)
 	zone := l.zone()
 	if zone != nil && !zone.Contains(moveX, moveY) {
 		// The straight escape leaves the hunting square: run
 		// toward the center instead.
-		l.walkZoneLeg(zone, selfX, selfY, selfZ)
+		dx = float64(zone.CX - selfX)
+		dy = float64(zone.CY - selfY)
+		if centerDist := math.Hypot(dx, dy); centerDist > 1 {
+			frac := math.Min(1, escapeWalkDistance/centerDist)
+			moveX = int32(float64(selfX) + dx*frac)
+			moveY = int32(float64(selfY) + dy*frac)
+		}
+	}
 
-		return
-	}
-	if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
-		l.logger.Printf("Hunt: escape walk failed: %v", err)
-	}
+	return moveX, moveY, selfZ, true
 }
 
 // threatPosition returns the position of the mob the escape runs
@@ -932,6 +986,29 @@ func (l *Loop) threatPosition() (int32, int32, bool) {
 	}
 
 	return pick.X, pick.Y, true
+}
+
+// emergencyLogout saves a character with no way out: the health
+// is critical, the blows keep landing and the escape could not
+// shake the chase. One last escape leg keeps the character moving
+// through the combat window the server holds an offline character
+// in the world (fifteen seconds), then the session logs out and
+// the supervisor reconnects after the armed login cooldown - by
+// then the mobs reset and the character regenerates sitting.
+func (l *Loop) emergencyLogout() {
+	l.logoutDone = true
+	l.logger.Printf("Hunt: HP %.0f%% under attack, "+
+		"emergency logout for %s", l.tracker.SelfHealthPercent(),
+		panicLogoutPause)
+	if moveX, moveY, moveZ, ok := l.escapeWalkDestination(); ok {
+		if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
+			l.logger.Printf("Hunt: escape walk failed: %v", err)
+		}
+	}
+	l.tracker.SetLoginCooldown(panicLogoutPause)
+	if err := l.game.RequestLogout(); err != nil {
+		l.logger.Printf("Hunt: logout request failed: %v", err)
+	}
 }
 
 // patrolToCenter walks a targetless hunter toward the zone center:

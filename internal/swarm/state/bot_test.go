@@ -755,3 +755,22 @@ func TestSnapshotCarriesExpPercent(t *testing.T) {
 	snap := bot.Snapshot()
 	require.InDelta(t, 50.0, snap.Character.ExpPercent, 0.5)
 }
+
+// TestLoginCooldownSpansSessions pins the emergency logout pause: the
+// cooldown arms on the tracker, survives the session reset (the
+// supervisor reads it across the sessions) and lapses to zero.
+func TestLoginCooldownSpansSessions(t *testing.T) {
+	bot := NewBot("acc1")
+	require.Zero(t, bot.LoginCooldownRemaining())
+
+	bot.SetLoginCooldown(2 * time.Minute)
+	require.Greater(t, bot.LoginCooldownRemaining(), time.Minute)
+	require.LessOrEqual(t, bot.LoginCooldownRemaining(), 2*time.Minute)
+
+	bot.ResetSession()
+	require.Greater(t, bot.LoginCooldownRemaining(), time.Minute,
+		"the cooldown survives the session reset")
+
+	bot.loginCooldownUntil = time.Now().Add(-time.Second)
+	require.Zero(t, bot.LoginCooldownRemaining(), "a lapsed cooldown is zero")
+}

@@ -260,6 +260,16 @@ func runBotForever(
 		if err != nil {
 			log.Println("Bot failed: " + err.Error())
 		}
+		// An emergency logout of the hunt loop armed a login
+		// cooldown: honor it on top of the reconnect backoff so the
+		// next session starts after the danger window (the mobs
+		// reset, the character regenerates) instead of the seconds
+		// of the backoff.
+		if cooldown := tracker.LoginCooldownRemaining(); cooldown > delay {
+			log.Printf("Login cooldown %s holds the reconnect back",
+				cooldown)
+			delay = cooldown
+		}
 		if time.Since(started) >= stableSessionTime {
 			delay = reconnectMinDelay
 		}
