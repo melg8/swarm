@@ -472,25 +472,37 @@ func (l *Loop) tick() {
 
 		return
 	}
+	// The auto equipment runs in every phase of the hunt: the paperdoll
+	// stays current while a town trip buys its gear and while the loot
+	// drops arrive, so the combat stats never lag behind the inventory.
+	l.maybeEquipGear()
 	if l.tripActive() {
 		l.tickTownTrip()
 
 		return
 	}
-	l.maybeStartTownTrip()
-	if l.tripActive() {
-		l.tickTownTrip()
+	// A town trip never abandons a running fight: the loot of the kill
+	// is the point of the fight, so the trip start waits for the last
+	// corpse to be looted and the character to stand between the
+	// targets (see fightBusy).
+	if !l.fightBusy() {
+		l.maybeStartTownTrip()
+		if l.tripActive() {
+			l.tickTownTrip()
 
-		return
+			return
+		}
 	}
+	// The destroy cleanup runs outside the trips: everything the
+	// merchant refuses is still better sold at the next shop than
+	// destroyed on the way.
+	l.cleanupInventory()
 	if l.delevelWanted() {
 		l.startDelevel()
 		l.tickDelevel()
 
 		return
 	}
-	l.cleanupInventory()
-	l.maybeEquipGear()
 	l.maybeSwitchZone()
 	if l.phase == phaseEngage {
 		l.engage()
@@ -498,6 +510,25 @@ func (l *Loop) tick() {
 	if l.phase == phaseLoot {
 		l.loot()
 	}
+}
+
+// fightBusy reports whether the character is still bound to the fight
+// it started: a selected living target, a pending loot pickup or a hit
+// landing right now. The town trip start waits it out - walking to a
+// vendor mid-combat leaves the mob alive (it heals back up) and its
+// drops on the ground.
+func (l *Loop) fightBusy() bool {
+	if l.phase == phaseLoot {
+		return true
+	}
+	if l.phase != phaseEngage {
+		return false
+	}
+	if l.target != 0 {
+		return true
+	}
+
+	return l.tracker.SelfUnderAttack()
 }
 
 // recoverFromDeath returns a dead character to the hunt: the village

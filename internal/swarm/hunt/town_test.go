@@ -419,6 +419,51 @@ func TestTripStuckWalkRepaths(t *testing.T) {
 	require.False(t, loop.tripCooldownOver())
 }
 
+// TestTripWaitsForTheFightToEnd pins the combat gate of the trip start:
+// a full inventory must not send the character to the vendor while the
+// target lives or the loot of the kill still lies on the ground - the
+// drops are the point of the fight. Only the between-fights window
+// starts the trip.
+func TestTripWaitsForTheFightToEnd(t *testing.T) {
+	loop, game, bot, _ := newTripLoop()
+	spawnMob(bot)
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplySpawnItem(state.ItemInfo{
+		ObjectID: 9, TemplateID: 57, X: 45040, Y: 50040, Z: -3500,
+	})
+
+	// The mob is picked as the target while the inventory is still
+	// light.
+	loop.tick()
+	require.Equal(t, int32(7), loop.target)
+	require.False(t, loop.tripActive())
+
+	// The bag crosses the trip threshold mid-fight: no vendor walk.
+	fillInventory(bot, 500)
+	loop.tick()
+	require.False(t, loop.tripActive(), "no vendor walk mid-combat")
+	require.Equal(t, phaseEngage, loop.phase)
+
+	// The target dies with a drop on the ground: the kill tick enters
+	// the loot phase and the loot keeps the trip armed off.
+	bot.ApplyStatusUpdate(7, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 0},
+	})
+	bot.ApplySelfTarget(7)
+	loop.tick()
+	require.Equal(t, phaseLoot, loop.phase)
+	require.False(t, loop.tripActive(), "the loot of the kill comes first")
+
+	// The drop is picked up: the loot phase drains, the between-fights
+	// window opens and the full inventory starts the trip.
+	bot.ApplyItemPickup(state.ItemPickup{ObjectID: 9, PlayerID: 100})
+	loop.tick()
+	require.Equal(t, phaseEngage, loop.phase)
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+	require.NotEmpty(t, game.walks)
+}
+
 // TestTripDeathResetsWithoutCooldown verifies that a death during a
 // trip drops the trip state but lets a new trip start right after the
 // revival: the village restart lands next to the shops.
