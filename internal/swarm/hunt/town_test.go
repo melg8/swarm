@@ -298,9 +298,29 @@ func TestTripFullFlow(t *testing.T) {
 	require.Len(t, game.sells, 1)
 
 	// The server confirms the sale (InventoryUpdate removals): the
-	// inventory drops below the trigger and the walk home starts.
+	// remaining 16 junk items of the bag keep selling - the trip
+	// sells everything sellable, not just past the trigger.
 	updates := make([]state.InventoryItem, 0, sellBatchSize)
 	for _, item := range game.sells[0] {
+		updates = append(updates, state.InventoryItem{
+			ObjectID: item.ObjectID, ItemID: item.ItemID,
+			Count: item.Count, Type2: 5, Change: 3,
+		})
+	}
+	bot.ApplyInventoryUpdate(updates)
+	loop.tick()
+	require.Equal(t, phaseTownSell, loop.phase,
+		"the unsold junk keeps selling")
+	loop.sellAt = time.Now().Add(-sellPause - time.Second)
+	loop.tick()
+	require.Len(t, game.sells, 2)
+	require.Len(t, game.sells[1], 41-sellBatchSize)
+
+	// The second batch confirms as well: nothing sellable is left,
+	// the purchases plan (nothing worth the adena here) and the
+	// walk home starts.
+	updates = make([]state.InventoryItem, 0, 41-sellBatchSize)
+	for _, item := range game.sells[1] {
 		updates = append(updates, state.InventoryItem{
 			ObjectID: item.ObjectID, ItemID: item.ItemID,
 			Count: item.Count, Type2: 5, Change: 3,
@@ -464,15 +484,93 @@ func TestTripWaitsForTheFightToEnd(t *testing.T) {
 	require.NotEmpty(t, game.walks)
 }
 
+// TestShoppingTripSellsJunkBelowTheTrigger pins the sell policy of
+// every vendor trip: a light bag of accumulated junk below the 50
+// percent trigger still sells completely when the shopping plan walks
+// the character to a merchant - the bot must not farm with the junk
+// first and return for the sale later.
+func TestShoppingTripSellsJunkBelowTheTrigger(t *testing.T) {
+	loop, game, bot, _ := newTripLoop()
+	items := make([]state.InventoryItem, 0, 6)
+	for i := range 5 {
+		items = append(items, state.InventoryItem{
+			ObjectID: 500 + int32(i), ItemID: 1060, Count: 1,
+			Type2: 5, Change: 1,
+		})
+	}
+	items = append(items, state.InventoryItem{
+		ObjectID: 999, ItemID: 57, Count: 500, Type2: 4, Change: 1,
+	})
+	bot.ApplyItemList(items)
+
+	// The shopping plan (500 adena of fillers) starts the trip.
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+	moveSelfTo(bot, herbielPos[0], herbielPos[1], herbielPos[2])
+	loop.tick()
+	require.Equal(t, phaseTownSell, loop.phase)
+
+	// No merchant visible: skip its wait like the other sell tests.
+	loop.merchantID = -1
+	loop.sellAt = time.Time{}
+	loop.tick()
+	require.Len(t, game.sells, 1)
+	require.Len(t, game.sells[0], 5,
+		"all the accumulated junk sells below the trigger")
+
+	// The sale confirms: the purchases plan with the fresh state
+	// and the trip advances to its buy stops.
+	updates := make([]state.InventoryItem, 0, 5)
+	for _, item := range game.sells[0] {
+		updates = append(updates, state.InventoryItem{
+			ObjectID: item.ObjectID, ItemID: item.ItemID,
+			Count: item.Count, Type2: 5, Change: 3,
+		})
+	}
+	bot.ApplyInventoryUpdate(updates)
+	loop.tick()
+	require.True(t, loop.buysPlanned,
+		"the buy planning runs after the complete sale")
+	require.Equal(t, phaseTownWalk, loop.phase)
+}
+
+// TestTripStandsUpBeforeWalking pins the sit guard of the trip start:
+// a resting character (the regen sits it down between the fights)
+// stands up first - the server refuses move requests while sitting -
+// and the trip starts once the ChangeWaitType broadcast confirms the
+// standing.
+func TestTripStandsUpBeforeWalking(t *testing.T) {
+	loop, game, bot, _ := newTripLoop()
+	fillInventory(bot, 500)
+	// The character rests: the regeneration sat it down.
+	bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: true})
+
+	loop.tick()
+	require.Equal(t, phaseEngage, loop.phase,
+		"the trip does not start while the character sits")
+	require.Equal(t, 1, game.sits, "the stand up toggle is sent")
+
+	// The broadcast confirms the standing: the trip starts.
+	bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: false})
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+	require.Equal(t, 1, game.sits, "no double toggle")
+	require.NotEmpty(t, game.walks)
+}
+
 // TestTripDeathResetsWithoutCooldown verifies that a death during a
 // trip drops the trip state but lets a new trip start right after the
-// revival: the village restart lands next to the shops.
+// revival: the village restart lands next to the shops. A cooldown a
+// recent finished trip armed is cleared as well - the revived
+// character sells right there instead of farming with the full bag.
 func TestTripDeathResetsWithoutCooldown(t *testing.T) {
 	loop, game, bot, _ := newTripLoop()
 	fillInventory(bot, 500)
 
 	loop.tick()
 	require.Equal(t, phaseTownWalk, loop.phase)
+	// A finished trip from minutes ago still holds the cooldown.
+	loop.tripEndedAt = time.Now()
 
 	// Death during the walk: the village restart request goes out and
 	// the trip state is dropped.
@@ -483,7 +581,7 @@ func TestTripDeathResetsWithoutCooldown(t *testing.T) {
 	require.Equal(t, 1, game.restarts)
 	require.Equal(t, phaseEngage, loop.phase)
 	require.True(t, loop.tripCooldownOver(),
-		"the death does not arm the trip cooldown")
+		"the death clears the trip cooldown")
 
 	// Revived in the village with a full inventory: a fresh trip starts
 	// (from the village, so the farm spot is the zone center).

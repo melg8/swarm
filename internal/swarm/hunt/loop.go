@@ -564,6 +564,11 @@ func (l *Loop) recoverFromDeath() {
 			l.phase = phaseIdle
 		}
 		l.resetTownTrip()
+		// The village restart lands next to the shops and the cooldown
+		// a recent finished trip armed must not hold the sale back:
+		// otherwise the revived character walks to the farm spot with
+		// the full bag first and returns to sell later.
+		l.tripEndedAt = time.Time{}
 	}
 	l.logger.Printf("Hunt: character died, restarting at the nearest village")
 	if err := l.game.RestartAtVillage(); err != nil {

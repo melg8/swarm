@@ -85,10 +85,22 @@ func TestShoppingTripBuysAfterSelling(t *testing.T) {
 	require.Len(t, game.sells, 1)
 	require.Len(t, game.sells[0], sellBatchSize)
 
-	// The server confirms the sale: the inventory goes light, the
-	// purchase planning kicks in with the adena.
+	// The server confirms the sale: the remaining 16 junk items keep
+	// selling below the trigger, the complete sale frees the bag.
 	updates := make([]state.InventoryItem, 0, sellBatchSize)
 	for _, item := range game.sells[0] {
+		updates = append(updates, state.InventoryItem{
+			ObjectID: item.ObjectID, ItemID: item.ItemID,
+			Count: item.Count, Type2: 5, Change: 3,
+		})
+	}
+	bot.ApplyInventoryUpdate(updates)
+	loop.tick()
+	loop.sellAt = time.Now().Add(-sellPause - time.Second)
+	loop.tick()
+	require.Len(t, game.sells, 2, "the second junk batch sells")
+	updates = updates[:0]
+	for _, item := range game.sells[1] {
 		updates = append(updates, state.InventoryItem{
 			ObjectID: item.ObjectID, ItemID: item.ItemID,
 			Count: item.Count, Type2: 5, Change: 3,

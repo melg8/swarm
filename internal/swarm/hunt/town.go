@@ -215,6 +215,11 @@ func (l *Loop) maybeStartTownTrip() {
 		(!l.inventoryFull() && !shopping) {
 		return
 	}
+	// The walk needs a standing character: a resting one stands up
+	// first and the trip starts on a later tick.
+	if !l.standUpBeforeTrip(time.Now()) {
+		return
+	}
 	selfX, selfY, _, ok := l.tracker.SelfPosition()
 	if !ok {
 		return
@@ -482,14 +487,17 @@ func (l *Loop) enterSellPhase() {
 }
 
 // tickTownSell runs the sell stop (the first trip stop) and the buy
-// stops: the junk selling ends once the inventory is light again,
-// the fresh adena of the sales re-plans the purchases and every buy
-// stop completes when its purchases were requested. The return leg
-// starts when no stop is left.
+// stops. EVERY vendor trip sells the whole accumulated junk - the
+// selling ends when nothing sellable is left, not when the inventory
+// drops below the trip trigger (a bag of 30 percent junk on a buy
+// trip still sells, or the bot would farm with it and walk back for
+// the sale later). The fresh adena of the sales re-plans the
+// purchases, every buy stop completes when its purchases were
+// requested, and the return leg starts when no stop is left.
 func (l *Loop) tickTownSell() {
 	now := time.Now()
 	if l.sellableStop() {
-		if l.inventoryFull() {
+		if l.junkRemaining() {
 			if !l.handleMerchant(now, merchantTemplates()) {
 				return
 			}
@@ -499,7 +507,7 @@ func (l *Loop) tickTownSell() {
 		}
 		if !l.buysPlanned {
 			stats := l.tracker.InventoryStats()
-			l.logger.Printf("Hunt: inventory light again (%d slots, "+
+			l.logger.Printf("Hunt: shop: junk sold (%d slots left, "+
 				"%.0f%% weight), planning the purchases", stats.Slots,
 				stats.WeightPercent)
 			l.planShoppingStops()
@@ -632,6 +640,19 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 	return true
 }
 
+// junkRemaining reports whether sellable inventory items are left the
+// trip has not offered yet: every vendor visit sells the accumulated
+// junk completely, batch after batch, whatever started the trip.
+func (l *Loop) junkRemaining() bool {
+	for _, item := range l.tracker.SellableItems() {
+		if !l.sold[item.ObjectID] {
+			return true
+		}
+	}
+
+	return false
+}
+
 // sellJunk sells the next batch of inventory junk, most junky items
 // first. Every item is offered once per trip: the server silently skips
 // what it refuses to sell, so re-offering it forever would stall the
@@ -705,9 +726,10 @@ func (l *Loop) abortTownTrip(reason string) {
 	l.endTownTrip("aborted, " + reason)
 }
 
-// resetTownTrip drops the trip state after a death without arming the
-// cooldown: the village restart is not a failed trip, and a full
-// inventory should sell right after the revival.
+// resetTownTrip drops the trip state after a death. The village
+// restart lands next to the shops, and the cooldown of the trip the
+// death interrupted is cleared as well, so a full inventory sells
+// right after the revival instead of farming with the junk first.
 func (l *Loop) resetTownTrip() {
 	if !l.tripActive() {
 		return
@@ -719,4 +741,39 @@ func (l *Loop) resetTownTrip() {
 	l.legDest = pathfind.Vec3{}
 	l.tripStops = nil
 	l.buysPlanned = false
+	l.tripEndedAt = time.Time{}
+}
+
+// standUpBeforeTrip stands a sitting character up before the trip
+// walk: the server refuses move requests while the character sits, so
+// a walk started sitting would stall into the stuck re-paths. The
+// toggle shares the pending transition gate with the rest logic, so
+// the two never double toggle each other, and the trip starts on a
+// later tick once the ChangeWaitType broadcast confirms the standing.
+func (l *Loop) standUpBeforeTrip(now time.Time) bool {
+	if !l.tracker.SelfSitting() {
+		// Standing already: consume a confirmed stand transition of
+		// this guard so it never lingers into the rest logic.
+		if !l.restActionAt.IsZero() && !l.restActionSit {
+			l.restActionAt = time.Time{}
+		}
+
+		return true
+	}
+	// Sitting: a transition is in flight (the rest sit request or this
+	// guard's stand) - wait out its confirmation window before the
+	// stand request, never double toggle.
+	if !l.restActionAt.IsZero() &&
+		now.Sub(l.restActionAt) < restRetryPeriod {
+		return false
+	}
+	if err := l.game.ActionSitStand(); err != nil {
+		l.logger.Printf("Hunt: stand up for the trip failed: %v", err)
+
+		return false
+	}
+	l.restActionAt = now
+	l.restActionSit = false
+
+	return false
 }
