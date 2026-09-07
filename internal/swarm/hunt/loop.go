@@ -107,6 +107,19 @@ const (
 	// leg): past the budget the return falls back to the direct legacy
 	// legs, which at least keep the character moving home.
 	zoneReturnFailBudget = 3
+	// engageStuckTimeout bounds how long the engage keeps re-requesting
+	// a target that never actually starts the fight: the usual cause
+	// is a stale server side selection (an abrupt disconnect left the
+	// auto attack running, the target died and the server keeps the
+	// corpse selected - it never clears the selection, only the next
+	// selection of a DIFFERENT object replaces it), so every forced
+	// attack on the same object id comes back refused forever.
+	engageStuckTimeout = 12 * time.Second
+	// engageSkipDelay keeps a stuck target out of the target search:
+	// the next selection of a different object already breaks the
+	// stale state, the delay only stops the immediate re-pick of the
+	// very same nearest npc.
+	engageSkipDelay = 30 * time.Second
 )
 
 // phase is the coarse activity of the hunt loop.
@@ -130,48 +143,55 @@ const (
 
 // Loop is the hunt state machine of one bot session.
 type Loop struct {
-	game          GameAPI
-	tracker       *state.Bot
-	logger        *log.Logger
-	phase         phase
-	target        int32
-	lastHit       time.Time
-	lootID        int32
-	lootAt        time.Time
-	lootMoveAt    time.Time
-	skipped       map[int32]time.Time
-	restActionAt  time.Time
-	restActionSit bool
-	restartAt     time.Time
-	zoneCX        int32
-	zoneCY        int32
-	zoneHalf      int32
-	navigator     Navigator
-	waypoints     []pathfind.Vec3
-	wpIndex       int
-	legDest       pathfind.Vec3
-	moveAt        time.Time
-	stuckAt       time.Time
-	stuckX        int32
-	stuckY        int32
-	rePaths       int
-	farmX         int32
-	farmY         int32
-	farmZ         int32
-	sellAt        time.Time
-	sellPhaseAt   time.Time
-	merchantID    int32
-	merchantPick  time.Time
-	sold          map[int32]bool
-	tripStart     time.Time
-	tripEndedAt   time.Time
-	zoneReturn    bool
-	zoneFails     int
-	delevelTarget int32
-	delevelGuard  int32
-	delevelTried  map[string]bool
-	delevelFight  time.Time
-	delevelEnd    time.Time
+	game           GameAPI
+	tracker        *state.Bot
+	logger         *log.Logger
+	phase          phase
+	target         int32
+	lastHit        time.Time
+	lootID         int32
+	lootAt         time.Time
+	lootMoveAt     time.Time
+	skipped        map[int32]time.Time
+	restActionAt   time.Time
+	restActionSit  bool
+	restartAt      time.Time
+	zoneCX         int32
+	zoneCY         int32
+	zoneHalf       int32
+	navigator      Navigator
+	waypoints      []pathfind.Vec3
+	wpIndex        int
+	legDest        pathfind.Vec3
+	moveAt         time.Time
+	stuckAt        time.Time
+	stuckX         int32
+	stuckY         int32
+	rePaths        int
+	farmX          int32
+	farmY          int32
+	farmZ          int32
+	sellAt         time.Time
+	sellPhaseAt    time.Time
+	merchantID     int32
+	merchantPick   time.Time
+	sold           map[int32]bool
+	tripStart      time.Time
+	tripEndedAt    time.Time
+	zoneReturn     bool
+	zoneFails      int
+	delevelTarget  int32
+	delevelGuard   int32
+	delevelTried   map[string]bool
+	delevelFight   time.Time
+	delevelEnd     time.Time
+	delevelExp     int32
+	delevelLevel   int32
+	delevelFree    int
+	delevelWait    time.Time
+	delevelCounted bool
+	engageAt       time.Time
+	targetSkip     map[int32]time.Time
 }
 
 // NewLoop creates the hunt loop for a connected game client.
@@ -341,6 +361,10 @@ func (l *Loop) recoverFromDeath() {
 	l.target = 0
 	l.lootID = 0
 	if l.phase == phaseDelevel {
+		// Count the death against the experience it removed
+		// before the replan: the free death counter may abort
+		// the deleveling once the character is alive again.
+		l.noteDelevelDeath()
 		l.waypoints = nil
 	} else {
 		l.phase = phaseEngage
@@ -381,9 +405,13 @@ func (l *Loop) engage() {
 	// server never clears the selection of a corpse (only the next
 	// selection replaces it), so blindly trusting it locked the
 	// loop into an engage/loot ping-pong where the next target was
-	// never selected.
+	// never selected. A target marked stuck (its repeated attack
+	// requests never started the fight) is not re-adopted either
+	// while its skip delay lasts.
+	now := time.Now()
 	serverTarget := l.tracker.SelfTargetID()
-	if serverTarget != 0 && l.tracker.ObjectAlive(serverTarget) {
+	if serverTarget != 0 && l.tracker.ObjectAlive(serverTarget) &&
+		!l.targetSkipped(serverTarget, now) {
 		l.target = serverTarget
 	}
 	if l.target != 0 && !l.tracker.ObjectAlive(l.target) {
@@ -394,7 +422,26 @@ func (l *Loop) engage() {
 
 		return
 	}
-	now := time.Now()
+	if l.target != 0 && !l.tracker.SelfEngaged(l.target) &&
+		!l.engageAt.IsZero() && now.Sub(l.engageAt) > engageStuckTimeout {
+		// The repeated attack requests never started the fight:
+		// the selection on the server points at an object that
+		// refuses the forced attack (typically the corpse of an
+		// abruptly disconnected session, which the server keeps
+		// selected). Only the selection of a DIFFERENT object id
+		// replaces the stale one, so the target is dropped and
+		// skipped for a while.
+		l.logger.Printf("Hunt: target %d does not engage, "+
+			"switching to another", l.target)
+		if l.targetSkip == nil {
+			l.targetSkip = make(map[int32]time.Time)
+		}
+		l.targetSkip[l.target] = now
+		l.target = 0
+		l.engageAt = time.Time{}
+
+		return
+	}
 	if l.target == 0 {
 		// Rest while the character is hurt: the regeneration is
 		// faster out of combat and engaging with low HP risks
@@ -410,11 +457,13 @@ func (l *Loop) engage() {
 		if now.Sub(l.lastHit) < selectPeriod {
 			return
 		}
-		pick, ok := l.tracker.NearestAttackable(attackNearestRange, l.zone())
+		pick, ok := l.tracker.NearestAttackableExcept(
+			attackNearestRange, l.zone(), l.skippedTargets(now))
 		if !ok {
 			return
 		}
 		l.target = pick.ObjectID
+		l.engageAt = now
 	}
 	if l.tracker.SelfEngaged(l.target) {
 		return
@@ -428,6 +477,30 @@ func (l *Loop) engage() {
 		return
 	}
 	l.lastHit = now
+}
+
+// targetSkipped reports whether the object id is currently held out of
+// the engage target search after it refused to start a fight.
+func (l *Loop) targetSkipped(objectID int32, now time.Time) bool {
+	skippedAt, ok := l.targetSkip[objectID]
+
+	return ok && now.Sub(skippedAt) < engageSkipDelay
+}
+
+// skippedTargets collects the object ids currently held out of the
+// target search after they refused to start a fight.
+func (l *Loop) skippedTargets(now time.Time) map[int32]bool {
+	if len(l.targetSkip) == 0 {
+		return nil
+	}
+	ids := make(map[int32]bool, len(l.targetSkip))
+	for objectID, skippedAt := range l.targetSkip {
+		if now.Sub(skippedAt) < engageSkipDelay {
+			ids[objectID] = true
+		}
+	}
+
+	return ids
 }
 
 // returnToZone walks the character back into the hunting square over the

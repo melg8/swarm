@@ -34,6 +34,33 @@ Long term design goals, scalability ideas (packet deduplication, "eyes" bot
 concept, synchronized party behavior) are documented in
 `docs/project_description.md`. Read it before making architectural decisions.
 
+## Server integrity rules (non-negotiable)
+
+The L2J Mobius C1 server is the reference implementation for this project:
+its observed behavior is the spec the bot has to adapt to, never the other
+way round.
+
+- **Never patch the game server to change its behavior.** Gameplay
+  changes (AI decisions, damage, experience, drops, movement, guard
+  retaliation) are out of bounds even when they look like obvious bugs -
+  if the bot needs a behavior the server does not provide, the bot
+  changes, not the server.
+- The only accepted server-side patches are pure logging and diagnostics
+  ones (a log line that reveals what the server decided and why, like the
+  `DEATHLOG` / `GUARDDMG` / `MOVEDBG` lines in the local checkout). They
+  must not alter any decision the server makes.
+- Vanilla quirks discovered along the way (guards that follow without
+  attacking, the Lucky newbie protection below level 10) go into the
+  protocol notes below and into `docs/development_log.md`, and shape
+  the bot logic instead of a server fix. The historical
+  `mobius_server_delevel.patch` (guard revenge + NPC kill penalty)
+  violated this rule and was removed.
+- The geodata region files the bot navigates with live in `data/geodata`
+  of this repository (self-contained checkout, first candidate of the
+  bot's geodata detection) so the bot never depends on the server tree
+  for its pathfinding; refresh them from the server pack
+  `dist/game/data/geodata` when a deployment upgrade changes them.
+
 ## Tech stack
 
 - Go 1.23.2, module path `github.com/melg8/swarm`.
@@ -72,6 +99,9 @@ internal/swarm/
     to_auth_server/            Client -> login server packets.
     from_game_server/          Game server -> client packets.
     to_game_server/            Client -> game server packets.
+data/geodata/                  Geodata region files (X_Y.l2j) the bot
+                               pathfinds over: a self-contained copy of
+                               the server's dist/game/data/geodata pack.
 tools/                         Idempotent bash scripts that deploy and run
                                the local Mobius C1 test server stack.
 docs/                          Project goals and protocol description.
@@ -697,31 +727,38 @@ the same variables).
   destroy during the trip, stuck re-paths, death reset).
 - Deleveling (internal/swarm/hunt/delevel.go): when the character
   level exceeds the median level of the living attackable npcs inside
-  the zone by 7 or more, the bot walks to the nearest town guard
-  (delevelGuards: the Elven village Sentinels, display ids 7218..7221,
-  spawn coordinates from the C1 data), provokes it with the same
-  select-then-attack flow the hunt uses and dies; every death removes
-  the death penalty XP (see the protocol notes) and the village
-  restart revives the character next to the guards, where the walk to
-  the next death starts again. The deleveling stops at the target
-  level = median zone mob level + 5 (the last level with the full
-  item drop chance; the floor is level 5) and re-triggers after
-  hunting raised the level back above median + 7 - for the level 1
-  gremlins the cycle is die 11 -> 6, hunt to 8, die back to 6, which
-  keeps the item drop chance at 82..100% instead of the 10% floor a
-  level 11 character suffers. The fight stage re-paths when the guard
-  does not fight back within 60 s (another geodata deck, an ignored
-  request) and aborts the deleveling after 3 failed re-paths; the
-  whole deleveling is bounded by a 60 min timeout and a 1 min
-  cooldown after it ends. The walk legs are split into at most 1000
-  unit steps because the server refuses move requests with a target
-  farther than 9900 units (MoveToLocation readImpl); the smoothed
-  geodata routes happily exceed that over open terrain. A death
-  during the deleveling keeps the phase running (the town trip aborts
-  instead) and the destroy cleanup stays suspended like during the
-  town trips. Covered by internal/swarm/hunt/delevel_test.go
-  (trigger, hysteresis, guard fight, death continuation, target
-  exit, fight timeout).
+  the zone by 7 or more AND the level is at least 10, the bot walks to
+  the nearest archer guard (delevelGuards: the Elven village sentinels
+  Kendell and Starden only - display ids 7218 and 7220, Elven Bow,
+  ARCHER ai type; the melee sentinels Veltress and Rayen may never
+  retaliate and are never provoked), approaches it into melee range
+  (60 units) and provokes it with the same select-then-attack flow the
+  hunt uses; the archer always answers a provocation in its line of
+  sight with bow shots and kills the character, the village restart
+  revives it next to the guards, where the walk to the next death
+  starts again. Only deaths at level 10+ remove experience (Lucky
+  absorbs the penalty below 10), so the deleveling never triggers
+  below 10 and its target never aims below 9. The vanilla guard deaths
+  pay the penalty from level 10 up (verified live: level 10, exp
+  48229 died to the archer Kendell -> level 9, exp 46190, lost 2039
+  of the 22972 level span), and a free death counter stays as the
+  safety net for servers where the deaths remove nothing: three
+  consecutive penalty-free deaths abort the deleveling and arm a
+  30 min cooldown. The deleveling stops at the target level = median
+  zone mob level + 5 (the last level with the full item drop chance,
+  floored at 9) and re-triggers after hunting raised the level back
+  above the trigger. The fight stage re-paths when the guard does not
+  fight back within 20 s and aborts the deleveling after 3 failed
+  re-paths; the whole deleveling is bounded by a 60 min timeout and a
+  1 min cooldown after it ends. The walk legs are split into at most
+  1000 unit steps because the server refuses move requests with a
+  target farther than 9900 units (MoveToLocation readImpl); the
+  smoothed geodata routes happily exceed that over open terrain. A
+  death during the deleveling keeps the phase running (the town trip
+  aborts instead) and the destroy cleanup stays suspended like during
+  the town trips. Covered by internal/swarm/hunt/delevel_test.go
+  (trigger, hysteresis, guard fight, death continuation, target exit,
+  fight timeout, free death abort).
 - Map target links: the map renders the selection of every visible
   player, not only the own one. The own target is a red dashed line
   with a ring; the targets of other players are violet dashed lines
@@ -864,12 +901,19 @@ truth for packet formats (`L2J_Mobius_C1_HarbingersOfWar/java`). Summary:
   character AI checks `isMovementDisabled`). A village revive without
   the confirmation left the bot permanently stuck - the official client
   sends Appearing when the teleport screen closes.
-- Death penalty and deleveling (Mobius C1): every death removes
-  `percentLost` of the current level span
-  (`data/stats/players/experienceLoss.xml`, ~9-10% at low levels, the
+- Death penalty and deleveling (Mobius C1): the doDie experience
+  penalty branch runs for every killer - verified live on the vanilla
+  server: a guard (NPC) death at level 10 paid the penalty (level 10,
+  exp 48229 -> level 9, exp 46190, lost 2039 of the 22972 level span,
+  the DEATHLOG log line of the local checkout records both sides of
+  every death). It removes `percentLost` of the current level span
+  (`data/stats/players/experienceLoss.xml`, ~9% at low levels, the
   loss is capped at 10% of the span, `Delevel` config enabled, karma
-  multiplies it) - there is no low level death immunity in this data
-  pack. The level gap rules of the drop calculation
+  multiplies it), and the Lucky newbie skill (id 194, granted with
+  character creation) absorbs it entirely while level <= 9
+  (Player.isLucky) - verified: a guard death at level 9 removes
+  nothing, at level 10 the penalty lands. The
+  level gap rules of the drop calculation
   (`NpcTemplate.calculateGroupDrops`): item drops slide from 100% at
   mob level + 5 to 10% at + 10 and beyond, adena from 100% at + 8 to
   10% at + 15; experience and SP stop at + 11
@@ -893,56 +937,69 @@ reference Mobius Java class.
 - Do not push build artifacts (`*.out`, `*out`, binaries are gitignored) or
   `.env`.
 
-## Work in progress: deleveling live validation (handoff 2026-09-07)
+## Deleveling live validated (2026-09-07, round 3)
 
-The town trips (sell loop) are complete and live verified. The
-deleveling is implemented and partially live verified; the next agent
-should finish the live validation. Facts measured on the deployed
-stack (all in this session, do not re-derive):
+The town trips (sell loop) and the deleveling cycle are live verified
+end-to-end on the vanilla server (only logging patches: the
+DEATHLOG/GUARDDMG/MOVEDBG lines of the local checkout; the earlier
+guard revenge + NPC kill penalty server patch was reverted - see the
+server integrity rules). Facts measured on the deployed stack (do not
+re-derive):
 
 - **Appearing fix confirmed working**: after adding the 0x30 reply to
   the self TeleportToLocation (connection/game.go applyTeleport), the
-  death -> village revive -> walk cycle worked: 9 consecutive
-  provoke -> die -> revive -> walk-to-guard cycles, level dropped
-  11 -> 10 (~20-60 s per cycle). Before the fix every post revive
-  walk was silently ignored (server `_isTeleporting`).
-- **Village peace zone blocks guard retaliation**: after ~10 deaths
-  the char provoked Rayen from inside the village peace zone; the
-  guard never swings at a player standing inside it (guard AI peace
-  zone check), so the death stops happening. Implemented fix (NOT yet
-  live validated): delevel fight timeout (20 s) now walks a step
-  toward the farm spot (`walkToward(l.farmX, ...)`) to leave the zone
-  and provokes again; the guard follows and kills outside. Consider
-  also pre-walking out of the zone BEFORE the first provoke.
-- **CURRENT BLOCKER (live, reproduces at 02:40)**: the char is stuck
-  at Rayen's post (42808 51160 -2992) with every walk request
-  answered "Action failed". Server side the char is still auto
-  attacking Rayen (state API shows inCombat True, target Rayen) from
-  the previous session's provoke: `PlayerAI.setIntentionMoveTo`
-  refuses/defers every move while `isAttackingNow()`, and the guard
-  never kills the char inside the peace zone, so the attack never
-  ends. The bot has no attack-breaking action today. Candidate fixes:
-  select another target (AttackRequest on a different npc aborts the
-  old auto attack), or stop via the wait/other action the official
-  client uses; also make the delevel fight timeout stop feeding the
-  attack. After breaking the attack the leash walk works again (the
-  fresh session walks fine outside fights).
+  death -> village revive -> walk cycle worked: consecutive
+  provoke -> die -> revive -> walk-to-guard cycles.
+- **Archer guards always retaliate, melee guards may not**: an archer
+  guard in the attack intention shoots at everything within its 850+
+  unit bow range (the thinkAttack doAttack branch applies no karma
+  gate); a melee guard only follows the provoker (Guard.addDamage
+  startFollow) and the chase dies in the checkTarget gate
+  (Player.isAutoAttackable returns karma > 0 for guards). Verified in
+  the world. The deleveling therefore provokes the archer sentinels
+  Kendell and Starden only, in melee (60 unit approach).
+- **Guard death experience penalty**: verified live on the vanilla
+  server: a guard death at level 9 removes no experience while at
+  level 10 the penalty lands (the Lucky newbie skill absorbs it below
+  10; the doDie penalty branch runs for every killer, guards
+  included). Live sequence: test1 level 10, exp 48229 provoked the
+  archer Kendell in melee, died, and the penalty removed 2039 of the
+  22972 level span -> level 9, exp 46190 (DEATHLOG lines in the game
+  log). The bot's free death counter stays armed as the safety net
+  for penalty-free servers and does not interfere (the productive
+  death resets it).
+- **Server geodata loads after the restart**: the game server runs
+  with PathFinding = 2 and the region 21_19 in
+  dist/game/data/geodata ("GeoEngine: Loaded 1 regions"); the bot
+  pathfinds over its own repo copy in data/geodata (first candidate
+  of the geodata detection).
+- **Stale server side selections after abrupt disconnects**: an
+  abrupt disconnect (a killed process, a dropped pipe) while the
+  character auto attacks leaves the server side attack running; when
+  that target dies the corpse stays SELECTED (the server never clears
+  the selection, only the next selection replaces it) and every
+  forced attack on the same object id of the next session comes back
+  ActionFailed forever - observed live twice (inCombat true, 2
+  refused actions per second, no kills) after killing the bot
+  mid-farm. Bot-side recovery (no server patch): the engage drops a
+  target that never starts the fight within engageStuckTimeout (12 s)
+  and skips it for engageSkipDelay (30 s), so the next pick selects a
+  DIFFERENT object id - that selection replaces the stale one and the
+  hunt resumes. The ATTACKLOG diagnostics lines in the local server
+  checkout log which AttackRequest branch refused an action. The
+  reproduction is timing dependent (the kill must land while the auto
+  attack runs); three deliberate kill -9 attempts did not hit the
+  window again, the fix is covered by unit tests instead.
 - **Delevel trigger caveat**: `MedianZoneMobLevel` sees only the
   known objects around the char; at the village (8000+ units from
   the fields) the median is 0 and the delevel does not re-trigger -
   by design the trigger fires only from the farm zone.
-- **Server geodata is NOT loaded**: `game/log/java0.log` shows
-  `GeoEngine: Loaded 0 regions. Pathfinding is disabled` - the
-  geodata pack was copied after the last server start. Direct
-  server-routed walks work because of this (no `isCompletelyBlocked`
-  checks). A game server restart (safe: the MariaDB datadir holds the
-  characters, never wipe it) would load the 215 regions and change
-  the server move validation - retest the walks after any restart.
-- Live process state at handoff: `swarm-bot.exe` (build with the
-  peace zone fix) running from /tmp, log `/tmp/bot_delevel_test7.log`
-  (287 refused leash walks at Rayen's post); char test1 level 10,
-  exp 85.3%, inventory 35 slots / ~42% weight (below the sell
-  trigger). Kill with `taskkill //F //IM swarm-bot.exe`.
-- Offline state: `go vet`, `gofmt` and the full `go test ./...` are
-  clean; golangci-lint v1 cannot run on this host (known export data
-  mismatch, see the Windows caveats above).
+- **Live validation result (2026-09-07)**: the full cycle ran on the
+  vanilla server: trigger at level 10 over the level 1 gremlins ->
+  pathfinding walk to Kendell (~85 s, geodata from the repo
+  data/geodata) -> melee provocation -> the archer killed the
+  character in ~7 s (GUARDDMG at distance 0) -> exp penalty: level
+  10 -> 9 (DEATHLOG) -> "delevel finished at level 9, walking back"
+  -> pathfinding walk back to the farm spot (~62 s) -> farming
+  resumed (kills with loot). The bot then kept hunting at level 9
+  until the test window ended.

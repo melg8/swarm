@@ -904,3 +904,100 @@ same center below the Newbie Helper).
 
 User request: the zone grows again - 2500x2500 units (half 950 -> 1250)
 around the same center below the Newbie Helper.
+
+## Round 23: deleveling against the vanilla server (2026-09-07)
+
+User request: delevel through a melee provocation of archer guards only
+(melee guards may never join the fight, archers always retaliate in the
+line of sight), never try to delevel at level 9 (a guard death there
+removes no experience - Lucky absorbs it - while at level 10 the penalty
+lands, verified by the user personally), and stop patching the game
+server behavior: the server is the reference and only logging patches
+are allowed from now on. The geodata moves into the repository so the
+bot never depends on the server tree again.
+
+What was measured and changed:
+
+- The behavior patches of the previous session (guard revenge through
+  the aggro list, the NPC kill exp penalty, the removed startFollow)
+  were reverted; the local server checkout now differs from vanilla
+  only by three logging lines (DEATHLOG in Player.doDie and
+  Player.calculateDeathExpPenalty, GUARDDMG in Guard.addDamage, MOVEDBG
+  in MoveToLocation). The old mobius_server_delevel.patch left the
+  tools/ folder and AGENTS.md gained the "server integrity rules".
+- The exp penalty misreading is corrected: the doDie penalty branch
+  runs for EVERY killer, not only playable ones - the braces place it
+  inside `if (killer != null)` but outside the playable killer gate.
+  The guard death at level 10 therefore pays the vanilla penalty (live
+  DEATHLOG: level 10, exp 48229 -> level 9, exp 46190, lost 2039 of the
+  22972 level span), and the earlier "NPC deaths never lose exp"
+  diagnosis was wrong. The previous patch had only masked that with an
+  equivalent branch.
+- Why archer guards: thinkAttack lets an ATTACK-intention NPC strike
+  its most hated target without any karma gate once it is inside the
+  weapon range - 850+ units for the ARCHER ai type (Kendell and
+  Starden, Elven Bow, range 1100), but only ~57 units for the melee
+  sentinels (Veltress and Rayen, Elven Sword, range 40). A melee guard
+  whose provoker stands farther than that drops the chase in the
+  checkTarget gate (Player.isAutoAttackable returns karma > 0 for
+  guards) and only follows (Guard.addDamage startFollow), so it may
+  never swing at all; an archer always shoots back. The bot now
+  provokes Kendell and Starden only, walking into melee (60 units)
+  before the attack request.
+- The deleveling rules: the trigger requires level >= 10
+  (delevelMinLevel; below that the deaths are free because of Lucky,
+  Player.isLucky gates at level <= 9) and the target clamps at 9 - the
+  last productive death happens at 10 and drops the character to 9.
+  A free death counter compares the exp before and after every death
+  (the server refreshes the UserInfo exp on every change through
+  PlayerStat removeExpAndSp -> updateUserInfo): three consecutive
+  penalty-free deaths abort the deleveling with a 30 min cooldown, a
+  safety net for penalty-free configurations that never triggers on
+  this stack.
+- The geodata region 21_19.l2j now lives in data/geodata of this
+  repository - the first candidate of the bot's geodata detection - so
+  "no geodata found" sessions like today's cannot happen again; the
+  server keeps its own copy in dist/game/data/geodata with
+  PathFinding = 2.
+- Live validation on the vanilla server (test1 pushed to level 10,
+  exp 48229 through the database): trigger -> pathfinding walk to
+  Kendell (~85 s) -> melee provocation (GUARDDMG at distance 0) -> the
+  archer killed the character in ~7 s -> exp penalty to level 9
+  (DEATHLOG) -> "delevel finished at level 9, walking back" ->
+  pathfinding walk back to the farm spot (~62 s) -> farming resumed
+  with loot pickups. The character ended the window at level 9,
+  exp 46277 in the database.
+
+Round 23 addendum: stale selections after abrupt disconnects (2026-09-07).
+
+After the live validation above, two extra stability runs exposed a
+reconnect pathology: a bot process killed abruptly mid-farm (SIGPIPE of
+the log pipe) left the character auto attacking server side; the target
+died under the ownerless auto attack and the corpse stayed SELECTED
+(the vanilla server never clears a corpse selection, only the next
+selection of a different object replaces it). The next login then had
+every forced attack on that object id answered ActionFailed - two
+refusals per second, zero kills, no server side log (the refusals are
+silent in the vanilla AttackRequest branches). The state API showed
+inCombat true with the stale target id, the tracker saw the respawned
+npc alive at ~200 units, and a game server restart healed it instantly
+(farming resumed), which isolated the state to the character object.
+
+Fixes, all bot side (the server behavior stays the reference):
+- The engage now drops a target whose repeated attack requests never
+  started the fight within engageStuckTimeout (12 s) and skips the
+  object id for engageSkipDelay (30 s): the next pick necessarily
+  selects a DIFFERENT object id, and that selection replaces the stale
+  corpse selection on the server - the only vanilla way out. The server
+  target adoption ignores skipped ids for the same reason.
+- The state tracker grew NearestAttackableExcept so the pick can
+  exclude the skipped objects while they cool down.
+- The local server checkout gained ATTACKLOG diagnostics lines (pure
+  logging, allowed by the server integrity rules) in every
+  AttackRequest and Creature.onForcedAttack refusal branch, so the next
+  occurrence names the refusing branch directly.
+
+The reproduction is timing dependent (the kill must land exactly while
+the auto attack runs and the target must die after it); three deliberate
+kill -9 attempts missed the window, so the recovery path is covered by
+TestEngageSwitchesStuckTarget instead.

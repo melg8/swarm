@@ -352,6 +352,18 @@ func (b *Bot) SelfLevel() int32 {
 	return b.char.Level
 }
 
+// SelfExp returns the last observed experience of the played character.
+// The server refreshes the value in the UserInfo packet after every
+// experience change (the PlayerStat add and remove paths both call
+// updateUserInfo), so a death experience penalty shows up here at once;
+// a death that removed nothing leaves the value untouched.
+func (b *Bot) SelfExp() int32 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.Exp
+}
+
 // SelfUnderAttack reports whether the character was hit within the last
 // seconds. The hunt loop uses it to keep the rest logic from sitting
 // down in the middle of a fight it did not start itself.
@@ -1108,6 +1120,18 @@ func (z *Zone) Contains(x int32, y int32) bool {
 // from its last packet start position and a stale "nearest" choice
 // would send the character to a mob that is no longer the closest one.
 func (b *Bot) NearestAttackable(maxDistance float64, zone *Zone) (AttackTarget, bool) {
+	return b.NearestAttackableExcept(maxDistance, zone, nil)
+}
+
+// NearestAttackableExcept returns the closest living attackable npc of
+// the zone like NearestAttackable, skipping the given object ids: the
+// engage marks a target that never starts the fight as stuck (a stale
+// server side selection of a corpse keeps refusing every forced attack
+// on the same object id - only the next selection of a different object
+// replaces it) and searches for a different target for a while.
+func (b *Bot) NearestAttackableExcept(
+	maxDistance float64, zone *Zone, skip map[int32]bool,
+) (AttackTarget, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -1120,6 +1144,9 @@ func (b *Bot) NearestAttackable(maxDistance float64, zone *Zone) (AttackTarget, 
 	now := time.Now()
 	for _, obj := range b.objects {
 		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
+			continue
+		}
+		if skip[obj.ObjectID] {
 			continue
 		}
 		x, y := projectedPosition(obj, now)
