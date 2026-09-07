@@ -41,6 +41,9 @@ type HuntingZone struct {
 	Half int32
 }
 
+// regionElven is the region key of the elven lands zone registry.
+const regionElven = "elven"
+
 // elvenHuntingZones ladders the elven lands: the keltir field of the
 // village surroundings (levels 1-4, the default square of this
 // deployment), the goblin and kaboo orc camps east of the village
@@ -51,22 +54,22 @@ type HuntingZone struct {
 var elvenHuntingZones = []HuntingZone{
 	{
 		ID: "elven-keltirs", Name: "Elven Village Keltir Field",
-		Region: "elven", MinLevel: 1, MaxLevel: 4, MinGear: 0,
+		Region: regionElven, MinLevel: 1, MaxLevel: 4, MinGear: 0,
 		CX: 46112, CY: 41500, Half: 1650,
 	},
 	{
 		ID: "elven-goblins", Name: "East Forest Goblin Camp",
-		Region: "elven", MinLevel: 5, MaxLevel: 7, MinGear: 40,
+		Region: regionElven, MinLevel: 5, MaxLevel: 7, MinGear: 40,
 		CX: 51300, CY: 48700, Half: 2900,
 	},
 	{
 		ID: "elven-kaboo", Name: "West Kaboo Woods",
-		Region: "elven", MinLevel: 8, MaxLevel: 12, MinGear: 110,
+		Region: regionElven, MinLevel: 8, MaxLevel: 12, MinGear: 110,
 		CX: 35500, CY: 48700, Half: 3200,
 	},
 	{
 		ID: "elven-dryads", Name: "Southwest Dryad Forest",
-		Region: "elven", MinLevel: 13, MaxLevel: 18, MinGear: 200,
+		Region: regionElven, MinLevel: 13, MaxLevel: 18, MinGear: 200,
 		CX: 6000, CY: 53000, Half: 3500,
 	},
 }
@@ -117,7 +120,10 @@ func PickHuntingZone(
 			return zones[0], true
 		}
 
-		return HuntingZone{}, false
+		return HuntingZone{
+			ID: "", Name: "", Region: "", MinLevel: 0, MaxLevel: 0,
+			MinGear: 0, CX: 0, CY: 0, Half: 0,
+		}, false
 	}
 
 	return zones[best], true
@@ -140,7 +146,7 @@ func (l *Loop) SetHuntingZones(zones []HuntingZone) {
 // ("elven"): the map of the future deployments.
 func (l *Loop) SetHuntingZoneRegion(region string) {
 	switch region {
-	case "elven", "":
+	case regionElven, "":
 		l.SetHuntingZones(ElvenHuntingZones())
 	default:
 		l.logger.Printf("Hunt: no zone registry for region %q, hunting "+

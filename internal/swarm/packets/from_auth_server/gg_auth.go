@@ -16,10 +16,14 @@ type GGAuthPacket struct {
 
 func NewGGAuthPacketFromBytes(data []byte) (*GGAuthPacket, error) {
 	reader := packet.NewReader(data)
-	packet := GGAuthPacket{}
+	packet := GGAuthPacket{
+		SessionID: 0,
+		Unknown:   0,
+	}
 	if err := packet.FromBytes(reader); err != nil {
 		return nil, err
 	}
+
 	return &packet, nil
 }
 

@@ -27,9 +27,10 @@ type InitPacketView struct {
 // dataForBenchmarkV2 - создает тестовый срез байт.
 func dataForBenchmarkV2() []byte {
 	data := make([]byte, 1024)
-	for i := 0; i < 1024; i++ {
+	for i := range 1024 {
 		data[i] = byte(i)
 	}
+
 	return data
 }
 
@@ -61,7 +62,7 @@ func BenchmarkParseInitPacketPackedNoAllocs(b *testing.B) {
 	b.ReportAllocs() // Явно указываем, что нужно отслеживать аллокации.
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		// Передаем указатель на нашу структуру.
 		// Новая память в цикле не выделяется.
 		err = parseInitPacketPackedInto(&packet, data)
@@ -102,7 +103,7 @@ func BenchmarkParseInitPacketPackedWithAlloc(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		packet, err = parseInitPacketPackedWithAlloc(data)
 		if err != nil {
 			b.Fatal(err)
@@ -125,7 +126,7 @@ func TestStructSize(t *testing.T) {
 
 	t.Logf("Размер структуры PackedInitHeader: %d байт", actualSize)
 	headerType := reflect.TypeOf(PackedInitHeader{})
-	for i := 0; i < headerType.NumField(); i++ {
+	for i := range headerType.NumField() {
 		field := headerType.Field(i)
 		t.Logf("Поле %s: смещение %d, размер %d", field.Name, field.Offset, field.Type.Size())
 	}

@@ -98,7 +98,6 @@ func TestBotCommandUnknownBot(t *testing.T) {
 // queue with its fields.
 func TestBotCommandKinds(t *testing.T) {
 	server, bot := newTestServer(t)
-	//nolint:exhaustruct // fields under test are the only ones set
 	commands := []state.Command{
 		{Kind: state.CommandAttack, ObjectID: 7},
 		{Kind: state.CommandPickup, ObjectID: 9},

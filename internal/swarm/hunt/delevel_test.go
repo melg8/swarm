@@ -46,7 +46,6 @@ func newDelevelLoop(level int32) (*Loop, *fakeGame, *state.Bot, *fakeNavigator) 
 func spawnZoneMobs(bot *state.Bot) {
 	points := [][2]int32{{46000, 41400}, {46200, 41600}, {45900, 41300}}
 	for i, p := range points {
-		//nolint:exhaustruct // partial fields for the case
 		bot.ApplyNpcInfo(state.NpcInfo{
 			ObjectID: int32(200 + i), TemplateID: 1000001,
 			Attackable: true, X: p[0], Y: p[1], Name: "Gremlin",
@@ -350,7 +349,7 @@ func TestDelevelDeathProgressResetsFreeCounter(t *testing.T) {
 // provokeAndTimeout advances one silent guard fight: the fight stage
 // picked a guard (delevelGuard set), the timeout expires and the tick
 // marks the guard as tried.
-func provokeAndTimeout(t *testing.T, loop *Loop, bot *state.Bot) {
+func provokeAndTimeout(t *testing.T, loop *Loop, _ *state.Bot) {
 	t.Helper()
 	require.NotZero(t, loop.delevelGuard, "a guard must be picked first")
 	loop.delevelFight = time.Now().Add(-delevelFightTimeout - time.Second)

@@ -24,7 +24,7 @@ func TestProtocolVersionToBytes(t *testing.T) {
 	})
 
 	t.Run("constant matches c1", func(t *testing.T) {
-		require.EqualValues(t, 419, C1ProtocolVersion)
+		require.Equal(t, 419, C1ProtocolVersion)
 	})
 }
 

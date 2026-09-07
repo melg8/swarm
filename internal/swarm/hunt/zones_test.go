@@ -8,9 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/melg8/swarm/internal/swarm/state"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPickHuntingZoneGatesOnLevelAndGear(t *testing.T) {
@@ -60,7 +59,6 @@ func TestPickHuntingZoneFallbacks(t *testing.T) {
 
 func TestLoopSwitchesZoneOnLevel(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetHuntingZones(ElvenHuntingZones())
@@ -93,7 +91,6 @@ func TestLoopSwitchesZoneOnLevel(t *testing.T) {
 
 func TestLoopKeepsZoneDuringCooldown(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetHuntingZones(ElvenHuntingZones())
@@ -110,7 +107,6 @@ func TestLoopKeepsZoneDuringCooldown(t *testing.T) {
 
 func TestUserZoneSelectOverridesPicker(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetHuntingZones(ElvenHuntingZones())
@@ -142,7 +138,6 @@ func TestUserZoneSelectOverridesPicker(t *testing.T) {
 
 func TestUserZoneSelectBounds(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetHuntingZones(ElvenHuntingZones())
@@ -201,12 +196,14 @@ func equipZoneWithGear(bot *state.Bot, points int32) {
 		paperdoll[state.PaperdollLFinger] = 509
 	case points >= 66:
 		items = append(items, state.InventoryItem{
-			ObjectID: 503, ItemID: 28, Count: 1, Equipped: true})
+			ObjectID: 503, ItemID: 28, Count: 1, Equipped: true,
+		})
 		paperdoll[state.PaperdollLegs] = 503
 	case points >= 44:
 	default:
 		items = []state.InventoryItem{
-			{ObjectID: 501, ItemID: 1, Count: 1, Equipped: true}}
+			{ObjectID: 501, ItemID: 1, Count: 1, Equipped: true},
+		}
 		paperdoll = [state.PaperdollSlots]int32{}
 		paperdoll[state.PaperdollRHand] = 501
 	}

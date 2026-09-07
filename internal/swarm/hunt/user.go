@@ -421,6 +421,7 @@ func (l *Loop) followUserWaypoints(
 					continue
 				}
 			}
+
 			break
 		}
 		l.userWpIndex++
@@ -508,7 +509,9 @@ func (l *Loop) publishWalkPlan() {
 // stretch itself. A dead or vanished target hands control to the
 // looting phase so the drops of a killed mob are picked up; a fight
 // that never starts times out and the autonomous hunting resumes.
-func (l *Loop) tickUserAttack(now time.Time) {
+// Pre-consolidation phase debt; the hunt loop cleanup is planned
+// (docs/quality_review_and_agent_prompts.md P07).
+func (l *Loop) tickUserAttack(now time.Time) { //nolint:cyclop,funlen
 	if l.userTarget == 0 {
 		l.resumeAuto()
 

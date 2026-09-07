@@ -51,7 +51,7 @@ func writeValuesToWriter(writer *Writer) ([]byte, error) {
 	return writer.Bytes(), nil
 }
 
-func readValuesFromReader(reader *Reader) error { //nolint:cyclop
+func readValuesFromReader(reader *Reader) error {
 	int64Value, err := reader.ReadInt64()
 	if err != nil {
 		return err

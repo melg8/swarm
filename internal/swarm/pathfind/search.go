@@ -77,13 +77,13 @@ func newSearch(engine *Engine, maxPassableHeight uint16) *search {
 		openSet:           make(map[nodeKey]*node),
 		closed:            make(map[nodeKey]*node),
 		queue:             make(nodeQueue, 0, 256),
-		target:            Point{},
-		targetKey:         nodeKey{},
+		target:            Point{X: 0, Y: 0},
+		targetKey:         nodeKey{p: Point{X: 0, Y: 0}, h: 0},
 		strictTarget:      false,
 		neighborScratch:   nil,
 		ringScratch:       nil,
 		region:            nil,
-		regionKey:         RegionKey{},
+		regionKey:         RegionKey{Col: 0, Row: 0},
 		explored:          0,
 		aborted:           false,
 		seq:               0,
@@ -100,7 +100,7 @@ func (s *search) closestLayer(p Point, z int16) (Layer, bool) {
 		if err != nil || entry.region == nil {
 			s.region, s.regionKey = nil, key
 
-			return Layer{}, false
+			return Layer{Height: 0, NSWE: 0}, false
 		}
 		s.region, s.regionKey = entry.region, key
 	}

@@ -26,11 +26,11 @@ func newGeodataTestServer(t *testing.T) *Server {
 	dir := t.TempDir()
 	block := []byte{0, 0, 0} // flat block at height 0
 	data := make([]byte, 0, 65536*len(block))
-	for i := 0; i < 65536; i++ {
+	for range 65536 {
 		data = append(data, block...)
 	}
 	name := filepath.Join(dir, "22_22.l2j")
-	require.NoError(t, os.WriteFile(name, data, 0o644))
+	require.NoError(t, os.WriteFile(name, data, 0o600))
 
 	engine := pathfind.NewEngine(dir)
 

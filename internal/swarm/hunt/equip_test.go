@@ -8,9 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/melg8/swarm/internal/swarm/state"
+	"github.com/stretchr/testify/require"
 )
 
 // shortSwordItemID mirrors the short sword of the generated item
@@ -23,7 +22,6 @@ const shortSwordItemID = int32(1)
 // slot, armed behind the shared confirmation gate.
 func TestAutoEquipEquipsLootedGear(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -41,8 +39,10 @@ func TestAutoEquipEquipsLootedGear(t *testing.T) {
 	// The server applies it: the equipped flag flips and the gate
 	// opens for the next action (none is left).
 	bot.ApplyInventoryUpdate([]state.InventoryItem{
-		{ObjectID: 555, ItemID: shortSwordItemID, Count: 1,
-			Equipped: true, Change: 2},
+		{
+			ObjectID: 555, ItemID: shortSwordItemID, Count: 1,
+			Equipped: true, Change: 2,
+		},
 	})
 	bot.ApplyPaperdoll(paperdollWith(state.PaperdollRHand, 555))
 	loop.tick()
@@ -51,8 +51,10 @@ func TestAutoEquipEquipsLootedGear(t *testing.T) {
 
 	// A second identical sword brings no gain: nothing more equips.
 	bot.ApplyInventoryUpdate([]state.InventoryItem{
-		{ObjectID: 556, ItemID: shortSwordItemID, Count: 1,
-			Change: 1},
+		{
+			ObjectID: 556, ItemID: shortSwordItemID, Count: 1,
+			Change: 1,
+		},
 	})
 	loop.tick()
 	require.Equal(t, []int32{555}, game.uses,
@@ -64,7 +66,6 @@ func TestAutoEquipEquipsLootedGear(t *testing.T) {
 // equipment holds its requests.
 func TestAutoEquipDefersToManualCommands(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -95,7 +96,6 @@ func TestAutoEquipDefersToManualCommands(t *testing.T) {
 // never share one flood protector window.
 func TestAutoEquipPacesRequests(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -109,8 +109,10 @@ func TestAutoEquipPacesRequests(t *testing.T) {
 	// The first equip confirms fast, but the second request must
 	// wait for the pacing period.
 	bot.ApplyInventoryUpdate([]state.InventoryItem{
-		{ObjectID: 555, ItemID: shortSwordItemID, Count: 1,
-			Equipped: true, Change: 2},
+		{
+			ObjectID: 555, ItemID: shortSwordItemID, Count: 1,
+			Equipped: true, Change: 2,
+		},
 	})
 	bot.ApplyPaperdoll(paperdollWith(state.PaperdollRHand, 555))
 	loop.tick()
@@ -128,7 +130,6 @@ func TestAutoEquipPacesRequests(t *testing.T) {
 // equips into the freed slot after the confirmation.
 func TestAutoEquipPairSwapTwoSteps(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 

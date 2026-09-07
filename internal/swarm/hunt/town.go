@@ -84,6 +84,10 @@ type townNpc struct {
 	Z          int32
 }
 
+// zeroTownNpc is the not-found sentinel of the merchant and guard
+// searches.
+var zeroTownNpc = townNpc{TemplateID: 0, Name: "", X: 0, Y: 0, Z: 0}
+
 // townMerchants are the shop merchants of the known towns. Any merchant
 // accepts the sale of any sellable item (the inventory sell list), so
 // the bot simply walks to the nearest one; the list grows with the
@@ -121,7 +125,9 @@ type engineNavigator struct {
 }
 
 // NewNavigator wraps a geodata engine into the town trip navigator.
-func NewNavigator(engine *pathfind.Engine) Navigator {
+// Returning the Navigator interface is the deliberate seam of the
+// hunt package (see the AGENTS.md interface map).
+func NewNavigator(engine *pathfind.Engine) Navigator { //nolint:ireturn
 	return engineNavigator{engine: engine}
 }
 
@@ -235,7 +241,11 @@ func (l *Loop) maybeStartTownTrip() {
 	l.tripStart = time.Now()
 	l.sold = make(map[int32]bool)
 	l.rePaths = 0
-	l.tripStops = []tripStop{{merchant: merchant, sell: true}}
+	l.tripStops = []tripStop{{
+		merchant: merchant,
+		sell:     true,
+		buys:     nil,
+	}}
 	l.buysPlanned = false
 	l.buyAt = time.Time{}
 	l.buyRequested = nil
@@ -323,6 +333,9 @@ func (l *Loop) tickTownTrip() {
 		if l.walkTownWaypoints() {
 			l.endTownTrip("back at the farm spot")
 		}
+	default:
+		// The non-town phases never reach the town tick (the trip
+		// trigger starts the walk phase first).
 	}
 }
 
@@ -408,6 +421,7 @@ func (l *Loop) walkTownWaypoints() bool {
 					continue
 				}
 			}
+
 			break
 		}
 		l.wpIndex++
@@ -723,7 +737,7 @@ func (l *Loop) endTownTrip(reason string) {
 	l.target = 0
 	l.lootID = 0
 	l.waypoints = nil
-	l.legDest = pathfind.Vec3{}
+	l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.tripStops = nil
 	l.buysPlanned = false
 	l.buyRequested = nil
@@ -752,7 +766,7 @@ func (l *Loop) resetTownTrip() {
 	l.target = 0
 	l.lootID = 0
 	l.waypoints = nil
-	l.legDest = pathfind.Vec3{}
+	l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.tripStops = nil
 	l.buysPlanned = false
 	l.buyRequested = nil

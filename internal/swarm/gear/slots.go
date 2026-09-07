@@ -55,9 +55,9 @@ const (
 
 // slotNames carries the log names of the slots.
 var slotNames = [slotCount]string{
-	"underwear", "right ear", "left ear", "neck", "right finger",
+	"underwear", "right ear", "left ear", partNeck, "right finger",
 	"left finger", "head", "right hand", "left hand", "gloves",
-	"chest", "legs", "feet", "back",
+	partChest, partLegs, "feet", "back",
 }
 
 // String renders the slot for logs.
@@ -72,6 +72,21 @@ func (s Slot) String() string {
 // slotInvalid marks paperdoll block entries that map to no managed
 // slot (the C1 duplicate right hand at the end of the block).
 const slotInvalid Slot = -1
+
+// Body part mask names of the C1 item stats: the values the generated
+// GearStats.BodyPart field spells for the hand and family slots (the
+// pair families are "either-or" masks the server data writes as one
+// string).
+const (
+	partLhand    = "lhand"
+	partLrhand   = "lrhand"
+	partChest    = "chest"
+	partLegs     = "legs"
+	partNeck     = "neck"
+	partOnepiece = "onepiece"
+	partEars     = "rear;lear"
+	partFingers  = "rfinger;lfinger"
+)
 
 // paperdollIndexSlots maps the UserInfo paperdoll block index (the
 // state paperdoll constants) to the gear slot.
@@ -112,26 +127,25 @@ func SlotOfPaperdollIndex(index int) (Slot, bool) {
 // block of the C1 UserInfo paperdoll, so hair items are unequippable
 // for the planner (an empty slot list).
 var bodyPartSlots = map[string][]Slot{
-	"rhand":           {SlotRHand},
-	"lrhand":          {SlotRHand},
-	"lhand":           {SlotLHand},
-	"chest":           {SlotChest},
-	"legs":            {SlotLegs},
-	"onepiece":        {SlotChest},
-	"head":            {SlotHead},
-	"gloves":          {SlotGloves},
-	"feet":            {SlotFeet},
-	"back":            {SlotBack},
-	"underwear":       {SlotUnderwear},
-	"neck":            {SlotNeck},
-	"rear;lear":       {SlotREar, SlotLEar},
-	"rfinger;lfinger": {SlotRFinger, SlotLFinger},
+	"rhand":      {SlotRHand},
+	partLrhand:   {SlotRHand},
+	partLhand:    {SlotLHand},
+	partChest:    {SlotChest},
+	partLegs:     {SlotLegs},
+	partOnepiece: {SlotChest},
+	"head":       {SlotHead},
+	"gloves":     {SlotGloves},
+	"feet":       {SlotFeet},
+	"back":       {SlotBack},
+	"underwear":  {SlotUnderwear},
+	partNeck:     {SlotNeck},
+	partEars:     {SlotREar, SlotLEar},
+	partFingers:  {SlotRFinger, SlotLFinger},
 }
 
 // SlotsForBodyPart lists the paperdoll slots an item with the template
 // bodypart can occupy.
 func SlotsForBodyPart(bodyPart string) []Slot {
-
 	return bodyPartSlots[bodyPart]
 }
 
@@ -139,7 +153,7 @@ func SlotsForBodyPart(bodyPart string) []Slot {
 // family (the mDef carrying accessories).
 func jewelBodyPart(bodyPart string) bool {
 	switch bodyPart {
-	case "rear;lear", "rfinger;lfinger", "neck":
+	case partEars, partFingers, partNeck:
 		return true
 	default:
 		return false
@@ -170,9 +184,9 @@ const (
 func CategoryOf(stats npcdata.GearStats) Category {
 	switch {
 	case stats.WeaponType != "" &&
-		(stats.BodyPart == "rhand" || stats.BodyPart == "lrhand"):
+		(stats.BodyPart == "rhand" || stats.BodyPart == partLrhand):
 		return CategoryWeapon
-	case stats.BodyPart == "lhand" && stats.WeaponType == "":
+	case stats.BodyPart == partLhand && stats.WeaponType == "":
 		return CategoryShield
 	case jewelBodyPart(stats.BodyPart):
 		return CategoryJewel
@@ -226,7 +240,17 @@ func (e Equipment) itemByID(objectID int32) (state.InventoryItem, bool) {
 		}
 	}
 
-	return state.InventoryItem{}, false
+	return state.InventoryItem{
+		ObjectID: 0,
+		ItemID:   0,
+		Count:    0,
+		Type1:    0,
+		Type2:    0,
+		Equipped: false,
+		BodyPart: 0,
+		Enchant:  0,
+		Change:   0,
+	}, false
 }
 
 // Paperdoll returns the equipped item and its score of every slot

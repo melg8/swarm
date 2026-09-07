@@ -80,6 +80,6 @@ func (gc *GameCrypt) Decrypt(data []byte) {
 // advanceOffset adds size to the little endian int stored at key[0..3].
 func (gc *GameCrypt) advanceOffset(key *[GameCryptKeySize]byte, size int) {
 	offset := binary.LittleEndian.Uint32(key[0:4])
-	offset += uint32(size) //nolint:gosec
+	offset += uint32(size)
 	binary.LittleEndian.PutUint32(key[0:4], offset)
 }

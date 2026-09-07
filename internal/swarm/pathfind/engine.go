@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -79,11 +78,12 @@ func NewEngine(dir string) *Engine {
 		dir:      dir,
 		capacity: DefaultCacheCapacity,
 		maxPass:  DefaultMaxPassableHeight,
+		mu:       sync.Mutex{},
 		cache:    make(map[RegionKey]*cacheEntry),
 		lru:      make([]*cacheEntry, 0, DefaultCacheCapacity),
 		pool:     newLayerPool(),
 		files:    0,
-		center:   Vec3{},
+		center:   Vec3{X: 0, Y: 0, Z: 0},
 		hasFiles: false,
 	}
 	engine.scanFiles()
@@ -142,7 +142,11 @@ func (e *Engine) scanFiles() {
 		return
 	}
 	e.hasFiles = true
-	e.center = Vec3{X: sumX / float64(e.files), Y: sumY / float64(e.files)}
+	e.center = Vec3{
+		X: sumX / float64(e.files),
+		Y: sumY / float64(e.files),
+		Z: 0,
+	}
 }
 
 // parseRegionFileName accepts names like "22_22.l2j".
@@ -167,48 +171,6 @@ func parseRegionFileName(name string) (int, int, bool) {
 	return col, row, true
 }
 
-// regionFileNames lists the region files of the directory sorted by
-// name, for tests and diagnostics.
-func (e *Engine) regionFileNames() []string {
-	entries, err := os.ReadDir(e.dir)
-	if err != nil {
-		return nil
-	}
-	names := make([]string, 0, e.files)
-	for _, entry := range entries {
-		if _, _, ok := parseRegionFileName(entry.Name()); ok {
-			names = append(names, entry.Name())
-		}
-	}
-	sort.Strings(names)
-
-	return names
-}
-
-// cellLayers returns the layer stack of a global cell, loading its
-// region on demand. The second result is false when the cell has no
-// geodata (missing or failed region).
-func (e *Engine) cellLayers(p Point) ([]Layer, bool) {
-	key := CellToRegion(p)
-	entry, err := e.entry(key)
-	if err != nil {
-		return nil, false
-	}
-
-	return entry.region.Layers(LocalCell(p)), true
-}
-
-// closestLayer returns the layer of the cell closest to z.
-func (e *Engine) closestLayer(p Point, z int16) (Layer, bool) {
-	key := CellToRegion(p)
-	entry, err := e.entry(key)
-	if err != nil {
-		return Layer{}, false
-	}
-
-	return entry.region.ClosestLayer(LocalCell(p), z)
-}
-
 // entry returns the cache entry of a region, loading it on demand and
 // evicting the least recently used entry when the cache is full.
 func (e *Engine) entry(key RegionKey) (*cacheEntry, error) {
@@ -223,7 +185,7 @@ func (e *Engine) entry(key RegionKey) (*cacheEntry, error) {
 		return entry, entry.err
 	}
 
-	entry := &cacheEntry{key: key}
+	entry := &cacheEntry{key: key, region: nil, err: nil}
 	data, err := os.ReadFile(filepath.Join(
 		e.dir, fmt.Sprintf("%d_%d.l2j", key.Col, key.Row)))
 	if err == nil {

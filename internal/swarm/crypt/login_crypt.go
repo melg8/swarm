@@ -92,7 +92,7 @@ func (lc *LoginCrypt) Seal(dst []byte, content []byte) ([]byte, error) {
 	}
 
 	var header [loginHeaderSize]byte
-	binary.LittleEndian.PutUint16(header[:], uint16(size)) //nolint:gosec
+	binary.LittleEndian.PutUint16(header[:], uint16(size))
 	out = append(out, header[:]...)
 
 	payloadStart := len(out)

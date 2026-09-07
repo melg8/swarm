@@ -87,6 +87,7 @@ func newServer(address string, logger *log.Logger) *Server {
 		pathfinder:   nil,
 		pathfindView: nil,
 		geodataTiles: newGeodataTileCache(),
+		iconsDir:     atomic.Value{},
 		logger:       logger,
 		httpServer:   nil,
 		eventsDone:   make(chan struct{}),
@@ -114,7 +115,12 @@ func newServer(address string, logger *log.Logger) *Server {
 
 // handleBotConfig reports the bot mode of the web UI.
 func (s *Server) handleBotConfig(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, s.logger, configResponse{Mode: modeBot})
+	writeJSON(w, s.logger, configResponse{
+		Mode:     modeBot,
+		Geodata:  nil,
+		MaxSteps: 0,
+		Defaults: nil,
+	})
 }
 
 // Address returns the address the server listens on.

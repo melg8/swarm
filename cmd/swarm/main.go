@@ -118,9 +118,15 @@ func parseFlags() config {
 	return cfg
 }
 
+// swarmDialer dials the login and game server connections with the
+// connect timeout.
+// Listing the deprecated Dialer fields explicitly would trip
+// staticcheck SA1019, so the struct stays partial.
+var swarmDialer = &net.Dialer{Timeout: connectTimeout}
+
 // connectLoginServer establishes the login server connection.
 func connectLoginServer(address string) (net.Conn, error) {
-	conn, err := net.DialTimeout("tcp", address, connectTimeout)
+	conn, err := swarmDialer.Dial("tcp", address)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to connect to login server: %w", err)
@@ -136,7 +142,7 @@ func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
 	address := fmt.Sprintf("%d.%d.%d.%d:%d",
 		auth.ServerIP[0], auth.ServerIP[1], auth.ServerIP[2], auth.ServerIP[3],
 		auth.ServerPort)
-	conn, err := net.DialTimeout("tcp", address, connectTimeout)
+	conn, err := swarmDialer.Dial("tcp", address)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to connect to game server: %w", err)
@@ -151,7 +157,7 @@ func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
 // context is done or the session fails. The hunt loop of the session is
 // bound to a derived context so it stops with the session. The optional
 // geodata engine serves the town trips of the hunt loop.
-func runBot(
+func runBot( //nolint:funlen // linear session script
 	ctx context.Context, cfg config, tracker *state.Bot, engine *pathfind.Engine,
 ) error {
 	sessionCtx, cancelSession := context.WithCancel(ctx)
@@ -211,7 +217,6 @@ func runBot(
 	log.Printf("Playing character %s of level %d",
 		charInfo.Name, charInfo.Level)
 
-	//nolint:gosec // slot index is bounded by the character list length
 	if err := game.EnterWorld(int32(slot)); err != nil {
 		return fmt.Errorf("failed to enter world: %w", err)
 	}
@@ -298,8 +303,8 @@ func main() {
 	engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
 	stats := engine.Stats()
 	if stats.HasData {
-		log.Printf("Geodata ready: %d region files in %s, town trips and manual long walks enabled",
-			stats.RegionFiles, stats.Dir)
+		log.Printf("Geodata ready: %d region files in %s, town trips "+
+			"and manual long walks enabled", stats.RegionFiles, stats.Dir)
 	} else {
 		log.Println("No geodata files found in " + stats.Dir +
 			", the bot hunts without town trips")

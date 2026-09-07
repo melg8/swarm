@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -160,7 +161,9 @@ var bufferPool = sync.Pool{
 // NewGameClient wraps a game server connection and performs the protocol
 // handshake: sends the unencrypted ProtocolVersion and reads the
 // unencrypted KeyPacket that enables the XOR cipher.
-func NewGameClient(conn net.Conn) (*GameClient, error) {
+// The constructor initializes every reusable packet struct (the
+// exhaustruct convention), which exceeds the line budget.
+func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
 	client := &GameClient{
 		conn:           conn,
 		crypt:          nil,
@@ -174,6 +177,7 @@ func NewGameClient(conn net.Conn) (*GameClient, error) {
 		userInfo:       *fromgameserver.NewUserInfoPacket(),
 		charInfo:       *fromgameserver.NewCharInfoPacket(),
 		moveTo:         *fromgameserver.NewMoveToLocationPacket(),
+		moveToPawn:     *fromgameserver.NewMoveToPawnPacket(),
 		stopMove:       *fromgameserver.NewStopMovePacket(),
 		validateLoc:    *fromgameserver.NewValidateLocationPacket(),
 		deleted:        *fromgameserver.NewDeleteObjectPacket(),
@@ -328,7 +332,7 @@ func (gc *GameClient) UseItem(objectID int32) error {
 	if err := gc.sendPacket(request); err != nil {
 		return fmt.Errorf("failed to use item: %w", err)
 	}
-	gc.tracker.RecordEvent("using item " + fmt.Sprint(objectID))
+	gc.tracker.RecordEvent("using item " + strconv.Itoa(int(objectID)))
 
 	return nil
 }
@@ -350,8 +354,8 @@ func (gc *GameClient) DropItem(
 	if err := gc.sendPacket(request); err != nil {
 		return fmt.Errorf("failed to drop item: %w", err)
 	}
-	gc.tracker.RecordEvent("dropping " + fmt.Sprint(count) +
-		" of item " + fmt.Sprint(objectID))
+	gc.tracker.RecordEvent("dropping " + strconv.Itoa(int(count)) +
+		" of item " + strconv.Itoa(int(objectID)))
 
 	return nil
 }
@@ -875,7 +879,10 @@ func (gc *GameClient) applySystemMessage(payload []byte) {
 		return
 	}
 	if gc.tracker != nil {
-		message := state.SystemMessage{ID: gc.systemMessage.MessageID}
+		message := state.SystemMessage{
+			ID:     gc.systemMessage.MessageID,
+			Params: nil,
+		}
 		for _, param := range gc.systemMessage.Params {
 			message.Params = append(message.Params, state.ChatMessageParam{
 				Type: param.Type,

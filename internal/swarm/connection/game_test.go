@@ -222,7 +222,6 @@ func (s *fakeGameServer) writeEncrypted(
 func (s *fakeGameServer) writeFrame(conn net.Conn, payload []byte) {
 	frame := make([]byte, 0, len(payload)+2)
 	var header [2]byte
-	//nolint:gosec // the frame length fits the protocol limit
 	binary.LittleEndian.PutUint16(header[:], uint16(len(payload)+2))
 	frame = append(frame, header[:]...)
 	frame = append(frame, payload...)
@@ -322,7 +321,7 @@ func TestGameClientFullFlow(t *testing.T) {
 	require.True(t, found)
 	require.Equal(t, int32(18), info.BaseClassID)
 
-	require.NoError(t, client.EnterWorld(int32(slot))) //nolint:gosec // small list
+	require.NoError(t, client.EnterWorld(int32(slot)))
 
 	// The client must stay in the world until the context is done.
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -370,7 +369,7 @@ func buildValidateLocation(
 // appendInt32 appends a little endian int32 value to the packet.
 func appendInt32(dst []byte, value int32) []byte {
 	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], uint32(value)) //nolint:gosec // test
+	binary.LittleEndian.PutUint32(buf[:], uint32(value))
 
 	return append(dst, buf[:]...)
 }
@@ -444,7 +443,7 @@ func TestGameClientTracksWorldState(t *testing.T) {
 
 	slot, _, found := updated.FindCharacterByName("test1")
 	require.True(t, found)
-	require.NoError(t, client.EnterWorld(int32(slot))) //nolint:gosec // small
+	require.NoError(t, client.EnterWorld(int32(slot)))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()

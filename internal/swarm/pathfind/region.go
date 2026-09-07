@@ -6,6 +6,7 @@ package pathfind
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 )
 
@@ -49,13 +50,15 @@ func parseRegion(data []byte, key RegionKey, pool *layerPool) (*Region, error) {
 	region := &Region{
 		col:      key.Col,
 		row:      key.Row,
+		kinds:    [blocksPerRegion]blockKind{},
+		spans:    [cellsPerRegion]uint32{},
 		refs:     make([]uint16, 0, 4096),
 		refIndex: make(map[uint16]uint32),
 		pool:     pool,
 	}
 
 	position := 0
-	for block := 0; block < blocksPerRegion; block++ {
+	for block := range blocksPerRegion {
 		if position >= len(data) {
 			return nil, fmt.Errorf("region %d_%d truncated at block %d",
 				key.Col, key.Row, block)
@@ -106,7 +109,7 @@ func (r *Region) parseComplex(data []byte, position *int, block int) error {
 		return fmt.Errorf("truncated complex block at offset %d", *position-1)
 	}
 	r.kinds[block] = blockComplex
-	for cell := 0; cell < cellsPerBlock; cell++ {
+	for cell := range cellsPerBlock {
 		info := binary.LittleEndian.Uint16(data[*position:])
 		*position += 2
 		r.setSingleLayer(block, cell, decodeCell(info))
@@ -119,7 +122,7 @@ func (r *Region) parseComplex(data []byte, position *int, block int) error {
 // leading layer count byte followed by count layer words.
 func (r *Region) parseMultilayer(data []byte, position *int, block int) error {
 	r.kinds[block] = blockMultilayer
-	for cell := 0; cell < cellsPerBlock; cell++ {
+	for cell := range cellsPerBlock {
 		if *position >= len(data) {
 			return fmt.Errorf(
 				"truncated multilayer block at offset %d", *position-1)
@@ -136,9 +139,9 @@ func (r *Region) parseMultilayer(data []byte, position *int, block int) error {
 		}
 		offset := len(r.refs)
 		if offset >= 1<<spanOffsetBits {
-			return fmt.Errorf("region exceeds the span offset capacity")
+			return errors.New("region exceeds the span offset capacity")
 		}
-		for j := 0; j < count; j++ {
+		for range count {
 			info := binary.LittleEndian.Uint16(data[*position:])
 			*position += 2
 			r.refs = append(r.refs, r.pool.intern(decodeCell(info)))
@@ -150,10 +153,12 @@ func (r *Region) parseMultilayer(data []byte, position *int, block int) error {
 }
 
 // addUniformBlock stores one layer for all 64 cells of a block.
-func (r *Region) addUniformBlock(block int, kind blockKind, height int16, nswe uint8) {
+func (r *Region) addUniformBlock(
+	block int, kind blockKind, height int16, nswe uint8,
+) {
 	r.kinds[block] = kind
 	layer := Layer{Height: height, NSWE: nswe}
-	for cell := 0; cell < cellsPerBlock; cell++ {
+	for cell := range cellsPerBlock {
 		r.setSingleLayer(block, cell, layer)
 	}
 }

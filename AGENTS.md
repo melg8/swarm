@@ -369,11 +369,17 @@ provenance (verified 2026-09-05) are the reference for future work:
   and `AutoPlay.ini` has `EnableAutoPlay = False` on this deployment
   (ground items must be picked by the bot itself, nothing auto loots).
 - Windows dev tooling caveats: the installed Go (1.27) is newer than
-  `go.mod` (1.23) - fine for building and tests, but golangci-lint v1.x
-  fails with an export data version mismatch; golangci-lint v2 requires
-  a one time `.golangci.yml` migration, and the `task` binary is not
-  installed - run the underlying commands (`go test ./...`,
-  `gofmt -l .`, ...) directly until then.
+  `go.mod` (1.23) - fine for building and tests - and the `task` binary
+  is not installed, so run the underlying commands (`go build ./...`,
+  `go vet ./...`, `go test ./... -count=1`, `gofmt -l .`,
+  `golangci-lint run`) directly. golangci-lint v2.13.2 works since the
+  2026-09-08 migration (`.golangci.yml` is in the v2 format; the strict
+  linter set is preserved with documented exclusions: G115 integer
+  conversions of the wire parsers, and test-file relief for fixtures -
+  see the comments in `.golangci.yml`). Run `golangci-lint run` before
+  considering work done; the `exhaustruct` -> `exhaustruct_v5` rename
+  (deprecated since v2.13) is a known follow-up - the v5 major flags
+  new sites and needs its own round.
 
 ## Gear, shopping and multi-zone hunting
 

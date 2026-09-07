@@ -27,7 +27,7 @@ func utf16(value string) []byte {
 // putInt32 appends a little endian int32 value.
 func putInt32(dst []byte, value int32) []byte {
 	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], uint32(value)) //nolint:gosec // test
+	binary.LittleEndian.PutUint32(buf[:], uint32(value))
 
 	return append(dst, buf[:]...)
 }
@@ -43,7 +43,7 @@ func putFloat64(dst []byte, value float64) []byte {
 // putInt16 appends a little endian int16 value.
 func putInt16(dst []byte, value int16) []byte {
 	var buf [2]byte
-	binary.LittleEndian.PutUint16(buf[:], uint16(value)) //nolint:gosec // test
+	binary.LittleEndian.PutUint16(buf[:], uint16(value))
 
 	return append(dst, buf[:]...)
 }

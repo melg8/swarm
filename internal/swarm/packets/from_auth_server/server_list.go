@@ -114,16 +114,12 @@ const serverListTailSize = 4 + 1 + 1 + 2 + 2 + 1 + 4 + 1
 
 // decodeServerListTail decodes the fixed tail fields of a server entry.
 func decodeServerListTail(entry *ServerListEntry, tail []byte) {
-	//nolint:gosec // port is a network value
 	entry.Port = int32(binary.LittleEndian.Uint32(tail[0:4]))
 	entry.AgeLimit = int8(tail[4])
 	entry.Pvp = int8(tail[5])
-	//nolint:gosec // player counts are limited by the server capacity
 	entry.CurrentPlayers = int16(binary.LittleEndian.Uint16(tail[6:8]))
-	//nolint:gosec // player counts are limited by the server capacity
 	entry.MaxPlayers = int16(binary.LittleEndian.Uint16(tail[8:10]))
 	entry.Status = int8(tail[10])
-	//nolint:gosec // bits is a network value
 	entry.Bits = int32(binary.LittleEndian.Uint32(tail[11:15]))
 	entry.Brackets = int8(tail[15])
 }

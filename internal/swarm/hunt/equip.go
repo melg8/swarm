@@ -43,7 +43,6 @@ func newEquipManager(profile gear.Profile) *equipManager {
 
 // equipment builds the planner working set from the tracker.
 func (l *Loop) equipment() gear.Equipment {
-
 	return gear.NewEquipment(
 		l.tracker.InventoryItems(),
 		l.tracker.PaperdollSlotObjectIDs())

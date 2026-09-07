@@ -86,16 +86,18 @@ func (s *Server) serveIcons(w http.ResponseWriter, r *http.Request) {
 	// The file name allows letters, digits, underscores and a hyphen
 	// of the classic client icon naming scheme, nothing else.
 	for _, ch := range name {
-		if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' ||
-			ch >= '0' && ch <= '9' || ch == '_' || ch == '-') {
+		if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') &&
+			(ch < '0' || ch > '9') && ch != '_' && ch != '-' {
 			http.NotFound(w, r)
 
 			return
 		}
 	}
 
+	// The name is whitelist-validated above and os.Stat guards the
+	// joined path; the taint analysis cannot see the validation.
 	path := filepath.Join(dir, name+".png")
-	info, err := os.Stat(path)
+	info, err := os.Stat(path) //nolint:gosec
 	if err != nil || info.IsDir() {
 		http.NotFound(w, r)
 
@@ -103,13 +105,13 @@ func (s *Server) serveIcons(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Cache-Control", iconsCacheMaxAge)
-	http.ServeFile(w, r, path)
+	http.ServeFile(w, r, path) //nolint:gosec
 }
 
 // initIconsDir resolves the icon pack directory once at server start
 // and remembers it for the handler.
 func (s *Server) initIconsDir(logger *log.Logger) {
-	dir := ""
+	var dir string
 	if override := os.Getenv("SWARM_ICONS"); override != "" {
 		dir = override
 	} else {

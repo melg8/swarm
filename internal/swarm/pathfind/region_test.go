@@ -45,8 +45,8 @@ func encodeLayer(layer Layer) uint16 {
 // + 64 cell words, a multilayer block type 2 + per cell count + words.
 func (s *regionSpec) encode() []byte {
 	data := make([]byte, 0, blocksPerRegion*(1+2*cellsPerBlock))
-	for bx := 0; bx < blocksPerRegionSide; bx++ {
-		for by := 0; by < blocksPerRegionSide; by++ {
+	for bx := range blocksPerRegionSide {
+		for by := range blocksPerRegionSide {
 			spec := &s.blocks[bx][by]
 			switch spec.kind {
 			case blockFlat:
@@ -149,7 +149,7 @@ func (s *regionSpec) writeBlock(localX, localY int, spec blockSpec) {
 func (s *regionSpec) writeRegion(t *testing.T, dir string) {
 	t.Helper()
 	name := filepath.Join(dir, regionFileName(testRegionCol, testRegionRow))
-	require.NoError(t, os.WriteFile(name, s.encode(), 0o644))
+	require.NoError(t, os.WriteFile(name, s.encode(), 0o600))
 }
 
 // worldOf converts region local cell coordinates to the world center of
@@ -308,9 +308,9 @@ func TestParseRegionGiranSample(t *testing.T) {
 	for _, kind := range region.kinds {
 		kinds[kind]++
 	}
-	require.Greater(t, kinds[blockFlat], 0)
-	require.Greater(t, kinds[blockComplex], 0)
-	require.Greater(t, kinds[blockMultilayer], 0)
+	require.Positive(t, kinds[blockFlat])
+	require.Positive(t, kinds[blockComplex])
+	require.Positive(t, kinds[blockMultilayer])
 
 	// The example start position near the Giran weapon shop decodes to
 	// a sane street height.

@@ -23,7 +23,6 @@ func pushCommand(bot *state.Bot, cmd state.Command) {
 // it is consumed, no phase switch happens.
 func TestUserUseItemCommandRunsImmediately(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	spawnMob(bot)
@@ -43,7 +42,6 @@ func TestUserUseItemCommandRunsImmediately(t *testing.T) {
 // character position.
 func TestUserDropCommandDropsAtSelfPosition(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -61,7 +59,6 @@ func TestUserDropCommandDropsAtSelfPosition(t *testing.T) {
 // goes to the clicked point; arrival ends the manual phase.
 func TestUserMoveCommandSwitchesToManualPhase(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	spawnMob(bot)
@@ -94,7 +91,6 @@ func TestUserMoveCommandSwitchesToManualPhase(t *testing.T) {
 // hands control back after the manual deadline.
 func TestUserMoveTimesOut(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.phase = phaseUser
@@ -115,7 +111,6 @@ func TestUserMoveTimesOut(t *testing.T) {
 func TestUserAttackCommandEngages(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -143,7 +138,6 @@ func TestUserAttackCommandEngages(t *testing.T) {
 // vanished item ends the manual phase.
 func TestUserPickupCommandWalksAndPicks(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	bot.ApplySpawnItem(state.ItemInfo{
@@ -170,7 +164,6 @@ func TestUserPickupCommandWalksAndPicks(t *testing.T) {
 // the approach radius is walked to before the click.
 func TestUserPickupFarItemWalksFirst(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	bot.ApplySpawnItem(state.ItemInfo{
@@ -213,7 +206,6 @@ func TestUserCommandIgnoredDuringDelevel(t *testing.T) {
 // reconnect never replays the stale clicks of the previous session.
 func TestUserCommandsDrainOnReset(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -233,7 +225,6 @@ func TestUserCommandsDrainOnReset(t *testing.T) {
 // phase switch, the same one shot execution as the drop.
 func TestUserDestroyCommandRunsImmediately(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -252,7 +243,6 @@ func TestUserDestroyCommandRunsImmediately(t *testing.T) {
 // object or with a non positive count is dropped silently.
 func TestUserDestroyRejectsGarbage(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -277,12 +267,10 @@ func TestUserAttackReRequestsStaleEngagement(t *testing.T) {
 	// The mob stands in melee range: an out of range target is
 	// approached with a walk, the re-request case needs the swing
 	// range.
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 45100, Y: 50000, Name: "Gremlin",
 	})
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -330,7 +318,6 @@ func TestUserAttackReRequestsStaleEngagement(t *testing.T) {
 func TestUserAttackFreshFightStaysQuiet(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -362,7 +349,6 @@ func TestUserAttackFreshFightStaysQuiet(t *testing.T) {
 func TestManualOnlyModeRunsCommandsAndStaysIdle(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetAutonomy(false)
@@ -397,7 +383,6 @@ func TestManualOnlyModeRunsCommandsAndStaysIdle(t *testing.T) {
 func TestManualOnlyKillReturnsToIdle(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetAutonomy(false)
@@ -420,7 +405,6 @@ func TestManualOnlyKillReturnsToIdle(t *testing.T) {
 func TestManualOnlyDeathRestartsAtVillage(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetAutonomy(false)
@@ -442,10 +426,8 @@ func TestManualOnlyDeathRestartsAtVillage(t *testing.T) {
 // waypoint ends the manual phase.
 func TestUserMoveFarWalkPlansLegs(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
-	//nolint:exhaustruct // the result fields under test only
 	navigator := &fakeNavigator{found: true}
 	loop.SetNavigator(navigator)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -502,10 +484,8 @@ func TestUserMoveFarWalkPlansLegs(t *testing.T) {
 // walks straight to the point.
 func TestUserMoveNearWalkGoesDirect(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
-	//nolint:exhaustruct // the result fields under test only
 	navigator := &fakeNavigator{found: true}
 	loop.SetNavigator(navigator)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -526,10 +506,8 @@ func TestUserMoveNearWalkGoesDirect(t *testing.T) {
 // starts fresh.
 func TestUserMoveReplaceDropsThePlannedPath(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
-	//nolint:exhaustruct // the result fields under test only
 	navigator := &fakeNavigator{found: true}
 	loop.SetNavigator(navigator)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -559,7 +537,6 @@ func TestUserMoveReplaceDropsThePlannedPath(t *testing.T) {
 // the pair order intact.
 func TestUserSwapWaitsForServerConfirmation(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	bot.ApplyItemList([]state.InventoryItem{
@@ -594,7 +571,6 @@ func TestUserSwapWaitsForServerConfirmation(t *testing.T) {
 // command fires anyway.
 func TestUserSwapFallbackTimeout(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	bot.ApplyItemList([]state.InventoryItem{
@@ -623,7 +599,6 @@ func TestUserSwapFallbackTimeout(t *testing.T) {
 // server walk to finish.
 func TestUserMoveRedirectsARunningWalk(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -665,7 +640,6 @@ func TestUserMoveRedirectsARunningWalk(t *testing.T) {
 // clears the plan again.
 func TestUserWalkPlanPublishesAndClears(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -690,7 +664,6 @@ func TestUserWalkPlanPublishesAndClears(t *testing.T) {
 
 	// A far click plans a geodata path: the plan carries the remaining
 	// waypoints with the destination last.
-	//nolint:exhaustruct // the result fields under test only
 	navigator := &fakeNavigator{found: true}
 	loop.SetNavigator(navigator)
 	pushCommand(bot, state.Command{
@@ -723,7 +696,6 @@ func TestUserWalkPlanPublishesAndClears(t *testing.T) {
 func TestUserAttackWalksStalledChase(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
@@ -751,7 +723,7 @@ func TestUserAttackWalksStalledChase(t *testing.T) {
 	require.False(t, loop.userDistAt.IsZero(),
 		"the first sample must record the chase distance")
 	deadline := time.Now().Add(6 * time.Second)
-	for time.Now().Sub(loop.userDistAt) < chaseProgressWindow &&
+	for time.Since(loop.userDistAt) < chaseProgressWindow &&
 		time.Now().Before(deadline) {
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -770,7 +742,6 @@ func TestUserAttackWalksStalledChase(t *testing.T) {
 func TestUserAttackApproachWalksFarTarget(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 

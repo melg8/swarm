@@ -55,7 +55,6 @@ func startHuntFlowServer(t *testing.T) *huntFlowServer {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	//nolint:exhaustruct // zero defaults are the intended state
 	server := &huntFlowServer{
 		fakeGameServer: &fakeGameServer{listener: listener, t: t},
 		ready:          make(chan struct{}),
@@ -132,7 +131,6 @@ func (s *huntFlowServer) huntFlow(conn net.Conn, cipher *crypt.GameCrypt) {
 		case 0x09: // Logout
 			return
 		case 0x0A: // AttackRequest
-			//nolint:gosec // test target ids are small
 			target := int32(binary.LittleEndian.Uint32(payload[1:5]))
 			s.mu.Lock()
 			s.attackRequests = append(s.attackRequests, target)
@@ -165,11 +163,9 @@ func (s *huntFlowServer) huntFlow(conn net.Conn, cipher *crypt.GameCrypt) {
 // character: [0x1A][objectId][count][id][value]... (StatusUpdate).
 func buildSelfVitals(objectID int32, curHP int32) []byte {
 	packet := []byte{0x1A}
-	//nolint:gosec // test object ids are small
 	packet = binary.LittleEndian.AppendUint32(packet, uint32(objectID))
 	packet = binary.LittleEndian.AppendUint32(packet, 3)
 	packet = binary.LittleEndian.AppendUint32(packet, 0x09) // cur hp
-	//nolint:gosec // test hp values are small
 	packet = binary.LittleEndian.AppendUint32(packet, uint32(curHP))
 	packet = binary.LittleEndian.AppendUint32(packet, 0x0A) // max hp
 	packet = binary.LittleEndian.AppendUint32(packet, 100)
@@ -274,7 +270,7 @@ func startHuntBot(
 
 	slot, _, found := updated.FindCharacterByName("test1")
 	require.True(t, found)
-	require.NoError(t, client.EnterWorld(int32(slot))) //nolint:gosec // small
+	require.NoError(t, client.EnterWorld(int32(slot)))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)

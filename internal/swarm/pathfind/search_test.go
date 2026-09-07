@@ -5,7 +5,6 @@
 package pathfind
 
 import (
-	"errors"
 	"math"
 	"testing"
 
@@ -29,8 +28,8 @@ func closedWalls(height int16) Layer {
 
 // wallOnlyLayer keeps only the north and south walls open, closing the
 // east and west sides: the vertical wall columns of the scenarios.
-func wallOnlyLayer(height int16) Layer {
-	return Layer{Height: height, NSWE: nsweNorth | nsweSouth}
+func wallOnlyLayer() Layer {
+	return Layer{Height: 0, NSWE: nsweNorth | nsweSouth}
 }
 
 // TestFindPathOpenField checks the direct line of sight path over a flat
@@ -47,7 +46,7 @@ func TestFindPathOpenField(t *testing.T) {
 	require.Len(t, result.Waypoints, 2)
 	require.InDelta(t, 8000, result.Length, cellSize*2)
 	require.NotEmpty(t, result.RawPath)
-	require.Greater(t, int64(result.Duration), int64(0))
+	require.Positive(t, int64(result.Duration))
 }
 
 // TestFindPathAroundWall builds a full height wall with a single gap and
@@ -58,12 +57,12 @@ func TestFindPathAroundWall(t *testing.T) {
 	spec.setFlat(0)
 	wallX := 300
 	gapY := 1000
-	for ly := 0; ly < cellsPerRegionSide; ly++ {
+	for ly := range cellsPerRegionSide {
 		if ly >= gapY && ly < gapY+8 {
 			continue
 		}
-		spec.setCell(wallX, ly, wallOnlyLayer(0))
-		spec.setCell(wallX+1, ly, wallOnlyLayer(0))
+		spec.setCell(wallX, ly, wallOnlyLayer())
+		spec.setCell(wallX+1, ly, wallOnlyLayer())
 	}
 	engine := newTestEngine(t, spec)
 
@@ -76,11 +75,11 @@ func TestFindPathAroundWall(t *testing.T) {
 
 	// Every smoothed leg must be walkable by construction.
 	for i := 0; i+1 < len(result.Waypoints); i++ {
-		clear, err := engine.LineOfSight(
+		cleared, err := engine.LineOfSight(
 			result.Waypoints[i], result.Waypoints[i+1],
 			DefaultMaxPassableHeight)
 		require.NoError(t, err)
-		require.True(t, clear, "leg %d of the path is blocked", i)
+		require.True(t, cleared, "leg %d of the path is blocked", i)
 	}
 
 	// The raw cell path crosses the wall line inside the gap rows.
@@ -106,9 +105,9 @@ func TestFindPathAroundWall(t *testing.T) {
 func TestFindPathWallWithoutGap(t *testing.T) {
 	spec := &regionSpec{}
 	spec.setFlat(0)
-	for ly := 0; ly < cellsPerRegionSide; ly++ {
-		spec.setCell(300, ly, wallOnlyLayer(0))
-		spec.setCell(301, ly, wallOnlyLayer(0))
+	for ly := range cellsPerRegionSide {
+		spec.setCell(300, ly, wallOnlyLayer())
+		spec.setCell(301, ly, wallOnlyLayer())
 	}
 	engine := newTestEngine(t, spec)
 
@@ -118,7 +117,7 @@ func TestFindPathWallWithoutGap(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, result.Found)
 	require.Empty(t, result.Waypoints)
-	require.Greater(t, result.Explored, 0)
+	require.Positive(t, result.Explored)
 }
 
 // TestFindPathEnclosedTarget checks the fully enclosed target case: the
@@ -150,7 +149,7 @@ func TestFindPathHeightCliff(t *testing.T) {
 	spec := &regionSpec{}
 	spec.setFlat(0)
 	// Blocks from block row 62 on (cell 496) sit 200 units higher.
-	for bx := 0; bx < blocksPerRegionSide; bx++ {
+	for bx := range blocksPerRegionSide {
 		for by := 62; by < blocksPerRegionSide; by++ {
 			spec.blocks[bx][by] = blockSpec{
 				kind:  blockFlat,
@@ -211,27 +210,27 @@ func TestFindPathUpperDeck(t *testing.T) {
 func TestLineOfSight(t *testing.T) {
 	spec := &regionSpec{}
 	spec.setFlat(0)
-	spec.setCell(300, 1000, wallOnlyLayer(0))
-	spec.setCell(301, 1000, wallOnlyLayer(0))
+	spec.setCell(300, 1000, wallOnlyLayer())
+	spec.setCell(301, 1000, wallOnlyLayer())
 	engine := newTestEngine(t, spec)
 
-	clear, err := engine.LineOfSight(
+	cleared, err := engine.LineOfSight(
 		worldOf(200, 1000, 0), worldOf(400, 1000, 0),
 		DefaultMaxPassableHeight)
 	require.NoError(t, err)
-	require.False(t, clear)
+	require.False(t, cleared)
 
-	clear, err = engine.LineOfSight(
+	cleared, err = engine.LineOfSight(
 		worldOf(200, 1000, 0), worldOf(280, 1000, 0),
 		DefaultMaxPassableHeight)
 	require.NoError(t, err)
-	require.True(t, clear)
+	require.True(t, cleared)
 
-	clear, err = engine.LineOfSight(
+	cleared, err = engine.LineOfSight(
 		worldOf(300, 1000, 0), worldOf(300, 1000, 0),
 		DefaultMaxPassableHeight)
 	require.NoError(t, err)
-	require.True(t, clear)
+	require.True(t, cleared)
 }
 
 // TestFindPathBridgeOverWater is the regression test of the layer
@@ -247,8 +246,10 @@ func TestFindPathBridgeOverWater(t *testing.T) {
 	// the default max passable height allows. It stays inside one block
 	// so the builder does not overwrite it with the deck block.
 	for i, x := range []int{100, 101, 102, 103} {
-		spec.setCell(x, 1000, Layer{Height: int16((i + 1) * 16),
-			NSWE: nsweAll})
+		spec.setCell(x, 1000, Layer{
+			Height: int16((i + 1) * 16),
+			NSWE:   nsweAll,
+		})
 	}
 	// The deck and the island ride one layer above the water.
 	for x := 104; x <= 440; x++ {
@@ -276,8 +277,8 @@ func TestFindPathBridgeOverWater(t *testing.T) {
 func TestFindPathDeterministic(t *testing.T) {
 	spec := &regionSpec{}
 	spec.setFlat(0)
-	spec.setCell(300, 700, wallOnlyLayer(0))
-	spec.setCell(300, 701, wallOnlyLayer(0))
+	spec.setCell(300, 700, wallOnlyLayer())
+	spec.setCell(300, 701, wallOnlyLayer())
 	engine := newTestEngine(t, spec)
 
 	first, err := engine.FindPath(
@@ -305,12 +306,12 @@ func TestFindPathMissingGeodata(t *testing.T) {
 	_, err := engine.FindPath(
 		worldOf(100, 100, 0), Vec3{X: 100000, Y: 140000},
 		DefaultMaxPassableHeight)
-	require.True(t, errors.Is(err, ErrMissingCell), err)
+	require.ErrorIs(t, err, ErrMissingCell, err)
 
 	// With no files at all even the start fails.
 	empty := NewEngine(t.TempDir())
 	_, err = empty.FindPath(
 		worldOf(100, 100, 0), worldOf(500, 500, 0),
 		DefaultMaxPassableHeight)
-	require.True(t, errors.Is(err, ErrMissingCell), err)
+	require.ErrorIs(t, err, ErrMissingCell, err)
 }

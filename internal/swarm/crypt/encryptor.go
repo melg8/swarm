@@ -94,7 +94,7 @@ func (e *Encryptor) writePacketSize() error {
 	if size > math.MaxUint16 {
 		panic("packet size too big")
 	}
-	packetSize := int16(size) //nolint:gosec
+	packetSize := int16(size)
 	packetSizeBytes[0] = byte(packetSize)
 	packetSizeBytes[1] = byte(packetSize >> 8)
 

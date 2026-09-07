@@ -7,11 +7,11 @@ package hunt
 import (
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/gear"
 	"github.com/melg8/swarm/internal/swarm/npcdata"
-	"github.com/melg8/swarm/internal/swarm/state"
 )
 
 // Shopping of the town trips: the gear.PlanPurchases strategy decides
@@ -148,6 +148,7 @@ func (l *Loop) planShoppingStops() {
 		if !ok {
 			l.logger.Printf("Hunt: shop: no known merchant for template "+
 				"%d, skipping %d purchases", templateID, len(buys))
+
 			continue
 		}
 		stops = append(stops, merchantGroup{merchant: merchant, buys: buys})
@@ -194,7 +195,7 @@ func merchantByTemplate(templateID int32) (townNpc, bool) {
 		}
 	}
 
-	return townNpc{}, false
+	return zeroTownNpc, false
 }
 
 // stopMerchantTemplates lists the packet template ids of the current
@@ -298,8 +299,12 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 	l.buyAt = now
 	l.buyRequested = batch
 	l.buyConfirmAt = now
-	l.logger.Printf("Hunt: shop: buying %d items from %s (list %d)",
-		len(batch), stop.merchant.Name, listID)
+	names := make([]string, 0, len(batch))
+	for _, purchase := range batch {
+		names = append(names, npcdata.ItemName(purchase.ItemID))
+	}
+	l.logger.Printf("Hunt: shop: buying %d items from %s (list %d): %s",
+		len(batch), stop.merchant.Name, listID, strings.Join(names, ", "))
 
 	return len(l.tripStops) > 0 && len(l.tripStops[0].buys) == 0 &&
 		len(l.buyRequested) == 0
@@ -389,7 +394,3 @@ func (l *Loop) resetStopBuys(reason string) {
 func (l *Loop) sellableStop() bool {
 	return len(l.tripStops) > 0 && l.tripStops[0].sell
 }
-
-// state import marker: the trip keeps the inventory items through
-// the tracker.
-var _ = state.InventoryItem{}

@@ -41,6 +41,48 @@ migration to be performed directly.
 - 2026-09-08: committed `docs/quality_review_and_agent_prompts.md` (the
   architecture/quality review with the P01-P14 agent prompts written in
   the previous session; it was left uncommitted).
+- 2026-09-08: migration complete, the lint gate is green.
+  - golangci-lint 2.13.2 installed via
+    `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest`
+    (reads the Go 1.27 stdlib export data that v1.64.8 could not).
+  - `.golangci.yml` migrated to the v2 format (the `run.deadline` key
+    blocks `golangci-lint migrate`, removed first); the strict set is
+    preserved, comments restored by hand. Documented config decisions:
+    gosec G115 excluded (wire-parser integer conversions, guarded by the
+    parser capacity checks), cyclop max-complexity 15 (gocyclo dropped -
+    it duplicated cyclop at 30), funlen 65/45, exhaustive
+    `default-signifies-exhaustive`, test-file relief for errcheck/
+    exhaustruct/goconst/noctx/dogsled/funlen/lll/prealloc, cmd/geotest
+    exempt from forbidigo (it is a stdout tool), net.Dialer excluded
+    from exhaustruct (listing its deprecated fields trips SA1019).
+  - testify v1.4.0 (2019) -> v1.12.1: the testifylint autofix rewrites
+    `require.Greater(t, x, 0)` into `require.Positive(t, x)`, which the
+    pinned v1.4.0 did not compile. The upgrade is the honest fix.
+  - The generated npcdata files now carry the canonical single-line
+    `// Code generated ... DO NOT EDIT.` marker (the old two-line
+    markers were not recognized, so linters flagged item_icons.go ~340
+    times); all six generator scripts emit the canonical line.
+  - ~790 accumulated findings fixed (the strict set had not run since
+    the Go 1.27 toolchain broke): ~130 stale `//nolint` directives
+    dropped, explicit zero initialization for every production struct
+    literal (exhaustruct), the gear bodypart string masks extracted
+    into constants (goconst), dead code deleted (connector.go + tests,
+    crypt random_unique bench, three dead Engine methods), long lines
+    wrapped, a real bounds check added to the webserver geodata tile
+    range parse (G109), the SA4010 dead `names` append of the shop buy
+    logging now actually logs the item names, the G602 slice guard in
+    the gear planner, gosec G703/ireturn/unparam nolinted with reasons.
+    The five complexity monsters (hunt engage 29, tickUserAttack 22,
+    ParseUserInfoPacket 17, ParseNpcInfoPacket 16, fightDelevelGuard
+    16) carry reasoned `//nolint:cyclop` markers pointing at the
+    planned P07 refactor.
+  - Verification: `golangci-lint run` 0 issues, `go vet ./...` clean,
+    `gofmt -l .` clean, `go test ./... -count=1` all 13 packages ok.
+  - Known follow-ups: the `exhaustruct` -> `exhaustruct_v5` rename (the
+    v2.13 deprecation; the v5 major flags 50 new sites and needs its
+    own round), the crypt dead Encryptor/Decryptor stack deletion and
+    `task` binary install (P03 remainder), `-race` in the test task
+    (P01).
 
 ## Task (completed): gear auto-equip, shop buying strategy, multi-zone hunting
 

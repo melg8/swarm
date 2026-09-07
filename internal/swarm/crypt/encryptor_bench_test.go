@@ -13,7 +13,7 @@ import (
 
 func BenchmarkEncryptor_Write(b *testing.B) {
 	writer := packet.NewWriter()
-	writer.Buffer.Grow(100)
+	writer.Grow(100)
 	cipher := DefaultAuthKey()
 	encryptor := NewEncryptor(*writer, cipher)
 	packet := toauthserver.NewDefaultRequestGGAuth(1)

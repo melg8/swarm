@@ -21,7 +21,7 @@ import (
 func townGeodataCandidates() []string {
 	candidates := make([]string, 0, 8)
 	if dir, err := os.Getwd(); err == nil {
-		for i := 0; i < 6; i++ {
+		for range 6 {
 			candidates = append(candidates, filepath.Join(dir, "data", "geodata"))
 			parent := filepath.Dir(dir)
 			if parent == dir {

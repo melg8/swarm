@@ -96,7 +96,7 @@ func (f *fakeGame) SellItems(items []state.InventoryItem) error {
 	return nil
 }
 
-func (f *fakeGame) BuyItems(listID int32, items []gear.Purchase) error {
+func (f *fakeGame) BuyItems(_ int32, items []gear.Purchase) error {
 	if f.lastError != nil {
 		return f.lastError
 	}
@@ -140,7 +140,6 @@ func newTestBot() *state.Bot {
 
 // spawnMob adds an attackable npc in reach of the test character.
 func spawnMob(bot *state.Bot) {
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 46000, Y: 50000, Name: "Gremlin",
@@ -150,7 +149,6 @@ func spawnMob(bot *state.Bot) {
 func TestLoopAttacksWhenIdle(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -165,7 +163,6 @@ func TestLoopAttacksWhenIdle(t *testing.T) {
 func TestLoopForcesAttackAfterSelection(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -187,7 +184,6 @@ func TestLoopForcesAttackAfterSelection(t *testing.T) {
 func TestLoopRetriesForcedAttackUntilEngaged(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -207,7 +203,6 @@ func TestLoopRetriesForcedAttackUntilEngaged(t *testing.T) {
 func TestLoopStopsRequestingOnceEngaged(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -220,7 +215,6 @@ func TestLoopStopsRequestingOnceEngaged(t *testing.T) {
 
 	// The fight starts: the server broadcasts the chase and the auto
 	// attack. The loop must stop re-requesting the target.
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyPawnMovement(state.PawnMovement{
 		ObjectID: 100, TargetID: 7, Distance: 40,
 		X: 45000, Y: 50000, TargetX: 45960, TargetY: 50000, TargetZ: -3500,
@@ -237,12 +231,10 @@ func TestEngageSwitchesStuckTarget(t *testing.T) {
 	bot := newTestBot()
 	// The nearest mob and a second one a bit farther away.
 	spawnMob(bot)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 8, TemplateID: 1000001, Attackable: true,
 		X: 46200, Y: 50100, Name: "Gremlin",
 	})
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -284,14 +276,12 @@ func TestEngageSwitchesStuckTarget(t *testing.T) {
 
 func TestLoopLootsAfterKill(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
 
 	// A killed target with a drop next to the corpse.
 	spawnMob(bot)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplySpawnItem(state.ItemInfo{
 		ObjectID: 9, TemplateID: 57, X: 45040, Y: 50040, Z: -3500,
 	})
@@ -311,11 +301,9 @@ func TestLoopLootsAfterKill(t *testing.T) {
 
 func TestLoopSkipsUnreachableLoot(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.phase = phaseLoot
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplySpawnItem(state.ItemInfo{
 		ObjectID: 9, TemplateID: 57, X: 45040, Y: 50040, Z: -3500,
 	})
@@ -334,11 +322,9 @@ func TestLoopSkipsUnreachableLoot(t *testing.T) {
 
 func TestLoopWalksToFarLoot(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.phase = phaseLoot
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplySpawnItem(state.ItemInfo{
 		ObjectID: 9, TemplateID: 57, X: 45600, Y: 50000, Z: -3500,
 	})
@@ -361,7 +347,6 @@ func TestLoopWalksToFarLoot(t *testing.T) {
 
 func TestLoopWalksBackIntoTheZone(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	game.noTargets = true
 	loop := NewLoop(game, bot)
@@ -405,7 +390,6 @@ func TestLoopWalksBackIntoTheZone(t *testing.T) {
 
 func TestLoopPathfindsBackIntoTheZone(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	game.noTargets = true
 	nav := &fakeNavigator{found: true}
@@ -451,7 +435,6 @@ func TestLoopPathfindsBackIntoTheZone(t *testing.T) {
 
 func TestLoopIgnoresMobsOutsideTheZone(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetHuntingZone(46112, 41500, 450)
@@ -459,7 +442,6 @@ func TestLoopIgnoresMobsOutsideTheZone(t *testing.T) {
 
 	// A mob outside the hunting square is not attacked even though it
 	// is the closest one.
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 46000, Y: 50000, Name: "Gremlin",
@@ -475,7 +457,6 @@ func TestLoopIgnoresMobsOutsideTheZone(t *testing.T) {
 		ObjectID: 100, X: 46112, Y: 41500, Z: -3539,
 		DestX: 46112, DestY: 41500, DestZ: -3539,
 	})
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 8, TemplateID: 1000001, Attackable: true,
 		X: 46200, Y: 41800, Name: "Inside Gremlin",
@@ -489,7 +470,6 @@ func TestLoopIgnoresMobsOutsideTheZone(t *testing.T) {
 func TestLoopSitsDownWhenExhausted(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -529,7 +509,6 @@ func TestLoopSitsDownWhenExhausted(t *testing.T) {
 func TestLoopSitsAtTheNewThreshold(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -554,7 +533,6 @@ func TestLoopSitsAtTheNewThreshold(t *testing.T) {
 func TestLoopDoesNotSitWhileUnderAttack(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -564,7 +542,7 @@ func TestLoopDoesNotSitWhileUnderAttack(t *testing.T) {
 	bot.ApplyStatusUpdate(100, []state.Attribute{
 		{ID: state.AttrCurHP, Value: 20},
 	})
-	//nolint:exhaustruct // partial fields for the case
+
 	bot.ApplyAttack(state.Attack{
 		AttackerID: 7, X: 46000, Y: 50000, Z: -3500,
 		TargetX: 45000, TargetY: 50000, TargetZ: -3500,
@@ -580,7 +558,6 @@ func TestLoopDoesNotSitWhileUnderAttack(t *testing.T) {
 func TestLoopRestartsAfterDeath(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -616,7 +593,6 @@ func TestLoopRestartsAfterDeath(t *testing.T) {
 func TestLoopAttackErrorIsLoggedNotFatal(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	game.lastError = errors.New("connection lost")
 	loop := NewLoop(game, bot)
@@ -632,7 +608,6 @@ func TestLoopAttackErrorIsLoggedNotFatal(t *testing.T) {
 func TestLoopSelectsNextTargetAfterKill(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
@@ -652,7 +627,6 @@ func TestLoopSelectsNextTargetAfterKill(t *testing.T) {
 	// select a new target instead of ping-ponging between the engage
 	// and loot phases around the stale dead selection. A second living
 	// mob stands by for the re-pick.
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 8, TemplateID: 1000001, Attackable: true,
 		X: 45900, Y: 50000, Name: "Second Gremlin",
@@ -668,7 +642,6 @@ func TestLoopSelectsNextTargetAfterKill(t *testing.T) {
 func TestLoopWaitsForHealthWhenHurt(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
-	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)

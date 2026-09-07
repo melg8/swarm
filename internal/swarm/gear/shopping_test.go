@@ -7,10 +7,9 @@ package gear
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/melg8/swarm/internal/swarm/npcdata"
 	"github.com/melg8/swarm/internal/swarm/state"
+	"github.com/stretchr/testify/require"
 )
 
 // elvenCatalog mirrors the elven village shop deployment: the weapon

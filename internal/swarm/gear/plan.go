@@ -65,13 +65,13 @@ func NextUpgrade(
 			continue
 		}
 		switch candidate.Stats.BodyPart {
-		case "lrhand":
+		case partLrhand:
 			planTwoHandWeapon(&best, paperdoll, candidate)
-		case "onepiece":
+		case partOnepiece:
 			planOnePiece(&best, paperdoll, candidate)
-		case "lhand":
+		case partLhand:
 			planShield(&best, paperdoll, candidate)
-		case "legs":
+		case partLegs:
 			planLegs(&best, paperdoll, candidate, equipment, profile)
 		default:
 			planSimple(&best, paperdoll, candidate, slots)
@@ -104,6 +104,7 @@ func scoreUnequipped(
 			Item:  item,
 			Stats: stats,
 			Score: score,
+			Slot:  slotInvalid,
 		})
 	}
 	sort.Slice(candidates, func(i int, j int) bool {
@@ -128,8 +129,12 @@ func planSimple(
 	candidate ScoredItem, slots []Slot,
 ) {
 	if len(slots) == 2 {
-		planPair(best, paperdoll, candidate, slots[0], slots[1])
+		// G602: the len(slots) == 2 branch proves both indexes exist.
+		planPair(best, paperdoll, candidate, slots[0], slots[1]) //nolint:gosec
 
+		return
+	}
+	if len(slots) == 0 {
 		return
 	}
 	slot := slots[0]
@@ -243,7 +248,7 @@ func planShield(
 	if current.Item.ObjectID != 0 {
 		gain -= current.Score
 	}
-	if weapon.Stats.BodyPart == "lrhand" {
+	if weapon.Stats.BodyPart == partLrhand {
 		gain -= weapon.Score
 	}
 	if gain > 0 {
@@ -289,7 +294,7 @@ func planLegs(
 ) {
 	chest := paperdoll[SlotChest]
 	current := paperdoll[SlotLegs]
-	if chest.Stats.BodyPart != "onepiece" {
+	if chest.Stats.BodyPart != partOnepiece {
 		planSimple(best, paperdoll, candidate, []Slot{SlotLegs})
 
 		return
@@ -302,7 +307,7 @@ func planLegs(
 			continue
 		}
 		stats, ok := npcdata.ItemGearStats(item.ItemID)
-		if !ok || stats.BodyPart != "chest" {
+		if !ok || stats.BodyPart != partChest {
 			continue
 		}
 		score := scoreStats(profile, stats)

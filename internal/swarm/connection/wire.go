@@ -55,7 +55,7 @@ func writeWirePacket(conn io.Writer, payload []byte) error {
 	}
 
 	var header [wireHeaderSize]byte
-	wireEndian.PutUint16(header[:], uint16(size)) //nolint:gosec
+	wireEndian.PutUint16(header[:], uint16(size))
 
 	if _, err := conn.Write(header[:]); err != nil {
 		return fmt.Errorf("failed to write packet header: %w", err)

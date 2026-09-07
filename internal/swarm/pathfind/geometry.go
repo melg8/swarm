@@ -81,6 +81,7 @@ func CellToWorldMin(p Point) Vec3 {
 	return Vec3{
 		X: float64((p.X - tileZeroCol*cellsPerRegionSide) * cellSize),
 		Y: float64((p.Y - tileZeroRow*cellsPerRegionSide) * cellSize),
+		Z: 0,
 	}
 }
 
@@ -90,7 +91,7 @@ func CellToWorldMin(p Point) Vec3 {
 func CellToWorldCenter(p Point) Vec3 {
 	corner := CellToWorldMin(p)
 
-	return Vec3{X: corner.X + cellSize/2, Y: corner.Y + cellSize/2}
+	return Vec3{X: corner.X + cellSize/2, Y: corner.Y + cellSize/2, Z: 0}
 }
 
 // CellToRegion returns the region file coordinates of a global cell.
@@ -121,7 +122,9 @@ func floorDiv(v, d int32) int32 {
 	return q
 }
 
-// floorMod is the floored integer remainder, always in [0, d).
-func floorMod(v, d int32) int32 {
+// floorMod is the floored integer remainder, always in [0, d). The
+// divisor stays a parameter so the tests can exercise the modulo
+// semantics.
+func floorMod(v, d int32) int32 { //nolint:unparam // see above
 	return v - floorDiv(v, d)*d
 }

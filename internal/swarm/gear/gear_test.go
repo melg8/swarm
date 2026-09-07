@@ -7,10 +7,9 @@ package gear
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/melg8/swarm/internal/swarm/npcdata"
 	"github.com/melg8/swarm/internal/swarm/state"
+	"github.com/stretchr/testify/require"
 )
 
 // short sword (item 1): rhand SWORD pAtk 8 pAtkSpd 379.
@@ -351,5 +350,5 @@ func TestScoreSkipsNonGearItems(t *testing.T) {
 	profile := MeleeFighter{}
 	// Adena (57) carries no gear stats: zero score, zero points.
 	require.Zero(t, Score(profile, item(1, 57)))
-	require.Zero(t, GearPoints(profile, item(1, 57)))
+	require.Zero(t, gearPoints(profile, item(1, 57)))
 }

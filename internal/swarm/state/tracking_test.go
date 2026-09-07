@@ -14,7 +14,6 @@ import (
 func TestRotationPacketsTurnObjects(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyPlayerInfo(PlayerInfo{ObjectID: 55, Name: "Other", X: 100, Y: 100})
 
 	// The pair a standing player announces on spawn: begin carries the
@@ -30,7 +29,6 @@ func TestRotationPacketsTurnObjects(t *testing.T) {
 func TestAttackFacesTheTarget(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 46000, Y: 50000, Z: -3500, Name: "Gremlin",
@@ -57,7 +55,6 @@ func TestAttackFacesTheTarget(t *testing.T) {
 func TestSelfAttackFacesTargetAndKeepsTarget(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 46000, Y: 50000, Z: -3500, Name: "Gremlin",
@@ -95,7 +92,6 @@ func TestSelfPawnMovementChasesTarget(t *testing.T) {
 
 func TestMoveTypeUpdatesRunFlag(t *testing.T) {
 	bot := NewBot("acc1")
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 100, Y: 100, Name: "Gremlin", RunSpeed: 165, WalkSpeed: 80,
@@ -110,7 +106,6 @@ func TestMoveTypeUpdatesRunFlag(t *testing.T) {
 func TestSelfTargetTracking(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 100, Y: 100, Name: "Gremlin",
@@ -145,7 +140,6 @@ func TestSpawnItemAndPickup(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
 
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplySpawnItem(ItemInfo{
 		ObjectID: 9, TemplateID: 1057, Count: 5, X: 45040, Y: 50040, Z: -3500,
 	})
@@ -169,9 +163,7 @@ func TestSpawnItemAndPickup(t *testing.T) {
 func TestNearestGroundItemSkipsBlacklisted(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplySpawnItem(ItemInfo{ObjectID: 1, TemplateID: 57, X: 100, Y: 0, Z: 0})
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplySpawnItem(ItemInfo{ObjectID: 2, TemplateID: 57, X: 500, Y: 0, Z: 0})
 
 	item, ok := bot.NearestGroundItemExcluding(1000, map[int32]time.Time{
@@ -194,13 +186,9 @@ func TestInventoryTracking(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
 
-	//nolint:exhaustruct // partial fields for the case
 	items := []InventoryItem{
-		//nolint:exhaustruct // partial fields for the case
 		{ObjectID: 1, ItemID: 57, Count: 500, Type2: 4},
-		//nolint:exhaustruct // partial fields for the case
 		{ObjectID: 2, ItemID: 1146, Count: 1, Type2: 0},
-		//nolint:exhaustruct // partial fields for the case
 		{ObjectID: 3, ItemID: 1060, Count: 3, Type2: 5},
 	}
 	bot.ApplyItemList(items)
@@ -212,9 +200,7 @@ func TestInventoryTracking(t *testing.T) {
 
 	// Pickup adds one stack, destroy removes another.
 	bot.ApplyInventoryUpdate([]InventoryItem{
-		//nolint:exhaustruct // partial fields for the case
 		{ObjectID: 1, ItemID: 57, Count: 600, Type2: 4, Change: 2},
-		//nolint:exhaustruct // partial fields for the case
 		{ObjectID: 2, ItemID: 1146, Count: 1, Type2: 0, Change: 3},
 	})
 	stats = bot.InventoryStats()
@@ -228,7 +214,6 @@ func TestInventoryTracking(t *testing.T) {
 
 func TestInventoryStatsWeight(t *testing.T) {
 	bot := NewBot("acc1")
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyUserInfo(UserInfo{
 		CurrentLoad: 60000, MaxLoad: 6400000, RunSpeed: 165,
 	})
@@ -245,7 +230,6 @@ func TestEffectiveSpeedAppliesMultiplier(t *testing.T) {
 func TestSelfTargetClearedWhenTargetDies(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 7, X: 100, Y: 100, Name: "Gremlin", Attackable: true,
 	})
@@ -262,7 +246,6 @@ func TestSelfTargetClearedWhenTargetDies(t *testing.T) {
 func TestSelfTargetClearedWhenTargetRemoved(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 7, X: 100, Y: 100, Name: "Gremlin", Attackable: true,
 	})
@@ -277,7 +260,6 @@ func TestSelfTargetClearedWhenTargetRemoved(t *testing.T) {
 func TestSelfTargetClearedOnOwnTargetUnselected(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 7, X: 100, Y: 100, Name: "Gremlin", Attackable: true,
 	})
@@ -293,7 +275,6 @@ func TestSelfTargetClearedOnOwnTargetUnselected(t *testing.T) {
 func TestObjectTargetTrackedFromTargetSelected(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyPlayerInfo(PlayerInfo{
 		ObjectID: 55, Name: "Other", X: 100, Y: 100,
 	})
@@ -313,7 +294,6 @@ func TestObjectTargetTrackedFromTargetSelected(t *testing.T) {
 func TestSelfFightingFreshness(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 46000, Y: 50000, Name: "Gremlin",

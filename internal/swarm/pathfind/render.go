@@ -83,7 +83,9 @@ func buildHeightLUT() {
 
 // mix blends a base color toward the target by the fraction, clamping
 // every channel into the byte range.
-func mix(r, g, b uint32, target [3]uint8, fraction float64) (uint32, uint32, uint32) {
+func mix(
+	r, g, b uint32, target [3]uint8, fraction float64,
+) (uint32, uint32, uint32) {
 	channel := func(c uint32, t uint8) uint32 {
 		v := int(c) + int((float64(t)-float64(c))*fraction)
 		if v < 0 {
@@ -124,8 +126,8 @@ func (r *Region) render(size int, mode RenderMode) *image.RGBA {
 	const channelShift = 8
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
 	cpp := cellsPerRegionSide / size
-	for py := 0; py < size; py++ {
-		for px := 0; px < size; px++ {
+	for py := range size {
+		for px := range size {
 			var sumR, sumG, sumB, open, walled, maxLayers int
 			for ly := py * cpp; ly < (py+1)*cpp; ly++ {
 				for lx := px * cpp; lx < (px+1)*cpp; lx++ {
@@ -138,6 +140,7 @@ func (r *Region) render(size int, mode RenderMode) *image.RGBA {
 					}
 					if wall {
 						walled++
+
 						continue
 					}
 					lut := heightLUT[uint16(top.Height)]

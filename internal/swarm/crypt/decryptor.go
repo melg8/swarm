@@ -42,5 +42,6 @@ func (d *Decryptor) Read(destination Deserializable) error {
 		return fmt.Errorf("failed to decrypt packet data: %w", err)
 	}
 	unencryptedReader := packet.NewReader(encryptedData)
+
 	return destination.FromBytes(unencryptedReader)
 }

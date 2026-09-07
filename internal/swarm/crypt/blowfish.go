@@ -97,7 +97,8 @@ func (b *BlowfishCipher) Encrypt(dst, data []byte) error {
 
 	blockSize := b.cipher.BlockSize()
 	if lenData%blockSize != 0 {
-		return fmt.Errorf("data length must be a multiple of %d, got %d", blockSize, lenData)
+		return fmt.Errorf("data length must be a multiple of %d, got %d",
+			blockSize, lenData)
 	}
 
 	flip4BytesEndianInplace(data)

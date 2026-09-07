@@ -42,8 +42,10 @@ func TestWorldToCellRoundTrip(t *testing.T) {
 func TestWorldToCellGiran(t *testing.T) {
 	cell := WorldToCell(80364, 147100)
 	require.Equal(t, RegionKey{Col: 22, Row: 22}, CellToRegion(cell))
-	require.Equal(t, Point{X: 22*cellsPerRegionSide + 926,
-		Y: 22*cellsPerRegionSide + 1001}, cell)
+	require.Equal(t, Point{
+		X: 22*cellsPerRegionSide + 926,
+		Y: 22*cellsPerRegionSide + 1001,
+	}, cell)
 }
 
 // TestCellToRegionNegative checks the region split for cells left or

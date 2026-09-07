@@ -316,6 +316,7 @@ func NewBot(id string) *Bot {
 		char:         newCharacterState(),
 		objects:      make(map[int32]WorldObject),
 		inventory:    make(map[int32]InventoryItem),
+		paperdoll:    [PaperdollSlots]int32{},
 		events:       make([]Event, eventCapacity),
 		eventLen:     0,
 		eventPos:     0,
@@ -323,6 +324,7 @@ func NewBot(id string) *Bot {
 		chatLen:      0,
 		chatPos:      0,
 		zone:         nil,
+		zoneViews:    nil,
 		packets:      0,
 		version:      0,
 		started:      time.Now(),
@@ -1272,7 +1274,9 @@ func (z *Zone) Contains(x int32, y int32) bool {
 // second, so a moving mob is typically tens or hundreds of units away
 // from its last packet start position and a stale "nearest" choice
 // would send the character to a mob that is no longer the closest one.
-func (b *Bot) NearestAttackable(maxDistance float64, zone *Zone) (AttackTarget, bool) {
+func (b *Bot) NearestAttackable(
+	maxDistance float64, zone *Zone,
+) (AttackTarget, bool) {
 	return b.NearestAttackableExcept(maxDistance, zone, nil)
 }
 
@@ -1576,7 +1580,9 @@ type ZoneView struct {
 }
 
 // Snapshot returns a deep copy of the current state for serialization.
-func (b *Bot) Snapshot() Snapshot {
+// The full world copy of the web view; the section split is planned
+// (docs/quality_review_and_agent_prompts.md P11).
+func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	now := time.Now()
@@ -1617,12 +1623,21 @@ func (b *Bot) Snapshot() Snapshot {
 			Exp:             b.char.Exp,
 			ExpPercent: ExpPercent(b.char.Level,
 				int64(b.char.Exp)),
-			Sp:       b.char.Sp,
-			InCombat: b.char.inCombat(now),
+			Sp:             b.char.Sp,
+			InCombat:       b.char.inCombat(now),
+			CurrentLoad:    0,
+			MaxLoad:        0,
+			InventorySlots: 0,
+			InventoryMax:   0,
+			Adena:          0,
 		},
+		Inventory:    nil,
 		Objects:      make([]ObjectSnapshot, 0, len(b.objects)),
 		Events:       make([]Event, 0, min(b.eventLen, snapshotEvents)),
 		Chat:         make([]ChatEvent, 0, b.chatLen),
+		WalkPath:     nil,
+		HuntingZone:  nil,
+		HuntingZones: nil,
 		Packets:      b.packets,
 		Version:      b.version,
 		ServerTimeMs: now.UnixMilli(),
@@ -1729,7 +1744,7 @@ func sortInventorySnapshot(items []InventoryItemSnapshot) {
 func appendChat(
 	dst []ChatEvent, chat []ChatEvent, length int, pos int,
 ) []ChatEvent {
-	for i := 0; i < length; i++ {
+	for i := range length {
 		dst = append(dst, chat[(pos-length+i+chatCapacity)%chatCapacity])
 	}
 

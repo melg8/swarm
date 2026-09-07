@@ -360,7 +360,13 @@ func (b *Bot) GroundItemByID(objectID int32) (LootItem, bool) {
 	defer b.mu.RUnlock()
 	obj, ok := b.objects[objectID]
 	if !ok || obj.Kind != KindItem {
-		return LootItem{}, false
+		return LootItem{
+			ObjectID: 0,
+			Name:     "",
+			X:        0,
+			Y:        0,
+			Z:        0,
+		}, false
 	}
 
 	return LootItem{

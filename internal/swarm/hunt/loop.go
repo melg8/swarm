@@ -278,7 +278,9 @@ type Loop struct {
 }
 
 // NewLoop creates the hunt loop for a connected game client.
-func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
+// Every Loop field is initialized explicitly (the exhaustruct
+// convention), which exceeds the line budget.
+func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 	return &Loop{
 		game:              game,
 		tracker:           tracker,
@@ -301,7 +303,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 		navigator:         nil,
 		waypoints:         nil,
 		wpIndex:           0,
-		legDest:           pathfind.Vec3{},
+		legDest:           pathfind.Vec3{X: 0, Y: 0, Z: 0},
 		moveAt:            time.Time{},
 		stuckAt:           time.Time{},
 		stuckX:            0,
@@ -337,6 +339,13 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 		delevelTried:      nil,
 		delevelFight:      time.Time{},
 		delevelEnd:        time.Time{},
+		delevelExp:        0,
+		delevelLevel:      0,
+		delevelFree:       0,
+		delevelWait:       time.Time{},
+		delevelCounted:    false,
+		engageAt:          time.Time{},
+		targetSkip:        nil,
 		userKind:          "",
 		userX:             0,
 		userY:             0,
@@ -591,7 +600,9 @@ func (l *Loop) recoverFromDeath() {
 // re-requesting the target until the character is actually engaged in
 // the fight, which the MoveToPawn/Attack/AutoAttackStart broadcasts
 // confirm.
-func (l *Loop) engage() {
+// Pre-consolidation phase debt; the hunt loop cleanup is planned
+// (docs/quality_review_and_agent_prompts.md P07).
+func (l *Loop) engage() { //nolint:cyclop,funlen
 	// The hunting zone leash: attacks happen inside the square only,
 	// and a character outside of it (a long chase, a village respawn)
 	// walks back instead of hunting.
@@ -810,7 +821,9 @@ func (l *Loop) returnToZone() {
 // emergency fallback of the pathfinding zone return. The leg length
 // respects the server move request limit (9900 units) and the walk rate
 // limits itself through the select pacing of the return.
-func (l *Loop) walkZoneLeg(zone *state.Zone, selfX int32, selfY int32, selfZ int32) {
+func (l *Loop) walkZoneLeg(
+	zone *state.Zone, selfX int32, selfY int32, selfZ int32,
+) {
 	moveX, moveY := zone.CX, zone.CY
 	dx := float64(zone.CX - selfX)
 	dy := float64(zone.CY - selfY)
@@ -842,7 +855,7 @@ func (l *Loop) rest() {
 		// The sit is confirmed and the regeneration is running.
 		return
 	case l.tracker.SelfSitting():
-		wantSit = false
+		// Sitting and recovered: stand up (wantSit stays false).
 	case hp < sitDownHealthPercent:
 		wantSit = true
 	default:

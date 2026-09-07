@@ -33,7 +33,7 @@ func BenchmarkInitPacketParsing(b *testing.B) {
 	packet := &InitPacket{}
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if err := ParseInitPacket(packet, data); err != nil {
 			panic(err)
 		}
@@ -96,7 +96,7 @@ func BenchmarkInitPacket_WriteTo(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		// Переиспользуем тот же самый буфер на каждой итерации
 		_, err := initPacket.WriteTo(packetData)
 		if err != nil {

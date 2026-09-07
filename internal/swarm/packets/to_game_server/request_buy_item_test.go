@@ -7,9 +7,8 @@ package togameserver
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/melg8/swarm/internal/swarm/packets/packet"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRequestBuyItemToBytes(t *testing.T) {

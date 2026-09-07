@@ -32,8 +32,10 @@ func TestSellableItemsOrdersJunkFirst(t *testing.T) {
 		{ObjectID: 11, ItemID: 35, Count: 1, Type2: 1, Change: 1},
 		{ObjectID: 8, ItemID: 57, Count: 12345, Type2: 4, Change: 1},
 		{ObjectID: 9, ItemID: 1000, Count: 1, Type2: 3, Change: 1},
-		{ObjectID: 10, ItemID: 34, Count: 1, Type2: 1, Equipped: true,
-			Change: 1},
+		{
+			ObjectID: 10, ItemID: 34, Count: 1, Type2: 1, Equipped: true,
+			Change: 1,
+		},
 	})
 
 	items := bot.SellableItems()
@@ -58,8 +60,10 @@ func TestSellableItemsEmptyInventory(t *testing.T) {
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
 	bot.ApplyItemList([]InventoryItem{
 		{ObjectID: 8, ItemID: 57, Count: 100, Type2: 4, Change: 1},
-		{ObjectID: 10, ItemID: 34, Count: 1, Type2: 1, Equipped: true,
-			Change: 1},
+		{
+			ObjectID: 10, ItemID: 34, Count: 1, Type2: 1, Equipped: true,
+			Change: 1,
+		},
 	})
 	require.Empty(t, bot.SellableItems())
 }
@@ -73,16 +77,22 @@ func TestSnapshotInventoryWidget(t *testing.T) {
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
 	bot.ApplyItemList([]InventoryItem{
 		// Short Sword, equipped on the right hand.
-		{ObjectID: 1, ItemID: 1, Count: 1, Type2: 0, Equipped: true,
-			BodyPart: 0x80, Change: 1},
+		{
+			ObjectID: 1, ItemID: 1, Count: 1, Type2: 0, Equipped: true,
+			BodyPart: 0x80, Change: 1,
+		},
 		// Leather Shirt on the chest.
-		{ObjectID: 2, ItemID: 1146, Count: 1, Type2: 1, Equipped: true,
-			BodyPart: 0x400, Change: 1},
+		{
+			ObjectID: 2, ItemID: 1146, Count: 1, Type2: 1, Equipped: true,
+			BodyPart: 0x400, Change: 1,
+		},
 		// Adena.
 		{ObjectID: 3, ItemID: 57, Count: 4242, Type2: 4, Change: 1},
 		// Forest Bow in the bag, two handed template mask.
-		{ObjectID: 4, ItemID: 166, Count: 1, Type2: 0,
-			BodyPart: 0x4000, Change: 1},
+		{
+			ObjectID: 4, ItemID: 166, Count: 1, Type2: 0,
+			BodyPart: 0x4000, Change: 1,
+		},
 	})
 
 	snap := bot.Snapshot()
@@ -96,7 +106,7 @@ func TestSnapshotInventoryWidget(t *testing.T) {
 	require.Equal(t, "weapon_small_sword_i00", snap.Inventory[0].Icon)
 	require.Equal(t, int32(1146), snap.Inventory[1].ItemID)
 	require.Equal(t, int32(0x400), snap.Inventory[1].BodyPart)
-	require.True(t, snap.Inventory[1].Icon != "")
+	require.NotEmpty(t, snap.Inventory[1].Icon)
 	require.Equal(t, int32(57), snap.Inventory[2].ItemID)
 	require.Equal(t, int32(4242), snap.Inventory[2].Count)
 	require.Equal(t, "etc_adena_i00", snap.Inventory[2].Icon)
@@ -112,8 +122,10 @@ func TestSnapshotInventoryEnchant(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
 	bot.ApplyItemList([]InventoryItem{
-		{ObjectID: 1, ItemID: 10, Count: 1, Type2: 0, Equipped: true,
-			BodyPart: 0x80, Enchant: 3, Change: 1},
+		{
+			ObjectID: 1, ItemID: 10, Count: 1, Type2: 0, Equipped: true,
+			BodyPart: 0x80, Enchant: 3, Change: 1,
+		},
 	})
 
 	snap := bot.Snapshot()

@@ -116,11 +116,11 @@ func legWalkTarget(from [3]int32, to pathfind.Vec3) [3]int32 {
 
 // fillInventory fills the slots of the inventory with junk items: 41
 // items are 51 percent of the 80 slots and pass the trip trigger.
-func fillInventory(bot *state.Bot, firstObjectID int32) {
+func fillInventory(bot *state.Bot) {
 	items := make([]state.InventoryItem, 0, 41)
 	for i := range 41 {
 		items = append(items, state.InventoryItem{
-			ObjectID: firstObjectID + int32(i),
+			ObjectID: 500 + int32(i),
 			ItemID:   1060,
 			Count:    1,
 			Type2:    5,
@@ -156,7 +156,7 @@ func moveSelfTo(bot *state.Bot, x int32, y int32, z int32) {
 // and starts following it.
 func TestTripTriggersOnFullSlots(t *testing.T) {
 	loop, game, bot, _ := newTripLoop()
-	fillInventory(bot, 500)
+	fillInventory(bot)
 
 	loop.tick()
 	require.Equal(t, phaseTownWalk, loop.phase)
@@ -194,7 +194,7 @@ func TestTripNeedsNavigator(t *testing.T) {
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.lastHit = time.Now().Add(-time.Minute)
-	fillInventory(bot, 500)
+	fillInventory(bot)
 
 	loop.tick()
 	require.Equal(t, phaseEngage, loop.phase)
@@ -206,7 +206,7 @@ func TestTripNeedsNavigator(t *testing.T) {
 func TestTripNoPathArmsCooldown(t *testing.T) {
 	loop, _, bot, nav := newTripLoop()
 	nav.fail = true
-	fillInventory(bot, 500)
+	fillInventory(bot)
 
 	loop.tick()
 	require.Equal(t, phaseEngage, loop.phase, "no trip without a path")
@@ -227,7 +227,7 @@ func TestTripNoPathArmsCooldown(t *testing.T) {
 func TestTripDirectWalkWhenNoGeodataPath(t *testing.T) {
 	loop, game, bot, nav := newTripLoop()
 	nav.found = false
-	fillInventory(bot, 500)
+	fillInventory(bot)
 
 	loop.tick()
 	require.Equal(t, phaseTownWalk, loop.phase)
@@ -247,14 +247,16 @@ func TestTripDirectWalkWhenNoGeodataPath(t *testing.T) {
 func TestTripFallsBackWhenDeckUnreachable(t *testing.T) {
 	loop, game, bot, nav := newTripLoop()
 	nav.deckUnreachable = true
-	fillInventory(bot, 500)
+	fillInventory(bot)
 
 	loop.tick()
 	require.Equal(t, phaseTownWalk, loop.phase)
 	require.Equal(t, [][3]int32{legWalkTarget(
 		[3]int32{45000, 50000, -3500},
-		pathfind.Vec3{X: float64(herbielPos[0]),
-			Y: float64(herbielPos[1]), Z: float64(herbielPos[2])})},
+		pathfind.Vec3{
+			X: float64(herbielPos[0]),
+			Y: float64(herbielPos[1]), Z: float64(herbielPos[2]),
+		})},
 		game.walks, "the fallback plans the walk to the shop")
 }
 
@@ -262,7 +264,7 @@ func TestTripFallsBackWhenDeckUnreachable(t *testing.T) {
 // interaction, the sale, the walk back and the hunt resuming.
 func TestTripFullFlow(t *testing.T) {
 	loop, game, bot, _ := newTripLoop()
-	fillInventory(bot, 500)
+	fillInventory(bot)
 
 	// The trip starts and walks to the shop.
 	loop.tick()
@@ -349,7 +351,7 @@ func TestTripFullFlow(t *testing.T) {
 // batch goes out, and items already offered are not offered twice.
 func TestTripSellsRemainingJunkInBatches(t *testing.T) {
 	loop, game, bot, _ := newTripLoop()
-	fillInventory(bot, 500)
+	fillInventory(bot)
 	moveSelfTo(bot, herbielPos[0], herbielPos[1], herbielPos[2])
 
 	loop.tick()
@@ -416,7 +418,7 @@ func TestTripNoCleanupDuringTrip(t *testing.T) {
 // spent the trip aborts instead of walking into a wall forever.
 func TestTripStuckWalkRepaths(t *testing.T) {
 	loop, _, bot, nav := newTripLoop()
-	fillInventory(bot, 500)
+	fillInventory(bot)
 
 	loop.tick()
 	require.Equal(t, phaseTownWalk, loop.phase)
@@ -447,7 +449,6 @@ func TestTripStuckWalkRepaths(t *testing.T) {
 func TestTripWaitsForTheFightToEnd(t *testing.T) {
 	loop, game, bot, _ := newTripLoop()
 	spawnMob(bot)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplySpawnItem(state.ItemInfo{
 		ObjectID: 9, TemplateID: 57, X: 45040, Y: 50040, Z: -3500,
 	})
@@ -459,7 +460,7 @@ func TestTripWaitsForTheFightToEnd(t *testing.T) {
 	require.False(t, loop.tripActive())
 
 	// The bag crosses the trip threshold mid-fight: no vendor walk.
-	fillInventory(bot, 500)
+	fillInventory(bot)
 	loop.tick()
 	require.False(t, loop.tripActive(), "no vendor walk mid-combat")
 	require.Equal(t, phaseEngage, loop.phase)
@@ -541,7 +542,7 @@ func TestShoppingTripSellsJunkBelowTheTrigger(t *testing.T) {
 // standing.
 func TestTripStandsUpBeforeWalking(t *testing.T) {
 	loop, game, bot, _ := newTripLoop()
-	fillInventory(bot, 500)
+	fillInventory(bot)
 	// The character rests: the regeneration sat it down.
 	bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: true})
 
@@ -565,7 +566,7 @@ func TestTripStandsUpBeforeWalking(t *testing.T) {
 // character sells right there instead of farming with the full bag.
 func TestTripDeathResetsWithoutCooldown(t *testing.T) {
 	loop, game, bot, _ := newTripLoop()
-	fillInventory(bot, 500)
+	fillInventory(bot)
 
 	loop.tick()
 	require.Equal(t, phaseTownWalk, loop.phase)

@@ -17,7 +17,7 @@ func BenchmarkRenderRegionGiran(b *testing.B) {
 	key := RegionKey{Col: 22, Row: 22}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, err := engine.RenderRegion(key, 2048, RenderHeight)
 		if err != nil {
 			b.Fatal(err)
@@ -32,7 +32,7 @@ func BenchmarkRenderRegionGiranPNG(b *testing.B) {
 	key := RegionKey{Col: 22, Row: 22}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		img, err := engine.RenderRegion(key, 2048, RenderHeight)
 		if err != nil {
 			b.Fatal(err)

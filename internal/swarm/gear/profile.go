@@ -42,7 +42,6 @@ type MeleeFighter struct{}
 
 // Name of the melee fighter profile.
 func (MeleeFighter) Name() string {
-
 	return "melee fighter"
 }
 
@@ -75,20 +74,17 @@ func (MeleeFighter) WeaponScore(stats npcdata.GearStats) float64 {
 
 // ArmorScore ranks armor by its physical defense.
 func (MeleeFighter) ArmorScore(stats npcdata.GearStats) float64 {
-
 	return float64(stats.PDef)
 }
 
 // JewelScore ranks jewels by their magical defense.
 func (MeleeFighter) JewelScore(stats npcdata.GearStats) float64 {
-
 	return float64(stats.MDef)
 }
 
 // ShieldScore ranks shields by their expected block value: the block
 // power hits on the block rate share of the incoming swings.
 func (MeleeFighter) ShieldScore(stats npcdata.GearStats) float64 {
-
 	return float64(stats.SDef) * float64(stats.RShld) / 100
 }
 
@@ -135,7 +131,7 @@ func Score(profile Profile, item state.InventoryItem) float64 {
 // GearPoints returns the zone gating points of the item: the weapon
 // value on the character stat scale plus the defenses. A zero score
 // (an unusable item) always returns zero points.
-func GearPoints(profile Profile, item state.InventoryItem) int32 {
+func gearPoints(profile Profile, item state.InventoryItem) int32 {
 	stats, ok := npcdata.ItemGearStats(item.ItemID)
 	if !ok || scoreStats(profile, stats) <= 0 {
 		return 0
@@ -169,7 +165,7 @@ func TotalGearPoints(profile Profile, equipment Equipment) int32 {
 		if entry.Item.ObjectID == 0 {
 			continue
 		}
-		total += GearPoints(profile, entry.Item)
+		total += gearPoints(profile, entry.Item)
 	}
 
 	return total

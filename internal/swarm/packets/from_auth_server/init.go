@@ -68,7 +68,7 @@ func ParseInitPacket(p *InitPacket, data []byte) error {
 	return nil
 }
 
-func (p *InitPacket) ToBytes(writer *packet.Writer) error { //nolint:cyclop
+func (p *InitPacket) ToBytes(writer *packet.Writer) error {
 	if len(p.RsaPublicKey) != 128 {
 		return fmt.Errorf("invalid RSA public key len: %d bytes, expected 128",
 			len(p.RsaPublicKey))
@@ -110,7 +110,8 @@ func (p *InitPacket) WriteTo(dest []byte) (int, error) {
 	}
 
 	if len(dest) < requiredSize {
-		return 0, fmt.Errorf("destination buffer is too small: got %d, want %d", len(dest), requiredSize)
+		return 0, fmt.Errorf("destination buffer is too small: got %d, want %d",
+			len(dest), requiredSize)
 	}
 
 	offset := 0
@@ -147,14 +148,16 @@ func (p *InitPacket) ToString() string {
 	result := "\nInitPacket:" +
 		"\n  SessionID: " + helpers.HexStringFromInt32(p.SessionID) +
 		"\n  ProtocolVersion: " + helpers.HexStringFromInt32(p.ProtocolVersion) +
-		"\n  RsaPublicKey: \n" + helpers.HexViewFromWithLineSplit(p.RsaPublicKey, 16, "    ") +
+		"\n  RsaPublicKey: \n" +
+		helpers.HexViewFromWithLineSplit(p.RsaPublicKey, 16, "    ") +
 		"\n  GameGuard1: " + helpers.HexStringFromInt32(p.GameGuard1) +
 		"\n  GameGuard2: " + helpers.HexStringFromInt32(p.GameGuard2) +
 		"\n  GameGuard3: " + helpers.HexStringFromInt32(p.GameGuard3) +
 		"\n  GameGuard4: " + helpers.HexStringFromInt32(p.GameGuard4)
 
 	if p.BlowfishKey != nil {
-		result += "\n  BlowfishKey: \n" + helpers.HexViewFromWithLineSplit(p.BlowfishKey, 16, "    ")
+		result += "\n  BlowfishKey: \n" +
+			helpers.HexViewFromWithLineSplit(p.BlowfishKey, 16, "    ")
 	} else {
 		result += "\n  BlowfishKey: " + "nil"
 	}

@@ -8,11 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/melg8/swarm/internal/swarm/gear"
 	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/state"
+	"github.com/stretchr/testify/require"
 )
 
 // spawnMerchantNPC places the merchant npc of the template id at its
@@ -63,7 +62,7 @@ func settleMerchant(
 // village) buy their lists.
 func TestShoppingTripBuysAfterSelling(t *testing.T) {
 	loop, game, bot, _ := newTripLoop()
-	fillInventory(bot, 500)
+	fillInventory(bot)
 	// The adena of the character: 100 adena buys the apprentice's
 	// shoes, the short gloves and the magic ring of the elven
 	// catalogs.
@@ -124,7 +123,7 @@ func TestShoppingTripBuysAfterSelling(t *testing.T) {
 	}
 	require.LessOrEqual(t, boughtAdena, int64(100),
 		"the plan must respect the adena budget")
-	require.Greater(t, boughtAdena, int64(0))
+	require.Positive(t, boughtAdena)
 
 	// The character walks to Ariel and the armor list buys.
 	ariel := townMerchants[1]

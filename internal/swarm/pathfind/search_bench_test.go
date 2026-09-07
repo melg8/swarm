@@ -25,11 +25,11 @@ func benchMaze() *Engine {
 	spec.setFlat(0)
 	for wall := 8; wall < 800; wall += 8 {
 		gapStart := (wall / 8) % 2 * 1000
-		for ly := 0; ly < cellsPerRegionSide; ly++ {
+		for ly := range cellsPerRegionSide {
 			if ly >= gapStart && ly < gapStart+1000 {
 				continue
 			}
-			spec.setCell(wall, ly, wallOnlyLayer(0))
+			spec.setCell(wall, ly, wallOnlyLayer())
 		}
 	}
 
@@ -47,7 +47,7 @@ func BenchmarkFindPathOpenField(b *testing.B) {
 	engine := benchOpenField()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		result, err := engine.FindPath(
 			worldOf(100, 100, 0), worldOf(500, 400, 0),
 			DefaultMaxPassableHeight)
@@ -63,7 +63,7 @@ func BenchmarkFindPathWallMaze(b *testing.B) {
 	engine := benchMaze()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		result, err := engine.FindPath(
 			worldOf(100, 500, 0), worldOf(900, 1500, 0),
 			DefaultMaxPassableHeight)
@@ -82,7 +82,7 @@ func BenchmarkFindPathGiran(b *testing.B) {
 	end := Vec3{X: 83864, Y: 143100}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		result, err := engine.FindPath(start, end, 20)
 		if err != nil || !result.Found {
 			b.Fatal(err, result)
@@ -98,12 +98,12 @@ func BenchmarkLineOfSightGiran(b *testing.B) {
 	end := Vec3{X: 83864, Y: 143100}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		clear, err := engine.LineOfSight(start, end, 20)
+	for range b.N {
+		cleared, err := engine.LineOfSight(start, end, 20)
 		if err != nil {
 			b.Fatal(err)
 		}
-		if clear {
+		if cleared {
 			b.Fatal("expected the city blocks to block the sight")
 		}
 	}
@@ -116,7 +116,7 @@ func benchDirWithSpec(spec *regionSpec) string {
 		panic(err)
 	}
 	name := filepath.Join(dir, regionFileName(testRegionCol, testRegionRow))
-	if err := os.WriteFile(name, spec.encode(), 0o644); err != nil {
+	if err := os.WriteFile(name, spec.encode(), 0o600); err != nil {
 		panic(err)
 	}
 
@@ -133,7 +133,7 @@ func BenchmarkParseRegionGiran(b *testing.B) {
 	key := RegionKey{Col: 22, Row: 22}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		pool := newLayerPool()
 		_, err := parseRegion(data, key, pool)
 		if err != nil {

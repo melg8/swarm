@@ -31,7 +31,6 @@ type syncRecorder struct {
 }
 
 func newSyncRecorder() *syncRecorder {
-	//nolint:exhaustruct // the zero values are the point
 	return &syncRecorder{hdr: http.Header{}}
 }
 
@@ -72,7 +71,6 @@ func newTestServer(t *testing.T) (*Server, *state.Bot) {
 	bot := state.NewBot("test1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
 	bot.SetOnline("test1")
-	//nolint:exhaustruct // spawn fields only
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 7, X: 45100, Y: 50100, Name: "Keltir", Attackable: true,
 	})
@@ -169,7 +167,6 @@ func TestEventsStreamDeliversSnapshots(t *testing.T) {
 		return recorder.String() != ""
 	}, 2*time.Second, 20*time.Millisecond)
 
-	//nolint:exhaustruct // spawn fields only
 	bot.ApplyNpcInfo(state.NpcInfo{ObjectID: 8, Name: "Orc"})
 
 	require.Eventually(t, func() bool {
@@ -206,7 +203,6 @@ func TestListenAndServeOnFreePort(t *testing.T) {
 	}()
 
 	require.Eventually(t, func() bool {
-		//nolint:noctx // test request
 		response, err := http.Get("http://" + address + "/api/bots")
 		if err != nil {
 			return false

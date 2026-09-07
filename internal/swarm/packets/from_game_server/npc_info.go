@@ -79,7 +79,9 @@ func NewNpcInfoPacket() *NpcInfoPacket {
 }
 
 // ParseNpcInfoPacket reads the packet from payload bytes.
-func ParseNpcInfoPacket(p *NpcInfoPacket, data []byte) error {
+// Linear wire-format field dispatch; splitting hurts the protocol
+// readability.
+func ParseNpcInfoPacket(p *NpcInfoPacket, data []byte) error { //nolint:cyclop
 	reader := packet.NewReader(data)
 
 	if err := expectPacketID(reader, npcInfoPacketID); err != nil {

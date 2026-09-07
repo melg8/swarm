@@ -52,7 +52,6 @@ func ExpectedRsaPublicKey() []byte {
 }
 
 func convertBytesToInt32BigEndian(bytes []byte) int32 {
-	//nolint:gosec
 	return int32(binary.BigEndian.Uint32(bytes))
 }
 
@@ -60,7 +59,7 @@ func ExpectedGameGuard3() int32 {
 	return convertBytesToInt32BigEndian([]byte{0x97, 0xad, 0xb6, 0x20})
 }
 
-func TestInitPacketEncodingAndDecoding(t *testing.T) { //nolint:cyclop
+func TestInitPacketEncodingAndDecoding(t *testing.T) {
 	packetBin := InitPacketData()
 	initPacket := &InitPacket{}
 	err := ParseInitPacket(initPacket, packetBin)
@@ -410,7 +409,7 @@ func TestNewInitPacketWithZeroValues(t *testing.T) {
 	}
 }
 
-func TestNewInitPacketWithMaxValues(t *testing.T) { //nolint:cyclop
+func TestNewInitPacketWithMaxValues(t *testing.T) {
 	initPacket := &InitPacket{
 		SessionID:       math.MaxInt32, // More readable than int32(^uint32(0) >> 1)
 		ProtocolVersion: math.MaxInt32,

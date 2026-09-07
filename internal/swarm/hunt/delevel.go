@@ -254,9 +254,9 @@ func (l *Loop) planDelevelWalk() {
 func (l *Loop) nearestDelevelGuard() (townNpc, bool) {
 	selfX, selfY, _, ok := l.tracker.SelfPosition()
 	if !ok {
-		return townNpc{}, false
+		return zeroTownNpc, false
 	}
-	best := townNpc{}
+	best := zeroTownNpc
 	bestDist := math.MaxFloat64
 	found := false
 	for _, guard := range delevelGuards {
@@ -281,7 +281,9 @@ func (l *Loop) nearestDelevelGuard() (townNpc, bool) {
 // never fights back is marked as tried and the walk replans to the
 // next guard, aborting the delevel when every guard ignored the
 // provocation.
-func (l *Loop) fightDelevelGuard(now time.Time) {
+// Pre-consolidation phase debt; the hunt loop cleanup is planned
+// (docs/quality_review_and_agent_prompts.md P07).
+func (l *Loop) fightDelevelGuard(now time.Time) { //nolint:cyclop
 	if l.delevelGuard == 0 || !l.tracker.ObjectAlive(l.delevelGuard) {
 		guard, ok := l.tracker.NearestNpcByTemplates(
 			delevelGuardTemplates(), merchantFindRadius)

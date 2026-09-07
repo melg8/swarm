@@ -26,7 +26,6 @@ func TestSetCharacterAndPlacement(t *testing.T) {
 	bot.SetOnline("test1")
 
 	// The self placement corrects position and heading.
-	//nolint:exhaustruct // partial placement
 	bot.ApplyPlacement(Placement{
 		ObjectID: 100, X: 45100, Y: 50100, Z: -3500, Heading: 16384,
 	})
@@ -42,7 +41,6 @@ func TestSetCharacterAndPlacement(t *testing.T) {
 
 func TestApplyNpcInfoUpsert(t *testing.T) {
 	bot := NewBot("acc1")
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 1, TemplateID: 1001277, Attackable: true,
 		X: 100, Y: 200, Z: -3000, Heading: 8192,
@@ -50,7 +48,6 @@ func TestApplyNpcInfoUpsert(t *testing.T) {
 	})
 
 	// Respawn of the same object updates the position.
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 1, TemplateID: 1001277, Attackable: true,
 		X: 150, Y: 260, Z: -3000, Heading: 4096,
@@ -70,7 +67,6 @@ func TestApplyNpcInfoUpsert(t *testing.T) {
 func TestMovementUpdatesHeadingAndDestination(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 0, Y: 0, Z: 0, Name: "Gremlin"})
 
 	// Movement to the south east (dx=1, dy=1) yields heading 45 degrees.
@@ -86,7 +82,6 @@ func TestMovementUpdatesHeadingAndDestination(t *testing.T) {
 	require.Equal(t, int32(8192), obj.Heading)
 
 	// Stopping the movement clears the moving flag.
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyPlacement(Placement{
 		ObjectID: 7, X: 100, Y: 100, Z: 0, Heading: 0,
 	})
@@ -111,7 +106,6 @@ func TestSelfMovementUpdatesCharacter(t *testing.T) {
 
 func TestArrivalMovementKeepsHeading(t *testing.T) {
 	bot := NewBot("acc1")
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 0, Y: 0, Z: 0, Name: "Gremlin"})
 
 	// Movement to the south yields heading 90 degrees.
@@ -139,7 +133,6 @@ func TestArrivalMovementKeepsHeading(t *testing.T) {
 
 func TestNpcInfoCarriesSpeedAndAggro(t *testing.T) {
 	bot := NewBot("acc1")
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 7, TemplateID: 1000533, Attackable: true,
 		X: 0, Y: 0, Name: "Keltir",
@@ -162,12 +155,10 @@ func TestNpcInfoCarriesSpeedAndAggro(t *testing.T) {
 func TestAttackMarksCombat(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 0, Y: 0, Name: "Gremlin"})
 
 	var targets [4]int32
 	targets[0] = 100
-	//nolint:exhaustruct // partial attack fields for the case
 	bot.ApplyAttack(Attack{
 		AttackerID: 7, X: 10, Y: 10, TargetIDs: targets, TargetCount: 1,
 	})
@@ -180,14 +171,12 @@ func TestAttackMarksCombat(t *testing.T) {
 	require.True(t, snap.Character.InCombat)
 
 	// Attacking an unknown object is a no-op.
-	//nolint:exhaustruct // attacker id only
 	bot.ApplyAttack(Attack{AttackerID: 99, TargetCount: 0})
 	require.Len(t, bot.Snapshot().Objects, 1)
 }
 
 func TestAutoAttackFlags(t *testing.T) {
 	bot := NewBot("acc1")
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 0, Y: 0, Name: "Gremlin"})
 
 	bot.ApplyAutoAttackStart(7)
@@ -204,7 +193,6 @@ func TestAutoAttackFlags(t *testing.T) {
 func TestPawnMovementChasesTarget(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 500, 500, 0, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 300, Y: 300, Name: "Orc"})
 
 	bot.ApplyPawnMovement(PawnMovement{
@@ -228,7 +216,6 @@ func TestPawnMovementChasesTarget(t *testing.T) {
 
 func TestStatusUpdateMarksDead(t *testing.T) {
 	bot := NewBot("acc1")
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{ObjectID: 9, X: 0, Y: 0, Name: "Orc"})
 	bot.ApplyStatusUpdate(9, []Attribute{{ID: AttrCurHP, Value: 0}})
 	obj := findObject(bot.Snapshot(), 9)
@@ -255,7 +242,6 @@ func TestEffectiveSpeedFallbacks(t *testing.T) {
 
 func TestRemoveObject(t *testing.T) {
 	bot := NewBot("acc1")
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{ObjectID: 1, X: 0, Y: 0, Name: "Keltir"})
 	bot.RemoveObject(1)
 	bot.RemoveObject(1) // second delete is a no-op
@@ -267,7 +253,6 @@ func TestRemoveObject(t *testing.T) {
 func TestStatusUpdateAppliesVitals(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
-	//nolint:exhaustruct // vitals fields only
 	bot.ApplyUserInfo(UserInfo{
 		Name: "test1", Level: 3, MaxHP: 90, CurHP: 90, MaxMP: 40, CurMP: 40,
 	})
@@ -285,7 +270,6 @@ func TestStatusUpdateAppliesVitals(t *testing.T) {
 
 func TestStatusUpdateOfObjectHP(t *testing.T) {
 	bot := NewBot("acc1")
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{ObjectID: 9, X: 0, Y: 0, Name: "Orc"})
 	bot.ApplyStatusUpdate(9, []Attribute{
 		{ID: AttrMaxHP, Value: 120},
@@ -330,7 +314,6 @@ func TestSnapshotJSONShape(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 1, 2, 3, 50, 30)
 	bot.SetOnline("test1")
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 1, X: 10, Y: 20, Attackable: true, Name: "Keltir",
 	})
@@ -354,13 +337,11 @@ func TestVersionBumpsOnChanges(t *testing.T) {
 	bot := NewBot("acc1")
 	before := bot.Version()
 
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{ObjectID: 1, Name: "Keltir"})
 	require.Greater(t, bot.Version(), before)
 
 	// Unknown object placement does not bump the version.
 	same := bot.Version()
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyPlacement(Placement{ObjectID: 42, X: 1, Y: 1, Heading: 1})
 	require.Equal(t, same, bot.Version())
 }
@@ -374,11 +355,10 @@ func TestBotConcurrentAccess(t *testing.T) {
 		wg.Add(1)
 		go func(id int32) {
 			defer wg.Done()
-			//nolint:exhaustruct // partial fields for the case
 			bot.ApplyNpcInfo(NpcInfo{ObjectID: id, Name: "mob", X: id, Y: id})
 			bot.Snapshot()
 			bot.Version()
-		}(int32(i)) //nolint:gosec // small loop counter
+		}(int32(i))
 	}
 	wg.Wait()
 
@@ -433,7 +413,6 @@ func TestRegistry(t *testing.T) {
 func TestBotInfo(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
-	//nolint:exhaustruct // level update only
 	bot.ApplyUserInfo(UserInfo{Name: "test1", Level: 5})
 	bot.SetOnline("test1")
 
@@ -454,17 +433,12 @@ func TestSetOffline(t *testing.T) {
 func TestNearestAttackable(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 7, X: 100, Y: 0, Name: "Gremlin", Attackable: true,
 	})
-	//nolint:exhaustruct // partial fields for the case
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 8, X: 500, Y: 0, Name: "Far", Attackable: true,
 	})
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{ObjectID: 9, X: 50, Y: 0, Name: "Friendly"})
 	// Dead mobs are not attackable.
 	bot.ApplyStatusUpdate(8, []Attribute{{ID: AttrCurHP, Value: 0}})
@@ -608,7 +582,6 @@ func TestNearestAttackableUsesProjectedPosition(t *testing.T) {
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
 
 	// A standing mob recorded near the character but the farthest away.
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 7, X: 45300, Y: 50000, Name: "Standing", Attackable: true,
 	})
@@ -616,12 +589,10 @@ func TestNearestAttackableUsesProjectedPosition(t *testing.T) {
 	// A moving mob whose movement packet started 400 units away but ran
 	// toward the character: the projection must place it next to the
 	// character, the stale packet position must not win.
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(NpcInfo{
 		ObjectID: 8, X: 46000, Y: 50000, Name: "Runner", Attackable: true,
 		RunSpeed: 200,
 	})
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyMovement(Movement{
 		ObjectID: 8, X: 46000, Y: 50000, DestX: 45050, DestY: 50000,
 	})
@@ -675,7 +646,6 @@ func TestExpPercent(t *testing.T) {
 func TestSnapshotCarriesExpPercent(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyUserInfo(UserInfo{Level: 2, Exp: 215})
 
 	snap := bot.Snapshot()

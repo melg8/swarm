@@ -9,7 +9,25 @@ import (
 	"strconv"
 
 	"github.com/melg8/swarm/internal/swarm/npcdata"
+	"github.com/melg8/swarm/internal/swarm/state"
 )
+
+// emptyItem and emptyStats are the zero values the cleared virtual
+// paperdoll entries carry (plain var declarations: the value types are
+// cleared and rebuilt wholesale, never partially constructed).
+var (
+	emptyItem  state.InventoryItem
+	emptyStats npcdata.GearStats
+)
+
+// clearedScoredItem is the empty entry a simulated equip writes into a
+// paperdoll slot whose item the equip removes.
+var clearedScoredItem = ScoredItem{
+	Item:  emptyItem,
+	Stats: emptyStats,
+	Score: 0,
+	Slot:  slotInvalid,
+}
 
 // Shop is one merchant of the shopping strategy: the packet template
 // id (display id) of the NpcInfo packets, its buylists and the buy
@@ -193,7 +211,7 @@ func bestPurchase(
 		if planned[candidate.itemID] || candidate.price > budget {
 			continue
 		}
-		gain, _, ok := purchaseGain(virtual, candidate.stats, candidate.score)
+		gain, ok := purchaseGain(virtual, candidate.stats, candidate.score)
 		if !ok {
 			continue
 		}
@@ -219,41 +237,41 @@ func bestPurchase(
 // the weaker half), applied to simulated equips only.
 func purchaseGain(
 	virtual [slotCount]ScoredItem, stats npcdata.GearStats, score float64,
-) (float64, Slot, bool) {
+) (float64, bool) {
 	slots := SlotsForBodyPart(stats.BodyPart)
 	if len(slots) == 0 {
-		return 0, slotInvalid, false
+		return 0, false
 	}
 	switch stats.BodyPart {
-	case "lrhand":
+	case partLrhand:
 		gain := score - slotScore(virtual[SlotRHand]) -
 			slotScore(virtual[SlotLHand])
 
-		return gain, SlotRHand, gain > 0
-	case "lhand":
+		return gain, gain > 0
+	case partLhand:
 		gain := score - slotScore(virtual[SlotLHand])
-		if virtual[SlotRHand].Stats.BodyPart == "lrhand" {
+		if virtual[SlotRHand].Stats.BodyPart == partLrhand {
 			gain -= slotScore(virtual[SlotRHand])
 		}
 
-		return gain, SlotLHand, gain > 0
-	case "onepiece":
+		return gain, gain > 0
+	case partOnepiece:
 		gain := score - slotScore(virtual[SlotChest]) -
 			slotScore(virtual[SlotLegs])
 
-		return gain, SlotChest, gain > 0
-	case "legs":
+		return gain, gain > 0
+	case partLegs:
 		// Legs against a one-piece chest: the one-piece leaves the
 		// chest empty, the chest refill comes as its own pick.
-		if virtual[SlotChest].Stats.BodyPart == "onepiece" {
+		if virtual[SlotChest].Stats.BodyPart == partOnepiece {
 			gain := score - slotScore(virtual[SlotChest])
 
-			return gain, SlotLegs, gain > 0
+			return gain, gain > 0
 		}
 		gain := score - slotScore(virtual[SlotLegs])
 
-		return gain, SlotLegs, gain > 0
-	case "rear;lear", "rfinger;lfinger":
+		return gain, gain > 0
+	case partEars, partFingers:
 		first, second := slots[0], slots[1]
 		worse := first
 		if slotScore(virtual[second]) < slotScore(virtual[first]) {
@@ -261,12 +279,12 @@ func purchaseGain(
 		}
 		gain := score - slotScore(virtual[worse])
 
-		return gain, worse, gain > 0
+		return gain, gain > 0
 	default:
 		slot := slots[0]
 		gain := score - slotScore(virtual[slot])
 
-		return gain, slot, gain > 0
+		return gain, gain > 0
 	}
 }
 
@@ -289,15 +307,15 @@ func slotScore(entry ScoredItem) float64 {
 // may still fill the other, empty half.
 func affectedSlots(virtual [slotCount]ScoredItem, bodyPart string) []Slot {
 	switch {
-	case bodyPart == "lrhand":
+	case bodyPart == partLrhand:
 		return []Slot{SlotRHand, SlotLHand}
-	case bodyPart == "onepiece":
+	case bodyPart == partOnepiece:
 		return []Slot{SlotChest, SlotLegs}
-	case bodyPart == "lhand" && virtual[SlotRHand].Stats.BodyPart == "lrhand":
+	case bodyPart == partLhand && virtual[SlotRHand].Stats.BodyPart == partLrhand:
 		return []Slot{SlotLHand, SlotRHand}
-	case bodyPart == "legs" && virtual[SlotChest].Stats.BodyPart == "onepiece":
+	case bodyPart == partLegs && virtual[SlotChest].Stats.BodyPart == partOnepiece:
 		return []Slot{SlotLegs, SlotChest}
-	case bodyPart == "rear;lear" || bodyPart == "rfinger;lfinger":
+	case bodyPart == partEars || bodyPart == partFingers:
 		slots := SlotsForBodyPart(bodyPart)
 		slot := pairSlot(virtual, slots)
 		if slot == slotInvalid {
@@ -337,25 +355,25 @@ func applyToVirtual(virtual *[slotCount]ScoredItem, entry ScoredItem) {
 	stats := entry.Stats
 	slots := SlotsForBodyPart(stats.BodyPart)
 	switch {
-	case stats.BodyPart == "lrhand":
+	case stats.BodyPart == partLrhand:
 		entry.Slot = SlotRHand
 		virtual[SlotRHand] = entry
-		virtual[SlotLHand] = ScoredItem{}
-	case stats.BodyPart == "onepiece":
+		virtual[SlotLHand] = clearedScoredItem
+	case stats.BodyPart == partOnepiece:
 		entry.Slot = SlotChest
 		virtual[SlotChest] = entry
-		virtual[SlotLegs] = ScoredItem{}
-	case stats.BodyPart == "legs" &&
-		virtual[SlotChest].Stats.BodyPart == "onepiece":
+		virtual[SlotLegs] = clearedScoredItem
+	case stats.BodyPart == partLegs &&
+		virtual[SlotChest].Stats.BodyPart == partOnepiece:
 		entry.Slot = SlotLegs
 		virtual[SlotLegs] = entry
-		virtual[SlotChest] = ScoredItem{}
-	case stats.BodyPart == "lhand" &&
-		virtual[SlotRHand].Stats.BodyPart == "lrhand":
+		virtual[SlotChest] = clearedScoredItem
+	case stats.BodyPart == partLhand &&
+		virtual[SlotRHand].Stats.BodyPart == partLrhand:
 		entry.Slot = SlotLHand
 		virtual[SlotLHand] = entry
-		virtual[SlotRHand] = ScoredItem{}
-	case stats.BodyPart == "rear;lear" || stats.BodyPart == "rfinger;lfinger":
+		virtual[SlotRHand] = clearedScoredItem
+	case stats.BodyPart == partEars || stats.BodyPart == partFingers:
 		entry.Slot = pairSlot(*virtual, slots)
 		if entry.Slot != slotInvalid {
 			virtual[entry.Slot] = entry
@@ -398,7 +416,7 @@ func SimulateInventory(
 	virtual := equipment.Paperdoll(profile)
 	candidates := scoreUnequipped(profile, equipment)
 	for _, candidate := range candidates {
-		_, _, ok := purchaseGain(virtual, candidate.Stats, candidate.Score)
+		_, ok := purchaseGain(virtual, candidate.Stats, candidate.Score)
 		if ok {
 			applyToVirtual(&virtual, candidate)
 		}

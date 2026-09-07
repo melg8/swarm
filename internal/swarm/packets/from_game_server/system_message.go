@@ -117,8 +117,12 @@ func ParseSystemMessagePacket(p *SystemMessagePacket, data []byte) error {
 		return fmt.Errorf("implausible system message param count %d", count)
 	}
 	p.Params = p.Params[:0]
-	for i := int32(0); i < count; i++ {
-		p.Params = append(p.Params, SystemMessageParam{})
+	for i := range count {
+		p.Params = append(p.Params, SystemMessageParam{
+			Type: 0,
+			Int:  0,
+			Text: "",
+		})
 		if err := readSystemMessageParam(reader, &p.Params[i]); err != nil {
 			return err
 		}

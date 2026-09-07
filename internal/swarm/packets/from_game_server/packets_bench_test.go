@@ -14,7 +14,7 @@ import (
 func buildBenchmarkCharList(n int) []byte {
 	data := []byte{0x1F}
 	var count [4]byte
-	binary.LittleEndian.PutUint32(count[:], uint32(n)) //nolint:gosec // bench
+	binary.LittleEndian.PutUint32(count[:], uint32(n))
 	data = append(data, count[:]...)
 
 	entry := utf16("test1")

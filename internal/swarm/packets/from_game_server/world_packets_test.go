@@ -473,8 +473,8 @@ func TestParseStatusUpdatePacket(t *testing.T) {
 		data = putInt32(data, 1)
 		data = putInt32(data, 12)
 		for i := range 12 {
-			data = putInt32(data, int32(i))    //nolint:gosec // loop
-			data = putInt32(data, int32(i*10)) //nolint:gosec // loop
+			data = putInt32(data, int32(i))
+			data = putInt32(data, int32(i*10))
 		}
 
 		p := NewStatusUpdatePacket()
