@@ -14,6 +14,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/melg8/swarm/internal/swarm/gear"
 	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/state"
 )
@@ -237,6 +238,9 @@ type Loop struct {
 	// still running on the server: the next walk request fires at
 	// once instead of waiting for the old walk to finish.
 	userRedirect bool
+	// equip drives the auto equipment: it equips inventory gear that
+	// beats the paperdoll of the character (see equip.go).
+	equip *equipManager
 	// The pending server confirmation of the last inventory
 	// action (see markInventoryAction and gateInventoryCommand).
 	userPendingItem  int32
@@ -258,6 +262,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 		logger:           log.Default(),
 		autonomous:       true,
 		phase:            phaseEngage,
+		equip:            newEquipManager(gear.MeleeFighter{}),
 		target:           0,
 		lastHit:          time.Time{},
 		lootID:           0,
@@ -324,6 +329,18 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 // before.
 func (l *Loop) SetNavigator(navigator Navigator) {
 	l.navigator = navigator
+}
+
+// SetGearProfile replaces the gear scoring profile of the auto
+// equipment and the shop strategy (the melee fighter is the default;
+// a mage profile swaps weapon and armor preferences).
+func (l *Loop) SetGearProfile(profile gear.Profile) {
+	if l.equip == nil {
+		l.equip = newEquipManager(profile)
+
+		return
+	}
+	l.equip.profile = profile
 }
 
 // SetAutonomy toggles the autonomous hunting of the loop: a manual only
@@ -444,6 +461,7 @@ func (l *Loop) tick() {
 		return
 	}
 	l.cleanupInventory()
+	l.maybeEquipGear()
 	if l.phase == phaseEngage {
 		l.engage()
 	}
