@@ -184,11 +184,13 @@ func CategoryOf(stats npcdata.GearStats) Category {
 }
 
 // ScoredItem is an inventory item joined with its stats and profile
-// score.
+// score. The Slot is the paperdoll slot of an equipped entry (or the
+// slot a simulated equip placed it in).
 type ScoredItem struct {
 	Item  state.InventoryItem
 	Stats npcdata.GearStats
 	Score float64
+	Slot  Slot
 }
 
 // Equipment is the working set of the planners: every inventory item
@@ -248,6 +250,7 @@ func (e Equipment) Paperdoll(profile Profile) [slotCount]ScoredItem {
 			Item:  item,
 			Stats: stats,
 			Score: scoreStats(profile, stats),
+			Slot:  Slot(slot),
 		}
 	}
 
