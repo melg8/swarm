@@ -25,9 +25,17 @@ SPDX-License-Identifier: MIT
 // - the empty slots keep their labels;
 // - the inventory grid skips the equipped items and renders the stack
 //   count and enchant badges; the slot counter shows the usage;
+// - the pinned footer: the adena line formats the carried amount and
+//   the weight line fills the load bar by the percentage with the
+//   classic threshold colors (green under half load, amber past it,
+//   red near the limit; a dash when the load is unknown);
 // - keyed updates: re-rendering the same snapshot or changing only a
 //   stack count keeps the icon image elements alive (the icons must
-//   not blink on every snapshot), removed items drop their cells.
+//   not blink on every snapshot), removed items drop their cells;
+// - the floating placement: the widget is an overlay inside the map
+//   wrap (index.html), the CSS pins it to the top right corner over
+//   the map, the icons keep their 32px metric and the footer lines
+//   exist.
 //
 // Usage: node tools/repro_gear.js [--app <app.js>]
 // Exit code 0 = the equipment widget renders correctly, 1 = bug.
@@ -40,6 +48,10 @@ const vm = require("node:vm");
 
 const DEFAULT_APP_JS = path.join(__dirname, "..", "internal", "swarm",
     "webserver", "web", "app.js");
+const DEFAULT_INDEX_HTML = path.join(__dirname, "..", "internal", "swarm",
+    "webserver", "web", "index.html");
+const DEFAULT_STYLE_CSS = path.join(__dirname, "..", "internal", "swarm",
+    "webserver", "web", "style.css");
 
 // makeElement returns a DOM element stub recording children. append
 // mirrors the real DOM: appending an existing child moves it to the
@@ -142,14 +154,16 @@ function check(results, name, ok, detail) {
     results.push({ name, ok, detail });
 }
 
-// gearSnapshot builds a snapshot with the given inventory.
-function gearSnapshot(inventory, slots, maxSlots) {
+// gearSnapshot builds a snapshot with the given inventory. The extra
+// character fields (adena, load, maxLoad) feed the pinned footer.
+function gearSnapshot(inventory, slots, maxSlots, char) {
     return {
         id: "acc1",
-        character: {
+        character: Object.assign({
             objectId: 100, name: "test1", classId: 18, race: 1, level: 9,
-            inventorySlots: slots, inventoryMax: maxSlots || 80
-        },
+            inventorySlots: slots, inventoryMax: maxSlots || 80,
+            adena: 0, load: 0, maxLoad: 0
+        }, char || {}),
         inventory,
         objects: [], events: [], status: "online"
     };
@@ -391,6 +405,81 @@ function main() {
     check(results, "emptied inventory grid",
         invGrid.children.length === 0,
         "got " + invGrid.children.length + " cells");
+
+    // Pinned footer: adena and weight always visible below the bag.
+    gear.renderGear(gearSnapshot([], 0, 80,
+        { adena: 424242, load: 3000, maxLoad: 6000 }));
+    check(results, "adena line shows the carried amount",
+        elements.get("gear-adena").textContent === "424,242",
+        "adena line is " + JSON.stringify(
+            elements.get("gear-adena").textContent));
+    check(results, "weight line shows the load percent",
+        elements.get("gear-load-text").textContent === "50%" &&
+        elements.get("gear-load-fill").style.width === "50.0%",
+        "text " + elements.get("gear-load-text").textContent +
+        ", width " + elements.get("gear-load-fill").style.width);
+    check(results, "half load colors the bar amber",
+        elements.get("gear-load-fill").className === "load-fill warn",
+        "class " + elements.get("gear-load-fill").className);
+    check(results, "weight tooltip carries the raw numbers",
+        (elements.get("gear-weight-row").title || "")
+            .includes("3,000") &&
+        (elements.get("gear-weight-row").title || "")
+            .includes("6,000"),
+        "title " + elements.get("gear-weight-row").title);
+
+    gear.renderGear(gearSnapshot([], 0, 80,
+        { adena: 123456, load: 5900, maxLoad: 6000 }));
+    check(results, "near limit load colors the bar red",
+        elements.get("gear-load-fill").className === "load-fill heavy",
+        "class " + elements.get("gear-load-fill").className);
+
+    gear.renderGear(gearSnapshot([], 0, 80,
+        { adena: 0, load: 0, maxLoad: 0 }));
+    check(results, "unknown load shows the dash and an empty bar",
+        elements.get("gear-load-text").textContent === "—" &&
+        elements.get("gear-load-fill").style.width === "0%" &&
+        elements.get("gear-load-fill").className === "load-fill",
+        "text " + elements.get("gear-load-text").textContent +
+        ", class " + elements.get("gear-load-fill").className);
+
+    // Floating placement: the widget overlays the map instead of
+    // squeezing it as a fixed right column.
+    const html = fs.readFileSync(DEFAULT_INDEX_HTML, "utf8");
+    const mapWrapAt = html.indexOf('<div class="map-wrap">');
+    const canvasAt = html.indexOf('<canvas id="map-canvas">');
+    const gearAt = html.indexOf('id="gear-panel"');
+    const chatAt = html.indexOf('id="chat-box"');
+    check(results, "gear panel lives inside the map wrap",
+        mapWrapAt >= 0 && canvasAt > mapWrapAt && gearAt > canvasAt &&
+        chatAt > gearAt,
+        "mapWrap " + mapWrapAt + ", canvas " + canvasAt +
+        ", gear " + gearAt + ", chat " + chatAt);
+    check(results, "no fixed gear column remains in the app body",
+        !html.includes('aside class="gear-panel"'),
+        "the aside column is still there");
+    check(results, "footer holds the adena and weight lines",
+        html.includes('id="gear-adena"') &&
+        html.includes('id="gear-load-fill"') &&
+        html.includes('id="gear-load-text"'),
+        "missing footer ids");
+
+    const css = fs.readFileSync(DEFAULT_STYLE_CSS, "utf8");
+    const gearCssBlock = css.slice(css.indexOf(".gear-panel {"),
+        css.indexOf(".gear-panel {") + 400);
+    check(results, "gear panel floats over the map",
+        gearCssBlock.includes("position: absolute") &&
+        gearCssBlock.includes("top: 34px") &&
+        gearCssBlock.includes("right: 12px"),
+        "panel block: " + gearCssBlock.slice(0, 140));
+    check(results, "icons keep the 32px metric",
+        css.includes(".pd-cell img, .inv-cell img") &&
+        css.includes("width: 32px") && css.includes("height: 32px"),
+        "icon size css changed");
+    check(results, "load bar threshold colors exist",
+        css.includes(".load-fill.warn") &&
+        css.includes(".load-fill.heavy"),
+        "missing threshold color rules");
 
     let failed = 0;
     for (const result of results) {

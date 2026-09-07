@@ -438,7 +438,9 @@ function ensureSlotCells(box, slots) {
 }
 
 // resetGear drops every cell record: switching the observed bot starts
-// the widget from scratch instead of mixing two inventories.
+// the widget from scratch instead of mixing two inventories. The
+// pinned footer resets too, so a stale adena or load never survives
+// into the next bot.
 function resetGear() {
   GearCells.slots.clear();
   GearCells.inv.clear();
@@ -447,10 +449,18 @@ function resetGear() {
     const box = document.getElementById(id);
     if (box) { box.innerHTML = ""; }
   }
+  const adena = document.getElementById("gear-adena");
+  if (adena) { adena.textContent = "—"; adena.title = ""; }
+  const fill = document.getElementById("gear-load-fill");
+  if (fill) { fill.style.width = "0%"; fill.className = "load-fill"; }
+  const loadText = document.getElementById("gear-load-text");
+  if (loadText) { loadText.textContent = "—"; }
+  const row = document.getElementById("gear-weight-row");
+  if (row) { row.title = ""; }
 }
 
 // renderGear refreshes the paperdoll blocks and the inventory grid of
-// the right side equipment widget with keyed cells: unchanged items
+// the floating equipment widget with keyed cells: unchanged items
 // leave their DOM untouched, so their icons never blink.
 function renderGear(snap) {
   const wearBox = document.getElementById("gear-wear");
@@ -501,6 +511,47 @@ function renderGear(snap) {
 
   invCount.textContent = (snap.character.inventorySlots || 0) + "/" +
     (snap.character.inventoryMax || 80);
+  renderGearFoot(snap);
+}
+
+// renderGearFoot refreshes the pinned footer of the floating widget:
+// the adena line and the weight line stay visible below the inventory
+// grid whatever the scroll position of the bag is. The load bar fills
+// by the load percentage and colors by the classic thresholds - amber
+// past half load, red near the weight limit.
+function renderGearFoot(snap) {
+  const c = snap.character || {};
+  const adena = document.getElementById("gear-adena");
+  if (adena) {
+    adena.textContent = formatNumber(c.adena);
+    adena.title = "adena: " + formatNumber(c.adena);
+  }
+
+  const fill = document.getElementById("gear-load-fill");
+  const text = document.getElementById("gear-load-text");
+  const row = document.getElementById("gear-weight-row");
+  let percent = null;
+  if (c.maxLoad > 0) {
+    percent = Math.max(0, Math.min(100, (c.load / c.maxLoad) * 100));
+  }
+  if (fill && text) {
+    if (percent === null) {
+      fill.style.width = "0%";
+      fill.className = "load-fill";
+      text.textContent = "—";
+    } else {
+      fill.style.width = percent.toFixed(1) + "%";
+      fill.className = "load-fill" +
+        (percent >= 90 ? " heavy" : percent >= 50 ? " warn" : "");
+      text.textContent = Math.round(percent) + "%";
+    }
+  }
+  if (row) {
+    row.title = c.maxLoad > 0
+      ? "weight: " + formatNumber(c.load) + " / " +
+        formatNumber(c.maxLoad)
+      : "weight";
+  }
 }
 
 // Chat window state: auto scroll follows the newest line while the

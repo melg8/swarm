@@ -39,6 +39,16 @@ SPDX-License-Identifier: MIT
     #40a0ff 0%, #2060c0 45%, #103080 100%);
   --grad-xp: linear-gradient(to bottom,
     #f4f4f4 0%, #c7cbd1 45%, #9096a0 100%);
+  /* Load bar palette of the equipment widget footer: green while
+     comfortable, amber past half load, red near the weight limit -
+     the classic weight indicator colors, theme independent like the
+     vital bars. */
+  --grad-load: linear-gradient(to bottom,
+    #6fd06f 0%, #3f9f3f 45%, #2f7f2f 100%);
+  --grad-load-warn: linear-gradient(to bottom,
+    #f0d040 0%, #d0a020 45%, #a08010 100%);
+  --grad-load-heavy: linear-gradient(to bottom,
+    #f04040 0%, #c00000 45%, #8b0000 100%);
 }
 
 html[data-theme="dark"] {
@@ -724,22 +734,30 @@ body.mode-pathfind #live-label { display: none; }
   padding: 2.5px 4px;
 }
 
-/* ---- equipment widget (right side panel) ---- */
+/* ---- equipment widget (floating overlay on the map) ---- */
 
-/* The equipment widget is the fixed right column of the app body: the
-   paperdoll blocks of the equipped gear on top (the 3x3 wear block on
-   the left, the 2x3 jewelry block with five slots on the right), the
-   inventory grid below - six columns and four visible rows with a
-   scrollbar for larger bags. The pathfind test mode has no character
-   and hides it. */
+/* The equipment widget floats over the map in the top right corner
+   like the player HUD on the left: same panel chrome (background,
+   border, radius, shadow), so the two read as a pair of overlays
+   instead of a fixed layout column. The paperdoll blocks sit on top
+   (the 3x3 wear block on the left, the 2x3 jewelry block with five
+   slots on the right), the inventory grid below - six columns and
+   four visible rows with a scrollbar for larger bags - and a pinned
+   footer with the adena line and the weight bar that stays visible
+   without scrolling. It starts below the compass rose; the pathfind
+   test mode has no character and hides it. */
 .gear-panel {
-  width: 252px;
-  min-width: 252px;
+  position: absolute;
+  top: 34px;
+  right: 12px;
+  width: 254px;
   background: var(--bg-panel);
-  border-left: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  padding-bottom: 8px;
+  z-index: 4;
 }
 
 body.mode-pathfind .gear-panel { display: none; }
@@ -882,3 +900,67 @@ body.mode-pathfind .gear-panel { display: none; }
 .badge-enchant { left: 2px; top: 2px; color: #8ef2a0; }
 
 .badge-count { right: 2px; bottom: 2px; }
+
+/* Pinned footer of the floating widget: the adena line and the weight
+   line sit under the scrolling bag, so both stay visible whatever the
+   scroll position of the inventory is. */
+.gear-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px 9px;
+  margin-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.gear-row { display: flex; align-items: center; gap: 8px; }
+
+.gear-key {
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+/* Adena value in the classic gold of the currency. */
+.gear-adena {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--gold);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Weight bar: the fill width is the load percentage, the color class
+   switches at the classic thresholds. */
+.load-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+
+.load-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--grad-load);
+  transition: width 0.4s ease;
+}
+
+.load-fill.warn { background: var(--grad-load-warn); }
+
+.load-fill.heavy { background: var(--grad-load-heavy); }
+
+.gear-load-text {
+  font-family: var(--mono);
+  font-weight: 400;
+  font-size: 10.5px;
+  color: var(--text);
+  min-width: 30px;
+  text-align: right;
+  white-space: nowrap;
+}

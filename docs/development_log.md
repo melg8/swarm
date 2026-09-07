@@ -1158,3 +1158,53 @@ Three fixes reported from a fresh Windows pull:
   > 0, 0 JS errors; screenshot scripts/gear_compact_live.png.
   `go test ./... --cover --count=1` green (12 packages ok of 15, three without test files), gofmt/govet
   clean, node repro_hud.js ALL PASS.
+
+## Round 27: floating equipment widget with the pinned adena and weight footer (2026-09-07)
+
+The right column redesign from the review: the icons keep their
+size, the widget stops being a huge white panel.
+
+- The `<aside class="gear-panel">` column left the app body: the
+  widget moved into `.map-wrap` as a floating overlay (position
+  absolute, top 34px under the compass rose, right 12px, width
+  254px, z-index 4) with the same chrome as the player HUD -
+  panel background, border, radius and shadow - so the two read as
+  a pair of overlays. The map reclaims the full body width (1400px
+  at the smoke viewport instead of ~1150), the pathfind test mode
+  still hides it. Icon metrics untouched: 36px cells, 32px icons.
+- The pinned footer (`gear-foot`) under the scrolling bag: the
+  adena line (`character.adena`, formatted, gold `--gold`) and the
+  weight line below it - a load bar filled by
+  `character.load / character.maxLoad` with the classic threshold
+  colors (green below half load, amber `warn` past 50, red `heavy`
+  past 90) and the percent text; the raw weight numbers live in the
+  row tooltip, an unknown maxLoad shows the dash. Both lines stay
+  visible whatever the bag scroll position is, and the values track
+  the live stream (adena grows with the loot in the smoke).
+  `resetGear` clears the footer on a bot switch so stale money or
+  load never bleeds into the next character.
+- New theme gradients `--grad-load/-warn/-heavy` in `:root`, shared
+  by both themes like the vital bars.
+- repro_gear.js grew from 25 to 37 checks: the footer values
+  (formatted adena, percent text, fill width, amber at half load,
+  red near the limit, dash on unknown load, tooltip numbers) and
+  the placement pins - the panel sits inside `.map-wrap` after the
+  canvas and before the chat box, no `aside` column remains in the
+  html, the CSS block pins `position: absolute` at `top: 34px` /
+  `right: 12px`, the 32px icon metric survives and the threshold
+  color rules exist.
+- Live smoke on the running stack (script
+  scripts/floating_gear_smoke.sh, one shell so the bot survives the
+  probe): panel parent = `.map-wrap`, computed style absolute
+  34px/12px, adena 588 gold updating with loot, weight 18% green
+  with tooltip "weight: 15,731 / 88,320", 3 paperdoll icons + 8 bag
+  cells, flicker probe 11/11 icon elements alive after 10s of
+  farming, 0 JS errors, screenshot
+  scripts/gear_floating_live.png. Pitfall rediscovered: the icon
+  pack resolves from the process working directory (data/icons with
+  walk-up), so the bot must launch from the repo root - from
+  /home/z/my-project every icon 404s and the error handler strips
+  the imgs; the smoke script cds into the repo first.
+- `go build`, `go vet`, `go test ./... --count=1` green (12
+  packages ok, three without test files), node repro_gear.js OK
+  (37/37), node repro_hud.js ALL PASS.
