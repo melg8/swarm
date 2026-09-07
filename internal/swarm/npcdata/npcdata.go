@@ -9,6 +9,8 @@
 // the bot resolves the names itself.
 package npcdata
 
+import "strings"
+
 // npcTemplateOffset is added to the display id inside NpcInfo packets.
 const npcTemplateOffset = 1000000
 
@@ -51,6 +53,35 @@ func NPCIsAggressive(templateID int32) bool {
 	}
 
 	return npcAggressives[templateID-npcTemplateOffset]
+}
+
+// NPCClanHelpRange resolves the ai clanHelpRange of an npc by the raw
+// NpcInfo template id: the distance within the attacked npc calls its
+// clan mates to help. It returns zero when the template is unknown or
+// the npc hunts alone.
+func NPCClanHelpRange(templateID int32) int32 {
+	if templateID <= npcTemplateOffset {
+		return 0
+	}
+
+	return npcClanHelpRanges[templateID-npcTemplateOffset]
+}
+
+// NPCClans resolves the clan names of an npc by the raw NpcInfo template
+// id. The Mobius AttackableAI answers a player attack with a clan call:
+// every nearby npc whose clans intersect the clans of the attacked npc
+// (the special clan ALL matches every clan) joins the fight. It returns
+// nil when the template is unknown or the npc belongs to no clan.
+func NPCClans(templateID int32) []string {
+	if templateID <= npcTemplateOffset {
+		return nil
+	}
+	joined := npcClans[templateID-npcTemplateOffset]
+	if joined == "" {
+		return nil
+	}
+
+	return strings.Split(joined, " ")
 }
 
 // ItemName resolves the name of a ground item by its display id. It

@@ -7,13 +7,15 @@
 # empty name for most npcs (the classic client resolves names from
 # NPCName-e.dat by the display template id) and DropItem packets carry
 # only the item display id. This script reproduces both mappings and
-# additionally extracts the npc level and aggression data used by the
-# web interface to color mobs by threat:
+# additionally extracts the npc level, aggression, clan and social data
+# used by the web interface to color mobs by threat and by the hunt
+# loop to avoid pulling social mobs (the clan help mechanics of the
+# Mobius AttackableAI):
 #
 #   npc:   template id (packet) - 1000000 -> display id
 #          display id -> internal id via CT0_to_C4_ids.txt
-#          internal id -> name, level, aggroRange, isAggressive
-#          via data/stats/npcs/*.xml
+#          internal id -> name, level, aggroRange, isAggressive,
+#          clanHelpRange, clan list via data/stats/npcs/*.xml
 #   item:  display id -> name via data/stats/items/*.xml
 #
 # Usage: tools/generate_npc_names.sh [path/to/L2J_Mobius_C1_HarbingersOfWar]
@@ -56,12 +58,15 @@ with open(f"{stats}/npcs/CT0_to_C4_ids.txt", encoding="utf-8") as handle:
 # xml files). Attribute order inside the npc and ai elements varies, so
 # attributes are parsed by dictionary.
 npc_open_pattern = re.compile(r'<npc\s+([^>]*?)>')
-npc_ai_pattern = re.compile(r'<ai\s+([^>]*?)>')
+npc_ai_pattern = re.compile(r'<ai\s+([^>]*?)(/?)>')
+clan_pattern = re.compile(r'<clan>([^<]+)</clan>')
 attr_pattern = re.compile(r'(\w+)="([^"]*)"')
 npc_source = {}
 npc_levels = {}
 npc_aggro = {}
 npc_aggressive = {}
+npc_clan_help = {}
+npc_clans = {}
 for path in glob.glob(f"{stats}/npcs/*.xml"):
     with open(path, encoding="utf-8") as handle:
         content = handle.read()
@@ -79,22 +84,43 @@ for path in glob.glob(f"{stats}/npcs/*.xml"):
         if ai:
             ai_attrs = dict(attr_pattern.findall(ai.group(1)))
             npc_aggro[npc_id] = int(ai_attrs.get("aggroRange", 0))
-            npc_aggressive[npc_id] = ai_attrs.get("isAggressive", "false") == "true"
+            # The Mobius NpcTemplate defaults isAggressive to true: the
+            # mobs that omit the attribute (the Kaboo Orc Fighter for
+            # example) attack players on sight.
+            npc_aggressive[npc_id] = ai_attrs.get("isAggressive", "true") == "true"
+            if "clanHelpRange" in ai_attrs:
+                npc_clan_help[npc_id] = int(ai_attrs["clanHelpRange"])
+            # The clan list lives inside the ai element: the attacked
+            # mob calls every clan mate within its clanHelpRange to
+            # help. A self closing ai tag carries no clans.
+            ai_end = block_end
+            if not ai.group(2):
+                close = content.find("</ai>", ai.end())
+                if close != -1 and close <= block_end:
+                    ai_end = close
+            clans = sorted(set(clan_pattern.findall(content[ai.end():ai_end])))
+            if clans:
+                npc_clans[npc_id] = " ".join(clans)
         else:
             npc_aggro.setdefault(npc_id, 0)
             npc_aggressive.setdefault(npc_id, False)
+            npc_clan_help.setdefault(npc_id, 0)
 
-# Display id -> name/level/aggro, the lookup the bot needs.
+# Display id -> name/level/aggro/clan, the lookup the bot needs.
 npc_names = {}
 display_levels = {}
 display_aggro = {}
 display_aggressive = {}
+display_clan_help = {}
+display_clans = {}
 for internal, name in npc_source.items():
     display = internal_to_display.get(internal, internal)
     npc_names[display] = name
     display_levels[display] = npc_levels.get(internal, 0)
     display_aggro[display] = npc_aggro.get(internal, 0)
     display_aggressive[display] = npc_aggressive.get(internal, False)
+    display_clan_help[display] = npc_clan_help.get(internal, 0)
+    display_clans[display] = npc_clans.get(internal, "")
 
 # Item display id -> name (from the item stats xml files).
 item_pattern = re.compile(r'<item id="(\d+)"[^>]*?name="([^"]*)"')
@@ -105,6 +131,15 @@ for path in glob.glob(f"{stats}/items/*.xml"):
             item_id, name = int(match.group(1)), match.group(2)
             if name:
                 item_names[item_id] = name
+
+def render_string_map(values):
+    if not values:
+        return "\t{}\n"
+    lines = []
+    for key in sorted(values):
+        name = values[key].replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'\t{key}: "{name}",\n')
+    return "".join(lines)
 
 def render_map(values):
     if not values:
@@ -153,6 +188,16 @@ content = (
     "// isAggressive flag of the npc.\n"
     f"var npcAggressives = map[int32]bool{{\n{render_bool_map(display_aggressive)}}}\n"
     "\n"
+    "// npcClanHelpRanges maps the NpcInfo display template id to the ai\n"
+    "// clanHelpRange of the npc: the distance within the attacked npc\n"
+    "// calls its clan mates to help (0 for loners).\n"
+    f"var npcClanHelpRanges = map[int32]int32{{\n{render_int_map(display_clan_help)}}}\n"
+    "\n"
+    "// npcClans maps the NpcInfo display template id to the space\n"
+    "// separated clan names of the npc (the ALL clan matches every\n"
+    "// clan in the assist check of the server).\n"
+    f"var npcClans = map[int32]string{{\n{render_string_map(display_clans)}}}\n"
+    "\n"
     "// itemNames maps the DropItem display id to the item name.\n"
     f"var itemNames = map[int32]string{{\n{render_map(item_names)}}}\n"
 )
@@ -160,7 +205,8 @@ with open(out, "w", encoding="utf-8") as handle:
     handle.write(content)
 print(
     f"wrote {len(npc_names)} npc names, "
-    f"{len(display_levels)} levels, {len(display_aggressive)} aggression flags and "
+    f"{len(display_levels)} levels, {len(display_aggressive)} aggression flags, "
+    f"{len(display_clans)} clan lists and "
     f"{len(item_names)} item names to {out}"
 )
 PYEOF
