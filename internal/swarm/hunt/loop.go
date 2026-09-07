@@ -247,11 +247,15 @@ type Loop struct {
 	// beats the paperdoll of the character (see equip.go).
 	equip *equipManager
 	// The town trip shopping state (see shopping.go): the merchant
-	// stops of the running trip, the request pacing of the buys and
+	// stops of the running trip, the request pacing of the buys, the
+	// in-flight buy batch awaiting its inventory confirmation and
 	// the cached plan of the shopping trigger.
 	tripStops         []tripStop
 	buysPlanned       bool
 	buyAt             time.Time
+	buyRequested      []gear.Purchase
+	buyConfirmAt      time.Time
+	buyRetries        int
 	shoppingPlanAt    time.Time
 	shoppingPlanCache []gear.Purchase
 	// The multi zone hunting state (see zones.go): the registry of the
@@ -315,6 +319,9 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 		tripStops:         nil,
 		buysPlanned:       false,
 		buyAt:             time.Time{},
+		buyRequested:      nil,
+		buyConfirmAt:      time.Time{},
+		buyRetries:        0,
 		shoppingPlanAt:    time.Time{},
 		shoppingPlanCache: nil,
 		tripStart:         time.Time{},

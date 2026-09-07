@@ -138,9 +138,63 @@ func TestShoppingTripBuysAfterSelling(t *testing.T) {
 		require.Equal(t, int32(7148), purchase.MerchantTemplateID)
 	}
 
-	// Every stop is done: the return leg starts.
+	// The server confirms the buys: the inventory update carries the
+	// bought items, the stop completes on the arrival confirmation.
+	bought := make([]state.InventoryItem, 0, len(game.buys[0]))
+	for index, purchase := range game.buys[0] {
+		bought = append(bought, state.InventoryItem{
+			ObjectID: 9000 + int32(index), ItemID: purchase.ItemID,
+			Count: 1, Type2: 5, Change: 1,
+		})
+	}
+	bot.ApplyInventoryUpdate(bought)
+
+	// The confirmation completes the stop; the next tick starts the
+	// return leg.
+	loop.tick()
 	loop.tick()
 	require.Equal(t, phaseTownReturn, loop.phase)
+}
+
+// TestStopBuyRetriesAndSkipsLostBatch pins the arrival confirmation
+// of the buy requests: a transaction the server refuses answers
+// silently (the ActionFailed packet references nothing), so the
+// batch is re-requested on its confirmation deadline and given up
+// after the retry budget - the trip never stalls on a lost buy.
+func TestStopBuyRetriesAndSkipsLostBatch(t *testing.T) {
+	loop, game, _, _ := newTripLoop()
+	herbiel := townMerchants[3]
+	loop.tripStops = []tripStop{{merchant: herbiel, buys: []gear.Purchase{
+		{ItemID: 1121, ListID: 3014800, MerchantTemplateID: 7148,
+			Count: 1, Price: 9},
+	}}}
+	// The merchant never showed up: the sells work without one, the
+	// buy requests still go out.
+	loop.merchantID = -1
+	loop.buyAt = time.Now().Add(-buyPause - time.Second)
+
+	done := loop.tickStopShopping(time.Now())
+	require.False(t, done, "the stop waits for the arrival")
+	require.Len(t, game.buys, 1, "the buy request went out")
+	require.Len(t, loop.buyRequested, 1)
+
+	// The items never arrive (a refused transaction answers
+	// silently): every deadline re-requests the batch.
+	for i := 1; i <= stopBuyRetries; i++ {
+		loop.buyConfirmAt = time.Now().Add(-buyConfirmWait - time.Second)
+		loop.buyAt = time.Now().Add(-buyPause - time.Second)
+		done = loop.tickStopShopping(time.Now())
+		require.False(t, done, "the retry still waits for the arrival")
+		require.Len(t, game.buys, i+1, "retry %d re-requests the batch", i)
+	}
+
+	// The retry budget is spent: the batch is skipped and the stop
+	// completes without it.
+	loop.buyConfirmAt = time.Now().Add(-buyConfirmWait - time.Second)
+	loop.buyAt = time.Now().Add(-buyPause - time.Second)
+	done = loop.tickStopShopping(time.Now())
+	require.True(t, done, "the skipped batch completes the stop")
+	require.Len(t, game.buys, stopBuyRetries+1)
 }
 
 // TestShoppingTriggerPlansTrip pins the shopping trigger: a plan

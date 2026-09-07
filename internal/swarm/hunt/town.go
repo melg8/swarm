@@ -238,6 +238,9 @@ func (l *Loop) maybeStartTownTrip() {
 	l.tripStops = []tripStop{{merchant: merchant, sell: true}}
 	l.buysPlanned = false
 	l.buyAt = time.Time{}
+	l.buyRequested = nil
+	l.buyConfirmAt = time.Time{}
+	l.buyRetries = 0
 	l.phase = phaseTownWalk
 	stats := l.tracker.InventoryStats()
 	reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
@@ -579,10 +582,13 @@ func (l *Loop) handleMerchant(now time.Time, templates []int32) bool {
 
 // approachMerchant walks to the merchant, selects it inside the
 // interaction distance and reports when the sale may start. The
-// selection re-requests itself once per second until the
-// MyTargetSelected answer confirms it. A merchant standing on another
-// deck of the geodata (the disconnected village decks) is skipped: the
-// 3D interaction distance of the server can never be met and the sale
+// distance gate is 3D (the server INTERACTION_DISTANCE of 250 checks
+// x, y and z together - separate 2D and z limits would let a diagonal
+// stand-off slip past 250 and refuse every transaction). The selection
+// re-requests itself once per second until the MyTargetSelected
+// answer confirms it. A merchant standing on another deck of the
+// geodata (the disconnected village decks) is skipped: the 3D
+// interaction distance of the server can never be met and the sale
 // does not need the merchant.
 func (l *Loop) approachMerchant(now time.Time) bool {
 	x, y, z, ok := l.tracker.ObjectPosition(l.merchantID)
@@ -592,35 +598,40 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 		return true
 	}
 	selfX, selfY, selfZ, _ := l.tracker.SelfPosition()
-	dist := math.Hypot(float64(x-selfX), float64(y-selfY))
-	if dist > merchantApproachDist {
+	dist2D := math.Hypot(float64(x-selfX), float64(y-selfY))
+	dz := float64(z - selfZ)
+	dist3D := math.Sqrt(dist2D*dist2D + dz*dz)
+	if dist3D > merchantApproachDist {
+		if dist2D <= merchantApproachDist {
+			// The geodata pack misses some village ramps: the character
+			// stands under the merchant deck (the 2D distance is met,
+			// the z is not). Ground clicks route through the server
+			// pathfinder, which knows the ramps - click the exact
+			// merchant position until the z matches or the retry window
+			// closes.
+			if l.merchantDeckUntil.IsZero() {
+				l.merchantDeckUntil = now.Add(merchantDeckWindow)
+				l.logger.Printf("Hunt: %s stands on another deck (z %d vs "+
+					"%d), re-walking by server routing",
+					l.tracker.ObjectName(l.merchantID), selfZ, z)
+			}
+			if now.Before(l.merchantDeckUntil) {
+				l.walkToward(x, y, z, now)
+
+				return false
+			}
+			l.logger.Printf("Hunt: %s stays out of reach, the sells work "+
+				"without it and its buys are skipped",
+				l.tracker.ObjectName(l.merchantID))
+			l.merchantID = -1
+
+			return true
+		}
+
+		// Far away on the same level: a plain approach walk.
 		l.walkToward(x, y, z, now)
 
 		return false
-	}
-	if math.Abs(float64(z-selfZ)) > merchantApproachDist {
-		// The geodata pack misses some village ramps: the character
-		// stands under the merchant deck. Ground clicks route through
-		// the server pathfinder, which knows the ramps - click the
-		// exact merchant position until the z matches or the retry
-		// window closes.
-		if l.merchantDeckUntil.IsZero() {
-			l.merchantDeckUntil = now.Add(merchantDeckWindow)
-			l.logger.Printf("Hunt: %s stands on another deck (z %d vs "+
-				"%d), re-walking by server routing",
-				l.tracker.ObjectName(l.merchantID), selfZ, z)
-		}
-		if now.Before(l.merchantDeckUntil) {
-			l.walkToward(x, y, z, now)
-
-			return false
-		}
-		l.logger.Printf("Hunt: %s stays out of reach, the sells work "+
-			"without it and its buys are skipped",
-			l.tracker.ObjectName(l.merchantID))
-		l.merchantID = -1
-
-		return true
 	}
 	if l.tracker.SelfTargetID() != l.merchantID {
 		// The transactions need the merchant as the selected target
@@ -715,6 +726,9 @@ func (l *Loop) endTownTrip(reason string) {
 	l.legDest = pathfind.Vec3{}
 	l.tripStops = nil
 	l.buysPlanned = false
+	l.buyRequested = nil
+	l.buyConfirmAt = time.Time{}
+	l.buyRetries = 0
 	l.shoppingPlanCache = nil
 	l.shoppingPlanAt = time.Time{}
 	l.tripEndedAt = time.Now()
@@ -741,6 +755,9 @@ func (l *Loop) resetTownTrip() {
 	l.legDest = pathfind.Vec3{}
 	l.tripStops = nil
 	l.buysPlanned = false
+	l.buyRequested = nil
+	l.buyConfirmAt = time.Time{}
+	l.buyRetries = 0
 	l.tripEndedAt = time.Time{}
 }
 
