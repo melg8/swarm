@@ -35,11 +35,17 @@ const (
 	connectTimeout      = 10 * time.Second
 )
 
-// Candidate geodata directories of the pathfind test mode, checked in
-// order when -geodata is empty: the relative server layout first, then
-// the reference Windows deployment of this project (see AGENTS.md).
+// Candidate geodata directories, checked in order when -geodata is empty:
+// the relative server layouts first (the sandbox checkout next to the swarm
+// root keeps the server tree at l2j_mobius/L2J_Mobius_C1_HarbingersOfWar,
+// the reference Windows deployment runs the server straight from its
+// L2J_Mobius_C1_HarbingersOfWar/game folder, see AGENTS.md), then the bot
+// tree itself.
 var defaultGeodataCandidates = []string{
 	filepath.Join("data", "geodata"),
+	filepath.Join("..", "l2j_mobius", "L2J_Mobius_C1_HarbingersOfWar",
+		"dist", "game", "data", "geodata"),
+	filepath.Join("L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
 	filepath.Join("E:\\", "work", "lineage_workspace_fresh",
 		"L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
 }

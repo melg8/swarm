@@ -102,6 +102,11 @@ const (
 	cleanupWeightPercent = 75.0
 	// destroyBatch is the number of junk items destroyed per cleanup.
 	destroyBatch = 4
+	// zoneReturnFailBudget bounds the consecutive pathfound zone return
+	// legs that end without reaching the zone (a stuck walk aborts the
+	// leg): past the budget the return falls back to the direct legacy
+	// legs, which at least keep the character moving home.
+	zoneReturnFailBudget = 3
 )
 
 // phase is the coarse activity of the hunt loop.
@@ -160,8 +165,11 @@ type Loop struct {
 	sold          map[int32]bool
 	tripStart     time.Time
 	tripEndedAt   time.Time
+	zoneReturn    bool
+	zoneFails     int
 	delevelTarget int32
 	delevelGuard  int32
+	delevelTried  map[string]bool
 	delevelFight  time.Time
 	delevelEnd    time.Time
 }
@@ -204,8 +212,11 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 		sold:          make(map[int32]bool),
 		tripStart:     time.Time{},
 		tripEndedAt:   time.Time{},
+		zoneReturn:    false,
+		zoneFails:     0,
 		delevelTarget: 0,
 		delevelGuard:  0,
+		delevelTried:  nil,
 		delevelFight:  time.Time{},
 		delevelEnd:    time.Time{},
 	}
@@ -358,6 +369,11 @@ func (l *Loop) engage() {
 
 		return
 	}
+	if l.zoneReturn {
+		l.zoneReturn = false
+		l.zoneFails = 0
+		l.logger.Printf("Hunt: back in the hunting zone, resuming the hunt")
+	}
 	// Prefer the server view of the target while it lives: the
 	// MyTargetSelected answer of the last attack request arrives
 	// asynchronously, so the fresh value is read every tick. A stale
@@ -414,10 +430,16 @@ func (l *Loop) engage() {
 	l.lastHit = now
 }
 
-// returnToZone walks the character back into the hunting square: the
-// leash keeps the bot from chasing mobs or wandering beyond it, and a
-// village respawn after death lands far outside. The walk rate limits
-// itself to one request per second.
+// returnToZone walks the character back into the hunting square over the
+// geodata waypoints: a village respawn after death or a deleveling guard
+// post sits behind the village walls, and a direct walk bumps into them,
+// so the return is planned with the pathfinder and followed by the town
+// trip waypoint machinery (leg splitting, passed waypoint skipping, stuck
+// re-pathing) through phaseTownReturn. The remembered farm spot is the
+// destination when one exists, the zone center otherwise. The failures of
+// the pathfound legs (a missing geodata region, an unreachable deck) fall
+// back to the legacy direct legs, so a character without a walkable path
+// still moves home.
 func (l *Loop) returnToZone() {
 	now := time.Now()
 	if now.Sub(l.lastHit) < selectPeriod {
@@ -428,15 +450,67 @@ func (l *Loop) returnToZone() {
 	if zone == nil {
 		return
 	}
-	_, _, z, ok := l.tracker.SelfPosition()
+	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
 	if !ok {
 		return
 	}
 	l.target = 0
 	l.lootID = 0
-	l.phase = phaseEngage
-	l.logger.Printf("Hunt: outside the hunting zone, walking back")
-	if err := l.game.WalkTo(zone.CX, zone.CY, z); err != nil {
+	if l.zoneReturn && l.phase == phaseEngage {
+		// The previous pathfound return leg ended without reaching
+		// the zone (a stuck walk aborts the leg): count the failure
+		// and stop planning past the budget.
+		l.zoneFails++
+	}
+	if !l.zoneReturn {
+		l.zoneReturn = true
+		l.logger.Printf("Hunt: outside the hunting zone, pathfinding back")
+	}
+	if (l.navigator == nil) || l.zoneFails >= zoneReturnFailBudget {
+		l.phase = phaseEngage
+		l.walkZoneLeg(zone, selfX, selfY, selfZ)
+
+		return
+	}
+	dest := pathfind.Vec3{
+		X: float64(zone.CX),
+		Y: float64(zone.CY),
+		Z: float64(selfZ),
+	}
+	if (l.farmX != 0) || (l.farmY != 0) {
+		dest = pathfind.Vec3{
+			X: float64(l.farmX),
+			Y: float64(l.farmY),
+			Z: float64(l.farmZ),
+		}
+	}
+	l.tripStart = time.Now()
+	l.rePaths = 0
+	l.phase = phaseTownReturn
+	if !l.startWalkLeg(dest) {
+		// No geodata path: direct legs toward the zone, the server
+		// stops them at obstacles and the next second plans again.
+		l.phase = phaseEngage
+		l.walkZoneLeg(zone, selfX, selfY, selfZ)
+
+		return
+	}
+}
+
+// walkZoneLeg walks one direct short leg toward the zone center: the
+// emergency fallback of the pathfinding zone return. The leg length
+// respects the server move request limit (9900 units) and the walk rate
+// limits itself through the select pacing of the return.
+func (l *Loop) walkZoneLeg(zone *state.Zone, selfX int32, selfY int32, selfZ int32) {
+	moveX, moveY := zone.CX, zone.CY
+	dx := float64(zone.CX - selfX)
+	dy := float64(zone.CY - selfY)
+	if dist := math.Hypot(dx, dy); dist > returnWalkLeg {
+		frac := returnWalkLeg / dist
+		moveX = int32(float64(selfX) + dx*frac)
+		moveY = int32(float64(selfY) + dy*frac)
+	}
+	if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
 		l.logger.Printf("Hunt: walk back failed: %v", err)
 	}
 }

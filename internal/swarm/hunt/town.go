@@ -349,8 +349,11 @@ func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
 // longer than the server move request limit are split into straight
 // intermediate points (the smoothing guarantees the line of sight of
 // every leg, so the intermediate points stay on the verified segment).
-// A walk that stands still re-paths from the current position to the
-// leg destination, bounded by the re-path budget of the trip.
+// Waypoints the character already passed are skipped: a server position
+// correction or a restart jump can place the character ahead of the
+// follower, and walking back to a passed waypoint would loop. A walk
+// that stands still re-paths from the current position to the leg
+// destination, bounded by the re-path budget of the trip.
 func (l *Loop) walkTownWaypoints() bool {
 	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
 	if !ok {
@@ -359,8 +362,22 @@ func (l *Loop) walkTownWaypoints() bool {
 	now := time.Now()
 	for l.wpIndex < len(l.waypoints) {
 		wp := l.waypoints[l.wpIndex]
-		if math.Hypot(wp.X-float64(selfX), wp.Y-float64(selfY)) >
-			waypointArriveDist {
+		dist := math.Hypot(wp.X-float64(selfX), wp.Y-float64(selfY))
+		if dist > waypointArriveDist {
+			// The waypoint is not reached yet: skip it when the
+			// next one is closer - the character already passed
+			// it (a jump, a server correction).
+			if l.wpIndex+1 < len(l.waypoints) {
+				next := l.waypoints[l.wpIndex+1]
+				nextDist := math.Hypot(
+					next.X-float64(selfX), next.Y-float64(selfY))
+				if nextDist < dist {
+					l.wpIndex++
+					l.moveAt = time.Time{}
+
+					continue
+				}
+			}
 			break
 		}
 		l.wpIndex++
