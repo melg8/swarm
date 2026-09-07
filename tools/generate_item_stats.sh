@@ -10,7 +10,12 @@
 # bot sells duplicates and the lowest value per weight first. Missing
 # attributes mean unknown (price 0, weight 0).
 #
-#   item: display id -> price, weight via data/stats/items/*.xml
+# The generated gear stats map the auto equipment and the shop strategy
+# of the bot: every equippable item (a bodypart attribute present) carries
+# its bodypart, weapon type and combat stats (pAtk, mAtk, pDef, mDef,
+# sDef, rShld, pAtkSpd) used by the gear scoring profiles.
+#
+#   item: display id -> price, weight, gear stats via data/stats/items/*.xml
 #
 # Usage: tools/generate_item_stats.sh [path/to/L2J_Mobius_C1_HarbingersOfWar]
 # Output: internal/swarm/npcdata/item_stats.go
@@ -43,8 +48,10 @@ stats, out = sys.argv[1], sys.argv[2]
 # the block of each item is sliced out and searched inside.
 item_open_pattern = re.compile(r'<item\s+id="(\d+)"[^>]*>')
 set_pattern = re.compile(r'<set\s+name="(\w+)"\s+val="([^"]*)"')
+stat_pattern = re.compile(r'<stat\s+type="(\w+)">([^<]*)</stat>')
 item_prices = {}
 item_weights = {}
+item_gear = {}
 for path in glob.glob(f"{stats}/items/*.xml"):
     with open(path, encoding="utf-8") as handle:
         content = handle.read()
@@ -56,11 +63,42 @@ for path in glob.glob(f"{stats}/items/*.xml"):
             if index + 1 < len(matches)
             else len(content)
         )
-        for name, value in set_pattern.findall(content, match.end(), block_end):
-            if name == "price" and value.lstrip("-").isdigit():
-                item_prices[item_id] = int(value)
-            elif name == "weight" and value.isdigit():
-                item_weights[item_id] = int(value)
+        block = content[match.end():block_end]
+        sets = {}
+        for name, value in set_pattern.findall(block):
+            if name not in sets:
+                sets[name] = value
+        if "price" in sets and sets["price"].lstrip("-").isdigit():
+            item_prices[item_id] = int(sets["price"])
+        if "weight" in sets and sets["weight"].isdigit():
+            item_weights[item_id] = int(sets["weight"])
+        if "bodypart" not in sets:
+            continue
+        stats_map = {}
+        for name, value in stat_pattern.findall(block):
+            if name not in stats_map:
+                stats_map[name] = value
+
+        def stat_int(name):
+            value = stats_map.get(name)
+            if value is None:
+                return 0
+            try:
+                return int(round(float(value)))
+            except ValueError:
+                return 0
+
+        item_gear[item_id] = {
+            "bodypart": sets["bodypart"],
+            "weapon_type": sets.get("weapon_type", ""),
+            "pAtk": stat_int("pAtk"),
+            "mAtk": stat_int("mAtk"),
+            "pDef": stat_int("pDef"),
+            "mDef": stat_int("mDef"),
+            "sDef": stat_int("sDef"),
+            "rShld": stat_int("rShld"),
+            "pAtkSpd": stat_int("pAtkSpd"),
+        }
 
 def render_int64_map(values):
     if not values:
@@ -71,6 +109,20 @@ def render_int32_map(values):
     if not values:
         return "\t{}\n"
     return "".join(f"\t{key}: {values[key]},\n" for key in sorted(values))
+
+def render_gear_map(values):
+    import json
+    parts = []
+    for key in sorted(values):
+        v = values[key]
+        parts.append(
+            f"\t{key}: {{BodyPart: {json.dumps(v['bodypart'])}, "
+            f"WeaponType: {json.dumps(v['weapon_type'])}, PAtk: {v['pAtk']}, "
+            f"MAtk: {v['mAtk']}, PDef: {v['pDef']}, MDef: {v['mDef']}, "
+            f"SDef: {v['sDef']}, RShld: {v['rShld']}, "
+            f"PAtkSpd: {v['pAtkSpd']}}},\n"
+        )
+    return "".join(parts)
 
 content = (
     "// SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>\n"
@@ -88,12 +140,18 @@ content = (
     "// itemWeights maps the item display id to the unit weight of the\n"
     "// item stats.\n"
     f"var itemWeights = map[int32]int32{{\n{render_int32_map(item_weights)}}}\n"
+    "\n"
+    "// itemGearStats maps the item display id of every equippable item\n"
+    "// (an item with a bodypart attribute) to its combat stats, the\n"
+    "// scoring base of the auto equipment and the shop strategy.\n"
+    f"var itemGearStats = map[int32]GearStats{{\n{render_gear_map(item_gear)}}}\n"
 )
 with open(out, "w", encoding="utf-8", newline="\n") as handle:
     handle.write(content)
 print(
-    f"wrote {len(item_prices)} item prices and "
-    f"{len(item_weights)} item weights to {out}"
+    f"wrote {len(item_prices)} item prices, "
+    f"{len(item_weights)} item weights and "
+    f"{len(item_gear)} gear stats to {out}"
 )
 PYEOF
 
