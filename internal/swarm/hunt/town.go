@@ -13,8 +13,10 @@ package hunt
 
 import (
 	"math"
+	"strconv"
 	"time"
 
+	"github.com/melg8/swarm/internal/swarm/gear"
 	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/state"
 )
@@ -199,12 +201,14 @@ func (l *Loop) inventoryFull() bool {
 }
 
 // maybeStartTownTrip begins a town trip when the inventory is full
-// enough and the trip cooldown is over. Everything that can block the
-// trip (no navigator, no geodata, no path) arms the cooldown, so a
-// broken deployment does not retry every tick.
+// enough or the shop strategy has a plan worth a trip and the trip
+// cooldown is over. Everything that can block the trip (no navigator,
+// no geodata, no path) arms the cooldown, so a broken deployment does
+// not retry every tick.
 func (l *Loop) maybeStartTownTrip() {
+	shopping := l.shoppingTripEnabled() && l.shoppingWanted()
 	if l.navigator == nil || !l.tripCooldownOver() ||
-		!l.inventoryFull() {
+		(!l.inventoryFull() && !shopping) {
 		return
 	}
 	selfX, selfY, _, ok := l.tracker.SelfPosition()
@@ -222,10 +226,26 @@ func (l *Loop) maybeStartTownTrip() {
 	l.tripStart = time.Now()
 	l.sold = make(map[int32]bool)
 	l.rePaths = 0
+	l.tripStops = []tripStop{{merchant: merchant, sell: true}}
+	l.buysPlanned = false
+	l.buyAt = time.Time{}
+	l.shoppingPlanCache = nil
+	l.shoppingPlanAt = time.Time{}
 	l.phase = phaseTownWalk
 	stats := l.tracker.InventoryStats()
-	l.logger.Printf("Hunt: inventory at %d slots and %.0f%% weight, "+
-		"walking to the trader %s", stats.Slots, stats.WeightPercent,
+	reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
+		strconv.FormatFloat(stats.WeightPercent, 'f', 0, 64) +
+		"% weight"
+	if !l.inventoryFull() {
+		reason = "the shop strategy plans purchases worth " +
+			strconv.FormatInt(
+				gear.AdenaSpent(l.shoppingPlanCache), 10) + " adena"
+	}
+	// The trigger plan cache drops: the stop planning recomputes it
+	// with the fresh adena of the sales.
+	l.shoppingPlanCache = nil
+	l.shoppingPlanAt = time.Time{}
+	l.logger.Printf("Hunt: %s, walking to the trader %s", reason,
 		merchant.Name)
 	if !l.startWalkLeg(townNpcPosition(merchant)) {
 		l.abortTownTrip("no walkable path to the shop")
@@ -446,39 +466,66 @@ func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
 	return false
 }
 
-// enterSellPhase switches into the selling state at the shop.
+// enterSellPhase switches into the selling and shopping state at the
+// shop.
 func (l *Loop) enterSellPhase() {
 	l.phase = phaseTownSell
 	l.sellPhaseAt = time.Now()
 	l.sellAt = time.Time{}
+	l.buyAt = time.Time{}
 	l.merchantID = 0
 	l.merchantPick = time.Time{}
 	l.logger.Printf("Hunt: shop reached, selling the junk")
 }
 
-// tickTownSell sells the inventory junk and heads back once the
-// inventory is light again.
+// tickTownSell runs the sell stop (the first trip stop) and the buy
+// stops: the junk selling ends once the inventory is light again,
+// the fresh adena of the sales re-plans the purchases and every buy
+// stop completes when its purchases were requested. The return leg
+// starts when no stop is left.
 func (l *Loop) tickTownSell() {
-	if !l.inventoryFull() {
+	now := time.Now()
+	if l.sellableStop() {
+		if l.inventoryFull() {
+			if !l.handleMerchant(now, merchantTemplates()) {
+				return
+			}
+			l.sellJunk()
+
+			return
+		}
 		stats := l.tracker.InventoryStats()
 		l.logger.Printf("Hunt: inventory light again (%d slots, %.0f%% "+
-			"weight), heading back", stats.Slots, stats.WeightPercent)
-		l.startReturnLeg()
+			"weight), planning the purchases", stats.Slots,
+			stats.WeightPercent)
+		if !l.buysPlanned {
+			l.planShoppingStops()
+		}
+	}
+	if l.stopBuysPending() {
+		if l.handleMerchant(now, l.stopMerchantTemplates()) {
+			l.tickStopShopping(now)
+		}
 
 		return
 	}
-	if !l.handleMerchant(time.Now()) {
+	if len(l.tripStops) > 1 || (len(l.tripStops) == 1 &&
+		!l.tripStops[0].sell && !l.stopBuysPending()) ||
+		l.buysPlanned {
+		l.advanceTripStop()
+
 		return
 	}
-	l.sellJunk()
+	l.startReturnLeg()
 }
 
 // handleMerchant approaches the shop merchant and selects it like the
 // official client does before a transaction. It reports false while the
 // character still walks toward the merchant or waits for one to appear.
 // The sale itself works without a merchant (the standard inventory sell
-// list), so a merchant that never shows up only delays it.
-func (l *Loop) handleMerchant(now time.Time) bool {
+// list), so a merchant that never shows up only delays it; the buys
+// need the merchant, their stops skip the purchases instead.
+func (l *Loop) handleMerchant(now time.Time, templates []int32) bool {
 	if l.merchantID < 0 {
 		return true
 	}
@@ -490,18 +537,22 @@ func (l *Loop) handleMerchant(now time.Time) bool {
 	}
 	l.merchantPick = now
 	merchant, ok := l.tracker.NearestNpcByTemplates(
-		merchantTemplates(), merchantFindRadius)
+		templates, merchantFindRadius)
 	if ok {
 		l.merchantID = merchant.ObjectID
-		l.logger.Printf("Hunt: selling to " + merchant.Name)
+		l.logger.Printf("Hunt: trading with " + merchant.Name)
 
 		return false
 	}
 	if now.Sub(l.sellPhaseAt) < merchantWaitTimeout {
 		return false
 	}
-	l.logger.Printf("Hunt: no merchant around, selling without one")
 	l.merchantID = -1
+	if l.stopBuysPending() {
+		// The buys cannot run without the selected merchant: skip
+		// them instead of waiting forever.
+		l.resetStopBuys("merchant never showed up")
+	}
 
 	return true
 }
@@ -607,6 +658,10 @@ func (l *Loop) endTownTrip(reason string) {
 	l.lootID = 0
 	l.waypoints = nil
 	l.legDest = pathfind.Vec3{}
+	l.tripStops = nil
+	l.buysPlanned = false
+	l.shoppingPlanCache = nil
+	l.shoppingPlanAt = time.Time{}
 	l.tripEndedAt = time.Now()
 	l.logger.Printf("Hunt: town trip ended: " + reason)
 }
@@ -628,4 +683,6 @@ func (l *Loop) resetTownTrip() {
 	l.lootID = 0
 	l.waypoints = nil
 	l.legDest = pathfind.Vec3{}
+	l.tripStops = nil
+	l.buysPlanned = false
 }

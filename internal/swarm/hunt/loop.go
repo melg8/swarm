@@ -40,6 +40,10 @@ type GameAPI interface {
 	DestroyItem(objectID int32, count int32) error
 	// SellItems sells inventory items to the shop merchant.
 	SellItems(items []state.InventoryItem) error
+	// BuyItems buys items from the buylist of the selected merchant
+	// (one list per request, paced by the transaction flood
+	// protector).
+	BuyItems(listID int32, items []gear.Purchase) error
 	// UseItem uses an inventory item: equippable items toggle their
 	// equipped state, the same packet equips and unequips.
 	UseItem(objectID int32) error
@@ -241,6 +245,14 @@ type Loop struct {
 	// equip drives the auto equipment: it equips inventory gear that
 	// beats the paperdoll of the character (see equip.go).
 	equip *equipManager
+	// The town trip shopping state (see shopping.go): the merchant
+	// stops of the running trip, the request pacing of the buys and
+	// the cached plan of the shopping trigger.
+	tripStops         []tripStop
+	buysPlanned       bool
+	buyAt             time.Time
+	shoppingPlanAt    time.Time
+	shoppingPlanCache []gear.Purchase
 	// The pending server confirmation of the last inventory
 	// action (see markInventoryAction and gateInventoryCommand).
 	userPendingItem  int32

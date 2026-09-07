@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/melg8/swarm/internal/swarm/gear"
 	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/stretchr/testify/require"
 )
@@ -25,6 +26,7 @@ type fakeGame struct {
 	restarts  int
 	destroys  [][2]int32
 	sells     [][]state.InventoryItem
+	buys      [][]gear.Purchase
 	uses      []int32
 	drops     [][5]int32
 	noTargets bool
@@ -90,6 +92,15 @@ func (f *fakeGame) SellItems(items []state.InventoryItem) error {
 		return f.lastError
 	}
 	f.sells = append(f.sells, items)
+
+	return nil
+}
+
+func (f *fakeGame) BuyItems(listID int32, items []gear.Purchase) error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.buys = append(f.buys, items)
 
 	return nil
 }
