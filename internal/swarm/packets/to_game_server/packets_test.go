@@ -271,3 +271,39 @@ func TestRequestItemListToBytes(t *testing.T) {
 		require.Equal(t, []byte{0x0F}, writer.Bytes())
 	})
 }
+
+func TestRequestUseItemToBytes(t *testing.T) {
+	t.Run("use item request", func(t *testing.T) {
+		writer := packet.NewWriter()
+		request := NewRequestUseItem()
+		request.ObjectID = 268476112
+		err := request.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, []byte{
+			0x14,                   // opcode
+			0xD0, 0x9E, 0x00, 0x10, // object id 268476112
+		}, writer.Bytes())
+	})
+}
+
+func TestRequestDropItemToBytes(t *testing.T) {
+	t.Run("drop item request", func(t *testing.T) {
+		writer := packet.NewWriter()
+		request := NewRequestDropItem()
+		request.ObjectID = 17
+		request.Count = 50
+		request.X = 46112
+		request.Y = 41500
+		request.Z = -3056
+		err := request.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, []byte{
+			0x12,                   // opcode
+			0x11, 0x00, 0x00, 0x00, // object id
+			0x32, 0x00, 0x00, 0x00, // count
+			0x20, 0xB4, 0x00, 0x00, // x
+			0x1C, 0xA2, 0x00, 0x00, // y
+			0x10, 0xF4, 0xFF, 0xFF, // z
+		}, writer.Bytes())
+	})
+}

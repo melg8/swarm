@@ -316,6 +316,45 @@ func (gc *GameClient) DestroyItem(objectID int32, count int32) error {
 	return nil
 }
 
+// UseItem uses an inventory item. Equippable items toggle their
+// equipped state (the same packet equips and unequips, see
+// UseItem.runImpl -> useEquippableItem), other items run their item
+// handler. The web UI drives it from the equipment widget: double
+// click and drag-and-drop of the cells.
+func (gc *GameClient) UseItem(objectID int32) error {
+	request := togameserver.NewRequestUseItem()
+	request.ObjectID = objectID
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to use item: %w", err)
+	}
+	gc.tracker.RecordEvent("using item " + fmt.Sprint(objectID))
+
+	return nil
+}
+
+// DropItem drops an inventory item on the ground at the given world
+// position: the server only accepts drops within 150 units of the
+// player (see RequestDropItem.runImpl), so the caller passes the
+// character position. Stackable items drop a partial stack through the
+// count, the server splits the stack itself.
+func (gc *GameClient) DropItem(
+	objectID int32, count int32, x int32, y int32, z int32,
+) error {
+	request := togameserver.NewRequestDropItem()
+	request.ObjectID = objectID
+	request.Count = count
+	request.X = x
+	request.Y = y
+	request.Z = z
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to drop item: %w", err)
+	}
+	gc.tracker.RecordEvent("dropping " + fmt.Sprint(count) +
+		" of item " + fmt.Sprint(objectID))
+
+	return nil
+}
+
 // SellItems sells inventory items to the targeted merchant. The packet
 // uses the standard inventory sell list of the official client (list id
 // 0): the server prices every item itself at referencePrice/2, answers

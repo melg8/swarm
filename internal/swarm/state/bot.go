@@ -249,47 +249,49 @@ type Attribute struct {
 
 // Bot tracks the observed state of a single bot session.
 type Bot struct {
-	mu        sync.RWMutex
-	id        string
-	status    Status
-	selfID    int32
-	char      CharacterState
-	objects   map[int32]WorldObject
-	inventory map[int32]InventoryItem
-	events    []Event
-	eventLen  int
-	eventPos  int
-	chatLog   []ChatEvent
-	chatLen   int
-	chatPos   int
-	zone      *Zone
-	packets   int64
-	version   uint64
-	started   time.Time
-	updated   time.Time
+	mu           sync.RWMutex
+	id           string
+	status       Status
+	selfID       int32
+	char         CharacterState
+	objects      map[int32]WorldObject
+	inventory    map[int32]InventoryItem
+	events       []Event
+	eventLen     int
+	eventPos     int
+	chatLog      []ChatEvent
+	chatLen      int
+	chatPos      int
+	zone         *Zone
+	packets      int64
+	version      uint64
+	started      time.Time
+	updated      time.Time
+	commandQueue chan Command
 }
 
 // NewBot creates a bot tracker for the given session id (account name).
 func NewBot(id string) *Bot {
 	return &Bot{
-		mu:        sync.RWMutex{},
-		id:        id,
-		status:    StatusConnecting,
-		selfID:    0,
-		char:      newCharacterState(),
-		objects:   make(map[int32]WorldObject),
-		inventory: make(map[int32]InventoryItem),
-		events:    make([]Event, eventCapacity),
-		eventLen:  0,
-		eventPos:  0,
-		chatLog:   make([]ChatEvent, chatCapacity),
-		chatLen:   0,
-		chatPos:   0,
-		zone:      nil,
-		packets:   0,
-		version:   0,
-		started:   time.Now(),
-		updated:   time.Time{},
+		mu:           sync.RWMutex{},
+		id:           id,
+		status:       StatusConnecting,
+		selfID:       0,
+		char:         newCharacterState(),
+		objects:      make(map[int32]WorldObject),
+		inventory:    make(map[int32]InventoryItem),
+		events:       make([]Event, eventCapacity),
+		eventLen:     0,
+		eventPos:     0,
+		chatLog:      make([]ChatEvent, chatCapacity),
+		chatLen:      0,
+		chatPos:      0,
+		zone:         nil,
+		packets:      0,
+		version:      0,
+		started:      time.Now(),
+		updated:      time.Time{},
+		commandQueue: make(chan Command, commandQueueCapacity),
 	}
 }
 
@@ -494,6 +496,7 @@ func (b *Bot) SetHuntingZone(cx int32, cy int32, half int32) {
 func (b *Bot) ResetSession() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.drainCommands()
 	b.selfID = 0
 	b.char = newCharacterState()
 	b.objects = make(map[int32]WorldObject)

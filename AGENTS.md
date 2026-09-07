@@ -846,7 +846,27 @@ the same variables).
   (`tools/generate_item_icons.sh`). Reproduction harness:
   `tools/repro_gear.js` (`task repro:gear`) - it also pins the keyed
   rendering (image element identity across re-renders), the pinned
-  footer values and the floating placement.
+  footer values, the floating placement and the manual interactions.
+- The web UI is interactive: a double click on the map (move/attack/
+  pickup - hit test over the interpolated object positions), a double
+  click on a widget cell (useItem: equips a wearable bag item,
+  unequips an equipped one - the same C1 packet toggles both, see
+  UseItem.runImpl) and drags (bag cell -> paperdoll equips, paperdoll
+  cell -> bag unequips, any cell -> map drops on the ground at the
+  character feet, stackable items ask the count through a small
+  dialog, an equipped drag unequips first because the server refuses
+  drops of equipped items). The commands flow through
+  `POST /api/bots/{id}/commands` -> `state.Bot.PushCommand` (a 32
+  entry queue, newest wins) -> the hunt loop drains it every tick
+  (hunt/user.go): useItem/drop execute at once, move/attack/pickup
+  switch the `phaseUser` manual mode that overrides the autonomous
+  hunting until arrival/death/timeout (an active town trip is
+  cancelled, the deleveling refuses movement commands - the guard
+  walk must finish). The attack phase falls into the loot phase on a
+  killed target, the same way as the autonomous engage. The command
+  queue is drained on session resets so a reconnect never replays
+  stale clicks. Manual commands need the hunt loop running
+  (`-hunt`); without it the commands queue up but nothing executes.
 - The web UI is plain HTML/CSS/JS without a build step; keep it that way
   (embedded via go:embed). Watch out: top level `const` declarations are
   not `window` properties, so cross script references must use the bare

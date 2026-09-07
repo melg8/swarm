@@ -25,6 +25,8 @@ type fakeGame struct {
 	restarts  int
 	destroys  []int32
 	sells     [][]state.InventoryItem
+	uses      []int32
+	drops     [][5]int32
 	noTargets bool
 	lastError error
 }
@@ -88,6 +90,26 @@ func (f *fakeGame) SellItems(items []state.InventoryItem) error {
 		return f.lastError
 	}
 	f.sells = append(f.sells, items)
+
+	return nil
+}
+
+func (f *fakeGame) UseItem(objectID int32) error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.uses = append(f.uses, objectID)
+
+	return nil
+}
+
+func (f *fakeGame) DropItem(
+	objectID int32, count int32, x int32, y int32, z int32,
+) error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.drops = append(f.drops, [5]int32{objectID, count, x, y, z})
 
 	return nil
 }

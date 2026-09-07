@@ -289,7 +289,9 @@ function itemSignature(item) {
 }
 
 // makeCellRecord creates a cell record with its persistent DOM cell.
-// The slot variant carries a label span for the empty state.
+// The slot variant carries a label span for the empty state. Every
+// cell answers a double click (use the item: equip or unequip) and
+// starts a drag (move the item to the paperdoll, the bag or the map).
 function makeCellRecord(className, label) {
   const cell = document.createElement("div");
   cell.className = className;
@@ -300,7 +302,8 @@ function makeCellRecord(className, label) {
     glyph: null,
     badgeEn: null,
     badgeCount: null,
-    sig: null
+    sig: null,
+    item: null
   };
   if (label) {
     const span = document.createElement("span");
@@ -309,6 +312,9 @@ function makeCellRecord(className, label) {
     cell.append(span);
     record.label = span;
   }
+  cell.draggable = true;
+  cell.addEventListener("dblclick", () => activateGearCell(record));
+  cell.addEventListener("dragstart", (event) => startGearDrag(record, event));
 
   return record;
 }
@@ -348,6 +354,7 @@ function assignPaperdoll(items) {
 // itself - stack counts and enchant updates must not blink the icon.
 function applyItemCell(record, item) {
   const sig = itemSignature(item);
+  record.item = item || null;
   if (record.sig === sig) { return; }
   record.sig = sig;
   const cell = record.cell;
@@ -449,6 +456,8 @@ function resetGear() {
     const box = document.getElementById(id);
     if (box) { box.innerHTML = ""; }
   }
+  GearDrag.item = null;
+  closeDropDialog();
   const adena = document.getElementById("gear-adena");
   if (adena) { adena.textContent = "—"; adena.title = ""; }
   const fill = document.getElementById("gear-load-fill");
@@ -553,6 +562,227 @@ function renderGearFoot(snap) {
       : "weight";
   }
 }
+
+// ---- manual commands: map clicks, cell double clicks and drags ----
+
+// postCommand queues one manual command on the active bot: the hunt
+// loop picks it up within a quarter second and turns it into world
+// action.
+function postCommand(fields) {
+  const botId = App.activeBotId;
+  if (!botId) { return; }
+  fetch("/api/bots/" + botId + "/commands", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields)
+  }).catch(() => {});
+}
+
+// Wearable item families of the type2 ids: 0 weapons, 1 armor,
+// 2 jewelry. Everything else (quest, adena, materials) is not
+// equippable and a double click must not use it.
+const WEARABLE_TYPE2_MAX = 2;
+
+function isWearable(item) {
+  return Boolean(item) && item.type2 >= 0 && item.type2 <= WEARABLE_TYPE2_MAX;
+}
+
+// The item currently leaving the equipment widget through a drag: set
+// by dragstart, read by the drop targets (the map prefers the drag
+// event data, the stub harnesses read this state).
+const GearDrag = { item: null };
+
+// activateGearCell is the double click of one widget cell: a wearable
+// bag item equips (the server toggles the slot), an equipped item
+// unequips. The useItem packet covers both directions.
+function activateGearCell(record) {
+  const item = record.item;
+  if (!item) { return; }
+  if (!item.equipped && !isWearable(item)) { return; }
+  postCommand({ kind: "useItem", objectId: item.objectId });
+}
+
+// startGearDrag arms the drag of one widget cell.
+function startGearDrag(record, event) {
+  const item = record.item;
+  if (!item) {
+    event.preventDefault();
+
+    return;
+  }
+  GearDrag.item = item;
+  try {
+    event.dataTransfer.setData("application/x-swarm-item",
+      JSON.stringify(item));
+    event.dataTransfer.effectAllowed = "move";
+  } catch (err) {
+    // Stub DOMs without a real dataTransfer fall back to GearDrag.
+  }
+}
+
+// draggedItem resolves the dragged item of a drop event: the drag
+// payload first, the widget drag state as the fallback.
+function draggedItem(event) {
+  try {
+    const raw = event.dataTransfer.getData("application/x-swarm-item");
+    if (raw) { return JSON.parse(raw); }
+  } catch (err) {
+    // Read the fallback state below.
+  }
+
+  return GearDrag.item;
+}
+
+// The pending stackable drop behind the count dialog.
+const PendingDrop = { item: null };
+
+// dropItemOnMap starts the ground drop of a dragged item: stackable
+// items (adena, bones) ask for the count first, plain items drop
+// whole.
+function dropItemOnMap(item) {
+  if (!item) { return; }
+  if (item.count > 1) {
+    openDropDialog(item);
+
+    return;
+  }
+  commitDrop(item, 1);
+}
+
+// commitDrop sends the drop command: the server drops at the feet of
+// the character (it refuses drops farther than 150 units away) and
+// refuses equipped items, so an equipped drag unequips first - the
+// queue preserves the order.
+function commitDrop(item, count) {
+  if (item.equipped) {
+    postCommand({ kind: "useItem", objectId: item.objectId });
+  }
+  postCommand({ kind: "drop", objectId: item.objectId, count });
+}
+
+// resolveDropCount parses the count dialog answer: null rejects
+// garbage input, a valid answer clamps into 1..max.
+function resolveDropCount(input, max) {
+  const value = Math.floor(Number(input));
+  if (!Number.isFinite(value) || value < 1) { return null; }
+
+  return Math.min(value, max);
+}
+
+function openDropDialog(item) {
+  PendingDrop.item = item;
+  const dialog = document.getElementById("drop-dialog");
+  if (!dialog) { return; }
+  document.getElementById("drop-name").textContent =
+    item.name || ("item " + item.itemId);
+  const input = document.getElementById("drop-count");
+  input.value = 1;
+  input.max = item.count;
+  input.classList.remove("invalid");
+  document.getElementById("drop-max").textContent = "/ " + item.count;
+  dialog.classList.remove("hidden");
+  input.focus();
+  input.select();
+}
+
+function closeDropDialog() {
+  PendingDrop.item = null;
+  const dialog = document.getElementById("drop-dialog");
+  if (dialog) { dialog.classList.add("hidden"); }
+}
+
+function confirmDropDialog() {
+  const item = PendingDrop.item;
+  if (!item) {
+    closeDropDialog();
+
+    return;
+  }
+  const input = document.getElementById("drop-count");
+  const count = resolveDropCount(input.value, item.count);
+  if (count === null) {
+    input.classList.add("invalid");
+
+    return;
+  }
+  closeDropDialog();
+  commitDrop(item, count);
+}
+
+// initGearInteractions wires the drop targets of the widget: the
+// paperdoll area equips a dragged bag item, the bag unequips a
+// dragged paperdoll item, the drop dialog buttons commit the count.
+// The map itself is wired by map.js.
+function initGearInteractions() {
+  if (typeof document.querySelector !== "function") {
+    // Stub DOMs of the reproduction harnesses wire no drop targets.
+    return;
+  }
+  const slots = document.querySelector(".gear-slots");
+  if (slots) {
+    slots.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      slots.classList.add("drop-hover");
+    });
+    slots.addEventListener("dragleave", () => {
+      slots.classList.remove("drop-hover");
+    });
+    slots.addEventListener("drop", (event) => {
+      event.preventDefault();
+      slots.classList.remove("drop-hover");
+      const item = draggedItem(event);
+      if (item && !item.equipped && isWearable(item)) {
+        postCommand({ kind: "useItem", objectId: item.objectId });
+      }
+      GearDrag.item = null;
+    });
+  }
+  const grid = document.getElementById("inv-grid");
+  if (grid) {
+    grid.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      grid.classList.add("drop-hover");
+    });
+    grid.addEventListener("dragleave", () => {
+      grid.classList.remove("drop-hover");
+    });
+    grid.addEventListener("drop", (event) => {
+      event.preventDefault();
+      grid.classList.remove("drop-hover");
+      const item = draggedItem(event);
+      if (item && item.equipped) {
+        postCommand({ kind: "useItem", objectId: item.objectId });
+      }
+      GearDrag.item = null;
+    });
+  }
+  const ok = document.getElementById("drop-ok");
+  if (ok) { ok.addEventListener("click", confirmDropDialog); }
+  const all = document.getElementById("drop-all");
+  if (all) {
+    all.addEventListener("click", () => {
+      const item = PendingDrop.item;
+      if (item) {
+        closeDropDialog();
+        commitDrop(item, item.count);
+      }
+    });
+  }
+  const cancel = document.getElementById("drop-cancel");
+  if (cancel) { cancel.addEventListener("click", closeDropDialog); }
+  const input = document.getElementById("drop-count");
+  if (input) {
+    input.addEventListener("input", () => input.classList.remove("invalid"));
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { confirmDropDialog(); }
+      if (event.key === "Escape") { closeDropDialog(); }
+    });
+  }
+}
+
+// Wire the interactions at script load: the scripts run at the end of
+// the body, the widget markup is parsed already.
+initGearInteractions();
 
 // Chat window state: auto scroll follows the newest line while the
 // user stays at the bottom; scrolling up reads the history, scrolling

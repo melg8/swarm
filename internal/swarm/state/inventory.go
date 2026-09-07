@@ -263,6 +263,26 @@ type LootItem struct {
 	Z        int32
 }
 
+// GroundItemByID returns the tracked ground item with the given object
+// id. The manual pickup command of the web UI resolves its click
+// through it; a picked up or vanished item reports false.
+func (b *Bot) GroundItemByID(objectID int32) (LootItem, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	obj, ok := b.objects[objectID]
+	if !ok || obj.Kind != KindItem {
+		return LootItem{}, false
+	}
+
+	return LootItem{
+		ObjectID: obj.ObjectID,
+		Name:     obj.Name,
+		X:        obj.X,
+		Y:        obj.Y,
+		Z:        obj.Z,
+	}, true
+}
+
 // NearestGroundItem returns the closest ground item within the given
 // distance of the character.
 func (b *Bot) NearestGroundItem(maxDistance float64) (LootItem, bool) {

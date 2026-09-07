@@ -32,10 +32,15 @@ SPDX-License-Identifier: MIT
 // - keyed updates: re-rendering the same snapshot or changing only a
 //   stack count keeps the icon image elements alive (the icons must
 //   not blink on every snapshot), removed items drop their cells;
+// - the manual interactions: a double click posts the useItem command
+//   for wearable and equipped cells (never for adena or materials), a
+//   drag arms the item, dropping it on the map opens the count dialog
+//   for stacks (a plain item drops whole, an equipped item unequips
+//   first), the dialog commits the typed count and rejects garbage;
 // - the floating placement: the widget is an overlay inside the map
-//   wrap (index.html), the CSS pins it to the top right corner over
-//   the map, the icons keep their 32px metric and the footer lines
-//   exist.
+//   wrap (index.html), the CSS pins it to the top right corner at the
+//   same height as the player HUD (top 10px), the icons keep their
+//   32px metric, the footer lines and the drop dialog exist.
 //
 // Usage: node tools/repro_gear.js [--app <app.js>]
 // Exit code 0 = the equipment widget renders correctly, 1 = bug.
@@ -53,9 +58,9 @@ const DEFAULT_INDEX_HTML = path.join(__dirname, "..", "internal", "swarm",
 const DEFAULT_STYLE_CSS = path.join(__dirname, "..", "internal", "swarm",
     "webserver", "web", "style.css");
 
-// makeElement returns a DOM element stub recording children. append
-// mirrors the real DOM: appending an existing child moves it to the
-// end, it never duplicates an element.
+// makeElement returns a DOM element stub recording children and
+// event listeners. append mirrors the real DOM: appending an existing
+// child moves it to the end, it never duplicates an element.
 function makeElement() {
     return {
         textContent: "",
@@ -67,7 +72,16 @@ function makeElement() {
         title: "",
         loading: "",
         className: "",
+        max: "",
+        draggable: false,
         children: [],
+        listeners: {},
+        addEventListener(type, handler) {
+            if (!this.listeners[type]) { this.listeners[type] = []; }
+            this.listeners[type].push(handler);
+        },
+        focus: () => {},
+        select: () => {},
         classList: {
             _classes: new Set(),
             contains(cls) { return this._classes.has(cls); },
@@ -88,7 +102,6 @@ function makeElement() {
             this._innerHTML = value;
             this.children.length = 0;
         },
-        addEventListener: () => {},
         remove: function () {
             if (this._parent) {
                 const at = this._parent.children.indexOf(this);
@@ -113,8 +126,30 @@ function makeElement() {
     };
 }
 
+// fire dispatches one stub DOM event on an element that records its
+// listeners. The handler return values are ignored like in the real
+// DOM (preventDefault only mutates the event object).
+function fire(element, type, event) {
+    const handlers = (element.listeners || {})[type] || [];
+    const prepared = Object.assign({
+        preventDefault: () => {}, key: "",
+        dataTransfer: {
+            setData: () => {},
+            getData: () => "",
+            dropEffect: "",
+            effectAllowed: ""
+        }
+    }, event || {});
+    for (const handler of handlers) {
+        handler(prepared);
+    }
+
+    return prepared;
+}
+
 function loadAppJs(appFile) {
     const elements = new Map();
+    const posts = [];
     const document = {
         getElementById: (id) => {
             if (!elements.has(id)) {
@@ -131,6 +166,10 @@ function loadAppJs(appFile) {
             getItem: () => null, setItem: () => {}
         } },
         document,
+        fetch: (url, options) => {
+            posts.push({ url, options });
+            return { catch: () => {} };
+        },
         EventSource: function () {
             this.addEventListener = () => {};
         },
@@ -144,10 +183,17 @@ function loadAppJs(appFile) {
         " renderGear: typeof renderGear === 'function'" +
         " ? renderGear : undefined," +
         " assignPaperdoll: typeof assignPaperdoll === 'function'" +
-        " ? assignPaperdoll : undefined };",
+        " ? assignPaperdoll : undefined," +
+        " dropItemOnMap: typeof dropItemOnMap === 'function'" +
+        " ? dropItemOnMap : undefined," +
+        " confirmDropDialog: typeof confirmDropDialog === 'function'" +
+        " ? confirmDropDialog : undefined," +
+        " resolveDropCount: typeof resolveDropCount === 'function'" +
+        " ? resolveDropCount : undefined," +
+        " App: App, GearDrag: GearDrag };",
         sandbox);
 
-    return { gear: sandbox.__gear, elements, sandbox };
+    return { gear: sandbox.__gear, elements, sandbox, posts };
 }
 
 function check(results, name, ok, detail) {
@@ -260,8 +306,18 @@ function main() {
         console.error("app.js not found: " + appFile);
         process.exit(1);
     }
-    const { gear, elements } = loadAppJs(appFile);
+    const { gear, elements, posts } = loadAppJs(appFile);
     const results = [];
+
+    // The manual interactions need an active bot to post to.
+    gear.App.activeBotId = "acc1";
+
+    // lastPost returns the newest captured command post body.
+    const lastPost = () => {
+        const post = posts[posts.length - 1];
+        return post ? JSON.parse(post.options.body) : null;
+    };
+    const postCount = () => posts.length;
 
     if (typeof gear.renderGear !== "function" ||
         typeof gear.assignPaperdoll !== "function") {
@@ -467,11 +523,16 @@ function main() {
     const css = fs.readFileSync(DEFAULT_STYLE_CSS, "utf8");
     const gearCssBlock = css.slice(css.indexOf(".gear-panel {"),
         css.indexOf(".gear-panel {") + 400);
-    check(results, "gear panel floats over the map",
+    check(results, "gear panel floats at the HUD height",
         gearCssBlock.includes("position: absolute") &&
-        gearCssBlock.includes("top: 34px") &&
+        gearCssBlock.includes("top: 10px") &&
         gearCssBlock.includes("right: 12px"),
         "panel block: " + gearCssBlock.slice(0, 140));
+    check(results, "compass rose moved out of the panel corner",
+        css.includes(".map-rose") &&
+        !css.slice(css.indexOf(".map-rose {"),
+            css.indexOf(".map-rose {") + 200).includes("top: 10px"),
+        "the rose still sits at the top right");
     check(results, "icons keep the 32px metric",
         css.includes(".pd-cell img, .inv-cell img") &&
         css.includes("width: 32px") && css.includes("height: 32px"),
@@ -480,6 +541,98 @@ function main() {
         css.includes(".load-fill.warn") &&
         css.includes(".load-fill.heavy"),
         "missing threshold color rules");
+
+    // ---- manual interactions ----
+
+    // A mixed inventory again: a weapon to equip and unequip, adena
+    // to drop with a count dialog.
+    gear.renderGear(gearSnapshot([
+        item(1, 0x80, true, { name: "Squire's Sword" }),
+        item(57, 0, false, { count: 4242, type2: 4, name: "Adena" }),
+        item(10, 0x80, false, { enchant: 3, name: "Dagger" })
+    ], 3));
+    const weaponCell2 = slotCell(wearBox, jewelBox, "rhand");
+    const adenaCell2 = findIconCell(invGrid, 57);
+    const daggerCell2 = findIconCell(invGrid, 10);
+
+    // Double click: wearable items and equipped items post useItem,
+    // adena never posts.
+    fire(weaponCell2, "dblclick");
+    check(results, "double click on an equipped weapon posts useItem",
+        postCount() === 1 && lastPost().kind === "useItem" &&
+        lastPost().objectId === 10,
+        "posts: " + JSON.stringify(posts.map((p) => p.options.body)));
+    fire(daggerCell2, "dblclick");
+    check(results, "double click on a bag weapon posts useItem",
+        postCount() === 2 && lastPost().kind === "useItem" &&
+        lastPost().objectId === 100,
+        "posts: " + JSON.stringify(posts.map((p) => p.options.body)));
+    fire(adenaCell2, "dblclick");
+    check(results, "double click on adena posts nothing",
+        postCount() === 2,
+        "posts: " + JSON.stringify(posts.map((p) => p.options.body)));
+
+    // Drag of a stackable item onto the map: the count dialog opens
+    // instead of an immediate drop.
+    fire(adenaCell2, "dragstart");
+    check(results, "dragstart arms the dragged item",
+        gear.GearDrag.item && gear.GearDrag.item.itemId === 57,
+        "drag state: " + JSON.stringify(gear.GearDrag.item));
+    gear.dropItemOnMap(gear.GearDrag.item);
+    const dialog = elements.get("drop-dialog");
+    check(results, "dropping a stack opens the count dialog",
+        !dialog.classList.contains("hidden") &&
+        elements.get("drop-name").textContent === "Adena" &&
+        elements.get("drop-max").textContent === "/ 4242",
+        "dialog hidden=" + dialog.classList.contains("hidden") +
+        ", name " + elements.get("drop-name").textContent);
+
+    // Garbage input is rejected, a typed count commits the drop.
+    elements.get("drop-count").value = "banana";
+    gear.confirmDropDialog();
+    check(results, "garbage count keeps the dialog open",
+        !dialog.classList.contains("hidden") && postCount() === 2,
+        "dialog closed or posted");
+    elements.get("drop-count").value = "12";
+    gear.confirmDropDialog();
+    check(results, "typed count commits the drop",
+        dialog.classList.contains("hidden") &&
+        lastPost().kind === "drop" && lastPost().objectId === 570 &&
+        lastPost().count === 12,
+        "last post: " + JSON.stringify(lastPost()));
+
+    // An equipped item dragged to the map unequips first: the queue
+    // preserves the order useItem -> drop.
+    fire(weaponCell2, "dragstart");
+    gear.dropItemOnMap(gear.GearDrag.item);
+    check(results, "equipped drop asks no count (plain item)",
+        dialog.classList.contains("hidden"),
+        "dialog opened for a count 1 item");
+    check(results, "equipped drop posts unequip then drop",
+        postCount() === 5 &&
+        JSON.parse(posts[3].options.body).kind === "useItem" &&
+        lastPost().kind === "drop" && lastPost().count === 1,
+        "posts: " + JSON.stringify(posts.map((p) => p.options.body)));
+
+    // The count resolver itself.
+    const resolved = [
+        gear.resolveDropCount("3", 10),
+        gear.resolveDropCount("99", 10),
+        gear.resolveDropCount("", 10),
+        gear.resolveDropCount("x", 10),
+        gear.resolveDropCount("2.7", 10)
+    ];
+    check(results, "resolveDropCount parses, clamps and rejects",
+        JSON.stringify(resolved) === "[3,10,null,null,2]",
+        "resolved: " + JSON.stringify(resolved));
+
+    // The drop dialog markup exists in the html.
+    check(results, "drop dialog exists in the html",
+        html.includes('id="drop-dialog"') &&
+        html.includes('id="drop-count"') &&
+        html.includes('id="drop-ok"') &&
+        html.includes('id="drop-all"'),
+        "missing dialog ids");
 
     let failed = 0;
     for (const result of results) {

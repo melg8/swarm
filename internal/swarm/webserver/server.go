@@ -73,6 +73,7 @@ func NewServer(
 	mux.HandleFunc("GET /api/bots", server.handleBotList)
 	mux.HandleFunc("GET /api/bots/{id}/state", server.handleBotState)
 	mux.HandleFunc("GET /api/bots/{id}/events", server.handleBotEvents)
+	mux.HandleFunc("POST /api/bots/{id}/commands", server.handleBotCommand)
 	mux.HandleFunc("GET /api/config", server.handleBotConfig)
 
 	return server

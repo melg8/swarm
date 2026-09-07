@@ -41,6 +41,11 @@ const MapView = {
   // regular bot mode so every hook below stays a no-op.
   pathfind: null,
 
+  // The world point of the last manual command (a map double click):
+  // drawn as a fading ring so the click answer stays visible while
+  // the bot walks there.
+  userMark: null,
+
   // The server world region grid: every region is 2048 units and every
   // object within the 3x3 region block around the player is loaded (see
   // World.broadcastPacket of the Mobius server).
@@ -81,6 +86,9 @@ const MapView = {
     });
     this.canvas.addEventListener("mousemove", (e) => this.onHover(e));
     this.canvas.addEventListener("mouseleave", () => this.hideTooltip());
+    this.canvas.addEventListener("dblclick", (e) => this.onDoubleClick(e));
+    this.canvas.addEventListener("dragover", (e) => this.onMapDragOver(e));
+    this.canvas.addEventListener("drop", (e) => this.onMapDrop(e));
     document.getElementById("zoom-in")
       .addEventListener("click", () => this.zoom(1.5));
     document.getElementById("zoom-out")
@@ -318,7 +326,7 @@ const MapView = {
       if (obj.moving && obj.speed > 0) { return true; }
     }
 
-    return this.smoothingPending();
+    return this.smoothingPending() || this.userMarkAge() < 2500;
   },
 
   smoothingPending() {
@@ -798,6 +806,7 @@ const MapView = {
     this.drawTargetLinks(ctx);
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
+    this.drawUserIntent(ctx);
     if (this.lastSnap
       && document.getElementById("show-labels").checked) {
       this.drawLabels(ctx);
@@ -1258,10 +1267,28 @@ const MapView = {
 
       return;
     }
-    if (!this.lastSnap) { return; }
+    const best = this.objectAt(event.clientX, event.clientY);
     const rect = this.canvas.getBoundingClientRect();
     const mx = event.clientX - rect.left;
     const my = event.clientY - rect.top;
+    if (best !== this.hover) {
+      this.hover = best;
+      if (best) {
+        this.showTooltip(best, mx, my);
+      } else {
+        this.hideTooltip();
+      }
+    }
+  },
+
+  // objectAt hit tests the world objects at one client point: the
+  // interpolated draw position of every object is checked within the
+  // tooltip pick radius.
+  objectAt(clientX, clientY) {
+    if (!this.lastSnap) { return null; }
+    const rect = this.canvas.getBoundingClientRect();
+    const mx = clientX - rect.left;
+    const my = clientY - rect.top;
     let best = null;
     let bestDist = 14;
     for (const obj of this.lastSnap.objects || []) {
@@ -1274,14 +1301,95 @@ const MapView = {
         best = obj;
       }
     }
-    if (best !== this.hover) {
-      this.hover = best;
-      if (best) {
-        this.showTooltip(best, mx, my);
-      } else {
-        this.hideTooltip();
-      }
+
+    return best;
+  },
+
+  // onDoubleClick turns a map double click into a manual command:
+  // an attackable monster runs the attack, a ground item runs the
+  // pickup, anything else walks to the clicked point (the click
+  // height falls back to the character height - the server snap
+  // corrects the z on arrival).
+  onDoubleClick(event) {
+    if (this.pathfindEnabled()) { return; }
+    if (!this.lastSnap) { return; }
+    const obj = this.objectAt(event.clientX, event.clientY);
+    const world = this.eventWorld(event);
+    const z = this.lastSnap.character ? this.lastSnap.character.z : 0;
+    if (obj && obj.kind === "item") {
+      postCommand({ kind: "pickup", objectId: obj.objectId });
+      this.markUserIntent(obj.x, obj.y);
+    } else if (obj && obj.kind === "npc" && obj.attackable && !obj.dead) {
+      postCommand({ kind: "attack", objectId: obj.objectId });
+      this.markUserIntent(obj.x, obj.y);
+    } else {
+      postCommand({
+        kind: "move",
+        x: Math.round(world.x),
+        y: Math.round(world.y),
+        z: z
+      });
+      this.markUserIntent(world.x, world.y);
     }
+  },
+
+  // The manual command click ripple: kept alive by the animation
+  // loop while it fades.
+  userMarkAge() {
+    if (!this.userMark) { return Infinity; }
+
+    return performance.now() - this.userMark.at;
+  },
+
+  markUserIntent(x, y) {
+    this.userMark = { x, y, at: performance.now() };
+    this.draw();
+    this.kickAnimation();
+  },
+
+  drawUserIntent(ctx) {
+    const age = this.userMarkAge();
+    if (age > 2500) {
+      this.userMark = null;
+
+      return;
+    }
+    const fade = 1 - age / 2500;
+    const p = this.worldToScreen(this.userMark.x, this.userMark.y);
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.strokeStyle = this.colors.zone;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5 + (1 - fade) * 16, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#d97706";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  },
+
+  // onMapDragOver accepts the drag of an equipment widget cell over
+  // the map: the browser only allows the drop when the target cancels
+  // the default.
+  onMapDragOver(event) {
+    if (this.pathfindEnabled()) { return; }
+    event.preventDefault();
+    try {
+      event.dataTransfer.dropEffect = "move";
+    } catch (err) {
+      // Stub events without a dataTransfer ignore the effect hint.
+    }
+  },
+
+  // onMapDrop drops the dragged widget item on the ground: the server
+  // drops at the feet of the character, stackable items open the
+  // count dialog first (dropItemOnMap of app.js).
+  onMapDrop(event) {
+    if (this.pathfindEnabled()) { return; }
+    event.preventDefault();
+    dropItemOnMap(draggedItem(event));
   },
 
   showTooltip(obj, mx, my) {

@@ -39,6 +39,12 @@ type GameAPI interface {
 	DestroyItem(objectID int32, count int32) error
 	// SellItems sells inventory items to the shop merchant.
 	SellItems(items []state.InventoryItem) error
+	// UseItem uses an inventory item: equippable items toggle their
+	// equipped state, the same packet equips and unequips.
+	UseItem(objectID int32) error
+	// DropItem drops an inventory item on the ground at the given
+	// position (the server accepts drops at the feet only).
+	DropItem(objectID int32, count int32, x int32, y int32, z int32) error
 }
 
 // Timing and threshold constants of the hunt loop.
@@ -139,6 +145,10 @@ const (
 	phaseTownReturn phase = "townReturn"
 	// phaseDelevel dies at the town guards to lose the excess levels.
 	phaseDelevel phase = "delevel"
+	// phaseUser executes a manual command of the web UI (a map click
+	// for a walk, an attack or a pickup) until it completes, then the
+	// autonomous hunting resumes.
+	phaseUser phase = "user"
 )
 
 // Loop is the hunt state machine of one bot session.
@@ -192,6 +202,13 @@ type Loop struct {
 	delevelCounted bool
 	engageAt       time.Time
 	targetSkip     map[int32]time.Time
+	userKind       string
+	userX          int32
+	userY          int32
+	userZ          int32
+	userTarget     int32
+	userStart      time.Time
+	userMoveAt     time.Time
 }
 
 // NewLoop creates the hunt loop for a connected game client.
@@ -239,6 +256,13 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 		delevelTried:  nil,
 		delevelFight:  time.Time{},
 		delevelEnd:    time.Time{},
+		userKind:      "",
+		userX:         0,
+		userY:         0,
+		userZ:         0,
+		userTarget:    0,
+		userStart:     time.Time{},
+		userMoveAt:    time.Time{},
 	}
 }
 
@@ -310,8 +334,17 @@ func (l *Loop) tick() {
 
 		return
 	}
+	// The manual commands of the web UI arrive asynchronously on the
+	// bot tracker: drain them before the phase dispatch so a command
+	// can interrupt the current phase.
+	l.consumeUserCommands()
 	if l.phase == phaseDelevel {
 		l.tickDelevel()
+
+		return
+	}
+	if l.phase == phaseUser {
+		l.tickUser()
 
 		return
 	}

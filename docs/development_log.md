@@ -1208,3 +1208,78 @@ size, the widget stops being a huge white panel.
 - `go build`, `go vet`, `go test ./... --count=1` green (12
   packages ok, three without test files), node repro_gear.js OK
   (37/37), node repro_hud.js ALL PASS.
+
+## Round 28: the interactive web UI - manual commands from the map and the equipment widget (2026-09-07)
+
+The web UI stops being a passive observer: double clicks and
+drag-and-drop drive the character.
+
+- Two new C1 client packets (formats verified against the Mobius
+  source): `RequestUseItem` 0x14 `[objectId]` - the equip/unequip
+  toggle, one packet for both directions (UseItem.runImpl ->
+  useEquippableItem); `RequestDropItem` 0x12
+  `[objectId][count][x][y][z]` - the server accepts drops within 150
+  units of the character only (RequestDropItem.runImpl), so the bot
+  drops at its own feet, and splits stacks server side.
+- Command pipeline: `POST /api/bots/{id}/commands` (webserver/
+  commands.go, validated kinds: move/attack/pickup/useItem/drop,
+  receipt 202, an event log line "user command: ...") ->
+  `state.Bot.PushCommand` (commands.go: a 32 entry channel queue,
+  non blocking, oldest dropped on overflow, drained on session
+  resets) -> the hunt loop drains the queue every tick (hunt/user.go)
+  and acts: useItem/drop execute immediately, move/attack/pickup
+  switch the new `phaseUser` manual mode. The mode overrides the
+  autonomous hunting: an active town trip is cancelled
+  (resetTownTrip), the deleveling refuses movement commands (the
+  guard walk must finish for the level to drop), the death recovery
+  resets it. move re-clicks WalkTo at the 1s action cadence until
+  arrival (60u) or a 90s timeout; attack re-requests the forced
+  attack until the fight starts (30s timeout) and a died target
+  falls into the loot phase like the autonomous engage; pickup walks
+  to the item and clicks it within the 60u approach radius (30s
+  timeout). GameAPI grew UseItem/DropItem, the GameClient implements
+  them, GroundItemByID resolves the pickup clicks.
+- Frontend: the canvas answers dblclick (map.js objectAt - the same
+  hit test the tooltip uses: an attackable npc -> attack, a ground
+  item -> pickup, ground -> move with the character z) with a fading
+  click ring (userMark) drawn by the animation loop; the canvas also
+  accepts widget drags (drop on the map -> dropItemOnMap). The
+  widget cells are draggable and double clickable (app.js): dblclick
+  posts useItem for wearable bag items and equipped items (never for
+  adena/materials, type2 filter), a drag to the paperdoll area
+  equips, to the bag unequips, to the map drops - stackable items
+  (count > 1) open the drop-dialog (a small modal: typed count with
+  clamp validation, all/cancel/drop, Enter/Escape), an equipped drag
+  posts useItem then drop (the queue preserves the order).
+- Widget alignment fix from the review: the gear panel sits at
+  top 10px - exactly the height of the player HUD stack (both
+  measured 117px in the live probe), the compass rose moved to the
+  bottom right corner so the panel owns the top right.
+- Tests: packet serialization (RequestUseItem/RequestDropItem byte
+  layouts), hunt/user_test.go (9 tests: immediate useItem/drop at the
+  self position, the manual phase switch with the suppressed
+  autonomous engage, arrival and timeout, the killed manual target
+  into the loot phase, the pickup walk/click/vanish, the delevel
+  guard, the queue drain on session reset), webserver/commands_test
+  (queue happy path, validation matrix, 404, all kinds round trip).
+  repro_gear.js grew to 43 checks with a behavioral DOM: the stub
+  elements record event listeners and a stub fetch captures the
+  posts - the dblclick matrix (weapon/adena), the drag arm, the
+  count dialog (stack opens it, garbage keeps it, a typed count
+  commits 12), the equipped drag posting useItem -> drop in order,
+  and the resolveDropCount pure function.
+- Live smoke on the running stack (scripts/interactive_ui_smoke.sh;
+  the account id of the endpoint is "test1", and the first run
+  caught the character mid-delevel - the wait loop now polls for
+  attackable mobs in reach before the probes): panel top == HUD top
+  (117/117), the mob dblclick logs "user command: attacking object
+  <id>" and cancels the town trip, the ground dblclick logs
+  "user command: walking to ...", the weapon cell dblclick unequips
+  (icon out, label back) and the bag dblclick re-equips (icon back),
+  the adena drop command returns 202, the map shows "item appeared:
+  Adena" and the adena line ticks 588 -> 587, the delevel guard
+  refuses a move with a log line, 0 JS errors, screenshot
+  scripts/interactive_ui_live.png.
+- `go build`, `go vet`, `go test ./... -count=1` green (12 packages
+  ok, three without test files), node repro_gear.js OK (43/43),
+  repro_hud.js / repro_map_render.js / repro_movement.js ALL PASS.
