@@ -185,6 +185,7 @@ function selectBot(botId) {
   openEventStream(botId);
   renderBotList();
   resetPanels();
+  resetGear();
 }
 
 function resetPanels() {
@@ -228,27 +229,32 @@ function renderSnapshot() {
 
 // ---- equipment widget ----
 
-// Paperdoll slot layout of the equipment widget: three columns of
-// classic character window slots. mask is the body part mask of the
-// inventory packets (see the C1 BodyPart enum), anyOf marks the
-// either-or masks (earrings and rings carry the combined template
-// mask) resolved into the first free slot of the group.
-const PAPERDOLL_SLOTS = [
-  { key: "hair", label: "hair", mask: 0x10000 },
+// Wearable slot layout of the equipment widget: the left 3x3 block of
+// the classic armor and weapon paperdoll. mask is the body part mask
+// of the inventory packets (see the C1 BodyPart enum).
+const WEAR_SLOTS = [
+  { key: "head", label: "head", mask: 0x40 },
+  { key: "back", label: "cloak", mask: 0x2000 },
+  { key: "gloves", label: "gloves", mask: 0x200 },
+  { key: "rhand", label: "weapon", mask: 0x80 },
+  { key: "chest", label: "chest", mask: 0x400 },
+  { key: "lhand", label: "shield", mask: 0x100 },
+  { key: "under", label: "shirt", mask: 0x1 },
+  { key: "legs", label: "legs", mask: 0x800 },
+  { key: "feet", label: "boots", mask: 0x1000 }
+];
+
+// Jewelry layout: a 2x3 block with only five real slots (two earrings,
+// a necklace, two rings) - the sixth position, the middle right cell,
+// stays empty because the classic character has no sixth jewelry slot.
+// The null entry renders the placeholder hole of the grid.
+const JEWEL_SLOTS = [
   { key: "r_ear", label: "r.ear", mask: 0x2, group: "ear" },
   { key: "l_ear", label: "l.ear", mask: 0x4, group: "ear" },
   { key: "neck", label: "neck", mask: 0x8 },
+  null,
   { key: "r_finger", label: "r.ring", mask: 0x10, group: "finger" },
-  { key: "l_finger", label: "l.ring", mask: 0x20, group: "finger" },
-  { key: "head", label: "head", mask: 0x40 },
-  { key: "chest", label: "chest", mask: 0x400 },
-  { key: "legs", label: "legs", mask: 0x800 },
-  { key: "rhand", label: "weapon", mask: 0x80 },
-  { key: "lhand", label: "shield", mask: 0x100 },
-  { key: "back", label: "cloak", mask: 0x2000 },
-  { key: "gloves", label: "gloves", mask: 0x200 },
-  { key: "feet", label: "boots", mask: 0x1000 },
-  { key: "under", label: "shirt", mask: 0x1 }
+  { key: "l_finger", label: "l.ring", mask: 0x20, group: "finger" }
 ];
 
 // Masks that map onto another slot: two handed weapons and full armor
@@ -260,6 +266,52 @@ const EITHER_OR_MASKS = { 0x6: "ear", 0x30: "finger" };
 
 // Fallback glyph per type2 family when an item has no icon.
 const TYPE2_GLYPH = { 0: "W", 1: "A", 2: "J", 3: "Q", 4: "$", 5: "•" };
+
+// Cell registry of the equipment widget: one record per rendered cell
+// so a snapshot only touches the cells whose item actually changed.
+// Rebuilding the whole grid on every snapshot recreated the <img>
+// elements and made all icons flash for a moment - the images are
+// cached by the browser, but a fresh element still decodes and paints
+// asynchronously. Keyed records keep the elements alive instead.
+const GearCells = {
+  slots: new Map(), // slot key -> cell record
+  inv: new Map(),   // item objectId -> cell record
+  order: ""         // last inventory order signature
+};
+
+// itemSignature is the change signature of one cell content: two
+// snapshots with equal signatures leave the DOM untouched.
+function itemSignature(item) {
+  if (!item) { return ""; }
+
+  return [item.itemId, item.icon, item.count, item.enchant,
+    item.type2, item.name, item.equipped].join("|");
+}
+
+// makeCellRecord creates a cell record with its persistent DOM cell.
+// The slot variant carries a label span for the empty state.
+function makeCellRecord(className, label) {
+  const cell = document.createElement("div");
+  cell.className = className;
+  const record = {
+    cell,
+    label: null,
+    img: null,
+    glyph: null,
+    badgeEn: null,
+    badgeCount: null,
+    sig: null
+  };
+  if (label) {
+    const span = document.createElement("span");
+    span.className = "slot-label";
+    span.textContent = label;
+    cell.append(span);
+    record.label = span;
+  }
+
+  return record;
+}
 
 // assignPaperdoll places every equipped item on a paperdoll slot.
 // Returns the slot key -> item map.
@@ -275,8 +327,9 @@ function assignPaperdoll(items) {
     } else if (SLOT_MASK_ALIASES[item.bodyPart]) {
       key = SLOT_MASK_ALIASES[item.bodyPart];
     } else {
-      const slot = PAPERDOLL_SLOTS.find((s) => s.mask === item.bodyPart);
-      key = slot ? slot.key : null;
+      const wear = WEAR_SLOTS.concat(JEWEL_SLOTS).find(
+        (s) => s && s.mask === item.bodyPart);
+      key = wear ? wear.key : null;
     }
     if (!key || placed[key]) { continue; }
     placed[key] = item;
@@ -289,44 +342,72 @@ function assignPaperdoll(items) {
   return placed;
 }
 
-// makeIconCell builds one icon cell: the pack image when the item
-// resolves to an icon, the type glyph otherwise (also the image error
-// fallback - a 404 icon must not leave an empty box).
-function makeIconCell(item, className) {
-  const cell = document.createElement("div");
-  cell.className = className;
-  if (!item) { return cell; }
+// applyItemCell refreshes one cell record to show the item (or the
+// empty label). Text badges may be recreated freely, but the icon
+// image element survives every change that does not alter the icon
+// itself - stack counts and enchant updates must not blink the icon.
+function applyItemCell(record, item) {
+  const sig = itemSignature(item);
+  if (record.sig === sig) { return; }
+  record.sig = sig;
+  const cell = record.cell;
 
+  if (record.glyph) { record.glyph.remove(); record.glyph = null; }
+  if (record.badgeEn) { record.badgeEn.remove(); record.badgeEn = null; }
+  if (record.badgeCount) { record.badgeCount.remove(); record.badgeCount = null; }
+
+  if (!item) {
+    if (record.img) { record.img.remove(); record.img = null; }
+    cell.title = "";
+    if (record.label) { record.label.style.display = ""; }
+
+    return;
+  }
+
+  if (record.label) { record.label.style.display = "none"; }
+
+  // The glyph layer sits under the image: it shows while the icon
+  // loads, stays as the fallback when it fails (the error handler
+  // removes the img) and tints by the item family.
   const glyph = document.createElement("span");
   glyph.className = "icon-glyph glyph-t" + (item.type2 || 0);
   glyph.textContent = TYPE2_GLYPH[item.type2] || "•";
   cell.append(glyph);
+  record.glyph = glyph;
 
   if (item.icon) {
-    const img = document.createElement("img");
-    img.alt = "";
-    img.loading = "lazy";
-    img.src = "/icons/" + item.icon + ".png";
-    img.addEventListener("error", () => img.remove());
-    cell.append(img);
+    const src = "/icons/" + item.icon + ".png";
+    if (!record.img) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = src;
+      img.addEventListener("error", () => img.remove());
+      cell.append(img);
+      record.img = img;
+    } else if (record.img.src !== src) {
+      record.img.src = src;
+    }
+  } else if (record.img) {
+    record.img.remove();
+    record.img = null;
   }
 
   if (item.enchant > 0) {
-    const en = document.createElement("span");
-    en.className = "icon-badge badge-enchant";
-    en.textContent = "+" + item.enchant;
-    cell.append(en);
+    const badge = document.createElement("span");
+    badge.className = "icon-badge badge-enchant";
+    badge.textContent = "+" + item.enchant;
+    cell.append(badge);
+    record.badgeEn = badge;
   }
   if (item.count > 1) {
-    const count = document.createElement("span");
-    count.className = "icon-badge badge-count";
-    count.textContent = item.count >= 10000
+    const badge = document.createElement("span");
+    badge.className = "icon-badge badge-count";
+    badge.textContent = item.count >= 10000
       ? Math.round(item.count / 1000) + "k" : item.count;
-    cell.append(count);
+    cell.append(badge);
+    record.badgeCount = badge;
   }
   cell.title = itemTooltip(item);
-
-  return cell;
 }
 
 // itemTooltip composes the hover title of an item cell.
@@ -339,34 +420,85 @@ function itemTooltip(item) {
   return tip;
 }
 
-// renderGear draws the paperdoll and the inventory grid of the right
-// side equipment widget.
+// ensureSlotCells creates the slot cells (and the jewelry hole) of one
+// slot block once; later snapshots only refresh their contents.
+function ensureSlotCells(box, slots) {
+  if (box.children.length > 0) { return; }
+  for (const slot of slots) {
+    if (!slot) {
+      const hole = document.createElement("div");
+      hole.className = "jewel-hole";
+      box.append(hole);
+      continue;
+    }
+    const record = makeCellRecord("pd-cell", slot.label);
+    GearCells.slots.set(slot.key, record);
+    box.append(record.cell);
+  }
+}
+
+// resetGear drops every cell record: switching the observed bot starts
+// the widget from scratch instead of mixing two inventories.
+function resetGear() {
+  GearCells.slots.clear();
+  GearCells.inv.clear();
+  GearCells.order = "";
+  for (const id of ["gear-wear", "gear-jewel", "inv-grid"]) {
+    const box = document.getElementById(id);
+    if (box) { box.innerHTML = ""; }
+  }
+}
+
+// renderGear refreshes the paperdoll blocks and the inventory grid of
+// the right side equipment widget with keyed cells: unchanged items
+// leave their DOM untouched, so their icons never blink.
 function renderGear(snap) {
-  const paperdoll = document.getElementById("paperdoll");
+  const wearBox = document.getElementById("gear-wear");
+  const jewelBox = document.getElementById("gear-jewel");
   const invGrid = document.getElementById("inv-grid");
   const invCount = document.getElementById("inv-count");
-  if (!paperdoll || !invGrid) { return; }
+  if (!wearBox || !jewelBox || !invGrid) { return; }
 
   const items = snap.inventory || [];
   const placed = assignPaperdoll(items);
 
-  paperdoll.innerHTML = "";
-  for (const slot of PAPERDOLL_SLOTS) {
-    const item = placed[slot.key] || null;
-    const cell = makeIconCell(item, "pd-cell" + (item ? "" : " pd-empty"));
-    if (!item) {
-      cell.textContent = slot.label;
-    }
-    paperdoll.append(cell);
+  ensureSlotCells(wearBox, WEAR_SLOTS);
+  ensureSlotCells(jewelBox, JEWEL_SLOTS);
+  for (const [key, record] of GearCells.slots) {
+    applyItemCell(record, placed[key] || null);
   }
 
-  invGrid.innerHTML = "";
-  let invItems = 0;
+  const order = [];
+  const seen = new Set();
   for (const item of items) {
     if (item.equipped) { continue; }
-    invItems++;
-    invGrid.append(makeIconCell(item, "inv-cell"));
+    seen.add(item.objectId);
+    order.push(item.objectId);
+    let record = GearCells.inv.get(item.objectId);
+    if (!record) {
+      record = makeCellRecord("inv-cell", null);
+      GearCells.inv.set(item.objectId, record);
+      invGrid.append(record.cell);
+    }
+    applyItemCell(record, item);
   }
+  for (const [id, record] of Array.from(GearCells.inv)) {
+    if (!seen.has(id)) {
+      record.cell.remove();
+      GearCells.inv.delete(id);
+    }
+  }
+  // Reordering moves the persistent cells (appendChild never reloads
+  // an image) and only when the order actually changed.
+  const orderSig = order.join(",");
+  if (GearCells.order !== orderSig) {
+    GearCells.order = orderSig;
+    for (const id of order) {
+      const record = GearCells.inv.get(id);
+      if (record) { invGrid.append(record.cell); }
+    }
+  }
+
   invCount.textContent = (snap.character.inventorySlots || 0) + "/" +
     (snap.character.inventoryMax || 80);
 }

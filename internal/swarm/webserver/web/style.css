@@ -727,11 +727,14 @@ body.mode-pathfind #live-label { display: none; }
 /* ---- equipment widget (right side panel) ---- */
 
 /* The equipment widget is the fixed right column of the app body: the
-   paperdoll of the equipped gear on top, the scrollable inventory grid
-   below. The pathfind test mode has no character and hides it. */
+   paperdoll blocks of the equipped gear on top (the 3x3 wear block on
+   the left, the 2x3 jewelry block with five slots on the right), the
+   inventory grid below - six columns and four visible rows with a
+   scrollbar for larger bags. The pathfind test mode has no character
+   and hides it. */
 .gear-panel {
-  width: 172px;
-  min-width: 172px;
+  width: 252px;
+  min-width: 252px;
   background: var(--bg-panel);
   border-left: 1px solid var(--border);
   display: flex;
@@ -749,18 +752,39 @@ body.mode-pathfind .gear-panel { display: none; }
 
 .inv-count { color: var(--text-dim); letter-spacing: 0; }
 
-/* Paperdoll: three columns of 44x44 cells, the slot labels live inside
-   the empty cells so the grid reads as one unit. */
-.paperdoll {
+/* Paperdoll blocks: the wear and jewelry grids share the compact 36px
+   cell metric of the inventory grid, so the blocks read as one
+   widget. */
+.gear-slots {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 8px 8px;
+  gap: 8px;
+}
+
+.gear-wear {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
-  padding: 0 10px 10px;
+  grid-template-columns: repeat(3, 36px);
+  grid-auto-rows: 36px;
+  gap: 3px;
+}
+
+.gear-jewel {
+  display: grid;
+  grid-template-columns: repeat(2, 36px);
+  grid-auto-rows: 36px;
+  gap: 3px;
+}
+
+/* The sixth jewelry position: only five jewelry slots exist, the
+   middle right cell of the block stays blank. */
+.jewel-hole {
+  border: none;
+  background: none;
 }
 
 .pd-cell {
   position: relative;
-  height: 44px;
   border: 1px solid var(--border);
   border-radius: 5px;
   background: var(--bg);
@@ -770,9 +794,11 @@ body.mode-pathfind .gear-panel { display: none; }
   overflow: hidden;
 }
 
-.pd-cell.pd-empty {
-  font-size: 8.5px;
-  letter-spacing: 1px;
+/* Slot label of an empty paperdoll cell: a persistent span toggled by
+   display, so filling or clearing a slot never rebuilds the cell. */
+.slot-label {
+  font-size: 8px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--text-dim);
 }
@@ -785,22 +811,31 @@ body.mode-pathfind .gear-panel { display: none; }
   z-index: 2;
 }
 
-/* Inventory grid below the paperdoll: five columns of icon cells with
-   scroll when the bags grow. */
+/* Inventory grid: six columns of four visible rows, scrolling when the
+   bag grows past them. */
 .inv-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
-  padding: 0 10px;
+  grid-template-columns: repeat(6, 36px);
+  grid-auto-rows: 36px;
+  gap: 3px;
+  padding: 0 8px;
   overflow-y: auto;
-  flex: 1;
-  min-height: 0;
+  height: 153px;
   align-content: start;
+  scrollbar-width: thin;
+}
+
+.inv-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.inv-grid::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 
 .inv-cell {
   position: relative;
-  height: 40px;
   border: 1px solid var(--border-soft);
   border-radius: 5px;
   background: var(--bg);

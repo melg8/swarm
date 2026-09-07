@@ -92,6 +92,23 @@ func TestIconDisabledWithoutPack(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, recorder.Code)
 }
 
+// chdir switches the working directory for the duration of the test.
+// A manual os.Chdir instead of testing.T.Chdir: the module builds with
+// the go 1.23 language level where T.Chdir is not available yet, and
+// the test must keep compiling on 1.23 and 1.24 toolchains alike.
+func chdir(t *testing.T, dir string) {
+	t.Helper()
+
+	orig, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(dir))
+	t.Cleanup(func() {
+		if err := os.Chdir(orig); err != nil {
+			t.Errorf("restore working directory %q: %v", orig, err)
+		}
+	})
+}
+
 // TestDetectIconsDirWalkUp verifies the candidate walk: the pack is
 // found in a parent of the working directory, not only next to it.
 func TestDetectIconsDirWalkUp(t *testing.T) {
@@ -104,7 +121,7 @@ func TestDetectIconsDirWalkUp(t *testing.T) {
 		filepath.Join(pack, "etc_adena_i00.png"),
 		[]byte{0x89, 'P', 'N', 'G'}, 0o600))
 
-	t.Chdir(nested)
+	chdir(t, nested)
 
 	require.Equal(t, pack, detectIconsDir())
 }

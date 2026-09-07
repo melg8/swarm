@@ -1104,3 +1104,57 @@ What was verified and done:
   icon that only exists through the sqlite resolution - and
   /icons/etc_adena_i00.png answers 200 image/png. go test ./... green
   (12 packages).
+
+## Round 26: compact equipment widget, no icon flicker, go 1.23 build fix (2026-09-07)
+
+Three fixes reported from a fresh Windows pull:
+
+- `go test ./... --cover` failed to build the webserver package:
+  `testing.(*T).Chdir requires go1.24 or later (file is go1.23)` - the
+  module pins `go 1.23.2` and icons_test.go used the go 1.24 only
+  `t.Chdir`. Replaced with a local `chdir` helper (os.Getwd +
+  os.Chdir + t.Cleanup restore) so the file compiles on both 1.23
+  and 1.24 toolchains; no other go 1.24 API is used anywhere.
+- The items widget flickered: every SSE snapshot wiped
+  paperdoll/inv-grid innerHTML and recreated all cells, so every icon
+  `<img>` was a fresh element - the browser re-decodes and re-paints
+  even a cached image asynchronously, and all icons vanished for a
+  fraction of a second on every snapshot (the bot pushes snapshots
+  continuously while farming). renderGear is now a keyed incremental
+  renderer: one persistent cell record per paperdoll slot (slot key)
+  and per bag item (objectId) in a module-level registry; a snapshot
+  only touches the cells whose change signature (itemId, icon,
+  count, enchant, type2, name, equipped) actually differs. Within a
+  changed cell the `<img>` element survives everything that does not
+  alter the icon itself - stack counts and enchant updates rewrite
+  only the text badges - and reordering moves the persistent cells
+  (appendChild never reloads an image). Removed the pointless
+  `img.loading = "lazy"` (a fresh lazy element postpones the decode
+  even longer). Switching the observed bot resets the registry
+  (resetGear in selectBot) so two inventories never mix.
+- Compact layout: the 15-cell three-column paperdoll became two
+  blocks sharing the 36px cell metric of the bag - the 3x3 wear
+  block (head, cloak, gloves / weapon, chest, shield / shirt, legs,
+  boots) on the left and the 2x3 jewelry block on the right with
+  five slots (r.ear, l.ear / neck, hole / r.ring, l.ring): the
+  middle-right cell is a blank `jewel-hole` because the classic
+  character has only five jewelry slots. The inventory grid is six
+  columns by four visible rows (36px cells, 3px gaps, fixed 153px
+  height) with a thin scrollbar; the C1 hair mask (0x10000, unused
+  in C1 items) lost its dedicated slot with the rest of the layout
+  unchanged (masks, aliases 0x4000/0x8000/0x20000 and the either-or
+  pairs 0x6/0x30 resolve exactly as before).
+- repro_gear.js grew from 12 to 25 checks: the block layout (9 wear
+  cells, 5 jewelry cells + hole), placement per mask, hidden labels
+  on filled slots, and the flicker regression - the icon image
+  element identity must survive an identical re-render, a count
+  change and the weapon slot across snapshots; removed items drop
+  their cells. The stub DOM append now mirrors the real one
+  (appending an existing child moves it, never duplicates).
+- Live validation on the running stack (bot -hunt, test1 lv 9 in
+  combat): DOM probe marked all 9 icon elements and re-checked after
+  4s and after 14s of active farming (snapshots flowing, adena badge
+  updating from loot) - 9/9 survived, 0 recreated, all naturalWidth
+  > 0, 0 JS errors; screenshot scripts/gear_compact_live.png.
+  `go test ./... --cover --count=1` green (12 packages ok of 15, three without test files), gofmt/govet
+  clean, node repro_hud.js ALL PASS.

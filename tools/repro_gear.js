@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /*
+
 SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
 
 SPDX-License-Identifier: MIT
+
 */
 
 // Reproduction harness for the equipment widget rendering.
@@ -10,6 +12,10 @@ SPDX-License-Identifier: MIT
 // It loads the real internal/swarm/webserver/web/app.js into a
 // sandboxed context with a stub DOM and checks:
 //
+// - the compact layout: the wear block renders its nine slots (head,
+//   cloak, gloves, weapon, chest, shield, shirt, legs, boots), the
+//   jewelry block renders five slots plus the blank middle-right hole
+//   (the classic character has only five jewelry slots);
 // - the paperdoll places the equipped items by the body part mask:
 //   weapon 0x80 on the weapon slot, chest 0x400, legs 0x800, boots
 //   0x1000, shirt 0x1, the two handed weapon mask 0x4000 on the
@@ -18,8 +24,10 @@ SPDX-License-Identifier: MIT
 //   slots, two rings with 0x30 on different finger slots;
 // - the empty slots keep their labels;
 // - the inventory grid skips the equipped items and renders the stack
-//   count and enchant badges;
-// - the slot counter shows the inventory usage.
+//   count and enchant badges; the slot counter shows the usage;
+// - keyed updates: re-rendering the same snapshot or changing only a
+//   stack count keeps the icon image elements alive (the icons must
+//   not blink on every snapshot), removed items drop their cells.
 //
 // Usage: node tools/repro_gear.js [--app <app.js>]
 // Exit code 0 = the equipment widget renders correctly, 1 = bug.
@@ -33,7 +41,9 @@ const vm = require("node:vm");
 const DEFAULT_APP_JS = path.join(__dirname, "..", "internal", "swarm",
     "webserver", "web", "app.js");
 
-// makeElement returns a DOM element stub recording children.
+// makeElement returns a DOM element stub recording children. append
+// mirrors the real DOM: appending an existing child moves it to the
+// end, it never duplicates an element.
 function makeElement() {
     return {
         textContent: "",
@@ -44,10 +54,8 @@ function makeElement() {
         alt: "",
         title: "",
         loading: "",
+        className: "",
         children: [],
-        append: function (...added) {
-            for (const child of added) { this.children.push(child); }
-        },
         classList: {
             _classes: new Set(),
             contains(cls) { return this._classes.has(cls); },
@@ -70,8 +78,6 @@ function makeElement() {
         },
         addEventListener: () => {},
         remove: function () {
-            // The image error fallback calls remove; the stub drops
-            // the element from the parent when attached to one.
             if (this._parent) {
                 const at = this._parent.children.indexOf(this);
                 if (at >= 0) { this._parent.children.splice(at, 1); }
@@ -83,7 +89,15 @@ function makeElement() {
             const at = this.children.indexOf(child);
             if (at >= 0) { this.children.splice(at, 1); }
         },
-        firstChild: null
+        firstChild: null,
+        append: function (...added) {
+            for (const child of added) {
+                const at = this.children.indexOf(child);
+                if (at >= 0) { this.children.splice(at, 1); }
+                this.children.push(child);
+                child._parent = this;
+            }
+        }
     };
 }
 
@@ -96,16 +110,7 @@ function loadAppJs(appFile) {
             }
             return elements.get(id);
         },
-        createElement: () => {
-            const el = makeElement();
-            el.append = function (...added) {
-                for (const child of added) {
-                    child._parent = this;
-                    this.children.push(child);
-                }
-            };
-            return el;
-        },
+        createElement: () => makeElement(),
         documentElement: { dataset: {} }
     };
     const sandbox = {
@@ -168,6 +173,18 @@ function cellText(cell) {
     return text.trim();
 }
 
+// findImg returns the icon image element of the given item.
+function findImg(root, itemId) {
+    for (const cell of root.children) {
+        for (const child of cell.children) {
+            if (child.src === "/icons/icon" + itemId + ".png") {
+                return child;
+            }
+        }
+    }
+    return null;
+}
+
 // findIconCell returns the cell holding the given item icon src.
 function findIconCell(root, itemId) {
     for (const cell of root.children) {
@@ -178,6 +195,47 @@ function findIconCell(root, itemId) {
         }
     }
     return null;
+}
+
+// Slot order of the two paperdoll blocks (mirrors app.js).
+const WEAR_KEYS = ["head", "back", "gloves", "rhand", "chest",
+    "lhand", "under", "legs", "feet"];
+const JEWEL_KEYS = ["r_ear", "l_ear", "neck", null, "r_finger", "l_finger"];
+
+// slotCell returns the rendered cell of a slot key.
+function slotCell(wearBox, jewelBox, key) {
+    const wearAt = WEAR_KEYS.indexOf(key);
+    if (wearAt >= 0) { return wearBox.children[wearAt]; }
+    const jewelAt = JEWEL_KEYS.indexOf(key);
+    if (jewelAt >= 0) { return jewelBox.children[jewelAt]; }
+
+    return null;
+}
+
+// hasImg reports whether the cell shows the icon of the item.
+function hasImg(cell, itemId) {
+    if (!cell) { return false; }
+    for (const child of cell.children) {
+        if (child.src === "/icons/icon" + itemId + ".png") {
+            return true;
+        }
+    }
+    return false;
+}
+
+// labelOf returns the label span of a slot cell.
+function labelOf(cell) {
+    for (const child of cell.children) {
+        if (child.className === "slot-label") { return child; }
+    }
+    return null;
+}
+
+// labelVisible reports whether the slot shows its empty label.
+function labelVisible(cell) {
+    const label = labelOf(cell);
+    return Boolean(label) && label.textContent.length > 0 &&
+        label.style.display !== "none";
 }
 
 function main() {
@@ -199,7 +257,7 @@ function main() {
 
     // Full gear set: weapon, chest, legs, boots, shirt, two earrings
     // and two rings with the either-or masks.
-    gear.renderGear(gearSnapshot([
+    const fullSet = [
         item(1, 0x80, true),
         item(2, 0x400, true),
         item(3, 0x800, true),
@@ -209,35 +267,54 @@ function main() {
         item(7, 0x6, true),
         item(8, 0x30, true),
         item(9, 0x30, true)
-    ], 9));
-    const paperdoll = elements.get("paperdoll");
+    ];
+    gear.renderGear(gearSnapshot(fullSet, 9));
+    const wearBox = elements.get("gear-wear");
+    const jewelBox = elements.get("gear-jewel");
     const invGrid = elements.get("inv-grid");
 
-    // The paperdoll counts 15 slots, the equipped items fill nine of
-    // them, the inventory grid holds nothing.
-    check(results, "paperdoll has 15 slot cells",
-        paperdoll.children.length === 15,
-        "got " + paperdoll.children.length + " cells");
+    // The compact layout: nine wear cells, five jewelry cells and the
+    // blank middle-right hole, nothing in the bag.
+    check(results, "wear block holds 9 slot cells",
+        wearBox.children.length === 9,
+        "got " + wearBox.children.length + " cells");
+    check(results, "jewel block holds 5 slots and the blank hole",
+        jewelBox.children.length === 6 &&
+        jewelBox.children[3].className === "jewel-hole",
+        "got " + jewelBox.children.length + " children, hole class " +
+        (jewelBox.children[3] || makeElement()).className);
     check(results, "empty inventory grid",
         invGrid.children.length === 0,
         "got " + invGrid.children.length + " cells");
 
-    const placed = gear.assignPaperdoll([
-        item(1, 0x80, true), item(6, 0x6, true), item(7, 0x6, true),
-        item(8, 0x30, true), item(9, 0x30, true)
-    ]);
-    check(results, "weapon mask 0x80 lands on the weapon slot",
-        placed.rhand.itemId === 1, "rhand is " + placed.rhand);
+    // Placement by the body part mask.
+    check(results, "weapon mask 0x80 fills the weapon slot",
+        hasImg(slotCell(wearBox, jewelBox, "rhand"), 1),
+        "weapon slot children " + JSON.stringify(
+            (slotCell(wearBox, jewelBox, "rhand") || {}).children.length));
+    check(results, "chest mask 0x400 fills the chest slot",
+        hasImg(slotCell(wearBox, jewelBox, "chest"), 2), "chest slot");
+    check(results, "legs mask 0x800 fills the legs slot",
+        hasImg(slotCell(wearBox, jewelBox, "legs"), 3), "legs slot");
+    check(results, "boots mask 0x1000 fill the boots slot",
+        hasImg(slotCell(wearBox, jewelBox, "feet"), 4), "boots slot");
+    check(results, "shirt mask 0x1 fills the shirt slot",
+        hasImg(slotCell(wearBox, jewelBox, "under"), 5), "shirt slot");
     check(results, "two earrings 0x6 fill both ear slots",
-        (placed.r_ear && placed.l_ear &&
-            placed.r_ear.itemId !== placed.l_ear.itemId) === true,
-        "r_ear=" + placed.r_ear + " l_ear=" + placed.l_ear);
+        hasImg(slotCell(wearBox, jewelBox, "r_ear"), 6) &&
+        hasImg(slotCell(wearBox, jewelBox, "l_ear"), 7), "ear slots");
     check(results, "two rings 0x30 fill both finger slots",
-        (placed.r_finger && placed.l_finger &&
-            placed.r_finger.itemId !== placed.l_finger.itemId) === true,
-        "r_finger=" + placed.r_finger + " l_finger=" + placed.l_finger);
+        hasImg(slotCell(wearBox, jewelBox, "r_finger"), 8) &&
+        hasImg(slotCell(wearBox, jewelBox, "l_finger"), 9), "finger slots");
+    check(results, "filled slots hide their labels",
+        labelOf(slotCell(wearBox, jewelBox, "rhand")).style.display === "none",
+        "weapon label display " +
+        labelOf(slotCell(wearBox, jewelBox, "rhand")).style.display);
 
-    // Aliased masks: two handed weapon and full armor.
+    // assignPaperdoll unit checks, including the aliased masks.
+    const placed = gear.assignPaperdoll(fullSet);
+    check(results, "assignPaperdoll keys the weapon",
+        placed.rhand.itemId === 1, "rhand is " + placed.rhand);
     const aliased = gear.assignPaperdoll([
         item(70, 0x4000, true), item(1146, 0x8000, true)
     ]);
@@ -248,15 +325,15 @@ function main() {
 
     // Mixed inventory: equipped gear stays out of the bag, the bag
     // renders one cell per item with the badges.
-    gear.renderGear(gearSnapshot([
+    const mixed = [
         item(1, 0x80, true, { name: "Squire's Sword" }),
         item(57, 0, false, { count: 4242, type2: 4, name: "Adena" }),
         item(10, 0x80, false, { enchant: 3, name: "Dagger" })
-    ], 3));
+    ];
+    gear.renderGear(gearSnapshot(mixed, 3));
     check(results, "inventory grid holds the bag items only",
         invGrid.children.length === 2,
         "got " + invGrid.children.length + " cells");
-
     const adenaCell = findIconCell(invGrid, 57);
     const daggerCell = findIconCell(invGrid, 10);
     check(results, "adena cell renders the stack count badge",
@@ -269,14 +346,51 @@ function main() {
         elements.get("inv-count").textContent === "3/80",
         "counter is " + elements.get("inv-count").textContent);
 
+    // Keyed updates: the flicker regression. A repeated snapshot must
+    // keep every image element (a rebuilt element decodes again and
+    // the icon blinks), a count change keeps the adena image too.
+    const adenaImg = findImg(invGrid, 57);
+    const daggerImg = findImg(invGrid, 10);
+    const weaponImg = findImg(slotCell(wearBox, jewelBox, "rhand"), 1);
+    gear.renderGear(gearSnapshot(mixed, 3));
+    check(results, "unchanged snapshot keeps the icon elements",
+        findImg(invGrid, 57) === adenaImg &&
+        findImg(invGrid, 10) === daggerImg &&
+        findImg(slotCell(wearBox, jewelBox, "rhand"), 1) === weaponImg,
+        "icons were recreated");
+    check(results, "unchanged snapshot does not duplicate cells",
+        invGrid.children.length === 2,
+        "got " + invGrid.children.length + " cells");
+
+    gear.renderGear(gearSnapshot([
+        item(1, 0x80, true, { name: "Squire's Sword" }),
+        item(57, 0, false, { count: 9999, type2: 4, name: "Adena" })
+    ], 2));
+    check(results, "count change keeps the adena icon element",
+        findImg(invGrid, 57) === adenaImg, "adena icon was recreated");
+    check(results, "count badge updates in place",
+        cellText(findIconCell(invGrid, 57)).includes("9999"),
+        "cell text " + cellText(findIconCell(invGrid, 57) || makeElement()));
+    check(results, "removed item drops its cell",
+        invGrid.children.length === 1,
+        "got " + invGrid.children.length + " cells");
+
     // Empty slots keep their labels for a readable paperdoll.
     gear.renderGear(gearSnapshot([], 0));
     let labels = 0;
-    for (const cell of paperdoll.children) {
-        if (cell.textContent && cell.textContent.length > 0) { labels++; }
+    for (const cell of wearBox.children) {
+        if (labelVisible(cell)) { labels++; }
     }
-    check(results, "empty paperdoll labels every slot",
-        labels === 15, "labeled " + labels + " of 15");
+    for (const cell of jewelBox.children) {
+        if (cell.className !== "jewel-hole" && labelVisible(cell)) {
+            labels++;
+        }
+    }
+    check(results, "empty paperdoll labels all 14 slots",
+        labels === 14, "labeled " + labels + " of 14");
+    check(results, "emptied inventory grid",
+        invGrid.children.length === 0,
+        "got " + invGrid.children.length + " cells");
 
     let failed = 0;
     for (const result of results) {

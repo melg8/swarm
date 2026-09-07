@@ -814,19 +814,30 @@ the same variables).
   enchant level of every entry (see AbstractItemPacket.writeItem), the
   snapshot carries the whole inventory as `snapshot.inventory` with
   the resolved display name and icon file name per item, sorted
-  equipped-first. app.js places the equipped items by the C1 BodyPart
-  mask (two handed weapons and full armor alias onto the weapon/chest
-  slot, the either-or earring/ring masks 0x6/0x30 fill the first free
-  slot of their pair) and renders one icon cell per bag item with
-  stack count and enchant badges; an empty or missing icon falls back
-  to a per type2 glyph. The icon pack lives in `data/icons` (3134
-  PNGs of the classic client naming scheme from the l2walker mirror,
-  C1 compatibility verified 4222/4222 items - see
-  data/icons/Readme.txt), the web server serves it at
-  `/icons/<name>.png` with a day of cache; the item id to icon
+  equipped-first. The paperdoll is compact: a 3x3 wear block (head,
+  cloak, gloves, weapon, chest, shield, shirt, legs, boots) on the
+  left and a 2x3 jewelry block on the right whose middle-right cell
+  is a blank hole - the classic character has only five jewelry slots
+  (two earrings, a necklace, two rings). app.js places the equipped
+  items by the C1 BodyPart mask (two handed weapons and full armor
+  alias onto the weapon/chest slot, the either-or earring/ring masks
+  0x6/0x30 fill the first free slot of their pair); below them the
+  bag renders six columns by four visible rows with a scrollbar, one
+  icon cell per item with stack count and enchant badges; an empty or
+  missing icon falls back to a per type2 glyph. The cells are keyed
+  (slot key / item objectId) and rendered incrementally: unchanged
+  items keep their DOM - the icon `<img>` elements are never
+  recreated by a snapshot (a fresh element re-decodes and the icon
+  blinks), stack count and enchant updates only rewrite the text
+  badges, and reordering moves the persistent cells. The icon pack
+  lives in `data/icons` (3134 PNGs of the classic client naming
+  scheme from the l2walker mirror, C1 compatibility verified
+  4222/4222 items - see data/icons/Readme.txt), the web server serves
+  it at `/icons/<name>.png` with a day of cache; the item id to icon
   mapping is generated into `npcdata/item_icons.go`
   (`tools/generate_item_icons.sh`). Reproduction harness:
-  `tools/repro_gear.js` (`task repro:gear`).
+  `tools/repro_gear.js` (`task repro:gear`) - it also pins the keyed
+  rendering (image element identity across re-renders).
 - The web UI is plain HTML/CSS/JS without a build step; keep it that way
   (embedded via go:embed). Watch out: top level `const` declarations are
   not `window` properties, so cross script references must use the bare
