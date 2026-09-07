@@ -32,7 +32,7 @@ func validCommand(cmd commandRequest) bool {
 		return cmd.X != 0 || cmd.Y != 0 || cmd.Z != 0
 	case state.CommandAttack, state.CommandPickup, state.CommandUseItem:
 		return cmd.ObjectID != 0
-	case state.CommandDrop:
+	case state.CommandDrop, state.CommandDestroy:
 		return cmd.ObjectID != 0 && cmd.Count >= 1
 	default:
 		return false
@@ -56,6 +56,9 @@ func describeCommand(cmd commandRequest) string {
 			strconv.Itoa(int(cmd.ObjectID))
 	case state.CommandDrop:
 		return "user command: drop " + strconv.Itoa(int(cmd.Count)) +
+			" of item " + strconv.Itoa(int(cmd.ObjectID))
+	case state.CommandDestroy:
+		return "user command: destroy " + strconv.Itoa(int(cmd.Count)) +
 			" of item " + strconv.Itoa(int(cmd.ObjectID))
 	default:
 		return "user command: " + cmd.Kind

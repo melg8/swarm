@@ -1283,3 +1283,115 @@ drag-and-drop drive the character.
 - `go build`, `go vet`, `go test ./... -count=1` green (12 packages
   ok, three without test files), node repro_gear.js OK (43/43),
   repro_hud.js / repro_map_render.js / repro_movement.js ALL PASS.
+
+## Round 29: commands without -hunt, the attack fixes, the trash destroy and the widget polish (2026-09-07)
+
+User feedback round: the manual commands must work without `-hunt`,
+double clicking the selected target must start the melee attack, an
+occupied slot must swap, the trash destroys, the dialog buttons stay
+readable and the wear grid takes the classic placement.
+
+- Manual only mode: the loop always runs now (`cmd/swarm/main.go`),
+  `-hunt` only toggles the autonomy. `Loop.SetAutonomy(false)` keeps
+  the loop in the new `phaseIdle` phase: it drains the manual web
+  commands exactly like the hunt mode, never engages, loots, trips or
+  delevels on its own, and still restarts at the village after a
+  death. The geodata engine loads in every mode (the region files are
+  indexed lazily, a no-hunt session pays nothing until a long walk
+  asks for a path).
+- The "double click the selected target" bug, root cause one: the
+  stale engagement. `SelfEngaged` trusted the auto attack flag and a
+  10s combat window; after an interrupted fight (a retreat walk) both
+  linger while the character stands - and being hit refreshed the
+  window forever, so the manual attack and the autonomous engage both
+  believed the fight was running and never re-requested the forced
+  attack (the "change the target so the attack starts" symptom). The
+  new `SelfFighting` view requires fresh fight evidence (a swing or a
+  chase step within 3s, tracked by `CombatActiveAt`), the manual
+  attack and the engage re-request on stale engagements, and a fresh
+  fight refreshes the manual deadline so a long fight never hands
+  control back mid swing.
+- The same bug, root cause two: the stalled server chase. The Mobius
+  packet executor runs every client packet as its own thread pool
+  task (PacketExecutor -> ThreadPoolExecutor), and the AI chase
+  stalls on some routes while the stuck chase packets keep the
+  engagement fresh - the character stands next to a far target
+  forever (the standing 2/s "Action failed" stream of the hunt was
+  the same stall). The chase progress watchdog samples the distance
+  to the target once per 3s window: no 50 units of progress with the
+  target beyond the 150u melee radius makes the loop walk toward the
+  target itself (the client WalkTo works where the AI chase's
+  path search gives up - verified live: a 2427 unit click stalled
+  for 2s, the loop walked, killed the target and pathfound back
+  into the zone). The manual attack approaches far targets the same
+  way: the first request selects, the walk closes the distance, the
+  forced attack lands in swing range.
+- Manual long walks: the server MoveToLocation handler silently
+  refuses far targets (a village-to-farm 8.7k request never moved the
+  character; short walks up to ~2k work). A click beyond 2000 units
+  plans the bot side geodata path once (the navigator now exists in
+  every mode) and follows the waypoints in server accepted legs (1s
+  request pace, 1000u leg cap, pass-skip, stall re-issue) - the
+  village-to-farm walk arrives in ~51s. Short clicks keep the direct
+  request, and a walking character is never re-clicked (the old 1s
+  re-click restart of the server path search halved the walk speed).
+- Inventory pacing: two same-burst useItem packets (the unequip and
+  the equip of a swap) race in the server thread pool and cancelled
+  each other (each useItem is a toggle: equip A then equip B lands
+  back at A). The loop spaces useItem/drop/destroy one second apart
+  - a request inside the window defers to a later tick (the swap
+  pair order is preserved by the deferred list).
+- Equip swap: a double click or a paperdoll drop of a bag item whose
+  slot is taken now unequips the old item first and equips the new
+  one after it (`slotKeyOf` resolves the target slot with the same
+  placement rules as the paperdoll renderer, the either-or pairs
+  included).
+- Trash destroy: the gear footer carries a trash bin icon left of
+  the adena and weight lines; a cell dragged onto it destroys the
+  item (the new `destroy` command -> RequestDestroyItem 0x59
+  `[objectId][count]`, the packet and the server behavior were
+  already in the tree for the junk cleanup). Stacks open the count
+  dialog in the destroy mode (labels, note and the commit button
+  relabel), an equipped drag unequips first - the server side
+  handler would unequip itself, the explicit request keeps the flow
+  uniform with the drop.
+- The count dialog buttons: the `.btn` base pins 26x24px for the
+  toolbar icons, which squashed the dialog buttons and shifted their
+  text. `.drop-btn` now overrides with auto sizing, a min height and
+  centered text.
+- The target HUD panel answers a double click with the attack
+  command for the shown target (attackable npc, alive - a friendly
+  or dead target ignores the click).
+- The wear grid takes the classic paperdoll placement: cloak top
+  left, head top-center above the chest, shirt top right, weapon and
+  shield flanking the chest, boots bottom left, legs bottom center,
+  gloves bottom right. The item cells keep the plain cursor (no grab
+  hint on hover), the drags work unchanged.
+- Tests: hunt/user_test.go grew the destroy cases, the stale
+  engagement re-request (a self-calibrating poll on the public
+  tracker views), the fresh fight quiet, the manual only mode
+  (idle, commands, kill, death restart), the far click planning,
+  the near click direct walk, the command replacement, the swap
+  spacing and the stall/approach walks; state tracks SelfFighting
+  and SelfWalking freshness; the webserver matrix covers the
+  destroy kind; repro_gear.js pins the new layout order, the cursor,
+  the trash markup/css/flow, the dialog relabeling, the button
+  sizing, the swap order, and the target widget clicks (68 checks).
+- Live verification on the running stack
+  (scripts/manual_ui_smoke.sh, the bot started without -hunt): 0
+  autonomous activity lines, the wear rows read cloak/head/shirt and
+  boots/legs/gloves, the destroy dialog is readable (67x26px,
+  centered), the map dblclick walks and arrives, the bag weapon
+  double click posts useItem(old) then useItem(new) ~1s apart and
+  the swap lands (dagger equipped, sword in the bag), the trash drag
+  destroys 5 adena (577 -> 572, zero ground items), the attack on a
+  mob engages (the target panel shows it), the interrupted fight
+  re-clicked on the same selected target restarts the swings (the
+  mob dies, control returns to idle), and the target widget double
+  click posts the attack. The hunt mode run: the 2427 unit far click
+  stall-walked, killed, and the zone return resumed the hunt. 0 JS
+  errors; screenshots scripts/manual_ui_live.png and
+  scripts/manual_ui_swap.png.
+- `go build`, `go vet`, `go test ./... -count=1` green (12 packages
+  ok), node repro_gear.js OK (68/68), repro_hud.js /
+  repro_map_render.js / repro_movement.js ALL PASS.

@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/state"
 )
 
@@ -34,13 +35,31 @@ const (
 	// userAttackTimeout bounds a manual attack that never starts the
 	// fight (an unreachable or protected target).
 	userAttackTimeout = 30 * time.Second
+	// userPathfindDistance is the straight line distance above which a
+	// manual move switches to the geodata planner: the server side
+	// pathfinder silently refuses far targets (observed stuck walks on
+	// requests past a few thousand units), so long clicks follow the
+	// bot planned waypoints instead, one server accepted leg at a time.
+	userPathfindDistance = 2000.0
+	// useItemSpacing is the pause between two inventory actions of the
+	// web UI. The Mobius packet executor runs every client packet as
+	// its own thread pool task, so two same-burst requests race in the
+	// paperdoll: the unequip and the equip of one swap cancelled each
+	// other in testing. The official client never fires two item uses
+	// inside a second (the flood protector idiom), the loop mirrors
+	// that: a request inside the window defers to a later tick and the
+	// order of a swap pair stays intact.
+	useItemSpacing = 1 * time.Second
 )
 
 // consumeUserCommands drains the command queue of the bot and applies
-// every entry. One shot inventory commands execute right away, the
-// movement commands reprogram the manual phase (the newest command
-// wins).
+// every entry. One shot inventory commands execute right away (spaced
+// one second apart, see useItemSpacing), the movement commands (move,
+// attack, pickup) reprogram the manual phase (the newest command
+// wins). Deferred commands retry first so the spacing never reorders
+// a swap pair.
 func (l *Loop) consumeUserCommands() {
+	l.flushDeferredCommands()
 	for {
 		select {
 		case cmd := <-l.tracker.Commands():
@@ -51,18 +70,69 @@ func (l *Loop) consumeUserCommands() {
 	}
 }
 
+// flushDeferredCommands retries the inventory commands that were
+// deferred by the spacing gate, oldest first. The gate re-checks every
+// entry, so a still gapped command stays deferred.
+func (l *Loop) flushDeferredCommands() {
+	if len(l.userDeferred) == 0 {
+		return
+	}
+	kept := l.userDeferred[:0]
+	for _, cmd := range l.userDeferred {
+		if l.gateInventoryCommand(cmd) {
+			kept = append(kept, cmd)
+
+			continue
+		}
+		l.applyUserCommand(cmd)
+	}
+	l.userDeferred = kept
+}
+
+// gateInventoryCommand defers one command when it is an inventory
+// action landing inside the spacing window of the previous one: the
+// deferred list preserves the pair order of a swap (the older command
+// was already sent, this one waits for its own server game tick).
+func (l *Loop) gateInventoryCommand(cmd state.Command) bool {
+	switch cmd.Kind {
+	case state.CommandUseItem, state.CommandDrop, state.CommandDestroy:
+	default:
+		return false
+	}
+	if l.userInventoryAt.IsZero() ||
+		time.Since(l.userInventoryAt) >= useItemSpacing {
+		return false
+	}
+	l.userDeferred = append(l.userDeferred, cmd)
+	l.logger.Printf("Hunt: user command %q waits for the item pace",
+		cmd.Kind)
+
+	return true
+}
+
 // applyUserCommand turns one queued web command into world action.
 func (l *Loop) applyUserCommand(cmd state.Command) {
+	if l.gateInventoryCommand(cmd) {
+		return
+	}
 	switch cmd.Kind {
 	case state.CommandUseItem:
 		l.userUseItem(cmd)
 	case state.CommandDrop:
 		l.userDrop(cmd)
+	case state.CommandDestroy:
+		l.userDestroy(cmd)
 	case state.CommandMove, state.CommandAttack, state.CommandPickup:
 		l.userMovement(cmd)
 	default:
 		l.logger.Printf("Hunt: unknown user command %q", cmd.Kind)
 	}
+}
+
+// markInventoryAction records the send time of one inventory action:
+// the next one inside useItemSpacing defers.
+func (l *Loop) markInventoryAction() {
+	l.userInventoryAt = time.Now()
 }
 
 // userUseItem executes the equip/unequip toggle of one item right
@@ -74,6 +144,7 @@ func (l *Loop) userUseItem(cmd state.Command) {
 		return
 	}
 	l.logger.Printf("Hunt: user command: use item %d", cmd.ObjectID)
+	l.markInventoryAction()
 	if err := l.game.UseItem(cmd.ObjectID); err != nil {
 		l.logger.Printf("Hunt: use item failed: %v", err)
 	}
@@ -94,8 +165,26 @@ func (l *Loop) userDrop(cmd state.Command) {
 	}
 	l.logger.Printf("Hunt: user command: drop %d of item %d",
 		cmd.Count, cmd.ObjectID)
+	l.markInventoryAction()
 	if err := l.game.DropItem(cmd.ObjectID, cmd.Count, x, y, z); err != nil {
 		l.logger.Printf("Hunt: drop item failed: %v", err)
+	}
+}
+
+// userDestroy destroys inventory items without dropping them: the
+// trash target of the equipment widget sends it. The server (see
+// RequestDestroyItem.runImpl) splits the stack by the count and even
+// unequips an equipped item before destroying it, so no extra request
+// is needed.
+func (l *Loop) userDestroy(cmd state.Command) {
+	if cmd.ObjectID == 0 || cmd.Count < 1 {
+		return
+	}
+	l.logger.Printf("Hunt: user command: destroy %d of item %d",
+		cmd.Count, cmd.ObjectID)
+	l.markInventoryAction()
+	if err := l.game.DestroyItem(cmd.ObjectID, cmd.Count); err != nil {
+		l.logger.Printf("Hunt: destroy item failed: %v", err)
 	}
 }
 
@@ -127,6 +216,10 @@ func (l *Loop) userMovement(cmd state.Command) {
 	l.userTarget = cmd.ObjectID
 	l.userStart = time.Now()
 	l.userMoveAt = time.Time{}
+	l.userWaypoints = nil
+	l.userWpIndex = 0
+	l.userPathTried = false
+	l.resetChaseSamples()
 	l.target = 0
 	l.lootID = 0
 	l.engageAt = time.Time{}
@@ -161,13 +254,20 @@ func (l *Loop) tickUser() {
 }
 
 // tickUserMove walks to the clicked point until the character arrives
-// or the walk times out. The repeated MoveToLocation requests are the
-// ground clicks of the official client: they keep the walk going when
-// the server interrupted it (an obstacle, a hit).
+// or the walk times out. The request repeats only when the walk
+// actually stalled: the server pathfinds and runs the walk on its own,
+// and re-clicking every second would restart its path search and slow
+// the walk down. A stall shows up as a stopped character (the server
+// broadcasts the stop) or a silent moving flag (a lost stop packet).
 func (l *Loop) tickUserMove(now time.Time) {
-	selfX, selfY, _, ok := l.tracker.SelfPosition()
+	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
 	if !ok {
 		l.resumeAuto()
+
+		return
+	}
+	if len(l.userWaypoints) > 0 {
+		l.followUserWaypoints(now, selfX, selfY, selfZ)
 
 		return
 	}
@@ -185,6 +285,17 @@ func (l *Loop) tickUserMove(now time.Time) {
 
 		return
 	}
+	if dist >= userPathfindDistance && l.navigator != nil &&
+		!l.userPathTried {
+		l.userPathTried = true
+		l.planUserWalk(selfX, selfY, selfZ)
+
+		return
+	}
+	if l.tracker.SelfWalking() {
+		// The walk is running: do not restart the server side path.
+		return
+	}
 	if !l.userMoveAt.IsZero() && now.Sub(l.userMoveAt) < selectPeriod {
 		return
 	}
@@ -194,12 +305,116 @@ func (l *Loop) tickUserMove(now time.Time) {
 	}
 }
 
+// planUserWalk computes the geodata path of one long manual move. The
+// search runs once per move (a failed or missing path leaves the
+// direct server routed walk). The result becomes the leg plan the
+// follower walks one server accepted leg at a time.
+func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
+	from := pathfind.Vec3{
+		X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+	}
+	end := pathfind.Vec3{
+		X: float64(l.userX), Y: float64(l.userY), Z: float64(l.userZ),
+	}
+	result, err := l.navigator.FindPath(from, end)
+	if err != nil {
+		l.logger.Printf("Hunt: manual walk path search failed: %v", err)
+
+		return
+	}
+	if result == nil || !result.Found || len(result.Waypoints) == 0 {
+		l.logger.Printf("Hunt: no geodata path to %d %d, "+
+			"walking by server routing", l.userX, l.userY)
+
+		return
+	}
+	l.userWaypoints = result.Waypoints
+	l.userWpIndex = 0
+	l.userMoveAt = time.Time{}
+	l.logger.Printf("Hunt: manual walk path planned: %d waypoints, "+
+		"%.0f units (%.2fs search)", len(result.Waypoints),
+		result.Length, result.Duration.Seconds())
+}
+
+// followUserWaypoints walks the planned legs of a long manual move:
+// every waypoint gets a ground click walk, legs longer than the server
+// move limit split into straight intermediate points (the smoothing
+// keeps the line of sight of every leg), and waypoints the character
+// already passed skip ahead. The walk ends when the last waypoint is
+// reached or the manual deadline passes; a leg that stalls (the server
+// stopped the character short) re-issues at the walk request period.
+func (l *Loop) followUserWaypoints(
+	now time.Time, selfX int32, selfY int32, selfZ int32,
+) {
+	for l.userWpIndex < len(l.userWaypoints) {
+		wp := l.userWaypoints[l.userWpIndex]
+		dist := math.Hypot(wp.X-float64(selfX), wp.Y-float64(selfY))
+		if dist > waypointArriveDist {
+			if l.userWpIndex+1 < len(l.userWaypoints) {
+				next := l.userWaypoints[l.userWpIndex+1]
+				nextDist := math.Hypot(
+					next.X-float64(selfX), next.Y-float64(selfY))
+				if nextDist < dist {
+					l.userWpIndex++
+					l.userMoveAt = time.Time{}
+
+					continue
+				}
+			}
+			break
+		}
+		l.userWpIndex++
+		l.userMoveAt = time.Time{}
+	}
+	if l.userWpIndex >= len(l.userWaypoints) {
+		l.logger.Printf("Hunt: manual walk arrived (path done)")
+		l.resumeAuto()
+
+		return
+	}
+	if now.Sub(l.userStart) > userMoveTimeout {
+		l.logger.Printf("Hunt: manual walk timed out, resuming the hunt")
+		l.resumeAuto()
+
+		return
+	}
+	if l.tracker.SelfWalking() {
+		// The current leg is running: do not restart the server path.
+		return
+	}
+	if !l.userMoveAt.IsZero() && now.Sub(l.userMoveAt) < walkRequestPeriod {
+		return
+	}
+	wp := l.userWaypoints[l.userWpIndex]
+	dx := wp.X - float64(selfX)
+	dy := wp.Y - float64(selfY)
+	dist := math.Hypot(dx, dy)
+	moveX, moveY, moveZ := wp.X, wp.Y, wp.Z
+	if dist > maxMoveLeg {
+		// Split the leg into a straight intermediate point: the
+		// smoothing verified the whole segment, the server only
+		// gets the short piece it accepts.
+		scale := maxMoveLeg / dist
+		moveX = float64(selfX) + dx*scale
+		moveY = float64(selfY) + dy*scale
+		moveZ = float64(selfZ)
+	}
+	l.userMoveAt = now
+	if err := l.game.WalkTo(
+		int32(moveX), int32(moveY), int32(moveZ)); err != nil {
+		l.logger.Printf("Hunt: manual walk failed: %v", err)
+	}
+}
+
 // tickUserAttack forces the attack on the clicked object until the
-// fight starts, then the fight plays out under the server AI. A dead
-// or vanished target hands control to the looting phase so the drops
-// of a killed mob are picked up (the loot phase falls straight back
-// to the hunt when there is nothing around); a fight that never
-// starts times out and the autonomous hunting resumes.
+// fight starts, then the fight plays out under the server AI. The
+// first request selects the target, the repeated request forces the
+// attack; a target beyond melee range is chased by the server AI, and
+// when that chase stalls (the Mobius path search gives up on some
+// routes while the engagement keeps looking fresh) the loop walks the
+// stretch itself. A dead or vanished target hands control to the
+// looting phase so the drops of a killed mob are picked up; a fight
+// that never starts times out and the autonomous hunting resumes.
 func (l *Loop) tickUserAttack(now time.Time) {
 	if l.userTarget == 0 {
 		l.resumeAuto()
@@ -207,18 +422,50 @@ func (l *Loop) tickUserAttack(now time.Time) {
 		return
 	}
 	if !l.tracker.ObjectAlive(l.userTarget) {
-		l.logger.Printf("Hunt: manual target %d died or vanished, looting",
-			l.userTarget)
-		l.phase = phaseLoot
+		if l.autonomous {
+			// The kill drops loot around the corpse: hand control to
+			// the looting phase so the drops are picked up.
+			l.phase = phaseLoot
+		} else {
+			l.phase = phaseIdle
+		}
 		l.lootID = 0
 		l.userKind = ""
 		l.target = 0
+		l.logger.Printf("Hunt: manual target %d died or vanished",
+			l.userTarget)
 
 		return
 	}
-	if l.tracker.SelfEngaged(l.userTarget) {
-		// The fight is running: the death branch takes over on the
-		// next tick.
+	x, y, z, ok := l.tracker.ObjectPosition(l.userTarget)
+	selfX, selfY, _, selfOK := l.tracker.SelfPosition()
+	if !ok || !selfOK {
+		if now.Sub(l.userStart) > userAttackTimeout {
+			l.resumeAuto()
+		}
+
+		return
+	}
+	dist := math.Hypot(float64(x-selfX), float64(y-selfY))
+	fighting := l.tracker.SelfFighting(l.userTarget)
+	if fighting || l.tracker.SelfWalking() {
+		// A running fight or walk refreshes the manual deadline: a
+		// long fight under manual control never hands control back
+		// mid swing.
+		l.userStart = now
+	}
+	if fighting && dist > userEngageRadius &&
+		!l.chaseProgress(&l.userLastDist, &l.userDistAt, dist, now) {
+		// The server chase stalled with the target far away: walk
+		// toward the target instead of trusting the stuck chase.
+		l.logger.Printf("Hunt: manual attack chase stalled at %d "+
+			"units, walking to the target", int(dist))
+		fighting = false
+	}
+	if fighting {
+		// The fight is running right now: the swings and the chase
+		// steps keep the engagement fresh, the death branch takes
+		// over on the next tick.
 		return
 	}
 	if now.Sub(l.userStart) > userAttackTimeout {
@@ -232,6 +479,26 @@ func (l *Loop) tickUserAttack(now time.Time) {
 		return
 	}
 	l.userMoveAt = now
+	if l.tracker.SelfTargetID() != l.userTarget {
+		// The first request selects the target (and starts the
+		// server chase).
+		if err := l.game.AttackTarget(l.userTarget); err != nil {
+			l.logger.Printf("Hunt: manual attack failed: %v", err)
+		}
+
+		return
+	}
+	if dist > userEngageRadius {
+		// Selected but out of melee range: approach the target - the
+		// walk request works where the AI chase stalls.
+		if !l.tracker.SelfWalking() {
+			if err := l.game.WalkTo(x, y, z); err != nil {
+				l.logger.Printf("Hunt: manual attack walk failed: %v", err)
+			}
+		}
+
+		return
+	}
 	if err := l.game.AttackTarget(l.userTarget); err != nil {
 		l.logger.Printf("Hunt: manual attack failed: %v", err)
 	}
@@ -280,11 +547,45 @@ func (l *Loop) tickUserPickup(now time.Time) {
 	}
 }
 
+// chaseProgress samples the distance to the chase target once per
+// progress window and reports whether the chase still closes in: a
+// healthy chase covers well past the step distance per window, a stall
+// (the Mobius path search gave up while the engagement stays fresh
+// through stuck chase packets) needs the fallback walk.
+func (l *Loop) chaseProgress(
+	sampler *float64, at *time.Time, dist float64, now time.Time,
+) bool {
+	if at.IsZero() || now.Sub(*at) >= chaseProgressWindow {
+		progressed := dist <= *sampler-chaseProgressStep
+		*sampler = dist
+		*at = now
+
+		return progressed
+	}
+
+	return true
+}
+
+// resetChaseSamples drops the chase progress state: a new command or
+// a new target restarts the sampling.
+func (l *Loop) resetChaseSamples() {
+	l.userLastDist = 0
+	l.userDistAt = time.Time{}
+	l.engLastDist = 0
+	l.engDistAt = time.Time{}
+}
+
 // resumeAuto returns the loop to the autonomous hunting: the engage
 // phase re-selects a target (or walks back into the zone when the
 // manual action led outside of it).
 func (l *Loop) resumeAuto() {
-	l.phase = phaseEngage
+	if l.autonomous {
+		l.phase = phaseEngage
+	} else {
+		// A manual only session has no hunt to resume: the loop
+		// waits in the idle phase for the next web command.
+		l.phase = phaseIdle
+	}
 	l.userKind = ""
 	l.userTarget = 0
 	l.target = 0

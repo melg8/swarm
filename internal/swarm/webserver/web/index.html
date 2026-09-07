@@ -165,7 +165,8 @@ SPDX-License-Identifier: MIT
               </div>
             </div>
 
-            <div id="hud-target" class="hud hud-target hidden">
+            <div id="hud-target" class="hud hud-target hidden"
+              title="double click: attack the target">
               <div class="hud-name-row">
                 <span id="target-name" class="hud-name hud-name-small">—</span>
                 <span id="target-level" class="hud-chip chip-level hidden">—</span>
@@ -197,30 +198,39 @@ SPDX-License-Identifier: MIT
             </div>
             <div id="inv-grid" class="inv-grid"></div>
             <div class="gear-foot">
-              <div class="gear-row adena-row">
-                <span class="gear-key">adena</span>
-                <b id="gear-adena" class="gear-adena">—</b>
+              <div id="gear-trash" class="gear-trash"
+                title="drag an item here to destroy it">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path fill="currentColor" fill-rule="evenodd"
+                    d="M9 2.5h6c.6 0 1 .4 1 1v1h4.5c.3 0 .5.2.5.5v1.5c0 .3-.2.5-.5.5H3.5a.5.5 0 0 1-.5-.5V5.5c0-.3.2-.5.5-.5H8v-1c0-.6.4-1 1-1zm-2.7 6h11.4l-.9 11.4c-.1 1.2-1.1 2.1-2.3 2.1H9.5c-1.2 0-2.2-.9-2.3-2.1L6.3 8.5zm3.2 2v8.2h1.4V10.5H9.5zm3.6 0v8.2h1.4V10.5H13z"/>
+                </svg>
               </div>
-              <div id="gear-weight-row" class="gear-row weight-row">
-                <span class="gear-key">weight</span>
-                <div class="load-bar"><div id="gear-load-fill" class="load-fill"></div></div>
-                <b id="gear-load-text" class="gear-load-text">—</b>
+              <div class="gear-foot-cols">
+                <div class="gear-row adena-row">
+                  <span class="gear-key">adena</span>
+                  <b id="gear-adena" class="gear-adena">—</b>
+                </div>
+                <div id="gear-weight-row" class="gear-row weight-row">
+                  <span class="gear-key">weight</span>
+                  <div class="load-bar"><div id="gear-load-fill" class="load-fill"></div></div>
+                  <b id="gear-load-text" class="gear-load-text">—</b>
+                </div>
               </div>
             </div>
           </div>
 
           <div id="drop-dialog" class="drop-dialog hidden">
-            <div class="drop-head">drop on the ground</div>
+            <div id="drop-head" class="drop-head">drop on the ground</div>
             <div id="drop-name" class="drop-name">—</div>
             <div class="drop-row">
               <input id="drop-count" type="number" min="1" step="1" value="1" class="drop-input">
               <span id="drop-max" class="drop-max">/ 0</span>
             </div>
-            <div class="drop-note">lands at the character feet</div>
+            <div id="drop-note" class="drop-note">lands at the character feet</div>
             <div class="drop-actions">
-              <button id="drop-all" class="btn drop-btn" title="drop the whole stack">all</button>
-              <button id="drop-cancel" class="btn drop-btn" title="cancel the drop">cancel</button>
-              <button id="drop-ok" class="btn drop-btn drop-ok" title="drop the typed count">drop</button>
+              <button id="drop-all" class="btn drop-btn" title="use the whole stack">all</button>
+              <button id="drop-cancel" class="btn drop-btn" title="cancel">cancel</button>
+              <button id="drop-ok" class="btn drop-btn drop-ok" title="use the typed count">drop</button>
             </div>
           </div>
 

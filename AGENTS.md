@@ -816,8 +816,10 @@ the same variables).
   enchant level of every entry (see AbstractItemPacket.writeItem), the
   snapshot carries the whole inventory as `snapshot.inventory` with
   the resolved display name and icon file name per item, sorted
-  equipped-first. The paperdoll is compact: a 3x3 wear block (head,
-  cloak, gloves, weapon, chest, shield, shirt, legs, boots) on the
+  equipped-first. The paperdoll is compact: a 3x3 wear block (cloak,
+  head, shirt, weapon, chest, shield, boots, legs, gloves - the head
+  sits top-center above the chest, the gloves bottom-right, mirroring
+  the classic paperdoll placement) on the
   left and a 2x3 jewelry block on the right whose middle-right cell
   is a blank hole - the classic character has only five jewelry slots
   (two earrings, a necklace, two rings). app.js places the equipped
@@ -847,26 +849,44 @@ the same variables).
   `tools/repro_gear.js` (`task repro:gear`) - it also pins the keyed
   rendering (image element identity across re-renders), the pinned
   footer values, the floating placement and the manual interactions.
-- The web UI is interactive: a double click on the map (move/attack/
-  pickup - hit test over the interpolated object positions), a double
-  click on a widget cell (useItem: equips a wearable bag item,
-  unequips an equipped one - the same C1 packet toggles both, see
-  UseItem.runImpl) and drags (bag cell -> paperdoll equips, paperdoll
+- The web UI is interactive in every launch mode: a double click on
+  the map (move/attack/pickup - hit test over the interpolated object
+  positions) or on the target HUD panel (attack the shown target),
+  a double click on a widget cell (useItem: equips a wearable bag
+  item into its slot, unequips an equipped one - the same C1 packet
+  toggles both, see UseItem.runImpl; an occupied slot swaps: the
+  equipped item comes off first, the new one equips after it) and
+  drags (bag cell -> paperdoll equips with the same swap, paperdoll
   cell -> bag unequips, any cell -> map drops on the ground at the
   character feet, stackable items ask the count through a small
-  dialog, an equipped drag unequips first because the server refuses
-  drops of equipped items). The commands flow through
+  dialog; a cell dragged onto the trash target left of the adena and
+  weight lines destroys the item - RequestDestroyItem 0x59
+  `[objectId][count]`, stacks open the count dialog in the destroy
+  mode, an equipped drag unequips first). The commands flow through
   `POST /api/bots/{id}/commands` -> `state.Bot.PushCommand` (a 32
-  entry queue, newest wins) -> the hunt loop drains it every tick
-  (hunt/user.go): useItem/drop execute at once, move/attack/pickup
-  switch the `phaseUser` manual mode that overrides the autonomous
-  hunting until arrival/death/timeout (an active town trip is
-  cancelled, the deleveling refuses movement commands - the guard
-  walk must finish). The attack phase falls into the loot phase on a
-  killed target, the same way as the autonomous engage. The command
-  queue is drained on session resets so a reconnect never replays
-  stale clicks. Manual commands need the hunt loop running
-  (`-hunt`); without it the commands queue up but nothing executes.
+  entry queue, newest wins) -> the loop drains it every tick
+  (hunt/user.go): useItem/drop/destroy execute at once (spaced one
+  second apart - the Mobius packet executor runs every client packet
+  as its own thread pool task, so a same-burst unequip+equip pair
+  raced in the paperdoll and cancelled each other; a deferred
+  command retries on a later tick with the pair order intact),
+  move/attack/pickup switch the `phaseUser` manual mode that
+  overrides the autonomous hunting until
+  arrival/death/timeout (an active town trip is cancelled, the
+  deleveling refuses movement commands - the guard walk must
+  finish). The attack phase falls into the loot phase on a killed
+  target, the same way as the autonomous engage. The command queue
+  is drained on session resets so a reconnect never replays stale
+  clicks. Without `-hunt` the loop runs in the manual only mode
+  (`SetAutonomy(false)`, the `phaseIdle` phase): the commands
+  execute exactly the same way, the autonomous hunting, town trips
+  and deleveling stay off, the village restart after a death still
+  works. The geodata engine loads in every mode and serves the
+  manual long walks: the server side pathfinder silently refuses far
+  targets (observed stuck walks past a few thousand units), so a
+  click beyond 2000 units plans the geodata path once and follows
+  the waypoints in server accepted legs (userWaypoints, 1s request
+  pace, legs capped at 1000 units).
 - The web UI is plain HTML/CSS/JS without a build step; keep it that way
   (embedded via go:embed). Watch out: top level `const` declarations are
   not `window` properties, so cross script references must use the bare

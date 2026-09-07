@@ -12,8 +12,9 @@ SPDX-License-Identifier: MIT
 // It loads the real internal/swarm/webserver/web/app.js into a
 // sandboxed context with a stub DOM and checks:
 //
-// - the compact layout: the wear block renders its nine slots (head,
-//   cloak, gloves, weapon, chest, shield, shirt, legs, boots), the
+// - the compact layout: the wear block renders its nine slots (cloak,
+//   head, shirt, weapon, chest, shield, boots, legs, gloves - the head
+//   sits top-center above the chest, the gloves bottom-right), the
 //   jewelry block renders five slots plus the blank middle-right hole
 //   (the classic character has only five jewelry slots);
 // - the paperdoll places the equipped items by the body part mask:
@@ -186,6 +187,12 @@ function loadAppJs(appFile) {
         " ? assignPaperdoll : undefined," +
         " dropItemOnMap: typeof dropItemOnMap === 'function'" +
         " ? dropItemOnMap : undefined," +
+        " equipItem: typeof equipItem === 'function'" +
+        " ? equipItem : undefined," +
+        " destroyItemFromWidget: typeof destroyItemFromWidget === 'function'" +
+        " ? destroyItemFromWidget : undefined," +
+        " commitDestroy: typeof commitDestroy === 'function'" +
+        " ? commitDestroy : undefined," +
         " confirmDropDialog: typeof confirmDropDialog === 'function'" +
         " ? confirmDropDialog : undefined," +
         " resolveDropCount: typeof resolveDropCount === 'function'" +
@@ -258,8 +265,8 @@ function findIconCell(root, itemId) {
 }
 
 // Slot order of the two paperdoll blocks (mirrors app.js).
-const WEAR_KEYS = ["head", "back", "gloves", "rhand", "chest",
-    "lhand", "under", "legs", "feet"];
+const WEAR_KEYS = ["back", "head", "under", "rhand", "chest",
+    "lhand", "feet", "legs", "gloves"];
 const JEWEL_KEYS = ["r_ear", "l_ear", "neck", null, "r_finger", "l_finger"];
 
 // slotCell returns the rendered cell of a slot key.
@@ -631,8 +638,216 @@ function main() {
         html.includes('id="drop-dialog"') &&
         html.includes('id="drop-count"') &&
         html.includes('id="drop-ok"') &&
-        html.includes('id="drop-all"'),
+        html.includes('id="drop-all"') &&
+        html.includes('id="drop-head"') &&
+        html.includes('id="drop-note"'),
         "missing dialog ids");
+
+    // ---- interactive round 2 ----
+
+    // The wear order: head top-center above the chest, gloves
+    // bottom-right, the cloak top-left, boots bottom-left.
+    const orderKeys = [];
+    for (const cell of wearBox.children) {
+        const label = labelOf(cell);
+        orderKeys.push(label ? label.textContent : "(filled)");
+    }
+    check(results, "wear grid: head label sits top-center",
+        orderKeys[1] === "head", "row1: " + JSON.stringify(orderKeys));
+    check(results, "wear grid: gloves label sits bottom-right",
+        orderKeys[8] === "gloves", "row3: " + JSON.stringify(orderKeys));
+
+    // The trash target of the footer: markup, css and the svg icon.
+    check(results, "trash target exists left of the footer lines",
+        html.indexOf('id="gear-trash"') <
+        html.indexOf('id="gear-adena"') &&
+        html.includes('class="gear-foot-cols"'),
+        "footer order wrong");
+    check(results, "trash target carries the bin icon",
+        html.includes("<svg") &&
+        html.indexOf("<svg", html.indexOf('id="gear-trash"')) <
+        html.indexOf("</div>", html.indexOf('id="gear-trash"')),
+        "no svg inside the trash cell");
+    check(results, "trash css styles the destroy target",
+        css.includes(".gear-trash") &&
+        css.includes(".gear-trash.drop-hover"),
+        "missing trash css rules");
+
+    // No cursor change over the item cells.
+    const cursorBlock = css.slice(css.indexOf(".pd-cell, .inv-cell"),
+        css.indexOf(".pd-cell, .inv-cell") + 260);
+    check(results, "item cells keep the plain cursor",
+        !cursorBlock.includes("cursor: grab") &&
+        !cursorBlock.includes("cursor: grabbing") &&
+        cursorBlock.includes("cursor: default"),
+        "cursor block: " + cursorBlock.slice(0, 120));
+
+    // The dialog buttons size for readable text (the .btn base pins
+    // 26x24 px for the toolbar icons, the dialog must override it).
+    const btnBlock = css.slice(css.indexOf(".drop-btn {"),
+        css.indexOf(".drop-btn {") + 260);
+    check(results, "dialog buttons use readable sizing",
+        btnBlock.includes("width: auto") &&
+        btnBlock.includes("height: auto") &&
+        btnBlock.includes("min-height") &&
+        btnBlock.includes("text-align: center"),
+        "button block: " + btnBlock.slice(0, 140));
+
+    // The equip swap: a bag weapon double click with the slot taken
+    // unequips the old weapon first, then equips the new one.
+    gear.App.snapshot = gearSnapshot([
+        item(1, 0x80, true, { name: "Squire's Sword" }),
+        item(10, 0x80, false, { name: "Dagger" })
+    ], 2);
+    gear.renderGear(gear.App.snapshot);
+    const swapCell = findIconCell(invGrid, 10);
+    const postsBefore = posts.length;
+    fire(swapCell, "dblclick");
+    check(results, "occupied slot swap posts useItem old then new",
+        posts.length === postsBefore + 2 &&
+        JSON.parse(posts[posts.length - 2].options.body).kind ===
+        "useItem" &&
+        JSON.parse(posts[posts.length - 2].options.body).objectId === 10 &&
+        JSON.parse(posts[posts.length - 1].options.body).kind ===
+        "useItem" &&
+        JSON.parse(posts[posts.length - 1].options.body).objectId === 100,
+        "posts: " + JSON.stringify(
+            posts.slice(postsBefore).map((p) => p.options.body)));
+
+    // The same swap through the paperdoll drop helper.
+    const postsBefore2 = posts.length;
+    gear.equipItem(findIconCell(invGrid, 10) && {
+        objectId: 100, itemId: 10, count: 1, type2: 0, equipped: false,
+        bodyPart: 0x80, name: "Dagger", enchant: 0, icon: "icon10"
+    });
+    check(results, "equipItem swaps the occupied slot too",
+        posts.length === postsBefore2 + 2 &&
+        JSON.parse(posts[posts.length - 2].options.body).objectId === 10 &&
+        JSON.parse(posts[posts.length - 1].options.body).objectId === 100,
+        "posts: " + JSON.stringify(
+            posts.slice(postsBefore2).map((p) => p.options.body)));
+
+    // A free slot equips without the unequip request.
+    gear.App.snapshot = gearSnapshot([
+        item(10, 0x80, false, { name: "Dagger" })
+    ], 1);
+    const postsBefore3 = posts.length;
+    gear.equipItem({ objectId: 100, itemId: 10, count: 1, type2: 0,
+        equipped: false, bodyPart: 0x80, name: "Dagger", enchant: 0,
+        icon: "icon10" });
+    check(results, "free slot equips with a single useItem",
+        posts.length === postsBefore3 + 1 &&
+        JSON.parse(posts[posts.length - 1].options.body).objectId === 100,
+        "posts: " + JSON.stringify(
+            posts.slice(postsBefore3).map((p) => p.options.body)));
+
+    // The trash flow: a plain item destroys whole, a stack opens the
+    // dialog in the destroy mode, an equipped item unequips first.
+    const postsBefore4 = posts.length;
+    gear.destroyItemFromWidget({ objectId: 570, itemId: 57, count: 1,
+        type2: 4, equipped: false, bodyPart: 0, name: "Adena",
+        enchant: 0, icon: "icon57" });
+    check(results, "plain item drag to trash destroys whole",
+        posts.length === postsBefore4 + 1 &&
+        JSON.parse(posts[posts.length - 1].options.body).kind ===
+        "destroy" &&
+        JSON.parse(posts[posts.length - 1].options.body).count === 1,
+        "posts: " + JSON.stringify(
+            posts.slice(postsBefore4).map((p) => p.options.body)));
+
+    gear.destroyItemFromWidget({ objectId: 570, itemId: 57, count: 4242,
+        type2: 4, equipped: false, bodyPart: 0, name: "Adena",
+        enchant: 0, icon: "icon57" });
+    check(results, "stack drag to trash opens the dialog",
+        !dialog.classList.contains("hidden"),
+        "dialog stayed hidden");
+    check(results, "destroy mode relabels the dialog",
+        elements.get("drop-head").textContent === "destroy the item" &&
+        elements.get("drop-note").textContent ===
+        "the item is gone for good" &&
+        elements.get("drop-ok").textContent === "destroy",
+        "head " + elements.get("drop-head").textContent +
+        ", note " + elements.get("drop-note").textContent +
+        ", ok " + elements.get("drop-ok").textContent);
+    elements.get("drop-count").value = "777";
+    const postsBefore5 = posts.length;
+    gear.confirmDropDialog();
+    check(results, "typed count commits the destroy",
+        dialog.classList.contains("hidden") &&
+        posts.length === postsBefore5 + 1 &&
+        JSON.parse(posts[posts.length - 1].options.body).kind ===
+        "destroy" &&
+        JSON.parse(posts[posts.length - 1].options.body).count === 777,
+        "posts: " + JSON.stringify(
+            posts.slice(postsBefore5).map((p) => p.options.body)));
+
+    gear.destroyItemFromWidget({ objectId: 300, itemId: 30, count: 5,
+        type2: 0, equipped: true, bodyPart: 0x400, name: "Tunic",
+        enchant: 0, icon: "icon30" });
+    elements.get("drop-count").value = "5";
+    const postsBefore6 = posts.length;
+    gear.confirmDropDialog();
+    check(results, "equipped trash posts unequip then destroy",
+        posts.length === postsBefore6 + 2 &&
+        JSON.parse(posts[posts.length - 2].options.body).kind ===
+        "useItem" &&
+        JSON.parse(posts[posts.length - 1].options.body).kind ===
+        "destroy" &&
+        JSON.parse(posts[posts.length - 1].options.body).objectId === 300,
+        "posts: " + JSON.stringify(
+            posts.slice(postsBefore6).map((p) => p.options.body)));
+
+    // The drop dialog keeps its ground-drop labels in the drop mode.
+    gear.dropItemOnMap({ objectId: 570, itemId: 57, count: 4242,
+        type2: 4, equipped: false, bodyPart: 0, name: "Adena",
+        enchant: 0, icon: "icon57" });
+    check(results, "drop mode keeps the ground labels",
+        elements.get("drop-head").textContent ===
+        "drop on the ground" &&
+        elements.get("drop-note").textContent ===
+        "lands at the character feet" &&
+        elements.get("drop-ok").textContent === "drop",
+        "head " + elements.get("drop-head").textContent);
+
+    // The target widget double click: an attackable target posts the
+    // attack command, a friendly or dead one posts nothing.
+    const targetPanel = elements.get("hud-target");
+    const postsBefore7 = posts.length;
+    gear.App.snapshot = gearSnapshot([], 0);
+    gear.App.snapshot.character.targetId = 7;
+    gear.App.snapshot.objects = [
+        { objectId: 7, kind: "npc", name: "Gremlin", attackable: true,
+        dead: false, level: 1, curHp: 30, maxHp: 30, curMp: 10,
+        maxMp: 10 }
+    ];
+    fire(targetPanel, "dblclick");
+    check(results, "target widget dblclick attacks the target",
+        posts.length === postsBefore7 + 1 &&
+        JSON.parse(posts[posts.length - 1].options.body).kind ===
+        "attack" &&
+        JSON.parse(posts[posts.length - 1].options.body).objectId === 7,
+        "posts: " + JSON.stringify(
+            posts.slice(postsBefore7).map((p) => p.options.body)));
+
+    gear.App.snapshot.objects = [
+        { objectId: 7, kind: "npc", name: "Newbie Helper",
+        attackable: false, dead: false }
+    ];
+    fire(targetPanel, "dblclick");
+    check(results, "friendly target dblclick posts nothing",
+        posts.length === postsBefore7 + 1,
+        "posts: " + JSON.stringify(
+            posts.slice(postsBefore7).map((p) => p.options.body)));
+
+    gear.App.snapshot.objects = [
+        { objectId: 7, kind: "npc", name: "Gremlin", attackable: true,
+        dead: true }
+    ];
+    fire(targetPanel, "dblclick");
+    check(results, "dead target dblclick posts nothing",
+        posts.length === postsBefore7 + 1,
+        "posts: " + JSON.stringify(
+            posts.slice(postsBefore7).map((p) => p.options.body)));
 
     let failed = 0;
     for (const result of results) {

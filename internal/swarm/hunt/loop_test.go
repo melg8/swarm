@@ -23,7 +23,7 @@ type fakeGame struct {
 	walks     [][3]int32
 	sits      int
 	restarts  int
-	destroys  []int32
+	destroys  [][2]int32
 	sells     [][]state.InventoryItem
 	uses      []int32
 	drops     [][5]int32
@@ -76,11 +76,11 @@ func (f *fakeGame) RestartAtVillage() error {
 	return nil
 }
 
-func (f *fakeGame) DestroyItem(objectID int32, _ int32) error {
+func (f *fakeGame) DestroyItem(objectID int32, count int32) error {
 	if f.lastError != nil {
 		return f.lastError
 	}
-	f.destroys = append(f.destroys, objectID)
+	f.destroys = append(f.destroys, [2]int32{objectID, count})
 
 	return nil
 }

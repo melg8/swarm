@@ -121,6 +121,17 @@ const (
 	// selection of a DIFFERENT object replaces it), so every forced
 	// attack on the same object id comes back refused forever.
 	engageStuckTimeout = 12 * time.Second
+	// userEngageRadius is the melee approach distance of an attack
+	// command: inside it the forced attack request starts the swings,
+	// outside it the chase (or the fallback walk) closes the distance
+	// first.
+	userEngageRadius = 150.0
+	// chaseProgressWindow bounds one progress sample of a chase: the
+	// distance to the target is measured once per window.
+	chaseProgressWindow = 3 * time.Second
+	// chaseProgressStep is the distance a healthy chase closes within
+	// one progress window; less than that counts as stalled.
+	chaseProgressStep = 50.0
 	// engageSkipDelay keeps a stuck target out of the target search:
 	// the next selection of a different object already breaks the
 	// stale state, the delay only stops the immediate re-pick of the
@@ -149,120 +160,149 @@ const (
 	// for a walk, an attack or a pickup) until it completes, then the
 	// autonomous hunting resumes.
 	phaseUser phase = "user"
+	// phaseIdle waits for the next manual command of the web UI: the
+	// manual only mode of a session started without -hunt never leaves
+	// this phase, the loop exists purely to turn the queued commands
+	// into world actions.
+	phaseIdle phase = "idle"
 )
 
 // Loop is the hunt state machine of one bot session.
 type Loop struct {
-	game           GameAPI
-	tracker        *state.Bot
-	logger         *log.Logger
-	phase          phase
-	target         int32
-	lastHit        time.Time
-	lootID         int32
-	lootAt         time.Time
-	lootMoveAt     time.Time
-	skipped        map[int32]time.Time
-	restActionAt   time.Time
-	restActionSit  bool
-	restartAt      time.Time
-	zoneCX         int32
-	zoneCY         int32
-	zoneHalf       int32
-	navigator      Navigator
-	waypoints      []pathfind.Vec3
-	wpIndex        int
-	legDest        pathfind.Vec3
-	moveAt         time.Time
-	stuckAt        time.Time
-	stuckX         int32
-	stuckY         int32
-	rePaths        int
-	farmX          int32
-	farmY          int32
-	farmZ          int32
-	sellAt         time.Time
-	sellPhaseAt    time.Time
-	merchantID     int32
-	merchantPick   time.Time
-	sold           map[int32]bool
-	tripStart      time.Time
-	tripEndedAt    time.Time
-	zoneReturn     bool
-	zoneFails      int
-	delevelTarget  int32
-	delevelGuard   int32
-	delevelTried   map[string]bool
-	delevelFight   time.Time
-	delevelEnd     time.Time
-	delevelExp     int32
-	delevelLevel   int32
-	delevelFree    int
-	delevelWait    time.Time
-	delevelCounted bool
-	engageAt       time.Time
-	targetSkip     map[int32]time.Time
-	userKind       string
-	userX          int32
-	userY          int32
-	userZ          int32
-	userTarget     int32
-	userStart      time.Time
-	userMoveAt     time.Time
+	game    GameAPI
+	tracker *state.Bot
+	logger  *log.Logger
+	phase   phase
+	// autonomous enables the hunting phases of the loop: the engage,
+	// loot, town trip and delevel logic. A manual only session (started
+	// without -hunt) keeps it off, the loop then drains the manual web
+	// commands and otherwise stays idle.
+	autonomous      bool
+	target          int32
+	lastHit         time.Time
+	lootID          int32
+	lootAt          time.Time
+	lootMoveAt      time.Time
+	skipped         map[int32]time.Time
+	restActionAt    time.Time
+	restActionSit   bool
+	restartAt       time.Time
+	zoneCX          int32
+	zoneCY          int32
+	zoneHalf        int32
+	navigator       Navigator
+	waypoints       []pathfind.Vec3
+	wpIndex         int
+	legDest         pathfind.Vec3
+	moveAt          time.Time
+	stuckAt         time.Time
+	stuckX          int32
+	stuckY          int32
+	rePaths         int
+	farmX           int32
+	farmY           int32
+	farmZ           int32
+	sellAt          time.Time
+	sellPhaseAt     time.Time
+	merchantID      int32
+	merchantPick    time.Time
+	sold            map[int32]bool
+	tripStart       time.Time
+	tripEndedAt     time.Time
+	zoneReturn      bool
+	zoneFails       int
+	delevelTarget   int32
+	delevelGuard    int32
+	delevelTried    map[string]bool
+	delevelFight    time.Time
+	delevelEnd      time.Time
+	delevelExp      int32
+	delevelLevel    int32
+	delevelFree     int
+	delevelWait     time.Time
+	delevelCounted  bool
+	engageAt        time.Time
+	targetSkip      map[int32]time.Time
+	userKind        string
+	userX           int32
+	userY           int32
+	userZ           int32
+	userTarget      int32
+	userStart       time.Time
+	userMoveAt      time.Time
+	userWaypoints   []pathfind.Vec3
+	userWpIndex     int
+	userPathTried   bool
+	userInventoryAt time.Time
+	userDeferred    []state.Command
+	userLastDist    float64
+	userDistAt      time.Time
+	engLastDist     float64
+	engDistAt       time.Time
 }
 
 // NewLoop creates the hunt loop for a connected game client.
 func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 	return &Loop{
-		game:          game,
-		tracker:       tracker,
-		logger:        log.Default(),
-		phase:         phaseEngage,
-		target:        0,
-		lastHit:       time.Time{},
-		lootID:        0,
-		lootAt:        time.Time{},
-		lootMoveAt:    time.Time{},
-		skipped:       make(map[int32]time.Time),
-		restActionAt:  time.Time{},
-		restActionSit: false,
-		restartAt:     time.Time{},
-		zoneCX:        0,
-		zoneCY:        0,
-		zoneHalf:      0,
-		navigator:     nil,
-		waypoints:     nil,
-		wpIndex:       0,
-		legDest:       pathfind.Vec3{},
-		moveAt:        time.Time{},
-		stuckAt:       time.Time{},
-		stuckX:        0,
-		stuckY:        0,
-		rePaths:       0,
-		farmX:         0,
-		farmY:         0,
-		farmZ:         0,
-		sellAt:        time.Time{},
-		sellPhaseAt:   time.Time{},
-		merchantID:    0,
-		merchantPick:  time.Time{},
-		sold:          make(map[int32]bool),
-		tripStart:     time.Time{},
-		tripEndedAt:   time.Time{},
-		zoneReturn:    false,
-		zoneFails:     0,
-		delevelTarget: 0,
-		delevelGuard:  0,
-		delevelTried:  nil,
-		delevelFight:  time.Time{},
-		delevelEnd:    time.Time{},
-		userKind:      "",
-		userX:         0,
-		userY:         0,
-		userZ:         0,
-		userTarget:    0,
-		userStart:     time.Time{},
-		userMoveAt:    time.Time{},
+		game:            game,
+		tracker:         tracker,
+		logger:          log.Default(),
+		autonomous:      true,
+		phase:           phaseEngage,
+		target:          0,
+		lastHit:         time.Time{},
+		lootID:          0,
+		lootAt:          time.Time{},
+		lootMoveAt:      time.Time{},
+		skipped:         make(map[int32]time.Time),
+		restActionAt:    time.Time{},
+		restActionSit:   false,
+		restartAt:       time.Time{},
+		zoneCX:          0,
+		zoneCY:          0,
+		zoneHalf:        0,
+		navigator:       nil,
+		waypoints:       nil,
+		wpIndex:         0,
+		legDest:         pathfind.Vec3{},
+		moveAt:          time.Time{},
+		stuckAt:         time.Time{},
+		stuckX:          0,
+		stuckY:          0,
+		rePaths:         0,
+		farmX:           0,
+		farmY:           0,
+		farmZ:           0,
+		sellAt:          time.Time{},
+		sellPhaseAt:     time.Time{},
+		merchantID:      0,
+		merchantPick:    time.Time{},
+		sold:            make(map[int32]bool),
+		tripStart:       time.Time{},
+		tripEndedAt:     time.Time{},
+		zoneReturn:      false,
+		zoneFails:       0,
+		delevelTarget:   0,
+		delevelGuard:    0,
+		delevelTried:    nil,
+		delevelFight:    time.Time{},
+		delevelEnd:      time.Time{},
+		userKind:        "",
+		userX:           0,
+		userY:           0,
+		userZ:           0,
+		userTarget:      0,
+		userStart:       time.Time{},
+		userMoveAt:      time.Time{},
+		userWaypoints:   nil,
+		userWpIndex:     0,
+		userPathTried:   false,
+		userInventoryAt: time.Time{},
+		userDeferred:    nil,
+		userLastDist:    0,
+		userDistAt:      time.Time{},
+		engLastDist:     0,
+		engDistAt:       time.Time{},
 	}
 }
 
@@ -271,6 +311,18 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 // before.
 func (l *Loop) SetNavigator(navigator Navigator) {
 	l.navigator = navigator
+}
+
+// SetAutonomy toggles the autonomous hunting of the loop: a manual only
+// session (the bot started without -hunt) keeps the loop in the idle
+// phase and only executes the manual commands of the web UI (move,
+// attack, pickup, useItem, drop, destroy), including the village
+// restart after a death.
+func (l *Loop) SetAutonomy(autonomous bool) {
+	l.autonomous = autonomous
+	if !autonomous {
+		l.phase = phaseIdle
+	}
 }
 
 // SetHuntingZone configures the hunting square: the bot attacks the
@@ -348,6 +400,13 @@ func (l *Loop) tick() {
 
 		return
 	}
+	if !l.autonomous {
+		// A manual only session never hunts on its own: the loop
+		// waits in the idle phase for the next web command.
+		l.phase = phaseIdle
+
+		return
+	}
 	if l.tripActive() {
 		l.tickTownTrip()
 
@@ -400,7 +459,11 @@ func (l *Loop) recoverFromDeath() {
 		l.noteDelevelDeath()
 		l.waypoints = nil
 	} else {
-		l.phase = phaseEngage
+		if l.autonomous {
+			l.phase = phaseEngage
+		} else {
+			l.phase = phaseIdle
+		}
 		l.resetTownTrip()
 	}
 	l.logger.Printf("Hunt: character died, restarting at the nearest village")
@@ -498,7 +561,36 @@ func (l *Loop) engage() {
 		l.target = pick.ObjectID
 		l.engageAt = now
 	}
-	if l.tracker.SelfEngaged(l.target) {
+	if l.tracker.SelfFighting(l.target) {
+		// The swings land right now: nothing to re-request. A stale
+		// engagement (the fight was interrupted, the auto attack flag
+		// and the combat window linger) falls through and keeps
+		// re-requesting the forced attack instead of standing still
+		// until the stuck timeout switches the target. A running chase
+		// also needs the progress watchdog: the Mobius path search
+		// stalls on some routes while the stuck chase packets keep the
+		// engagement fresh - then the loop walks the stretch itself.
+		if x, y, z, ok := l.tracker.ObjectPosition(l.target); ok {
+			if selfX, selfY, _, selfOK := l.tracker.SelfPosition(); selfOK {
+				dist := math.Hypot(
+					float64(x-selfX), float64(y-selfY))
+				if dist > userEngageRadius &&
+					!l.chaseProgress(
+						&l.engLastDist, &l.engDistAt, dist, now) &&
+					!l.tracker.SelfWalking() &&
+					now.Sub(l.lastHit) >= engageRetryPeriod {
+					l.lastHit = now
+					l.logger.Printf("Hunt: chase on %d stalled at "+
+						"%d units, walking to the target",
+						l.target, int(dist))
+					if err := l.game.WalkTo(x, y, z); err != nil {
+						l.logger.Printf("Hunt: chase walk failed: %v",
+							err)
+					}
+				}
+			}
+		}
+
 		return
 	}
 	if now.Sub(l.lastHit) < engageRetryPeriod {

@@ -217,16 +217,22 @@ func runBot(
 	}
 	log.Println("Character " + cfg.charName + " entered the world")
 
-	if cfg.hunt {
-		loop := hunt.NewLoop(game, tracker)
-		loop.SetHuntingZone(hunt.DefaultHuntingZone())
-		if engine != nil {
-			loop.SetNavigator(hunt.NewNavigator(engine))
-		} else {
-			log.Println("Hunt runs without town trips: no geodata available")
-		}
-		go loop.Run(sessionCtx)
+	// The loop always runs: with -hunt it hunts autonomously, without
+	// it stays in the manual mode and only executes the commands of the
+	// web UI (map clicks, equipment drags) so the interface stays
+	// interactive in both launch modes.
+	loop := hunt.NewLoop(game, tracker)
+	if engine != nil {
+		loop.SetNavigator(hunt.NewNavigator(engine))
+	} else if cfg.hunt {
+		log.Println("Hunt runs without town trips: no geodata available")
 	}
+	if cfg.hunt {
+		loop.SetHuntingZone(hunt.DefaultHuntingZone())
+	} else {
+		loop.SetAutonomy(false)
+	}
+	go loop.Run(sessionCtx)
 
 	return game.Run(sessionCtx, cfg.charName)
 }
@@ -280,22 +286,23 @@ func main() {
 
 	web := startWebInterface(cfg, registry, nil)
 
+	// The geodata engine serves the town trips of the hunt and the
+	// long manual walks of the web UI (the server side pathfinder
+	// refuses far targets), so it loads in every mode.
 	var engine *pathfind.Engine
-	if cfg.hunt {
-		dir := cfg.geodataDir
-		if dir == "" {
-			dir = detectGeodataDir()
-		}
-		engine = pathfind.NewEngine(dir)
-		engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
-		stats := engine.Stats()
-		if stats.HasData {
-			log.Printf("Geodata ready: %d region files in %s, town trips enabled",
-				stats.RegionFiles, stats.Dir)
-		} else {
-			log.Println("No geodata files found in " + stats.Dir +
-				", the bot hunts without town trips")
-		}
+	dir := cfg.geodataDir
+	if dir == "" {
+		dir = detectGeodataDir()
+	}
+	engine = pathfind.NewEngine(dir)
+	engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+	stats := engine.Stats()
+	if stats.HasData {
+		log.Printf("Geodata ready: %d region files in %s, town trips and manual long walks enabled",
+			stats.RegionFiles, stats.Dir)
+	} else {
+		log.Println("No geodata files found in " + stats.Dir +
+			", the bot hunts without town trips")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(),

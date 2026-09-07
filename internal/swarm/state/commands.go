@@ -18,6 +18,9 @@ const (
 	// CommandDrop drops an inventory item on the ground at the feet
 	// of the character (the server accepts feet drops only).
 	CommandDrop = "drop"
+	// CommandDestroy destroys inventory items without dropping
+	// them (the trash target of the equipment widget).
+	CommandDestroy = "destroy"
 )
 
 // Command is one manual command of the web interface, queued on the bot

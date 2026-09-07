@@ -68,6 +68,8 @@ func TestBotCommandValidation(t *testing.T) {
 		`{"kind":"pickup","objectId":0}`,
 		`{"kind":"useItem","objectId":0}`,
 		`{"kind":"drop","objectId":5,"count":0}`,
+		`{"kind":"destroy","objectId":5,"count":0}`,
+		`{"kind":"destroy","objectId":0,"count":5}`,
 		`{"kind":"move","x":0,"y":0,"z":0}`,
 		`not json`,
 	} {
@@ -102,6 +104,7 @@ func TestBotCommandKinds(t *testing.T) {
 		{Kind: state.CommandPickup, ObjectID: 9},
 		{Kind: state.CommandUseItem, ObjectID: 555},
 		{Kind: state.CommandDrop, ObjectID: 555, Count: 40},
+		{Kind: state.CommandDestroy, ObjectID: 570, Count: 12},
 	}
 
 	for _, want := range commands {

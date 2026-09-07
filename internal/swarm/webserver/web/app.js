@@ -233,15 +233,15 @@ function renderSnapshot() {
 // the classic armor and weapon paperdoll. mask is the body part mask
 // of the inventory packets (see the C1 BodyPart enum).
 const WEAR_SLOTS = [
-  { key: "head", label: "head", mask: 0x40 },
   { key: "back", label: "cloak", mask: 0x2000 },
-  { key: "gloves", label: "gloves", mask: 0x200 },
+  { key: "head", label: "head", mask: 0x40 },
+  { key: "under", label: "shirt", mask: 0x1 },
   { key: "rhand", label: "weapon", mask: 0x80 },
   { key: "chest", label: "chest", mask: 0x400 },
   { key: "lhand", label: "shield", mask: 0x100 },
-  { key: "under", label: "shirt", mask: 0x1 },
+  { key: "feet", label: "boots", mask: 0x1000 },
   { key: "legs", label: "legs", mask: 0x800 },
-  { key: "feet", label: "boots", mask: 0x1000 }
+  { key: "gloves", label: "gloves", mask: 0x200 }
 ];
 
 // Jewelry layout: a 2x3 block with only five real slots (two earrings,
@@ -587,6 +587,49 @@ function isWearable(item) {
   return Boolean(item) && item.type2 >= 0 && item.type2 <= WEARABLE_TYPE2_MAX;
 }
 
+// SLOT_PAIRS lists the slot keys of the either-or families (the
+// earrings and the rings): a new item of the family takes the first
+// free slot, or replaces the first one when both are taken.
+const SLOT_PAIRS = { ear: ["r_ear", "l_ear"], finger: ["r_finger", "l_finger"] };
+
+// slotKeyOf resolves the paperdoll slot key an item equips into, using
+// the same placement rules as assignPaperdoll: the either-or families
+// take the first free slot of their pair (or the first slot when both
+// are taken), the aliases map onto their target slot, anything else
+// resolves by the direct body part mask.
+function slotKeyOf(item, placed) {
+  const either = EITHER_OR_MASKS[item.bodyPart];
+  if (either) {
+    for (const key of SLOT_PAIRS[either]) {
+      if (!placed[key]) { return key; }
+    }
+
+    return SLOT_PAIRS[either][0];
+  }
+  if (SLOT_MASK_ALIASES[item.bodyPart]) {
+    return SLOT_MASK_ALIASES[item.bodyPart];
+  }
+  const slot = WEAR_SLOTS.concat(JEWEL_SLOTS).find(
+    (s) => s && s.mask === item.bodyPart);
+
+  return slot ? slot.key : null;
+}
+
+// equipItem equips a bag item: when its slot is already taken the
+// equipped item comes off first, so the new item takes its place (the
+// command queue preserves the order: useItem(old), useItem(new)).
+function equipItem(item) {
+  if (!item || item.equipped || !isWearable(item)) { return; }
+  const items = App.snapshot ? (App.snapshot.inventory || []) : [];
+  const placed = assignPaperdoll(items);
+  const key = slotKeyOf(item, placed);
+  const occupied = key ? placed[key] : null;
+  if (occupied && occupied.objectId !== item.objectId) {
+    postCommand({ kind: "useItem", objectId: occupied.objectId });
+  }
+  postCommand({ kind: "useItem", objectId: item.objectId });
+}
+
 // The item currently leaving the equipment widget through a drag: set
 // by dragstart, read by the drop targets (the map prefers the drag
 // event data, the stub harnesses read this state).
@@ -598,8 +641,12 @@ const GearDrag = { item: null };
 function activateGearCell(record) {
   const item = record.item;
   if (!item) { return; }
-  if (!item.equipped && !isWearable(item)) { return; }
-  postCommand({ kind: "useItem", objectId: item.objectId });
+  if (item.equipped) {
+    postCommand({ kind: "useItem", objectId: item.objectId });
+
+    return;
+  }
+  equipItem(item);
 }
 
 // startGearDrag arms the drag of one widget cell.
@@ -633,8 +680,10 @@ function draggedItem(event) {
   return GearDrag.item;
 }
 
-// The pending stackable drop behind the count dialog.
-const PendingDrop = { item: null };
+// The pending stackable drop or destroy behind the count dialog. The
+// mode picks the action: "drop" throws the item on the ground, the
+// "destroy" of the trash target deletes it.
+const PendingDrop = { item: null, mode: "drop" };
 
 // dropItemOnMap starts the ground drop of a dragged item: stackable
 // items (adena, bones) ask for the count first, plain items drop
@@ -642,11 +691,24 @@ const PendingDrop = { item: null };
 function dropItemOnMap(item) {
   if (!item) { return; }
   if (item.count > 1) {
-    openDropDialog(item);
+    openDropDialog(item, "drop");
 
     return;
   }
   commitDrop(item, 1);
+}
+
+// destroyItemFromWidget starts the destroy of a dragged item (the
+// trash target of the footer): stackable items ask for the count first,
+// plain items destroy whole.
+function destroyItemFromWidget(item) {
+  if (!item) { return; }
+  if (item.count > 1) {
+    openDropDialog(item, "destroy");
+
+    return;
+  }
+  commitDestroy(item, 1);
 }
 
 // commitDrop sends the drop command: the server drops at the feet of
@@ -660,6 +722,15 @@ function commitDrop(item, count) {
   postCommand({ kind: "drop", objectId: item.objectId, count });
 }
 
+// commitDestroy sends the destroy command: the item is deleted on the
+// server without ever touching the ground.
+function commitDestroy(item, count) {
+  if (item.equipped) {
+    postCommand({ kind: "useItem", objectId: item.objectId });
+  }
+  postCommand({ kind: "destroy", objectId: item.objectId, count });
+}
+
 // resolveDropCount parses the count dialog answer: null rejects
 // garbage input, a valid answer clamps into 1..max.
 function resolveDropCount(input, max) {
@@ -669,10 +740,21 @@ function resolveDropCount(input, max) {
   return Math.min(value, max);
 }
 
-function openDropDialog(item) {
+function openDropDialog(item, mode) {
   PendingDrop.item = item;
+  PendingDrop.mode = mode === "destroy" ? "destroy" : "drop";
   const dialog = document.getElementById("drop-dialog");
   if (!dialog) { return; }
+  const destroy = PendingDrop.mode === "destroy";
+  document.getElementById("drop-head").textContent = destroy
+    ? "destroy the item" : "drop on the ground";
+  document.getElementById("drop-note").textContent = destroy
+    ? "the item is gone for good" : "lands at the character feet";
+  const ok = document.getElementById("drop-ok");
+  ok.textContent = destroy ? "destroy" : "drop";
+  ok.title = destroy ? "destroy the typed count" : "drop the typed count";
+  const all = document.getElementById("drop-all");
+  all.title = destroy ? "destroy the whole stack" : "drop the whole stack";
   document.getElementById("drop-name").textContent =
     item.name || ("item " + item.itemId);
   const input = document.getElementById("drop-count");
@@ -687,6 +769,7 @@ function openDropDialog(item) {
 
 function closeDropDialog() {
   PendingDrop.item = null;
+  PendingDrop.mode = "drop";
   const dialog = document.getElementById("drop-dialog");
   if (dialog) { dialog.classList.add("hidden"); }
 }
@@ -705,7 +788,13 @@ function confirmDropDialog() {
 
     return;
   }
+  const destroy = PendingDrop.mode === "destroy";
   closeDropDialog();
+  if (destroy) {
+    commitDestroy(item, count);
+
+    return;
+  }
   commitDrop(item, count);
 }
 
@@ -732,7 +821,7 @@ function initGearInteractions() {
       slots.classList.remove("drop-hover");
       const item = draggedItem(event);
       if (item && !item.equipped && isWearable(item)) {
-        postCommand({ kind: "useItem", objectId: item.objectId });
+        equipItem(item);
       }
       GearDrag.item = null;
     });
@@ -756,6 +845,22 @@ function initGearInteractions() {
       GearDrag.item = null;
     });
   }
+  const trash = document.getElementById("gear-trash");
+  if (trash) {
+    trash.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      trash.classList.add("drop-hover");
+    });
+    trash.addEventListener("dragleave", () => {
+      trash.classList.remove("drop-hover");
+    });
+    trash.addEventListener("drop", (event) => {
+      event.preventDefault();
+      trash.classList.remove("drop-hover");
+      destroyItemFromWidget(draggedItem(event));
+      GearDrag.item = null;
+    });
+  }
   const ok = document.getElementById("drop-ok");
   if (ok) { ok.addEventListener("click", confirmDropDialog); }
   const all = document.getElementById("drop-all");
@@ -763,7 +868,13 @@ function initGearInteractions() {
     all.addEventListener("click", () => {
       const item = PendingDrop.item;
       if (item) {
+        const destroy = PendingDrop.mode === "destroy";
         closeDropDialog();
+        if (destroy) {
+          commitDestroy(item, item.count);
+
+          return;
+        }
         commitDrop(item, item.count);
       }
     });
@@ -780,9 +891,31 @@ function initGearInteractions() {
   }
 }
 
+// initTargetWidget arms the double click of the target HUD panel: the
+// current target gets the attack command, exactly like a double click
+// on the map. Friendly or dead targets ignore the click.
+function initTargetWidget() {
+  const panel = document.getElementById("hud-target");
+  if (!panel) { return; }
+  panel.addEventListener("dblclick", () => {
+    const snap = App.snapshot;
+    const c = snap ? snap.character : null;
+    const targetId = c ? c.targetId : 0;
+    if (!targetId) { return; }
+    const target = (snap.objects || []).find(
+      (obj) => obj.objectId === targetId);
+    if (!target || target.kind !== "npc" || !target.attackable ||
+      target.dead) {
+      return;
+    }
+    postCommand({ kind: "attack", objectId: target.objectId });
+  });
+}
+
 // Wire the interactions at script load: the scripts run at the end of
 // the body, the widget markup is parsed already.
 initGearInteractions();
+initTargetWidget();
 
 // Chat window state: auto scroll follows the newest line while the
 // user stays at the bottom; scrolling up reads the history, scrolling

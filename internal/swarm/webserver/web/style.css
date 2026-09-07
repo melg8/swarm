@@ -908,21 +908,52 @@ body.mode-pathfind .gear-panel { display: none; }
    scroll position of the inventory is. */
 .gear-foot {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
   padding: 8px 10px 9px;
   margin-top: 8px;
   border-top: 1px solid var(--border-soft);
 }
 
+/* The trash target left of the adena and weight lines: dragging an
+   item onto it destroys the item on the server. */
+.gear-trash {
+  width: 30px;
+  height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 5px;
+  color: var(--text-dim);
+  background: var(--bg);
+}
+
+.gear-trash:hover,
+.gear-trash.drop-hover {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.gear-trash.drop-hover {
+  background: rgba(207, 34, 46, 0.08);
+}
+
+.gear-foot-cols {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
 /* ---- manual interactions of the equipment widget ---- */
 
-/* Cells with an item answer drags: the grab cursor advertises it. */
+/* Cells keep the plain cursor over items: the widget must not change
+   the cursor on hover, the drags work without the grab hint. */
 .pd-cell, .inv-cell { cursor: default; }
-
-.pd-cell[draggable], .inv-cell[draggable] { cursor: grab; }
-
-.pd-cell:active, .inv-cell:active { cursor: grabbing; }
 
 /* The active drop target of a widget drag glows with the accent. */
 .drop-hover {
@@ -938,7 +969,7 @@ body.mode-pathfind .gear-panel { display: none; }
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 230px;
+  width: 252px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1007,7 +1038,16 @@ body.mode-pathfind .gear-panel { display: none; }
   gap: 6px;
 }
 
-.drop-btn { font-size: 11.5px; padding: 4px 10px; }
+.drop-btn {
+  width: auto;
+  height: auto;
+  min-width: 58px;
+  min-height: 26px;
+  padding: 5px 13px;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+}
 
 .drop-ok {
   background: var(--accent);

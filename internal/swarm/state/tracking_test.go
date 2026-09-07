@@ -309,3 +309,38 @@ func TestObjectTargetTrackedFromTargetSelected(t *testing.T) {
 	snap = bot.Snapshot()
 	require.Zero(t, snap.Objects[0].TargetID)
 }
+
+func TestSelfFightingFreshness(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 46000, Y: 50000, Name: "Gremlin",
+	})
+
+	// A chase step of the played character marks the fresh fight.
+	bot.ApplyPawnMovement(PawnMovement{
+		ObjectID: 100, TargetID: 7, Distance: 60,
+		X: 45900, Y: 50000, Z: -3500,
+		TargetX: 46000, TargetY: 50000, TargetZ: -3500,
+	})
+	require.True(t, bot.SelfFighting(7),
+		"a fresh chase step must count as a running fight")
+	require.False(t, bot.SelfFighting(8),
+		"another target is never the running fight")
+
+	// Without further fight activity the engagement goes stale long
+	// before the combat window (10s) ends.
+	time.Sleep(60 * time.Millisecond)
+	require.True(t, bot.SelfEngaged(7),
+		"the loose engagement view keeps the combat window")
+	// The fresh window is 3s: fake its expiry without sleeping.
+	bot.mu.Lock()
+	bot.char.CombatActiveAt = time.Now().Add(-4 * time.Second)
+	bot.mu.Unlock()
+	require.False(t, bot.SelfFighting(7),
+		"a fight without swings for seconds is stale")
+	require.True(t, bot.SelfEngaged(7),
+		"the stale fight stays engaged for the loose view")
+}

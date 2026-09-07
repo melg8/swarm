@@ -79,6 +79,7 @@ type CharacterState struct {
 	SocialUntil      time.Time
 	AutoAttacking    bool
 	CombatUntil      time.Time
+	CombatActiveAt   time.Time
 	FightingTargetID int32
 	TargetID         int32
 	Sitting          bool
@@ -121,6 +122,7 @@ func newCharacterState() CharacterState {
 		SocialUntil:      time.Time{},
 		AutoAttacking:    false,
 		CombatUntil:      time.Time{},
+		CombatActiveAt:   time.Time{},
 		FightingTargetID: 0,
 		TargetID:         0,
 		Sitting:          false,
@@ -133,6 +135,33 @@ func newCharacterState() CharacterState {
 // inCombat reports whether the character fought within the combat window.
 func (c CharacterState) inCombat(now time.Time) bool {
 	return c.AutoAttacking || c.CombatUntil.After(now)
+}
+
+// walkingFreshWindow bounds how long the moving flag of the character
+// still counts as an actually running walk without a fresh movement
+// update: the server broadcasts the walking position continuously, so
+// a silent stretch means the walk ended or stalled.
+const walkingFreshWindow = 5 * time.Second
+
+// fightingFreshWindow bounds how long the last attack or chase step of
+// the character still counts as an actually running fight: swings and
+// chase steps arrive at a sub second cadence while the auto attack
+// runs, so a few seconds without either means the fight stopped even
+// when the auto attack flag or the combat window still claim otherwise.
+const fightingFreshWindow = 3 * time.Second
+
+// fightingFresh reports whether the fight of the character is running
+// right now: an attack or a chase step landed within the fresh window.
+func (c CharacterState) fightingFresh(now time.Time) bool {
+	return now.Sub(c.CombatActiveAt) <= fightingFreshWindow
+}
+
+// noteSelfCombatLocked records fresh fight activity of the played
+// character (a swing or a chase step). The caller must hold the write
+// lock.
+func (b *Bot) noteSelfCombatLocked(now time.Time) {
+	b.char.CombatActiveAt = now
+	b.char.CombatUntil = now.Add(combatWindow)
 }
 
 // Event is a single entry of the rolling bot event log.
@@ -321,6 +350,31 @@ func (b *Bot) SelfEngaged(targetID int32) bool {
 	defer b.mu.RUnlock()
 
 	return b.char.FightingTargetID == targetID && b.char.inCombat(time.Now())
+}
+
+// SelfFighting reports whether the character is actually swinging at or
+// chasing the given target right now: the engagement must be fresh (an
+// attack or a chase step within the last seconds). The auto attack flag
+// and the combat window linger after an interrupted fight, so a manual
+// attack command relies on this stricter view: a stale engagement
+// re-requests the forced attack instead of trusting the stale flags.
+func (b *Bot) SelfFighting(targetID int32) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.FightingTargetID == targetID &&
+		b.char.fightingFresh(time.Now())
+}
+
+// SelfWalking reports whether the character is moving right now: the
+// moving flag is set by the movement broadcasts and the fresh window
+// guards against a lost stop packet (no update for seconds means the
+// walk stalled even though the flag claims motion).
+func (b *Bot) SelfWalking() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.Moving && time.Since(b.char.MoveAt) <= walkingFreshWindow
 }
 
 // SelfPosition returns the last observed placement of the played
@@ -732,7 +786,7 @@ func (b *Bot) applySelfPawnMovementLocked(
 	b.char.MoveAt = now
 	b.char.TargetID = m.TargetID
 	b.char.FightingTargetID = m.TargetID
-	b.char.CombatUntil = now.Add(combatWindow)
+	b.noteSelfCombatLocked(now)
 }
 
 // pawnDestination computes the stop point of a chasing object.
@@ -774,7 +828,7 @@ func (b *Bot) ApplyAttack(a Attack) {
 			b.char.TargetID = a.TargetIDs[0]
 			b.char.FightingTargetID = a.TargetIDs[0]
 		}
-		b.char.CombatUntil = now.Add(combatWindow)
+		b.noteSelfCombatLocked(now)
 		b.touch()
 	} else if obj, ok := b.objects[a.AttackerID]; ok {
 		obj.X = a.X
