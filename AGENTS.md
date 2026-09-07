@@ -56,10 +56,13 @@ way round.
   `mobius_server_delevel.patch` (guard revenge + NPC kill penalty)
   violated this rule and was removed.
 - The geodata region files the bot navigates with live in `data/geodata`
-  of this repository (self-contained checkout, first candidate of the
-  bot's geodata detection) so the bot never depends on the server tree
-  for its pathfinding; refresh them from the server pack
-  `dist/game/data/geodata` when a deployment upgrade changes them.
+  of this repository: the complete old-world pack (165 regions, grid
+  16_10..26_26, l2j headerless format, sha1-verified at download time
+  from the LGK-Games/Geodata mirror of the upstream pack; 21_19.l2j is
+  byte identical with the region the running server already used) so
+  the bot never depends on the server tree for its pathfinding and
+  future hunting grounds beyond the elven lands are covered too;
+  refresh the pack the same way when a deployment upgrade changes it.
 
 ## Tech stack
 
@@ -100,8 +103,9 @@ internal/swarm/
     from_game_server/          Game server -> client packets.
     to_game_server/            Client -> game server packets.
 data/geodata/                  Geodata region files (X_Y.l2j) the bot
-                               pathfinds over: a self-contained copy of
-                               the server's dist/game/data/geodata pack.
+                               pathfinds over: the complete old-world
+                               pack (165 regions, 16_10..26_26), see
+                               data/geodata/Readme.txt for provenance.
 tools/                         Idempotent bash scripts that deploy and run
                                the local Mobius C1 test server stack.
 docs/                          Project goals and protocol description.

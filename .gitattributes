@@ -1,0 +1,3 @@
+# Geodata region files are binary (headerless l2j format) - never let
+# git touch line endings or diff them as text.
+*.l2j binary

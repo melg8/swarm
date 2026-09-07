@@ -14,12 +14,27 @@ import (
 )
 
 // townGeodataCandidates mirrors the bot mode geodata detection of
-// cmd/swarm: the relative server layout first, then the reference
-// Windows deployment of this project.
-var townGeodataCandidates = []string{
-	filepath.Join("data", "geodata"),
-	filepath.Join("E:\\", "work", "lineage_workspace_fresh",
-		"L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
+// cmd/swarm: the in-repository pack first (go test runs with the
+// package directory as CWD, so the search walks up to the repository
+// root where data/geodata lives), then the reference Windows
+// deployment of this project.
+func townGeodataCandidates() []string {
+	candidates := make([]string, 0, 8)
+	if dir, err := os.Getwd(); err == nil {
+		for i := 0; i < 6; i++ {
+			candidates = append(candidates, filepath.Join(dir, "data", "geodata"))
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+	candidates = append(candidates, filepath.Join("E:\\", "work",
+		"lineage_workspace_fresh", "L2J_Mobius_C1_HarbingersOfWar",
+		"game", "data", "geodata"))
+
+	return candidates
 }
 
 // townTestEngine builds an engine over the real geodata pack when it is
@@ -27,7 +42,7 @@ var townGeodataCandidates = []string{
 // below spans several regions and only exists in the deployed pack.
 func townTestEngine(t *testing.T) *Engine {
 	t.Helper()
-	for _, candidate := range townGeodataCandidates {
+	for _, candidate := range townGeodataCandidates() {
 		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
 			engine := NewEngine(candidate)
 			require.True(t, engine.Stats().HasData,

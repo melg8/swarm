@@ -1001,3 +1001,42 @@ The reproduction is timing dependent (the kill must land exactly while
 the auto attack runs and the target must die after it); three deliberate
 kill -9 attempts missed the window, so the recovery path is covered by
 TestEngageSwitchesStuckTarget instead.
+
+## Round 24: the full geodata pack moves into the repository (2026-09-07)
+
+User request: store ALL geodata files in the project, not just the one
+region of the current hunting zone, so future zones can use them
+without another download hunt.
+
+What was done:
+
+- The full old-world pack (the C1 continent) now lives in
+  data/geodata: 165 region files X_Y.l2j covering the region grid
+  16_10..26_26 (about 544 MB, the l2j headerless format the server and
+  the pathfind engine read). Source: the INTERLUDE/Geodata2/geodata
+  directory of the LGK-Games/Geodata GitHub mirror of the upstream
+  pack. Every file was sha1-verified against the upstream git tree
+  during the download (scripts/download_full_geodata.sh outside the
+  repository keeps the manifest); the pack lineage was proven before
+  the bulk import: its 21_19.l2j is byte identical (md5
+  5f45ef9f0924ba691dfe962bf892cab1) with the region the elven lands
+  bot already navigated and the running server already loaded, so no
+  format or grid surprises are possible.
+- data/geodata/Readme.txt documents the provenance, and .gitattributes
+  marks *.l2j binary so git never rewrites the region files.
+- The town route test now finds the in-repository pack on its own:
+  townGeodataCandidates walks up from the test CWD to the repository
+  root (go test always runs in the package directory, so the old
+  relative "data/geodata" never resolved; on the reference Windows
+  machine only the absolute E:\ candidate matched). TestFindPathToShopDeck
+  left its skip state and ran for real over the multi-region pack
+  (10.8 s, PASS): the plain search reaches the Elven Village shop deck
+  across regions, the strict deck-targeted search reports the known
+  deck disconnect and the town trips keep the plain-search fallback.
+- go test ./... green over the full repository (12 packages).
+
+The server keeps its own subset in dist/game/data/geodata (21_19 for
+the current elven lands hunt); adding every region there would only
+grow the GeoEngine memory for no present need. The bot detects
+data/geodata first and is now self-sufficient for any future hunting
+ground on the old continent.
