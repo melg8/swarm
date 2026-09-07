@@ -57,15 +57,32 @@ virtual paperdoll and repeats. Consequences that match the data:
   carries is bought** (the free upgrades are simulated first, the
   purchases compare against the paperdoll the auto equipment will
   reach anyway).
+- **One item per slot per trip**: each purchase marks the paperdoll
+  slots it fills or clears (the family interplay included - a
+  two-hander owns both hands, a one-piece owns chest and legs) and the
+  later picks skip the candidates that would write into them. The
+  upgrade chains are cut: a rich bot buys ONE weapon (the best value
+  pick), not the knife/short sword/sickle ladder in a single walk, and
+  never two necklaces of which only the better one gets worn. The next
+  trip re-plans against the paperdoll the purchases reached and takes
+  the next step - the progression converges over the trips without
+  ever paying for a step that ends up in the sale bag instead.
 
-**Rule 2 - buy at the town trip, sell first.** The purchases run
-inside the town trips the loop already makes: the junk selling frees
-the slots and the adena first, the purchase plan is recomputed with
-the fresh numbers, then the bot walks to every merchant of the plan
-(buy groups order by walking distance; a group of the merchant the
-character already stands at buys without an extra walk). A trip is
-worth it when the plan totals at least 100 adena - below that the
-walking time costs more than the gains.
+**Rule 2 - buy at the town trip, sell first - and sell everything.**
+The purchases run inside the town trips the loop already makes: the
+junk selling frees the slots and the adena first, the purchase plan is
+recomputed with the fresh numbers, then the bot walks to every
+merchant of the plan (buy groups order by walking distance; a group of
+the merchant the character already stands at buys without an extra
+walk). A trip is worth it when the plan totals at least 100 adena -
+below that the walking time costs more than the gains. **Every vendor
+visit sells the whole accumulated junk, not only past the 50 percent
+inventory trigger**: the selling ends when nothing sellable is left,
+so a buy trip never leaves the bag half full of sellable drops (the
+bot would farm with them and walk back for the sale later otherwise).
+A trip also never interrupts a running fight: it waits for the kill,
+the loot pickup and the between-fights window, because the drops of
+the kill are the point of the fight.
 
 **Rule 3 - the gear feeds the zone ladder.** The hunting zones gate
 on gear points (`gear.TotalGearPoints`: the weapon damage per hit

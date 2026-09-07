@@ -396,10 +396,19 @@ the design goal is per-class and per-region extension):
   `docs/shopping_strategy.md`): the greedy value-per-adena planner
   buys the best score gain per adena first (the cheap empty slot
   fillers beat the weapon upgrades early), never buys what the
-  inventory already carries and respects the adena budget; the town
-  trips sell the junk first, re-plan with the fresh adena and walk to
-  every merchant of the plan (one buylist per transaction request,
-  11 second pacing). The catalogs are generated from the Mobius
+  inventory already carries and respects the adena budget; **one item
+  per paperdoll slot per trip** - every purchase marks the slots it
+  fills or clears (the family interplay included) and the later picks
+  skip them, so no upgrade chains are bought in a single walk (the
+  next trip re-plans from the reached paperdoll). The town trips
+  **sell all the accumulated junk first** (the selling ends when
+  nothing sellable is left, not at the 50 percent trigger), re-plan
+  with the fresh adena and walk to every merchant of the plan (one
+  buylist per transaction request, 11 second pacing). A trip start
+  never interrupts a fight: `fightBusy` (a living target, pending
+  loot, an incoming hit) holds it until the between-fights window; the
+  auto equipment runs during the trips so the purchases are worn at
+  the shop already. The catalogs are generated from the Mobius
   buylists (`tools/generate_shop_catalogs.sh`, keyed by packet
   template id).
 - **Multi-zone hunting** (`hunt/zones.go`): the zone registry
@@ -817,7 +826,12 @@ the same variables).
   50% of the slots or 50% of the maximum weight, the character stops
   hunting and walks to the nearest town shop over the geodata, sells
   the junk and walks back to the farm spot (the trip start position
-  inside the zone, the zone center otherwise). The path plan comes
+  inside the zone, the zone center otherwise). The trip start waits
+  for the fight to end (`fightBusy`: a living target, a pending loot
+  pickup or an incoming hit hold it - the loot of the kill is the
+  point of the fight) and stands a resting character up first (the
+  server refuses move requests while sitting; the stand toggle shares
+  the pending transition gate with the rest logic). The path plan comes
   from the pathfind engine through the hunt.Navigator interface (set
   in main.go with hunt.NewNavigator from the auto detected geodata
   directory; without geodata the bot hunts without trips). A
@@ -825,9 +839,10 @@ the same variables).
   (one per 2 s, arrival within 150 units) and re-paths around
   obstacles after 15 s of standing still (3 re-paths abort the trip);
   a trip timeout (20 min) and a trigger cooldown (5 min after every
-  trip end) bound the whole feature, and a death mid trip drops the
-  trip state without a cooldown - the village restart lands next to
-  the shops and a full inventory sells right after the revival.
+  trip end) bound the whole feature, and a death - mid trip or not -
+  clears the cooldown: the village restart lands next to the shops
+  and a full inventory sells right after the revival instead of
+  walking to the farm spot with the junk first.
   Merchants: townMerchants carries the shop npcs of the known towns
   with their spawn coordinates; the C1 spawn ids map to the client
   display ids the NpcInfo packets carry (30147..30150 -> 7147..7150
@@ -848,8 +863,11 @@ the same variables).
   of an item id but one), then the lowest sell value per unit weight
   (the generated npcdata.ItemPrice/ItemWeight dictionaries, see
   tools/generate_item_stats.sh); equipped gear, adena and quest items
-  never sell. The trip stops selling as soon as the inventory is back
-  below the trigger. Path layer selection: the trip legs navigate
+  never sell. The trip sells everything sellable: the selling ends
+  when no unsold sellable item is left (`junkRemaining`), not when
+  the inventory drops back below the trigger - a buy trip with a
+  30 percent bag still sells the junk, so the bot never farms with
+  sellable loot it could have sold on the visit. Path layer selection: the trip legs navigate
   with pathfind.Engine.FindPathTo, which resolves the target cell
   layer against the destination z (the merchant spawn z, the farm z)
   and strictly requires the arrival on that deck - the plain search

@@ -87,3 +87,64 @@ designed to generalize later):
 - Feature 2 (shopping strategy): done - docs/shopping_strategy.md documents the strategy, gear.PlanPurchases implements it, the multi-stop town trips execute it live (12 items, exact budget).
 - Feature 3 (multi-zone hunting): done - 4 elven zones with level+gear gates, auto switching (30 s re-evaluation between fights), map display with the active highlight, manual selection via the web UI.
 - Extension design: gear.Profile for mage classes, per-region merchant lists and zone registries, per-town tax rates.
+
+## Active task: shopping/trip behavior fixes from the first long live session
+
+Started: 2026-09-08 (second session). Branch: `mobius-c1-client-1`.
+Commits from melg8 (git author set to melg8 + noreply email per user
+instruction).
+
+### Goal
+
+Three behavioral regressions observed in the first live run of a rich
+character (40k adena):
+
+1. **Redundant same-slot purchases.** The planner bought the whole
+   upgrade chain in one walk: Knife + Short Sword + Sickle together,
+   and both Necklace of Magic and Necklace of Knowledge while only the
+   better one ever got worn - pure adena waste.
+2. **Vendor walk mid-combat.** The bot left a mob alive and ran to
+   sell (the trip trigger fired during the fight).
+3. **Sell-after-farming instead of sell-on-arrival.** The bot walked
+   to the farm spot with a bag of sellable junk and only later
+   returned to town for the sale; buy trips also skipped the selling
+   when the inventory was below the 50 percent trigger.
+
+### Progress
+
+- 2026-09-08 cd638c9 + 6a8ba3a (gofmt): fix 1 - PlanPurchases now
+  marks the paperdoll slots every purchase fills or clears
+  (affectedSlots mirrors the family logic: lrhand owns both hands,
+  onepiece owns chest+legs, legs-vs-onepiece, lhand-vs-lrhand) and
+  skips candidates writing into a marked slot: ONE item per slot per
+  trip, the chains are cut. Regression tests pin the 40k scenario
+  (one weapon, one necklace). The rich-weapon test now expects the
+  Short Sword (value pick), not the Long Sword chain; the
+  broadsword-in-inventory test expects the Dirk (best value upgrade).
+- 2026-09-08 1b5b31d: fix 2 - tick() runs the trip start behind
+  fightBusy() (a living target, a pending loot pickup or an incoming
+  hit blocks it), so a trip only starts in the between-fights window;
+  maybeEquipGear moved before the trip dispatch so bought gear is worn
+  during the trip (equipped items are never sellable - also protects
+  fresh purchases from the sell loop). Test: TestTripWaitsForTheFightToEnd.
+- 2026-09-08 bbf216d: fix 3 - tickTownSell sells while junkRemaining()
+  (unsold sellable items) instead of while inventoryFull(): every
+  vendor trip sells ALL accumulated junk, batch after batch, whatever
+  started the trip. recoverFromDeath clears tripEndedAt: a revival in
+  the village sells at once even when a recent finished trip armed the
+  5 minute cooldown (no more farm-first-sell-later after death).
+  standUpBeforeTrip: a resting (sitting) character stands up before
+  the trip walk (move requests are refused while sitting; the toggle
+  shares the pending-transition gate with rest() so the two never
+  double toggle). Tests updated: the full flows now sell both batches;
+  new: TestShoppingTripSellsJunkBelowTheTrigger,
+  TestTripStandsUpBeforeWalking.
+- 2026-09-08 docs: shopping_strategy.md rule updates (one item per
+  slot per trip; sell everything on every vendor visit; no
+  mid-combat trips).
+
+### Status
+
+- All three fixes implemented, unit tested (go vet + go test ./...
+  green) and pushed.
+- Live verification on the running stack: pending.
