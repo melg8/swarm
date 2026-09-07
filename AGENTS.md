@@ -34,6 +34,69 @@ Long term design goals, scalability ideas (packet deduplication, "eyes" bot
 concept, synchronized party behavior) are documented in
 `docs/project_description.md`. Read it before making architectural decisions.
 
+## Mandatory first step of every task: deploy and verify the environment
+
+Any task in this repository - a bug fix, a feature, a refactor, a test run
+or an investigation - starts by deploying the repository dependencies with
+`tools/swarm_fast_deploy.sh` and verifying that it brought the environment up
+successfully. Do not begin the actual work on an undeployed or broken stack:
+nearly every task needs the live login server (2106), game server (7777) and
+MariaDB (3306) to reproduce, test and validate behavior.
+
+```bash
+bash tools/swarm_fast_deploy.sh
+```
+
+The script is idempotent (finished steps are detected and skipped, re-running
+is always safe), needs no root and brings the whole stack up from a blank
+z.ai-style sandbox (Debian 13, no javac/go/MariaDB preinstalled) in about 90
+seconds: it clones this repo at `mobius-c1-client-1`, sparse-clones the
+Mobius C1 module, unpacks OpenJDK 25, MariaDB and Go 1.24 from
+`deb.debian.org` into `~/opt`, compiles the server, loads the 75-table
+database and starts the stack. All paths can be overridden through the
+same-named environment variables (`BASE`, `SWARM`, `MOBIUS_ROOT`, `OPT`,
+...), see the script header. The script is byte-identical to
+`tools/mobius_fast_deploy.sh`; `swarm_fast_deploy.sh` is the canonical name
+referenced by this rule.
+
+The deploy is considered successful only when ALL of these checks pass:
+
+1. The script finished without errors and its last lines contain
+   `STACK_READY: login :2106, game :7777, db :3306`.
+2. The three ports are listening:
+
+   ```bash
+   ss -ltn | grep -E ':(2106|7777|3306) '
+   ```
+
+   must list all of 2106 (login), 7777 (game) and 3306 (MariaDB).
+
+3. The database schema is loaded (the count must be 75):
+
+   ```bash
+   ~/opt/mariadb/bin/mariadb --socket="$HOME/mysql_tmp/mysql.sock" -u root -N \
+       -e "SELECT COUNT(*) FROM information_schema.tables \
+           WHERE table_schema='l2jmobiusc1';"
+   ```
+
+For a deeper end-to-end verification run the bot test (must print `E2E_OK`):
+
+```bash
+export PATH="$HOME/opt/go-root/usr/lib/go-1.24/bin:$PATH"
+export JDK_DIR="$HOME/opt/jdk25-root/usr/lib/jvm/java-25-openjdk-amd64"
+export MARIADB_DIR="$HOME/opt/mariadb"
+tools/mobius_e2e.sh 45
+```
+
+The `JDK_DIR` and `MARIADB_DIR` exports rebind `tools/mobius_start.sh` and
+`tools/mobius_e2e.sh` (which read them from the environment) to the
+`~/opt/...` layout the fast deploy unpacks; plain `mariadb`/`go` are not on
+the default PATH, hence the `PATH` export.
+
+If any check fails, stop and fix the deployment first (re-run the script,
+inspect `../logs/login.log`, `../logs/game.log`, `../logs/mariadb.log`).
+Only after the environment is verified as up does the actual task start.
+
 ## Server integrity rules (non-negotiable)
 
 The L2J Mobius C1 server is the reference implementation for this project:
@@ -176,8 +239,12 @@ When the deployment target is a z.ai-style sandbox (Debian 13, no root/sudo,
 git+curl+gcc+OpenJDK 21 JRE preinstalled, no javac/go/MariaDB server and a
 slow `archive.mariadb.org`), use `tools/mobius_fast_deploy.sh` instead of the
 `mobius_bootstrap.sh` path: it brings the whole stack up from a blank
-sandbox in about 90 seconds. Everything is unpacked from
-`deb.debian.org` packages via `apt-get download` + `dpkg -x` into `~/opt`
+sandbox in about 90 seconds. The same script is committed as
+`tools/swarm_fast_deploy.sh` (byte-identical) and that is the canonical name
+used by the mandatory first step rule at the top of this document:
+`bash tools/swarm_fast_deploy.sh` is how every task starts. Everything is
+unpacked from `deb.debian.org` packages via `apt-get download` + `dpkg -x`
+into `~/opt`
 (no root needed): OpenJDK 25 (the Mobius build requires Java 25), MariaDB
 server and Go 1.24; broken Debian JDK symlinks are re-bound to the
 extracted tree, three MariaDB wrapper scripts export the needed
