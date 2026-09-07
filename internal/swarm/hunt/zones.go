@@ -50,7 +50,10 @@ const regionElven = "elven"
 // (levels 5-7), the kaboo fighter woods in the west (levels 8-12,
 // entered once the gear pays for it) and the dryad and spider forest
 // of the southwest (levels 13-18, the deep hunting grounds). Centers
-// and halves mirror the Mobius C1 spawn data of ElvenStarting.xml.
+// and halves mirror the Mobius C1 spawn data of ElvenStarting.xml
+// (the kaboo woods square hugs the fighter camps of the territory
+// cluster - the wide 3200 half wandered into empty spider and
+// dryad grounds).
 var elvenHuntingZones = []HuntingZone{
 	{
 		ID: "elven-keltirs", Name: "Elven Village Keltir Field",
@@ -65,7 +68,7 @@ var elvenHuntingZones = []HuntingZone{
 	{
 		ID: "elven-kaboo", Name: "West Kaboo Woods",
 		Region: regionElven, MinLevel: 8, MaxLevel: 12, MinGear: 110,
-		CX: 35500, CY: 48700, Half: 3200,
+		CX: 35400, CY: 48300, Half: 2000,
 	},
 	{
 		ID: "elven-dryads", Name: "Southwest Dryad Forest",
