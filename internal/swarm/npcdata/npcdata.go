@@ -16,60 +16,60 @@ const npcTemplateOffset = 1000000
 // (display id + 1000000). It returns an empty string when the template is
 // unknown.
 func NPCName(templateID int32) string {
-        if templateID <= npcTemplateOffset {
-                return ""
-        }
+	if templateID <= npcTemplateOffset {
+		return ""
+	}
 
-        return npcNames[templateID-npcTemplateOffset]
+	return npcNames[templateID-npcTemplateOffset]
 }
 
 // NPCLevel resolves the level of an npc by the raw NpcInfo template id.
 // It returns zero when the template is unknown.
 func NPCLevel(templateID int32) int32 {
-        if templateID <= npcTemplateOffset {
-                return 0
-        }
+	if templateID <= npcTemplateOffset {
+		return 0
+	}
 
-        return npcLevels[templateID-npcTemplateOffset]
+	return npcLevels[templateID-npcTemplateOffset]
 }
 
 // NPCAggroRange resolves the ai aggroRange of an npc by the raw NpcInfo
 // template id. It returns zero when the template is unknown or passive.
 func NPCAggroRange(templateID int32) int32 {
-        if templateID <= npcTemplateOffset {
-                return 0
-        }
+	if templateID <= npcTemplateOffset {
+		return 0
+	}
 
-        return npcAggroRanges[templateID-npcTemplateOffset]
+	return npcAggroRanges[templateID-npcTemplateOffset]
 }
 
 // NPCIsAggressive resolves the ai isAggressive flag of an npc by the raw
 // NpcInfo template id: aggressive npcs attack players on sight.
 func NPCIsAggressive(templateID int32) bool {
-        if templateID <= npcTemplateOffset {
-                return false
-        }
+	if templateID <= npcTemplateOffset {
+		return false
+	}
 
-        return npcAggressives[templateID-npcTemplateOffset]
+	return npcAggressives[templateID-npcTemplateOffset]
 }
 
 // ItemName resolves the name of a ground item by its display id. It
 // returns an empty string when the item is unknown.
 func ItemName(displayID int32) string {
-        return itemNames[displayID]
+	return itemNames[displayID]
 }
 
 // ItemPrice resolves the reference price of an item by its display id.
 // The Mobius server sells items at referencePrice/2. It returns zero
 // when the item is unknown.
 func ItemPrice(displayID int32) int64 {
-        return itemPrices[displayID]
+	return itemPrices[displayID]
 }
 
 // ItemWeight resolves the unit weight of an item by its display id. It
 // returns zero when the item is unknown.
 func ItemWeight(displayID int32) int32 {
-        return itemWeights[displayID]
+	return itemWeights[displayID]
 }
 
 // ItemIcon resolves the icon file name (without extension) of an item
@@ -77,7 +77,7 @@ func ItemWeight(displayID int32) int32 {
 // /icons/<name>.png. It returns an empty string when the item is
 // unknown.
 func ItemIcon(displayID int32) string {
-        return itemIcons[displayID]
+	return itemIcons[displayID]
 }
 
 // GearStats are the combat stats of an equippable item from the item
@@ -88,22 +88,22 @@ func ItemIcon(displayID int32) string {
 // scoring profiles of the bot derive the slot and the value of an item
 // from them.
 type GearStats struct {
-        BodyPart   string
-        WeaponType string
-        PAtk       int32
-        MAtk       int32
-        PDef       int32
-        MDef       int32
-        SDef       int32
-        RShld      int32
-        PAtkSpd    int32
+	BodyPart   string
+	WeaponType string
+	PAtk       int32
+	MAtk       int32
+	PDef       int32
+	MDef       int32
+	SDef       int32
+	RShld      int32
+	PAtkSpd    int32
 }
 
 // ItemGearStats resolves the combat stats of an equippable item by its
 // display id. It reports false when the item is unknown or carries no
 // bodypart (a consumable, a material: nothing the bot can equip).
 func ItemGearStats(displayID int32) (GearStats, bool) {
-        stats, ok := itemGearStats[displayID]
+	stats, ok := itemGearStats[displayID]
 
-        return stats, ok
+	return stats, ok
 }
