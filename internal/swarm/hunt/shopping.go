@@ -257,6 +257,7 @@ func (l *Loop) advanceTripStop() {
 	l.phase = phaseTownWalk
 	l.merchantID = 0
 	l.merchantPick = time.Time{}
+	l.merchantDeckUntil = time.Time{}
 	stop := l.tripStops[0]
 	l.logger.Printf("Hunt: shop: walking to %s", stop.merchant.Name)
 	if !l.startWalkLeg(townNpcPosition(stop.merchant)) {

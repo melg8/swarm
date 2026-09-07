@@ -68,6 +68,10 @@ const (
 	// tripTimeout ends a trip that got stuck somewhere in between so
 	// the bot resumes hunting.
 	tripTimeout = 20 * time.Minute
+	// merchantDeckWindow bounds the server routed re-walk onto a
+	// merchant deck the geodata pack cannot reach (the village
+	// ramps): the ground clicks retry until the window closes.
+	merchantDeckWindow = 30 * time.Second
 )
 
 // townNpc is a town npc the trip machinery navigates to: a shop
@@ -473,6 +477,7 @@ func (l *Loop) enterSellPhase() {
 	l.buyAt = time.Time{}
 	l.merchantID = 0
 	l.merchantPick = time.Time{}
+	l.merchantDeckUntil = time.Time{}
 	l.logger.Printf("Hunt: shop reached, selling the junk")
 }
 
@@ -501,8 +506,16 @@ func (l *Loop) tickTownSell() {
 		}
 	}
 	if l.stopBuysPending() {
-		if l.handleMerchant(now, l.stopMerchantTemplates()) {
+		if !l.handleMerchant(now, l.stopMerchantTemplates()) {
+			return
+		}
+		// The buys need the selected merchant within the interaction
+		// distance: without it the sells still work, the buys are
+		// skipped.
+		if l.merchantID > 0 {
 			l.tickStopShopping(now)
+		} else {
+			l.resetStopBuys("no merchant in reach for the buys")
 		}
 
 		return
@@ -534,6 +547,7 @@ func (l *Loop) handleMerchant(now time.Time, templates []int32) bool {
 		return false
 	}
 	l.merchantPick = now
+	l.merchantDeckUntil = time.Time{}
 	merchant, ok := l.tracker.NearestNpcByTemplates(
 		templates, merchantFindRadius)
 	if ok {
@@ -577,8 +591,25 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 		return false
 	}
 	if math.Abs(float64(z-selfZ)) > merchantApproachDist {
-		l.logger.Printf("Hunt: %s stands on another deck, selling "+
-			"without one", l.tracker.ObjectName(l.merchantID))
+		// The geodata pack misses some village ramps: the character
+		// stands under the merchant deck. Ground clicks route through
+		// the server pathfinder, which knows the ramps - click the
+		// exact merchant position until the z matches or the retry
+		// window closes.
+		if l.merchantDeckUntil.IsZero() {
+			l.merchantDeckUntil = now.Add(merchantDeckWindow)
+			l.logger.Printf("Hunt: %s stands on another deck (z %d vs "+
+				"%d), re-walking by server routing",
+				l.tracker.ObjectName(l.merchantID), selfZ, z)
+		}
+		if now.Before(l.merchantDeckUntil) {
+			l.walkToward(x, y, z, now)
+
+			return false
+		}
+		l.logger.Printf("Hunt: %s stays out of reach, the sells work "+
+			"without it and its buys are skipped",
+			l.tracker.ObjectName(l.merchantID))
 		l.merchantID = -1
 
 		return true

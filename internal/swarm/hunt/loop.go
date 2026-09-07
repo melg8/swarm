@@ -182,62 +182,63 @@ type Loop struct {
 	// loot, town trip and delevel logic. A manual only session (started
 	// without -hunt) keeps it off, the loop then drains the manual web
 	// commands and otherwise stays idle.
-	autonomous     bool
-	target         int32
-	lastHit        time.Time
-	lootID         int32
-	lootAt         time.Time
-	lootMoveAt     time.Time
-	skipped        map[int32]time.Time
-	restActionAt   time.Time
-	restActionSit  bool
-	restartAt      time.Time
-	zoneCX         int32
-	zoneCY         int32
-	zoneHalf       int32
-	navigator      Navigator
-	waypoints      []pathfind.Vec3
-	wpIndex        int
-	legDest        pathfind.Vec3
-	moveAt         time.Time
-	stuckAt        time.Time
-	stuckX         int32
-	stuckY         int32
-	rePaths        int
-	farmX          int32
-	farmY          int32
-	farmZ          int32
-	sellAt         time.Time
-	sellPhaseAt    time.Time
-	merchantID     int32
-	merchantPick   time.Time
-	sold           map[int32]bool
-	tripStart      time.Time
-	tripEndedAt    time.Time
-	zoneReturn     bool
-	zoneFails      int
-	delevelTarget  int32
-	delevelGuard   int32
-	delevelTried   map[string]bool
-	delevelFight   time.Time
-	delevelEnd     time.Time
-	delevelExp     int32
-	delevelLevel   int32
-	delevelFree    int
-	delevelWait    time.Time
-	delevelCounted bool
-	engageAt       time.Time
-	targetSkip     map[int32]time.Time
-	userKind       string
-	userX          int32
-	userY          int32
-	userZ          int32
-	userTarget     int32
-	userStart      time.Time
-	userMoveAt     time.Time
-	userWaypoints  []pathfind.Vec3
-	userWpIndex    int
-	userPathTried  bool
+	autonomous        bool
+	target            int32
+	lastHit           time.Time
+	lootID            int32
+	lootAt            time.Time
+	lootMoveAt        time.Time
+	skipped           map[int32]time.Time
+	restActionAt      time.Time
+	restActionSit     bool
+	restartAt         time.Time
+	zoneCX            int32
+	zoneCY            int32
+	zoneHalf          int32
+	navigator         Navigator
+	waypoints         []pathfind.Vec3
+	wpIndex           int
+	legDest           pathfind.Vec3
+	moveAt            time.Time
+	stuckAt           time.Time
+	stuckX            int32
+	stuckY            int32
+	rePaths           int
+	farmX             int32
+	farmY             int32
+	farmZ             int32
+	sellAt            time.Time
+	sellPhaseAt       time.Time
+	merchantID        int32
+	merchantPick      time.Time
+	merchantDeckUntil time.Time
+	sold              map[int32]bool
+	tripStart         time.Time
+	tripEndedAt       time.Time
+	zoneReturn        bool
+	zoneFails         int
+	delevelTarget     int32
+	delevelGuard      int32
+	delevelTried      map[string]bool
+	delevelFight      time.Time
+	delevelEnd        time.Time
+	delevelExp        int32
+	delevelLevel      int32
+	delevelFree       int
+	delevelWait       time.Time
+	delevelCounted    bool
+	engageAt          time.Time
+	targetSkip        map[int32]time.Time
+	userKind          string
+	userX             int32
+	userY             int32
+	userZ             int32
+	userTarget        int32
+	userStart         time.Time
+	userMoveAt        time.Time
+	userWaypoints     []pathfind.Vec3
+	userWpIndex       int
+	userPathTried     bool
 	// userRedirect marks a manual command that replaced a walk
 	// still running on the server: the next walk request fires at
 	// once instead of waiting for the old walk to finish.
@@ -309,6 +310,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 		sellPhaseAt:       time.Time{},
 		merchantID:        0,
 		merchantPick:      time.Time{},
+		merchantDeckUntil: time.Time{},
 		sold:              make(map[int32]bool),
 		tripStops:         nil,
 		buysPlanned:       false,
