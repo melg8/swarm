@@ -1395,3 +1395,114 @@ readable and the wear grid takes the classic placement.
 - `go build`, `go vet`, `go test ./... -count=1` green (12 packages
   ok), node repro_gear.js OK (68/68), repro_hud.js /
   repro_map_render.js / repro_movement.js ALL PASS.
+
+## Round 30: the C1 paperdoll order, the debuff weight gauge, the confirmation-paced swaps and the walk plan view (2026-09-07)
+
+The review of the interactive UI: the slot layout of the classic
+client doll, the weight bar tied to the actual server debuffs, the
+swap pacing by server confirmation instead of a fixed pause, and the
+manual walks visible on the map.
+
+- The wear grid of the equipment widget reorders to the C1 client
+  doll: shirt, head, cloak / weapon, chest, shield / gloves, legs,
+  boots (WEAR_SLOTS in app.js - the labels and the mask placement
+  move together, the masks/aliases/either-or logic is untouched).
+  The jewelry block flips: the blank hole sits middle-left, the
+  necklace occupies the middle-right cell (JEWEL_SLOTS null/neck
+  swap).
+- The weight line recolors by the server weight penalty thresholds,
+  verified in the Mobius C1 source (Player.refreshOverloaded: the
+  load per mille switches the penalty at 500/666/800/1000 - 50%,
+  66.6%, 80% and 100%, each level slows the speed to
+  x0.90/x0.87/x0.84/x0.81 and the last marks the overload). Below
+  the first threshold the bar keeps the green gradient; past it the
+  fill melts from yellow through orange into red - a JS hue
+  interpolation between the level anchors (weightFillStyle), set as
+  the inline background over the gradient, the percent text takes
+  the same color, and the row tooltip carries the raw numbers plus
+  the active debuff level with its speed modifier. The fixed
+  .load-fill.warn/.heavy classes are gone.
+- The inventory command gate paces by the server confirmation
+  instead of the fixed one second: the Mobius UseItem flood
+  protector is disabled in this build
+  (FloodProtectorUseItemInterval = 0, retail matching), so the only
+  real hazard is the packet executor thread pool racing a same
+  burst unequip+equip pair. markInventoryAction now records the
+  item state as it left (equipped flag, stack count), the gate
+  holds the next inventory command until the tracker observed the
+  change (or the item vanished) - InventoryItemState on the state
+  bot - with a 600 ms fallback timeout so a refused request never
+  blocks the queue. A live swap pair (Squire's Sword into the
+  occupied Dagger slot) lands in 334 ms, both useItem requests in
+  the same second, the pair order intact.
+- A manual command replaces a running walk instantly: userMovement
+  arms userRedirect, the next tick re-issues the walk request at
+  once even while the old server walk is still flagged moving (the
+  server replaces the destination of a running walk with the next
+  MoveToLocation) instead of waiting for the old destination; the
+  flag clears when the new walk request fires. Live: the redirect
+  click logs "replaces the manual move" and "walking to <new>" in
+  the same second as the POST, the published plan switches to the
+  new target.
+- The manual walks become visible: the loop publishes the walk
+  plan into the tracker (state.Bot.SetWalkPlan - the remaining
+  waypoints with the clicked destination last, refreshed every
+  tick while phaseUser runs, a no-op republish only refreshes the
+  2 s lifetime so the event stream never churns, an empty or stale
+  plan clears/expiring on its own so a crashed loop leaves no
+  stale line). The snapshot carries it as walkPath; the map draws
+  the plan while the paths toggle is on - a blue dashed polyline
+  from the character through the remaining waypoints (the same
+  light blue #4da3ff as the command feedback) - and the
+  destination marker drawn from the plan: a solid blue dot with a
+  pulsing breathing ring (shared drawUserMarker with the click
+  ripple, so the click answer never changes style mid walk). The
+  self character now also draws the same dashed destination line
+  as every other moving object while it runs (it was the only
+  unit without one). The animation loop keeps pulsing while a
+  walk plan exists.
+- The trash bin moves from the left of the footer to the far
+  right end, after the adena and weight numbers (the footer
+  columns take the width, the bin hugs the right edge; the drag
+  destroy flow is unchanged).
+- The drop count dialog gains the scroll wheel: a wheel notch
+  over the open dialog steps the count by one, clamped into the
+  stack (bumpDropCount shares the resolveDropCount clamping), the
+  listener stays non-passive so the page does not scroll; a small
+  hint line under the note documents the wheel, Enter and Escape.
+- Tests: user_test.go replaces the fixed spacing test with
+  TestUserSwapWaitsForServerConfirmation (the deferred command
+  releases on the observed inventory flip) and
+  TestUserSwapFallbackTimeout, adds the redirect test
+  (TestUserMoveRedirectsARunningWalk: the running walk re-issues
+  at once, an uninterrupted walk does not) and the walk plan test
+  (TestUserWalkPlanPublishesAndClears: the direct plan, the
+  planned waypoints with the destination last, the shrink on
+  passed waypoints, the clear on arrival); bot_test.go adds the
+  walk plan publish/clear/expire/reset and the InventoryItemState
+  tests; repro_gear.js pins the new slot order, the hole/neck
+  flip, the debuff melt (unit probes of weightFillStyle and
+  weightPenalty plus the rendered pen classes and tooltips), the
+  footer order, and the wheel stepping (79 checks; the stub DOM
+  now answers querySelector so initGearInteractions wires the
+  real dialog listeners).
+- Live verification on the running stack
+  (scripts/round10_smoke.sh + scripts/round10_swap_smoke.sh, the
+  bot started without -hunt): the wear rows read shirt/head/cloak
+  and gloves/legs/boots with the hole left of the neck; the trash
+  bin sits 10 px from the right footer edge after the numbers;
+  the live 21% load stays green with "no weight debuff" in the
+  tooltip while the unit probes return hsl(50/26/8/0) and penalty
+  levels null..4; the far double click publishes the walk plan
+  (the last point equals the target, the server leg runs) and the
+  screenshot shows the blue dashed path with the pulsing blue dot
+  marker; the redirect POST replaces the plan and the walk within
+  the same second and the walk arrives ("manual walk arrived
+  (path done)"); the equip swap lands in 334/373 ms; the wheel
+  steps 1 -> 2 -> 1 and clamps at the stack size; the trash
+  destroy takes 5 adena (935 -> 930) with the ground unchanged; 0
+  JS errors; screenshots scripts/round10_live.png and
+  scripts/round10_dialog.png.
+- `go build`, `go vet`, `go test ./... -count=1` green (12 packages
+  ok), node repro_gear.js OK (79/79), repro_hud.js /
+  repro_map_render.js / repro_movement.js ALL PASS.

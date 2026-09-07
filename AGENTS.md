@@ -816,12 +816,12 @@ the same variables).
   enchant level of every entry (see AbstractItemPacket.writeItem), the
   snapshot carries the whole inventory as `snapshot.inventory` with
   the resolved display name and icon file name per item, sorted
-  equipped-first. The paperdoll is compact: a 3x3 wear block (cloak,
-  head, shirt, weapon, chest, shield, boots, legs, gloves - the head
-  sits top-center above the chest, the gloves bottom-right, mirroring
-  the classic paperdoll placement) on the
-  left and a 2x3 jewelry block on the right whose middle-right cell
-  is a blank hole - the classic character has only five jewelry slots
+  equipped-first. The paperdoll is compact: a 3x3 wear block ordered
+  like the C1 client doll (shirt, head, cloak / weapon, chest,
+  shield / gloves, legs, boots) on the
+  left and a 2x3 jewelry block on the right whose middle-left cell
+  is a blank hole with the necklace on the middle-right - the
+  classic character has only five jewelry slots
   (two earrings, a necklace, two rings). app.js places the equipped
   items by the C1 BodyPart mask (two handed weapons and full armor
   alias onto the weapon/chest slot, the either-or earring/ring masks
@@ -836,8 +836,17 @@ the same variables).
   badges, and reordering moves the persistent cells. A pinned footer
   under the scrolling bag stays always visible: the adena line (gold,
   from `character.adena`) and the weight line (fill by load percent
-  from `character.load/maxLoad`, amber past half load, red past 90,
-  raw numbers in the tooltip). The icon pack
+  from `character.load/maxLoad`) and the trash bin at the far right
+  end - a cell dragged onto it destroys the item. The weight fill
+  colors by the server weight debuff thresholds (Player
+  refreshOverloaded of the Mobius C1 source: the load per mille
+  switches the penalty at 500/666/800/1000 - 50%, 66.6%, 80% and
+  100%): green below the first threshold, then the fill melts from
+  yellow through orange into red (a JS hue interpolation between
+  the level anchors, set inline over the green gradient), the
+  percent text takes the fill color, and the tooltip carries the
+  raw numbers plus the active debuff level and its speed modifier
+  (x0.90/x0.87/x0.84/x0.81). The icon pack
   lives in `data/icons` (3134 PNGs of the classic client naming
   scheme from the l2walker mirror, C1 compatibility verified
   4222/4222 items - see data/icons/Readme.txt), the web server serves
@@ -859,17 +868,28 @@ the same variables).
   drags (bag cell -> paperdoll equips with the same swap, paperdoll
   cell -> bag unequips, any cell -> map drops on the ground at the
   character feet, stackable items ask the count through a small
-  dialog; a cell dragged onto the trash target left of the adena and
+  dialog - the scroll wheel over the open dialog steps the count by
+  one, clamped into the stack (with the all/cancel/drop buttons,
+  Enter and Escape); a cell dragged onto the trash target right of
+  the adena and
   weight lines destroys the item - RequestDestroyItem 0x59
   `[objectId][count]`, stacks open the count dialog in the destroy
   mode, an equipped drag unequips first). The commands flow through
   `POST /api/bots/{id}/commands` -> `state.Bot.PushCommand` (a 32
   entry queue, newest wins) -> the loop drains it every tick
-  (hunt/user.go): useItem/drop/destroy execute at once (spaced one
-  second apart - the Mobius packet executor runs every client packet
-  as its own thread pool task, so a same-burst unequip+equip pair
-  raced in the paperdoll and cancelled each other; a deferred
-  command retries on a later tick with the pair order intact),
+  (hunt/user.go): useItem/drop/destroy execute at once, gated on
+  the server confirmation of the previous one - the Mobius packet
+  executor runs every client packet as its own thread pool task, so
+  a same-burst unequip+equip pair raced in the paperdoll and
+  cancelled each other; the gate holds the newcomer until the
+  tracker observed the effect of the previous action (the equipped
+  flag flipped, the count changed or the item vanished, see
+  `InventoryItemState`) with a 600 ms fallback timeout so a refused
+  request never blocks the queue (the UseItem flood protector of
+  this build is disabled: FloodProtectorUseItemInterval = 0, retail
+  matching) - a swap pair lands in ~350 ms live instead of the old
+  fixed one second pause; a deferred
+  command retries on a later tick with the pair order intact,
   move/attack/pickup switch the `phaseUser` manual mode that
   overrides the autonomous hunting until
   arrival/death/timeout (an active town trip is cancelled, the
@@ -886,7 +906,22 @@ the same variables).
   targets (observed stuck walks past a few thousand units), so a
   click beyond 2000 units plans the geodata path once and follows
   the waypoints in server accepted legs (userWaypoints, 1s request
-  pace, legs capped at 1000 units).
+  pace, legs capped at 1000 units). A manual command that replaces
+  a walk still running on the server re-issues the walk request at
+  once (`userRedirect`: the next tick fires the new
+  MoveToLocation instead of waiting for the old walk - the server
+  replaces the destination of a running walk), so a click somewhere
+  else changes the direction immediately. While a manual move runs,
+  the loop publishes the walk plan into the tracker
+  (`state.Bot.SetWalkPlan`: the remaining waypoints with the
+  clicked destination last, refreshed every tick, expiring on its
+  own after 2 s without a refresh); the snapshot carries it as
+  `snapshot.walkPath` and the map draws it while the paths toggle
+  is on - a blue dashed polyline from the character through the
+  remaining waypoints - plus the always visible destination marker
+  shared with the click ripple: a light blue dot with a pulsing
+  breathing ring (the self character also gets the same dashed
+  destination line as every other moving object while it runs).
 - The web UI is plain HTML/CSS/JS without a build step; keep it that way
   (embedded via go:embed). Watch out: top level `const` declarations are
   not `window` properties, so cross script references must use the bare

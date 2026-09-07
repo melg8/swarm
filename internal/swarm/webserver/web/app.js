@@ -230,29 +230,32 @@ function renderSnapshot() {
 // ---- equipment widget ----
 
 // Wearable slot layout of the equipment widget: the left 3x3 block of
-// the classic armor and weapon paperdoll. mask is the body part mask
-// of the inventory packets (see the C1 BodyPart enum).
+// the classic armor and weapon paperdoll, ordered like the C1 client
+// doll - shirt over the head row left, cloak right, gloves bottom left,
+// boots bottom right. mask is the body part mask of the inventory
+// packets (see the C1 BodyPart enum).
 const WEAR_SLOTS = [
-  { key: "back", label: "cloak", mask: 0x2000 },
-  { key: "head", label: "head", mask: 0x40 },
   { key: "under", label: "shirt", mask: 0x1 },
+  { key: "head", label: "head", mask: 0x40 },
+  { key: "back", label: "cloak", mask: 0x2000 },
   { key: "rhand", label: "weapon", mask: 0x80 },
   { key: "chest", label: "chest", mask: 0x400 },
   { key: "lhand", label: "shield", mask: 0x100 },
-  { key: "feet", label: "boots", mask: 0x1000 },
+  { key: "gloves", label: "gloves", mask: 0x200 },
   { key: "legs", label: "legs", mask: 0x800 },
-  { key: "gloves", label: "gloves", mask: 0x200 }
+  { key: "feet", label: "boots", mask: 0x1000 }
 ];
 
 // Jewelry layout: a 2x3 block with only five real slots (two earrings,
-// a necklace, two rings) - the sixth position, the middle right cell,
-// stays empty because the classic character has no sixth jewelry slot.
-// The null entry renders the placeholder hole of the grid.
+// a necklace, two rings) - the necklace sits on the right of the middle
+// row and the sixth position, the middle left cell, stays empty because
+// the classic character has no sixth jewelry slot. The null entry
+// renders the placeholder hole of the grid.
 const JEWEL_SLOTS = [
   { key: "r_ear", label: "r.ear", mask: 0x2, group: "ear" },
   { key: "l_ear", label: "l.ear", mask: 0x4, group: "ear" },
-  { key: "neck", label: "neck", mask: 0x8 },
   null,
+  { key: "neck", label: "neck", mask: 0x8 },
   { key: "r_finger", label: "r.ring", mask: 0x10, group: "finger" },
   { key: "l_finger", label: "l.ring", mask: 0x20, group: "finger" }
 ];
@@ -461,7 +464,7 @@ function resetGear() {
   const adena = document.getElementById("gear-adena");
   if (adena) { adena.textContent = "—"; adena.title = ""; }
   const fill = document.getElementById("gear-load-fill");
-  if (fill) { fill.style.width = "0%"; fill.className = "load-fill"; }
+  if (fill) { fill.style.width = "0%"; fill.className = "load-fill"; fill.style.background = ""; }
   const loadText = document.getElementById("gear-load-text");
   if (loadText) { loadText.textContent = "—"; }
   const row = document.getElementById("gear-weight-row");
@@ -523,11 +526,69 @@ function renderGear(snap) {
   renderGearFoot(snap);
 }
 
+// ---- weight gauge coloring ----
+
+// The weight penalty thresholds of the Mobius C1 server (Player
+// refreshOverloaded): the load is measured per mille and the debuff
+// levels switch at 500/666/800/1000 - 50%, 66.6%, 80% and 100% of the
+// maximum load. Each level slows the character (speed x0.90 / 0.87 /
+// 0.84 / 0.81) and the last one marks the character overloaded.
+const WEIGHT_PENALTIES = [
+  { percent: 100.0, level: 4, speed: "x0.81" },
+  { percent: 80.0, level: 3, speed: "x0.84" },
+  { percent: 66.6, level: 2, speed: "x0.87" },
+  { percent: 50.0, level: 1, speed: "x0.90" }
+];
+
+// weightPenalty resolves the active weight debuff of a load percent,
+// null while the load stays under the first threshold.
+function weightPenalty(percent) {
+  for (const penalty of WEIGHT_PENALTIES) {
+    if (percent >= penalty.percent) { return penalty; }
+  }
+
+  return null;
+}
+
+// weightFillStyle colors the weight bar of a load percent: green below
+// the first debuff threshold, then the color melts from yellow through
+// orange into red as the load climbs the server debuff levels - the
+// hue interpolates between the level anchors so the bar transfers
+// smoothly instead of jumping.
+function weightFillStyle(percent) {
+  if (percent < WEIGHT_PENALTIES[WEIGHT_PENALTIES.length - 1].percent) {
+    return "";
+  }
+  // Hue anchors: yellow at 50%, orange at 66.6%, red at 80%, deep red
+  // at 100%; lightness darkens slightly toward the overload.
+  const stops = [
+    { percent: 50.0, hue: 50, light: 50 },
+    { percent: 66.6, hue: 26, light: 48 },
+    { percent: 80.0, hue: 8, light: 45 },
+    { percent: 100.0, hue: 0, light: 42 }
+  ];
+  let hue = stops[stops.length - 1].hue;
+  let light = stops[stops.length - 1].light;
+  for (let i = 0; i + 1 < stops.length; i++) {
+    const a = stops[i];
+    const b = stops[i + 1];
+    if (percent >= a.percent && percent <= b.percent) {
+      const f = (percent - a.percent) / (b.percent - a.percent);
+      hue = a.hue + (b.hue - a.hue) * f;
+      light = a.light + (b.light - a.light) * f;
+      break;
+    }
+  }
+
+  return "hsl(" + hue.toFixed(1) + ", 85%, " + light.toFixed(1) + "%)";
+}
+
 // renderGearFoot refreshes the pinned footer of the floating widget:
 // the adena line and the weight line stay visible below the inventory
 // grid whatever the scroll position of the bag is. The load bar fills
-// by the load percentage and colors by the classic thresholds - amber
-// past half load, red near the weight limit.
+// by the load percentage and colors by the server weight debuff
+// thresholds - green below 50%, then yellow melting into orange and
+// red toward the overload levels.
 function renderGearFoot(snap) {
   const c = snap.character || {};
   const adena = document.getElementById("gear-adena");
@@ -547,18 +608,27 @@ function renderGearFoot(snap) {
     if (percent === null) {
       fill.style.width = "0%";
       fill.className = "load-fill";
+      fill.style.background = "";
       text.textContent = "—";
     } else {
+      const penalty = weightPenalty(percent);
       fill.style.width = percent.toFixed(1) + "%";
       fill.className = "load-fill" +
-        (percent >= 90 ? " heavy" : percent >= 50 ? " warn" : "");
+        (penalty ? " pen" + penalty.level : "");
+      fill.style.background = weightFillStyle(percent);
       text.textContent = Math.round(percent) + "%";
+      text.style.color = penalty ? weightFillStyle(percent) : "";
     }
   }
   if (row) {
+    const penalty = percent === null ? null : weightPenalty(percent);
     row.title = c.maxLoad > 0
       ? "weight: " + formatNumber(c.load) + " / " +
-        formatNumber(c.maxLoad)
+        formatNumber(c.maxLoad) +
+        (penalty
+          ? " · weight debuff " + penalty.level +
+            " (speed " + penalty.speed + ")"
+          : " · no weight debuff")
       : "weight";
   }
 }
@@ -740,6 +810,19 @@ function resolveDropCount(input, max) {
   return Math.min(value, max);
 }
 
+// bumpDropCount steps the count dialog answer by delta and clamps it
+// into the stack bounds: the scroll wheel over the dialog tunes the
+// count without touching the keyboard, a garbage field counts as one.
+function bumpDropCount(delta) {
+  const item = PendingDrop.item;
+  const input = document.getElementById("drop-count");
+  if (!item || !input) { return; }
+  const current = resolveDropCount(input.value, item.count);
+  const base = current === null ? 1 : current;
+  input.value = Math.max(1, Math.min(item.count, base + delta));
+  input.classList.remove("invalid");
+}
+
 function openDropDialog(item, mode) {
   PendingDrop.item = item;
   PendingDrop.mode = mode === "destroy" ? "destroy" : "drop";
@@ -888,6 +971,17 @@ function initGearInteractions() {
       if (event.key === "Enter") { confirmDropDialog(); }
       if (event.key === "Escape") { closeDropDialog(); }
     });
+  }
+  const dialog = document.getElementById("drop-dialog");
+  if (dialog) {
+    // The scroll wheel over the open dialog steps the count: one notch
+    // up or down, clamped into the stack. The listener must stay
+    // non-passive because the wheel also scrolls the page otherwise.
+    dialog.addEventListener("wheel", (event) => {
+      if (dialog.classList.contains("hidden")) { return; }
+      event.preventDefault();
+      bumpDropCount(event.deltaY < 0 ? 1 : -1);
+    }, { passive: false });
   }
 }
 

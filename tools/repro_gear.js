@@ -27,9 +27,10 @@ SPDX-License-Identifier: MIT
 // - the inventory grid skips the equipped items and renders the stack
 //   count and enchant badges; the slot counter shows the usage;
 // - the pinned footer: the adena line formats the carried amount and
-//   the weight line fills the load bar by the percentage with the
-//   classic threshold colors (green under half load, amber past it,
-//   red near the limit; a dash when the load is unknown);
+//   the weight line fills the load bar by the percentage, colored by
+//   the server weight debuff thresholds (green below 50%, then the
+//   fill melts from yellow through orange into red at 50/66.6/80/
+//   100 percent of the load; a dash when the load is unknown);
 // - keyed updates: re-rendering the same snapshot or changing only a
 //   stack count keeps the icon image elements alive (the icons must
 //   not blink on every snapshot), removed items drop their cells;
@@ -158,6 +159,10 @@ function loadAppJs(appFile) {
             }
             return elements.get(id);
         },
+        // querySelector answers null: the harness owns no .gear-slots
+        // element, but a defined querySelector lets initGearInteractions
+        // wire the real dialog listeners (the wheel stepping included).
+        querySelector: () => null,
         createElement: () => makeElement(),
         documentElement: { dataset: {} }
     };
@@ -197,6 +202,12 @@ function loadAppJs(appFile) {
         " ? confirmDropDialog : undefined," +
         " resolveDropCount: typeof resolveDropCount === 'function'" +
         " ? resolveDropCount : undefined," +
+        " weightPenalty: typeof weightPenalty === 'function'" +
+        " ? weightPenalty : undefined," +
+        " weightFillStyle: typeof weightFillStyle === 'function'" +
+        " ? weightFillStyle : undefined," +
+        " bumpDropCount: typeof bumpDropCount === 'function'" +
+        " ? bumpDropCount : undefined," +
         " App: App, GearDrag: GearDrag };",
         sandbox);
 
@@ -265,9 +276,9 @@ function findIconCell(root, itemId) {
 }
 
 // Slot order of the two paperdoll blocks (mirrors app.js).
-const WEAR_KEYS = ["back", "head", "under", "rhand", "chest",
-    "lhand", "feet", "legs", "gloves"];
-const JEWEL_KEYS = ["r_ear", "l_ear", "neck", null, "r_finger", "l_finger"];
+const WEAR_KEYS = ["under", "head", "back", "rhand", "chest",
+    "lhand", "gloves", "legs", "feet"];
+const JEWEL_KEYS = ["r_ear", "l_ear", null, "neck", "r_finger", "l_finger"];
 
 // slotCell returns the rendered cell of a slot key.
 function slotCell(wearBox, jewelBox, key) {
@@ -351,15 +362,22 @@ function main() {
     const invGrid = elements.get("inv-grid");
 
     // The compact layout: nine wear cells, five jewelry cells and the
-    // blank middle-right hole, nothing in the bag.
+    // blank middle-left hole, nothing in the bag.
     check(results, "wear block holds 9 slot cells",
         wearBox.children.length === 9,
         "got " + wearBox.children.length + " cells");
     check(results, "jewel block holds 5 slots and the blank hole",
         jewelBox.children.length === 6 &&
-        jewelBox.children[3].className === "jewel-hole",
+        jewelBox.children[2].className === "jewel-hole",
         "got " + jewelBox.children.length + " children, hole class " +
-        (jewelBox.children[3] || makeElement()).className);
+        (jewelBox.children[2] || makeElement()).className);
+    check(results, "neck sits right of the blank hole",
+        labelOf(jewelBox.children[3]) &&
+        labelOf(jewelBox.children[3]).textContent === "neck",
+        "middle row: " + JSON.stringify([
+            jewelBox.children[2].className,
+            labelOf(jewelBox.children[3])
+                ? labelOf(jewelBox.children[3]).textContent : "?"]));
     check(results, "empty inventory grid",
         invGrid.children.length === 0,
         "got " + invGrid.children.length + " cells");
@@ -481,21 +499,51 @@ function main() {
         elements.get("gear-load-fill").style.width === "50.0%",
         "text " + elements.get("gear-load-text").textContent +
         ", width " + elements.get("gear-load-fill").style.width);
-    check(results, "half load colors the bar amber",
-        elements.get("gear-load-fill").className === "load-fill warn",
-        "class " + elements.get("gear-load-fill").className);
-    check(results, "weight tooltip carries the raw numbers",
+    check(results, "half load crosses the first weight debuff",
+        elements.get("gear-load-fill").className === "load-fill pen1" &&
+        (elements.get("gear-load-fill").style.background || "")
+            .startsWith("hsl("),
+        "class " + elements.get("gear-load-fill").className +
+        ", background " +
+        elements.get("gear-load-fill").style.background);
+    check(results, "weight tooltip carries the debuff level",
         (elements.get("gear-weight-row").title || "")
             .includes("3,000") &&
         (elements.get("gear-weight-row").title || "")
-            .includes("6,000"),
+            .includes("6,000") &&
+        (elements.get("gear-weight-row").title || "")
+            .includes("weight debuff 1") &&
+        (elements.get("gear-weight-row").title || "")
+            .includes("x0.90"),
         "title " + elements.get("gear-weight-row").title);
+
+    gear.renderGear(gearSnapshot([], 0, 80,
+        { adena: 123456, load: 3996, maxLoad: 6000 }));
+    check(results, "two thirds load turns the bar orange",
+        elements.get("gear-load-fill").className === "load-fill pen2" &&
+        (elements.get("gear-load-fill").style.background || "")
+            .startsWith("hsl(26"),
+        "class " + elements.get("gear-load-fill").className +
+        ", background " +
+        elements.get("gear-load-fill").style.background);
+
+    gear.renderGear(gearSnapshot([], 0, 80,
+        { adena: 123456, load: 7000, maxLoad: 6000 }));
+    check(results, "overload clamps to the deepest debuff",
+        elements.get("gear-load-fill").className === "load-fill pen4" &&
+        elements.get("gear-load-text").textContent === "100%",
+        "class " + elements.get("gear-load-fill").className +
+        ", text " + elements.get("gear-load-text").textContent);
 
     gear.renderGear(gearSnapshot([], 0, 80,
         { adena: 123456, load: 5900, maxLoad: 6000 }));
     check(results, "near limit load colors the bar red",
-        elements.get("gear-load-fill").className === "load-fill heavy",
-        "class " + elements.get("gear-load-fill").className);
+        elements.get("gear-load-fill").className === "load-fill pen3" &&
+        (elements.get("gear-load-fill").style.background || "")
+            .startsWith("hsl("),
+        "class " + elements.get("gear-load-fill").className +
+        ", background " +
+        elements.get("gear-load-fill").style.background);
 
     gear.renderGear(gearSnapshot([], 0, 80,
         { adena: 0, load: 0, maxLoad: 0 }));
@@ -526,6 +574,12 @@ function main() {
         html.includes('id="gear-load-fill"') &&
         html.includes('id="gear-load-text"'),
         "missing footer ids");
+    check(results, "footer numbers come before the trash bin",
+        html.indexOf('class="gear-foot-cols"') <
+        html.indexOf('id="gear-trash"') &&
+        html.indexOf('id="gear-adena"') <
+        html.indexOf('id="gear-trash"'),
+        "the trash bin is not on the right side");
 
     const css = fs.readFileSync(DEFAULT_STYLE_CSS, "utf8");
     const gearCssBlock = css.slice(css.indexOf(".gear-panel {"),
@@ -544,10 +598,30 @@ function main() {
         css.includes(".pd-cell img, .inv-cell img") &&
         css.includes("width: 32px") && css.includes("height: 32px"),
         "icon size css changed");
-    check(results, "load bar threshold colors exist",
-        css.includes(".load-fill.warn") &&
-        css.includes(".load-fill.heavy"),
-        "missing threshold color rules");
+    check(results, "load bar melt replaces the threshold classes",
+        !css.includes(".load-fill.warn") &&
+        !css.includes(".load-fill.heavy") &&
+        css.includes("melts from yellow"),
+        "the fixed threshold classes are still styled");
+    const fillStyle = gear.weightFillStyle;
+    const melt = [
+        fillStyle(40), fillStyle(50), fillStyle(66.6),
+        fillStyle(80), fillStyle(100)
+    ];
+    check(results, "weightFillStyle melts yellow to red",
+        melt[0] === "" && melt[1].startsWith("hsl(50") &&
+        melt[2].startsWith("hsl(26") &&
+        melt[3].startsWith("hsl(8") &&
+        melt[4].startsWith("hsl(0"),
+        "melt: " + JSON.stringify(melt));
+    const penalties = [
+        gear.weightPenalty(49.9), gear.weightPenalty(50).level,
+        gear.weightPenalty(67).level, gear.weightPenalty(85).level,
+        gear.weightPenalty(100).level
+    ];
+    check(results, "weightPenalty mirrors the server thresholds",
+        JSON.stringify(penalties) === '[null,1,2,3,4]',
+        "penalties: " + JSON.stringify(penalties));
 
     // ---- manual interactions ----
 
@@ -645,22 +719,31 @@ function main() {
 
     // ---- interactive round 2 ----
 
-    // The wear order: head top-center above the chest, gloves
-    // bottom-right, the cloak top-left, boots bottom-left.
+    // The wear order of the C1 client doll: shirt top-left, head
+    // top-center, cloak top-right, gloves bottom-left, legs bottom
+    // center, boots bottom-right.
     const orderKeys = [];
     for (const cell of wearBox.children) {
         const label = labelOf(cell);
         orderKeys.push(label ? label.textContent : "(filled)");
     }
-    check(results, "wear grid: head label sits top-center",
-        orderKeys[1] === "head", "row1: " + JSON.stringify(orderKeys));
-    check(results, "wear grid: gloves label sits bottom-right",
-        orderKeys[8] === "gloves", "row3: " + JSON.stringify(orderKeys));
+    check(results, "wear grid: shirt, head, cloak row",
+        orderKeys[0] === "shirt" && orderKeys[1] === "head" &&
+        orderKeys[2] === "cloak",
+        "row1: " + JSON.stringify(orderKeys));
+    check(results, "wear grid: weapon, chest, shield row",
+        orderKeys[3] === "weapon" && orderKeys[4] === "chest" &&
+        orderKeys[5] === "shield",
+        "row2: " + JSON.stringify(orderKeys));
+    check(results, "wear grid: gloves, legs, boots row",
+        orderKeys[6] === "gloves" && orderKeys[7] === "legs" &&
+        orderKeys[8] === "boots",
+        "row3: " + JSON.stringify(orderKeys));
 
     // The trash target of the footer: markup, css and the svg icon.
-    check(results, "trash target exists left of the footer lines",
-        html.indexOf('id="gear-trash"') <
-        html.indexOf('id="gear-adena"') &&
+    check(results, "trash target exists right of the footer lines",
+        html.indexOf('id="gear-adena"') <
+        html.indexOf('id="gear-trash"') &&
         html.includes('class="gear-foot-cols"'),
         "footer order wrong");
     check(results, "trash target carries the bin icon",
@@ -808,6 +891,27 @@ function main() {
         "lands at the character feet" &&
         elements.get("drop-ok").textContent === "drop",
         "head " + elements.get("drop-head").textContent);
+
+    // The scroll wheel over the open dialog steps the count.
+    const wheelInput = elements.get("drop-count");
+    wheelInput.value = "1";
+    let wheelDefaulted = false;
+    fire(dialog, "wheel", { deltaY: -100,
+        preventDefault() { wheelDefaulted = true; } });
+    check(results, "wheel up steps the count",
+        String(wheelInput.value) === "2" && wheelDefaulted,
+        "count " + wheelInput.value +
+        ", default prevented " + wheelDefaulted);
+    fire(dialog, "wheel", { deltaY: 100 });
+    check(results, "wheel down steps back",
+        String(wheelInput.value) === "1", "count " + wheelInput.value);
+    fire(dialog, "wheel", { deltaY: 100 });
+    check(results, "wheel down clamps at one",
+        String(wheelInput.value) === "1", "count " + wheelInput.value);
+    wheelInput.value = "4242";
+    fire(dialog, "wheel", { deltaY: -100 });
+    check(results, "wheel up clamps at the stack size",
+        String(wheelInput.value) === "4242", "count " + wheelInput.value);
 
     // The target widget double click: an attackable target posts the
     // attack command, a friendly or dead one posts nothing.

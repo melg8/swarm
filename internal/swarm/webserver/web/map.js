@@ -130,6 +130,11 @@ const MapView = {
       aggressive: "#e37400",
       combat: "#d93025",
       dead: "#80868b",
+      // The manual command feedback of the user: the walk plan line and
+      // the destination marker share the light blue so a click answer
+      // reads over both the light imagery and the dark fill.
+      userPath: "#4da3ff",
+      userMark: "#4da3ff",
       // The outline and the direction tick of the markers: a middle
       // slate that reads over the light map imagery and over both
       // theme fills alike.
@@ -326,7 +331,17 @@ const MapView = {
       if (obj.moving && obj.speed > 0) { return true; }
     }
 
-    return this.smoothingPending() || this.userMarkAge() < 2500;
+    return this.smoothingPending() || this.userMarkAge() < 2500 ||
+      this.hasWalkPlan();
+  },
+
+  // hasWalkPlan reports whether the bot runs a manual walk right now:
+  // the destination marker of the plan pulses on its own animation
+  // even while the character itself already stands (the plan switches
+  // to the first leg).
+  hasWalkPlan() {
+    return Boolean(this.lastSnap && this.lastSnap.walkPath &&
+      this.lastSnap.walkPath.length);
   },
 
   smoothingPending() {
@@ -806,6 +821,7 @@ const MapView = {
     this.drawTargetLinks(ctx);
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
+    this.drawWalkPlan(ctx);
     this.drawUserIntent(ctx);
     if (this.lastSnap
       && document.getElementById("show-labels").checked) {
@@ -1159,6 +1175,24 @@ const MapView = {
     const p = this.worldToScreen(
       rt ? rt.drawX : c.x, rt ? rt.drawY : c.y);
 
+    // The server side walk of the character gets the same dashed
+    // destination line as every other moving object (the paths
+    // toggle): the manual walk plan line of drawWalkPlan adds the
+    // full planned route on top of it.
+    if (document.getElementById("show-dest").checked && c.moving) {
+      const d = this.worldToScreen(c.destX, c.destY);
+      ctx.save();
+      ctx.strokeStyle = this.colors.textDim;
+      ctx.globalAlpha = 0.35;
+      ctx.setLineDash([4, 3]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(d.x, d.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // The self marker: bigger circle, accent ring and the look tick.
     const selfRadius = 7 * this.unitScale;
     drawUnitTick(ctx, p.x, p.y, heading, selfRadius,
@@ -1333,8 +1367,8 @@ const MapView = {
     }
   },
 
-  // The manual command click ripple: kept alive by the animation
-  // loop while it fades.
+  // The manual command click marker: kept alive by the animation
+  // loop while it breathes and fades.
   userMarkAge() {
     if (!this.userMark) { return Infinity; }
 
@@ -1347,6 +1381,31 @@ const MapView = {
     this.kickAnimation();
   },
 
+  // drawUserMarker renders the blue destination marker of a manual
+  // command: a solid blue dot with a breathing ring that pulses in
+  // and out around it. The walk plan marker and the click ripple share
+  // it so a click answer never changes style mid walk.
+  drawUserMarker(ctx, x, y, nowMs, alpha) {
+    const breathe = 0.5 + 0.5 * Math.sin(nowMs / 280);
+    const ring = 6.5 + 5.5 * breathe;
+    ctx.save();
+    ctx.globalAlpha = alpha * (0.4 + 0.6 * (1 - breathe));
+    ctx.strokeStyle = this.mapColors.userMark;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, ring, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = this.mapColors.userMark;
+    ctx.beginPath();
+    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  },
+
   drawUserIntent(ctx) {
     const age = this.userMarkAge();
     if (age > 2500) {
@@ -1354,20 +1413,42 @@ const MapView = {
 
       return;
     }
-    const fade = 1 - age / 2500;
     const p = this.worldToScreen(this.userMark.x, this.userMark.y);
-    ctx.save();
-    ctx.globalAlpha = fade;
-    ctx.strokeStyle = this.colors.zone;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 5 + (1 - fade) * 16, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = "#d97706";
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    // The marker stays fully visible for the first stretch, then melts
+    // away over the last 700 ms.
+    const fade = age < 1800 ? 1 : 1 - (age - 1800) / 700;
+    this.drawUserMarker(ctx, p.x, p.y, performance.now(), fade);
+  },
+
+  // drawWalkPlan renders the manual walk plan of a map double click:
+  // while the paths toggle is on, the remaining waypoints draw as a
+  // blue dashed line from the character to the clicked destination,
+  // and the destination itself carries the pulsing blue marker.
+  drawWalkPlan(ctx) {
+    const plan = this.lastSnap.walkPath;
+    if (!plan || plan.length === 0) { return; }
+    const c = this.lastSnap.character;
+    if (document.getElementById("show-dest").checked && c && c.x) {
+      const rt = this.runtime.get("self");
+      const p = this.worldToScreen(
+        rt ? rt.drawX : c.x, rt ? rt.drawY : c.y);
+      ctx.save();
+      ctx.strokeStyle = this.mapColors.userPath;
+      ctx.globalAlpha = 0.8;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      for (const wp of plan) {
+        const q = this.worldToScreen(wp.x, wp.y);
+        ctx.lineTo(q.x, q.y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+    const last = plan[plan.length - 1];
+    const t = this.worldToScreen(last.x, last.y);
+    this.drawUserMarker(ctx, t.x, t.y, performance.now(), 1);
   },
 
   // onMapDragOver accepts the drag of an equipment widget cell over

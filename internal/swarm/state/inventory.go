@@ -100,6 +100,19 @@ func (b *Bot) ApplyInventoryUpdate(items []InventoryItem) {
 	}
 }
 
+// InventoryItemState returns the tracked state of one inventory
+// item by its object id: the equipped flag, the stack count and
+// whether the item exists at all. The manual command gate of the
+// hunt loop watches it for the server confirmation of a queued
+// use, drop or destroy.
+func (b *Bot) InventoryItemState(objectID int32) (InventoryItem, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	item, ok := b.inventory[objectID]
+
+	return item, ok
+}
+
 // InventoryStats reports the inventory and weight usage of the character.
 func (b *Bot) InventoryStats() InventoryStats {
 	b.mu.RLock()

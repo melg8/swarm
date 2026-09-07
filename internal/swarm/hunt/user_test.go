@@ -551,16 +551,21 @@ func TestUserMoveReplaceDropsThePlannedPath(t *testing.T) {
 		"the new click must walk directly (inside the planning distance)")
 }
 
-// TestUserSwapCommandsAreSpaced pins the inventory pacing: the Mobius
-// packet executor runs every client packet as its own thread pool task,
-// so the unequip and the equip of one swap must never share a burst -
-// the second command defers for the spacing window and retries on a
-// later tick with the pair order intact.
-func TestUserSwapCommandsAreSpaced(t *testing.T) {
+// TestUserSwapWaitsForServerConfirmation pins the inventory pacing: the
+// Mobius packet executor runs every client packet as its own thread pool
+// task, so the unequip and the equip of one swap must never share a
+// burst - the second command defers until the tracker observed the
+// effect of the first (the equipped flag flipped) and retries then, with
+// the pair order intact.
+func TestUserSwapWaitsForServerConfirmation(t *testing.T) {
 	bot := newTestBot()
 	//nolint:exhaustruct // fake keeps zero defaults
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
+	bot.ApplyItemList([]state.InventoryItem{
+		{ObjectID: 555, ItemID: 1146, Count: 1, Equipped: true},
+		{ObjectID: 556, ItemID: 1147, Count: 1},
+	})
 
 	pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 555})
 	pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 556})
@@ -569,36 +574,146 @@ func TestUserSwapCommandsAreSpaced(t *testing.T) {
 	require.Equal(t, []int32{555}, game.uses,
 		"the first useItem of the burst must go out")
 	require.Len(t, loop.userDeferred, 1,
-		"the second useItem must defer behind the item pace")
+		"the second useItem must defer behind the unconfirmed one")
 	require.Equal(t, int32(556), loop.userDeferred[0].ObjectID)
 
-	// The spacing window passes: the deferred command retries.
-	loop.userInventoryAt = time.Now().Add(-2 * useItemSpacing)
-	loop.tick()
-	require.Equal(t, []int32{555, 556}, game.uses,
-		"the deferred useItem must send after the pace")
-	require.Empty(t, loop.userDeferred)
-
-	// The drop of an equipped item (the unequip + drop pair) spaces
-	// the same way: the drop defers behind the unequip that just
-	// landed and sends once the pace allows it.
-	pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 557})
-	loop.tick()
-	require.Len(t, loop.userDeferred, 1,
-		"the useItem after the last send must defer")
-	loop.userInventoryAt = time.Now().Add(-2 * useItemSpacing)
-	loop.tick()
-	require.Equal(t, []int32{555, 556, 557}, game.uses)
-	pushCommand(bot, state.Command{
-		Kind: state.CommandDrop, ObjectID: 557, Count: 1,
+	// The server applies the first request: the paperdoll update flips
+	// the equipped flag of the item, the gate opens for the second.
+	bot.ApplyInventoryUpdate([]state.InventoryItem{
+		{ObjectID: 555, ItemID: 1146, Count: 1, Equipped: false, Change: 2},
 	})
 	loop.tick()
-	require.Empty(t, game.drops,
-		"the drop must wait for the unequip to land")
-	loop.userInventoryAt = time.Now().Add(-2 * useItemSpacing)
+	require.Equal(t, []int32{555, 556}, game.uses,
+		"the deferred useItem must send right after the confirmation")
+	require.Empty(t, loop.userDeferred)
+}
+
+// TestUserSwapFallbackTimeout pins the rescue path of the gate: a
+// request the server refuses (the inventory never changes) must not
+// block the queue forever - after inventoryConfirmTimeout the next
+// command fires anyway.
+func TestUserSwapFallbackTimeout(t *testing.T) {
+	bot := newTestBot()
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	bot.ApplyItemList([]state.InventoryItem{
+		{ObjectID: 555, ItemID: 1146, Count: 1, Equipped: true},
+		{ObjectID: 556, ItemID: 1147, Count: 1},
+	})
+
+	pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 555})
+	pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 556})
 	loop.tick()
-	require.Len(t, game.drops, 1,
-		"the drop must send once the pace allows it")
+	require.Len(t, loop.userDeferred, 1,
+		"the second useItem defers while the first is unconfirmed")
+
+	// Nothing confirms the request (a refused item), the fallback
+	// timeout opens the gate.
+	loop.userPendingAt = time.Now().Add(-2 * inventoryConfirmTimeout)
+	loop.tick()
+	require.Equal(t, []int32{555, 556}, game.uses,
+		"the timeout must release the deferred command")
+	require.Empty(t, loop.userDeferred)
+}
+
+// TestUserMoveRedirectsARunningWalk pins the instant redirect: while the
+// character walks toward the old click, a new move command must
+// re-issue the walk on the same tick instead of waiting for the old
+// server walk to finish.
+func TestUserMoveRedirectsARunningWalk(t *testing.T) {
+	bot := newTestBot()
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+
+	// The first click: the character walks toward 45600 50400.
+	pushCommand(bot, state.Command{
+		Kind: state.CommandMove, X: 45600, Y: 50400, Z: -3500,
+	})
+	loop.tick()
+	require.Equal(t, [][3]int32{{45600, 50400, -3500}}, game.walks)
+
+	// The server runs the walk: the character is moving toward the old
+	// destination.
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 45100, Y: 50100, Z: -3500,
+		DestX: 45600, DestY: 50400, DestZ: -3500,
+	})
+	// Without a new command the running walk must not restart.
+	loop.tick()
+	require.Len(t, game.walks, 1,
+		"a running walk toward the manual target must not re-issue")
+
+	// The user clicks somewhere else: the redirect re-issues the walk
+	// at once even though the character is still moving.
+	pushCommand(bot, state.Command{
+		Kind: state.CommandMove, X: 44800, Y: 49500, Z: -3500,
+	})
+	loop.tick()
+	require.Equal(t, [][3]int32{
+		{45600, 50400, -3500}, {44800, 49500, -3500},
+	}, game.walks,
+		"the new click must redirect the running walk immediately")
+	require.False(t, loop.userRedirect,
+		"the issued walk must consume the redirect")
+}
+
+// TestUserWalkPlanPublishesAndClears pins the walk plan view: a manual
+// move publishes the clicked destination, a planned walk publishes the
+// remaining waypoints with the destination last, and finishing the walk
+// clears the plan again.
+func TestUserWalkPlanPublishesAndClears(t *testing.T) {
+	bot := newTestBot()
+	//nolint:exhaustruct // fake keeps zero defaults
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+
+	// A near click: the plan is just the clicked destination.
+	pushCommand(bot, state.Command{
+		Kind: state.CommandMove, X: 45600, Y: 50400, Z: -3500,
+	})
+	loop.tick()
+	require.Equal(t, []state.WalkPoint{
+		{X: 45600, Y: 50400, Z: -3500},
+	}, bot.Snapshot().WalkPath,
+		"the direct walk plan must be the clicked point")
+
+	// The character arrives: the plan clears.
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 45600, Y: 50400, Z: -3500,
+		DestX: 45600, DestY: 50400, DestZ: -3500,
+	})
+	loop.tick()
+	require.Empty(t, bot.Snapshot().WalkPath,
+		"the finished walk must clear the plan")
+
+	// A far click plans a geodata path: the plan carries the remaining
+	// waypoints with the destination last.
+	//nolint:exhaustruct // the result fields under test only
+	navigator := &fakeNavigator{found: true}
+	loop.SetNavigator(navigator)
+	pushCommand(bot, state.Command{
+		Kind: state.CommandMove, X: 48000, Y: 45000, Z: -3500,
+	})
+	loop.tick()
+	require.NotNil(t, loop.userWaypoints,
+		"the far click must plan a geodata path")
+	plan := bot.Snapshot().WalkPath
+	require.NotEmpty(t, plan)
+	require.Equal(t, state.WalkPoint{X: 48000, Y: 45000, Z: -3500},
+		plan[len(plan)-1],
+		"the clicked destination must close the plan")
+
+	// Waypoints the character passes drop out of the published plan.
+	loop.userWpIndex = len(loop.userWaypoints) - 1
+	loop.tick()
+	trimmed := bot.Snapshot().WalkPath
+	require.Len(t, trimmed, 1,
+		"the passed waypoints must leave the plan")
+	require.Equal(t, state.WalkPoint{X: 48000, Y: 45000, Z: -3500},
+		trimmed[0],
+		"the remaining plan must keep the destination last")
 }
 
 // TestUserAttackWalksStalledChase pins the chase progress watchdog: a

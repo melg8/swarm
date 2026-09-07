@@ -478,6 +478,109 @@ func TestNearestAttackable(t *testing.T) {
 	require.False(t, ok)
 }
 
+// TestWalkPlanPublishesAndClears pins the manual walk plan view of the
+// web UI: SetWalkPlan publishes the remaining waypoints with the
+// snapshot, republishing the same plan only refreshes the lifetime
+// without churning the version, and ClearWalkPlan (or an empty plan)
+// drops it again.
+func TestWalkPlanPublishesAndClears(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+	require.Empty(t, bot.Snapshot().WalkPath)
+
+	plan := []WalkPoint{
+		{X: 45600, Y: 50400, Z: -3500},
+		{X: 46000, Y: 51000, Z: -3500},
+	}
+	bot.SetWalkPlan(plan)
+	snap := bot.Snapshot()
+	require.Equal(t, plan, snap.WalkPath)
+
+	// The same plan republishes without a version bump: the steady
+	// per tick refresh of the hunt loop must not wake the event
+	// stream.
+	version := bot.Snapshot().Version
+	bot.SetWalkPlan(plan)
+	require.Equal(t, version, bot.Snapshot().Version,
+		"an unchanged plan must not bump the version")
+
+	// A changed plan publishes and bumps.
+	bot.SetWalkPlan(plan[1:])
+	require.Equal(t, plan[1:], bot.Snapshot().WalkPath)
+
+	// Clearing drops the plan (an empty list clears too).
+	bot.SetWalkPlan(nil)
+	require.Empty(t, bot.Snapshot().WalkPath)
+	bot.SetWalkPlan(plan)
+	bot.ClearWalkPlan()
+	require.Empty(t, bot.Snapshot().WalkPath)
+}
+
+// TestWalkPlanExpires pins the plan lifetime: without a refresh the
+// snapshot drops the plan after walkPlanTTL so a crashed loop never
+// leaves a stale line on the map.
+func TestWalkPlanExpires(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+	bot.SetWalkPlan([]WalkPoint{{X: 1, Y: 2, Z: 3}})
+	require.Len(t, bot.Snapshot().WalkPath, 1)
+
+	bot.walkPathAt = time.Now().Add(-2 * walkPlanTTL)
+	require.Empty(t, bot.Snapshot().WalkPath,
+		"the stale plan must expire out of the snapshot")
+	// The expired plan still clears without a panic and without a
+	// second touch side effect.
+	bot.ClearWalkPlan()
+	require.Empty(t, bot.Snapshot().WalkPath)
+}
+
+// TestResetSessionClearsWalkPlan pins the session boundary: a fresh
+// login never inherits the walk plan of the previous session.
+func TestResetSessionClearsWalkPlan(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	bot.SetWalkPlan([]WalkPoint{{X: 1, Y: 2, Z: 3}})
+
+	bot.ResetSession()
+
+	require.Empty(t, bot.Snapshot().WalkPath)
+}
+
+// TestInventoryItemState pins the item lookup of the manual command
+// gate: the equipped flag, the stack count and the existence must
+// answer for both the listed and the updated inventory.
+func TestInventoryItemState(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+	_, ok := bot.InventoryItemState(555)
+	require.False(t, ok, "an unknown item must report missing")
+
+	bot.ApplyItemList([]InventoryItem{
+		{ObjectID: 555, ItemID: 1146, Count: 1, Equipped: true},
+	})
+	item, ok := bot.InventoryItemState(555)
+	require.True(t, ok)
+	require.True(t, item.Equipped)
+	require.Equal(t, int32(1), item.Count)
+
+	bot.ApplyInventoryUpdate([]InventoryItem{
+		{ObjectID: 555, ItemID: 1146, Count: 3, Change: 2},
+	})
+	item, ok = bot.InventoryItemState(555)
+	require.True(t, ok)
+	require.False(t, item.Equipped)
+	require.Equal(t, int32(3), item.Count)
+
+	bot.ApplyInventoryUpdate([]InventoryItem{
+		{ObjectID: 555, ItemID: 1146, Count: 0, Change: 3},
+	})
+	_, ok = bot.InventoryItemState(555)
+	require.False(t, ok, "the removed item must report missing")
+}
+
 func TestSelfMovementTracksDestination(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)

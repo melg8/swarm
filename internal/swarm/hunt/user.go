@@ -41,23 +41,27 @@ const (
 	// requests past a few thousand units), so long clicks follow the
 	// bot planned waypoints instead, one server accepted leg at a time.
 	userPathfindDistance = 2000.0
-	// useItemSpacing is the pause between two inventory actions of the
-	// web UI. The Mobius packet executor runs every client packet as
-	// its own thread pool task, so two same-burst requests race in the
-	// paperdoll: the unequip and the equip of one swap cancelled each
-	// other in testing. The official client never fires two item uses
-	// inside a second (the flood protector idiom), the loop mirrors
-	// that: a request inside the window defers to a later tick and the
-	// order of a swap pair stays intact.
-	useItemSpacing = 1 * time.Second
+	// inventoryConfirmTimeout bounds how long one inventory action
+	// waits for its server confirmation before the next command fires
+	// anyway. The gate normally releases as soon as the tracker
+	// observed the effect of the previous action (the equipped flag
+	// flipped, the count changed, the item vanished), so a swap pair
+	// continues at the speed the server actually processes it; the
+	// timeout only rescues a refused request from blocking the queue.
+	// The UseItem flood protector of this server build is disabled
+	// (FloodProtectorUseItemInterval = 0, retail matching), so once
+	// the packet race is serialized nothing on the server side rate
+	// limits the pair.
+	inventoryConfirmTimeout = 600 * time.Millisecond
 )
 
 // consumeUserCommands drains the command queue of the bot and applies
-// every entry. One shot inventory commands execute right away (spaced
-// one second apart, see useItemSpacing), the movement commands (move,
-// attack, pickup) reprogram the manual phase (the newest command
-// wins). Deferred commands retry first so the spacing never reorders
-// a swap pair.
+// every entry. One shot inventory commands execute right away (gated
+// on the server confirmation of the previous one, see
+// gateInventoryCommand), the movement commands (move, attack,
+// pickup) reprogram the manual phase (the newest command wins).
+// Deferred commands retry first so the gate never reorders a swap
+// pair.
 func (l *Loop) consumeUserCommands() {
 	l.flushDeferredCommands()
 	for {
@@ -90,17 +94,22 @@ func (l *Loop) flushDeferredCommands() {
 }
 
 // gateInventoryCommand defers one command when it is an inventory
-// action landing inside the spacing window of the previous one: the
-// deferred list preserves the pair order of a swap (the older command
-// was already sent, this one waits for its own server game tick).
+// action that would race the previous one on the server: the Mobius
+// packet executor runs every client packet as its own thread pool
+// task, so the unequip and the equip of one swap cancel each other
+// when they land in the same burst. The gate holds the newcomer
+// until the tracker observed the effect of the previous action, so
+// the pair continues as fast as the server actually processes it -
+// not on a fixed pause. The deferred list preserves the pair order
+// of a swap (the older command was already sent, this one waits for
+// its server game tick).
 func (l *Loop) gateInventoryCommand(cmd state.Command) bool {
 	switch cmd.Kind {
 	case state.CommandUseItem, state.CommandDrop, state.CommandDestroy:
 	default:
 		return false
 	}
-	if l.userInventoryAt.IsZero() ||
-		time.Since(l.userInventoryAt) >= useItemSpacing {
+	if l.inventoryGateOpen() {
 		return false
 	}
 	l.userDeferred = append(l.userDeferred, cmd)
@@ -108,6 +117,36 @@ func (l *Loop) gateInventoryCommand(cmd state.Command) bool {
 		cmd.Kind)
 
 	return true
+}
+
+// inventoryGateOpen reports whether the previous inventory action is
+// confirmed: its effect showed up in the tracked inventory, or the
+// action is old enough that a refused request must not block the
+// queue forever.
+func (l *Loop) inventoryGateOpen() bool {
+	if l.userPendingAt.IsZero() {
+		return true
+	}
+	if time.Since(l.userPendingAt) >= inventoryConfirmTimeout {
+		return true
+	}
+
+	return l.pendingInventoryConfirmed()
+}
+
+// pendingInventoryConfirmed checks the tracked inventory for the
+// effect of the previous action: any change of the equipped flag,
+// the stack count or the existence of the item means the server
+// processed the request.
+func (l *Loop) pendingInventoryConfirmed() bool {
+	item, ok := l.tracker.InventoryItemState(l.userPendingItem)
+	if !ok {
+		// Vanished: consumed by the request.
+		return true
+	}
+
+	return item.Equipped != l.userPendingEquip ||
+		item.Count != l.userPendingCount
 }
 
 // applyUserCommand turns one queued web command into world action.
@@ -129,22 +168,34 @@ func (l *Loop) applyUserCommand(cmd state.Command) {
 	}
 }
 
-// markInventoryAction records the send time of one inventory action:
-// the next one inside useItemSpacing defers.
-func (l *Loop) markInventoryAction() {
-	l.userInventoryAt = time.Now()
+// markInventoryAction records the pending confirmation of one
+// inventory action: the item state as it was when the request left.
+// The gate watches the tracker for the actual server effect (see
+// pendingInventoryConfirmed).
+func (l *Loop) markInventoryAction(objectID int32) {
+	item, ok := l.tracker.InventoryItemState(objectID)
+	l.userPendingItem = objectID
+	l.userPendingEquip = item.Equipped
+	l.userPendingCount = item.Count
+	l.userPendingAt = time.Now()
+	if !ok {
+		// Unknown item (the request may remove it entirely): the
+		// vanishing itself is the confirmation.
+		l.userPendingEquip = false
+		l.userPendingCount = 0
+	}
 }
 
 // userUseItem executes the equip/unequip toggle of one item right
 // away: the packet is a one shot request, the server applies or
-// refuses it by itself (the flood protector allows one use per
-// second).
+// refuses it by itself (the UseItem flood protector of this build
+// is disabled, the confirmation gate paces the pairs).
 func (l *Loop) userUseItem(cmd state.Command) {
 	if cmd.ObjectID == 0 {
 		return
 	}
 	l.logger.Printf("Hunt: user command: use item %d", cmd.ObjectID)
-	l.markInventoryAction()
+	l.markInventoryAction(cmd.ObjectID)
 	if err := l.game.UseItem(cmd.ObjectID); err != nil {
 		l.logger.Printf("Hunt: use item failed: %v", err)
 	}
@@ -165,7 +216,7 @@ func (l *Loop) userDrop(cmd state.Command) {
 	}
 	l.logger.Printf("Hunt: user command: drop %d of item %d",
 		cmd.Count, cmd.ObjectID)
-	l.markInventoryAction()
+	l.markInventoryAction(cmd.ObjectID)
 	if err := l.game.DropItem(cmd.ObjectID, cmd.Count, x, y, z); err != nil {
 		l.logger.Printf("Hunt: drop item failed: %v", err)
 	}
@@ -182,7 +233,7 @@ func (l *Loop) userDestroy(cmd state.Command) {
 	}
 	l.logger.Printf("Hunt: user command: destroy %d of item %d",
 		cmd.Count, cmd.ObjectID)
-	l.markInventoryAction()
+	l.markInventoryAction(cmd.ObjectID)
 	if err := l.game.DestroyItem(cmd.ObjectID, cmd.Count); err != nil {
 		l.logger.Printf("Hunt: destroy item failed: %v", err)
 	}
@@ -216,6 +267,11 @@ func (l *Loop) userMovement(cmd state.Command) {
 	l.userTarget = cmd.ObjectID
 	l.userStart = time.Now()
 	l.userMoveAt = time.Time{}
+	// The new command redirects a walk that is already running: the
+	// next tick re-issues the walk request at once instead of
+	// waiting for the old server walk to finish (the server replaces
+	// the destination of a running walk with the next move request).
+	l.userRedirect = true
 	l.userWaypoints = nil
 	l.userWpIndex = 0
 	l.userPathTried = false
@@ -292,13 +348,15 @@ func (l *Loop) tickUserMove(now time.Time) {
 
 		return
 	}
-	if l.tracker.SelfWalking() {
-		// The walk is running: do not restart the server side path.
+	if l.tracker.SelfWalking() && !l.userRedirect {
+		// The walk is running toward the manual target: do not
+		// restart the server side path.
 		return
 	}
 	if !l.userMoveAt.IsZero() && now.Sub(l.userMoveAt) < selectPeriod {
 		return
 	}
+	l.userRedirect = false
 	l.userMoveAt = now
 	if err := l.game.WalkTo(l.userX, l.userY, l.userZ); err != nil {
 		l.logger.Printf("Hunt: manual walk failed: %v", err)
@@ -378,7 +436,7 @@ func (l *Loop) followUserWaypoints(
 
 		return
 	}
-	if l.tracker.SelfWalking() {
+	if l.tracker.SelfWalking() && !l.userRedirect {
 		// The current leg is running: do not restart the server path.
 		return
 	}
@@ -399,11 +457,44 @@ func (l *Loop) followUserWaypoints(
 		moveY = float64(selfY) + dy*scale
 		moveZ = float64(selfZ)
 	}
+	l.userRedirect = false
 	l.userMoveAt = now
 	if err := l.game.WalkTo(
 		int32(moveX), int32(moveY), int32(moveZ)); err != nil {
 		l.logger.Printf("Hunt: manual walk failed: %v", err)
 	}
+}
+
+// publishWalkPlan refreshes the walk plan view of the web UI: while
+// a manual move runs, the remaining waypoints of the plan publish
+// with the clicked destination last (the map draws the path line
+// and the destination marker from it). Every other state of the
+// loop clears the plan; the tracker also expires it on its own, so
+// an abrupt exit never leaves a stale line.
+func (l *Loop) publishWalkPlan() {
+	if l.phase != phaseUser || l.userKind != state.CommandMove {
+		l.tracker.ClearWalkPlan()
+
+		return
+	}
+	pts := make([]state.WalkPoint, 0,
+		len(l.userWaypoints)-l.userWpIndex+1)
+	for _, wp := range l.userWaypoints[l.userWpIndex:] {
+		pts = append(pts, state.WalkPoint{
+			X: int32(wp.X), Y: int32(wp.Y), Z: int32(wp.Z),
+		})
+	}
+	// The clicked destination always closes the plan: a planned
+	// path ends on its last waypoint, a direct walk is just the
+	// target.
+	if n := len(pts); n == 0 || math.Hypot(
+		float64(pts[n-1].X-l.userX),
+		float64(pts[n-1].Y-l.userY)) > 100 {
+		pts = append(pts, state.WalkPoint{
+			X: l.userX, Y: l.userY, Z: l.userZ,
+		})
+	}
+	l.tracker.SetWalkPlan(pts)
 }
 
 // tickUserAttack forces the attack on the clicked object until the
@@ -588,7 +679,9 @@ func (l *Loop) resumeAuto() {
 	}
 	l.userKind = ""
 	l.userTarget = 0
+	l.userRedirect = false
 	l.target = 0
 	l.lootID = 0
 	l.engageAt = time.Time{}
+	l.tracker.ClearWalkPlan()
 }

@@ -39,16 +39,13 @@ SPDX-License-Identifier: MIT
     #40a0ff 0%, #2060c0 45%, #103080 100%);
   --grad-xp: linear-gradient(to bottom,
     #f4f4f4 0%, #c7cbd1 45%, #9096a0 100%);
-  /* Load bar palette of the equipment widget footer: green while
-     comfortable, amber past half load, red near the weight limit -
-     the classic weight indicator colors, theme independent like the
-     vital bars. */
+  /* Load bar palette of the equipment widget footer: the calm green
+     gradient while the load stays under the first weight debuff
+     threshold; the warn colors past the thresholds come inline from
+     weightFillStyle of app.js - theme independent like the vital
+     bars. */
   --grad-load: linear-gradient(to bottom,
     #6fd06f 0%, #3f9f3f 45%, #2f7f2f 100%);
-  --grad-load-warn: linear-gradient(to bottom,
-    #f0d040 0%, #d0a020 45%, #a08010 100%);
-  --grad-load-heavy: linear-gradient(to bottom,
-    #f04040 0%, #c00000 45%, #8b0000 100%);
 }
 
 html[data-theme="dark"] {
@@ -797,7 +794,8 @@ body.mode-pathfind .gear-panel { display: none; }
 }
 
 /* The sixth jewelry position: only five jewelry slots exist, the
-   middle right cell of the block stays blank. */
+   middle left cell of the block stays blank and the necklace occupies
+   the middle right cell. */
 .jewel-hole {
   border: none;
   background: none;
@@ -916,11 +914,12 @@ body.mode-pathfind .gear-panel { display: none; }
   border-top: 1px solid var(--border-soft);
 }
 
-/* The trash target left of the adena and weight lines: dragging an
-   item onto it destroys the item on the server. */
+/* The trash target at the right end of the footer, after the adena
+   and weight numbers: dragging an item onto it destroys the item on
+   the server. */
 .gear-trash {
   width: 30px;
-  height: 34px;
+  height: 38px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -929,6 +928,7 @@ body.mode-pathfind .gear-panel { display: none; }
   border-radius: 5px;
   color: var(--text-dim);
   background: var(--bg);
+  margin-left: 2px;
 }
 
 .gear-trash:hover,
@@ -948,7 +948,6 @@ body.mode-pathfind .gear-panel { display: none; }
   flex-direction: column;
   gap: 5px;
 }
-
 /* ---- manual interactions of the equipment widget ---- */
 
 /* Cells keep the plain cursor over items: the widget must not change
@@ -1032,6 +1031,14 @@ body.mode-pathfind .gear-panel { display: none; }
   font-size: 10.5px;
 }
 
+/* Keyboard and wheel hints of the count dialog. */
+.drop-hint {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.4px;
+}
+
 .drop-actions {
   display: flex;
   justify-content: flex-end;
@@ -1077,8 +1084,12 @@ body.mode-pathfind .gear-panel { display: none; }
   white-space: nowrap;
 }
 
-/* Weight bar: the fill width is the load percentage, the color class
-   switches at the classic thresholds. */
+/* Weight bar: the fill width is the load percentage, the inline
+   background (set by weightFillStyle of app.js) melts from yellow
+   through orange into red across the server weight debuff thresholds
+   - 50%, 66.6%, 80% and 100% of the maximum load (Player
+   refreshOverloaded of the Mobius C1 server). Below the first
+   threshold the fill keeps the calm green gradient. */
 .load-bar {
   flex: 1;
   height: 8px;
@@ -1092,12 +1103,8 @@ body.mode-pathfind .gear-panel { display: none; }
   height: 100%;
   width: 0%;
   background: var(--grad-load);
-  transition: width 0.4s ease;
+  transition: width 0.4s ease, background 0.4s ease;
 }
-
-.load-fill.warn { background: var(--grad-load-warn); }
-
-.load-fill.heavy { background: var(--grad-load-heavy); }
 
 .gear-load-text {
   font-family: var(--mono);

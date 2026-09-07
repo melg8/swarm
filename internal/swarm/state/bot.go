@@ -297,6 +297,11 @@ type Bot struct {
 	started      time.Time
 	updated      time.Time
 	commandQueue chan Command
+	// The published manual walk plan of the web UI (see
+	// SetWalkPlan): the remaining waypoints of a double click
+	// walk, the clicked destination last.
+	walkPath   []WalkPoint
+	walkPathAt time.Time
 }
 
 // NewBot creates a bot tracker for the given session id (account name).
@@ -321,6 +326,8 @@ func NewBot(id string) *Bot {
 		started:      time.Now(),
 		updated:      time.Time{},
 		commandQueue: make(chan Command, commandQueueCapacity),
+		walkPath:     nil,
+		walkPathAt:   time.Time{},
 	}
 }
 
@@ -555,8 +562,82 @@ func (b *Bot) ResetSession() {
 	b.char = newCharacterState()
 	b.objects = make(map[int32]WorldObject)
 	b.inventory = make(map[int32]InventoryItem)
+	b.walkPath = nil
+	b.walkPathAt = time.Time{}
 	b.status = StatusConnecting
 	b.touch()
+}
+
+// walkPlanTTL bounds how long a published walk plan survives
+// without a refresh: the hunt loop re-publishes the plan every
+// tick while the manual walk runs, so an expired plan means the
+// loop moved on (or died) and the map must stop drawing the line
+// and the marker.
+const walkPlanTTL = 2 * time.Second
+
+// WalkPoint is one waypoint of the published walk plan of the
+// manual web UI: the remaining waypoints of a double click walk,
+// the clicked destination last.
+type WalkPoint struct {
+	X int32 `json:"x"`
+	Y int32 `json:"y"`
+	Z int32 `json:"z"`
+}
+
+// SetWalkPlan publishes the manual walk plan of the web UI: the
+// remaining waypoints, the clicked destination last. An empty
+// plan clears it. Republishing the same plan only refreshes its
+// lifetime, so the steady per tick refresh of the hunt loop never
+// churns the event stream.
+func (b *Bot) SetWalkPlan(points []WalkPoint) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if len(points) == 0 {
+		b.clearWalkPlanLocked()
+
+		return
+	}
+	if walkPointsEqual(b.walkPath, points) {
+		b.walkPathAt = time.Now()
+
+		return
+	}
+	b.walkPath = points
+	b.walkPathAt = time.Now()
+	b.touch()
+}
+
+// ClearWalkPlan drops the published walk plan (a no-op when none
+// is published).
+func (b *Bot) ClearWalkPlan() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.clearWalkPlanLocked()
+}
+
+// clearWalkPlanLocked drops the walk plan, the caller must hold
+// the state write lock.
+func (b *Bot) clearWalkPlanLocked() {
+	if b.walkPath == nil {
+		return
+	}
+	b.walkPath = nil
+	b.walkPathAt = time.Time{}
+	b.touch()
+}
+
+// walkPointsEqual compares two walk plans element wise.
+func walkPointsEqual(a []WalkPoint, b []WalkPoint) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 // SetCharacter applies the initial character state from CharSelected.
@@ -1453,6 +1534,7 @@ type Snapshot struct {
 	Objects      []ObjectSnapshot        `json:"objects"`
 	Events       []Event                 `json:"events"`
 	Chat         []ChatEvent             `json:"chat"`
+	WalkPath     []WalkPoint             `json:"walkPath"`
 	HuntingZone  *Zone                   `json:"huntingZone"`
 	Packets      int64                   `json:"packets"`
 	Version      uint64                  `json:"version"`
@@ -1514,6 +1596,10 @@ func (b *Bot) Snapshot() Snapshot {
 		ServerTimeMs: now.UnixMilli(),
 		StartedAt:    b.started,
 		UpdatedAt:    b.updated,
+	}
+	if b.walkPath != nil && time.Since(b.walkPathAt) <= walkPlanTTL {
+		snap.WalkPath = make([]WalkPoint, len(b.walkPath))
+		copy(snap.WalkPath, b.walkPath)
 	}
 	for _, obj := range b.objects {
 		snap.Objects = append(snap.Objects, ObjectSnapshot{

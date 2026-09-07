@@ -177,132 +177,145 @@ type Loop struct {
 	// loot, town trip and delevel logic. A manual only session (started
 	// without -hunt) keeps it off, the loop then drains the manual web
 	// commands and otherwise stays idle.
-	autonomous      bool
-	target          int32
-	lastHit         time.Time
-	lootID          int32
-	lootAt          time.Time
-	lootMoveAt      time.Time
-	skipped         map[int32]time.Time
-	restActionAt    time.Time
-	restActionSit   bool
-	restartAt       time.Time
-	zoneCX          int32
-	zoneCY          int32
-	zoneHalf        int32
-	navigator       Navigator
-	waypoints       []pathfind.Vec3
-	wpIndex         int
-	legDest         pathfind.Vec3
-	moveAt          time.Time
-	stuckAt         time.Time
-	stuckX          int32
-	stuckY          int32
-	rePaths         int
-	farmX           int32
-	farmY           int32
-	farmZ           int32
-	sellAt          time.Time
-	sellPhaseAt     time.Time
-	merchantID      int32
-	merchantPick    time.Time
-	sold            map[int32]bool
-	tripStart       time.Time
-	tripEndedAt     time.Time
-	zoneReturn      bool
-	zoneFails       int
-	delevelTarget   int32
-	delevelGuard    int32
-	delevelTried    map[string]bool
-	delevelFight    time.Time
-	delevelEnd      time.Time
-	delevelExp      int32
-	delevelLevel    int32
-	delevelFree     int
-	delevelWait     time.Time
-	delevelCounted  bool
-	engageAt        time.Time
-	targetSkip      map[int32]time.Time
-	userKind        string
-	userX           int32
-	userY           int32
-	userZ           int32
-	userTarget      int32
-	userStart       time.Time
-	userMoveAt      time.Time
-	userWaypoints   []pathfind.Vec3
-	userWpIndex     int
-	userPathTried   bool
-	userInventoryAt time.Time
-	userDeferred    []state.Command
-	userLastDist    float64
-	userDistAt      time.Time
-	engLastDist     float64
-	engDistAt       time.Time
+	autonomous     bool
+	target         int32
+	lastHit        time.Time
+	lootID         int32
+	lootAt         time.Time
+	lootMoveAt     time.Time
+	skipped        map[int32]time.Time
+	restActionAt   time.Time
+	restActionSit  bool
+	restartAt      time.Time
+	zoneCX         int32
+	zoneCY         int32
+	zoneHalf       int32
+	navigator      Navigator
+	waypoints      []pathfind.Vec3
+	wpIndex        int
+	legDest        pathfind.Vec3
+	moveAt         time.Time
+	stuckAt        time.Time
+	stuckX         int32
+	stuckY         int32
+	rePaths        int
+	farmX          int32
+	farmY          int32
+	farmZ          int32
+	sellAt         time.Time
+	sellPhaseAt    time.Time
+	merchantID     int32
+	merchantPick   time.Time
+	sold           map[int32]bool
+	tripStart      time.Time
+	tripEndedAt    time.Time
+	zoneReturn     bool
+	zoneFails      int
+	delevelTarget  int32
+	delevelGuard   int32
+	delevelTried   map[string]bool
+	delevelFight   time.Time
+	delevelEnd     time.Time
+	delevelExp     int32
+	delevelLevel   int32
+	delevelFree    int
+	delevelWait    time.Time
+	delevelCounted bool
+	engageAt       time.Time
+	targetSkip     map[int32]time.Time
+	userKind       string
+	userX          int32
+	userY          int32
+	userZ          int32
+	userTarget     int32
+	userStart      time.Time
+	userMoveAt     time.Time
+	userWaypoints  []pathfind.Vec3
+	userWpIndex    int
+	userPathTried  bool
+	// userRedirect marks a manual command that replaced a walk
+	// still running on the server: the next walk request fires at
+	// once instead of waiting for the old walk to finish.
+	userRedirect bool
+	// The pending server confirmation of the last inventory
+	// action (see markInventoryAction and gateInventoryCommand).
+	userPendingItem  int32
+	userPendingEquip bool
+	userPendingCount int32
+	userPendingAt    time.Time
+	userDeferred     []state.Command
+	userLastDist     float64
+	userDistAt       time.Time
+	engLastDist      float64
+	engDistAt        time.Time
 }
 
 // NewLoop creates the hunt loop for a connected game client.
 func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
 	return &Loop{
-		game:            game,
-		tracker:         tracker,
-		logger:          log.Default(),
-		autonomous:      true,
-		phase:           phaseEngage,
-		target:          0,
-		lastHit:         time.Time{},
-		lootID:          0,
-		lootAt:          time.Time{},
-		lootMoveAt:      time.Time{},
-		skipped:         make(map[int32]time.Time),
-		restActionAt:    time.Time{},
-		restActionSit:   false,
-		restartAt:       time.Time{},
-		zoneCX:          0,
-		zoneCY:          0,
-		zoneHalf:        0,
-		navigator:       nil,
-		waypoints:       nil,
-		wpIndex:         0,
-		legDest:         pathfind.Vec3{},
-		moveAt:          time.Time{},
-		stuckAt:         time.Time{},
-		stuckX:          0,
-		stuckY:          0,
-		rePaths:         0,
-		farmX:           0,
-		farmY:           0,
-		farmZ:           0,
-		sellAt:          time.Time{},
-		sellPhaseAt:     time.Time{},
-		merchantID:      0,
-		merchantPick:    time.Time{},
-		sold:            make(map[int32]bool),
-		tripStart:       time.Time{},
-		tripEndedAt:     time.Time{},
-		zoneReturn:      false,
-		zoneFails:       0,
-		delevelTarget:   0,
-		delevelGuard:    0,
-		delevelTried:    nil,
-		delevelFight:    time.Time{},
-		delevelEnd:      time.Time{},
-		userKind:        "",
-		userX:           0,
-		userY:           0,
-		userZ:           0,
-		userTarget:      0,
-		userStart:       time.Time{},
-		userMoveAt:      time.Time{},
-		userWaypoints:   nil,
-		userWpIndex:     0,
-		userPathTried:   false,
-		userInventoryAt: time.Time{},
-		userDeferred:    nil,
-		userLastDist:    0,
-		userDistAt:      time.Time{},
-		engLastDist:     0,
-		engDistAt:       time.Time{},
+		game:             game,
+		tracker:          tracker,
+		logger:           log.Default(),
+		autonomous:       true,
+		phase:            phaseEngage,
+		target:           0,
+		lastHit:          time.Time{},
+		lootID:           0,
+		lootAt:           time.Time{},
+		lootMoveAt:       time.Time{},
+		skipped:          make(map[int32]time.Time),
+		restActionAt:     time.Time{},
+		restActionSit:    false,
+		restartAt:        time.Time{},
+		zoneCX:           0,
+		zoneCY:           0,
+		zoneHalf:         0,
+		navigator:        nil,
+		waypoints:        nil,
+		wpIndex:          0,
+		legDest:          pathfind.Vec3{},
+		moveAt:           time.Time{},
+		stuckAt:          time.Time{},
+		stuckX:           0,
+		stuckY:           0,
+		rePaths:          0,
+		farmX:            0,
+		farmY:            0,
+		farmZ:            0,
+		sellAt:           time.Time{},
+		sellPhaseAt:      time.Time{},
+		merchantID:       0,
+		merchantPick:     time.Time{},
+		sold:             make(map[int32]bool),
+		tripStart:        time.Time{},
+		tripEndedAt:      time.Time{},
+		zoneReturn:       false,
+		zoneFails:        0,
+		delevelTarget:    0,
+		delevelGuard:     0,
+		delevelTried:     nil,
+		delevelFight:     time.Time{},
+		delevelEnd:       time.Time{},
+		userKind:         "",
+		userX:            0,
+		userY:            0,
+		userZ:            0,
+		userTarget:       0,
+		userStart:        time.Time{},
+		userMoveAt:       time.Time{},
+		userWaypoints:    nil,
+		userWpIndex:      0,
+		userPathTried:    false,
+		userRedirect:     false,
+		userPendingItem:  0,
+		userPendingEquip: false,
+		userPendingCount: 0,
+		userPendingAt:    time.Time{},
+		userDeferred:     nil,
+		userLastDist:     0,
+		userDistAt:       time.Time{},
+		engLastDist:      0,
+		engDistAt:        time.Time{},
 	}
 }
 
@@ -392,14 +405,20 @@ func (l *Loop) tick() {
 	l.consumeUserCommands()
 	if l.phase == phaseDelevel {
 		l.tickDelevel()
+		l.tracker.ClearWalkPlan()
 
 		return
 	}
 	if l.phase == phaseUser {
 		l.tickUser()
+		// The walk plan view follows the manual phase: the plan
+		// publishes while a manual move runs, anything else clears
+		// it (ClearWalkPlan is a no-op without a plan).
+		l.publishWalkPlan()
 
 		return
 	}
+	l.tracker.ClearWalkPlan()
 	if !l.autonomous {
 		// A manual only session never hunts on its own: the loop
 		// waits in the idle phase for the next web command.
@@ -449,6 +468,7 @@ func (l *Loop) recoverFromDeath() {
 	if !l.restartAt.IsZero() && now.Sub(l.restartAt) < deathRestartPeriod {
 		return
 	}
+	l.tracker.ClearWalkPlan()
 	l.restartAt = now
 	l.target = 0
 	l.lootID = 0
