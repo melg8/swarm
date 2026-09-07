@@ -229,8 +229,6 @@ func (l *Loop) maybeStartTownTrip() {
 	l.tripStops = []tripStop{{merchant: merchant, sell: true}}
 	l.buysPlanned = false
 	l.buyAt = time.Time{}
-	l.shoppingPlanCache = nil
-	l.shoppingPlanAt = time.Time{}
 	l.phase = phaseTownWalk
 	stats := l.tracker.InventoryStats()
 	reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
