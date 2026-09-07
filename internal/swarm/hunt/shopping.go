@@ -220,7 +220,9 @@ func (l *Loop) stopMerchantTemplates() []int32 {
 // stopBuyRetries times before the stop gives it up. It reports true
 // when every purchase of the stop was requested AND confirmed and the
 // trip may advance.
-func (l *Loop) tickStopShopping(now time.Time) bool {
+// Pre-split debt of the buy confirmation gate (extract the gate into
+// its own step when the stop pipeline is refactored).
+func (l *Loop) tickStopShopping(now time.Time) bool { //nolint:cyclop,funlen
 	if len(l.tripStops) == 0 {
 		return true
 	}
@@ -234,15 +236,16 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 	// The confirmation gate of the in-flight batch: the arrived items
 	// complete it, the deadline re-requests it.
 	if len(l.buyRequested) > 0 {
-		if l.buysArrived(l.buyRequested) {
+		switch {
+		case l.buysArrived(l.buyRequested):
 			l.logger.Printf("Hunt: shop: %d purchases confirmed",
 				len(l.buyRequested))
 			l.buyRequested = nil
 			l.buyConfirmAt = time.Time{}
 			l.buyRetries = 0
-		} else if now.Sub(l.buyConfirmAt) < buyConfirmWait {
+		case now.Sub(l.buyConfirmAt) < buyConfirmWait:
 			return false
-		} else {
+		default:
 			l.buyRetries++
 			if l.buyRetries > stopBuyRetries {
 				l.logger.Printf("Hunt: shop: %d purchases never "+
@@ -277,7 +280,7 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 	// batch.
 	batch := l.buyRequested
 	remaining := make([]gear.Purchase, 0, len(stop.buys))
-	listID := int32(0)
+	var listID int32
 	if len(batch) > 0 {
 		listID = batch[0].ListID
 	} else {
@@ -322,6 +325,7 @@ func (l *Loop) buysArrived(batch []gear.Purchase) bool {
 		for _, item := range items {
 			if item.ItemID == purchase.ItemID {
 				found = true
+
 				break
 			}
 		}

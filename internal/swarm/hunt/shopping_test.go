@@ -164,8 +164,10 @@ func TestStopBuyRetriesAndSkipsLostBatch(t *testing.T) {
 	loop, game, _, _ := newTripLoop()
 	herbiel := townMerchants[3]
 	loop.tripStops = []tripStop{{merchant: herbiel, buys: []gear.Purchase{
-		{ItemID: 1121, ListID: 3014800, MerchantTemplateID: 7148,
-			Count: 1, Price: 9},
+		{
+			ItemID: 1121, ListID: 3014800, MerchantTemplateID: 7148,
+			Count: 1, Price: 9,
+		},
 	}}}
 	// The merchant never showed up: the sells work without one, the
 	// buy requests still go out.
