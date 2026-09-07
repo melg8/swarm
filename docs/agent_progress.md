@@ -181,8 +181,40 @@ character (40k adena):
   slot per trip; sell everything on every vendor visit; no
   mid-combat trips).
 
+- 2026-09-08 502e746 (rebased over the f8ba5b0 review docs): the live
+  verification round (rich1, 40k adena, naked gear) found a fourth
+  defect - the FIRST buy after the sells fired within the transaction
+  flood window (which is 10 game ticks = 1 second, not 10 seconds -
+  FloodProtectorAction/ GameTimeTaskManager reading) and the server
+  refused it silently: the planned Short Sword was never delivered
+  while the stop reported it done. Fixes: (1) the buy pacing now waits
+  out the last sell batch as well (max(buyAt, sellAt) + buyPause);
+  (2) every sent buy batch waits for its arrival confirmation
+  (buysArrived: the bought item ids show up in the inventory) and is
+  re-requested up to stopBuyRetries = 3 times before the trip skips
+  it - refused transactions (flood, range races, selection resets)
+  all answer without referencing the request, so the inventory is the
+  only reliable confirmation source; (3) approachMerchant gates on the
+  3D distance (the server INTERACTION_DISTANCE 250 covers x, y and z
+  together; the old separate 2D/z limits allowed a 283-unit stand-off
+  where every transaction is refused). Test:
+  TestStopBuyRetriesAndSkipsLostBatch; the buy flow tests simulate the
+  arrival confirmations.
+- 2026-09-08 LIVE VERIFIED (second run, rich1): the shopping trip sold
+  the whole 22%-weight junk bag (only the non-sellable starter items
+  stay - the server flags them is_sellable=false, the sell offers them
+  once and tolerates the refusal), waited out the sell pacing, bought
+  10 items from 3 merchants - one per slot - with every batch
+  confirmed ("1/6/3 purchases confirmed"), the Short Sword arrived and
+  swapped the Squire's Sword within seconds, the Leather set and the
+  Necklace of Knowledge upgrade (ONE necklace, the Magic one sold
+  context) equipped during the walk, and the hunt resumed at the farm
+  spot (level 3, gear 189). No mid-combat trip starts, no redundant
+  same-slot purchases, no lost transactions. The starter item
+  non-sellability (Dagger, Squire's set: is_sellable=false in the
+  Mobius item xml) is a server rule, the bot tolerates it by design.
+
 ### Status
 
-- All three fixes implemented, unit tested (go vet + go test ./...
-  green) and pushed.
-- Live verification on the running stack: pending.
+- All four fixes implemented, unit tested (go vet + go test ./...
+  green), pushed and live verified on the running stack.
