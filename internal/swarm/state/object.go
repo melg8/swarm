@@ -36,6 +36,8 @@ type WorldObject struct {
 	Aggressive      bool
 	AggroRange      int32
 	Level           int32
+	ClanHelpRange   int32
+	Clans           []string
 	AutoAttacking   bool
 	CombatUntil     time.Time
 	Dead            bool
@@ -75,6 +77,8 @@ func newWorldObject(objectID int32, kind ObjectKind) WorldObject {
 		Aggressive:      false,
 		AggroRange:      0,
 		Level:           0,
+		ClanHelpRange:   0,
+		Clans:           nil,
 		AutoAttacking:   false,
 		CombatUntil:     time.Time{},
 		Dead:            false,

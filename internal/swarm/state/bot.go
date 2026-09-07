@@ -1015,6 +1015,8 @@ func (b *Bot) ApplyNpcInfo(info NpcInfo) {
 	obj.Aggressive = npcdata.NPCIsAggressive(info.TemplateID)
 	obj.AggroRange = npcdata.NPCAggroRange(info.TemplateID)
 	obj.Level = npcdata.NPCLevel(info.TemplateID)
+	obj.ClanHelpRange = npcdata.NPCClanHelpRange(info.TemplateID)
+	obj.Clans = npcdata.NPCClans(info.TemplateID)
 	obj.X = info.X
 	obj.Y = info.Y
 	obj.Z = info.Z
@@ -1289,6 +1291,32 @@ func (b *Bot) NearestAttackable(
 func (b *Bot) NearestAttackableExcept(
 	maxDistance float64, zone *Zone, skip map[int32]bool,
 ) (AttackTarget, bool) {
+	return b.nearestAttackable(maxDistance, zone, skip, 0, false)
+}
+
+// NearestAttackableConstrained returns the closest living attackable
+// npc of the zone with the hunt safety constraints applied on top of
+// the skip list: mobs above maxLevel are never initiated on (a level
+// gap fight is a death risk, zero disables the filter) and mobs whose
+// clan mates stand within their clan help range are skipped while
+// avoidSocial is set - attacking them pulls the whole camp (the Mobius
+// AttackableAI clan call). The level of an unknown template stays
+// pass the filter: the data of the C1 dictionary is complete, an
+// unknown level means the bot never resolved the template and should
+// not be fenced by it.
+func (b *Bot) NearestAttackableConstrained(
+	maxDistance float64, zone *Zone, skip map[int32]bool,
+	maxLevel int32, avoidSocial bool,
+) (AttackTarget, bool) {
+	return b.nearestAttackable(maxDistance, zone, skip, maxLevel, avoidSocial)
+}
+
+// nearestAttackable is the shared target search core of the two public
+// pickers.
+func (b *Bot) nearestAttackable(
+	maxDistance float64, zone *Zone, skip map[int32]bool,
+	maxLevel int32, avoidSocial bool,
+) (AttackTarget, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -1304,6 +1332,12 @@ func (b *Bot) NearestAttackableExcept(
 			continue
 		}
 		if skip[obj.ObjectID] {
+			continue
+		}
+		if maxLevel > 0 && obj.Level > maxLevel && obj.Level > 0 {
+			continue
+		}
+		if avoidSocial && b.socialHelpersNearLocked(obj, now) {
 			continue
 		}
 		x, y := projectedPosition(obj, now)
@@ -1325,6 +1359,73 @@ func (b *Bot) NearestAttackableExcept(
 	}
 
 	return best, found
+}
+
+// socialHelpMargin widens the clan help radius of the target search: a
+// pack mate that wanders into the radius while the fight runs would
+// join it, so the pick keeps a spare margin instead of trusting the
+// frozen positions of the last packets.
+const socialHelpMargin = 200.0
+
+// socialHelpZLimit mirrors the Mobius AttackableAI guard: clan mates
+// more than 600 units apart in height never answer the call.
+const socialHelpZLimit = 600.0
+
+// socialHelpersNearLocked reports whether attacking obj would pull its
+// clan mates: the Mobius AttackableAI lets the attacked npc call every
+// nearby attackable that shares one of its clans (the special ALL clan
+// matches everything) within its clanHelpRange. The candidate list is
+// the projected positions of the live objects, so moving pack mates
+// are measured where they actually stand.
+func (b *Bot) socialHelpersNearLocked(obj WorldObject, now time.Time) bool {
+	if obj.ClanHelpRange <= 0 {
+		return false
+	}
+	x, y := projectedPosition(obj, now)
+	reach := float64(obj.ClanHelpRange) + socialHelpMargin
+	for _, other := range b.objects {
+		if other.ObjectID == obj.ObjectID || other.Kind != KindNPC ||
+			!other.Attackable || other.Dead {
+			continue
+		}
+		if !clanAssists(obj, other) {
+			continue
+		}
+		if math.Abs(float64(other.Z-obj.Z)) > socialHelpZLimit {
+			continue
+		}
+		ox, oy := projectedPosition(other, now)
+		if math.Hypot(ox-x, oy-y) <= reach {
+			return true
+		}
+	}
+
+	return false
+}
+
+// clanAssists mirrors the Mobius clan check of the assist call: the
+// attacked npc obj calls the nearby npc other when their clans
+// intersect, or when obj itself belongs to the ALL clan (ALL matches
+// every clan). The single sided ALL keeps the server semantics: a lone
+// ALL mob next to a clanned mob does not pull it.
+func clanAssists(attacked WorldObject, helper WorldObject) bool {
+	if len(attacked.Clans) == 0 || len(helper.Clans) == 0 {
+		return false
+	}
+	for _, clan := range attacked.Clans {
+		if clan == "ALL" {
+			return true
+		}
+	}
+	for _, helperClan := range helper.Clans {
+		for _, attackedClan := range attacked.Clans {
+			if helperClan == attackedClan {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // NearestNpcByTemplates returns the closest living npc whose template id

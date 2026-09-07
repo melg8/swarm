@@ -452,6 +452,110 @@ func TestNearestAttackable(t *testing.T) {
 	require.False(t, ok)
 }
 
+// spawnNpcInfo is the test helper of the constrained target search: an
+// attackable npc with the clan bookkeeping of the given template.
+func spawnNpcInfo(bot *Bot, objectID, templateID, x, y int32) {
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: objectID, TemplateID: templateID, Attackable: true,
+		X: x, Y: y, Z: -3500,
+	})
+}
+
+// TestNearestAttackableSkipsTooStrongMobs pins the level constraint of
+// the hunt picker: a mob above the level cap is never initiated on,
+// the weaker neighbor is picked instead, and an unknown level (an
+// unresolved template) stays eligible.
+func TestNearestAttackableSkipsTooStrongMobs(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	// Display 6 is the Orc Archer (level 8), display 3 the Goblin
+	// (level 5).
+	spawnNpcInfo(bot, 7, 1000006, 45100, 50000)
+	spawnNpcInfo(bot, 8, 1000003, 45200, 50000)
+
+	// The level cap between the two picks the goblin.
+	target, ok := bot.NearestAttackableConstrained(1500, nil, nil, 5, false)
+	require.True(t, ok)
+	require.Equal(t, int32(8), target.ObjectID)
+
+	// Without the cap the nearer orc is the pick.
+	target, ok = bot.NearestAttackableConstrained(1500, nil, nil, 0, false)
+	require.True(t, ok)
+	require.Equal(t, int32(7), target.ObjectID)
+
+	// An unresolved template (level 0) passes the cap.
+	spawnNpcInfo(bot, 9, 0, 45050, 50000)
+	target, ok = bot.NearestAttackableConstrained(1500, nil, nil, 2, false)
+	require.True(t, ok)
+	require.Equal(t, int32(9), target.ObjectID)
+}
+
+// TestNearestAttackableAvoidsSocialPacks pins the social constraint:
+// a mob whose clan mates stand within its clan help range is never
+// initiated on (the Mobius AttackableAI would call them all into the
+// fight), the clanless loner next to the pack is picked instead.
+func TestNearestAttackableAvoidsSocialPacks(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	// Two Orc Archer mates (display 6, clan ORC, clanHelpRange 300)
+	// standing 200 units apart - a pull of one drags both. The
+	// Gremlin (display 1, no clan) is a loner: nobody answers its
+	// call and it answers nobody's.
+	spawnNpcInfo(bot, 7, 1000006, 45100, 50000)
+	spawnNpcInfo(bot, 8, 1000006, 45300, 50000)
+	spawnNpcInfo(bot, 9, 1000001, 45500, 50000)
+
+	target, ok := bot.NearestAttackableConstrained(1500, nil, nil, 0, true)
+	require.True(t, ok, "the clanless gremlin stays a valid pick")
+	require.Equal(t, int32(9), target.ObjectID,
+		"the orc pair is a social pull and must be skipped")
+
+	target, ok = bot.NearestAttackableConstrained(1500, nil, nil, 0, false)
+	require.True(t, ok)
+	require.Equal(t, int32(7), target.ObjectID,
+		"without the constraint the nearer orc is the pick")
+
+	// The far apart pack mate (beyond help range + margin) turns the
+	// pair into two loners: the nearer orc is a valid target again.
+	spawnNpcInfo(bot, 8, 1000006, 46100, 50000)
+	target, ok = bot.NearestAttackableConstrained(1500, nil, nil, 0, true)
+	require.True(t, ok)
+	require.Equal(t, int32(7), target.ObjectID)
+}
+
+// TestNearestAttackableTreatsAllClanAsUniversal pins the ALL clan
+// semantics of the Mobius assist call: a mob of the ALL clan pulls
+// every clanned npc next to it (the pick skips it), while a clanned
+// mob does not pull a lone ALL neighbor (the check is single sided,
+// like on the server, so the goblin next to the fungus stays valid).
+func TestNearestAttackableTreatsAllClanAsUniversal(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	// Display 7 is the Green Fungus (clan ALL, clanHelpRange 300).
+	spawnNpcInfo(bot, 7, 1000007, 45100, 50000)
+	// Display 3 is the Goblin (clan GOBLIN, clanHelpRange 300).
+	spawnNpcInfo(bot, 8, 1000003, 45300, 50000)
+
+	// The ALL fungus calls the goblin for help: the pick falls through
+	// to the goblin, which pulls nobody.
+	target, ok := bot.NearestAttackableConstrained(1500, nil, nil, 0, true)
+	require.True(t, ok)
+	require.Equal(t, int32(8), target.ObjectID)
+
+	// Without the constraint the nearer fungus is the pick.
+	target, ok = bot.NearestAttackableConstrained(1500, nil, nil, 0, false)
+	require.True(t, ok)
+	require.Equal(t, int32(7), target.ObjectID)
+
+	// An ALL mob with no clanned neighbor in reach is a valid target
+	// again.
+	spawnNpcInfo(bot, 8, 1000003, 46100, 50000)
+	target, ok = bot.NearestAttackableConstrained(1500, nil, nil, 0, true)
+	require.True(t, ok)
+	require.Equal(t, int32(7), target.ObjectID)
+}
+
 // TestWalkPlanPublishesAndClears pins the manual walk plan view of the
 // web UI: SetWalkPlan publishes the remaining waypoints with the
 // snapshot, republishing the same plan only refreshes the lifetime
