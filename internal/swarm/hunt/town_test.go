@@ -594,3 +594,56 @@ func TestTripDeathResetsWithoutCooldown(t *testing.T) {
 	require.Equal(t, phaseTownWalk, loop.phase,
 		"a full inventory sells right after the revival")
 }
+
+func TestReturnEngagesTargetOnZoneEntry(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	nav := &fakeNavigator{found: true}
+	loop := NewLoop(game, bot)
+	loop.SetNavigator(nav)
+	// The character stands inside the zone, the return leg still has
+	// waypoints to go.
+	loop.SetHuntingZone(45500, 50000, 1500)
+	loop.phase = phaseTownReturn
+	loop.tripStart = time.Now()
+	loop.waypoints = []pathfind.Vec3{{X: 46000, Y: 50000, Z: -3500}}
+	loop.wpIndex = 0
+	//nolint:exhaustruct // partial fields for the case
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 45200, Y: 50000, Name: "Gremlin",
+	})
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The entry radius offers a target: the return ends instead of
+	// walking to the center first, and the next tick attacks.
+	loop.tick()
+	require.Equal(t, phaseEngage, loop.phase,
+		"the return ends on the zone entry target")
+	require.Empty(t, game.walks, "no walking while a target stands in reach")
+	loop.lastHit = time.Now().Add(-time.Minute)
+	loop.tick()
+	require.Equal(t, []int32{7}, game.forces,
+		"the entry target is engaged")
+}
+
+func TestReturnWalksOnWithoutZoneTargets(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	nav := &fakeNavigator{found: true}
+	loop := NewLoop(game, bot)
+	loop.SetNavigator(nav)
+	loop.SetHuntingZone(45500, 50000, 1500)
+	loop.phase = phaseTownReturn
+	loop.tripStart = time.Now()
+	loop.waypoints = []pathfind.Vec3{{X: 46000, Y: 50000, Z: -3500}}
+	loop.wpIndex = 0
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// No mob in reach: the return keeps walking its waypoints toward
+	// the destination.
+	loop.tick()
+	require.Equal(t, phaseTownReturn, loop.phase,
+		"the return continues without targets")
+	require.Len(t, game.walks, 1, "the waypoint walk goes on")
+}

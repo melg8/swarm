@@ -330,6 +330,12 @@ func (l *Loop) tickTownTrip() {
 	case phaseTownSell:
 		l.tickTownSell()
 	case phaseTownReturn:
+		// Entering the zone with a target in reach ends the walk:
+		// the hunt answers whatever the entry radius offers
+		// instead of marching to the center first.
+		if l.engagesOnZoneEntry() {
+			return
+		}
 		if l.walkTownWaypoints() {
 			l.endTownTrip("back at the farm spot")
 		}
@@ -713,6 +719,34 @@ func (l *Loop) sellJunk() {
 		l.sold[item.ObjectID] = true
 	}
 	l.logger.Printf("Hunt: offered %d items for sale", len(batch))
+}
+
+// engagesOnZoneEntry ends the return walk the moment the hunting
+// zone holds a valid target: entering a zone means fighting
+// whatever the entry radius offers, the walk to the farm spot or
+// the zone center only continues while the surroundings stay
+// empty (the level slack and the social fence of the constrained
+// search apply here too). The next engage tick picks the target
+// the search found.
+func (l *Loop) engagesOnZoneEntry() bool {
+	zone := l.zone()
+	if zone == nil || !l.inZoneSelf() {
+		return false
+	}
+	now := time.Now()
+	if now.Sub(l.lastHit) < selectPeriod {
+		return false
+	}
+	pick, ok := l.tracker.NearestAttackableConstrained(
+		attackNearestRange, zone, l.skippedTargets(now),
+		l.maxTargetLevel(), true)
+	if !ok {
+		return false
+	}
+	l.endTownTrip("a target stands inside the zone")
+	l.logger.Printf("Hunt: engaging %s on the zone entry", pick.Name)
+
+	return true
 }
 
 // startReturnLeg plans the walk back to the farm spot.
