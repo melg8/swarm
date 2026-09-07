@@ -97,6 +97,28 @@ If any check fails, stop and fix the deployment first (re-run the script,
 inspect `../logs/login.log`, `../logs/game.log`, `../logs/mariadb.log`).
 Only after the environment is verified as up does the actual task start.
 
+## Work protocol: atomic commits and progress tracking in the repo
+
+- **Commit early, commit often.** Every finished logical unit of work (a
+  function, a fix, a config slice, a test) is its own small atomic commit
+  pushed to the remote branch immediately after it is ready - never let
+  meaningful changes sit only in the working tree.
+- **Track the current task and its progress inside the repository**, in
+  `docs/agent_progress.md`: at the start of a task write its full context
+  (goal, constraints, acceptance criteria), and after every atomic commit
+  append a dated progress entry (what was done, what changed, what is next).
+  Update and push that file together with every atomic commit.
+- **Rationale: crash-safe handover.** The agent session can die at any
+  moment (connection loss, sandbox restart). A new agent must be able to
+  `git pull`, read `AGENTS.md` + `docs/agent_progress.md` and continue the
+  task from the exact point where the previous agent stopped, without
+  rediscovering context or losing progress. Never keep task state only in
+  the conversation, only in the working tree or only locally.
+- Before starting any task, read `docs/agent_progress.md` first: if it
+  contains an unfinished task entry, resume that task (verify the described
+  state against the code, then continue from the recorded "next" step)
+  before taking a new one.
+
 ## Server integrity rules (non-negotiable)
 
 The L2J Mobius C1 server is the reference implementation for this project:
