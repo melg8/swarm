@@ -228,7 +228,7 @@ func runBot(
 		log.Println("Hunt runs without town trips: no geodata available")
 	}
 	if cfg.hunt {
-		loop.SetHuntingZone(hunt.DefaultHuntingZone())
+		loop.SetHuntingZoneRegion("elven")
 	} else {
 		loop.SetAutonomy(false)
 	}

@@ -161,6 +161,8 @@ func (l *Loop) applyUserCommand(cmd state.Command) {
 		l.userDrop(cmd)
 	case state.CommandDestroy:
 		l.userDestroy(cmd)
+	case state.CommandZone:
+		l.userZoneSelect(cmd.Count)
 	case state.CommandMove, state.CommandAttack, state.CommandPickup:
 		l.userMovement(cmd)
 	default:

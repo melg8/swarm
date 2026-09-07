@@ -840,22 +840,52 @@ const MapView = {
     return Math.max(0.3, Math.min(1.6, factor));
   },
 
-  // drawHuntingZone outlines the hunting square of the bot (the area
-  // it attacks inside and never leaves): a dashed amber rectangle with
-  // a small label, drawn under the units.
+  // drawHuntingZone outlines the hunting squares of the deployment
+  // (the registry the hunt loop switches through): every zone draws
+  // as a dashed rectangle with its name and level band, the active
+  // zone in bright amber with the thicker stroke, the future ones
+  // dimmed. A snapshot without the zone registry falls back to the
+  // single legacy hunting square.
   drawHuntingZone(ctx) {
+    const zones = this.lastSnap.huntingZones;
+    if (Array.isArray(zones) && zones.length > 0) {
+      for (const zone of zones) {
+        this.drawHuntingZoneRect(ctx, zone, zone.active);
+      }
+      return;
+    }
     const zone = this.lastSnap.huntingZone;
     if (!zone) { return; }
+    this.drawHuntingZoneRect(ctx, {
+      cx: zone.cx, cy: zone.cy, half: zone.half,
+      name: "hunting zone", minLevel: 0, maxLevel: 0, minGear: 0,
+    }, true);
+  },
+
+  // drawHuntingZoneRect draws one hunting zone square: the active
+  // zone in amber with the level band and the gear gate of its
+  // ladder step, the inactive zones dimmed under the units.
+  drawHuntingZoneRect(ctx, zone, active) {
     const p1 = this.worldToScreen(zone.cx - zone.half, zone.cy - zone.half);
     const size = zone.half * 2 * this.scale;
     if (p1.x > this.canvas.clientWidth || p1.y > this.canvas.clientHeight
       || p1.x + size < 0 || p1.y + size < 0) {
       return;
     }
+    let label = zone.name;
+    if (zone.maxLevel > 0) {
+      label += " · L" + zone.minLevel + "-" + zone.maxLevel;
+    }
+    if (!active && zone.minGear > 0) {
+      label += " · gear " + zone.minGear + "+";
+    }
+    if (active) {
+      label += " · ACTIVE";
+    }
     ctx.save();
-    ctx.strokeStyle = this.mapColors.item;
-    ctx.globalAlpha = 0.85;
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = active ? "#f9ab00" : this.colors.textDim;
+    ctx.globalAlpha = active ? 0.9 : 0.45;
+    ctx.lineWidth = active ? 2 : 1;
     ctx.setLineDash([10, 6]);
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
@@ -869,9 +899,9 @@ const MapView = {
       .getPropertyValue("--sans").trim() || "sans-serif");
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
-    ctx.strokeText("hunting zone", p1.x + 6, p1.y + 14);
-    ctx.fillStyle = "#f9ab00";
-    ctx.fillText("hunting zone", p1.x + 6, p1.y + 14);
+    ctx.strokeText(label, p1.x + 6, p1.y + 14);
+    ctx.fillStyle = active ? "#f9ab00" : this.colors.textDim;
+    ctx.fillText(label, p1.x + 6, p1.y + 14);
     ctx.restore();
   },
 

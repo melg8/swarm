@@ -183,6 +183,56 @@ body {
 
 .bot-list { list-style: none; overflow-y: auto; flex: 1; }
 
+.zone-list { list-style: none; max-height: 220px; overflow-y: auto; }
+
+.zone-item {
+  padding: 6px 12px;
+  border-left: 2px solid transparent;
+}
+
+.zone-item.active {
+  background: var(--bg-panel-2);
+  border-left-color: var(--accent);
+}
+
+.zone-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.zone-name {
+  font-size: 12px;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zone-item.active .zone-name { color: var(--accent); }
+
+.zone-meta {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.zone-hunt-btn {
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 4px;
+}
+
+.zone-hunt-btn:hover {
+  background: var(--bg-panel-2);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .bot-item {
   padding: 7px 12px;
   cursor: pointer;

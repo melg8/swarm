@@ -293,6 +293,7 @@ type Bot struct {
 	chatLen      int
 	chatPos      int
 	zone         *Zone
+	zoneViews    []ZoneView
 	packets      int64
 	version      uint64
 	started      time.Time
@@ -547,6 +548,17 @@ func (b *Bot) SetHuntingZone(cx int32, cy int32, half int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.zone = &Zone{CX: cx, CY: cy, Half: half}
+	b.touch()
+}
+
+// SetHuntingZones publishes the hunting zone registry of the map
+// view: every zone of the region with the active marker of the zone
+// the loop hunts in.
+func (b *Bot) SetHuntingZones(zones []ZoneView) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.zoneViews = make([]ZoneView, len(zones))
+	copy(b.zoneViews, zones)
 	b.touch()
 }
 
@@ -1539,11 +1551,28 @@ type Snapshot struct {
 	Chat         []ChatEvent             `json:"chat"`
 	WalkPath     []WalkPoint             `json:"walkPath"`
 	HuntingZone  *Zone                   `json:"huntingZone"`
+	HuntingZones []ZoneView              `json:"huntingZones"`
 	Packets      int64                   `json:"packets"`
 	Version      uint64                  `json:"version"`
 	ServerTimeMs int64                   `json:"serverTimeMs"`
 	StartedAt    time.Time               `json:"startedAt"`
 	UpdatedAt    time.Time               `json:"updatedAt"`
+}
+
+// ZoneView is one hunting zone of the map view: the registry entry
+// of the deployment with the active marker of the zone the loop
+// hunts in.
+type ZoneView struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Region   string `json:"region"`
+	MinLevel int32  `json:"minLevel"`
+	MaxLevel int32  `json:"maxLevel"`
+	MinGear  int32  `json:"minGear"`
+	CX       int32  `json:"cx"`
+	CY       int32  `json:"cy"`
+	Half     int32  `json:"half"`
+	Active   bool   `json:"active"`
 }
 
 // Snapshot returns a deep copy of the current state for serialization.
@@ -1642,6 +1671,8 @@ func (b *Bot) Snapshot() Snapshot {
 		snap.Events, b.events, b.eventLen, b.eventPos)
 	snap.Chat = appendChat(snap.Chat, b.chatLog, b.chatLen, b.chatPos)
 	snap.HuntingZone = b.zone
+	snap.HuntingZones = make([]ZoneView, len(b.zoneViews))
+	copy(snap.HuntingZones, b.zoneViews)
 	b.fillInventorySnapshot(&snap)
 
 	return snap

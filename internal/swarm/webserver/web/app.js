@@ -221,10 +221,61 @@ function renderSnapshot() {
   renderHUD(snap);
   renderTarget(snap);
   renderGear(snap);
+  renderZones(snap);
   renderChat(snap);
   renderLog(snap);
   renderFooter(snap);
   MapView.update(snap);
+}
+
+// ---- hunting zones panel ----
+
+// renderZones refreshes the hunting zone list of the sidebar: every
+// zone of the registry with its level band and gear gate, the active
+// one highlighted, a hunt button switching the zone of the bot (the
+// manual override of the automatic picker).
+function renderZones(snap) {
+  const section = document.getElementById("zone-section");
+  const list = document.getElementById("zone-list");
+  if (!section || !list) { return; }
+  const zones = Array.isArray(snap.huntingZones) ? snap.huntingZones : [];
+  if (zones.length === 0) {
+    section.classList.add("hidden");
+    return;
+  }
+  section.classList.remove("hidden");
+  if (renderZones.lastKey === JSON.stringify(zones)) { return; }
+  renderZones.lastKey = JSON.stringify(zones);
+  list.textContent = "";
+  zones.forEach((zone, index) => {
+    const item = document.createElement("li");
+    item.className = "zone-item" + (zone.active ? " active" : "");
+    const row = document.createElement("div");
+    row.className = "zone-row";
+    const info = document.createElement("div");
+    const name = document.createElement("div");
+    name.className = "zone-name";
+    name.textContent = zone.name;
+    name.title = zone.id + " · " + zone.region;
+    const meta = document.createElement("div");
+    meta.className = "zone-meta";
+    meta.textContent = "L" + zone.minLevel + "-" + zone.maxLevel +
+      (zone.minGear > 0 ? " · gear " + zone.minGear + "+" : "") +
+      (zone.active ? " · hunting" : "");
+    info.appendChild(name);
+    info.appendChild(meta);
+    const button = document.createElement("button");
+    button.className = "zone-hunt-btn";
+    button.textContent = zone.active ? "here" : "hunt";
+    button.title = "switch the hunting zone of the bot to " + zone.name;
+    button.addEventListener("click", () => {
+      postCommand({ kind: "zone", count: index });
+    });
+    row.appendChild(info);
+    row.appendChild(button);
+    item.appendChild(row);
+    list.appendChild(item);
+  });
 }
 
 // ---- equipment widget ----

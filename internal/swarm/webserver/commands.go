@@ -34,6 +34,8 @@ func validCommand(cmd commandRequest) bool {
 		return cmd.ObjectID != 0
 	case state.CommandDrop, state.CommandDestroy:
 		return cmd.ObjectID != 0 && cmd.Count >= 1
+	case state.CommandZone:
+		return cmd.Count >= 0
 	default:
 		return false
 	}
@@ -60,6 +62,8 @@ func describeCommand(cmd commandRequest) string {
 	case state.CommandDestroy:
 		return "user command: destroy " + strconv.Itoa(int(cmd.Count)) +
 			" of item " + strconv.Itoa(int(cmd.ObjectID))
+	case state.CommandZone:
+		return "user command: hunt in zone " + strconv.Itoa(int(cmd.Count))
 	default:
 		return "user command: " + cmd.Kind
 	}

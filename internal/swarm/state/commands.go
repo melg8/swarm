@@ -21,6 +21,9 @@ const (
 	// CommandDestroy destroys inventory items without dropping
 	// them (the trash target of the equipment widget).
 	CommandDestroy = "destroy"
+	// CommandZone selects the hunting zone of the registry (the zone
+	// list order indexes the selection, carried by the count field).
+	CommandZone = "zone"
 )
 
 // Command is one manual command of the web interface, queued on the bot
