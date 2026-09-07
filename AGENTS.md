@@ -375,6 +375,50 @@ provenance (verified 2026-09-05) are the reference for future work:
   installed - run the underlying commands (`go test ./...`,
   `gofmt -l .`, ...) directly until then.
 
+## Gear, shopping and multi-zone hunting
+
+The three growth subsystems of the autonomous hunt (all unit tested;
+the design goal is per-class and per-region extension):
+
+- **Auto equipment** (`internal/swarm/gear`, `hunt/equip.go`): the
+  melee fighter profile scores every equippable item (weapon = pAtk x
+  attack speed, armor = pDef, jewel = mDef, shield = expected block
+  value; bows score zero for melee), `NextUpgrade` plans the next
+  strictly improving use item request against the tracked paperdoll
+  (empty slot fills, strict slot swaps, the pair swap through freeing
+  the weaker jewel, the two hand weapon and one-piece family guards)
+  and the hunt loop executes one action every 2 seconds behind the
+  shared confirmation gate of the manual inventory commands, so the
+  paperdoll stays optimal after every loot, buy and death event.
+  `gear.TotalGearPoints` summarizes the equipped gear for the zone
+  gates (weapon damage per hit plus defenses).
+- **Shop strategy** (`gear/shopping.go`, `hunt/shopping.go`,
+  `docs/shopping_strategy.md`): the greedy value-per-adena planner
+  buys the best score gain per adena first (the cheap empty slot
+  fillers beat the weapon upgrades early), never buys what the
+  inventory already carries and respects the adena budget; the town
+  trips sell the junk first, re-plan with the fresh adena and walk to
+  every merchant of the plan (one buylist per transaction request,
+  11 second pacing). The catalogs are generated from the Mobius
+  buylists (`tools/generate_shop_catalogs.sh`, keyed by packet
+  template id).
+- **Multi-zone hunting** (`hunt/zones.go`): the zone registry
+  ladders the elven lands (keltirs 1-4 gear 0, east goblins 5-7 gear
+  40, west kaboo woods 8-12 gear 110, southwest dryads 13-18 gear
+  200); `PickHuntingZone` gates on level AND gear points, the loop
+  re-evaluates between fights (30 s cadence), the map draws every
+  zone (active amber, future dimmed with the gear gate) and the
+  sidebar zone panel switches zones manually (the `zone` command,
+  index in the Count field; the override holds until the character
+  outgrows the band).
+
+Extension path: a mage class implements `gear.Profile` (mAtk
+weapons, robe preference - the planner, the strategy and the trip
+execution stay unchanged), a new region adds its `townMerchants`
+list, its zone registry entries and its tax rate. The elven
+deployment is the reference wiring of all three (`main.go`:
+`SetHuntingZoneRegion("elven")`).
+
 ## Mobius stack operational notes
 
 Lessons learned while running the stack locally; relevant when debugging
@@ -1136,6 +1180,38 @@ truth for packet formats (`L2J_Mobius_C1_HarbingersOfWar/java`). Summary:
   exists to fix that.
 - The elven fighter creation values: race 1 (ELF), classId 18
   (ELVEN_FIGHTER), see `gameserver/entity/actor/enums/player/PlayerClass`.
+- Equip semantics of `UseItem` (0x14, `Player.useEquippableItem` /
+  `Inventory.equipItem`): a right hand weapon, chest, neck, head,
+  gloves, feet or back item replaces the occupant of its slot
+  directly; the paperdoll listener unequips the old item. The pair
+  families fill the first EMPTY ear/finger slot (left first, right
+  second) and replace the LEFT slot blindly when both are occupied -
+  swapping the better jewel needs the explicit unequip of the weaker
+  piece first (see `gear.NextUpgrade`). A two hand weapon
+  (`lrhand`: bows, poles) unequips the left hand shield on equip, a
+  shield unequips a two hand weapon, a one-piece armor
+  (`onepiece`) occupies the chest slot, blocks the legs slot and
+  unequips on a legs equip - the planner guards all four cases.
+- Paperdoll knowledge: the inventory packets carry the template
+  bodypart mask (an earring is always 0x6) and cannot tell which ear
+  or finger slot an equipped jewel occupies; the UserInfo (0x04)
+  paperdoll object id block is the only source for that (slot order:
+  underwear, right ear, left ear, neck, right finger, left finger,
+  head, right hand, left hand, gloves, chest, legs, feet, back and a
+  C1 duplicate right hand). The server broadcasts UserInfo after
+  every equip and unequip.
+- Shop protocol: `RequestBuyItem` (0x1F) `[listId: 4][count: 4]`
+  entries of `[itemId: 4][count: 4]` requires the selected merchant
+  of the list within the 250 unit interaction distance; the server
+  prices every entry itself (buylist product price or the item
+  reference price) with the town tax: Elven Village 15 percent over
+  reference while no castle owns it (`MerchantPriceConfig.xml`),
+  sell is always reference/2. Buying and selling share the
+  transaction flood protector (10 seconds), so buy and sell requests
+  pace like the sell batches. The buylist ids are the file names of
+  `data/buylists/*.xml`; the merchant of a list is the npc of its
+  `<npcs>` block (join to the packet template id through
+  `stats/npcs/CT0_to_C4_ids.txt`, 30147 Unoren -> 7147 etc).
 
 When adding a new packet: implement the struct in the correct direction
 package (`from_*` / `to_*`), add parsing/serialization via
