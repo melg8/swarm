@@ -1021,3 +1021,24 @@ GitLab download attempts continue until they succeed.
   is why the production paths must call AppendJSON directly.
   AGENTS.md documents the layout contract. Full suite green, lint
   0 issues. Pushed as the third atomic commit.
+
+- 2026-09-08: task wrap up. The final verification round: go build,
+  go vet, go test ./... (14 packages green), golangci-lint run
+  (0 issues), the benchmark sweep re-measured, and the live E2E
+  (tools/mobius_e2e.sh 45) prints E2E_OK against the deployed
+  stack. Final numbers (before -> after, 200 npc world unless
+  noted): NearestAttackableConstrained 316 us -> 9.3 us (34x),
+  SelfAttackerCount 2765 ns -> 217 ns (13x),
+  NearestGroundItemExcluding 2678 ns -> 229 ns (12x),
+  MedianZoneMobLevel 5.9 us/3 allocs -> 1.2 us/1 alloc,
+  ApplyNpcInfo 371 ns/2 allocs -> 263 ns/1 alloc, NPCClans 60 ns/1
+  alloc -> 5.1 ns/0 allocs, snapshot stream encode (SSE path) 249
+  us/104 allocs -> 135 us/4 allocs (1.85x faster, 26x fewer
+  allocations, including the snapshot build 273 us -> 136 us).
+  The task is complete: benchmarks added, the slowest elements
+  identified from their results (the O(N^2) social scan, the
+  reflection JSON marshal, the map based object storage, the
+  per packet dictionary allocations), and each eliminated with
+  data oriented design. All work pushed to mobius-c1-client-1 as
+  melg8 (four commits: the benchmark suite, the dense storage and
+  social scan rework, the direct JSON writer, the wrap up entry).
