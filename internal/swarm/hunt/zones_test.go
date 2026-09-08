@@ -291,7 +291,7 @@ func TestZoneDeathOnFreshSessionCountsByPosition(t *testing.T) {
 		{ID: state.AttrCurHP, Value: 0},
 	})
 	loop.tick()
-	require.Equal(t, "", loop.zonePickedID,
+	require.Empty(t, loop.zonePickedID,
 		"the death tick runs before the first zone pick")
 	require.Equal(t, int32(1), loop.zoneDeaths["elven-goblin-camp"],
 		"the death counts against the square it happened in")
