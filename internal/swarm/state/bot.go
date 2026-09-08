@@ -1105,26 +1105,7 @@ func (b *Bot) ApplyAttack(a Attack) {
 		b.objects[a.AttackerID] = obj
 		b.touch()
 	}
-	// The swing animation of the web view: one swing per hit that
-	// actually landed. The Mobius Attack packet carries the miss flag
-	// of every hit, so an evaded blow draws nothing - the streak only
-	// plays for the blows that connect, and the viewer reads who hit
-	// whom instead of a swing storm of dodged attacks.
-	for i := range a.TargetCount {
-		if a.HitFlags[i]&attackHitMissFlag != 0 {
-			continue
-		}
-		b.recordCombatEventLocked(CombatEvent{
-			Kind:       CombatEventAttack,
-			AttackerID: a.AttackerID,
-			TargetID:   a.TargetIDs[i],
-			X:          a.X,
-			Y:          a.Y,
-			TargetX:    a.TargetX,
-			TargetY:    a.TargetY,
-			At:         now,
-		})
-	}
+	b.recordSwingEventsLocked(a, now)
 	for i := range a.TargetCount {
 		if a.TargetIDs[i] == b.selfID {
 			b.char.X = a.TargetX
@@ -1141,6 +1122,31 @@ func (b *Bot) ApplyAttack(a Attack) {
 			obj.UpdatedAt = now
 			b.objects[a.TargetIDs[i]] = obj
 		}
+	}
+}
+
+// recordSwingEventsLocked feeds the swing animation of the web view
+// with one event per hit that actually landed. The Mobius Attack
+// packet carries the miss flag of every hit, so an evaded blow draws
+// nothing - the streak only plays for the blows that connect, and
+// the viewer reads who hit whom instead of a swing storm of dodged
+// attacks. The caller must hold the write lock.
+func (b *Bot) recordSwingEventsLocked(a Attack, now time.Time) {
+	for i := range a.TargetCount {
+		if a.HitFlags[i]&attackHitMissFlag != 0 {
+			continue
+		}
+		//nolint:exhaustruct // the ring assigns Seq, a swing carries no amount
+		b.recordCombatEventLocked(CombatEvent{
+			Kind:       CombatEventAttack,
+			AttackerID: a.AttackerID,
+			TargetID:   a.TargetIDs[i],
+			X:          a.X,
+			Y:          a.Y,
+			TargetX:    a.TargetX,
+			TargetY:    a.TargetY,
+			At:         now,
+		})
 	}
 }
 

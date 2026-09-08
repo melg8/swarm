@@ -121,14 +121,15 @@ func (l *Loop) maybeDestroyReplacedStarters() {
 	}
 	replaced := gear.ReplacedStarterItems(manager.profile, l.equipment())
 	for _, drop := range replaced {
-		if until, ok := manager.starterRetryAt[drop.Item.ObjectID]; ok && now.Before(until) {
+		if until, ok := manager.starterRetryAt[drop.Item.ObjectID]; ok &&
+			now.Before(until) {
 			continue
 		}
 		l.markInventoryAction(drop.Item.ObjectID)
-		if err := l.game.DestroyItem(drop.Item.ObjectID, drop.Item.Count); err != nil {
+		if err := l.game.DestroyItem(drop.Item.ObjectID,
+			drop.Item.Count); err != nil {
 			l.logger.Printf("Hunt: starter destroy failed: %v", err)
-			manager.starterRetryAt[drop.Item.ObjectID] =
-				now.Add(starterRetryDelay)
+			manager.starterRetryAt[drop.Item.ObjectID] = now.Add(starterRetryDelay)
 
 			return
 		}
