@@ -30,6 +30,13 @@ window.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  if (config && config.mode === "fight") {
+    document.body.classList.add("mode-fight");
+    FightUI.init();
+
+    return;
+  }
+
   initChat();
   MapView.init();
   refreshBots();

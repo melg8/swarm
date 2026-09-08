@@ -89,6 +89,30 @@ SPDX-License-Identifier: MIT
     </aside>
 
     <main class="main">
+      <section id="fight-panel" class="fight-panel">
+        <div class="fight-header">
+          <div class="fight-title-row">
+            <span class="fight-title">FIGHT FX VARIANTS</span>
+            <span id="fight-count" class="fight-count"></span>
+          </div>
+          <div class="fight-sub">
+            Все варианты проигрывают один и тот же бой в одном такте: герой
+            бьёт врага, получает удар, наносит крит и получает крит —
+            четыре позиции врага по вертикали, идеи по горизонтали.
+            Прокрути ленту, посмотри и выбери номер, который больше
+            всего подходит для карты.
+          </div>
+          <div class="fight-legend">
+            <span class="fight-chip"><i class="dot dot-swing-self"></i>удар героя</span>
+            <span class="fight-chip"><i class="dot dot-swing-mob"></i>удар врага</span>
+            <span class="fight-chip"><i class="dot dot-dealt"></i>нанесённый урон</span>
+            <span class="fight-chip"><i class="dot dot-taken"></i>полученный урон</span>
+            <span class="fight-chip"><i class="dot dot-crit"></i>крит</span>
+          </div>
+        </div>
+        <div id="fight-strip" class="fight-strip"></div>
+      </section>
+
       <section id="tab-map" class="tab-content active">
         <div class="map-toolbar">
           <button id="zoom-out" class="btn" title="zoom out">−</button>
@@ -285,6 +309,7 @@ SPDX-License-Identifier: MIT
 <script src="app.js"></script>
 <script src="map.js"></script>
 <script src="pathfind.js"></script>
+<script src="fight.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

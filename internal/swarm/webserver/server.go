@@ -31,6 +31,9 @@ var webContent embed.FS
 const (
 	modeBot      = "bot"
 	modePathfind = "pathfind"
+	// modeFight is the combat animation variant showcase of the
+	// -test-fight-ui-v1 run: a looping demo fight on every variant.
+	modeFight = "fight"
 
 	// defaultPathfindScale is the initial map zoom of the pathfind
 	// test, a bit closer than the bot map default.

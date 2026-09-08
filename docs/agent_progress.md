@@ -1042,3 +1042,31 @@ GitLab download attempts continue until they succeed.
   data oriented design. All work pushed to mobius-c1-client-1 as
   melg8 (four commits: the benchmark suite, the dense storage and
   social scan rework, the direct JSON writer, the wrap up entry).
+## Follow-up task: the fight FX variant showcase (-test-fight-ui-v1)
+
+Started and finished: 2026-09-08. Branch: `mobius-c1-client-1`.
+Commits as melg8, pushed as they land.
+
+### Goal
+
+The user asked for a test command that demos the hero versus enemy
+fight with different damage visualization ideas: four enemy positions
+(top, bottom, left, right) stacked vertically, the animation variants
+horizontally behind a scroll bar, the map background as usual and a
+number per variant, so the winner can be picked by looking at the
+running page.
+
+### Progress
+
+- 2026-09-08: done. `-test-fight-ui-v1` boots the bot less `fight`
+  web mode; `web/fight.js` renders twelve numbered variant columns
+  (floating numbers, comic pop, slash, sparks, shockwave, HP chunk,
+  arrow, hit-stop, cell flash, dizzy stars, arcade banner, combo
+  counter) x four enemy positions on the real map tile, all cells on
+  one shared scripted fight clock (hit / take / crit / take crit /
+  regen). The command name carries the v1 suffix per the user
+  request - a future v2 idea set can coexist. Round 34 of the
+  development log; `webserver/fight_test.go` pins the mode handshake
+  and the static shell; live verified in the headless browser (12
+  columns, 48 cells, zero console errors, screenshots in
+  download/fight_shots/).

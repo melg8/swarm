@@ -72,28 +72,30 @@ const (
 )
 
 type config struct {
-	loginAddress string
-	account      string
-	password     string
-	charName     string
-	webAddress   string
-	hunt         bool
-	pathfindTest bool
-	geodataDir   string
-	maxPassable  uint
+	loginAddress  string
+	account       string
+	password      string
+	charName      string
+	webAddress    string
+	hunt          bool
+	pathfindTest  bool
+	testFightUIV1 bool
+	geodataDir    string
+	maxPassable   uint
 }
 
 func parseFlags() config {
 	cfg := config{
-		loginAddress: "",
-		account:      "",
-		password:     "",
-		charName:     "",
-		webAddress:   "",
-		hunt:         false,
-		pathfindTest: false,
-		geodataDir:   "",
-		maxPassable:  uint(pathfind.DefaultMaxPassableHeight),
+		loginAddress:  "",
+		account:       "",
+		password:      "",
+		charName:      "",
+		webAddress:    "",
+		hunt:          false,
+		pathfindTest:  false,
+		testFightUIV1: false,
+		geodataDir:    "",
+		maxPassable:   uint(pathfind.DefaultMaxPassableHeight),
 	}
 	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
 		"login server address")
@@ -107,6 +109,10 @@ func parseFlags() config {
 	flag.BoolVar(&cfg.pathfindTest, "pathfind-test", false,
 		"map pathfinding test UI instead of the bot: no game connection, "+
 			"draggable start and end markers show the found path")
+	flag.BoolVar(&cfg.testFightUIV1, "test-fight-ui-v1", false,
+		"combat animation variant showcase UI (v1 idea set) instead of the "+
+			"bot: no game connection, a looping hero versus enemy demo fight "+
+			"plays every damage visualization idea side by side for picking one")
 	flag.StringVar(&cfg.geodataDir, "geodata", "",
 		"geodata directory with X_Y.l2j region files for the pathfind "+
 			"test (auto detected when empty)")
@@ -293,6 +299,12 @@ func main() {
 		return
 	}
 
+	if cfg.testFightUIV1 {
+		runTestFightUIV1(cfg)
+
+		return
+	}
+
 	log.Println("Starting swarm bot for account " + cfg.account)
 
 	registry := state.NewRegistry()
@@ -365,6 +377,39 @@ func runPathfindTest(cfg config) {
 	<-ctx.Done()
 	shutdownWebInterface(web)
 	log.Println("Pathfind test finished")
+}
+
+// runTestFightUIV1 serves the combat animation variant showcase (the
+// v1 idea set): no game connection and no bot, the web interface plays
+// a looping hero versus enemy demo fight through every damage
+// visualization idea (four enemy positions vertically, the variants
+// horizontally with a scroll bar, the map tiles as the background)
+// until the process is stopped. The user compares the numbered
+// variants in the browser and picks the winner for the live map
+// implementation.
+func runTestFightUIV1(cfg config) {
+	if cfg.webAddress == "" {
+		log.Println("Fight test UI needs the web interface, " +
+			"pass a -web address")
+
+		return
+	}
+
+	server := webserver.NewFightServer(cfg.webAddress, log.Default())
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			log.Printf("Web interface stopped: %v", err)
+		}
+	}()
+
+	log.Println("Fight test UI is ready")
+
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+	shutdownWebInterface(server)
+	log.Println("Fight test finished")
 }
 
 // detectGeodataDir picks the first candidate directory that exists.

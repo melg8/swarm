@@ -261,6 +261,8 @@ task run:app              # or: go run ./cmd/swarm -web 127.0.0.1:8080
 
 go run ./cmd/swarm -pathfind-test   # map pathfinding test UI (no bot),
                                     # flags: -geodata DIR, -max-passable N
+go run ./cmd/swarm -test-fight-ui-v1 # combat FX variant showcase (no
+                                    # bot), the -web address serves it
 ```
 
 Tests and linters (run both before considering work done):
@@ -683,6 +685,18 @@ which they currently do (see below).
   search statistics (time, nodes explored, waypoints, path length,
   loaded regions) in the sidebar. Endpoints: `GET /api/config` (mode,
   geodata summary) and `POST /api/pathfind` (start/end world points).
+- **Fight FX showcase (`-test-fight-ui-v1`)**: a bot less page of
+  numbered combat animation ideas (`web/fight.js`): every column is
+  one damage visualization variant (floating numbers, comic pop,
+  slash, spark spray, shockwave, HP chunk, arrow, hit-stop, cell
+  flash, dizzy stars, arcade banner, combo counter), every column
+  stacks the four enemy positions (top, bottom, left, right of the
+  hero) so each idea is judged from every attack direction. All
+  cells share one clock and one scripted fight loop (hit, take,
+  crit, take crit, regen), the background is the real map tile of
+  the hunting grounds and the strip scrolls horizontally. The mode
+  answers `/api/config` with `{"mode":"fight"}`; the page exists to
+  pick the variant the live map combat layer should implement.
 - **Tests and benchmarks** run without a bot or server: the synthetic
   region builder in `region_test.go` writes hand built l2j files, the
   real Giran region of the original example ships as

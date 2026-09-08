@@ -1326,3 +1326,192 @@ body.mode-pathfind .gear-panel { display: none; }
   text-align: right;
   white-space: nowrap;
 }
+
+/* ============================================================
+   The fight animation variant showcase (-test-fight-ui-v1 mode).
+
+   The body.mode-fight class (set by main.js on the mode handshake)
+   swaps the bot map for the showcase: a header with the legend and
+   a horizontal strip of numbered variant columns, four demo cells
+   per column (the enemy above, below, left and right of the hero).
+   ============================================================ */
+
+#fight-panel { display: none; }
+
+body.mode-fight #fight-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+body.mode-fight #tab-map,
+body.mode-fight .map-toolbar,
+body.mode-fight #bot-section,
+body.mode-fight .sidebar-foot,
+body.mode-fight .hud-stack,
+body.mode-fight .chat-box,
+body.mode-fight .follow-check,
+body.mode-fight .bot-only,
+body.mode-fight .map-legend,
+body.mode-fight #foot-packets,
+body.mode-fight #foot-objects,
+body.mode-fight #foot-uptime,
+body.mode-fight #foot-updated,
+body.mode-fight .tab[data-tab="log"] {
+  display: none;
+}
+
+body.mode-fight .tabs .tab[data-tab="map"] {
+  pointer-events: none;
+}
+
+.fight-header {
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.fight-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.fight-title {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.fight-count {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.fight-sub {
+  margin-top: 4px;
+  max-width: 720px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.fight-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 7px;
+}
+
+.fight-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.fight-chip .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 18, 22, 0.45);
+}
+
+.dot-swing-self { background: #7cc4ff; }
+.dot-swing-mob { background: #ff6b4a; }
+.dot-dealt { background: #ffd25c; }
+.dot-taken { background: #ff5252; }
+.dot-crit { background: #ffab00; }
+
+/* The strip: one column per variant, horizontal scroll through the
+   catalog. The scrollbar is styled thin like the inventory grid. */
+.fight-strip {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: flex-start;
+  scrollbar-width: thin;
+}
+
+.fight-strip::-webkit-scrollbar {
+  height: 9px;
+}
+
+.fight-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fight-strip::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.fight-column {
+  flex: 0 0 auto;
+  width: 292px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 8px;
+}
+
+.fight-col-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 2px 2px 0;
+}
+
+.fight-num {
+  font-weight: 700;
+  font-size: 13px;
+  color: #ffab00;
+  font-variant-numeric: tabular-nums;
+}
+
+.fight-name {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.fight-note {
+  margin: 3px 2px 7px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  min-height: 28px;
+}
+
+.fight-cell {
+  position: relative;
+  margin: 0 0 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #20262e;
+}
+
+.fight-cell:last-child { margin-bottom: 0; }
+
+.fight-cell canvas {
+  display: block;
+}
+
+.fight-cell-tag {
+  position: absolute;
+  left: 6px;
+  bottom: 4px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.62);
+  text-shadow: 0 1px 2px rgba(15, 18, 22, 0.85);
+  pointer-events: none;
+}

@@ -1677,3 +1677,62 @@ mirror's 1318. The bot had started adapting to a stale reference.
   `STACK_READY: login :2106, game :7777, db :3306`, and
   `tools/mobius_e2e.sh 45` prints `E2E_OK` against the fresh
   official database.
+
+## Round 34: the fight FX variant showcase page of -test-fight-ui-v1 (2026-09-08)
+
+Scope: the user asked for a dedicated test command that demos how the
+combat damage and the critical hits could be visualized, so the live
+map style can be picked from working examples instead of words.
+
+### Problem statement
+
+The live map combat layer (round 30) renders one chosen style of the
+swings and the damage numbers, but the visual language of "the hero
+dealt damage / received damage / landed or took a critical" was never
+compared against alternatives. Judging the ideas needs them running
+side by side, in every attack direction, on the real map background.
+
+### Fix
+
+- The new `-test-fight-ui-v1` flag boots a bot less web mode
+  (`webserver.NewFightServer`, mode `fight` in `/api/config`): no
+  game connection, the showcase runs entirely in the browser.
+- `web/fight.js` builds the showcase: twelve numbered variant
+  columns in a horizontally scrolling strip - floating numbers (the
+  current live style), comic pop with the cell shake, the slash
+  streak and the crit X cross, the spark spray, the shockwave rings,
+  the falling HP bar chunk, the projectile arrow with the crit flame
+  trail, the cinematic hit-stop zoom punch, the full cell flash
+  vignette, the dizzy orbit stars, the arcade banner and the combo
+  counter with the count up numbers.
+- Every column stacks four demo cells - the enemy above, below,
+  left and right of the hero - so each idea is judged from every
+  attack direction. All 48 cells share one clock and one scripted
+  loop (the hero hits 38, takes 26, crits 95, takes a 68 crit, the
+  health refills, restart), so the same beat plays in every variant
+  at the same moment and the columns compare directly.
+- The cell background is the real map tile the bot hunts on (the
+  elven lands crop), the fighters render in the live map unit
+  language (the blue hero circle with the pulse ring, the red enemy
+  with the combat ring, the health bars and the names) and every
+  damage event carries a caption ("hero hits -38", "CRIT deals
+  -95").
+- The renderers are stateless functions of the effect age, so the
+  showcase holds no event bookkeeping and cannot desync; the frame
+  loop throttles to ~30 fps for 48 canvases.
+
+### Verification
+
+- `go build ./...`, `go vet ./...`, `gofmt -l` clean; `go test
+  ./... -count=1` all packages ok; `node --check` on the touched
+  JS files; the four repro harnesses keep their state (repro_map_
+  render holds its pre-existing zone label failure).
+- New `webserver/fight_test.go`: the mode handshake answers
+  `fight`, the index page carries the strip container, the fight
+  script and the map tile of the background answer.
+- Live run: `swarm -test-fight-ui-v1 -web 127.0.0.1:8090`, the
+  headless browser loads the page with zero console errors, the
+  strip holds 12 columns / 48 cells / 3664 px of scroll width, and
+  the captured screenshots (download/fight_shots/) show the numbered
+  columns, the map background, the hero/enemy markers, the HP bars
+  and the variant effects rendering correctly.
