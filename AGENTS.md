@@ -944,7 +944,15 @@ the same variables).
   the tests and external readers, and both paths share the
   `objectSnapshotLocked` view builder - keep them byte identical
   (pinned by `TestAppendSnapshotJSONMatchesSnapshot` and
-  `TestSnapshotJSONMatchesReflection`). The world objects live in the
+  `TestSnapshotJSONMatchesReflection`). The invalid UTF-8 bytes of a
+  string encode through the probed `jsonInvalidUTF8Replacement`
+  (`state/snapshot_json_encode.go`): the classic `encoding/json`
+  writes the `\ufffd` escape sequence while the v2 backed stdlib
+  (GOEXPERIMENT=jsonv2 and the newer toolchains that ship it by
+  default) writes the literal U+FFFD replacement rune - never hardcode
+  either form, the writer mirrors the stdlib of the toolchain running
+  the tests (both forms pinned by
+  `TestAppendJSONStringInvalidUTF8Modes`). The world objects live in the
   SoA halves of the `state.objectStore` (the `world` field of the
   bot): `hot` (an 88 byte `objectHot` per object - position,
   destination, level, kind code, attack flags, clan bitmask, speeds,

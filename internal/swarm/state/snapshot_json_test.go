@@ -277,6 +277,37 @@ func TestAppendJSONStringTable(t *testing.T) {
 	}
 }
 
+// TestAppendJSONStringInvalidUTF8Modes pins both replacement forms
+// the writer may emit for invalid UTF-8 bytes: the \ufffd escape
+// sequence of the classic encoder and the literal U+FFFD replacement
+// rune of the v2 backed one. The active form follows the stdlib of
+// the running toolchain (the probe behind
+// jsonInvalidUTF8Replacement); the test also pins the other branch so
+// a toolchain switch flips a loud test instead of a silent byte
+// drift.
+func TestAppendJSONStringInvalidUTF8Modes(t *testing.T) {
+	const invalid = "\xff\xfe"
+	escapeForm := "\"\\ufffd\\ufffd\""
+	rawForm := "\"\uFFFD\uFFFD\""
+
+	active := string(appendJSONString(nil, invalid))
+	reflected, err := json.Marshal(invalid)
+	require.NoError(t, err)
+	require.Equal(t, string(reflected), active)
+	require.Contains(t, []string{escapeForm, rawForm}, active)
+
+	saved := jsonInvalidUTF8Replacement
+	defer func() { jsonInvalidUTF8Replacement = saved }()
+
+	if active == escapeForm {
+		jsonInvalidUTF8Replacement = []byte("\uFFFD")
+		require.Equal(t, rawForm, string(appendJSONString(nil, invalid)))
+	} else {
+		jsonInvalidUTF8Replacement = []byte(`\ufffd`)
+		require.Equal(t, escapeForm, string(appendJSONString(nil, invalid)))
+	}
+}
+
 // TestAppendJSONTimeTable pins the time encoding against the
 // reflection encoder.
 func TestAppendJSONTimeTable(t *testing.T) {

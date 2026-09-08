@@ -1464,3 +1464,22 @@ name the variant number that best fits the real bot UI.
   round: go build/vet/test (14 packages), golangci-lint 0
   issues, mobius_e2e.sh 45 -> E2E_OK. Four commits pushed to
   mobius-c1-client-1 as melg8.
+- 2026-09-08: invalid UTF-8 parity fix of the JSON string writer. The
+  reflection golden suite (TestSnapshotJSONMatchesReflection,
+  TestAppendJSONStringTable) compares the hand rolled writer against
+  json.Marshal at runtime, and newer toolchains (the v2 backed
+  encoding/json of GOEXPERIMENT=jsonv2 and the releases shipping it
+  by default) replace the invalid UTF-8 bytes of a JSON string with
+  the literal U+FFFD replacement rune instead of the classic \ufffd
+  escape sequence, so the suite went red on those toolchains while
+  Go 1.24 stayed green (the repo toolchain). appendJSONString now
+  emits the replacement through the init time probed
+  jsonInvalidUTF8Replacement - a one byte json.Marshal probe at
+  package init, zero runtime cost, mirroring the same stdlib the
+  reflection tests marshal with - which keeps the writer byte
+  identical to the reflection encoder on every toolchain. Both
+  replacement forms are pinned by TestAppendJSONStringInvalidUTF8Modes
+  (the inactive branch is forced in the test so a toolchain switch
+  flips a loud test, not a silent byte drift). AGENTS.md documents
+  the probe contract. Verified: go build/vet, go test ./... (16
+  packages), golangci-lint 0 issues.

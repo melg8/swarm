@@ -5,6 +5,7 @@
 package state
 
 import (
+	"encoding/json"
 	"strconv"
 	"time"
 	"unicode/utf8"
@@ -34,8 +35,9 @@ var jsonHTMLSafeSet = func() [utf8.RuneSelf]bool {
 // appendJSONString appends the JSON encoding of s - the exact bytes
 // of the encoding/json string encoder with HTML escaping: the two
 // mandatory escapes, the control bytes as \u00XX, the invalid UTF-8
-// bytes as the replacement rune and the U+2028/U+2029 line break
-// escapes (they are valid JSON but break JavaScript string literals).
+// bytes as the replacement form of the running stdlib and the
+// U+2028/U+2029 line break escapes (they are valid JSON but break
+// JavaScript string literals).
 func appendJSONString(dst []byte, s string) []byte {
 	dst = append(dst, '"')
 	start := 0
@@ -68,7 +70,7 @@ func appendJSONString(dst []byte, s string) []byte {
 		c, size := utf8.DecodeRuneInString(s[i:])
 		if c == utf8.RuneError && size == 1 {
 			dst = append(dst, s[start:i]...)
-			dst = append(dst, `\ufffd`...)
+			dst = append(dst, jsonInvalidUTF8Replacement...)
 			i += size
 			start = i
 
@@ -89,6 +91,25 @@ func appendJSONString(dst []byte, s string) []byte {
 
 	return dst
 }
+
+// jsonInvalidUTF8Replacement is the byte sequence the running
+// stdlib writes for one invalid UTF-8 byte inside a JSON string: the
+// classic encoding/json appends the \ufffd escape sequence while the
+// v2 backed encoder (GOEXPERIMENT=jsonv2 and the toolchains that
+// ship it by default) appends the literal U+FFFD replacement rune.
+// The init time probe mirrors json.Marshal of the same process so
+// the hand rolled writer stays byte identical to the reflection
+// encoder on every toolchain: the parity is pinned by the reflection
+// tests and both replacement forms by
+// TestAppendJSONStringInvalidUTF8Modes.
+var jsonInvalidUTF8Replacement = func() []byte {
+	probe, err := json.Marshal("\xff")
+	if err == nil && string(probe) == "\"\uFFFD\"" {
+		return []byte("\uFFFD")
+	}
+
+	return []byte(`\ufffd`)
+}()
 
 // appendJSONFloat appends the JSON encoding of f - the ES6 number
 // to string conversion of encoding/json: the shortest round trip
