@@ -804,12 +804,15 @@ client log file) - the short form:
   deployed stack; a fake C1 client walks the real protocol through
   the proxy, moves the character through the relay and prints
   `PROXY_E2E_OK`).
-- Port layout: proxy login `127.0.0.1:2107` + the `127.0.0.2:2106`
-  fallback for clients with the hardcoded login port (requires
-  `LoginserverHostname = 127.0.0.1` on the real login server - the
-  fast deploy applies it), proxy game `127.0.0.1:7778` +
-  `127.0.0.2:7778`. The redirected client l2.ini ships in
-  `data/client/`.
+- Port layout: the classic C1 exe hardcodes the auth port 2106 (the
+  ini [URL] Port line is an Unreal leftover it ignores - the stock ini
+  ships 7777), so the proxy login listeners answer 2106 and 2107 on
+  both `127.0.0.1` and `127.0.0.2` (mandatory first:
+  `127.0.0.1:2107`, the rest optional - `127.0.0.1:2106` is the real
+  login server address, the two recipes of `docs/proxy.md` resolve
+  the conflict), proxy game `127.0.0.1:7778` + `127.0.0.2:7778` (the
+  emulated server list advertises the login connection family). The
+  redirected client l2.ini ships in `data/client/`.
 
 ## Web interface
 

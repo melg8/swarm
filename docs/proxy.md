@@ -20,30 +20,61 @@ Flags:
 | Flag | Default | Meaning |
 |------|---------|---------|
 | `-proxy` | off | enables the client proxy |
-| `-proxy-login` | `127.0.0.1:2107,127.0.0.2:2106` | login listen addresses (the first is mandatory, the rest are fallbacks) |
+| `-proxy-login` | `127.0.0.1:2107,127.0.0.1:2106,127.0.0.2:2106,127.0.0.2:2107` | login listen addresses (the first is mandatory, the rest are optional fallbacks) |
 | `-proxy-game` | `127.0.0.1:7778,127.0.0.2:7778` | game listen addresses |
 | `-proxy-log` | `proxy.log` | the client connection log file |
 
 The proxy needs nothing else from the stack: the swarm bot keeps
-connecting to the real `127.0.0.1:2106` / `:7777` as usual.
+connecting to the real `127.0.0.1:2106` / `:7777` as usual (or wherever
+`-login` points it).
+
+## How the C1 client finds the proxy (read this first)
+
+The classic C1 executable **hardcodes the auth port 2106**: the auth
+socket dials `ServerAddr:2106` and ignores the `[URL]` `Port` line of
+`l2.ini` (an Unreal Engine leftover - the stock C1 `l2.ini` ships
+`Port=7777` while the auth server always answered on 2106). The `Port`
+edit of the shipped ini only matters for builds that honor it, so the
+proxy answers every combination: `2106` and `2107` on both `127.0.0.1`
+and `127.0.0.2`.
+
+The catch: `127.0.0.1:2106` is the address of the **real** Mobius login
+server, and the swarm bots need that server. Two proven recipes resolve
+the conflict (both are one config line plus one flag or ini line):
+
+**Recipe A (recommended, every client path works).** Move the real login
+server to the third loopback address and let the proxy own
+`127.0.0.1:2106`:
+
+1. In the Mobius login `Server.ini`: `LoginserverHostname = 127.0.0.3`
+   (a wildcard `*`/`0.0.0.0` bind blocks *all* loopback addresses on
+   that port under Windows).
+2. Run the swarm with `-login 127.0.0.3:2106` (the bots reach the real
+   login server there).
+3. Keep the shipped `l2.ini` (`ServerAddr=127.0.0.1`): a classic client
+   lands on the proxy through the hardcoded 2106, a port-honoring
+   build through 2107.
+
+**Recipe B (no swarm flag change).** Keep the real login server on
+`127.0.0.1:2106` (not wildcard!) and move the client to the second
+loopback address:
+
+1. In the Mobius login `Server.ini`: `LoginserverHostname = 127.0.0.1`
+   (must not be `*`/`0.0.0.0`, otherwise the proxy cannot bind
+   `127.0.0.2:2106` on Windows).
+2. Edit `l2.ini`: `ServerAddr=127.0.0.2` (the classic client then dials
+   `127.0.0.2:2106`, which the proxy answers).
 
 ## Client setup (l2.ini)
 
 The C1 client finds the auth server through the `[URL]` section of its
 `l2.ini`. The repository ships a ready re-encrypted copy at
 `data/client/l2.ini` (open-l2encdec, protocol 212 container): its
-`ServerAddr=127.0.0.1` and `Port=2107` point at the proxy. Copy it over
-the `l2.ini` of the client folder (backup the original first).
-
-The classic clients hardcode the login port 2106 in the executable and
-may ignore the ini port. For that case the proxy also listens on
-`127.0.0.2:2106` (the whole `127.0.0.0/8` block is loopback): set
-`ServerAddr=127.0.0.2` in the ini (keep `Port` as is) and make sure the
-Mobius login server does not own `0.0.0.0:2106` - set
-`LoginserverHostname = 127.0.0.1` in the login `Server.ini` and restart
-it. The sandbox deployment applies that tweak automatically
-(`tools/swarm_fast_deploy.sh`); the reference Windows deployment needs
-the same one line change.
+`ServerAddr=127.0.0.1` and `Port=2107` pair with Recipe A above (and
+with any client build that honors the ini port). Copy it over the
+`l2.ini` of the client folder (backup the original first); for Recipe B
+decrypt it, set `ServerAddr=127.0.0.2`, re-encrypt (see
+`data/client/Readme.txt`).
 
 When the swarm, the stack and the client run on one machine (the
 reference setup), `127.0.0.1` works as is. A client on another machine
@@ -113,10 +144,27 @@ Everything the proxy observes lands in `proxy.log` (separate from the
 console output of the bot): every connection with its number
 (`login#3`, `game#7`), every login attempt with the credentials used,
 every state transition, the replay statistics, every client -> server
-packet id and every close reason. When a login does not work, send
-this file - it shows whether the client reached the proxy at all
-(nothing in the file: the client never connected, check the l2.ini and
-the port), which port it used, and how far the flow got.
+packet id and every close reason.
+
+The file is the first diagnostic of a login failure and its content
+maps the problem directly:
+
+- **Nothing but the startup lines** (no `login#N: client connected`):
+  the client never reached the proxy. With the classic hardcoded 2106
+  this means the client dialed the real login server address instead -
+  apply Recipe A or B above. Check who owns the port on Windows:
+  `netstat -ano | findstr :2106`.
+- **`Proxy optional listener 127.0.0.1:2106 skipped ... access
+  permissions`**: either the real Mobius login server holds the port
+  (its wildcard bind blocks the whole port on Windows - the recipes
+  above) or Windows reserved the port range through Hyper-V/WinNAT.
+  The reserved ranges are listed by
+  `netsh interface ipv4 show excludedportrange protocol=tcp`; when 2106
+  is inside one, `net stop winnat` (then `net start winnat` after the
+  swarm bound its listeners) or a reboot frees it.
+- **`login#N: client connected` followed by an immediate close**:
+  the client reached the proxy but the handshake failed - the following
+  lines carry the exact packet and reason (send the file).
 
 The live verification harness of the whole path (against the deployed
 stack, with a fake C1 client that walks the same protocol as the real

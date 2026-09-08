@@ -17,11 +17,12 @@ edits of the plaintext `[URL]` section:
 | Setting      | Stock value  | This copy   | Meaning |
 |--------------|--------------|-------------|---------|
 | `ServerAddr` | `127.0.0.1`  | `127.0.0.1` | swarm proxy login server host (swarm and the client run on the same machine) |
-| `Port`       | `7777`       | `2107`      | swarm proxy login port (`-proxy-login` default) |
+| `Port`       | `7777`       | `2107`      | swarm proxy login port for client builds that honor the ini port (see the port notes) |
 
 The swarm proxy (branch `feature/proxy-server`, run the bot with
-`-proxy`) listens for client logins on `127.0.0.1:2107` and for game
-connections on `127.0.0.1:7778`; the emulated login server answers with
+`-proxy`) listens for client logins on `127.0.0.1:2107`, `127.0.0.1:2106`,
+`127.0.0.2:2106` and `127.0.0.2:2107`, and for game connections on
+`127.0.0.1:7778` and `127.0.0.2:7778`; the emulated login server answers with
 a one entry server list pointing at the proxy game port, so the client
 never needs to know the Mobius ports.
 
@@ -30,15 +31,25 @@ the original first).
 
 ### Port notes (read if the client cannot login)
 
-The classic clients ship with the login port 2106 hardcoded in the
-executable and may ignore the ini port. The proxy therefore binds a
-second login listener on `127.0.0.2:2106` by default, so a client with
-the hardcoded port also reaches it when `ServerAddr=127.0.0.2` is set
-in the ini (the whole 127.0.0.0/8 block is loopback). For that listener
-to bind, the Mobius login server must not own `0.0.0.0:2106`: set
-`LoginserverHostname = 127.0.0.1` in the login `Server.ini` (the
-sandbox deployment of `tools/swarm_fast_deploy.sh` applies this
-automatically, see `docs/proxy.md` for the Windows deployment).
+The classic C1 executable **hardcodes the login port 2106**: the auth
+socket dials `ServerAddr:2106` and ignores the ini `Port` line (an
+Unreal Engine leftover - that is why the stock ini ships `Port=7777`
+while the real auth server always answered on 2106). The `Port=2107`
+edit of this copy only matters for client builds that honor the ini
+port; the proxy therefore answers 2106 and 2107 on both `127.0.0.1` and
+`127.0.0.2` (the whole 127.0.0.0/8 block is loopback).
+
+`127.0.0.1:2106` belongs to the real Mobius login server by default, so
+pick one of the two recipes of `docs/proxy.md` ("How the C1 client finds
+the proxy"): either move the real login server to `127.0.0.3`
+(`LoginserverHostname = 127.0.0.3` in the login `Server.ini` + swarm
+`-login 127.0.0.3:2106`, this ini then works as is), or keep the real
+login on a non-wildcard `127.0.0.1` and re-encrypt this ini with
+`ServerAddr=127.0.0.2`. A login listener skipped with an access
+permissions error on Windows means the port is either wildcard-owned or
+reserved by Hyper-V/WinNAT (`netsh interface ipv4 show excludedportrange
+protocol=tcp`, `net stop winnat` frees it) - the proxy log names the
+remedies.
 
 ### Regenerating after edits
 

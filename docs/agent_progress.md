@@ -4,7 +4,51 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
-## Active task: MITM proxy server for the real C1 client (feature/proxy-server)
+## Active task: fix the real client connection failure (feature/proxy-server)
+
+Started: 2026-09-08 (second round, after the user's first real client
+test). Branch: `feature/proxy-server`. Commits as melg8. The stack was
+redeployed and verified first (STACK_READY).
+
+### Goal
+
+The user's real C1 client could not connect ("не удалось подключиться").
+The proxy.log they sent holds only the startup lines and the web UI
+selection - no `login#N: client connected` at all - so the client never
+reached the proxy. Root cause: the classic C1 executable hardcodes the
+auth port 2106 (the l2.ini [URL] Port line is an Unreal leftover the
+auth socket ignores - the user's stock ini shipped Port=7777 while the
+real login always answered on 2106, which is also why the ini worked
+against the real stack). The shipped ini's Port=2107 edit therefore did
+nothing: the client dialed `127.0.0.1:2106`, the real Mobius login
+server address, whose wildcard bind is also what made the proxy's
+`127.0.0.2:2106` fallback fail with the Windows access permissions
+error (a wildcard 0.0.0.0:port bind blocks every loopback address of
+that port under Windows).
+
+### Plan
+
+- The proxy answers the hardcoded port 2106 AND the ini port 2107 on
+  BOTH 127.0.0.1 and 127.0.0.2 (optional listeners: 127.0.0.1:2106 is
+  normally the real login server address, so a bind failure is logged,
+  not fatal).
+- Family specific listener bookkeeping (the old flat slice would have
+  made gamePort() read a login listener once several login listeners
+  bind).
+- Honest startup logging (only the actually bound addresses) plus a
+  routing banner and a Windows aware bind hint naming the remedies.
+- docs/proxy.md gains the two recipes: (A) move the real login server
+  to 127.0.0.3 (LoginserverHostname=127.0.0.3 + swarm -login
+  127.0.0.3:2106) so the proxy owns 127.0.0.1:2106, or (B) keep the
+  real login on non-wildcard 127.0.0.1 and point the ini
+  ServerAddr=127.0.0.2. Plus the Hyper-V/WinNAT excluded port range
+  triage.
+- Acceptance: unit tests for the listener semantics, the full suite,
+  lint, and the live proxy E2E stay green; the startup log of a real
+  run shows the bound listeners and the skip hint for the busy
+  127.0.0.1:2106.
+
+## Finished task: MITM proxy server for the real C1 client (feature/proxy-server)
 
 Started: 2026-09-08. Branch: `feature/proxy-server`. Commits as melg8,
 pushed as they land. The stack was deployed and verified first
@@ -123,15 +167,18 @@ real server through the bot's session.
   consecutive runs).
 - 14 atomic commits on feature/proxy-server, all pushed as melg8.
 
-### Open: the real client check
+### Outcome of the real client check (2026-09-08)
 
-The C1 client runs on Windows only, so the final live check is the
-user's: copy data/client/l2.ini into the client folder, run the stack
-and `go run ./cmd/swarm -hunt -proxy -web 127.0.0.1:8080`, login with
-any credentials, enter the offered character and watch the bot farm.
-On any failure send the proxy.log file - it records every connection
-attempt, the credentials used, the state transitions and the close
-reasons.
+The user ran the first real client test and the client could not
+connect. The proxy.log they sent contained only the startup lines (no
+client connection at all): the classic C1 exe hardcodes the auth port
+2106, so the Port=2107 ini edit did not route the client to the proxy.
+The follow-up task above ("fix the real client connection failure")
+covers the listener expansion, the honest bind logging and the two
+Windows recipes. The live check remains the user's: after applying a
+recipe, on any failure send the proxy.log file - it records every
+connection attempt, the credentials used, the state transitions and
+the close reasons.
 
 
 ## Finished task: spawn-true hunting zones, all-mob farming, rotation sweep
