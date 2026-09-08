@@ -23,7 +23,9 @@ func NewTestFightServer(address string, logger *log.Logger) *Server {
 }
 
 // handleFightConfig reports the fight test mode of the web UI.
-func (s *Server) handleFightGalleryConfig(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleFightGalleryConfig(
+	w http.ResponseWriter, _ *http.Request,
+) {
 	writeJSON(w, s.logger, configResponse{
 		Mode:     modeTestFight,
 		Geodata:  nil,
