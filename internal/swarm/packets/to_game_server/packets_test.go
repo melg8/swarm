@@ -351,7 +351,7 @@ func TestRequestActionUseToBytes(t *testing.T) {
 			0x45,                   // opcode
 			0x00, 0x00, 0x00, 0x00, // action id 0 (sit/stand)
 			0x00, 0x00, 0x00, 0x00, // ctrl not pressed
-			0x00,                   // shift not pressed
+			0x00, // shift not pressed
 		}, writer.Bytes())
 	})
 
@@ -364,7 +364,7 @@ func TestRequestActionUseToBytes(t *testing.T) {
 			0x45,                   // opcode
 			0x02, 0x00, 0x00, 0x00, // action id
 			0x01, 0x00, 0x00, 0x00, // ctrl pressed
-			0x01,                   // shift pressed
+			0x01, // shift pressed
 		}, writer.Bytes())
 	})
 }
