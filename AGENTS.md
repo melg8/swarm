@@ -768,6 +768,49 @@ which they currently do (see below).
   its next restart; the pathfinder reads them directly and needs no
   server restart.
 
+## Client proxy (MITM server for the real C1 client)
+
+`internal/swarm/proxy` is the MITM server a real Lineage 2 C1 client
+connects to (run the bot with `-proxy`). Read `docs/proxy.md` for the
+operational picture (the l2.ini redirect, the port fallbacks, the
+client log file) - the short form:
+
+- The emulated login server accepts any account/password pair and
+  answers a one entry server list pointing at the proxy game port;
+  the emulated game server shows exactly one character (the bot
+  selected in the web UI, the first session without a selection) and
+  answers the character selection with the recorded CharSelected
+  packet of the bot session.
+- After the client's EnterWorld the proxy replays the recorded
+  server->client stream of the session (the `Recorder` history fed by
+  the `GameClient` tap - everything after the bot's CharSelected) and
+  then relays live packets both ways, re-encrypting on the direction
+  specific cipher chains. The replay model keeps the chains
+  independent: that is what makes packet rewriting safe and is the
+  contract of the `proxy.Transformer` seam (identity today, the
+  future debug spoofing hangs there).
+- Client packets ride the SAME outbound cipher chain as the hunt loop
+  actions: `GameClient.SendRaw` encrypts under the session writeMu, so
+  proxied clicks and autonomous actions interleave without corrupting
+  the cipher (see `TestGameClientConcurrentSendKeepsCipherOrder`).
+- The login phase of the client never reaches the real servers
+  (character management is refused by the emulation), the in world
+  packets transit unchanged.
+- The client connection log is a dedicated file (`proxy.log`,
+  `-proxy-log`): connection numbers, credentials, state transitions,
+  replay stats, every client -> server packet id and close reasons.
+  A failed real client login is diagnosed from that file alone.
+- The live E2E of the whole path is `tools/proxy_e2e.sh` (needs the
+  deployed stack; a fake C1 client walks the real protocol through
+  the proxy, moves the character through the relay and prints
+  `PROXY_E2E_OK`).
+- Port layout: proxy login `127.0.0.1:2107` + the `127.0.0.2:2106`
+  fallback for clients with the hardcoded login port (requires
+  `LoginserverHostname = 127.0.0.1` on the real login server - the
+  fast deploy applies it), proxy game `127.0.0.1:7778` +
+  `127.0.0.2:7778`. The redirected client l2.ini ships in
+  `data/client/`.
+
 ## Web interface
 
 The UI boots in one of four modes chosen by `GET /api/config`: the bot

@@ -332,3 +332,65 @@ animates the item flying into the inventory). The picker position is
 already known from the StopMove broadcasts of the arrival, so the tracker
 must not snap the picker to these coordinates - it teleported the marker
 across the map on every pickup.
+
+# The proxy emulation (swarm -> C1 client)
+
+The emulated servers of the client proxy (`internal/swarm/proxy`, see
+docs/proxy.md) speak the same wire formats with additions noted here.
+The login emulation is a full state machine mirror of the Mobius
+LoginPacketHandler (any credentials pass, GGAuth 0x07 gets the legacy
+0x0B answer `[opcode 0x0B][sessionId: 4][0: 4]`), so only the packets
+the proxy SYNTHESIZES (instead of relaying recorded bytes) are listed.
+
+### Login Init (0x00, proxy variant)
+
+The proxy Init mirrors the real packet byte for byte
+(`loginserver/network/serverpackets/Init.java`): the scrambled RSA
+modulus is copied from the Init packet the BOT received on its own
+login (`AuthResult.RsaPublicKey`), so the client accepts it like the
+real one. The session id is random per client connection, the protocol
+revision is 0x0000c621, no trailing Blowfish key.
+
+### ServerList (0x04, proxy variant)
+
+One entry: server id 1, the IPv4 the client used to reach the login
+listener (`conn.LocalAddr`), the proxy game port, status up, brackets
+off, current players = the connected client count.
+
+### CharSelectionInfo (0x1F, proxy variant)
+
+Exactly one character: the played character of the selected bot
+session. The appearance block (sex, race, base class, hair, face) is
+re-serialized from the LAST recorded real char list of the session that
+contains the played name (full fidelity for the character screen
+render), while the vitals, the position and the level come from the
+live tracker (fresher than the login time list). Sp/exp are written as
+zeros (the parser never stored them), the paperdoll blocks as zeros.
+
+### KeyPacket (0x00, proxy variant)
+
+Same layout as the real one, but the key is a random per client
+session key and the server id is 1. The client cipher chain starts from
+this key; the bot session keeps its own chain from the real server key
+- the two chains advance independently, which is the property the
+packet transformer seam builds on (rewriting, resizing, dropping and
+injecting stay cipher safe).
+
+### CharCreateFail (0x26, proxy answer)
+
+The emulation answers creation attempts with reason 0x01 ("too many
+characters"): the emulated account offers exactly the one served
+character, the real account is never touched by client login phase
+packets.
+
+### The relay model
+
+After the client EnterWorld the proxy sends the recorded stream of the
+bot session (every packet after the bot's CharSelected, sequence
+numbers keep the order) and then continues with the live feed. Every
+client packet from the char selected state onward transits to the real
+game server through `GameClient.SendRaw` (the same outbound cipher
+critical section the hunt loop uses). The client's move request
+`[opcode 0x01][targetX/Y/Z][originX/Y/Z][mode: INT 4 bytes]` (mode 1 =
+mouse, 0 = keyboard - a full int, see MoveToLocation.readImpl) is the
+reference example covered by the E2E.

@@ -70,12 +70,60 @@ real server through the bot's session.
   (server->proxy and proxy->client) advance independently, which makes
   the relay a true MITM instead of a byte pipe.
 
-### Status: in progress
+### Status: in progress (code complete, live E2E green)
 
 - [x] Environment deployed and verified (STACK_READY).
 - [x] l2.ini decrypted with open-l2encdec, [URL] Port 7777 -> 2107,
       re-encrypted and committed as data/client/l2.ini.
-- [ ] Login/game emulation, relay, web UI selection, E2E harness.
+- [x] Login packet serializers (LoginOk/ServerList/PlayOk/Init opcode
+      framing, CharSelectionInfo full serializer) with round trip
+      tests.
+- [x] connection: the GameClient tap (every decrypted server packet
+      from the char list onward), SendRaw (raw client packets through
+      the shared outbound cipher critical section) and the scrambled
+      RSA modulus capture of the login Init (AuthResult).
+- [x] proxy.Recorder: the session history with sequence numbers, the
+      prologue+tail byte cap, live subscribers with poison on lag.
+- [x] proxy login server emulation: Init -> any credentials -> LoginOk
+      -> one entry ServerList (advertises the proxy game port on the
+      login connection address family) -> PlayOk; GGAuth answered.
+- [x] proxy game server emulation: ProtocolVersion/KeyPacket with a
+      per client key, any session keys accepted, the one character
+      list (recorded appearance + live tracker vitals), the recorded
+      CharSelected answer, EnterWorld -> the recorded stream replay +
+      the live relay, the client packet transit through the bot
+      session, character create/delete refused.
+- [x] The transformer seam (proxy.Transformer, identity passthrough
+      today) documented as the future packet spoofing point.
+- [x] web UI: GET/POST /api/proxy endpoints, the sidebar click
+      selects the bot for connecting clients (the proxy chip).
+- [x] main.go: -proxy, -proxy-login, -proxy-game, -proxy-log flags;
+      the session registration/unregistration lifecycle, the proxy.log
+      file logger.
+- [x] Live stack E2E (tools/proxy_e2e.sh -> PROXY_E2E_OK): the bot
+      enters the world, a fake C1 client logs in with garbage
+      credentials, sees the one character, enters the world through the
+      replay, receives the live NPC traffic, moves the character
+      through the relay (the own movement echo arrives) and everything
+      shuts down gracefully. The one real fix it forced: the movement
+      mode of the client MoveToLocation is a full int (the server
+      failed reading the short packet - see the game log "Failed
+      reading: MoveToLocation").
+- [x] Deploy tweak: LoginserverHostname = 127.0.0.1 on the login
+      Server.ini so the proxy fallback 127.0.0.2:2106 binds (both
+      deploy scripts synced).
+- [x] Docs: docs/proxy.md (the user guide), the AGENTS.md proxy
+      section, the protocol_description.md emulation packet notes.
+
+### Open: the real client check
+
+The C1 client runs on Windows only, so the final live check is the
+user's: copy data/client/l2.ini into the client folder, run the stack
+and `go run ./cmd/swarm -hunt -proxy -web 127.0.0.1:8080`, login with
+any credentials, enter the offered character and watch the bot farm.
+On any failure send the proxy.log file - it records every connection
+attempt, the credentials used, the state transitions and the close
+reasons.
 
 
 ## Finished task: spawn-true hunting zones, all-mob farming, rotation sweep
