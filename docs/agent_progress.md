@@ -4,7 +4,81 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
-## Active task: spawn-true hunting zones, all-mob farming, rotation sweep
+## Active task: MITM proxy server for the real C1 client (feature/proxy-server)
+
+Started: 2026-09-08. Branch: `feature/proxy-server`. Commits as melg8,
+pushed as they land. The stack was deployed and verified first
+(ports 2106/7777/3306, 75 tables, STACK_READY).
+
+### Goal
+
+A real Lineage 2 C1 client must be able to connect to the swarm process
+and observe/control the character of the running in-game bot exactly as
+if the client were connected to the L2J Mobius C1 server directly. The
+swarm acts as a transparent MITM server (transparent for both the client
+and the game server) and as the carrier of the in-game bot: with the bot
+farming, a connecting user watches the automated gameplay from the
+bot's perspective, and the packets of the user's own clicks flow to the
+real server through the bot's session.
+
+### Constraints (from the task brief)
+
+- The swarm emulates BOTH the login server and the game server for the
+  client. Any login/password pair is accepted; the character list shows
+  exactly one character - the bot selected in the web UI, or the first
+  bot when nothing is selected or the web UI is offline. Neither the
+  server list nor the character list is used to pick which character to
+  enter (the emulation only forwards the single preselected character).
+- Multiple bots will run later: the web UI selection is the switch for
+  which bot a connecting client attaches to; the client switches by
+  reconnecting after changing the selection.
+- swarm and Mobius run on the same machine, so connection interception
+  on the same ports is impossible - the proxy listens on its own ports
+  (login 127.0.0.1:2107 plus a 127.0.0.2:2106 hardcoded-port fallback,
+  game 127.0.0.1:7778), and the C1 client is redirected through a
+  re-encrypted l2.ini (data/client/l2.ini, open-l2encdec protocol 212).
+- Every packet is decrypted and re-encrypted by the swarm in both
+  directions (login Blowfish framing, game XOR cipher - the proxy owns
+  two independent cipher chains per client connection, so future packet
+  rewriting/dropping stays possible: that transformer seam is designed
+  in, the current transformer is the identity/transparent one).
+- Packets the swarm does not handle transit unchanged between the
+  client and the real server.
+- The C1 client runs on Windows only, so the real-client check is a
+  user-side step: the swarm must log every client connection attempt to
+  a dedicated file (proxy.log) so a failed attempt can be diagnosed from
+  the file alone.
+
+### Design
+
+- `internal/swarm/proxy`: the emulated login server (Init -> any
+  RequestAuthLogin -> LoginOk -> ServerList with one proxy entry ->
+  PlayOk), the emulated game server (ProtocolVersion/KeyPacket with a
+  proxy key -> AuthLogin -> one character CharSelectionInfo synthesized
+  from the bot tracker -> replayed CharSelected -> EnterWorld replays
+  the recorded world stream of the bot session -> live relay), the
+  packet history recorder (the bot session tap: full stream with a
+  prologue+tail cap), the transformer seam and the file logger.
+- `connection.GameClient` grows a packet tap (every decrypted server
+  packet, from CharSelectionInfo onward) and a raw send path
+  (`SendRaw`) that encrypts through the same outKey/writeMu critical
+  section the hunt loop uses, so client packets and hunt packets share
+  one cipher chain without races.
+- The replay model: the client gets the full recorded server->client
+  stream of the bot session (everything after the bot's CharSelected),
+  then the live feed continues at the cursor - the two cipher chains
+  (server->proxy and proxy->client) advance independently, which makes
+  the relay a true MITM instead of a byte pipe.
+
+### Status: in progress
+
+- [x] Environment deployed and verified (STACK_READY).
+- [x] l2.ini decrypted with open-l2encdec, [URL] Port 7777 -> 2107,
+      re-encrypted and committed as data/client/l2.ini.
+- [ ] Login/game emulation, relay, web UI selection, E2E harness.
+
+
+## Finished task: spawn-true hunting zones, all-mob farming, rotation sweep
 
 Started: 2026-09-08. Branch: `mobius-c1-client-1`. Commits as melg8,
 pushed as they land. The stack was deployed and verified first
