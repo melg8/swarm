@@ -1147,3 +1147,75 @@ cache friendly, and refactor the oversized god object classes.
   the Snapshot deep copy the encoder needs). Also fixed the
   lint drift of the fight showcase config response (explicit
   zero fields, exhaustruct).
+
+## Active task: the test-fight-ui fight FX comparison gallery
+
+Started: 2026-09-08. Branch: `mobius-c1-client-1`.
+Commits as melg8, pushed as they land.
+
+### Goal
+
+The user asked for a separate `-test-fight-ui` flag: a web UI page
+of hero vs enemy fight examples for comparing visual ideas of
+damage feedback. Vertically 4 rows - the enemy above, below, left
+and right of the character; horizontally many numbered variants of
+"the hero dealt damage / the hero received damage / a critical of
+either" visualizations, scrollable with a horizontal scrollbar, the
+map background as usual, so the user can run the test, watch and
+name the variant number that best fits the real bot UI.
+
+### Constraints
+
+- Plain HTML/CSS/JS in the webserver embed, no framework, no build
+  step, no new dependencies (project rule).
+- No game connection, no geodata: the gallery is a static design
+  aid; the map background is the static tile pyramid.
+- Every effect must be a pure function of the shared loop clock
+  (seeded per beat random tables) so repaints are deterministic and
+  a Node vm harness can assert the drawing.
+- The classic-script sandbox rule: no top-level DOM access in
+  fighttest.js (everything inside init/build/render), top-level
+  const bindings referenced by bare name from main.js.
+
+### Progress
+
+- 2026-09-08: implemented and verified. `webserver.NewTestFightServer`
+  (mode `test-fight` via GET /api/config), the `-test-fight-ui`
+  flag of cmd/swarm, `web/fighttest.js` (the engine: the grid DOM,
+  the virtual clock with pause/speed, the 9 s beat loop of four
+  beats - hero hit 46, taken 12, hero crit 92, crit taken 24 - the
+  unit markers with the lunge, the HP bars, the beat caption, the
+  map tile crop of the starter meadow, the per column pick
+  highlight) and 18 variants: classic popups (the live replica),
+  punch numbers, slash crescent, starburst + shockwave, blood
+  spray, knockback recoil, HP chunk ghost, lightning jolt, comic
+  burst, arrow volley, local shake, damage tally, unit flash +
+  ring, ground cracks, ticker feed, hitstop punch, beam lance,
+  attacker aura. index.html/style.css/main.js boot the
+  `mode-test-fight` body class. Harness `tools/repro_fight_ui.js`
+  (46 checks: structure, per variant engagement during all four
+  beats measured against a null-variant baseline, the tile crop
+  geometry, the caption texts, the HP integration, the lunge
+  geometry, the scroll window skipping, the controls). Go tests
+  `fighttest_test.go` (the config endpoint and the static asset
+  chain). Fixed during verification: a doubled lunge factor, the
+  map tile crop missing the tile world origin, the lightning
+  flicker windows too narrow for 60 fps sampling, the hitstop
+  number colliding with the unit name. Live verified with
+  agent-browser + VLM screenshot reviews at frozen beat moments:
+  all four beat phases and three scroll windows render correctly.
+  golangci-lint 0 issues, go vet + go test ./... green, all five
+  repro harnesses green (repro_map_render keeps its pre-existing
+  zone label failure).
+
+### Status
+
+- Rebase note: the parallel session pushed the same brief as
+  `-test-fight-ui-v1` (mode `fight`, `web/fight.js`, twelve
+  variants); both idea sets now coexist side by side, the
+  colliding identifiers of this side were renamed
+  (handleFightGalleryConfig, newFightGalleryServer, the
+  .fxg-* classes) and the union was re-verified (build, tests,
+  lint, the harness).
+- Gallery complete and live-verified; awaiting the user's variant
+  pick to port the favorite into the real combat layer of map.js.

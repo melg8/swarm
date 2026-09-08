@@ -2,12 +2,12 @@
 name: webui-harness
 description: >-
   How to change the swarm web UI (plain HTML/CSS/JS in
-  internal/swarm/webserver/web) safely: the four Node repro harnesses,
+  internal/swarm/webserver/web) safely: the five Node repro harnesses,
   the vm-sandbox constraints, the keyed rendering rules and the
   end-to-end path of a snapshot field. Use for any map, HUD, equipment
-  widget, chat or style change, for adding snapshot fields, panels or
-  toolbar toggles, and whenever a harness fails - even if the user
-  only says "карта глючит" or "добавь панель".
+  widget, chat, fight FX gallery or style change, for adding snapshot
+  fields, panels or toolbar toggles, and whenever a harness fails - even
+  if the user only says "карта глючит" or "добавь панель".
 ---
 
 # Web UI harness (swarm)
@@ -28,6 +28,17 @@ node tools/repro_gear.js         # equipment widget (79 checks)
 node tools/repro_map_render.js   # markers, links, camera, draw order
 node tools/repro_movement.js     # movement interpolation vs the
                                  # simulated Mobius server
+```
+
+The fight FX gallery mode (`-test-fight-ui`, `web/fighttest.js`) has
+its own harness built the same way:
+
+```bash
+node tools/repro_fight_ui.js     # the 18x4 comparison grid: the
+                                 # structure, the per variant engagement
+                                 # during all four beats, the map tile
+                                 # background, the HP/lunge timeline, the
+                                 # scroll window and the controls
 ```
 
 Run every harness you could plausibly have affected plus `go test

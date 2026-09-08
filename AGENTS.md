@@ -206,7 +206,8 @@ way round.
 ```
 cmd/swarm/                     Application entry point (flags: login, account,
                                password, char, web, hunt, pathfind-test,
-                               geodata, max-passable).
+                               test-fight-ui, test-fight-ui-v1, geodata,
+                               max-passable).
 internal/swarm/
   pathfind/                    Geodata path finder: l2j region loader, A* with
                                post smoothing and line of sight over the
@@ -261,6 +262,14 @@ task run:app              # or: go run ./cmd/swarm -web 127.0.0.1:8080
 
 go run ./cmd/swarm -pathfind-test   # map pathfinding test UI (no bot),
                                     # flags: -geodata DIR, -max-passable N
+
+go run ./cmd/swarm -test-fight-ui  # fight FX comparison gallery (no bot,
+                                    # no geodata): 18 numbered damage
+                                    # visualization ideas, each with the
+                                    # enemy above, below, left and right
+                                    # of the character, horizontally
+                                    # scrollable, map background per cell
+
 go run ./cmd/swarm -test-fight-ui-v1 # combat FX variant showcase (no
                                     # bot), the -web address serves it
 ```
@@ -740,11 +749,25 @@ which they currently do (see below).
 
 ## Web interface
 
-The UI boots in one of two modes chosen by `GET /api/config`: the bot
-control mode described here and the bot less pathfind test mode (see
+The UI boots in one of four modes chosen by `GET /api/config`: the bot
+control mode described here, the bot less pathfind test mode (see
 ## Pathfinding) that reuses the same map canvas, camera and theme - a
 `body.mode-pathfind` class hides the bot panels and shows the pathfind
-sidebar panel.
+sidebar panel - the bot less fight FX gallery of the `-test-fight-ui`
+flag (mode `test-fight`, `body.mode-test-fight`), a design decision aid
+for the combat damage visualization: a horizontally scrollable grid of
+18 numbered variant columns x 4 enemy placement rows (the enemy above,
+below, left and right of the character), where every cell runs the same
+synchronized beat loop (the hero hits, the hero takes a hit, the hero
+lands a critical, the hero takes a critical) on the same starter meadow
+map tile crop. All effects are pure functions of the loop clock seeded
+per beat, so repainting is deterministic and the off screen columns are
+skipped. Clicking a variant head marks the column (the pick highlight);
+the pause button and the speed select drive the loop. The harness is
+`tools/repro_fight_ui.js`. The parallel `-test-fight-ui-v1` flag (mode
+`fight`, `body.mode-fight`, the v1 idea set of the concurrent session)
+shows its own twelve variant showcase of the same brief - both pages
+stay side by side until one idea set wins.
 
 The bot embeds a web UI (`internal/swarm/webserver`, files in `web/`)
 served from the bot process itself, so it is reachable exactly while the
