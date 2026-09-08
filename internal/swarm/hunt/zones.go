@@ -310,7 +310,7 @@ func sameBand(zone HuntingZone, other HuntingZone) bool {
 // band passes the cap are too hard for now, a negative value
 // disables the cap). The starter zone (the first of the list) is the
 // fallback for levels below every band.
-func PickHuntingZone( //nolint:cyclop
+func PickHuntingZone(
 	zones []HuntingZone, level int32, gearPoints int32,
 	currentID string, fromX int32, fromY int32, maxMinLevel int32,
 ) (HuntingZone, bool) {
@@ -378,10 +378,14 @@ func (z HuntingZone) containsPoint(x int32, y int32) bool {
 		y >= z.CY-z.Half && y <= z.CY+z.Half
 }
 
+// noZone is the zero zone of the not-found returns (exhaustruct
+// wants the plain var instead of a partial literal).
+var noZone HuntingZone
+
 // zoneByID resolves a zone of the registry by its id.
 func (l *Loop) zoneByID(id string) (HuntingZone, bool) {
 	if id == "" {
-		return HuntingZone{}, false
+		return noZone, false
 	}
 	for index := range l.zones {
 		if l.zones[index].ID == id {
@@ -389,7 +393,7 @@ func (l *Loop) zoneByID(id string) (HuntingZone, bool) {
 		}
 	}
 
-	return HuntingZone{}, false
+	return noZone, false
 }
 
 // SetHuntingZones installs the zone registry of the deployment: the
@@ -505,7 +509,10 @@ func (l *Loop) selfZoneAnchor() (int32, int32) {
 // brings the character to the middle first); running fights, resting
 // walks and town trips reset the timer - a rotation never abandons
 // any of them.
-func (l *Loop) maybeRotateEmptyZone(now time.Time) {
+// The linear guard chain is the emptiness protocol itself: every
+// guard either resets or holds the empty timer, and splitting it
+// would scatter that contract over helpers.
+func (l *Loop) maybeRotateEmptyZone(now time.Time) { //nolint:cyclop
 	zone := l.zone()
 	if zone == nil || l.zonePickedID == "" {
 		l.zoneEmptySince = time.Time{}
@@ -573,7 +580,7 @@ func (l *Loop) maybeRotateEmptyZone(now time.Time) {
 func (l *Loop) rotationZone(selfX int32, selfY int32) (HuntingZone, bool) {
 	current, ok := l.zoneByID(l.zonePickedID)
 	if !ok {
-		return HuntingZone{}, false
+		return noZone, false
 	}
 	best := -1
 	bestDist := math.MaxFloat64
@@ -592,7 +599,7 @@ func (l *Loop) rotationZone(selfX int32, selfY int32) (HuntingZone, bool) {
 		}
 	}
 	if best < 0 {
-		return HuntingZone{}, false
+		return noZone, false
 	}
 
 	return l.zones[best], true
