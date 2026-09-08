@@ -1027,6 +1027,32 @@ the same variables).
   the CP color of later chronicles) with light-top/dark-bottom
   cylindrical gradients; the three gradients are shared CSS variables
   (`--grad-hp/mp/xp`) reused by the sidebar mini bars.
+- Bot status banner: a compact chip pinned to the top center of the
+  map (`#bot-status` in index.html, `renderBotStatus` in app.js) shows
+  the current activity of the active bot at a glance - hunting,
+  looting, walking to town, selling, walking to farm spot, deleveling,
+  manual move, idle. The activity text and the data-kind attribute
+  come from `phaseLabel(snap)` which maps the hunt loop phase
+  (`snapshot.phase`, published by `state.Bot.SetPhase` from the hunt
+  loop tick through a defer) to a human readable label and color kind.
+  The session status takes precedence when no phase is published
+  (the manual only sessions never set the phase): the banner falls
+  back to the connecting/offline text. The dot pulses while the bot
+  is active so the banner reads as live; the pathfind test mode hides
+  it. The sidebar bot row carries the same activity text under the
+  name (`botActivityLabel`, fed by the `phase` field of the BotInfo
+  payload) so the overview shows what every session is doing.
+- Walk path view: the map already drew the manual walk plan
+  (`snapshot.walkPath`) as a blue dashed line from the character to
+  the clicked destination. The publishWalkPlan path now covers every
+  walking phase of the hunt loop, not only the manual move: town
+  trips (the walk to the trader and the walk back to the farm spot)
+  and the deleveling guard walks publish their remaining geodata
+  waypoints too, so the map draws the planned path of every
+  autonomous walk. The plan clears on the non walking phases
+  (engage, loot, sell, idle) through the `ClearWalkPlan` call of
+  the tick. The destination marker (the pulsing blue dot) draws at
+  the last waypoint of the published plan.
 - Chat window: the bottom left corner of the map shows the parsed
   system messages and the social animations (`snapshot.chat`, a rolling
   64 line ring fed by ApplySystemMessage/ApplySocialAction). The auto

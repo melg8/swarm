@@ -621,3 +621,94 @@ character (40k adena):
 
 - All four fixes implemented, unit tested (go vet + go test ./...
   green), pushed and live verified on the running stack.
+
+## Active task: webui bot status banner and walk path view
+
+Started: 2026-09-08. Branch: `mobius-c1-client-1`.
+
+### Goal
+
+The user asked to add to the webui (a) the display of the path drawn
+from the multiple pathfind elements (the planned geodata waypoints of
+every walking phase, not only the manual move) and (b) a small status
+banner in the bot widget showing what the bot is doing right now
+(hunting, running to a spot, running to sell items, deleveling). The
+banner must coexist with concurrent edits of other models on the
+same branch (rebase before every push, never force-push).
+
+### Constraints
+
+- The web UI is plain HTML/CSS/JS without a build step (project rule,
+  see AGENTS.md): no framework, no bundler, no npm. New fields flow
+  through the existing snapshot endpoint and the SSE stream.
+- Adding a snapshot field follows the best practice path: track it in
+  state, copy it into Snapshot and BotInfo, render it in app.js,
+  cover it with a harness check, document it in AGENTS.md.
+- The hunt loop phase is the source of truth for the activity banner.
+  The phase must publish through a defer so every return path of
+  tick() updates the tracker (a plain defer call evaluates its
+  arguments at registration time, so a closure that captures l.phase
+  by reference is required).
+- The walk plan view must publish on every walking phase (phaseUser,
+  phaseTownWalk, phaseTownReturn, phaseDelevel) and clear on the non
+  walking phases (engage, loot, townSell, idle). The town trip and
+  the deleveling share the l.waypoints slice and l.wpIndex cursor
+  through startWalkLeg, so a single geodataWalkPlanTail covers them.
+- exhaustruct, funlen, gci, lll: the strict lint set of .golangci.yml.
+  The tick() function was already at the funlen limit (45 statements),
+  so the new defer pushed it over - the town trip handling was
+  extracted into handleTownTrip() to bring it back under.
+
+### Acceptance criteria
+
+- The webui shows a small status banner (top center chip on the map)
+  with the current bot activity (hunting, walking to town, selling,
+  walking to farm spot, deleveling, manual move, idle). The sidebar
+  bot row carries the same activity text under the name.
+- The webui draws the planned path of every walking phase: the manual
+  move, the town trip walk to the trader, the town trip walk back to
+  the farm spot, the deleveling guard walk. The destination marker
+  (pulsing blue dot) draws at the last waypoint.
+- go test ./... green, golangci-lint run --new 0 issues, every repro
+  harness passes (repro_hud, repro_gear, repro_map_render,
+  repro_movement; the pre-existing hunting zone label failure of
+  repro_map_render is unrelated and was already failing before this
+  task).
+- The new harness check covers the phase to label mapping of every
+  hunt loop phase and the renderBotStatus DOM update.
+- AGENTS.md documents the new fields and the new banner.
+
+### Progress
+
+- 2026-09-08: state.Bot gains a phase field, SetPhase/Phase methods
+  and the Snapshot/BotInfo payloads carry it. ResetSession clears it
+  for the next login. The same phase refresh is a no-op so the per
+  tick call never churns the event stream. Covered by
+  state.TestSetPhase.
+- 2026-09-08: hunt loop publishes the phase through a defer on every
+  tick; the town trip handling was extracted into handleTownTrip to
+  keep tick under the funlen limit. publishWalkPlan now covers every
+  walking phase: the manual move (phaseUser), the town trip walk and
+  return (phaseTownWalk, phaseTownReturn) and the deleveling guard
+  walk (phaseDelevel) publish their remaining geodata waypoints with
+  the leg destination last. Covered by hunt.TestTripWalkPlanPublishes
+  (the existing TestUserWalkPlanPublishesAndClears still pins the
+  manual move plan).
+- 2026-09-08: webui gains the bot status banner (#bot-status in
+  index.html, renderBotStatus + phaseLabel + userPhaseLabel in
+  app.js, the .bot-status CSS). The sidebar bot row gains the
+  activity line (botActivityLabel). The banner colors by activity
+  through data-kind; the dot pulses while active. The pathfind test
+  mode hides it. Covered by the new repro_hud checks (every hunt
+  phase -> label/kind mapping, the connecting/offline fallback, the
+  detail text).
+- 2026-09-08: AGENTS.md documents the new bot status banner and the
+  walk path view extension. All checks green: go test ./... ok,
+  golangci-lint run --new 0 issues, repro_hud ALL PASS, repro_gear
+  OK, repro_movement PASS (repro_map_render has the pre-existing
+  hunting zone label failure, unrelated).
+
+### Status
+
+- All changes implemented, unit tested, harness checked, lint clean
+  (new), documented. Pushed to mobius-c1-client-1 as melg8.
