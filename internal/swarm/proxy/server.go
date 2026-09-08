@@ -18,20 +18,43 @@ import (
 	"github.com/melg8/swarm/internal/swarm/state"
 )
 
-// Default listen addresses of the proxy. The login listeners carry both
-// redirect paths: 127.0.0.1:2107 answers the l2.ini Port redirect, and
-// 127.0.0.2:2106 answers clients whose executable hardcodes the login
-// port 2106 and whose l2.ini ServerAddr points at the second loopback
-// address (the whole 127.0.0.0/8 block is loopback, so the client needs
-// no patching). The game listeners mirror the same addresses on port
-// 7778 because the emulated login server advertises the address the
-// client used for the login connection.
+// Default listen addresses of the proxy. The login listeners cover every
+// combination a C1 client can dial: the classic executable hardcodes the
+// auth port 2106 (the [URL] Port line of l2.ini is an Unreal Engine
+// leftover the auth connection ignores - the stock C1 l2.ini ships
+// Port=7777), and l2.ini ServerAddr decides the loopback address. So the
+// proxy answers 2106 and 2107 on both 127.0.0.1 and 127.0.0.2: a client
+// honoring the ini port reaches 127.0.0.1:2107, a hardcoded-port client
+// with ServerAddr=127.0.0.1 reaches 127.0.0.1:2106, and ServerAddr
+// =127.0.0.2 variants reach the second loopback pair. The game listeners
+// mirror the same addresses on port 7778 because the emulated login
+// server advertises the address family the client used for the login
+// connection. Only the first login address is mandatory; the rest are
+// optional (127.0.0.1:2106 is normally owned by the real Mobius login
+// server, see the bind diagnostics in Listen).
 const (
-	DefaultLoginAddress  = "127.0.0.1:2107"
-	LoginFallbackAddress = "127.0.0.2:2106"
-	DefaultGameAddress   = "127.0.0.1:7778"
-	GameFallbackAddress  = "127.0.0.2:7778"
+	DefaultLoginAddress   = "127.0.0.1:2107"
+	LoginInterceptAddress = "127.0.0.1:2106"
+	LoginFallbackAddress  = "127.0.0.2:2106"
+	LoginAltPortAddress   = "127.0.0.2:2107"
+	DefaultGameAddress    = "127.0.0.1:7778"
+	GameFallbackAddress   = "127.0.0.2:7778"
 )
+
+// DefaultLoginAddresses is the login listener set of the default
+// configuration (see the const block comment for the routing rationale).
+func DefaultLoginAddresses() []string {
+	return []string{
+		DefaultLoginAddress, LoginInterceptAddress,
+		LoginFallbackAddress, LoginAltPortAddress,
+	}
+}
+
+// DefaultGameAddresses is the game listener set of the default
+// configuration.
+func DefaultGameAddresses() []string {
+	return []string{DefaultGameAddress, GameFallbackAddress}
+}
 
 // gameProxyPort is the game server port the emulated login server
 // advertises in its server list.
@@ -57,12 +80,13 @@ type Server struct {
 	sessions []*botSession
 	selected string
 
-	rsaModulus atomic.Value // []byte
-	connSeq    atomic.Int64
-	clients    atomic.Int64
-	listeners  []net.Listener
-	done       chan struct{}
-	stopOnce   sync.Once
+	rsaModulus     atomic.Value // []byte
+	connSeq        atomic.Int64
+	clients        atomic.Int64
+	loginListeners []net.Listener
+	gameListeners  []net.Listener
+	done           chan struct{}
+	stopOnce       sync.Once
 }
 
 // botSession couples the live pieces of one bot the proxy serves: the
@@ -100,19 +124,20 @@ func WithTransformer(t Transformer) Option {
 // NewServer creates the proxy bound to the default addresses.
 func NewServer(logger *log.Logger, opts ...Option) *Server {
 	server := &Server{
-		loginAddrs:  []string{DefaultLoginAddress, LoginFallbackAddress},
-		gameAddrs:   []string{DefaultGameAddress, GameFallbackAddress},
-		logger:      logger,
-		transformer: PassthroughTransformer{},
-		mu:          sync.Mutex{},
-		sessions:    nil,
-		selected:    "",
-		rsaModulus:  atomic.Value{},
-		connSeq:     atomic.Int64{},
-		clients:     atomic.Int64{},
-		listeners:   nil,
-		done:        make(chan struct{}),
-		stopOnce:    sync.Once{},
+		loginAddrs:     DefaultLoginAddresses(),
+		gameAddrs:      DefaultGameAddresses(),
+		logger:         logger,
+		transformer:    PassthroughTransformer{},
+		mu:             sync.Mutex{},
+		sessions:       nil,
+		selected:       "",
+		rsaModulus:     atomic.Value{},
+		connSeq:        atomic.Int64{},
+		clients:        atomic.Int64{},
+		loginListeners: nil,
+		gameListeners:  nil,
+		done:           make(chan struct{}),
+		stopOnce:       sync.Once{},
 	}
 	for _, opt := range opts {
 		opt(server)
@@ -270,8 +295,8 @@ func (s *Server) ClientCount() int {
 // the primary game listener (the default 7778, custom ports follow the
 // -proxy-game flag).
 func (s *Server) gamePort() int32 {
-	if len(s.listeners) > 1 {
-		addr := s.listeners[1].Addr().String()
+	if len(s.gameListeners) > 0 {
+		addr := s.gameListeners[0].Addr().String()
 		if _, port, err := net.SplitHostPort(addr); err == nil {
 			if value, err := strconv.ParseInt(port, 10, 32); err == nil {
 				return int32(value)
@@ -289,9 +314,10 @@ func (s *Server) nextConnID() int64 {
 
 // Listen binds the login and game listeners. The first address of each
 // family is mandatory (a bind failure there returns the error), the
-// fallback listeners only log their failures (a busy 127.0.0.2:2106
-// means the real login server still owns 0.0.0.0:2106, see
-// data/client/Readme.txt).
+// fallback listeners only log their failures together with the likely
+// causes and remedies (a busy 127.0.0.1:2106 or 127.0.0.2:2106 means the
+// real login server still owns the auth port, see data/client/Readme.txt
+// and docs/proxy.md).
 func (s *Server) Listen() error {
 	err := s.listenFamily(true, s.loginAddrs, s.serveLoginListener)
 	if err != nil {
@@ -308,7 +334,7 @@ func (s *Server) ListenAndServe() error {
 		return err
 	}
 	s.logger.Printf("Proxy ready: login on %v, game on %v",
-		s.loginAddrs, s.gameAddrs)
+		s.boundLoginAddrs(), s.boundGameAddrs())
 
 	return s.Serve()
 }
@@ -316,8 +342,8 @@ func (s *Server) ListenAndServe() error {
 // LoginAddr returns the address of the primary login listener (the
 // empty string before Listen).
 func (s *Server) LoginAddr() string {
-	if len(s.listeners) > 0 {
-		return s.listeners[0].Addr().String()
+	if len(s.loginListeners) > 0 {
+		return s.loginListeners[0].Addr().String()
 	}
 
 	return ""
@@ -326,11 +352,43 @@ func (s *Server) LoginAddr() string {
 // GameAddr returns the address of the primary game listener (the empty
 // string before Listen).
 func (s *Server) GameAddr() string {
-	if len(s.listeners) > 1 {
-		return s.listeners[1].Addr().String()
+	if len(s.gameListeners) > 0 {
+		return s.gameListeners[0].Addr().String()
 	}
 
 	return ""
+}
+
+// LoginAddrs lists the successfully bound login listener addresses (the
+// first entry is the primary of LoginAddr). Empty before Listen.
+func (s *Server) LoginAddrs() []string {
+	return s.boundLoginAddrs()
+}
+
+// GameAddrs lists the successfully bound game listener addresses (the
+// first entry is the primary of GameAddr). Empty before Listen.
+func (s *Server) GameAddrs() []string {
+	return s.boundGameAddrs()
+}
+
+// boundLoginAddrs lists the successfully bound login listener addresses.
+func (s *Server) boundLoginAddrs() []string {
+	addrs := make([]string, 0, len(s.loginListeners))
+	for _, listener := range s.loginListeners {
+		addrs = append(addrs, listener.Addr().String())
+	}
+
+	return addrs
+}
+
+// boundGameAddrs lists the successfully bound game listener addresses.
+func (s *Server) boundGameAddrs() []string {
+	addrs := make([]string, 0, len(s.gameListeners))
+	for _, listener := range s.gameListeners {
+		addrs = append(addrs, listener.Addr().String())
+	}
+
+	return addrs
 }
 
 // Serve accepts and serves connections until the server is shut down.
@@ -359,26 +417,61 @@ func (s *Server) serve(listener net.Listener, handle func(net.Conn)) {
 }
 
 // listenFamily binds every address of one family and starts accepting.
+// The listener bookkeeping is family specific: gamePort and the primary
+// address accessors read the first listener of their own family, so
+// extra login listeners must not interleave into the game slice.
 func (s *Server) listenFamily(
-	mandatory bool, addrs []string, serve func(net.Listener),
+	login bool, addrs []string, serve func(net.Listener),
 ) error {
 	for i, addr := range addrs {
 		//nolint:exhaustruct // the zero fields of ListenConfig are the defaults
 		listener, err := (&net.ListenConfig{}).Listen(
 			context.Background(), "tcp", addr)
 		if err != nil {
-			if i == 0 && mandatory {
+			if i == 0 {
 				return fmt.Errorf("proxy cannot bind %s: %w", addr, err)
 			}
 			s.logger.Printf("Proxy optional listener %s skipped: %v", addr, err)
+			s.logBindHint(login, addr)
 
 			continue
 		}
-		s.listeners = append(s.listeners, listener)
+		if login {
+			s.loginListeners = append(s.loginListeners, listener)
+		} else {
+			s.gameListeners = append(s.gameListeners, listener)
+		}
 		go serve(listener)
 	}
 
 	return nil
+}
+
+// logBindHint explains why an optional listener could not bind and how
+// to free it. The interesting case is the hardcoded auth port 2106: the
+// real Mobius login server owns it by default (a wildcard 0.0.0.0:2106
+// bind also blocks 127.0.0.2:2106 on Windows with the access permissions
+// error), and Windows itself can reserve the port range through Hyper-V
+// or WinNAT. The hint mirrors the two recipes of docs/proxy.md.
+func (s *Server) logBindHint(login bool, addr string) {
+	if !login {
+		return // a busy custom game port has no generic remedy
+	}
+	if _, port, err := net.SplitHostPort(addr); err == nil && port != "2106" {
+		return // a custom -proxy-login port: nothing generic to explain
+	}
+	s.logger.Printf(
+		"hint: classic C1 clients hardcode the login port 2106, so a client "+
+			"whose l2.ini ServerAddr matches %s dials this address. The port is "+
+			"normally owned by the real Mobius login server: either point the "+
+			"client elsewhere (set ServerAddr=127.0.0.2 in l2.ini, the proxy "+
+			"answers 127.0.0.2:2106 too) or free 127.0.0.1:2106 for the proxy "+
+			"(set LoginserverHostname=127.0.0.3 in the Mobius login Server.ini "+
+			"and run swarm with -login 127.0.0.3:2106). A bind rejected with "+
+			"access permissions on Windows also means the port is reserved "+
+			"(Hyper-V/WinNAT: 'netsh interface ipv4 show excludedportrange "+
+			"protocol=tcp' lists 2106, 'net stop winnat' or a reboot frees it).",
+		addr)
 }
 
 // serveLoginListener accepts login server connections.
@@ -394,7 +487,7 @@ func (s *Server) serveGameListener(listener net.Listener) {
 // Shutdown stops the proxy and closes the listeners.
 func (s *Server) Shutdown(_ context.Context) error {
 	s.stopOnce.Do(func() { close(s.done) })
-	for _, listener := range s.listeners {
+	for _, listener := range append(s.loginListeners, s.gameListeners...) {
 		if err := listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
 			s.logger.Printf("Proxy listener close failed: %v", err)
 		}

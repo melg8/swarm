@@ -134,27 +134,38 @@ func parseFlags() config {
 	flag.StringVar(&cfg.geodataDir, "geodata", "",
 		"geodata directory with X_Y.l2j region files for the pathfind "+
 			"test (auto detected when empty)")
-	flag.BoolVar(&cfg.proxy, "proxy", false,
-		"run the MITM proxy for real C1 clients: an emulated login "+
-			"server on 127.0.0.1:2107 (+127.0.0.2:2106) and an emulated "+
-			"game server on 127.0.0.1:7778 that attach a connecting "+
-			"client to the live bot session (any login/password pair is "+
-			"accepted, the char list shows the selected bot)")
-	flag.StringVar(&cfg.proxyLogin, "proxy-login",
-		proxy.DefaultLoginAddress+","+proxy.LoginFallbackAddress,
-		"comma separated login listen addresses of the proxy (the first "+
-			"is mandatory, the rest are optional fallbacks)")
-	flag.StringVar(&cfg.proxyGame,
-		"proxy-game", proxy.DefaultGameAddress+","+proxy.GameFallbackAddress,
-		"comma separated game listen addresses of the proxy")
-	flag.StringVar(&cfg.proxyLog, "proxy-log", defaultProxyLogPath,
-		"file the proxy writes its client connection log to")
+	registerProxyFlags(&cfg)
 	flag.UintVar(&cfg.maxPassable, "max-passable",
 		uint(pathfind.DefaultMaxPassableHeight),
 		"maximum walkable height difference between neighbouring cells")
 	flag.Parse()
 
 	return cfg
+}
+
+// registerProxyFlags declares the client proxy flags. The listener
+// defaults answer the hardcoded auth port 2106 of the classic C1 exe on
+// both loopback addresses (see proxy.DefaultLoginAddresses).
+func registerProxyFlags(cfg *config) {
+	flag.BoolVar(&cfg.proxy, "proxy", false,
+		"run the MITM proxy for real C1 clients: an emulated login "+
+			"server answering 2106 and 2107 on 127.0.0.1 and 127.0.0.2 "+
+			"(the classic C1 exe hardcodes the auth port 2106, the ini "+
+			"[URL] Port line is ignored by it) and an emulated game "+
+			"server on 127.0.0.1:7778 that attach a connecting client to "+
+			"the live bot session (any login/password pair is accepted, "+
+			"the char list shows the selected bot)")
+	flag.StringVar(&cfg.proxyLogin, "proxy-login",
+		strings.Join(proxy.DefaultLoginAddresses(), ","),
+		"comma separated login listen addresses of the proxy (the first "+
+			"is mandatory, the rest are optional fallbacks: 127.0.0.1:2106 "+
+			"intercepts hardcoded-port clients, the 127.0.0.2 pair answers "+
+			"ServerAddr=127.0.0.2 variants)")
+	flag.StringVar(&cfg.proxyGame,
+		"proxy-game", strings.Join(proxy.DefaultGameAddresses(), ","),
+		"comma separated game listen addresses of the proxy")
+	flag.StringVar(&cfg.proxyLog, "proxy-log", defaultProxyLogPath,
+		"file the proxy writes its client connection log to")
 }
 
 // swarmDialer dials the login and game server connections with the
@@ -436,10 +447,20 @@ func startProxy(cfg config) *proxy.Server {
 		}
 	}()
 
-	logger.Printf("proxy started, login on %v, game on %v, log file %s",
-		splitAddresses(cfg.proxyLogin), splitAddresses(cfg.proxyGame), cfg.proxyLog)
-	log.Printf("Proxy for C1 clients ready: login %s, game %s, client log %s",
-		server.LoginAddr(), server.GameAddr(), cfg.proxyLog)
+	logger.Printf("proxy started, login bound to %v, game bound to %v, log %s",
+		server.LoginAddrs(), server.GameAddrs(), cfg.proxyLog)
+	// The routing banner: a C1 client reaching none of the login
+	// listeners never appears in this file (the classic exe dials
+	// ServerAddr:2106 with the ini [URL] Port line ignored), so the
+	// banner names the address every client path lands on.
+	logger.Printf("client routing: a C1 client connects to the l2.ini "+
+		"ServerAddr on the hardcoded auth port 2106 unless its build "+
+		"honors the ini Port; this proxy answers 127.0.0.1 and "+
+		"127.0.0.2 on both 2106 and 2107 (bound: %v), the emulated "+
+		"login server then hands out the game address %v",
+		server.LoginAddrs(), server.GameAddrs())
+	log.Printf("Proxy for C1 clients ready: login %v, game %v, client log %s",
+		server.LoginAddrs(), server.GameAddrs(), cfg.proxyLog)
 
 	return server
 }
