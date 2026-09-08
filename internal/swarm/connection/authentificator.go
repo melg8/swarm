@@ -33,6 +33,10 @@ type AuthResult struct {
 	ServerID   int
 	ServerIP   [4]byte
 	ServerPort int32
+	// RsaPublicKey carries the scrambled 128 byte RSA modulus of the login
+	// server Init packet, copied for the emulated login server of the proxy
+	// (the proxy Init mirrors the real one so the C1 client accepts it).
+	RsaPublicKey []byte
 }
 
 // LoginClient drives the login server flow of the Mobius protocol.
@@ -44,6 +48,7 @@ type LoginClient struct {
 	loginOK   fromauthserver.LoginOkPacket
 	serverIDs fromauthserver.ServerListPacket
 	playOK    fromauthserver.PlayOkPacket
+	rsaKey    []byte
 }
 
 // NewLoginClient wraps an established login server connection.
@@ -56,6 +61,7 @@ func NewLoginClient(conn net.Conn) *LoginClient {
 		loginOK:   fromauthserver.LoginOkPacket{LoginOkID1: 0, LoginOkID2: 0},
 		serverIDs: *fromauthserver.NewServerListPacket(),
 		playOK:    fromauthserver.PlayOkPacket{PlayOkID1: 0, PlayOkID2: 0},
+		rsaKey:    nil,
 	}
 }
 
@@ -144,6 +150,11 @@ func (lc *LoginClient) authAccount(account, password string) error {
 	}
 	log.Println("Received init packet with session id " +
 		helpers.HexStringFromInt32(initPacket.SessionID))
+
+	// The scrambled modulus is backed by the reusable read buffer: copy it
+	// out before the next read overwrites the bytes.
+	lc.rsaKey = make([]byte, len(initPacket.RsaPublicKey))
+	copy(lc.rsaKey, initPacket.RsaPublicKey)
 
 	if err := lc.sendPacket(&toauthserver.RequestAuthLogin{
 		Account:  account,
@@ -247,13 +258,14 @@ func Authenticate(
 		server.Port)
 
 	return &AuthResult{
-		Account:    account,
-		LoginOkID1: client.loginOK.LoginOkID1,
-		LoginOkID2: client.loginOK.LoginOkID2,
-		PlayOkID1:  client.playOK.PlayOkID1,
-		PlayOkID2:  client.playOK.PlayOkID2,
-		ServerID:   int(server.ServerID),
-		ServerIP:   server.IP,
-		ServerPort: server.Port,
+		Account:      account,
+		LoginOkID1:   client.loginOK.LoginOkID1,
+		LoginOkID2:   client.loginOK.LoginOkID2,
+		PlayOkID1:    client.playOK.PlayOkID1,
+		PlayOkID2:    client.playOK.PlayOkID2,
+		ServerID:     int(server.ServerID),
+		ServerIP:     server.IP,
+		ServerPort:   server.Port,
+		RsaPublicKey: client.rsaKey,
 	}, nil
 }

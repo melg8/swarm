@@ -106,6 +106,8 @@ type GameClient struct {
 	packetCount    atomic.Int64
 	readBuf        []byte
 	tracker        *state.Bot
+	tap            func(payload []byte)
+	rawWriteBuf    []byte
 	npcInfo        fromgameserver.NpcInfoPacket
 	userInfo       fromgameserver.UserInfoPacket
 	charInfo       fromgameserver.CharInfoPacket
@@ -173,6 +175,8 @@ func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
 		packetCount:    atomic.Int64{},
 		readBuf:        nil,
 		tracker:        nil,
+		tap:            nil,
+		rawWriteBuf:    nil,
 		npcInfo:        *fromgameserver.NewNpcInfoPacket(),
 		userInfo:       *fromgameserver.NewUserInfoPacket(),
 		charInfo:       *fromgameserver.NewCharInfoPacket(),
@@ -253,6 +257,50 @@ func (gc *GameClient) SetLogger(logger *log.Logger) {
 // tracker is optional; without it the client only logs packets.
 func (gc *GameClient) SetTracker(tracker *state.Bot) {
 	gc.tracker = tracker
+}
+
+// SetTap installs a callback that observes every decrypted server packet
+// of the session, from the first CharSelectionInfo onward (the handshake
+// KeyPacket is unencrypted and never tapped). The callback runs on the
+// session reader goroutine and must copy the payload synchronously: the
+// buffer is reused by the next read. The proxy server installs the
+// history recorder here.
+func (gc *GameClient) SetTap(tap func(payload []byte)) {
+	gc.tap = tap
+}
+
+// SendRaw sends a raw decrypted client packet payload (opcode and body,
+// without wire framing) through the session cipher, exactly like a typed
+// sendPacket call: the encryption and the wire write share the same
+// critical section so hunt loop actions and proxied client packets keep
+// one consistent outbound cipher chain.
+func (gc *GameClient) SendRaw(payload []byte) error {
+	if len(payload) == 0 {
+		return nil
+	}
+	if gc.trace {
+		gc.logger.Printf("Sent raw packet id 0x%02x", payload[0])
+	}
+
+	gc.writeMu.Lock()
+	defer gc.writeMu.Unlock()
+
+	// The encryption transforms the buffer in place and the payload may
+	// be backed by a shared proxy buffer, so it is copied into the
+	// reusable outbound scratch first.
+	wire := append(gc.rawWriteBuf[:0], payload...)
+	gc.rawWriteBuf = wire
+	gc.crypt.Encrypt(wire)
+
+	if err := gc.conn.SetWriteDeadline(
+		time.Now().Add(gameWriteTimeout)); err != nil {
+		return fmt.Errorf("failed to set write deadline: %w", err)
+	}
+	if err := writeWirePacket(gc.conn, wire); err != nil {
+		return fmt.Errorf("failed to send raw game packet: %w", err)
+	}
+
+	return nil
 }
 
 // PacketCount returns the number of packets received so far.
@@ -510,6 +558,9 @@ func (gc *GameClient) readPacket(buf []byte) ([]byte, error) {
 		return nil, nil
 	}
 	gc.packetCount.Add(1)
+	if gc.tap != nil {
+		gc.tap(payload)
+	}
 
 	return payload, nil
 }
