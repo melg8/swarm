@@ -181,6 +181,24 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
 		}, "the own movement echo through the live relay")
 	require.Equal(t, byte(0x01), echo[0])
 
+	// --- the client keepalive: the C1 client pings continuously ---
+	// A burst of RequestNetPing packets transits through the bot
+	// session and every answer must return through the relay (the
+	// connection stays alive). The session log must stay silent
+	// about them: one log line per answer used to flood the
+	// process log with several "Net ping with game time" lines
+	// per second whenever a real client was attached.
+	const pingBurst = 10
+	for range pingBurst {
+		gameClient.sendPacket([]byte{0xA8})
+	}
+	for range pingBurst {
+		reply := readPacketUntil(t, gameClient, e2eLiveWait,
+			func(payload []byte) bool { return payload[0] == 0xEC },
+			"the net ping answer through the live relay")
+		require.Equal(t, byte(0xEC), reply[0])
+	}
+
 	// --- the reconnection: the client drops and a new one enters while
 	// the bot stands at the walked-to place far from its login spot ---
 	require.NoError(t, gameClient.conn.Close())
@@ -255,6 +273,9 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
 	require.Contains(t, logText, "auth login accepted")
 	require.Contains(t, logText, "replaying")
 	require.Contains(t, logText, "client -> server 0x01")
+	require.Contains(t, logText, "client -> server 0xa8")
+	require.NotContains(t, logText, "Net ping with game time",
+		"the net ping answers must stay silent in the session log")
 
 	// The shutdown: cancel the bot, the relay winds the client down.
 	cancel()

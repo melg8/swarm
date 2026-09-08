@@ -5,6 +5,7 @@
 package connection
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"io"
@@ -220,6 +221,54 @@ func (s *fakeGameServer) awaitFloodLogout(
 	}
 	require.True(s.t, sawAppearing,
 		"the client must confirm the self teleport with Appearing")
+}
+
+// TestNetPingAnswersStaySilent floods the session with net ping
+// replies and drops the connection: the valid answers must stay
+// silent while the malformed one still logs. One log line per reply
+// used to flood the process log with several lines per second
+// whenever a C1 client was attached through the proxy (the client
+// pings continuously and the proxy relays every request through the
+// bot session).
+func TestNetPingAnswersStaySilent(t *testing.T) {
+	server := startFakeGameServerFlow(t, (*fakeGameServer).netPingFloodFlow)
+
+	conn, err := net.Dial("tcp", server.Addr())
+	require.NoError(t, err)
+
+	client, err := NewGameClient(conn)
+	require.NoError(t, err)
+
+	logBuf := &bytes.Buffer{}
+	client.SetLogger(log.New(logBuf, "", 0))
+
+	// The flow closes the server side: Run reports the connection
+	// loss after draining the ping burst.
+	require.Error(t, client.Run(context.Background(), "pingflood"))
+
+	output := logBuf.String()
+	require.NotContains(t, output, "Net ping with game time",
+		"the valid net ping replies must not log")
+	require.Contains(t, output, "Failed to parse net ping",
+		"a malformed reply must still log the parse failure")
+}
+
+// netPingFloodCount is the burst size of the net ping silence test:
+// the live client produced several replies per second, the burst
+// exaggerates it so any regression is obvious.
+const netPingFloodCount = 100
+
+// netPingFloodFlow answers the session with a burst of net ping
+// replies followed by one truncated packet, then drops the
+// connection.
+func (s *fakeGameServer) netPingFloodFlow(
+	conn net.Conn, cipher *crypt.GameCrypt,
+) {
+	for range netPingFloodCount {
+		s.writeEncrypted(conn, cipher, buildFloodNetPing())
+	}
+	s.writeEncrypted(conn, cipher, []byte{0xEC}) // truncated game time
+	_ = conn.Close()
 }
 
 // appendFloat64 appends a little endian float64 value to the packet.

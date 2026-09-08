@@ -4,6 +4,60 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: silence the net ping answer log spam
+
+Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.
+The stack was already deployed and verified (STACK_READY,
+PathFinding=2 like the reference deployment).
+
+### Goal
+
+The user reported the process log spamming "Net ping with game time"
+messages many times per second whenever a real C1 client connects to
+the game through the proxy. The task: identify what the message is
+and, if it is just a debug line, remove it.
+
+### Diagnosis
+
+- The line lived in `connection/game_dispatch.go` `handleNetPing`:
+  every NetPing (0xEC) answer of the game server was logged with the
+  game time it carries, and nothing consumed that value (no pong
+  tracking, no keepalive decision - the quality review already lists
+  pong tracking as a future improvement, P02 task 2).
+- The frequency comes from the client, not from a bug: the C1 client
+  pings continuously on its own (RequestNetPing 0xA8, the client
+  connection monitor). Behind the proxy every request transits
+  through the bot session (`transitToServer` -> `SendRaw`), so the
+  server answers at the client's ping rate - several replies per
+  second observed live, one log line each (the GameClient logs into
+  `log.Default`, the process log the user watches).
+- The answers themselves are healthy: each one is tapped to the
+  recorder and relayed back to the client, the connection stays
+  alive. Only the logging was the problem.
+- The proxy's own per-packet relay log ("game#N: client -> server
+  0xa8") stays untouched: it lives in the separate `proxy.log`, which
+  exists exactly for that per-packet trace (docs/proxy.md,
+  "Debugging the client connection").
+
+### Fix
+
+- `handleNetPing` stays silent on the happy path. The packet is still
+  parsed: a malformed one flags a cipher or protocol desync and still
+  logs "Failed to parse net ping".
+- Regression coverage: `TestNetPingAnswersStaySilent` (a fake server
+  floods 100 valid replies plus one truncated: no spam line in the
+  session log, the parse failure still logs) and the live proxy E2E
+  gained the keepalive leg (a client burst of 10 RequestNetPing, all
+  10 answers return through the relay, and the log assertions demand
+  "client -> server 0xa8" present in proxy.log while "Net ping with
+  game time" stays absent).
+
+### Status: done (2026-09-09)
+
+Verified: go build/vet, go test ./... (16 packages),
+golangci-lint 0 issues, the live proxy E2E PASS against the running
+stack (login 2106, game 7777) including the new ping burst leg.
+
 ## Active task: fix the elven village navigation (town trip to the trader)
 
 Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.

@@ -1814,3 +1814,54 @@ correct on such multilayer terrain.
   then selected the merchant (MyTargetSelected, target id set, the
   character at 25 units). tools/mobius_e2e.sh 45 prints E2E_OK, the
   full suite and golangci-lint stay green.
+
+## Round 36: the net ping answer log spam of the attached client (2026-09-09)
+
+Scope: the user reported the process log spamming "Net ping with game
+time" messages many times per second whenever a real C1 client
+connects to the game through the proxy. The task: identify the source
+and, if it is just a debug line, remove it.
+
+### Diagnosis
+
+- The line lived in `connection/game_dispatch.go` `handleNetPing`:
+  every NetPing (0xEC) answer of the game server was logged with the
+  game time it carries, and nothing consumed that value (no pong
+  tracking, no keepalive decision - the quality review P02 already
+  lists pong tracking as a future improvement).
+- The rate is the client's own ping rate, not a bug: the C1 client
+  sends RequestNetPing (0xA8) continuously (its connection monitor).
+  Behind the proxy each request transits through the bot session
+  (`transitToServer` -> `SendRaw`), so the server answers at the
+  client's pace - several replies per second observed live, one log
+  line each, all into `log.Default` (the process log the user
+  watches).
+- The answers are healthy otherwise: each one is tapped to the
+  recorder and relayed back to the client, the connection stays
+  alive. Only the unconditional logging was the problem.
+- The proxy's own per-packet relay line ("game#N: client -> server
+  0xa8") is untouched: it belongs to the separate `proxy.log`, whose
+  documented purpose is exactly that per-packet trace
+  (docs/proxy.md, "Debugging the client connection").
+
+### Fix
+
+- `handleNetPing` stays silent on the happy path. The packet is
+  still parsed, so a malformed one (a cipher or protocol desync)
+  still logs "Failed to parse net ping".
+- Regression coverage: `TestNetPingAnswersStaySilent` floods a fake
+  server session with 100 valid replies plus one truncated - the
+  spam line must stay absent while the parse failure must log. The
+  live proxy E2E gained the keepalive leg: the fake client sends a
+  burst of 10 RequestNetPing, all 10 answers must return through the
+  live relay, and the final log assertions demand "client -> server
+  0xa8" present in proxy.log while "Net ping with game time" stays
+  absent.
+
+### Verification
+
+- go build/vet, go test ./... (16 packages), gofmt clean,
+  golangci-lint 0 issues.
+- The live proxy E2E PASS against the running stack (login 2106,
+  game 7777) with the new ping burst leg: 10 requests sent, 10
+  answers relayed back in 1.2 s, the session log silent about them.
