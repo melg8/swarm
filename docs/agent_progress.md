@@ -84,11 +84,29 @@ in the same radius is pointless; per-mob priorities are acceptable).
   aware emptiness, the priority bias of the engage; state tests for
   ZoneHasAttackableBelow and NearestAttackablePreferred.
 
-### Status
+### Status: done
 
-- Code complete: go vet + go test ./... green, golangci-lint clean
-  (the pre-existing webserver/fight.go exhaustruct finding stays).
-- Live E2E round pending.
+- Code complete: go vet + go test ./... green, golangci-lint clean,
+  pushed as e42c6c5 after the rebase onto the fleet scale round.
+
+### Live verification (zonetest1, the stack up)
+
+- Round 1 (3 min, -hunt): the picker took the generated starter
+  square "Red Keltir SE-a1" (elven-2119_01-a1, the nearest band 1-3
+  square to the village - it sits on the eastern keltir polygon, not
+  on the village meadow of the old registry); 8 kills with one rest
+  cycle, level 1 -> 3; the character fought inside the square the
+  whole round (no wandering through empty ground).
+- Round 2 (55 s, -hunt -web): the snapshot carried all 227 zones
+  with the active marker on elven-2119_01-a1; the character stood at
+  (46812, 43419) inside the active square, in combat, with 12 Red
+  Keltir + 3 Elder + 2 Young visible around it - the square sits
+  exactly on the real spawn mass; three more kills during the
+  round.
+- The rotation never fired live (the 20 s respawn of a compact
+  square keeps up with the kill rate of one hunter - the intended
+  steady state); the sweep semantics stay pinned by the unit suite
+  (A to B to C, the cooldown blocks the return).
 
 ### Progress
 
