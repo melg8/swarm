@@ -70,7 +70,7 @@ real server through the bot's session.
   (server->proxy and proxy->client) advance independently, which makes
   the relay a true MITM instead of a byte pipe.
 
-### Status: in progress (code complete, live E2E green)
+### Status: code complete, live E2E green, lint clean (2026-09-08)
 
 - [x] Environment deployed and verified (STACK_READY).
 - [x] l2.ini decrypted with open-l2encdec, [URL] Port 7777 -> 2107,
@@ -114,6 +114,14 @@ real server through the bot's session.
       deploy scripts synced).
 - [x] Docs: docs/proxy.md (the user guide), the AGENTS.md proxy
       section, the protocol_description.md emulation packet notes.
+
+### Verification summary
+
+- go build / go vet / go test ./... - 16 packages green.
+- golangci-lint run - 0 issues (the full strict set of .golangci.yml).
+- tools/proxy_e2e.sh - PROXY_E2E_OK against the deployed stack (three
+  consecutive runs).
+- 14 atomic commits on feature/proxy-server, all pushed as melg8.
 
 ### Open: the real client check
 
