@@ -1381,6 +1381,33 @@ func (b *Bot) NearestAttackableExcept(
 	return b.nearestAttackable(maxDistance, zone, skip, 0, false)
 }
 
+// ZoneHasAttackable reports whether at least one living attackable
+// npc stands inside the zone square (the projected position, so a
+// walking mob counts where it actually is). The zone rotation uses it
+// as the emptiness reading of a hunting ground: the constrained
+// search of the engage fences the socially packed camps out, while
+// this check answers the plain question of whether the square still
+// holds anything to kill at all. A nil zone never holds mobs.
+func (b *Bot) ZoneHasAttackable(zone *Zone) bool {
+	if zone == nil {
+		return false
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	now := time.Now()
+	for _, obj := range b.objects {
+		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
+			continue
+		}
+		x, y := projectedPosition(obj, now)
+		if zone.Contains(int32(math.Round(x)), int32(math.Round(y))) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // NearestAttackableConstrained returns the closest living attackable
 // npc of the zone with the hunt safety constraints applied on top of
 // the skip list: mobs above maxLevel are never initiated on (a level
@@ -1753,7 +1780,8 @@ type Snapshot struct {
 
 // ZoneView is one hunting zone of the map view: the registry entry
 // of the deployment with the active marker of the zone the loop
-// hunts in.
+// hunts in, the death count the session paid in it and the demoted
+// marker of the bands the death regression locked out.
 type ZoneView struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -1765,6 +1793,8 @@ type ZoneView struct {
 	CY       int32  `json:"cy"`
 	Half     int32  `json:"half"`
 	Active   bool   `json:"active"`
+	Deaths   int32  `json:"deaths"`
+	Demoted  bool   `json:"demoted"`
 }
 
 // Snapshot returns a deep copy of the current state for serialization.

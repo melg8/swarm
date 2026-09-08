@@ -327,6 +327,17 @@ type Loop struct {
 	zonePickedID string
 	zoneOverride int
 	zoneCheckAt  time.Time
+	// The death regression bookkeeping of the multi zone hunting (see
+	// zones.go): the per zone death counts of the session, the band
+	// cap a demoted zone installs (negative = no cap) and the character
+	// level the bookkeeping last reset at.
+	zoneDeaths     map[string]int32
+	zoneDeathCap   int32
+	zoneDeathLevel int32
+	// zoneEmptySince arms the rotation of a cleared-out square (see
+	// zones.go): the timestamp the square turned mob-less, zero while
+	// mobs remain or the character fights, rests or walks.
+	zoneEmptySince time.Time
 	// The pending server confirmation of the last inventory
 	// action (see markInventoryAction and gateInventoryCommand).
 	userPendingItem  int32
@@ -395,6 +406,10 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		zonePickedID:      "",
 		zoneOverride:      -1,
 		zoneCheckAt:       time.Time{},
+		zoneDeaths:        nil,
+		zoneDeathCap:      -1,
+		zoneDeathLevel:    0,
+		zoneEmptySince:    time.Time{},
 		zoneReturn:        false,
 		zoneFails:         0,
 		delevelTarget:     0,
@@ -669,6 +684,11 @@ func (l *Loop) recoverFromDeath() {
 		// otherwise the revived character walks to the farm spot with
 		// the full bag first and returns to sell later.
 		l.tripEndedAt = time.Time{}
+		// The death counts against the active zone: past the limit
+		// the band ladder regresses onto easier grounds (the
+		// deleveling branch above never counts, its deaths are the
+		// point of the phase).
+		l.noteZoneDeath()
 	}
 	l.logger.Printf("Hunt: character died, restarting at the nearest village")
 	if err := l.game.RestartAtVillage(); err != nil {

@@ -844,13 +844,14 @@ const MapView = {
   // (the registry the hunt loop switches through): every zone draws
   // as a dashed rectangle with its name and level band, the active
   // zone in bright amber with the thicker stroke, the future ones
-  // dimmed. A snapshot without the zone registry falls back to the
-  // single legacy hunting square.
+  // dimmed, the demoted bands of the death regression in red. A
+  // snapshot without the zone registry falls back to the single
+  // legacy hunting square.
   drawHuntingZone(ctx) {
     const zones = this.lastSnap.huntingZones;
     if (Array.isArray(zones) && zones.length > 0) {
       for (const zone of zones) {
-        this.drawHuntingZoneRect(ctx, zone, zone.active);
+        this.drawHuntingZoneRect(ctx, zone);
       }
       return;
     }
@@ -859,19 +860,28 @@ const MapView = {
     this.drawHuntingZoneRect(ctx, {
       cx: zone.cx, cy: zone.cy, half: zone.half,
       name: "hunting zone", minLevel: 0, maxLevel: 0, minGear: 0,
-    }, true);
+      active: true,
+    });
   },
 
   // drawHuntingZoneRect draws one hunting zone square: the active
   // zone in amber with the level band and the gear gate of its
-  // ladder step, the inactive zones dimmed under the units.
-  drawHuntingZoneRect(ctx, zone, active) {
+  // ladder step, the inactive zones dimmed under the units, the
+  // demoted bands in red. The label only draws when the square is
+  // big enough on screen or active: the thirty granular grounds of
+  // the registry would smear into one unreadable blob when zoomed
+  // out, so the far zoom shows the squares and the level colors,
+  // the labels wait for the zoom in.
+  drawHuntingZoneRect(ctx, zone) {
+    const active = zone.active;
+    const demoted = zone.demoted;
     const p1 = this.worldToScreen(zone.cx - zone.half, zone.cy - zone.half);
     const size = zone.half * 2 * this.scale;
     if (p1.x > this.canvas.clientWidth || p1.y > this.canvas.clientHeight
       || p1.x + size < 0 || p1.y + size < 0) {
       return;
     }
+    const drawLabel = active || size >= 80;
     let label = zone.name;
     if (zone.maxLevel > 0) {
       label += " · L" + zone.minLevel + "-" + zone.maxLevel;
@@ -882,9 +892,17 @@ const MapView = {
     if (active) {
       label += " · ACTIVE";
     }
+    if (demoted) {
+      label += " · too hard";
+    }
+    if (zone.deaths > 0) {
+      label += " · " + zone.deaths +
+        (zone.deaths === 1 ? " death" : " deaths");
+    }
     ctx.save();
-    ctx.strokeStyle = active ? "#f9ab00" : this.colors.textDim;
-    ctx.globalAlpha = active ? 0.9 : 0.45;
+    ctx.strokeStyle = active
+      ? "#f9ab00" : demoted ? "#ff5c5c" : this.colors.textDim;
+    ctx.globalAlpha = active ? 0.9 : demoted ? 0.75 : 0.45;
     ctx.lineWidth = active ? 2 : 1;
     ctx.setLineDash([10, 6]);
     ctx.beginPath();
@@ -895,13 +913,16 @@ const MapView = {
     ctx.closePath();
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.font = "600 10.5px " + (getComputedStyle(document.documentElement)
-      .getPropertyValue("--sans").trim() || "sans-serif");
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
-    ctx.strokeText(label, p1.x + 6, p1.y + 14);
-    ctx.fillStyle = active ? "#f9ab00" : this.colors.textDim;
-    ctx.fillText(label, p1.x + 6, p1.y + 14);
+    if (drawLabel) {
+      ctx.font = "600 10.5px " + (getComputedStyle(document.documentElement)
+        .getPropertyValue("--sans").trim() || "sans-serif");
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
+      ctx.strokeText(label, p1.x + 6, p1.y + 14);
+      ctx.fillStyle = active
+        ? "#f9ab00" : demoted ? "#ff5c5c" : this.colors.textDim;
+      ctx.fillText(label, p1.x + 6, p1.y + 14);
+    }
     ctx.restore();
   },
 

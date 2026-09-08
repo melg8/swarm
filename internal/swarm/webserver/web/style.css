@@ -183,7 +183,7 @@ body {
 
 .bot-list { list-style: none; overflow-y: auto; flex: 1; }
 
-.zone-list { list-style: none; max-height: 220px; overflow-y: auto; }
+.zone-list { list-style: none; max-height: 320px; overflow-y: auto; }
 
 .zone-item {
   padding: 6px 12px;
@@ -194,6 +194,10 @@ body {
   background: var(--bg-panel-2);
   border-left-color: var(--accent);
 }
+
+.zone-item.lost .zone-name { color: #ff5c5c; }
+
+.zone-item.lost .zone-meta { color: #b97070; }
 
 .zone-row {
   display: flex;

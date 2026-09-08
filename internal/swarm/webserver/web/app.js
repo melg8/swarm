@@ -232,8 +232,10 @@ function renderSnapshot() {
 
 // renderZones refreshes the hunting zone list of the sidebar: every
 // zone of the registry with its level band and gear gate, the active
-// one highlighted, a hunt button switching the zone of the bot (the
-// manual override of the automatic picker).
+// one highlighted (the ground the bot hunts in or walks to), the
+// demoted bands of the death regression marked, a hunt button
+// switching the zone of the bot (the manual override of the automatic
+// picker).
 function renderZones(snap) {
   const section = document.getElementById("zone-section");
   const list = document.getElementById("zone-list");
@@ -249,7 +251,8 @@ function renderZones(snap) {
   list.textContent = "";
   zones.forEach((zone, index) => {
     const item = document.createElement("li");
-    item.className = "zone-item" + (zone.active ? " active" : "");
+    item.className = "zone-item" + (zone.active ? " active" : "") +
+      (zone.demoted ? " lost" : "");
     const row = document.createElement("div");
     row.className = "zone-row";
     const info = document.createElement("div");
@@ -261,7 +264,11 @@ function renderZones(snap) {
     meta.className = "zone-meta";
     meta.textContent = "L" + zone.minLevel + "-" + zone.maxLevel +
       (zone.minGear > 0 ? " · gear " + zone.minGear + "+" : "") +
-      (zone.active ? " · hunting" : "");
+      (zone.active ? " · hunting" : "") +
+      (zone.demoted ? " · too hard" : "") +
+      (zone.deaths > 0
+        ? " · " + zone.deaths + (zone.deaths === 1 ? " death" : " deaths")
+        : "");
     info.appendChild(name);
     info.appendChild(meta);
     const button = document.createElement("button");
