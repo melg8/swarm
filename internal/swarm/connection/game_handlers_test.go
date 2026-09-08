@@ -16,6 +16,7 @@ import (
 
 	"github.com/melg8/swarm/internal/swarm/crypt"
 	"github.com/melg8/swarm/internal/swarm/gear"
+	fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
 	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/stretchr/testify/require"
 )
@@ -673,6 +674,45 @@ func TestGameClientReportsConnectionLoss(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "game connection lost")
 	require.Equal(t, state.StatusOffline, tracker.Snapshot().Status)
+}
+
+// TestEnsureCharacterReportsCreationFail drives the character creation
+// into the server refusal: EnsureCharacter must surface the reason.
+func TestEnsureCharacterReportsCreationFail(t *testing.T) {
+	server := startFakeGameServerFlow(t, (*fakeGameServer).createFailFlow)
+
+	conn, err := net.Dial("tcp", server.Addr())
+	require.NoError(t, err)
+	defer conn.Close()
+
+	client, err := NewGameClient(conn)
+	require.NoError(t, err)
+	client.SetLogger(log.New(io.Discard, "", 0))
+
+	_, err = client.EnsureCharacter(CharacterParams{
+		Name:      "test1",
+		Race:      1,
+		Female:    0,
+		ClassID:   18,
+		HairStyle: 0,
+		HairColor: 0,
+		Face:      0,
+	}, fromgameserver.NewCharSelectInfoPacket())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "name already exists")
+}
+
+// createFailFlow answers the character creation with a refusal.
+func (s *fakeGameServer) createFailFlow(
+	conn net.Conn, cipher *crypt.GameCrypt,
+) {
+	payload := s.readEncrypted(conn, cipher)
+	require.Equal(s.t, byte(0x0B), payload[0])
+	name := readUtf16String(payload[1:])
+	require.Equal(s.t, "test1", name)
+
+	reason := []byte{0x26, 0x02, 0x00, 0x00, 0x00} // name already exists
+	s.writeEncrypted(conn, cipher, reason)
 }
 
 // closeFlow closes the connection right after the handshake.
