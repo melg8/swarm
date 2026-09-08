@@ -1236,3 +1236,13 @@ name the variant number that best fits the real bot UI.
   benchmarks stay at the previous round numbers (200 npc
   NearestAttackableConstrained 9.7 us, snapshot 26.7 us/3 allocs).
   AGENTS.md documents the new component layout contract.
+- 2026-09-08: the connection god file split. game.go (1624 lines)
+  held the session flow, the command senders, the opcode routing
+  and thirty apply paths of one GameClient. The dispatch layer
+  (handleServerPacket routing, the unknown packet log, the net
+  ping keepalive) moved to game_dispatch.go and the world packet
+  apply paths (one apply function per packet family, parsing into
+  the reusable scratch structs) to game_apply.go; game.go keeps
+  the client struct, the session flow and the command senders
+  (852/247/560 lines). No behavior change; all connection tests
+  pass unchanged, lint clean.
