@@ -636,6 +636,13 @@ func (l *Loop) noteZoneDeath() {
 	if l.zoneDeathCap < 0 || zone.MinLevel-1 < l.zoneDeathCap {
 		l.zoneDeathCap = zone.MinLevel - 1
 	}
+	// A manual zone selection dies with the demotion: the operator
+	// picked the ground, but the character keeps dying in it - the
+	// regression takes over instead of walking the corpse back into
+	// the same blows.
+	if l.zoneOverride >= 0 {
+		l.zoneOverride = -1
+	}
 	// Force the ladder re-pick on the next living tick: the gate of
 	// maybeSwitchZone passes with a zero evaluation time.
 	l.zoneCheckAt = time.Time{}

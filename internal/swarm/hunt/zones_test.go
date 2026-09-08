@@ -297,6 +297,44 @@ func TestZoneDeathOnFreshSessionCountsByPosition(t *testing.T) {
 		"the death counts against the square it happened in")
 }
 
+// TestZoneDemotionBreaksTheManualOverride pins the safety semantics of
+// the regression: a manually selected ground the character keeps
+// dying in releases its override with the demotion, so the automatic
+// picker walks the character onto an easier band instead of marching
+// the corpse back into the same blows.
+func TestZoneDemotionBreaksTheManualOverride(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZones(ElvenHuntingZones())
+	setZoneTestLevel(bot, 5)
+	equipZoneWithGear(bot, 44)
+	loop.tick()
+	require.Equal(t, "elven-goblin-camp", loop.zonePickedID)
+
+	// The operator forces the kaboo fighter woods (way above the
+	// level 5 character).
+	loop.userZoneSelect(17)
+	require.Equal(t, "elven-kaboo-fighter-woods", loop.zonePickedID)
+	require.Equal(t, 17, loop.zoneOverride)
+	bot.ApplyPlacement(state.Placement{
+		ObjectID: 100, X: 34769, Y: 51063, Z: -3400,
+	})
+	zoneDeathWaitRevival(bot)
+	for range 3 {
+		zoneDeathKill(bot, loop)
+	}
+	require.Equal(t, -1, loop.zoneOverride,
+		"the demotion releases the manual zone selection")
+
+	// The next living tick re-picks with the cap: the fighter band is
+	// below the cap line, the goblin band is the highest one left.
+	zoneDeathWaitRevival(bot)
+	loop.tick()
+	require.Equal(t, "elven-goblin-camp", loop.zonePickedID)
+	require.True(t, bot.Snapshot().HuntingZones[17].Demoted)
+}
+
 func TestZoneDeathOfDelevelingNeverCounts(t *testing.T) {
 	bot := newTestBot()
 	game := &fakeGame{}

@@ -449,15 +449,32 @@ the design goal is per-class and per-region extension):
   the shop already. The catalogs are generated from the Mobius
   buylists (`tools/generate_shop_catalogs.sh`, keyed by packet
   template id).
-- **Multi-zone hunting** (`hunt/zones.go`): the zone registry
-  ladders the elven lands (keltirs 1-4 gear 0, east goblins 5-7 gear
-  40, west kaboo woods 8-12 gear 110, southwest dryads 13-18 gear
-  200); `PickHuntingZone` gates on level AND gear points, the loop
-  re-evaluates between fights (30 s cadence), the map draws every
-  zone (active amber, future dimmed with the gear gate) and the
-  sidebar zone panel switches zones manually (the `zone` command,
-  index in the Count field; the override holds until the character
-  outgrows the band).
+- **Multi-zone hunting** (`hunt/zones.go`): thirty granular hunting
+  squares (1000-1300 halves) anchored on the ElvenStarting.xml spawn
+  territory clusters, laddered in ten mob level bands (keltirs 1-3
+  gear 0, wolves 3-4 gear 10, raiders 4-6 gear 30, goblins 5-7 gear
+  40, grunts 7-8 gear 80, fighters 8-10 gear 110, lieutenants 9-12
+  gear 130, leaders 11-13 gear 160, elders 12-14 gear 200, spiders
+  13-16 gear 230, lirein 16-19 gear 300); `PickHuntingZone` gates on
+  level AND gear points, keeps the current zone of the winning band
+  (the 30 s re-pick never bounces between same-band grounds) and
+  takes the nearest ground of an open band. A cleared-out square
+  rotates: no attackable mob inside the square for 10 s while the
+  hunter stands central (the raw `ZoneHasAttackable` reading, not
+  the socially constrained search) moves it to the nearest sibling
+  of the same band - the fights, rests, walks and town trips reset
+  the timer. The death regression: three deaths in one square demote
+  its whole band, the ladder caps below it until the level changes
+  (a level up or a delevel resets the bookkeeping; delevel-phase
+  deaths never count); deaths count against the square they happen
+  in (the position lookup - an emergency logout death lands on a
+  fresh session before any zone pick), a manual zone override dies
+  with the demotion. The map draws every zone (active amber, future
+  dimmed with the gear gate, demoted bands red - labels only when
+  the square is big enough on screen) and the sidebar zone panel
+  carries the death counts and switches zones manually (the `zone`
+  command, index in the Count field; the override holds until the
+  character outgrows the band or dies it out).
 
 - **Combat safety** (`hunt/loop.go` + the constrained target search
   of `state`): the engage never initiates on mobs above the character

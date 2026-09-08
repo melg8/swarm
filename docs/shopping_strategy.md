@@ -87,20 +87,34 @@ the kill are the point of the fight.
 **Rule 3 - the gear feeds the zone ladder.** The hunting zones gate
 on gear points (`gear.TotalGearPoints`: the weapon damage per hit
 plus the defenses, in character-stat-sheet units). The intended
-ladder of the elven lands:
+ladder of the elven lands (the ten band gates of the granular zone
+registry, `hunt/zones.go` - every band holds two to six small squares
+anchored on the real spawn territories, the picker takes the nearest
+ground of the highest band the level and the gear allow and rotates
+between the siblings when a square runs dry):
 
-| Zone | Mob levels | Gear gate | The gear that passes it |
+| Band | Mob levels | Gear gate | The gear that passes it |
 | --- | --- | --- | --- |
-| Elven Village Keltir Field | 1-4 | 0 | anything (fists work) |
-| East Forest Goblin Camp | 5-7 | 40 | Short Sword + Shirt |
-| West Kaboo Woods | 8-12 | 110 | Broadsword + the wooden set |
-| Southwest Dryad Forest | 13-18 | 200 | Gladius/Long Sword + the bone set + jewels |
+| Keltir ring around the village | 1-3 | 0 | anything (fists work) |
+| Wolf downs | 3-4 | 10 | any weapon |
+| Raider fields | 4-6 | 30 | Short Sword + Shirt |
+| Goblin and kaboo camps | 5-7 | 40 | Short Sword + Shirt |
+| Kaboo grunt woods | 7-8 | 80 | Broadsword or the wooden set start |
+| Kaboo fighter woods | 8-10 | 110 | Broadsword + the wooden set |
+| Lieutenant camps | 9-12 | 130 | Broadsword + the wooden set complete |
+| Leader camps | 11-13 | 160 | Gladius + wooden set + first jewels |
+| Elder and spider forests | 12-16 | 200-230 | Gladius/Long Sword + the bone set + jewels |
+| Lirein and pincer grounds | 16-19 | 300 | the full shop dress |
+
+Three deaths in one square demote its whole band (the ladder caps
+below it until the level changes), so the gear gates and the death
+regression steer the same ladder from both ends.
 
 The strategy therefore aims the spending at the *next* gate: while
 the character farms the goblins (level 5-7), the planner saves into
 the Broadsword and the wooden set pieces because those are the
 highest gain-per-adena buys left - exactly the gear that unlocks the
-kaboo woods, where the income doubles again.
+fighter woods, where the income doubles again.
 
 **Rule 4 - the melee fighter buys melee gear.** The scoring profile
 filters the catalogs: bows score zero (the bot fights in melee),

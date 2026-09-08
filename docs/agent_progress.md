@@ -4,6 +4,83 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Finished task: granular farm zone system (rotation, regression, web view)
+
+Started and finished: 2026-09-08. Branch: `mobius-c1-client-1`. Commits
+as melg8, pushed as they landed.
+
+### Goal
+
+The user asked to rework the farm square system: (1) the web UI must
+show ALL farm grounds and highlight the one the bot heads to; (2) more
+granular zones - smaller squares, more of them, with rotation when a
+zone runs out of mobs, and the squares must match the real spawn
+points (the old wide squares left part of the spawns outside and
+emptied out); (3) three deaths in a zone mean the character does not
+pull it - regress onto an easier ground.
+
+### What was done
+
+- Studied the spawn data: `ElvenStarting.xml` holds 106 spawn
+  territories / 812 npcs in ten natural level bands (respawn 15-20 s);
+  the old four squares (1650-3500 halves) covered only fractions of
+  them. `scripts/analyze_spawns.py` (sandbox side) produced the
+  territory -> centroid/radius/mob composition table the new registry
+  was anchored on.
+- Commit cd7828f: thirty granular zones (1000-1300 halves) in ten
+  bands (elven-keltir-* 1-3 ... elven-pincer-forest 16-19), the gear
+  gates of the old ladder kept at the matching levels; the picker
+  keeps the current zone of the winning band (no same-band flapping),
+  takes the nearest ground of an open band; the rotation (10 s of a
+  mob-less square while standing central -> the nearest sibling of
+  the band, `state.Bot.ZoneHasAttackable` as the raw emptiness
+  reading); the death regression (3 deaths in a square -> the ladder
+  caps below its band until the level changes; level change or
+  delevel resets; delevel-phase deaths never count); the web map
+  draws all thirty (active amber, demoted red, labels only when big
+  enough on screen), the zone panel shows the death counts.
+- Commit eb8f2c5: deaths count against the square they happen in (the
+  position lookup) - round 1 showed an emergency logout death landing
+  on a fresh session before any zone pick, where the picked-zone
+  attribution silently dropped it. Pinned by
+  TestZoneDeathOnFreshSessionCountsByPosition.
+- The demotion also releases a manual zone override (the operator
+  forced the ground, the character keeps dying in it - the regression
+  walks it out instead of marching the corpse back), pinned by
+  TestZoneDemotionBreaksTheManualOverride.
+
+### Live verification (rich1, the stack up)
+
+- Round 1 (5 min): picked Raider Trail South for the level 4/gear 199
+  character standing in the old kaboo position, pathfound out of the
+  fighter woods, engaged a Goblin Raider on the zone entry; a social
+  add beat it to 10% -> the panic logout, the offline death (the bug
+  above), the re-pick moved it sideways to Raider Field Southeast
+  after the revival (death 1 of 3, below the threshold).
+- Round 2 (8 min): the snapshot carried all 30 zones with the active
+  highlight; 7 kills, zero deaths; the level up to 5 moved the picker
+  to the goblin band automatically ("level 5 with gear 199: hunting
+  Goblin Camp Southeast"); the DB logout store confirmed the level and
+  the camp position (an immediate post-logout DB query can race the
+  store - re-read after a few seconds).
+- Round 3 (forced death attempt): the manual zone 17 (Kaboo Fighter
+  Woods) through the web command worked; the character farmed the
+  grunt edge of the square (3 grunt kills) without dying - the engage
+  safety held. Round 4 teleported it into the pincer spider grounds
+  via a DB position edit + game server restart: the spiders smashed
+  it to 8% in 22 s, the emergency logout saved it (no death, the
+  survival machinery works) and the walk home resumed after the
+  cooldown.
+- The rotation never fired live (the respawn refills the small
+  squares faster than the kills empty them - exactly the intent); the
+  death regression paths are pinned by the unit suite instead.
+
+### Status
+
+- All implemented, `go vet` + `go test ./...` green, 3 commits pushed
+  (cd7828f, eb8f2c5, the override-release one), live rounds logged
+  above.
+
 ## Active task: test coverage round 2 (the remaining weak packages)
 
 Started: 2026-09-08 (third session). Branch: `mobius-c1-client-1`.
