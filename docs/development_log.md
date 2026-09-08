@@ -1574,3 +1574,106 @@ remainders of the golangci-lint v2 migration (P03).
   `golangci-lint run` 0 issues; `go test ./... -count=1` all 13
   packages ok (the two new tests included). The `-race` suite runs in
   the cgo environments (`task test:race`).
+
+## Round 32: the forced destruction of the replaced Squire's starter kit (2026-09-08)
+
+Scope: the user request to stop hauling the dead weight of the
+starter set once a replacement is worn - the Squire's pieces are
+neither sellable to a shop nor droppable on the ground, so the
+character would carry them forever.
+
+### Problem statement
+
+The starter kit (Squire's Shirt 1146, Squire's Pants 1147,
+Squire's Sword 2369) weighs 3301 + 1750 + 1600 = 6651 units the
+character can never shed: the Mobius item xml flags them
+`is_sellable=false` and `is_dropable=false`, so no shop buys them,
+no buylist prices them, the ground refuses them, and the trash bin
+(destroy) was never automated. Once a real replacement is worn the
+pieces are pure encumbrance - 6651 units against the ~50% weight
+penalty threshold of a low level character.
+
+### Fix
+
+- `gear.ReplacedStarterItems` (new `internal/swarm/gear/starters.go`)
+  lists every unequipped starter piece whose paperdoll slot already
+  holds an equal or better scored item - the equip planner swaps
+  only on a strictly better candidate, so a listed piece will never
+  be worn again. An empty slot keeps its starter piece (the auto
+  equipment still wears it); the legs special case: a one-piece
+  chest armor displaces the starter pants with itself. The order is
+  deterministic (object ids ascending).
+- The hunt loop (`maybeDestroyReplacedStarters`) destroys the listed
+  pieces through the destroy request behind the shared confirmation
+  gate: the equip always lands first, the destroy fires only once
+  the tracker shows the replacement worn, one request at a time in
+  the equip action budget, a failed request retries after a 10 s
+  delay instead of re-logging every pacing period.
+- The detection is datapack-verified: the official item xml carries
+  the flags and weights above and `is_destroyable` defaults true in
+  `ItemTemplate`, so the destroy request is the one open exit and
+  the bot takes it.
+
+### Verification
+
+- `go build ./...`, `go vet ./...` clean; `go test ./... -count=1`
+  all packages ok.
+- New tests: `gear/starters_test.go` (the whole-kit listing with
+  weights and reasons, the empty-slot survival, the better-kit-only
+  guard, the one-piece chest displacing the pants, the deterministic
+  order) and `hunt/starters_test.go` (the destroy lands behind the
+  gate and never repeats after the vanish, the equip-first ordering,
+  the retry pacing of refused requests).
+
+## Round 33: official GitLab only - the server source of truth, the mirror ban and the archive channel (2026-09-08)
+
+Scope: the server stack provenance. The user directive of 2026-09-08
+made the official GitLab repository the only acceptable source of the
+Mobius C1 server code; every outdated copy is forbidden.
+
+### Problem statement
+
+The sandbox server checkout was a GitHub mirror clone
+(`tichopad/L2J_Mobius`, last commit 2026-06-20) - three months behind
+the official `MobiusDevelopment/L2J_Mobius` master (activity through
+2026-08-29+). The drift was measurable: the mirror SQL produced a
+74 table schema where the official SQL produces 75, and the git
+clone of the official tip compiles 1314 java files against the
+mirror's 1318. The bot had started adapting to a stale reference.
+
+### Fix
+
+- The official source is pinned:
+  `https://gitlab.com/MobiusDevelopment/L2J_Mobius` (project id
+  70889258), branch `master`, module `L2J_Mobius_C1_HarbingersOfWar`,
+  commit `43ac8878` (2026-08-29).
+- GitLab answers the git upload-pack endpoints with intermittent
+  Cloudflare 403s (the clone passes, the promisor blob batch fetch
+  fails). The official REST API stays stable, so
+  `tools/swarm_fast_deploy.sh` now walks two official channels: the
+  sparse git clone with retries, then the repository archive API
+  (`/repository/archive.tar.gz?path=L2J_Mobius_C1_HarbingersOfWar`,
+  one GET, same repo, same commit). The mirror fallback path that
+  produced the outdated checkout is gone.
+- The deployed checkout is a real git repository grafted onto the
+  archive download: refs fetched blob-less from GitLab, the working
+  tree blobs rehydrated from the byte identical archive files, the
+  one divergent blob (GeoEngine.ini, PathFinding 0 deployment patch)
+  rehydrated through the blob raw API with sha1 verification.
+  `git fetch`/`git pull` work against the official remote again.
+- The database was reloaded from the official SQL (75 tables now).
+- AGENTS.md records the rule in "Server integrity rules": official
+  GitLab only, mirrors and outdated copies are forbidden.
+
+### Verification
+
+- The starter kit assumptions of round 32 hold on the official
+  datapack: items 1146/1147/2369 are `is_sellable=false` and
+  `is_dropable=false` with weights 3301/1750/1600, and
+  `is_destroyable` defaults true in `ItemTemplate` - the destroy
+  request is the only exit and it is open, exactly as
+  `gear.ReplacedStarterItems` expects.
+- Full redeploy from the official code: 1314 files compiled,
+  `STACK_READY: login :2106, game :7777, db :3306`, and
+  `tools/mobius_e2e.sh 45` prints `E2E_OK` against the fresh
+  official database.

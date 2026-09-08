@@ -907,3 +907,34 @@ precomputed flat data instead of per call allocations).
   both toggles; the hud harness covers the zone panel collapse and
   render. All harnesses green (repro_map_render keeps its
   pre-existing zone label failure).
+## Follow-up task: the Squire's starter kit destruction and the official-only server source
+
+Started and finished: 2026-09-08. Branch: `mobius-c1-client-1`.
+Commits as melg8, pushed as they land.
+
+### Goal
+
+Two user requests: (a) destroy the Squire's starter pieces
+automatically once their replacements are worn (they are unsellable,
+undroppable dead weight); (b) the server code may come ONLY from
+the official GitLab repository - no outdated copies - and the
+GitLab download attempts continue until they succeed.
+
+### Progress
+
+- 2026-09-08: (a) done and pushed. `gear.ReplacedStarterItems`
+  detects the replaced kit pieces (equal or better scored item on
+  their paperdoll slot, the one-piece chest displaces the starter
+  pants), the hunt loop destroys them behind the shared
+  confirmation gate with equip-first ordering and a 10 s retry
+  pacing. Round 32 of the development log; tests in
+  `gear/starters_test.go` and `hunt/starters_test.go`.
+- 2026-09-08: (b) done and pushed. The 3 month old GitHub mirror
+  checkout was deleted; the official master `43ac8878` is deployed
+  (git clone with retries, then the official archive API for the
+  rate-limited blob fetch, the checkout grafted back into a real
+  git repo with `git fetch` working); the database was reloaded
+  from the official SQL (74 -> 75 tables). `tools/swarm_fast_deploy.sh`
+  implements the two official channels, AGENTS.md bans mirrors in
+  the server integrity rules. Round 33 of the development log.
+  `tools/mobius_e2e.sh 45` prints `E2E_OK` on the official stack.

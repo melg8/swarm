@@ -155,6 +155,20 @@ The L2J Mobius C1 server is the reference implementation for this project:
 its observed behavior is the spec the bot has to adapt to, never the other
 way round.
 
+- **The server comes ONLY from the official GitLab repository**
+  (`https://gitlab.com/MobiusDevelopment/L2J_Mobius`, project id 70889258,
+  branch `master`, module directory `L2J_Mobius_C1_HarbingersOfWar`).
+  Outdated copies and third party mirrors (GitHub mirrors like
+  `tichopad/L2J_Mobius`, forum archives, old tarballs) are FORBIDDEN as a
+  source: the mirror used before 2026-09-08 lagged three months behind and
+  its datapack/SQL drift surfaced as phantom schema and item flag
+  differences. When GitLab rate limits the git protocol with intermittent
+  403 answers (Cloudflare on the upload-pack endpoints), keep retrying or
+  fall back to the official repository archive API
+  (`/api/v4/projects/MobiusDevelopment%2FL2J_Mobius/repository/archive.tar.gz?path=L2J_Mobius_C1_HarbingersOfWar`,
+  one stable GET, same repo, same commit) - `tools/swarm_fast_deploy.sh`
+  implements both channels. Never substitute a non official source.
+
 - **Never patch the game server to change its behavior.** Gameplay
   changes (AI decisions, damage, experience, drops, movement, guard
   retaliation) are out of bounds even when they look like obvious bugs -

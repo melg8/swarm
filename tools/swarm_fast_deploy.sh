@@ -60,24 +60,73 @@ fi
 
 # ---------------------------------------------------------------------------
 step "2/8. Sparse-clone L2J_Mobius (только модуль C1, ~167 МБ)"
-if [ -d "${MOBIUS_C1}/dist" ]; then
+# ПОЛИТИКА: сервер Mobius берётся ТОЛЬКО из официального репозитория GitLab
+# https://gitlab.com/MobiusDevelopment/L2J_Mobius. Устаревшие копии/зеркала
+# (GitHub и пр.) ЗАПРЕЩЕНЫ - расхождение datapack/SQL чинится потом часами.
+# GitLab (Cloudflare) отдаёт 403 на серию быстрых git-запросов, поэтому
+# три официальных канала по убыванию надёжности:
+#   a) git clone (sparse, blob:none) с ретраями;
+#   b) API-архив того же коммита того же репозитория (один GET, стабильный);
+#   c) докачка blobs в существующий sparse-клон (git restore).
+if [ -d "${MOBIUS_C1}/dist" ] && [ -d "${MOBIUS_ROOT}/.git" ]; then
     echo "Mobius уже склонирован"
 else
     t0
+    gitlab_archive_fetch() {
+        # Скачивает официальный API-архив подкаталога C1 и распаковывает его.
+        # Тот же репозиторий, тот же коммит master - источник остаётся
+        # официальным, меняется только транспорт.
+        local api="https://gitlab.com/api/v4/projects/MobiusDevelopment%2FL2J_Mobius/repository/archive.tar.gz"
+        local path="L2J_Mobius_C1_HarbingersOfWar"
+        local tarball="${BASE}/l2j_mobius_c1.tar.gz"
+        local i
+        for i in 1 2 3 4 5; do
+            if curl -sfL --connect-timeout 20 --max-time 570 \
+                -o "${tarball}" "${api}?path=${path}"; then
+                mkdir -p "${MOBIUS_ROOT}"
+                # strip-components=1: путь архива <proj>-<branch>-<sha>/<module>/...
+                tar -xzf "${tarball}" -C "${MOBIUS_ROOT}" --strip-components=1
+                [ -d "${MOBIUS_C1}/dist" ] && return 0
+            fi
+            echo ">>> API-архив не скачался (попытка ${i}/5), повтор через 10 с"
+            sleep 10
+        done
+        return 1
+    }
     if [ ! -d "${MOBIUS_ROOT}/.git" ]; then
-        # GitLab (Cloudflare) иногда отдаёт 403 — ретраим до 5 раз
+        # git-клон с ретраями (иногда 403 на промисорной докачке blobs)
+        ok=0
         for i in 1 2 3 4 5; do
             if git clone --filter=blob:none --sparse --depth 1 \
                 https://gitlab.com/MobiusDevelopment/L2J_Mobius.git "${MOBIUS_ROOT}"; then
+                ok=1
                 break
             fi
             echo ">>> клон не удался (попытка ${i}/5), повтор через 10 с"
             rm -rf "${MOBIUS_ROOT}"
-            [ "${i}" = 5 ] && { echo "GitLab недоступен"; exit 1; }
             sleep 10
         done
+        if [ "${ok}" = 1 ]; then
+            # Докачка blobs для sparse-конуса; при 403 падаем на API-архив.
+            if ! git -C "${MOBIUS_ROOT}" sparse-checkout set \
+                L2J_Mobius_C1_HarbingersOfWar 2>/dev/null; then
+                echo ">>> докачка blobs через git не прошла, берём API-архив"
+                rm -rf "${MOBIUS_ROOT}"
+                gitlab_archive_fetch || { echo "GitLab недоступен"; exit 1; }
+            fi
+        else
+            # git-протокол закрыт rate-limiter-ом целиком - API-архив.
+            gitlab_archive_fetch || { echo "GitLab недоступен"; exit 1; }
+        fi
+    else
+        # .git есть, но рабочих файлов нет (прерванная докачка blobs).
+        if ! git -C "${MOBIUS_ROOT}" sparse-checkout set \
+            L2J_Mobius_C1_HarbingersOfWar 2>/dev/null; then
+            echo ">>> докачка blobs через git не прошла, берём API-архив"
+            rm -rf "${MOBIUS_ROOT}"
+            gitlab_archive_fetch || { echo "GitLab недоступен"; exit 1; }
+        fi
     fi
-    git -C "${MOBIUS_ROOT}" sparse-checkout set L2J_Mobius_C1_HarbingersOfWar
     t1
 fi
 
