@@ -12,6 +12,7 @@ import (
 
 	"github.com/melg8/swarm/internal/swarm/gear"
 	"github.com/melg8/swarm/internal/swarm/npcdata"
+	"github.com/melg8/swarm/internal/swarm/state"
 )
 
 // Shopping of the town trips: the gear.PlanPurchases strategy decides
@@ -41,6 +42,12 @@ const (
 	// stopBuyRetries bounds the re-requests of a lost buy batch
 	// before the trip gives the purchases up.
 	stopBuyRetries = 3
+	// replaceSellTimeout bounds the wait for the inventory update
+	// that confirms the replacement sales: the junk flow batches the
+	// pieces at its own pace, and a piece the server refuses to sell
+	// never vanishes - the trip proceeds without its credit after the
+	// wait instead of stalling.
+	replaceSellTimeout = 60 * time.Second
 	// shoppingPlanPeriod bounds the shopping trigger re-plans: the
 	// adena and the inventory change with every loot, the plan for
 	// the trip trigger is cached for this period.
@@ -112,6 +119,235 @@ func (l *Loop) shoppingWanted() bool {
 	}
 
 	return gear.AdenaSpent(l.shoppingPlanCache) >= shoppingTripMinValue
+}
+
+// replacementSellingActive reports whether the sell first step of
+// the replacement purchases is still in flight: the auto equipment
+// must not re-equip the pieces the step just unequipped for their
+// sale (the empty slot would pull them right back on).
+func (l *Loop) replacementSellingActive() bool {
+	return len(l.replaceQueue) > 0 || len(l.replaceSelling) > 0
+}
+
+// stepReplacementSales runs the sell first step of the replacement
+// purchases: the plan credits the sell value of the equipped pieces
+// its buys displace (see gear.PlanPurchases), and the trip actually
+// banks that credit - every displaced piece is unequipped, sold to
+// the merchant, and only then the buys run and the auto equipment
+// wears the replacements into the freed slots. One step per tick;
+// reports false while the step is still busy (a unequip in flight,
+// the sale batch waiting for its transaction window or its
+// inventory confirmation).
+func (l *Loop) stepReplacementSales(now time.Time) bool {
+	if !l.replacePlanned {
+		l.replacePlanned = true
+		l.replaceQueue = l.replacementTargets()
+		if len(l.replaceQueue) == 0 {
+			return true
+		}
+		l.logger.Printf("Hunt: shop: %d equipped pieces feed the "+
+			"replacements, selling them first", len(l.replaceQueue))
+
+		return false
+	}
+	if !l.replaceUnequipsDone(now) {
+		return false
+	}
+	if !l.replaceOfferDone(now) {
+		return false
+	}
+
+	return l.replaceSalesSettled(now)
+}
+
+// replaceUnequipsDone drives the unequip phase of the sell first
+// step: every queued piece comes off (paced like the auto equipment,
+// retried twice before the piece stays on and the buy runs without
+// its credit). An unequipped piece turns into a plain sellable
+// candidate and joins the sale list - the junk flow of the stop or
+// the offer batch below sells it. Reports false while a unequip is
+// still in flight, true when the queue is drained.
+func (l *Loop) replaceUnequipsDone(now time.Time) bool {
+	for len(l.replaceQueue) > 0 {
+		head := l.replaceQueue[0]
+		if l.replaceHeadSettled(head) {
+			continue
+		}
+		if !l.replaceHeadOff(head, now) {
+			return false
+		}
+		l.dropReplacementHead()
+	}
+
+	return true
+}
+
+// replaceHeadSettled reports whether the queued head needs no
+// unequip request anymore and drops it from the queue: offered by
+// the junk flow already, gone from the inventory, or unequipped
+// (the piece joins the sale list for the settle wait).
+func (l *Loop) replaceHeadSettled(head int32) bool {
+	if l.sold[head] {
+		l.dropReplacementHead()
+
+		return true
+	}
+	item, ok := l.tracker.InventoryItemState(head)
+	if !ok {
+		l.dropReplacementHead()
+
+		return true
+	}
+	if item.Equipped {
+		return false
+	}
+	l.replaceQueue = l.replaceQueue[1:]
+	l.replaceSelling = append(l.replaceSelling, item)
+	l.replaceTried = 0
+
+	return true
+}
+
+// replaceHeadOff sends the paced unequip request for the queued
+// piece and reports whether the phase still waits on it. The request
+// repeats every equip period, twice per piece before it is given up
+// (the buy then runs without its credit - the server swap semantics
+// still replace the piece).
+func (l *Loop) replaceHeadOff(head int32, now time.Time) bool {
+	if !l.replaceUnequipAt.IsZero() &&
+		now.Sub(l.replaceUnequipAt) < equipActionPeriod {
+		return false
+	}
+	if l.replaceTried >= 2 {
+		l.logger.Printf("Hunt: shop: item %d does not come off, "+
+			"buying without its credit", head)
+
+		return true
+	}
+	l.replaceUnequipAt = now
+	l.replaceTried++
+	l.logger.Printf("Hunt: shop: unequipping the replaced item %d",
+		head)
+	if err := l.game.UseItem(head); err != nil {
+		l.logger.Printf("Hunt: shop: unequip of %d failed: %v",
+			head, err)
+
+		return false
+	}
+
+	return false
+}
+
+// dropReplacementHead drops the head of the replacement queue with
+// its retry budget.
+func (l *Loop) dropReplacementHead() {
+	l.replaceQueue = l.replaceQueue[1:]
+	l.replaceTried = 0
+}
+
+// replaceOfferDone drives the sale phase: the handed pieces the junk
+// flow has not offered yet go out as one batch (the transaction
+// window paces it through l.sellAt, the buys wait it out behind the
+// same window). Reports false while the offer is pending, true when
+// the offer phase concluded - the own batch went out or the junk
+// flow owns every piece.
+func (l *Loop) replaceOfferDone(now time.Time) bool {
+	if l.replaceSellSent || len(l.replaceSelling) == 0 {
+		return true
+	}
+	batch := make([]state.InventoryItem, 0, len(l.replaceSelling))
+	for _, item := range l.replaceSelling {
+		if !l.sold[item.ObjectID] {
+			batch = append(batch, item)
+		}
+	}
+	if len(batch) == 0 {
+		// The junk flow already offered every handed piece: the
+		// settle phase waits out their removals.
+		l.replaceSellSent = true
+
+		return true
+	}
+	if !l.sellAt.IsZero() && now.Sub(l.sellAt) < sellPause {
+		return false
+	}
+	if err := l.game.SellItems(batch); err != nil {
+		l.logger.Printf("Hunt: shop: replacement sell failed: %v", err)
+
+		return false
+	}
+	for _, item := range batch {
+		l.sold[item.ObjectID] = true
+	}
+	l.sellAt = now
+	l.replaceSellSent = true
+	l.logger.Printf("Hunt: shop: offered %d replaced pieces for sale",
+		len(batch))
+
+	return true
+}
+
+// replaceSalesSettled waits for the inventory update that confirms
+// the replacement sales: the proceeds land with it, and the buys
+// re-plan against the fresh adena only after that - planning earlier
+// would drop the replacement (its credit is spent, the adena has not
+// arrived). A piece the server refuses to sell never vanishes, so
+// the wait is bounded and the trip proceeds without its credit.
+func (l *Loop) replaceSalesSettled(now time.Time) bool {
+	if len(l.replaceSelling) == 0 {
+		return true
+	}
+	if l.replaceWaitAt.IsZero() {
+		l.replaceWaitAt = now
+	}
+	if now.Sub(l.replaceWaitAt) < replaceSellTimeout {
+		for _, item := range l.replaceSelling {
+			if _, ok := l.tracker.InventoryItemState(item.ObjectID); ok {
+				return false
+			}
+		}
+	}
+	l.replaceSelling = nil
+
+	return true
+}
+
+// resetReplacementSales drops the sell first step state: a fresh
+// trip re-plans the replacement sales from the current gear state,
+// an aborted trip leaves no half-sold queue behind that the auto
+// equipment would have to steer around.
+func (l *Loop) resetReplacementSales() {
+	l.replacePlanned = false
+	l.replaceDone = false
+	l.replaceQueue = nil
+	l.replaceSelling = nil
+	l.replaceSellSent = false
+	l.replaceUnequipAt = time.Time{}
+	l.replaceWaitAt = time.Time{}
+	l.replaceTried = 0
+}
+
+// replacementTargets collects the equipped object ids the planned
+// purchases displace: the plan runs against the current gear state
+// and carries the SellFirst list on every replacing purchase.
+func (l *Loop) replacementTargets() []int32 {
+	purchases := l.shoppingPlan()
+	if len(purchases) == 0 {
+		return nil
+	}
+	seen := make(map[int32]bool)
+	var targets []int32
+	for _, purchase := range purchases {
+		for _, objectID := range purchase.SellFirst {
+			if objectID == 0 || seen[objectID] {
+				continue
+			}
+			seen[objectID] = true
+			targets = append(targets, objectID)
+		}
+	}
+
+	return targets
 }
 
 // planShoppingStops plans the buy stops of the running trip with the

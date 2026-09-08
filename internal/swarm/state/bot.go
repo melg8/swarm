@@ -268,16 +268,26 @@ type Placement struct {
 // AttackTargets is the capacity of the Attack target list.
 const AttackTargets = 4
 
+// attackHitMissFlag mirrors the Mobius Hit flag of a missed swing
+// (Hit.java HITFLAG_MISS, bit pattern 0x80): the Attack packet
+// carries it per hit, so the tracker can tell a landed blow from an
+// evaded one. The packet reader hands the byte over as a signed
+// int8, so the flag reads as a negative value.
+const attackHitMissFlag int8 = -128
+
 // Attack describes an Attack packet of one attacker.
 type Attack struct {
-	AttackerID  int32
-	X           int32
-	Y           int32
-	Z           int32
-	TargetX     int32
-	TargetY     int32
-	TargetZ     int32
-	TargetIDs   [AttackTargets]int32
+	AttackerID int32
+	X          int32
+	Y          int32
+	Z          int32
+	TargetX    int32
+	TargetY    int32
+	TargetZ    int32
+	TargetIDs  [AttackTargets]int32
+	// HitFlags carries the per hit flags (see attackHitMissFlag) of
+	// the TargetIDs entries.
+	HitFlags    [AttackTargets]int8
 	TargetCount int
 }
 
@@ -1095,15 +1105,19 @@ func (b *Bot) ApplyAttack(a Attack) {
 		b.objects[a.AttackerID] = obj
 		b.touch()
 	}
-	// The swing animation of the web view: the attacker swings at
-	// its first hit target (a melee Attack broadcast carries one
-	// target; the multi target form only appears with special
-	// shots whose damage lands the same way).
-	if a.TargetCount > 0 {
+	// The swing animation of the web view: one swing per hit that
+	// actually landed. The Mobius Attack packet carries the miss flag
+	// of every hit, so an evaded blow draws nothing - the streak only
+	// plays for the blows that connect, and the viewer reads who hit
+	// whom instead of a swing storm of dodged attacks.
+	for i := range a.TargetCount {
+		if a.HitFlags[i]&attackHitMissFlag != 0 {
+			continue
+		}
 		b.recordCombatEventLocked(CombatEvent{
 			Kind:       CombatEventAttack,
 			AttackerID: a.AttackerID,
-			TargetID:   a.TargetIDs[0],
+			TargetID:   a.TargetIDs[i],
 			X:          a.X,
 			Y:          a.Y,
 			TargetX:    a.TargetX,

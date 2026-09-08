@@ -349,6 +349,20 @@ type Loop struct {
 	buyRetries        int
 	shoppingPlanAt    time.Time
 	shoppingPlanCache []gear.Purchase
+	// The sell first step of the replacement purchases (see
+	// stepReplacementSales): the planned purchases that displace
+	// equipped gear sell the displaced pieces before buying, so the
+	// queue holds the object ids to unequip, replaceSelling the
+	// collected sale batch and the flags pace the unequip requests
+	// and mark the step done.
+	replacePlanned   bool
+	replaceDone      bool
+	replaceQueue     []int32
+	replaceSelling   []state.InventoryItem
+	replaceSellSent  bool
+	replaceUnequipAt time.Time
+	replaceWaitAt    time.Time
+	replaceTried     int
 	// The multi zone hunting state (see zones.go): the registry of the
 	// deployment, the picked and the manually overridden zone.
 	zones        []HuntingZone
@@ -428,6 +442,14 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		buyRetries:        0,
 		shoppingPlanAt:    time.Time{},
 		shoppingPlanCache: nil,
+		replacePlanned:    false,
+		replaceDone:       false,
+		replaceQueue:      nil,
+		replaceSelling:    nil,
+		replaceSellSent:   false,
+		replaceUnequipAt:  time.Time{},
+		replaceWaitAt:     time.Time{},
+		replaceTried:      0,
 		tripStart:         time.Time{},
 		tripEndedAt:       time.Time{},
 		zones:             nil,

@@ -199,3 +199,47 @@ func TestSimulateInventoryAppliesFreeUpgrades(t *testing.T) {
 	virtual := SimulateInventory(profile, equipment)
 	require.Equal(t, int32(3), virtual[SlotRHand].Item.ItemID)
 }
+
+// TestPlanPurchasesCreditsDisplacedGear pins the sell credit of the
+// replacement planning: a purchase that displaces an equipped piece
+// carries its SellFirst object ids and its sell value, and the
+// affordability counts the credit - 56000 adena alone cannot pay the
+// dirk (62214), the 9250 credit of the equipped sickle closes the
+// gap, so the plan spends past the carried adena.
+func TestPlanPurchasesCreditsDisplacedGear(t *testing.T) {
+	profile := MeleeFighter{}
+	// The character wears the sickle (18500 reference price).
+	equipment := equipmentWith(
+		[]state.InventoryItem{item(100, 153)},
+		map[Slot]int32{SlotRHand: 100})
+	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 56000)
+	var weapon *Purchase
+	for index := range purchases {
+		stats, ok := npcdata.ItemGearStats(purchases[index].ItemID)
+		require.True(t, ok)
+		if stats.BodyPart == "rhand" || stats.BodyPart == "lrhand" {
+			weapon = &purchases[index]
+		}
+	}
+	require.NotNil(t, weapon,
+		"the dirk upgrade appears only through the sell credit")
+	require.Equal(t, []int32{100}, weapon.SellFirst,
+		"the equipped sickle is sold before the buy")
+	require.Equal(t, npcdata.ItemPrice(153)/2, weapon.SellCredit)
+	require.Greater(t, AdenaSpent(purchases), int64(56000),
+		"the plan spends past the carried adena through the credit")
+}
+
+// TestPlanPurchasesNoCreditWithoutEquippedGear pins the empty slot
+// case: an empty weapon slot displaces nothing, the fillers carry no
+// sell credit and the spend stays inside the carried adena.
+func TestPlanPurchasesNoCreditWithoutEquippedGear(t *testing.T) {
+	profile := MeleeFighter{}
+	equipment := equipmentWith(nil, nil)
+	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 56000)
+	require.LessOrEqual(t, AdenaSpent(purchases), int64(56000))
+	require.Zero(t, SellCreditOf(purchases))
+	for _, purchase := range purchases {
+		require.Empty(t, purchase.SellFirst)
+	}
+}

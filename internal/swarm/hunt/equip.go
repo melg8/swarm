@@ -64,6 +64,12 @@ func (l *Loop) maybeEquipGear() {
 	if !l.inventoryGateOpen() || len(l.userDeferred) > 0 {
 		return
 	}
+	if l.replacementSellingActive() {
+		// The sell first step of the replacement sales owns the
+		// affected slots right now: an auto equip here would pull the
+		// just unequipped pieces right back on before their sale.
+		return
+	}
 	if now.Sub(manager.lastActionAt) < equipActionPeriod {
 		return
 	}

@@ -150,3 +150,71 @@ func TestCombatEventsFeedBounded(t *testing.T) {
 
 	require.Len(t, bot.Snapshot().CombatEvents, combatEventMax)
 }
+
+// TestApplyAttackSkipsMissedHits pins the hit only swing feed: the
+// Attack packet marks every hit with the Mobius miss flag, and only
+// the blows that actually land play a swing - a dodged attack draws
+// nothing, a dual hit draws one swing per landed blow.
+func TestApplyAttackSkipsMissedHits(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetOnline("test1")
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 46000, Y: 50000, Name: "Gremlin",
+	})
+
+	// The mob swings at the character and misses: no swing event.
+	bot.ApplyAttack(Attack{
+		AttackerID: 7, X: 46000, Y: 50000, Z: -3500,
+		TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+		TargetIDs:   [AttackTargets]int32{100},
+		HitFlags:    [AttackTargets]int8{attackHitMissFlag},
+		TargetCount: 1,
+	})
+	views := bot.Snapshot().CombatEvents
+	require.Empty(t, countSwings(views),
+		"the missed swing records no attack event")
+
+	// The mob lands a blow: one swing event on the attacker.
+	bot.ApplyAttack(Attack{
+		AttackerID: 7, X: 46000, Y: 50000, Z: -3500,
+		TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+		TargetIDs:   [AttackTargets]int32{100},
+		TargetCount: 1,
+	})
+	views = bot.Snapshot().CombatEvents
+	require.Equal(t, 1, countSwings(views))
+
+	// A dual weapon lands both hits: two swing events, one per hit.
+	bot.ApplyAttack(Attack{
+		AttackerID: 7, X: 46000, Y: 50000, Z: -3500,
+		TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+		TargetIDs:   [AttackTargets]int32{100, 100},
+		TargetCount: 2,
+	})
+	views = bot.Snapshot().CombatEvents
+	require.Equal(t, 3, countSwings(views))
+
+	// A dual weapon lands one and misses one: one swing event.
+	bot.ApplyAttack(Attack{
+		AttackerID: 7, X: 46000, Y: 50000, Z: -3500,
+		TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+		TargetIDs:   [AttackTargets]int32{100, 100},
+		HitFlags:    [AttackTargets]int8{0, attackHitMissFlag},
+		TargetCount: 2,
+	})
+	views = bot.Snapshot().CombatEvents
+	require.Equal(t, 4, countSwings(views))
+}
+
+// countSwings counts the attack events of the snapshot feed.
+func countSwings(views []CombatEventView) int {
+	count := 0
+	for _, view := range views {
+		if view.Kind == CombatEventAttack {
+			count++
+		}
+	}
+
+	return count
+}

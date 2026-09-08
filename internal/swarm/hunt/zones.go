@@ -484,7 +484,37 @@ func (l *Loop) userZoneSelect(index int32) {
 	zone := l.zones[index]
 	l.zoneOverride = int(index)
 	l.logger.Printf("Hunt: user selected the hunting zone %s", zone.Name)
+	l.stopForZoneSwitch()
 	l.applyHuntingZone(zone)
+}
+
+// stopForZoneSwitch halts the walks the manual zone selection makes
+// pointless: a manual move, a town trip walk to the trader or back
+// and a zone return leg all aimed at the old square. The server
+// keeps a walk running until the next move request replaces its
+// destination, so one walk request to the current spot stops it. The
+// selling stop (the character stands at the merchant) keeps running
+// - its return leg re-targets the new zone on its own - and the
+// deleveling refuses the stop like it refuses every movement
+// command.
+func (l *Loop) stopForZoneSwitch() {
+	if l.phase == phaseDelevel {
+		return
+	}
+	if l.phase == phaseUser && l.userKind == state.CommandMove {
+		l.resumeAuto()
+	}
+	if l.phase == phaseTownWalk || l.phase == phaseTownReturn {
+		l.resetTownTrip()
+		l.zoneReturn = false
+		l.zoneFails = 0
+	}
+	if x, y, z, ok := l.tracker.SelfPosition(); ok &&
+		l.tracker.SelfWalking() {
+		if err := l.game.WalkTo(x, y, z); err != nil {
+			l.logger.Printf("Hunt: zone switch stop walk failed: %v", err)
+		}
+	}
 }
 
 // maybeSwitchZone re-evaluates the automatic zone pick: a level gain

@@ -464,6 +464,58 @@ func TestZoneRotationWithoutSiblingStays(t *testing.T) {
 		"the window re-arms instead of spinning the check")
 }
 
+func TestZoneSwitchStopsTheRunningWalks(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZones(ElvenHuntingZones())
+	setZoneTestLevel(bot, 1)
+	loop.tick()
+	require.Equal(t, "elven-keltir-village", loop.zonePickedID)
+
+	// The bot walks a manual move toward the east when the user
+	// switches the zone: the manual phase ends and the server walk is
+	// stopped (one walk request to the current spot replaces the
+	// running destination).
+	loop.phase = phaseUser
+	loop.userKind = "move"
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 45000, Y: 50000, Z: -3500,
+		DestX: 47000, DestY: 50000, DestZ: -3500,
+	})
+	loop.userZoneSelect(1)
+	require.Equal(t, "elven-keltir-east", loop.zonePickedID)
+	require.NotEqual(t, phaseUser, loop.phase,
+		"the manual move phase ends with the zone switch")
+	require.NotEmpty(t, game.walks, "the running walk is stopped")
+	stop := game.walks[len(game.walks)-1]
+	require.Equal(t, [3]int32{45000, 50000, -3500}, stop,
+		"the stop walks to the current spot")
+
+	// A town trip walk to the trader is cancelled the same way.
+	game.walks = nil
+	loop.phase = phaseTownReturn
+	loop.zoneReturn = true
+	loop.zoneFails = 2
+	loop.zonePickedID = "elven-keltir-village"
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 45000, Y: 50000, Z: -3500,
+		DestX: 47000, DestY: 50000, DestZ: -3500,
+	})
+	loop.userZoneSelect(2)
+	require.Equal(t, phaseEngage, loop.phase,
+		"the trip walk phase ends with the zone switch")
+	require.False(t, loop.zoneReturn)
+	require.Zero(t, loop.zoneFails)
+
+	// The deleveling refuses the stop: its guard walk must finish.
+	game.walks = nil
+	loop.phase = phaseDelevel
+	loop.userZoneSelect(3)
+	require.Equal(t, phaseDelevel, loop.phase)
+	require.Empty(t, game.walks)
+}
+
 func TestZoneSwitchDropsTheStaleFarmSpot(t *testing.T) {
 	bot := newTestBot()
 	game := &fakeGame{}

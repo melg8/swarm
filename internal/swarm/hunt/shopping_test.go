@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/gear"
+	"github.com/melg8/swarm/internal/swarm/npcdata"
 	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/stretchr/testify/require"
@@ -295,4 +296,106 @@ func TestPlanShoppingStopsMergesCurrentMerchant(t *testing.T) {
 	_ = game
 	_ = pathfind.Vec3{}
 	_ = gear.Purchase{}
+}
+
+// TestReplacementSalesSellBeforeBuy pins the sell first step of the
+// shopping trips: the equipped piece a planned purchase displaces is
+// unequipped and sold BEFORE the buys run, so its proceeds fund the
+// replacement. The sequence: the unequip request goes out, the
+// equipped flag flip collects the piece, the sell batch goes out and
+// only then the purchase planning starts.
+func TestReplacementSalesSellBeforeBuy(t *testing.T) {
+	loop, game, bot, _ := newTripLoop()
+	// The character wears the sickle and carries adena that upgrades
+	// the weapon only through the sickle's sell credit.
+	bot.ApplyItemList([]state.InventoryItem{
+		{
+			ObjectID: 100, ItemID: 153, Count: 1, Equipped: true,
+			BodyPart: 0x80, Change: 1,
+		},
+		{ObjectID: 999, ItemID: 57, Count: 60000, Type2: 4, Change: 1},
+	})
+	bot.ApplyUserInfo(state.UserInfo{
+		Name: "test1", Level: 8,
+		X: 46112, Y: 41500, Z: -3500,
+		MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
+		PaperdollObjectIDs: [state.PaperdollSlots]int32{0, 0, 0, 0, 0, 0, 0, 100},
+	})
+
+	// The sell stop with no junk: the replacement step runs before
+	// the buy planning.
+	loop.phase = phaseTownSell
+	loop.tripStops = []tripStop{{merchant: townMerchants[3], sell: true}}
+	loop.tripStart = time.Now()
+	loop.sellPhaseAt = time.Now().Add(-time.Minute)
+	loop.sellAt = time.Time{}
+
+	// The first step call plans the replacement targets.
+	loop.tick()
+	require.True(t, loop.replacePlanned)
+	require.Equal(t, []int32{100}, loop.replaceQueue,
+		"the equipped sickle is queued for the sale")
+
+	// The unequip request goes out (paced by the equip period).
+	loop.replaceUnequipAt = time.Now().Add(-equipActionPeriod - time.Second)
+	loop.tick()
+	require.Equal(t, []int32{100}, game.uses,
+		"the displaced piece is unequipped first")
+	require.Empty(t, game.sells, "no sell before the unequip lands")
+
+	// The unequip confirms: the piece became a plain sellable
+	// candidate and sells (the junk flow or the replacement batch -
+	// one offer either way).
+	bot.ApplyInventoryUpdate([]state.InventoryItem{
+		{
+			ObjectID: 100, ItemID: 153, Count: 1, Equipped: false,
+			BodyPart: 0x80, Change: 2,
+		},
+	})
+	loop.sellAt = time.Now().Add(-sellPause - time.Second)
+	loop.tick()
+	require.NotEmpty(t, game.sells,
+		"the displaced piece is sold before the buys")
+	offers := 0
+	for _, batch := range game.sells {
+		for _, item := range batch {
+			if item.ObjectID == 100 {
+				offers++
+			}
+		}
+	}
+	require.Equal(t, 1, offers, "exactly one sale offer of the piece")
+
+	// The sale lands: the piece vanishes from the tracked inventory
+	// (the same update carries the adena) and the buy planning runs
+	// against the fresh budget that includes the proceeds.
+	bot.ApplyInventoryUpdate([]state.InventoryItem{
+		{ObjectID: 100, ItemID: 153, Count: 0, Change: 3},
+		{ObjectID: 999, ItemID: 57, Count: 69250, Type2: 4, Change: 2},
+	})
+	loop.tick()
+	require.True(t, loop.replaceDone,
+		"the sell first step completes with the confirmation")
+	require.True(t, loop.buysPlanned,
+		"the purchase planning runs after the replacement sale")
+
+	// The re-plan with the sale proceeds still buys a weapon
+	// upgrade - the freed slot and the fresh adena pay for it.
+	foundWeapon := false
+	for _, stop := range loop.tripStops {
+		for _, purchase := range stop.buys {
+			stats, ok := npcdata.ItemGearStats(purchase.ItemID)
+			if ok && (stats.BodyPart == "rhand" ||
+				stats.BodyPart == "lrhand") {
+				foundWeapon = true
+			}
+		}
+	}
+	require.True(t, foundWeapon,
+		"a weapon upgrade is planned with the sale proceeds")
+
+	// The auto equipment stayed suspended through the step: nothing
+	// re-equipped the sickle between the unequip and the sale.
+	require.Len(t, game.uses, 1,
+		"no re-equip raced the sale")
 }

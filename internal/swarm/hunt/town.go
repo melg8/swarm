@@ -251,6 +251,7 @@ func (l *Loop) maybeStartTownTrip() {
 	l.buyRequested = nil
 	l.buyConfirmAt = time.Time{}
 	l.buyRetries = 0
+	l.resetReplacementSales()
 	l.phase = phaseTownWalk
 	stats := l.tracker.InventoryStats()
 	reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
@@ -528,6 +529,15 @@ func (l *Loop) tickTownSell() {
 
 			return
 		}
+		if !l.replaceDone {
+			// The replacement purchases sell their displaced pieces
+			// first: the credit the plan counted on must be banked
+			// before the buys spend it.
+			if !l.stepReplacementSales(now) {
+				return
+			}
+			l.replaceDone = true
+		}
 		if !l.buysPlanned {
 			stats := l.tracker.InventoryStats()
 			l.logger.Printf("Hunt: shop: junk sold (%d slots left, "+
@@ -786,6 +796,7 @@ func (l *Loop) endTownTrip(reason string) {
 	l.buyRetries = 0
 	l.shoppingPlanCache = nil
 	l.shoppingPlanAt = time.Time{}
+	l.resetReplacementSales()
 	l.tripEndedAt = time.Now()
 	l.logger.Printf("Hunt: town trip ended: " + reason)
 }
@@ -813,6 +824,7 @@ func (l *Loop) resetTownTrip() {
 	l.buyRequested = nil
 	l.buyConfirmAt = time.Time{}
 	l.buyRetries = 0
+	l.resetReplacementSales()
 	l.tripEndedAt = time.Time{}
 }
 

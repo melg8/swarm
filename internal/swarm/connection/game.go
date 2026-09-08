@@ -1315,6 +1315,10 @@ func (gc *GameClient) applyAttack(payload []byte) {
 		return
 	}
 	if gc.tracker != nil {
+		// The tracker list is capped like the packet struct: the count
+		// clamps to the capacity so the extra hits of a wide multi
+		// attack never index past the array.
+		count := min(gc.attack.HitCount, state.AttackTargets)
 		attack := state.Attack{
 			AttackerID:  gc.attack.AttackerID,
 			X:           gc.attack.X,
@@ -1324,10 +1328,12 @@ func (gc *GameClient) applyAttack(payload []byte) {
 			TargetY:     gc.attack.TargetY,
 			TargetZ:     gc.attack.TargetZ,
 			TargetIDs:   [4]int32{},
-			TargetCount: gc.attack.HitCount,
+			HitFlags:    [state.AttackTargets]int8{},
+			TargetCount: count,
 		}
-		for i := range min(gc.attack.HitCount, state.AttackTargets) {
+		for i := range count {
 			attack.TargetIDs[i] = gc.attack.Hits[i].TargetID
+			attack.HitFlags[i] = gc.attack.Hits[i].Flags
 		}
 		gc.tracker.ApplyAttack(attack)
 	}

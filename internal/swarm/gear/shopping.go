@@ -65,6 +65,16 @@ type Purchase struct {
 	Price int64
 	// Reason is the human readable log line.
 	Reason string
+	// SellFirst lists the equipped object ids the purchase displaces
+	// (the real paperdoll occupants of the slots it writes to): the
+	// trip unequips and sells them before buying, so their proceeds
+	// fund the replacement and the adena on hand only needs to cover
+	// the difference.
+	SellFirst []int32
+	// SellCredit is the summed sell value of the SellFirst pieces
+	// (the Mobius sell pays referencePrice/2). The planner credits it
+	// to the budget of the trip that sells them.
+	SellCredit int64
 }
 
 // purchaseCandidate is one shop offer joined with the item stats.
@@ -109,11 +119,13 @@ func PlanPurchases(
 	planned := make(map[int32]bool)
 	boughtSlots := make(map[Slot]bool)
 	for budget > 0 {
-		best, gain := bestPurchase(virtual, candidates, budget, planned, boughtSlots)
+		best, gain, credit, sellFirst := bestPurchase(
+			virtual, candidates, budget, planned, boughtSlots, equipment)
 		if best == nil || gain <= 0 {
 			break
 		}
 		planned[best.itemID] = true
+		budget += credit
 		budget -= best.price
 		purchases = append(purchases, Purchase{
 			ItemID:             best.itemID,
@@ -122,6 +134,8 @@ func PlanPurchases(
 			Count:              1,
 			Price:              best.price,
 			Reason:             "buying " + best.describe(gain),
+			SellFirst:          sellFirst,
+			SellCredit:         credit,
 		})
 		for _, slot := range affectedSlots(virtual, best.stats.BodyPart) {
 			boughtSlots[slot] = true
@@ -199,16 +213,30 @@ func catalogCandidates(
 // gain per adena; the plain gain breaks ties between equally priced
 // offers. The candidates that would write into a slot this plan
 // already bought for are skipped (one purchase per slot per trip).
+// The affordability counts the sell credit of the pieces the
+// purchase displaces (the trip sells them before buying, see
+// displacedValue): a replacement is within reach as soon as the
+// adena plus the proceeds cover it, so the character shops for it
+// immediately instead of hoarding the full price first. The winner
+// returns with its credit and the SellFirst object ids.
 func bestPurchase(
 	virtual [slotCount]ScoredItem, candidates []purchaseCandidate,
 	budget int64, planned map[int32]bool, boughtSlots map[Slot]bool,
-) (*purchaseCandidate, float64) {
+	equipment Equipment,
+) (*purchaseCandidate, float64, int64, []int32) {
 	var best *purchaseCandidate
 	bestValue := float64(0)
 	bestGain := float64(0)
+	var bestCredit int64
+	var bestSellFirst []int32
 	for index := range candidates {
 		candidate := &candidates[index]
-		if planned[candidate.itemID] || candidate.price > budget {
+		if planned[candidate.itemID] {
+			continue
+		}
+		credit, sellFirst := displacedValue(equipment, affectedSlots(
+			virtual, candidate.stats.BodyPart))
+		if candidate.price > budget+credit {
 			continue
 		}
 		gain, ok := purchaseGain(virtual, candidate.stats, candidate.score)
@@ -223,11 +251,15 @@ func bestPurchase(
 			value = gain / float64(candidate.price)
 		}
 		if value > bestValue || (value == bestValue && gain > bestGain) {
-			best, bestValue, bestGain = candidate, value, gain
+			best = candidate
+			bestValue = value
+			bestGain = gain
+			bestCredit = credit
+			bestSellFirst = sellFirst
 		}
 	}
 
-	return best, bestGain
+	return best, bestGain, bestCredit, bestSellFirst
 }
 
 // purchaseGain computes the score gain the stats would bring to the
@@ -445,4 +477,40 @@ func AdenaSpent(purchases []Purchase) int64 {
 	}
 
 	return total
+}
+
+// SellCreditOf sums the sell credits of the purchases: the adena the
+// trip banks from selling the displaced pieces before the buys.
+func SellCreditOf(purchases []Purchase) int64 {
+	total := int64(0)
+	for _, purchase := range purchases {
+		total += purchase.SellCredit
+	}
+
+	return total
+}
+
+// displacedValue prices the equipped pieces the purchase displaces:
+// the real paperdoll occupants of the affected slots (the virtual
+// paperdoll decides WHICH slots a purchase writes to, the real
+// paperdoll decides WHAT is sold), each at its sell value of
+// referencePrice/2. Empty slots contribute nothing - the empty slot
+// fillers replace no one.
+func displacedValue(equipment Equipment, slots []Slot) (int64, []int32) {
+	var credit int64
+	var ids []int32
+	for _, slot := range slots {
+		objectID := equipment.Slots[slot]
+		if objectID == 0 {
+			continue
+		}
+		item, ok := equipment.itemByID(objectID)
+		if !ok {
+			continue
+		}
+		credit += npcdata.ItemPrice(item.ItemID) / 2
+		ids = append(ids, objectID)
+	}
+
+	return credit, ids
 }
