@@ -890,4 +890,3 @@ precomputed flat data instead of per call allocations).
   `hunt/zones_bench_test.go` (zone picker), `webserver/
   server_bench_test.go` (snapshot JSON marshal). Baseline recorded
   above. Pushed as the first atomic commit.
->>>>>>> 99805f0 (add benchmark suite for state, npcdata, hunt and webserver hot paths)
