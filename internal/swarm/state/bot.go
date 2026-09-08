@@ -6,7 +6,6 @@ package state
 
 import (
 	"math"
-	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -343,7 +342,7 @@ type Bot struct {
 	// packet apply paths mutate the records in place and the
 	// scans walk the memory sequentially.
 	world     objectStore
-	inventory map[int32]InventoryItem
+	inventory inventoryStore
 	// inventoryVersion counts the inventory and paperdoll
 	// mutations: the equip managers of the hunt loop key their
 	// cached scans on it, so an unchanged bag costs no per tick
@@ -385,7 +384,7 @@ func NewBot(id string) *Bot {
 		selfID:             0,
 		char:               newCharacterState(),
 		world:              newObjectStore(),
-		inventory:          make(map[int32]InventoryItem),
+		inventory:          newInventoryStore(),
 		inventoryVersion:   0,
 		paperdoll:          [PaperdollSlots]int32{},
 		log:                newEventLog(),
@@ -737,7 +736,7 @@ func (b *Bot) ResetSession() {
 	b.selfID = 0
 	b.char = newCharacterState()
 	b.world = newObjectStore()
-	b.inventory = make(map[int32]InventoryItem)
+	b.inventory = newInventoryStore()
 	b.inventoryVersion++
 	b.walkPath = nil
 	b.walkPathAt = time.Time{}
@@ -1722,15 +1721,17 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 // fillInventorySnapshot completes the character view with the inventory
 // usage and builds the item list of the equipment widget: every entry
 // carries the resolved display name, the icon file name of the icon
-// pack and the paperdoll slot mask. The caller must hold the read
-// lock.
+// pack and the paperdoll slot mask. The dense store keeps the records
+// in the canonical widget order (see inventoryStore), so the fill is a
+// straight sequential walk with no read time sort. The caller must
+// hold the read lock.
 func (b *Bot) fillInventorySnapshot(snap *Snapshot) {
 	snap.Character.CurrentLoad = b.char.CurrentLoad
 	snap.Character.MaxLoad = b.char.MaxLoad
-	snap.Character.InventorySlots = len(b.inventory)
+	snap.Character.InventorySlots = len(b.inventory.items)
 	snap.Character.InventoryMax = inventorySlotLimit
-	snap.Inventory = make([]InventoryItemSnapshot, 0, len(b.inventory))
-	for _, item := range b.inventory {
+	snap.Inventory = make([]InventoryItemSnapshot, 0, len(b.inventory.items))
+	for _, item := range b.inventory.items {
 		snap.Inventory = append(snap.Inventory, InventoryItemSnapshot{
 			ObjectID: item.ObjectID,
 			ItemID:   item.ItemID,
@@ -1746,20 +1747,13 @@ func (b *Bot) fillInventorySnapshot(snap *Snapshot) {
 			snap.Character.Adena += item.Count
 		}
 	}
-	sortInventorySnapshot(snap.Inventory)
-}
-
-// sortInventorySnapshot orders the widget item list deterministically:
-// the equipped gear first (the paperdoll anchors the widget), then the
-// plain inventory, both by item id with the object id breaking ties.
-func sortInventorySnapshot(items []InventoryItemSnapshot) {
-	slices.SortFunc(items, compareInventoryItems)
 }
 
 // compareInventoryItems orders two widget entries: the equipped gear
-// first, then the item id, the object id breaks the ties.
+// first, then the item id, the object id breaks the ties. It doubles as
+// the canonical order comparator of the dense inventory store.
 func compareInventoryItems(
-	a InventoryItemSnapshot, b InventoryItemSnapshot,
+	a InventoryItem, b InventoryItem,
 ) int {
 	if a.Equipped != b.Equipped {
 		if a.Equipped {

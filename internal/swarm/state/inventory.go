@@ -103,10 +103,7 @@ type InventoryStats struct {
 func (b *Bot) ApplyItemList(items []InventoryItem) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	clear(b.inventory)
-	for _, item := range items {
-		b.inventory[item.ObjectID] = item
-	}
+	b.inventory.replaceLocked(items)
 	b.inventoryVersion++
 	b.touch()
 	b.recordLocked("inventory listed: " + strconv.Itoa(len(items)) + " items")
@@ -134,21 +131,21 @@ func (b *Bot) PaperdollSlotObjectIDs() [PaperdollSlots]int32 {
 }
 
 // InventoryItems returns a copy of every tracked inventory item: the
-// equipped gear and the carried items together. The gear managers use
-// it as their working set.
+// equipped gear and the carried items together, in the canonical
+// widget order of the dense store. The gear managers use it as their
+// working set.
 func (b *Bot) InventoryItems() []InventoryItem {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	items := make([]InventoryItem, 0, len(b.inventory))
-	for _, item := range b.inventory {
-		items = append(items, item)
-	}
+	items := make([]InventoryItem, len(b.inventory.items))
+	copy(items, b.inventory.items)
 
 	return items
 }
 
 // ApplyInventoryUpdate applies added, modified and removed inventory
-// items from the InventoryUpdate packet.
+// items from the InventoryUpdate packet. The batch restores the
+// canonical order once at its end (see inventoryStore).
 func (b *Bot) ApplyInventoryUpdate(items []InventoryItem) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -156,7 +153,7 @@ func (b *Bot) ApplyInventoryUpdate(items []InventoryItem) {
 	for _, item := range items {
 		switch item.Change {
 		case 1, 2:
-			existing, ok := b.inventory[item.ObjectID]
+			previous, ok := b.inventory.upsertLocked(item)
 			if !ok {
 				changed = true
 				b.recordLocked("received " + inventoryItemName(item))
@@ -166,19 +163,18 @@ func (b *Bot) ApplyInventoryUpdate(items []InventoryItem) {
 			// count changes: the version keyed scans of the
 			// hunt loop and the web view refresh both need
 			// every real state change.
-			if !ok || existing != item {
+			if !ok || previous != item {
 				changed = true
 			}
-			b.inventory[item.ObjectID] = item
 		case 3:
-			if _, ok := b.inventory[item.ObjectID]; ok {
+			if b.inventory.removeLocked(item.ObjectID) {
 				changed = true
 				b.recordLocked("lost " + inventoryItemName(item))
 			}
-			delete(b.inventory, item.ObjectID)
 		}
 	}
 	if changed {
+		b.inventory.canonicalizeLocked()
 		b.inventoryVersion++
 		b.touch()
 	}
@@ -202,7 +198,7 @@ func (b *Bot) InventoryVersion() uint64 {
 func (b *Bot) InventoryItemState(objectID int32) (InventoryItem, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	item, ok := b.inventory[objectID]
+	item, ok := b.inventory.lookupLocked(objectID)
 
 	return item, ok
 }
@@ -213,7 +209,7 @@ func (b *Bot) InventoryStats() InventoryStats {
 	defer b.mu.RUnlock()
 	//nolint:exhaustruct // zero value grows inside the loop
 	stats := InventoryStats{
-		Slots:    len(b.inventory),
+		Slots:    len(b.inventory.items),
 		MaxSlots: inventorySlotLimit,
 		Load:     b.char.CurrentLoad,
 		MaxLoad:  b.char.MaxLoad,
@@ -224,7 +220,7 @@ func (b *Bot) InventoryStats() InventoryStats {
 	if stats.MaxLoad > 0 {
 		stats.WeightPercent = float64(stats.Load) / float64(stats.MaxLoad) * 100
 	}
-	for _, item := range b.inventory {
+	for _, item := range b.inventory.items {
 		if item.Type2 == itemType2Adena {
 			stats.Adena += item.Count
 		}
@@ -239,8 +235,8 @@ func (b *Bot) InventoryStats() InventoryStats {
 func (b *Bot) DestroyableItems(limit int) []InventoryItem {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	candidates := make([]InventoryItem, 0, len(b.inventory))
-	for _, item := range b.inventory {
+	candidates := make([]InventoryItem, 0, len(b.inventory.items))
+	for _, item := range b.inventory.items {
 		if item.Equipped || item.Type2 == itemType2Adena {
 			continue
 		}
@@ -286,10 +282,10 @@ func isGearFamily(type2 int16) bool {
 func (b *Bot) SellableItems() []InventoryItem {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	candidates := make([]InventoryItem, 0, len(b.inventory))
+	candidates := make([]InventoryItem, 0, len(b.inventory.items))
 	gearCount := make(map[int32]int)
 	gearKept := make(map[int32]int32)
-	for _, item := range b.inventory {
+	for _, item := range b.inventory.items {
 		if item.Equipped || item.Type2 == itemType2Adena ||
 			item.Type2 == itemType2Quest {
 			continue
