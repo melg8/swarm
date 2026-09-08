@@ -79,6 +79,7 @@ type config struct {
 	webAddress    string
 	hunt          bool
 	pathfindTest  bool
+	testFightUI   bool
 	testFightUIV1 bool
 	geodataDir    string
 	maxPassable   uint
@@ -93,6 +94,7 @@ func parseFlags() config {
 		webAddress:    "",
 		hunt:          false,
 		pathfindTest:  false,
+		testFightUI:   false,
 		testFightUIV1: false,
 		geodataDir:    "",
 		maxPassable:   uint(pathfind.DefaultMaxPassableHeight),
@@ -109,6 +111,11 @@ func parseFlags() config {
 	flag.BoolVar(&cfg.pathfindTest, "pathfind-test", false,
 		"map pathfinding test UI instead of the bot: no game connection, "+
 			"draggable start and end markers show the found path")
+	flag.BoolVar(&cfg.testFightUI, "test-fight-ui", false,
+		"fight FX comparison gallery instead of the bot: no game "+
+			"connection, a horizontal grid of numbered damage "+
+			"visualization variants, each shown with the enemy "+
+			"above, below, left and right of the character")
 	flag.BoolVar(&cfg.testFightUIV1, "test-fight-ui-v1", false,
 		"combat animation variant showcase UI (v1 idea set) instead of the "+
 			"bot: no game connection, a looping hero versus enemy demo fight "+
@@ -293,6 +300,12 @@ func main() {
 	cfg := parseFlags()
 	log.SetOutput(os.Stdout)
 
+	if cfg.testFightUI {
+		runTestFightUI(cfg)
+
+		return
+	}
+
 	if cfg.pathfindTest {
 		runPathfindTest(cfg)
 
@@ -339,6 +352,36 @@ func main() {
 	stop()
 	shutdownWebInterface(web)
 	log.Println("Bot finished")
+}
+
+// runTestFightUI serves the bot less fight FX comparison gallery: the
+// web interface answers with the static variant grid until the process
+// is stopped. No game connection and no geodata is needed - the map
+// background of the gallery cells is the static tile pyramid shipped
+// with the web content.
+func runTestFightUI(cfg config) {
+	if cfg.webAddress == "" {
+		log.Println("Fight FX test needs the web interface, " +
+			"pass a -web address")
+
+		return
+	}
+
+	web := webserver.NewTestFightServer(cfg.webAddress, log.Default())
+	go func() {
+		if err := web.ListenAndServe(); err != nil {
+			log.Println("Web interface failed: " + err.Error())
+		}
+	}()
+
+	log.Println("Fight FX test UI is ready")
+
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+	shutdownWebInterface(web)
+	log.Println("Fight FX test finished")
 }
 
 // runPathfindTest serves the bot less map pathfinding test UI: the geodata

@@ -37,6 +37,13 @@ window.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  if (config && config.mode === "test-fight") {
+    document.body.classList.add("mode-test-fight");
+    FightTest.init();
+
+    return;
+  }
+
   initChat();
   MapView.init();
   refreshBots();

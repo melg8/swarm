@@ -113,6 +113,25 @@ SPDX-License-Identifier: MIT
         <div id="fight-strip" class="fight-strip"></div>
       </section>
 
+      <section id="fight-section" class="fight-section">
+        <div class="fight-bar">
+          <div class="fxg-title">FIGHT FX GALLERY</div>
+          <div class="fxg-sub">hero vs enemy · every cell loops: hero hit → taken hit → hero crit → crit taken · 4 enemy placements × 18 numbered ideas</div>
+          <div class="fight-controls">
+            <button id="fight-pause" class="btn" title="freeze the beat loop">pause</button>
+            <select id="fight-speed" class="fight-select" title="playback speed of the beat loop">
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="2">2x</option>
+            </select>
+            <span class="fight-hint">scroll horizontally · click a variant number to mark it</span>
+          </div>
+        </div>
+        <div class="fight-scroll" id="fight-scroll">
+          <div class="fight-grid" id="fight-grid"></div>
+        </div>
+      </section>
+
       <section id="tab-map" class="tab-content active">
         <div class="map-toolbar">
           <button id="zoom-out" class="btn" title="zoom out">−</button>
@@ -310,6 +329,7 @@ SPDX-License-Identifier: MIT
 <script src="map.js"></script>
 <script src="pathfind.js"></script>
 <script src="fight.js"></script>
+<script src="fighttest.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

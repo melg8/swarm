@@ -31,6 +31,9 @@ var webContent embed.FS
 const (
 	modeBot      = "bot"
 	modePathfind = "pathfind"
+	// modeTestFight is the fight FX comparison gallery mode
+	// (NewTestFightServer): the static cells of the -test-fight-ui flag.
+	modeTestFight = "test-fight"
 	// modeFight is the combat animation variant showcase of the
 	// -test-fight-ui-v1 run: a looping demo fight on every variant.
 	modeFight = "fight"
