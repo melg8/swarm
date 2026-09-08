@@ -70,7 +70,8 @@ func benchSnapshotBot(npcCount int) *state.Bot {
 }
 
 // BenchmarkSnapshotJSON measures the reflection marshal of the full
-// snapshot the event stream sends per version change.
+// snapshot through json.Marshal (the compatibility path: the golden
+// tests and any external caller still marshal this way).
 func BenchmarkSnapshotJSON(b *testing.B) {
 	bot := benchSnapshotBot(200)
 	snapshot := bot.Snapshot()
@@ -87,17 +88,28 @@ func BenchmarkSnapshotJSON(b *testing.B) {
 	}
 }
 
+// BenchmarkSnapshotJSONAppend measures the direct append writer the
+// event stream and the state endpoint use (see Snapshot.AppendJSON).
+func BenchmarkSnapshotJSONAppend(b *testing.B) {
+	bot := benchSnapshotBot(200)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		data := bot.Snapshot().AppendJSON(nil)
+		if len(data) == 0 {
+			b.Fatal("expected json output")
+		}
+	}
+}
+
 // BenchmarkSnapshotJSONBuild measures the snapshot copy plus the
-// marshal together - the true per event cost of the stream.
+// direct encoding together - the true per event cost of the stream.
 func BenchmarkSnapshotJSONBuild(b *testing.B) {
 	bot := benchSnapshotBot(200)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		data, err := json.Marshal(bot.Snapshot())
-		if err != nil {
-			b.Fatal(err)
-		}
+		data := bot.Snapshot().AppendJSON(nil)
 		if len(data) == 0 {
 			b.Fatal("expected json output")
 		}

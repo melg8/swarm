@@ -998,3 +998,26 @@ GitLab download attempts continue until they succeed.
   checkbox; (9) the replacement purchases sell the displaced gear
   first and count its credit; (10) the red screen edge flash is
   removed; (11) the swing feed only records the hits that landed.
+
+- 2026-09-08: the snapshot JSON encoding moved off the reflection
+  path. `state.Snapshot` now carries a hand rolled append writer
+  (`snapshot_json.go` + `snapshot_json_encode.go`): a linear field
+  walk over the flat arrays producing the exact bytes of
+  encoding/json (field order, ES6 float formatting, HTML escaping,
+  RFC3339Nano times, null for nil slices) - pinned byte for byte
+  against the reflection encoder by
+  `TestSnapshotJSONMatchesReflection` and the string/float/time
+  tables over the edge cases (HTML chars, control bytes, U+2028/29,
+  invalid UTF-8, 1e-6/1e21 boundaries). The SSE stream
+  (`writeSnapshotEvent`, the initial event of `streamEvents`), the
+  state endpoint (`handleBotState`) and the SSE event frame
+  (`writeEvent`, one pre-sized buffer) use `AppendJSON` directly;
+  `json.Marshal(Snapshot)` keeps working through `MarshalJSON` for
+  compatibility. Benchmark deltas (200 npc snapshot):
+  stream encode 249 us/104 allocs -> 127 us/4 allocs (2x faster,
+  26x fewer allocations); with the snapshot build 273 us -> 155 us.
+  Profile note: json.Marshal over a MarshalJSON implementation pays
+  a full compacting scan of the output (~450 us for 100 KB), which
+  is why the production paths must call AppendJSON directly.
+  AGENTS.md documents the layout contract. Full suite green, lint
+  0 issues. Pushed as the third atomic commit.

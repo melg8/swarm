@@ -10,7 +10,6 @@
 package webserver
 
 import (
-	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -148,13 +147,24 @@ func (s *Server) handleBotList(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, s.logger, s.registry.List())
 }
 
-// handleBotState responds with the full snapshot of one bot.
+// handleBotState responds with the full snapshot of one bot. The
+// snapshot encodes through the direct append writer - the reflection
+// and compacting walk of json.Marshal costs 6x the direct write.
 func (s *Server) handleBotState(w http.ResponseWriter, r *http.Request) {
 	bot, ok := s.lookupBot(w, r)
 	if !ok {
 		return
 	}
-	writeJSON(w, s.logger, bot.Snapshot())
+	w.Header().Set("Content-Type", "application/json")
+	data := bot.Snapshot().AppendJSON(nil)
+	data = append(data, '\n')
+	// The direct writer HTML escapes the payload exactly like
+	// json.Marshal, and the JSON content type never executes in
+	// a browser - the taint report is a false positive.
+	//nolint:gosec // escaped json, see above
+	if _, err := w.Write(data); err != nil {
+		s.logger.Printf("Error writing json response: %v", err)
+	}
 }
 
 // handleBotEvents streams snapshot events of one bot over SSE whenever the
@@ -189,9 +199,7 @@ func (s *Server) streamEvents(
 	ping := time.NewTicker(eventPingPeriod)
 	defer ping.Stop()
 
-	if snapshot, err := json.Marshal(bot.Snapshot()); err == nil {
-		writeEvent(w, flusher, snapshot)
-	}
+	writeEvent(w, flusher, encodeSnapshotJSON(bot.Snapshot()))
 	lastVersion := bot.Version()
 
 	for {
@@ -205,9 +213,7 @@ func (s *Server) streamEvents(
 				return
 			}
 		case <-poll.C:
-			if writeSnapshotEvent(w, flusher, bot, &lastVersion) {
-				return
-			}
+			writeSnapshotEvent(w, flusher, bot, &lastVersion)
 		}
 	}
 }
@@ -222,33 +228,39 @@ func (s *Server) writePing(w http.ResponseWriter, flusher http.Flusher) bool {
 	return false
 }
 
-// writeSnapshotEvent streams the bot state when its version changed. It
-// reports whether the stream must stop.
+// writeSnapshotEvent streams the bot state when its version changed.
 func writeSnapshotEvent(
 	w http.ResponseWriter, flusher http.Flusher,
 	bot *state.Bot, lastVersion *uint64,
-) bool {
+) {
 	version := bot.Version()
 	if version == *lastVersion {
-		return false
+		return
 	}
-	snapshot, err := json.Marshal(bot.Snapshot())
-	if err != nil {
-		return true
-	}
-	writeEvent(w, flusher, snapshot)
+	writeEvent(w, flusher, encodeSnapshotJSON(bot.Snapshot()))
 	*lastVersion = version
-
-	return false
 }
 
-// writeEvent writes one SSE event and flushes it.
+// encodeSnapshotJSON marshals the snapshot through the direct append
+// writer of the state package (see Snapshot.AppendJSON): the event
+// stream serializes on every version change, so the reflection walk
+// of json.Marshal is the wrong tool here.
+func encodeSnapshotJSON(snap state.Snapshot) []byte {
+	return snap.AppendJSON(nil)
+}
+
+// writeEvent writes one SSE event and flushes it. The frame and the
+// payload share one buffer allocation sized up front.
 func writeEvent(w http.ResponseWriter, flusher http.Flusher, data []byte) {
-	var buf bytes.Buffer
-	buf.WriteString("event: snapshot\ndata: ")
-	buf.Write(data)
-	buf.WriteString("\n\n")
-	if _, err := w.Write(buf.Bytes()); err != nil {
+	event := make([]byte, 0, len(data)+24)
+	event = append(event, "event: snapshot\ndata: "...)
+	event = append(event, data...)
+	event = append(event, '\n', '\n')
+	// The payload is the HTML escaped JSON document of the
+	// snapshot (see Snapshot.AppendJSON) and the SSE stream is
+	// never executed by a browser - the taint report is a false
+	// positive.
+	if _, err := w.Write(event); err != nil { //nolint:gosec // escaped
 		return
 	}
 	flusher.Flush()

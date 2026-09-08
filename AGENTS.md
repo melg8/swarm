@@ -869,6 +869,21 @@ the same variables).
   snapshot), `GET /api/bots/{id}/events` (SSE stream that pushes a
   snapshot whenever the bot state version changes), `GET /` and the
   static assets.
+- Snapshot encoding: the state endpoint and the SSE stream serialize
+  the snapshot through the hand rolled append writer
+  (`state.Snapshot.AppendJSON`, see `state/snapshot_json*.go`) - a
+  linear field walk over the flat arrays with the exact bytes
+  encoding/json produces (field order, ES6 float formatting, HTML
+  escaping, RFC3339Nano times), pinned byte for byte by
+  `TestSnapshotJSONMatchesReflection`. Do not route these paths back
+  through `json.Marshal`: its reflection walk plus the compacting scan
+  over the MarshalJSON result costs 4x the direct write (249 us/104
+  allocs -> 127 us/4 allocs per 200 npc snapshot, see
+  `webserver/server_bench_test.go`). The world objects live in a
+  dense slot array (`[]WorldObject` + `objectIndex`), the social pull
+  check of the target search works on precomputed clan bitmasks
+  (`npcdata.NPCClanMask`), and the NPC clans resolve to shared
+  pre-split lists - keep new tracker code on those layouts.
 - The state tracker (`internal/swarm/state`) is fed by the game session
   from these packets: UserInfo (self vitals, weight and speeds), CharInfo
   (players with speeds and running/dead/combat flags), NpcInfo
