@@ -33,6 +33,20 @@ const (
 	bufferInitialSize = 4096
 )
 
+// Character selection constants. The server drops a CharacterSelect
+// silently when it races the creation flow: the updated char list is
+// written before the server side char selection cache is updated, so a
+// select that arrives in that window finds no character and is ignored
+// without any answer. The wait for the CharSelected answer is therefore
+// bounded and the selection retransmitted; the server flood protector
+// allows one select per 3 seconds (30 game ticks of 100 ms), which the
+// 5 second wait between attempts respects.
+const (
+	charSelectWait     = 5 * time.Second
+	charSelectAttempts = 3
+	charCreateOkWait   = 2 * time.Second
+)
+
 // Packet ids used by the game flow state machine.
 const (
 	charSelectInfoID  = 0x1F
@@ -643,8 +657,58 @@ func (gc *GameClient) EnsureCharacter(
 			return nil, err
 		}
 		if done {
+			// The updated list precedes the trailing CharCreateOk on the
+			// wire (the server writes the list from inside the creation
+			// handler and the ok after it returns). Draining the ok with a
+			// bounded wait guarantees the server side char selection cache
+			// is populated before the next packet selection runs, which
+			// closes the silent drop race of a fast client.
+			gc.drainCharCreateOk()
+
 			return updated, nil
 		}
+	}
+}
+
+// drainCharCreateOk consumes the CharCreateOk packet that follows the
+// updated character list of a successful creation. The packet always
+// follows (the server writes it last), so a bounded wait drains it; a
+// lost packet only costs the selection retry of EnterWorld.
+func (gc *GameClient) drainCharCreateOk() {
+	deadline := time.Now().Add(charCreateOkWait)
+	if err := gc.conn.SetReadDeadline(deadline); err != nil {
+		gc.logger.Printf("Failed to set the char create ok deadline: %v", err)
+
+		return
+	}
+
+	for {
+		payload, err := gc.readPacket(gc.readBuf)
+		if err != nil {
+			gc.readBuf = nil
+			if !errors.Is(err, os.ErrDeadlineExceeded) {
+				gc.logger.Printf("Failed to drain the char create ok: %v", err)
+
+				return
+			}
+			gc.logger.Println("Char create ok not drained in time, " +
+				"the selection retry will cover it")
+
+			return
+		}
+		gc.readBuf = payload
+		if len(payload) == 0 {
+			continue
+		}
+		if payload[0] == charCreateOkID {
+			gc.logger.Println("Character create confirmed")
+
+			break
+		}
+	}
+
+	if err := gc.conn.SetReadDeadline(time.Time{}); err != nil {
+		gc.logger.Printf("Failed to reset the char create ok deadline: %v", err)
 	}
 }
 
@@ -720,32 +784,31 @@ func (gc *GameClient) handleUpdatedCharList(
 
 // EnterWorld selects the character slot and requests world entry.
 func (gc *GameClient) EnterWorld(slot int32) error {
-	if err := gc.sendPacket(
-		&togameserver.CharacterSelect{CharSlot: slot}); err != nil {
-		return fmt.Errorf("failed to send character select: %w", err)
-	}
-
-	// Wait for the char selected packet that allows entering the world.
+	// The selection is retransmitted when the server drops it
+	// silently (see the charSelectWait constants): the wait is
+	// bounded, the select is resent and only repeated failures give
+	// up (the reconnect supervisor then rebuilds the session).
 	var selected fromgameserver.CharSelectedPacket
-	for {
-		payload, err := gc.readPacket(gc.readBuf)
-		if err != nil {
-			return fmt.Errorf("failed to read character selected: %w", err)
+	for attempt := 1; attempt <= charSelectAttempts; attempt++ {
+		if err := gc.sendPacket(
+			&togameserver.CharacterSelect{CharSlot: slot}); err != nil {
+			return fmt.Errorf("failed to send character select: %w", err)
 		}
-		gc.readBuf = payload
-		if len(payload) == 0 {
-			continue
-		}
-		if payload[0] == charSelectedID {
-			if err := fromgameserver.ParseCharSelectedPacket(
-				&selected, payload); err != nil {
-				return fmt.Errorf("failed to parse char selected: %w", err)
-			}
-			gc.trackerApplySelection(&selected)
 
+		answered, err := gc.awaitCharSelected(&selected)
+		if err != nil {
+			return err
+		}
+		if answered {
 			break
 		}
-		gc.logger.Printf("Ignoring packet id 0x%02x while entering world", payload[0])
+		if attempt == charSelectAttempts {
+			return errors.New("the server did not answer the character " +
+				"selection after " + strconv.Itoa(charSelectAttempts) +
+				" attempts")
+		}
+		gc.logger.Printf("CharSelected did not arrive (attempt %d), "+
+			"reselecting in %s", attempt, charSelectWait)
 	}
 	gc.logger.Println("Selected character " + selected.Name)
 
@@ -755,6 +818,52 @@ func (gc *GameClient) EnterWorld(slot int32) error {
 	gc.logger.Println("Sent enter world request")
 
 	return nil
+}
+
+// awaitCharSelected waits for the CharSelected packet that allows
+// entering the world, bounded by charSelectWait. It reports whether the
+// answer arrived; unrelated packets are ignored like before.
+func (gc *GameClient) awaitCharSelected(
+	selected *fromgameserver.CharSelectedPacket,
+) (bool, error) {
+	if err := gc.conn.SetReadDeadline(time.Now().Add(charSelectWait)); err != nil {
+		return false, fmt.Errorf(
+			"failed to set the char select deadline: %w", err)
+	}
+
+	for {
+		payload, err := gc.readPacket(gc.readBuf)
+		if err != nil {
+			gc.readBuf = nil
+			if errors.Is(err, os.ErrDeadlineExceeded) {
+				return false, nil
+			}
+
+			return false, fmt.Errorf(
+				"failed to read character selected: %w", err)
+		}
+		gc.readBuf = payload
+		if len(payload) == 0 {
+			continue
+		}
+		if payload[0] == charSelectedID {
+			if err := fromgameserver.ParseCharSelectedPacket(
+				selected, payload); err != nil {
+				return false, fmt.Errorf(
+					"failed to parse char selected: %w", err)
+			}
+			gc.trackerApplySelection(selected)
+
+			if resetErr := gc.conn.SetReadDeadline(time.Time{}); resetErr != nil {
+				gc.logger.Printf(
+					"Failed to reset the char select deadline: %v",
+					resetErr)
+			}
+
+			return true, nil
+		}
+		gc.logger.Printf("Ignoring packet id 0x%02x while entering world", payload[0])
+	}
 }
 
 // trackerApplySelection feeds the selected character state to the tracker.
