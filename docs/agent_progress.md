@@ -119,6 +119,58 @@ headers, testify, go test + golangci-lint green.
   errors), ReadFloat64 (the round trip through WriteInt64 plus the empty
   and truncated errors), ReadInt16 with a single byte and NewWriterTo
   (appends to seeded data and reads back). Lint clean.
+- 2026-09-08: from_game_server 71.0% -> 98.6% -
+  change_wait_type_test.go pins the ChangeWaitType parse (sitting,
+  standing, the fake death default, wrong id, both truncations) and the
+  CharCreateOk/ReasonText paths (all eight reason texts, the missing
+  key packet result byte and tail). parse_error_paths_test.go sweeps
+  every strict prefix of a valid packet through every parser family:
+  a truncated packet must error, never parse and never panic (targets,
+  rotations, teleport, social action, auto attack, delete/move/stop/
+  validate, drop/spawn/get item, status update, net ping, attack with
+  hits, char selected, char select info, user info, npc info, inventory
+  update, system message with the typed parameters); CharInfo pins the
+  optional clan/flag tail (cut keeps the defaults); the ItemList
+  truncated entry stops the list without an error; ForEach caps the
+  stored attributes; the implausible system message counts reject.
+- 2026-09-08: state 76.0% -> 94.0% - bot_accessors_test.go covers the
+  self accessors (object id, position with and without a character,
+  walking, sitting, level, exp, under attack, dead), the object
+  accessors (position, name, alive, health percent with and without
+  vitals), ApplyWaitType (self transitions, other objects ignored),
+  ApplyItemInfo + GroundItemByID (found, non item, removed),
+  SetHuntingZone/SetHuntingZones, CountPacket, NearestAttacker (the
+  closest chaser, none), ZoneHasAttackable (nil, empty, dead),
+  NearestNpcByTemplates, MedianZoneMobLevel (nil, empty, median, out of
+  square), the command queue (order, overflow drops the oldest, drain),
+  ApplyPaperdoll/PaperdollSlotObjectIDs/InventoryItems,
+  DestroyableItems ranking (destroyRank through the sort comparator),
+  the ApplyAutoAttack self/unknown branches, ApplyStatusUpdate level
+  and load attributes and the object separation.
+- 2026-09-08: webserver 66.3% -> 94.3% - pathfind_api_test.go covers
+  the pathfind HTTP API end to end over a synthetic flat region
+  (GET /api/config with and without the view override, POST
+  /api/pathfind found / missing cell error / invalid json, the geodata
+  tile cache hit, the missing region 404, the bad tile parameters),
+  toResponsePoints and downsample (short path untouched, oversized
+  path keeps the shape), the geodata tile LRU cache itself (hit
+  reorder, repeated put, eviction of the untouched key), the bot mode
+  /api/config, Address, the SSE helpers (writePing and its write
+  failure, writeSnapshotEvent unchanged/changed/no-repeat), the
+  streamEvents flusher requirement, the poll driven second event, the
+  shutdown closing active streams, writeJSON encode failure logging,
+  the icon pack detection without a pack (404 serving), the zone
+  command validation and the describeCommand fallback.
+- 2026-09-08: round complete. Full verification: go vet ./..., go test
+  ./... -count=1 green, golangci-lint run 0 issues. Coverage before ->
+  after (go test ./... -cover, Go 1.24.4): packet 75.0 -> 97.8,
+  from_game_server 71.0 -> 98.6, state 76.0 -> 94.0, webserver 66.3 ->
+  94.3. Consciously left: the unreachable bytes.Buffer writer error
+  branches of to_game_server (64.5) and to_auth_server (78.1) - the
+  decision of the first round holds; npcdata and cmd/* stay generated/
+  main packages by design.
+
+### Status: coverage round 2 done
 
 ## Active task: test coverage round (the weakest packages)
 
