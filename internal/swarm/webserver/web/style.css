@@ -324,6 +324,107 @@ body {
 .bot-chip.chip-combat { color: var(--red); border: 1px solid var(--red); }
 .bot-chip.chip-rest { color: var(--green); border: 1px solid var(--green); }
 
+/* Activity banner of the sidebar bot row: a compact one line summary
+   of the bot phase so the overview shows at a glance what every
+   session is doing (hunting, walking to town, selling, deleveling).
+   The kind-* classes color the row by activity, mirroring the bot
+   status banner of the map. */
+.bot-activity {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text-dim);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--bg-panel-2);
+  border-left: 3px solid var(--gray);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bot-activity.kind-hunt { color: var(--green); border-left-color: var(--green); }
+.bot-activity.kind-combat { color: var(--red); border-left-color: var(--red); }
+.bot-activity.kind-loot { color: var(--accent); border-left-color: var(--accent); }
+.bot-activity.kind-town { color: var(--gold); border-left-color: var(--gold); }
+.bot-activity.kind-return { color: var(--blue); border-left-color: var(--blue); }
+.bot-activity.kind-delevel { color: var(--violet); border-left-color: var(--violet); }
+.bot-activity.kind-user { color: var(--accent); border-left-color: var(--accent); }
+.bot-activity.kind-idle { color: var(--text-dim); border-left-color: var(--gray); }
+.bot-activity.kind-connecting { color: var(--text-dim); border-left-color: var(--gray); }
+.bot-activity.kind-offline { color: var(--red); border-left-color: var(--red); }
+
+/* Floating bot status banner on the map: a compact chip pinned to the
+   top center of the map showing the current activity of the active
+   bot (hunting, walking to town, selling, deleveling). The data-kind
+   attribute colors the banner by activity; the dot pulses while the
+   bot is active so the banner reads as live even at a glance. */
+.bot-status {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  max-width: 60%;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.bot-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gray);
+  flex-shrink: 0;
+  animation: bot-status-pulse 1.6s ease-in-out infinite;
+}
+
+.bot-status-text {
+  font-weight: 700;
+  color: var(--text-bright);
+  letter-spacing: 0.3px;
+}
+
+.bot-status-detail {
+  color: var(--text-dim);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes bot-status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.25); }
+}
+
+.bot-status[data-kind="hunt"] .bot-status-dot { background: var(--green); }
+.bot-status[data-kind="combat"] .bot-status-dot { background: var(--red); }
+.bot-status[data-kind="loot"] .bot-status-dot { background: var(--accent); }
+.bot-status[data-kind="town"] .bot-status-dot { background: var(--gold); }
+.bot-status[data-kind="return"] .bot-status-dot { background: var(--blue); }
+.bot-status[data-kind="delevel"] .bot-status-dot { background: var(--violet); }
+.bot-status[data-kind="user"] .bot-status-dot { background: var(--accent); }
+.bot-status[data-kind="idle"] .bot-status-dot { background: var(--gray); animation: none; }
+.bot-status[data-kind="connecting"] .bot-status-dot { background: var(--text-dim); }
+.bot-status[data-kind="offline"] .bot-status-dot { background: var(--red); animation: none; }
+.bot-status[data-kind="online"] .bot-status-dot { background: var(--green); animation: none; }
+
+/* The pathfind test mode hides the bot status banner (no bot, no
+   activity); the body.mode-pathfind class on the index page toggles
+   it together with the other bot only panels. */
+body.mode-pathfind .bot-status { display: none; }
+
 .hidden { display: none; }
 
 .sidebar-foot { padding: 10px 12px; border-top: 1px solid var(--border-soft); }

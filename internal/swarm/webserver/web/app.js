@@ -127,6 +127,19 @@ function renderBotList() {
     row.append(level);
     item.append(row);
 
+    // The activity banner of the sidebar row: a compact one line
+    // summary of the bot phase so the overview shows at a glance
+    // what every session is doing (hunting, walking to town,
+    // selling, deleveling). Hidden when no phase is published
+    // (the manual only sessions and the pre-world sessions).
+    const activity = botActivityLabel(bot);
+    if (activity) {
+      const act = document.createElement("div");
+      act.className = "bot-activity kind-" + activity.kind;
+      act.textContent = activity.text;
+      item.append(act);
+    }
+
     // The mini HP/MP/XP bars share the HUD palette: one look at the
     // sidebar shows what every session is doing.
     if (bot.status === "online") {
@@ -135,6 +148,47 @@ function renderBotList() {
 
     item.addEventListener("click", () => selectBot(bot.id));
     list.append(item);
+  }
+}
+
+// botActivityLabel mirrors phaseLabel for the compact BotInfo payload
+// of the sidebar list: it maps the bot phase to a short text the
+// overview row shows under the name. Returns null when no phase is
+// published (the manual only sessions never set it) so the row
+// stays compact.
+function botActivityLabel(bot) {
+  const status = bot.status;
+  if (status === "offline") {
+    return { kind: "offline", text: "offline" };
+  }
+  if (status === "connecting") {
+    return { kind: "connecting", text: "connecting" };
+  }
+  const phase = bot.phase || "";
+  switch (phase) {
+  case "engage":
+    return { kind: "hunt",
+      text: bot.inCombat ? "hunting · combat" : "hunting" };
+  case "loot":
+    return { kind: "loot", text: "looting" };
+  case "townWalk":
+    return { kind: "town", text: "walking to town" };
+  case "townSell":
+    return { kind: "town", text: "selling" };
+  case "townReturn":
+    return { kind: "return", text: "walking to farm spot" };
+  case "delevel":
+    return { kind: "delevel", text: "deleveling" };
+  case "user":
+    if (bot.inCombat) {
+      return { kind: "combat", text: "manual · attacking" };
+    }
+
+    return { kind: "user", text: "manual" };
+  case "idle":
+    return { kind: "idle", text: "idle" };
+  default:
+    return null;
   }
 }
 
@@ -225,7 +279,101 @@ function renderSnapshot() {
   renderChat(snap);
   renderLog(snap);
   renderFooter(snap);
+  renderBotStatus(snap);
   MapView.update(snap);
+}
+
+// phaseLabel maps the hunt loop phase (snap.phase, the same string the
+// hunt package uses internally: engage, loot, townWalk, townSell,
+// townReturn, delevel, user, idle) to a short human readable activity
+// text. The session status (snap.status: connecting, online, offline)
+// takes precedence when the loop has not published a phase yet - a
+// manual only session never sets the phase, so its banner stays on
+// the status text. The label is the headline of the bot status
+// banner; the detail adds the next step (e.g. "selling junk at the
+// trader", "walking back to the farm spot") so the user sees at a
+// glance what every bot is doing right now.
+function phaseLabel(snap) {
+  const status = snap.status;
+  if (status === "offline") {
+    return { kind: "offline", text: "offline", detail: "session ended" };
+  }
+  if (status === "connecting") {
+    return { kind: "connecting", text: "connecting",
+      detail: "logging in to the world" };
+  }
+  const c = snap.character || {};
+  const phase = snap.phase || "";
+  switch (phase) {
+  case "engage":
+    if (c.inCombat) {
+      return { kind: "combat", text: "hunting",
+        detail: "fighting a target in the zone" };
+    }
+    return { kind: "hunt", text: "hunting",
+      detail: "looking for the next target" };
+  case "loot":
+    return { kind: "loot", text: "looting",
+      detail: "picking up the drops of the last kill" };
+  case "townWalk":
+    return { kind: "town", text: "walking to town",
+      detail: "heading to the trader to sell junk" };
+  case "townSell":
+    return { kind: "town", text: "selling",
+      detail: "selling the inventory at the trader" };
+  case "townReturn":
+    return { kind: "return", text: "walking to farm spot",
+      detail: "heading back to the hunting zone" };
+  case "delevel":
+    return { kind: "delevel", text: "deleveling",
+      detail: "dying at the town guards to drop levels" };
+  case "user":
+    return userPhaseLabel(snap);
+  case "idle":
+    return { kind: "idle", text: "idle",
+      detail: "waiting for a manual command" };
+  default:
+    return { kind: "online", text: status || "online", detail: "" };
+  }
+}
+
+// userPhaseLabel describes the manual command the loop is executing:
+// a move, an attack or a pickup. The bot widget banner shows the
+// activity so the user sees their click took effect.
+function userPhaseLabel(snap) {
+  // The snapshot does not carry the manual command kind directly,
+  // so the label stays on the generic "manual" text. The combat and
+  // sitting chips of the HUD already cover the in-fight and rest
+  // states, the banner adds the manual mode context.
+  const c = snap.character || {};
+  if (c.inCombat) {
+    return { kind: "combat", text: "manual · attacking",
+      detail: "fighting the manually selected target" };
+  }
+  if (c.moving) {
+    return { kind: "user", text: "manual · moving",
+      detail: "walking to the clicked destination" };
+  }
+  return { kind: "user", text: "manual",
+    detail: "executing a manual command" };
+}
+
+// renderBotStatus updates the floating activity banner of the bot
+// widget: a compact chip pinned to the top of the map (the HUD
+// stack area) that shows the current activity (hunting, walking to
+// town, selling, deleveling, manual move). The banner uses the
+// phase the hunt loop publishes through snap.phase; a manual only
+// session falls back to the session status.
+function renderBotStatus(snap) {
+  const banner = document.getElementById("bot-status");
+  if (!banner) { return; }
+  const label = phaseLabel(snap);
+  banner.dataset.kind = label.kind;
+  banner.classList.toggle("hidden", false);
+  const text = document.getElementById("bot-status-text");
+  if (text) { text.textContent = label.text; }
+  const detail = document.getElementById("bot-status-detail");
+  if (detail) { detail.textContent = label.detail || ""; }
 }
 
 // ---- hunting zones panel ----

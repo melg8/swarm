@@ -19,7 +19,10 @@ SPDX-License-Identifier: MIT
 // - the HP and MP bars render cur/max values into the fill and text,
 //   and show "—" while the server maximum is unknown;
 // - renderHUD no longer writes the target into the character panel
-//   (renderTarget owns the target panel).
+//   (renderTarget owns the target panel);
+// - the bot status banner maps the hunt loop phase to a human readable
+//   activity (hunting, walking to town, selling, deleveling) and the
+//   data-kind attribute colors the banner by activity.
 //
 // Usage: node tools/repro_hud.js [--app <app.js>]
 // Exit code 0 = HUD rendering is correct, 1 = bug reproduced.
@@ -42,6 +45,7 @@ function makeElement() {
         value: "",
         checked: true,
         children: [],
+        dataset: {},
         append: function (...added) {
             for (const child of added) { this.children.push(child); }
         },
@@ -122,7 +126,11 @@ function loadAppJs(appFile) {
         " ChatWindow: typeof ChatWindow === 'undefined'" +
         " ? undefined : ChatWindow," +
         " renderHUD: typeof renderHUD === 'function'" +
-        " ? renderHUD : undefined };",
+        " ? renderHUD : undefined," +
+        " renderBotStatus: typeof renderBotStatus === 'function'" +
+        " ? renderBotStatus : undefined," +
+        " phaseLabel: typeof phaseLabel === 'function'" +
+        " ? phaseLabel : undefined };",
         sandbox);
 
     return { hud: sandbox.__hud, elements, sandbox };
@@ -363,6 +371,106 @@ function main() {
                 scrollHeight: 500 }),
             "bottom detection broken");
         elements.set("chat-list", chatList);
+    }
+
+    // The bot status banner maps the hunt loop phase to a human
+    // readable activity and the data-kind attribute colors the banner
+    // by activity. Every phase of the hunt loop must resolve to a
+    // label and a kind so the banner reads correctly.
+    sandbox.document.getElementById("bot-status");
+    sandbox.document.getElementById("bot-status-text");
+    sandbox.document.getElementById("bot-status-detail");
+    if (typeof hud.renderBotStatus !== "function") {
+        check(results, "renderBotStatus writes the activity text",
+            false, "renderBotStatus is missing from app.js");
+        check(results, "renderBotStatus colors the banner by activity",
+            false, "renderBotStatus is missing from app.js");
+        check(results, "renderBotStatus falls back to status text",
+            false, "renderBotStatus is missing from app.js");
+    } else {
+        const baseSnap = {
+            status: "online",
+            character: { inCombat: false, moving: false },
+            phase: ""
+        };
+        const cases = [
+            { phase: "engage", inCombat: false, wantKind: "hunt",
+                wantText: "hunting" },
+            { phase: "engage", inCombat: true, wantKind: "combat",
+                wantText: "hunting" },
+            { phase: "loot", inCombat: false, wantKind: "loot",
+                wantText: "looting" },
+            { phase: "townWalk", inCombat: false, wantKind: "town",
+                wantText: "walking to town" },
+            { phase: "townSell", inCombat: false, wantKind: "town",
+                wantText: "selling" },
+            { phase: "townReturn", inCombat: false, wantKind: "return",
+                wantText: "walking to farm spot" },
+            { phase: "delevel", inCombat: false, wantKind: "delevel",
+                wantText: "deleveling" },
+            { phase: "user", inCombat: false, moving: true,
+                wantKind: "user", wantText: "manual · moving" },
+            { phase: "user", inCombat: true, wantKind: "combat",
+                wantText: "manual · attacking" },
+            { phase: "idle", inCombat: false, wantKind: "idle",
+                wantText: "idle" }
+        ];
+        let allLabels = true;
+        for (const c of cases) {
+            const snap = Object.assign({}, baseSnap, {
+                phase: c.phase,
+                character: { inCombat: c.inCombat, moving: c.moving }
+            });
+            const label = hud.phaseLabel(snap);
+            const labelOk = label && label.kind === c.wantKind &&
+                label.text === c.wantText;
+            check(results,
+                "phaseLabel " + c.phase +
+                (c.inCombat ? " combat" : c.moving ? " moving" : "") +
+                " -> " + c.wantKind + " / " + c.wantText,
+                Boolean(labelOk),
+                "got " + JSON.stringify(label));
+            if (!labelOk) { allLabels = false; }
+            hud.renderBotStatus(snap);
+            const banner = elements.get("bot-status");
+            const textOk = elements.get("bot-status-text").textContent
+                === c.wantText;
+            const kindOk = banner.dataset.kind === c.wantKind;
+            check(results,
+                "renderBotStatus " + c.phase + " writes text and kind",
+                textOk && kindOk,
+                "text=" + JSON.stringify(
+                    elements.get("bot-status-text").textContent) +
+                " kind=" + JSON.stringify(banner.dataset.kind));
+            if (!textOk || !kindOk) { allLabels = false; }
+        }
+        check(results, "every hunt phase resolves to a label",
+            allLabels, "see the case failures above");
+
+        // The session status takes precedence when no phase is
+        // published (the manual only sessions never set it): the
+        // banner falls back to the connecting and offline status.
+        const connecting = hud.phaseLabel({ status: "connecting" });
+        check(results, "connecting status banner",
+            connecting.kind === "connecting" &&
+            connecting.text === "connecting",
+            "got " + JSON.stringify(connecting));
+        const offline = hud.phaseLabel({ status: "offline" });
+        check(results, "offline status banner",
+            offline.kind === "offline" && offline.text === "offline",
+            "got " + JSON.stringify(offline));
+
+        // The detail line carries the human readable description so
+        // the user sees what every activity means at a glance.
+        const detailSnap = Object.assign({}, baseSnap, {
+            phase: "townSell"
+        });
+        hud.renderBotStatus(detailSnap);
+        const detailText = elements.get("bot-status-detail")
+            .textContent;
+        check(results, "renderBotStatus carries the detail text",
+            typeof detailText === "string" && detailText.length > 0,
+            "got " + JSON.stringify(detailText));
     }
 
     let failed = 0;
