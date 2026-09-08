@@ -77,6 +77,12 @@ tasks:
     cmds:
       - go test ./...
 
+  test:race:
+    desc: Runs the test suite under the race detector (needs cgo/gcc, the race tests of connection and pathfind target the 2026-09-08 send and layer pool races)
+    aliases: [tr]
+    cmds:
+      - CGO_ENABLED=1 go test ./... -race -count=1
+
   test:cover:
     desc: Runs test suite with coverage
     aliases: [tc]

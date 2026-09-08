@@ -4,6 +4,10 @@
 
 package pathfind
 
+import (
+	"sync"
+)
+
 // NSWE wall flags of a cell layer, following the Mobius Cell.java bit
 // layout: east bit 0, west bit 1, south bit 2, north bit 3. A set bit
 // means the direction is open (walkable).
@@ -41,8 +45,12 @@ func (l Layer) IsCompletelyOpen() bool { return l.NSWE == nsweAll }
 // once per engine and cells reference them by a small id. Real regions
 // contain only a few thousand distinct layers, so this cuts the memory
 // of the parsed data several fold (the original uses the same trick in
-// its LayerFactory).
+// its LayerFactory). The pool is shared by every region of the engine:
+// parsing a region interns under the engine lock while searches of the
+// already loaded regions read through get without it, so the pool
+// guards itself.
 type layerPool struct {
+	mu     sync.RWMutex
 	ids    map[layerKey]uint16
 	layers []Layer
 }
@@ -56,6 +64,7 @@ type layerKey struct {
 // newLayerPool creates an empty layer pool.
 func newLayerPool() *layerPool {
 	return &layerPool{
+		mu:     sync.RWMutex{},
 		ids:    make(map[layerKey]uint16),
 		layers: make([]Layer, 0, 4096),
 	}
@@ -64,6 +73,8 @@ func newLayerPool() *layerPool {
 // intern returns the pool id of the layer, adding it on first use.
 func (p *layerPool) intern(layer Layer) uint16 {
 	key := layerKey{height: layer.Height, nswe: layer.NSWE}
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if id, ok := p.ids[key]; ok {
 		return id
 	}
@@ -76,5 +87,8 @@ func (p *layerPool) intern(layer Layer) uint16 {
 
 // get returns the layer of a pool id.
 func (p *layerPool) get(id uint16) Layer {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	return p.layers[id]
 }

@@ -468,7 +468,11 @@ func (gc *GameClient) WalkTo(x int32, y int32, z int32) error {
 	return nil
 }
 
-// sendPacket serializes, encrypts and sends a game server packet.
+// sendPacket serializes, encrypts and sends a game server packet. The
+// encryption and the wire write share one critical section: the game
+// cipher is a stateful rolling XOR chain, so the encryption order must
+// match the wire order exactly (the run loop and the client action
+// callers run on different goroutines).
 func (gc *GameClient) sendPacket(data crypt.Serializable) error {
 	writer := packet.NewWriter()
 	if err := data.ToBytes(writer); err != nil {
@@ -478,10 +482,10 @@ func (gc *GameClient) sendPacket(data crypt.Serializable) error {
 		gc.logger.Printf("Sent packet id 0x%02x", writer.Bytes()[0])
 	}
 
-	gc.crypt.Encrypt(writer.Bytes())
-
 	gc.writeMu.Lock()
 	defer gc.writeMu.Unlock()
+	gc.crypt.Encrypt(writer.Bytes())
+
 	if err := gc.conn.SetWriteDeadline(
 		time.Now().Add(gameWriteTimeout)); err != nil {
 		return fmt.Errorf("failed to set write deadline: %w", err)
