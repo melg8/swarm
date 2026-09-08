@@ -747,9 +747,9 @@ func (l *Loop) engagesOnZoneEntry() bool {
 	if now.Sub(l.lastHit) < selectPeriod {
 		return false
 	}
-	pick, ok := l.tracker.NearestAttackableConstrained(
+	pick, ok := l.tracker.NearestAttackablePreferred(
 		attackNearestRange, zone, l.activeSkips(now),
-		l.maxTargetLevel(), true)
+		l.maxTargetLevel(), true, l.zoneMobPriority)
 	if !ok {
 		return false
 	}

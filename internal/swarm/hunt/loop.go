@@ -384,6 +384,15 @@ type Loop struct {
 	// zones.go): the timestamp the square turned mob-less, zero while
 	// mobs remain or the character fights, rests or walks.
 	zoneEmptySince time.Time
+	// zoneEmptyUntil holds the empty cooldown of the rotated-away
+	// squares (see zones.go): the zone stays out of the rotation
+	// contest until its expiry so the sweep moves forward through
+	// the band instead of ping ponging between two squares.
+	zoneEmptyUntil map[string]time.Time
+	// zoneMobPriority holds the engage bias of the picked zone (see
+	// zones.go): the template id to priority map built from the mob
+	// list of the active ground, nil for zones without mob data.
+	zoneMobPriority map[int32]int32
 	// The pending server confirmation of the last inventory
 	// action (see markInventoryAction and gateInventoryCommand).
 	userPendingItem  int32
@@ -464,6 +473,8 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		zoneDeathCap:      -1,
 		zoneDeathLevel:    0,
 		zoneEmptySince:    time.Time{},
+		zoneEmptyUntil:    nil,
+		zoneMobPriority:   nil,
 		zoneReturn:        false,
 		zoneFails:         0,
 		delevelTarget:     0,
@@ -913,9 +924,9 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		if now.Sub(l.lastHit) < selectPeriod {
 			return
 		}
-		pick, ok := l.tracker.NearestAttackableConstrained(
+		pick, ok := l.tracker.NearestAttackablePreferred(
 			attackNearestRange, l.zone(), l.activeSkips(now),
-			l.maxTargetLevel(), true)
+			l.maxTargetLevel(), true, l.zoneMobPriority)
 		if !ok {
 			if l.walkToFarTarget(now) {
 				return

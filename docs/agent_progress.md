@@ -4,6 +4,107 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: spawn-true hunting zones, all-mob farming, rotation sweep
+
+Started: 2026-09-08. Branch: `mobius-c1-client-1`. Commits as melg8,
+pushed as they land. The stack was deployed and verified first
+(ports 2106/7777/3306, 75 tables, STACK_READY).
+
+### Goal
+
+The user reported three problems of the multi zone hunting: (1) most
+hunting squares sit "past" the real points where the main mob groups
+stand on the live server - suspecting the mob movement off the spawn
+point; (2) the rotation ping pongs - zone A empty, the bot walks to B,
+B is empty too, it walks back to A (still empty) instead of moving on
+to C; (3) the zones must farm ALL mobs that live on the ground, not
+just one species (killing only orcs in a square where goblins stand
+in the same radius is pointless; per-mob priorities are acceptable).
+
+### Root cause analysis
+
+- The Mobius spawn mechanism is the key: `Spawn.initializeNpc` rolls
+  every npc at a uniformly random point of the territory polygon
+  (`NpcSpawnTerritory.getRandomPoint`), the random walk keeps the mob
+  inside the polygon (AttackableAI checks `isInsideZone` for every
+  wander target) and `MaxDriftRange = 300` leashes the rest (the
+  WorldRegion teleports a mob back to its spawn once it drifted too
+  far and the region emptied). The real mob distribution is therefore
+  uniform over the polygon area - a square anchored on a "cluster
+  centroid" only covers the fraction of the polygon inside it.
+- Measured (scripts/analyze_spawns.py, sandbox side): the old hand
+  placed registry of 30 squares covered 18% of the expected spawn
+  mass; 88 of 106 territories sat below 50% coverage, many at 0% (the
+  whole far southwest 2020 block, the grunt woods 2119_22..26, most
+  of the 2019 west). That is why the zones "missed".
+- The A-B-A bounce: `rotationZone` picked the nearest same-band
+  sibling with no memory of recently emptied squares - from B the
+  nearest sibling is A again.
+- The "one species" complaint: the engage itself always attacked the
+  nearest attackable npc (no name filter), but the old squares sat on
+  parts of one territory, so the practical pick collapsed to that
+  territory's mobs.
+
+### What was done
+
+- `tools/generate_hunt_zones.py` (committed): parses
+  ElvenStarting.xml + the npc stats, drops the same-band
+  sub-territories folded into their parents (>= 85% containment),
+  partitions each polygon into a density-adaptive grid (cell
+  2600-3600, square half 1300-1900, cells with >= 22% polygon overlap
+  kept, one square for a small territory), assigns the ten band /
+  gear gates by the territory's top mob level, emits the mob list
+  with level-sorted priorities, orders the registry by band then
+  village distance (zones[0] is the starter fallback). Output:
+  `hunt/zones_elven.go` - 227 squares, 96% spawn mass coverage (was
+  18%).
+- `hunt.HuntingZone.Mobs []ZoneMob` (template id, name, level, count,
+  priority) carries the full mob list of the ground;
+  `applyHuntingZone` builds the priority map for the engage.
+- `state.Bot.NearestAttackablePreferred`: the target search scores
+  `dist - 200*priority` per candidate (plain and social variants
+  share it), so every species stays attackable while the exp richer
+  mobs of the ground win among comparably near candidates. The
+  engage, the far-target walk and the zone-entry engage pass the
+  priorities.
+- `state.Bot.ZoneHasAttackableBelow`: the rotation emptiness reading
+  applies the engage level ceiling - a square whose survivors all sit
+  above the max target level counts as empty.
+- The rotation cooldown: a rotated-away square keeps a 40 s
+  `zoneEmptyCooldown` (`zoneEmptyUntil` map, pruned on write);
+  `rotationZone` skips the cooling squares, so the sweep moves
+  forward through the band (A to B to C) instead of bouncing back;
+  when every sibling cools down the hunter waits out the respawn in
+  place.
+- zones_test.go rewritten to look zones up by band and position (no
+  hardcoded generated ids - a regeneration keeps the suite green);
+  new tests: the generated registry sanity (band order, unique ids,
+  compact halves, non-empty mob lists), the cooldown sweep
+  (A-B-C-blocked-return-expiry), the all-cooling wait, the level
+  aware emptiness, the priority bias of the engage; state tests for
+  ZoneHasAttackableBelow and NearestAttackablePreferred.
+
+### Status
+
+- Code complete: go vet + go test ./... green, golangci-lint clean
+  (the pre-existing webserver/fight.go exhaustruct finding stays).
+- Live E2E round pending.
+
+### Progress
+
+- 2026-09-08: analysis + generator + registry + cooldown + priorities
+  landed as the first commit round; this entry.
+- 2026-09-08: rebased onto the fleet scale round (a parallel agent
+  split the god objects: the target search now lives in
+  state/scans.go with the pooled scan arrays and the dense skip
+  slices, the hunt loop split into loop_actions/loop_movement/
+  loop_safety). The priority map threads through the new
+  NearestAttackablePreferred signatures (skip []int32), the npcScan
+  record carries the template id for the pooled social variant, the
+  scans.go ZoneHasAttackableBelow replaces the bot.go edit. Zones,
+  the generated registry, the tests and the docs port unchanged.
+
+
 ## Finished task: granular farm zone system (rotation, regression, web view)
 
 Started and finished: 2026-09-08. Branch: `mobius-c1-client-1`. Commits

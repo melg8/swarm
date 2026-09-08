@@ -7,8 +7,9 @@ package hunt
 import "testing"
 
 // BenchmarkPickHuntingZone measures the 30 s zone re-pick over the full
-// elven registry (30 zones): the ladder walk with the band rank and
-// distance tie breaks the picker runs per re-evaluation.
+// generated elven registry (227 compact squares): the ladder walk with
+// the band rank and distance tie breaks the picker runs per
+// re-evaluation.
 func BenchmarkPickHuntingZone(b *testing.B) {
 	zones := ElvenHuntingZones()
 	b.ReportAllocs()

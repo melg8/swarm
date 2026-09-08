@@ -248,6 +248,85 @@ func TestZoneHasAttackableReadsTheSquare(t *testing.T) {
 	require.False(t, bot.ZoneHasAttackable(&Zone{CX: 45000, CY: 50000, Half: 300}))
 }
 
+// TestZoneHasAttackableBelowAppliesTheLevelCeiling pins the level
+// aware emptiness reading of the zone rotation: a square whose only
+// survivors sit above the engage ceiling counts as empty (the hunter
+// cannot start a fight it can win there), an unresolved level passes
+// and a zero ceiling disables the filter.
+func TestZoneHasAttackableBelowAppliesTheLevelCeiling(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	// Display 6 is the Orc Archer (level 8), display 1 the Gremlin
+	// (level 1).
+	spawnNpcInfo(bot, 7, 1000006, 45100)
+	zone := &Zone{CX: 45000, CY: 50000, Half: 300}
+
+	require.True(t, bot.ZoneHasAttackableBelow(zone, 0),
+		"a zero ceiling keeps the plain reading")
+	require.True(t, bot.ZoneHasAttackableBelow(zone, 8),
+		"the orc passes its own level")
+	require.False(t, bot.ZoneHasAttackableBelow(zone, 5),
+		"an orc above the ceiling never counts")
+
+	// An unresolved template (level 0) passes the ceiling.
+	spawnNpcInfo(bot, 8, 1001277, 45150)
+	require.True(t, bot.ZoneHasAttackableBelow(zone, 2))
+	bot.RemoveObject(7)
+	bot.RemoveObject(8)
+	require.False(t, bot.ZoneHasAttackableBelow(nil, 0))
+}
+
+// TestNearestAttackablePreferredAppliesThePriorityBias pins the zone
+// mob priorities of the target search: every priority point biases
+// the pick by 200 units of distance - a preferred mob wins among
+// comparably near candidates while a far preferred mob loses to a
+// doorstep one, and both the plain and the socially constrained
+// variants share the bias.
+func TestNearestAttackablePreferredAppliesThePriorityBias(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	// A gremlin at 300 units and a rabbit at 600.
+	spawnNpcInfo(bot, 7, 1000001, 45300)
+	spawnNpcInfo(bot, 8, 1000002, 45600)
+	priority := map[int32]int32{1000002: 2}
+
+	// The rabbit (600 - 2x200 = 200) beats the gremlin (300).
+	for _, avoidSocial := range []bool{false, true} {
+		target, ok := bot.NearestAttackablePreferred(
+			1500, nil, nil, 0, avoidSocial, priority)
+		require.True(t, ok)
+		require.Equal(t, int32(8), target.ObjectID)
+	}
+
+	// Without the priorities the nearer gremlin wins.
+	target, ok := bot.NearestAttackablePreferred(
+		1500, nil, nil, 0, false, nil)
+	require.True(t, ok)
+	require.Equal(t, int32(7), target.ObjectID)
+
+	// A far preferred mob loses to the doorstep one: the rabbit at
+	// 1200 units scores 800 against the 300 of the gremlin.
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 9, TemplateID: 1000002, Attackable: true,
+		X: 46200, Y: 50000, Z: -3500,
+	})
+	bot.RemoveObject(8)
+	target, ok = bot.NearestAttackablePreferred(
+		1500, nil, nil, 0, false, priority)
+	require.True(t, ok)
+	require.Equal(t, int32(7), target.ObjectID)
+
+	// The search radius still bounds the pick in absolute units: a
+	// preferred mob beyond maxDistance never enters the contest.
+	_, ok = bot.NearestAttackablePreferred(1000, nil, nil, 0, false, priority)
+	require.True(t, ok)
+	_, ok = bot.NearestAttackablePreferred(500, nil, nil, 0, false, priority)
+	require.True(t, ok)
+	_, ok = bot.NearestAttackablePreferred(
+		300, nil, []int32{7}, 0, false, priority)
+	require.False(t, ok)
+}
+
 func TestNearestNpcByTemplatesPicksTheClosest(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)

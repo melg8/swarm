@@ -103,7 +103,7 @@ func (b *Bot) NearestAttackable(
 func (b *Bot) NearestAttackableExcept(
 	maxDistance float64, zone *Zone, skip []int32,
 ) (AttackTarget, bool) {
-	return b.nearestAttackable(maxDistance, zone, skip, 0, false)
+	return b.nearestAttackable(maxDistance, zone, skip, 0, false, nil)
 }
 
 // ZoneHasAttackable reports whether at least one living attackable
@@ -114,6 +114,17 @@ func (b *Bot) NearestAttackableExcept(
 // this check answers the plain question of whether the square still
 // holds anything to kill at all. A nil zone never holds mobs.
 func (b *Bot) ZoneHasAttackable(zone *Zone) bool {
+	return b.ZoneHasAttackableBelow(zone, 0)
+}
+
+// ZoneHasAttackableBelow reports whether at least one living
+// attackable npc stands inside the zone square AND passes the level
+// ceiling of the engage (a mob above maxLevel never enters a fight
+// this character can win, so a square whose survivors all sit above
+// the ceiling is as good as empty for the rotation; level 0 disables
+// the filter like everywhere in the target search, an unresolved
+// template counts as passable). A nil zone never holds mobs.
+func (b *Bot) ZoneHasAttackableBelow(zone *Zone, maxLevel int32) bool {
 	if zone == nil {
 		return false
 	}
@@ -125,6 +136,9 @@ func (b *Bot) ZoneHasAttackable(zone *Zone) bool {
 		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
 			continue
 		}
+		if maxLevel > 0 && obj.Level > maxLevel && obj.Level > 0 {
+			continue
+		}
 		x, y := projectedPosition(obj, now)
 		if zone.Contains(int32(math.Round(x)), int32(math.Round(y))) {
 			return true
@@ -133,6 +147,14 @@ func (b *Bot) ZoneHasAttackable(zone *Zone) bool {
 
 	return false
 }
+
+// targetPriorityBias converts one priority point of the zone mob
+// list into the distance discount of the target search: a priority 2
+// mob reads as 2 x bias units closer than it stands, so the pick
+// prefers it among comparably near candidates while a far stronger
+// preference still loses to a mob at the doorstep (the bias stays
+// small next to the 1500 unit engage radius on purpose).
+const targetPriorityBias = 200.0
 
 // NearestAttackableConstrained returns the closest living attackable
 // npc of the zone with the hunt safety constraints applied on top of
@@ -148,27 +170,42 @@ func (b *Bot) NearestAttackableConstrained(
 	maxDistance float64, zone *Zone, skip []int32,
 	maxLevel int32, avoidSocial bool,
 ) (AttackTarget, bool) {
-	return b.nearestAttackable(maxDistance, zone, skip, maxLevel, avoidSocial)
+	return b.nearestAttackable(
+		maxDistance, zone, skip, maxLevel, avoidSocial, nil)
 }
 
-// nearestAttackable is the shared target search core of the two public
+// NearestAttackablePreferred extends NearestAttackableConstrained
+// with the zone mob priorities: every priority point of the template
+// id biases the pick by targetPriorityBias units of distance, so the
+// engage farms every species of the ground while tilting toward the
+// exp rich mobs when several candidates sit at a comparable range. A
+// nil (or empty) priority map keeps the plain nearest-first pick.
+func (b *Bot) NearestAttackablePreferred(
+	maxDistance float64, zone *Zone, skip []int32,
+	maxLevel int32, avoidSocial bool, priority map[int32]int32,
+) (AttackTarget, bool) {
+	return b.nearestAttackable(
+		maxDistance, zone, skip, maxLevel, avoidSocial, priority)
+}
+
+// nearestAttackable is the shared target search core of the public
 // pickers. The plain variant walks the dense storage directly; the
 // socially constrained variant flattens the living attackable npcs
 // into compact scan records first (see nearestAttackableSocial).
 func (b *Bot) nearestAttackable(
 	maxDistance float64, zone *Zone, skip []int32,
-	maxLevel int32, avoidSocial bool,
+	maxLevel int32, avoidSocial bool, priority map[int32]int32,
 ) (AttackTarget, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	if avoidSocial {
 		return b.nearestAttackableSocial(
-			maxDistance, zone, skip, maxLevel)
+			maxDistance, zone, skip, maxLevel, priority)
 	}
 
 	//nolint:exhaustruct // zero value grows inside the loop
 	best := AttackTarget{}
-	bestDist := maxDistance
+	bestScore := math.MaxFloat64
 	found := false
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
@@ -190,8 +227,13 @@ func (b *Bot) nearestAttackable(
 			continue
 		}
 		dist := math.Hypot(x-selfX, y-selfY)
-		if dist < bestDist {
-			bestDist = dist
+		if dist >= maxDistance {
+			continue
+		}
+		score := dist - targetPriorityBias*
+			float64(priority[obj.TemplateID])
+		if score < bestScore {
+			bestScore = score
 			found = true
 			best = AttackTarget{
 				ObjectID: obj.ObjectID,
@@ -214,10 +256,11 @@ func (b *Bot) nearestAttackable(
 // caller must hold the read lock.
 func (b *Bot) nearestAttackableSocial(
 	maxDistance float64, zone *Zone, skip []int32, maxLevel int32,
+	priority map[int32]int32,
 ) (AttackTarget, bool) {
 	//nolint:exhaustruct // zero value grows inside the loop
 	best := AttackTarget{}
-	bestDist := maxDistance
+	bestScore := math.MaxFloat64
 	found := false
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
@@ -233,23 +276,7 @@ func (b *Bot) nearestAttackableSocial(
 		*scanPtr = scans[:0]
 		npcScanPool.Put(scanPtr)
 	}()
-	for i := range b.world.objects {
-		obj := &b.world.objects[i]
-		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
-			continue
-		}
-		x, y := projectedPosition(obj, now)
-		scans = append(scans, npcScan{
-			x:             x,
-			y:             y,
-			z:             obj.Z,
-			objectID:      obj.ObjectID,
-			slot:          int32(i),
-			level:         obj.Level,
-			clanHelpRange: obj.ClanHelpRange,
-			clanMask:      obj.ClanMask,
-		})
-	}
+	scans = b.appendAttackableScans(scans, now)
 	for i := range scans {
 		cand := &scans[i]
 		if skipContains(skip, cand.objectID) {
@@ -266,8 +293,13 @@ func (b *Bot) nearestAttackableSocial(
 			continue
 		}
 		dist := math.Hypot(cand.x-selfX, cand.y-selfY)
-		if dist < bestDist {
-			bestDist = dist
+		if dist >= maxDistance {
+			continue
+		}
+		score := dist - targetPriorityBias*
+			float64(priority[cand.templateID])
+		if score < bestScore {
+			bestScore = score
 			found = true
 			obj := &b.world.objects[cand.slot]
 			best = AttackTarget{
@@ -281,6 +313,33 @@ func (b *Bot) nearestAttackableSocial(
 	}
 
 	return best, found
+}
+
+// appendAttackableScans flattens every living attackable npc of the
+// dense world storage into the pooled scan array (one projected
+// position per npc, clans as bitmasks, the template id for the
+// priority bias). The caller must hold the read lock.
+func (b *Bot) appendAttackableScans(scans []npcScan, now time.Time) []npcScan {
+	for i := range b.world.objects {
+		obj := &b.world.objects[i]
+		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
+			continue
+		}
+		x, y := projectedPosition(obj, now)
+		scans = append(scans, npcScan{
+			x:             x,
+			y:             y,
+			z:             obj.Z,
+			objectID:      obj.ObjectID,
+			slot:          int32(i),
+			level:         obj.Level,
+			templateID:    obj.TemplateID,
+			clanHelpRange: obj.ClanHelpRange,
+			clanMask:      obj.ClanMask,
+		})
+	}
+
+	return scans
 }
 
 // npcScanPool recycles the flat scan arrays of the constrained target
@@ -332,6 +391,7 @@ type npcScan struct {
 	objectID      int32
 	slot          int32
 	level         int32
+	templateID    int32
 	clanHelpRange int32
 	clanMask      uint64
 }

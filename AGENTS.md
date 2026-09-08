@@ -485,49 +485,70 @@ the design goal is per-class and per-region extension):
   the shop already. The catalogs are generated from the Mobius
   buylists (`tools/generate_shop_catalogs.sh`, keyed by packet
   template id).
-- **Multi-zone hunting** (`hunt/zones.go`): thirty granular hunting
-  squares (1000-1300 halves) anchored on the ElvenStarting.xml spawn
-  territory clusters, laddered in ten mob level bands (keltirs 1-3
-  gear 0, wolves 3-4 gear 20, raiders 4-6 gear 50, goblins 5-7 gear
-  70, grunts 7-8 gear 100, fighters 8-10 gear 140, lieutenants 9-12
-  gear 180, leaders 11-13 gear 220, elders 12-14 gear 260, spiders
-  13-16 gear 300, lirein 16-19 gear 380); `PickHuntingZone` gates on
-  level AND gear points - a band opens only above its top mob level
-  plus the lead (`zoneLevelLead` 1), so the character always hunts
-  mobs 1-2 levels below itself instead of engaging mobs above its own
-  level - keeps the current zone of the winning band
-  (the 30 s re-pick never bounces between same-band grounds) and
-  takes the nearest ground of an open band; a character below every
-  band (or under a death cap that closed the ladder) falls back to
-  the starter band contest (the nearest ground of the first band,
-  the current ground keeps its post). A cleared-out square
-  rotates: no attackable mob inside the square for 10 s while the
-  hunter stands central (the raw `ZoneHasAttackable` reading, not
-  the socially constrained search) moves it to the nearest sibling
-  of the same band - the fights, rests, walks and town trips reset
-  the timer. The death regression: three deaths in one square demote
-  its whole band, the ladder caps below it until the level changes
-  (a level up or a delevel resets the bookkeeping; delevel-phase
-  deaths never count); deaths count against the square they happen
-  in (the position lookup - an emergency logout death lands on a
-  fresh session before any zone pick), a manual zone override dies
-  with the demotion. A manual zone selection stops the walks aimed
-  at the old square (`stopForZoneSwitch`: a manual move, a town trip
-  walk and a zone return leg are cancelled, one walk request to the
-  current spot replaces the running server walk; the deleveling
-  refuses the stop like every movement command, the selling stop
-  keeps running and its return leg re-targets the new zone). The map
-  draws every zone (active amber, the future grounds in a bright
-  soft blue with a light fill - the demonstration of where the bot
-  will hunt next, dimmed hints do not read; demoted bands red -
-  labels only when the square is big enough on screen; the `hunt
-  zones` toolbar checkbox hides the whole layer like the targets and
-  map background toggles) and the floating collapsible zone panel of
-  the map (bottom right corner, collapsed by default, the count chip
-  carries the registry total; the left sidebar lists bots only)
-  carries the death counts and switches zones manually (the `zone`
-  command, index in the Count field; the override holds until the
-  character outgrows the band or dies it out).
+- **Multi-zone hunting** (`hunt/zones.go`, the generated registry
+  `hunt/zones_elven.go`): the hunting squares derive from the real
+  spawn polygons - a Mobius territory spawns its mobs at uniformly
+  random points of its polygon (`NpcSpawnTerritory.getRandomPoint`)
+  and the random walk stays inside it (the wander target must pass
+  `isInsideZone`, `MaxDriftRange` 300 leashes the rest), so a square
+  anchored on a "cluster centroid" misses most of the ground (the
+  measured spawn mass coverage of the old hand placed thirty squares
+  was 18 percent). `tools/generate_hunt_zones.py` parses
+  ElvenStarting.xml plus the npc stats and generates 227 compact
+  squares (1300-1900 halves, one square for a small territory, a
+  density adaptive grid partition for a big one, same-band
+  sub-territories folded into their parents) covering 96 percent of
+  the spawn mass in the ten mob level bands (keltirs 1-3 gear 0,
+  wolves 3-4 gear 20, raiders 4-6 gear 50, goblins 5-7 gear 70,
+  grunts 7-8 gear 100, fighters 8-10 gear 140, lieutenants 9-12 gear
+  180, leaders 11-13 gear 220, elders 12-14 gear 260, spiders 13-16
+  gear 300, lirein 16-19 gear 380); every square carries the full
+  mob list of its territory (`ZoneMob` with a level-sorted
+  `Priority`), so the engage farms every species of the ground - the
+  priorities bias the pick by `targetPriorityBias` (200 units per
+  point) through `state.Bot.NearestAttackablePreferred`, tilting the
+  fight toward the exp richer mobs while a far preferred mob still
+  loses to a doorstep one. `PickHuntingZone` gates on level AND gear
+  points - a band opens only above its top mob level plus the lead
+  (`zoneLevelLead` 1), so the character always hunts mobs 1-2 levels
+  below itself instead of engaging mobs above its own level - keeps
+  the current zone of the winning band (the 30 s re-pick never
+  bounces between same-band grounds) and takes the nearest ground of
+  an open band; a character below every band (or under a death cap
+  that closed the ladder) falls back to the starter band contest
+  (the nearest ground of the first band, the current ground keeps
+  its post). A cleared-out square rotates: no attackable mob inside
+  the square that passes the engage level ceiling for 10 s while the
+  hunter stands central (the `ZoneHasAttackableBelow` reading - a
+  square whose survivors all sit above the max target level is as
+  good as empty) moves it to the nearest non-cooling sibling of the
+  same band, and the rotated-away square keeps a 40 s empty cooldown
+  (`zoneEmptyCooldown`) so the rotation sweeps forward through the
+  band (A to B to C) instead of ping ponging back into the square it
+  just left (A to B to A) - the fights, rests, walks and town trips
+  reset the timer. The death regression: three deaths in one square
+  demote its whole band, the ladder caps below it until the level
+  changes (a level up or a delevel resets the bookkeeping;
+  delevel-phase deaths never count); deaths count against the square
+  they happen in (the position lookup - an emergency logout death
+  lands on a fresh session before any zone pick), a manual zone
+  override dies with the demotion. A manual zone selection stops the
+  walks aimed at the old square (`stopForZoneSwitch`: a manual move,
+  a town trip walk and a zone return leg are cancelled, one walk
+  request to the current spot replaces the running server walk; the
+  deleveling refuses the stop like every movement command, the
+  selling stop keeps running and its return leg re-targets the new
+  zone). The map draws every zone (active amber, the future grounds
+  in a bright soft blue with a light fill - the demonstration of
+  where the bot will hunt next, dimmed hints do not read; demoted
+  bands red - labels only when the square is big enough on screen;
+  the `hunt zones` toolbar checkbox hides the whole layer like the
+  targets and map background toggles) and the floating collapsible
+  zone panel of the map (bottom right corner, collapsed by default,
+  the count chip carries the registry total; the left sidebar lists
+  bots only) carries the death counts and switches zones manually
+  (the `zone` command, index in the Count field; the override holds
+  until the character outgrows the band or dies it out).
 
 - **Combat safety** (`hunt/loop.go` + the constrained target search
   of `state`): the engage never initiates on mobs above the character

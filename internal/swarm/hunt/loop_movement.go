@@ -43,9 +43,9 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
 	if !ok {
 		return false
 	}
-	pick, found := l.tracker.NearestAttackableConstrained(
+	pick, found := l.tracker.NearestAttackablePreferred(
 		farTargetRange, l.zone(), l.activeSkips(now),
-		l.maxTargetLevel(), true)
+		l.maxTargetLevel(), true, l.zoneMobPriority)
 	if !found {
 		return false
 	}
