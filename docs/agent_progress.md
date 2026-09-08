@@ -4,6 +4,78 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Finished task: combat safety of the hunt loop (survivability round)
+
+Started and finished: 2026-09-08. Branch: `mobius-c1-client-1`. Commits
+as melg8, pushed as they landed.
+
+### Goal
+
+The long live session exposed five survivability defects of the hunt
+loop: the bot initiated a fight it could not win (135/267 health, a
+level 10 pull, death), a low health character under attack had no way
+out except dying, the third hunting zone was too big, the bot marched
+to the zone center past killable mobs, and it ignored the social clan
+mechanics (pulling packs).
+
+### What was implemented (commit order)
+
+- `460a579` npc clan data: the generator extracts clanHelpRange and
+  the clan list of every npc (plus the isAggressive=true default fix -
+  the Mobius NpcTemplate defaults it true, the Kaboo Orc Fighter
+  attacks on sight), npcdata exposes NPCClanHelpRange/NPCClans.
+- `9a6026a` (rebased over the lint agent commits) state: the target
+  search gains the level cap and the social fence - mobs above the
+  character level slack and mobs whose clan mates stand within the
+  help range (ALL clan matches everything, 600 z distance blocks the
+  assist, projected positions, 200 unit margin) are never initiated
+  on; the WorldObjects track the clan data of their templates.
+- `e565361` hunt combat safety: the losing-fight escape (under 25%
+  health or a 25+ percent target health lead under 60%, a two minute
+  target skip, paced escape legs away from the threat, the beaten
+  target is finished instead), the hurt-under-attack flee, the
+  no-target center patrol after a 6 s patience, per-entry skip
+  expiries.
+- `28c9f84` panic logout: critical health (12%) under attack ends the
+  session - one last escape leg, the RequestLogout packet plus the
+  socket close (the server stores a mid combat character 15 s after
+  the combat ends), a three minute login cooldown on the tracker that
+  survives sessions, honored by the runBotForever supervisor.
+- `e4d032e` zone entry: the return phase engages the first valid
+  target inside the zone instead of walking to the center past it.
+- `2d85d32` zones: the kaboo woods square shrunk onto the fighter
+  camps (half 3200 -> 2000, center 35400 48300, 39% of the old area).
+- `bb0cb5f` (found live) zone switches drop the stale farm spot: the
+  live round 1 exposed a 3 second return loop after a zone switch -
+  the returns aimed at the farm spot of the OLD square; the switch
+  now clears it and both return paths guard against an out-of-zone
+  farm spot.
+
+### Live verification (rich1, level 4, the running stack)
+
+- Round 1 (goblin zone switch): the trip flow, the one-item-per-slot
+  buys and the gear swaps all work unchanged; the stale farm spot
+  loop observed here produced the fix above.
+- Round 2 (keltir return + zone switch back): "engaging Gremlin on
+  the zone entry" - the return ended on the first target inside the
+  zone; zero farm-spot loop lines; 23 kills, +667 exp, health
+  regenerating between fights, no deaths; the panic logout never
+  fired (nothing pushed the character that low).
+- Rounds 3-4 (kaboo woods, the suicide scenario): a level 4 character
+  inside the kaboo square and the fighter camps NEVER initiated a
+  fight (0 kills, 0 hits landed, full health) - the level slack and
+  the social fence hold the line exactly where the reported death
+  happened.
+- tools/mobius_e2e.sh: E2E_OK.
+
+The escape and panic-logout reaction layers are pinned by unit tests
+(TestLoopEscapesALosingFight, TestLoopEscapesTheLevelGapFight,
+TestLoopFinishesTheBeatenTarget, TestLoopEscapesWhenHurtUnderAttack,
+TestLoopLogsOutAtCriticalHealthUnderAttack,
+TestLoopDoesNotPanicLogoutWhileDeleveling) - the live Mobius camps did
+not aggro the character on demand (the aggressive fighters are sparse
+and the passive camps ignore a standing character).
+
 ## Active task: golangci-lint v2 migration (lint toolchain repair)
 
 Started: 2026-09-08. Branch: `mobius-c1-client-1`.

@@ -427,6 +427,32 @@ the design goal is per-class and per-region extension):
   index in the Count field; the override holds until the character
   outgrows the band).
 
+- **Combat safety** (`hunt/loop.go` + the constrained target search
+  of `state`): the engage never initiates on mobs above the character
+  level + 2 or on social pulls - a mob whose clan mates stand within
+  its `clanHelpRange` (mirroring the Mobius AttackableAI clan call:
+  the ALL clan of the attacked mob matches everything, a 600 unit z
+  distance blocks the assist, the projected positions measure moving
+  packs, a 200 unit margin covers the mates wandering in mid fight).
+  A running fight that turns into a death risk is fled: under 25%
+  health, or under 60% while the target holds a 25+ percent health
+  lead, the target is dropped with a two minute skip and paced escape
+  legs open distance (toward the zone center when the straight line
+  leaves the square); a target one swing from dead is finished
+  instead. A hurt character under attack keeps fleeing instead of
+  standing in the blows. Critical health (12%) under attack ends the
+  session: one last escape leg (the server keeps an offline character
+  in the world for the 15 s combat stance - the walk keeps it moving),
+  the `RequestLogout` packet plus the socket close, and a three minute
+  login cooldown the supervisor (`runBotForever`) honors before the
+  next session (the tracker carries the cooldown across sessions).
+  Entering a hunting zone engages the first valid target the entry
+  radius offers (`engagesOnZoneEntry` of the return phase), and a
+  targetless hunter patrols toward the zone center after a 6 s
+  patience window instead of standing still. A zone switch drops the
+  remembered farm spot of the previous square (the returns aim at the
+  new center until a fresh spot is remembered inside it).
+
 Extension path: a mage class implements `gear.Profile` (mAtk
 weapons, robe preference - the planner, the strategy and the trip
 execution stay unchanged), a new region adds its `townMerchants`
@@ -1236,6 +1262,24 @@ truth for packet formats (`L2J_Mobius_C1_HarbingersOfWar/java`). Summary:
   `data/buylists/*.xml`; the merchant of a list is the npc of its
   `<npcs>` block (join to the packet template id through
   `stats/npcs/CT0_to_C4_ids.txt`, 30147 Unoren -> 7147 etc).
+
+- Logout semantics: `RequestLogout` is refused while the character
+  holds an attack stance (`Player.canLogout` checks the
+  `AttackStanceTaskManager`, `YOU_CANNOT_LOGOUT_WHILE_IN_COMBAT`);
+  the stance lapses 15 seconds after the last combat event
+  (`AttackStanceTaskManager.COMBAT_TIME`). A socket close of a
+  character in combat stores it on the same 15 second delay
+  (`Disconnection.onDisconnection`), so an emergency logout is one
+  escape walk + the logout packet + the socket close either way.
+- The Mobius `NpcTemplate` defaults `isAggressive` to TRUE: the mobs
+  that omit the attribute (the Kaboo Orc Fighter) attack players on
+  sight - the generated npc data mirrors this since the clan round.
+- The clan assist of the Mobius `AttackableAI`: an attacked npc calls
+  every nearby attackable within its `clanHelpRange` whose clans
+  intersect its own (the ALL clan matches everything, the check runs
+  against the ATTACKED mob's clan set - see `NpcTemplate.isClan`),
+  a 600 unit z distance blocks the call and npcs spawned within the
+  last 7 seconds ignore it.
 
 When adding a new packet: implement the struct in the correct direction
 package (`from_*` / `to_*`), add parsing/serialization via
