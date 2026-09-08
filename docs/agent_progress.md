@@ -4,6 +4,50 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: test coverage round (the weakest packages)
+
+Started: 2026-09-08. Branch: `mobius-c1-client-1`.
+
+### Goal
+
+The user asked to improve the code coverage. Baseline measured with
+`go test ./... -cover -count=1` (2026-09-08):
+
+- connection 38.1% (the worst real package: every game.go `apply*`
+  packet handler and the whole authentificator.go login flow at ~0%)
+- to_game_server 49.4% (half of the client -> game packet
+  serializers untested)
+- from_auth_server 57.4% (init.go parse path 0%, gg_auth partial)
+- webserver 68.7%, state 75.9%, from_game_server 74.5% (mid)
+- gear 85.3%, crypt 93.8%, pathfind 96.5%, helpers 100% (fine)
+- npcdata 0% and cmd/* 0% are generated/main packages, skipped by design
+
+### Constraints
+
+- Tests must assert real behavior (round trips against the Mobius C1
+  packet layouts from docs/protocol_description.md), never coverage
+  gaming (no assertion-free "execute the function" tests).
+- Reuse the existing harnesses: the scripted game session fake server
+  of connection/game_test.go and hunt_flow_test.go patterns, the
+  packets_test.go style for the packet packages.
+- Every new test file carries the SPDX header; testify require/assert;
+  go test + golangci-lint must stay green; benchmarks compare
+  allocations only when touching packet parse code.
+- Windows host: no cgo, so no -race locally (task test:race stays a
+  CI/sandbox concern).
+
+### Acceptance criteria
+
+- connection, to_game_server and from_auth_server coverage measurably
+  up (target: every package over 60% as the round goal, the biggest
+  uncovered functions handled or consciously left with a reason).
+- `go test ./... -count=1` green, `golangci-lint run` 0 issues.
+
+### Progress
+
+- 2026-09-08: baseline recorded; task started. Stack verified up
+  (ports 2106/7777/3306 listening on the Windows dev deployment).
+
 ## Finished task: combat safety of the hunt loop (survivability round)
 
 Started and finished: 2026-09-08. Branch: `mobius-c1-client-1`. Commits
