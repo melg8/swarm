@@ -28,16 +28,16 @@ import (
 // cipher chains (the proxy re-encrypts everything it sends).
 type Recorder struct {
 	mu          sync.Mutex
-	entries     []recorderEntry
+	entries     []RecorderEntry
 	bytes       int
 	nextSeq     int64
 	closed      bool
 	closeSignal chan struct{}
-	subscribers map[*subscriber]struct{}
+	subscribers map[*Subscriber]struct{}
 }
 
-// recorderEntry is one recorded packet with its sequence number.
-type recorderEntry struct {
+// RecorderEntry is one recorded packet with its sequence number.
+type RecorderEntry struct {
 	seq     int64
 	payload []byte
 }
@@ -54,12 +54,13 @@ const (
 // NewRecorder creates an empty packet history.
 func NewRecorder() *Recorder {
 	return &Recorder{
+		mu:          sync.Mutex{},
 		entries:     nil,
 		bytes:       0,
 		nextSeq:     1,
 		closed:      false,
 		closeSignal: make(chan struct{}),
-		subscribers: make(map[*subscriber]struct{}),
+		subscribers: make(map[*Subscriber]struct{}),
 	}
 }
 
@@ -71,7 +72,7 @@ func (r *Recorder) Record(payload []byte) {
 	if len(payload) == 0 {
 		return
 	}
-	entry := recorderEntry{
+	entry := RecorderEntry{
 		seq:     0,
 		payload: make([]byte, len(payload)),
 	}
@@ -89,7 +90,7 @@ func (r *Recorder) Record(payload []byte) {
 	r.bytes += len(entry.payload)
 	r.trimLocked()
 
-	update := liveUpdate{seq: entry.seq, payload: entry.payload}
+	update := liveUpdate(entry) // S1016: direct conversion of the same layout
 	for sub := range r.subscribers {
 		sub.deliver(update)
 	}
@@ -110,7 +111,7 @@ func (r *Recorder) trimLocked() {
 	for i := dropFrom; i < dropTo; i++ {
 		dropped += len(r.entries[i].payload)
 	}
-	kept := make([]recorderEntry, 0, dropFrom+recorderTailEntries)
+	kept := make([]RecorderEntry, 0, dropFrom+recorderTailEntries)
 	kept = append(kept, r.entries[:dropFrom]...)
 	kept = append(kept, r.entries[dropTo:]...)
 	r.entries = kept
@@ -176,18 +177,18 @@ func (r *Recorder) Entry(seq int64) []byte {
 // entries end: the snapshot and the subscription are taken under one
 // lock, so no entry is lost between them. The returned payloads must not
 // be modified.
-func (r *Recorder) Attach(afterSeq int64) ([]recorderEntry, *subscriber) {
+func (r *Recorder) Attach(afterSeq int64) ([]RecorderEntry, *Subscriber) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	snapshot := make([]recorderEntry, 0, len(r.entries))
+	snapshot := make([]RecorderEntry, 0, len(r.entries))
 	for i := range r.entries {
 		if r.entries[i].seq > afterSeq {
 			snapshot = append(snapshot, r.entries[i])
 		}
 	}
 
-	sub := &subscriber{
+	sub := &Subscriber{
 		ch:      make(chan liveUpdate, subscriberQueueSize),
 		poison:  make(chan struct{}),
 		stopped: false,
@@ -200,7 +201,7 @@ func (r *Recorder) Attach(afterSeq int64) ([]recorderEntry, *subscriber) {
 }
 
 // removeSubscriber drops a subscription of a detached client.
-func (r *Recorder) removeSubscriber(sub *subscriber) {
+func (r *Recorder) removeSubscriber(sub *Subscriber) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.subscribers, sub)
@@ -244,8 +245,8 @@ type liveUpdate struct {
 // because skipping packets would corrupt its world view.
 const subscriberQueueSize = 1024
 
-// subscriber receives the live packets of a recorder.
-type subscriber struct {
+// Subscriber receives the live packets of a recorder.
+type Subscriber struct {
 	ch      chan liveUpdate
 	poison  chan struct{}
 	stopped bool
@@ -254,7 +255,7 @@ type subscriber struct {
 // deliver hands one update to the subscriber without blocking the
 // recorder: a full queue poisons the subscriber. The caller holds the
 // recorder lock.
-func (s *subscriber) deliver(update liveUpdate) {
+func (s *Subscriber) deliver(update liveUpdate) {
 	if s.stopped {
 		return
 	}
@@ -266,7 +267,7 @@ func (s *subscriber) deliver(update liveUpdate) {
 }
 
 // poisonSubscriber marks the subscriber as fallen behind exactly once.
-func (s *subscriber) poisonSubscriber() {
+func (s *Subscriber) poisonSubscriber() {
 	if s.stopped {
 		return
 	}

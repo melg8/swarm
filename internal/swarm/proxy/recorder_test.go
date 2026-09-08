@@ -126,12 +126,10 @@ func TestRecorderTrimKeepsPrologueAndTail(t *testing.T) {
 	t.Parallel()
 	recorder := NewRecorder()
 
-	// Fill the recorder past the cap with distinct one byte payloads.
+	// Fill the recorder with distinct one byte payloads.
 	total := recorderPrologueEntries + recorderTailEntries + 100
-	payloads := make([]byte, 0, total)
 	for i := range total {
 		recorder.Record([]byte{byte(i % 251)})
-		payloads = append(payloads, byte(i%251))
 	}
 
 	// One byte entries stay far below the byte cap: the trim only fires

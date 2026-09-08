@@ -5,6 +5,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/binary"
 	"io"
 	"log"
@@ -33,7 +34,7 @@ func startTestServer(t *testing.T) *Server {
 		_ = server.Serve()
 	}()
 	t.Cleanup(func() {
-		_ = server.Shutdown(nil)
+		_ = server.Shutdown(context.Background())
 	})
 
 	return server
@@ -182,7 +183,7 @@ func TestLoginServerFullLoginFlow(t *testing.T) {
 	// port in tests, the default 7778 in production).
 	_, advertisedPort, err := net.SplitHostPort(server.GameAddr())
 	require.NoError(t, err)
-	require.EqualValues(t, advertisedPort, strconv.Itoa(int(entry.Port)))
+	require.Equal(t, advertisedPort, strconv.Itoa(int(entry.Port)))
 	require.NotZero(t, entry.Status, "the proxy game server must be up")
 	require.Equal(t, [4]byte{127, 0, 0, 1}, entry.IP)
 

@@ -5,89 +5,89 @@
 package fromauthserver
 
 import (
-        "errors"
+	"errors"
 
-        "github.com/melg8/swarm/internal/swarm/packets/packet"
+	"github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const (
-        loginOkPacketID  = 0x03
-        loginOkExtraInts = 5
+	loginOkPacketID  = 0x03
+	loginOkExtraInts = 5
 )
 
 // LoginOk tail constants mirrored from the Mobius LoginOk server packet.
 const (
-        loginOkUnknown1 = 0x00
-        loginOkUnknown2 = 0x00
-        loginOkUnknown3 = 0x000003ea
-        loginOkUnknown4 = 0x00
-        loginOkUnknown5 = 0x02
+	loginOkUnknown1 = 0x00
+	loginOkUnknown2 = 0x00
+	loginOkUnknown3 = 0x000003ea
+	loginOkUnknown4 = 0x00
+	loginOkUnknown5 = 0x02
 )
 
 // LoginOkPacket confirms successful account authentication.
 // Wire format: [opcode 0x03][loginOkID1: 4][loginOkID2: 4][5 unused ints].
 type LoginOkPacket struct {
-        LoginOkID1 int32
-        LoginOkID2 int32
+	LoginOkID1 int32
+	LoginOkID2 int32
 }
 
 // NewLoginOkPacket creates a zero valued login ok packet ready for
 // parsing.
 func NewLoginOkPacket() *LoginOkPacket {
-        return &LoginOkPacket{LoginOkID1: 0, LoginOkID2: 0}
+	return &LoginOkPacket{LoginOkID1: 0, LoginOkID2: 0}
 }
 
 // ToBytes serializes the packet for the emulated login server, mirroring
 // the five unused tail ints of the Mobius LoginOk packet.
 func (p *LoginOkPacket) ToBytes(writer *packet.Writer) error {
-        if err := writer.WriteInt8(loginOkPacketID); err != nil {
-                return err
-        }
-        if err := writer.WriteInt32(p.LoginOkID1); err != nil {
-                return err
-        }
-        if err := writer.WriteInt32(p.LoginOkID2); err != nil {
-                return err
-        }
-        if err := writer.WriteInt32(loginOkUnknown1); err != nil {
-                return err
-        }
-        if err := writer.WriteInt32(loginOkUnknown2); err != nil {
-                return err
-        }
-        if err := writer.WriteInt32(loginOkUnknown3); err != nil {
-                return err
-        }
-        if err := writer.WriteInt32(loginOkUnknown4); err != nil {
-                return err
-        }
+	if err := writer.WriteInt8(loginOkPacketID); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(p.LoginOkID1); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(p.LoginOkID2); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(loginOkUnknown1); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(loginOkUnknown2); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(loginOkUnknown3); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(loginOkUnknown4); err != nil {
+		return err
+	}
 
-        return writer.WriteInt32(loginOkUnknown5)
+	return writer.WriteInt32(loginOkUnknown5)
 }
 
 // ParseLoginOkPacket reads the packet from decrypted content bytes.
 func ParseLoginOkPacket(p *LoginOkPacket, data []byte) error {
-        reader := packet.NewReader(data)
+	reader := packet.NewReader(data)
 
-        id, err := reader.ReadInt8()
-        if err != nil {
-                return err
-        }
-        if id != loginOkPacketID {
-                return errors.New("invalid login ok packet id")
-        }
+	id, err := reader.ReadInt8()
+	if err != nil {
+		return err
+	}
+	if id != loginOkPacketID {
+		return errors.New("invalid login ok packet id")
+	}
 
-        if p.LoginOkID1, err = reader.ReadInt32(); err != nil {
-                return err
-        }
-        if p.LoginOkID2, err = reader.ReadInt32(); err != nil {
-                return err
-        }
+	if p.LoginOkID1, err = reader.ReadInt32(); err != nil {
+		return err
+	}
+	if p.LoginOkID2, err = reader.ReadInt32(); err != nil {
+		return err
+	}
 
-        // Skip unused tail of the packet.
-        if err := reader.Skip(loginOkExtraInts * 4); err != nil {
-                return err
-        }
+	// Skip unused tail of the packet.
+	if err := reader.Skip(loginOkExtraInts * 4); err != nil {
+		return err
+	}
 
-        return nil
+	return nil
 }

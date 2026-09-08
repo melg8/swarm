@@ -19,9 +19,9 @@ func TestCharSelectInfoToBytesRoundTrip(t *testing.T) {
 	original := &CharSelectInfoPacket{
 		Count: 1,
 		Characters: []CharacterInfo{{
-			Name:        "proxybot",
-			ObjectID:    1055,
-			Account:     "test1",
+			Name:     "proxybot",
+			ObjectID: 1055,
+			Account:  "test1",
 			// SessionID and ClanID are skipped by the parser (never
 			// stored), so the round trip compares them as zeros.
 			SessionID:   0,
@@ -62,14 +62,18 @@ func TestCharSelectInfoToBytesRoundTrip(t *testing.T) {
 	require.Equal(t, original.Characters[0].X, parsed.Characters[0].X)
 	require.Equal(t, original.Characters[0].Y, parsed.Characters[0].Y)
 	require.Equal(t, original.Characters[0].Z, parsed.Characters[0].Z)
-	require.Equal(t, original.Characters[0].CurrentHP, parsed.Characters[0].CurrentHP)
-	require.Equal(t, original.Characters[0].CurrentMP, parsed.Characters[0].CurrentMP)
+	require.InDelta(t, original.Characters[0].CurrentHP,
+		parsed.Characters[0].CurrentHP, 0.0001)
+	require.InDelta(t, original.Characters[0].CurrentMP,
+		parsed.Characters[0].CurrentMP, 0.0001)
 	require.Equal(t, original.Characters[0].Level, parsed.Characters[0].Level)
 	require.Equal(t, original.Characters[0].HairStyle, parsed.Characters[0].HairStyle)
 	require.Equal(t, original.Characters[0].HairColor, parsed.Characters[0].HairColor)
 	require.Equal(t, original.Characters[0].Face, parsed.Characters[0].Face)
-	require.Equal(t, original.Characters[0].MaxHP, parsed.Characters[0].MaxHP)
-	require.Equal(t, original.Characters[0].MaxMP, parsed.Characters[0].MaxMP)
+	require.InDelta(t, original.Characters[0].MaxHP,
+		parsed.Characters[0].MaxHP, 0.0001)
+	require.InDelta(t, original.Characters[0].MaxMP,
+		parsed.Characters[0].MaxMP, 0.0001)
 	require.Equal(t, original.Characters[0].DeleteTimer, parsed.Characters[0].DeleteTimer)
 }
 

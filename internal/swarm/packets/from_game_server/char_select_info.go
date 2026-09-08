@@ -264,6 +264,18 @@ func (p *CharSelectInfoPacket) ToBytes(writer *packet.Writer) error {
 
 // writeCharacterInfo writes a single character entry.
 func writeCharacterInfo(writer *packet.Writer, info *CharacterInfo) error {
+	if err := writeCharacterIdentity(writer, info); err != nil {
+		return err
+	}
+	if err := writeCharacterVitals(writer, info); err != nil {
+		return err
+	}
+
+	return writeCharacterAppearance(writer, info)
+}
+
+// writeCharacterIdentity writes the strings, ids and position fields.
+func writeCharacterIdentity(writer *packet.Writer, info *CharacterInfo) error {
 	if err := writer.WriteStringAsUtf16(info.Name); err != nil {
 		return err
 	}
@@ -300,9 +312,13 @@ func writeCharacterInfo(writer *packet.Writer, info *CharacterInfo) error {
 	if err := writer.WriteInt32(info.Y); err != nil {
 		return err
 	}
-	if err := writer.WriteInt32(info.Z); err != nil {
-		return err
-	}
+
+	return writer.WriteInt32(info.Z)
+}
+
+// writeCharacterVitals writes the hp/mp, sp/exp/level and karma blocks
+// including the deprecated zero ints and the paperdoll tables.
+func writeCharacterVitals(writer *packet.Writer, info *CharacterInfo) error {
 	if err := writer.WriteFloat64(info.CurrentHP); err != nil {
 		return err
 	}
@@ -318,24 +334,21 @@ func writeCharacterInfo(writer *packet.Writer, info *CharacterInfo) error {
 	if err := writer.WriteInt32(info.Level); err != nil {
 		return err
 	}
-	if err := writer.WriteInt32(0); err != nil { // karma
+	// karma plus the deprecated zero block
+	if err := writeZeroInts(writer, 1+charInfoZeroInts); err != nil {
 		return err
 	}
-	for range charInfoZeroInts {
-		if err := writer.WriteInt32(0); err != nil {
-			return err
-		}
+	if err := writeZeroInts(writer, charInfoPaperdollSlots); err != nil {
+		return err
 	}
-	for range charInfoPaperdollSlots {
-		if err := writer.WriteInt32(0); err != nil { // paperdoll object ids
-			return err
-		}
-	}
-	for range charInfoPaperdollSlots {
-		if err := writer.WriteInt32(0); err != nil { // paperdoll item ids
-			return err
-		}
-	}
+
+	return writeZeroInts(writer, charInfoPaperdollSlots)
+}
+
+// writeCharacterAppearance writes the hair, face and max vitals fields.
+func writeCharacterAppearance(
+	writer *packet.Writer, info *CharacterInfo,
+) error {
 	if err := writer.WriteInt32(info.HairStyle); err != nil {
 		return err
 	}
@@ -353,4 +366,16 @@ func writeCharacterInfo(writer *packet.Writer, info *CharacterInfo) error {
 	}
 
 	return writer.WriteInt32(info.DeleteTimer)
+}
+
+// writeZeroInts writes count zero int32 fields (the deprecated and
+// paperdoll blocks of the packet).
+func writeZeroInts(writer *packet.Writer, count int) error {
+	for range count {
+		if err := writer.WriteInt32(0); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

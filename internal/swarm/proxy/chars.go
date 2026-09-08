@@ -81,7 +81,9 @@ func (gc *gameConn) characterInfo(
 
 // recordedCharacter returns the entry of the played character from the
 // newest recorded real char list of the bot session, or nil.
-func (gc *gameConn) recordedCharacter(name string) *fromgameserver.CharacterInfo {
+func (gc *gameConn) recordedCharacter(
+	name string,
+) *fromgameserver.CharacterInfo {
 	if gc.session == nil {
 		return nil
 	}
@@ -92,7 +94,8 @@ func (gc *gameConn) recordedCharacter(name string) *fromgameserver.CharacterInfo
 		if len(payload) == 0 || payload[0] != charListOpcode {
 			return true
 		}
-		if err := fromgameserver.ParseCharSelectInfoPacket(list, payload); err != nil {
+		err := fromgameserver.ParseCharSelectInfoPacket(list, payload)
+		if err != nil {
 			return true
 		}
 		for i := range list.Characters {

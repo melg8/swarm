@@ -285,10 +285,11 @@ func (gc *GameClient) SendRaw(payload []byte) error {
 	gc.writeMu.Lock()
 	defer gc.writeMu.Unlock()
 
-	// The encryption transforms the buffer in place and the payload may
-	// be backed by a shared proxy buffer, so it is copied into the
+	// The encryption transforms the buffer in place and the payload
+	// may be backed by a shared proxy buffer, so it is copied into the
 	// reusable outbound scratch first.
-	wire := append(gc.rawWriteBuf[:0], payload...)
+	wire := make([]byte, 0, len(payload))
+	wire = append(wire, payload...)
 	gc.rawWriteBuf = wire
 	gc.crypt.Encrypt(wire)
 

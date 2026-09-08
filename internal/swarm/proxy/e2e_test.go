@@ -75,7 +75,7 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
 	go func() {
 		_ = server.Serve()
 	}()
-	t.Cleanup(func() { _ = server.Shutdown(nil) })
+	t.Cleanup(func() { _ = server.Shutdown(context.Background()) })
 
 	// The bot session: the same wiring runBot uses (login, game
 	// handshake, character, world entry, proxy registration).
@@ -129,7 +129,7 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
 		charList, charListPayload))
 	require.Len(t, charList.Characters, 1)
 	require.Equal(t, e2eAccount, charList.Characters[0].Name)
-	require.Greater(t, charList.Characters[0].Level, int32(0))
+	require.Positive(t, charList.Characters[0].Level)
 
 	// Character selection answers with the recorded packet of the bot.
 	gameClient.sendPacket([]byte{0x0D, 0x00, 0x00, 0x00, 0x00})

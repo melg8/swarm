@@ -7,6 +7,7 @@ package proxy
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"net"
 	"strings"
@@ -73,6 +74,8 @@ func (s *Server) handleLoginConn(conn net.Conn) {
 		id:       id,
 		state:    loginStateConnected,
 		account:  "",
+		loginOk1: 0,
+		loginOk2: 0,
 		readBuf:  nil,
 		writeBuf: nil,
 	}
@@ -96,6 +99,12 @@ func (lc *loginConn) run() error {
 	for {
 		payload, err := readWirePacket(lc.conn, lc.readBuf)
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				// The client closed the connection: the normal end of
+				// a login session, not a failure.
+				return nil
+			}
+
 			return fmt.Errorf("login read failed: %w", err)
 		}
 		lc.readBuf = payload
@@ -119,7 +128,7 @@ func (lc *loginConn) run() error {
 // modulus and the four GameGuard constants).
 func (lc *loginConn) sendInit() error {
 	initPacket := &fromauthserver.InitPacket{
-		SessionID:       rand.Int32(),
+		SessionID:       rand.Int32(), //nolint:gosec // a session id, not a secret
 		ProtocolVersion: loginProtocolRevision,
 		RsaPublicKey:    lc.server.rsaModulusBytes(),
 		GameGuard1:      loginGG1,
@@ -181,11 +190,14 @@ func (lc *loginConn) handleAuthLogin(content []byte) error {
 	}
 	lc.account = strings.ToLower(account)
 	lc.server.logger.Printf(
-		"login#%d: auth login accepted for account %q (password %q, any pair is accepted)",
+		"login#%d: auth login accepted for account %q "+
+			"(password %q, any pair is accepted)",
 		lc.id, lc.account, password)
 
-	lc.loginOk1 = rand.Int32()
-	lc.loginOk2 = rand.Int32()
+	// The login ok session ids only have to be unique within the
+	// process: they are not secrets.
+	lc.loginOk1 = rand.Int32() //nolint:gosec // see above
+	lc.loginOk2 = rand.Int32() //nolint:gosec // see above
 	reply := &fromauthserver.LoginOkPacket{
 		LoginOkID1: lc.loginOk1,
 		LoginOkID2: lc.loginOk2,
@@ -222,7 +234,8 @@ func (lc *loginConn) handleServerList(_ []byte) error {
 	if err := lc.sendPacket(list); err != nil {
 		return fmt.Errorf("failed to send server list: %w", err)
 	}
-	lc.server.logger.Printf("login#%d: sent server list, proxy game at %d.%d.%d.%d:%d",
+	lc.server.logger.Printf(
+		"login#%d: sent server list, proxy game at %d.%d.%d.%d:%d",
 		lc.id, ip[0], ip[1], ip[2], ip[3], lc.server.gamePort())
 
 	return nil
@@ -239,8 +252,8 @@ func (lc *loginConn) handleServerLogin(content []byte) error {
 		lc.id, serverID)
 
 	reply := &fromauthserver.PlayOkPacket{
-		PlayOkID1: rand.Int32(),
-		PlayOkID2: rand.Int32(),
+		PlayOkID1: rand.Int32(), //nolint:gosec // a session key, not a secret
+		PlayOkID2: rand.Int32(), //nolint:gosec // a session key, not a secret
 	}
 	if err := lc.sendPacket(reply); err != nil {
 		return fmt.Errorf("failed to send play ok: %w", err)

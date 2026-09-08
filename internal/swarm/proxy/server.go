@@ -121,9 +121,9 @@ func NewServer(logger *log.Logger, opts ...Option) *Server {
 	return server
 }
 
-// SetRsaModulus publishes the scrambled RSA modulus of the real login
-// server so the emulated Init packet mirrors it (captured by the bot's
-// own login flow, see connection.Authenticate).
+// SetRsaModulus publishes the scrambled RSA modulus of the real
+// login server so the emulated Init packet mirrors it (captured by
+// the bot's own login flow, see connection.Authenticate).
 func (s *Server) SetRsaModulus(modulus []byte) {
 	s.rsaModulus.Store(modulus)
 }
@@ -145,7 +145,9 @@ func (s *Server) RegisterSession(
 	id string, client RawSender, tracker *state.Bot,
 ) *Recorder {
 	recorder := NewRecorder()
-	session := &botSession{id: id, recorder: recorder, client: client, tracker: tracker}
+	session := &botSession{
+		id: id, recorder: recorder, client: client, tracker: tracker,
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -156,6 +158,7 @@ func (s *Server) RegisterSession(
 			s.sessions[i] = session
 			replaced = true
 			go old.recorder.Close()
+
 			break
 		}
 	}
@@ -268,8 +271,9 @@ func (s *Server) ClientCount() int {
 // -proxy-game flag).
 func (s *Server) gamePort() int32 {
 	if len(s.listeners) > 1 {
-		if _, port, err := net.SplitHostPort(s.listeners[1].Addr().String()); err == nil {
-			if value, err := strconv.Atoi(port); err == nil {
+		addr := s.listeners[1].Addr().String()
+		if _, port, err := net.SplitHostPort(addr); err == nil {
+			if value, err := strconv.ParseInt(port, 10, 32); err == nil {
 				return int32(value)
 			}
 		}
@@ -289,7 +293,8 @@ func (s *Server) nextConnID() int64 {
 // means the real login server still owns 0.0.0.0:2106, see
 // data/client/Readme.txt).
 func (s *Server) Listen() error {
-	if err := s.listenFamily(true, s.loginAddrs, s.serveLoginListener); err != nil {
+	err := s.listenFamily(true, s.loginAddrs, s.serveLoginListener)
+	if err != nil {
 		return err
 	}
 
@@ -358,7 +363,9 @@ func (s *Server) listenFamily(
 	mandatory bool, addrs []string, serve func(net.Listener),
 ) error {
 	for i, addr := range addrs {
-		listener, err := net.Listen("tcp", addr)
+		//nolint:exhaustruct // the zero fields of ListenConfig are the defaults
+		listener, err := (&net.ListenConfig{}).Listen(
+			context.Background(), "tcp", addr)
 		if err != nil {
 			if i == 0 && mandatory {
 				return fmt.Errorf("proxy cannot bind %s: %w", addr, err)

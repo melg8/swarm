@@ -7,6 +7,7 @@ package proxy
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"net"
 	"sync"
@@ -124,6 +125,12 @@ func (gc *gameConn) run() error {
 	for {
 		payload, err := readWirePacket(gc.conn, gc.readBuf)
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				// The client closed the connection itself: a normal
+				// disconnect, not a failure.
+				return nil
+			}
+
 			return fmt.Errorf("client read failed: %w", err)
 		}
 		gc.readBuf = payload
@@ -157,6 +164,7 @@ func (gc *gameConn) handshake() error {
 	}
 	if version != togameserver.C1ProtocolVersion {
 		gc.sendRawKeyPacket(0, crypt.DefaultGameCryptKey())
+
 		return fmt.Errorf("client protocol version %d rejected", version)
 	}
 
@@ -174,8 +182,10 @@ func (gc *gameConn) handshake() error {
 }
 
 // sendRawKeyPacket writes the unencrypted KeyPacket of the handshake:
-// [opcode 0x00][result: 1][key: 8][serverID: 4][1: 4].
-func (gc *gameConn) sendRawKeyPacket(result byte, key [crypt.GameCryptKeySize]byte) {
+// [opcode 0x00][result: 1][key: 8][serverID: 4][tail 1: 4].
+func (gc *gameConn) sendRawKeyPacket(
+	result byte, key [crypt.GameCryptKeySize]byte,
+) {
 	writer := packet.NewWriter()
 	if err := writer.WriteInt8(gameOpKeyPacket); err != nil {
 		return
@@ -197,11 +207,13 @@ func (gc *gameConn) sendRawKeyPacket(result byte, key [crypt.GameCryptKeySize]by
 	}
 }
 
-// randomGameKey generates the per connection game cipher key.
+// randomGameKey generates the per connection game cipher key. The
+// key is not a secret (the real Mobius server even ships one fixed
+// key), so the math/rand generator is fine here.
 func randomGameKey() [crypt.GameCryptKeySize]byte {
 	var key [crypt.GameCryptKeySize]byte
 	for i := range key {
-		key[i] = byte(rand.IntN(256))
+		key[i] = byte(rand.IntN(256)) //nolint:gosec // see above
 	}
 
 	return key
@@ -211,6 +223,13 @@ func randomGameKey() [crypt.GameCryptKeySize]byte {
 func (gc *gameConn) handleClientPacket(payload []byte) error {
 	opcode := payload[0]
 	switch gc.state {
+	case gameStateHandshake:
+		// The handshake completes before the read loop starts; a packet
+		// arriving here means a desynchronized client.
+		gc.server.logger.Printf(
+			"game#%d: packet 0x%02x before the handshake finished",
+			gc.id, opcode)
+
 	case gameStateAuthed:
 		if opcode == gameOpAuthLogin {
 			return gc.handleAuthLogin(payload)
@@ -225,6 +244,7 @@ func (gc *gameConn) handleClientPacket(payload []byte) error {
 			gc.server.logger.Printf(
 				"game#%d: character management packet 0x%02x ignored by the emulation",
 				gc.id, opcode)
+
 			return nil
 		}
 	case gameStateSelected:
@@ -425,9 +445,11 @@ func (gc *gameConn) runRelay() {
 			return
 		case <-sub.poison:
 			gc.shutdown("the client fell behind the live feed")
+
 			return
 		case <-recorder.CloseSignal():
 			gc.shutdown("the bot session ended")
+
 			return
 		case update := <-sub.ch:
 			if !gc.relayToClient(update.payload) {
