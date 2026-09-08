@@ -623,6 +623,15 @@ func (b *Bot) Version() uint64 {
 	return b.version
 }
 
+// Packets returns the count of packets the session received so far:
+// the fleet diagnostics sample it to report the live packet rate.
+func (b *Bot) Packets() int64 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.packets
+}
+
 // Status returns the current session status.
 func (b *Bot) Status() Status {
 	b.mu.RLock()

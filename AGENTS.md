@@ -928,29 +928,62 @@ the same variables).
   snapshot whenever the bot state version changes), `GET /` and the
   static assets.
 - Snapshot encoding: the state endpoint and the SSE stream serialize
-  the snapshot through the hand rolled append writer
-  (`state.Snapshot.AppendJSON`, see `state/snapshot_json*.go`) - a
-  linear field walk over the flat arrays with the exact bytes
-  encoding/json produces (field order, ES6 float formatting, HTML
-  escaping, RFC3339Nano times), pinned byte for byte by
-  `TestSnapshotJSONMatchesReflection`. Do not route these paths back
-  through `json.Marshal`: its reflection walk plus the compacting scan
-  over the MarshalJSON result costs 4x the direct write (249 us/104
-  allocs -> 127 us/4 allocs per 200 npc snapshot, see
-  `webserver/server_bench_test.go`). The world objects live in a
-  dense slot array of the `state.objectStore` (the `world` field of
-  the bot: `objects` slice + id to slot index, removals swap the
-  last record in), the social pull check of the target search works
-  on precomputed clan bitmasks (`npcdata.NPCClanMask`), and the NPC
-  clans resolve to shared pre-split lists - keep new tracker code
-  on those layouts. The tracker itself is split into components:
-  `objectStore` (dense world storage + scans in scans.go), `eventLog`
+  the bot state through the direct live encoder
+  (`state.Bot.AppendSnapshotJSON`, see `state/snapshot_live.go`): it
+  walks the live records under the read lock, builds the per element
+  view structs on the call stack and reuses the golden append
+  functions of `state/snapshot_json*.go` (the exact bytes
+  encoding/json produces - field order, ES6 float formatting, HTML
+  escaping, RFC3339Nano times), so the steady state of a watched
+  stream allocates nothing per event. Do not route these paths back
+  through `json.Marshal` (its reflection walk plus the compacting scan
+  over the MarshalJSON result costs 4x the direct write) and do not
+  insert a `Snapshot()` copy in between (the copy paid the object,
+  combat, event and chat slice allocations, ~26 KB of garbage per
+  event on a 100 npc bot): `Snapshot()` remains the deep copy view for
+  the tests and external readers, and both paths share the
+  `objectSnapshotLocked` view builder - keep them byte identical
+  (pinned by `TestAppendSnapshotJSONMatchesSnapshot` and
+  `TestSnapshotJSONMatchesReflection`). The world objects live in the
+  SoA halves of the `state.objectStore` (the `world` field of the
+  bot): `hot` (an 88 byte `objectHot` per object - position,
+  destination, level, kind code, attack flags, clan bitmask, speeds,
+  move and combat unix nanosecond stamps) and `cold` (an
+  `objectCold` - names, title, template, heading, vitals, social
+  marker), length locked and indexed by the same slot, removals swap
+  the last records of both halves in. The scans and the movement
+  projection walk the hot array only (see scans.go); timestamps
+  store unix nanoseconds with 0 as the zero time whose JSON view
+  matches `time.Time.UnixMilli` exactly; the object kind is a one
+  byte code (`kindCode`/`kindString`). The inventory lives in the
+  dense `inventoryStore` (canonical widget order restored once per
+  mutation batch, see `inventory_store.go`). The social pull check
+  of the target search works on precomputed clan bitmasks
+  (`npcdata.NPCClanMask`), and the NPC clans resolve to shared
+  pre-split lists - keep new tracker code on those layouts. The
+  tracker itself is split into components: `objectStore` (dense SoA
+  world storage + scans in scans.go), `inventoryStore`, `eventLog`
   and `chatLog` (lazily allocated rings - a fleet of idle sessions
   pays no per bot log memory), `combatFeed` (the animation feed),
   with `Bot` as the locking facade; the SSE stream of the webserver
   reuses its frame and payload buffers per connection (see
   `sseStream`), so a watched fleet costs no per event buffer
   garbage.
+- Fleet E2E benchmark: `internal/swarm/fleete2e` runs the real
+  100 bot fleet against the live stack (login, elven fighters, hunt
+  loops, the 24/7 reconnect supervisor) and measures the state layer
+  under the real packet load - the aggregate live encode sweep, the
+  engage scan sweep and the fleet packet rate. It needs the deployed
+  stack and the explicit opt in (`SWARM_FLEET_E2E=1 go test
+  ./internal/swarm/fleete2e/ -bench . -benchtime 20x -timeout 25m`);
+  the crowded starting area cycles sessions through the emergency
+  logout cooldowns, so the fleet reaches a breathing steady state
+  (about two thirds online) instead of a static hundred. The
+  in-process cache pressure shape lives in
+  `state.BenchmarkFleetScanPressure` and
+  `state.BenchmarkFleetLiveEncodePressure` (a hundred 200 npc worlds
+  walked back to back - the working set that shows the hot/cold
+  record split, the single world benches fit any cache).
 - The state tracker (`internal/swarm/state`) is fed by the game session
   from these packets: UserInfo (self vitals, weight and speeds), CharInfo
   (players with speeds and running/dead/combat flags), NpcInfo

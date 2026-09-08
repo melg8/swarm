@@ -229,3 +229,60 @@ func BenchmarkHundredBotsTickTraffic(b *testing.B) {
 		}
 	}
 }
+
+// benchScanFleet builds the cache pressure shape of the fleet: a
+// hundred trackers, each carrying a full 200 npc world, so the scan
+// footprint of one fleet sweep (100 x 17.6 KB of hot records after
+// the SoA split, 4.8 MB before it) exceeds the per core caches - the
+// memory layout, not the arithmetic, decides the throughput there.
+func benchScanFleet() []*Bot {
+	bots := make([]*Bot, 0, benchBotCount)
+	for i := range benchBotCount {
+		bot := NewBot("scan" + strconv.Itoa(i))
+		bot.SetCharacter("char"+strconv.Itoa(i),
+			int32(268473919+i), 18,
+			benchSelfX, benchSelfY, benchSelfZ, 100, 50)
+		for j := range 200 {
+			bot.ApplyNpcInfo(benchNpcInfo(
+				int32(1_000_000+j*10), benchGoblinTemplate,
+				benchSelfX+int32((j*97)%2200-1100),
+				benchSelfY+int32((j*131)%2200-1100)))
+		}
+		bots = append(bots, bot)
+	}
+
+	return bots
+}
+
+// BenchmarkFleetScanPressure measures the target search across the
+// whole fleet at once: a hundred 200 npc worlds walked back to back
+// hold far more scan footprint than the core caches, so this is the
+// bench that pays (and shows) the hot/cold record split - the single
+// world benches fit any cache and measure the compute only.
+func BenchmarkFleetScanPressure(b *testing.B) {
+	bots := benchScanFleet()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		for _, bot := range bots {
+			bot.NearestAttackableConstrained(1500, nil, nil, 0, true)
+		}
+	}
+}
+
+// BenchmarkFleetLiveEncodePressure measures the snapshot encode sweep
+// across the same cache pressure shape: the worst case of the web
+// view watching the whole fleet, every tracker walked once per
+// iteration while the aggregate working set stays far above the
+// caches.
+func BenchmarkFleetLiveEncodePressure(b *testing.B) {
+	bots := benchScanFleet()
+	payload := make([]byte, 0, 128<<10)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		for _, bot := range bots {
+			payload = bot.AppendSnapshotJSON(payload[:0])
+		}
+	}
+}

@@ -1410,3 +1410,57 @@ name the variant number that best fits the real bot UI.
   + apply layers), hunt loop.go 1480 -> 1010 (safety, movement
   and action phase files). Six commits pushed to
   mobius-c1-client-1 as melg8.
+- 2026-09-08: direct live encode round. The inventory map became a
+  dense canonical store (inventory_store.go: the widget order -
+  equipped first, then item id, object id - is restored once per
+  mutation batch, so the snapshot fill walks the slice with no
+  read time materialize-and-sort and the gear scans skip the map
+  buckets). Bot.AppendSnapshotJSON (snapshot_live.go) encodes the
+  whole state straight from the live records under the read lock:
+  the per element view structs live on the call stack and the
+  golden append functions of snapshot_json.go are reused per
+  element (appendEventJSON, appendChatEventJSON, ...), so the
+  steady state of a watched stream allocates nothing - the
+  Snapshot() copy in between used to pay the object, combat, event
+  and chat slice allocations. Byte equality with the copy path is
+  pinned by TestAppendSnapshotJSONMatchesSnapshot (same
+  millisecond retry) on top of the reflection golden suite; the
+  SSE stream event and the state endpoint call the live encoder
+  directly. SSEStreamSteadyState 65 us/25.7 KB/3 allocs ->
+  53 us/3 B/0 allocs; SSEEncodeAndFrame 109 us/173 KB/5 allocs ->
+  98 us/147 KB/2 allocs.
+- 2026-09-08: SoA split of the world records. The 240 byte
+  WorldObject became two parallel dense arrays in objectStore,
+  length locked and indexed by the same slot: objectHot (88 bytes:
+  the scan fields - position, destination, level, the one byte
+  kind code, attack flags, the clan bitmask, speeds, move and
+  combat unix nanosecond stamps with 0 as the zero time) and
+  objectCold (names, title, template, heading, vitals, the social
+  marker). Every scan and the movement projection walk the hot
+  array only; a 200 npc world drops from 48 KB to 17.6 KB of scan
+  traffic (the strings stop polluting the scan cache lines). The
+  priority biased target search and the ZoneHasAttackableBelow
+  rotation check of the parallel agent kept their semantics on
+  the new layout. Constrained 200 npc scan 6.6 us/0 allocs (with
+  the priority bias); the new BenchmarkFleetScanPressure (a
+  hundred 200 npc worlds swept back to back, 1.76 MB of hot
+  records vs 4.8 MB before the split) measures 1.2 ms per fleet
+  sweep, and BenchmarkFleetLiveEncodePressure 8.4 ms per fleet
+  sweep at 0 allocs.
+- 2026-09-08: real 100 bot fleet E2E. internal/swarm/fleete2e
+  launches a hundred live sessions against the deployed Mobius
+  stack (login, elven fighters, hunt loops, the 24/7 reconnect
+  supervisor with the emergency logout cooldown honored) and
+  measures the state layer under the real packet load:
+  BenchmarkFleetE2ELiveEncodeSweep 5.9 ms per 100 bot sweep
+  (~59 us per bot) under live contention, the engage scan sweep
+  64 us per fleet, and the fleet packet rate test samples 2860
+  packets/s aggregate with 60-70 of the 100 sessions online
+  (the crowded elven starting area cycles the rest through the
+  emergency logout cooldowns - the breathing steady state is the
+  real shape, the supervisor brings them back). The suite is
+  opt in: SWARM_FLEET_E2E=1 go test ./internal/swarm/fleete2e/
+  -bench . -benchtime 20x -timeout 25m. Full verification each
+  round: go build/vet/test (14 packages), golangci-lint 0
+  issues, mobius_e2e.sh 45 -> E2E_OK. Four commits pushed to
+  mobius-c1-client-1 as melg8.
