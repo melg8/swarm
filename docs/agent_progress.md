@@ -845,3 +845,49 @@ actually land (single hit per event).
   zone command stop, the combat animation layer) - the doc patch of
   the previous commit failed its pattern match and the code went out
   alone.
+
+## Active task: benchmark suite and data oriented optimization of the tracker hot paths
+
+Started: 2026-09-08. Branch: `mobius-c1-client-1`. Commits as melg8,
+pushed as they land (rebase before every push - other models edit the
+branch concurrently).
+
+### Goal
+
+The user asked for benchmark tests over the code base, the slowest
+elements identified from their results, and those elements eliminated
+with data oriented design (dense arrays, cache friendly layouts,
+precomputed flat data instead of per call allocations).
+
+### Constraints
+
+- The behavior of the tracker must not change: the existing unit
+  tests of state, hunt and webserver stay green untouched.
+- The stack was deployed and verified (STACK_READY, ports 2106/7777/
+  3306, 75 tables) before the work started.
+- Benchmarks follow the repo conventions: `_bench_test.go` files,
+  `b.ReportAllocs()`, `for range b.N` (go.mod pins go 1.23).
+
+### Measured baseline (the slowest elements)
+
+- `state.NearestAttackableConstrained` 316 us / 200 npcs - the
+  `avoidSocial` path rescans the whole objects map per candidate
+  (O(N^2) with 200 byte struct copies out of the map).
+- `webserver` snapshot JSON marshal 249 us, 120 KB, 104 allocs per
+  event (encoding/json reflection over the full snapshot, one per
+  version change - per received packet with a web client).
+- `state.Snapshot` build 27 us, 48 KB, 6 allocs (map iteration with
+  struct copies, sort.Slice reflection over the inventory).
+- `state.MedianZoneMobLevel` 5.9 us, 3 allocs (sort.Slice).
+- npcdata map lookups 5.2 ns each, `NPCClans` 60 ns + 1 alloc
+  (strings.Split per NpcInfo packet).
+
+### Progress
+
+- 2026-09-08: benchmark suite added: `state/bot_bench_test.go`
+  (Apply paths, target searches, zone scans, snapshot build),
+  `npcdata/npcdata_bench_test.go` (dictionary lookups),
+  `hunt/zones_bench_test.go` (zone picker), `webserver/
+  server_bench_test.go` (snapshot JSON marshal). Baseline recorded
+  above. Pushed as the first atomic commit.
+>>>>>>> 99805f0 (add benchmark suite for state, npcdata, hunt and webserver hot paths)
