@@ -206,6 +206,11 @@ sed -i 's/^PathFinding = 2$/PathFinding = 0/' \
 [ -f "${MOBIUS_C1}/dist/game/config/ipconfig.xml" ] || \
     cp "${MOBIUS_C1}/dist/game/config/default-ipconfig.xml" \
        "${MOBIUS_C1}/dist/game/config/ipconfig.xml"
+# логин-сервер слушает только 127.0.0.1:2106, чтобы MITM-прокси swarm
+# мог занять 127.0.0.2:2106 для C1-клиентов с захардкоженным портом
+# (см. data/client/Readme.txt и docs/proxy.md)
+sed -i 's/^LoginserverHostname = 0.0.0.0$/LoginserverHostname = 127.0.0.1/' \
+    "${MOBIUS_C1}/dist/login/config/Server.ini"
 
 # ---------------------------------------------------------------------------
 step "7/8. БД: datadir, запуск MariaDB, импорт SQL (75 таблиц)"

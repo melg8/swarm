@@ -426,6 +426,7 @@ func startProxy(cfg config) *proxy.Server {
 		proxy.WithGameAddresses(splitAddresses(cfg.proxyGame)...))
 	if err := server.Listen(); err != nil {
 		logger.Printf("Proxy failed to start: %v", err)
+		log.Printf("Proxy failed to start: %v", err)
 
 		return nil
 	}
@@ -434,6 +435,11 @@ func startProxy(cfg config) *proxy.Server {
 			logger.Printf("Proxy stopped: %v", err)
 		}
 	}()
+
+	logger.Printf("proxy started, login on %v, game on %v, log file %s",
+		splitAddresses(cfg.proxyLogin), splitAddresses(cfg.proxyGame), cfg.proxyLog)
+	log.Printf("Proxy for C1 clients ready: login %s, game %s, client log %s",
+		server.LoginAddr(), server.GameAddr(), cfg.proxyLog)
 
 	return server
 }
