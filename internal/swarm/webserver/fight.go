@@ -28,6 +28,9 @@ func NewFightServer(address string, logger *log.Logger) *Server {
 // handleFightConfig reports the fight showcase mode of the web UI.
 func (s *Server) handleFightConfig(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, s.logger, configResponse{
-		Mode: modeFight,
+		Mode:     modeFight,
+		Geodata:  nil,
+		MaxSteps: 0,
+		Defaults: nil,
 	})
 }

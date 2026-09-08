@@ -275,20 +275,21 @@ func TestWriteSnapshotEventStreamsVersionChanges(t *testing.T) {
 	_, bot := newTestServer(t)
 	recorder := httptest.NewRecorder()
 	lastVersion := bot.Version()
+	stream := &sseStream{frame: nil, payload: nil}
 
 	// An unchanged version writes nothing.
-	writeSnapshotEvent(recorder, recorder, bot, &lastVersion)
+	writeSnapshotEvent(recorder, recorder, bot, &lastVersion, stream)
 	require.Empty(t, recorder.Body.String())
 
 	// A version change writes the snapshot event and moves the cursor.
 	bot.ApplyNpcInfo(state.NpcInfo{ObjectID: 9, Name: "Orc"})
-	writeSnapshotEvent(recorder, recorder, bot, &lastVersion)
+	writeSnapshotEvent(recorder, recorder, bot, &lastVersion, stream)
 	require.Contains(t, recorder.Body.String(), "event: snapshot")
 	require.Contains(t, recorder.Body.String(), `"id":"test1"`)
 	require.Equal(t, bot.Version(), lastVersion)
 
 	// The delivered version does not repeat.
-	writeSnapshotEvent(recorder, recorder, bot, &lastVersion)
+	writeSnapshotEvent(recorder, recorder, bot, &lastVersion, stream)
 	require.Equal(t, 1, bytes.Count(recorder.Body.Bytes(),
 		[]byte("event: snapshot")))
 }

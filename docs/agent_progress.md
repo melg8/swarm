@@ -1129,3 +1129,21 @@ cache friendly, and refactor the oversized god object classes.
   garbage); SSEStreamPoll100 1.4 us. The slowest elements of the
   fleet shape: the SSE per event triple allocation, the registry
   map walk in List, and the per bot upfront ring allocations.
+- 2026-09-08: the registry reworked to the dense layout (a
+  []*Bot slice walked by List plus an id->slot index map for
+  Get; Add replaces in place so the order stays stable).
+  RegistryList100 12.5 us -> 10.7 us (the per bot map hash and
+  the random pointer hop of the old map iteration are gone).
+- 2026-09-08: the SSE stream path reuses its buffers. The
+  streamEvents connection now owns an sseStream carrying the
+  frame buffer and the JSON payload buffer; both are paid once
+  on the first event and reused by every later one (the old
+  path allocated a fresh 64 KB frame plus a fresh payload per
+  event). The writeSnapshotEvent tests gained the stream
+  argument; the ping comment is a package level value. The
+  steady state benchmark: SSEStreamSteadyState 67.4 us/25.7
+  KB/3 allocs per event against the old path 109 us/173 KB/5
+  allocs (-85% garbage, -38% time; the remaining 3 allocs are
+  the Snapshot deep copy the encoder needs). Also fixed the
+  lint drift of the fight showcase config response (explicit
+  zero fields, exhaustruct).

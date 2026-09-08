@@ -46,6 +46,45 @@ const (
 	eventPingPeriod = 15 * time.Second
 )
 
+// ssePingComment is the constant keepalive comment of the stream.
+var ssePingComment = []byte(": ping\n\n")
+
+// sseStream writes the SSE events of one open connection. It owns
+// the reusable frame and payload buffers, so the steady state of a
+// long lived stream costs zero allocations per event: the frame
+// assembly and the JSON encoding both write into buffers sized by
+// the first (largest) snapshot and reused by every later one (a
+// watched 100 npc bot used to pay a fresh 64 KB frame plus a fresh
+// payload buffer on every version change - with a fleet of
+// streams that is megabytes of garbage per second).
+type sseStream struct {
+	frame   []byte
+	payload []byte
+}
+
+// snapshotEvent encodes the current bot state into the payload
+// buffer, assembles the SSE frame over it and writes both out.
+func (s *sseStream) snapshotEvent(
+	w http.ResponseWriter, flusher http.Flusher, bot *state.Bot,
+) {
+	s.payload = bot.Snapshot().AppendJSON(s.payload[:0])
+	s.frame = appendEventFrame(s.frame[:0], s.payload)
+	if _, err := w.Write(s.frame); err != nil {
+		return
+	}
+	flusher.Flush()
+}
+
+// appendEventFrame assembles the SSE event frame for a payload into
+// dst: the event header, the data bytes and the blank line that
+// terminates the frame.
+func appendEventFrame(dst, data []byte) []byte {
+	dst = append(dst, "event: snapshot\ndata: "...)
+	dst = append(dst, data...)
+
+	return append(dst, '\n', '\n')
+}
+
 // httpReadHeaderTimeout bounds the header read of the web server.
 const httpReadHeaderTimeout = 5 * time.Second
 
@@ -202,7 +241,8 @@ func (s *Server) streamEvents(
 	ping := time.NewTicker(eventPingPeriod)
 	defer ping.Stop()
 
-	writeEvent(w, flusher, encodeSnapshotJSON(bot.Snapshot()))
+	stream := &sseStream{frame: nil, payload: nil}
+	stream.snapshotEvent(w, flusher, bot)
 	lastVersion := bot.Version()
 
 	for {
@@ -216,14 +256,14 @@ func (s *Server) streamEvents(
 				return
 			}
 		case <-poll.C:
-			writeSnapshotEvent(w, flusher, bot, &lastVersion)
+			writeSnapshotEvent(w, flusher, bot, &lastVersion, stream)
 		}
 	}
 }
 
 // writePing sends the keepalive comment. It reports a write failure.
 func (s *Server) writePing(w http.ResponseWriter, flusher http.Flusher) bool {
-	if _, err := w.Write([]byte(": ping\n\n")); err != nil {
+	if _, err := w.Write(ssePingComment); err != nil {
 		return true
 	}
 	flusher.Flush()
@@ -232,38 +272,25 @@ func (s *Server) writePing(w http.ResponseWriter, flusher http.Flusher) bool {
 }
 
 // writeSnapshotEvent streams the bot state when its version changed.
+// The buffers of the stream are reused across the events.
 func writeSnapshotEvent(
 	w http.ResponseWriter, flusher http.Flusher,
-	bot *state.Bot, lastVersion *uint64,
+	bot *state.Bot, lastVersion *uint64, stream *sseStream,
 ) {
 	version := bot.Version()
 	if version == *lastVersion {
 		return
 	}
-	writeEvent(w, flusher, encodeSnapshotJSON(bot.Snapshot()))
+	stream.snapshotEvent(w, flusher, bot)
 	*lastVersion = version
 }
 
-// encodeSnapshotJSON marshals the snapshot through the direct append
-// writer of the state package (see Snapshot.AppendJSON): the event
-// stream serializes on every version change, so the reflection walk
-// of json.Marshal is the wrong tool here.
-func encodeSnapshotJSON(snap state.Snapshot) []byte {
-	return snap.AppendJSON(nil)
-}
-
-// writeEvent writes one SSE event and flushes it. The frame and the
-// payload share one buffer allocation sized up front.
+// writeEvent writes one SSE event and flushes it. Test seam for
+// the frame layout; the stream path reuses its buffers through
+// sseStream.snapshotEvent instead.
 func writeEvent(w http.ResponseWriter, flusher http.Flusher, data []byte) {
-	event := make([]byte, 0, len(data)+24)
-	event = append(event, "event: snapshot\ndata: "...)
-	event = append(event, data...)
-	event = append(event, '\n', '\n')
-	// The payload is the HTML escaped JSON document of the
-	// snapshot (see Snapshot.AppendJSON) and the SSE stream is
-	// never executed by a browser - the taint report is a false
-	// positive.
-	if _, err := w.Write(event); err != nil { //nolint:gosec // escaped
+	event := appendEventFrame(make([]byte, 0, len(data)+24), data)
+	if _, err := w.Write(event); err != nil {
 		return
 	}
 	flusher.Flush()

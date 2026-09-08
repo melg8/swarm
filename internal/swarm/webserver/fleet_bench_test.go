@@ -133,6 +133,22 @@ func BenchmarkSSEEncodeAndFrame(b *testing.B) {
 	}
 }
 
+// BenchmarkSSEStreamSteadyState measures the per event cost of the
+// real stream path: the sseStream reuses its frame and payload
+// buffers across the events, so only the snapshot build and the
+// encode walk itself remain (the steady state of a long lived
+// fleet stream - the buffers were paid once on the first event).
+func BenchmarkSSEStreamSteadyState(b *testing.B) {
+	bot := benchSnapshotBot(100)
+	discard := &discardWriter{}
+	stream := &sseStream{frame: nil, payload: nil}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		stream.snapshotEvent(discard, discard, bot)
+	}
+}
+
 // BenchmarkSSEStreamPoll100 measures the aggregate poll loop of
 // the fleet streams: every streamEvents connection wakes every
 // 300 ms and checks the version - the idle fleet overhead of the
