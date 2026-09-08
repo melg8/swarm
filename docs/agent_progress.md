@@ -938,3 +938,36 @@ GitLab download attempts continue until they succeed.
   implements the two official channels, AGENTS.md bans mirrors in
   the server integrity rules. Round 33 of the development log.
   `tools/mobius_e2e.sh 45` prints `E2E_OK` on the official stack.
+
+- 2026-09-08: the final verification round. go vet + go test ./...
+  green (14 packages), golangci-lint run back at the two
+  pre-existing exhaustruct debt items of the damage literals (the
+  swing literal got a scoped nolint, ApplyAttack's funlen overage
+  resolved by extracting recordSwingEventsLocked, the parallel
+  session's benchmark/starter-kit files lint-repaired as a drive-by:
+  tab formatting, the lll splits, an unconvert). All four repro
+  harnesses green (repro_map_render keeps its pre-existing zone
+  label failure). tools/mobius_e2e.sh 45: E2E_OK, the bot entered
+  the world and shut down gracefully. Live probe with -hunt -web:
+  the level 1 character hunted the starter keltir meadow (the
+  recalibrated picker), the snapshot carried 30 zone views with the
+  active marker, the aggressive objects carried their aggroRange
+  (the Newbie Helper 1000) and the combatEvents feed flowed with
+  attack and damage beats through real fights.
+
+### Status
+
+- All eleven requested behaviors implemented, unit tested, harness
+  checked, live verified, documented in AGENTS.md and pushed to
+  mobius-c1-client-1 as melg8: (1) the flee episode budget ends the
+  session through the emergency logout; (2) the inactive zones draw
+  bright with a fill behind the hunt zones checkbox; (3) the manual
+  zone selection stops the running walks; (4) the zones live in the
+  collapsible map panel, the sidebar is bots-only; (5) the far
+  target walk closes on packs beyond the engage radius; (6) the
+  manual clicks stand a resting character up before acting; (7) the
+  zone gates open one level above the band top with raised gear
+  gates; (8) the aggression radius circles toggle behind the aggro
+  checkbox; (9) the replacement purchases sell the displaced gear
+  first and count its credit; (10) the red screen edge flash is
+  removed; (11) the swing feed only records the hits that landed.
