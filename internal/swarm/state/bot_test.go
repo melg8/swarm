@@ -423,6 +423,46 @@ func TestBotInfo(t *testing.T) {
 	require.Equal(t, int32(5), info.Level)
 }
 
+// TestSetPhase verifies the hunt loop phase publication: SetPhase
+// stores the phase on the tracker, the Snapshot and the BotInfo carry
+// it for the web UI, a same phase refresh is a no-op (no version
+// churn) and ResetSession clears it for the next login.
+func TestSetPhase(t *testing.T) {
+	bot := NewBot("acc1")
+	require.Empty(t, bot.Phase(), "the phase starts empty")
+
+	bot.SetOnline("test1")
+	snap := bot.Snapshot()
+	require.Empty(t, snap.Phase, "the snapshot phase is empty before set")
+
+	bot.SetPhase("engage")
+	require.Equal(t, "engage", bot.Phase())
+	snap = bot.Snapshot()
+	require.Equal(t, "engage", snap.Phase,
+		"the snapshot carries the published phase")
+	info := bot.Info()
+	require.Equal(t, "engage", info.Phase,
+		"the bot info carries the published phase")
+
+	// A same phase refresh must not bump the version: the per tick
+	// call of the hunt loop never churns the event stream.
+	versionBefore := bot.Version()
+	bot.SetPhase("engage")
+	require.Equal(t, versionBefore, bot.Version(),
+		"a same phase refresh is a no-op")
+
+	bot.SetPhase("townWalk")
+	require.Equal(t, "townWalk", bot.Phase(),
+		"a different phase updates the stored value")
+
+	bot.ResetSession()
+	require.Empty(t, bot.Phase(),
+		"ResetSession clears the phase for the next login")
+	snap = bot.Snapshot()
+	require.Empty(t, snap.Phase,
+		"the snapshot phase is empty after reset")
+}
+
 func TestSetOffline(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetOnline("test1")

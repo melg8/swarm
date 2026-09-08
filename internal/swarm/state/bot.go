@@ -278,9 +278,15 @@ type Attribute struct {
 
 // Bot tracks the observed state of a single bot session.
 type Bot struct {
-	mu           sync.RWMutex
-	id           string
-	status       Status
+	mu     sync.RWMutex
+	id     string
+	status Status
+	// phase mirrors the hunt loop phase so the web UI can show a
+	// human readable activity banner (hunting, walking to town,
+	// selling, deleveling). Empty until the loop publishes its
+	// first phase; the manual only sessions stay empty (the loop
+	// never sets it) and the UI falls back to the status text.
+	phase        string
 	selfID       int32
 	char         CharacterState
 	objects      map[int32]WorldObject
@@ -316,6 +322,7 @@ func NewBot(id string) *Bot {
 		mu:                 sync.RWMutex{},
 		id:                 id,
 		status:             StatusConnecting,
+		phase:              "",
 		loginCooldownUntil: time.Time{},
 		selfID:             0,
 		char:               newCharacterState(),
@@ -546,6 +553,32 @@ func (b *Bot) Status() Status {
 	return b.status
 }
 
+// Phase returns the last published hunt loop phase of the bot. It is
+// empty before the loop sets it (the manual only sessions and the
+// pre-world sessions never set it). The web UI maps it to a human
+// readable activity banner.
+func (b *Bot) Phase() string {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.phase
+}
+
+// SetPhase publishes the current hunt loop phase so the web UI can
+// show a human readable activity banner (hunting, walking to town,
+// selling, deleveling). The hunt loop calls this on every phase
+// transition (and a steady state refresh is a no-op so the per tick
+// call never churns the event stream).
+func (b *Bot) SetPhase(phase string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.phase == phase {
+		return
+	}
+	b.phase = phase
+	b.touch()
+}
+
 // SetOnline marks the character as being inside the world.
 func (b *Bot) SetOnline(name string) {
 	b.mu.Lock()
@@ -628,6 +661,7 @@ func (b *Bot) ResetSession() {
 	b.inventory = make(map[int32]InventoryItem)
 	b.walkPath = nil
 	b.walkPathAt = time.Time{}
+	b.phase = ""
 	b.status = StatusConnecting
 	b.touch()
 }
@@ -1761,8 +1795,14 @@ type ObjectSnapshot struct {
 
 // Snapshot is the JSON view of the whole bot state.
 type Snapshot struct {
-	ID           string                  `json:"id"`
-	Status       Status                  `json:"status"`
+	ID     string `json:"id"`
+	Status Status `json:"status"`
+	// Phase is the last published hunt loop phase (hunt.HuntPhase*
+	// string values: engage, loot, townWalk, townSell, townReturn,
+	// delevel, user, idle). The web UI maps it to the human readable
+	// activity banner of the bot widget. Empty before the loop sets
+	// it (the manual only sessions never do).
+	Phase        string                  `json:"phase"`
 	Character    CharacterSnapshot       `json:"character"`
 	Inventory    []InventoryItemSnapshot `json:"inventory"`
 	Objects      []ObjectSnapshot        `json:"objects"`
@@ -1808,6 +1848,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 	snap := Snapshot{
 		ID:     b.id,
 		Status: b.status,
+		Phase:  b.phase,
 		Character: CharacterSnapshot{
 			ObjectID:        b.selfID,
 			Name:            b.char.Name,
@@ -1984,9 +2025,13 @@ func appendEvents(dst []Event, events []Event, length int, pos int) []Event {
 // vitals and the combat flag let the sidebar show the mini HP/MP/XP bars
 // and the fighting state of every session at a glance.
 type BotInfo struct {
-	ID         string  `json:"id"`
-	Name       string  `json:"name"`
-	Status     Status  `json:"status"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Status Status `json:"status"`
+	// Phase mirrors the hunt loop phase so the sidebar bot row can
+	// show the same activity banner as the map HUD. Empty for the
+	// manual only sessions and the pre-world sessions.
+	Phase      string  `json:"phase"`
 	Level      int32   `json:"level"`
 	CurHP      float64 `json:"curHp"`
 	MaxHP      float64 `json:"maxHp"`
@@ -2006,6 +2051,7 @@ func (b *Bot) Info() BotInfo {
 		ID:         b.id,
 		Name:       b.char.Name,
 		Status:     b.status,
+		Phase:      b.phase,
 		Level:      b.char.Level,
 		CurHP:      b.char.CurHP,
 		MaxHP:      b.char.MaxHP,
