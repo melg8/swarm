@@ -1271,3 +1271,23 @@ name the variant number that best fits the real bot UI.
   NearestAttackableConstrained 200 npc 9.7 us/10 KB/1 alloc ->
   7.1 us/0 B/0 allocs. A hundred hunting bots at 4 ticks/s now
   produce zero steady state garbage from the decision path.
+- 2026-09-08: task wrap up. The final verification round: go build,
+  go vet, go test ./... (14 packages green), golangci-lint run
+  (0 issues) and the live E2E (tools/mobius_e2e.sh 45) prints
+  E2E_OK against the deployed stack. Final fleet numbers (before
+  -> after): SSE per event 109 us/173 KB/5 allocs -> 64 us/26
+  KB/3 allocs (the frame and payload buffers are reused per
+  connection, -85% garbage; the remaining cost is the snapshot
+  deep copy the encoder needs), NewBot 9.7 us/28 KB/7 allocs ->
+  1.3 us/2.5 KB/5 allocs (lazy rings, a hundred idle trackers hold
+  250 KB instead of 2.8 MB), RegistryList100 12.5 -> 10.7 us
+  (dense slice walk, no per bot map hashing), hunt engage tick
+  4352 ns/3040 B/5 allocs -> 3000 ns/0 B/0 allocs (catalog cached
+  once, scans keyed on InventoryVersion, pooled social search,
+  dense skip list), NearestAttackableConstrained 200 npc 9.7
+  us/1 alloc -> 7.1 us/0 allocs. The god objects are split: state
+  bot.go 2448 -> 1848 lines (objectStore, eventLog, chatLog,
+  combatFeed, scans.go), connection game.go 1624 -> 852 (dispatch
+  + apply layers), hunt loop.go 1480 -> 1010 (safety, movement
+  and action phase files). Six commits pushed to
+  mobius-c1-client-1 as melg8.
