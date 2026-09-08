@@ -12,7 +12,11 @@ const App = {
   snapshot: null,
   source: null,
   seenEvents: 0,
-  bots: []
+  bots: [],
+  // The client proxy state (null when the process runs without -proxy):
+  // the bot a connecting C1 game client attaches to is the selected
+  // bot, and clicking a bot row in the sidebar switches it.
+  proxy: null
 };
 
 // Class and race names of the known C1 ids.
@@ -91,12 +95,57 @@ async function refreshBots() {
   } catch (err) {
     return;
   }
+  await refreshProxy();
   renderBotList();
   if (!App.activeBotId && App.bots.length > 0) {
     const saved = window.localStorage.getItem("swarm.activeBot");
     const exists = App.bots.some((bot) => bot.id === saved);
     selectBot(exists ? saved : App.bots[0].id);
   }
+}
+
+// Fetch the proxy state (the endpoints stay absent without -proxy and
+// the UI then hides the selection entirely).
+async function refreshProxy() {
+  try {
+    const response = await fetch("/api/proxy");
+    if (!response.ok) {
+      App.proxy = null;
+      return;
+    }
+    App.proxy = await response.json();
+  } catch (err) {
+    App.proxy = null;
+  }
+}
+
+// selectProxyBot marks the bot a connecting game client attaches to.
+async function selectProxyBot(botId) {
+  if (!App.proxy || App.proxy.selectedBot === botId) { return; }
+  try {
+    const response = await fetch("/api/proxy/select", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ botId })
+    });
+    if (response.ok) {
+      App.proxy = await response.json();
+      renderBotList();
+    }
+  } catch (err) {
+    // The selection is best effort: the proxy keeps its previous
+    // target when the request fails.
+  }
+}
+
+// proxyTargetId returns the bot a connecting game client attaches to:
+// the proxy selection when set, the first bot otherwise (mirrors the
+// selection fallback of the proxy server).
+function proxyTargetId() {
+  if (!App.proxy) { return null; }
+  if (App.proxy.selectedBot) { return App.proxy.selectedBot; }
+  const first = App.proxy.sessions && App.proxy.sessions[0];
+  return first || (App.bots.length > 0 ? App.bots[0].id : null);
 }
 
 function renderBotList() {
@@ -120,6 +169,12 @@ function renderBotList() {
     }
     if (bot.sitting) {
       row.append(makeChip("bot-chip chip-rest", "rest"));
+    }
+    // The proxy chip marks the bot a connecting C1 game client attaches
+    // to (the proxy falls back to the first bot when nothing is
+    // selected - the first row carries the chip implicitly then).
+    if (App.proxy && App.proxy.enabled && bot.id === proxyTargetId()) {
+      row.append(makeChip("bot-chip chip-proxy", "proxy"));
     }
     const level = document.createElement("span");
     level.className = "bot-level";
@@ -232,6 +287,10 @@ function selectBot(botId) {
   App.snapshot = null;
   App.seenEvents = 0;
   window.localStorage.setItem("swarm.activeBot", botId);
+  // The observed bot is also the bot a connecting C1 client attaches
+  // to: one click in the sidebar switches both the map view and the
+  // proxy target.
+  selectProxyBot(botId);
   if (App.source) {
     App.source.close();
     App.source = null;

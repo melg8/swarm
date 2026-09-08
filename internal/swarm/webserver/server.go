@@ -103,10 +103,30 @@ type Server struct {
 	pathfindView *pathfind.Vec3
 	geodataTiles *geodataTileCache
 	iconsDir     atomic.Value // string, the icon pack directory or ""
+	proxy        ProxyController
 	logger       *log.Logger
 	httpServer   *http.Server
 	eventsDone   chan struct{}
 	shutdown     func()
+}
+
+// ProxyController drives the client proxy from the web UI: which bot a
+// connecting game client attaches to. The proxy server of the swarm
+// process implements it; without a proxy the endpoints stay absent and
+// the UI hides the selection.
+type ProxyController interface {
+	// SelectBot marks the bot the next connecting client attaches to.
+	SelectBot(id string)
+	// SelectedBot returns the marked bot id ("" when nothing selected).
+	SelectedBot() string
+	// SessionIDs lists the registered bot sessions in order.
+	SessionIDs() []string
+	// ClientCount returns the connected game client count.
+	ClientCount() int
+	// LoginAddr returns the primary login listen address.
+	LoginAddr() string
+	// GameAddr returns the primary game listen address.
+	GameAddr() string
 }
 
 // NewServer creates the web server bound to the given address.
@@ -126,6 +146,76 @@ func NewServer(
 	return server
 }
 
+// SetProxy attaches the client proxy controller and registers its
+// endpoints. Call it before ListenAndServe.
+func (s *Server) SetProxy(controller ProxyController) {
+	s.proxy = controller
+	mux := s.httpServer.Handler.(*http.ServeMux)
+	mux.HandleFunc("GET /api/proxy", s.handleProxyStatus)
+	mux.HandleFunc("POST /api/proxy/select", s.handleProxySelect)
+}
+
+// proxyStatus is the payload of GET /api/proxy.
+type proxyStatus struct {
+	Enabled     bool     `json:"enabled"`
+	SelectedBot string   `json:"selectedBot"`
+	Sessions    []string `json:"sessions"`
+	Clients     int      `json:"clients"`
+	Login       string   `json:"login"`
+	Game        string   `json:"game"`
+}
+
+// proxySelectRequest is the payload of POST /api/proxy/select.
+type proxySelectRequest struct {
+	BotID string `json:"botId"`
+}
+
+// handleProxyStatus reports the proxy state for the UI selection.
+func (s *Server) handleProxyStatus(w http.ResponseWriter, _ *http.Request) {
+	if s.proxy == nil {
+		http.Error(w, "no proxy", http.StatusNotFound)
+
+		return
+	}
+	writeJSON(w, s.logger, proxyStatus{
+		Enabled:     true,
+		SelectedBot: s.proxy.SelectedBot(),
+		Sessions:    s.proxy.SessionIDs(),
+		Clients:     s.proxy.ClientCount(),
+		Login:       s.proxy.LoginAddr(),
+		Game:        s.proxy.GameAddr(),
+	})
+}
+
+// handleProxySelect switches the bot a connecting client attaches to.
+func (s *Server) handleProxySelect(w http.ResponseWriter, r *http.Request) {
+	if s.proxy == nil {
+		http.Error(w, "no proxy", http.StatusNotFound)
+
+		return
+	}
+	var request proxySelectRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+
+		return
+	}
+	if request.BotID == "" {
+		http.Error(w, "botId is required", http.StatusBadRequest)
+
+		return
+	}
+	s.proxy.SelectBot(request.BotID)
+	writeJSON(w, s.logger, proxyStatus{
+		Enabled:     true,
+		SelectedBot: request.BotID,
+		Sessions:    s.proxy.SessionIDs(),
+		Clients:     s.proxy.ClientCount(),
+		Login:       s.proxy.LoginAddr(),
+		Game:        s.proxy.GameAddr(),
+	})
+}
+
 // newServer builds the shared server shell with the static files.
 func newServer(address string, logger *log.Logger) *Server {
 	mux := http.NewServeMux()
@@ -135,6 +225,7 @@ func newServer(address string, logger *log.Logger) *Server {
 		pathfindView: nil,
 		geodataTiles: newGeodataTileCache(),
 		iconsDir:     atomic.Value{},
+		proxy:        nil,
 		logger:       logger,
 		httpServer:   nil,
 		eventsDone:   make(chan struct{}),

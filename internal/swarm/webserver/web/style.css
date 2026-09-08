@@ -379,6 +379,10 @@ body.mode-pathfind .zone-panel { display: none; }
 
 .bot-chip.chip-combat { color: var(--red); border: 1px solid var(--red); }
 .bot-chip.chip-rest { color: var(--green); border: 1px solid var(--green); }
+/* The proxy chip marks the bot a connecting C1 game client attaches
+   to: the link color of the classic tool look, distinct from the
+   combat and rest states. */
+.bot-chip.chip-proxy { color: var(--accent); border: 1px solid var(--accent); }
 
 /* Activity banner of the sidebar bot row: a compact one line summary
    of the bot phase so the overview shows at a glance what every
