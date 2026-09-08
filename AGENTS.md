@@ -917,10 +917,19 @@ the same variables).
   over the MarshalJSON result costs 4x the direct write (249 us/104
   allocs -> 127 us/4 allocs per 200 npc snapshot, see
   `webserver/server_bench_test.go`). The world objects live in a
-  dense slot array (`[]WorldObject` + `objectIndex`), the social pull
-  check of the target search works on precomputed clan bitmasks
-  (`npcdata.NPCClanMask`), and the NPC clans resolve to shared
-  pre-split lists - keep new tracker code on those layouts.
+  dense slot array of the `state.objectStore` (the `world` field of
+  the bot: `objects` slice + id to slot index, removals swap the
+  last record in), the social pull check of the target search works
+  on precomputed clan bitmasks (`npcdata.NPCClanMask`), and the NPC
+  clans resolve to shared pre-split lists - keep new tracker code
+  on those layouts. The tracker itself is split into components:
+  `objectStore` (dense world storage + scans in scans.go), `eventLog`
+  and `chatLog` (lazily allocated rings - a fleet of idle sessions
+  pays no per bot log memory), `combatFeed` (the animation feed),
+  with `Bot` as the locking facade; the SSE stream of the webserver
+  reuses its frame and payload buffers per connection (see
+  `sseStream`), so a watched fleet costs no per event buffer
+  garbage.
 - The state tracker (`internal/swarm/state`) is fed by the game session
   from these packets: UserInfo (self vitals, weight and speeds), CharInfo
   (players with speeds and running/dead/combat flags), NpcInfo

@@ -1219,3 +1219,20 @@ name the variant number that best fits the real bot UI.
   lint, the harness).
 - Gallery complete and live-verified; awaiting the user's variant
   pick to port the favorite into the real combat layer of map.js.
+
+- 2026-09-08: the state god object split into components.
+  state.Bot (2448 lines) held every concern: identity, character
+  vitals, world objects, inventory, the event ring, the chat ring,
+  the combat feed, zones, walk plans and the snapshot build. The
+  storage mechanics moved into dedicated types with the bot as the
+  locking facade: objectStore (dense world storage, the density
+  invariant lives in it), eventLog + chatLog (rings that allocate
+  lazily on the first record) and combatFeed (bounded animation
+  feed with the TTL window read). The world scans moved to
+  scans.go, the combat record helpers to combat.go. The lazy rings
+  cut the per tracker footprint: NewBot 9.7 us/28 KB/7 allocs ->
+  1.2 us/2.5 KB/5 allocs (a hundred idle trackers hold 250 KB
+  instead of 2.8 MB). All state tests pass unchanged; the scan
+  benchmarks stay at the previous round numbers (200 npc
+  NearestAttackableConstrained 9.7 us, snapshot 26.7 us/3 allocs).
+  AGENTS.md documents the new component layout contract.

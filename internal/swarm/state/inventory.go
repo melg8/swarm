@@ -400,8 +400,8 @@ func (b *Bot) NearestGroundItemExcluding(
 	now := time.Now()
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
-	for i := range b.objects {
-		obj := &b.objects[i]
+	for i := range b.world.objects {
+		obj := &b.world.objects[i]
 		if obj.Kind != KindItem {
 			continue
 		}

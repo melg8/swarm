@@ -98,14 +98,47 @@ func (b *Bot) ApplySocialAction(a SocialAction) {
 // recordChatLocked appends one line to the chat ring buffer. The caller
 // must hold the state write lock.
 func (b *Bot) recordChatLocked(kind string, text string) {
-	b.chatLog[b.chatPos] = ChatEvent{
-		Time: time.Now(), Kind: kind, Text: text,
-	}
-	b.chatPos = (b.chatPos + 1) % chatCapacity
-	if b.chatLen < chatCapacity {
-		b.chatLen++
-	}
+	b.chat.record(kind, text, time.Now())
 	b.touch()
+}
+
+// chatLog is the rolling chat window of one bot session, split out of
+// the Bot god object: a fixed capacity ring written by the system
+// message and social action paths and read whole by the snapshot. The
+// ring allocates lazily on the first line so idle sessions pay no
+// per bot chat memory.
+type chatLog struct {
+	ring   []ChatEvent
+	length int
+	head   int
+}
+
+// newChatLog creates the empty log.
+func newChatLog() chatLog {
+	return chatLog{ring: nil, length: 0, head: 0}
+}
+
+// record appends one chat line. The caller must hold the bot write
+// lock.
+func (l *chatLog) record(kind string, text string, at time.Time) {
+	if l.ring == nil {
+		l.ring = make([]ChatEvent, chatCapacity)
+	}
+	l.ring[l.head] = ChatEvent{Time: at, Kind: kind, Text: text}
+	l.head = (l.head + 1) % chatCapacity
+	if l.length < chatCapacity {
+		l.length++
+	}
+}
+
+// appendAll copies every line in chronological order onto dst and
+// returns the grown slice.
+func (l *chatLog) appendAll(dst []ChatEvent) []ChatEvent {
+	for i := range l.length {
+		dst = append(dst, l.ring[(l.head-l.length+i+chatCapacity)%chatCapacity])
+	}
+
+	return dst
 }
 
 // formatChatText substitutes the $sN and $cN placeholders of a system

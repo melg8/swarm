@@ -237,7 +237,7 @@ func (b *Bot) ApplyItemPickup(p ItemPickup) {
 		return
 	}
 	name := itemName(obj.Name, obj.TemplateID)
-	slot := b.objectIndex[p.ObjectID]
+	slot := b.world.slotLocked(p.ObjectID)
 	b.removeObjectAtLocked(slot, p.ObjectID)
 	pickerName := ""
 	if p.PlayerID == b.selfID {
