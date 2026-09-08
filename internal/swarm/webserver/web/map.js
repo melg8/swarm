@@ -46,6 +46,16 @@ const MapView = {
   // the bot walks there.
   userMark: null,
 
+  // The live combat animation layer: the server observed swings and
+  // damage landings replayed as short canvas effects (see
+  // spawnCombatAnim). lastCombatSeq dedupes the events across the
+  // repeated SSE snapshots of the two second server feed window.
+  combatAnims: [],
+  lastCombatSeq: 0,
+  // selfHurtUntil holds the moment the red hurt vignette of the map
+  // fades out after a damage landing on the character.
+  selfHurtUntil: 0,
+
   // The server world region grid: every region is 2048 units and every
   // object within the 3x3 region block around the player is loaded (see
   // World.broadcastPacket of the Mobius server).
@@ -174,6 +184,7 @@ const MapView = {
     for (const id of this.runtime.keys()) {
       if (!alive.has(id)) { this.runtime.delete(id); }
     }
+    this.ingestCombatEvents(snapshot);
     this.lastSnap = snapshot;
     this.kickAnimation();
     this.draw();
@@ -331,8 +342,8 @@ const MapView = {
       if (obj.moving && obj.speed > 0) { return true; }
     }
 
-    return this.smoothingPending() || this.userMarkAge() < 2500 ||
-      this.hasWalkPlan();
+    return this.combatAnims.length > 0 || this.smoothingPending() ||
+      this.userMarkAge() < 2500 || this.hasWalkPlan();
   },
 
   // hasWalkPlan reports whether the bot runs a manual walk right now:
@@ -821,6 +832,7 @@ const MapView = {
     this.drawTargetLinks(ctx);
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
+    this.drawCombatEffects(ctx);
     this.drawWalkPlan(ctx);
     this.drawUserIntent(ctx);
     if (this.lastSnap
@@ -1585,6 +1597,264 @@ const MapView = {
     this.hover = null;
   },
 
+  // ---- combat animation layer ----
+
+  // ingestCombatEvents replays the fresh server combat events of
+  // one snapshot: the sequence cursor dedupes them across the SSE
+  // snapshots (every event rides along for the whole two second
+  // feed window). The first snapshot after a page load and a bot
+  // switch only accept the cursor, so the replay never fires beats
+  // that are seconds old.
+  ingestCombatEvents(snapshot) {
+    const events = snapshot.combatEvents || [];
+    const switched = this.lastSnap && this.lastSnap.id !== snapshot.id;
+    const first = !this.lastSnap || switched;
+    if (first) {
+      this.lastCombatSeq = 0;
+      this.combatAnims = [];
+      this.selfHurtUntil = 0;
+    }
+    for (const ev of events) {
+      if (ev.seq <= this.lastCombatSeq) { continue; }
+      this.lastCombatSeq = ev.seq;
+      if (!first) { this.spawnCombatAnim(ev); }
+    }
+  },
+
+  // spawnCombatAnim turns one fresh combat event into an animation
+  // entry: a swing streak from the attacker to the hit target, or
+  // a floating damage number on the hurt unit. The entry captures
+  // the event placement so the effect still renders after the unit
+  // despawns; while the unit stays on the map the effect follows
+  // its interpolated position.
+  spawnCombatAnim(ev) {
+    const selfId = this.lastSnap.character
+      && this.lastSnap.character.objectId;
+    if (ev.kind === "attack") {
+      this.combatAnims.push({
+        kind: "swing", at: performance.now(), seq: ev.seq,
+        attackerId: ev.attackerId, targetId: ev.targetId,
+        fromWorld: { x: ev.x, y: ev.y },
+        toWorld: { x: ev.targetX, y: ev.targetY },
+        bySelf: ev.attackerId === selfId,
+        onSelf: ev.targetId === selfId
+      });
+
+      return;
+    }
+    if (ev.kind !== "damage" || !(ev.amount > 0)) { return; }
+    if (ev.targetId === selfId) {
+      this.selfHurtUntil = Math.max(this.selfHurtUntil,
+        performance.now() + hurtVignetteMs);
+    }
+    // The horizontal jitter spreads the numbers of a multi hit
+    // burst instead of painting one blob.
+    const jitter = ((ev.seq * 37) % 17 - 8) * 1.6;
+    this.combatAnims.push({
+      kind: "damage", at: performance.now(), seq: ev.seq,
+      objectId: ev.targetId, amount: ev.amount,
+      world: { x: ev.x, y: ev.y }, onSelf: ev.targetId === selfId,
+      jitter
+    });
+  },
+
+  // drawCombatEffects renders the live combat animation layer on
+  // top of the units: the swing streaks of every attack broadcast
+  // and the floating damage numbers of the HP deltas, plus the red
+  // hurt vignette of the hits the character takes. Finished
+  // entries drop out here; needsMoreFrames keeps the render loop
+  // alive while any of them are still running.
+  drawCombatEffects(ctx) {
+    if (this.combatAnims.length === 0 && this.selfHurtUntil === 0) {
+      return;
+    }
+    const nowMs = performance.now();
+    const keep = [];
+    for (const anim of this.combatAnims) {
+      const life = anim.kind === "swing" ? swingMs : damageMs;
+      const age = nowMs - anim.at;
+      if (age >= life) { continue; }
+      keep.push(anim);
+      if (anim.kind === "swing") {
+        this.drawSwingEffect(ctx, anim, age / life);
+      } else {
+        this.drawDamageEffect(ctx, anim, age / life);
+      }
+    }
+    this.combatAnims = keep;
+    this.drawSelfHurtVignette(ctx, nowMs);
+  },
+
+  // drawSwingEffect draws one attack: a tapered streak that shoots
+  // from the attacker toward the hit target, a windup swoosh arc
+  // at the attacker and an impact starburst on the target when the
+  // streak lands. The own attacks swing in light blue, the mob
+  // attacks in red - both read over the light map imagery and the
+  // dark theme fill alike.
+  drawSwingEffect(ctx, anim, t) {
+    const from = this.effectScreenPos(anim.attackerId, anim.fromWorld);
+    const to = this.effectScreenPos(anim.targetId, anim.toWorld);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 2) { return; }
+    const color = anim.bySelf ? swingSelfColor : swingMobColor;
+    const ux = dx / dist;
+    const uy = dy / dist;
+    ctx.save();
+    // The windup swoosh at the attacker: a short arc sweeping
+    // around the direction of the strike.
+    if (t < 0.45) {
+      const w = easeOutQuad(t / 0.45);
+      const angle = Math.atan2(uy, ux);
+      ctx.globalAlpha = 0.7 * (1 - w);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(from.x, from.y, 9 + 7 * w,
+        angle - 1.1 + 0.5 * w, angle - 0.25 + 0.5 * w);
+      ctx.stroke();
+    }
+    // The traveling streak: a tapered dash that shoots from the
+    // attacker to the target in the first half of the life.
+    if (t < 0.62) {
+      const travel = easeOutQuad(Math.min(1, t / 0.62));
+      const reach = Math.min(dist, 16 + dist * 0.25) * travel;
+      const head = 6 + 14 * travel;
+      const tail = Math.max(2, reach - head);
+      const x0 = from.x + ux * tail;
+      const y0 = from.y + uy * tail;
+      const x1 = from.x + ux * reach;
+      const y1 = from.y + uy * reach;
+      ctx.globalAlpha = 0.9 * (1 - travel * 0.45);
+      ctx.strokeStyle = color;
+      ctx.lineCap = "round";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+      // A wider faint underlay gives the streak its glow.
+      ctx.globalAlpha *= 0.55;
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+    }
+    // The impact: a white starburst plus a colored flash ring on
+    // the target.
+    if (t > 0.5) {
+      const burst = (t - 0.5) / 0.5;
+      const spikes = 6;
+      const len = (5 + 9 * easeOutQuad(burst)) *
+        (anim.onSelf ? 1.25 : 1);
+      ctx.globalAlpha = (1 - burst) * 0.95;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = "round";
+      for (let i = 0; i < spikes; i++) {
+        const a = (i / spikes) * Math.PI * 2 + burst * 0.6;
+        const r0 = 2.5 + 2 * burst;
+        ctx.beginPath();
+        ctx.moveTo(to.x + Math.cos(a) * r0, to.y + Math.sin(a) * r0);
+        ctx.lineTo(to.x + Math.cos(a) * (r0 + len),
+          to.y + Math.sin(a) * (r0 + len));
+        ctx.stroke();
+      }
+      ctx.globalAlpha = (1 - burst) * 0.5;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(to.x, to.y, 3 + 10 * burst, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
+  // drawDamageEffect renders one floating damage number: it pops
+  // in with a slight overshoot, rises above the hurt unit and melts
+  // away. The hits the character takes read red, the damage the
+  // character deals amber; a short flash ring under the number
+  // marks the hurt unit itself.
+  drawDamageEffect(ctx, anim, t) {
+    const pos = this.effectScreenPos(anim.objectId, anim.world);
+    const k = this.unitScale || 1;
+    const rise = easeOutQuad(t) * 30 * k;
+    const alpha = t < 0.75 ? 1 : 1 - (t - 0.75) / 0.25;
+    const scale = t < 0.14 ? easeOutBack(t / 0.14) : 1;
+    const color = anim.onSelf ? damageSelfColor : damageMobColor;
+    const size = Math.max(10, Math.min(17,
+      (anim.onSelf ? 12 : 11) + Math.sqrt(anim.amount) * 0.7)) * k;
+    const x = pos.x + anim.jitter * k;
+    const y = pos.y - 8 * k - rise;
+    ctx.save();
+    // The flash ring under the number.
+    ctx.globalAlpha = alpha * 0.55 * (1 - t);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, (5 + 13 * t) * k, 0, Math.PI * 2);
+    ctx.stroke();
+    // The number itself, scaled by the pop and with the same dark
+    // halo the map labels use.
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    ctx.font = "700 " + size.toFixed(1) + "px " +
+      (getComputedStyle(document.documentElement)
+        .getPropertyValue("--sans").trim() || "sans-serif");
+    ctx.textAlign = "center";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(15, 18, 22, 0.75)";
+    ctx.globalAlpha = alpha;
+    const text = "-" + Math.round(anim.amount);
+    ctx.strokeText(text, 0, 0);
+    ctx.fillStyle = color;
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+  },
+
+  // drawSelfHurtVignette flashes the map edges red when the
+  // character takes a hit: the gradient stays a moment and melts
+  // away, so a beating mob reads at a glance without watching the
+  // HP bar.
+  drawSelfHurtVignette(ctx, nowMs) {
+    if (!this.selfHurtUntil || nowMs >= this.selfHurtUntil) {
+      this.selfHurtUntil = 0;
+      return;
+    }
+    const fade = Math.min(1,
+      (this.selfHurtUntil - nowMs) / hurtVignetteMs);
+    const rect = this.canvas.getBoundingClientRect();
+    const r = Math.max(rect.width, rect.height) / 2;
+    const grad = ctx.createRadialGradient(
+      rect.width / 2, rect.height / 2, r * 0.55,
+      rect.width / 2, rect.height / 2, r);
+    grad.addColorStop(0, "rgba(217, 48, 37, 0)");
+    grad.addColorStop(1,
+      "rgba(217, 48, 37, " + (0.3 * fade).toFixed(3) + ")");
+    ctx.save();
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, rect.width, rect.height);
+    ctx.restore();
+  },
+
+  // effectScreenPos resolves the screen position of an animation
+  // anchor: the interpolated runtime position while the unit is
+  // still on the map (the self character included), the captured
+  // event placement once it despawned.
+  effectScreenPos(id, fallbackWorld) {
+    const selfId = this.lastSnap.character
+      && this.lastSnap.character.objectId;
+    const rt = this.runtime.get(id === selfId ? "self" : id);
+    if (rt) {
+      return this.worldToScreen(rt.drawX, rt.drawY);
+    }
+
+    return this.worldToScreen(fallbackWorld.x, fallbackWorld.y);
+  },
+
   // ---- transforms ----
 
   // World to screen transform. Follow mode centers on the character,
@@ -1659,6 +1929,42 @@ const chaseFloor = 60;
 // socialWindowMs is how long the social animation marker stays visible
 // (the tracker side window in state/chat.go).
 const socialWindowMs = 3000;
+
+// swingMs is the life of one attack animation: the windup swoosh,
+// the streak that shoots from the attacker to the hit target and
+// the impact starburst (the Mobius attack cadence is roughly one
+// swing a second, so the effects of a running fight never overlap
+// into one smear).
+const swingMs = 340;
+
+// damageMs is the life of one floating damage number: it pops in,
+// rises above the hurt unit and melts away.
+const damageMs = 950;
+
+// hurtVignetteMs is how long the red screen edge flash of a hit on
+// the character stays up.
+const hurtVignetteMs = 650;
+
+// The combat animation palette: the own swings read light blue, the
+// mob swings red; the damage numbers on the mobs the character
+// grinds render amber, the hits the character takes red.
+const swingSelfColor = "#7cc4ff";
+const swingMobColor = "#ff6b4a";
+const damageMobColor = "#ffd25c";
+const damageSelfColor = "#ff5252";
+
+// easeOutQuad eases t out: fast at the start, settled at the end.
+function easeOutQuad(t) {
+  return 1 - (1 - t) * (1 - t);
+}
+
+// easeOutBack eases t out with a small overshoot: the pop of the
+// damage numbers when a hit lands.
+function easeOutBack(t) {
+  const c = 1.70158;
+
+  return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2);
+}
 
 // normHeading maps an arbitrary degree value back to the game range.
 function normHeading(deg) {
