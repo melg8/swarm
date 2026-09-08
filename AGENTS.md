@@ -780,7 +780,7 @@ client log file) - the short form:
   the emulated game server shows exactly one character (the bot
   selected in the web UI, the first session without a selection) and
   answers the character selection with the recorded CharSelected
-  packet of the bot session.
+  packet of the bot session patched to the live tracker state.
 - After the client's EnterWorld the proxy replays the recorded
   server->client stream of the session (the `Recorder` history fed by
   the `GameClient` tap - everything after the bot's CharSelected) and
@@ -788,7 +788,14 @@ client log file) - the short form:
   specific cipher chains. The replay model keeps the chains
   independent: that is what makes packet rewriting safe and is the
   contract of the `proxy.Transformer` seam (identity today, the
-  future debug spoofing hangs there).
+  future debug spoofing hangs there). The recorded packets that
+  describe the played character itself are live-patched before the
+  replay (see "The live self state" in docs/proxy.md): the char list
+  carries the live paperdoll (the selection screen equipment), the
+  CharSelected answer and every replayed self UserInfo carry the live
+  position/vitals, and the stale self movement packets are dropped
+  except the newest one - a reconnecting client spawns where the bot
+  actually stands.
 - Client packets ride the SAME outbound cipher chain as the hunt loop
   actions: `GameClient.SendRaw` encrypts under the session writeMu, so
   proxied clicks and autonomous actions interleave without corrupting
