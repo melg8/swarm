@@ -1246,3 +1246,28 @@ name the variant number that best fits the real bot UI.
   the client struct, the session flow and the command senders
   (852/247/560 lines). No behavior change; all connection tests
   pass unchanged, lint clean.
+- 2026-09-08: the hunt loop god file split and the tick made
+  allocation free. loop.go (1480 lines) held the state machine, the
+  safety layer, the movement phases and the between-fights phases;
+  the safety layer (flee, escape walks, emergency logout, the skip
+  list) moved to loop_safety.go, the movement phases (far target
+  walk, patrol, return to zone) to loop_movement.go and the
+  rest/loot/cleanup phases to loop_actions.go (1010/181/195/144
+  lines). The allocation profile of the engage tick (memprofile of
+  BenchmarkHuntTickEngage): the per tick shopCatalog rebuild of
+  the town trip trigger, the per tick starter item scan and equip
+  scan over an unchanged inventory, and the per call skip map of
+  the target search. Fixes: the town shop catalog is built once
+  (package level, static generated data), the equip manager keys
+  its scans on the new tracker InventoryVersion (a bag unchanged
+  since an empty scan costs nothing; the version bumps on every
+  inventory/paperdoll mutation - the full record compare also
+  catches the equip flag flips now), the skip map became a reused
+  dense slice on the loop (state scans take []int32), and the flat
+  npcScan arrays of the social search come from a sync.Pool (the
+  search runs under the read lock, a per bot scratch would race).
+  BenchmarkHuntTickEngage 4352 ns/3040 B/5 allocs -> 3020 ns/0
+  B/0 allocs; BenchmarkActiveSkips 61 ns/0 allocs;
+  NearestAttackableConstrained 200 npc 9.7 us/10 KB/1 alloc ->
+  7.1 us/0 B/0 allocs. A hundred hunting bots at 4 ticks/s now
+  produce zero steady state garbage from the decision path.

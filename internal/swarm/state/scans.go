@@ -7,6 +7,7 @@ package state
 import (
 	"math"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/npcdata"
@@ -96,9 +97,11 @@ func (b *Bot) NearestAttackable(
 // engage marks a target that never starts the fight as stuck (a stale
 // server side selection of a corpse keeps refusing every forced attack
 // on the same object id - only the next selection of a different object
-// replaces it) and searches for a different target for a while.
+// replaces it) and searches for a different target for a while. The
+// skip list is a dense id slice the caller rebuilds into a reused
+// buffer - no per call map allocation on the tick path.
 func (b *Bot) NearestAttackableExcept(
-	maxDistance float64, zone *Zone, skip map[int32]bool,
+	maxDistance float64, zone *Zone, skip []int32,
 ) (AttackTarget, bool) {
 	return b.nearestAttackable(maxDistance, zone, skip, 0, false)
 }
@@ -142,7 +145,7 @@ func (b *Bot) ZoneHasAttackable(zone *Zone) bool {
 // unknown level means the bot never resolved the template and should
 // not be fenced by it.
 func (b *Bot) NearestAttackableConstrained(
-	maxDistance float64, zone *Zone, skip map[int32]bool,
+	maxDistance float64, zone *Zone, skip []int32,
 	maxLevel int32, avoidSocial bool,
 ) (AttackTarget, bool) {
 	return b.nearestAttackable(maxDistance, zone, skip, maxLevel, avoidSocial)
@@ -153,7 +156,7 @@ func (b *Bot) NearestAttackableConstrained(
 // socially constrained variant flattens the living attackable npcs
 // into compact scan records first (see nearestAttackableSocial).
 func (b *Bot) nearestAttackable(
-	maxDistance float64, zone *Zone, skip map[int32]bool,
+	maxDistance float64, zone *Zone, skip []int32,
 	maxLevel int32, avoidSocial bool,
 ) (AttackTarget, bool) {
 	b.mu.RLock()
@@ -175,7 +178,7 @@ func (b *Bot) nearestAttackable(
 		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
 			continue
 		}
-		if skip[obj.ObjectID] {
+		if skipContains(skip, obj.ObjectID) {
 			continue
 		}
 		if maxLevel > 0 && obj.Level > maxLevel && obj.Level > 0 {
@@ -210,7 +213,7 @@ func (b *Bot) nearestAttackable(
 // implementation rescanned the whole world storage per candidate. The
 // caller must hold the read lock.
 func (b *Bot) nearestAttackableSocial(
-	maxDistance float64, zone *Zone, skip map[int32]bool, maxLevel int32,
+	maxDistance float64, zone *Zone, skip []int32, maxLevel int32,
 ) (AttackTarget, bool) {
 	//nolint:exhaustruct // zero value grows inside the loop
 	best := AttackTarget{}
@@ -219,7 +222,17 @@ func (b *Bot) nearestAttackableSocial(
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
 	now := time.Now()
-	scans := make([]npcScan, 0, len(b.world.objects))
+	// The flat scan records come from a pool: the search runs under
+	// the read lock (concurrent readers), so a per bot scratch would
+	// race - the pool hands every caller its own array and the fleet
+	// of searches shares the memory instead of allocating a fresh
+	// block per tick.
+	scanPtr := npcScanPool.Get().(*[]npcScan)
+	scans := (*scanPtr)[:0]
+	defer func() {
+		*scanPtr = scans[:0]
+		npcScanPool.Put(scanPtr)
+	}()
 	for i := range b.world.objects {
 		obj := &b.world.objects[i]
 		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
@@ -239,7 +252,7 @@ func (b *Bot) nearestAttackableSocial(
 	}
 	for i := range scans {
 		cand := &scans[i]
-		if skip[cand.objectID] {
+		if skipContains(skip, cand.objectID) {
 			continue
 		}
 		if maxLevel > 0 && cand.level > maxLevel && cand.level > 0 {
@@ -268,6 +281,31 @@ func (b *Bot) nearestAttackableSocial(
 	}
 
 	return best, found
+}
+
+// npcScanPool recycles the flat scan arrays of the constrained target
+// search across the calls (pointer to slice, so the grown capacity
+// travels back into the pool).
+var npcScanPool = sync.Pool{
+	New: func() any {
+		scans := make([]npcScan, 0, 64)
+
+		return &scans
+	},
+}
+
+// skipContains reports whether the dense skip list holds the id. The
+// lists stay tiny (the handful of targets the engage or the flee flow
+// held out), so the linear walk beats a map hash lookup and keeps the
+// tick path allocation free.
+func skipContains(skip []int32, objectID int32) bool {
+	for _, id := range skip {
+		if id == objectID {
+			return true
+		}
+	}
+
+	return false
 }
 
 // socialHelpMargin widens the clan help radius of the target search: a

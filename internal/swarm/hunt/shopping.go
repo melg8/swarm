@@ -71,6 +71,12 @@ type tripStop struct {
 	sell     bool
 }
 
+// townShopCatalog is the static gear catalog of the town merchants,
+// built once from the generated buylist data: the town trip trigger
+// consults it on every hunt tick, so the per tick catalog build of
+// the shops slice was pure allocation churn.
+var townShopCatalog = shopCatalog(townMerchants)
+
 // shopCatalog builds the gear catalog of the town merchants from the
 // generated buylist data: every merchant of the trip targets sells
 // its buylists at the town tax rate.
@@ -100,7 +106,7 @@ func (l *Loop) shoppingPlan() []gear.Purchase {
 	stats := l.tracker.InventoryStats()
 
 	return gear.PlanPurchases(
-		l.equip.profile, l.equipment(), shopCatalog(townMerchants),
+		l.equip.profile, l.equipment(), townShopCatalog,
 		int64(stats.Adena))
 }
 
@@ -606,8 +612,7 @@ func (l *Loop) advanceTripStop() {
 // and the known merchants must sell something (the generated
 // catalogs).
 func (l *Loop) shoppingTripEnabled() bool {
-	return l.equip != nil &&
-		len(shopCatalog(townMerchants).Shops) > 0
+	return l.equip != nil && len(townShopCatalog.Shops) > 0
 }
 
 // stopBuysPending reports whether the current stop still wants buys:

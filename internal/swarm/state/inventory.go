@@ -107,6 +107,7 @@ func (b *Bot) ApplyItemList(items []InventoryItem) {
 	for _, item := range items {
 		b.inventory[item.ObjectID] = item
 	}
+	b.inventoryVersion++
 	b.touch()
 	b.recordLocked("inventory listed: " + strconv.Itoa(len(items)) + " items")
 }
@@ -119,6 +120,7 @@ func (b *Bot) ApplyPaperdoll(ids [PaperdollSlots]int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.paperdoll = ids
+	b.inventoryVersion++
 	b.touch()
 }
 
@@ -159,7 +161,12 @@ func (b *Bot) ApplyInventoryUpdate(items []InventoryItem) {
 				changed = true
 				b.recordLocked("received " + inventoryItemName(item))
 			}
-			if !ok || existing.Count != item.Count {
+			// The full record comparison catches the equip flag
+			// flips of the UseItem toggles too, not only the
+			// count changes: the version keyed scans of the
+			// hunt loop and the web view refresh both need
+			// every real state change.
+			if !ok || existing != item {
 				changed = true
 			}
 			b.inventory[item.ObjectID] = item
@@ -172,8 +179,19 @@ func (b *Bot) ApplyInventoryUpdate(items []InventoryItem) {
 		}
 	}
 	if changed {
+		b.inventoryVersion++
 		b.touch()
 	}
+}
+
+// InventoryVersion returns the count of inventory and paperdoll
+// mutations so far: unchanged since a previous read means the
+// cached equipment scans of the hunt loop stay valid.
+func (b *Bot) InventoryVersion() uint64 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.inventoryVersion
 }
 
 // InventoryItemState returns the tracked state of one inventory

@@ -344,7 +344,12 @@ type Bot struct {
 	// scans walk the memory sequentially.
 	world     objectStore
 	inventory map[int32]InventoryItem
-	paperdoll [PaperdollSlots]int32
+	// inventoryVersion counts the inventory and paperdoll
+	// mutations: the equip managers of the hunt loop key their
+	// cached scans on it, so an unchanged bag costs no per tick
+	// re-scan (see hunt equipManager).
+	inventoryVersion uint64
+	paperdoll        [PaperdollSlots]int32
 	// log is the rolling packet event log, chat the chat window
 	// ring, combat the web view animation feed (one component
 	// value each, see their types for the layout contracts).
@@ -381,6 +386,7 @@ func NewBot(id string) *Bot {
 		char:               newCharacterState(),
 		world:              newObjectStore(),
 		inventory:          make(map[int32]InventoryItem),
+		inventoryVersion:   0,
 		paperdoll:          [PaperdollSlots]int32{},
 		log:                newEventLog(),
 		chat:               newChatLog(),
@@ -732,6 +738,7 @@ func (b *Bot) ResetSession() {
 	b.char = newCharacterState()
 	b.world = newObjectStore()
 	b.inventory = make(map[int32]InventoryItem)
+	b.inventoryVersion++
 	b.walkPath = nil
 	b.walkPathAt = time.Time{}
 	b.phase = ""

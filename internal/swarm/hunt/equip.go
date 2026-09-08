@@ -28,6 +28,16 @@ type equipManager struct {
 	// starterRetryAt maps a starter item object id to the time its
 	// failed destroy request may retry.
 	starterRetryAt map[int32]time.Time
+	// equipScanVersion holds the tracker inventory version the last
+	// upgrade scan ran against, equipScanNone its empty result: the
+	// tick path skips the gear scoring while the bag is unchanged
+	// (the scan cost the full inventory walk of the planner).
+	equipScanVersion uint64
+	equipScanNone    bool
+	// starterScanVersion and starterScanNone gate the starter item
+	// scan the same way.
+	starterScanVersion uint64
+	starterScanNone    bool
 }
 
 // equipActionPeriod paces the auto equipment requests: the Mobius
@@ -44,9 +54,13 @@ const starterRetryDelay = 10 * time.Second
 // newEquipManager creates the manager for the gear profile.
 func newEquipManager(profile gear.Profile) *equipManager {
 	return &equipManager{
-		profile:        profile,
-		lastActionAt:   time.Time{},
-		starterRetryAt: make(map[int32]time.Time),
+		profile:            profile,
+		lastActionAt:       time.Time{},
+		starterRetryAt:     make(map[int32]time.Time),
+		equipScanVersion:   0,
+		equipScanNone:      false,
+		starterScanVersion: 0,
+		starterScanNone:    false,
 	}
 }
 
@@ -82,7 +96,15 @@ func (l *Loop) maybeEquipGear() {
 	if now.Sub(manager.lastActionAt) < equipActionPeriod {
 		return
 	}
+	// The scan cache: an unchanged bag since the last empty scan
+	// cannot hold a new upgrade, skip the inventory walk.
+	version := l.tracker.InventoryVersion()
+	if manager.equipScanNone && version == manager.equipScanVersion {
+		return
+	}
 	action, ok := gear.NextUpgrade(manager.profile, l.equipment())
+	manager.equipScanVersion = version
+	manager.equipScanNone = !ok
 	if !ok {
 		return
 	}
@@ -119,7 +141,15 @@ func (l *Loop) maybeDestroyReplacedStarters() {
 	if now.Sub(manager.lastActionAt) < equipActionPeriod {
 		return
 	}
+	// The scan cache: an unchanged bag since the last empty scan
+	// holds no replaced starters.
+	version := l.tracker.InventoryVersion()
+	if manager.starterScanNone && version == manager.starterScanVersion {
+		return
+	}
 	replaced := gear.ReplacedStarterItems(manager.profile, l.equipment())
+	manager.starterScanVersion = version
+	manager.starterScanNone = len(replaced) == 0
 	for _, drop := range replaced {
 		if until, ok := manager.starterRetryAt[drop.Item.ObjectID]; ok &&
 			now.Before(until) {
