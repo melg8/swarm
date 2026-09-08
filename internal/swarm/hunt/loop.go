@@ -539,6 +539,14 @@ func (l *Loop) Run(ctx context.Context) {
 // Pre-consolidation phase debt; the hunt loop cleanup is planned
 // (docs/quality_review_and_agent_prompts.md P07).
 func (l *Loop) tick() { //nolint:cyclop
+	// Publish the hunt loop phase to the bot tracker so the web UI
+	// can show the human readable activity banner. SetPhase is a
+	// no-op when the phase has not changed, so the per tick call
+	// never churns the event stream. Runs on every return path
+	// through the defer. The closure captures l.phase by reference
+	// so the value at return time is published (a plain defer call
+	// evaluates its arguments at registration time).
+	defer func() { l.tracker.SetPhase(string(l.phase)) }()
 	if l.tracker.SelfDead() {
 		l.recoverFromDeath()
 
@@ -564,7 +572,7 @@ func (l *Loop) tick() { //nolint:cyclop
 	l.consumeUserCommands()
 	if l.phase == phaseDelevel {
 		l.tickDelevel()
-		l.tracker.ClearWalkPlan()
+		l.publishWalkPlan()
 
 		return
 	}
@@ -577,10 +585,10 @@ func (l *Loop) tick() { //nolint:cyclop
 
 		return
 	}
-	l.tracker.ClearWalkPlan()
 	if !l.autonomous {
 		// A manual only session never hunts on its own: the loop
 		// waits in the idle phase for the next web command.
+		l.tracker.ClearWalkPlan()
 		l.phase = phaseIdle
 
 		return
@@ -589,23 +597,12 @@ func (l *Loop) tick() { //nolint:cyclop
 	// stays current while a town trip buys its gear and while the loot
 	// drops arrive, so the combat stats never lag behind the inventory.
 	l.maybeEquipGear()
-	if l.tripActive() {
-		l.tickTownTrip()
-
+	if l.handleTownTrip() {
 		return
 	}
-	// A town trip never abandons a running fight: the loot of the kill
-	// is the point of the fight, so the trip start waits for the last
-	// corpse to be looted and the character to stand between the
-	// targets (see fightBusy).
-	if !l.fightBusy() {
-		l.maybeStartTownTrip()
-		if l.tripActive() {
-			l.tickTownTrip()
-
-			return
-		}
-	}
+	// The non walking hunt phases clear the walk plan view: the
+	// engage and loot phases have no planned path to draw.
+	l.tracker.ClearWalkPlan()
 	// The destroy cleanup runs outside the trips: everything the
 	// merchant refuses is still better sold at the next shop than
 	// destroyed on the way.
@@ -613,6 +610,7 @@ func (l *Loop) tick() { //nolint:cyclop
 	if l.delevelWanted() {
 		l.startDelevel()
 		l.tickDelevel()
+		l.publishWalkPlan()
 
 		return
 	}
@@ -623,6 +621,35 @@ func (l *Loop) tick() { //nolint:cyclop
 	if l.phase == phaseLoot {
 		l.loot()
 	}
+}
+
+// handleTownTrip drives the town trip start and the running trip tick.
+// It reports true when the tick was consumed by a town trip (already
+// running or just started), so the caller skips the engage/loot logic.
+// The town walk plan view publishes here too: while the trip walks to
+// or from the merchant, the remaining geodata waypoints publish so the
+// map draws the planned path. A town trip never abandons a running
+// fight (the loot of the kill is the point of the fight), so the start
+// waits for the last corpse to be looted and the character to stand
+// between the targets (see fightBusy).
+func (l *Loop) handleTownTrip() bool {
+	if l.tripActive() {
+		l.tickTownTrip()
+		l.publishWalkPlan()
+
+		return true
+	}
+	if l.fightBusy() {
+		return false
+	}
+	l.maybeStartTownTrip()
+	if !l.tripActive() {
+		return false
+	}
+	l.tickTownTrip()
+	l.publishWalkPlan()
+
+	return true
 }
 
 // fightBusy reports whether the character is still bound to the fight

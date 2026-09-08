@@ -468,18 +468,48 @@ func (l *Loop) followUserWaypoints(
 	}
 }
 
-// publishWalkPlan refreshes the walk plan view of the web UI: while
-// a manual move runs, the remaining waypoints of the plan publish
-// with the clicked destination last (the map draws the path line
-// and the destination marker from it). Every other state of the
-// loop clears the plan; the tracker also expires it on its own, so
+// publishWalkPlan refreshes the walk plan view of the web UI: while a
+// walk runs (a manual move, a town trip leg or a deleveling guard
+// walk), the remaining waypoints of the plan publish with the
+// clicked destination or the leg destination last (the map draws the
+// path line and the destination marker from it). Every other state of
+// the loop clears the plan; the tracker also expires it on its own, so
 // an abrupt exit never leaves a stale line.
 func (l *Loop) publishWalkPlan() {
-	if l.phase != phaseUser || l.userKind != state.CommandMove {
+	pts := l.activeWalkPlan()
+	if len(pts) == 0 {
 		l.tracker.ClearWalkPlan()
 
 		return
 	}
+	l.tracker.SetWalkPlan(pts)
+}
+
+// activeWalkPlan returns the remaining waypoints of the walk the loop
+// is currently following, with the final destination last. Returns
+// nil when the loop is not walking a planned path right now. The
+// manual move plan is the user clicked destination; the town trip and
+// deleveling plans are the geodata waypoints to their target.
+func (l *Loop) activeWalkPlan() []state.WalkPoint {
+	switch l.phase {
+	case phaseUser:
+		if l.userKind != state.CommandMove {
+			return nil
+		}
+
+		return l.userWalkPlanTail()
+	case phaseTownWalk, phaseTownReturn, phaseDelevel:
+		return l.geodataWalkPlanTail()
+	default:
+		return nil
+	}
+}
+
+// userWalkPlanTail builds the walk plan of a manual move: the
+// remaining geodata waypoints (when the planner armed them) plus the
+// clicked destination last. A direct walk (no planned waypoints) is
+// just the clicked target.
+func (l *Loop) userWalkPlanTail() []state.WalkPoint {
 	pts := make([]state.WalkPoint, 0,
 		len(l.userWaypoints)-l.userWpIndex+1)
 	for _, wp := range l.userWaypoints[l.userWpIndex:] {
@@ -497,7 +527,42 @@ func (l *Loop) publishWalkPlan() {
 			X: l.userX, Y: l.userY, Z: l.userZ,
 		})
 	}
-	l.tracker.SetWalkPlan(pts)
+
+	return pts
+}
+
+// geodataWalkPlanTail builds the walk plan of a town trip or a
+// deleveling guard walk: the remaining geodata waypoints (shared
+// l.waypoints slice, l.wpIndex cursor) plus the leg destination last.
+// startWalkLeg arms l.legDest with the destination it planned the
+// walk to (the merchant spawn, the farm spot, the guard spawn), so
+// the map can draw the final target even when the smoothing collapsed
+// it into the last waypoint. Returns nil when the loop is between
+// legs (no waypoints, no destination).
+func (l *Loop) geodataWalkPlanTail() []state.WalkPoint {
+	if len(l.waypoints) == 0 {
+		return nil
+	}
+	pts := make([]state.WalkPoint, 0, len(l.waypoints)-l.wpIndex+1)
+	for _, wp := range l.waypoints[l.wpIndex:] {
+		pts = append(pts, state.WalkPoint{
+			X: int32(wp.X), Y: int32(wp.Y), Z: int32(wp.Z),
+		})
+	}
+	destX, destY, destZ := int32(l.legDest.X), int32(l.legDest.Y),
+		int32(l.legDest.Z)
+	if destX == 0 && destY == 0 {
+		return pts
+	}
+	if n := len(pts); n == 0 ||
+		math.Hypot(float64(pts[n-1].X-destX),
+			float64(pts[n-1].Y-destY)) > 100 {
+		pts = append(pts, state.WalkPoint{
+			X: destX, Y: destY, Z: destZ,
+		})
+	}
+
+	return pts
 }
 
 // tickUserAttack forces the attack on the clicked object until the

@@ -172,6 +172,28 @@ func TestTripTriggersOnFullSlots(t *testing.T) {
 		"the leg keeps its waypoint list")
 }
 
+// TestTripWalkPlanPublishes pins the walk plan view of a town trip:
+// while the trip walks to the trader, the snapshot carries the
+// remaining geodata waypoints with the trader destination last so
+// the map draws the planned path. The phase publishes too so the
+// bot widget banner shows "walking to town".
+func TestTripWalkPlanPublishes(t *testing.T) {
+	loop, _, bot, _ := newTripLoop()
+	fillInventory(bot)
+
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+	snap := bot.Snapshot()
+	require.NotEmpty(t, snap.WalkPath,
+		"the town walk must publish its plan")
+	require.Equal(t, "townWalk", snap.Phase,
+		"the phase must publish for the activity banner")
+	last := snap.WalkPath[len(snap.WalkPath)-1]
+	require.Equal(t, state.WalkPoint{
+		X: herbielPos[0], Y: herbielPos[1], Z: herbielPos[2],
+	}, last, "the trader destination must close the plan")
+}
+
 // TestTripTriggersOnWeight verifies the weight trigger: half of the
 // maximum load starts a trip even with empty slots.
 func TestTripTriggersOnWeight(t *testing.T) {
