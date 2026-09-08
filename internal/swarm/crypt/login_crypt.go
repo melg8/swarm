@@ -19,6 +19,11 @@ const (
 	loginMaxPacket    = 65535
 )
 
+// Serializable is a packet that serializes itself into a writer.
+type Serializable interface {
+	ToBytes(w *packet.Writer) error
+}
+
 // LoginCrypt implements packet framing of the Mobius login protocol.
 // Wire layout is [size:2 little endian][blowfish(content+filler+crc32le)]
 // where the payload is aligned to 8 bytes and the little endian XOR checksum
