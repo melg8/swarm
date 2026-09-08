@@ -1960,25 +1960,25 @@ type Snapshot struct {
 	// delevel, user, idle). The web UI maps it to the human readable
 	// activity banner of the bot widget. Empty before the loop sets
 	// it (the manual only sessions never do).
-	Phase        string                  `json:"phase"`
-	Character    CharacterSnapshot       `json:"character"`
-	Inventory    []InventoryItemSnapshot `json:"inventory"`
-	Objects      []ObjectSnapshot        `json:"objects"`
-	Events       []Event                 `json:"events"`
-	Chat         []ChatEvent             `json:"chat"`
-	WalkPath     []WalkPoint             `json:"walkPath"`
+	Phase     string                  `json:"phase"`
+	Character CharacterSnapshot       `json:"character"`
+	Inventory []InventoryItemSnapshot `json:"inventory"`
+	Objects   []ObjectSnapshot        `json:"objects"`
+	Events    []Event                 `json:"events"`
+	Chat      []ChatEvent             `json:"chat"`
+	WalkPath  []WalkPoint             `json:"walkPath"`
 	// CombatEvents carries the recent swings and damage
 	// landings of the animation layer: the last
 	// combatEventTTL window, in chronological order,
 	// deduped by the client on the sequence.
 	CombatEvents []CombatEventView `json:"combatEvents"`
-	HuntingZone  *Zone                   `json:"huntingZone"`
-	HuntingZones []ZoneView              `json:"huntingZones"`
-	Packets      int64                   `json:"packets"`
-	Version      uint64                  `json:"version"`
-	ServerTimeMs int64                   `json:"serverTimeMs"`
-	StartedAt    time.Time               `json:"startedAt"`
-	UpdatedAt    time.Time               `json:"updatedAt"`
+	HuntingZone  *Zone             `json:"huntingZone"`
+	HuntingZones []ZoneView        `json:"huntingZones"`
+	Packets      int64             `json:"packets"`
+	Version      uint64            `json:"version"`
+	ServerTimeMs int64             `json:"serverTimeMs"`
+	StartedAt    time.Time         `json:"startedAt"`
+	UpdatedAt    time.Time         `json:"updatedAt"`
 }
 
 // ZoneView is one hunting zone of the map view: the registry entry
