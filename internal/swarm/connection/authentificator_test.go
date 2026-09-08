@@ -20,7 +20,6 @@ import (
 // with the next scripted reply content.
 type fakeLoginServer struct {
 	listener net.Listener
-	t        *testing.T
 	// initContent is the unencrypted Init payload.
 	initContent []byte
 	// replies are the sealed reply contents, one per client packet.
