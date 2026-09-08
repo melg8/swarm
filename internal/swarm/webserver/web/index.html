@@ -40,11 +40,6 @@ SPDX-License-Identifier: MIT
         <ul id="bot-list" class="bot-list"></ul>
       </div>
 
-      <div id="zone-section" class="hidden">
-        <div class="sidebar-title">HUNTING ZONES</div>
-        <ul id="zone-list" class="zone-list"></ul>
-      </div>
-
       <div id="pf-panel" class="pf-panel">
         <div class="sidebar-title">PATHFIND TEST</div>
         <div class="pf-hint">
@@ -115,6 +110,8 @@ SPDX-License-Identifier: MIT
             <label class="check"><input type="checkbox" id="show-dest"> paths</label>
             <label class="check"><input type="checkbox" id="show-zone" checked> zone</label>
             <label class="check"><input type="checkbox" id="show-targets" checked> targets</label>
+            <label class="check"><input type="checkbox" id="show-hunt-zones" checked> hunt zones</label>
+            <label class="check"><input type="checkbox" id="show-aggro" checked> aggro</label>
           </span>
           <label class="check"><input type="checkbox" id="show-map" checked> map bg</label>
           <span id="map-scale" class="map-scale"></span>
@@ -227,6 +224,19 @@ SPDX-License-Identifier: MIT
                     d="M9 2.5h6c.6 0 1 .4 1 1v1h4.5c.3 0 .5.2.5.5v1.5c0 .3-.2.5-.5.5H3.5a.5.5 0 0 1-.5-.5V5.5c0-.3.2-.5.5-.5H8v-1c0-.6.4-1 1-1zm-2.7 6h11.4l-.9 11.4c-.1 1.2-1.1 2.1-2.3 2.1H9.5c-1.2 0-2.2-.9-2.3-2.1L6.3 8.5zm3.2 2v8.2h1.4V10.5H9.5zm3.6 0v8.2h1.4V10.5H13z"/>
                 </svg>
               </div>
+            </div>
+          </div>
+
+          <div id="zone-panel" class="zone-panel hidden"
+            title="the hunting grounds of the deployment">
+            <button id="zone-panel-head" class="zone-panel-head"
+              type="button" title="collapse or expand the zone list">
+              <span class="zone-panel-title">HUNTING ZONES</span>
+              <span id="zone-panel-count" class="zone-panel-count"></span>
+              <span id="zone-panel-chev" class="zone-panel-chev">&#9656;</span>
+            </button>
+            <div id="zone-panel-body" class="zone-panel-body">
+              <ul id="zone-list" class="zone-list"></ul>
             </div>
           </div>
 

@@ -890,3 +890,20 @@ precomputed flat data instead of per call allocations).
   `hunt/zones_bench_test.go` (zone picker), `webserver/
   server_bench_test.go` (snapshot JSON marshal). Baseline recorded
   above. Pushed as the first atomic commit.
+
+- 2026-09-08: (2, 4, 8, 10) the web round. The inactive hunting
+  zones draw in a bright soft blue with a light fill (the future
+  grounds read at a glance instead of barely visible dimmed hints)
+  and the new `hunt zones` toolbar checkbox hides the whole layer;
+  the aggression radius of the living aggressive mobs draws as a
+  dashed circle (amber idle, red in combat) behind the `aggro`
+  toolbar checkbox; the red map edge flash of a hit on the character
+  is removed (the damage numbers and the swing streaks carry the
+  combat, the blinking screen only distracted); the hunting zones
+  moved out of the left sidebar into a floating collapsible panel on
+  the map (bottom right, collapsed by default with a count chip -
+  the sidebar lists bots only). Harness checks added: the map render
+  harness covers the bright inactive square, the aggro circle and
+  both toggles; the hud harness covers the zone panel collapse and
+  render. All harnesses green (repro_map_render keeps its
+  pre-existing zone label failure).

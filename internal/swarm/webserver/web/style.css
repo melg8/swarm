@@ -183,7 +183,63 @@ body {
 
 .bot-list { list-style: none; overflow-y: auto; flex: 1; }
 
-.zone-list { list-style: none; max-height: 320px; overflow-y: auto; }
+/* The hunting zone panel: a floating collapsible list on the map
+   (bottom right corner, the same chrome as the equipment widget) -
+   the left sidebar is the bots-only overview. The head is one button
+   (title, zone count, collapse chevron); the collapsed state hides
+   the body. The pathfind test mode has no zones and hides it. */
+.zone-panel {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 254px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  z-index: 4;
+}
+
+body.mode-pathfind .zone-panel { display: none; }
+
+.zone-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.zone-panel-title { font-weight: 600; }
+
+.zone-panel-count {
+  margin-left: auto;
+  color: var(--text-dim);
+  letter-spacing: 0;
+}
+
+.zone-panel-chev {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.zone-panel-body {
+  border-top: 1px solid var(--border);
+}
+
+.zone-panel.collapsed .zone-panel-body { display: none; }
+
+.zone-list { list-style: none; max-height: 40vh; overflow-y: auto; }
 
 .zone-item {
   padding: 6px 12px;

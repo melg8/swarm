@@ -52,9 +52,6 @@ const MapView = {
   // repeated SSE snapshots of the two second server feed window.
   combatAnims: [],
   lastCombatSeq: 0,
-  // selfHurtUntil holds the moment the red hurt vignette of the map
-  // fades out after a damage landing on the character.
-  selfHurtUntil: 0,
 
   // The server world region grid: every region is 2048 units and every
   // object within the 3x3 region block around the player is loaded (see
@@ -108,7 +105,7 @@ const MapView = {
       if (!follow.checked) { this.syncPanAnchor(); }
       this.draw();
     });
-    for (const id of ["show-labels", "show-dest", "show-zone", "show-targets", "show-map", "show-geo"]) {
+    for (const id of ["show-labels", "show-dest", "show-zone", "show-targets", "show-hunt-zones", "show-aggro", "show-map", "show-geo"]) {
       document.getElementById(id).addEventListener("change", () => {
         this.draw();
       });
@@ -830,6 +827,7 @@ const MapView = {
     this.drawGrid(ctx, rect);
     this.drawZone(ctx, rect);
     this.drawTargetLinks(ctx);
+    this.drawAggroRanges(ctx, rect);
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
     this.drawCombatEffects(ctx);
@@ -856,10 +854,15 @@ const MapView = {
   // (the registry the hunt loop switches through): every zone draws
   // as a dashed rectangle with its name and level band, the active
   // zone in bright amber with the thicker stroke, the future ones
-  // dimmed, the demoted bands of the death regression in red. A
+  // in a clearly readable soft blue with a light fill (the
+  // demonstration of the grounds the bot will hunt next, not a
+  // barely visible hint), the demoted bands of the death regression
+  // in red. The hunt zones checkbox of the toolbar hides the whole
+  // layer like the targets and the map background toggles. A
   // snapshot without the zone registry falls back to the single
   // legacy hunting square.
   drawHuntingZone(ctx) {
+    if (!document.getElementById("show-hunt-zones").checked) { return; }
     const zones = this.lastSnap.huntingZones;
     if (Array.isArray(zones) && zones.length > 0) {
       for (const zone of zones) {
@@ -878,8 +881,9 @@ const MapView = {
 
   // drawHuntingZoneRect draws one hunting zone square: the active
   // zone in amber with the level band and the gear gate of its
-  // ladder step, the inactive zones dimmed under the units, the
-  // demoted bands in red. The label only draws when the square is
+  // ladder step, the inactive zones in a bright soft blue with a
+  // light fill so the future grounds read at a glance, the demoted
+  // bands in red. The label only draws when the square is
   // big enough on screen or active: the thirty granular grounds of
   // the registry would smear into one unreadable blob when zoomed
   // out, so the far zoom shows the squares and the level colors,
@@ -912,10 +916,17 @@ const MapView = {
         (zone.deaths === 1 ? " death" : " deaths");
     }
     ctx.save();
-    ctx.strokeStyle = active
-      ? "#f9ab00" : demoted ? "#ff5c5c" : this.colors.textDim;
-    ctx.globalAlpha = active ? 0.9 : demoted ? 0.75 : 0.45;
-    ctx.lineWidth = active ? 2 : 1;
+    const stroke = active
+      ? "#f9ab00" : demoted ? "#ff5c5c" : zoneFutureColor;
+    ctx.strokeStyle = stroke;
+    ctx.globalAlpha = active ? 0.9 : demoted ? 0.75 : 0.7;
+    ctx.lineWidth = active ? 2 : 1.5;
+    if (!active && !demoted) {
+      // A light fill demonstrates the future grounds even at the far
+      // zoom where a thin dashed outline alone melts into the map.
+      ctx.fillStyle = zoneFutureFill;
+      ctx.fillRect(p1.x, p1.y, size, size);
+    }
     ctx.setLineDash([10, 6]);
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
@@ -931,8 +942,7 @@ const MapView = {
       ctx.lineWidth = 3;
       ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
       ctx.strokeText(label, p1.x + 6, p1.y + 14);
-      ctx.fillStyle = active
-        ? "#f9ab00" : demoted ? "#ff5c5c" : this.colors.textDim;
+      ctx.fillStyle = stroke;
       ctx.fillText(label, p1.x + 6, p1.y + 14);
     }
     ctx.restore();
@@ -1001,6 +1011,41 @@ const MapView = {
     const lx = Math.max(p1.x, 6);
     const ly = Math.min(Math.max(p1.y + 12, 14), rect.height - 6);
     ctx.fillText(label, lx, ly);
+  },
+
+  // drawAggroRanges draws the aggression radius circles of the
+  // living aggressive mobs around their drawn (interpolated)
+  // positions: the circle is the range the mob attacks a passing
+  // player from, so the hunter reads which camps to steer around.
+  // The aggro checkbox of the toolbar hides the layer - a full pack
+  // of overlapping circles clutters the far zoom. A fighting mob
+  // reads red (it already holds a target), the idle ones amber.
+  drawAggroRanges(ctx, rect) {
+    if (!document.getElementById("show-aggro").checked) { return; }
+    if (!this.lastSnap || !this.lastSnap.objects) { return; }
+    for (const obj of this.lastSnap.objects) {
+      if (obj.kind !== "npc" || !obj.aggressive || obj.dead) { continue; }
+      if (!obj.aggroRange || obj.aggroRange <= 0) { continue; }
+      const rt = this.runtime.get(obj.objectId);
+      const x = rt ? rt.drawX : obj.x;
+      const y = rt ? rt.drawY : obj.y;
+      const c = this.worldToScreen(x, y);
+      const radius = obj.aggroRange * this.scale;
+      if (c.x + radius < 0 || c.x - radius > rect.width
+        || c.y + radius < 0 || c.y - radius > rect.height) {
+        continue;
+      }
+      ctx.save();
+      ctx.strokeStyle = obj.inCombat
+        ? this.mapColors.combat : this.mapColors.aggressive;
+      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   },
 
   drawObjects(ctx, rect) {
@@ -1612,7 +1657,6 @@ const MapView = {
     if (first) {
       this.lastCombatSeq = 0;
       this.combatAnims = [];
-      this.selfHurtUntil = 0;
     }
     for (const ev of events) {
       if (ev.seq <= this.lastCombatSeq) { continue; }
@@ -1643,10 +1687,6 @@ const MapView = {
       return;
     }
     if (ev.kind !== "damage" || !(ev.amount > 0)) { return; }
-    if (ev.targetId === selfId) {
-      this.selfHurtUntil = Math.max(this.selfHurtUntil,
-        performance.now() + hurtVignetteMs);
-    }
     // The horizontal jitter spreads the numbers of a multi hit
     // burst instead of painting one blob.
     const jitter = ((ev.seq * 37) % 17 - 8) * 1.6;
@@ -1659,13 +1699,12 @@ const MapView = {
   },
 
   // drawCombatEffects renders the live combat animation layer on
-  // top of the units: the swing streaks of every attack broadcast
-  // and the floating damage numbers of the HP deltas, plus the red
-  // hurt vignette of the hits the character takes. Finished
+  // top of the units: the swing streaks of the landed hits
+  // and the floating damage numbers of the HP deltas. Finished
   // entries drop out here; needsMoreFrames keeps the render loop
   // alive while any of them are still running.
   drawCombatEffects(ctx) {
-    if (this.combatAnims.length === 0 && this.selfHurtUntil === 0) {
+    if (this.combatAnims.length === 0) {
       return;
     }
     const nowMs = performance.now();
@@ -1682,7 +1721,6 @@ const MapView = {
       }
     }
     this.combatAnims = keep;
-    this.drawSelfHurtVignette(ctx, nowMs);
   },
 
   // drawSwingEffect draws one attack: a tapered streak that shoots
@@ -1815,31 +1853,6 @@ const MapView = {
     ctx.restore();
   },
 
-  // drawSelfHurtVignette flashes the map edges red when the
-  // character takes a hit: the gradient stays a moment and melts
-  // away, so a beating mob reads at a glance without watching the
-  // HP bar.
-  drawSelfHurtVignette(ctx, nowMs) {
-    if (!this.selfHurtUntil || nowMs >= this.selfHurtUntil) {
-      this.selfHurtUntil = 0;
-      return;
-    }
-    const fade = Math.min(1,
-      (this.selfHurtUntil - nowMs) / hurtVignetteMs);
-    const rect = this.canvas.getBoundingClientRect();
-    const r = Math.max(rect.width, rect.height) / 2;
-    const grad = ctx.createRadialGradient(
-      rect.width / 2, rect.height / 2, r * 0.55,
-      rect.width / 2, rect.height / 2, r);
-    grad.addColorStop(0, "rgba(217, 48, 37, 0)");
-    grad.addColorStop(1,
-      "rgba(217, 48, 37, " + (0.3 * fade).toFixed(3) + ")");
-    ctx.save();
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, rect.width, rect.height);
-    ctx.restore();
-  },
-
   // effectScreenPos resolves the screen position of an animation
   // anchor: the interpolated runtime position while the unit is
   // still on the map (the self character included), the captured
@@ -1933,6 +1946,17 @@ const socialWindowMs = 3000;
 // swingMs is the life of one attack animation: the windup swoosh,
 // the streak that shoots from the attacker to the hit target and
 // the impact starburst (the Mobius attack cadence is roughly one
+// zoneFutureColor is the stroke of the inactive hunting zones: a
+// bright soft blue that reads over the light map imagery and both
+// theme fills alike, clearly distinct from the amber active square
+// and the red demoted bands.
+const zoneFutureColor = "#5b9bd5";
+
+// zoneFutureFill is the faint fill of the inactive hunting zones: it
+// demonstrates the future grounds at the far zoom where a thin
+// outline alone melts into the map imagery.
+const zoneFutureFill = "rgba(91, 155, 213, 0.07)";
+
 // swing a second, so the effects of a running fight never overlap
 // into one smear).
 const swingMs = 340;
@@ -1940,10 +1964,6 @@ const swingMs = 340;
 // damageMs is the life of one floating damage number: it pops in,
 // rises above the hurt unit and melts away.
 const damageMs = 950;
-
-// hurtVignetteMs is how long the red screen edge flash of a hit on
-// the character stays up.
-const hurtVignetteMs = 650;
 
 // The combat animation palette: the own swings read light blue, the
 // mob swings red; the damage numbers on the mobs the character

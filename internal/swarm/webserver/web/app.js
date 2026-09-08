@@ -378,15 +378,43 @@ function renderBotStatus(snap) {
 
 // ---- hunting zones panel ----
 
-// renderZones refreshes the hunting zone list of the sidebar: every
-// zone of the registry with its level band and gear gate, the active
-// one highlighted (the ground the bot hunts in or walks to), the
-// demoted bands of the death regression marked, a hunt button
-// switching the zone of the bot (the manual override of the automatic
-// picker).
+// The zone panel starts collapsed: the map corner chip carries the
+// count, the click on the head expands the scrollable list. The
+// sidebar stays the bots-only overview.
+const zonePanelCollapsed = { value: true };
+
+// initZonePanel wires the collapse toggle of the zone panel head.
+function initZonePanel() {
+  const head = document.getElementById("zone-panel-head");
+  const panel = document.getElementById("zone-panel");
+  if (!head || !panel) { return; }
+  head.addEventListener("click", () => {
+    zonePanelCollapsed.value = !zonePanelCollapsed.value;
+    applyZonePanelState();
+  });
+}
+
+// applyZonePanelState syncs the panel DOM with the collapse flag.
+function applyZonePanelState() {
+  const panel = document.getElementById("zone-panel");
+  const chev = document.getElementById("zone-panel-chev");
+  if (!panel) { return; }
+  panel.classList.toggle("collapsed", zonePanelCollapsed.value);
+  if (chev) {
+    chev.textContent = zonePanelCollapsed.value ? "\u25B8" : "\u25BE";
+  }
+}
+
+// renderZones refreshes the hunting zone list of the floating map
+// panel: every zone of the registry with its level band and gear
+// gate, the active one highlighted (the ground the bot hunts in or
+// walks to), the demoted bands of the death regression marked, a
+// hunt button switching the zone of the bot (the manual override of
+// the automatic picker).
 function renderZones(snap) {
-  const section = document.getElementById("zone-section");
+  const section = document.getElementById("zone-panel");
   const list = document.getElementById("zone-list");
+  const count = document.getElementById("zone-panel-count");
   if (!section || !list) { return; }
   const zones = Array.isArray(snap.huntingZones) ? snap.huntingZones : [];
   if (zones.length === 0) {
@@ -394,6 +422,8 @@ function renderZones(snap) {
     return;
   }
   section.classList.remove("hidden");
+  if (count) { count.textContent = String(zones.length); }
+  applyZonePanelState();
   if (renderZones.lastKey === JSON.stringify(zones)) { return; }
   renderZones.lastKey = JSON.stringify(zones);
   list.textContent = "";

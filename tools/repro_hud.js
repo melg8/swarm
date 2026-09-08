@@ -49,6 +49,11 @@ function makeElement() {
         append: function (...added) {
             for (const child of added) { this.children.push(child); }
         },
+        appendChild: function (child) {
+            this.children.push(child);
+
+            return child;
+        },
         classList: {
             _classes: new Set(),
             contains(cls) { return this._classes.has(cls); },
@@ -130,7 +135,13 @@ function loadAppJs(appFile) {
         " renderBotStatus: typeof renderBotStatus === 'function'" +
         " ? renderBotStatus : undefined," +
         " phaseLabel: typeof phaseLabel === 'function'" +
-        " ? phaseLabel : undefined };",
+        " ? phaseLabel : undefined," +
+        " renderZones: typeof renderZones === 'function'" +
+        " ? renderZones : undefined," +
+        " applyZonePanelState: typeof applyZonePanelState === 'function'" +
+        " ? applyZonePanelState : undefined," +
+        " zonePanelCollapsed: typeof zonePanelCollapsed === 'undefined'" +
+        " ? undefined : zonePanelCollapsed };",
         sandbox);
 
     return { hud: sandbox.__hud, elements, sandbox };
@@ -471,6 +482,49 @@ function main() {
         check(results, "renderBotStatus carries the detail text",
             typeof detailText === "string" && detailText.length > 0,
             "got " + JSON.stringify(detailText));
+    }
+
+    // The hunting zone panel: a floating collapsible list on the map
+    // (the sidebar stays the bots-only overview). The default state is
+    // collapsed, the count chip carries the zone total, the zones
+    // render into the list and the collapse flag drives the body.
+    if (typeof hud.renderZones !== "function") {
+        check(results, "renderZones is present in app.js", false,
+            "renderZones is missing");
+    } else {
+        const zones = [
+            { id: "z1", name: "Keltir Meadow", minLevel: 1, maxLevel: 3,
+                minGear: 0, active: true, demoted: false, deaths: 0 },
+            { id: "z2", name: "Wolf Ridge", minLevel: 3, maxLevel: 4,
+                minGear: 20, active: false, demoted: false, deaths: 1 }
+        ];
+        const snap = snapshotWith(0, []);
+        snap.huntingZones = zones;
+        hud.renderZones(snap);
+        const panel = elements.get("zone-panel");
+        const list = elements.get("zone-list");
+        const count = elements.get("zone-panel-count");
+        check(results, "zone panel shows with zones",
+            !panel.classList.contains("hidden"),
+            "panel still hidden");
+        check(results, "zone count chip carries the total",
+            count.textContent === "2", "count is " + count.textContent);
+        check(results, "zone panel starts collapsed",
+            panel.classList.contains("collapsed"),
+            "no collapsed class");
+        check(results, "zones render into the list",
+            list.children.length === 2,
+            list.children.length + " children");
+        hud.zonePanelCollapsed.value = false;
+        hud.renderZones(snap);
+        check(results, "expanded state drops the collapsed class",
+            !panel.classList.contains("collapsed"),
+            "still collapsed");
+        hud.zonePanelCollapsed.value = true;
+        snap.huntingZones = [];
+        hud.renderZones(snap);
+        check(results, "no zones hides the panel",
+            panel.classList.contains("hidden"), "panel still visible");
     }
 
     let failed = 0;

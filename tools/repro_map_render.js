@@ -202,7 +202,8 @@ function loadMapJs(mapFile) {
     };
     const checkboxes = {
         follow: true, "show-labels": false, "show-dest": false,
-        "show-zone": false, "show-targets": true
+        "show-zone": false, "show-targets": true,
+        "show-hunt-zones": true, "show-aggro": true
     };
     const elements = new Map();
     const sandbox = {
@@ -553,6 +554,66 @@ function runScenarioHuntingZone(mapFile) {
     return results;
 }
 
+// runScenarioHuntZonesView covers the multi zone view layer: the
+// inactive future grounds draw with the bright blue demonstration
+// stroke, the aggro radius circles draw around the aggressive mobs,
+// and the two toolbar checkboxes hide their layers.
+function runScenarioHuntZonesView(mapFile) {
+    const { MapView, record, elements } = loadMapJs(mapFile);
+    MapView.init();
+    const snap = buildSnapshot(0, false);
+    snap.huntingZones = [{
+        id: "z1", name: "Future Ground", region: "elven",
+        minLevel: 1, maxLevel: 3, minGear: 0,
+        cx: WORLD.self.x, cy: WORLD.self.y, half: 450,
+        active: false, demoted: false, deaths: 0
+    }];
+    snap.objects.push({
+        objectId: 500, kind: "npc", name: "Orc Raider",
+        x: WORLD.self.x + 300, y: WORLD.self.y - 200, z: -3500,
+        heading: 0, moving: false, speed: 0, targetId: 0,
+        dead: false, attackable: true, aggressive: true, aggroRange: 400,
+        inCombat: false, level: 4
+    });
+    MapView.update(snap);
+    MapView.draw();
+
+    const results = [];
+    const future = record.strokes.filter((stroke) =>
+        stroke.style === "#5b9bd5" && stroke.segments.length >= 3);
+    check(results, "inactive hunting zone draws the bright blue square",
+        future.length > 0, "no bright blue square stroke");
+
+    const center = worldToScreen(WORLD.self.x + 300, WORLD.self.y - 200);
+    const radius = 400 * WORLD.scale;
+    const circles = record.strokes.filter((stroke) =>
+        stroke.style === MARK.aggressive && stroke.arcs.length === 1
+        && Math.hypot(stroke.arcs[0][0] - center.x,
+            stroke.arcs[0][1] - center.y) < 3
+        && Math.abs(stroke.arcs[0][2] - radius) < 3);
+    check(results, "aggressive mob draws its aggro radius circle",
+        circles.length > 0, "no circle at the mob position");
+
+    // Both toggles hide their layers: flip them, clear the record and
+    // redraw the same snapshot.
+    elements.get("show-hunt-zones").checked = false;
+    elements.get("show-aggro").checked = false;
+    record.strokes.length = 0;
+    record.fills.length = 0;
+    record.texts.length = 0;
+    MapView.draw();
+    const zoneStrokes = record.strokes.filter((stroke) =>
+        stroke.style === "#5b9bd5").length;
+    check(results, "hunt zones checkbox hides the zone squares",
+        zoneStrokes === 0, "zone strokes still drawn: " + zoneStrokes);
+    const aggroStrokes = record.strokes.filter((stroke) =>
+        stroke.style === MARK.aggressive && stroke.arcs.length === 1).length;
+    check(results, "aggro checkbox hides the radius circles",
+        aggroStrokes === 0, "circles still drawn: " + aggroStrokes);
+
+    return results;
+}
+
 // runScenarioSocialMarker covers the social animation marker: a
 // creature with a fresh socialUntilMs shows the small ring above its
 // marker, and the ring fades out once the window is over.
@@ -699,7 +760,8 @@ function main() {
         ["social animation marker", runScenarioSocialMarker(mapFile)],
         ["stable draw order", runScenarioStableOrder(mapFile)],
         ["resting marker", runScenarioRestMarker(mapFile)],
-        ["hunting zone", runScenarioHuntingZone(mapFile)]
+        ["hunting zone", runScenarioHuntingZone(mapFile)],
+        ["hunt zones view", runScenarioHuntZonesView(mapFile)]
     ];
     let failed = 0;
     for (const [name, results] of scenarios) {
