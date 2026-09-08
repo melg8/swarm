@@ -489,12 +489,18 @@ the design goal is per-class and per-region extension):
   legs open distance (toward the zone center when the straight line
   leaves the square); a target one swing from dead is finished
   instead. A hurt character under attack keeps fleeing instead of
-  standing in the blows. Critical health (12%) under attack ends the
-  session: one last escape leg (the server keeps an offline character
-  in the world for the 15 s combat stance - the walk keeps it moving),
-  the `RequestLogout` packet plus the socket close, and a three minute
-  login cooldown the supervisor (`runBotForever`) honors before the
-  next session (the tracker carries the cooldown across sessions).
+  standing in the blows. Two triggers end the session: critical
+  health (12%) under attack, or a social pile up - two or more living
+  attackable mobs holding the character as their target
+  (`SelfAttackerCount`; a chasing mob carries the same target id as a
+  swinging one, the character's own engagement never counts). One
+  last escape leg keeps the offline character moving through the 15 s
+  combat stance the server holds it in, the `RequestLogout` packet
+  plus the socket close follow, and a 30 s login cooldown the
+  supervisor (`runBotForever`) honors before the next session (the
+  tracker carries the cooldown across sessions - half a minute covers
+  the combat stance plus the mob reset walk home without idling the
+  farm for minutes).
   Entering a hunting zone engages the first valid target the entry
   radius offers (`engagesOnZoneEntry` of the return phase), and a
   targetless hunter patrols toward the zone center after a 6 s
@@ -508,6 +514,27 @@ execution stay unchanged), a new region adds its `townMerchants`
 list, its zone registry entries and its tax rate. The elven
 deployment is the reference wiring of all three (`main.go`:
 `SetHuntingZoneRegion("elven")`).
+
+### Combat animation layer (map.js + state combatEvents)
+
+The map plays the combat the tracker observes: every `Attack`
+broadcast lands as one swing (a colored streak from the attacker to
+the hit target, light blue for the own attacks, red for the mob ones,
+with a windup swoosh at the attacker and a white impact starburst on
+the target), every `StatusUpdate` HP drop floats a damage number
+above the hurt unit (amber on mobs, red on the character) with a
+flash ring under it, and a hit on the character flashes the map edges
+red. The server side is `state.CombatEvent` (the `combatEvents` ring
+of the tracker): `ApplyAttack` records the swings, the HP deltas of
+`ApplyStatusUpdate` record the damage (the Attack broadcast carries
+no damage value, heals record nothing), the snapshot carries the last
+2 s with a monotonic `seq` and the client dedupes on it across the
+SSE snapshots (the first snapshot after a page load only accepts the
+cursor). The effects track the interpolated runtime positions while
+the units stay on the map and fall back to the event placement after
+they despawn; `needsMoreFrames` keeps the render loop alive while any
+effect lives. The feed is bounded (64 events) and the snapshots only
+grow by the 2 s window, so the payload stays small.
 
 ## Mobius stack operational notes
 

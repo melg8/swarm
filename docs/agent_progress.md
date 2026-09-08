@@ -712,3 +712,71 @@ same branch (rebase before every push, never force-push).
 
 - All changes implemented, unit tested, harness checked, lint clean
   (new), documented. Pushed to mobius-c1-client-1 as melg8.
+
+## Finished task: two-attacker logout, 30 s pause, combat animations
+
+Started and finished: 2026-09-08. Branch: `mobius-c1-client-1`. Commits
+as melg8, pushed as they landed (rebased over the parallel banner
+commit of the lint agent).
+
+### Goal
+
+The user asked for three changes: (1) log the bot off when two or
+more mobs aggro on it, and cut the reconnect cooldown to 30 seconds;
+(2) an attack animation for the bot and for the mobs plus pretty
+damage animations on both; (3) everything on the shared branch with
+the concurrent edits of the other models respected.
+
+### Implementation
+
+- `state`: the tracker gains a combat animation feed
+  (`combatEvents`, `CombatEvent`/`CombatEventView`, bounded to 64
+  entries, 2 s snapshot window, monotonic `seq`). `ApplyAttack`
+  records every swing with the attacker and hit-target placement;
+  the HP deltas of `ApplyStatusUpdate` record the damage landings
+  (heals record nothing - the Attack broadcast carries no damage
+  value, the delta is the observed truth). `SelfAttackerCount` reads
+  the live aggro load (living attackable npcs holding the character
+  as their target - a chaser counts the same as a swinger).
+- `hunt`: the emergency logout fires on EITHER critical health under
+  attack OR `SelfAttackerCount >= 2` (the social pile up - the gate
+  stays one-shot behind `logoutDone`); the login cooldown drops from
+  3 minutes to 30 seconds (the combat stance plus the mob reset walk
+  home; the farm stops idling for minutes). The log line names the
+  actual trigger.
+- `web/map.js`: the combat animation layer. Fresh `combatEvents`
+  replay as canvas effects deduped by `seq` across the SSE
+  snapshots: swings draw a windup swoosh at the attacker, a colored
+  streak shooting to the target (light blue for the own attacks, red
+  for the mob ones) and a white impact starburst; damage numbers pop
+  in with an overshoot, rise and melt (amber on mobs, red on the
+  character) with a flash ring under them; a hit on the character
+  flashes the map edges red. The effects track the interpolated
+  runtime positions and `needsMoreFrames` keeps the render loop
+  alive while they live.
+
+### Verification
+
+- Unit tests: `state/combat_events_test.go` (the attacker count
+  semantics, the swing feed, the damage feed incl. no-heal rule, the
+  feed bound) and two new hunt tests (the two-mob logout with its
+  30 s pause, the single-attacker fight never logging out); the
+  existing critical-health logout test re-pinned to the 30 s pause.
+  go vet + go test ./... green.
+- Live: rich1 hunted the goblin camp - the snapshot carried
+  `combatEvents` with live attack/damage beats (amounts 10-24, mob
+  ids and positions) and the map page played them (the browser
+  probe saw the anims list filling, `seq` advancing, zero page
+  errors). Screenshots during real fights caught the floating
+  damage numbers; controlled injections of every effect kind were
+  each confirmed visually by a vision model (the blue bot swing, the
+  red mob swing pointing at the character, the amber -47 on a mob,
+  the red -31 with the flash ring on the character, the impact
+  starburst).
+- tools/mobius_e2e.sh 45: E2E_OK with the new code path.
+
+### Status
+
+- All three requested behaviors implemented, unit tested, live
+  verified (feed + rendering), documented in AGENTS.md, pushed to
+  mobius-c1-client-1 as melg8.
