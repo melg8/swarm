@@ -440,7 +440,18 @@ the design goal is per-class and per-region extension):
   skip them, so no upgrade chains are bought in a single walk (the
   next trip re-plans from the reached paperdoll). The town trips
   **sell all the accumulated junk first** (the selling ends when
-  nothing sellable is left, not at the 50 percent trigger), re-plan
+  nothing sellable is left, not at the 50 percent trigger), **sell
+  the replaced gear before the buys** (a planned purchase that
+  displaces an equipped piece carries its `SellFirst` object ids and
+  its sell credit of referencePrice/2 - the planner counts the
+  credit toward the budget, so the character shops for a replacement
+  as soon as the adena plus the proceeds cover it instead of
+  hoarding the full price; the trip unequips the displaced pieces -
+  they become plain sellable candidates the junk flow or the
+  replacement batch sells - and waits out their removal before
+  re-planning, so the fresh adena of the sale funds the buy; the
+  auto equipment stays suspended over that window so nothing
+  re-equips a piece bound for the merchant), re-plan
   with the fresh adena and walk to every merchant of the plan (one
   buylist per transaction request, 11 second pacing). A trip start
   never interrupts a fight: `fightBusy` (a living target, pending
@@ -475,7 +486,13 @@ the design goal is per-class and per-region extension):
   deaths never count); deaths count against the square they happen
   in (the position lookup - an emergency logout death lands on a
   fresh session before any zone pick), a manual zone override dies
-  with the demotion. The map draws every zone (active amber, future
+  with the demotion. A manual zone selection stops the walks aimed
+  at the old square (`stopForZoneSwitch`: a manual move, a town trip
+  walk and a zone return leg are cancelled, one walk request to the
+  current spot replaces the running server walk; the deleveling
+  refuses the stop like every movement command, the selling stop
+  keeps running and its return leg re-targets the new zone). The map
+  draws every zone (active amber, future
   dimmed with the gear gate, demoted bands red - labels only when
   the square is big enough on screen) and the sidebar zone panel
   carries the death counts and switches zones manually (the `zone`
@@ -534,13 +551,14 @@ deployment is the reference wiring of all three (`main.go`:
 ### Combat animation layer (map.js + state combatEvents)
 
 The map plays the combat the tracker observes: every `Attack`
-broadcast lands as one swing (a colored streak from the attacker to
+broadcast lands as one swing per hit that actually connected (the
+packet carries the Mobius miss flag per hit - an evaded blow draws
+nothing) - a colored streak runs from the attacker to
 the hit target, light blue for the own attacks, red for the mob ones,
 with a windup swoosh at the attacker and a white impact starburst on
-the target), every `StatusUpdate` HP drop floats a damage number
+the target; every `StatusUpdate` HP drop floats a damage number
 above the hurt unit (amber on mobs, red on the character) with a
-flash ring under it, and a hit on the character flashes the map edges
-red. The server side is `state.CombatEvent` (the `combatEvents` ring
+flash ring under it. The server side is `state.CombatEvent` (the `combatEvents` ring
 of the tracker): `ApplyAttack` records the swings, the HP deltas of
 `ApplyStatusUpdate` record the damage (the Attack broadcast carries
 no damage value, heals record nothing), the snapshot carries the last
@@ -845,7 +863,9 @@ the same variables).
   distance from the target, marks combat and the target reference -
   also for the played character itself when it chases its attack
   target), StopMove/ValidateLocation (placement and heading), Attack
-  0x06 (attacker position, hit targets: marks combat for both sides,
+  0x06 (attacker position, hit targets with their per hit flags -
+  the Mobius miss flag filters the swing feed: only the landed blows
+  animate; marks combat for both sides,
   attacker faces the target, target location refreshes the own
   position when the bot is the target), AutoAttackStart 0x3B /
   AutoAttackStop 0x3C (auto attack flags), MyTargetSelected 0xBF (the
