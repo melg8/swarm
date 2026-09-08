@@ -164,6 +164,7 @@ func (gc *gameConn) handshake() error {
 	gc.sendRawKeyPacket(1, key)
 	gc.crypt = crypt.NewGameCrypt(key)
 	gc.crypt.Enable()
+	gc.state = gameStateAuthed
 	gc.server.logger.Printf("game#%d: protocol %d accepted, cipher enabled",
 		gc.id, version)
 
