@@ -1070,3 +1070,62 @@ running page.
   and the static shell; live verified in the headless browser (12
   columns, 48 cells, zero console errors, screenshots in
   download/fight_shots/).
+
+
+## Unfinished task: fleet scale hardening (100 bots), DOD round 2
+
+Started: 2026-09-08 (second benchmark round). Branch:
+`mobius-c1-client-1`. Commits as melg8, pushed as they land.
+
+### Goal
+
+The user asked to continue covering the code with tests and
+benchmarks, to identify the remaining bottlenecks, and to optimize
+them for the real deployment shape of the project: not one bot but
+up to 100 concurrent bot sessions in one process. Apply data
+oriented design, pay special attention to unnecessary memory
+allocations and cache misses in the operations, make the hot paths
+cache friendly, and refactor the oversized god object classes.
+
+### Constraints
+
+- AGENTS.md rules: the stack deployment first, atomic commits pushed
+  immediately, the go-verify-loop (build + vet + test + lint) before
+  every push, the live E2E at wrap up.
+- The server integrity rules: no server patches, the bot adapts.
+- The existing benchmark suite (state, npcdata, hunt, webserver)
+  pins the previous round results; keep them green.
+- A parallel agent may edit the same branch: rebase before push.
+
+### Acceptance criteria
+
+- Fleet benchmarks (100 bots) exist for the registry, the bot list
+  endpoint, the SSE stream path and the aggregate apply load.
+- The per SSE event allocation profile is fixed (the frame + encode
+  buffers are reused, the intermediate deep copies removed where
+  the hot path allows).
+- The registry iterates a dense slice (no per bot string hash map
+  lookups in the list walk).
+- The god objects (state.Bot 2448 lines, connection.GameClient 1624,
+  hunt.Loop 1480) are split into cohesive components without
+  behavior changes (the existing tests stay green unchanged).
+- Every optimization is proven by the benchmark before/after
+  numbers recorded here.
+
+### Progress
+
+- 2026-09-08: the fleet benchmark suite landed
+  (state/registry_bench_test.go, webserver/fleet_bench_test.go).
+  Baseline numbers on the sandbox (2 vcpu): RegistryList100 12.5
+  us/12 KB/1 alloc; BotInfo 76 ns/0 allocs; NewBot 9.7 us/28 KB/7
+  allocs (the 512 entry event ring and the 64 entry chat ring are
+  allocated up front per bot); SnapshotContended 37.7 us/48 KB/3
+  allocs; HundredBotsSnapshot 224 us/500 KB/200 allocs;
+  BotListEndpoint100 54.9 us/12 KB/3 allocs; SSEFrame 27.1 us/65
+  KB/1 alloc (a fresh 64 KB frame buffer per event);
+  SSEEncodeAndFrame 115.8 us/173 KB/5 allocs (the full per event
+  cost of the stream: snapshot copy + JSON buffer + frame buffer -
+  at the 300 ms poll of 100 watched bots that is ~50 MB/s of
+  garbage); SSEStreamPoll100 1.4 us. The slowest elements of the
+  fleet shape: the SSE per event triple allocation, the registry
+  map walk in List, and the per bot upfront ring allocations.
