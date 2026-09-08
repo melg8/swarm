@@ -48,6 +48,30 @@ that port under Windows).
   run shows the bound listeners and the skip hint for the busy
   127.0.0.1:2106.
 
+### Progress (2026-09-08)
+
+- 2026-09-08: listener expansion landed (a57d741) and the routing docs
+  with the two recipes (d946937). Live check on the standard sandbox:
+  the busy 127.0.0.1:2106 is skipped with the remedy hint, the honest
+  bound list and the routing banner land in proxy.log.
+- 2026-09-08: the full Recipe A rehearsal against the live stack: the
+  real login server rebound to 127.0.0.3:2106 (the game server
+  re-registers automatically), the swarm with -login
+  127.0.0.3:2106 -proxy, and a fake C1 client connecting through the
+  hardcoded 127.0.0.1:2106 - login, one char list, world replay all
+  green. The rehearsal exposed a second bug: a FRESH account hung at
+  the character selection (see the next entry). PROXY_E2E_OK after the
+  fix.
+- 2026-09-08: fresh account creation race fixed (0eccffc). The Mobius
+  creation handler writes the updated char list before the server
+  cache update and the trailing create ok after it; a fast client's
+  select lands in the window and is silently dropped. EnsureCharacter
+  drains the trailing ok, EnterWorld retransmits the select with a
+  bounded wait. Verified with a fresh account on the live stack.
+- Sandbox note: the rehearsal temporarily rebound the login server to
+  127.0.0.3 (dist/login/config/Server.ini); the sandbox is restored to
+  127.0.0.1 afterwards (the standard E2E layout).
+
 ## Finished task: MITM proxy server for the real C1 client (feature/proxy-server)
 
 Started: 2026-09-08. Branch: `feature/proxy-server`. Commits as melg8,
