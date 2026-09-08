@@ -1673,39 +1673,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 		copy(snap.WalkPath, b.walkPath)
 	}
 	for i := range b.world.objects {
-		obj := &b.world.objects[i]
-		snap.Objects = append(snap.Objects, ObjectSnapshot{
-			ObjectID:        obj.ObjectID,
-			Kind:            obj.Kind,
-			Name:            obj.Name,
-			Title:           obj.Title,
-			TemplateID:      obj.TemplateID,
-			Attackable:      obj.Attackable,
-			Aggressive:      obj.Aggressive,
-			AggroRange:      obj.AggroRange,
-			Level:           obj.Level,
-			TargetID:        obj.TargetID,
-			InCombat:        obj.InCombat(now),
-			Dead:            obj.Dead,
-			Moving:          obj.Moving,
-			Running:         obj.Running,
-			Speed:           obj.EffectiveSpeed(),
-			CollisionRadius: obj.CollisionRadius,
-			SocialUntilMs:   obj.SocialUntil.UnixMilli(),
-			Count:           obj.Count,
-			X:               obj.X,
-			Y:               obj.Y,
-			Z:               obj.Z,
-			Heading:         obj.Heading,
-			DestX:           obj.DestX,
-			DestY:           obj.DestY,
-			DestZ:           obj.DestZ,
-			MoveAtMs:        obj.MoveAt.UnixMilli(),
-			CurHP:           obj.CurHP,
-			MaxHP:           obj.MaxHP,
-			CurMP:           obj.CurMP,
-			MaxMP:           obj.MaxMP,
-		})
+		snap.Objects = append(snap.Objects, b.objectSnapshotLocked(i, now))
 	}
 	snap.CombatEvents = b.combat.appendView(snap.CombatEvents, now)
 	snap.Events = b.log.appendNewest(snap.Events, snapshotEvents)

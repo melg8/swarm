@@ -288,29 +288,37 @@ func appendInventoryJSON(dst []byte, items []InventoryItemSnapshot) []byte {
 		if i > 0 {
 			dst = append(dst, ',')
 		}
-		dst = append(dst, `{"objectId":`...)
-		dst = strconv.AppendInt(dst, int64(items[i].ObjectID), 10)
-		dst = append(dst, `,"itemId":`...)
-		dst = strconv.AppendInt(dst, int64(items[i].ItemID), 10)
-		dst = append(dst, `,"count":`...)
-		dst = strconv.AppendInt(dst, int64(items[i].Count), 10)
-		dst = append(dst, `,"type2":`...)
-		dst = strconv.AppendInt(dst, int64(items[i].Type2), 10)
-		dst = append(dst, `,"equipped":`...)
-		dst = strconv.AppendBool(dst, items[i].Equipped)
-		dst = append(dst, `,"bodyPart":`...)
-		dst = strconv.AppendInt(dst, int64(items[i].BodyPart), 10)
-		dst = append(dst, `,"enchant":`...)
-		dst = strconv.AppendInt(dst, int64(items[i].Enchant), 10)
-		dst = append(dst, `,"name":`...)
-		dst = appendJSONString(dst, items[i].Name)
-		dst = append(dst, `,"icon":`...)
-		dst = appendJSONString(dst, items[i].Icon)
-		dst = append(dst, '}')
+		dst = appendInventoryItemJSON(dst, items[i])
 	}
 	dst = append(dst, ']')
 
 	return dst
+}
+
+// appendInventoryItemJSON writes one equipment widget item. The live
+// state encoder reuses it with a stack allocated view, so the element
+// encoding stays byte identical between the two paths.
+func appendInventoryItemJSON(dst []byte, item InventoryItemSnapshot) []byte {
+	dst = append(dst, `{"objectId":`...)
+	dst = strconv.AppendInt(dst, int64(item.ObjectID), 10)
+	dst = append(dst, `,"itemId":`...)
+	dst = strconv.AppendInt(dst, int64(item.ItemID), 10)
+	dst = append(dst, `,"count":`...)
+	dst = strconv.AppendInt(dst, int64(item.Count), 10)
+	dst = append(dst, `,"type2":`...)
+	dst = strconv.AppendInt(dst, int64(item.Type2), 10)
+	dst = append(dst, `,"equipped":`...)
+	dst = strconv.AppendBool(dst, item.Equipped)
+	dst = append(dst, `,"bodyPart":`...)
+	dst = strconv.AppendInt(dst, int64(item.BodyPart), 10)
+	dst = append(dst, `,"enchant":`...)
+	dst = strconv.AppendInt(dst, int64(item.Enchant), 10)
+	dst = append(dst, `,"name":`...)
+	dst = appendJSONString(dst, item.Name)
+	dst = append(dst, `,"icon":`...)
+	dst = appendJSONString(dst, item.Icon)
+
+	return append(dst, '}')
 }
 
 // appendEventsJSON writes the rolling event log array.
@@ -323,15 +331,22 @@ func appendEventsJSON(dst []byte, events []Event) []byte {
 		if i > 0 {
 			dst = append(dst, ',')
 		}
-		dst = append(dst, `{"time":`...)
-		dst = appendJSONTime(dst, events[i].Time)
-		dst = append(dst, `,"message":`...)
-		dst = appendJSONString(dst, events[i].Message)
-		dst = append(dst, '}')
+		dst = appendEventJSON(dst, events[i])
 	}
 	dst = append(dst, ']')
 
 	return dst
+}
+
+// appendEventJSON writes one rolling event log entry. The live state
+// encoder reuses it with the ring record directly.
+func appendEventJSON(dst []byte, event Event) []byte {
+	dst = append(dst, `{"time":`...)
+	dst = appendJSONTime(dst, event.Time)
+	dst = append(dst, `,"message":`...)
+	dst = appendJSONString(dst, event.Message)
+
+	return append(dst, '}')
 }
 
 // appendChatJSON writes the chat window array.
@@ -344,17 +359,24 @@ func appendChatJSON(dst []byte, chat []ChatEvent) []byte {
 		if i > 0 {
 			dst = append(dst, ',')
 		}
-		dst = append(dst, `{"time":`...)
-		dst = appendJSONTime(dst, chat[i].Time)
-		dst = append(dst, `,"kind":`...)
-		dst = appendJSONString(dst, chat[i].Kind)
-		dst = append(dst, `,"text":`...)
-		dst = appendJSONString(dst, chat[i].Text)
-		dst = append(dst, '}')
+		dst = appendChatEventJSON(dst, chat[i])
 	}
 	dst = append(dst, ']')
 
 	return dst
+}
+
+// appendChatEventJSON writes one chat window line. The live state
+// encoder reuses it with the ring record directly.
+func appendChatEventJSON(dst []byte, line ChatEvent) []byte {
+	dst = append(dst, `{"time":`...)
+	dst = appendJSONTime(dst, line.Time)
+	dst = append(dst, `,"kind":`...)
+	dst = appendJSONString(dst, line.Kind)
+	dst = append(dst, `,"text":`...)
+	dst = appendJSONString(dst, line.Text)
+
+	return append(dst, '}')
 }
 
 // appendWalkPathJSON writes the walk plan array.
@@ -367,17 +389,24 @@ func appendWalkPathJSON(dst []byte, points []WalkPoint) []byte {
 		if i > 0 {
 			dst = append(dst, ',')
 		}
-		dst = append(dst, `{"x":`...)
-		dst = strconv.AppendInt(dst, int64(points[i].X), 10)
-		dst = append(dst, `,"y":`...)
-		dst = strconv.AppendInt(dst, int64(points[i].Y), 10)
-		dst = append(dst, `,"z":`...)
-		dst = strconv.AppendInt(dst, int64(points[i].Z), 10)
-		dst = append(dst, '}')
+		dst = appendWalkPointJSON(dst, points[i])
 	}
 	dst = append(dst, ']')
 
 	return dst
+}
+
+// appendWalkPointJSON writes one walk plan waypoint. The live state
+// encoder reuses it with the published plan directly.
+func appendWalkPointJSON(dst []byte, point WalkPoint) []byte {
+	dst = append(dst, `{"x":`...)
+	dst = strconv.AppendInt(dst, int64(point.X), 10)
+	dst = append(dst, `,"y":`...)
+	dst = strconv.AppendInt(dst, int64(point.Y), 10)
+	dst = append(dst, `,"z":`...)
+	dst = strconv.AppendInt(dst, int64(point.Z), 10)
+
+	return append(dst, '}')
 }
 
 // appendCombatEventsJSON writes the combat animation feed array.
@@ -390,31 +419,39 @@ func appendCombatEventsJSON(dst []byte, events []CombatEventView) []byte {
 		if i > 0 {
 			dst = append(dst, ',')
 		}
-		dst = append(dst, `{"seq":`...)
-		dst = strconv.AppendUint(dst, events[i].Seq, 10)
-		dst = append(dst, `,"kind":`...)
-		dst = appendJSONString(dst, events[i].Kind)
-		dst = append(dst, `,"attackerId":`...)
-		dst = strconv.AppendInt(dst, int64(events[i].AttackerID), 10)
-		dst = append(dst, `,"targetId":`...)
-		dst = strconv.AppendInt(dst, int64(events[i].TargetID), 10)
-		dst = append(dst, `,"amount":`...)
-		dst = appendJSONFloat(dst, events[i].Amount)
-		dst = append(dst, `,"atMs":`...)
-		dst = strconv.AppendInt(dst, events[i].AtMs, 10)
-		dst = append(dst, `,"x":`...)
-		dst = strconv.AppendInt(dst, int64(events[i].X), 10)
-		dst = append(dst, `,"y":`...)
-		dst = strconv.AppendInt(dst, int64(events[i].Y), 10)
-		dst = append(dst, `,"targetX":`...)
-		dst = strconv.AppendInt(dst, int64(events[i].TargetX), 10)
-		dst = append(dst, `,"targetY":`...)
-		dst = strconv.AppendInt(dst, int64(events[i].TargetY), 10)
-		dst = append(dst, '}')
+		dst = appendCombatEventViewJSON(dst, events[i])
 	}
 	dst = append(dst, ']')
 
 	return dst
+}
+
+// appendCombatEventViewJSON writes one combat animation beat. The live
+// state encoder reuses it with a stack allocated view of the feed
+// record.
+func appendCombatEventViewJSON(dst []byte, view CombatEventView) []byte {
+	dst = append(dst, `{"seq":`...)
+	dst = strconv.AppendUint(dst, view.Seq, 10)
+	dst = append(dst, `,"kind":`...)
+	dst = appendJSONString(dst, view.Kind)
+	dst = append(dst, `,"attackerId":`...)
+	dst = strconv.AppendInt(dst, int64(view.AttackerID), 10)
+	dst = append(dst, `,"targetId":`...)
+	dst = strconv.AppendInt(dst, int64(view.TargetID), 10)
+	dst = append(dst, `,"amount":`...)
+	dst = appendJSONFloat(dst, view.Amount)
+	dst = append(dst, `,"atMs":`...)
+	dst = strconv.AppendInt(dst, view.AtMs, 10)
+	dst = append(dst, `,"x":`...)
+	dst = strconv.AppendInt(dst, int64(view.X), 10)
+	dst = append(dst, `,"y":`...)
+	dst = strconv.AppendInt(dst, int64(view.Y), 10)
+	dst = append(dst, `,"targetX":`...)
+	dst = strconv.AppendInt(dst, int64(view.TargetX), 10)
+	dst = append(dst, `,"targetY":`...)
+	dst = strconv.AppendInt(dst, int64(view.TargetY), 10)
+
+	return append(dst, '}')
 }
 
 // appendZoneJSON writes the hunting zone square (nil becomes null).
@@ -443,33 +480,40 @@ func appendZoneViewsJSON(dst []byte, zones []ZoneView) []byte {
 		if i > 0 {
 			dst = append(dst, ',')
 		}
-		dst = append(dst, `{"id":`...)
-		dst = appendJSONString(dst, zones[i].ID)
-		dst = append(dst, `,"name":`...)
-		dst = appendJSONString(dst, zones[i].Name)
-		dst = append(dst, `,"region":`...)
-		dst = appendJSONString(dst, zones[i].Region)
-		dst = append(dst, `,"minLevel":`...)
-		dst = strconv.AppendInt(dst, int64(zones[i].MinLevel), 10)
-		dst = append(dst, `,"maxLevel":`...)
-		dst = strconv.AppendInt(dst, int64(zones[i].MaxLevel), 10)
-		dst = append(dst, `,"minGear":`...)
-		dst = strconv.AppendInt(dst, int64(zones[i].MinGear), 10)
-		dst = append(dst, `,"cx":`...)
-		dst = strconv.AppendInt(dst, int64(zones[i].CX), 10)
-		dst = append(dst, `,"cy":`...)
-		dst = strconv.AppendInt(dst, int64(zones[i].CY), 10)
-		dst = append(dst, `,"half":`...)
-		dst = strconv.AppendInt(dst, int64(zones[i].Half), 10)
-		dst = append(dst, `,"active":`...)
-		dst = strconv.AppendBool(dst, zones[i].Active)
-		dst = append(dst, `,"deaths":`...)
-		dst = strconv.AppendInt(dst, int64(zones[i].Deaths), 10)
-		dst = append(dst, `,"demoted":`...)
-		dst = strconv.AppendBool(dst, zones[i].Demoted)
-		dst = append(dst, '}')
+		dst = appendZoneViewJSON(dst, zones[i])
 	}
 	dst = append(dst, ']')
 
 	return dst
+}
+
+// appendZoneViewJSON writes one zone registry entry of the map view.
+// The live state encoder reuses it with the stored view directly.
+func appendZoneViewJSON(dst []byte, zone ZoneView) []byte {
+	dst = append(dst, `{"id":`...)
+	dst = appendJSONString(dst, zone.ID)
+	dst = append(dst, `,"name":`...)
+	dst = appendJSONString(dst, zone.Name)
+	dst = append(dst, `,"region":`...)
+	dst = appendJSONString(dst, zone.Region)
+	dst = append(dst, `,"minLevel":`...)
+	dst = strconv.AppendInt(dst, int64(zone.MinLevel), 10)
+	dst = append(dst, `,"maxLevel":`...)
+	dst = strconv.AppendInt(dst, int64(zone.MaxLevel), 10)
+	dst = append(dst, `,"minGear":`...)
+	dst = strconv.AppendInt(dst, int64(zone.MinGear), 10)
+	dst = append(dst, `,"cx":`...)
+	dst = strconv.AppendInt(dst, int64(zone.CX), 10)
+	dst = append(dst, `,"cy":`...)
+	dst = strconv.AppendInt(dst, int64(zone.CY), 10)
+	dst = append(dst, `,"half":`...)
+	dst = strconv.AppendInt(dst, int64(zone.Half), 10)
+	dst = append(dst, `,"active":`...)
+	dst = strconv.AppendBool(dst, zone.Active)
+	dst = append(dst, `,"deaths":`...)
+	dst = strconv.AppendInt(dst, int64(zone.Deaths), 10)
+	dst = append(dst, `,"demoted":`...)
+	dst = strconv.AppendBool(dst, zone.Demoted)
+
+	return append(dst, '}')
 }

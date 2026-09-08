@@ -348,6 +348,26 @@ func BenchmarkSnapshot(b *testing.B) {
 	}
 }
 
+// BenchmarkAppendSnapshotJSON measures the direct live state encode
+// (see Bot.AppendSnapshotJSON): the stack view walk with a reused
+// payload buffer - the steady state of a watched stream event.
+func BenchmarkAppendSnapshotJSON(b *testing.B) {
+	for _, size := range []int{50, 200} {
+		b.Run(mapSizeLabel(size), func(b *testing.B) {
+			bot := benchWorld(size)
+			payload := make([]byte, 0, 64<<10)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				payload = bot.AppendSnapshotJSON(payload[:0])
+				if len(payload) == 0 {
+					b.Fatal("expected json output")
+				}
+			}
+		})
+	}
+}
+
 // mapSizeLabel names the sub benchmark of a world size.
 func mapSizeLabel(size int) string {
 	switch size {

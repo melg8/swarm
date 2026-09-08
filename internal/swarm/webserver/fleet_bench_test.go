@@ -121,15 +121,16 @@ func (d *discardWriter) WriteHeader(_ int) {}
 func (d *discardWriter) Flush() {}
 
 // BenchmarkSSEEncodeAndFrame measures the full per event cost the
-// stream pays on every version change: the snapshot build, the
-// JSON append encode and the frame write together.
+// stream pays on every version change with a one shot payload: the
+// live state encode and the frame write together (the steady state
+// reuse path is BenchmarkSSEStreamSteadyState).
 func BenchmarkSSEEncodeAndFrame(b *testing.B) {
 	bot := benchSnapshotBot(100)
 	discard := &discardWriter{}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		writeEvent(discard, discard, bot.Snapshot().AppendJSON(nil))
+		writeEvent(discard, discard, bot.AppendSnapshotJSON(nil))
 	}
 }
 

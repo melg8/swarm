@@ -66,11 +66,14 @@ type sseStream struct {
 }
 
 // snapshotEvent encodes the current bot state into the payload
-// buffer, assembles the SSE frame over it and writes both out.
+// buffer, assembles the SSE frame over it and writes both out. The
+// encode walks the live state under the read lock and allocates
+// nothing: the view structs of the elements stay on the call stack
+// (see Bot.AppendSnapshotJSON).
 func (s *sseStream) snapshotEvent(
 	w http.ResponseWriter, flusher http.Flusher, bot *state.Bot,
 ) {
-	s.payload = bot.Snapshot().AppendJSON(s.payload[:0])
+	s.payload = bot.AppendSnapshotJSON(s.payload[:0])
 	s.frame = appendEventFrame(s.frame[:0], s.payload)
 	if _, err := w.Write(s.frame); err != nil {
 		return
@@ -174,7 +177,8 @@ func (s *Server) Address() string {
 
 // ListenAndServe runs the web server until shutdown.
 func (s *Server) ListenAndServe() error {
-	s.logger.Println("Web interface listening on http://" + s.httpServer.Addr)
+	s.logger.Println("Web interface listening on http://" +
+		s.httpServer.Addr)
 
 	return s.httpServer.ListenAndServe()
 }
@@ -201,7 +205,7 @@ func (s *Server) handleBotState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	data := bot.Snapshot().AppendJSON(nil)
+	data := bot.AppendSnapshotJSON(nil)
 	data = append(data, '\n')
 	// The direct writer HTML escapes the payload exactly like
 	// json.Marshal, and the JSON content type never executes in
@@ -230,7 +234,8 @@ func (s *Server) streamEvents(
 ) {
 	flusher, canFlush := w.(http.Flusher)
 	if !canFlush {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		http.Error(w, "streaming unsupported",
+			http.StatusInternalServerError)
 
 		return
 	}
@@ -259,7 +264,8 @@ func (s *Server) streamEvents(
 				return
 			}
 		case <-poll.C:
-			writeSnapshotEvent(w, flusher, bot, &lastVersion, stream)
+			writeSnapshotEvent(w, flusher, bot,
+				&lastVersion, stream)
 		}
 	}
 }
