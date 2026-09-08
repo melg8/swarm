@@ -145,3 +145,65 @@ func (p *ServerListPacket) FirstAvailableServer() *ServerListEntry {
 
 	return nil
 }
+
+// ToBytes serializes the packet for the emulated login server, mirroring
+// the byte layout the Mobius ServerList packet writes (see the entry
+// tail order in decodeServerListTail).
+func (p *ServerListPacket) ToBytes(writer *packet.Writer) error {
+	count := len(p.Servers)
+	if count > 255 {
+		return fmt.Errorf("server count %d exceeds 255", count)
+	}
+	if err := writer.WriteInt8(serverListPacketID); err != nil {
+		return err
+	}
+	if err := writer.WriteInt8(int8(count)); err != nil {
+		return err
+	}
+	if err := writer.WriteInt8(p.LastServer); err != nil {
+		return err
+	}
+
+	for i := range p.Servers {
+		if err := writeServerListEntry(writer, &p.Servers[i]); err != nil {
+			return fmt.Errorf("failed to write server entry %d: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+// writeServerListEntry writes a single game server entry.
+func writeServerListEntry(
+	writer *packet.Writer, entry *ServerListEntry,
+) error {
+	if err := writer.WriteInt8(entry.ServerID); err != nil {
+		return err
+	}
+	if err := writer.WriteBytes(entry.IP[:]); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(entry.Port); err != nil {
+		return err
+	}
+	if err := writer.WriteInt8(entry.AgeLimit); err != nil {
+		return err
+	}
+	if err := writer.WriteInt8(entry.Pvp); err != nil {
+		return err
+	}
+	if err := writer.WriteInt16(entry.CurrentPlayers); err != nil {
+		return err
+	}
+	if err := writer.WriteInt16(entry.MaxPlayers); err != nil {
+		return err
+	}
+	if err := writer.WriteInt8(entry.Status); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(entry.Bits); err != nil {
+		return err
+	}
+
+	return writer.WriteInt8(entry.Brackets)
+}

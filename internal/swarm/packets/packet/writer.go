@@ -5,60 +5,71 @@
 package packet
 
 import (
-	"bytes"
-	"unsafe"
+        "bytes"
+        "encoding/binary"
+        "math"
+        "unsafe"
 )
 
 type Writer struct {
-	*bytes.Buffer
+        *bytes.Buffer
 }
 
 func NewWriter() *Writer {
-	return &Writer{Buffer: bytes.NewBuffer([]byte{})}
+        return &Writer{Buffer: bytes.NewBuffer([]byte{})}
 }
 
 func NewWriterTo(data []byte) *Writer {
-	return &Writer{Buffer: bytes.NewBuffer(data)}
+        return &Writer{Buffer: bytes.NewBuffer(data)}
 }
 
 func (b *Writer) WriteInt64(value int64) error {
-	buf := (*[8]byte)(unsafe.Pointer(&value))
-	_, err := b.Write(buf[:])
+        buf := (*[8]byte)(unsafe.Pointer(&value))
+        _, err := b.Write(buf[:])
 
-	return err
+        return err
 }
 
 func (b *Writer) WriteInt32(value int32) error {
-	buf := (*[4]byte)(unsafe.Pointer(&value))
-	_, err := b.Write(buf[:])
+        buf := (*[4]byte)(unsafe.Pointer(&value))
+        _, err := b.Write(buf[:])
 
-	return err
+        return err
 }
 
 func (b *Writer) WriteInt16(value int16) error {
-	buf := (*[2]byte)(unsafe.Pointer(&value))
-	_, err := b.Write(buf[:])
+        buf := (*[2]byte)(unsafe.Pointer(&value))
+        _, err := b.Write(buf[:])
 
-	return err
+        return err
 }
 
 func (b *Writer) WriteInt8(value int8) error {
-	return b.WriteByte(byte(value))
+        return b.WriteByte(byte(value))
+}
+
+// WriteFloat64 writes a little endian float64 value.
+func (b *Writer) WriteFloat64(value float64) error {
+        var buf [8]byte
+        binary.LittleEndian.PutUint64(buf[:], math.Float64bits(value))
+        _, err := b.Write(buf[:])
+
+        return err
 }
 
 func (b *Writer) WriteBytes(bytes []byte) error {
-	_, err := b.Write(bytes)
+        _, err := b.Write(bytes)
 
-	return err
+        return err
 }
 
 func (b *Writer) WriteStringAsUtf16(value string) error {
-	bytes := make([]byte, 0, len(value)*2+2)
-	for _, r := range value {
-		bytes = append(bytes, byte(r), byte(0))
-	}
+        bytes := make([]byte, 0, len(value)*2+2)
+        for _, r := range value {
+                bytes = append(bytes, byte(r), byte(0))
+        }
 
-	bytes = append(bytes, 0, 0)
+        bytes = append(bytes, 0, 0)
 
-	return b.WriteBytes(bytes)
+        return b.WriteBytes(bytes)
 }
