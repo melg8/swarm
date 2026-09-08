@@ -130,6 +130,25 @@ etiquette), `webui-harness` (web UI changes and the repro harnesses),
 stays the source of truth for rules and facts; the skills are the
 step-by-step procedures.
 
+On top of the four project playbooks the repository vendors the
+`samber/cc-skills-golang` collection (46 `golang-*` skills, MIT, e.g.
+`golang-testing`, `golang-concurrency`, `golang-error-handling`,
+`golang-lint`, `golang-troubleshooting`) as the general Go knowledge
+base - load the matching one for generic Go questions. The vendored
+copy travels with the repository (a fresh environment gets it through
+`git clone` alone, no network access needed). Management:
+
+```bash
+tools/install_agent_skills.sh           # (re)install the pinned commit
+tools/install_agent_skills.sh latest    # update to upstream HEAD
+tools/install_agent_skills.sh check     # verify against the pin, exit 1 on drift
+```
+
+The script manages the `golang-*` directories only - the four project
+playbooks are hand-maintained and never touched. The pinned upstream
+commit lives in the script header (`SKILLS_COMMIT`); after updating,
+refresh the pin there and commit the diff.
+
 ## Server integrity rules (non-negotiable)
 
 The L2J Mobius C1 server is the reference implementation for this project:
