@@ -837,3 +837,11 @@ actually land (single hit per event).
   bare ActionFailed - the old loop spammed refused walk requests
   and never stood up). Covered by
   hunt.TestUserMoveStandsUpTheRestingCharacter.
+
+- 2026-09-08: (3, 9, 11 docs round) the previous commit landed the
+  code of the zone switch stop, the sell-first shopping and the
+  hit-only swing feed; this commit carries the AGENTS.md
+  documentation of all three (the shopping strategy section, the
+  zone command stop, the combat animation layer) - the doc patch of
+  the previous commit failed its pattern match and the code went out
+  alone.
