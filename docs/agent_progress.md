@@ -47,6 +47,53 @@ The user asked to improve the code coverage. Baseline measured with
 
 - 2026-09-08: baseline recorded; task started. Stack verified up
   (ports 2106/7777/3306 listening on the Windows dev deployment).
+- 2026-09-08: round complete, all pushed and green. Coverage before ->
+  after (go test ./... -cover):
+  - connection 38.1% -> 89.9%: one scripted world session floods the
+    client through every observed packet handler (UserInfo, CharInfo,
+    DropItem/SpawnItem/GetItem, StopMove, MoveToPawn, Attack,
+    AutoAttackStart/Stop, the rotation pair, ChangeMoveType/WaitType,
+    TeleportToLocation with the Appearing confirmation, the target
+    packets, ItemList/InventoryUpdate, SystemMessage, SocialAction,
+    NetPing, leave world/server close/action failed/unknown id) plus a
+    truncated one byte packet per known id (the parse error paths) and
+    an empty frame; the tracker snapshot is asserted per packet family
+    (TestGameClientAppliesWorldPackets). The client action methods
+    (AttackTarget, PickupItem, WalkTo, UseItem, DestroyItem, DropItem,
+    SellItems, BuyItems, RequestInventory, ActionSitStand,
+    RestartAtVillage, RequestLogout) are verified through the received
+    opcodes (TestGameClientSendsClientActions); the connection loss
+    path of Run (TestGameClientReportsConnectionLoss) and the creation
+    refusal (TestEnsureCharacterReportsCreationFail) included. The full
+    login flow runs against a scripted fake login server
+    (authentificator_test.go: Init, RequestAuthLogin, LoginOk,
+    RequestServerList, RequestServerLogin, PlayOk with per field
+    assertions, plus LoginFail, empty server list and unexpected init
+    id rejection).
+  - from_auth_server 57.4% -> 92.6%: InitPacket.WriteTo round trips
+    through ParseInitPacket (with and without the Blowfish key, plus
+    the too small destination), NewInitPacket zero values.
+  - to_game_server 49.4% -> 65.3%: the MoveToLocation (0x01),
+    RequestActionUse (0x45) and RequestRestartPoint (0x6D) serializers
+    with byte exact layouts and the constructors.
+  - BUG FIXED (found by the coverage work): a zero length frame
+    (size header 2, no payload) panicked the run loop at
+    handleServerPacket payload[0]; the empty payload is skipped now
+    (game.go, covered by the flood session).
+  - Lint fallout of the parallel zones commit (cd7828f) fixed on the
+    way: the stale PickHuntingZone nolint removed, the
+    maybeRotateEmptyZone guard chain carries a reasoned nolint, the
+    zero zone returns use the noZone var, zones_test require.Empty.
+    golangci-lint run: 0 issues. One rebase conflict against the
+    parallel session resolved keeping both sides (containsPoint +
+    noZone).
+  - Consciously left uncovered: the unreachable writer error branches
+    of the packet serializers (packet.Writer wraps bytes.Buffer and
+    never errors), the 25 s ping ticker branch (would need an injected
+    clock in connection), the tracker==nil branches of the apply
+    handlers, the RequestLogout send-fail branch.
+
+### Status: coverage round done
 
 ## Finished task: combat safety of the hunt loop (survivability round)
 
