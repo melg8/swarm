@@ -91,15 +91,22 @@ needs `-proxy-login 0.0.0.0:2107 -proxy-game 0.0.0.0:7778` and the
    proxy game port -> `RequestServerLogin` -> `PlayOk` with locally
    generated keys. A `RequestGGAuth` (0x07) is answered like the legacy
    servers did.
-2. **Game server** (emulated): `ProtocolVersion`/`KeyPacket` with a
-   proxy key (the client's cipher chain starts from the proxy key, the
-   bot's chain from the real server key - the two chains are
-   independent, which is what makes the proxy a true MITM instead of a
-   byte pipe) -> the client's `AuthLogin` (any keys) -> a
-   `CharSelectionInfo` with exactly **one character**: the character
-   played by the selected bot (the web UI selection, see below). The
-   appearance fields come from the recorded real char list of the
-   session, the vitals from the live tracker.
+2. **Game server** (emulated): `ProtocolVersion`/`KeyPacket` with the
+   **static Mobius C1 session key** (`94 35 00 00 a1 6c 54 87`, exactly
+   what the real `GameClient.CRYPT_KEY` ships). The real C1 client must
+   stay compatible with a hardcoded key - that is why Mobius never
+   rotates it - so the proxy must not either: a random per connection
+   key desynchronized the real client and made its encrypted
+   `AuthLogin` undecodable. The client's cipher chain starts from the
+   proxy key, the bot's chain from the real server key - the two chains
+   are independent, which is what makes the proxy a true MITM instead
+   of a byte pipe. The client's `AuthLogin` (any keys) is parsed
+   leniently (both the null terminated and the length prefixed utf16
+   layouts, and a fully unreadable packet still continues - the account
+   name is cosmetic) -> a `CharSelectionInfo` with exactly **one
+   character**: the character played by the selected bot (the web UI
+   selection, see below). The appearance fields come from the recorded
+   real char list of the session, the vitals from the live tracker.
 3. **Character select**: the proxy answers with the *recorded*
    `CharSelected` packet of the bot session - byte identical to what
    the real server sent the bot.
@@ -165,6 +172,21 @@ maps the problem directly:
 - **`login#N: client connected` followed by an immediate close**:
   the client reached the proxy but the handshake failed - the following
   lines carry the exact packet and reason (send the file).
+- **`game#N: auth login packet unreadable (len N, decrypted XX:...):
+  continuing`**: the game `AuthLogin` of the client did not decode into
+  an account name. The connection still continues (any account is
+  accepted), but the hex dump tells the protocol state: bytes looking
+  like `08 74 00 65 00 ...` mean the cipher is in sync and only the
+  string layout differs, while pure noise means a cipher
+  desynchronization (compare with `94 35 00 00 a1 6c 54 87` on the
+  client side). The historical random-key bug produced exactly this
+  signature before the static key fix. If the account line right after
+  shows readable garbage, the login still works - the name is only
+  used for logging.
+- **`game#N: no bot session available for the client`**: the client
+  made it through the full handshake, but no bot is online yet. Start
+  the swarm with a bot that entered the world (the char list is built
+  from its session).
 
 The live verification harness of the whole path (against the deployed
 stack, with a fake C1 client that walks the same protocol as the real

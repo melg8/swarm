@@ -1684,3 +1684,27 @@ name the variant number that best fits the real bot UI.
   flips a loud test, not a silent byte drift). AGENTS.md documents
   the probe contract. Verified: go build/vet, go test ./... (16
   packages), golangci-lint 0 issues.
+- 2026-09-08: real client game handshake fix (round 3, feature/proxy-
+  server). The user's Windows C1 client passed the login emulation and
+  the server selection, then dropped on the game port with
+  `failed to parse auth login: EOF`. Root cause: the emulated game
+  server answered the KeyPacket with a random per connection cipher
+  key, while the real Mobius C1 server always answers with the fixed
+  GameClient.CRYPT_KEY (94 35 00 00 a1 6c 54 87, "the last 4 bytes
+  are fixed") - the C1 client must stay compatible with a hardcoded
+  key, so its encrypted AuthLogin desynchronized the proxy XOR chain
+  and the parse failure closed the connection (the fake e2e client
+  honors the packet bytes, which is why the suite stayed green).
+  The handshake now sends the exact static key (regression test
+  TestGameServerStaticKeyServesHardcodedKeyClient drives a client
+  that ignores the KeyPacket bytes and encrypts with its own copy).
+  Defense in depth: readGameAuthLogin is lenient now - it accepts the
+  null terminated Mobius layout and the short length prefixed utf16
+  layout, and a fully unreadable packet logs a bounded decrypted hex
+  dump (`auth login packet unreadable (len N, decrypted XX:...)`)
+  and continues under the `<unreadable>` account instead of dropping
+  the client (the name is cosmetic, any pair is accepted). The
+  proxy.md triage table documents the new signatures. Verified:
+  stack redeployed (STACK_READY), SWARM_PROXY_E2E=1 full MITM e2e
+  against the live stack, go test ./... (16 packages), golangci-lint
+  0 issues.

@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand/v2"
 	"net"
 	"sync"
 	"time"
+	"unicode/utf16"
 
 	"github.com/melg8/swarm/internal/swarm/crypt"
 	"github.com/melg8/swarm/internal/swarm/packets/packet"
@@ -22,7 +22,8 @@ import (
 // gameConn drives one client connection of the emulated game server.
 //
 // The handshake mirrors the real server (ProtocolVersion, KeyPacket
-// with a proxy key, then the stateful XOR cipher). The pre world packets
+// with the static Mobius session key, then the stateful XOR cipher). The pre
+// world packets
 // are fully emulated: any AuthLogin session keys are accepted, the char
 // list shows exactly the played character of the selected bot and the
 // CharSelected answer is the recorded packet of the bot session. After
@@ -168,12 +169,20 @@ func (gc *gameConn) handshake() error {
 		return fmt.Errorf("client protocol version %d rejected", version)
 	}
 
-	key := randomGameKey()
+	// The real Mobius C1 server answers with one fixed session key
+	// (GameClient.CRYPT_KEY: "the last 4 bytes are fixed") for every
+	// connection, so a C1 client build with a hardcoded key stays
+	// compatible. A random per connection key desynchronized the real
+	// client: its encrypted AuthLogin decrypted into garbage and the
+	// proxy closed the connection. The exact static key replicates the
+	// real server for both client behaviors (hardcoded and honored).
+	key := crypt.DefaultGameCryptKey()
 	gc.sendRawKeyPacket(1, key)
 	gc.crypt = crypt.NewGameCrypt(key)
 	gc.crypt.Enable()
 	gc.state = gameStateAuthed
-	gc.server.logger.Printf("game#%d: protocol %d accepted, cipher enabled",
+	gc.server.logger.Printf(
+		"game#%d: protocol %d accepted, cipher enabled (static key)",
 		gc.id, version)
 
 	go gc.runSender()
@@ -205,18 +214,6 @@ func (gc *gameConn) sendRawKeyPacket(
 	if err := writeWirePacket(gc.conn, writer.Bytes()); err != nil {
 		gc.server.logger.Printf("game#%d: key packet write failed: %v", gc.id, err)
 	}
-}
-
-// randomGameKey generates the per connection game cipher key. The
-// key is not a secret (the real Mobius server even ships one fixed
-// key), so the math/rand generator is fine here.
-func randomGameKey() [crypt.GameCryptKeySize]byte {
-	var key [crypt.GameCryptKeySize]byte
-	for i := range key {
-		key[i] = byte(rand.IntN(256)) //nolint:gosec // see above
-	}
-
-	return key
 }
 
 // handleClientPacket dispatches one decrypted client packet by state.
@@ -268,9 +265,14 @@ func (gc *gameConn) handleClientPacket(payload []byte) error {
 // serve (waiting for one to enter the world) and answers with the one
 // character char list.
 func (gc *gameConn) handleAuthLogin(payload []byte) error {
-	login, err := readGameAuthLogin(payload)
-	if err != nil {
-		return fmt.Errorf("failed to parse auth login: %w", err)
+	login := readGameAuthLogin(payload)
+	if login == "" {
+		hexLen := min(len(payload), authLoginHexDumpLimit)
+		gc.server.logger.Printf(
+			"game#%d: auth login packet unreadable (len %d, decrypted % x): "+
+				"continuing, any pair is accepted",
+			gc.id, len(payload), payload[:hexLen])
+		login = authLoginFallbackAccount
 	}
 	gc.server.logger.Printf(
 		"game#%d: auth login for account %q (any pair is accepted)", gc.id, login)
@@ -493,18 +495,50 @@ func (gc *gameConn) shutdown(reason string) {
 	})
 }
 
+// authLoginFallbackAccount is the placeholder account name used when
+// the login string of the game AuthLogin packet cannot be decoded: the
+// emulated server accepts any account, so a cosmetic field must never
+// fail the client connection.
+const authLoginFallbackAccount = "<unreadable>"
+
+// authLoginHexDumpLimit bounds the decrypted hex dump logged for an
+// unreadable auth login packet.
+const authLoginHexDumpLimit = 48
+
+// authLoginPrefixLen is the byte size of the opcode plus the short
+// length prefix of the fallback auth login layout.
+const authLoginPrefixLen = 3
+
 // readGameAuthLogin extracts the login string of the game AuthLogin
 // packet: [opcode 0x08][login: utf16][4 session key ints]. The session
-// key values are accepted as whatever the client carries.
-func readGameAuthLogin(payload []byte) (string, error) {
-	reader := packet.NewReader(payload)
-	if err := reader.Skip(1); err != nil {
-		return "", err
-	}
-	login, err := reader.ReadStringFromUtf16Format()
-	if err != nil {
-		return "", err
+// key values are accepted as whatever the client carries. The login is
+// cosmetic, so the reader accepts both known utf16 layouts (null
+// terminated like the Mobius readString, and short length prefixed) and
+// degrades to an empty string instead of failing on anything else.
+func readGameAuthLogin(payload []byte) string {
+	if len(payload) < 2 {
+		return ""
 	}
 
-	return login, nil
+	// The documented Mobius layout: a null terminated UTF-16LE string.
+	login, err := packet.NewReader(payload[1:]).ReadStringFromUtf16Format()
+	if err == nil {
+		return login
+	}
+
+	// The fallback layout: [short char count][UTF-16LE data].
+	if len(payload) >= authLoginPrefixLen {
+		charCount := int(uint16(payload[1]) | uint16(payload[2])<<8)
+		if charCount > 0 && authLoginPrefixLen+charCount*2 <= len(payload) {
+			data := payload[authLoginPrefixLen : authLoginPrefixLen+charCount*2]
+			units := make([]uint16, 0, charCount)
+			for i := 0; i+1 < len(data); i += 2 {
+				units = append(units, uint16(data[i])|uint16(data[i+1])<<8)
+			}
+
+			return string(utf16.Decode(units))
+		}
+	}
+
+	return ""
 }

@@ -56,7 +56,9 @@ func dialGame(t *testing.T, address string) *fakeGameClient {
 }
 
 // handshake sends the protocol version and enables the cipher with the
-// key of the answered KeyPacket.
+// key of the answered KeyPacket. The key must be the static Mobius C1
+// session key: the real C1 client stays compatible with a hardcoded
+// key, so the proxy must never rotate it.
 func (c *fakeGameClient) handshake() {
 	c.t.Helper()
 	request := []byte{0x00}
@@ -70,6 +72,8 @@ func (c *fakeGameClient) handshake() {
 	require.Equal(c.t, byte(0x01), keyPacket[1], "key packet result")
 	var key [crypt.GameCryptKeySize]byte
 	copy(key[:], keyPacket[2:10])
+	require.Equal(c.t, crypt.DefaultGameCryptKey(), key,
+		"the key packet must carry the static Mobius C1 session key")
 	c.crypt = crypt.NewGameCrypt(key)
 	c.crypt.Enable()
 }
@@ -276,6 +280,87 @@ func TestGameServerServesFullClientFlow(t *testing.T) {
 	recorder.Close()
 	_, err := client.conn.Read(make([]byte, 1))
 	require.Error(t, err, "the client connection must close with the session")
+}
+
+// TestGameServerStaticKeyServesHardcodedKeyClient reproduces the real
+// C1 client behavior that broke the previous random per connection
+// key: a client that encrypts with its own hardcoded copy of the Mobius
+// key (ignoring the KeyPacket bytes) must stay synchronized with the
+// proxy cipher and receive the character list.
+func TestGameServerStaticKeyServesHardcodedKeyClient(t *testing.T) {
+	server := startTestServer(t)
+	recorder, _, _ := registerFakeBot(t, server, "StaticKeyChar")
+	recorder.Record(buildTestCharSelected("StaticKeyChar"))
+
+	client := dialGame(t, server.GameAddr())
+	request := []byte{0x00}
+	request = binary.LittleEndian.AppendUint32(request, 419)
+	require.NoError(t, writeWirePacket(client.conn, request))
+	keyPacket, err := readWirePacket(client.conn, client.readBuf)
+	require.NoError(t, err)
+	client.readBuf = keyPacket
+	require.Equal(t, byte(0x01), keyPacket[1], "key packet result")
+
+	// The client cipher is keyed with the hardcoded value only.
+	client.crypt = crypt.NewGameCrypt(crypt.DefaultGameCryptKey())
+	client.crypt.Enable()
+
+	authLogin := []byte{0x08}
+	authLogin = appendUTF16(authLogin, "hardcoded")
+	for range 4 {
+		authLogin = binary.LittleEndian.AppendUint32(authLogin, 9)
+	}
+	client.sendPacket(authLogin)
+
+	charListPayload := client.readPacket()
+	require.Equal(t, byte(0x1F), charListPayload[0], "char list opcode")
+	charList := fromgameserver.NewCharSelectInfoPacket()
+	require.NoError(t, fromgameserver.ParseCharSelectInfoPacket(charList, charListPayload))
+	require.Equal(t, "StaticKeyChar", charList.Characters[0].Name)
+}
+
+// TestGameServerToleratesUnreadableAuthLogin pins the lenient auth
+// login handling: a real client whose auth login bytes do not decode
+// into a utf16 account name must still receive the character list,
+// because the emulated server accepts any account anyway.
+func TestGameServerToleratesUnreadableAuthLogin(t *testing.T) {
+	server := startTestServer(t)
+	recorder, _, _ := registerFakeBot(t, server, "LenientChar")
+	recorder.Record(buildTestCharSelected("LenientChar"))
+
+	client := dialGame(t, server.GameAddr())
+	client.handshake()
+
+	// Garbage after the opcode: no utf16 terminator anywhere.
+	authLogin := []byte{0x08, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48}
+	client.sendPacket(authLogin)
+
+	charListPayload := client.readPacket()
+	require.Equal(t, byte(0x1F), charListPayload[0], "char list opcode")
+	charList := fromgameserver.NewCharSelectInfoPacket()
+	require.NoError(t, fromgameserver.ParseCharSelectInfoPacket(charList, charListPayload))
+	require.Equal(t, "LenientChar", charList.Characters[0].Name)
+}
+
+// TestReadGameAuthLoginLayouts covers the accepted auth login string
+// layouts and the unreadable degradation.
+func TestReadGameAuthLoginLayouts(t *testing.T) {
+	// The documented Mobius layout: null terminated utf16.
+	terminated := []byte{0x08}
+	terminated = appendUTF16(terminated, "test1")
+	terminated = binary.LittleEndian.AppendUint32(terminated, 1)
+	require.Equal(t, "test1", readGameAuthLogin(terminated))
+
+	// The fallback layout: short length prefixed utf16.
+	prefixed := []byte{0x08, 0x02, 0x00}
+	prefixed = append(prefixed, 'a', 0, 'b', 0)
+	require.Equal(t, "ab", readGameAuthLogin(prefixed))
+
+	// Unreadable garbage degrades to an empty login.
+	require.Empty(t, readGameAuthLogin(
+		[]byte{0x08, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48}))
+	require.Empty(t, readGameAuthLogin([]byte{0x08}))
+	require.Empty(t, readGameAuthLogin(nil))
 }
 
 // TestGameServerRejectsWrongProtocol pins the handshake behavior for a
