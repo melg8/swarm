@@ -492,9 +492,14 @@ the design goal is per-class and per-region extension):
   current spot replaces the running server walk; the deleveling
   refuses the stop like every movement command, the selling stop
   keeps running and its return leg re-targets the new zone). The map
-  draws every zone (active amber, future
-  dimmed with the gear gate, demoted bands red - labels only when
-  the square is big enough on screen) and the sidebar zone panel
+  draws every zone (active amber, the future grounds in a bright
+  soft blue with a light fill - the demonstration of where the bot
+  will hunt next, dimmed hints do not read; demoted bands red -
+  labels only when the square is big enough on screen; the `hunt
+  zones` toolbar checkbox hides the whole layer like the targets and
+  map background toggles) and the floating collapsible zone panel of
+  the map (bottom right corner, collapsed by default, the count chip
+  carries the registry total; the left sidebar lists bots only)
   carries the death counts and switches zones manually (the `zone`
   command, index in the Count field; the override holds until the
   character outgrows the band or dies it out).
@@ -895,6 +900,9 @@ the same variables).
 - Threat data: the npc level, `aggroRange` and `isAggressive` ai flags
   come from the generated `internal/swarm/npcdata` maps (the C1 data
   pack marks every monster `isAggressive=false`: they only defend).
+  The map draws the aggression radius of every living aggressive mob
+  as a dashed circle around its drawn position (amber idle, red once
+  it fights; the `aggro` toolbar checkbox hides the layer).
 - The server sends NpcInfo names empty for most npcs (the classic client
   resolves them from NPCName-e.dat by display template id). The bot
   resolves them through `internal/swarm/npcdata`, generated from the
