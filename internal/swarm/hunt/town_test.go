@@ -608,7 +608,6 @@ func TestReturnEngagesTargetOnZoneEntry(t *testing.T) {
 	loop.tripStart = time.Now()
 	loop.waypoints = []pathfind.Vec3{{X: 46000, Y: 50000, Z: -3500}}
 	loop.wpIndex = 0
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 45200, Y: 50000, Name: "Gremlin",

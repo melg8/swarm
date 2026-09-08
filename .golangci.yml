@@ -24,7 +24,6 @@ linters:
     - funlen        # Function length
     - goconst       # Repeated strings that could be replaced by a constant
     - gocritic      # Extensive code analysis
-    - gocyclo       # Function complexity
     - godot         # Comments end in a period
     - gosec         # Security problems
     - inamedparam   # Interface method parameters must be named

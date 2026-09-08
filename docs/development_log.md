@@ -1506,3 +1506,71 @@ manual walks visible on the map.
 - `go build`, `go vet`, `go test ./... -count=1` green (12 packages
   ok), node repro_gear.js OK (79/79), repro_hud.js /
   repro_map_render.js / repro_movement.js ALL PASS.
+
+
+## Round 31: the send and layer pool data races, the race task and the agent skills (2026-09-08)
+
+Scope: the two data races identified by the architecture review
+(`docs/quality_review_and_agent_prompts.md` P01) plus the toolchain
+remainders of the golangci-lint v2 migration (P03).
+
+### Problem statement
+
+1. `connection.GameClient.sendPacket` encrypted the payload with the
+   stateful rolling XOR cipher BEFORE taking `writeMu`: the run loop
+   (ping, Appearing, Logout) and the hunt loop (client actions) call it
+   concurrently, so two packets could be encrypted in one order and
+   written in the other. The game cipher advances its rolling offset
+   per packet, so any encryption/write order mismatch desyncs the chain
+   and the server decrypts garbage from the affected frame on.
+2. `pathfind` parsed regions under the engine mutex while the shared
+   `layerPool.intern` mutated the pool, and concurrent searches read
+   `layerPool.get` without any lock - a data race whenever one
+   goroutine's FindPath triggered a region load while another searched
+   a loaded region.
+
+### Reproduction
+
+- Race 1: `TestGameClientConcurrentSendKeepsCipherOrder`
+  (`connection/send_order_test.go`) - 8 goroutines x 50 `sendPacket`
+  calls against a raw socket that mirrors the session cipher and
+  verifies every decrypted first opcode byte (RequestNetPing, 0xA8).
+  Any encryption/write order violation corrupts the affected and all
+  subsequent frames, so the test fails without the race detector too.
+- Race 2: `TestEngineConcurrentSearchesRaceFree`
+  (`pathfind/concurrency_test.go`) - 4 goroutines search across a 2x2
+  synthetic region grid with the cache capped at 2 regions, so every
+  search re-parses two regions (intern) while the others read (get).
+- The detector itself needs cgo with gcc, which the Windows dev host
+  lacks; `task test:race` (`CGO_ENABLED=1 go test ./... -race -count=1`)
+  runs the suite where cgo exists (the Linux sandbox, CI). The plain
+  `task test` stays race free.
+
+### Fix
+
+- `sendPacket`: the `crypt.Encrypt` call moved inside the `writeMu`
+  critical section - serialize, encrypt and write now share one lock
+  hold, which guarantees the encryption order equals the wire order.
+- `layerPool`: own `sync.RWMutex`; `intern` writes under the write
+  lock, `get` reads under the read lock (one slice index, contention
+  negligible).
+
+### Follow-up tooling of the same round
+
+- Dead code deleted: the unused big endian login framing stack
+  (`crypt` Encryptor/Decryptor/Checksum + their tests and benches;
+  the live `ChecksumLE` stayed in `login_crypt.go`, which absorbed the
+  `Serializable` interface definition).
+- `task` 3.53.1 installed (`go install
+  github.com/go-task/task/v3/cmd/task@latest`), `task test:race` added
+  to the Taskfile, AGENTS.md documents the cgo/gcc caveat.
+- Agent skills added under `.agents/skills/` (go-verify-loop,
+  webui-harness, packet-recipe, mobius-stack) - see the new "Agent
+  skills" section of AGENTS.md.
+
+### Verification
+
+- `go build ./...`, `go vet ./...`, `gofmt -l` clean;
+  `golangci-lint run` 0 issues; `go test ./... -count=1` all 13
+  packages ok (the two new tests included). The `-race` suite runs in
+  the cgo environments (`task test:race`).

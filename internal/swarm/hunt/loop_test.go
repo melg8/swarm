@@ -704,12 +704,10 @@ func TestLoopSkipsTooStrongTargets(t *testing.T) {
 	bot.ApplyStatusUpdate(100, []state.Attribute{
 		{ID: state.AttrLevel, Value: 3},
 	})
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 7, TemplateID: 1000006, Attackable: true,
 		X: 45100, Y: 50000, Name: "Orc Archer",
 	})
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 8, TemplateID: 1000001, Attackable: true,
 		X: 45500, Y: 50000, Name: "Gremlin",
@@ -728,7 +726,6 @@ func TestLoopSkipsTooStrongTargets(t *testing.T) {
 
 func TestLoopEscapesALosingFight(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 45600, Y: 50000, Name: "Gremlin",
@@ -757,7 +754,6 @@ func TestLoopEscapesALosingFight(t *testing.T) {
 
 func TestLoopEscapesTheLevelGapFight(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 7, TemplateID: 1000006, Attackable: true,
 		X: 45600, Y: 50000, Name: "Orc Archer",
@@ -786,7 +782,6 @@ func TestLoopEscapesTheLevelGapFight(t *testing.T) {
 
 func TestLoopFinishesTheBeatenTarget(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 45600, Y: 50000, Name: "Gremlin",
@@ -842,7 +837,6 @@ func TestLoopPatrolsTowardTheCenterWithoutTargets(t *testing.T) {
 
 func TestLoopLogsOutAtCriticalHealthUnderAttack(t *testing.T) {
 	bot := newTestBot()
-	//nolint:exhaustruct // partial fields for the case
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
 		X: 45600, Y: 50000, Name: "Gremlin",
@@ -865,7 +859,7 @@ func TestLoopLogsOutAtCriticalHealthUnderAttack(t *testing.T) {
 	loop.tick()
 
 	require.Equal(t, 1, game.logouts, "the emergency logout fires")
-	require.True(t, bot.LoginCooldownRemaining() > time.Minute,
+	require.Greater(t, bot.LoginCooldownRemaining(), time.Minute,
 		"the login cooldown spans several minutes")
 	require.Len(t, game.walks, 1,
 		"the last escape leg keeps the offline character moving")

@@ -521,7 +521,9 @@ func (l *Loop) Run(ctx context.Context) {
 // tick advances the hunt state machine by one decision. The phase
 // transitions fall through, so a kill switches into looting and the
 // first pickup happens on the same tick.
-func (l *Loop) tick() {
+// Pre-consolidation phase debt; the hunt loop cleanup is planned
+// (docs/quality_review_and_agent_prompts.md P07).
+func (l *Loop) tick() { //nolint:cyclop
 	if l.tracker.SelfDead() {
 		l.recoverFromDeath()
 

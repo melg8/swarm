@@ -162,6 +162,22 @@ migration to be performed directly.
   history, no merges, no force-push, re-verify after a conflict) and
   always commit as melg8 <public.melg8@gmail.com> (checked repo-locally
   before the first commit of a session).
+- 2026-09-08 (later): P01 executed on top of the migration - the two
+  verified data races are fixed. `sendPacket` now encrypts inside the
+  writeMu critical section (the rolling XOR chain requires the
+  encryption order to equal the wire order), guarded by
+  `TestGameClientConcurrentSendKeepsCipherOrder` (a mirror-cipher drain
+  that fails without the race detector too). The pathfind layerPool
+  guards itself with a RWMutex (intern writes under the engine lock
+  while concurrent searches read), guarded by
+  `TestEngineConcurrentSearchesRaceFree` (2x2 synthetic regions, cache
+  thrash). `-race` needs cgo+gcc, which the Windows host lacks: the new
+  `task test:race` runs the suite where cgo exists. P03 remainders
+  closed: the dead crypt framing stack deleted (Serializable moved into
+  login_crypt.go) and `task` 3.53.1 installed. Four agent playbooks
+  added under `.agents/skills/` (go-verify-loop, webui-harness,
+  packet-recipe, mobius-stack), AGENTS.md gained the "Agent skills"
+  pointer section; the round 31 entry is in the development log.
 
 ## Task (completed): gear auto-equip, shop buying strategy, multi-zone hunting
 

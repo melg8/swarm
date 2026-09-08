@@ -119,6 +119,17 @@ Only after the environment is verified as up does the actual task start.
   state against the code, then continue from the recorded "next" step)
   before taking a new one.
 
+## Agent skills
+
+Operational playbooks live in `.agents/skills/` and are discovered by
+the agent tooling automatically; read the matching one before working
+in its area: `go-verify-loop` (the verification loop and the lint/nolint
+etiquette), `webui-harness` (web UI changes and the repro harnesses),
+`packet-recipe` (adding or debugging a protocol packet),
+`mobius-stack` (the live server stack and its pitfalls). AGENTS.md
+stays the source of truth for rules and facts; the skills are the
+step-by-step procedures.
+
 ## Server integrity rules (non-negotiable)
 
 The L2J Mobius C1 server is the reference implementation for this project:
@@ -369,17 +380,19 @@ provenance (verified 2026-09-05) are the reference for future work:
   and `AutoPlay.ini` has `EnableAutoPlay = False` on this deployment
   (ground items must be picked by the bot itself, nothing auto loots).
 - Windows dev tooling caveats: the installed Go (1.27) is newer than
-  `go.mod` (1.23) - fine for building and tests - and the `task` binary
-  is not installed, so run the underlying commands (`go build ./...`,
-  `go vet ./...`, `go test ./... -count=1`, `gofmt -l .`,
-  `golangci-lint run`) directly. golangci-lint v2.13.2 works since the
-  2026-09-08 migration (`.golangci.yml` is in the v2 format; the strict
-  linter set is preserved with documented exclusions: G115 integer
-  conversions of the wire parsers, and test-file relief for fixtures -
-  see the comments in `.golangci.yml`). Run `golangci-lint run` before
-  considering work done; the `exhaustruct` -> `exhaustruct_v5` rename
-  (deprecated since v2.13) is a known follow-up - the v5 major flags
-  new sites and needs its own round.
+  `go.mod` (1.23) - fine for building and tests. The toolchain works:
+  `task` 3.53.1 (installed 2026-09-08 via `go install
+  github.com/go-task/task/v3/cmd/task@latest`) and golangci-lint v2.13.2
+  (the `.golangci.yml` v2 migration of the same day; the strict linter
+  set is preserved with documented exclusions - G115 for the wire
+  parser integer conversions, test-file relief for fixtures - see the
+  comments in `.golangci.yml`). Run `golangci-lint run` before
+  considering work done. The race detector needs cgo with a gcc
+  toolchain, which the Windows host lacks: `task test:race` is the
+  `-race` suite for environments with cgo (the Linux sandbox, CI); the
+  plain `task test` stays race free. The `exhaustruct` ->
+  `exhaustruct_v5` rename (deprecated since v2.13) is a known follow-up
+  - the v5 major flags new sites and needs its own round.
 
 ## Gear, shopping and multi-zone hunting
 
