@@ -307,3 +307,86 @@ func TestRequestDropItemToBytes(t *testing.T) {
 		}, writer.Bytes())
 	})
 }
+
+func TestMoveToLocationToBytes(t *testing.T) {
+	t.Run("ground click walk", func(t *testing.T) {
+		writer := packet.NewWriter()
+		request := NewMoveToLocationRequestPacket()
+		request.TargetX = 46112
+		request.TargetY = 41500
+		request.TargetZ = -3056
+		request.OriginX = 45008
+		request.OriginY = 41492
+		request.OriginZ = -3056
+		err := request.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, []byte{
+			0x01,                   // opcode
+			0x20, 0xB4, 0x00, 0x00, // target x
+			0x1C, 0xA2, 0x00, 0x00, // target y
+			0x10, 0xF4, 0xFF, 0xFF, // target z
+			0xD0, 0xAF, 0x00, 0x00, // origin x
+			0x14, 0xA2, 0x00, 0x00, // origin y
+			0x10, 0xF4, 0xFF, 0xFF, // origin z
+			0x01, 0x00, 0x00, 0x00, // mouse mode
+		}, writer.Bytes())
+	})
+
+	t.Run("constructor defaults to mouse mode", func(t *testing.T) {
+		request := NewMoveToLocationRequestPacket()
+		require.Equal(t, MoveModeMouse, request.Mode)
+		require.Zero(t, request.TargetX)
+		require.Zero(t, request.OriginZ)
+	})
+}
+
+func TestRequestActionUseToBytes(t *testing.T) {
+	t.Run("sit stand toggle", func(t *testing.T) {
+		writer := packet.NewWriter()
+		request := NewRequestActionUsePacket()
+		request.ActionID = ActionSitStand
+		err := request.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, []byte{
+			0x45,                   // opcode
+			0x00, 0x00, 0x00, 0x00, // action id 0 (sit/stand)
+			0x00, 0x00, 0x00, 0x00, // ctrl not pressed
+			0x00,                   // shift not pressed
+		}, writer.Bytes())
+	})
+
+	t.Run("ctrl and shift pressed", func(t *testing.T) {
+		writer := packet.NewWriter()
+		request := &RequestActionUsePacket{ActionID: 2, Ctrl: true, Shift: true}
+		err := request.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, []byte{
+			0x45,                   // opcode
+			0x02, 0x00, 0x00, 0x00, // action id
+			0x01, 0x00, 0x00, 0x00, // ctrl pressed
+			0x01,                   // shift pressed
+		}, writer.Bytes())
+	})
+}
+
+func TestRequestRestartPointToBytes(t *testing.T) {
+	t.Run("village restart", func(t *testing.T) {
+		writer := packet.NewWriter()
+		request := NewRequestRestartPointPacket()
+		err := request.ToBytes(writer)
+		require.NoError(t, err)
+		require.Equal(t, []byte{
+			0x6D,                   // opcode
+			0x00, 0x00, 0x00, 0x00, // restart type village
+		}, writer.Bytes())
+	})
+}
+
+func TestNewAttackRequestPacketDefaults(t *testing.T) {
+	request := NewAttackRequestPacket()
+	require.Zero(t, request.TargetID)
+	require.Zero(t, request.X)
+	require.Zero(t, request.Y)
+	require.Zero(t, request.Z)
+	require.Equal(t, int8(0), request.Shift)
+}
