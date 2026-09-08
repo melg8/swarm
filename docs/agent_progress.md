@@ -4,6 +4,45 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: test coverage round 2 (the remaining weak packages)
+
+Started: 2026-09-08 (third session). Branch: `mobius-c1-client-1`.
+
+### Goal
+
+Continue the coverage work of the finished first round. Baseline measured
+with `go test ./... -cover -count=1` on the fresh sandbox deployment
+(Go 1.24.4, stack deployed and verified: ports 2106/7777/3306, 75 tables,
+E2E_OK):
+
+- packet 75.0% (Skip, ReadFloat64 and NewWriterTo at 0%)
+- to_game_server 64.5% (only unreachable writer error branches remain)
+- webserver 66.3% (the pathfind HTTP API handlers at 0%)
+- from_game_server 71.0% (ChangeWaitType and CharCreateOk parse paths,
+  the truncated packet error paths of the parse functions)
+- state 76.0% (twenty eight accessor and query functions at 0%)
+- to_auth_server 78.1% (unreachable writer error branches)
+
+### Constraints
+
+Same as round 1: tests assert real behavior, no coverage gaming; the
+unreachable `bytes.Buffer` writer error branches of the serializers stay
+consciously uncovered (the decision of the first round holds); SPDX
+headers, testify, go test + golangci-lint green.
+
+### Acceptance criteria
+
+- packet, webserver, from_game_server and state coverage measurably up.
+- `go test ./... -count=1` green, `golangci-lint run` 0 issues.
+
+### Progress
+
+- 2026-09-08: packet 75.0% -> 97.8% - reader_writer_extra_test.go covers
+  Skip (the 64 byte chunk loop, the whole buffer, the past end and empty
+  errors), ReadFloat64 (the round trip through WriteInt64 plus the empty
+  and truncated errors), ReadInt16 with a single byte and NewWriterTo
+  (appends to seeded data and reads back). Lint clean.
+
 ## Active task: test coverage round (the weakest packages)
 
 Started: 2026-09-08. Branch: `mobius-c1-client-1`.
