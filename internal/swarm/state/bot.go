@@ -46,6 +46,17 @@ const defaultSelfCollision = 9.0
 // still swinging would only prolong the fight.
 const underAttackWindow = 3 * time.Second
 
+// combatEventTTL bounds how long an animation event stays in the
+// snapshot feed: the SSE poll delivers a snapshot every 300 ms, so
+// a two second window guarantees every event reaches the web view
+// at least once while the sequence dedupe keeps the replays
+// silent.
+const combatEventTTL = 2 * time.Second
+
+// combatEventMax bounds the animation feed length so a burst of
+// swings and status updates cannot grow it without end.
+const combatEventMax = 64
+
 // CharacterState holds the observed state of the played character.
 type CharacterState struct {
 	Name             string
@@ -270,6 +281,35 @@ type Attack struct {
 	TargetCount int
 }
 
+// Combat event kinds of the web view animation feed.
+const (
+	// CombatEventAttack is a swing: the attacker placement runs in
+	// X and Y, the hit target placement in TargetX and TargetY.
+	CombatEventAttack = "attack"
+	// CombatEventDamage is a hit landing: TargetID is the hurt
+	// unit, Amount the HP it lost and X/Y its placement at the
+	// moment.
+	CombatEventDamage = "damage"
+)
+
+// CombatEvent is one observed beat of the combat animation feed
+// of the web view: an attack swing of the Attack broadcast or a
+// damage landing of a StatusUpdate HP drop. The monotonic
+// sequence lets the client replay every event exactly once across
+// the repeated snapshots of the event stream.
+type CombatEvent struct {
+	Seq        uint64
+	Kind       string
+	AttackerID int32
+	TargetID   int32
+	Amount     float64
+	At         time.Time
+	X          int32
+	Y          int32
+	TargetX    int32
+	TargetY    int32
+}
+
 // Attribute is one id/value pair of a StatusUpdate packet.
 type Attribute struct {
 	ID    int32
@@ -314,6 +354,11 @@ type Bot struct {
 	// honors after an emergency logout. The tracker outlives the
 	// sessions, so the cooldown spans them (see SetLoginCooldown).
 	loginCooldownUntil time.Time
+	// combatEvents feeds the web view combat animation layer (see
+	// recordCombatEventLocked): the swings of the Attack broadcasts
+	// and the damage of the HP deltas, bounded by combatEventMax.
+	combatEvents []CombatEvent
+	combatSeq    uint64
 }
 
 // NewBot creates a bot tracker for the given session id (account name).
@@ -324,6 +369,8 @@ func NewBot(id string) *Bot {
 		status:             StatusConnecting,
 		phase:              "",
 		loginCooldownUntil: time.Time{},
+		combatEvents:       nil,
+		combatSeq:          0,
 		selfID:             0,
 		char:               newCharacterState(),
 		objects:            make(map[int32]WorldObject),
@@ -452,6 +499,28 @@ func (b *Bot) SelfUnderAttack() bool {
 	last := b.char.LastHitAt
 
 	return !last.IsZero() && time.Since(last) < underAttackWindow
+}
+
+// SelfAttackerCount returns how many living attackable npcs hold
+// the played character as their target right now: the aggro load
+// of the moment. The emergency logout of the hunt loop fires on a
+// social pile up - two swinging mobs grind a lone farmer down
+// faster than any escape could answer.
+func (b *Bot) SelfAttackerCount() int {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if b.selfID == 0 {
+		return 0
+	}
+	count := 0
+	for _, obj := range b.objects {
+		if obj.Kind == KindNPC && obj.Attackable && !obj.Dead &&
+			obj.TargetID == b.selfID {
+			count++
+		}
+	}
+
+	return count
 }
 
 // SelfDead reports whether the character died: a known maximum with a
@@ -1026,6 +1095,22 @@ func (b *Bot) ApplyAttack(a Attack) {
 		b.objects[a.AttackerID] = obj
 		b.touch()
 	}
+	// The swing animation of the web view: the attacker swings at
+	// its first hit target (a melee Attack broadcast carries one
+	// target; the multi target form only appears with special
+	// shots whose damage lands the same way).
+	if a.TargetCount > 0 {
+		b.recordCombatEventLocked(CombatEvent{
+			Kind:       CombatEventAttack,
+			AttackerID: a.AttackerID,
+			TargetID:   a.TargetIDs[0],
+			X:          a.X,
+			Y:          a.Y,
+			TargetX:    a.TargetX,
+			TargetY:    a.TargetY,
+			At:         now,
+		})
+	}
 	for i := range a.TargetCount {
 		if a.TargetIDs[i] == b.selfID {
 			b.char.X = a.TargetX
@@ -1208,7 +1293,9 @@ const (
 func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	now := time.Now()
 	if objectID == b.charObjectID() {
+		b.recordCharDamageLocked(attrs, now)
 		for _, attr := range attrs {
 			b.applyCharAttr(attr)
 		}
@@ -1220,6 +1307,7 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
 	if !ok {
 		return
 	}
+	b.recordObjectDamageLocked(&obj, objectID, attrs, now)
 	for _, attr := range attrs {
 		switch attr.ID {
 		case AttrCurHP:
@@ -1690,6 +1778,61 @@ func (b *Bot) recordLocked(message string) {
 	}
 }
 
+// recordCombatEventLocked appends one combat animation beat with
+// the next sequence number and bounds the feed length. The caller
+// must hold the state write lock.
+func (b *Bot) recordCombatEventLocked(e CombatEvent) {
+	b.combatSeq++
+	e.Seq = b.combatSeq
+	e.At = time.Now()
+	b.combatEvents = append(b.combatEvents, e)
+	if len(b.combatEvents) > combatEventMax {
+		b.combatEvents = b.combatEvents[len(b.combatEvents)-combatEventMax:]
+	}
+}
+
+// recordCharDamageLocked feeds the damage of a self HP drop into
+// the animation feed: the damage numbers of the web view render
+// from the observed HP deltas, the Attack broadcast carries no
+// damage value. Heals record nothing. The caller must hold the
+// write lock.
+func (b *Bot) recordCharDamageLocked(attrs []Attribute, now time.Time) {
+	for _, attr := range attrs {
+		if attr.ID != AttrCurHP || float64(attr.Value) >= b.char.CurHP {
+			continue
+		}
+		b.recordCombatEventLocked(CombatEvent{
+			Kind:     CombatEventDamage,
+			TargetID: b.selfID,
+			Amount:   b.char.CurHP - float64(attr.Value),
+			X:        b.char.X,
+			Y:        b.char.Y,
+			At:       now,
+		})
+	}
+}
+
+// recordObjectDamageLocked feeds the damage of an object HP drop
+// into the animation feed the same way as the character one. The
+// caller must hold the write lock.
+func (b *Bot) recordObjectDamageLocked(
+	obj *WorldObject, objectID int32, attrs []Attribute, now time.Time,
+) {
+	for _, attr := range attrs {
+		if attr.ID != AttrCurHP || float64(attr.Value) >= obj.CurHP {
+			continue
+		}
+		b.recordCombatEventLocked(CombatEvent{
+			Kind:     CombatEventDamage,
+			TargetID: objectID,
+			Amount:   obj.CurHP - float64(attr.Value),
+			X:        obj.X,
+			Y:        obj.Y,
+			At:       now,
+		})
+	}
+}
+
 // markObjectCombatLocked refreshes the combat window of an object and
 // logs the transition into combat once. The caller must hold the state
 // write lock.
@@ -1793,6 +1936,21 @@ type ObjectSnapshot struct {
 	MaxMP           float64    `json:"maxMp"`
 }
 
+// CombatEventView is the JSON view of one combat animation beat
+// (see CombatEvent).
+type CombatEventView struct {
+	Seq        uint64  `json:"seq"`
+	Kind       string  `json:"kind"`
+	AttackerID int32   `json:"attackerId"`
+	TargetID   int32   `json:"targetId"`
+	Amount     float64 `json:"amount"`
+	AtMs       int64   `json:"atMs"`
+	X          int32   `json:"x"`
+	Y          int32   `json:"y"`
+	TargetX    int32   `json:"targetX"`
+	TargetY    int32   `json:"targetY"`
+}
+
 // Snapshot is the JSON view of the whole bot state.
 type Snapshot struct {
 	ID     string `json:"id"`
@@ -1809,6 +1967,11 @@ type Snapshot struct {
 	Events       []Event                 `json:"events"`
 	Chat         []ChatEvent             `json:"chat"`
 	WalkPath     []WalkPoint             `json:"walkPath"`
+	// CombatEvents carries the recent swings and damage
+	// landings of the animation layer: the last
+	// combatEventTTL window, in chronological order,
+	// deduped by the client on the sequence.
+	CombatEvents []CombatEventView `json:"combatEvents"`
 	HuntingZone  *Zone                   `json:"huntingZone"`
 	HuntingZones []ZoneView              `json:"huntingZones"`
 	Packets      int64                   `json:"packets"`
@@ -1892,6 +2055,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 		},
 		Inventory:    nil,
 		Objects:      make([]ObjectSnapshot, 0, len(b.objects)),
+		CombatEvents: make([]CombatEventView, 0, len(b.combatEvents)),
 		Events:       make([]Event, 0, min(b.eventLen, snapshotEvents)),
 		Chat:         make([]ChatEvent, 0, b.chatLen),
 		WalkPath:     nil,
@@ -1939,6 +2103,24 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 			MaxHP:           obj.MaxHP,
 			CurMP:           obj.CurMP,
 			MaxMP:           obj.MaxMP,
+		})
+	}
+	cut := now.Add(-combatEventTTL)
+	for _, ev := range b.combatEvents {
+		if ev.At.Before(cut) {
+			continue
+		}
+		snap.CombatEvents = append(snap.CombatEvents, CombatEventView{
+			Seq:        ev.Seq,
+			Kind:       ev.Kind,
+			AttackerID: ev.AttackerID,
+			TargetID:   ev.TargetID,
+			Amount:     ev.Amount,
+			AtMs:       ev.At.UnixMilli(),
+			X:          ev.X,
+			Y:          ev.Y,
+			TargetX:    ev.TargetX,
+			TargetY:    ev.TargetY,
 		})
 	}
 	snap.Events = appendEvents(
