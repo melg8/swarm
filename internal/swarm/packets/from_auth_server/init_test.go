@@ -478,3 +478,110 @@ func TestNewInitPacketWithNegativeValues(t *testing.T) {
 		t.Error("negative values were not preserved during encoding/decoding")
 	}
 }
+
+func TestNewInitPacketZeroValues(t *testing.T) {
+	initPacket := NewInitPacket()
+	if initPacket.SessionID != 0 || initPacket.ProtocolVersion != 0 ||
+		initPacket.GameGuard1 != 0 || initPacket.GameGuard2 != 0 ||
+		initPacket.GameGuard3 != 0 || initPacket.GameGuard4 != 0 {
+		t.Error("expected zero valued init packet fields")
+	}
+	if initPacket.RsaPublicKey != nil || initPacket.BlowfishKey != nil {
+		t.Error("expected nil key slices on a fresh init packet")
+	}
+}
+
+func TestInitPacketWriteToRoundTrip(t *testing.T) {
+	blowfishKey := []byte("static-blowfish-key!")
+	initPacket := &InitPacket{
+		SessionID:       0x7c610eca,
+		ProtocolVersion: 0x0000c621,
+		RsaPublicKey:    ExpectedRsaPublicKey(),
+		GameGuard1:      0x29dd954e,
+		GameGuard2:      0x77c39cfc,
+		GameGuard3:      ExpectedGameGuard3(),
+		GameGuard4:      0x07bde0f7,
+		BlowfishKey:     blowfishKey,
+	}
+
+	required := 4 + 4 + 128 + 4*4 + len(blowfishKey)
+	dest := make([]byte, required)
+	written, err := initPacket.WriteTo(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if written != required {
+		t.Errorf("WriteTo wrote %d bytes, want %d", written, required)
+	}
+
+	decoded := &InitPacket{}
+	if err := ParseInitPacket(decoded, dest); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.SessionID != initPacket.SessionID ||
+		decoded.ProtocolVersion != initPacket.ProtocolVersion ||
+		decoded.GameGuard1 != initPacket.GameGuard1 ||
+		decoded.GameGuard2 != initPacket.GameGuard2 ||
+		decoded.GameGuard3 != initPacket.GameGuard3 ||
+		decoded.GameGuard4 != initPacket.GameGuard4 {
+		t.Error("WriteTo round trip lost header fields")
+	}
+	if !bytes.Equal(decoded.RsaPublicKey, initPacket.RsaPublicKey) {
+		t.Error("WriteTo round trip lost the rsa public key")
+	}
+	if !bytes.Equal(decoded.BlowfishKey, blowfishKey) {
+		t.Error("WriteTo round trip lost the blowfish key")
+	}
+}
+
+func TestInitPacketWriteToWithoutBlowfishKey(t *testing.T) {
+	initPacket := &InitPacket{
+		SessionID:       1,
+		ProtocolVersion: 2,
+		RsaPublicKey:    ExpectedRsaPublicKey(),
+		GameGuard1:      3,
+		GameGuard2:      4,
+		GameGuard3:      5,
+		GameGuard4:      6,
+		BlowfishKey:     nil,
+	}
+
+	dest := make([]byte, 4+4+128+4*4)
+	written, err := initPacket.WriteTo(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if written != len(dest) {
+		t.Errorf("WriteTo wrote %d bytes, want %d", written, len(dest))
+	}
+
+	decoded := &InitPacket{}
+	if err := ParseInitPacket(decoded, dest); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.BlowfishKey != nil {
+		t.Error("expected no blowfish key in the decoded packet")
+	}
+}
+
+func TestInitPacketWriteToTooSmallDestination(t *testing.T) {
+	initPacket := &InitPacket{
+		SessionID:       1,
+		ProtocolVersion: 2,
+		RsaPublicKey:    ExpectedRsaPublicKey(),
+		GameGuard1:      3,
+		GameGuard2:      4,
+		GameGuard3:      5,
+		GameGuard4:      6,
+		BlowfishKey:     nil,
+	}
+
+	dest := make([]byte, 4+4+128+4*4-1)
+	written, err := initPacket.WriteTo(dest)
+	if err == nil {
+		t.Error("expected an error for the too small destination")
+	}
+	if written != 0 {
+		t.Errorf("expected no bytes written, got %d", written)
+	}
+}
