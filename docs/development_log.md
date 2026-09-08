@@ -1736,3 +1736,81 @@ side by side, in every attack direction, on the real map background.
   the captured screenshots (download/fight_shots/) show the numbered
   columns, the map background, the hero/enemy markers, the HP bars
   and the variant effects rendering correctly.
+
+## Round 35: the elven village navigation - approach radius, water cost, server step rules (2026-09-09)
+
+Scope: the user reported the bot stuck at x 45544 y 45880 z -2992
+while trying to reach the trader Unoren (44667 46896 -2982) of the
+floating elven village, and earlier sessions swam through the lake
+under the village instead of crossing a bridge. The task demanded the
+full diagnosis (which Z coordinates reach the pathfinder, whether it
+runs at all, what it returns) and a fix that makes the pathfinding
+correct on such multilayer terrain.
+
+### Diagnosis (measured on the deployed pack, live verified)
+
+- The town trips DO use the pathfinder: `startWalkLeg` calls
+  `Navigator.FindPathTo(from, dest, int16(dest.Z))` - the start z is
+  the live character z, the target z the merchant spawn z.
+- The Unoren shop cell holds layers -2632 (a raised surface) and
+  -3928 (the lake floor) but NO deck layer -2984: the C1 l2j geodata
+  does not model the shop interiors (the NPC spawn z -2982 is the
+  real floor). The strict search resolved the target against the
+  merchant z, picked the raised surface and aborted at the 1M
+  expansion cap hunting an unreachable layer.
+- The plain fallback resolved the target against the START z, which
+  picked the lake floor under the shop; water costs the same as land
+  and the swim (5683 units) is shorter than the bridge route
+  (~6300), so the planned waypoints led under the village - the
+  observed swimming. The approachMerchant direct far walks then
+  depended on the server's own routing, which stalls at the pond
+  edge north of the shop (the straight line to the merchant crosses
+  the water gap; the user's stuck position 45544 45880 is exactly
+  that deck edge).
+- The three village bridges are wide gentle ramps (8..16 unit steps,
+  the fields -3488 up to the deck -2984, fully connected in the
+  geodata); the earlier "the geodata pack disconnects the Elven
+  village decks" conclusion was a misreading of the missing shop
+  floor layers plus the water preference.
+- The Mobius movement validation (GeoEngine.getValidLocation) gates
+  upward steps at HEIGHT_INCREASE_LIMIT 40, accepts any drop, and the
+  water surface sits at -3780 (the maxZ of the water.xml cuboids).
+
+### Fix
+
+- The A* step rules now mirror the server (canStep): walls of the
+  source cell, upward <= 40, drops walkable; the line of sight keeps
+  the strict symmetric rule so the smoothing never collapses a
+  detour into a straight drop. DefaultMaxPassableHeight 30 -> 40.
+- Water cost: layers below -3780 cost 3x per step
+  (waterCostMultiplier), so bridges and shores beat swimming
+  whenever they exist.
+- FindPathTo is replaced by FindPathApproach(start, end, radius): the
+  search succeeds on the first node within the 3D radius of the
+  target point - the z difference counts, so the water deck below a
+  shop never satisfies the radius while the deck ring around the
+  merchant (the counter front, within the 250 unit interaction
+  distance) does. The town trips use radius 200, the manual long
+  walks 150; a fully reachable target is still reached exactly
+  (the exact node pops first).
+- The plain FindPath resolves the target layer against the target z
+  like the server's own pathfinder (getHeight(tx, ty, tz)).
+
+### Verification
+
+- Regression tests over the real pack: from the lake shore farm
+  (47320 42216 -3488) and from the user's stuck spot the approach
+  search ends on the village deck (z -2992, 189 units from Unoren,
+  zero water waypoints); the bridge route runs through the ramp
+  entrance at (45912, 42776) in both cases.
+- Synthetic tests pin the water preference (a bridge beats a shorter
+  swim; water alone still routes), the approach radius (a sealed
+  counter is reached at its front; an open target is reached
+  exactly), the any-height drop walkability and the 40 unit climb
+  gate.
+- Live E2E on the deployed stack (PathFinding=2): a fresh bot walked
+  spawn -> fields -> bridge ramp -> village deck -> 59 units from
+  Unoren in 45 s (search 0.46 s, 4 waypoints, z never below -3440),
+  then selected the merchant (MyTargetSelected, target id set, the
+  character at 25 units). tools/mobius_e2e.sh 45 prints E2E_OK, the
+  full suite and golangci-lint stay green.

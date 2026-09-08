@@ -55,9 +55,18 @@ Conclusions:
 
 ## Water movement (swimming vs walking) - a separate cost dimension
 
-The current search treats water as ordinary ground: the ocean floor
-heights are open walkable cells, so routes happily cross the sea. That
-is wrong in three ways for a real walker:
+Status 2026-09-09: the elven village part of this roadmap is
+implemented - layers below the C1 water surface (-3780, the maxZ of
+the water zones) cost 3x per step in the A* (waterCostMultiplier), so
+the town trips cross the village bridges instead of swimming the lake
+under the floating island (see development_log round 35 and the
+TestFindPathWaterCost regression). The remaining points below stay
+open: the exact swim/run speed ratio (the 3x is a planning
+conservative), the breath limits and the boat edges.
+
+The plain search otherwise treats water as ordinary ground: the ocean
+floor heights are open walkable cells, so routes happily cross the
+sea. That is wrong in three ways for a real walker:
 
 1. **Speed.** Swimming in C1 is much slower than running on land. The
    A* cost model is pure distance, so a water shortcut looks

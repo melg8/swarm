@@ -69,6 +69,25 @@ verified from the stuck point and from the lake shore farm points.
   crosses a bridge without entering the water; the full suite, lint
   and mobius_e2e stay green.
 
+### Progress (2026-09-09)
+
+- 2026-09-09: the fix landed (13660c7). The approach search replaces
+  the strict layer-target search (FindPathTo is gone), the A* step
+  rules mirror the Mobius validation (up 40, drops walkable), water
+  below -3780 costs 3x, the manual long walks navigate with the
+  approach search too. Verified: the real pack routes from the farm
+  and the stuck spot end on the deck 189 units from Unoren (tests
+  TestFindPathToShopDeck, the synthetic water/approach/drop/climb
+  tests), go build/vet, go test ./... (16 packages), golangci-lint 0
+  issues, mobius_e2e.sh 45 -> E2E_OK.
+- 2026-09-09: live E2E on the deployed stack (PathFinding=2 like the
+  reference deployment): a fresh bot walked spawn -> fields -> the
+  bridge ramp (45912 42776) -> the village deck -> 59 units from
+  Unoren in 45 s (search 0.46 s, 4 waypoints, z never below -3440 -
+  no swimming), then selected the merchant (the target id confirmed,
+  the character at 25 units from the NPC). AGENTS.md, the development
+  log (round 35) and the navigation analysis carry the diagnosis.
+
 ## Active task: fix the real client connection failure (feature/proxy-server)
 
 Started: 2026-09-08 (second round, after the user's first real client

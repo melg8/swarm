@@ -688,10 +688,24 @@ which they currently do (see below).
   length; `ErrMissingCell` marks a start or target without geodata and
   `Result.Aborted` a search that hit `MaxSearchExpansions` (1M) - an
   unreachable target in open terrain would otherwise sweep the whole
-  region grid. The start z drives the layer resolution of both ends
-  (the original passes the start z as the target z too), and the search
-  terminates on the target cell with whatever layer the walk arrived
-  on.
+  region grid. The target z drives the target layer resolution (like
+  the server's own `PathFinding.findPath` getHeight(tx, ty, tz)), and
+  the plain search terminates on the target cell with whatever layer
+  the walk arrived on. `Engine.FindPathApproach(start, end,
+  approachRadius, maxPassableHeight)` terminates on the first node
+  within the 3D approach radius of the end point instead - the town
+  trips navigate with it (a merchant behind a counter or on a floor
+  layer the geodata does not model is reached through the deck ring
+  within the interaction distance, the water deck below the shop
+  never satisfies the radius). The A* step rules mirror the Mobius
+  movement validation: upward steps are gated at
+  `DefaultMaxPassableHeight` (40, the Mobius HEIGHT_INCREASE_LIMIT),
+  drops of any height are walkable, and layers below the C1 water
+  surface (waterLevel -3780, the maxZ of the water zones) cost
+  `waterCostMultiplier` (3x) per step so bridges and shores beat
+  swimming whenever they exist. The line of sight raster keeps the
+  strict symmetric height rule, so the smoothing never collapses a
+  detour into a straight drop.
 - **Deliberate deviations from the original**: wall hits are skipped
   instead of being pushed into the open set with an astronomic cost
   (the original can return a wall crossing path for a sealed target);
@@ -707,7 +721,7 @@ which they currently do (see below).
 - **Pathfind test UI**: `go run ./cmd/swarm -pathfind-test` serves the
   map without any bot behind it (`-geodata` points at a geodata
   directory, auto detected at `./data/geodata` and the reference
-  deployment otherwise; `-max-passable` overrides the default 30). The
+  deployment otherwise; `-max-passable` overrides the default 40). The
   UI opens on the hunting zone, shows draggable A and B markers (or arm
   the set A/set B buttons and click the map), draws the found path as a
   red dashed line with a small circle at every turning point, the raw
@@ -1210,17 +1224,19 @@ the same variables).
   the inventory drops back below the trigger - a buy trip with a
   30 percent bag still sells the junk, so the bot never farms with
   sellable loot it could have sold on the visit. Path layer selection: the trip legs navigate
-  with pathfind.Engine.FindPathTo, which resolves the target cell
-  layer against the destination z (the merchant spawn z, the farm z)
-  and strictly requires the arrival on that deck - the plain search
-  would happily end on the water deck below a shop standing over the
-  shore. The deployed geodata pack disconnects the Elven village
-  decks from the hunting fields, so startWalkLeg falls back to the
-  plain search (any deck) when the targeted one reports not found:
-  the sale works from anywhere (list id 0) and only the merchant
-  targeting degrades - approachMerchant also gives up targeting when
-  the merchant stands more than the interaction distance above or
-  below the character. The
+  with pathfind.Engine.FindPathApproach and the trip approach radius
+  (200 units, under the interaction distance): the walk ends on the
+  deck ring around the merchant, which handles the C1 shop interiors
+  (the geodata holds no floor layer at the real merchant z - only a
+  raised surface and the water below) and the counters the same way,
+  while the water deck below the shop never satisfies the radius (the
+  z difference counts in the 3D distance). The water cost of the
+  search keeps the routes on bridges and shores, so the walks cross
+  the village ramps instead of swimming the lake under the floating
+  island (the 2026-09-09 fix; regression tests `TestFindPathToShopDeck`
+  and the synthetic water tests of `search_test.go`). approachMerchant
+  also gives up targeting when the merchant stands more than the
+  interaction distance above or below the character. The
   live verified cycle (2026-09-07): trigger at 55 slots/73% weight,
   walk to the trader ~18k units in ~60 s, one batch of 25 items sold
   (55 -> 30 slots, 73% -> 36% weight), walk back and hunting resumed;
