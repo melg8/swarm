@@ -365,12 +365,20 @@ re-serialized from the LAST recorded real char list of the session that
 contains the played name (full fidelity for the character screen
 render), while the vitals, the position and the level come from the
 live tracker (fresher than the login time list). Sp/exp are written as
-zeros (the parser never stored them), the paperdoll blocks as zeros.
+zeros (the parser never stored them). The paperdoll object ids of the
+15 slots come from the last UserInfo broadcast of the bot session (the
+server refreshes the block on every equip and unequip) and the item
+ids are resolved through the tracked inventory - the C1 client renders
+the selection screen model from the item id table, so the slots must
+carry the real equipped gear.
 
 ### KeyPacket (0x00, proxy variant)
 
-Same layout as the real one, but the key is a random per client
-session key and the server id is 1. The client cipher chain starts from
+Same layout as the real one, but the key is the STATIC Mobius C1
+session key (`94 35 00 00 a1 6c 54 87`, the real `GameClient.CRYPT_KEY`)
+and the server id is 1: the real C1 client build stays compatible with
+a hardcoded key (Mobius never rotates it), so a random per connection
+key desynchronized the real client and is forbidden. The client cipher chain starts from
 this key; the bot session keeps its own chain from the real server key
 - the two chains advance independently, which is the property the
 packet transformer seam builds on (rewriting, resizing, dropping and
@@ -394,3 +402,24 @@ critical section the hunt loop uses). The client's move request
 `[opcode 0x01][targetX/Y/Z][originX/Y/Z][mode: INT 4 bytes]` (mode 1 =
 mouse, 0 = keyboard - a full int, see MoveToLocation.readImpl) is the
 reference example covered by the E2E.
+
+The recorded packets that describe the played character itself are
+patched to the LIVE tracker state before the replay (the world packets
+of other objects replay unchanged):
+
+- the CharSelected answer is binary-patched with the live x/y/z,
+  curHp/curMp, sp, exp and level (the byte offsets are scanned from
+  the two utf16 strings and the header ints; an unscannable packet
+  replays unchanged),
+- every replayed UserInfo of the played character carries the live
+  position, vitals, level and progression,
+- the movement family packets of the played character
+  (MoveToLocation 0x01, MoveToPawn 0x75, StopMove 0x59,
+  ValidateLocation 0x76, TeleportToLocation 0x38) are dropped except
+  the newest one - its coordinates are exactly the tracker position
+  because the tracker takes its position from that packet.
+
+This is what makes a reconnection after the bot walked away correct:
+the client spawns where the character actually stands instead of the
+login-time place (the stale spawn ran into the server-side walls and
+crashed the real client).

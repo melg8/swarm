@@ -20,9 +20,20 @@ const (
 	charInfoGameServerName = 1
 	// charInfoIntsSpExp skips the sp and exp fields.
 	charInfoIntsSpExp = 2
-	// charInfoSkippedInts skips karma, deprecated zero and paperdoll fields.
-	charInfoSkippedInts = 1 + 9 + 15*2
+	// charInfoKarmaAndZeroInts skips the karma and the deprecated zero
+	// block before the paperdoll tables.
+	charInfoKarmaAndZeroInts = 1 + 9
 )
+
+// charInfoZeroInts counts the deprecated zero ints after karma: the
+// Mobius writeImpl emits nine zero ints between karma and the paperdoll
+// object id block.
+const charInfoZeroInts = 9
+
+// charInfoPaperdollSlots is the number of paperdoll slots the packet
+// carries, first as object ids then as item ids (the right hand appears
+// twice: the last slot repeats PAPERDOLL_RHAND).
+const charInfoPaperdollSlots = 15
 
 // CharacterInfo describes a single character of the account.
 type CharacterInfo struct {
@@ -46,6 +57,16 @@ type CharacterInfo struct {
 	MaxHP       float64
 	MaxMP       float64
 	DeleteTimer int32
+	// PaperdollObjectIDs carries the equipped item object id of every
+	// paperdoll slot in the Mobius write order (underwear, right ear,
+	// left ear, neck, right finger, left finger, head, right hand,
+	// left hand, gloves, chest, legs, feet, cloak and the C1 right
+	// hand duplicate; 0 = empty slot).
+	PaperdollObjectIDs [charInfoPaperdollSlots]int32
+	// PaperdollItemIDs carries the item id of every paperdoll slot in
+	// the same order: the C1 client renders the selection screen
+	// model from these ids, so zeroed slots show a naked character.
+	PaperdollItemIDs [charInfoPaperdollSlots]int32
 }
 
 // CharSelectInfoPacket lists the characters available for selection.
@@ -142,7 +163,9 @@ func parseCharacterCondition(reader *packet.Reader, info *CharacterInfo) error {
 }
 
 // parseCharacterProgression reads the vitals, level and appearance fields.
-// The karma, deprecated zero and paperdoll fields are skipped.
+// The karma and the deprecated zero block are skipped, the paperdoll
+// tables are parsed (the selection screen renders the equipment from
+// them).
 func parseCharacterProgression(
 	reader *packet.Reader, info *CharacterInfo,
 ) error {
@@ -152,12 +175,36 @@ func parseCharacterProgression(
 	if err := parseCharacterLevel(reader, info); err != nil {
 		return err
 	}
-	// Skip karma, deprecated zero and paperdoll fields.
-	if err := skipInts(reader, charInfoSkippedInts); err != nil {
+	// Skip karma and the deprecated zero block before the paperdoll.
+	if err := skipInts(reader, charInfoKarmaAndZeroInts); err != nil {
+		return err
+	}
+	if err := parseCharacterPaperdoll(reader, info); err != nil {
 		return err
 	}
 
 	return readInt32Fields(reader, &info.HairStyle, &info.HairColor, &info.Face)
+}
+
+// parseCharacterPaperdoll reads the object id and item id tables of
+// the paperdoll slots (15 slots each, the right hand repeats last).
+func parseCharacterPaperdoll(reader *packet.Reader, info *CharacterInfo) error {
+	for i := range info.PaperdollObjectIDs {
+		objectID, err := reader.ReadInt32()
+		if err != nil {
+			return err
+		}
+		info.PaperdollObjectIDs[i] = objectID
+	}
+	for i := range info.PaperdollItemIDs {
+		itemID, err := reader.ReadInt32()
+		if err != nil {
+			return err
+		}
+		info.PaperdollItemIDs[i] = itemID
+	}
+
+	return nil
 }
 
 // parseCharacterLevel reads the level field of a character.
@@ -231,16 +278,6 @@ func (p *CharSelectInfoPacket) FindCharacterByName(
 
 	return 0, nil, false
 }
-
-// charInfoZeroInts counts the deprecated zero ints after karma: the
-// Mobius writeImpl emits nine zero ints between karma and the paperdoll
-// object id block.
-const charInfoZeroInts = 9
-
-// charInfoPaperdollSlots is the number of paperdoll slots the packet
-// carries, first as object ids then as item ids (the right hand appears
-// twice: the last slot repeats PAPERDOLL_RHAND).
-const charInfoPaperdollSlots = 15
 
 // ToBytes serializes the packet for the emulated game server of the
 // proxy, mirroring the byte layout of the Mobius CharSelectionInfo
@@ -338,11 +375,18 @@ func writeCharacterVitals(writer *packet.Writer, info *CharacterInfo) error {
 	if err := writeZeroInts(writer, 1+charInfoZeroInts); err != nil {
 		return err
 	}
-	if err := writeZeroInts(writer, charInfoPaperdollSlots); err != nil {
-		return err
+	for _, objectID := range info.PaperdollObjectIDs {
+		if err := writer.WriteInt32(objectID); err != nil {
+			return err
+		}
+	}
+	for _, itemID := range info.PaperdollItemIDs {
+		if err := writer.WriteInt32(itemID); err != nil {
+			return err
+		}
 	}
 
-	return writeZeroInts(writer, charInfoPaperdollSlots)
+	return nil
 }
 
 // writeCharacterAppearance writes the hair, face and max vitals fields.
@@ -368,8 +412,8 @@ func writeCharacterAppearance(
 	return writer.WriteInt32(info.DeleteTimer)
 }
 
-// writeZeroInts writes count zero int32 fields (the deprecated and
-// paperdoll blocks of the packet).
+// writeZeroInts writes count zero int32 fields (the deprecated zero
+// block of the packet).
 func writeZeroInts(writer *packet.Writer, count int) error {
 	for range count {
 		if err := writer.WriteInt32(0); err != nil {

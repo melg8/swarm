@@ -36,11 +36,14 @@ func (gc *gameConn) buildCharacterList() ([]byte, error) {
 // appearance fields (sex, race, class, hair, face) come from the last
 // recorded real char list of the session that contains the played
 // character, so the client renders the same look the real server would;
-// the vitals and the position come from the live tracker (they are
-// fresher than anything recorded at login time).
+// the vitals, the position and the paperdoll come from the live tracker
+// (they are fresher than anything recorded at login time: the C1 client
+// renders the selection screen model from the paperdoll item ids, so
+// the zeroed table showed a naked character).
 func (gc *gameConn) characterInfo(
 	character state.CharacterSnapshot, account string,
 ) fromgameserver.CharacterInfo {
+	//nolint:exhaustruct // the paperdoll is filled below
 	info := fromgameserver.CharacterInfo{
 		Name:        character.Name,
 		ObjectID:    character.ObjectID,
@@ -75,8 +78,35 @@ func (gc *gameConn) characterInfo(
 			info.Name = recorded.Name
 		}
 	}
+	gc.fillLivePaperdoll(&info)
 
 	return info
+}
+
+// fillLivePaperdoll resolves the equipped gear of the played character
+// from the live tracker: the paperdoll object ids of the slots come from
+// the last UserInfo broadcast the server sent (it refreshes the block on
+// every equip and unequip), and the item ids are looked up in the
+// tracked inventory. The two tables share the Mobius wire slot order,
+// so the mapping is index to index (the right hand duplicate repeats
+// in both).
+func (gc *gameConn) fillLivePaperdoll(info *fromgameserver.CharacterInfo) {
+	if gc.session == nil {
+		return
+	}
+
+	paperdoll := gc.session.tracker.PaperdollSlotObjectIDs()
+	inventory := gc.session.tracker.InventoryItems()
+	itemIDs := make(map[int32]int32, len(inventory))
+	for _, item := range inventory {
+		itemIDs[item.ObjectID] = item.ItemID
+	}
+	slots := min(len(info.PaperdollObjectIDs), len(paperdoll))
+	for i := range slots {
+		objectID := paperdoll[i]
+		info.PaperdollObjectIDs[i] = objectID
+		info.PaperdollItemIDs[i] = itemIDs[objectID]
+	}
 }
 
 // recordedCharacter returns the entry of the played character from the

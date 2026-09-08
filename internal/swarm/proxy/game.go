@@ -300,8 +300,12 @@ func (gc *gameConn) handleAuthLogin(payload []byte) error {
 }
 
 // handleCharacterSelect answers with the recorded CharSelected packet
-// of the bot session: the client asked for the only offered slot, so
-// the slot index itself is irrelevant.
+// of the bot session patched to the live tracker state: the slot index
+// itself is irrelevant (the client asked for the only offered slot), but
+// the recorded coordinates are the login-time place of the bot. A client
+// reconnecting after the bot walked away must spawn where the character
+// actually stands, so the position, vitals and progression fields are
+// rewritten from the live snapshot (see patchCharSelectedLive).
 func (gc *gameConn) handleCharacterSelect(payload []byte) error {
 	slot := int32(0)
 	if len(payload) >= 5 {
@@ -313,10 +317,13 @@ func (gc *gameConn) handleCharacterSelect(payload []byte) error {
 	if selected == nil {
 		return errors.New("no char selected packet recorded for the session")
 	}
+	live := gc.session.tracker.SelfSnapshot()
+	answer := patchCharSelectedLive(selected, live)
 	gc.server.logger.Printf(
-		"game#%d: char select (slot %d) answered with the recorded packet",
-		gc.id, slot)
-	if err := gc.sendToClient(selected); err != nil {
+		"game#%d: char select (slot %d) answered with the recorded packet, "+
+			"live state %d %d %d hp %.0f/%.0f level %d",
+		gc.id, slot, live.X, live.Y, live.Z, live.CurHP, live.MaxHP, live.Level)
+	if err := gc.sendToClient(answer); err != nil {
 		return err
 	}
 	gc.state = gameStateSelected
@@ -421,23 +428,50 @@ func (gc *gameConn) runSender() {
 // recorded stream of the bot session after its CharSelected packet) and
 // then continues with the live feed. Packets pass the transformer seam
 // in both cases.
+//
+// The replayed self-state is live-patched (see replay.go): every
+// UserInfo of the played character carries the current tracker
+// position and vitals, and the stale self movement packets are dropped
+// except the newest one (whose coordinates match the tracker by
+// construction). The world packets of other objects replay unchanged.
 func (gc *gameConn) runRelay() {
 	recorder := gc.session.recorder
 	entries, sub := recorder.Attach(gc.charSelectedSeq)
 	defer recorder.removeSubscriber(sub)
+
+	selfID := gc.session.tracker.SelfObjectID()
+	lastSelfMoveSeq := lastSelfMovementSeq(entries, selfID)
 
 	replayBytes := 0
 	for i := range entries {
 		replayBytes += len(entries[i].payload)
 	}
 	gc.server.logger.Printf(
-		"game#%d: replaying %d recorded packets (%d bytes), then live",
-		gc.id, len(entries), replayBytes)
+		"game#%d: replaying %d recorded packets (%d bytes) with the live self state "+
+			"(self id %d), then live",
+		gc.id, len(entries), replayBytes, selfID)
 
+	droppedMoves := 0
 	for i := range entries {
-		if !gc.relayToClient(entries[i].payload) {
+		payload := entries[i].payload
+		if isSelfMovementPayload(payload, selfID) &&
+			entries[i].seq != lastSelfMoveSeq {
+			droppedMoves++
+
+			continue
+		}
+		if payload[0] == replayOpUserInfo {
+			payload = patchUserInfoSelfLive(
+				payload, selfID, gc.session.tracker.SelfSnapshot())
+		}
+		if !gc.relayToClient(payload) {
 			return
 		}
+	}
+	if droppedMoves > 0 {
+		gc.server.logger.Printf(
+			"game#%d: replay dropped %d stale self movement packets",
+			gc.id, droppedMoves)
 	}
 	gc.server.logger.Printf("game#%d: replay done, live relay active", gc.id)
 

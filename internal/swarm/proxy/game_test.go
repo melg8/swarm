@@ -6,6 +6,7 @@ package proxy
 
 import (
 	"encoding/binary"
+	"math"
 	"net"
 	"testing"
 	"time"
@@ -149,8 +150,17 @@ func buildTestCharSelected(name string) []byte {
 	data = binary.LittleEndian.AppendUint32(data, 45000)
 	data = binary.LittleEndian.AppendUint32(data, 50000)
 	data = binary.LittleEndian.AppendUint32(data, 0xFFFFF268)
-	data = binary.LittleEndian.AppendUint64(data, 90) // cur hp
-	data = binary.LittleEndian.AppendUint64(data, 40) // cur mp
+	data = binary.LittleEndian.AppendUint64(data, math.Float64bits(90)) // cur hp
+	data = binary.LittleEndian.AppendUint64(data, math.Float64bits(40)) // cur mp
+	data = binary.LittleEndian.AppendUint32(data, 5)                    // sp
+	data = binary.LittleEndian.AppendUint32(data, 1000)
+	data = binary.LittleEndian.AppendUint32(data, 7) // level
+	// The real Mobius packet continues with karma, pk kills, stats and
+	// a fixed zero tail; the trailing ints below keep the packet longer
+	// than the patch window of the proxy.
+	for range 10 {
+		data = binary.LittleEndian.AppendUint32(data, 0)
+	}
 
 	return data
 }
@@ -486,4 +496,101 @@ func TestGameServerRefusesCharacterCreation(t *testing.T) {
 	fail := fromgameserver.NewCharCreateFailPacket()
 	require.NoError(t, fromgameserver.ParseCharCreateFailPacket(fail, failPayload))
 	require.EqualValues(t, 0x01, fail.Reason)
+}
+
+// TestGameServerReconnectServesLiveSelfState reproduces the reconnection
+// bug report: the bot walked far away from its login place, a new client
+// connects and must spawn at the live position with the live equipment.
+// The char list renders the paperdoll of the live tracker, the char
+// selected answer and the replayed UserInfo carry the live position, and
+// the stale self movement packets of the replay are dropped except the
+// newest one.
+func TestGameServerReconnectServesLiveSelfState(t *testing.T) {
+	server := startTestServer(t)
+	recorder, tracker, _ := registerFakeBot(t, server, "MovedChar")
+
+	// The bot gears up and walks away from the recorded login state
+	// after the session was recorded.
+	paperdoll := [state.PaperdollSlots]int32{}
+	paperdoll[state.PaperdollRHand] = 10
+	paperdoll[state.PaperdollChest] = 11
+	paperdoll[state.PaperdollDuplicateRHand] = 10
+	tracker.ApplyPaperdoll(paperdoll)
+	tracker.ApplyItemList([]state.InventoryItem{
+		{ObjectID: 10, ItemID: 10, Count: 1, Equipped: true},
+		{ObjectID: 11, ItemID: 1146, Count: 1, Equipped: true},
+	})
+	tracker.ApplyPlacement(state.Placement{
+		ObjectID: 1055, X: 60000, Y: 61000, Z: -2500, Heading: 1000,
+	})
+
+	recorder.Record(buildTestCharList("MovedChar"))
+	recorder.Record(buildTestCharSelected("MovedChar"))
+	recorder.Record(buildTestUserInfoPacket())        // login position
+	recorder.Record(buildTestWorldPacket(0x01, 1055)) // stale self move
+	recorder.Record(buildTestWorldPacket(0x22, 42))   // npc info
+	recorder.Record(buildTestWorldPacket(0x01, 1055)) // newest self move
+	recorder.Record(buildTestWorldPacket(0x59, 42))   // npc stop
+
+	client := dialGame(t, server.GameAddr())
+	client.handshake()
+
+	authLogin := []byte{0x08}
+	authLogin = appendUTF16(authLogin, "reconnector")
+	for range 4 {
+		authLogin = binary.LittleEndian.AppendUint32(authLogin, 7)
+	}
+	client.sendPacket(authLogin)
+
+	// The char list carries the live equipment of the bot.
+	charListPayload := client.readPacket()
+	charList := fromgameserver.NewCharSelectInfoPacket()
+	require.NoError(t, fromgameserver.ParseCharSelectInfoPacket(charList, charListPayload))
+	live := tracker.SelfSnapshot()
+	require.EqualValues(t, 60000, charList.Characters[0].X, "live char list x")
+	equipped := charList.Characters[0]
+	require.EqualValues(t, 10, equipped.PaperdollItemIDs[state.PaperdollRHand],
+		"right hand item id")
+	require.EqualValues(t, 1146, equipped.PaperdollItemIDs[state.PaperdollChest],
+		"chest item id")
+	require.EqualValues(t, 10,
+		equipped.PaperdollItemIDs[state.PaperdollDuplicateRHand],
+		"the C1 right hand duplicate")
+	require.Zero(t, equipped.PaperdollItemIDs[state.PaperdollFeet], "empty slot")
+
+	// The char selected answer is the recorded packet patched to the
+	// live tracker state.
+	client.sendPacket([]byte{0x0D, 0x00, 0x00, 0x00, 0x00})
+	selected := fromgameserver.NewCharSelectedPacket()
+	require.NoError(t, fromgameserver.ParseCharSelectedPacket(
+		selected, client.readPacket()))
+	require.Equal(t, live.X, selected.X, "live char selected x")
+	require.Equal(t, live.Y, selected.Y, "live char selected y")
+	require.Equal(t, live.Z, selected.Z, "live char selected z")
+	require.InDelta(t, live.CurHP, selected.CurrentHP, 0.001)
+
+	// Enter world: the replayed UserInfo is live-patched, the earlier
+	// self movement is dropped and the newest one survives.
+	client.sendPacket([]byte{0x03})
+	replayedUserInfo := fromgameserver.NewUserInfoPacket()
+	require.NoError(t, fromgameserver.ParseUserInfoPacket(
+		replayedUserInfo, client.readPacket()))
+	require.Equal(t, live.X, replayedUserInfo.X, "live replay user info x")
+	require.Equal(t, live.Y, replayedUserInfo.Y, "live replay user info y")
+	require.Equal(t, live.Z, replayedUserInfo.Z, "live replay user info z")
+	require.Equal(t, live.Level, replayedUserInfo.Level)
+	require.InDelta(t, live.CurHP, replayedUserInfo.CurHP, 0.001)
+
+	npc := client.readPacket()
+	require.Equal(t, byte(0x22), npc[0], "the npc info replays between the self packets")
+
+	selfMove := client.readPacket()
+	require.Equal(t, byte(0x01), selfMove[0], "the newest self movement survives")
+	require.EqualValues(t, 1055, int32(binary.LittleEndian.Uint32(selfMove[1:5])))
+
+	// The queued EnterWorld transition ends the replay: the next packet
+	// is the live feed (the npc stop recorded after the attach).
+	npcStop := client.readPacket()
+	require.Equal(t, byte(0x59), npcStop[0], "the tail replays after the drop")
+	require.EqualValues(t, 42, int32(binary.LittleEndian.Uint32(npcStop[1:5])))
 }

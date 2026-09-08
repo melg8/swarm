@@ -181,6 +181,72 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
 		}, "the own movement echo through the live relay")
 	require.Equal(t, byte(0x01), echo[0])
 
+	// --- the reconnection: the client drops and a new one enters while
+	// the bot stands at the walked-to place far from its login spot ---
+	require.NoError(t, gameClient.conn.Close())
+	moved := waitBotArrived(t, bot, snapshot.Character.X+100,
+		snapshot.Character.Y+100)
+	t.Logf("the bot walked to %d %d %d", moved.X, moved.Y, moved.Z)
+
+	reconnectClient := dialGame(t, gameAddress)
+	require.NoError(t, reconnectClient.conn.SetDeadline(
+		time.Now().Add(e2eReadTimeout)))
+	reconnectClient.handshake()
+
+	reconnectClient.sendPacket(authLogin)
+
+	// The char list of the reconnection carries the live paperdoll: the
+	// selection screen must render the equipped gear, not a naked model.
+	reconnectListPayload := reconnectClient.readPacket()
+	require.Equal(t, byte(0x1F), reconnectListPayload[0])
+	reconnectList := fromgameserver.NewCharSelectInfoPacket()
+	require.NoError(t, fromgameserver.ParseCharSelectInfoPacket(
+		reconnectList, reconnectListPayload))
+	require.Len(t, reconnectList.Characters, 1)
+	expectedPaperdoll := expectedPaperdollItems(t, bot)
+	require.Equal(t, expectedPaperdoll,
+		reconnectList.Characters[0].PaperdollItemIDs,
+		"the char list paperdoll must mirror the live equipment")
+	liveEntry := reconnectList.Characters[0]
+	require.InDelta(t, moved.X, liveEntry.X, 300,
+		"the char list carries the walked-to position")
+	require.InDelta(t, moved.Y, liveEntry.Y, 300)
+
+	// The char selected answer is patched to the live position: the
+	// client spawns where the character actually stands.
+	reconnectClient.sendPacket([]byte{0x0D, 0x00, 0x00, 0x00, 0x00})
+	reconnectSelectedPayload := reconnectClient.readPacket()
+	require.Equal(t, byte(0x21), reconnectSelectedPayload[0])
+	reconnectSelected := fromgameserver.NewCharSelectedPacket()
+	require.NoError(t, fromgameserver.ParseCharSelectedPacket(
+		reconnectSelected, reconnectSelectedPayload))
+	require.Equal(t, e2eAccount, reconnectSelected.Name)
+	current := bot.SelfSnapshot()
+	require.InDelta(t, current.X, reconnectSelected.X, 300,
+		"the char selected answer carries the live x")
+	require.InDelta(t, current.Y, reconnectSelected.Y, 300,
+		"the char selected answer carries the live y")
+	require.InDelta(t, current.Z, reconnectSelected.Z, 600,
+		"the char selected answer carries the live z")
+
+	// The replayed UserInfo is live-patched too: the entering world view
+	// of the played character matches the walked-to place.
+	reconnectClient.sendPacket([]byte{0x03})
+	replayUserInfoPayload := readPacketUntil(t, reconnectClient, e2eReadTimeout,
+		func(payload []byte) bool { return payload[0] == 0x04 },
+		"the live-patched replayed user info")
+	replayUserInfo := fromgameserver.NewUserInfoPacket()
+	require.NoError(t, fromgameserver.ParseUserInfoPacket(
+		replayUserInfo, replayUserInfoPayload))
+	require.Equal(t, current.ObjectID, replayUserInfo.ObjectID)
+	require.InDelta(t, current.X, replayUserInfo.X, 300,
+		"the replayed user info carries the live x")
+	require.InDelta(t, current.Y, replayUserInfo.Y, 300,
+		"the replayed user info carries the live y")
+	require.InDelta(t, current.Level, replayUserInfo.Level, 0)
+	require.Positive(t, replayUserInfo.Level)
+	require.NoError(t, reconnectClient.conn.Close())
+
 	// The proxy log file carries the client session for the debugging
 	// workflow of the real client (the whole point of the file).
 	logContent, err := os.ReadFile(logPath)
@@ -320,4 +386,53 @@ func readPacketUntil(
 			return payload
 		}
 	}
+}
+
+// waitBotArrived waits for the bot session to finish the walk the
+// client transit started and returns the final character snapshot.
+func waitBotArrived(
+	t *testing.T, bot *state.Bot, destX int32, destY int32,
+) state.CharacterSnapshot {
+	t.Helper()
+	deadline := time.Now().Add(e2eLiveWait)
+	for {
+		snapshot := bot.SelfSnapshot()
+		arrived := !snapshot.Moving &&
+			absDelta(snapshot.X, destX) <= 300 && absDelta(snapshot.Y, destY) <= 300
+		if arrived {
+			return snapshot
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the bot never arrived at %d %d: it stands at %d %d (moving %v)",
+				destX, destY, snapshot.X, snapshot.Y, snapshot.Moving)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// expectedPaperdollItems resolves the live equipment of the bot into
+// the paperdoll item id table the char list packet must carry.
+func expectedPaperdollItems(t *testing.T, bot *state.Bot) [15]int32 {
+	t.Helper()
+	paperdoll := bot.PaperdollSlotObjectIDs()
+	inventory := bot.InventoryItems()
+	itemIDs := make(map[int32]int32, len(inventory))
+	for _, item := range inventory {
+		itemIDs[item.ObjectID] = item.ItemID
+	}
+	var expected [15]int32
+	for i, objectID := range paperdoll {
+		expected[i] = itemIDs[objectID]
+	}
+
+	return expected
+}
+
+// absDelta returns the absolute difference of two int32 values.
+func absDelta(a int32, b int32) int32 {
+	if a > b {
+		return a - b
+	}
+
+	return b - a
 }

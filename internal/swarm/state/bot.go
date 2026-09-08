@@ -1615,6 +1615,18 @@ type ZoneView struct {
 	Demoted  bool   `json:"demoted"`
 }
 
+// SelfSnapshot returns the live character view of the played character
+// alone (no world, inventory or event copies). The proxy uses it to
+// patch the entering world packets of a connecting client with the
+// position, vitals and level the bot has right now, so the reconnection
+// replay never spawns the client at a stale login-time place.
+func (b *Bot) SelfSnapshot() CharacterSnapshot {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.characterSnapshotLocked(time.Now(), 0, len(b.inventory.items))
+}
+
 // Snapshot returns a deep copy of the current state for serialization.
 // The full world copy of the web view; the section split is planned
 // (docs/quality_review_and_agent_prompts.md P11).

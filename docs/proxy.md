@@ -106,16 +106,24 @@ needs `-proxy-login 0.0.0.0:2107 -proxy-game 0.0.0.0:7778` and the
    name is cosmetic) -> a `CharSelectionInfo` with exactly **one
    character**: the character played by the selected bot (the web UI
    selection, see below). The appearance fields come from the recorded
-   real char list of the session, the vitals from the live tracker.
+   real char list of the session, the vitals, the position and the
+   paperdoll from the live tracker.
 3. **Character select**: the proxy answers with the *recorded*
    `CharSelected` packet of the bot session - byte identical to what
-   the real server sent the bot.
+   the real server sent the bot, except the position, vitals and
+   progression fields, which are rewritten from the live tracker (see
+   "The live self state" below). A client reconnecting after the bot
+   walked away spawns where the character actually stands, not at the
+   stale login-time coordinates.
 4. **Enter world**: the client receives the *recorded* server packet
    stream of the bot session (everything after the bot's
    `CharSelected`: the UserInfo, the inventory, the known list, every
    movement and fight since the bot entered - the replay) and then the
    live feed continues seamlessly. The client processes the backlog in
-   a fast forward burst and converges on the current world state.
+   a fast forward burst and converges on the current world state. The
+   recorded packets describing the played character itself are patched
+   to the live state (see below); the world packets of other objects
+   replay unchanged.
 5. **In world**: every server packet is relayed to the client, every
    client packet (movement, attacks, actions, chat, logout) is
    forwarded to the real game server through the bot session - the
@@ -126,6 +134,41 @@ needs `-proxy-login 0.0.0.0:2107 -proxy-game 0.0.0.0:7778` and the
 Character creation and deletion are refused by the emulation (the
 client manages exactly the one served character). The login phase
 packets never reach the real server, so the bot account is untouched.
+
+## The live self state (reconnection correctness)
+
+The replay answers one hard question: *where is the character right
+now?* The recorded stream holds the world as the bot saw it, and for
+every object except the played character the answer stays valid. For
+the character itself the recorded place is the login-time spot, which
+is wrong the moment the bot moves - a reconnecting client spawned
+there, ran against the server-side geometry and crashed. Three pieces
+fix it, all fed by the live state tracker (which the bot session keeps
+current through every UserInfo, movement and teleport packet):
+
+- **The char list paperdoll** (the selection screen equipment): the
+  `CharSelectionInfo` paperdoll tables are built from the tracker -
+  the slot object ids from the last UserInfo broadcast (the server
+  refreshes the block on every equip and unequip) and the item ids
+  resolved through the tracked inventory. Before the fix the tables
+  were zeroed, so the selection screen rendered a naked character.
+- **The char selected answer**: the recorded `CharSelected` packet is
+  patched with the live position, HP/MP, SP/EXP and level (binary
+  patch on a copy - the byte layout is scanned, not reserialized, so
+  everything unpatched stays byte identical to the real server).
+- **The replayed UserInfo**: every `UserInfo` of the played character
+  is patched with the live position, vitals, level and progression.
+  The stale *movement family* packets of the character itself
+  (`MoveToLocation`, `MoveToPawn`, `StopMove`, `ValidateLocation`,
+  `TeleportToLocation`) are dropped from the replay except the newest
+  one - its coordinates are exactly where the tracker stands, because
+  the tracker takes its position from that very packet. When the bot
+  is mid-run at the reconnect, the client animates the same run; when
+  it stands, the client places it at the same spot.
+
+The live relay after the replay needs no patching: the real server
+already answers with the current state, and the two views converge on
+their own.
 
 ## Switching bots
 

@@ -1708,3 +1708,43 @@ name the variant number that best fits the real bot UI.
   stack redeployed (STACK_READY), SWARM_PROXY_E2E=1 full MITM e2e
   against the live stack, go test ./... (16 packages), golangci-lint
   0 issues.
+- 2026-09-08: reconnection live state fix (round 4, feature/proxy-
+  server). The user's real client reconnected after the bot had walked
+  far from its login place and spawned at the stale login coordinates:
+  the character ran into the server-side walls and the client crashed.
+  The proxy replayed the recorded CharSelected and UserInfo byte for
+  byte, so the entering world packets described the login-time state,
+  not the current one. Three changes, all fed by the live state
+  tracker (state.Bot): (1) the synthesized CharSelectionInfo now
+  carries the paperdoll tables (15 slot object ids + 15 item ids,
+  parsed and serialized by fromgameserver.CharacterInfo now) built
+  from the tracker - the slot object ids come from the last UserInfo
+  broadcast, the item ids from the tracked inventory - so the
+  selection screen renders the equipped gear instead of a naked
+  character (the user's second report); (2) the recorded CharSelected
+  answer is binary-patched with the live x/y/z, curHp/curMp, sp, exp
+  and level (patchCharSelectedLive scans the two utf16 strings and
+  the header ints to find the x offset; an unscannable packet replays
+  unchanged); (3) the replay patches every UserInfo of the played
+  character with the live position/vitals/progression
+  (patchUserInfoSelfLive - fixed header offsets for x/y/z, a name
+  scan for the vitals block, position-only degradation when the name
+  cannot be scanned) and drops the stale self movement packets
+  (MoveToLocation, MoveToPawn, StopMove, ValidateLocation,
+  TeleportToLocation) except the newest one, whose coordinates match
+  the tracker by construction. state.Bot gained the light
+  SelfSnapshot() accessor (character view only, no world copy) for
+  the per-packet patch reads. New tests: TestPatchCharSelectedLive*,
+  TestPatchUserInfoSelfLive*, TestSelfMovementFiltering,
+  TestGameServerReconnectServesLiveSelfState (full flow: bot gears up
+  and walks away, client reconnects, char list paperdoll + live
+  position, patched char selected, patched replayed UserInfo, the
+  last self movement kept); the e2e got the real reconnection leg
+  (the client closes, the bot finishes the walk, a second client
+  enters and must see the walked-to place in the char list, the char
+  selected answer and the replayed UserInfo, plus the live paperdoll
+  mirroring bot.PaperdollSlotObjectIDs + InventoryItems). Verified
+  against the deployed stack: SWARM_PROXY_E2E=1 e2e PASS (the bot
+  walked, the second client saw 46315 41341 -3440 with the real
+  gear), go build/vet, go test ./... (16 packages), golangci-lint 0
+  issues.
