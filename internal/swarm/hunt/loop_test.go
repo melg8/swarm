@@ -859,8 +859,10 @@ func TestLoopLogsOutAtCriticalHealthUnderAttack(t *testing.T) {
 	loop.tick()
 
 	require.Equal(t, 1, game.logouts, "the emergency logout fires")
-	require.Greater(t, bot.LoginCooldownRemaining(), time.Minute,
-		"the login cooldown spans several minutes")
+	require.Greater(t, bot.LoginCooldownRemaining(), 20*time.Second,
+		"the login cooldown covers the combat stance and the reset")
+	require.LessOrEqual(t, bot.LoginCooldownRemaining(), 30*time.Second,
+		"the login cooldown is half a minute, not minutes")
 	require.Len(t, game.walks, 1,
 		"the last escape leg keeps the offline character moving")
 	require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0])
@@ -871,6 +873,73 @@ func TestLoopLogsOutAtCriticalHealthUnderAttack(t *testing.T) {
 	loop.tick()
 	require.Equal(t, 1, game.logouts)
 	require.Len(t, game.walks, 1)
+}
+
+func TestLoopLogsOutWhenTwoMobsAggro(t *testing.T) {
+	bot := newTestBot()
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 45600, Y: 50000, Name: "Gremlin",
+	})
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 8, TemplateID: 1000001, Attackable: true,
+		X: 45400, Y: 50200, Name: "Gremlin",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The social pile up: a second gremlin joins the fight while
+	// the character is still healthy - the pack only grows, the
+	// logout fires on the attacker count alone.
+	for _, id := range []int32{7, 8} {
+		bot.ApplyAttack(state.Attack{
+			AttackerID: id, X: 45500, Y: 50000, Z: -3500,
+			TargetCount: 1,
+			TargetIDs:   [state.AttackTargets]int32{100},
+			TargetX:     45000, TargetY: 50000, TargetZ: -3500,
+		})
+	}
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+
+	require.Equal(t, 1, game.logouts,
+		"two attackers trigger the emergency logout")
+	require.LessOrEqual(t, bot.LoginCooldownRemaining(),
+		30*time.Second, "the reconnect pause is half a minute")
+
+	// The request stays one shot while the session unwinds.
+	loop.tick()
+	require.Equal(t, 1, game.logouts)
+}
+
+func TestLoopKeepsFightingAgainstOneAttacker(t *testing.T) {
+	bot := newTestBot()
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 45600, Y: 50000, Name: "Gremlin",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// A single fair fight never logs the character out, however
+	// hard the mob swings.
+	bot.ApplyAttack(state.Attack{
+		AttackerID: 7, X: 45600, Y: 50000, Z: -3500,
+		TargetCount: 1,
+		TargetIDs:   [state.AttackTargets]int32{100},
+		TargetX:     45000, TargetY: 50000, TargetZ: -3500,
+	})
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 90},
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+
+	require.Zero(t, game.logouts,
+		"one attacker is a normal fight, not a pile up")
+	require.Equal(t, 0, int(bot.LoginCooldownRemaining()))
 }
 
 func TestLoopKeepsFightingAtCriticalHealthWithoutAggro(t *testing.T) {

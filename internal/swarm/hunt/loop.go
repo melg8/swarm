@@ -10,6 +10,7 @@ package hunt
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math"
 	"time"
@@ -192,7 +193,15 @@ const (
 	// logout: the supervisor waits it out before the next session,
 	// so the mobs reset around the stored character and it
 	// regenerates sitting instead of logging into the same blows.
-	panicLogoutPause = 3 * time.Minute
+	// Half a minute covers the fifteen second combat stance the
+	// server holds an offline character in plus the mob reset walk
+	// home, without idling the farm for minutes.
+	panicLogoutPause = 30 * time.Second
+	// panicLogoutAttackers is the aggro count that triggers the
+	// emergency logout on its own: two swinging mobs outdamage
+	// anything a lone farmer can answer, and a social pack only
+	// grows while the fight lasts.
+	panicLogoutAttackers = 2
 )
 
 // phase is the coarse activity of the hunt loop.
@@ -553,12 +562,14 @@ func (l *Loop) tick() { //nolint:cyclop
 		return
 	}
 	// The emergency logout: critical health with the blows still
-	// landing. The deleveling wants the deaths, a manual only
-	// session never decides on its own, and a request already
-	// sent stays one shot while the session unwinds.
+	// landing, or a social pile up - several mobs already hold the
+	// character as their target. The deleveling wants the deaths, a
+	// manual only session never decides on its own, and a request
+	// already sent stays one shot while the session unwinds.
 	if !l.logoutDone && l.autonomous && l.phase != phaseDelevel &&
-		l.tracker.SelfHealthPercent() < panicLogoutHealthPercent &&
-		l.tracker.SelfUnderAttack() {
+		((l.tracker.SelfHealthPercent() < panicLogoutHealthPercent &&
+			l.tracker.SelfUnderAttack()) ||
+			l.tracker.SelfAttackerCount() >= panicLogoutAttackers) {
 		l.emergencyLogout()
 
 		return
@@ -1046,9 +1057,13 @@ func (l *Loop) threatPosition() (int32, int32, bool) {
 // then the mobs reset and the character regenerates sitting.
 func (l *Loop) emergencyLogout() {
 	l.logoutDone = true
-	l.logger.Printf("Hunt: HP %.0f%% under attack, "+
-		"emergency logout for %s", l.tracker.SelfHealthPercent(),
-		panicLogoutPause)
+	reason := fmt.Sprintf("HP %.0f%% under attack",
+		l.tracker.SelfHealthPercent())
+	if count := l.tracker.SelfAttackerCount(); count >= panicLogoutAttackers {
+		reason = fmt.Sprintf("%d mobs piled on us", count)
+	}
+	l.logger.Printf("Hunt: %s, emergency logout for %s",
+		reason, panicLogoutPause)
 	if moveX, moveY, moveZ, ok := l.escapeWalkDestination(); ok {
 		if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
 			l.logger.Printf("Hunt: escape walk failed: %v", err)
