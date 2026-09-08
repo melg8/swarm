@@ -25,108 +25,144 @@ const (
 	KindItem ObjectKind = "item"
 )
 
-// WorldObject is one object in the vicinity of the bot character.
-type WorldObject struct {
+// objectKindCode values are the compact int8 codes of the object kinds
+// stored in the hot records: the scan filters compare the kind every
+// tick and a one byte load beats the sixteen byte string header walk
+// (plus the string data cache miss on a real comparison).
+const (
+	kindNPC int8 = iota
+	kindPlayer
+	kindItem
+)
+
+// kindCode maps the public kind to the compact code.
+func kindCode(kind ObjectKind) int8 {
+	switch kind {
+	case KindNPC:
+		return kindNPC
+	case KindPlayer:
+		return kindPlayer
+	case KindItem:
+		return kindItem
+	default:
+		return kindNPC
+	}
+}
+
+// kindString maps the compact code back to the public kind: the
+// snapshot encode writes it as the wire string.
+func kindString(code int8) ObjectKind {
+	switch code {
+	case kindNPC:
+		return KindNPC
+	case kindPlayer:
+		return KindPlayer
+	case kindItem:
+		return KindItem
+	default:
+		return KindNPC
+	}
+}
+
+// zeroTimeUnixMilli is the UnixMilli of the zero time.Time (year 1):
+// the 0 sentinel of the stored nanoseconds encodes the same value, so
+// the JSON view of an untouched field stays byte identical to the
+// time.Time based encoding it replaces.
+const zeroTimeUnixMilli = int64(-62135596800000)
+
+// unixMilliFromNano converts stored unix nanoseconds to the
+// milliseconds of the JSON view; the 0 sentinel is the zero time,
+// exactly like time.Time.UnixMilli of a zero value.
+func unixMilliFromNano(n int64) int64 {
+	if n == 0 {
+		return zeroTimeUnixMilli
+	}
+
+	return n / int64(time.Millisecond)
+}
+
+// objectHot is the hot half of a world object record (see
+// objectStore): the fields the per tick scan paths, the movement
+// projection, the target tracking and the combat marks touch. The
+// layout is one dense 88 byte block per object, so the scans stream
+// the first cache lines of the records instead of chasing the 240
+// byte full records (names, titles and vitals included) line by line
+// - a 200 npc world drops from 48 KB of scan traffic to 17.6 KB.
+type objectHot struct {
 	ObjectID      int32
-	Kind          ObjectKind
-	Name          string
-	Title         string
-	TemplateID    int32
+	TargetID      int32
+	Level         int32
+	X             int32
+	Y             int32
+	Z             int32
+	DestX         int32
+	DestY         int32
+	DestZ         int32
+	ClanHelpRange int32
+	RunSpeed      int32
+	WalkSpeed     int32
+	ClanMask      uint64
+	// MoveAt is the movement start as unix nanoseconds, 0 = never
+	// (the zero time).
+	MoveAt int64
+	// CombatUntil is the end of the observed combat window as unix
+	// nanoseconds, 0 = none.
+	CombatUntil int64
+	// MoveSpeedMult is the multiplier of the spawn packet.
+	MoveSpeedMult float64
+	// Kind is the objectKindCode of the record.
+	Kind          int8
 	Attackable    bool
 	Aggressive    bool
-	AggroRange    int32
-	Level         int32
-	ClanHelpRange int32
-	// ClanMask is the precomputed clan bitmask of the npc (see
-	// npcdata.NPCClanMask): the social pull check of the target
-	// search works on the bits instead of the clan strings.
-	ClanMask        uint64
-	AutoAttacking   bool
-	CombatUntil     time.Time
-	Dead            bool
-	Moving          bool
-	Running         bool
-	RunSpeed        int32
-	WalkSpeed       int32
-	MoveSpeedMult   float64
-	CollisionRadius float64
-	TargetID        int32
-	Count           int32
-	X               int32
-	Y               int32
-	Z               int32
+	Dead          bool
+	Moving        bool
+	Running       bool
+	AutoAttacking bool
+}
+
+// objectCold is the cold half of a world object record: the display
+// fields of the snapshot view and the vitals of the StatusUpdate
+// writes. The scan paths never touch it, so the names and HP floats
+// cost bandwidth only on the 300 ms snapshot polls of a watched bot,
+// not on the hunt loop ticks.
+type objectCold struct {
+	Name            string
+	Title           string
+	TemplateID      int32
 	Heading         int32
-	DestX           int32
-	DestY           int32
-	DestZ           int32
-	MoveAt          time.Time
-	SocialUntil     time.Time
-	CurHP           float64
-	MaxHP           float64
-	CurMP           float64
-	MaxMP           float64
-	UpdatedAt       time.Time
+	Count           int32
+	AggroRange      int32
+	CollisionRadius float64
+	// SocialUntil is the end of the social animation marker as unix
+	// nanoseconds, 0 = none.
+	SocialUntil int64
+	// UpdatedAt is the arrival time of the last packet that touched
+	// the record, as unix nanoseconds.
+	UpdatedAt int64
+	CurHP     float64
+	MaxHP     float64
+	CurMP     float64
+	MaxMP     float64
 }
 
-// newWorldObject creates a zero valued object with the given identity.
-func newWorldObject(objectID int32, kind ObjectKind) WorldObject {
-	return WorldObject{
-		ObjectID:        objectID,
-		Kind:            kind,
-		Name:            "",
-		Title:           "",
-		TemplateID:      0,
-		Attackable:      false,
-		Aggressive:      false,
-		AggroRange:      0,
-		Level:           0,
-		ClanHelpRange:   0,
-		ClanMask:        0,
-		AutoAttacking:   false,
-		CombatUntil:     time.Time{},
-		Dead:            false,
-		Moving:          false,
-		Running:         true,
-		RunSpeed:        0,
-		WalkSpeed:       0,
-		MoveSpeedMult:   1,
-		CollisionRadius: 0,
-		TargetID:        0,
-		Count:           1,
-		X:               0,
-		Y:               0,
-		Z:               0,
-		Heading:         0,
-		DestX:           0,
-		DestY:           0,
-		DestZ:           0,
-		MoveAt:          time.Time{},
-		SocialUntil:     time.Time{},
-		CurHP:           0,
-		MaxHP:           0,
-		CurMP:           0,
-		MaxMP:           0,
-		UpdatedAt:       time.Time{},
-	}
-}
-
-// InCombat reports whether the object was seen fighting recently. The
+// inCombat reports whether the object was seen fighting recently. The
 // auto attack flag holds until the stop packet, single attacks and the
 // NpcInfo combat flag hold for the combat window.
-func (o WorldObject) InCombat(now time.Time) bool {
-	return o.AutoAttacking || o.CombatUntil.After(now)
+func (h *objectHot) inCombat(nowNano int64) bool {
+	return h.AutoAttacking || h.CombatUntil > nowNano
 }
 
-// EffectiveSpeed returns the movement speed of the object in world units
-// per second, applying the move multiplier of the spawn packet. It falls
-// back to a common monster run speed when the packet carried nothing.
-func (o WorldObject) EffectiveSpeed() float64 {
-	speed := float64(o.WalkSpeed)
-	if o.Running || o.WalkSpeed <= 0 {
-		speed = float64(o.RunSpeed)
+// effectiveSpeed returns the movement speed of the object in world
+// units per second, applying the move multiplier of the spawn packet.
+// It falls back to a common monster run speed when the packet carried
+// nothing.
+func (h *objectHot) effectiveSpeed() float64 {
+	speed := float64(h.WalkSpeed)
+	if h.Running || h.WalkSpeed <= 0 {
+		speed = float64(h.RunSpeed)
 	}
-	if o.MoveSpeedMult > 0 {
-		speed *= o.MoveSpeedMult
+	if h.MoveSpeedMult > 0 {
+		speed *= h.MoveSpeedMult
 	}
 	if speed <= 1 {
 		return defaultRunSpeed

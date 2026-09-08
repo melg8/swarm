@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
-
+//
 // SPDX-License-Identifier: MIT
 
 package state
@@ -54,21 +54,21 @@ func (b *Bot) NearestAttacker() (AttackTarget, bool) {
 	found := false
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
-	now := time.Now()
-	for i := range b.world.objects {
-		obj := &b.world.objects[i]
-		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead ||
+	nowNano := time.Now().UnixNano()
+	for i := range b.world.hot {
+		obj := &b.world.hot[i]
+		if obj.Kind != kindNPC || !obj.Attackable || obj.Dead ||
 			obj.TargetID != b.selfID {
 			continue
 		}
-		x, y := projectedPosition(obj, now)
+		x, y := projectedPosition(obj, nowNano)
 		dist := math.Hypot(x-selfX, y-selfY)
 		if dist < bestDist {
 			bestDist = dist
 			found = true
 			best = AttackTarget{
 				ObjectID: obj.ObjectID,
-				Name:     obj.Name,
+				Name:     b.world.cold[i].Name,
 				X:        int32(math.Round(x)),
 				Y:        int32(math.Round(y)),
 				Z:        obj.Z,
@@ -130,16 +130,16 @@ func (b *Bot) ZoneHasAttackableBelow(zone *Zone, maxLevel int32) bool {
 	}
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	now := time.Now()
-	for i := range b.world.objects {
-		obj := &b.world.objects[i]
-		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
+	nowNano := time.Now().UnixNano()
+	for i := range b.world.hot {
+		obj := &b.world.hot[i]
+		if obj.Kind != kindNPC || !obj.Attackable || obj.Dead {
 			continue
 		}
 		if maxLevel > 0 && obj.Level > maxLevel && obj.Level > 0 {
 			continue
 		}
-		x, y := projectedPosition(obj, now)
+		x, y := projectedPosition(obj, nowNano)
 		if zone.Contains(int32(math.Round(x)), int32(math.Round(y))) {
 			return true
 		}
@@ -189,7 +189,7 @@ func (b *Bot) NearestAttackablePreferred(
 }
 
 // nearestAttackable is the shared target search core of the public
-// pickers. The plain variant walks the dense storage directly; the
+// pickers. The plain variant walks the dense hot storage directly; the
 // socially constrained variant flattens the living attackable npcs
 // into compact scan records first (see nearestAttackableSocial).
 func (b *Bot) nearestAttackable(
@@ -209,10 +209,10 @@ func (b *Bot) nearestAttackable(
 	found := false
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
-	now := time.Now()
-	for i := range b.world.objects {
-		obj := &b.world.objects[i]
-		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
+	nowNano := time.Now().UnixNano()
+	for i := range b.world.hot {
+		obj := &b.world.hot[i]
+		if obj.Kind != kindNPC || !obj.Attackable || obj.Dead {
 			continue
 		}
 		if skipContains(skip, obj.ObjectID) {
@@ -221,7 +221,7 @@ func (b *Bot) nearestAttackable(
 		if maxLevel > 0 && obj.Level > maxLevel && obj.Level > 0 {
 			continue
 		}
-		x, y := projectedPosition(obj, now)
+		x, y := projectedPosition(obj, nowNano)
 		if !zone.Contains(
 			int32(math.Round(x)), int32(math.Round(y))) {
 			continue
@@ -231,13 +231,13 @@ func (b *Bot) nearestAttackable(
 			continue
 		}
 		score := dist - targetPriorityBias*
-			float64(priority[obj.TemplateID])
+			float64(priority[b.world.cold[i].TemplateID])
 		if score < bestScore {
 			bestScore = score
 			found = true
 			best = AttackTarget{
 				ObjectID: obj.ObjectID,
-				Name:     obj.Name,
+				Name:     b.world.cold[i].Name,
 				X:        int32(math.Round(x)),
 				Y:        int32(math.Round(y)),
 				Z:        obj.Z,
@@ -264,19 +264,21 @@ func (b *Bot) nearestAttackableSocial(
 	found := false
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
-	now := time.Now()
+	nowNano := time.Now().UnixNano()
 	// The flat scan records come from a pool: the search runs under
 	// the read lock (concurrent readers), so a per bot scratch would
 	// race - the pool hands every caller its own array and the fleet
 	// of searches shares the memory instead of allocating a fresh
-	// block per tick.
+	// block per tick. The flattening walk streams the compact hot
+	// records only; the name and template of a candidate resolve
+	// through the cold half afterwards.
 	scanPtr := npcScanPool.Get().(*[]npcScan)
 	scans := (*scanPtr)[:0]
 	defer func() {
 		*scanPtr = scans[:0]
 		npcScanPool.Put(scanPtr)
 	}()
-	scans = b.appendAttackableScans(scans, now)
+	scans = b.appendAttackableScans(scans, nowNano)
 	for i := range scans {
 		cand := &scans[i]
 		if skipContains(skip, cand.objectID) {
@@ -301,10 +303,9 @@ func (b *Bot) nearestAttackableSocial(
 		if score < bestScore {
 			bestScore = score
 			found = true
-			obj := &b.world.objects[cand.slot]
 			best = AttackTarget{
 				ObjectID: cand.objectID,
-				Name:     obj.Name,
+				Name:     b.world.cold[cand.slot].Name,
 				X:        int32(math.Round(cand.x)),
 				Y:        int32(math.Round(cand.y)),
 				Z:        cand.z,
@@ -316,16 +317,20 @@ func (b *Bot) nearestAttackableSocial(
 }
 
 // appendAttackableScans flattens every living attackable npc of the
-// dense world storage into the pooled scan array (one projected
+// dense hot storage into the pooled scan array (one projected
 // position per npc, clans as bitmasks, the template id for the
-// priority bias). The caller must hold the read lock.
-func (b *Bot) appendAttackableScans(scans []npcScan, now time.Time) []npcScan {
-	for i := range b.world.objects {
-		obj := &b.world.objects[i]
-		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
+// priority bias). The template read touches the cold half, the filter
+// runs on the hot half first so non npcs cost nothing. The caller
+// must hold the read lock.
+func (b *Bot) appendAttackableScans(
+	scans []npcScan, nowNano int64,
+) []npcScan {
+	for i := range b.world.hot {
+		obj := &b.world.hot[i]
+		if obj.Kind != kindNPC || !obj.Attackable || obj.Dead {
 			continue
 		}
-		x, y := projectedPosition(obj, now)
+		x, y := projectedPosition(obj, nowNano)
 		scans = append(scans, npcScan{
 			x:             x,
 			y:             y,
@@ -333,7 +338,7 @@ func (b *Bot) appendAttackableScans(scans []npcScan, now time.Time) []npcScan {
 			objectID:      obj.ObjectID,
 			slot:          int32(i),
 			level:         obj.Level,
-			templateID:    obj.TemplateID,
+			templateID:    b.world.cold[i].TemplateID,
 			clanHelpRange: obj.ClanHelpRange,
 			clanMask:      obj.ClanMask,
 		})
@@ -466,12 +471,12 @@ func (b *Bot) NearestNpcByTemplates(
 	found := false
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
-	for i := range b.world.objects {
-		obj := &b.world.objects[i]
-		if obj.Kind != KindNPC || obj.Dead {
+	for i := range b.world.hot {
+		obj := &b.world.hot[i]
+		if obj.Kind != kindNPC || obj.Dead {
 			continue
 		}
-		if !templateWanted(obj.TemplateID, templates) {
+		if !templateWanted(b.world.cold[i].TemplateID, templates) {
 			continue
 		}
 		dist := math.Hypot(
@@ -481,7 +486,7 @@ func (b *Bot) NearestNpcByTemplates(
 			found = true
 			best = AttackTarget{
 				ObjectID: obj.ObjectID,
-				Name:     obj.Name,
+				Name:     b.world.cold[i].Name,
 				X:        obj.X,
 				Y:        obj.Y,
 				Z:        obj.Z,
@@ -516,10 +521,10 @@ func (b *Bot) MedianZoneMobLevel(zone *Zone) int32 {
 	if zone == nil {
 		return 0
 	}
-	levels := make([]int32, 0, len(b.world.objects))
-	for i := range b.world.objects {
-		obj := &b.world.objects[i]
-		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead ||
+	levels := make([]int32, 0, len(b.world.hot))
+	for i := range b.world.hot {
+		obj := &b.world.hot[i]
+		if obj.Kind != kindNPC || !obj.Attackable || obj.Dead ||
 			obj.Level <= 0 {
 			continue
 		}
@@ -542,18 +547,18 @@ func (b *Bot) MedianZoneMobLevel(zone *Zone) int32 {
 // the server side counterpart of the web map interpolation (the Mobius
 // Creature.updatePosition loop steps creatures toward the destination
 // every 100 ms game tick from the last broadcast position).
-func projectedPosition(obj *WorldObject, now time.Time) (float64, float64) {
-	if !obj.Moving || obj.MoveAt.IsZero() {
+func projectedPosition(obj *objectHot, nowNano int64) (float64, float64) {
+	if !obj.Moving || obj.MoveAt == 0 {
 		return float64(obj.X), float64(obj.Y)
 	}
 	dx := float64(obj.DestX - obj.X)
 	dy := float64(obj.DestY - obj.Y)
 	dist := math.Hypot(dx, dy)
-	speed := obj.EffectiveSpeed()
+	speed := obj.effectiveSpeed()
 	if dist < 1 || speed <= 0 {
 		return float64(obj.X), float64(obj.Y)
 	}
-	elapsed := now.Sub(obj.MoveAt).Seconds()
+	elapsed := float64(nowNano-obj.MoveAt) / 1e9
 	if elapsed <= 0 {
 		return float64(obj.X), float64(obj.Y)
 	}

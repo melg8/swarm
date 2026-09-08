@@ -93,18 +93,18 @@ func (b *Bot) applyRotation(r Rotation, stop bool) {
 
 		return
 	}
-	obj := b.objectLocked(r.ObjectID)
+	obj, cold := b.objectLocked(r.ObjectID)
 	if obj == nil {
 		return
 	}
-	obj.Heading = r.Heading
+	cold.Heading = r.Heading
 	if stop {
 		obj.Moving = false
 		obj.DestX = obj.X
 		obj.DestY = obj.Y
 		obj.DestZ = obj.Z
 	}
-	obj.UpdatedAt = time.Now()
+	cold.UpdatedAt = time.Now().UnixNano()
 	b.touch()
 }
 
@@ -132,12 +132,11 @@ func (b *Bot) ApplySelfTarget(objectID int32) {
 func (b *Bot) ApplyObjectTarget(objectID int32, targetID int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj := b.objectLocked(objectID)
+	obj, _ := b.objectLocked(objectID)
 	if obj == nil {
 		return
 	}
 	obj.TargetID = targetID
-	obj.UpdatedAt = time.Now()
 	b.touch()
 }
 
@@ -154,12 +153,11 @@ func (b *Bot) ApplyTargetClear(objectID int32) {
 
 		return
 	}
-	obj := b.objectLocked(objectID)
+	obj, _ := b.objectLocked(objectID)
 	if obj == nil {
 		return
 	}
 	obj.TargetID = 0
-	obj.UpdatedAt = time.Now()
 	b.touch()
 }
 
@@ -167,12 +165,11 @@ func (b *Bot) ApplyTargetClear(objectID int32) {
 func (b *Bot) ApplyMoveType(mt MoveType) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj := b.objectLocked(mt.ObjectID)
+	obj, _ := b.objectLocked(mt.ObjectID)
 	if obj == nil {
 		return
 	}
 	obj.Running = mt.Running
-	obj.UpdatedAt = time.Now()
 	b.touch()
 }
 
@@ -190,19 +187,19 @@ func (b *Bot) ApplyTeleport(t Teleport) {
 
 		return
 	}
-	obj := b.objectLocked(t.ObjectID)
+	obj, cold := b.objectLocked(t.ObjectID)
 	if obj == nil {
 		return
 	}
 	obj.X = t.X
 	obj.Y = t.Y
 	obj.Z = t.Z
-	obj.Heading = t.Heading
+	cold.Heading = t.Heading
 	obj.Moving = false
 	obj.DestX = t.X
 	obj.DestY = t.Y
 	obj.DestZ = t.Z
-	obj.UpdatedAt = time.Now()
+	cold.UpdatedAt = time.Now().UnixNano()
 	b.touch()
 }
 
@@ -211,16 +208,16 @@ func (b *Bot) ApplyTeleport(t Teleport) {
 func (b *Bot) ApplySpawnItem(info ItemInfo) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj := b.upsertLocked(info.ObjectID, KindItem)
-	obj.TemplateID = info.TemplateID
-	obj.Name = npcdata.ItemName(info.TemplateID)
-	obj.Count = info.Count
+	obj, cold := b.upsertLocked(info.ObjectID, KindItem)
+	cold.TemplateID = info.TemplateID
+	cold.Name = npcdata.ItemName(info.TemplateID)
+	cold.Count = info.Count
 	obj.X = info.X
 	obj.Y = info.Y
 	obj.Z = info.Z
-	obj.UpdatedAt = time.Now()
+	cold.UpdatedAt = time.Now().UnixNano()
 	b.touch()
-	b.recordLocked("item appeared: " + itemName(obj.Name, info.TemplateID))
+	b.recordLocked("item appeared: " + itemName(cold.Name, info.TemplateID))
 }
 
 // ApplyItemPickup removes a picked up ground item. The GetItem packet
@@ -232,18 +229,18 @@ func (b *Bot) ApplySpawnItem(info ItemInfo) {
 func (b *Bot) ApplyItemPickup(p ItemPickup) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj := b.objectLocked(p.ObjectID)
+	obj, cold := b.objectLocked(p.ObjectID)
 	if obj == nil {
 		return
 	}
-	name := itemName(obj.Name, obj.TemplateID)
+	name := itemName(cold.Name, cold.TemplateID)
 	slot := b.world.slotLocked(p.ObjectID)
 	b.removeObjectAtLocked(slot, p.ObjectID)
 	pickerName := ""
 	if p.PlayerID == b.selfID {
 		pickerName = "self"
-	} else if picker := b.objectLocked(p.PlayerID); picker != nil {
-		pickerName = picker.Name
+	} else if _, pickerCold := b.objectLocked(p.PlayerID); pickerCold != nil {
+		pickerName = pickerCold.Name
 	}
 	b.touch()
 	switch pickerName {
@@ -262,8 +259,8 @@ func (b *Bot) objectNameLocked(objectID int32) string {
 	if objectID == b.selfID {
 		return b.char.Name
 	}
-	if obj := b.objectLocked(objectID); obj != nil && obj.Name != "" {
-		return obj.Name
+	if _, cold := b.objectLocked(objectID); cold != nil && cold.Name != "" {
+		return cold.Name
 	}
 
 	return "object " + strconv.Itoa(int(objectID))

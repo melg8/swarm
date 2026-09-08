@@ -109,11 +109,12 @@ func (b *Bot) appendLiveInventoryJSON(dst []byte) []byte {
 // appendLiveObjectsJSON writes the world object array opened by the
 // caller. The caller must hold a lock.
 func (b *Bot) appendLiveObjectsJSON(dst []byte, now time.Time) []byte {
-	for i := range b.world.objects {
+	nowNano := now.UnixNano()
+	for i := range b.world.hot {
 		if i > 0 {
 			dst = append(dst, ',')
 		}
-		dst = appendObjectJSON(dst, b.objectSnapshotLocked(i, now))
+		dst = appendObjectJSON(dst, b.objectSnapshotLocked(i, nowNano))
 	}
 
 	return dst
@@ -263,42 +264,43 @@ func (b *Bot) characterSnapshotLocked(
 }
 
 // objectSnapshotLocked builds the object view of the snapshot from
-// the live record. The value stays on the stack of the caller. The
-// caller must hold a lock.
-func (b *Bot) objectSnapshotLocked(slot int, now time.Time) ObjectSnapshot {
-	obj := &b.world.objects[slot]
+// the live hot and cold records. The value stays on the stack of the
+// caller. The caller must hold a lock.
+func (b *Bot) objectSnapshotLocked(slot int, nowNano int64) ObjectSnapshot {
+	hot := &b.world.hot[slot]
+	cold := &b.world.cold[slot]
 
 	return ObjectSnapshot{
-		ObjectID:        obj.ObjectID,
-		Kind:            obj.Kind,
-		Name:            obj.Name,
-		Title:           obj.Title,
-		TemplateID:      obj.TemplateID,
-		Attackable:      obj.Attackable,
-		Aggressive:      obj.Aggressive,
-		AggroRange:      obj.AggroRange,
-		Level:           obj.Level,
-		TargetID:        obj.TargetID,
-		InCombat:        obj.InCombat(now),
-		Dead:            obj.Dead,
-		Moving:          obj.Moving,
-		Running:         obj.Running,
-		Speed:           obj.EffectiveSpeed(),
-		CollisionRadius: obj.CollisionRadius,
-		SocialUntilMs:   obj.SocialUntil.UnixMilli(),
-		Count:           obj.Count,
-		X:               obj.X,
-		Y:               obj.Y,
-		Z:               obj.Z,
-		Heading:         obj.Heading,
-		DestX:           obj.DestX,
-		DestY:           obj.DestY,
-		DestZ:           obj.DestZ,
-		MoveAtMs:        obj.MoveAt.UnixMilli(),
-		CurHP:           obj.CurHP,
-		MaxHP:           obj.MaxHP,
-		CurMP:           obj.CurMP,
-		MaxMP:           obj.MaxMP,
+		ObjectID:        hot.ObjectID,
+		Kind:            kindString(hot.Kind),
+		Name:            cold.Name,
+		Title:           cold.Title,
+		TemplateID:      cold.TemplateID,
+		Attackable:      hot.Attackable,
+		Aggressive:      hot.Aggressive,
+		AggroRange:      cold.AggroRange,
+		Level:           hot.Level,
+		TargetID:        hot.TargetID,
+		InCombat:        hot.inCombat(nowNano),
+		Dead:            hot.Dead,
+		Moving:          hot.Moving,
+		Running:         hot.Running,
+		Speed:           hot.effectiveSpeed(),
+		CollisionRadius: cold.CollisionRadius,
+		SocialUntilMs:   unixMilliFromNano(cold.SocialUntil),
+		Count:           cold.Count,
+		X:               hot.X,
+		Y:               hot.Y,
+		Z:               hot.Z,
+		Heading:         cold.Heading,
+		DestX:           hot.DestX,
+		DestY:           hot.DestY,
+		DestZ:           hot.DestZ,
+		MoveAtMs:        unixMilliFromNano(hot.MoveAt),
+		CurHP:           cold.CurHP,
+		MaxHP:           cold.MaxHP,
+		CurMP:           cold.CurMP,
+		MaxMP:           cold.MaxMP,
 	}
 }
 
@@ -323,7 +325,7 @@ func (b *Bot) snapshotJSONSizeLocked() int {
 	size := 640 + len(b.id) + len(b.phase) + len(b.status) +
 		len(b.char.Name)
 	size += 448 * len(b.inventory.items)
-	size += 384 * len(b.world.objects)
+	size += 384 * len(b.world.hot)
 	count := min(b.log.length, snapshotEvents)
 	size += 96 * count
 	size += 96 * b.chat.length

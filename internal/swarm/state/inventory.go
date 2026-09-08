@@ -372,8 +372,8 @@ type LootItem struct {
 func (b *Bot) GroundItemByID(objectID int32) (LootItem, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	obj := b.objectLocked(objectID)
-	if obj == nil || obj.Kind != KindItem {
+	hot, cold := b.objectLocked(objectID)
+	if hot == nil || hot.Kind != kindItem {
 		return LootItem{
 			ObjectID: 0,
 			Name:     "",
@@ -384,11 +384,11 @@ func (b *Bot) GroundItemByID(objectID int32) (LootItem, bool) {
 	}
 
 	return LootItem{
-		ObjectID: obj.ObjectID,
-		Name:     obj.Name,
-		X:        obj.X,
-		Y:        obj.Y,
-		Z:        obj.Z,
+		ObjectID: hot.ObjectID,
+		Name:     cold.Name,
+		X:        hot.X,
+		Y:        hot.Y,
+		Z:        hot.Z,
 	}, true
 }
 
@@ -414,9 +414,9 @@ func (b *Bot) NearestGroundItemExcluding(
 	now := time.Now()
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
-	for i := range b.world.objects {
-		obj := &b.world.objects[i]
-		if obj.Kind != KindItem {
+	for i := range b.world.hot {
+		obj := &b.world.hot[i]
+		if obj.Kind != kindItem {
 			continue
 		}
 		if until, ok := skipped[obj.ObjectID]; ok && until.After(now) {
@@ -431,7 +431,7 @@ func (b *Bot) NearestGroundItemExcluding(
 			found = true
 			best = LootItem{
 				ObjectID: obj.ObjectID,
-				Name:     obj.Name,
+				Name:     b.world.cold[i].Name,
 				X:        obj.X,
 				Y:        obj.Y,
 				Z:        obj.Z,

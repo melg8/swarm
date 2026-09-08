@@ -94,19 +94,20 @@ func (b *Bot) recordCharDamageLocked(attrs []Attribute, now time.Time) {
 // into the animation feed the same way as the character one. The
 // caller must hold the write lock.
 func (b *Bot) recordObjectDamageLocked(
-	obj *WorldObject, objectID int32, attrs []Attribute, now time.Time,
+	hot *objectHot, cold *objectCold,
+	objectID int32, attrs []Attribute, now time.Time,
 ) {
 	for _, attr := range attrs {
-		if attr.ID != AttrCurHP || float64(attr.Value) >= obj.CurHP {
+		if attr.ID != AttrCurHP || float64(attr.Value) >= cold.CurHP {
 			continue
 		}
 		b.recordCombatEventLocked(CombatEvent{
 			Kind:       CombatEventDamage,
 			TargetID:   objectID,
 			AttackerID: 0,
-			Amount:     obj.CurHP - float64(attr.Value),
-			X:          obj.X,
-			Y:          obj.Y,
+			Amount:     cold.CurHP - float64(attr.Value),
+			X:          hot.X,
+			Y:          hot.Y,
 			TargetX:    0,
 			TargetY:    0,
 			Seq:        0,
@@ -118,9 +119,11 @@ func (b *Bot) recordObjectDamageLocked(
 // markObjectCombatLocked refreshes the combat window of an object and
 // logs the transition into combat once. The caller must hold the state
 // write lock.
-func (b *Bot) markObjectCombatLocked(obj *WorldObject, now time.Time) {
-	if !obj.InCombat(now) && obj.Name != "" {
-		b.recordLocked(obj.Name + " enters combat")
+func (b *Bot) markObjectCombatLocked(
+	hot *objectHot, cold *objectCold, now time.Time,
+) {
+	if !hot.inCombat(now.UnixNano()) && cold.Name != "" {
+		b.recordLocked(cold.Name + " enters combat")
 	}
-	obj.CombatUntil = now.Add(combatWindow)
+	hot.CombatUntil = now.Add(combatWindow).UnixNano()
 }

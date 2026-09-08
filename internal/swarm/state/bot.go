@@ -521,9 +521,9 @@ func (b *Bot) SelfAttackerCount() int {
 		return 0
 	}
 	count := 0
-	for i := range b.world.objects {
-		obj := &b.world.objects[i]
-		if obj.Kind == KindNPC && obj.Attackable && !obj.Dead &&
+	for i := range b.world.hot {
+		obj := &b.world.hot[i]
+		if obj.Kind == kindNPC && obj.Attackable && !obj.Dead &&
 			obj.TargetID == b.selfID {
 			count++
 		}
@@ -546,7 +546,7 @@ func (b *Bot) SelfDead() bool {
 func (b *Bot) ObjectPosition(objectID int32) (int32, int32, int32, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	obj := b.objectLocked(objectID)
+	obj, _ := b.objectLocked(objectID)
 	if obj == nil {
 		return 0, 0, 0, false
 	}
@@ -559,12 +559,12 @@ func (b *Bot) ObjectPosition(objectID int32) (int32, int32, int32, bool) {
 func (b *Bot) ObjectName(objectID int32) string {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	obj := b.objectLocked(objectID)
-	if obj == nil {
+	_, cold := b.objectLocked(objectID)
+	if cold == nil {
 		return ""
 	}
 
-	return obj.Name
+	return cold.Name
 }
 
 // ObjectAlive reports whether the object is known around the character
@@ -572,7 +572,7 @@ func (b *Bot) ObjectName(objectID int32) string {
 func (b *Bot) ObjectAlive(objectID int32) bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	obj := b.objectLocked(objectID)
+	obj, _ := b.objectLocked(objectID)
 
 	return obj != nil && !obj.Dead
 }
@@ -601,11 +601,11 @@ func (b *Bot) SelfHealthPercent() float64 {
 func (b *Bot) ObjectHealthPercent(objectID int32) float64 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	obj := b.objectLocked(objectID)
-	if obj == nil || obj.MaxHP <= 0 {
+	_, cold := b.objectLocked(objectID)
+	if cold == nil || cold.MaxHP <= 0 {
 		return -1
 	}
-	pct := obj.CurHP / obj.MaxHP * 100
+	pct := cold.CurHP / cold.MaxHP * 100
 
 	return math.Min(100, math.Max(0, pct))
 }
@@ -912,22 +912,23 @@ func (b *Bot) ApplyPlacement(p Placement) {
 
 		return
 	}
-	obj := b.objectLocked(p.ObjectID)
+	obj, cold := b.objectLocked(p.ObjectID)
 	if obj == nil {
 		return
 	}
 	obj.X = p.X
 	obj.Y = p.Y
 	obj.Z = p.Z
-	obj.Heading = p.Heading
+	cold.Heading = p.Heading
 	obj.Moving = p.Moving
 	if !p.Moving {
 		obj.DestX = p.X
 		obj.DestY = p.Y
 		obj.DestZ = p.Z
 	}
-	obj.MoveAt = time.Now()
-	obj.UpdatedAt = time.Now()
+	nowNano := time.Now().UnixNano()
+	obj.MoveAt = nowNano
+	cold.UpdatedAt = nowNano
 	b.touch()
 }
 
@@ -960,7 +961,7 @@ func (b *Bot) ApplyMovement(m Movement) {
 
 		return
 	}
-	obj := b.objectLocked(m.ObjectID)
+	obj, cold := b.objectLocked(m.ObjectID)
 	if obj == nil {
 		return
 	}
@@ -968,14 +969,15 @@ func (b *Bot) ApplyMovement(m Movement) {
 	obj.Y = m.Y
 	obj.Z = m.Z
 	if !arrived {
-		obj.Heading = HeadingFromDelta(m.DestX-m.X, m.DestY-m.Y)
+		cold.Heading = HeadingFromDelta(m.DestX-m.X, m.DestY-m.Y)
 	}
 	obj.DestX = m.DestX
 	obj.DestY = m.DestY
 	obj.DestZ = m.DestZ
 	obj.Moving = !arrived
-	obj.MoveAt = time.Now()
-	obj.UpdatedAt = time.Now()
+	nowNano := time.Now().UnixNano()
+	obj.MoveAt = nowNano
+	cold.UpdatedAt = nowNano
 	b.touch()
 }
 
@@ -1003,7 +1005,7 @@ func (b *Bot) ApplyPawnMovement(m PawnMovement) {
 		b.char.LastHitAt = now
 		b.touch()
 	}
-	obj := b.objectLocked(m.ObjectID)
+	obj, cold := b.objectLocked(m.ObjectID)
 	if obj == nil {
 		return
 	}
@@ -1014,14 +1016,14 @@ func (b *Bot) ApplyPawnMovement(m PawnMovement) {
 	obj.DestY = destY
 	obj.DestZ = m.TargetZ
 	if m.X != m.TargetX || m.Y != m.TargetY {
-		obj.Heading = HeadingFromDelta(m.TargetX-m.X, m.TargetY-m.Y)
+		cold.Heading = HeadingFromDelta(m.TargetX-m.X, m.TargetY-m.Y)
 	}
 	obj.Moving = true
 	obj.Running = true
 	obj.TargetID = m.TargetID
-	b.markObjectCombatLocked(obj, now)
-	obj.MoveAt = now
-	obj.UpdatedAt = now
+	b.markObjectCombatLocked(obj, cold, now)
+	obj.MoveAt = now.UnixNano()
+	cold.UpdatedAt = now.UnixNano()
 	b.touch()
 }
 
@@ -1087,18 +1089,18 @@ func (b *Bot) ApplyAttack(a Attack) {
 		}
 		b.noteSelfCombatLocked(now)
 		b.touch()
-	} else if obj := b.objectLocked(a.AttackerID); obj != nil {
+	} else if obj, cold := b.objectLocked(a.AttackerID); obj != nil {
 		obj.X = a.X
 		obj.Y = a.Y
 		obj.Z = a.Z
 		if hasFacing {
-			obj.Heading = facing
+			cold.Heading = facing
 		}
 		if a.TargetCount > 0 {
 			obj.TargetID = a.TargetIDs[0]
 		}
-		b.markObjectCombatLocked(obj, now)
-		obj.UpdatedAt = now
+		b.markObjectCombatLocked(obj, cold, now)
+		cold.UpdatedAt = now.UnixNano()
 		b.touch()
 	}
 	b.recordSwingEventsLocked(a, now)
@@ -1113,9 +1115,9 @@ func (b *Bot) ApplyAttack(a Attack) {
 
 			continue
 		}
-		if obj := b.objectLocked(a.TargetIDs[i]); obj != nil {
-			b.markObjectCombatLocked(obj, now)
-			obj.UpdatedAt = now
+		if obj, cold := b.objectLocked(a.TargetIDs[i]); obj != nil {
+			b.markObjectCombatLocked(obj, cold, now)
+			cold.UpdatedAt = now.UnixNano()
 		}
 	}
 }
@@ -1157,13 +1159,13 @@ func (b *Bot) ApplyAutoAttackStart(objectID int32) {
 
 		return
 	}
-	obj := b.objectLocked(objectID)
+	obj, cold := b.objectLocked(objectID)
 	if obj == nil {
 		return
 	}
 	obj.AutoAttacking = true
-	b.markObjectCombatLocked(obj, now)
-	obj.UpdatedAt = now
+	b.markObjectCombatLocked(obj, cold, now)
+	cold.UpdatedAt = now.UnixNano()
 	b.touch()
 }
 
@@ -1177,12 +1179,12 @@ func (b *Bot) ApplyAutoAttackStop(objectID int32) {
 
 		return
 	}
-	obj := b.objectLocked(objectID)
+	obj, cold := b.objectLocked(objectID)
 	if obj == nil {
 		return
 	}
 	obj.AutoAttacking = false
-	obj.UpdatedAt = time.Now()
+	cold.UpdatedAt = time.Now().UnixNano()
 	b.touch()
 }
 
@@ -1190,54 +1192,54 @@ func (b *Bot) ApplyAutoAttackStop(objectID int32) {
 func (b *Bot) ApplyNpcInfo(info NpcInfo) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj := b.upsertLocked(info.ObjectID, KindNPC)
-	obj.TemplateID = info.TemplateID
+	obj, cold := b.upsertLocked(info.ObjectID, KindNPC)
+	cold.TemplateID = info.TemplateID
 	obj.Attackable = info.Attackable
 	obj.Aggressive = npcdata.NPCIsAggressive(info.TemplateID)
-	obj.AggroRange = npcdata.NPCAggroRange(info.TemplateID)
+	cold.AggroRange = npcdata.NPCAggroRange(info.TemplateID)
 	obj.Level = npcdata.NPCLevel(info.TemplateID)
 	obj.ClanHelpRange = npcdata.NPCClanHelpRange(info.TemplateID)
 	obj.ClanMask = npcdata.NPCClanMask(info.TemplateID)
 	obj.X = info.X
 	obj.Y = info.Y
 	obj.Z = info.Z
-	obj.Heading = info.Heading
+	cold.Heading = info.Heading
 	obj.RunSpeed = info.RunSpeed
 	obj.WalkSpeed = info.WalkSpeed
 	obj.MoveSpeedMult = info.MoveSpeedMult
-	obj.CollisionRadius = info.CollisionRadius
+	cold.CollisionRadius = info.CollisionRadius
 	obj.Running = info.Running
 	obj.Moving = false
 	obj.DestX = info.X
 	obj.DestY = info.Y
 	obj.DestZ = info.Z
 	obj.Dead = info.Dead
-	obj.Name = resolveNpcName(info.Name, info.TemplateID)
-	obj.Title = info.Title
+	cold.Name = resolveNpcName(info.Name, info.TemplateID)
+	cold.Title = info.Title
 	now := time.Now()
 	if info.InCombat {
-		b.markObjectCombatLocked(obj, now)
+		b.markObjectCombatLocked(obj, cold, now)
 	}
-	obj.MoveAt = now
-	obj.UpdatedAt = now
+	obj.MoveAt = now.UnixNano()
+	cold.UpdatedAt = now.UnixNano()
 	b.touch()
-	b.recordLocked("npc spawned: " + obj.Name)
+	b.recordLocked("npc spawned: " + cold.Name)
 }
 
 // ApplyPlayerInfo upserts an observed player object.
 func (b *Bot) ApplyPlayerInfo(info PlayerInfo) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj := b.upsertLocked(info.ObjectID, KindPlayer)
-	obj.Name = info.Name
-	obj.Title = info.Title
+	obj, cold := b.upsertLocked(info.ObjectID, KindPlayer)
+	cold.Name = info.Name
+	cold.Title = info.Title
 	obj.X = info.X
 	obj.Y = info.Y
 	obj.Z = info.Z
 	obj.RunSpeed = info.RunSpeed
 	obj.WalkSpeed = info.WalkSpeed
 	obj.MoveSpeedMult = info.MoveSpeedMult
-	obj.CollisionRadius = info.CollisionRadius
+	cold.CollisionRadius = info.CollisionRadius
 	obj.Running = info.Running
 	obj.Dead = info.Dead
 	obj.Moving = false
@@ -1246,10 +1248,10 @@ func (b *Bot) ApplyPlayerInfo(info PlayerInfo) {
 	obj.DestZ = info.Z
 	now := time.Now()
 	if info.InCombat {
-		b.markObjectCombatLocked(obj, now)
+		b.markObjectCombatLocked(obj, cold, now)
 	}
-	obj.MoveAt = now
-	obj.UpdatedAt = now
+	obj.MoveAt = now.UnixNano()
+	cold.UpdatedAt = now.UnixNano()
 	b.touch()
 	b.recordLocked("player appeared: " + info.Name)
 }
@@ -1258,16 +1260,16 @@ func (b *Bot) ApplyPlayerInfo(info PlayerInfo) {
 func (b *Bot) ApplyItemInfo(info ItemInfo) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj := b.upsertLocked(info.ObjectID, KindItem)
-	obj.TemplateID = info.TemplateID
-	obj.Name = npcdata.ItemName(info.TemplateID)
-	obj.Count = info.Count
+	obj, cold := b.upsertLocked(info.ObjectID, KindItem)
+	cold.TemplateID = info.TemplateID
+	cold.Name = npcdata.ItemName(info.TemplateID)
+	cold.Count = info.Count
 	obj.X = info.X
 	obj.Y = info.Y
 	obj.Z = info.Z
-	obj.UpdatedAt = time.Now()
+	cold.UpdatedAt = time.Now().UnixNano()
 	b.touch()
-	b.recordLocked("item dropped: " + itemName(obj.Name, info.TemplateID))
+	b.recordLocked("item dropped: " + itemName(cold.Name, info.TemplateID))
 }
 
 // RemoveObject deletes an object that left the known list. When the
@@ -1276,11 +1278,11 @@ func (b *Bot) ApplyItemInfo(info ItemInfo) {
 func (b *Bot) RemoveObject(objectID int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj := b.world.lookupLocked(objectID)
-	if obj == nil {
+	_, cold := b.world.lookupLocked(objectID)
+	if cold == nil {
 		return
 	}
-	name := obj.Name
+	name := cold.Name
 	b.removeObjectAtLocked(b.world.slotLocked(objectID), objectID)
 	if b.char.TargetID == objectID {
 		b.clearSelfTargetLocked("target object removed")
@@ -1314,25 +1316,25 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
 
 		return
 	}
-	obj := b.objectLocked(objectID)
+	obj, cold := b.objectLocked(objectID)
 	if obj == nil {
 		return
 	}
-	b.recordObjectDamageLocked(obj, objectID, attrs, now)
+	b.recordObjectDamageLocked(obj, cold, objectID, attrs, now)
 	for _, attr := range attrs {
 		switch attr.ID {
 		case AttrCurHP:
-			obj.CurHP = float64(attr.Value)
+			cold.CurHP = float64(attr.Value)
 			obj.Dead = attr.Value <= 0
 		case AttrMaxHP:
-			obj.MaxHP = float64(attr.Value)
+			cold.MaxHP = float64(attr.Value)
 		case AttrCurMP:
-			obj.CurMP = float64(attr.Value)
+			cold.CurMP = float64(attr.Value)
 		case AttrMaxMP:
-			obj.MaxMP = float64(attr.Value)
+			cold.MaxMP = float64(attr.Value)
 		}
 	}
-	obj.UpdatedAt = time.Now()
+	cold.UpdatedAt = time.Now().UnixNano()
 	if obj.Dead && b.char.TargetID == objectID {
 		// A killed target is no target anymore: the server keeps
 		// the corpse selected, the tracker drops it so the HUD
@@ -1376,16 +1378,19 @@ func (b *Bot) RecordEvent(message string) {
 	b.recordLocked(message)
 }
 
-// upsertLocked returns a pointer to the existing object record or
-// appends a fresh one for the id (see objectStore.upsertLocked). The
-// caller must hold the write lock.
-func (b *Bot) upsertLocked(objectID int32, kind ObjectKind) *WorldObject {
-	return b.world.upsertLocked(objectID, kind)
+// upsertLocked returns the pointers to the hot and cold records of
+// the object id or appends fresh ones (see objectStore.upsertLocked).
+// The caller must hold the write lock.
+func (b *Bot) upsertLocked(
+	objectID int32, kind ObjectKind,
+) (*objectHot, *objectCold) {
+	return b.world.upsertLocked(objectID, kindCode(kind))
 }
 
-// objectLocked returns a pointer to the record of the object id, nil
-// when the id is unknown. The caller must hold a lock.
-func (b *Bot) objectLocked(objectID int32) *WorldObject {
+// objectLocked returns the pointers to the hot and cold records of
+// the object id, both nil when the id is unknown. The caller must
+// hold a lock.
+func (b *Bot) objectLocked(objectID int32) (*objectHot, *objectCold) {
 	return b.world.lookupLocked(objectID)
 }
 
@@ -1655,7 +1660,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 			Adena:          0,
 		},
 		Inventory:    nil,
-		Objects:      make([]ObjectSnapshot, 0, len(b.world.objects)),
+		Objects:      make([]ObjectSnapshot, 0, len(b.world.hot)),
 		CombatEvents: make([]CombatEventView, 0, len(b.combat.events)),
 		Events:       make([]Event, 0, min(b.log.length, snapshotEvents)),
 		Chat:         make([]ChatEvent, 0, b.chat.length),
@@ -1672,8 +1677,10 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 		snap.WalkPath = make([]WalkPoint, len(b.walkPath))
 		copy(snap.WalkPath, b.walkPath)
 	}
-	for i := range b.world.objects {
-		snap.Objects = append(snap.Objects, b.objectSnapshotLocked(i, now))
+	nowNano := now.UnixNano()
+	for i := range b.world.hot {
+		snap.Objects = append(snap.Objects,
+			b.objectSnapshotLocked(i, nowNano))
 	}
 	snap.CombatEvents = b.combat.appendView(snap.CombatEvents, now)
 	snap.Events = b.log.appendNewest(snap.Events, snapshotEvents)

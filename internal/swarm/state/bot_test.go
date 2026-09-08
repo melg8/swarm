@@ -227,17 +227,17 @@ func TestStatusUpdateMarksDead(t *testing.T) {
 }
 
 func TestEffectiveSpeedFallbacks(t *testing.T) {
-	obj := newWorldObject(1, KindNPC)
-	require.InDelta(t, defaultRunSpeed, obj.EffectiveSpeed(), 0.001)
+	obj := objectHot{ObjectID: 1, Kind: kindNPC, MoveSpeedMult: 1}
+	require.InDelta(t, defaultRunSpeed, obj.effectiveSpeed(), 0.001)
 
 	obj.RunSpeed = 200
 	obj.WalkSpeed = 60
 	obj.Running = false
 	obj.MoveSpeedMult = 1.5
-	require.InDelta(t, 60*1.5, obj.EffectiveSpeed(), 0.001)
+	require.InDelta(t, 60*1.5, obj.effectiveSpeed(), 0.001)
 
 	obj.Running = true
-	require.InDelta(t, 200*1.5, obj.EffectiveSpeed(), 0.001)
+	require.InDelta(t, 200*1.5, obj.effectiveSpeed(), 0.001)
 }
 
 func TestRemoveObject(t *testing.T) {
@@ -742,9 +742,9 @@ func TestNearestAttackableUsesProjectedPosition(t *testing.T) {
 	// The test pokes the tracked record directly to age the
 	// movement start (no lock needed: the test is single
 	// threaded).
-	runner := bot.objectLocked(8)
+	runner, _ := bot.objectLocked(8)
 	require.NotNil(t, runner)
-	runner.MoveAt = time.Now().Add(-5 * time.Second)
+	runner.MoveAt = time.Now().Add(-5 * time.Second).UnixNano()
 
 	target, ok := bot.NearestAttackable(1500, nil)
 	require.True(t, ok)
