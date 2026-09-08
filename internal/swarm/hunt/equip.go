@@ -25,6 +25,9 @@ type equipManager struct {
 	// lastActionAt paces the use item requests between the player
 	// action flood protector windows.
 	lastActionAt time.Time
+	// starterRetryAt maps a starter item object id to the time its
+	// failed destroy request may retry.
+	starterRetryAt map[int32]time.Time
 }
 
 // equipActionPeriod paces the auto equipment requests: the Mobius
@@ -33,11 +36,17 @@ type equipManager struct {
 // requests.
 const equipActionPeriod = 2 * time.Second
 
+// starterRetryDelay spaces the destroy retries of one starter item:
+// a refused or lost request must not re-send and re-log every pacing
+// period.
+const starterRetryDelay = 10 * time.Second
+
 // newEquipManager creates the manager for the gear profile.
 func newEquipManager(profile gear.Profile) *equipManager {
 	return &equipManager{
-		profile:      profile,
-		lastActionAt: time.Time{},
+		profile:        profile,
+		lastActionAt:   time.Time{},
+		starterRetryAt: make(map[int32]time.Time),
 	}
 }
 
@@ -85,6 +94,49 @@ func (l *Loop) maybeEquipGear() {
 	}
 	manager.lastActionAt = now
 	l.logger.Printf("Hunt: gear: %s", action.Reason)
+}
+
+// maybeDestroyReplacedStarters destroys the starter kit items a
+// replacement has already displaced on the paperdoll: the Squire's
+// set is neither sellable to a shop nor droppable on the ground
+// (is_sellable=false, is_dropable=false in the Mobius item xml), so
+// the destroy request is the only way the dead weight ever leaves
+// the character. The request runs behind the same confirmation gate
+// as the equips (the vanishing of the item confirms it) and shares
+// the equip action budget, so a replace swap always lands its equip
+// first and the starter item is destroyed only once the tracker
+// shows the replacement worn. Called on every tick of the
+// autonomous hunting phases right after the auto equipment.
+func (l *Loop) maybeDestroyReplacedStarters() {
+	manager := l.equip
+	if manager == nil || l.game == nil {
+		return
+	}
+	now := time.Now()
+	if !l.inventoryGateOpen() || len(l.userDeferred) > 0 {
+		return
+	}
+	if now.Sub(manager.lastActionAt) < equipActionPeriod {
+		return
+	}
+	replaced := gear.ReplacedStarterItems(manager.profile, l.equipment())
+	for _, drop := range replaced {
+		if until, ok := manager.starterRetryAt[drop.Item.ObjectID]; ok && now.Before(until) {
+			continue
+		}
+		l.markInventoryAction(drop.Item.ObjectID)
+		if err := l.game.DestroyItem(drop.Item.ObjectID, drop.Item.Count); err != nil {
+			l.logger.Printf("Hunt: starter destroy failed: %v", err)
+			manager.starterRetryAt[drop.Item.ObjectID] =
+				now.Add(starterRetryDelay)
+
+			return
+		}
+		manager.lastActionAt = now
+		l.logger.Printf("Hunt: gear: %s", drop.Reason)
+
+		return
+	}
 }
 
 // gearPoints reports the zone gating points of the equipped gear.

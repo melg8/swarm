@@ -323,7 +323,7 @@ func purchaseGain(
 // slotScore returns the score of the virtual slot entry (0 for an
 // empty slot).
 func slotScore(entry ScoredItem) float64 {
-	if entry.Item.ObjectID == 0 && entry.Stats.BodyPart == "" {
+	if paperdollEmpty(entry) {
 		return 0
 	}
 

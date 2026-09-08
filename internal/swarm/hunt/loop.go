@@ -650,6 +650,10 @@ func (l *Loop) tick() { //nolint:cyclop
 	// stays current while a town trip buys its gear and while the loot
 	// drops arrive, so the combat stats never lag behind the inventory.
 	l.maybeEquipGear()
+	// The replaced starter kit follows the equips: the unsellable,
+	// undroppable Squire's pieces leave the bag through the destroy
+	// request as soon as their replacement is worn.
+	l.maybeDestroyReplacedStarters()
 	if l.handleTownTrip() {
 		return
 	}
