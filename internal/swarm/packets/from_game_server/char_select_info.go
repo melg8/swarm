@@ -231,3 +231,126 @@ func (p *CharSelectInfoPacket) FindCharacterByName(
 
 	return 0, nil, false
 }
+
+// charInfoZeroInts counts the deprecated zero ints after karma: the
+// Mobius writeImpl emits nine zero ints between karma and the paperdoll
+// object id block.
+const charInfoZeroInts = 9
+
+// charInfoPaperdollSlots is the number of paperdoll slots the packet
+// carries, first as object ids then as item ids (the right hand appears
+// twice: the last slot repeats PAPERDOLL_RHAND).
+const charInfoPaperdollSlots = 15
+
+// ToBytes serializes the packet for the emulated game server of the
+// proxy, mirroring the byte layout of the Mobius CharSelectionInfo
+// writeImpl (see the parser above for the field order).
+func (p *CharSelectInfoPacket) ToBytes(writer *packet.Writer) error {
+	if err := writer.WriteInt8(charSelectInfoPacketID); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(p.Count); err != nil {
+		return err
+	}
+
+	for i := range p.Characters {
+		if err := writeCharacterInfo(writer, &p.Characters[i]); err != nil {
+			return fmt.Errorf("failed to write character %d: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+// writeCharacterInfo writes a single character entry.
+func writeCharacterInfo(writer *packet.Writer, info *CharacterInfo) error {
+	if err := writer.WriteStringAsUtf16(info.Name); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(info.ObjectID); err != nil {
+		return err
+	}
+	if err := writer.WriteStringAsUtf16(info.Account); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(info.SessionID); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(info.ClanID); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(0); err != nil { // builder level
+		return err
+	}
+	if err := writer.WriteInt32(info.Sex); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(info.Race); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(info.BaseClassID); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(1); err != nil { // game server name
+		return err
+	}
+	if err := writer.WriteInt32(info.X); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(info.Y); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(info.Z); err != nil {
+		return err
+	}
+	if err := writer.WriteFloat64(info.CurrentHP); err != nil {
+		return err
+	}
+	if err := writer.WriteFloat64(info.CurrentMP); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(0); err != nil { // sp
+		return err
+	}
+	if err := writer.WriteInt32(0); err != nil { // exp
+		return err
+	}
+	if err := writer.WriteInt32(info.Level); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(0); err != nil { // karma
+		return err
+	}
+	for range charInfoZeroInts {
+		if err := writer.WriteInt32(0); err != nil {
+			return err
+		}
+	}
+	for range charInfoPaperdollSlots {
+		if err := writer.WriteInt32(0); err != nil { // paperdoll object ids
+			return err
+		}
+	}
+	for range charInfoPaperdollSlots {
+		if err := writer.WriteInt32(0); err != nil { // paperdoll item ids
+			return err
+		}
+	}
+	if err := writer.WriteInt32(info.HairStyle); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(info.HairColor); err != nil {
+		return err
+	}
+	if err := writer.WriteInt32(info.Face); err != nil {
+		return err
+	}
+	if err := writer.WriteFloat64(info.MaxHP); err != nil {
+		return err
+	}
+	if err := writer.WriteFloat64(info.MaxMP); err != nil {
+		return err
+	}
+
+	return writer.WriteInt32(info.DeleteTimer)
+}
