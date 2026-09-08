@@ -16,36 +16,40 @@ func TestPickHuntingZoneGatesOnLevelAndGear(t *testing.T) {
 	zones := ElvenHuntingZones()
 	require.Len(t, zones, 30)
 
-	// A fresh level 1 character without gear hunts the village keltir
-	// meadow (the nearest of the starter band to the village).
+	// A fresh level 1 character without gear hunts the starter keltir
+	// band (the nearest ground to the village).
 	zone, ok := PickHuntingZone(zones, 1, 0, "", 46112, 41500, -1)
 	require.True(t, ok)
 	require.Equal(t, "elven-keltir-village", zone.ID)
 
-	// Level 5 with the starter gear (44+ points) moves to the goblin
-	// band; level 5 with bare fists stays below it (the gear gate).
+	// Level 5 with the starter kit (44 points) hunts the wolf band -
+	// the mobs sit 1-2 levels below the character; level 5 with bare
+	// fists stays in the starter keltir band (the wolf gear gate).
 	zone, ok = PickHuntingZone(zones, 5, 44, "", 46112, 41500, -1)
 	require.True(t, ok)
-	require.Equal(t, "elven-goblin-camp", zone.ID)
+	require.Equal(t, "elven-wolf-north", zone.ID)
 	zone, ok = PickHuntingZone(zones, 5, 10, "", 46112, 41500, -1)
 	require.True(t, ok)
-	require.Equal(t, "elven-wolf-north", zone.ID)
+	require.Equal(t, "elven-keltir-village", zone.ID)
 
-	// Level 10 with the wooden set (130+ points) enters the lieutenant
-	// band; without it (100 points) the gear gate holds the character
-	// in the grunt band.
+	// Level 10 with the wooden set (130 points) hunts the grunt band;
+	// without it (60 points) the gear gate holds the character in the
+	// raider band.
 	zone, ok = PickHuntingZone(zones, 10, 130, "", 46112, 41500, -1)
 	require.True(t, ok)
-	require.Equal(t, "elven-lieutenant-woods", zone.ID)
-	zone, ok = PickHuntingZone(zones, 10, 100, "", 46112, 41500, -1)
-	require.True(t, ok)
 	require.Equal(t, "elven-grunt-west", zone.ID)
+	zone, ok = PickHuntingZone(zones, 10, 60, "", 46112, 41500, -1)
+	require.True(t, ok)
+	require.Equal(t, "elven-raider-southeast", zone.ID)
 
-	// Level 17 with the deep set (300+ points) hunts the lirein
-	// grounds of the far southwest.
+	// Level 17 with the deep set (280 points) hunts the elder woods;
+	// the full drop dress (320 points) opens the spider band on top.
+	zone, ok = PickHuntingZone(zones, 17, 280, "", 46112, 41500, -1)
+	require.True(t, ok)
+	require.Equal(t, "elven-elder-forest", zone.ID)
 	zone, ok = PickHuntingZone(zones, 17, 320, "", 46112, 41500, -1)
 	require.True(t, ok)
-	require.Equal(t, "elven-pincer-forest", zone.ID)
+	require.Equal(t, "elven-spider-forest", zone.ID)
 }
 
 func TestPickHuntingZoneNearestOfTheBand(t *testing.T) {
@@ -76,15 +80,16 @@ func TestPickHuntingZoneKeepsCurrentZoneOfTheBand(t *testing.T) {
 func TestPickHuntingZoneDeathCap(t *testing.T) {
 	zones := ElvenHuntingZones()
 	// The death regression capped the ladder below the goblin band
-	// (MinLevel 5): a level 8 character with the gear for the fighters
+	// (MinLevel 5): a level 8 character with the gear for the goblins
 	// regresses to the raider band instead.
 	zone, ok := PickHuntingZone(zones, 8, 120, "", 51707, 50504, 4)
 	require.True(t, ok)
 	require.Equal(t, "elven-raider-southeast", zone.ID)
-	// A negative cap (the default) disables the regression.
+	// A negative cap (the default) disables the regression: the level 8
+	// character hunts the goblin band (mobs 1-2 levels below it).
 	zone, ok = PickHuntingZone(zones, 8, 120, "", 51707, 50504, -1)
 	require.True(t, ok)
-	require.Equal(t, "elven-fighter-ridge", zone.ID)
+	require.Equal(t, "elven-goblin-camp", zone.ID)
 }
 
 func TestPickHuntingZoneFallbacks(t *testing.T) {
@@ -123,17 +128,17 @@ func TestLoopSwitchesZoneOnLevel(t *testing.T) {
 	require.True(t, views[0].Active)
 	require.False(t, views[1].Active)
 
-	// The character grows to level 5 with the gear: the next
-	// evaluation switches to the goblin band.
+	// The character grows to level 5 with the starter kit: the next
+	// evaluation switches to the wolf band (mobs 1-2 levels below).
 	setZoneTestLevel(bot, 5)
 	equipZoneWithGear(bot, 44)
 	loop.zoneCheckAt = time.Now().Add(-zoneSwitchPeriod)
 	loop.tick()
-	require.Equal(t, "elven-goblin-camp", loop.zonePickedID)
+	require.Equal(t, "elven-wolf-north", loop.zonePickedID)
 	require.Equal(t, int32(1100), loop.zoneHalf)
 	views = bot.Snapshot().HuntingZones
 	require.False(t, views[0].Active)
-	require.True(t, views[13].Active)
+	require.True(t, views[8].Active)
 }
 
 func TestLoopKeepsZoneDuringCooldown(t *testing.T) {
@@ -176,13 +181,13 @@ func TestUserZoneSelectOverridesPicker(t *testing.T) {
 
 	// Outgrowing the band (level beyond max + slack) resumes the
 	// automatic picker. The full shop dress (212 points) opens the
-	// elder band, the spider band still waits for its 230 gate.
+	// lieutenant band, the elder band waits for its 260 gear gate.
 	setZoneTestLevel(bot, 16)
-	equipZoneWithGear(bot, 250)
+	equipZoneWithGear(bot, 212)
 	loop.zoneCheckAt = time.Now().Add(-zoneSwitchPeriod)
 	loop.tick()
 	require.Equal(t, -1, loop.zoneOverride)
-	require.Equal(t, "elven-elder-forest", loop.zonePickedID)
+	require.Equal(t, "elven-lieutenant-woods", loop.zonePickedID)
 }
 
 func TestUserZoneSelectBounds(t *testing.T) {
@@ -204,8 +209,8 @@ func TestZoneDeathsDemoteTheBand(t *testing.T) {
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetHuntingZones(ElvenHuntingZones())
-	setZoneTestLevel(bot, 5)
-	equipZoneWithGear(bot, 44)
+	setZoneTestLevel(bot, 8)
+	equipZoneWithGear(bot, 212)
 	loop.tick()
 	require.Equal(t, "elven-goblin-camp", loop.zonePickedID)
 	// The hunt walks into the goblin camp square: deaths count against
@@ -251,8 +256,8 @@ func TestZoneDeathsResetOnLevelChange(t *testing.T) {
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetHuntingZones(ElvenHuntingZones())
-	setZoneTestLevel(bot, 5)
-	equipZoneWithGear(bot, 44)
+	setZoneTestLevel(bot, 8)
+	equipZoneWithGear(bot, 212)
 	loop.tick()
 	require.Equal(t, "elven-goblin-camp", loop.zonePickedID)
 	bot.ApplyPlacement(state.Placement{
@@ -307,8 +312,8 @@ func TestZoneDemotionBreaksTheManualOverride(t *testing.T) {
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetHuntingZones(ElvenHuntingZones())
-	setZoneTestLevel(bot, 5)
-	equipZoneWithGear(bot, 44)
+	setZoneTestLevel(bot, 8)
+	equipZoneWithGear(bot, 212)
 	loop.tick()
 	require.Equal(t, "elven-goblin-camp", loop.zonePickedID)
 
@@ -340,8 +345,8 @@ func TestZoneDeathOfDelevelingNeverCounts(t *testing.T) {
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	loop.SetHuntingZones(ElvenHuntingZones())
-	setZoneTestLevel(bot, 5)
-	equipZoneWithGear(bot, 44)
+	setZoneTestLevel(bot, 8)
+	equipZoneWithGear(bot, 212)
 	loop.tick()
 	require.Equal(t, "elven-goblin-camp", loop.zonePickedID)
 

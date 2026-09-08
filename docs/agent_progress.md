@@ -780,3 +780,39 @@ the concurrent edits of the other models respected.
 - All three requested behaviors implemented, unit tested, live
   verified (feed + rendering), documented in AGENTS.md, pushed to
   mobius-c1-client-1 as melg8.
+
+## Active task: survivability and web UX round (flee logout, zone view, shopping)
+
+Started: 2026-09-08. Branch: `mobius-c1-client-1`. Commits as melg8,
+pushed as they land (rebase before every push - other models edit the
+branch concurrently).
+
+### Goal
+
+The user asked for eleven changes: (1) log out when fleeing from mobs
+too long instead of running forever; (2) a brighter demonstration of
+the inactive hunting zones plus a show/hide checkbox; (3) stop the bot
+movement when the user switches the hunting zone manually; (4) move
+the hunting zones into a collapsible list (the left sidebar holds
+bots only); (5) fix the target search so a big zone with far mobs
+never leaves the bot standing; (6) fix the resting softlock (user
+clicks while sitting -> repeated Action failed, the bot never stands);
+(7) recalibrate the zone level and gear gates so the bot hunts mobs
+1-2 levels below itself; (8) an aggro radius display for aggressive
+mobs (toggleable); (9) shopping counts the sell value of the replaced
+item and sells it before buying the replacement; (10) remove the red
+screen edge flash; (11) the attack animation only plays on hits that
+actually land (single hit per event).
+
+### Progress
+
+- 2026-09-08: (7) the zone ladder recalibrated. A band now opens only
+  above its top mob level plus `zoneLevelLead` (1) - the character
+  hunts mobs 1-2 levels below itself; the gear gates of the elven
+  registry raised (wolves 20, raiders 50, goblins 70, grunts 100,
+  fighters 140, lieutenants 180, leaders 220, elders 260, spiders
+  300, lirein 380); the below-every-band fallback became the starter
+  band contest (the nearest ground of the first band, the current
+  ground keeps its post - no re-pick bouncing for sub-band
+  characters). Zone tests re-pinned to the new gates. AGENTS.md
+  documents the new calibration.

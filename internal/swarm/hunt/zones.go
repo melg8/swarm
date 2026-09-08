@@ -102,132 +102,132 @@ var elvenHuntingZones = []HuntingZone{
 	// Band 3-4: the wolf downs past the keltir ring.
 	{
 		ID: "elven-wolf-west", Name: "Wolf Ridge West",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4, MinGear: 10,
+		Region: regionElven, MinLevel: 3, MaxLevel: 4, MinGear: 20,
 		CX: 38500, CY: 40200, Half: 1200,
 	},
 	{
 		ID: "elven-wolf-northwest", Name: "Wolf Hills Northwest",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4, MinGear: 10,
+		Region: regionElven, MinLevel: 3, MaxLevel: 4, MinGear: 20,
 		CX: 41000, CY: 35200, Half: 1200,
 	},
 	{
 		ID: "elven-wolf-north", Name: "Wolf Downs North",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4, MinGear: 10,
+		Region: regionElven, MinLevel: 3, MaxLevel: 4, MinGear: 20,
 		CX: 46655, CY: 35342, Half: 1100,
 	},
 	// Band 4-6: the wolf-raider fields and the first goblin contact.
 	{
 		ID: "elven-raider-southeast", Name: "Raider Field Southeast",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6, MinGear: 30,
+		Region: regionElven, MinLevel: 4, MaxLevel: 6, MinGear: 50,
 		CX: 50556, CY: 46156, Half: 1000,
 	},
 	{
 		ID: "elven-raider-east", Name: "Raider Camp East",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6, MinGear: 30,
+		Region: regionElven, MinLevel: 4, MaxLevel: 6, MinGear: 50,
 		CX: 53600, CY: 45300, Half: 1100,
 	},
 	{
 		ID: "elven-raider-south", Name: "Raider Trail South",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6, MinGear: 30,
+		Region: regionElven, MinLevel: 4, MaxLevel: 6, MinGear: 50,
 		CX: 39500, CY: 53600, Half: 1100,
 	},
 	{
 		ID: "elven-raider-vale", Name: "Raider Vale South",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6, MinGear: 30,
+		Region: regionElven, MinLevel: 4, MaxLevel: 6, MinGear: 50,
 		CX: 48788, CY: 55700, Half: 1100,
 	},
 	// Band 5-7: the goblin and kaboo camps of the southeast.
 	{
 		ID: "elven-goblin-camp", Name: "Goblin Camp Southeast",
-		Region: regionElven, MinLevel: 5, MaxLevel: 7, MinGear: 40,
+		Region: regionElven, MinLevel: 5, MaxLevel: 7, MinGear: 70,
 		CX: 51707, CY: 50504, Half: 1100,
 	},
 	{
 		ID: "elven-kaboo-camp-east", Name: "Kaboo Camp East",
-		Region: regionElven, MinLevel: 5, MaxLevel: 7, MinGear: 40,
+		Region: regionElven, MinLevel: 5, MaxLevel: 7, MinGear: 70,
 		CX: 54400, CY: 51200, Half: 1100,
 	},
 	// Band 7-8: the kaboo grunt woods of the south.
 	{
 		ID: "elven-grunt-forest", Name: "Kaboo Grunt Forest",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8, MinGear: 80,
+		Region: regionElven, MinLevel: 7, MaxLevel: 8, MinGear: 100,
 		CX: 43074, CY: 56632, Half: 1200,
 	},
 	{
 		ID: "elven-grunt-west", Name: "Kaboo Grunt Woods West",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8, MinGear: 80,
+		Region: regionElven, MinLevel: 7, MaxLevel: 8, MinGear: 100,
 		CX: 38324, CY: 50214, Half: 1100,
 	},
 	// Band 8-10: the kaboo fighter and spore fungus woods.
 	{
 		ID: "elven-kaboo-fighter-woods", Name: "Kaboo Fighter Woods",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10, MinGear: 110,
+		Region: regionElven, MinLevel: 8, MaxLevel: 10, MinGear: 140,
 		CX: 34769, CY: 51063, Half: 1100,
 	},
 	{
 		ID: "elven-fighter-ridge", Name: "Kaboo Fighter Ridge",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10, MinGear: 110,
+		Region: regionElven, MinLevel: 8, MaxLevel: 10, MinGear: 140,
 		CX: 38499, CY: 46233, Half: 1100,
 	},
 	{
 		ID: "elven-fungus-woods", Name: "Fungus Woods Southwest",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10, MinGear: 110,
+		Region: regionElven, MinLevel: 8, MaxLevel: 10, MinGear: 140,
 		CX: 35471, CY: 55288, Half: 1100,
 	},
 	// Band 9-12: the kaboo fighter lieutenant camps of the far west.
 	{
 		ID: "elven-lieutenant-woods", Name: "Lieutenant Woods West",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12, MinGear: 130,
+		Region: regionElven, MinLevel: 9, MaxLevel: 12, MinGear: 180,
 		CX: 30917, CY: 48818, Half: 1100,
 	},
 	{
 		ID: "elven-lieutenant-camp", Name: "Lieutenant Camp West",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12, MinGear: 130,
+		Region: regionElven, MinLevel: 9, MaxLevel: 12, MinGear: 180,
 		CX: 25442, CY: 41213, Half: 1100,
 	},
 	// Band 11-13: the fighter leader camps.
 	{
 		ID: "elven-leader-forest", Name: "Leader Forest West",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13, MinGear: 160,
+		Region: regionElven, MinLevel: 11, MaxLevel: 13, MinGear: 220,
 		CX: 26115, CY: 50735, Half: 1100,
 	},
 	{
 		ID: "elven-leader-south", Name: "Leader Downs South",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13, MinGear: 160,
+		Region: regionElven, MinLevel: 11, MaxLevel: 13, MinGear: 220,
 		CX: 26697, CY: 63398, Half: 1100,
 	},
 	// Band 12-14: the dryad elder woods.
 	{
 		ID: "elven-elder-forest", Name: "Elder Forest West",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14, MinGear: 200,
+		Region: regionElven, MinLevel: 12, MaxLevel: 14, MinGear: 260,
 		CX: 17134, CY: 45435, Half: 1200,
 	},
 	{
 		ID: "elven-elder-woods", Name: "Elder Woods Deep West",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14, MinGear: 200,
+		Region: regionElven, MinLevel: 12, MaxLevel: 14, MinGear: 260,
 		CX: 16232, CY: 52625, Half: 1200,
 	},
 	// Band 13-16: the dryad elder and spider forest.
 	{
 		ID: "elven-spider-forest", Name: "Spider Forest West",
-		Region: regionElven, MinLevel: 13, MaxLevel: 16, MinGear: 230,
+		Region: regionElven, MinLevel: 13, MaxLevel: 16, MinGear: 300,
 		CX: 9730, CY: 49233, Half: 1100,
 	},
 	{
 		ID: "elven-spider-hills", Name: "Spider Hills West",
-		Region: regionElven, MinLevel: 13, MaxLevel: 16, MinGear: 230,
+		Region: regionElven, MinLevel: 13, MaxLevel: 16, MinGear: 300,
 		CX: 11150, CY: 56050, Half: 1100,
 	},
 	// Band 16-19: the lirein and pincer spider grounds of the deep
 	// southwest.
 	{
 		ID: "elven-lirein-woods", Name: "Lirein Woods Deep West",
-		Region: regionElven, MinLevel: 16, MaxLevel: 19, MinGear: 300,
+		Region: regionElven, MinLevel: 16, MaxLevel: 19, MinGear: 380,
 		CX: 6566, CY: 59847, Half: 1100,
 	},
 	{
 		ID: "elven-pincer-forest", Name: "Pincer Forest South",
-		Region: regionElven, MinLevel: 16, MaxLevel: 19, MinGear: 300,
+		Region: regionElven, MinLevel: 16, MaxLevel: 19, MinGear: 380,
 		CX: 9618, CY: 63158, Half: 1100,
 	},
 }
@@ -239,6 +239,16 @@ func ElvenHuntingZones() []HuntingZone {
 
 	return zones
 }
+
+// zoneLevelLead is the level lead the character must hold over the
+// top mob of a band before the picker opens it: the fights stay
+// winnable when the hunted mobs sit 1-2 levels below the character
+// (the observed deaths came from characters that just reached a
+// band and engaged mobs above their own level), so every band opens
+// at its MaxLevel plus this lead instead of its MinLevel. The starter
+// band of the registry is the floor: a character below every band
+// hunts it through the starter fallback.
+const zoneLevelLead = 1
 
 // zoneSwitchPeriod bounds the automatic zone re-evaluation: the level
 // changes and the gear upgrades (the town trips and the auto
@@ -302,14 +312,17 @@ func sameBand(zone HuntingZone, other HuntingZone) bool {
 // PickHuntingZone returns the best zone of the list for the character
 // level, the gear points and the position: the highest level band
 // both gates allow, so the gear gate holds the character back until
-// its equipment pays for the stronger mobs. Among the zones of the
-// winning band the current one keeps its post (a periodic re-pick
-// never bounces the character between the grounds of one band), the
-// nearest one to the character wins an open contest. maxMinLevel
-// caps the ladder from above for the death regression (zones whose
-// band passes the cap are too hard for now, a negative value
-// disables the cap). The starter zone (the first of the list) is the
-// fallback for levels below every band.
+// its equipment pays for the stronger mobs. The level gate opens a
+// band only above its top mob plus the level lead - the character
+// hunts mobs 1-2 levels below itself, never above itself. Among the
+// zones of the winning band the current one keeps its post (a
+// periodic re-pick never bounces the character between the grounds of
+// one band), the nearest one to the character wins an open contest.
+// maxMinLevel caps the ladder from above for the death regression
+// (zones whose band passes the cap are too hard for now, a negative
+// value disables the cap). A character below every band (or under a
+// cap that closed the ladder) hunts the starter band through the
+// starter fallback contest.
 func PickHuntingZone(
 	zones []HuntingZone, level int32, gearPoints int32,
 	currentID string, fromX int32, fromY int32, maxMinLevel int32,
@@ -317,7 +330,7 @@ func PickHuntingZone(
 	best := -1
 	for index := range zones {
 		candidate := zones[index]
-		if level < candidate.MinLevel ||
+		if level < candidate.MaxLevel+zoneLevelLead ||
 			gearPoints < candidate.MinGear {
 			continue
 		}
@@ -356,16 +369,47 @@ func PickHuntingZone(
 		}
 	}
 	if best < 0 {
-		// Below every band or the cap closed the ladder: the first
-		// zone of the region (the starter ground).
-		if len(zones) > 0 {
-			return zones[0], true
-		}
+		// Below every band or the cap closed the ladder: the
+		// starter band runs its own fallback contest.
+		return starterZone(zones, currentID, fromX, fromY)
+	}
 
-		return HuntingZone{
-			ID: "", Name: "", Region: "", MinLevel: 0, MaxLevel: 0,
-			MinGear: 0, CX: 0, CY: 0, Half: 0,
-		}, false
+	return zones[best], true
+}
+
+// starterZone resolves the fallback of the picker: the starter band
+// (the band of the first zone of the registry) runs its own contest
+// when no ladder band opens for the character - a level below every
+// band or a death regression that capped the ladder shut. The current
+// ground of the starter band keeps its post (the periodic re-pick
+// never bounces a sub-band character between the starter squares), an
+// open contest takes the nearest ground to the character.
+func starterZone(
+	zones []HuntingZone, currentID string, fromX int32, fromY int32,
+) (HuntingZone, bool) {
+	if len(zones) == 0 {
+		return noZone, false
+	}
+	best := 0
+	for index := 1; index < len(zones); index++ {
+		candidate := zones[index]
+		if !sameBand(candidate, zones[0]) {
+			continue
+		}
+		if candidate.ID == currentID {
+			if zones[best].ID != currentID {
+				best = index
+			}
+
+			continue
+		}
+		if zones[best].ID == currentID {
+			continue
+		}
+		if zoneDistance(candidate, fromX, fromY) <
+			zoneDistance(zones[best], fromX, fromY) {
+			best = index
+		}
 	}
 
 	return zones[best], true

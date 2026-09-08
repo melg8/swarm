@@ -452,13 +452,19 @@ the design goal is per-class and per-region extension):
 - **Multi-zone hunting** (`hunt/zones.go`): thirty granular hunting
   squares (1000-1300 halves) anchored on the ElvenStarting.xml spawn
   territory clusters, laddered in ten mob level bands (keltirs 1-3
-  gear 0, wolves 3-4 gear 10, raiders 4-6 gear 30, goblins 5-7 gear
-  40, grunts 7-8 gear 80, fighters 8-10 gear 110, lieutenants 9-12
-  gear 130, leaders 11-13 gear 160, elders 12-14 gear 200, spiders
-  13-16 gear 230, lirein 16-19 gear 300); `PickHuntingZone` gates on
-  level AND gear points, keeps the current zone of the winning band
+  gear 0, wolves 3-4 gear 20, raiders 4-6 gear 50, goblins 5-7 gear
+  70, grunts 7-8 gear 100, fighters 8-10 gear 140, lieutenants 9-12
+  gear 180, leaders 11-13 gear 220, elders 12-14 gear 260, spiders
+  13-16 gear 300, lirein 16-19 gear 380); `PickHuntingZone` gates on
+  level AND gear points - a band opens only above its top mob level
+  plus the lead (`zoneLevelLead` 1), so the character always hunts
+  mobs 1-2 levels below itself instead of engaging mobs above its own
+  level - keeps the current zone of the winning band
   (the 30 s re-pick never bounces between same-band grounds) and
-  takes the nearest ground of an open band. A cleared-out square
+  takes the nearest ground of an open band; a character below every
+  band (or under a death cap that closed the ladder) falls back to
+  the starter band contest (the nearest ground of the first band,
+  the current ground keeps its post). A cleared-out square
   rotates: no attackable mob inside the square for 10 s while the
   hunter stands central (the raw `ZoneHasAttackable` reading, not
   the socially constrained search) moves it to the nearest sibling
