@@ -816,3 +816,24 @@ actually land (single hit per event).
   ground keeps its post - no re-pick bouncing for sub-band
   characters). Zone tests re-pinned to the new gates. AGENTS.md
   documents the new calibration.
+
+- 2026-09-08: (1) the flee episode budget. `fleeSince` tracks the
+  start of the running flee; past `fleeLogoutAfter` (20 s) without
+  shaking the chase the loop calls the emergency logout (the 30 s
+  login pause resets the aggro), a recovered health or a fresh
+  fight clears the episode. Covered by
+  hunt.TestLoopLogsOutWhenTheFleeNeverShakesTheChase.
+- 2026-09-08: (5) the far target walk. The engage pick failure
+  (nothing inside the 1500 engage radius of a big square) now falls
+  through `walkToFarTarget` before the center patrol: the nearest
+  valid in-zone mob is looked up with a 6000 unit radius and walked
+  toward one paced leg per second, so a far pack is closed on
+  instead of the bot standing central with an empty radius. Covered
+  by hunt.TestLoopWalksToFarTargetsOfABigZone (and the negative:
+  a mob inside the radius is engaged directly).
+- 2026-09-08: (6) the resting softlock fix. `tickUser` stands a
+  sitting character up before executing a manual move/attack/pickup
+  (the server refuses every request of a sitting session with a
+  bare ActionFailed - the old loop spammed refused walk requests
+  and never stood up). Covered by
+  hunt.TestUserMoveStandsUpTheRestingCharacter.

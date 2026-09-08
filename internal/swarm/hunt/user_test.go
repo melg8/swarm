@@ -767,3 +767,35 @@ func TestUserAttackApproachWalksFarTarget(t *testing.T) {
 	require.Equal(t, []int32{7, 7}, game.forces,
 		"the melee range attack must force the swings")
 }
+
+func TestUserMoveStandsUpTheRestingCharacter(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The character rests (the sit toggle confirmed by the ChangeWaitType
+	// broadcast) and the user clicks a spot on the map: the server refuses
+	// every move request of a sitting session, so the loop must stand the
+	// character up FIRST instead of spamming refused walk requests.
+	bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: true})
+	loop.tracker.PushCommand(state.Command{
+		Kind: state.CommandMove, X: 46000, Y: 51000, Z: -3500,
+	})
+	loop.tick()
+
+	require.Equal(t, phaseUser, loop.phase)
+	require.Equal(t, 1, game.sits,
+		"the first manual tick stands the sitting character up")
+	require.Empty(t, game.walks,
+		"no walk request while the character still sits")
+
+	// The stand transition confirms: the walk request goes out on the
+	// next tick.
+	bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: false})
+	loop.lastHit = time.Now().Add(-time.Minute)
+	loop.tick()
+	require.NotEmpty(t, game.walks,
+		"the manual walk starts once the character stands")
+	require.Equal(t, 1, game.sits, "no double toggle")
+}

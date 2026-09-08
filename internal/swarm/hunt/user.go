@@ -297,8 +297,22 @@ func (l *Loop) userMovement(cmd state.Command) {
 // tickUser advances the manual phase: it re-issues the action at the
 // player action cadence (the Mobius flood protector allows one action
 // per second) until it completes, then the autonomous hunting resumes.
+// A sitting character stands up first: the server refuses every move,
+// attack and pickup request of a sitting session with a bare
+// ActionFailed, so walking straight into the request loop leaves the
+// bot sitting through an endless stream of refusals (the softlock of
+// a rest interrupted by a manual click).
 func (l *Loop) tickUser() {
 	now := time.Now()
+	if l.tracker.SelfSitting() && l.userKind != "" {
+		// The stand request shares the pending transition gate with
+		// the rest logic (never a double toggle); the walk starts on
+		// a later tick once the ChangeWaitType broadcast confirms the
+		// standing.
+		if !l.standUpGuarded(now) {
+			return
+		}
+	}
 	switch l.userKind {
 	case state.CommandMove:
 		l.tickUserMove(now)

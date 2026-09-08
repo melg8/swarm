@@ -510,7 +510,17 @@ the design goal is per-class and per-region extension):
   Entering a hunting zone engages the first valid target the entry
   radius offers (`engagesOnZoneEntry` of the return phase), and a
   targetless hunter patrols toward the zone center after a 6 s
-  patience window instead of standing still. A zone switch drops the
+  patience window instead of standing still. A big square whose pack
+  sits outside the engage radius (1500) is walked toward directly:
+  `walkToFarTarget` searches the whole zone for the nearest valid
+  mob and follows one paced leg per second, so the hunter closes on
+  a far pack instead of standing central in an empty radius (the
+  rotation only fires on a fully empty square). A flee that never
+  shakes the chase ends the session too: one escape episode older
+  than `fleeLogoutAfter` (20 s) logs the character out (a recovered
+  health or a fresh fight clears the episode) - the relogin after
+  the pause resets the mob aggro instead of the bot running from
+  the pack forever. A zone switch drops the
   remembered farm spot of the previous square (the returns aim at the
   new center until a fresh spot is remembered inside it).
 

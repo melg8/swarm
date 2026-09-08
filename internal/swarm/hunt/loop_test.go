@@ -835,6 +835,109 @@ func TestLoopPatrolsTowardTheCenterWithoutTargets(t *testing.T) {
 	require.InDelta(t, float64(50000)+dy*frac, float64(leg[1]), 1)
 }
 
+func TestLoopWalksToFarTargetsOfABigZone(t *testing.T) {
+	bot := newTestBot()
+	// The pack sits inside the big square but far outside the engage
+	// radius: the character stands at the west edge, the mob 2000
+	// units east (attackNearestRange is 1500). The hunter must walk
+	// toward the pack instead of standing still.
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 9, TemplateID: 1000001, Attackable: true,
+		X: 47000, Y: 50000, Name: "Gremlin",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZone(46000, 50000, 1300)
+	loop.lastHit = time.Now().Add(-time.Minute)
+	loop.noTargetSince = time.Now().Add(-noTargetPatience - time.Second)
+
+	loop.tick()
+	require.NotEmpty(t, game.walks,
+		"the targetless hunter walks toward the far pack")
+	walk := game.walks[len(game.walks)-1]
+	require.True(t, walk[0] > 45000 && walk[0] <= 46000,
+		"the walk leg heads toward the mob (x grows, capped at the leg length)")
+	require.Equal(t, int32(50000), walk[1],
+		"the walk keeps the line to the mob")
+}
+
+func TestLoopKeepsStandingWhenTheFarMobEntersTheEngageRadius(t *testing.T) {
+	bot := newTestBot()
+	// The mob enters the engage radius on its own: the far target walk
+	// must not fire, the normal engage pick takes over.
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 9, TemplateID: 1000001, Attackable: true,
+		X: 46000, Y: 50000, Name: "Gremlin",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZone(46000, 50000, 1300)
+	loop.lastHit = time.Now().Add(-time.Minute)
+	loop.noTargetSince = time.Now().Add(-noTargetPatience - time.Second)
+
+	loop.tick()
+	require.Empty(t, game.walks,
+		"no far target walk while a valid target sits inside the radius")
+	require.Equal(t, []int32{9}, game.forces,
+		"the engage picks the target directly")
+}
+
+func TestLoopLogsOutWhenTheFleeNeverShakesTheChase(t *testing.T) {
+	bot := newTestBot()
+	spawnMob(bot)
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// A hurt character under attack flees - and the chase never ends:
+	// after the flee budget the session logs out instead of running
+	// forever, arming the 30 s login pause.
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 40},
+	})
+	bot.ApplyAttack(state.Attack{
+		AttackerID: 7, X: 46000, Y: 50000, Z: -3500,
+		TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+		TargetIDs: [state.AttackTargets]int32{100}, TargetCount: 1,
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Zero(t, game.logouts, "the fresh flee starts with a budget")
+
+	// The episode ages past the budget while the blows keep landing:
+	// the next escape leg never happens, the logout does.
+	loop.fleeAt = time.Now().Add(-2 * time.Second)
+	loop.fleeSince = time.Now().Add(-fleeLogoutAfter - time.Second)
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.logouts,
+		"the endless chase ends the session")
+	require.True(t, loop.logoutDone)
+	require.GreaterOrEqual(t, bot.LoginCooldownRemaining(),
+		panicLogoutPause-time.Second,
+		"the relogin pause resets the mob aggro")
+
+	// A single fresh flee never logs out: the budget only fires on a
+	// long running episode.
+	bot2 := newTestBot()
+	spawnMob(bot2)
+	game2 := &fakeGame{}
+	loop2 := NewLoop(game2, bot2)
+	loop2.lastHit = time.Now().Add(-time.Minute)
+	bot2.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 40},
+	})
+	bot2.ApplyAttack(state.Attack{
+		AttackerID: 7, X: 46000, Y: 50000, Z: -3500,
+		TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+		TargetIDs: [state.AttackTargets]int32{100}, TargetCount: 1,
+	})
+	loop2.lastHit = time.Now().Add(-2 * time.Second)
+	loop2.tick()
+	require.Zero(t, game2.logouts,
+		"a fresh escape episode keeps the session alive")
+}
+
 func TestLoopLogsOutAtCriticalHealthUnderAttack(t *testing.T) {
 	bot := newTestBot()
 	bot.ApplyNpcInfo(state.NpcInfo{

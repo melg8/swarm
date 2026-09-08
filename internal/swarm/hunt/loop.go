@@ -183,6 +183,13 @@ const (
 	// patrolCenterMinDist suppresses the center patrol when the
 	// character already stands central: the respawns come to it.
 	patrolCenterMinDist = 700.0
+	// farTargetRange bounds the far target lookup of a targetless
+	// hunter: the granular zone squares reach past the engage radius
+	// (a 1300 half corner sits 1800+ units from the center), so the
+	// nearest in-zone mob can stand far outside the pick radius. The
+	// tracker only knows the mobs the server showed the character,
+	// so this stays inside the loaded region block anyway.
+	farTargetRange = 6000.0
 	// panicLogoutHealthPercent is the HP level below which a
 	// character under attack logs out for a pause: the escape
 	// could not shake the chase, staying means dying (the
@@ -202,6 +209,12 @@ const (
 	// anything a lone farmer can answer, and a social pack only
 	// grows while the fight lasts.
 	panicLogoutAttackers = 2
+	// fleeLogoutAfter bounds one flee episode: an escape that has
+	// not shaken the chase within this budget ends the session
+	// instead - the mobs keep the character running forever
+	// otherwise, and the relogin after the pause resets their
+	// aggro while the character regenerates sitting.
+	fleeLogoutAfter = 20 * time.Second
 )
 
 // phase is the coarse activity of the hunt loop.
@@ -297,6 +310,12 @@ type Loop struct {
 	// wait out the attack request pacing of the engage (the last
 	// forced attack fired moments before the threshold crossed).
 	fleeAt time.Time
+	// fleeSince tracks the start of the running flee episode: the
+	// escape legs never stop the chase by themselves when the
+	// pursuing pack is fast, and past the fleeLogoutAfter budget
+	// the session logs out to reset the aggro instead of running
+	// forever. A recovered health or a fresh fight clears it.
+	fleeSince time.Time
 	// logoutDone marks the one shot emergency logout: the session
 	// unwinds within a second of the request, the flag keeps the
 	// dying ticks quiet.
@@ -435,6 +454,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		targetSkip:        nil,
 		noTargetSince:     time.Time{},
 		fleeAt:            time.Time{},
+		fleeSince:         time.Time{},
 		logoutDone:        false,
 		userKind:          "",
 		userX:             0,
@@ -717,6 +737,7 @@ func (l *Loop) recoverFromDeath() {
 		l.resetTownTrip()
 		l.noTargetSince = time.Time{}
 		l.fleeAt = time.Time{}
+		l.fleeSince = time.Time{}
 		// The village restart lands next to the shops and the cooldown
 		// a recent finished trip armed must not hold the sale back:
 		// otherwise the revived character walks to the farm spot with
@@ -834,6 +855,11 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		// out of targets it can win: it keeps fleeing instead of
 		// standing in the blows or sitting into them.
 		hurt := l.tracker.SelfHealthPercent() < reengageHealthPercent
+		if !hurt && !l.tracker.SelfUnderAttack() {
+			// The health recovered and the blows stopped: the flee
+			// episode is over, a future escape gets a fresh budget.
+			l.fleeSince = time.Time{}
+		}
 		if hurt && l.tracker.SelfUnderAttack() {
 			l.fleeFromThreat(now)
 
@@ -860,6 +886,9 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 			attackNearestRange, l.zone(), l.skippedTargets(now),
 			l.maxTargetLevel(), true)
 		if !ok {
+			if l.walkToFarTarget(now) {
+				return
+			}
 			l.patrolToCenter(now)
 
 			return
@@ -869,6 +898,9 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		l.engageAt = now
 	}
 	if l.tracker.SelfFighting(l.target) {
+		// A running fight ends the flee episode: the character
+		// answered instead of running, the escape budget resets.
+		l.fleeSince = time.Time{}
 		// The swings land right now: nothing to re-request. A stale
 		// engagement (the fight was interrupted, the auto attack flag
 		// and the combat window linger) falls through and keeps
@@ -975,6 +1007,21 @@ func (l *Loop) fleeFromThreat(now time.Time) {
 		return
 	}
 	l.fleeAt = now
+	if l.fleeSince.IsZero() {
+		l.fleeSince = now
+	}
+	if now.Sub(l.fleeSince) >= fleeLogoutAfter {
+		// The escape never shook the chase: the mobs keep the
+		// character running forever, the session ends and the
+		// login cooldown resets the aggro while the character
+		// regenerates sitting.
+		l.logger.Printf("Hunt: fleeing for %.0fs without shaking "+
+			"the chase, resetting the aggro via logout",
+			now.Sub(l.fleeSince).Seconds())
+		l.emergencyLogout()
+
+		return
+	}
 	if !l.standUpGuarded(now) {
 		return
 	}
@@ -1073,6 +1120,61 @@ func (l *Loop) emergencyLogout() {
 	if err := l.game.RequestLogout(); err != nil {
 		l.logger.Printf("Hunt: logout request failed: %v", err)
 	}
+}
+
+// walkToFarTarget walks a targetless hunter toward the nearest
+// valid mob of the zone when the pack sits outside the engage
+// radius: a big square holds its mobs far from wherever the
+// character stands, and standing still until luck walks a mob
+// into the radius stalls the hunt (the zone rotation only fires
+// on a fully empty square, a far pack keeps it armed). One paced
+// leg at a time - the per second target search of the engage
+// picks up any mob the leg comes past, so the character engages
+// the moment something valid enters the radius. Reports whether
+// the tick was handled (a far target exists); without one the
+// caller falls back to the center patrol.
+func (l *Loop) walkToFarTarget(now time.Time) bool {
+	if l.noTargetSince.IsZero() {
+		l.noTargetSince = now
+
+		return false
+	}
+	if now.Sub(l.noTargetSince) < noTargetPatience {
+		return false
+	}
+	if now.Sub(l.lastHit) < selectPeriod {
+		return true
+	}
+	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+	if !ok {
+		return false
+	}
+	pick, found := l.tracker.NearestAttackableConstrained(
+		farTargetRange, l.zone(), l.skippedTargets(now),
+		l.maxTargetLevel(), true)
+	if !found {
+		return false
+	}
+	dist := math.Hypot(float64(pick.X-selfX), float64(pick.Y-selfY))
+	if dist <= attackNearestRange {
+		// Inside the engage radius already: the per second pick takes
+		// it from here.
+		return false
+	}
+	l.lastHit = now
+	moveX, moveY := pick.X, pick.Y
+	dx := float64(pick.X - selfX)
+	dy := float64(pick.Y - selfY)
+	if dist > returnWalkLeg {
+		frac := returnWalkLeg / dist
+		moveX = int32(float64(selfX) + dx*frac)
+		moveY = int32(float64(selfY) + dy*frac)
+	}
+	if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
+		l.logger.Printf("Hunt: far target walk failed: %v", err)
+	}
+
+	return true
 }
 
 // patrolToCenter walks a targetless hunter toward the zone center:
