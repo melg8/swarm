@@ -315,3 +315,229 @@ func TestFindPathMissingGeodata(t *testing.T) {
 		DefaultMaxPassableHeight)
 	require.ErrorIs(t, err, ErrMissingCell, err)
 }
+
+// TestFindPathApproachRadius checks the approach goal of the town
+// trips: a target whose cell cannot be entered (the merchant behind
+// the counter boards) is still reached by the walk - the search ends
+// on the first cell within the approach radius, at the counter front.
+func TestFindPathApproachRadius(t *testing.T) {
+	spec := &regionSpec{}
+	spec.setFlat(0)
+	// The counter: the target cell and its whole ring are sealed.
+	targetX, targetY := 1000, 1000
+	for dx := -1; dx <= 1; dx++ {
+		for dy := -1; dy <= 1; dy++ {
+			spec.setCell(targetX+dx, targetY+dy, closedWalls(0))
+		}
+	}
+	engine := newTestEngine(t, spec)
+	target := worldOf(targetX, targetY, 0)
+
+	// The plain search cannot reach the sealed cell at all.
+	plain, err := engine.FindPath(
+		worldOf(200, 200, 0), target, DefaultMaxPassableHeight)
+	require.NoError(t, err)
+	require.False(t, plain.Found)
+
+	// The approach search stops at the counter front: within the
+	// radius, on an open cell.
+	result, err := engine.FindPathApproach(
+		worldOf(200, 200, 0), target, 200, DefaultMaxPassableHeight)
+	require.NoError(t, err)
+	require.True(t, result.Found)
+	end := result.Waypoints[len(result.Waypoints)-1]
+	dist := math.Sqrt(
+		(end.X-target.X)*(end.X-target.X) +
+			(end.Y-target.Y)*(end.Y-target.Y) +
+			(end.Z-target.Z)*(end.Z-target.Z))
+	require.LessOrEqual(t, dist, 200.0)
+	require.Greater(t, dist, 40.0, "the walk stops in front, not inside")
+}
+
+// TestFindPathApproachPrefersExactTarget checks that the approach
+// radius never shortens a walk that can reach the exact target: over
+// open ground the arrival is the target cell, not a radius shortcut.
+func TestFindPathApproachPrefersExactTarget(t *testing.T) {
+	spec := &regionSpec{}
+	spec.setFlat(0)
+	engine := newTestEngine(t, spec)
+	target := worldOf(900, 900, 0)
+
+	result, err := engine.FindPathApproach(
+		worldOf(100, 100, 0), target, 200, DefaultMaxPassableHeight)
+	require.NoError(t, err)
+	require.True(t, result.Found)
+	end := result.Waypoints[len(result.Waypoints)-1]
+	require.InDelta(t, target.X, end.X, cellSize)
+	require.InDelta(t, target.Y, end.Y, cellSize)
+}
+
+// waterChannelSpec builds the elven lake shape: the land at -3000 on
+// both sides of a water channel whose bed sits at -4000 (below the
+// -3780 C1 water surface), a climbable 40 unit step slope on the south
+// shore and an optional bridge deck column crossing the channel at
+// land height. The start and the goal sit on opposite shores. The
+// blocks of the channel band are built whole because setCell zeroes
+// the untouched cells of a block.
+func waterChannelSpec(bridge bool) (*regionSpec, Vec3, Vec3) {
+	const land = int16(-3000)
+	const bed = int16(-4000)
+	spec := &regionSpec{}
+	spec.setFlat(land)
+	// The channel band covers the local cells y 400..703 (the block
+	// rows 50..87): the sharp north edge, the bed, the south slope.
+	for by := 50; by <= 87; by++ {
+		for bx := range blocksPerRegionSide {
+			if bridge && bx >= 50 && bx <= 52 {
+				// The bridge column blocks: multilayer with the deck.
+				block := blockSpec{
+					kind:  blockMultilayer,
+					cells: [cellsPerBlock]Layer{},
+				}
+				for cy := range cellsPerBlockSide {
+					ly := by*cellsPerBlockSide + cy
+					for cx := range cellsPerBlockSide {
+						lx := bx*cellsPerBlockSide + cx
+						base := cellHeight(ly, land, bed)
+						block.cells[cx*cellsPerBlockSide+cy] = Layer{
+							Height: base, NSWE: nsweAll,
+						}
+						if lx >= 400 && lx <= 420 {
+							block.stacks[cx*cellsPerBlockSide+cy] = []Layer{
+								{Height: land, NSWE: nsweAll},
+								{Height: base, NSWE: nsweAll},
+							}
+						}
+					}
+				}
+				spec.blocks[bx][by] = block
+
+				continue
+			}
+			block := blockSpec{kind: blockComplex, cells: [cellsPerBlock]Layer{}}
+			for cy := range cellsPerBlockSide {
+				ly := by*cellsPerBlockSide + cy
+				for cx := range cellsPerBlockSide {
+					block.cells[cx*cellsPerBlockSide+cy] = Layer{
+						Height: cellHeight(ly, land, bed), NSWE: nsweAll,
+					}
+				}
+			}
+			spec.blocks[bx][by] = block
+		}
+	}
+	start := worldOf(100, 300, land)
+	end := worldOf(100, 800, land)
+
+	return spec, start, end
+}
+
+// cellHeight returns the surface height of a channel band cell: the
+// bed below y 676, the 40 unit climb slope up to the land on y 676..700
+// and the land from y 701 on.
+func cellHeight(ly int, land, bed int16) int16 {
+	switch {
+	case ly <= 675:
+		return bed
+	case ly <= 700:
+		return int16(-4000 + (ly-675)*40)
+	default:
+		return land
+	}
+}
+
+// TestFindPathWaterCost checks the water cost dimension: a water
+// channel (the geodata floor below the C1 water surface) is walkable
+// but costs more per step than land, so the route prefers the longer
+// bridge over the shorter swim - the elven village town trip shape.
+func TestFindPathWaterCost(t *testing.T) {
+	spec, start, end := waterChannelSpec(true)
+	engine := newTestEngine(t, spec)
+
+	result, err := engine.FindPath(start, end, DefaultMaxPassableHeight)
+	require.NoError(t, err)
+	require.True(t, result.Found)
+	// The route never swims: every waypoint stays above the C1 water
+	// surface (the slope cells above the bed are fair land).
+	for _, wp := range result.Waypoints {
+		require.Greater(t, wp.Z, -3780.0,
+			"the route must cross the water above its surface")
+	}
+	// The bridge route is longer than the direct swim line.
+	direct := math.Hypot(end.X-start.X, end.Y-start.Y)
+	require.Greater(t, result.Length, direct,
+		"the bridge detour is longer than the straight swim")
+	// The route actually uses the bridge column.
+	lowX, highX := worldOf(399, 0, 0).X, worldOf(421, 0, 0).X
+	onBridge := false
+	for _, wp := range result.Waypoints {
+		if wp.X >= lowX && wp.X <= highX {
+			onBridge = true
+		}
+	}
+	require.True(t, onBridge, "the route must cross the bridge column")
+}
+
+// TestFindPathWaterOnlyRouteStillSwims checks the water cost is a
+// preference, not a wall: with no bridge at all the route still
+// crosses the water bed (the server accepts swimming).
+func TestFindPathWaterOnlyRouteStillSwims(t *testing.T) {
+	spec, start, end := waterChannelSpec(false)
+	engine := newTestEngine(t, spec)
+
+	result, err := engine.FindPath(start, end, DefaultMaxPassableHeight)
+	require.NoError(t, err)
+	require.True(t, result.Found, "water remains walkable at a cost")
+}
+
+// TestFindPathDownwardAnyHeight checks the server mirroring step rule:
+// a walk may drop any height (the Mobius movement validation only
+// gates upward steps), so a deck exit over a ledge still plans.
+func TestFindPathDownwardAnyHeight(t *testing.T) {
+	spec := &regionSpec{}
+	spec.setFlat(0)
+	// A high plateau on the left half.
+	for lx := range 400 {
+		spec.setCell(lx, 1000, Layer{Height: 500, NSWE: nsweAll})
+	}
+	engine := newTestEngine(t, spec)
+
+	result, err := engine.FindPath(
+		worldOf(100, 1000, 500), worldOf(900, 1000, 0),
+		DefaultMaxPassableHeight)
+	require.NoError(t, err)
+	require.True(t, result.Found, "the 500 unit drop is walkable")
+
+	// The reverse walk cannot climb the ledge.
+	back, err := engine.FindPath(
+		worldOf(900, 1000, 0), worldOf(100, 1000, 500),
+		DefaultMaxPassableHeight)
+	require.NoError(t, err)
+	require.False(t, back.Found, "the upward ledge stays blocked")
+}
+
+// TestFindPathStepUpForty checks the climb gate matches the Mobius
+// HEIGHT_INCREASE_LIMIT of 40: a 40 unit step is walkable, a 48 unit
+// step is not.
+func TestFindPathStepUpForty(t *testing.T) {
+	for _, tc := range []struct {
+		step   int16
+		expect bool
+	}{
+		{step: 40, expect: true},
+		{step: 48, expect: false},
+	} {
+		spec := &regionSpec{}
+		spec.setFlat(0)
+		for lx := 400; lx < cellsPerRegionSide; lx++ {
+			spec.setCell(lx, 1000, Layer{Height: tc.step, NSWE: nsweAll})
+		}
+		engine := newTestEngine(t, spec)
+		result, err := engine.FindPath(
+			worldOf(100, 1000, 0), worldOf(900, 1000, tc.step),
+			DefaultMaxPassableHeight)
+		require.NoError(t, err)
+		require.Equal(t, tc.expect, result.Found,
+			"a %d unit climb must be found=%t", tc.step, tc.expect)
+	}
+}

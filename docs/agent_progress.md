@@ -4,6 +4,71 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: fix the elven village navigation (town trip to the trader)
+
+Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.
+The stack was redeployed and verified first (STACK_READY, PathFinding=2
+like the reference Windows deployment for the live reproduction).
+
+### Goal
+
+The user reported the bot stuck at x 45544 y 45880 z -2992 trying to
+approach the trader Unoren (44667 46896 -2982) of the floating elven
+village, and earlier sessions swam through the lake under the village
+instead of crossing a bridge. The task: diagnose which Z coordinates
+reach the pathfinder, whether it is used at all and what it returns,
+then fix the navigation so the bridge/deck routes are planned and
+verified from the stuck point and from the lake shore farm points.
+
+### Diagnosis (measured on the deployed pack, live verified)
+
+- The town trip DOES use the pathfinder (`startWalkLeg` ->
+  `Navigator.FindPathTo(from, dest, int16(dest.Z))`): the start z is
+  the live tracked character z, the target z is the merchant spawn z
+  (-2982 for Unoren).
+- `FindPathTo` resolves the target cell layer against that z: the shop
+  cell holds layers -2632 (a raised surface) and -3928 (the lake
+  floor), no deck layer -2984 - the C1 shop interiors have no floor
+  layer in the l2j geodata, so the strict search hunts an unreachable
+  roof layer and aborts at the 1M expansion cap (~12 s).
+- The fallback plain search resolves the target against the START z,
+  which picks the lake floor (-3928) under the shop; water cells cost
+  the same as land, and the swim route (5683 units) is shorter than
+  the bridge route (~6300), so the planned waypoints lead through the
+  lake under the village - the observed swimming.
+- The bridge ramps are gentle slopes (8..16 unit steps) from the
+  fields onto the village deck (-3488 to -2984), fully connected in
+  the geodata; the "disconnected village decks" note was a misreading
+  of the missing shop floor layers plus the water preference.
+- The server (Mobius C1 `GeoEngine.getValidLocation`) allows downward
+  steps of any height, upward steps up to 40 (HEIGHT_INCREASE_LIMIT),
+  and resolves the target z against the TARGET z (`PathFinding.findPath`
+  uses `getHeight(tx, ty, tz)`); the water surface sits at -3780 (the
+  water zones' maxZ) and the lake floor is walkable but slow.
+- The interaction distance (250, 3D) is met from the deck ring around
+  the shop terrace (the counter front), so the walk must only arrive
+  within ~200 units of the merchant position, never inside the
+  counter or on the roof layer.
+
+### Plan
+
+- pathfind: replace the strict layer-target search with an approach
+  radius search (`FindPathApproach`): the A* terminates on the first
+  node within the 3D radius of the target point, which keeps the
+  arrival on the merchant's own deck and out of the water.
+- pathfind: mirror the server step rules in the A* (downward any,
+  upward 40), keep the strict symmetric rule for the line of sight
+  smoothing so routes never collapse across drops.
+- pathfind: water cost - layers below -3780 (the C1 water surface)
+  cost 3x per step, so land routes beat swimming whenever they exist.
+- hunt: the town trips and the manual long walks navigate through the
+  approach search (200 for merchant stops, 150 for manual clicks).
+- Acceptance: regression tests over the real pack from the stuck
+  point and the lake shore farm points reach the merchant on the deck
+  (end z near -2992, within 200 units of Unoren); the live walk
+  crosses a bridge without entering the water; the full suite, lint
+  and mobius_e2e stay green.
+
 ## Active task: fix the real client connection failure (feature/proxy-server)
 
 Started: 2026-09-08 (second round, after the user's first real client

@@ -16,14 +16,12 @@ import (
 )
 
 // fakeNavigator plans straight two point paths: the start (reached
-// instantly) and the requested destination. The targeted form behaves
-// like the plain one unless the deck is flagged unreachable.
+// instantly) and the requested destination.
 type fakeNavigator struct {
-	fail            bool
-	found           bool
-	deckUnreachable bool
-	calls           int
-	callsAt         []time.Time
+	fail    bool
+	found   bool
+	calls   int
+	callsAt []time.Time
 }
 
 func (f *fakeNavigator) result(
@@ -59,28 +57,10 @@ func (f *fakeNavigator) result(
 	}, nil
 }
 
-// FindPathTo plans the deck targeted search: it reports not found when
-// the fake deck is flagged unreachable, like the strict engine search
-// does on the disconnected village decks.
-func (f *fakeNavigator) FindPathTo(
-	start, end pathfind.Vec3, _ int16,
+// FindPathApproach plans the approach radius search.
+func (f *fakeNavigator) FindPathApproach(
+	start, end pathfind.Vec3, _ float64,
 ) (*pathfind.Result, error) {
-	if f.deckUnreachable {
-		f.calls++
-		f.callsAt = append(f.callsAt, time.Now())
-
-		return &pathfind.Result{
-			Found:     false,
-			Aborted:   false,
-			Waypoints: nil,
-			RawPath:   nil,
-			Duration:  0,
-			Explored:  0,
-			OpenLeft:  0,
-			Length:    0,
-		}, nil
-	}
-
 	return f.result(start, end)
 }
 
@@ -243,9 +223,9 @@ func TestTripNoPathArmsCooldown(t *testing.T) {
 }
 
 // TestTripDirectWalkWhenNoGeodataPath verifies the last resort of the
-// walk planning: when no geodata path exists (the disconnected village
-// decks) the leg becomes a single direct walk the server routes
-// itself.
+// walk planning: when no geodata path exists (the approach search
+// reports not found) the leg becomes a single direct walk the server
+// routes itself.
 func TestTripDirectWalkWhenNoGeodataPath(t *testing.T) {
 	loop, game, bot, nav := newTripLoop()
 	nav.found = false
@@ -256,19 +236,19 @@ func TestTripDirectWalkWhenNoGeodataPath(t *testing.T) {
 	require.Equal(t, [][3]int32{legWalkTarget(
 		[3]int32{45000, 50000, -3500}, pathfind.Vec3{X: float64(herbielPos[0]), Y: float64(herbielPos[1]), Z: float64(herbielPos[2])})},
 		game.walks, "the direct walk aims at the nearest town trader")
-	require.Equal(t, 2, nav.calls,
-		"the targeted and the plain search ran")
+	require.Equal(t, 1, nav.calls,
+		"the approach search ran")
 	require.Len(t, loop.waypoints, 1,
 		"the fallback leg is the destination only")
 }
 
-// TestTripFallsBackWhenDeckUnreachable verifies the disconnected deck
-// fallback: the targeted search reports not found (the shop deck is
-// disconnected in the geodata), the plain search still plans the walk
-// and the trip happens - the sale does not need the shop deck.
-func TestTripFallsBackWhenDeckUnreachable(t *testing.T) {
+// TestTripFallsBackWhenApproachNotFound verifies the not found
+// fallback: the approach search reports no reachable cell within the
+// radius, the trip still happens with the direct server routed walk -
+// the sale does not need the geodata path.
+func TestTripFallsBackWhenApproachNotFound(t *testing.T) {
 	loop, game, bot, nav := newTripLoop()
-	nav.deckUnreachable = true
+	nav.found = false
 	fillInventory(bot)
 
 	loop.tick()

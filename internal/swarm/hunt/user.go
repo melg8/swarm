@@ -41,6 +41,12 @@ const (
 	// requests past a few thousand units), so long clicks follow the
 	// bot planned waypoints instead, one server accepted leg at a time.
 	userPathfindDistance = 2000.0
+	// userApproachRadius is the geodata search goal of a long manual
+	// move: the walk ends within this 3D distance of the clicked point,
+	// so a click onto a shop interior cell or a walled structure still
+	// lands on the reachable deck around it instead of routing through
+	// the water below.
+	userApproachRadius = 150.0
 	// inventoryConfirmTimeout bounds how long one inventory action
 	// waits for its server confirmation before the next command fires
 	// anyway. The gate normally releases as soon as the tracker
@@ -390,7 +396,7 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
 	end := pathfind.Vec3{
 		X: float64(l.userX), Y: float64(l.userY), Z: float64(l.userZ),
 	}
-	result, err := l.navigator.FindPath(from, end)
+	result, err := l.navigator.FindPathApproach(from, end, userApproachRadius)
 	if err != nil {
 		l.logger.Printf("Hunt: manual walk path search failed: %v", err)
 

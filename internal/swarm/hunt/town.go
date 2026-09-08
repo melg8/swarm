@@ -55,6 +55,11 @@ const (
 	// merchantApproachDist is the distance the seller stands from the
 	// merchant: below the 250 units interaction distance of the server.
 	merchantApproachDist = 200.0
+	// tripApproachRadius is the geodata search radius the trip walks
+	// end within: a merchant cell without a modeled floor layer (the
+	// elven village shops) or behind a counter stays reachable, the
+	// water deck below the shop - far in z - does not.
+	tripApproachRadius = 200.0
 	// merchantFindRadius is the radius around the character within
 	// which the spawned merchant npc is looked up once the shop point
 	// is reached.
@@ -107,10 +112,11 @@ var townMerchants = []townNpc{
 // pathfind engine is wrapped into one through NewNavigator; tests fake
 // the interface.
 type Navigator interface {
-	// FindPathTo plans a walk that must end on the deck of the target
-	// cell resolved against targetZ; Found=false when that deck is
-	// unreachable from the start.
-	FindPathTo(start, end pathfind.Vec3, targetZ int16) (
+	// FindPathApproach plans a walk that must end within the
+	// approach radius (3D) of the target point: the merchant stops
+	// use the interaction distance, the exact target is preferred
+	// whenever it is reachable.
+	FindPathApproach(start, end pathfind.Vec3, approachRadius float64) (
 		*pathfind.Result, error,
 	)
 	// FindPath plans a walk to the target cell arriving on whatever
@@ -131,13 +137,13 @@ func NewNavigator(engine *pathfind.Engine) Navigator { //nolint:ireturn
 	return engineNavigator{engine: engine}
 }
 
-// FindPathTo searches the walkable path with the engine settings and a
-// strict arrival on the destination deck.
-func (e engineNavigator) FindPathTo(
-	start, end pathfind.Vec3, targetZ int16,
+// FindPathApproach searches the walkable path with the engine settings
+// and the approach radius goal.
+func (e engineNavigator) FindPathApproach(
+	start, end pathfind.Vec3, approachRadius float64,
 ) (*pathfind.Result, error) {
-	return e.engine.FindPathTo(
-		start, end, targetZ, e.engine.MaxPassableHeight())
+	return e.engine.FindPathApproach(
+		start, end, approachRadius, e.engine.MaxPassableHeight())
 }
 
 // FindPath searches the walkable path with the engine settings.
@@ -347,14 +353,13 @@ func (l *Loop) tickTownTrip() {
 }
 
 // startWalkLeg plans the walk to the destination and arms the waypoint
-// follower. The destination is planned as a targeted search first (the
-// walk must end on the deck the destination stands on); when that deck
-// is unreachable - some village decks are disconnected from the fields
-// in the geodata pack - the plain search falls back to any deck, and
-// when no geodata path exists at all the leg becomes a single direct
-// walk the server routes itself (its own pathfinding reaches what the
-// pack misses, proven by the death leash of the earlier sessions). It
-// reports whether the leg was planned.
+// follower. The search goal is the approach radius of the destination
+// (the merchant interaction distance): a destination behind a counter
+// or on a floor layer the geodata does not model is still reached on
+// the surrounding deck, and unreachable destinations leave a fallback
+// direct walk the server routes itself (its own pathfinder reaches
+// what the pack misses, proven by the death leash of the earlier
+// sessions). It reports whether the leg was planned.
 func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
 	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
 	if !ok {
@@ -365,19 +370,11 @@ func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
 		Y: float64(selfY),
 		Z: float64(selfZ),
 	}
-	result, err := l.navigator.FindPathTo(from, dest, int16(dest.Z))
+	result, err := l.navigator.FindPathApproach(from, dest, tripApproachRadius)
 	if err != nil {
 		l.logger.Printf("Hunt: town trip path search failed: %v", err)
 
 		return false
-	}
-	if result == nil || !result.Found || len(result.Waypoints) == 0 {
-		result, err = l.navigator.FindPath(from, dest)
-		if err != nil {
-			l.logger.Printf("Hunt: town trip path search failed: %v", err)
-
-			return false
-		}
 	}
 	if result != nil && result.Found && len(result.Waypoints) > 0 {
 		l.waypoints = result.Waypoints

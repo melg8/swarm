@@ -15,10 +15,11 @@ import (
 	"time"
 )
 
-// DefaultMaxPassableHeight is the default maximum height difference the
-// search accepts between two neighbouring cells. It follows the
-// L2Bot2.0 default (its combat AI moves with 30).
-const DefaultMaxPassableHeight = uint16(30)
+// DefaultMaxPassableHeight is the default maximum height the search
+// accepts climbing between two neighbouring cells. It mirrors the
+// Mobius GeoEngine HEIGHT_INCREASE_LIMIT (40) - the upward step gate
+// of the server movement validation the planned walks must pass.
+const DefaultMaxPassableHeight = uint16(40)
 
 // DefaultCacheCapacity bounds how many parsed regions stay in memory.
 // One multilayer region costs roughly 20 MB parsed, so the default keeps
@@ -233,36 +234,39 @@ type Result struct {
 }
 
 // FindPath searches the walkable path from start to end. The max
-// passable height bounds the height difference the walker can step
-// between neighbouring cells. The target layer is selected as the layer
-// of the target cell closest to the start height, like the original
-// pathfinder does: a target coordinate with several floors resolves to
-// the floor the walker can actually reach from where it stands. A search
-// that exhausts the grid returns Found=false with a nil error; hard
-// failures (no geodata at the start or target, corrupt regions) return
-// an error.
+// passable height bounds the height difference the walker can climb
+// between neighbouring cells; downward steps of any height are
+// accepted like the server does. The target layer is selected as the
+// layer of the target cell closest to the target z, like the server's
+// own pathfinder does (getHeight(tx, ty, tz)), and the search succeeds
+// on the first arrival on the target cell at any layer. A search that
+// exhausts the grid returns Found=false with a nil error; hard
+// failures (no geodata at the start or target, corrupt regions)
+// return an error.
 func (e *Engine) FindPath(
 	start, end Vec3, maxPassableHeight uint16,
 ) (*Result, error) {
 	search := newSearch(e, maxPassableHeight)
 
-	return search.run(start, end, int16(start.Z), false)
+	return search.run(start, end, 0)
 }
 
-// FindPathTo searches the walkable path from start to end and resolves
-// the layer of the target cell against the given z instead of the start
-// height. The search is strict about the arrival: the path must end on
-// the resolved layer of the target cell, the first arrival on the cell
-// at any other height (the water deck below the shop) does not count.
-// Use it when the destination names a deck of a multilayer cell; if the
-// deck is unreachable from the start the search reports not found. The
-// town trips of the hunt loop navigate with it.
-func (e *Engine) FindPathTo(
-	start, end Vec3, targetZ int16, maxPassableHeight uint16,
+// FindPathApproach searches the walkable path from start to end and
+// succeeds as soon as the walk reaches a cell within the approach
+// radius (the 3D distance) of the end point - preferring the exact
+// target whenever it is reachable. The town trips navigate with it:
+// a merchant standing behind a counter or on a floor layer the
+// geodata does not model (the elven village shops hold no deck layer
+// at their real floor z) is still reached correctly, because the walk
+// ends on the deck ring within the merchant interaction distance
+// while the water deck below the shop - close in x and y but far in
+// z - never satisfies the radius.
+func (e *Engine) FindPathApproach(
+	start, end Vec3, approachRadius float64, maxPassableHeight uint16,
 ) (*Result, error) {
 	search := newSearch(e, maxPassableHeight)
 
-	return search.run(start, end, targetZ, true)
+	return search.run(start, end, approachRadius)
 }
 
 // LineOfSight reports whether a straight line between two world

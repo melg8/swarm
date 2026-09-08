@@ -22,6 +22,23 @@ const (
 	impassableScore = float32(math.MaxFloat32 / 2)
 )
 
+// Water plane constants of the C1 world. The water zones of the
+// Mobius data sit with their surface at -3780 (the maxZ of the
+// water.xml cuboids); the geodata layers below it are the lake and
+// sea beds. The server lets characters walk (swim) over them, so
+// the search must too - but at a cost, so land routes win whenever
+// they exist (the elven village town trips crossed the whole lake
+// under the floating island before this cost existed).
+const (
+	// waterLevel is the water surface height; layers below it count
+	// as underwater.
+	waterLevel = int16(-3780)
+	// waterCostMultiplier scales the step cost of every move landing
+	// on an underwater cell: swimming is several times slower than
+	// running and burns the breath meter.
+	waterCostMultiplier = float32(3)
+)
+
 // nodeKey identifies one search node: the cell plus the height of the
 // layer it was reached with. Multilayer cells produce one node per
 // walkable floor, so a cell first touched from the water does not seal
@@ -57,14 +74,20 @@ type search struct {
 	queue             nodeQueue
 	target            Point
 	targetKey         nodeKey
-	strictTarget      bool
-	neighborScratch   []*node
-	ringScratch       []*node
-	region            *Region
-	regionKey         RegionKey
-	explored          int
-	aborted           bool
-	seq               uint64
+	// targetWorld is the world point of the goal; the approach
+	// searches measure the remaining 3D distance against it.
+	targetWorld Vec3
+	// approachRadius terminates the search on the first node within
+	// this 3D distance of targetWorld. Zero keeps the plain cell
+	// arrival semantics (any layer of the target cell).
+	approachRadius  float64
+	neighborScratch []*node
+	ringScratch     []*node
+	region          *Region
+	regionKey       RegionKey
+	explored        int
+	aborted         bool
+	seq             uint64
 }
 
 // newSearch prepares a fresh search over an engine.
@@ -79,7 +102,8 @@ func newSearch(engine *Engine, maxPassableHeight uint16) *search {
 		queue:             make(nodeQueue, 0, 256),
 		target:            Point{X: 0, Y: 0},
 		targetKey:         nodeKey{p: Point{X: 0, Y: 0}, h: 0},
-		strictTarget:      false,
+		targetWorld:       Vec3{X: 0, Y: 0, Z: 0},
+		approachRadius:    0,
 		neighborScratch:   nil,
 		ringScratch:       nil,
 		region:            nil,
@@ -162,34 +186,29 @@ func (s *search) nextSeq() uint64 {
 }
 
 // run executes the whole search and fills the result statistics. The
-// targetResolveZ is the height the target cell resolves its layer
-// against (normally the start z, an explicit deck z for the targeted
-// searches). With strictTarget the search only accepts an arrival on
-// the resolved layer of the target cell; without it the first arrival
-// on the cell wins (the original behavior).
-func (s *search) run(
-	start, end Vec3, targetResolveZ int16, strictTarget bool,
-) (*Result, error) {
+// target cell resolves its intended layer against the target z, like
+// the server's own pathfinder does (PathFinding.findPath resolves
+// getHeight(tx, ty, tz)): a coordinate with several floors picks the
+// floor the destination names, not the floor the start stands on.
+// With a positive approachRadius the search succeeds on the first
+// node within that 3D distance of the end point (the merchant
+// interaction distance of the town trips); with zero it succeeds on
+// the first arrival on the target cell at any layer (the original
+// behavior).
+func (s *search) run(start, end Vec3, approachRadius float64) (*Result, error) {
 	began := time.Now()
 	from, err := s.nodeAtWorld(start)
 	if err != nil {
 		return nil, err
 	}
-	// The target cell resolves its intended layer against the start
-	// height: a coordinate with several floors picks the floor
-	// reachable from where the walker stands (the original
-	// CreateTargetNode takes the start z). The search terminates on the
-	// target cell with whatever layer the walk arrived on - every hop
-	// of the arrival is height validated by construction.
-	to, err := s.nodeAtWorld(Vec3{
-		X: end.X, Y: end.Y, Z: float64(targetResolveZ),
-	})
+	to, err := s.nodeAtWorld(end)
 	if err != nil {
 		return nil, err
 	}
 	s.target = to.coords
 	s.targetKey = to.key
-	s.strictTarget = strictTarget
+	s.targetWorld = end
+	s.approachRadius = approachRadius
 
 	result := &Result{
 		Found:     false,
@@ -229,14 +248,7 @@ func (s *search) astar(from *node) []*node {
 	for s.queue.Len() > 0 {
 		current := heap.Pop(&s.queue).(*node)
 		delete(s.openSet, current.key)
-		reached := current.coords == s.target
-		if reached && s.strictTarget {
-			// The targeted searches only accept an arrival on the
-			// resolved layer: reaching the cell on another deck (the
-			// water below the shop) is not reaching the target.
-			reached = current.key == s.targetKey
-		}
-		if reached {
+		if s.nodeReached(current) {
 			return s.reconstruct(current)
 		}
 		if s.explored >= MaxSearchExpansions {
@@ -284,6 +296,24 @@ func (s *search) astar(from *node) []*node {
 	return nil
 }
 
+// nodeReached reports whether a popped node satisfies the goal of
+// the search: an approach run accepts the first node within the 3D
+// approach radius of the target point (the exact target node sits
+// inside that ball whenever it is reachable), a plain run accepts the
+// first arrival on the target cell whatever layer the walk came on.
+func (s *search) nodeReached(current *node) bool {
+	if s.approachRadius > 0 {
+		world := nodeWorld(current)
+		dx := world.X - s.targetWorld.X
+		dy := world.Y - s.targetWorld.Y
+		dz := world.Z - s.targetWorld.Z
+
+		return math.Sqrt(dx*dx+dy*dy+dz*dz) <= s.approachRadius
+	}
+
+	return current.coords == s.target
+}
+
 // push inserts a node into the open set.
 func (s *search) push(node *node) {
 	s.openSet[node.key] = node
@@ -304,17 +334,22 @@ func (s *search) reconstruct(target *node) []*node {
 }
 
 // costTo returns the movement cost between neighbouring cells, with the
-// wall proximity multiplier of the original (the more walled cells in
-// the 7x7 ring, the more the step costs, pulling the path away from
-// walls).
+// wall proximity multiplier of the original (the more walled cells in the
+// 7x7 ring, the more the step costs, pulling the path away from)
+// and the water penalty of the destination.
 func (s *search) costTo(current, next *node, ring []*node) float32 {
-	if !s.canMoveTo(current, next) {
+	if !s.canStep(current, next) {
 		return impassableScore
 	}
 	cost := commonScore
 	if current.coords.X != next.coords.X &&
 		current.coords.Y != next.coords.Y {
 		cost = diagonalScore
+	}
+	if next.layer.Height < waterLevel {
+		// The step lands underwater: swimming costs several land
+		// steps, so bridges and shores beat water crossings.
+		cost *= waterCostMultiplier
 	}
 
 	return cost * s.obstacleMultiplier(ring)
@@ -339,10 +374,26 @@ func (s *search) obstacleMultiplier(ring []*node) float32 {
 	return float32(len(ring)) / float32(obstacles)
 }
 
-// canMoveTo reports whether the walk from one cell to an adjacent one is
-// allowed by the walls of the source cell and the height difference of
-// the two layers.
-func (s *search) canMoveTo(from, to *node) bool {
+// canStep mirrors the Mobius movement validation of one cell step
+// (GeoEngine.getValidLocation): the walls of the source cell must be
+// open for the step direction, the height may rise at most
+// maxPassableHeight (the Mobius HEIGHT_INCREASE_LIMIT is 40) and any
+// drop is accepted - the server lets characters walk down cliffs and
+// into water, so the search may plan those steps too. The line of
+// sight keeps the stricter symmetric canMoveTo rule so the smoothing
+// never collapses a detour into a straight drop.
+func (s *search) canStep(from, to *node) bool {
+	if !s.wallsOpen(from, to) {
+		return false
+	}
+
+	return int(to.layer.Height)-int(from.layer.Height) <=
+		s.maxPassableHeight
+}
+
+// wallsOpen reports whether the walls of the source node allow the
+// step to the adjacent node.
+func (s *search) wallsOpen(from, to *node) bool {
 	if from.coords.Y > to.coords.Y && !from.layer.IsNorthOpen() {
 		return false
 	}
@@ -356,8 +407,18 @@ func (s *search) canMoveTo(from, to *node) bool {
 		return false
 	}
 
-	return heightDelta(from.layer.Height, to.layer.Height) <=
-		s.maxPassableHeight
+	return true
+}
+
+// canMoveTo reports whether the straight walk from one cell to an
+// adjacent one is allowed by the walls of the source cell and a
+// symmetric height difference within the passable limit. The line of
+// sight raster and the smoothing use this strict form: a leg they
+// verify must stay on one walkable surface, never drop off it.
+func (s *search) canMoveTo(from, to *node) bool {
+	return s.wallsOpen(from, to) &&
+		heightDelta(from.layer.Height, to.layer.Height) <=
+			s.maxPassableHeight
 }
 
 // heuristic is the Manhattan cell distance scaled like the step costs.

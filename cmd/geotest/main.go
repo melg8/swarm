@@ -17,8 +17,8 @@ func main() {
 	// From the hunting zone center to the guard Kendell (47595, 51569, -2992).
 	from := pathfind.Vec3{X: 46112, Y: 41500, Z: -3500}
 	to := pathfind.Vec3{X: 47595, Y: 51569, Z: -2992}
-	res, err := engine.FindPathTo(
-		from, to, int16(to.Z), engine.MaxPassableHeight())
+	res, err := engine.FindPathApproach(
+		from, to, 200, engine.MaxPassableHeight())
 	if err != nil {
 		fmt.Println("path error:", err)
 
