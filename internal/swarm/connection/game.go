@@ -851,8 +851,13 @@ func drainPackets(packets <-chan gamePacket, readerDone <-chan struct{}) {
 	}
 }
 
-// handleServerPacket logs and dispatches known in game packets.
+// handleServerPacket logs and dispatches known in game packets. An
+// empty payload is the zero length frame the read loop reports as
+// no packet: skip it instead of indexing the opcode.
 func (gc *GameClient) handleServerPacket(payload []byte) {
+	if len(payload) == 0 {
+		return
+	}
 	if gc.tracker != nil {
 		gc.tracker.CountPacket()
 	}

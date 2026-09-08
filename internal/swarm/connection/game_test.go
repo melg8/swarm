@@ -22,6 +22,9 @@ import (
 type fakeGameServer struct {
 	listener net.Listener
 	t        *testing.T
+	// flow replaces the default character and world flows when set:
+	// it runs right after the handshake for specialized sessions.
+	flow func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt)
 }
 
 // startFakeGameServer starts a scripted game server on a random port.
@@ -53,6 +56,11 @@ func (s *fakeGameServer) serve() {
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 	serverCrypt := s.handshake(conn)
+	if s.flow != nil {
+		s.flow(s, conn, serverCrypt)
+
+		return
+	}
 	s.characterFlow(conn, serverCrypt)
 	s.worldFlow(conn, serverCrypt)
 }
