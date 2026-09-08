@@ -208,6 +208,11 @@ func TestZoneDeathsDemoteTheBand(t *testing.T) {
 	equipZoneWithGear(bot, 44)
 	loop.tick()
 	require.Equal(t, "elven-goblin-camp", loop.zonePickedID)
+	// The hunt walks into the goblin camp square: deaths count against
+	// the ground they happen in (the position attribution).
+	bot.ApplyPlacement(state.Placement{
+		ObjectID: 100, X: 51707, Y: 50504, Z: -3529,
+	})
 	zoneDeathWaitRevival(bot)
 	// Two deaths count, the third demotes the band.
 	for range 2 {
@@ -250,6 +255,9 @@ func TestZoneDeathsResetOnLevelChange(t *testing.T) {
 	equipZoneWithGear(bot, 44)
 	loop.tick()
 	require.Equal(t, "elven-goblin-camp", loop.zonePickedID)
+	bot.ApplyPlacement(state.Placement{
+		ObjectID: 100, X: 51707, Y: 50504, Z: -3529,
+	})
 	zoneDeathWaitRevival(bot)
 	zoneDeathKill(bot, loop)
 	zoneDeathWaitRevival(bot)
@@ -263,6 +271,32 @@ func TestZoneDeathsResetOnLevelChange(t *testing.T) {
 	require.Empty(t, loop.zoneDeaths)
 }
 
+// TestZoneDeathOnFreshSessionCountsByPosition pins the emergency
+// logout scenario: the character died while the session was offline
+// (the server keeps it in the world through the combat window), so
+// the reconnect lands on a fresh loop before any zone pick - the
+// death spot is the only truthful attribution and the position
+// lookup counts it there.
+func TestZoneDeathOnFreshSessionCountsByPosition(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZones(ElvenHuntingZones())
+	// The character reconnects dead at the goblin camp, no zone picked.
+	setZoneTestLevel(bot, 5)
+	bot.ApplyPlacement(state.Placement{
+		ObjectID: 100, X: 51707, Y: 50504, Z: -3529,
+	})
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 0},
+	})
+	loop.tick()
+	require.Equal(t, "", loop.zonePickedID,
+		"the death tick runs before the first zone pick")
+	require.Equal(t, int32(1), loop.zoneDeaths["elven-goblin-camp"],
+		"the death counts against the square it happened in")
+}
+
 func TestZoneDeathOfDelevelingNeverCounts(t *testing.T) {
 	bot := newTestBot()
 	game := &fakeGame{}
@@ -274,7 +308,11 @@ func TestZoneDeathOfDelevelingNeverCounts(t *testing.T) {
 	require.Equal(t, "elven-goblin-camp", loop.zonePickedID)
 
 	// A death of the delevel phase is the point of the phase, not a
-	// regression signal.
+	// regression signal (the character stands inside the goblin camp
+	// square: only the phase check keeps it from counting).
+	bot.ApplyPlacement(state.Placement{
+		ObjectID: 100, X: 51707, Y: 50504, Z: -3529,
+	})
 	loop.phase = phaseDelevel
 	zoneDeathWaitRevival(bot)
 	zoneDeathKill(bot, loop)

@@ -371,6 +371,13 @@ func PickHuntingZone( //nolint:cyclop
 	return zones[best], true
 }
 
+// containsPoint reports whether the world point lies inside the
+// hunting square of the zone.
+func (z HuntingZone) containsPoint(x int32, y int32) bool {
+	return z.Half > 0 && x >= z.CX-z.Half && x <= z.CX+z.Half &&
+		y >= z.CY-z.Half && y <= z.CY+z.Half
+}
+
 // zoneByID resolves a zone of the registry by its id.
 func (l *Loop) zoneByID(id string) (HuntingZone, bool) {
 	if id == "" {
@@ -591,14 +598,19 @@ func (l *Loop) rotationZone(selfX int32, selfY int32) (HuntingZone, bool) {
 	return l.zones[best], true
 }
 
-// noteZoneDeath counts a hunting death against the active zone: past
-// the death limit the zone outguns the character, the band ladder
-// caps below the zone band (the regression onto an easier ground) and
-// the next tick re-picks with the cap. The counting happens in
+// noteZoneDeath counts a hunting death against the zone the death
+// happened in: the square that contains the death spot first (an
+// emergency logout death lands on a fresh session before any zone
+// pick - the death spot is the only truthful attribution), the picked
+// zone of the loop as the fallback (a flight that ended between the
+// squares still belongs to the ground it fled from). Past the death
+// limit the zone outguns the character, the band ladder caps below
+// the zone band (the regression onto an easier ground) and the next
+// tick re-picks with the cap. The counting happens in
 // recoverFromDeath; the deleveling deaths are the point of that phase
 // and never count.
 func (l *Loop) noteZoneDeath() {
-	zone, ok := l.zoneByID(l.zonePickedID)
+	zone, ok := l.deathZone()
 	if !ok {
 		return
 	}
@@ -625,6 +637,21 @@ func (l *Loop) noteZoneDeath() {
 	l.logger.Printf("Hunt: %d deaths in %s, the zone outguns the "+
 		"character: regressing to an easier band (capped below level "+
 		"%d) until the level grows", deaths, zone.Name, zone.MinLevel)
+}
+
+// deathZone resolves the zone a death counts against: the square
+// that contains the death spot, the picked zone when the spot lies
+// between the squares (a flight that died outside every ground).
+func (l *Loop) deathZone() (HuntingZone, bool) {
+	if x, y, _, ok := l.tracker.SelfPosition(); ok {
+		for index := range l.zones {
+			if l.zones[index].containsPoint(x, y) {
+				return l.zones[index], true
+			}
+		}
+	}
+
+	return l.zoneByID(l.zonePickedID)
 }
 
 // resetZoneDeathState clears the zone death bookkeeping when the
