@@ -6,9 +6,10 @@ package proxy
 
 import (
 	"encoding/binary"
-	"log"
 	"io"
+	"log"
 	"net"
+	"strconv"
 	"testing"
 
 	"github.com/melg8/swarm/internal/swarm/crypt"
@@ -177,7 +178,11 @@ func TestLoginServerFullLoginFlow(t *testing.T) {
 	require.Len(t, list.Servers, 1)
 	entry := list.Servers[0]
 	require.EqualValues(t, 1, entry.ServerID)
-	require.EqualValues(t, gameProxyPort, entry.Port)
+	// The advertised port must match the actual game listener (a random
+	// port in tests, the default 7778 in production).
+	_, advertisedPort, err := net.SplitHostPort(server.GameAddr())
+	require.NoError(t, err)
+	require.EqualValues(t, advertisedPort, strconv.Itoa(int(entry.Port)))
 	require.NotZero(t, entry.Status, "the proxy game server must be up")
 	require.Equal(t, [4]byte{127, 0, 0, 1}, entry.IP)
 

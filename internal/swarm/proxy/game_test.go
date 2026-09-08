@@ -197,7 +197,7 @@ func registerFakeBot(t *testing.T, server *Server, name string) (
 
 	sender := newFakeRawSender()
 	recorder := server.RegisterSession("testbot", sender, tracker)
-	t.Cleanup(func() { server.UnregisterSession("testbot") })
+	t.Cleanup(func() { server.UnregisterSession("testbot", recorder) })
 
 	return recorder, tracker, sender
 }
@@ -321,7 +321,7 @@ func TestGameServerSelectsTheHighlightedBot(t *testing.T) {
 	})
 	first.SetOnline("FirstChar")
 	recorder1 := server.RegisterSession("bot1", newFakeRawSender(), first)
-	t.Cleanup(func() { server.UnregisterSession("bot1") })
+	t.Cleanup(func() { server.UnregisterSession("bot1", recorder1) })
 	recorder1.Record(buildTestCharSelected("FirstChar"))
 
 	second := state.NewBot("bot2")
@@ -341,7 +341,7 @@ func TestGameServerSelectsTheHighlightedBot(t *testing.T) {
 	})
 	second.SetOnline("SecondChar")
 	recorder2 := server.RegisterSession("bot2", newFakeRawSender(), second)
-	t.Cleanup(func() { server.UnregisterSession("bot2") })
+	t.Cleanup(func() { server.UnregisterSession("bot2", recorder2) })
 	recorder2.Record(buildTestCharSelected("SecondChar"))
 
 	// Without a selection the first session serves the client.

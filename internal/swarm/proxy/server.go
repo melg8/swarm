@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -166,12 +167,17 @@ func (s *Server) RegisterSession(
 }
 
 // UnregisterSession removes the bot session and ends its history, which
-// also disconnects the game clients attached to it.
-func (s *Server) UnregisterSession(id string) {
+// also disconnects the game clients attached to it. The recorder
+// argument guards the reconnect cycle: only the session that still owns
+// the id is removed, a replaced session unregisters nothing.
+func (s *Server) UnregisterSession(id string, recorder *Recorder) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.sessions {
 		if s.sessions[i].id == id {
+			if s.sessions[i].recorder != recorder {
+				return
+			}
 			session := s.sessions[i]
 			s.sessions = append(s.sessions[:i], s.sessions[i+1:]...)
 			session.recorder.Close()
@@ -257,8 +263,18 @@ func (s *Server) ClientCount() int {
 	return int(s.clients.Load())
 }
 
-// gamePort returns the game port advertised to clients.
+// gamePort returns the game port advertised to clients: the port of
+// the primary game listener (the default 7778, custom ports follow the
+// -proxy-game flag).
 func (s *Server) gamePort() int32 {
+	if len(s.listeners) > 1 {
+		if _, port, err := net.SplitHostPort(s.listeners[1].Addr().String()); err == nil {
+			if value, err := strconv.Atoi(port); err == nil {
+				return int32(value)
+			}
+		}
+	}
+
 	return gameProxyPort
 }
 

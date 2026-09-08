@@ -15,12 +15,14 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/connection"
 	"github.com/melg8/swarm/internal/swarm/hunt"
 	"github.com/melg8/swarm/internal/swarm/pathfind"
+	"github.com/melg8/swarm/internal/swarm/proxy"
 	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/melg8/swarm/internal/swarm/webserver"
 )
@@ -33,6 +35,7 @@ const (
 	defaultCharName     = "test1"
 	defaultWebAddress   = "127.0.0.1:8080"
 	connectTimeout      = 10 * time.Second
+	defaultProxyLogPath = "proxy.log"
 )
 
 // Candidate geodata directories, checked in order when -geodata is empty:
@@ -83,6 +86,10 @@ type config struct {
 	testFightUIV1 bool
 	geodataDir    string
 	maxPassable   uint
+	proxy         bool
+	proxyLogin    string
+	proxyGame     string
+	proxyLog      string
 }
 
 func parseFlags() config {
@@ -98,6 +105,10 @@ func parseFlags() config {
 		testFightUIV1: false,
 		geodataDir:    "",
 		maxPassable:   uint(pathfind.DefaultMaxPassableHeight),
+		proxy:         false,
+		proxyLogin:    "",
+		proxyGame:     "",
+		proxyLog:      "",
 	}
 	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
 		"login server address")
@@ -123,6 +134,21 @@ func parseFlags() config {
 	flag.StringVar(&cfg.geodataDir, "geodata", "",
 		"geodata directory with X_Y.l2j region files for the pathfind "+
 			"test (auto detected when empty)")
+	flag.BoolVar(&cfg.proxy, "proxy", false,
+		"run the MITM proxy for real C1 clients: an emulated login "+
+			"server on 127.0.0.1:2107 (+127.0.0.2:2106) and an emulated "+
+			"game server on 127.0.0.1:7778 that attach a connecting "+
+			"client to the live bot session (any login/password pair is "+
+			"accepted, the char list shows the selected bot)")
+	flag.StringVar(&cfg.proxyLogin, "proxy-login",
+		proxy.DefaultLoginAddress+","+proxy.LoginFallbackAddress,
+		"comma separated login listen addresses of the proxy (the first "+
+			"is mandatory, the rest are optional fallbacks)")
+	flag.StringVar(&cfg.proxyGame,
+		"proxy-game", proxy.DefaultGameAddress+","+proxy.GameFallbackAddress,
+		"comma separated game listen addresses of the proxy")
+	flag.StringVar(&cfg.proxyLog, "proxy-log", defaultProxyLogPath,
+		"file the proxy writes its client connection log to")
 	flag.UintVar(&cfg.maxPassable, "max-passable",
 		uint(pathfind.DefaultMaxPassableHeight),
 		"maximum walkable height difference between neighbouring cells")
@@ -172,6 +198,7 @@ func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
 // geodata engine serves the town trips of the hunt loop.
 func runBot( //nolint:funlen // linear session script
 	ctx context.Context, cfg config, tracker *state.Bot, engine *pathfind.Engine,
+	proxyServer *proxy.Server,
 ) error {
 	sessionCtx, cancelSession := context.WithCancel(ctx)
 	defer cancelSession()
@@ -188,6 +215,12 @@ func runBot( //nolint:funlen // linear session script
 		return fmt.Errorf("failed to authenticate: %w", err)
 	}
 
+	// The emulated login server of the proxy mirrors the Init packet of
+	// the real one, so its scrambled RSA modulus is published here.
+	if proxyServer != nil {
+		proxyServer.SetRsaModulus(auth.RsaPublicKey)
+	}
+
 	gameConn, err := connectGameServer(auth)
 	if err != nil {
 		return err
@@ -198,6 +231,17 @@ func runBot( //nolint:funlen // linear session script
 		return fmt.Errorf("game handshake failed: %w", err)
 	}
 	game.SetTracker(tracker)
+
+	// The proxy observes the whole session (the recorder replays it to
+	// connecting C1 clients) and forwards their packets through the
+	// shared outbound cipher of the session. The registration must
+	// happen before the session starts reading so nothing is missed.
+	var sessionRecorder *proxy.Recorder
+	if proxyServer != nil {
+		sessionRecorder = proxyServer.RegisterSession(cfg.account, game, tracker)
+		game.SetTap(sessionRecorder.Record)
+		defer proxyServer.UnregisterSession(cfg.account, sessionRecorder)
+	}
 
 	charList, err := game.Authenticate(connection.GameSessionParams{
 		Account:    auth.Account,
@@ -262,11 +306,12 @@ func runBot( //nolint:funlen // linear session script
 // its own. The geodata engine survives the reconnects.
 func runBotForever(
 	ctx context.Context, cfg config, tracker *state.Bot, engine *pathfind.Engine,
+	proxyServer *proxy.Server,
 ) {
 	delay := reconnectMinDelay
 	for {
 		started := time.Now()
-		err := runBot(ctx, cfg, tracker, engine)
+		err := runBot(ctx, cfg, tracker, engine, proxyServer)
 		if ctx.Err() != nil {
 			return
 		}
@@ -324,7 +369,12 @@ func main() {
 	tracker := state.NewBot(cfg.account)
 	registry.Add(tracker)
 
-	web := startWebInterface(cfg, registry, nil)
+	var proxyServer *proxy.Server
+	if cfg.proxy {
+		proxyServer = startProxy(cfg)
+	}
+
+	web := startWebInterface(cfg, registry, nil, proxyServer)
 
 	// The geodata engine serves the town trips of the hunt and the
 	// long manual walks of the web UI (the server side pathfinder
@@ -348,10 +398,70 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
 
-	runBotForever(ctx, cfg, tracker, engine)
+	runBotForever(ctx, cfg, tracker, engine, proxyServer)
 	stop()
 	shutdownWebInterface(web)
+	shutdownProxy(proxyServer)
 	log.Println("Bot finished")
+}
+
+// startProxy builds and runs the client proxy with its own log file so
+// the C1 client connection attempts can be diagnosed without digging
+// through the console output of the bot (see docs/proxy.md).
+func startProxy(cfg config) *proxy.Server {
+	file, err := os.OpenFile(cfg.proxyLog,
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger := log.New(file, "proxy ", log.LstdFlags|log.Lmicroseconds)
+	if err != nil {
+		logger = log.Default()
+		logger.Printf("Proxy log file %s unavailable: %v",
+			cfg.proxyLog, err)
+	}
+	// The log file stays open for the process lifetime: the OS closes
+	// it at exit, no deferred close here (the logger would write into a
+	// closed file otherwise).
+
+	server := proxy.NewServer(logger,
+		proxy.WithLoginAddresses(splitAddresses(cfg.proxyLogin)...),
+		proxy.WithGameAddresses(splitAddresses(cfg.proxyGame)...))
+	if err := server.Listen(); err != nil {
+		logger.Printf("Proxy failed to start: %v", err)
+
+		return nil
+	}
+	go func() {
+		if err := server.Serve(); err != nil {
+			logger.Printf("Proxy stopped: %v", err)
+		}
+	}()
+
+	return server
+}
+
+// splitAddresses splits a comma separated flag value.
+func splitAddresses(value string) []string {
+	addresses := strings.Split(value, ",")
+	cleaned := make([]string, 0, len(addresses))
+	for _, address := range addresses {
+		address = strings.TrimSpace(address)
+		if address != "" {
+			cleaned = append(cleaned, address)
+		}
+	}
+
+	return cleaned
+}
+
+// shutdownProxy stops the client proxy.
+func shutdownProxy(server *proxy.Server) {
+	if server == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("Proxy shutdown failed: %v", err)
+	}
 }
 
 // runTestFightUI serves the bot less fight FX comparison gallery: the
@@ -404,7 +514,7 @@ func runPathfindTest(cfg config) {
 			", pass -geodata with the game server data/geodata directory")
 	}
 
-	web := startWebInterface(cfg, nil, engine)
+	web := startWebInterface(cfg, nil, engine, nil)
 	if web == nil {
 		log.Println("Pathfind test needs the web interface, " +
 			"pass a -web address")
@@ -472,6 +582,7 @@ func detectGeodataDir() string {
 // mode, otherwise the bot registry is served.
 func startWebInterface(
 	cfg config, registry *state.Registry, engine *pathfind.Engine,
+	proxyServer *proxy.Server,
 ) *webserver.Server {
 	if cfg.webAddress == "" {
 		return nil
@@ -491,6 +602,9 @@ func startWebInterface(
 			})
 	} else {
 		server = webserver.NewServer(registry, cfg.webAddress, log.Default())
+		if proxyServer != nil {
+			server.SetProxy(proxyServer)
+		}
 	}
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
