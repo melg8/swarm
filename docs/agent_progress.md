@@ -178,6 +178,13 @@ migration to be performed directly.
   added under `.agents/skills/` (go-verify-loop, webui-harness,
   packet-recipe, mobius-stack), AGENTS.md gained the "Agent skills"
   pointer section; the round 31 entry is in the development log.
+- 2026-09-08 (evening): vendored the samber/cc-skills-golang collection
+  (46 `golang-*` skills, MIT, pinned commit 19a0626a) into
+  `.agents/skills/` as the general Go knowledge base next to the four
+  hand-maintained project playbooks. New tool `tools/install_agent_skills.sh`
+  (install pinned / latest / check drift, exit 1 on drift) manages the
+  vendored dirs only; AGENTS.md documents the commands. A fresh
+  environment receives the skills through git clone alone.
 
 ## Task (completed): gear auto-equip, shop buying strategy, multi-zone hunting
 
