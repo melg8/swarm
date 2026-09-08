@@ -358,8 +358,8 @@ type LootItem struct {
 func (b *Bot) GroundItemByID(objectID int32) (LootItem, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	obj, ok := b.objects[objectID]
-	if !ok || obj.Kind != KindItem {
+	obj := b.objectLocked(objectID)
+	if obj == nil || obj.Kind != KindItem {
 		return LootItem{
 			ObjectID: 0,
 			Name:     "",
@@ -400,7 +400,8 @@ func (b *Bot) NearestGroundItemExcluding(
 	now := time.Now()
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
-	for _, obj := range b.objects {
+	for i := range b.objects {
+		obj := &b.objects[i]
 		if obj.Kind != KindItem {
 			continue
 		}

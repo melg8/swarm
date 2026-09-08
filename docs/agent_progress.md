@@ -891,6 +891,33 @@ precomputed flat data instead of per call allocations).
   server_bench_test.go` (snapshot JSON marshal). Baseline recorded
   above. Pushed as the first atomic commit.
 
+- 2026-09-08: data oriented rework of the tracker storage and the
+  target search landed. `state.Bot.objects` is now a dense
+  `[]WorldObject` array with an `objectIndex map[int32]int32`
+  (removals swap the last record into the freed slot): the packet
+  apply paths mutate the records in place (no more 200 byte struct
+  copies through the map per packet) and every scan walks the memory
+  sequentially. The socially constrained target search
+  (`nearestAttackableSocial`) flattens the living attackable npcs
+  into compact `npcScan` records (one projection per npc, squared
+  distances, no sqrt per pair) and checks the clan pull through
+  precomputed clan bitmasks (`npcdata.NPCClanMask`, bit per clan of
+  the sorted alphabet, the ALL marker bit) instead of nested string
+  loops. `NPCClans` returns the pre-split shared dictionary entries
+  (no strings.Split per NpcInfo packet). `sort.Slice` ->
+  `slices.Sort`/`slices.SortFunc` in the median and the inventory
+  ordering, `NearestNpcByTemplates` dropped its per call map
+  allocation. Benchmark deltas (200 npc world):
+  NearestAttackableConstrained 316 us -> 10 us (31x),
+  SelfAttackerCount 2765 ns -> 212 ns (13x),
+  NearestGroundItemExcluding 2678 ns -> 230 ns (12x),
+  MedianZoneMobLevel 5.9 us/3 allocs -> 1.3 us/1 alloc,
+  NPCClans 60 ns/1 alloc -> 5 ns/0 allocs. Full suite green, lint
+  0 issues (the three pre-existing exhaustruct findings of the
+  combat event literals included explicit zero fields, the swing
+  loop moved into recordAttackSwingsLocked for the funlen limit).
+  Pushed as the second atomic commit.
+
 - 2026-09-08: (2, 4, 8, 10) the web round. The inactive hunting
   zones draw in a bright soft blue with a light fill (the future
   grounds read at a glance instead of barely visible dimmed hints)

@@ -93,8 +93,8 @@ func (b *Bot) applyRotation(r Rotation, stop bool) {
 
 		return
 	}
-	obj, ok := b.objects[r.ObjectID]
-	if !ok {
+	obj := b.objectLocked(r.ObjectID)
+	if obj == nil {
 		return
 	}
 	obj.Heading = r.Heading
@@ -105,7 +105,6 @@ func (b *Bot) applyRotation(r Rotation, stop bool) {
 		obj.DestZ = obj.Z
 	}
 	obj.UpdatedAt = time.Now()
-	b.objects[r.ObjectID] = obj
 	b.touch()
 }
 
@@ -133,13 +132,12 @@ func (b *Bot) ApplySelfTarget(objectID int32) {
 func (b *Bot) ApplyObjectTarget(objectID int32, targetID int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj, ok := b.objects[objectID]
-	if !ok {
+	obj := b.objectLocked(objectID)
+	if obj == nil {
 		return
 	}
 	obj.TargetID = targetID
 	obj.UpdatedAt = time.Now()
-	b.objects[objectID] = obj
 	b.touch()
 }
 
@@ -156,13 +154,12 @@ func (b *Bot) ApplyTargetClear(objectID int32) {
 
 		return
 	}
-	obj, ok := b.objects[objectID]
-	if !ok {
+	obj := b.objectLocked(objectID)
+	if obj == nil {
 		return
 	}
 	obj.TargetID = 0
 	obj.UpdatedAt = time.Now()
-	b.objects[objectID] = obj
 	b.touch()
 }
 
@@ -170,13 +167,12 @@ func (b *Bot) ApplyTargetClear(objectID int32) {
 func (b *Bot) ApplyMoveType(mt MoveType) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj, ok := b.objects[mt.ObjectID]
-	if !ok {
+	obj := b.objectLocked(mt.ObjectID)
+	if obj == nil {
 		return
 	}
 	obj.Running = mt.Running
 	obj.UpdatedAt = time.Now()
-	b.objects[mt.ObjectID] = obj
 	b.touch()
 }
 
@@ -194,8 +190,8 @@ func (b *Bot) ApplyTeleport(t Teleport) {
 
 		return
 	}
-	obj, ok := b.objects[t.ObjectID]
-	if !ok {
+	obj := b.objectLocked(t.ObjectID)
+	if obj == nil {
 		return
 	}
 	obj.X = t.X
@@ -207,7 +203,6 @@ func (b *Bot) ApplyTeleport(t Teleport) {
 	obj.DestY = t.Y
 	obj.DestZ = t.Z
 	obj.UpdatedAt = time.Now()
-	b.objects[t.ObjectID] = obj
 	b.touch()
 }
 
@@ -224,7 +219,6 @@ func (b *Bot) ApplySpawnItem(info ItemInfo) {
 	obj.Y = info.Y
 	obj.Z = info.Z
 	obj.UpdatedAt = time.Now()
-	b.objects[info.ObjectID] = obj
 	b.touch()
 	b.recordLocked("item appeared: " + itemName(obj.Name, info.TemplateID))
 }
@@ -238,16 +232,17 @@ func (b *Bot) ApplySpawnItem(info ItemInfo) {
 func (b *Bot) ApplyItemPickup(p ItemPickup) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj, ok := b.objects[p.ObjectID]
-	if !ok {
+	obj := b.objectLocked(p.ObjectID)
+	if obj == nil {
 		return
 	}
 	name := itemName(obj.Name, obj.TemplateID)
-	delete(b.objects, p.ObjectID)
+	slot := b.objectIndex[p.ObjectID]
+	b.removeObjectAtLocked(slot, p.ObjectID)
 	pickerName := ""
 	if p.PlayerID == b.selfID {
 		pickerName = "self"
-	} else if picker, found := b.objects[p.PlayerID]; found {
+	} else if picker := b.objectLocked(p.PlayerID); picker != nil {
 		pickerName = picker.Name
 	}
 	b.touch()
@@ -267,7 +262,7 @@ func (b *Bot) objectNameLocked(objectID int32) string {
 	if objectID == b.selfID {
 		return b.char.Name
 	}
-	if obj, ok := b.objects[objectID]; ok && obj.Name != "" {
+	if obj := b.objectLocked(objectID); obj != nil && obj.Name != "" {
 		return obj.Name
 	}
 

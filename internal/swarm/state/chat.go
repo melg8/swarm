@@ -80,9 +80,8 @@ func (b *Bot) ApplySocialAction(a SocialAction) {
 	now := time.Now()
 	if a.ObjectID == b.selfID {
 		b.char.SocialUntil = now.Add(socialWindow)
-	} else if obj, ok := b.objects[a.ObjectID]; ok {
+	} else if obj := b.objectLocked(a.ObjectID); obj != nil {
 		obj.SocialUntil = now.Add(socialWindow)
-		b.objects[a.ObjectID] = obj
 	}
 	if a.ActionID != socialActionLevelUp {
 		return
@@ -90,7 +89,7 @@ func (b *Bot) ApplySocialAction(a SocialAction) {
 	name := "someone"
 	if a.ObjectID == b.selfID {
 		name = "You"
-	} else if obj, ok := b.objects[a.ObjectID]; ok && obj.Name != "" {
+	} else if obj := b.objectLocked(a.ObjectID); obj != nil && obj.Name != "" {
 		name = obj.Name
 	}
 	b.recordChatLocked("social", name+" reached a new level")

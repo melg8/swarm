@@ -739,9 +739,12 @@ func TestNearestAttackableUsesProjectedPosition(t *testing.T) {
 	bot.ApplyMovement(Movement{
 		ObjectID: 8, X: 46000, Y: 50000, DestX: 45050, DestY: 50000,
 	})
-	runner := bot.objects[8]
+	// The test pokes the tracked record directly to age the
+	// movement start (no lock needed: the test is single
+	// threaded).
+	runner := bot.objectLocked(8)
+	require.NotNil(t, runner)
 	runner.MoveAt = time.Now().Add(-5 * time.Second)
-	bot.objects[8] = runner
 
 	target, ok := bot.NearestAttackable(1500, nil)
 	require.True(t, ok)

@@ -27,17 +27,20 @@ const (
 
 // WorldObject is one object in the vicinity of the bot character.
 type WorldObject struct {
-	ObjectID        int32
-	Kind            ObjectKind
-	Name            string
-	Title           string
-	TemplateID      int32
-	Attackable      bool
-	Aggressive      bool
-	AggroRange      int32
-	Level           int32
-	ClanHelpRange   int32
-	Clans           []string
+	ObjectID      int32
+	Kind          ObjectKind
+	Name          string
+	Title         string
+	TemplateID    int32
+	Attackable    bool
+	Aggressive    bool
+	AggroRange    int32
+	Level         int32
+	ClanHelpRange int32
+	// ClanMask is the precomputed clan bitmask of the npc (see
+	// npcdata.NPCClanMask): the social pull check of the target
+	// search works on the bits instead of the clan strings.
+	ClanMask        uint64
 	AutoAttacking   bool
 	CombatUntil     time.Time
 	Dead            bool
@@ -78,7 +81,7 @@ func newWorldObject(objectID int32, kind ObjectKind) WorldObject {
 		AggroRange:      0,
 		Level:           0,
 		ClanHelpRange:   0,
-		Clans:           nil,
+		ClanMask:        0,
 		AutoAttacking:   false,
 		CombatUntil:     time.Time{},
 		Dead:            false,

@@ -6,7 +6,7 @@ package state
 
 import (
 	"math"
-	"sort"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -336,10 +336,16 @@ type Bot struct {
 	// selling, deleveling). Empty until the loop publishes its
 	// first phase; the manual only sessions stay empty (the loop
 	// never sets it) and the UI falls back to the status text.
-	phase        string
-	selfID       int32
-	char         CharacterState
-	objects      map[int32]WorldObject
+	phase  string
+	selfID int32
+	char   CharacterState
+	// objects stores the world in a dense array (slot order, no
+	// holes): the packet apply paths mutate the records in place
+	// and the scans walk the memory sequentially. objectIndex
+	// maps the object id to its slot; removals swap the last
+	// record into the freed slot.
+	objects      []WorldObject
+	objectIndex  map[int32]int32
 	inventory    map[int32]InventoryItem
 	paperdoll    [PaperdollSlots]int32
 	events       []Event
@@ -383,7 +389,8 @@ func NewBot(id string) *Bot {
 		combatSeq:          0,
 		selfID:             0,
 		char:               newCharacterState(),
-		objects:            make(map[int32]WorldObject),
+		objects:            nil,
+		objectIndex:        make(map[int32]int32),
 		inventory:          make(map[int32]InventoryItem),
 		paperdoll:          [PaperdollSlots]int32{},
 		events:             make([]Event, eventCapacity),
@@ -523,7 +530,8 @@ func (b *Bot) SelfAttackerCount() int {
 		return 0
 	}
 	count := 0
-	for _, obj := range b.objects {
+	for i := range b.objects {
+		obj := &b.objects[i]
 		if obj.Kind == KindNPC && obj.Attackable && !obj.Dead &&
 			obj.TargetID == b.selfID {
 			count++
@@ -547,8 +555,8 @@ func (b *Bot) SelfDead() bool {
 func (b *Bot) ObjectPosition(objectID int32) (int32, int32, int32, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	obj, ok := b.objects[objectID]
-	if !ok {
+	obj := b.objectLocked(objectID)
+	if obj == nil {
 		return 0, 0, 0, false
 	}
 
@@ -560,8 +568,8 @@ func (b *Bot) ObjectPosition(objectID int32) (int32, int32, int32, bool) {
 func (b *Bot) ObjectName(objectID int32) string {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	obj, ok := b.objects[objectID]
-	if !ok {
+	obj := b.objectLocked(objectID)
+	if obj == nil {
 		return ""
 	}
 
@@ -573,9 +581,9 @@ func (b *Bot) ObjectName(objectID int32) string {
 func (b *Bot) ObjectAlive(objectID int32) bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	obj, ok := b.objects[objectID]
+	obj := b.objectLocked(objectID)
 
-	return ok && !obj.Dead
+	return obj != nil && !obj.Dead
 }
 
 // SelfHealthPercent returns the current HP of the character as a
@@ -602,8 +610,8 @@ func (b *Bot) SelfHealthPercent() float64 {
 func (b *Bot) ObjectHealthPercent(objectID int32) float64 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	obj, ok := b.objects[objectID]
-	if !ok || obj.MaxHP <= 0 {
+	obj := b.objectLocked(objectID)
+	if obj == nil || obj.MaxHP <= 0 {
 		return -1
 	}
 	pct := obj.CurHP / obj.MaxHP * 100
@@ -736,7 +744,8 @@ func (b *Bot) ResetSession() {
 	b.drainCommands()
 	b.selfID = 0
 	b.char = newCharacterState()
-	b.objects = make(map[int32]WorldObject)
+	b.objects = nil
+	b.objectIndex = make(map[int32]int32)
 	b.inventory = make(map[int32]InventoryItem)
 	b.walkPath = nil
 	b.walkPathAt = time.Time{}
@@ -912,8 +921,8 @@ func (b *Bot) ApplyPlacement(p Placement) {
 
 		return
 	}
-	obj, ok := b.objects[p.ObjectID]
-	if !ok {
+	obj := b.objectLocked(p.ObjectID)
+	if obj == nil {
 		return
 	}
 	obj.X = p.X
@@ -928,7 +937,6 @@ func (b *Bot) ApplyPlacement(p Placement) {
 	}
 	obj.MoveAt = time.Now()
 	obj.UpdatedAt = time.Now()
-	b.objects[p.ObjectID] = obj
 	b.touch()
 }
 
@@ -961,8 +969,8 @@ func (b *Bot) ApplyMovement(m Movement) {
 
 		return
 	}
-	obj, ok := b.objects[m.ObjectID]
-	if !ok {
+	obj := b.objectLocked(m.ObjectID)
+	if obj == nil {
 		return
 	}
 	obj.X = m.X
@@ -977,7 +985,6 @@ func (b *Bot) ApplyMovement(m Movement) {
 	obj.Moving = !arrived
 	obj.MoveAt = time.Now()
 	obj.UpdatedAt = time.Now()
-	b.objects[m.ObjectID] = obj
 	b.touch()
 }
 
@@ -1005,8 +1012,8 @@ func (b *Bot) ApplyPawnMovement(m PawnMovement) {
 		b.char.LastHitAt = now
 		b.touch()
 	}
-	obj, ok := b.objects[m.ObjectID]
-	if !ok {
+	obj := b.objectLocked(m.ObjectID)
+	if obj == nil {
 		return
 	}
 	obj.X = m.X
@@ -1021,10 +1028,9 @@ func (b *Bot) ApplyPawnMovement(m PawnMovement) {
 	obj.Moving = true
 	obj.Running = true
 	obj.TargetID = m.TargetID
-	b.markObjectCombatLocked(&obj, now)
+	b.markObjectCombatLocked(obj, now)
 	obj.MoveAt = now
 	obj.UpdatedAt = now
-	b.objects[m.ObjectID] = obj
 	b.touch()
 }
 
@@ -1090,7 +1096,7 @@ func (b *Bot) ApplyAttack(a Attack) {
 		}
 		b.noteSelfCombatLocked(now)
 		b.touch()
-	} else if obj, ok := b.objects[a.AttackerID]; ok {
+	} else if obj := b.objectLocked(a.AttackerID); obj != nil {
 		obj.X = a.X
 		obj.Y = a.Y
 		obj.Z = a.Z
@@ -1100,9 +1106,8 @@ func (b *Bot) ApplyAttack(a Attack) {
 		if a.TargetCount > 0 {
 			obj.TargetID = a.TargetIDs[0]
 		}
-		b.markObjectCombatLocked(&obj, now)
+		b.markObjectCombatLocked(obj, now)
 		obj.UpdatedAt = now
-		b.objects[a.AttackerID] = obj
 		b.touch()
 	}
 	b.recordSwingEventsLocked(a, now)
@@ -1117,10 +1122,9 @@ func (b *Bot) ApplyAttack(a Attack) {
 
 			continue
 		}
-		if obj, ok := b.objects[a.TargetIDs[i]]; ok {
-			b.markObjectCombatLocked(&obj, now)
+		if obj := b.objectLocked(a.TargetIDs[i]); obj != nil {
+			b.markObjectCombatLocked(obj, now)
 			obj.UpdatedAt = now
-			b.objects[a.TargetIDs[i]] = obj
 		}
 	}
 }
@@ -1162,14 +1166,13 @@ func (b *Bot) ApplyAutoAttackStart(objectID int32) {
 
 		return
 	}
-	obj, ok := b.objects[objectID]
-	if !ok {
+	obj := b.objectLocked(objectID)
+	if obj == nil {
 		return
 	}
 	obj.AutoAttacking = true
-	b.markObjectCombatLocked(&obj, now)
+	b.markObjectCombatLocked(obj, now)
 	obj.UpdatedAt = now
-	b.objects[objectID] = obj
 	b.touch()
 }
 
@@ -1183,13 +1186,12 @@ func (b *Bot) ApplyAutoAttackStop(objectID int32) {
 
 		return
 	}
-	obj, ok := b.objects[objectID]
-	if !ok {
+	obj := b.objectLocked(objectID)
+	if obj == nil {
 		return
 	}
 	obj.AutoAttacking = false
 	obj.UpdatedAt = time.Now()
-	b.objects[objectID] = obj
 	b.touch()
 }
 
@@ -1204,7 +1206,7 @@ func (b *Bot) ApplyNpcInfo(info NpcInfo) {
 	obj.AggroRange = npcdata.NPCAggroRange(info.TemplateID)
 	obj.Level = npcdata.NPCLevel(info.TemplateID)
 	obj.ClanHelpRange = npcdata.NPCClanHelpRange(info.TemplateID)
-	obj.Clans = npcdata.NPCClans(info.TemplateID)
+	obj.ClanMask = npcdata.NPCClanMask(info.TemplateID)
 	obj.X = info.X
 	obj.Y = info.Y
 	obj.Z = info.Z
@@ -1223,11 +1225,10 @@ func (b *Bot) ApplyNpcInfo(info NpcInfo) {
 	obj.Title = info.Title
 	now := time.Now()
 	if info.InCombat {
-		b.markObjectCombatLocked(&obj, now)
+		b.markObjectCombatLocked(obj, now)
 	}
 	obj.MoveAt = now
 	obj.UpdatedAt = now
-	b.objects[info.ObjectID] = obj
 	b.touch()
 	b.recordLocked("npc spawned: " + obj.Name)
 }
@@ -1254,11 +1255,10 @@ func (b *Bot) ApplyPlayerInfo(info PlayerInfo) {
 	obj.DestZ = info.Z
 	now := time.Now()
 	if info.InCombat {
-		b.markObjectCombatLocked(&obj, now)
+		b.markObjectCombatLocked(obj, now)
 	}
 	obj.MoveAt = now
 	obj.UpdatedAt = now
-	b.objects[info.ObjectID] = obj
 	b.touch()
 	b.recordLocked("player appeared: " + info.Name)
 }
@@ -1275,7 +1275,6 @@ func (b *Bot) ApplyItemInfo(info ItemInfo) {
 	obj.Y = info.Y
 	obj.Z = info.Z
 	obj.UpdatedAt = time.Now()
-	b.objects[info.ObjectID] = obj
 	b.touch()
 	b.recordLocked("item dropped: " + itemName(obj.Name, info.TemplateID))
 }
@@ -1286,16 +1285,17 @@ func (b *Bot) ApplyItemInfo(info ItemInfo) {
 func (b *Bot) RemoveObject(objectID int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	obj, ok := b.objects[objectID]
+	slot, ok := b.objectIndex[objectID]
 	if !ok {
 		return
 	}
-	delete(b.objects, objectID)
+	name := b.objects[slot].Name
+	b.removeObjectAtLocked(slot, objectID)
 	if b.char.TargetID == objectID {
 		b.clearSelfTargetLocked("target object removed")
 	}
 	b.touch()
-	b.recordLocked("object removed: " + obj.Name)
+	b.recordLocked("object removed: " + name)
 }
 
 // Status attribute ids from the Mobius StatusUpdate packet.
@@ -1323,11 +1323,11 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
 
 		return
 	}
-	obj, ok := b.objects[objectID]
-	if !ok {
+	obj := b.objectLocked(objectID)
+	if obj == nil {
 		return
 	}
-	b.recordObjectDamageLocked(&obj, objectID, attrs, now)
+	b.recordObjectDamageLocked(obj, objectID, attrs, now)
 	for _, attr := range attrs {
 		switch attr.ID {
 		case AttrCurHP:
@@ -1342,7 +1342,6 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
 		}
 	}
 	obj.UpdatedAt = time.Now()
-	b.objects[objectID] = obj
 	if obj.Dead && b.char.TargetID == objectID {
 		// A killed target is no target anymore: the server keeps
 		// the corpse selected, the tracker drops it so the HUD
@@ -1386,14 +1385,43 @@ func (b *Bot) RecordEvent(message string) {
 	b.recordLocked(message)
 }
 
-// upsertLocked returns the existing object or a fresh one for the id.
-// The caller must hold the write lock.
-func (b *Bot) upsertLocked(objectID int32, kind ObjectKind) WorldObject {
-	if obj, ok := b.objects[objectID]; ok {
-		return obj
+// upsertLocked returns a pointer to the existing object record or
+// appends a fresh one for the id. The pointer stays valid until the
+// next append or removal - the packet apply paths finish their
+// mutation before either happens. The caller must hold the write
+// lock.
+func (b *Bot) upsertLocked(objectID int32, kind ObjectKind) *WorldObject {
+	if slot, ok := b.objectIndex[objectID]; ok {
+		return &b.objects[slot]
+	}
+	b.objects = append(b.objects, newWorldObject(objectID, kind))
+	slot := int32(len(b.objects) - 1)
+	b.objectIndex[objectID] = slot
+
+	return &b.objects[slot]
+}
+
+// objectLocked returns a pointer to the record of the object id, nil
+// when the id is unknown. The caller must hold a lock.
+func (b *Bot) objectLocked(objectID int32) *WorldObject {
+	if slot, ok := b.objectIndex[objectID]; ok {
+		return &b.objects[slot]
 	}
 
-	return newWorldObject(objectID, kind)
+	return nil
+}
+
+// removeObjectAtLocked frees a slot of the dense object array: the
+// last record moves into the freed slot and the index follows it, so
+// the array stays dense. The caller must hold the write lock.
+func (b *Bot) removeObjectAtLocked(slot int32, objectID int32) {
+	last := int32(len(b.objects) - 1)
+	if slot != last {
+		b.objects[slot] = b.objects[last]
+		b.objectIndex[b.objects[slot].ObjectID] = slot
+	}
+	b.objects = b.objects[:last]
+	delete(b.objectIndex, objectID)
 }
 
 // charObjectID returns the object id of the self player, zero when the
@@ -1475,7 +1503,8 @@ func (b *Bot) NearestAttacker() (AttackTarget, bool) {
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
 	now := time.Now()
-	for _, obj := range b.objects {
+	for i := range b.objects {
+		obj := &b.objects[i]
 		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead ||
 			obj.TargetID != b.selfID {
 			continue
@@ -1537,7 +1566,8 @@ func (b *Bot) ZoneHasAttackable(zone *Zone) bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	now := time.Now()
-	for _, obj := range b.objects {
+	for i := range b.objects {
+		obj := &b.objects[i]
 		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
 			continue
 		}
@@ -1568,13 +1598,19 @@ func (b *Bot) NearestAttackableConstrained(
 }
 
 // nearestAttackable is the shared target search core of the two public
-// pickers.
+// pickers. The plain variant walks the dense storage directly; the
+// socially constrained variant flattens the living attackable npcs
+// into compact scan records first (see nearestAttackableSocial).
 func (b *Bot) nearestAttackable(
 	maxDistance float64, zone *Zone, skip map[int32]bool,
 	maxLevel int32, avoidSocial bool,
 ) (AttackTarget, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
+	if avoidSocial {
+		return b.nearestAttackableSocial(
+			maxDistance, zone, skip, maxLevel)
+	}
 
 	//nolint:exhaustruct // zero value grows inside the loop
 	best := AttackTarget{}
@@ -1583,7 +1619,8 @@ func (b *Bot) nearestAttackable(
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
 	now := time.Now()
-	for _, obj := range b.objects {
+	for i := range b.objects {
+		obj := &b.objects[i]
 		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
 			continue
 		}
@@ -1593,11 +1630,9 @@ func (b *Bot) nearestAttackable(
 		if maxLevel > 0 && obj.Level > maxLevel && obj.Level > 0 {
 			continue
 		}
-		if avoidSocial && b.socialHelpersNearLocked(obj, now) {
-			continue
-		}
 		x, y := projectedPosition(obj, now)
-		if !zone.Contains(int32(math.Round(x)), int32(math.Round(y))) {
+		if !zone.Contains(
+			int32(math.Round(x)), int32(math.Round(y))) {
 			continue
 		}
 		dist := math.Hypot(x-selfX, y-selfY)
@@ -1617,6 +1652,73 @@ func (b *Bot) nearestAttackable(
 	return best, found
 }
 
+// nearestAttackableSocial is the constrained variant of the target
+// search: one pass flattens the living attackable npcs into compact
+// scan records (one projection per npc, clans as bitmasks), the pair
+// check of the social pull walks that flat array - the old
+// implementation rescanned the whole world storage per candidate. The
+// caller must hold the read lock.
+func (b *Bot) nearestAttackableSocial(
+	maxDistance float64, zone *Zone, skip map[int32]bool, maxLevel int32,
+) (AttackTarget, bool) {
+	//nolint:exhaustruct // zero value grows inside the loop
+	best := AttackTarget{}
+	bestDist := maxDistance
+	found := false
+	selfX := float64(b.char.X)
+	selfY := float64(b.char.Y)
+	now := time.Now()
+	scans := make([]npcScan, 0, len(b.objects))
+	for i := range b.objects {
+		obj := &b.objects[i]
+		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead {
+			continue
+		}
+		x, y := projectedPosition(obj, now)
+		scans = append(scans, npcScan{
+			x:             x,
+			y:             y,
+			z:             obj.Z,
+			objectID:      obj.ObjectID,
+			slot:          int32(i),
+			level:         obj.Level,
+			clanHelpRange: obj.ClanHelpRange,
+			clanMask:      obj.ClanMask,
+		})
+	}
+	for i := range scans {
+		cand := &scans[i]
+		if skip[cand.objectID] {
+			continue
+		}
+		if maxLevel > 0 && cand.level > maxLevel && cand.level > 0 {
+			continue
+		}
+		if !zone.Contains(
+			int32(math.Round(cand.x)), int32(math.Round(cand.y))) {
+			continue
+		}
+		if socialHelpersNear(scans, cand) {
+			continue
+		}
+		dist := math.Hypot(cand.x-selfX, cand.y-selfY)
+		if dist < bestDist {
+			bestDist = dist
+			found = true
+			obj := &b.objects[cand.slot]
+			best = AttackTarget{
+				ObjectID: cand.objectID,
+				Name:     obj.Name,
+				X:        int32(math.Round(cand.x)),
+				Y:        int32(math.Round(cand.y)),
+				Z:        cand.z,
+			}
+		}
+	}
+
+	return best, found
+}
+
 // socialHelpMargin widens the clan help radius of the target search: a
 // pack mate that wanders into the radius while the fight runs would
 // join it, so the pick keeps a spare margin instead of trusting the
@@ -1627,31 +1729,54 @@ const socialHelpMargin = 200.0
 // more than 600 units apart in height never answer the call.
 const socialHelpZLimit = 600.0
 
-// socialHelpersNearLocked reports whether attacking obj would pull its
-// clan mates: the Mobius AttackableAI lets the attacked npc call every
-// nearby attackable that shares one of its clans (the special ALL clan
-// matches everything) within its clanHelpRange. The candidate list is
-// the projected positions of the live objects, so moving pack mates
-// are measured where they actually stand.
-func (b *Bot) socialHelpersNearLocked(obj WorldObject, now time.Time) bool {
-	if obj.ClanHelpRange <= 0 {
+// npcScan is the compact scan record of one living attackable npc:
+// the projected position, the z level, the clan bitmask and the
+// slot of the world record packed into one cache friendly block.
+// The constrained target search builds one array of them per call
+// and the social pull check walks it pairwise - no struct copies
+// out of the world storage, no repeated projections, no string
+// work in the pair loop.
+type npcScan struct {
+	x             float64
+	y             float64
+	z             int32
+	objectID      int32
+	slot          int32
+	level         int32
+	clanHelpRange int32
+	clanMask      uint64
+}
+
+// socialHelpersNear reports whether attacking the candidate would
+// pull its clan mates: the Mobius AttackableAI lets the attacked npc
+// call every nearby attackable that shares one of its clans (the
+// special ALL clan matches everything) within its clanHelpRange. The
+// positions of the flat scan array are the projected ones, so moving
+// pack mates are measured where they actually stand.
+func socialHelpersNear(scans []npcScan, cand *npcScan) bool {
+	if cand.clanHelpRange <= 0 || cand.clanMask == 0 {
 		return false
 	}
-	x, y := projectedPosition(obj, now)
-	reach := float64(obj.ClanHelpRange) + socialHelpMargin
-	for _, other := range b.objects {
-		if other.ObjectID == obj.ObjectID || other.Kind != KindNPC ||
-			!other.Attackable || other.Dead {
+	reach := float64(cand.clanHelpRange) + socialHelpMargin
+	reachSq := reach * reach
+	for i := range scans {
+		other := &scans[i]
+		if other.objectID == cand.objectID {
 			continue
 		}
-		if !clanAssists(obj, other) {
+		if !clanMaskAssists(cand.clanMask, other.clanMask) {
 			continue
 		}
-		if math.Abs(float64(other.Z-obj.Z)) > socialHelpZLimit {
+		zDiff := other.z - cand.z
+		if zDiff < 0 {
+			zDiff = -zDiff
+		}
+		if float64(zDiff) > socialHelpZLimit {
 			continue
 		}
-		ox, oy := projectedPosition(other, now)
-		if math.Hypot(ox-x, oy-y) <= reach {
+		dx := other.x - cand.x
+		dy := other.y - cand.y
+		if dx*dx+dy*dy <= reachSq {
 			return true
 		}
 	}
@@ -1659,29 +1784,21 @@ func (b *Bot) socialHelpersNearLocked(obj WorldObject, now time.Time) bool {
 	return false
 }
 
-// clanAssists mirrors the Mobius clan check of the assist call: the
-// attacked npc obj calls the nearby npc other when their clans
-// intersect, or when obj itself belongs to the ALL clan (ALL matches
-// every clan). The single sided ALL keeps the server semantics: a lone
-// ALL mob next to a clanned mob does not pull it.
-func clanAssists(attacked WorldObject, helper WorldObject) bool {
-	if len(attacked.Clans) == 0 || len(helper.Clans) == 0 {
+// clanMaskAssists mirrors the Mobius clan check of the assist call on
+// the precomputed bitmasks: the attacked npc calls the nearby npc when
+// their clans share a bit, or when the attacked npc itself belongs to
+// the ALL clan (ALL matches every clan). The single sided ALL keeps
+// the server semantics: a lone ALL mob next to a clanned mob does not
+// pull it.
+func clanMaskAssists(attacked uint64, helper uint64) bool {
+	if attacked == 0 || helper == 0 {
 		return false
 	}
-	for _, clan := range attacked.Clans {
-		if clan == "ALL" {
-			return true
-		}
-	}
-	for _, helperClan := range helper.Clans {
-		for _, attackedClan := range attacked.Clans {
-			if helperClan == attackedClan {
-				return true
-			}
-		}
+	if attacked&npcdata.ClanMaskAll != 0 {
+		return true
 	}
 
-	return false
+	return attacked&helper&^npcdata.ClanMaskAll != 0
 }
 
 // NearestNpcByTemplates returns the closest living npc whose template id
@@ -1693,10 +1810,6 @@ func (b *Bot) NearestNpcByTemplates(
 ) (AttackTarget, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	wanted := make(map[int32]struct{}, len(templates))
-	for _, id := range templates {
-		wanted[id] = struct{}{}
-	}
 
 	//nolint:exhaustruct // zero value grows inside the loop
 	best := AttackTarget{}
@@ -1704,11 +1817,12 @@ func (b *Bot) NearestNpcByTemplates(
 	found := false
 	selfX := float64(b.char.X)
 	selfY := float64(b.char.Y)
-	for _, obj := range b.objects {
+	for i := range b.objects {
+		obj := &b.objects[i]
 		if obj.Kind != KindNPC || obj.Dead {
 			continue
 		}
-		if _, ok := wanted[obj.TemplateID]; !ok {
+		if !templateWanted(obj.TemplateID, templates) {
 			continue
 		}
 		dist := math.Hypot(
@@ -1729,6 +1843,19 @@ func (b *Bot) NearestNpcByTemplates(
 	return best, found
 }
 
+// templateWanted reports whether the template id is in the wanted set.
+// The merchant lists of the town trips carry a handful of ids, so the
+// linear scan beats a per call map allocation.
+func templateWanted(templateID int32, templates []int32) bool {
+	for _, id := range templates {
+		if id == templateID {
+			return true
+		}
+	}
+
+	return false
+}
+
 // MedianZoneMobLevel returns the median level of the living attackable
 // npcs inside the zone, zero when none of them is visible or known: the
 // delevel policy compares the character level against it to detect a
@@ -1741,7 +1868,8 @@ func (b *Bot) MedianZoneMobLevel(zone *Zone) int32 {
 		return 0
 	}
 	levels := make([]int32, 0, len(b.objects))
-	for _, obj := range b.objects {
+	for i := range b.objects {
+		obj := &b.objects[i]
 		if obj.Kind != KindNPC || !obj.Attackable || obj.Dead ||
 			obj.Level <= 0 {
 			continue
@@ -1754,9 +1882,7 @@ func (b *Bot) MedianZoneMobLevel(zone *Zone) int32 {
 	if len(levels) == 0 {
 		return 0
 	}
-	sort.Slice(levels, func(i, j int) bool {
-		return levels[i] < levels[j]
-	})
+	slices.Sort(levels)
 
 	return levels[len(levels)/2]
 }
@@ -1767,7 +1893,7 @@ func (b *Bot) MedianZoneMobLevel(zone *Zone) int32 {
 // the server side counterpart of the web map interpolation (the Mobius
 // Creature.updatePosition loop steps creatures toward the destination
 // every 100 ms game tick from the last broadcast position).
-func projectedPosition(obj WorldObject, now time.Time) (float64, float64) {
+func projectedPosition(obj *WorldObject, now time.Time) (float64, float64) {
 	if !obj.Moving || obj.MoveAt.IsZero() {
 		return float64(obj.X), float64(obj.Y)
 	}
@@ -1822,12 +1948,16 @@ func (b *Bot) recordCharDamageLocked(attrs []Attribute, now time.Time) {
 			continue
 		}
 		b.recordCombatEventLocked(CombatEvent{
-			Kind:     CombatEventDamage,
-			TargetID: b.selfID,
-			Amount:   b.char.CurHP - float64(attr.Value),
-			X:        b.char.X,
-			Y:        b.char.Y,
-			At:       now,
+			Kind:       CombatEventDamage,
+			TargetID:   b.selfID,
+			AttackerID: 0,
+			Amount:     b.char.CurHP - float64(attr.Value),
+			X:          b.char.X,
+			Y:          b.char.Y,
+			TargetX:    0,
+			TargetY:    0,
+			Seq:        0,
+			At:         now,
 		})
 	}
 }
@@ -1843,12 +1973,16 @@ func (b *Bot) recordObjectDamageLocked(
 			continue
 		}
 		b.recordCombatEventLocked(CombatEvent{
-			Kind:     CombatEventDamage,
-			TargetID: objectID,
-			Amount:   obj.CurHP - float64(attr.Value),
-			X:        obj.X,
-			Y:        obj.Y,
-			At:       now,
+			Kind:       CombatEventDamage,
+			TargetID:   objectID,
+			AttackerID: 0,
+			Amount:     obj.CurHP - float64(attr.Value),
+			X:          obj.X,
+			Y:          obj.Y,
+			TargetX:    0,
+			TargetY:    0,
+			Seq:        0,
+			At:         now,
 		})
 	}
 }
@@ -2091,7 +2225,8 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 		snap.WalkPath = make([]WalkPoint, len(b.walkPath))
 		copy(snap.WalkPath, b.walkPath)
 	}
-	for _, obj := range b.objects {
+	for i := range b.objects {
+		obj := &b.objects[i]
 		snap.Objects = append(snap.Objects, ObjectSnapshot{
 			ObjectID:        obj.ObjectID,
 			Kind:            obj.Kind,
@@ -2188,16 +2323,37 @@ func (b *Bot) fillInventorySnapshot(snap *Snapshot) {
 // the equipped gear first (the paperdoll anchors the widget), then the
 // plain inventory, both by item id with the object id breaking ties.
 func sortInventorySnapshot(items []InventoryItemSnapshot) {
-	sort.Slice(items, func(i int, j int) bool {
-		if items[i].Equipped != items[j].Equipped {
-			return items[i].Equipped
-		}
-		if items[i].ItemID != items[j].ItemID {
-			return items[i].ItemID < items[j].ItemID
+	slices.SortFunc(items, compareInventoryItems)
+}
+
+// compareInventoryItems orders two widget entries: the equipped gear
+// first, then the item id, the object id breaks the ties.
+func compareInventoryItems(
+	a InventoryItemSnapshot, b InventoryItemSnapshot,
+) int {
+	if a.Equipped != b.Equipped {
+		if a.Equipped {
+			return -1
 		}
 
-		return items[i].ObjectID < items[j].ObjectID
-	})
+		return 1
+	}
+	if a.ItemID != b.ItemID {
+		if a.ItemID < b.ItemID {
+			return -1
+		}
+
+		return 1
+	}
+	if a.ObjectID != b.ObjectID {
+		if a.ObjectID < b.ObjectID {
+			return -1
+		}
+
+		return 1
+	}
+
+	return 0
 }
 
 // appendChat copies the chat window lines out of the ring buffer in
