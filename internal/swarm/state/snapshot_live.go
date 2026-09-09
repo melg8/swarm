@@ -90,16 +90,36 @@ func (b *Bot) appendLiveInventoryJSON(dst []byte) []byte {
 			dst = append(dst, ',')
 		}
 		item := b.inventory.items[i]
+		stats, hasStats := npcdata.ItemGearStats(item.ItemID)
+		itemType := stats.Type
+		if !hasStats {
+			itemType = npcdata.ItemType(item.ItemID)
+		}
 		dst = appendInventoryItemJSON(dst, InventoryItemSnapshot{
-			ObjectID: item.ObjectID,
-			ItemID:   item.ItemID,
-			Count:    item.Count,
-			Type2:    item.Type2,
-			Equipped: item.Equipped,
-			BodyPart: item.BodyPart,
-			Enchant:  item.Enchant,
-			Name:     npcdata.ItemName(item.ItemID),
-			Icon:     npcdata.ItemIcon(item.ItemID),
+			ObjectID:    item.ObjectID,
+			ItemID:      item.ItemID,
+			Count:       item.Count,
+			Type2:       item.Type2,
+			Equipped:    item.Equipped,
+			BodyPart:    item.BodyPart,
+			Enchant:     item.Enchant,
+			Name:        npcdata.ItemName(item.ItemID),
+			Icon:        npcdata.ItemIcon(item.ItemID),
+			Type:        itemType,
+			WeaponType:  stats.WeaponType,
+			ArmorType:   stats.ArmorType,
+			BodyPartKey: stats.BodyPart,
+			PAtk:        stats.PAtk,
+			MAtk:        stats.MAtk,
+			PDef:        stats.PDef,
+			MDef:        stats.MDef,
+			SDef:        stats.SDef,
+			RShld:       stats.RShld,
+			PAtkSpd:     stats.PAtkSpd,
+			SoulShots:   stats.SoulShots,
+			SpiritShots: stats.SpiritShots,
+			Weight:      npcdata.ItemWeight(item.ItemID),
+			Price:       npcdata.ItemPrice(item.ItemID),
 		})
 	}
 
@@ -324,7 +344,7 @@ func (b *Bot) inventoryTotalsLocked() (adena int32, slots int) {
 func (b *Bot) snapshotJSONSizeLocked() int {
 	size := 640 + len(b.id) + len(b.phase) + len(b.status) +
 		len(b.char.Name)
-	size += 448 * len(b.inventory.items)
+	size += 768 * len(b.inventory.items)
 	size += 384 * len(b.world.hot)
 	count := min(b.log.length, snapshotEvents)
 	size += 96 * count

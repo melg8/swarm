@@ -677,6 +677,7 @@ function makeCellRecord(className, label) {
   cell.draggable = true;
   cell.addEventListener("dblclick", () => activateGearCell(record));
   cell.addEventListener("dragstart", (event) => startGearDrag(record, event));
+  attachGearCellTooltip(record);
 
   return record;
 }
@@ -729,6 +730,7 @@ function applyItemCell(record, item) {
     if (record.img) { record.img.remove(); record.img = null; }
     cell.title = "";
     if (record.label) { record.label.style.display = ""; }
+    refreshGearCellTooltip(record);
 
     return;
   }
@@ -776,17 +778,357 @@ function applyItemCell(record, item) {
     cell.append(badge);
     record.badgeCount = badge;
   }
-  cell.title = itemTooltip(item);
+  cell.title = itemTooltipFallback(item);
+  refreshGearCellTooltip(record);
 }
 
-// itemTooltip composes the hover title of an item cell.
-function itemTooltip(item) {
+// itemTooltipFallback composes the hover title of an item cell. The
+// native title stays on the cell as the keyboard / touch fallback of
+// the rich DOM tooltip (it does not show while the custom panel is
+// open because the panel covers the cell, but screen readers and the
+// rare no JS environment still get a sensible text).
+function itemTooltipFallback(item) {
   let tip = item.name || ("item #" + item.itemId);
   if (item.enchant > 0) { tip = "+" + item.enchant + " " + tip; }
   if (item.count > 1) { tip += " x" + item.count; }
   if (item.equipped) { tip += " (equipped)"; }
 
   return tip;
+}
+
+// ---- item status tooltip (paperdoll + inventory hover) ----
+//
+// A custom DOM tooltip replaces the native title attribute of every
+// equipment widget cell. The classic L2 item tooltip is multi line,
+// family specific (armor shows P. Def, weapons show P. Atk / M. Atk /
+// Atk. Spd / consumed SoulShot / consumed Spiritshot, jewelry shows
+// M. Def) and uses tabular alignment between the label and the value.
+// A native title attribute cannot carry that shape, so a small
+// floating panel takes its place: it is positioned next to the
+// hovered cell, grows with the content and disappears on mouseleave.
+// The data comes from the inventory snapshot fields
+// (type / weaponType / armorType / bodyPartKey / pAtk / mAtk / ... /
+// weight / price), already filled by the bot from the generated
+// itemGearStats and itemTypes dictionaries of npcdata.
+
+const TooltipState = {
+  element: null,
+  cell: null
+};
+
+// tooltipElement lazily fetches the singleton DOM node of the
+// floating panel. The node lives once on the page and is repurposed
+// on every hover (its inner HTML is rebuilt by renderItemTooltip).
+function tooltipElement() {
+  if (TooltipState.element) { return TooltipState.element; }
+  const el = document.getElementById("item-tooltip");
+  if (!el) { return null; }
+  TooltipState.element = el;
+
+  return el;
+}
+
+// attachGearCellTooltip wires the hover handlers of one cell. Called
+// once per cell at creation time (makeCellRecord) so every paperdoll
+// and inventory cell answers the same tooltip: mouseenter shows the
+// panel with the current item (or hides it when the cell is empty),
+// mousemove keeps the panel near the cursor without flickering, and
+// mouseleave hides it. The handlers read record.item (refreshed by
+// applyItemCell on every snapshot) so the tooltip always reflects the
+// current state of the cell, even after an equip / unequip swap.
+function attachGearCellTooltip(record) {
+  record.cell.addEventListener("mouseenter", () => {
+    showItemTooltip(record.item, record.cell);
+  });
+  record.cell.addEventListener("mousemove", (event) => {
+    positionItemTooltip(event.clientX, event.clientY);
+  });
+  record.cell.addEventListener("mouseleave", () => {
+    hideItemTooltip();
+  });
+  // The cell can be recycled for a different item without a
+  // mouseleave when the snapshot mutates the cell in place (an
+  // equip swap): hide the tooltip on every cell refresh so a stale
+  // tooltip never sits over a new item. applyItemCell calls this
+  // after refreshing record.item.
+}
+
+// ITEM_BODY_PART_LABELS maps the bodypart key of the generated gear
+// stats (rhand, lhand, lrhand, chest, ...) to the human readable
+// label shown in the tooltip. The keys come from the Mobius item
+// stats XML <set name="bodypart" val="..."> attribute.
+const ITEM_BODY_PART_LABELS = {
+  underwear: "Shirt",
+  rear: "Right Ear",
+  lear: "Left Ear",
+  "rear;lear": "Earring",
+  neck: "Neck",
+  rfinger: "Right Finger",
+  lfinger: "Left Finger",
+  "rfinger;lfinger": "Ring",
+  head: "Head",
+  rhand: "Right Hand",
+  lhand: "Left Hand",
+  lrhand: "Both Hands",
+  gloves: "Gloves",
+  chest: "Chest",
+  legs: "Legs",
+  feet: "Feet",
+  back: "Back",
+  onepiece: "Full Body",
+  // hair / face / etc accessories of later chronicles, kept for
+  // forward compatibility.
+  hair: "Hair",
+  face: "Face",
+  hairall: "Hair"
+};
+
+// ITEM_TYPE_LABELS maps the XML item category (Weapon, Armor,
+// EtcItem, ...) to a short label the tooltip shows when the family
+// has no more specific type (a weapon's WeaponType, an armor piece's
+// ArmorType). EtcItem and Asset cover potions, scrolls, materials
+// and adena.
+const ITEM_TYPE_LABELS = {
+  Weapon: "Weapon",
+  Armor: "Armor",
+  Shield: "Shield",
+  EtcItem: "Etc",
+  Asset: "Asset",
+  QuestItem: "Quest",
+  Arrow: "Arrow",
+  Lure: "Lure"
+};
+
+// ITEM_FAMILY_WEAPON_TYPES lists the weapon types that drive the
+// weapon tooltip layout (P. Atk / M. Atk / Atk. Spd / SoulShot /
+// Spiritshot / weight). The empty weapon type of a non weapon
+// equippable item (a shield, an ETC fist weapon) skips the weapon
+// block. The presence of any weapon type triggers the weapon
+// layout.
+function itemFamily(item) {
+  // Weapons always carry the XML type "Weapon"; check first so the
+  // weapon layout (P. Atk / M. Atk / Atk. Spd / SoulShot / Spiritshot)
+  // wins over the bodypart fallback.
+  if (item.type === "Weapon") { return "weapon"; }
+  // Jewelry: the body part key carries the either-or mask of
+  // earrings / rings / the necklace slot. The XML type is "Armor"
+  // for jewelry too in Mobius C1, so the bodypart key is the
+  // discriminator - check it before the plain Armor family so a
+  // ring never lands in the armor block.
+  if (item.bodyPartKey === "neck" ||
+      item.bodyPartKey === "rear;lear" ||
+      item.bodyPartKey === "rfinger;lfinger") {
+    return "jewel";
+  }
+  if (item.type === "Armor" || item.type === "Shield") { return "armor"; }
+  return "etc";
+}
+
+// escapeHTML turns a string into safe HTML text. The item name, type
+// and bodypart labels come from the generated dictionaries of the
+// bot (never user input), but the tooltip is rendered through
+// innerHTML for the layout - escape anyway so a stray < or & in a
+// name cannot break the markup.
+function escapeHTML(value) {
+  if (!value) { return ""; }
+
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// tooltipLine builds one <div class="tip-line"> row: a muted key
+// followed by a bright value. Returns an empty string when the value
+// is null / undefined / empty (the tooltip omits lines the item does
+// not carry).
+function tooltipLine(key, value) {
+  if (value === null || value === undefined) { return ""; }
+  const text = String(value);
+  if (text === "") { return ""; }
+
+  return `<div class="tip-line"><span class="tip-key">${escapeHTML(key)}</span>` +
+    `<span class="tip-val">${escapeHTML(text)}</span></div>`;
+}
+
+// renderItemTooltip builds the HTML payload of the floating tooltip
+// for one item. The shape per family mirrors the classic L2 client
+// tooltip:
+//
+//   name (enchant prepended, count appended when > 1)
+//   type line: weapon type / armor type / etc
+//   body part line: where the item equips
+//   combat stats: P. Atk / M. Atk / Atk. Spd (weapon), P. Def
+//     (armor), M. Def (jewelry), Shield Def + Shield Block Rate
+//     (shield)
+//   SoulShot / Spiritshot consumption (weapon only)
+//   weight (always)
+//   sell price (always, half the reference price)
+//
+// The description line is rendered when the item ever carries one
+// (the Mobius C1 XML stats files have no description attribute, so
+// the line stays empty for now; the slot is kept so a later
+// description source drops in without a UI change).
+function renderItemTooltip(item) {
+  if (!item) { return ""; }
+  const family = itemFamily(item);
+  const lines = [];
+  const nameText = item.name || ("item #" + item.itemId);
+  const enchantHTML = item.enchant > 0
+    ? `<span class="tip-enchant">+${item.enchant}</span> ` : "";
+  const countHTML = item.count > 1
+    ? ` <span class="tip-key">x${item.count}</span>` : "";
+  const equippedHTML = item.equipped
+    ? ` <span class="tip-key">(equipped)</span>` : "";
+  lines.push(
+    `<div class="tip-name">${enchantHTML}${escapeHTML(nameText)}` +
+    `${countHTML}${equippedHTML}</div>`);
+
+  // The type line carries the family: weapon type for weapons, armor
+  // type for armor pieces, the XML category for everything else.
+  if (family === "weapon" && item.weaponType) {
+    lines.push(tooltipLine("Type", item.weaponType));
+  } else if (family === "armor" && item.armorType) {
+    lines.push(tooltipLine("Armor Type", item.armorType));
+  } else if (item.type) {
+    lines.push(tooltipLine("Type",
+      ITEM_TYPE_LABELS[item.type] || item.type));
+  }
+
+  // The body part line tells where the item equips. The bodyPartKey
+  // is the XML bodypart attribute (rhand, chest, neck, ...); the
+  // label table maps it to the human readable form.
+  if (item.bodyPartKey) {
+    const label = ITEM_BODY_PART_LABELS[item.bodyPartKey] ||
+      item.bodyPartKey;
+    lines.push(tooltipLine("Slot", label));
+  }
+
+  if (family === "weapon") {
+    if (item.pAtk) { lines.push(tooltipLine("P. Atk", item.pAtk)); }
+    if (item.mAtk) { lines.push(tooltipLine("M. Atk", item.mAtk)); }
+    if (item.pAtkSpd) { lines.push(tooltipLine("Atk. Spd", item.pAtkSpd)); }
+    if (item.soulShots) {
+      lines.push(tooltipLine("SoulShot", "x" + item.soulShots));
+    }
+    if (item.spiritShots) {
+      lines.push(tooltipLine("Spiritshot", "x" + item.spiritShots));
+    }
+  } else if (family === "armor") {
+    if (item.pDef) { lines.push(tooltipLine("P. Def", item.pDef)); }
+    if (item.mDef) { lines.push(tooltipLine("M. Def", item.mDef)); }
+    // A shield carries a shield defense and a block rate instead of
+    // a plain P. Def. Show both when present.
+    if (item.sDef) { lines.push(tooltipLine("Shield Def", item.sDef)); }
+    if (item.rShld) {
+      lines.push(tooltipLine("Block Rate", item.rShld + "%"));
+    }
+  } else if (family === "jewel") {
+    if (item.mDef) { lines.push(tooltipLine("M. Def", item.mDef)); }
+  }
+
+  // The description slot is rendered only when the item carries one
+  // - the Mobius C1 stats XML files have no description attribute,
+  // so the line stays empty today. Kept so a future description
+  // source (the client itemname-e.dat pack) drops in without a UI
+  // change.
+  if (item.description) {
+    lines.push(`<div class="tip-desc">${escapeHTML(item.description)}</div>`);
+  }
+
+  // The footer carries the weight and the sell price - the two
+  // economy fields shared by every item family. The sell price is
+  // half the reference price (the Mobius server sells at reference/2,
+  // buys at reference/2 too).
+  const foot = [];
+  if (item.weight) {
+    foot.push(`<span>Weight <b>${item.weight}</b></span>`);
+  }
+  if (item.price) {
+    foot.push(`<span>Sell <b>${formatNumber(Math.floor(item.price / 2))}</b></span>`);
+  }
+  if (foot.length) {
+    lines.push(`<div class="tip-foot">${foot.join("")}</div>`);
+  }
+
+  return `<div class="tip-inner tip-${family}">${lines.join("")}</div>`;
+}
+
+// showItemTooltip renders the tooltip for one item and positions the
+// floating panel next to the hovered cell. Called on mouseenter of a
+// cell; the panel hides when the cell is empty (no item).
+function showItemTooltip(item, cell) {
+  const el = tooltipElement();
+  if (!el) { return; }
+  if (!item) {
+    hideItemTooltip();
+
+    return;
+  }
+  TooltipState.cell = cell;
+  el.innerHTML = renderItemTooltip(item);
+  el.className = "item-tooltip fam-" + itemFamily(item);
+  el.setAttribute("aria-hidden", "false");
+  // Place the panel near the cursor / cell - the exact position is
+  // corrected after the layout paints so the panel never overflows
+  // the viewport edges.
+  const rect = cell.getBoundingClientRect();
+  positionItemTooltip(rect.left + rect.width, rect.top);
+}
+
+// positionItemTooltip places the floating panel so its top left
+// corner sits at (x, y), then flips it left of the cursor or above
+// when it would overflow the viewport right / bottom edge.
+function positionItemTooltip(x, y) {
+  const el = tooltipElement();
+  if (!el || el.classList.contains("hidden")) { return; }
+  const margin = 12;
+  const pad = 4;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const rect = el.getBoundingClientRect();
+  let left = x + pad;
+  let top = y + pad;
+  if (left + rect.width + margin > vw) {
+    left = Math.max(margin, x - rect.width - pad);
+  }
+  if (top + rect.height + margin > vh) {
+    top = Math.max(margin, vh - rect.height - margin);
+  }
+  el.style.left = left + "px";
+  el.style.top = top + "px";
+}
+
+// hideItemTooltip hides the floating panel. Called on mouseleave of a
+// cell or when a snapshot mutates the cell into an empty state.
+function hideItemTooltip() {
+  const el = TooltipState.element;
+  if (!el) { return; }
+  if (el.classList.contains("hidden")) { return; }
+  el.classList.add("hidden");
+  el.setAttribute("aria-hidden", "true");
+  el.innerHTML = "";
+  TooltipState.cell = null;
+}
+
+// refreshGearCellTooltip re-renders the tooltip of one cell when the
+// item it shows just changed (an equip swap, a count update). Called
+// from applyItemCell after the record is refreshed, so a hover that
+// is open during a snapshot keeps showing the current item instead
+// of the stale one.
+function refreshGearCellTooltip(record) {
+  if (!TooltipState.element || TooltipState.cell !== record.cell) {
+    return;
+  }
+  if (!record.item) {
+    hideItemTooltip();
+
+    return;
+  }
+  TooltipState.element.innerHTML = renderItemTooltip(record.item);
+  TooltipState.element.className =
+    "item-tooltip fam-" + itemFamily(record.item);
 }
 
 // ensureSlotCells creates the slot cells (and the jewelry hole) of one

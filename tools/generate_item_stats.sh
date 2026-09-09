@@ -13,9 +13,17 @@
 # The generated gear stats map the auto equipment and the shop strategy
 # of the bot: every equippable item (a bodypart attribute present) carries
 # its bodypart, weapon type and combat stats (pAtk, mAtk, pDef, mDef,
-# sDef, rShld, pAtkSpd) used by the gear scoring profiles.
+# sDef, rShld, pAtkSpd) used by the gear scoring profiles. Type,
+# armor_type, soulshots and spiritshots power the item status tooltip
+# of the equipment widget.
 #
-#   item: display id -> price, weight, gear stats via data/stats/items/*.xml
+# The generated item types map carries the XML category (Weapon, Armor,
+# EtcItem, ...) of every item that has no bodypart attribute, so the
+# tooltip shows the right family for potions, scrolls, materials and
+# adena too.
+#
+#   item: display id -> price, weight, gear stats, type via
+#         data/stats/items/*.xml
 #
 # Usage: tools/generate_item_stats.sh [path/to/L2J_Mobius_C1_HarbingersOfWar]
 # Output: internal/swarm/npcdata/item_stats.go
@@ -38,6 +46,7 @@ mkdir -p "$(dirname "${OUT}")"
 
 python3 - "${STATS}" "${OUT}" << 'PYEOF'
 import glob
+import json
 import re
 import sys
 
@@ -46,18 +55,20 @@ stats, out = sys.argv[1], sys.argv[2]
 # Item display id -> price, weight (from the item stats xml files). The
 # set attribute order varies and every item element holds many sets, so
 # the block of each item is sliced out and searched inside.
-item_open_pattern = re.compile(r'<item\s+id="(\d+)"[^>]*>')
+item_open_pattern = re.compile(r'<item\s+id="(\d+)"\s+type="(\w+)"[^>]*>')
 set_pattern = re.compile(r'<set\s+name="(\w+)"\s+val="([^"]*)"')
 stat_pattern = re.compile(r'<stat\s+type="(\w+)">([^<]*)</stat>')
 item_prices = {}
 item_weights = {}
 item_gear = {}
+item_types = {}
 for path in glob.glob(f"{stats}/items/*.xml"):
     with open(path, encoding="utf-8") as handle:
         content = handle.read()
     matches = list(item_open_pattern.finditer(content))
     for index, match in enumerate(matches):
         item_id = int(match.group(1))
+        item_type = match.group(2)
         block_end = (
             matches[index + 1].start()
             if index + 1 < len(matches)
@@ -72,7 +83,12 @@ for path in glob.glob(f"{stats}/items/*.xml"):
             item_prices[item_id] = int(sets["price"])
         if "weight" in sets and sets["weight"].isdigit():
             item_weights[item_id] = int(sets["weight"])
+        # Record the XML type for every item; the gear stats block
+        # below stashes it on the equippable items, the types map keeps
+        # the non equippable ones (potions, scrolls, materials, adena)
+        # so the tooltip shows the right family for them too.
         if "bodypart" not in sets:
+            item_types[item_id] = item_type
             continue
         stats_map = {}
         for name, value in stat_pattern.findall(block):
@@ -88,9 +104,20 @@ for path in glob.glob(f"{stats}/items/*.xml"):
             except ValueError:
                 return 0
 
+        def set_int(name):
+            value = sets.get(name)
+            if value is None:
+                return 0
+            try:
+                return int(value)
+            except ValueError:
+                return 0
+
         item_gear[item_id] = {
+            "type": item_type,
             "bodypart": sets["bodypart"],
             "weapon_type": sets.get("weapon_type", ""),
+            "armor_type": sets.get("armor_type", ""),
             "pAtk": stat_int("pAtk"),
             "mAtk": stat_int("mAtk"),
             "pDef": stat_int("pDef"),
@@ -98,6 +125,8 @@ for path in glob.glob(f"{stats}/items/*.xml"):
             "sDef": stat_int("sDef"),
             "rShld": stat_int("rShld"),
             "pAtkSpd": stat_int("pAtkSpd"),
+            "soulshots": set_int("soulshots"),
+            "spiritshots": set_int("spiritshots"),
         }
 
 def render_int64_map(values):
@@ -111,17 +140,29 @@ def render_int32_map(values):
     return "".join(f"\t{key}: {values[key]},\n" for key in sorted(values))
 
 def render_gear_map(values):
-    import json
     parts = []
     for key in sorted(values):
         v = values[key]
         parts.append(
-            f"\t{key}: {{BodyPart: {json.dumps(v['bodypart'])}, "
-            f"WeaponType: {json.dumps(v['weapon_type'])}, PAtk: {v['pAtk']}, "
-            f"MAtk: {v['mAtk']}, PDef: {v['pDef']}, MDef: {v['mDef']}, "
+            f"\t{key}: {{Type: {json.dumps(v['type'])}, "
+            f"BodyPart: {json.dumps(v['bodypart'])}, "
+            f"WeaponType: {json.dumps(v['weapon_type'])}, "
+            f"ArmorType: {json.dumps(v['armor_type'])}, "
+            f"PAtk: {v['pAtk']}, MAtk: {v['mAtk']}, "
+            f"PDef: {v['pDef']}, MDef: {v['mDef']}, "
             f"SDef: {v['sDef']}, RShld: {v['rShld']}, "
-            f"PAtkSpd: {v['pAtkSpd']}}},\n"
+            f"PAtkSpd: {v['pAtkSpd']}, "
+            f"SoulShots: {v['soulshots']}, "
+            f"SpiritShots: {v['spiritshots']}}},\n"
         )
+    return "".join(parts)
+
+def render_type_map(values):
+    if not values:
+        return "\t{}\n"
+    parts = []
+    for key in sorted(values):
+        parts.append(f"\t{key}: {json.dumps(values[key])},\n")
     return "".join(parts)
 
 content = (
@@ -143,15 +184,23 @@ content = (
     "\n"
     "// itemGearStats maps the item display id of every equippable item\n"
     "// (an item with a bodypart attribute) to its combat stats, the\n"
-    "// scoring base of the auto equipment and the shop strategy.\n"
+    "// scoring base of the auto equipment and the shop strategy and the\n"
+    "// status tooltip of the equipment widget.\n"
     f"var itemGearStats = map[int32]GearStats{{\n{render_gear_map(item_gear)}}}\n"
+    "\n"
+    "// itemTypes maps the item display id of every non equippable item\n"
+    "// (potions, scrolls, materials, adena, ...) to its XML category\n"
+    "// (EtcItem, Asset, ...). The item status tooltip uses it to show the\n"
+    "// right family for items without a bodypart.\n"
+    f"var itemTypes = map[int32]string{{\n{render_type_map(item_types)}}}\n"
 )
 with open(out, "w", encoding="utf-8", newline="\n") as handle:
     handle.write(content)
 print(
     f"wrote {len(item_prices)} item prices, "
-    f"{len(item_weights)} item weights and "
-    f"{len(item_gear)} gear stats to {out}"
+    f"{len(item_weights)} item weights, "
+    f"{len(item_gear)} gear stats and "
+    f"{len(item_types)} item types to {out}"
 )
 PYEOF
 

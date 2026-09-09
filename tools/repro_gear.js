@@ -208,6 +208,10 @@ function loadAppJs(appFile) {
         " ? weightFillStyle : undefined," +
         " bumpDropCount: typeof bumpDropCount === 'function'" +
         " ? bumpDropCount : undefined," +
+        " itemFamily: typeof itemFamily === 'function'" +
+        " ? itemFamily : undefined," +
+        " renderItemTooltip: typeof renderItemTooltip === 'function'" +
+        " ? renderItemTooltip : undefined," +
         " App: App, GearDrag: GearDrag };",
         sandbox);
 
@@ -952,6 +956,166 @@ function main() {
         posts.length === postsBefore7 + 1,
         "posts: " + JSON.stringify(
             posts.slice(postsBefore7).map((p) => p.options.body)));
+
+    // ---- item status tooltip ----
+    //
+    // The custom DOM tooltip replaces the native title attribute of
+    // every equipment widget cell. The markup, the CSS and the
+    // renderItemTooltip function together build the family specific
+    // layout (weapon / armor / jewelry / etc). The harness exercises
+    // the markup, the css, the family classification and the per
+    // family lines.
+
+    check(results, "tooltip container exists in the html",
+        html.includes('id="item-tooltip"') &&
+        html.includes('class="item-tooltip'),
+        "missing tooltip container");
+
+    check(results, "tooltip css covers the family layouts",
+        css.includes(".item-tooltip") &&
+        css.includes(".item-tooltip.hidden") &&
+        css.includes(".item-tooltip .tip-name") &&
+        css.includes(".item-tooltip .tip-line") &&
+        css.includes(".item-tooltip .tip-key") &&
+        css.includes(".item-tooltip .tip-val") &&
+        css.includes(".item-tooltip .tip-foot") &&
+        css.includes(".item-tooltip.fam-weapon .tip-name") &&
+        css.includes(".item-tooltip.fam-armor .tip-name") &&
+        css.includes(".item-tooltip.fam-jewel .tip-name") &&
+        css.includes(".item-tooltip.fam-etc .tip-name"),
+        "missing tooltip css rules");
+
+    // The family classifier drives the per family layout. A weapon
+    // (XML type Weapon) lands in the weapon family, an armor piece in
+    // the armor family, a jewelry entry (the bodypart key carries
+    // the either-or mask of earrings/rings/necklace) in the jewel
+    // family, adena and other etc items in the etc family.
+    check(results, "itemFamily classifies weapons",
+        gear.itemFamily({
+            type: "Weapon", weaponType: "SWORD", bodyPartKey: "rhand"
+        }) === "weapon",
+        "weapon family wrong");
+    check(results, "itemFamily classifies armor",
+        gear.itemFamily({
+            type: "Armor", armorType: "HEAVY", bodyPartKey: "chest"
+        }) === "armor",
+        "armor family wrong");
+    check(results, "itemFamily classifies jewelry by bodypart",
+        gear.itemFamily({
+            type: "Armor", bodyPartKey: "rear;lear"
+        }) === "jewel" &&
+        gear.itemFamily({
+            type: "Armor", bodyPartKey: "rfinger;lfinger"
+        }) === "jewel" &&
+        gear.itemFamily({
+            type: "Armor", bodyPartKey: "neck"
+        }) === "jewel",
+        "jewel family wrong");
+    check(results, "itemFamily classifies etc items",
+        gear.itemFamily({
+            type: "EtcItem", bodyPartKey: ""
+        }) === "etc",
+        "etc family wrong");
+
+    // The tooltip HTML payload: a weapon carries the name, the
+    // weapon type, the body part label, P. Atk, M. Atk, Atk. Spd,
+    // SoulShot and Spiritshot. A shield carries the body part and
+    // Shield Def / Block Rate instead of P. Def.
+    const swordTip = gear.renderItemTooltip({
+        name: "Short Sword", itemId: 1, count: 1, enchant: 0,
+        equipped: true,
+        type: "Weapon", weaponType: "SWORD", armorType: "",
+        bodyPartKey: "rhand",
+        pAtk: 8, mAtk: 6, pDef: 0, mDef: 0, sDef: 0, rShld: 0,
+        pAtkSpd: 379, soulShots: 1, spiritShots: 1,
+        weight: 1600, price: 768
+    });
+    check(results, "weapon tooltip renders the family lines",
+        swordTip.includes("tip-name") &&
+        swordTip.includes("Short Sword") &&
+        swordTip.includes("SWORD") &&
+        swordTip.includes("Right Hand") &&
+        swordTip.includes("P. Atk") && swordTip.includes(">8<") &&
+        swordTip.includes("M. Atk") && swordTip.includes(">6<") &&
+        swordTip.includes("Atk. Spd") && swordTip.includes(">379<") &&
+        swordTip.includes("SoulShot") && swordTip.includes(">x1<") &&
+        swordTip.includes("Spiritshot") && swordTip.includes(">x1<") &&
+        swordTip.includes("Weight") && swordTip.includes(">1600<") &&
+        swordTip.includes("Sell"),
+        "tip: " + swordTip.slice(0, 200));
+
+    const armorTip = gear.renderItemTooltip({
+        name: "Leather Tunic", itemId: 21, count: 1, enchant: 0,
+        equipped: true,
+        type: "Armor", weaponType: "", armorType: "LIGHT",
+        bodyPartKey: "chest",
+        pAtk: 0, mAtk: 0, pDef: 36, mDef: 0, sDef: 0, rShld: 0,
+        pAtkSpd: 0, soulShots: 0, spiritShots: 0,
+        weight: 1320, price: 12500
+    });
+    check(results, "armor tooltip renders the family lines",
+        armorTip.includes("tip-name") &&
+        armorTip.includes("Leather Tunic") &&
+        armorTip.includes("LIGHT") &&
+        armorTip.includes("Chest") &&
+        armorTip.includes("P. Def") && armorTip.includes(">36<") &&
+        !armorTip.includes("P. Atk") &&
+        !armorTip.includes("SoulShot"),
+        "tip: " + armorTip.slice(0, 200));
+
+    const jewelTip = gear.renderItemTooltip({
+        name: "Echo Crystal", itemId: 112, count: 1, enchant: 0,
+        equipped: true,
+        type: "Armor", weaponType: "", armorType: "",
+        bodyPartKey: "rear;lear",
+        pAtk: 0, mAtk: 0, pDef: 0, mDef: 11, sDef: 0, rShld: 0,
+        pAtkSpd: 0, soulShots: 0, spiritShots: 0,
+        weight: 150, price: 100
+    });
+    check(results, "jewel tooltip renders the family lines",
+        jewelTip.includes("tip-name") &&
+        jewelTip.includes("Echo Crystal") &&
+        jewelTip.includes("Earring") &&
+        jewelTip.includes("M. Def") && jewelTip.includes(">11<") &&
+        !jewelTip.includes("P. Def"),
+        "tip: " + jewelTip.slice(0, 200));
+
+    const etcTip = gear.renderItemTooltip({
+        name: "Adena", itemId: 57, count: 4242, enchant: 0,
+        equipped: false,
+        type: "EtcItem", weaponType: "", armorType: "",
+        bodyPartKey: "",
+        pAtk: 0, mAtk: 0, pDef: 0, mDef: 0, sDef: 0, rShld: 0,
+        pAtkSpd: 0, soulShots: 0, spiritShots: 0,
+        weight: 0, price: 0
+    });
+    check(results, "etc tooltip renders name, type and count",
+        etcTip.includes("tip-name") &&
+        etcTip.includes("Adena") &&
+        etcTip.includes("Etc") &&
+        etcTip.includes("x4242"),
+        "tip: " + etcTip.slice(0, 200));
+
+    check(results, "tooltip omits empty fields",
+        !etcTip.includes("P. Atk") &&
+        !etcTip.includes("Weight"),
+        "tip should omit empty fields: " + etcTip.slice(0, 200));
+
+    // The enchant prefix is rendered as a green +N span in front of
+    // the item name.
+    const enchantedTip = gear.renderItemTooltip({
+        name: "Long Sword", itemId: 2, count: 1, enchant: 3,
+        equipped: false,
+        type: "Weapon", weaponType: "SWORD", armorType: "",
+        bodyPartKey: "rhand",
+        pAtk: 24, mAtk: 17, pDef: 0, mDef: 0, sDef: 0, rShld: 0,
+        pAtkSpd: 379, soulShots: 2, spiritShots: 2,
+        weight: 1560, price: 136000
+    });
+    check(results, "tooltip renders the enchant prefix",
+        enchantedTip.includes("tip-enchant") &&
+        enchantedTip.includes("+3"),
+        "tip: " + enchantedTip.slice(0, 120));
 
     let failed = 0;
     for (const result of results) {

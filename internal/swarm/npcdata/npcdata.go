@@ -114,16 +114,25 @@ func ItemIcon(displayID int32) string {
 // BLUNT, DAGGER, POLE, BOW, ...) and the stats block values. The gear
 // scoring profiles of the bot derive the slot and the value of an item
 // from them.
+//
+// Type, ArmorType, SoulShots and SpiritShots power the item status
+// tooltip of the equipment widget: Type is the XML category (Weapon,
+// Armor, EtcItem), ArmorType the LIGHT/HEAVY/ROBE family of an armor
+// piece, SoulShots/SpiritShots the per swing consumption count.
 type GearStats struct {
-	BodyPart   string
-	WeaponType string
-	PAtk       int32
-	MAtk       int32
-	PDef       int32
-	MDef       int32
-	SDef       int32
-	RShld      int32
-	PAtkSpd    int32
+	BodyPart    string
+	WeaponType  string
+	ArmorType   string
+	Type        string
+	PAtk        int32
+	MAtk        int32
+	PDef        int32
+	MDef        int32
+	SDef        int32
+	RShld       int32
+	PAtkSpd     int32
+	SoulShots   int32
+	SpiritShots int32
 }
 
 // ItemGearStats resolves the combat stats of an equippable item by its
@@ -133,6 +142,19 @@ func ItemGearStats(displayID int32) (GearStats, bool) {
 	stats, ok := itemGearStats[displayID]
 
 	return stats, ok
+}
+
+// ItemType resolves the XML category of an item by its display id
+// ("Weapon", "Armor", "Shield", "EtcItem", "Asset", "Lure", "Arrow",
+// "QuestItem"). It returns an empty string when the item is unknown.
+// The category drives the family specific layout of the item status
+// tooltip.
+func ItemType(displayID int32) string {
+	if stats, ok := itemGearStats[displayID]; ok {
+		return stats.Type
+	}
+
+	return itemTypes[displayID]
 }
 
 // BuyListsOfNPC resolves the buylist ids a merchant sells by its

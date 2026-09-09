@@ -43,7 +43,7 @@ func (s Snapshot) AppendJSON(dst []byte) []byte {
 func snapshotJSONSize(s Snapshot) int {
 	size := 640 + len(s.ID) + len(s.Phase) + len(s.Status) +
 		len(s.Character.Name)
-	size += 448 * len(s.Inventory)
+	size += 768 * len(s.Inventory)
 	size += 384 * len(s.Objects)
 	size += 96 * len(s.Events)
 	size += 96 * len(s.Chat)
@@ -298,6 +298,8 @@ func appendInventoryJSON(dst []byte, items []InventoryItemSnapshot) []byte {
 // appendInventoryItemJSON writes one equipment widget item. The live
 // state encoder reuses it with a stack allocated view, so the element
 // encoding stays byte identical between the two paths.
+//
+//nolint:funlen // linear field order
 func appendInventoryItemJSON(dst []byte, item InventoryItemSnapshot) []byte {
 	dst = append(dst, `{"objectId":`...)
 	dst = strconv.AppendInt(dst, int64(item.ObjectID), 10)
@@ -317,6 +319,36 @@ func appendInventoryItemJSON(dst []byte, item InventoryItemSnapshot) []byte {
 	dst = appendJSONString(dst, item.Name)
 	dst = append(dst, `,"icon":`...)
 	dst = appendJSONString(dst, item.Icon)
+	dst = append(dst, `,"type":`...)
+	dst = appendJSONString(dst, item.Type)
+	dst = append(dst, `,"weaponType":`...)
+	dst = appendJSONString(dst, item.WeaponType)
+	dst = append(dst, `,"armorType":`...)
+	dst = appendJSONString(dst, item.ArmorType)
+	dst = append(dst, `,"bodyPartKey":`...)
+	dst = appendJSONString(dst, item.BodyPartKey)
+	dst = append(dst, `,"pAtk":`...)
+	dst = strconv.AppendInt(dst, int64(item.PAtk), 10)
+	dst = append(dst, `,"mAtk":`...)
+	dst = strconv.AppendInt(dst, int64(item.MAtk), 10)
+	dst = append(dst, `,"pDef":`...)
+	dst = strconv.AppendInt(dst, int64(item.PDef), 10)
+	dst = append(dst, `,"mDef":`...)
+	dst = strconv.AppendInt(dst, int64(item.MDef), 10)
+	dst = append(dst, `,"sDef":`...)
+	dst = strconv.AppendInt(dst, int64(item.SDef), 10)
+	dst = append(dst, `,"rShld":`...)
+	dst = strconv.AppendInt(dst, int64(item.RShld), 10)
+	dst = append(dst, `,"pAtkSpd":`...)
+	dst = strconv.AppendInt(dst, int64(item.PAtkSpd), 10)
+	dst = append(dst, `,"soulShots":`...)
+	dst = strconv.AppendInt(dst, int64(item.SoulShots), 10)
+	dst = append(dst, `,"spiritShots":`...)
+	dst = strconv.AppendInt(dst, int64(item.SpiritShots), 10)
+	dst = append(dst, `,"weight":`...)
+	dst = strconv.AppendInt(dst, int64(item.Weight), 10)
+	dst = append(dst, `,"price":`...)
+	dst = strconv.AppendInt(dst, item.Price, 10)
 
 	return append(dst, '}')
 }

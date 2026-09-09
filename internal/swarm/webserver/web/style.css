@@ -1747,3 +1747,108 @@ canvas.fxg-cell.picked {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+
+/* ---- item status tooltip (paperdoll + inventory hover) ----
+   A custom DOM tooltip rendered on hover over any equipment widget
+   cell. The native title attribute cannot carry the multi line,
+   family specific layout of the classic L2 item tooltip, so a small
+   floating panel takes its place: it sits next to the hovered cell,
+   grows with the content and disappears on mouseleave.
+*/
+
+.item-tooltip {
+  position: fixed;
+  z-index: 50;
+  min-width: 180px;
+  max-width: 280px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 22px rgba(15, 22, 35, 0.4);
+  padding: 8px 10px 9px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text);
+  pointer-events: none;
+  /* The tooltip never grabs focus or clicks: it shows on hover, the
+     cell underneath keeps working. */
+}
+
+.item-tooltip.hidden { display: none; }
+
+.item-tooltip .tip-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-bright);
+  /* Long item names wrap onto two lines instead of clipping - the
+     classic tooltip does the same. */
+  word-break: break-word;
+  margin-bottom: 4px;
+}
+
+.item-tooltip .tip-line {
+  color: var(--text);
+  /* A label runs into a value on the same line; the label carries
+     the muted text-dim color and the value the bright text-bright. */
+  display: flex;
+  gap: 6px;
+}
+
+.item-tooltip .tip-key {
+  color: var(--text-dim);
+  /* The key column has a fixed min width so the values of every line
+     align vertically - the same look as the in-game tooltip. */
+  min-width: 64px;
+  flex-shrink: 0;
+}
+
+.item-tooltip .tip-val {
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.item-tooltip .tip-enchant {
+  color: #8ef2a0;
+  margin-left: 4px;
+}
+
+.item-tooltip .tip-divider {
+  height: 1px;
+  background: var(--border-soft);
+  margin: 5px 0;
+}
+
+.item-tooltip .tip-desc {
+  color: var(--text-dim);
+  font-style: italic;
+  margin-top: 5px;
+  word-break: break-word;
+}
+
+/* The enchanted weapon name wears the classic L2 yellow tint. The
+   family class on the tooltip root carries the enchant level so a
+   future CSS rule can tint the name by the enchant tier. */
+.item-tooltip.fam-weapon .tip-name { color: #d9b24a; }
+.item-tooltip.fam-armor .tip-name { color: #6f9bd1; }
+.item-tooltip.fam-jewel .tip-name { color: #b88dd9; }
+.item-tooltip.fam-etc .tip-name { color: var(--text-bright); }
+
+/* The footer row at the bottom of the tooltip carries the weight and
+   the sell price - the two economy fields shared by every item
+   family. Sits below a divider so it visually separates from the
+   combat stats. */
+.item-tooltip .tip-foot {
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px dashed var(--border-soft);
+  display: flex;
+  gap: 12px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.item-tooltip .tip-foot span b {
+  color: var(--text);
+  font-weight: 600;
+}

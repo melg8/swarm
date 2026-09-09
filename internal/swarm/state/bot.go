@@ -1533,16 +1533,38 @@ type CharacterSnapshot struct {
 // (0x80 right hand, 0x400 chest and so on), Icon the file name inside
 // data/icons and Name the resolved display name; both are empty for
 // unknown items.
+//
+// The Type, WeaponType, ArmorType, PAtk, MAtk, PDef, MDef, SDef, RShld,
+// PAtkSpd, SoulShots, SpiritShots, Weight and Price fields drive the
+// multi line item status tooltip of the equipment widget (one stat
+// line per family: weapon, armor, jewelry, etc). They stay zero / empty
+// when the item carries no value of that field, so the tooltip renders
+// only the lines the item actually has.
 type InventoryItemSnapshot struct {
-	ObjectID int32  `json:"objectId"`
-	ItemID   int32  `json:"itemId"`
-	Count    int32  `json:"count"`
-	Type2    int16  `json:"type2"`
-	Equipped bool   `json:"equipped"`
-	BodyPart int32  `json:"bodyPart"`
-	Enchant  int16  `json:"enchant"`
-	Name     string `json:"name"`
-	Icon     string `json:"icon"`
+	ObjectID    int32  `json:"objectId"`
+	ItemID      int32  `json:"itemId"`
+	Count       int32  `json:"count"`
+	Type2       int16  `json:"type2"`
+	Equipped    bool   `json:"equipped"`
+	BodyPart    int32  `json:"bodyPart"`
+	Enchant     int16  `json:"enchant"`
+	Name        string `json:"name"`
+	Icon        string `json:"icon"`
+	Type        string `json:"type"`
+	WeaponType  string `json:"weaponType"`
+	ArmorType   string `json:"armorType"`
+	BodyPartKey string `json:"bodyPartKey"`
+	PAtk        int32  `json:"pAtk"`
+	MAtk        int32  `json:"mAtk"`
+	PDef        int32  `json:"pDef"`
+	MDef        int32  `json:"mDef"`
+	SDef        int32  `json:"sDef"`
+	RShld       int32  `json:"rShld"`
+	PAtkSpd     int32  `json:"pAtkSpd"`
+	SoulShots   int32  `json:"soulShots"`
+	SpiritShots int32  `json:"spiritShots"`
+	Weight      int32  `json:"weight"`
+	Price       int64  `json:"price"`
 }
 
 // ObjectSnapshot is the JSON view of a world object.
@@ -1756,16 +1778,36 @@ func (b *Bot) fillInventorySnapshot(snap *Snapshot) {
 	snap.Character.InventoryMax = inventorySlotLimit
 	snap.Inventory = make([]InventoryItemSnapshot, 0, len(b.inventory.items))
 	for _, item := range b.inventory.items {
+		stats, hasStats := npcdata.ItemGearStats(item.ItemID)
+		itemType := stats.Type
+		if !hasStats {
+			itemType = npcdata.ItemType(item.ItemID)
+		}
 		snap.Inventory = append(snap.Inventory, InventoryItemSnapshot{
-			ObjectID: item.ObjectID,
-			ItemID:   item.ItemID,
-			Count:    item.Count,
-			Type2:    item.Type2,
-			Equipped: item.Equipped,
-			BodyPart: item.BodyPart,
-			Enchant:  item.Enchant,
-			Name:     npcdata.ItemName(item.ItemID),
-			Icon:     npcdata.ItemIcon(item.ItemID),
+			ObjectID:    item.ObjectID,
+			ItemID:      item.ItemID,
+			Count:       item.Count,
+			Type2:       item.Type2,
+			Equipped:    item.Equipped,
+			BodyPart:    item.BodyPart,
+			Enchant:     item.Enchant,
+			Name:        npcdata.ItemName(item.ItemID),
+			Icon:        npcdata.ItemIcon(item.ItemID),
+			Type:        itemType,
+			WeaponType:  stats.WeaponType,
+			ArmorType:   stats.ArmorType,
+			BodyPartKey: stats.BodyPart,
+			PAtk:        stats.PAtk,
+			MAtk:        stats.MAtk,
+			PDef:        stats.PDef,
+			MDef:        stats.MDef,
+			SDef:        stats.SDef,
+			RShld:       stats.RShld,
+			PAtkSpd:     stats.PAtkSpd,
+			SoulShots:   stats.SoulShots,
+			SpiritShots: stats.SpiritShots,
+			Weight:      npcdata.ItemWeight(item.ItemID),
+			Price:       npcdata.ItemPrice(item.ItemID),
 		})
 		if item.Type2 == itemType2Adena {
 			snap.Character.Adena += item.Count

@@ -4,6 +4,139 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: item status tooltips on hover (paperdoll + inventory)
+
+Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.
+The stack was already up (login :2106, game :7777, db :3306, 75 tables)
+and re-verified before the work started. Other agents may push to the
+same branch concurrently - rebase before every push.
+
+### Goal
+
+Add a rich, multi-line item status tooltip to the equipment widget (the
+floating paperdoll + inventory panel) that shows on hover over any cell -
+both the equipped slots and the bag entries. The classic L2 item tooltip
+shape per family:
+
+- Armor: name, bodypart type (head/chest/legs/...), armor type
+  (LIGHT/HEAVY/ROBE), P. Def, weight, description (if any).
+- Weapon: name, weapon type (SWORD/BLUNT/DAGGER/BOW/POLE/ETC),
+  P. Atk, M. Atk, Atk. Spd, consumed SoulShot count, consumed
+  Spiritshot count, weight.
+- Jewelry (earrings, rings, necklace): name, bodypart type, M. Def,
+  weight.
+- Other items (potions, scrolls, materials, adena): name, item type
+  (EtcItem/Asset), weight, count.
+
+The Mobius C1 item stats XML files carry `type` (Weapon/Armor/EtcItem),
+`armor_type`, `weapon_type`, `bodypart`, `soulshots`, `spiritshots`
+and the stat block - they have no `description` field (descriptions
+live in the client-side `itemname-e.dat`), so the tooltip shows the
+description line only when one becomes available later. The `weight`
+and `price` are already in the generated `itemPrices`/`itemWeights`
+maps; `pAtk`, `mAtk`, `pDef`, `mDef`, `sDef`, `rShld`, `pAtkSpd`,
+`weapon_type`, `bodypart` are already in `itemGearStats` for the
+equippable items.
+
+### Plan
+
+- Extend `npcdata.GearStats` with four new fields: `Type` (Weapon,
+  Armor, EtcItem), `ArmorType` (LIGHT/HEAVY/ROBE), `SoulShots`,
+  `SpiritShots`. Regenerate `item_stats.go` from the Mobius XML to
+  extract them. Add a new `itemTypes` map for non-equippable items so
+  the tooltip shows the right `Type` (EtcItem/Asset) for potions,
+  scrolls, materials and adena too.
+- Extend `state.InventoryItemSnapshot` (and the live encoder
+  `appendInventoryItemJSON`) with the tooltip fields
+  (`type`, `weaponType`, `armorType`, `pAtk`, `mAtk`, `pDef`, `mDef`,
+  `sDef`, `rShld`, `pAtkSpd`, `soulShots`, `spiritShots`, `weight`,
+  `price`). The live encoder stays allocation free: the per item view
+  struct lives on the call stack.
+- Replace the simple `itemTooltip` `title=` attribute in `app.js`
+  with a custom DOM tooltip (`#item-tooltip`) shown on `mouseenter`
+  over any cell (paperdoll wear, paperdoll jewel, inventory bag),
+  positioned next to the cell. The tooltip renders the family-specific
+  lines (`P. Atk`, `M. Atk`, `Atk. Spd`, `P. Def`, `M. Def`, `Weight`,
+  `SoulShot xN`, `Spiritshot xN`) and gracefully omits any field the
+  item does not carry (an EtcItem shows only name, type, count,
+  weight).
+
+### Implementation
+
+- `internal/swarm/npcdata/npcdata.go`: the `GearStats` struct gained
+  the four tooltip fields (`Type`, `ArmorType`, `SoulShots`,
+  `SpiritShots`). A new `ItemType(displayID)` accessor returns the
+  XML category of any item - it reads `GearStats.Type` for
+  equippable items (so a single lookup suffices) and falls back to
+  the new `itemTypes` map for the non equippable items (potions,
+  scrolls, materials, adena).
+- `tools/generate_item_stats.sh`: the generator now extracts the
+  XML `type` attribute of every item plus the `armor_type`,
+  `soulshots` and `spiritshots` set values of the equippable ones.
+  The generated file gained a new `itemTypes` map (the XML category
+  of every non equippable item) alongside the extended `itemGearStats`
+  entries. Numbers: 2557 prices, 2481 weights, 1204 gear stats and
+  3027 item types.
+- `internal/swarm/state/bot.go`: `InventoryItemSnapshot` carries the
+  tooltip fields (`type`, `weaponType`, `armorType`, `bodyPartKey`,
+  `pAtk`, `mAtk`, `pDef`, `mDef`, `sDef`, `rShld`, `pAtkSpd`,
+  `soulShots`, `spiritShots`, `weight`, `price`). `fillInventorySnapshot`
+  resolves them through `npcdata.ItemGearStats` and the new
+  `npcdata.ItemType` / `npcdata.ItemWeight` / `npcdata.ItemPrice`
+  accessors.
+- `internal/swarm/state/snapshot_live.go` and `snapshot_json.go`:
+  the live encoder and the reflection golden encoder write the new
+  fields in the same order, byte identical (pinned by
+  `TestSnapshotJSONMatchesReflection` and
+  `TestAppendSnapshotJSONMatchesSnapshot`). The per item size budget
+  estimate grew from 448 to 768 bytes so the one shot buffer keeps
+  everything in one allocation.
+- `internal/swarm/webserver/web/index.html`: a new
+  `<div id="item-tooltip">` element lives at the bottom of the page
+  as the singleton floating panel.
+- `internal/swarm/webserver/web/style.css`: the `.item-tooltip` rules
+  cover the panel (fixed position, pointer events none, themed
+  background, border, shadow), the family classes
+  (`.fam-weapon`, `.fam-armor`, `.fam-jewel`, `.fam-etc` tint the
+  name) and the per line layout (`.tip-name`, `.tip-line`,
+  `.tip-key`, `.tip-val`, `.tip-enchant`, `.tip-foot`).
+- `internal/swarm/webserver/web/app.js`: the new `renderItemTooltip`
+  builds the family specific payload, `showItemTooltip` /
+  `positionItemTooltip` / `hideItemTooltip` drive the floating panel
+  on `mouseenter` / `mousemove` / `mouseleave`, the
+  `attachGearCellTooltip` call wired into `makeCellRecord` binds every
+  paperdoll and inventory cell to the panel, and the
+  `refreshGearCellTooltip` call inside `applyItemCell` keeps an open
+  tooltip current when a snapshot mutates the underlying item (an
+  equip swap mid hover). The classic `title=` attribute stays as the
+  keyboard / screen reader fallback.
+- `tools/repro_gear.js`: ten new harness checks pin the tooltip
+  markup, the css rules, the family classification and the per
+  family lines (a weapon shows P. Atk / M. Atk / Atk. Spd /
+  SoulShot / Spiritshot, an armor piece shows P. Def, a jewel shows
+  M. Def, an etc item shows only name / type / count and an enchanted
+  weapon shows the green +N prefix). The harness exports
+  `itemFamily` and `renderItemTooltip` for the test.
+- `internal/swarm/state/snapshot_json_test.go`: the golden snapshot
+  fixture gained the new tooltip fields on its two inventory items
+  (adena and an enchanted short sword), so the byte equality pin
+  covers them.
+
+### Verification
+
+- go build/vet, go test ./... (18 packages green), golangci-lint run
+  (no new issues; the one unparam warning on `pathfind/search_test.go`
+  predates this task).
+- The five repro harnesses (repro_gear, repro_hud, repro_map_render,
+  repro_fight_ui, repro_movement) all green; repro_gear carries the
+  ten new tooltip checks; repro_map_render keeps its pre existing
+  zone label failure noted in AGENTS.md.
+- Live: `tools/mobius_e2e.sh 20` prints `E2E_OK` against the
+  deployed stack - the bot still connects, enters the world and shuts
+  down gracefully with the new tooltip data in every snapshot.
+- Live check: hover the equipped sword and an armor piece on the
+  running bot, the tooltip shows the expected stat lines.
+
 ## Active task: the terrace rule of the pathfinder (the city deck exit)
 
 Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.
