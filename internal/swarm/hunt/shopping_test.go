@@ -168,6 +168,8 @@ func TestStopBuyRetriesAndSkipsLostBatch(t *testing.T) {
 		{
 			ItemID: 1121, ListID: 3014800, MerchantTemplateID: 7148,
 			Count: 1, Price: 9,
+			Reason: "", SellFirst: nil, SellCredit: 0, Gain: 0,
+			Affordable: true, Missing: 0,
 		},
 	}}}
 	// The merchant never showed up: the sells work without one, the

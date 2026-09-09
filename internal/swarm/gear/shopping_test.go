@@ -243,3 +243,129 @@ func TestPlanPurchasesNoCreditWithoutEquippedGear(t *testing.T) {
 		require.Empty(t, purchase.SellFirst)
 	}
 }
+
+// TestPlanPurchaseQueueMatchesPlainPlan pins the queue walker against
+// the plain planner: the affordable prefix of a purchase queue holds
+// exactly the PlanPurchases picks (same items, same order), the
+// affordability and the missing amounts of the prefix stay zero.
+func TestPlanPurchaseQueueMatchesPlainPlan(t *testing.T) {
+	profile := MeleeFighter{}
+	for _, adena := range []int64{0, 500, 56000, 10_000_000} {
+		equipment := equipmentWith(nil, nil)
+		plan := PlanPurchases(profile, equipment, elvenCatalog(), adena)
+		queue := PlanPurchaseQueue(profile, equipment, elvenCatalog(),
+			adena)
+		affordable := affordablePurchases(queue)
+		require.Equal(t, plan, affordable,
+			"the queue prefix must match the plain plan")
+		for index := range affordable {
+			require.True(t, affordable[index].Affordable)
+			require.Zero(t, affordable[index].Missing,
+				"an affordable entry misses no adena")
+		}
+		if len(queue) > len(plan) {
+			require.False(t, queue[len(plan)].Affordable,
+				"the first entry past the plan is a wanted one")
+		}
+	}
+}
+
+// TestPlanPurchaseQueueWantedTail pins the wanted tail of a queue: a
+// poor wallet plans no affordable buys, every queue entry is wanted
+// and the missing amounts grow with the cumulative prices minus the
+// planning adena and the sell credits.
+func TestPlanPurchaseQueueWantedTail(t *testing.T) {
+	profile := MeleeFighter{}
+	equipment := equipmentWith(nil, nil)
+	queue := PlanPurchaseQueue(profile, equipment, elvenCatalog(), 0)
+	require.NotEmpty(t, queue, "a bare character still wants gear")
+	adena := int64(0)
+	cumulative := int64(0)
+	credit := int64(0)
+	for _, purchase := range queue {
+		require.False(t, purchase.Affordable,
+			"a zero wallet affords nothing")
+		cumulative += purchase.Price
+		credit += purchase.SellCredit
+		missing := cumulative - adena - credit
+		if missing < 0 {
+			missing = 0
+		}
+		require.Equal(t, missing, purchase.Missing,
+			"the missing amount tracks the cumulative shortfall")
+	}
+	require.LessOrEqual(t, len(queue), shoppingQueueTail,
+		"the tail stays bounded")
+}
+
+// TestPlanPurchaseQueueRichNeedsNoTail pins the rich wallet: an
+// unbounded adena plans the same full queue with no wanted entries.
+func TestPlanPurchaseQueueRichNeedsNoTail(t *testing.T) {
+	profile := MeleeFighter{}
+	equipment := equipmentWith(nil, nil)
+	queue := PlanPurchaseQueue(
+		profile, equipment, elvenCatalog(), 10_000_000)
+	require.NotEmpty(t, queue)
+	for _, purchase := range queue {
+		require.True(t, purchase.Affordable)
+		require.Zero(t, purchase.Missing)
+	}
+}
+
+// TestPlanPurchaseQueueCreditsDisplacedGear pins the sell credit
+// accounting of the tail: a wanted replacement carries the SellFirst
+// object ids and the sell value of the piece it displaces (the same
+// credit semantics the affordable planner applies, see
+// TestPlanPurchasesCreditsDisplacedGear), and its missing amount
+// counts that credit - the shortfall stays below the raw price.
+func TestPlanPurchaseQueueCreditsDisplacedGear(t *testing.T) {
+	profile := MeleeFighter{}
+	// The character wears the sickle (18500 reference price) and
+	// carries nothing: the dirk (62214 with tax) is the wanted
+	// weapon upgrade, the sickle's sale pays 9250 of it.
+	equipment := equipmentWith(
+		[]state.InventoryItem{item(100, 153)},
+		map[Slot]int32{SlotRHand: 100})
+	// A long tail: the weapon upgrade ranks low on the value per
+	// adena scale, the shoppingQueueTail bound of the widget queue
+	// would cut it before the dirk's turn.
+	queue := planPurchases(profile, equipment, elvenCatalog(), 0, 40)
+	adena := int64(0)
+	cumulative := int64(0)
+	credit := int64(0)
+	var weapon *Purchase
+	for index := range queue {
+		purchase := &queue[index]
+		cumulative += purchase.Price
+		credit += purchase.SellCredit
+		missing := cumulative - adena - credit
+		if missing < 0 {
+			missing = 0
+		}
+		require.Equal(t, missing, purchase.Missing,
+			"the missing tracks the cumulative shortfall")
+		stats, ok := npcdata.ItemGearStats(purchase.ItemID)
+		require.True(t, ok)
+		if stats.BodyPart == "rhand" || stats.BodyPart == "lrhand" {
+			weapon = purchase
+		}
+	}
+	require.NotNil(t, weapon, "the dirk upgrade is the wanted weapon")
+	require.False(t, weapon.Affordable)
+	require.Equal(t, []int32{100}, weapon.SellFirst,
+		"the equipped sickle is sold before the buy")
+	require.Equal(t, npcdata.ItemPrice(153)/2, weapon.SellCredit)
+}
+
+// affordablePurchases filters the affordable prefix of a queue.
+func affordablePurchases(queue []Purchase) []Purchase {
+	affordable := make([]Purchase, 0, len(queue))
+	for _, purchase := range queue {
+		if !purchase.Affordable {
+			break
+		}
+		affordable = append(affordable, purchase)
+	}
+
+	return affordable
+}

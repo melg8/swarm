@@ -653,7 +653,11 @@ func TestGameClientSendsClientActions(t *testing.T) {
 		{ObjectID: 301, ItemID: 34, Count: 1},
 	}))
 	require.NoError(t, client.BuyItems(7150, []gear.Purchase{
-		{ItemID: 34, Count: 1},
+		{
+			ItemID: 34, ListID: 0, MerchantTemplateID: 0, Count: 1,
+			Price: 0, Reason: "", SellFirst: nil, SellCredit: 0,
+			Gain: 0, Affordable: true, Missing: 0,
+		},
 	}))
 	require.NoError(t, client.RequestInventory())
 	require.NoError(t, client.ActionSitStand())

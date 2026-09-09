@@ -4,6 +4,54 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: the web UI shop queue widget (what the bot plans to buy next)
+
+Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.
+The stack was deployed with `tools/swarm_fast_deploy.sh` and verified
+(STACK_READY, ports 2106/7777/3306, 75 tables, `tools/mobius_e2e.sh 45`
+printed E2E_OK) before the work started. Other agents may push to the
+same branch concurrently - rebase before every push.
+
+### Goal
+
+The web UI must show the purchase queue of the shop strategy: what the
+bot plans to buy next (weapons/armor), how much adena the purchases
+need and how much is still missing. The user wants to see the items the
+bot wants at any moment, spot a suboptimal pick (a poor gain per adena
+purchase) and report it for a strategy fix - the widget is the
+inspection tool, not a steering tool.
+
+### Plan
+
+- `gear.PlanPurchaseQueue`: the greedy planner walk extended past the
+  wallet - the affordable plan of the next trip first (byte identical
+  to `PlanPurchases`), then the wanted tail (the best value per adena
+  picks the adena cannot pay for yet) with the cumulative missing
+  adena per entry.
+- `state.ShoppingPlanView` + `SetShoppingPlan`: the tracker view of the
+  queue (per entry: item, icon, merchant, price, sell credit, gain,
+  affordability, missing) carried in the snapshot as `shopping`, null
+  when nothing is published.
+- `hunt`: the loop publishes the queue every tick (a 5 s recompute
+  cache, shared with the trip trigger), and while a town trip runs the
+  view switches to the remaining trip buys (the in-flight batch
+  marked `buying`).
+- `web`: a collapsible SHOP QUEUE section of the floating equipment
+  widget - small scrollable list, hover tooltips (the rich item
+  tooltip shape plus the purchase lines: gain, value per adena,
+  price, sell credit, missing), a collapsed one line summary and the
+  pinned need/have/missing foot. Harness checks in
+  `tools/repro_gear.js`.
+
+### Status: in progress (2026-09-09)
+
+- Committed: the gear queue walker (`PlanPurchaseQueue`, the
+  `Affordable`/`Missing`/`Gain` fields of `Purchase`, the
+  `shoppingQueueTail` bound of 8) with the queue tests
+  (prefix-equals-plan, wanted tail missing accounting, sell credit of
+  the tail, rich wallet has no tail). Next: the state view and the
+  snapshot encoding.
+
 ## Active task: the blind engage recovery (walk around the obstacle, then switch)
 
 Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.
@@ -11,6 +59,8 @@ The stack was deployed with `tools/swarm_fast_deploy.sh` and verified
 (STACK_READY, ports 2106/7777/3306, 75 tables) before the work started.
 Other agents may push to the same branch concurrently - rebase before
 every push.
+
+### Status: done (2026-09-09, verified live and green)
 
 ### Goal
 
