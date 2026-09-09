@@ -1370,6 +1370,45 @@ const ShopPanel = {
   signature: ""
 };
 
+// initViewMenu wires the view layers dropdown of the map toolbar: the
+// button click opens and closes the checklist, a click anywhere else
+// or the Escape key closes it. The clicks inside the pop stop their
+// propagation, so the document handler only ever sees outside clicks
+// and the checklist stays open across several toggles.
+function initViewMenu() {
+  const menu = document.getElementById("view-menu");
+  const btn = document.getElementById("view-menu-btn");
+  const pop = document.getElementById("view-menu-pop");
+  if (!menu || !btn || !pop) { return; }
+  const stop = (event) => {
+    if (event && event.stopPropagation) { event.stopPropagation(); }
+  };
+  const close = () => {
+    menu.classList.remove("open");
+    pop.classList.add("hidden");
+    btn.setAttribute("aria-expanded", "false");
+  };
+  const openMenu = () => {
+    menu.classList.add("open");
+    pop.classList.remove("hidden");
+    btn.setAttribute("aria-expanded", "true");
+  };
+  btn.addEventListener("click", (event) => {
+    stop(event);
+    if (menu.classList.contains("open")) { close(); } else { openMenu(); }
+  });
+  pop.addEventListener("click", stop);
+  if (document.addEventListener) {
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", (event) => {
+      if (event && event.key === "Escape") { close(); }
+    });
+  }
+  // The closed state is authoritative here (not just the markup class):
+  // the sync also lands the aria-expanded value at load.
+  close();
+}
+
 // initShopPanel wires the triangle tab of the flyout: the click
 // slides the queue out to the left of the equipment panel and back.
 function initShopPanel() {
@@ -2113,6 +2152,7 @@ function initTargetWidget() {
 // the body, the widget markup is parsed already.
 initGearInteractions();
 initTargetWidget();
+initViewMenu();
 initShopPanel();
 
 // Chat window state: auto scroll follows the newest line while the

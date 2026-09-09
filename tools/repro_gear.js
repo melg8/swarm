@@ -170,7 +170,15 @@ function loadAppJs(appFile) {
         // wire the real dialog listeners (the wheel stepping included).
         querySelector: () => null,
         createElement: () => makeElement(),
-        documentElement: { dataset: {} }
+        documentElement: { dataset: {} },
+        // app.js registers a document-level click and an Escape close
+        // for the view layers dropdown of the toolbar; record them so
+        // the harness can fire both.
+        listeners: {},
+        addEventListener(type, handler) {
+            if (!this.listeners[type]) { this.listeners[type] = []; }
+            this.listeners[type].push(handler);
+        }
     };
     const sandbox = {
         Math, JSON, Number, Date, isNaN,
@@ -353,7 +361,7 @@ function main() {
         console.error("app.js not found: " + appFile);
         process.exit(1);
     }
-    const { gear, elements, posts } = loadAppJs(appFile);
+    const { gear, elements, sandbox, posts } = loadAppJs(appFile);
     const results = [];
 
     // The manual interactions need an active bot to post to.
@@ -1335,6 +1343,89 @@ function main() {
         shoesShopTip.includes("next trip") &&
         !shoesShopTip.includes("Missing"),
         "tip: " + shoesShopTip.slice(0, 200));
+
+    // ---- toolbar view dropdown ----
+    //
+    // The map toolbar folds into a single row: the -/+ zoom buttons
+    // are gone (the wheel owns the zoom) and the layer checkboxes
+    // (labels, paths, zone, targets, hunt zones, aggro, map bg) live
+    // in a dropdown that opens under the "view" button.
+
+    check(results, "toolbar markup drops the zoom buttons and carries the view dropdown",
+        !html.includes('id="zoom-in"') &&
+        !html.includes('id="zoom-out"') &&
+        html.includes('<div id="view-menu"') &&
+        html.includes('id="view-menu-btn"') &&
+        html.includes('id="view-menu-pop"') &&
+        html.indexOf('id="view-menu-btn"') <
+            html.indexOf('id="view-menu-pop"'),
+        "zoom buttons remain or dropdown markup missing");
+
+    check(results, "the layer checkboxes live inside the dropdown pop",
+        ["show-labels", "show-dest", "show-zone", "show-targets",
+            "show-hunt-zones", "show-aggro", "show-map"]
+            .every((id) =>
+                html.indexOf('id="' + id + '"') >
+                html.indexOf('id="view-menu-pop"')) &&
+        html.indexOf('id="show-map"') < html.indexOf('id="map-scale"'),
+        "a layer checkbox sits outside the pop");
+
+    check(results, "the dropdown css keeps the pop under the button and the toolbar on one row",
+        css.includes(".view-menu-pop") &&
+        css.includes(".view-menu.open") &&
+        css.includes("top: calc(100% + 6px)") &&
+        css.includes("z-index: 40") &&
+        css.slice(css.indexOf(".map-toolbar {"),
+            css.indexOf(".map-toolbar {") + 260)
+            .includes("flex-wrap: nowrap") &&
+        css.includes("body.mode-pathfind .view-menu .bot-layer"),
+        "missing dropdown css rules");
+
+    // The dropdown behavior: the button toggles the pop, an outside
+    // click closes it, the Escape key closes it. The pop clicks stop
+    // their propagation, so the checklist survives several toggles.
+    const viewMenu = elements.get("view-menu");
+    const viewBtn = elements.get("view-menu-btn");
+    const viewPop = elements.get("view-menu-pop");
+    const docListeners = (sandbox.document || {}).listeners || {};
+    const fireDoc = (type, event) => {
+        for (const handler of docListeners[type] || []) {
+            handler(event);
+        }
+    };
+    check(results, "the dropdown starts closed",
+        viewPop.classList.contains("hidden") &&
+        !viewMenu.classList.contains("open") &&
+        viewBtn.getAttribute("aria-expanded") === "false",
+        "the dropdown did not start closed");
+    fire(viewBtn, "click");
+    check(results, "the view button click opens the dropdown",
+        !viewPop.classList.contains("hidden") &&
+        viewMenu.classList.contains("open") &&
+        viewBtn.getAttribute("aria-expanded") === "true",
+        "the dropdown did not open");
+    fire(viewPop, "click");
+    check(results, "a click inside the checklist keeps it open",
+        !viewPop.classList.contains("hidden") &&
+        viewBtn.getAttribute("aria-expanded") === "true",
+        "a checklist click closed the dropdown");
+    fire(viewBtn, "click");
+    check(results, "the second view button click closes the dropdown",
+        viewPop.classList.contains("hidden") &&
+        viewBtn.getAttribute("aria-expanded") === "false",
+        "the dropdown did not close");
+    fire(viewBtn, "click");
+    fireDoc("click", { target: null });
+    check(results, "an outside click closes the dropdown",
+        viewPop.classList.contains("hidden") &&
+        viewBtn.getAttribute("aria-expanded") === "false",
+        "the outside click did not close it");
+    fire(viewBtn, "click");
+    fireDoc("keydown", { key: "Escape" });
+    check(results, "the Escape key closes the dropdown",
+        viewPop.classList.contains("hidden") &&
+        viewBtn.getAttribute("aria-expanded") === "false",
+        "the escape key did not close it");
 
     let failed = 0;
     for (const result of results) {

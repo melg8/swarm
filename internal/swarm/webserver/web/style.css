@@ -529,10 +529,12 @@ body.mode-pathfind .bot-status { display: none; }
 .map-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 10px;
-  padding: 8px 12px;
+  padding: 6px 12px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
+  min-height: 34px;
 }
 
 .btn {
@@ -552,7 +554,66 @@ body.mode-pathfind .bot-status { display: none; }
 
 .check input { accent-color: var(--accent); }
 
-.map-scale, .map-objects { color: var(--text-dim); font-family: var(--mono); font-size: 11px; margin-left: auto; }
+/* The view layers dropdown of the map toolbar: the layer checkboxes
+   (labels, paths, zones, targets, aggro, the background imagery) fold
+   into one compact "view" button, so the toolbar stays a single row
+   and the map keeps the vertical space. The pop anchors to the button
+   below it; clicks inside never reach the document close handler. */
+.view-menu { position: relative; }
+
+.view-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  height: 24px;
+  background: var(--bg-panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  line-height: 1;
+}
+
+.view-menu-btn:hover,
+.view-menu.open .view-menu-btn {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.view-menu-caret {
+  font-size: 10px;
+  color: var(--text-dim);
+  transition: transform 0.15s ease;
+}
+
+.view-menu.open .view-menu-caret { transform: rotate(180deg); }
+
+.view-menu-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 132px;
+  padding: 9px 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+.view-menu-pop.hidden { display: none; }
+
+.view-menu-pop .check { color: var(--text); }
+
+.view-sep { height: 1px; background: var(--border); margin: 1px 0; }
+
+.map-scale, .map-objects { color: var(--text-dim); font-family: var(--mono); font-size: 11px; margin-left: auto; white-space: nowrap; }
 
 .map-objects { margin-left: 10px; }
 
@@ -850,7 +911,7 @@ body.mode-pathfind .sidebar-foot,
 body.mode-pathfind .hud-stack,
 body.mode-pathfind .chat-box,
 body.mode-pathfind .follow-check,
-body.mode-pathfind .bot-only,
+body.mode-pathfind .view-menu .bot-layer,
 body.mode-pathfind .tab[data-tab="log"],
 body.mode-pathfind #foot-packets,
 body.mode-pathfind #foot-objects,
@@ -1633,7 +1694,7 @@ body.mode-fight .sidebar-foot,
 body.mode-fight .hud-stack,
 body.mode-fight .chat-box,
 body.mode-fight .follow-check,
-body.mode-fight .bot-only,
+body.mode-fight .view-menu,
 body.mode-fight .map-legend,
 body.mode-fight #foot-packets,
 body.mode-fight #foot-objects,

@@ -4,6 +4,78 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: the map toolbar folds into one row (zoom buttons gone, layer checkboxes in a dropdown)
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+A follow-up round of the web UI polish (the shop queue flyout round
+below is done and live verified). Other agents may push to the same
+branch concurrently - rebase before every push.
+
+### Goal
+
+The user report (2026-09-10, Russian): fix the top panel - remove the
+-/+ buttons and rework it, it eats too much vertical space, make it a
+dropdown list. Live measurement confirmed the diagnosis: the
+`bot-only` checkbox span collapsed into a six-row column (the flex
+item squeezed to 84 px wide), so the toolbar stood 101 px tall on a
+900 px viewport.
+
+### Changes
+
+- web/index.html: the `-`/`+` zoom buttons are gone (the wheel owns
+  the zoom, cursor-anchored); the seven layer checkboxes (labels,
+  paths, zone, targets, hunt zones, aggro, map bg) moved from the
+  inline span into the `view` dropdown - a `view-menu` wrapper, the
+  `view-menu-btn` button (aria-expanded, aria-haspopup, a caret glyph)
+  and the `view-menu-pop` checklist under it; the follow checkbox and
+  the pathfind arm controls stay inline.
+- web/style.css: the toolbar keeps one row (nowrap, a 6/12 padding,
+  min-height 34); the dropdown chrome (the pop absolutely under the
+  button with the panel background and shadow, the open state flips
+  the caret 180 degrees, a separator above the map bg row); the
+  bot-only checkbox rows carry `bot-layer` and hide in the pathfind
+  mode (only map bg stays), the whole toolbar hides in the fight
+  modes; the scale/object counters keep `white-space: nowrap`.
+- web/map.js: the zoom-in/zoom-out button listeners removed (the
+  wheel path in `onWheel` was already the real zoom).
+- web/app.js: `initViewMenu` - the button toggles the pop, an outside
+  click or Escape closes it, the clicks inside the pop stop their
+  propagation (several checkbox toggles survive one open), the closed
+  state is applied at init so the markup class and the aria value
+  always agree.
+- tools/repro_gear.js: the document stub grew an addEventListener
+  recorder; the new checks pin the markup (no zoom buttons, the
+  checkboxes inside the pop), the css (the pop under the button, the
+  nowrap toolbar, the pathfind bot-layer rule) and the behavior
+  (toggle open/close, a pop click keeps it open, an outside click and
+  Escape close it, the aria flips).
+- tools/repro_hud.js: the element stub grew setAttribute/getAttribute
+  (the dropdown init syncs aria-expanded at load).
+- AGENTS.md: the toolbar paragraph (the map toolbar bullet) and the
+  hunt zones toggle wording now describe the dropdown.
+
+### Status: done (2026-09-10, live verified on the local stack)
+
+- The toolbar measures 37 px tall on a 900 px viewport (was 101), a
+  single row in every mode; the map wrap grew from 739 to 803 px.
+- The dropdown opens under the view button (btn [275,40,61,24], pop
+  [275,70,132,170]) with the seven rows; unchecking `hunt zones`
+  keeps the menu open; a click on the page header and the Escape key
+  both close it; the aria-expanded value follows every state.
+- The wheel zoom still works (a dispatched WheelEvent on the canvas
+  moved the scale 0.12 -> 0.104); the zoom-in/zoom-out buttons are
+  gone from the DOM.
+- The pathfind mode hides the six bot-layer rows (map bg stays) and
+  keeps the 37 px single-row toolbar.
+- Screenshots (closed/open/pathfind) passed a vision model layout
+  check; no JS console or page errors.
+- Verify loop: repro_gear (all checks incl. the eight new dropdown
+  ones), repro_hud, repro_movement, repro_fight_ui pass; go build,
+  go vet, go test ./... (18 packages, no failures). The one
+  repro_map_render failure ("hunting zone carries the label") is the
+  pre-existing map label regression noted below - re-confirmed at
+  HEAD with this task's changes stashed.
+
 ## Active task: the shop queue flyout slides out to the left (the equipment panel never resizes)
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.

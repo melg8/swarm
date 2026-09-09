@@ -96,10 +96,9 @@ const MapView = {
     this.canvas.addEventListener("dblclick", (e) => this.onDoubleClick(e));
     this.canvas.addEventListener("dragover", (e) => this.onMapDragOver(e));
     this.canvas.addEventListener("drop", (e) => this.onMapDrop(e));
-    document.getElementById("zoom-in")
-      .addEventListener("click", () => this.zoom(1.5));
-    document.getElementById("zoom-out")
-      .addEventListener("click", () => this.zoom(1 / 1.5));
+    // Zoom lives on the wheel only (anchored at the cursor, onWheel
+    // above): the old toolbar +/- buttons are gone with the layer
+    // dropdown rework of the toolbar.
     const follow = document.getElementById("follow");
     follow.addEventListener("change", () => {
       if (!follow.checked) { this.syncPanAnchor(); }

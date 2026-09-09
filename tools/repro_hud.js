@@ -69,6 +69,15 @@ function makeElement() {
                 return on;
             }
         },
+        // the view layers dropdown of the toolbar syncs its
+        // aria-expanded attribute at init; record it.
+        attributes: {},
+        setAttribute(key, value) {
+            this.attributes[key] = String(value);
+        },
+        getAttribute(key) {
+            return this.attributes[key];
+        },
         _innerHTML: "",
         get innerHTML() { return this._innerHTML; },
         set innerHTML(value) {

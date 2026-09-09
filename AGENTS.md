@@ -553,8 +553,9 @@ the design goal is per-class and per-region extension):
   in a bright soft blue with a light fill - the demonstration of
   where the bot will hunt next, dimmed hints do not read; demoted
   bands red - labels only when the square is big enough on screen;
-  the `hunt zones` toolbar checkbox hides the whole layer like the
-  targets and map background toggles) and the floating collapsible
+  the `hunt zones` row of the map toolbar view dropdown hides the
+  whole layer like the targets and map background toggles) and the
+  floating collapsible
   zone panel of the map (bottom right corner, collapsed by default,
   the count chip carries the registry total; the left sidebar lists
   bots only) carries the death counts and switches zones manually
@@ -1473,6 +1474,18 @@ the same variables).
   published (the manual-only sessions, sessions without the shop
   strategy). The
   widget checks live in `tools/repro_gear.js`.
+- Map toolbar: one compact row (a 37 px bar, never a wrapped checkbox
+  column). The old `-`/`+` zoom buttons are gone - the wheel owns the
+  zoom alone (cursor-anchored, `onWheel` of `web/map.js`). The layer
+  checkboxes (labels, paths, zone, targets, hunt zones, aggro, map
+  background) fold into a `view` dropdown (`web/app.js`
+  `initViewMenu`): the button toggles the pop under it, a click
+  anywhere else or Escape closes it, clicks inside the pop stop their
+  propagation so several toggles survive one open; the bot-only rows
+  carry the `bot-layer` class and hide in the pathfind mode (only the
+  map background row stays there), the whole toolbar hides in the
+  fight modes. The `follow` checkbox and the pathfind arm buttons
+  stay inline; the scale and object counters pin to the right.
 - The web UI is interactive in every launch mode: a double click on
   the map (move/attack/pickup - hit test over the interpolated object
   positions) or on the target HUD panel (attack the shown target),
