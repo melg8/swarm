@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/melg8/swarm/internal/swarm/npcdata"
 	"github.com/melg8/swarm/internal/swarm/state"
 )
 
@@ -686,7 +687,14 @@ func (l *Loop) applyHuntingZone(zone HuntingZone) {
 
 // zoneMobPriority builds the template id to priority map of a zone
 // mob list: nil when the list carries no priorities (the plain
-// nearest-first pick of the zones without mob data).
+// nearest-first pick of the zones without mob data). The generated
+// registries carry the Mobius CT0 xml template ids of the spawn data
+// (20471 for the Kaboo Orc Fighter) while the NpcInfo packets
+// identify the same npc by the C4 display id plus the 1000000 offset
+// (1000471: the Mobius NpcIdConverter maps the one onto the other on
+// the wire), so every mob id translates onto its wire key - without
+// the translation the bias never matched a scan template id and the
+// zone mob preferences stayed dead.
 func zoneMobPriority(zone HuntingZone) map[int32]int32 {
 	var priorities map[int32]int32
 	for index := range zone.Mobs {
@@ -697,7 +705,7 @@ func zoneMobPriority(zone HuntingZone) map[int32]int32 {
 		if priorities == nil {
 			priorities = make(map[int32]int32, len(zone.Mobs))
 		}
-		priorities[mob.TemplateID] = mob.Priority
+		priorities[npcdata.NPCWireTemplateID(mob.TemplateID)] = mob.Priority
 	}
 
 	return priorities

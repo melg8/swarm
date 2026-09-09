@@ -54,6 +54,15 @@ with open(f"{stats}/npcs/CT0_to_C4_ids.txt", encoding="utf-8") as handle:
         internal, display = line.split(";")
         internal_to_display[int(internal)] = int(display)
 
+# Internal npc id -> NpcInfo wire template id (display id + 1000000,
+# the encoding the Mobius AbstractNpcInfo writes on the wire). The
+# hunt zone registries carry the internal xml ids of the spawn data,
+# so the zone mob priorities resolve through this map.
+internal_to_wire = {
+    internal: display + 1000000
+    for internal, display in internal_to_display.items()
+}
+
 # Internal npc id -> name, level and aggression (from the npc stats
 # xml files). Attribute order inside the npc and ai elements varies, so
 # attributes are parsed by dictionary.
@@ -198,6 +207,13 @@ content = (
     "// clan in the assist check of the server).\n"
     f"var npcClans = map[int32]string{{\n{render_string_map(display_clans)}}}\n"
     "\n"
+    "// npcInternalWireIDs maps the Mobius internal (CT0 xml) npc id\n"
+    "// onto the NpcInfo wire template id of the same npc (the C4\n"
+    "// display id + 1000000, the translation the Mobius NpcIdConverter\n"
+    "// applies on the wire). The hunt zone registries carry the xml\n"
+    "// ids of the spawn data, the packets carry the wire ids.\n"
+    f"var npcInternalWireIDs = map[int32]int32{{\n{render_int_map(internal_to_wire)}}}\n"
+    "\n"
     "// itemNames maps the DropItem display id to the item name.\n"
     f"var itemNames = map[int32]string{{\n{render_map(item_names)}}}\n"
 )
@@ -206,7 +222,7 @@ with open(out, "w", encoding="utf-8") as handle:
 print(
     f"wrote {len(npc_names)} npc names, "
     f"{len(display_levels)} levels, {len(display_aggressive)} aggression flags, "
-    f"{len(display_clans)} clan lists and "
+    f"{len(display_clans)} clan lists, {len(internal_to_wire)} internal wire ids and "
     f"{len(item_names)} item names to {out}"
 )
 PYEOF

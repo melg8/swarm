@@ -897,6 +897,63 @@ func TestZoneMobPriorityGuidesTheEngage(t *testing.T) {
 		"the doorstep mob beats the far preferred one")
 }
 
+// TestZoneMobPriorityTranslatesTheRegistryIDs pins the id space of
+// the generated zone registries: the zone mob lists carry the Mobius
+// CT0 xml template ids of the spawn data (20471 for the Kaboo Orc
+// Fighter) while the NpcInfo packets identify the same npcs by the
+// C4 display ids plus the 1000000 offset, so the priority map keys
+// translate onto the wire ids - the bias of the generated registries
+// never matched a scan template id before and stayed dead.
+func TestZoneMobPriorityTranslatesTheRegistryIDs(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	zones := []HuntingZone{
+		{
+			ID: "kaboo", Name: "Kaboo Ground", Region: "test",
+			MinLevel: 9, MaxLevel: 12, MinGear: 0,
+			CX: 46112, CY: 41500, Half: 1400,
+			Mobs: []ZoneMob{
+				{
+					TemplateID: 20471, Name: "Kaboo Orc Fighter",
+					Level: 10, Count: 4, Priority: 1,
+				},
+				{
+					TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+					Level: 11, Count: 5, Priority: 2,
+				},
+			},
+		},
+	}
+	loop.SetHuntingZones(zones)
+	setZoneTestLevel(bot, 13)
+	loop.tick()
+	require.Equal(t, "kaboo", loop.zonePickedID)
+	// The map keys are the wire template ids of the packets.
+	require.NotNil(t, loop.zoneMobPriority)
+	require.Equal(t, int32(1), loop.zoneMobPriority[1000471])
+	require.Equal(t, int32(2), loop.zoneMobPriority[1000473])
+	require.NotContains(t, loop.zoneMobPriority, int32(20471))
+
+	// The translated bias guides the pick against wire-id scans: the
+	// fighter 600 units east (600 - 1x200 = 400) loses to the
+	// lieutenant 700 units west (700 - 2x200 = 300) - the priority 2
+	// mob wins from farther out. The two stand 1300 units apart, past
+	// the ORC clan fence of the social filter.
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 81, TemplateID: 1000471, Attackable: true,
+		X: 46712, Y: 41500, Name: "Kaboo Orc Fighter",
+	})
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 82, TemplateID: 1000473, Attackable: true,
+		X: 45412, Y: 41500, Name: "Kaboo Orc Fighter Lieutenant",
+	})
+	loop.lastHit = time.Now().Add(-time.Minute)
+	loop.tick()
+	require.Equal(t, int32(82), loop.target,
+		"the translated priority bias guides the pick on the wire ids")
+}
+
 // setZoneTestLevel sets the character level through the userinfo
 // path (the paperdoll resets with it, so equip the gear after) and
 // places it at the elven village.

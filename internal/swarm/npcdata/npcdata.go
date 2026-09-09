@@ -80,6 +80,24 @@ func NPCClans(templateID int32) []string {
 	return npcClanSets[templateID-npcTemplateOffset]
 }
 
+// NPCWireTemplateID maps the Mobius internal (CT0 xml) template id of
+// an npc onto the NpcInfo wire template id of the same npc: the Mobius
+// NpcIdConverter translates the xml id of the stats data onto the C4
+// display id and the wire adds the 1000000 offset (the xml id 20471 of
+// the Kaboo Orc Fighter arrives as 1000471). The hunt zone registries
+// carry the xml ids of the spawn data, so the zone mob priorities
+// resolve through this map. An id outside the converter table passes
+// through unchanged: a wire id or a hand written test id stays itself,
+// and an unmapped internal id keeps its value (the bias then simply
+// never matches, the plain nearest-first pick applies).
+func NPCWireTemplateID(internalID int32) int32 {
+	if wire, ok := npcInternalWireIDs[internalID]; ok {
+		return wire
+	}
+
+	return internalID
+}
+
 // ItemName resolves the name of a ground item by its display id. It
 // returns an empty string when the item is unknown.
 func ItemName(displayID int32) string {
