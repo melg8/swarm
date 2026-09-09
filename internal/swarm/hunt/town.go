@@ -122,6 +122,11 @@ type Navigator interface {
 	// FindPath plans a walk to the target cell arriving on whatever
 	// deck of it the walk reaches first.
 	FindPath(start, end pathfind.Vec3) (*pathfind.Result, error)
+	// ClosestHeight resolves the height of the layer at the world
+	// position closest to refZ - the deck the server itself picks
+	// for a destination named with that z. The zone return resolves
+	// its goal height through it before the approach search.
+	ClosestHeight(x, y float64, refZ int16) (int16, error)
 }
 
 // engineNavigator adapts a geodata engine to the Navigator interface,
@@ -151,6 +156,13 @@ func (e engineNavigator) FindPath(
 	start, end pathfind.Vec3,
 ) (*pathfind.Result, error) {
 	return e.engine.FindPath(start, end, e.engine.MaxPassableHeight())
+}
+
+// ClosestHeight resolves the destination deck height with the engine.
+func (e engineNavigator) ClosestHeight(
+	x, y float64, refZ int16,
+) (int16, error) {
+	return e.engine.ClosestHeight(x, y, refZ)
 }
 
 // nearestMerchant returns the town merchant closest to the point.
@@ -826,17 +838,28 @@ func (l *Loop) resetTownTrip() {
 }
 
 // standUpGuarded stands a sitting character up before an action the
-// server refuses while it sits: the trip walks and the escape runs of
-// the combat safety both move the character, and a walk started
-// sitting would stall into the stuck re-paths. The toggle shares the
-// pending transition gate with the rest logic, so the two never
-// double toggle each other, and the walk starts on a later tick once
-// the ChangeWaitType broadcast confirms the standing.
+// server refuses while it sits: the trip walks, the zone returns and
+// the escape runs of the combat safety all move the character, and a
+// walk started sitting would stall into the stuck re-paths. The
+// toggle shares the pending transition gate with the rest logic, so
+// the two never double toggle each other, and the walk starts on a
+// later tick once the ChangeWaitType broadcast confirms the standing.
+// The confirmation broadcast itself is only the start of the stand:
+// the server holds the character paralyzed on the REST intention for
+// a fixed animation window after it (the 2.5 s StandUpTask), and
+// every move request of that window bounces off ActionFailed - the
+// guard holds the caller through the settle window so the first walk
+// request lands on a movable character.
 func (l *Loop) standUpGuarded(now time.Time) bool {
 	if !l.tracker.SelfSitting() {
-		// Standing already: consume a confirmed stand transition of
-		// this guard so it never lingers into the rest logic.
+		// Standing already: a stand transition of this guard went
+		// out recently - hold the caller through the server side
+		// stand window, then consume the transition so it never
+		// lingers into the rest logic.
 		if !l.restActionAt.IsZero() && !l.restActionSit {
+			if now.Sub(l.restActionAt) < standSettlePeriod {
+				return false
+			}
 			l.restActionAt = time.Time{}
 		}
 

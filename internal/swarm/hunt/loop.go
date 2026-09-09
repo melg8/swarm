@@ -98,6 +98,14 @@ const (
 	// repeat is only sent when the flip never happened (lost packet),
 	// so a slow confirmation can never toggle the character back.
 	restRetryPeriod = 3 * time.Second
+	// standSettlePeriod holds the movement through the server side
+	// stand animation: the ChangeWaitType broadcast confirms the
+	// standing at once, but the server keeps the character
+	// paralyzed on the REST intention for the 2.5 s StandUpTask
+	// window after it - move requests of that window bounce off
+	// ActionFailed. Waiting the window out (plus a margin) makes
+	// the first walk request land on a movable character.
+	standSettlePeriod = 3 * time.Second
 	// deathRestartPeriod is the pause between village restart requests
 	// of a dead character: the server keeps a short death delay and
 	// refuses early revives, so the request retries until it lands.
@@ -552,6 +560,18 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 // before.
 func (l *Loop) SetNavigator(navigator Navigator) {
 	l.navigator = navigator
+}
+
+// SetLogger replaces the log target of the loop. The default is
+// log.Default; the deployment wires a logger that mirrors the hunt
+// decision lines into the bot tracker event log (they then show up
+// in the web UI log tab and the state dump - the debugging material
+// of the live sessions).
+func (l *Loop) SetLogger(logger *log.Logger) {
+	if logger == nil {
+		return
+	}
+	l.logger = logger
 }
 
 // SetGearProfile replaces the gear scoring profile of the auto

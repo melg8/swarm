@@ -22,6 +22,13 @@ type fakeNavigator struct {
 	found   bool
 	calls   int
 	callsAt []time.Time
+	// height is the ClosestHeight answer for the zone return goal
+	// (zero: the lookup fails and the self height stays).
+	height    int16
+	heightErr bool
+	// approachEnds records the destinations the approach searches
+	// received (the zone return goal checks live here).
+	approachEnds []pathfind.Vec3
 }
 
 func (f *fakeNavigator) result(
@@ -61,6 +68,8 @@ func (f *fakeNavigator) result(
 func (f *fakeNavigator) FindPathApproach(
 	start, end pathfind.Vec3, _ float64,
 ) (*pathfind.Result, error) {
+	f.approachEnds = append(f.approachEnds, end)
+
 	return f.result(start, end)
 }
 
@@ -69,6 +78,15 @@ func (f *fakeNavigator) FindPath(
 	start, end pathfind.Vec3,
 ) (*pathfind.Result, error) {
 	return f.result(start, end)
+}
+
+// ClosestHeight answers the configured zone deck height.
+func (f *fakeNavigator) ClosestHeight(_, _ float64, _ int16) (int16, error) {
+	if f.heightErr {
+		return 0, errors.New("no geodata")
+	}
+
+	return f.height, nil
 }
 
 // herbielPos is the spawn point of the Elven village trader Herbiel,
@@ -541,7 +559,7 @@ func TestShoppingTripSellsJunkBelowTheTrigger(t *testing.T) {
 // a resting character (the regen sits it down between the fights)
 // stands up first - the server refuses move requests while sitting -
 // and the trip starts once the ChangeWaitType broadcast confirms the
-// standing.
+// standing and the server side stand animation window settles.
 func TestTripStandsUpBeforeWalking(t *testing.T) {
 	loop, game, bot, _ := newTripLoop()
 	fillInventory(bot)
@@ -553,11 +571,20 @@ func TestTripStandsUpBeforeWalking(t *testing.T) {
 		"the trip does not start while the character sits")
 	require.Equal(t, 1, game.sits, "the stand up toggle is sent")
 
-	// The broadcast confirms the standing: the trip starts.
+	// The broadcast confirms the standing, but the server keeps the
+	// character on the REST intention through the stand animation
+	// window: the walk waits the settle out, no double toggle.
 	bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: false})
 	loop.tick()
-	require.Equal(t, phaseTownWalk, loop.phase)
+	require.Equal(t, phaseEngage, loop.phase,
+		"the stand animation window holds the trip")
 	require.Equal(t, 1, game.sits, "no double toggle")
+
+	// The settle window passes: the trip starts.
+	loop.restActionAt = time.Now().Add(-standSettlePeriod - time.Second)
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+	require.Equal(t, 1, game.sits)
 	require.NotEmpty(t, game.walks)
 }
 

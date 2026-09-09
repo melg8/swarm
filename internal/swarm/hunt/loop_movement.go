@@ -115,9 +115,16 @@ func (l *Loop) patrolToCenter(now time.Time) {
 // destination when one exists, the zone center otherwise. The failures of
 // the pathfound legs (a missing geodata region, an unreachable deck) fall
 // back to the legacy direct legs, so a character without a walkable path
-// still moves home.
+// still moves home. The return needs a standing character: the server
+// refuses every move request while it sits (the AI stays on the REST
+// intention and answers ActionFailed), so a zone switch that lands on a
+// resting character first waits out the sit transition, stands up and
+// only then plans the walk.
 func (l *Loop) returnToZone() {
 	now := time.Now()
+	if !l.standUpGuarded(now) {
+		return
+	}
 	if now.Sub(l.lastHit) < selectPeriod {
 		return
 	}
@@ -148,11 +155,7 @@ func (l *Loop) returnToZone() {
 
 		return
 	}
-	dest := pathfind.Vec3{
-		X: float64(zone.CX),
-		Y: float64(zone.CY),
-		Z: float64(selfZ),
-	}
+	dest := l.zoneReturnDestination(zone, selfZ)
 	farmKnown := l.farmX != 0 || l.farmY != 0
 	if farmKnown && zone.Contains(l.farmX, l.farmY) {
 		dest = pathfind.Vec3{
@@ -172,6 +175,39 @@ func (l *Loop) returnToZone() {
 
 		return
 	}
+}
+
+// zoneReturnDestination builds the search goal of the zone return for
+// the square center: the x and y of the center with the REAL deck
+// height under it, resolved the way the server itself resolves a
+// destination - the layer closest to the walker height. A fabricated
+// self height at the target (the old code) put the 3D approach goal
+// mid air whenever the zone sits on another deck than the character
+// (the live case: the floating elven city deck at z -2992 against a
+// ground zone at z -3664): no cell ever matched the approach radius,
+// the search burned the whole expansion cap (a thirteen second
+// frozen tick per attempt) and the return fell back to the direct
+// walk that ran the character into the city railing. A height lookup
+// failure keeps the self height - the same-deck case it answers
+// correctly.
+func (l *Loop) zoneReturnDestination(
+	zone *state.Zone, selfZ int32,
+) pathfind.Vec3 {
+	dest := pathfind.Vec3{
+		X: float64(zone.CX),
+		Y: float64(zone.CY),
+		Z: float64(selfZ),
+	}
+	height, err := l.navigator.ClosestHeight(
+		float64(zone.CX), float64(zone.CY), int16(selfZ))
+	if err != nil {
+		l.logger.Printf("Hunt: zone deck height lookup failed: %v", err)
+
+		return dest
+	}
+	dest.Z = float64(height)
+
+	return dest
 }
 
 // walkZoneLeg walks one direct short leg toward the zone center: the

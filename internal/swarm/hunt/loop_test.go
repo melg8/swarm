@@ -443,6 +443,110 @@ func TestLoopPathfindsBackIntoTheZone(t *testing.T) {
 	require.False(t, loop.zoneReturn)
 }
 
+// TestLoopStandsUpBeforeTheZoneReturnWalk pins the sit gate of the
+// zone return: a resting character outside the square (the user
+// switched the hunting zone under a regenerating bot) stands up
+// first and waits out the server side stand animation before any
+// walk or path search - the server refuses every move request of a
+// sitting character with ActionFailed, so the old code spammed the
+// refusals while the character stayed glued to the spot.
+func TestLoopStandsUpBeforeTheZoneReturnWalk(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	game.noTargets = true
+	nav := &fakeNavigator{found: true, height: -3500}
+	loop := NewLoop(game, bot)
+	loop.SetNavigator(nav)
+	loop.SetHuntingZone(46112, 41500, 450)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The character rests (the regeneration sat it down) far outside
+	// the hunting square.
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 49308, Y: 44213, Z: -3539,
+		DestX: 49308, DestY: 44213, DestZ: -3539,
+	})
+	bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: true})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Zero(t, game.walks,
+		"no walk request while the character sits")
+	require.Zero(t, nav.calls,
+		"no path search while the character sits")
+	require.Equal(t, 1, game.sits,
+		"the zone return stands the character up")
+
+	// The ChangeWaitType broadcast confirms the standing, the stand
+	// animation window settles: the return plans and walks.
+	bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: false})
+	loop.restActionAt = time.Now().Add(-standSettlePeriod - time.Second)
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, nav.calls,
+		"the return searches the path once the character stands")
+	require.Equal(t, phaseTownReturn, loop.phase)
+
+	// The follower walks the planned waypoints.
+	loop.tick()
+	require.NotEmpty(t, game.walks, "the follower walks home")
+	require.Equal(t, 1, game.sits, "no double toggle")
+}
+
+// TestLoopResolvesTheZoneReturnDeckHeight pins the zone return goal:
+// the destination carries the REAL geodata height of the zone center
+// (resolved the way the server resolves a destination), not the
+// fabricated self height - the floating city deck against a ground
+// zone put the 3D approach goal mid air before, the search aborted
+// at the expansion cap and the return fell back to the direct walk.
+func TestLoopResolvesTheZoneReturnDeckHeight(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	game.noTargets = true
+	nav := &fakeNavigator{found: true, height: -3664}
+	loop := NewLoop(game, bot)
+	loop.SetNavigator(nav)
+	loop.SetHuntingZone(46112, 41500, 450)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The character stands on the city deck (-2992) outside the zone
+	// whose center sits on the ground (-3664).
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 49308, Y: 44213, Z: -2992,
+		DestX: 49308, DestY: 44213, DestZ: -2992,
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, nav.calls)
+	require.InDelta(t, -3664, nav.approachEnds[0].Z, 0.001,
+		"the zone return goal carries the resolved deck height")
+	require.InDelta(t, 46112, nav.approachEnds[0].X, 0.001)
+	require.InDelta(t, 41500, nav.approachEnds[0].Y, 0.001)
+}
+
+// TestLoopKeepsSelfHeightWhenTheZoneDeckLookupFails: a height lookup
+// error (no geodata under the zone center) keeps the self height -
+// the same-deck case the old code answered correctly.
+func TestLoopKeepsSelfHeightWhenTheZoneDeckLookupFails(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	game.noTargets = true
+	nav := &fakeNavigator{found: true, heightErr: true}
+	loop := NewLoop(game, bot)
+	loop.SetNavigator(nav)
+	loop.SetHuntingZone(46112, 41500, 450)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 49308, Y: 44213, Z: -3539,
+		DestX: 49308, DestY: 44213, DestZ: -3539,
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, nav.calls)
+	require.InDelta(t, -3539, nav.approachEnds[0].Z, 0.001,
+		"the failed lookup falls back to the self height")
+}
+
 func TestLoopIgnoresMobsOutsideTheZone(t *testing.T) {
 	bot := newTestBot()
 	game := &fakeGame{}

@@ -269,6 +269,33 @@ func (e *Engine) FindPathApproach(
 	return search.run(start, end, approachRadius)
 }
 
+// ClosestHeight resolves the height of the geodata layer at the world
+// position that is closest to refZ: the deck the server itself would
+// pick for a destination at (x, y) named with z = refZ (its own
+// pathfinder resolves the target cell by the destination z, not by
+// the deck the walker stands on). Planning code uses it to put a
+// search goal on real ground before FindPathApproach - a fabricated
+// height at the target puts the 3D approach goal mid air whenever the
+// destination sits on another deck than the walker, and the search
+// then can never match the goal. A position with no region file
+// under it answers the region load error, a cell without layers
+// ErrMissingCell; either way the caller stays on its fallback height.
+func (e *Engine) ClosestHeight(
+	x, y float64, refZ int16,
+) (int16, error) {
+	coords := WorldToCell(x, y)
+	entry, err := e.entry(CellToRegion(coords))
+	if err != nil {
+		return 0, err
+	}
+	layer, ok := entry.region.ClosestLayer(LocalCell(coords), refZ)
+	if !ok {
+		return 0, fmt.Errorf("%w at %.0f %.0f", ErrMissingCell, x, y)
+	}
+
+	return layer.Height, nil
+}
+
 // LineOfSight reports whether a straight line between two world
 // positions crosses only open cells with compatible heights.
 func (e *Engine) LineOfSight(
