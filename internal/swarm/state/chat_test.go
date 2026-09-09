@@ -6,6 +6,7 @@ package state
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -100,4 +101,28 @@ func TestChatWindowRollsOver(t *testing.T) {
 	require.Equal(t, "You picked up 10 adena.", lines[0].Text)
 	require.Equal(t, "You picked up 73 adena.",
 		lines[len(lines)-1].Text)
+}
+
+func TestApplySystemMessageRecordsCannotSeeTarget(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+	// Any other system message leaves the refusal time untouched.
+	bot.ApplySystemMessage(SystemMessage{ID: 28})
+	require.True(t, bot.SelfCannotSeeTargetAt().IsZero(),
+		"an unrelated message never marks the blind attack")
+
+	// The "Cannot see target." answer (id 181 of the Mobius C1
+	// SystemMessageId) records its arrival time.
+	before := time.Now()
+	bot.ApplySystemMessage(SystemMessage{ID: 181})
+	at := bot.SelfCannotSeeTargetAt()
+	require.False(t, at.IsZero())
+	require.False(t, at.Before(before),
+		"the refusal time is the arrival time")
+
+	// The chat window still carries the formatted line.
+	lines := chatLines(bot)
+	require.Len(t, lines, 2)
+	require.Equal(t, "Cannot see target.", lines[1].Text)
 }

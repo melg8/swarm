@@ -58,87 +58,94 @@ const combatEventMax = 64
 
 // CharacterState holds the observed state of the played character.
 type CharacterState struct {
-	Name             string
-	Level            int32
-	Race             int32
-	ClassID          int32
-	X                int32
-	Y                int32
-	Z                int32
-	Heading          int32
-	STR              int32
-	DEX              int32
-	CON              int32
-	INT              int32
-	WIT              int32
-	MEN              int32
-	Exp              int32
-	Sp               int32
-	CurHP            float64
-	MaxHP            float64
-	CurMP            float64
-	MaxMP            float64
-	Moving           bool
-	DestX            int32
-	DestY            int32
-	DestZ            int32
-	RunSpeed         float64
-	WalkSpeed        float64
-	CollisionRadius  float64
-	MoveAt           time.Time
-	SocialUntil      time.Time
-	AutoAttacking    bool
-	CombatUntil      time.Time
-	CombatActiveAt   time.Time
-	FightingTargetID int32
-	TargetID         int32
-	Sitting          bool
-	LastHitAt        time.Time
-	CurrentLoad      int32
-	MaxLoad          int32
+	Name            string
+	Level           int32
+	Race            int32
+	ClassID         int32
+	X               int32
+	Y               int32
+	Z               int32
+	Heading         int32
+	STR             int32
+	DEX             int32
+	CON             int32
+	INT             int32
+	WIT             int32
+	MEN             int32
+	Exp             int32
+	Sp              int32
+	CurHP           float64
+	MaxHP           float64
+	CurMP           float64
+	MaxMP           float64
+	Moving          bool
+	DestX           int32
+	DestY           int32
+	DestZ           int32
+	RunSpeed        float64
+	WalkSpeed       float64
+	CollisionRadius float64
+	MoveAt          time.Time
+	SocialUntil     time.Time
+	AutoAttacking   bool
+	CombatUntil     time.Time
+	CombatActiveAt  time.Time
+	// CannotSeeTargetAt records when the server last answered the
+	// attack with "Cannot see target." - the geodata line of sight to
+	// the target is blocked (an obstacle between the character and the
+	// target), the hunt loop walks around it instead of re-requesting
+	// the refused attack.
+	CannotSeeTargetAt time.Time
+	FightingTargetID  int32
+	TargetID          int32
+	Sitting           bool
+	LastHitAt         time.Time
+	CurrentLoad       int32
+	MaxLoad           int32
 }
 
 // newCharacterState creates a zero valued character state.
 func newCharacterState() CharacterState {
 	return CharacterState{
-		Name:             "",
-		Level:            0,
-		Race:             0,
-		ClassID:          0,
-		X:                0,
-		Y:                0,
-		Z:                0,
-		Heading:          0,
-		STR:              0,
-		DEX:              0,
-		CON:              0,
-		INT:              0,
-		WIT:              0,
-		MEN:              0,
-		Exp:              0,
-		Sp:               0,
-		CurHP:            0,
-		MaxHP:            0,
-		CurMP:            0,
-		MaxMP:            0,
-		Moving:           false,
-		DestX:            0,
-		DestY:            0,
-		DestZ:            0,
-		RunSpeed:         defaultRunSpeed,
-		WalkSpeed:        defaultWalkSpeed,
-		CollisionRadius:  defaultSelfCollision,
-		MoveAt:           time.Time{},
-		SocialUntil:      time.Time{},
-		AutoAttacking:    false,
-		CombatUntil:      time.Time{},
-		CombatActiveAt:   time.Time{},
-		FightingTargetID: 0,
-		TargetID:         0,
-		Sitting:          false,
-		LastHitAt:        time.Time{},
-		CurrentLoad:      0,
-		MaxLoad:          0,
+		Name:              "",
+		Level:             0,
+		Race:              0,
+		ClassID:           0,
+		X:                 0,
+		Y:                 0,
+		Z:                 0,
+		Heading:           0,
+		STR:               0,
+		DEX:               0,
+		CON:               0,
+		INT:               0,
+		WIT:               0,
+		MEN:               0,
+		Exp:               0,
+		Sp:                0,
+		CurHP:             0,
+		MaxHP:             0,
+		CurMP:             0,
+		MaxMP:             0,
+		Moving:            false,
+		DestX:             0,
+		DestY:             0,
+		DestZ:             0,
+		RunSpeed:          defaultRunSpeed,
+		WalkSpeed:         defaultWalkSpeed,
+		CollisionRadius:   defaultSelfCollision,
+		MoveAt:            time.Time{},
+		SocialUntil:       time.Time{},
+		AutoAttacking:     false,
+		CombatUntil:       time.Time{},
+		CombatActiveAt:    time.Time{},
+		CannotSeeTargetAt: time.Time{},
+		FightingTargetID:  0,
+		TargetID:          0,
+		Sitting:           false,
+		LastHitAt:         time.Time{},
+		CurrentLoad:       0,
+		MaxLoad:           0,
 	}
 }
 
@@ -442,6 +449,19 @@ func (b *Bot) SelfFighting(targetID int32) bool {
 
 	return b.char.FightingTargetID == targetID &&
 		b.char.fightingFresh(time.Now())
+}
+
+// SelfCannotSeeTargetAt returns when the server last answered the attack
+// with "Cannot see target." (zero when it never happened): the geodata
+// line of sight to the attack target is blocked, an obstacle stands
+// between the character and the target. The hunt loop reads it to
+// recognize the obstructed engage and walk around the obstacle instead
+// of re-requesting the refused attack forever.
+func (b *Bot) SelfCannotSeeTargetAt() time.Time {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.CannotSeeTargetAt
 }
 
 // SelfWalking reports whether the character is moving right now: the

@@ -19,6 +19,13 @@ const chatCapacity = 64
 // when a character reaches a new level (SocialAction.LEVEL_UP).
 const socialActionLevelUp = 15
 
+// systemMessageCannotSeeTarget is the SystemMessage id the Mobius C1
+// server answers an attack with when the geodata line of sight to the
+// target is blocked (SystemMessageId.CANNOT_SEE_TARGET -
+// Creature.doAttack sends it and keeps the attack intention armed, so
+// the refusal repeats on every AI think while the obstruction lasts).
+const systemMessageCannotSeeTarget = 181
+
 // socialWindow is how long a creature keeps the social animation marker
 // on the map after its SocialAction broadcast.
 const socialWindow = 3 * time.Second
@@ -62,10 +69,16 @@ type SocialAction struct {
 }
 
 // ApplySystemMessage formats a system message with its parameters and
-// appends it to the chat window log.
+// appends it to the chat window log. The "Cannot see target." answer
+// additionally records its arrival time: the hunt loop reads it to
+// recognize an engage the terrain obstructs and to walk around the
+// obstacle instead of re-requesting the refused attack forever.
 func (b *Bot) ApplySystemMessage(m SystemMessage) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if m.ID == systemMessageCannotSeeTarget {
+		b.char.CannotSeeTargetAt = time.Now()
+	}
 	b.recordChatLocked("system",
 		formatChatText(npcdata.SystemMessageText(m.ID), m.Params))
 }
