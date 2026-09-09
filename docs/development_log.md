@@ -2049,3 +2049,72 @@ full debug state to the clipboard.
   up, the ~3 s settle, then "outside the hunting zone,
   pathfinding back" with a fast plan - and the dump button should
   hand the user the full story for any new report.
+
+## Round 39: the terrace rule - the pathfinder stays on walkable surfaces (2026-09-09)
+
+Scope: the follow-up live report of the zone switch (a state dump):
+the bot on the floating elven city deck (42440 49032 z -2992) heading
+to the Spore Fungus SW-e1 zone ground into the city walls with "town
+walk stuck, re-pathing" repeating, the remaining walk plan pointing
+straight west on the ground layer. The user's diagnosis: the
+pathfinding has no descent - the railings block the city edge, the
+character must use one of the three bridges with their gradual ramps.
+Explicitly demanded: a general multi-terrace solution, no hardcoded
+bridge routes.
+
+### Diagnosis
+
+- Replanning the dump route on the real geodata showed the A* DID
+  find a route: a 920 unit drop off the deck edge into the lake bed
+  at (42360, 49048) and a ~10000 unit swim west. The geodata does not
+  model the railings (the deck edge cells are fully open NSWE) and
+  the search's canStep mirrored only the upward Mobius
+  HEIGHT_INCREASE_LIMIT - any drop was walkable, so the jump off the
+  deck planned cleanly.
+- The follower made it worse: its 2D waypoint arrival consumed the
+  drop waypoint (80 units away horizontally, 920 below), so the
+  character skipped straight to the long west leg, walked it into the
+  city building walls, stuck, re-path, the same drop route, forever.
+- The height profiles of the real geodata separate the world cleanly:
+  the bridge ramps and the lake shores step 8..24 units per cell, the
+  deck edge jumps 920. Stacked terraces connect only through gradual
+  ramps.
+
+### Changes
+
+- `search.canStep` is symmetric now: a step between neighbouring
+  cells is walkable only when the height difference stays within the
+  passable height in BOTH directions; a bigger step is a terrace
+  boundary. The descent from the city deck routes through the ramps
+  with nothing hardcoded - the A* finds the south bridge itself
+  (deck -> 42824 51224 -> -3224 -> -3480 -> -3680, 14702 units, ~0.6
+  s, 46k expansions, no swimming). `canMoveTo` of the line of sight
+  raster delegates to the same rule, and the FindPath docs state the
+  terrace contract.
+- `waypointDistance` (hunt/town.go): the town trip and the manual
+  walk followers measure the waypoint arrival in full 3D - a drop
+  waypoint hundreds of units below is never consumed as reached.
+- `directOrAstar` (search.go): run()'s straight line shortcut answers
+  only DRY walks. The old form returned any walkable raster line,
+  including a lake ford, which bypassed the water cost while the
+  cheaper bridge sat unplanned - the synthetic channel route proved
+  it by swimming straight across. A wet, walled or truncated line
+  defers to the cost aware A*; the accepted dry line is its own
+  smoothing (the two endpoints), keeping the region crossing
+  concurrent searches instant (the full raster would have fed the
+  quadratic smoothing cascade - 269 s on the concurrency test).
+
+### Tests
+
+- New: TestFindPathTerraceBoundaryNeedsARamp (a 500 unit synthetic
+  terrace stays sealed without a ramp and connects through one, every
+  raw step within the limit, the climb back works);
+  TestFindPathFromDeckToFarWestZoneStaysOnRamps (the live dump
+  coordinates, the ramp invariant, no swimming, under 5 s).
+- Updated: TestFindPathFromCityDeckToGroundZone asserts the ramp
+  steps; the water channel fixture slopes both shores (the real lake
+  shores do) and sits closer to the bridge (the old margins flipped
+  inside the diagonal shortcut noise); TestLoopPathfindsBackIntoTheZone
+  pins the 3D arrival against a realistic zone deck height.
+- go build/vet, go test ./... (18 packages), gofmt, golangci-lint (no
+  new issues), tools/mobius_e2e.sh 45 E2E_OK, SWARM_PROXY_E2E=1 PASS.
