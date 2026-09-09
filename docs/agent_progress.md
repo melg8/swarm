@@ -65,10 +65,32 @@ inspection tool, not a steering tool.
   the equipment panel (keyed rows, summary line, buy/have/save foot,
   the rich purchase tooltip with the Gain / Value-per-adena planning
   block), the harness checks in repro_gear.js, the AGENTS.md and
-  shopping_strategy.md notes. Live verified on the deployed stack:
-  the queue publishes and tracks the wallet (the missing amounts
-  shrink with the looted adena), the page serves the markup.
-  Remaining: the final verify loop and the live trip-view check.
+  shopping_strategy.md notes.
+
+### Status: done (2026-09-09, live verified on the deployed stack)
+
+- The full stack verified before the work (STACK_READY, 75 tables,
+  `tools/mobius_e2e.sh 45` -> E2E_OK).
+- The widget verified live with a hunting bot + a headless browser:
+  the queue publishes (10 entries: the 2 affordable fillers and the
+  wanted tail through the Ring of Knowledge), the missing amounts
+  shrink with the looted adena (wallet 16 -> 44 -> the short sword
+  missing 806 -> 787), the head summary (count, affordable total,
+  the whole queue save-up), the buy/have/save foot, the purchase
+  tooltip (Gain +758, Value/adena 0.858, Sell first 69, Missing,
+  the saving up status) and the collapse toggle both ways; no JS
+  console errors.
+- Verify loop green: go build, go vet, go test ./... (full suite),
+  go test -race on state + hunt, gofmt clean, golangci-lint (the 9
+  reported issues are pre-existing: the gear goconst/prealloc and
+  the version/fleete2e/icons/server/pathfind findings of the other
+  commits), every web harness passes (repro_gear with the 15 new
+  shop queue checks, hud, movement, fight ui).
+- Note for the next agent: `tools/repro_map_render.js` fails one
+  check at HEAD without any of this task's changes ("hunting zone
+  carries the label - no label at the square corner") - a pre
+  existing regression of the map label rendering, worth its own
+  task.
 
 ## Active task: the blind engage recovery (walk around the obstacle, then switch)
 
