@@ -2350,3 +2350,85 @@ no commit. The user run mode must not degrade the identity.
   tools/mobius_e2e.sh E2E_OK (its log echoes the full hash too).
 - go build/vet, go test ./... (18 packages ok), gofmt clean,
   golangci-lint 0 issues on the touched packages.
+
+## Round 43: the stuck spot reproduction - re-verified and pinned (2026-09-09)
+
+Scope: the user asked to return to the original stuck problem of round
+35 (the character stuck at x 45544 y 45880 z -2992 while a town trip
+tried to reach the trader Unoren 44667 46896 -2982), re-check the
+state dump and everything around it once more, and create a
+reproduction test with the same positions.
+
+### The re-check (all measured again on the deployed pack)
+
+- The geodata of the reported scene: the stuck cell holds the village
+  deck (-2992) above the pond floor (-3840), the pond cells between
+  the spot and the shop hold water floor only (-3880, below the -3780
+  surface) and the Unoren cell holds a raised surface (-2632) and the
+  lake floor (-3928) but no floor layer at the real merchant z.
+- The straight line the old direct far walk sent is not walkable: the
+  line of sight from the stuck spot to the merchant is false, and a
+  cell by cell simulation of the server move validation
+  (GeoEngine.getValidLocation semantics) stalls at the very first step
+  - the reported coordinates 45544 45880 -2992 ARE the deck edge stall
+  point of that line.
+- The current approach search from the same spot: 3 waypoints, 1466
+  units, 182 nodes explored, the route stays on the deck at z -2992
+  around the pond and ends 189 units from Unoren (regression suite
+  TestFindPathToShopDeck re-run green).
+- The live reproduction on the deployed stack: the character test1
+  was placed at the stuck position through the database with a bag of
+  41 non stackable daggers (the 50% slot trigger; stackable junk
+  merges into one slot on login and never triggers), the bot ran one
+  hunt session - the trip started at the stuck spot, walked the
+  geodata route (13 s), sold the daggers in two batches, bought
+  nothing, walked back to the farm spot, hunting resumed. Zero stuck
+  re-paths in the log. The state dump captured mid walk carried the
+  build identity line, the live position with the active leg and the
+  published walk plan (3 waypoints: the deck edge route, the approach
+  ring, the merchant) - the same material the original report was
+  made of, now showing a working plan instead of a stall.
+
+### The reproduction tests (internal/swarm/hunt/town_repro_test.go)
+
+- TestReproStraightWalkStallsAtTheUserStuckSpot pins the mechanism of
+  the original problem: a server simulating walker (reproServer, a
+  MoveToLocation follower that advances cell by cell with the geodata
+  line of sight as the conservative model of the server's straight
+  line validation) sent straight at the merchant stalls exactly at the
+  reported coordinates, stays on the deck, never reaches the 250 unit
+  interaction distance - a straight MoveToLocation is not a route, the
+  contract the geodata planning exists to satisfy.
+- TestReproTownTripFromTheUserStuckSpot walks the full trip from the
+  same positions against the real pack: the trip targets Unoren (the
+  nearest merchant of the spot), plans a real geodata route (never the
+  single direct fallback leg), the follower walks it under the
+  simulated server, the walk ends inside the interaction distance with
+  ZERO stuck re-paths (the original failure signature), the walk plan
+  publishes for the dump view on the way, and the merchant selection
+  plus the first sell batch run at the reached shop.
+- Both tests need the real geodata pack (the same candidate directory
+  discovery as the pathfind town route tests, the Windows reference
+  deployment included) and skip on machines without it.
+
+### The live reproduction tool (tools/repro_stuck_trip.sh)
+
+- Repeatable end to end scenario: checks the stack, moves the offline
+  test1 to the stuck spot, arms the trigger with fresh daggers, builds
+  the bot with the identity flags, runs one hunt session, captures the
+  mid walk state dump into logs/repro_stuck_dump.txt and fails loudly
+  when the hunt log shows a stuck re-path or the shop was never
+  reached. Prints REPRO_OK otherwise. The tool run of this round: the
+  mid walk dump showed `walk plan (3 waypoints)` with the deck route
+  and the trip story ran trigger -> shop reached -> 25+17 items sold
+  -> back at the farm spot.
+
+### Verification
+
+- gofmt clean, go build/vet, go test ./... (19 packages),
+  golangci-lint 0 issues on the hunt package (the first lint pass
+  flagged 4 nits in the new test - an ineffectual assignment, the
+  ireturn interface helper, the `clear` builtin shadow - all fixed by
+  returning the concrete engine and renaming).
+- tools/mobius_e2e.sh 45 -> E2E_OK (the standard live verification on
+  the same stack).

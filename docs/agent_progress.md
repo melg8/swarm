@@ -2685,3 +2685,35 @@ name the variant number that best fits the real bot UI.
   build rendered the full hash with (dirty) and the link timestamp;
   tools/mobius_e2e.sh E2E_OK. go build/vet, go test ./...
   (18 packages), golangci-lint 0 issues.
+- 2026-09-09: the stuck spot reproduction pinned (round 8,
+  feature/proxy-server). Return to the original round 35 stuck problem
+  (the character stuck at 45544 45880 -2992 walking to the trader
+  Unoren 44667 46896 -2982): everything re-measured on the deployed
+  pack (the pond water cells at -3880 between the spot and the shop,
+  the missing shop floor layer, the false line of sight of the direct
+  line) and the whole scenario reproduced live on the stack - the
+  character placed at the stuck spot through the database with 41
+  non-stackable daggers as the trip trigger (stackable junk merges
+  into one slot on login and never fills the bag), one hunt session,
+  the trip walked the geodata route in 13 s, sold out, returned, zero
+  stuck re-paths, the mid-walk state dump carrying the build identity
+  line plus the published 3 waypoint walk plan. The reproduction is
+  now pinned by two tests over the real geodata pack
+  (internal/swarm/hunt/town_repro_test.go):
+  TestReproStraightWalkStallsAtTheUserStuckSpot (a server simulating
+  MoveToLocation follower - cell by cell advance with the geodata line
+  of sight as the conservative model of the server's straight line
+  validation - stalls at exactly the reported coordinates when sent
+  straight at the merchant: the mechanism of the original report) and
+  TestReproTownTripFromTheUserStuckSpot (the full trip from the same
+  positions: the geodata route, the walk under the simulated server,
+  the arrival within the interaction distance, ZERO stuck re-paths,
+  the merchant selection and the first sell batch). The live scenario
+  is repeatable through tools/repro_stuck_trip.sh (DB placement +
+  trigger arming + one session + the mid-walk dump capture +
+  REPRO_OK/FAIL verdict on the hunt log). One environment lesson
+  documented in the tool header: the bot must run with the swarm root
+  as CWD (or -geodata) - the relative geodata candidates silently
+  degrade to a hunt without town trips otherwise. Verified: stack
+  STACK_READY, gofmt, go build/vet, go test ./... (19 packages),
+  golangci-lint 0 issues on hunt, tools/mobius_e2e.sh E2E_OK.

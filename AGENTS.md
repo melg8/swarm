@@ -386,6 +386,17 @@ What each script does:
   runs the bot with `timeout -s INT`, reports the exit code, received
   packet count and the game server log tail. Exits non zero when the bot
   does not shut down gracefully.
+- `tools/repro_stuck_trip.sh` — the live reproduction of the round 35
+  stuck report: moves the offline `test1` to the reported stuck position
+  (45544 45880 -2992) through the database, arms the town trip trigger
+  with 41 non stackable daggers, builds and runs the bot for one hunt
+  session (90 s default, `SECONDS_IN_WORLD` overrides), captures the
+  mid-walk state dump into `../logs/repro_stuck_dump.txt` and prints
+  `REPRO_OK` only when the hunt log shows the shop reached without a
+  single stuck re-path. The daggers sell during the trip, so the run
+  cleans its own trigger state; the character must be offline and the
+  stack up. Run it from the swarm root (the bot resolves its geodata
+  relative to the CWD).
 
 Stack logs always land in `../logs` next to the repo (`login.log`,
 `game.log`, `mariadb.log`, `bot.log`). Server JVM memory limits and startup
@@ -1285,7 +1296,15 @@ the same variables).
   (55 -> 30 slots, 73% -> 36% weight), walk back and hunting resumed;
   covered offline by internal/swarm/hunt/town_test.go (trigger,
   waypoints, merchant selection, batches without a merchant, no
-  destroy during the trip, stuck re-paths, death reset).
+  destroy during the trip, stuck re-paths, death reset) and by the
+  stuck report reproduction of `town_repro_test.go` (the round 35
+  scenario with the exact reported positions 45544 45880 -2992 ->
+  Unoren 44667 46896 -2982: a straight MoveToLocation sent at the
+  merchant stalls at the reported spot under the server simulating
+  walker, the planned trip walks it with zero stuck re-paths; the
+  same scenario runs live through tools/repro_stuck_trip.sh, which
+  places the character at the stuck spot through the database and
+  captures the mid-walk state dump).
 - Deleveling (internal/swarm/hunt/delevel.go): when the character
   level exceeds the median level of the living attackable npcs inside
   the zone by 7 or more AND the level is at least 10, the bot walks to
