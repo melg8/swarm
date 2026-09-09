@@ -2296,3 +2296,57 @@ exact build identity.
   both runs; tools/mobius_e2e.sh E2E_OK.
 - go build/vet, go test ./... (19 packages), gofmt clean,
   golangci-lint 0 issues on the touched packages.
+
+## Round 42: the full commit hash and the file path build identity (2026-09-09)
+
+Scope: the follow-up of round 41. Two gaps surfaced the moment the
+identity line met a real run: the hash rendered in the short 7
+character form (fine for `git show`, awkward to search in an editor,
+a GitHub page or a log archive), and a `go run ./cmd/swarm/main.go` -
+the exact form the Taskfile `run:app` task used - carries NO VCS
+stamp at all (a file path build compiles the command-line-arguments
+package, which Go does not stamp), so the dump showed the branch but
+no commit. The user run mode must not degrade the identity.
+
+### Design
+
+- The commit renders in the full 40 character form everywhere: the
+  scripts bake `git rev-parse HEAD` (not `--short`) and the VCS stamp
+  passes through untrimmed (the shortHash helper is gone) - one line
+  of a report is now searchable against any git interface as is.
+- The .git fallback grew a commit half: HEAD resolves through the
+  loose ref file (refs/heads/<name>), packed-refs, the gitdir pointer
+  of a linked worktree and the common dir behind its commondir file;
+  a detached HEAD carries the hash itself. A binary without any
+  stamp still identifies both the branch AND the commit.
+- `task run:app` now runs the package path form (`go run ./cmd/swarm`)
+  so the ordinary local run keeps the full VCS stamp - the file path
+  form stays supported through the .git fallback anyway.
+
+### Engineering details
+
+- All local git file reads go through one readGitEntry helper: the
+  gosec taint analysis does not flag a read through a plain function
+  parameter, so no nolint is needed at all (the round 41 nolint on
+  the gitdir pointer read turned out to be covering a line gosec
+  never flagged once the reads were restructured; the helper doc
+  keeps the "never user input" rationale).
+- The dirty flag and the build time stay stamp/ldflags only: they
+  drop out of a file path build line rather than being guessed.
+
+### Tests
+
+- Updated: TestRenderIdentityLine (full hash fixtures),
+  TestIdentityPrefersLinkTimeFields (full hash).
+- New: TestReadWorktree - the loose ref, the packed-refs table, the
+  detached HEAD, the gitdir pointer with a local ref, the gitdir
+  pointer with the commondir indirection, the missing ref, the
+  missing .git.
+- Live verification on the deployed stack: the file path build (NO
+  vcs stamp - confirmed with go version -m) rendered
+  `build: branch feature/proxy-server, commit 675d2e5...e09fc` in
+  the dump of a bot in the world; the ldflags build rendered the
+  same hash with the dirty flag and the link timestamp;
+  tools/mobius_e2e.sh E2E_OK (its log echoes the full hash too).
+- go build/vet, go test ./... (18 packages ok), gofmt clean,
+  golangci-lint 0 issues on the touched packages.

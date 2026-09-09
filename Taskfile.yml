@@ -69,7 +69,11 @@ tasks:
     desc: Runs application
     aliases: [r]
     cmds:
-      - go run ./cmd/swarm/main.go
+      # The package path form (not ./cmd/swarm/main.go): a file path
+      # build compiles the command-line-arguments package and Go
+      # embeds no VCS stamp into it - the build identity of the state
+      # dump would lose the commit.
+      - go run ./cmd/swarm
 
   test:
     desc: Runs test suite

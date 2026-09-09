@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The full hash fixture of the tests - the identity line carries the
+// long form, searchable against any git interface as is.
+const fullHash = "675d2e545262df3b7215c198310765c4577e09fc"
+
 // TestRenderIdentityLine pins the layout of the identity line: the
 // fields render comma separated, the commit carries the tree state,
 // unknown fields drop out.
@@ -27,28 +31,28 @@ func TestRenderIdentityLine(t *testing.T) {
 		{
 			name:   "the full clean build",
 			branch: "feature/proxy-server",
-			commit: "6a0c183",
+			commit: fullHash,
 			dirty:  "false",
-			built:  "2026-09-10T18:00:00Z",
+			built:  "2026-09-09T21:24:29Z",
 			want: "branch feature/proxy-server, " +
-				"commit 6a0c183 (clean), " +
-				"built 2026-09-10T18:00:00Z",
+				"commit " + fullHash + " (clean), " +
+				"built 2026-09-09T21:24:29Z",
 		},
 		{
 			name:   "the dirty tree",
 			branch: "main",
-			commit: "abcdef1",
+			commit: fullHash,
 			dirty:  "true",
 			built:  "",
-			want:   "branch main, commit abcdef1 (dirty)",
+			want:   "branch main, commit " + fullHash + " (dirty)",
 		},
 		{
 			name:   "the tree state unknown",
 			branch: "",
-			commit: "abcdef1",
+			commit: fullHash,
 			dirty:  "",
 			built:  "",
-			want:   "commit abcdef1",
+			want:   "commit " + fullHash,
 		},
 		{
 			name:   "the branch only",
@@ -71,45 +75,96 @@ func TestRenderIdentityLine(t *testing.T) {
 	}
 }
 
-// TestShortHash pins the hash trim: a full git hash shrinks to the 7
-// character prefix, a short one passes through untouched.
-func TestShortHash(t *testing.T) {
-	require.Equal(t, "6a0c183", shortHash(
-		"6a0c1839e9c4a610c66d3808dcd3b186ae5897f4"))
-	require.Equal(t, "abc", shortHash("abc"))
-}
-
-// TestWorktreeBranch pins the .git/HEAD resolution: the ref form
-// carries the branch (slashes included), the gitdir pointer of a
-// linked worktree leads to its HEAD, a detached HEAD and a missing
-// .git report no branch at all.
-func TestWorktreeBranch(t *testing.T) {
-	t.Run("ref head", func(t *testing.T) {
+// TestReadWorktree pins the .git resolution - the last resort of a
+// binary with no VCS stamp (a file path go run): the branch and the
+// commit come out of HEAD and the ref it points at, the loose ref
+// file and packed-refs both resolve, a linked worktree is followed
+// through its gitdir and commondir pointers, a detached HEAD reports
+// the hash only.
+func TestReadWorktree(t *testing.T) {
+	t.Run("ref head with a loose ref", func(t *testing.T) {
 		dir := t.TempDir()
-		writeGitHead(t, filepath.Join(dir, ".git", "HEAD"),
+		writeFile(t, filepath.Join(dir, ".git", "HEAD"),
 			"ref: refs/heads/feature/proxy-server\n")
-		require.Equal(t, "feature/proxy-server", worktreeBranch(dir))
+		writeFile(t,
+			filepath.Join(dir, ".git", "refs", "heads",
+				"feature", "proxy-server"),
+			fullHash+"\n")
+		tree := readWorktree(dir)
+		require.Equal(t, "feature/proxy-server", tree.branch)
+		require.Equal(t, fullHash, tree.commit)
+	})
+
+	t.Run("ref head with packed refs", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, filepath.Join(dir, ".git", "HEAD"),
+			"ref: refs/heads/main\n")
+		writeFile(t, filepath.Join(dir, ".git", "packed-refs"),
+			"# pack-refs with: peeled fully-peeled sorted \n"+
+				fullHash+" refs/heads/main\n"+
+				"1111111111111111111111111111111111111111 "+
+				"refs/heads/other\n")
+		tree := readWorktree(dir)
+		require.Equal(t, "main", tree.branch)
+		require.Equal(t, fullHash, tree.commit)
 	})
 
 	t.Run("detached head", func(t *testing.T) {
 		dir := t.TempDir()
-		writeGitHead(t, filepath.Join(dir, ".git", "HEAD"),
-			"6a0c1839e9c4a610c66d3808dcd3b186ae5897f4\n")
-		require.Empty(t, worktreeBranch(dir))
+		writeFile(t, filepath.Join(dir, ".git", "HEAD"),
+			fullHash+"\n")
+		tree := readWorktree(dir)
+		require.Empty(t, tree.branch)
+		require.Equal(t, fullHash, tree.commit)
 	})
 
-	t.Run("gitdir pointer", func(t *testing.T) {
+	t.Run("gitdir pointer with commondir", func(t *testing.T) {
+		// A linked worktree: .git points at the worktree git dir,
+		// the shared refs live in the common dir behind commondir.
+		dir := t.TempDir()
+		common := t.TempDir()
+		gitdir := t.TempDir()
+		writeFile(t, filepath.Join(gitdir, "HEAD"),
+			"ref: refs/heads/main\n")
+		writeFile(t, filepath.Join(gitdir, "commondir"), common+"\n")
+		writeFile(t,
+			filepath.Join(common, "refs", "heads", "main"),
+			fullHash+"\n")
+		writeFile(t, filepath.Join(dir, ".git"),
+			"gitdir: "+gitdir+"\n")
+		tree := readWorktree(dir)
+		require.Equal(t, "main", tree.branch)
+		require.Equal(t, fullHash, tree.commit)
+	})
+
+	t.Run("gitdir pointer with a local ref", func(t *testing.T) {
 		dir := t.TempDir()
 		gitdir := t.TempDir()
-		writeGitHead(t, filepath.Join(gitdir, "HEAD"),
+		writeFile(t, filepath.Join(gitdir, "HEAD"),
 			"ref: refs/heads/main\n")
-		require.NoError(t, os.WriteFile(filepath.Join(dir, ".git"),
-			[]byte("gitdir: "+gitdir+"\n"), 0o600))
-		require.Equal(t, "main", worktreeBranch(dir))
+		writeFile(t,
+			filepath.Join(gitdir, "refs", "heads", "main"),
+			fullHash+"\n")
+		writeFile(t, filepath.Join(dir, ".git"),
+			"gitdir: "+gitdir+"\n")
+		tree := readWorktree(dir)
+		require.Equal(t, "main", tree.branch)
+		require.Equal(t, fullHash, tree.commit)
+	})
+
+	t.Run("ref head with a missing ref", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, filepath.Join(dir, ".git", "HEAD"),
+			"ref: refs/heads/gone\n")
+		tree := readWorktree(dir)
+		require.Equal(t, "gone", tree.branch)
+		require.Empty(t, tree.commit)
 	})
 
 	t.Run("no git", func(t *testing.T) {
-		require.Empty(t, worktreeBranch(t.TempDir()))
+		tree := readWorktree(t.TempDir())
+		require.Empty(t, tree.branch)
+		require.Empty(t, tree.commit)
 	})
 }
 
@@ -125,13 +180,14 @@ func TestIdentityPrefersLinkTimeFields(t *testing.T) {
 	})
 
 	Branch, Commit, Dirty, BuildTime =
-		"feature/x", "6a0c183", "false", "T"
-	require.Equal(t, "branch feature/x, commit 6a0c183 (clean), built T",
+		"feature/x", fullHash, "false", "T"
+	require.Equal(t,
+		"branch feature/x, commit "+fullHash+" (clean), built T",
 		Identity())
 }
 
-// writeGitHead creates a HEAD file with the content of a git dir.
-func writeGitHead(t *testing.T, path, content string) {
+// writeFile creates a file together with its parent directories.
+func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))

@@ -6,10 +6,13 @@
 // git branch, the commit, the tree state and the build time. The
 // build scripts bake the values in at link time with -ldflags -X; a
 // plain go build or go run falls back to the VCS stamp Go embeds into
-// binaries built from a git repository and to the .git/HEAD of the
-// working directory for the branch. Every artifact that must match a
-// code state - the state dump of the web UI, the startup log line of
-// the bot - renders the identity through Identity, so a live problem
+// binaries built from a git repository (the package path form - `go
+// run ./cmd/swarm`; a file path build like `go run ./cmd/swarm/main.go`
+// compiles the command-line-arguments package and gets NO stamp) and
+// to the .git directory of the working directory, which carries both
+// the branch and the commit. Every artifact that must match a code
+// state - the state dump of the web UI, the startup log line of the
+// bot - renders the identity through Identity, so a live problem
 // report always tells which exact code produced it.
 package version
 
@@ -26,7 +29,8 @@ var (
 	// Branch is the git branch name of the build.
 	Branch string
 
-	// Commit is the short git hash of the build.
+	// Commit is the full git hash of the build - the long form, so
+	// a report line is searchable against any git interface as is.
 	Commit string
 
 	// Dirty is "true" when the working tree had uncommitted changes
@@ -39,8 +43,9 @@ var (
 
 // Identity renders the build identity line of the running binary:
 // the branch, the commit with the tree state and the build time. The
-// link-time fields win, the VCS stamp of the binary and the .git/HEAD
-// of the working directory fill the gaps, unknown fields drop out.
+// link-time fields win, the VCS stamp of the binary and the .git
+// directory of the working directory fill the gaps, unknown fields
+// drop out.
 func Identity() string {
 	branch, commit, dirty, built := Branch, Commit, Dirty, BuildTime
 	if stamp, ok := readVCSStamp(); ok {
@@ -54,8 +59,14 @@ func Identity() string {
 			built = stamp.time
 		}
 	}
-	if branch == "" {
-		branch = worktreeBranch(".")
+	if branch == "" || commit == "" {
+		tree := readWorktree(".")
+		if branch == "" {
+			branch = tree.branch
+		}
+		if commit == "" {
+			commit = tree.commit
+		}
 	}
 
 	return render(branch, commit, dirty, built)
@@ -71,7 +82,7 @@ type vcsStamp struct {
 
 // readVCSStamp reads the vcs.* build settings: go build stamps the
 // revision, the modified flag and the commit time unless
-// -buildvcs=false was passed.
+// -buildvcs=false was passed or the build has no module package.
 func readVCSStamp() (vcsStamp, bool) {
 	var stamp vcsStamp
 	info, ok := debug.ReadBuildInfo()
@@ -81,7 +92,7 @@ func readVCSStamp() (vcsStamp, bool) {
 	for _, setting := range info.Settings {
 		switch setting.Key {
 		case "vcs.revision":
-			stamp.revision = shortHash(setting.Value)
+			stamp.revision = setting.Value
 		case "vcs.modified":
 			stamp.modified = setting.Value
 		case "vcs.time":
@@ -92,69 +103,132 @@ func readVCSStamp() (vcsStamp, bool) {
 	return stamp, stamp.revision != ""
 }
 
-// shortHash trims a git hash to the 7 character prefix the git log
-// output carries.
-func shortHash(hash string) string {
-	if len(hash) > 7 {
-		return hash[:7]
-	}
-
-	return hash
+// worktree carries the branch and the commit resolved straight out
+// of the .git directory of a worktree - the last resort of a binary
+// with no VCS stamp.
+type worktree struct {
+	branch string
+	commit string
 }
 
-// worktreeBranch resolves the branch name of the git worktree rooted
-// at dir: .git/HEAD holds "ref: refs/heads/<name>" on a branch and a
-// plain hash on a detached HEAD, a linked worktree keeps a
-// "gitdir: <path>" pointer file instead of the directory. It returns
-// "" whenever anything is off - a stale branch hint is worse than
-// none.
-func worktreeBranch(dir string) string {
-	head, err := os.ReadFile(filepath.Join(dir, ".git", "HEAD"))
-	if err != nil {
-		head, err = readGitDirHead(dir)
+// readWorktree resolves the branch and the commit of the worktree
+// rooted at dir out of .git: HEAD points either at a ref (resolved
+// through the loose ref file or packed-refs) or carries the hash of
+// a detached HEAD.
+func readWorktree(dir string) worktree {
+	var tree worktree
+	gitdir, head, ok := readHead(dir)
+	if !ok {
+		return tree
 	}
-	if err != nil {
-		return ""
-	}
+	head = strings.TrimSpace(head)
+	const refPrefix = "ref: "
+	if !strings.HasPrefix(head, refPrefix) {
+		// A detached HEAD: the hash itself, no branch to report.
+		tree.commit = head
 
-	return branchOfHead(string(head))
+		return tree
+	}
+	ref := strings.TrimPrefix(head, refPrefix)
+	if !strings.HasPrefix(ref, "refs/heads/") {
+		return tree
+	}
+	tree.branch = strings.TrimPrefix(ref, "refs/heads/")
+	tree.commit = resolveRef(gitdir, ref)
+
+	return tree
 }
 
-// readGitDirHead follows the "gitdir: <path>" pointer file of a
-// linked worktree to its HEAD.
-func readGitDirHead(dir string) ([]byte, error) {
-	pointer, err := os.ReadFile(filepath.Join(dir, ".git"))
+// readHead reads the HEAD file of the worktree rooted at dir and
+// returns the git directory it lives in: .git is a directory in a
+// plain checkout and a "gitdir: <path>" pointer file in a linked
+// worktree or a submodule.
+func readHead(dir string) (string, string, bool) {
+	dotGit := filepath.Join(dir, ".git")
+	head, err := readGitEntry(filepath.Join(dotGit, "HEAD"))
+	if err == nil {
+		return dotGit, string(head), true
+	}
+	pointer, err := readGitEntry(dotGit)
 	if err != nil {
-		return nil, err
+		return "", "", false
 	}
 	gitdir := strings.TrimSpace(
 		strings.TrimPrefix(string(pointer), "gitdir:"))
 	if !filepath.IsAbs(gitdir) {
 		gitdir = filepath.Join(dir, gitdir)
 	}
-
-	//nolint:gosec // G703: the gitdir pointer comes from the .git
-	// file of the worktree being inspected - a local build hint, not
-	// a user-supplied path.
-	return os.ReadFile(filepath.Join(gitdir, "HEAD"))
-}
-
-// branchOfHead extracts the branch name out of a HEAD file content,
-// "" for a detached HEAD.
-func branchOfHead(head string) string {
-	head = strings.TrimSpace(head)
-	const refPrefix = "ref: refs/heads/"
-	if !strings.HasPrefix(head, refPrefix) {
-		return ""
+	head, err = readGitEntry(filepath.Join(gitdir, "HEAD"))
+	if err != nil {
+		return "", "", false
 	}
 
-	return strings.TrimPrefix(head, refPrefix)
+	return gitdir, string(head), true
+}
+
+// resolveRef looks a ref up inside a git directory: the loose ref
+// file first, then packed-refs. A linked worktree keeps the shared
+// refs in the common dir - the commondir file points there.
+func resolveRef(gitdir, ref string) string {
+	for _, dir := range refSearchDirs(gitdir) {
+		if hash, err := readGitEntry(filepath.Join(dir, ref)); err == nil {
+			return strings.TrimSpace(string(hash))
+		}
+		if hash := packedRef(dir, ref); hash != "" {
+			return hash
+		}
+	}
+
+	return ""
+}
+
+// refSearchDirs lists the directories a shared ref can live in: the
+// git dir itself and, behind the commondir pointer, the common dir
+// of a linked worktree.
+func refSearchDirs(gitdir string) []string {
+	dirs := make([]string, 0, 2)
+	dirs = append(dirs, gitdir)
+	pointer, err := readGitEntry(filepath.Join(gitdir, "commondir"))
+	if err != nil {
+		return dirs
+	}
+	common := strings.TrimSpace(string(pointer))
+	if !filepath.IsAbs(common) {
+		common = filepath.Join(gitdir, common)
+	}
+
+	return append(dirs, common)
+}
+
+// packedRef scans the packed-refs file of a git directory for a ref.
+func packedRef(gitdir, ref string) string {
+	packed, err := readGitEntry(filepath.Join(gitdir, "packed-refs"))
+	if err != nil {
+		return ""
+	}
+	want := " " + ref
+	for _, line := range strings.Split(string(packed), "\n") {
+		if hash, found := strings.CutSuffix(
+			strings.TrimSpace(line), want); found {
+			return hash
+		}
+	}
+
+	return ""
+}
+
+// readGitEntry reads a file of the local git layout - HEAD, the
+// gitdir/commondir pointers, refs. Every path here resolves inside
+// the .git directory of the worktree being inspected, never through
+// user input.
+func readGitEntry(path string) ([]byte, error) {
+	return os.ReadFile(path)
 }
 
 // render assembles the identity line out of the resolved fields:
 // empty fields drop out, an empty input reports the missing metadata.
 func render(branch, commit, dirty, built string) string {
-	var parts []string
+	parts := make([]string, 0, 4)
 	if branch != "" {
 		parts = append(parts, "branch "+branch)
 	}

@@ -276,7 +276,7 @@ if [ ! -x "${LOGS_DIR}/swarm_bot" ]; then
     if [ "${SWARM_BRANCH}" = "HEAD" ]; then
         SWARM_BRANCH=""
     fi
-    SWARM_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || true)"
+    SWARM_COMMIT="$(git rev-parse HEAD 2>/dev/null || true)"
     if [ -n "$(git status --porcelain 2>/dev/null || true)" ]; then
         SWARM_DIRTY="true"
     else

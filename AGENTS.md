@@ -353,11 +353,14 @@ tools/mobius_e2e.sh 45      # full E2E: bot in the world 45s, then SIGINT
 
 The `swarm_bot` binaries the scripts build carry the build identity
 baked in via `-ldflags -X` into `internal/version`: the branch, the
-commit, the tree state and the build time. The state dump of the web
-UI and the first line of the bot log then tell the exact code state
-they came from. A plain `go build`/`go run` identifies itself too,
-through the VCS stamp Go embeds plus the `.git/HEAD` of the working
-directory.
+full commit hash, the tree state and the build time. The state dump
+of the web UI and the first line of the bot log then tell the exact
+code state they came from. A plain `go build`/`go run` identifies
+itself too: the package path form (`go run ./cmd/swarm`) carries
+the VCS stamp Go embeds, and even a file path form (`go run
+./cmd/swarm/main.go`, no stamp - `task run:app` used to do exactly
+that) resolves the branch and the commit out of the `.git` directory
+of the working directory.
 
 What each script does:
 
@@ -905,10 +908,10 @@ the same variables).
   their combat state, the walk plan, the recent combat/chat and a
   600 event deep window (the hunt loop decisions mirror into it).
   The second line of the report is the build identity - `build:
-  branch <name>, commit <hash> (dirty|clean), built <time>` - so a
-  live problem report always tells which exact code produced it (see
-  `internal/version`): the report plus a `git log` are all it takes
-  to line the behavior up with the source.
+  branch <name>, commit <full 40 char hash> (dirty|clean), built
+  <time>` - so a live problem report always tells which exact code
+  produced it (see `internal/version`): the report plus a `git log`
+  are all it takes to line the behavior up with the source.
 - Bot list: every row shows the status dot, the name, `combat`/`rest`
   chips, the level and three mini bars (HP red, MP blue, XP silver,
   same gradients as the HUD) fed by the extended `/api/bots` payload -

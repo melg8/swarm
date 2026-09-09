@@ -2491,3 +2491,25 @@ name the variant number that best fits the real bot UI.
   the dump of a bot in the world and in the bot log;
   tools/mobius_e2e.sh E2E_OK, go build/vet, go test ./...
   (19 packages), golangci-lint 0 issues on the touched packages.
+- 2026-09-09: the full commit hash and the file path build identity
+  (round 7, feature/proxy-server). The round 41 identity line had two
+  gaps in real runs: the hash was short (7 chars - awkward to search
+  anywhere but git itself) and `go run ./cmd/swarm/main.go` - the
+  exact Taskfile run:app form - compiles the command-line-arguments
+  package, which Go leaves WITHOUT a VCS stamp, so the user's local
+  dump showed the branch but no commit at all. Now the commit renders
+  in the full 40 character form on every path (the scripts bake
+  `git rev-parse HEAD`, the vcs stamp passes untrimmed), and the .git
+  fallback resolves the commit too: HEAD -> the loose ref file ->
+  packed-refs, with the gitdir pointer and the commondir indirection
+  of linked worktrees handled; a detached HEAD is the hash itself.
+  Taskfile run:app switched to the package path form (`go run
+  ./cmd/swarm`) so the ordinary local run keeps the full stamp. All
+  local git reads go through one readGitEntry helper - the gosec
+  taint analysis does not flag it, so the round 41 nolint is gone.
+  Verified live on the deployed stack: the file path build (no vcs
+  stamp, confirmed with go version -m) rendered `commit
+  675d2e545262...e09fc` in a dump of a bot in the world; the ldflags
+  build rendered the full hash with (dirty) and the link timestamp;
+  tools/mobius_e2e.sh E2E_OK. go build/vet, go test ./...
+  (18 packages), golangci-lint 0 issues.
