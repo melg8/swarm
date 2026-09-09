@@ -323,6 +323,14 @@ type Loop struct {
 	delevelCounted    bool
 	engageAt          time.Time
 	targetSkip        map[int32]time.Time
+	// The blind engage recovery state (see loop_los.go): the armed
+	// reposition walk, its planned geodata waypoints and the attempt
+	// budget for the current target.
+	losAt        time.Time
+	losWaypoints []pathfind.Vec3
+	losWpIndex   int
+	losMoveAt    time.Time
+	losTried     int
 	// skipScratch is the reused dense skip list of the target
 	// searches: activeSkips rebuilds it in place every call, so
 	// the per tick search filter costs no allocation (the old
@@ -524,6 +532,11 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		delevelCounted:    false,
 		engageAt:          time.Time{},
 		targetSkip:        nil,
+		losAt:             time.Time{},
+		losWaypoints:      nil,
+		losWpIndex:        0,
+		losMoveAt:         time.Time{},
+		losTried:          0,
 		skipScratch:       nil,
 		noTargetSince:     time.Time{},
 		fleeAt:            time.Time{},
@@ -825,6 +838,7 @@ func (l *Loop) recoverFromDeath() {
 	l.tracker.ClearWalkPlan()
 	l.restartAt = now
 	l.target = 0
+	l.clearBlindRecovery()
 	l.lootID = 0
 	if l.phase == phaseDelevel {
 		// Count the death against the experience it removed
@@ -915,20 +929,31 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 	if l.target != 0 && !l.tracker.ObjectAlive(l.target) {
 		l.logger.Printf("Hunt: target %d died, looting", l.target)
 		l.target = 0
+		l.clearBlindRecovery()
 		l.phase = phaseLoot
 		l.lootID = 0
 
 		return
 	}
-	if l.target != 0 && !l.tracker.SelfEngaged(l.target) &&
-		!l.engageAt.IsZero() && now.Sub(l.engageAt) > engageStuckTimeout {
-		// The repeated attack requests never started the fight:
-		// the selection on the server points at an object that
-		// refuses the forced attack (typically the corpse of an
-		// abruptly disconnected session, which the server keeps
-		// selected). Only the selection of a DIFFERENT object id
-		// replaces the stale one, so the target is dropped and
-		// skipped for a while.
+	if l.target != 0 && !l.tracker.SelfFighting(l.target) &&
+		!l.engageAt.IsZero() && now.Sub(l.engageAt) > engageStuckTimeout &&
+		!l.blindRecoveryArmed(now) {
+		// The repeated attack requests never started a real
+		// fight: the selection on the server points at an
+		// object that refuses the forced attack (typically the
+		// corpse of an abruptly disconnected session, which
+		// the server keeps selected), or the armed attack
+		// stance went stale behind an obstacle. The gate is
+		// the FRESH fight view: the looser SelfEngaged stays
+		// true forever behind an obstacle, because the server
+		// arms the attack stance without a line of sight
+		// check (Creature.onForcedAttack) and no swing ever
+		// lands to disarm it - the observed 53 minute stall
+		// held the loop exactly there. Only the selection of a
+		// DIFFERENT object id replaces the stale one, so the
+		// target is dropped and skipped for a while; the
+		// blind recovery owns the obstructed case with its
+		// own budgets instead.
 		l.logger.Printf("Hunt: target %d does not engage, "+
 			"switching to another", l.target)
 		if l.targetSkip == nil {
@@ -937,6 +962,7 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		l.targetSkip[l.target] = now.Add(engageSkipDelay)
 		l.target = 0
 		l.engageAt = time.Time{}
+		l.clearBlindRecovery()
 
 		return
 	}
@@ -947,7 +973,21 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		// observed death, an add that joined a social pack).
 		// Pressing on below that line dies far more often than it
 		// kills, so the fight is dropped and the character runs.
+		// It stays ahead of the blind recovery: an add grinding a
+		// repositioning character must escalate into the flee, not
+		// into another detour leg.
 		l.fleeFromTarget(l.target, now)
+
+		return
+	}
+	if l.target != 0 && l.blindRecoveryArmed(now) {
+		// The server refuses the swings with "Cannot see
+		// target." (a fresh refusal was seen) or the planned
+		// reposition walk is still running: an obstacle stands
+		// between the character and the selected target. Walk
+		// around it over the geodata first, switch the target only
+		// when no route clears the block (see loop_los.go).
+		l.recoverBlindEngage(now)
 
 		return
 	}
@@ -1000,11 +1040,17 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		l.noTargetSince = time.Time{}
 		l.target = pick.ObjectID
 		l.engageAt = now
+		l.clearBlindRecovery()
 	}
 	if l.tracker.SelfFighting(l.target) {
 		// A running fight ends the flee episode: the character
 		// answered instead of running, the escape budget resets.
 		l.fleeSince = time.Time{}
+		// The fresh fight also re-anchors the engage clock: the
+		// stuck timeout measures from the last real fight
+		// activity, not from the original pick - a slow but
+		// living fight must never trip it.
+		l.engageAt = now
 		// The swings land right now: nothing to re-request. A stale
 		// engagement (the fight was interrupted, the auto attack flag
 		// and the combat window linger) falls through and keeps

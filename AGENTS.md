@@ -1162,7 +1162,10 @@ the same variables).
   (the PlayerActionFloodProtector interval; GameClient.AttackTarget)
   until the tracker sees the character engaged with it
   (state.Bot.SelfEngaged: the chase MoveToPawn, Attack or
-  AutoAttackStart broadcasts set the fighting target). The whole flow
+  AutoAttackStart broadcasts set the fighting target); an engage that
+  never goes fresh is dropped by the stuck timeout or recovered by
+  the blind engage walk (see the protocol notes below - the
+  "Blind engage recovery" paragraph). The whole flow
   is covered end to end by the fake server in
   internal/swarm/connection/hunt_flow_test.go. Target death and idle
   chaining: the server never clears the selection of a killed target
@@ -1734,6 +1737,39 @@ re-derive):
   reproduction is timing dependent (the kill must land while the auto
   attack runs); three deliberate kill -9 attempts did not hit the
   window again, the fix is covered by unit tests instead.
+- **Blind engage recovery (walk around the obstacle, then switch)**:
+  a small obstacle (a column) between the character and its target
+  locks the plain engage - `Creature.onForcedAttack` arms the ATTACK
+  intention WITHOUT a line of sight check, `Creature.doAttack` then
+  answers every swing with SystemMessage 181 ("Cannot see target.")
+  while keeping the intention armed, the attack stance never stops
+  (no swing lands, no AutoAttackStop arrives), so SelfEngaged stays
+  true forever and the old stuck timeout never fired (observed live:
+  a 53 minute stall at 115 units with the refusal spam every ~3.5 s,
+  walk plan empty, no events). The recovery (hunt/loop_los.go) reads
+  the refusal through the tracker (ApplySystemMessage records the
+  last CANNOT_SEE_TARGET arrival in SelfCannotSeeTargetAt) and has
+  two levels: level A samples a ring of melee range standing points
+  (blindMeleeRadius, 16 directions) around the target, keeps the
+  nearest one with a bot side geodata sight line
+  (Navigator.LineOfSight over pathfind.Engine), plans the geodata
+  path to it and walks it with paced ground clicks (the attack
+  re-requests stop while the walk runs - an attack request would
+  replace the walk intention and cancel the detour); level B drops
+  the target and skips it for blindSkipDelay (1 min) when no
+  navigator or vantage point exists, the path search fails, the walk
+  misses blindWalkBudget (15 s) or blindMaxAttempts (2) attempts
+  could not clear the block - the next pick selects a different mob,
+  which also replaces the stale server side selection. The stuck
+  timeout itself now measures the FRESH fight view (the gate is
+  !SelfFighting, not !SelfEngaged) and a running fight re-anchors
+  the engage clock, so a stale attack stance without refusals still
+  trips it after 12 s of no fight packets; while the blind recovery
+  is armed the timeout stays held (the recovery manages its own
+  budgets). Covered by hunt/loop_los_test.go (reposition walk, arrival
+  re-engage, both switch levels, retry budget, stale stance timeout,
+  timeout hold, attempt scoping, fresh fight guard) and the state
+  tracker test of the refusal recording.
 - **Delevel trigger caveat**: `MedianZoneMobLevel` sees only the
   known objects around the char; at the village (8000+ units from
   the fields) the median is 0 and the delevel does not re-trigger -

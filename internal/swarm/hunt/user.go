@@ -285,6 +285,7 @@ func (l *Loop) userMovement(cmd state.Command) {
 	l.userPathTried = false
 	l.resetChaseSamples()
 	l.target = 0
+	l.clearBlindRecovery()
 	l.lootID = 0
 	l.engageAt = time.Time{}
 	switch cmd.Kind {
@@ -612,6 +613,7 @@ func (l *Loop) tickUserAttack(now time.Time) { //nolint:cyclop,funlen
 		l.lootID = 0
 		l.userKind = ""
 		l.target = 0
+		l.clearBlindRecovery()
 		l.logger.Printf("Hunt: manual target %d died or vanished",
 			l.userTarget)
 
@@ -770,6 +772,7 @@ func (l *Loop) resumeAuto() {
 	l.userTarget = 0
 	l.userRedirect = false
 	l.target = 0
+	l.clearBlindRecovery()
 	l.lootID = 0
 	l.engageAt = time.Time{}
 	l.tracker.ClearWalkPlan()

@@ -127,6 +127,10 @@ type Navigator interface {
 	// for a destination named with that z. The zone return resolves
 	// its goal height through it before the approach search.
 	ClosestHeight(x, y float64, refZ int16) (int16, error)
+	// LineOfSight reports whether the geodata holds a clear straight
+	// line between two world positions: the blind engage recovery uses
+	// it to find a standing point that sees the obstructed target.
+	LineOfSight(start, end pathfind.Vec3) (bool, error)
 }
 
 // engineNavigator adapts a geodata engine to the Navigator interface,
@@ -163,6 +167,13 @@ func (e engineNavigator) ClosestHeight(
 	x, y float64, refZ int16,
 ) (int16, error) {
 	return e.engine.ClosestHeight(x, y, refZ)
+}
+
+// LineOfSight answers the geodata sight line with the engine settings.
+func (e engineNavigator) LineOfSight(
+	start, end pathfind.Vec3,
+) (bool, error) {
+	return e.engine.LineOfSight(start, end, e.engine.MaxPassableHeight())
 }
 
 // nearestMerchant returns the town merchant closest to the point.
@@ -812,6 +823,7 @@ func (l *Loop) startReturnLeg() {
 func (l *Loop) endTownTrip(reason string) {
 	l.phase = phaseEngage
 	l.target = 0
+	l.clearBlindRecovery()
 	l.lootID = 0
 	l.waypoints = nil
 	l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
@@ -842,6 +854,7 @@ func (l *Loop) resetTownTrip() {
 	}
 	l.phase = phaseEngage
 	l.target = 0
+	l.clearBlindRecovery()
 	l.lootID = 0
 	l.waypoints = nil
 	l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}

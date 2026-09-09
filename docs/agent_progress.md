@@ -4,6 +4,125 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: the blind engage recovery (walk around the obstacle, then switch)
+
+Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.
+The stack was deployed with `tools/swarm_fast_deploy.sh` and verified
+(STACK_READY, ports 2106/7777/3306, 75 tables) before the work started.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The hunt loop locks up when a small obstacle (a column) stands between
+the character and its selected target: the bot stands at melee distance
+(115 units in the live dump), the server refuses every swing with
+"Cannot see target." and the bot never tries to walk around the column
+nor switches to another mob - a 53 minute stall on one target (state
+dump: phase engage, walk plan empty, "Cannot see target" chat spam
+every ~3.5 s, no events).
+
+Root cause (verified in the Mobius C1 source):
+- `Creature.onForcedAttack` sets the AI ATTACK intention WITHOUT the
+  line of sight check (the canSee check there is commented out), so the
+  attack stance arms (`AutoAttackStart` broadcast) and the bot tracker
+  holds `SelfEngaged` true forever (the stance never stops - no swing
+  ever lands, no `AutoAttackStop` ever arrives).
+- `PlayerAI.thinkAttack` calls `Creature.doAttack`, whose GeoData LOS
+  check fails behind the column: it answers SystemMessage 181
+  (CANNOT_SEE_TARGET) plus ActionFailed and keeps the intention armed -
+  the AI retries forever.
+- The hunt loop's `engageStuckTimeout` (12 s) is gated on
+  `!SelfEngaged`, which the stale attack stance holds true, so the
+  timeout never fires and the loop re-requests the forced attack
+  forever.
+
+### Plan
+
+Two levels of recovery, pathfinding first, target switch as the
+fallback (the user requirement):
+
+- Level A (reposition): when the tracker sees a fresh "Cannot see
+  target." answer during an engage attempt that never went fresh, the
+  loop samples a ring of melee-range standing points around the target,
+  keeps the ones with a bot-side geodata line of sight to the target
+  (pathfind.Engine.LineOfSight through the hunt Navigator), plans the
+  geodata path to the nearest one and walks it with paced ground clicks
+  (the engage stops re-requesting the attack meanwhile - an attack
+  request would replace the walk intention and cancel the recovery).
+- Level B (switch target): if no navigator/geodata is available, no
+  vantage point or path exists, the reposition walk misses its budget,
+  or the block persists after the attempt budget, the target is dropped
+  and skipped for a delay so the search picks a different mob.
+- Stuck timeout hardening: the gate moves from `!SelfEngaged` (held
+  true forever by the stale auto attack stance) to `!SelfFighting`
+  (fresh swings or chase steps), and a running fight refreshes the
+  engage timestamp so only a genuinely dead engagement (12 s without a
+  fight packet) trips the timeout; while the blind recovery is armed
+  the timeout stays held.
+
+### Acceptance criteria
+
+- Unit tests pin all levels: the reposition walk (no attack requests
+  while it runs), the arrival re-engage, the immediate switch without
+  geodata, the switch after the failed reposition, the stuck timeout
+  firing through the stale attack stance, and the timeout held during
+  the recovery.
+- The state tracker records the last CANNOT_SEE_TARGET answer time.
+- go build/vet, go test ./... and golangci-lint stay green.
+
+### Implementation
+
+- `state/chat.go` + `state/bot.go`: ApplySystemMessage records the
+  arrival of the C1 SystemMessage 181 (CANNOT_SEE_TARGET) in the new
+  CharacterState.CannotSeeTargetAt (the constant
+  systemMessageCannotSeeTarget), and SelfCannotSeeTargetAt exposes it.
+- `hunt/town.go`: the Navigator interface gained LineOfSight (the
+  engineNavigator passes the engine MaxPassableHeight through
+  pathfind.Engine.LineOfSight).
+- `hunt/loop_los.go` (new): blindEngageBlocked (the detection: a
+  fresh refusal during an attempt that never went fresh, past
+  blindEngageDelay), recoverBlindEngage (level A start/walk/hold,
+  level B switch), blindVantagePoint (16 candidate ring points at
+  blindMeleeRadius around the target, nearest one with a clear sight
+  line), walkBlindWaypoints (paced leg following with the arrival
+  handoff), switchBlindTarget (drop + blindSkipDelay skip) and
+  clearBlindRecovery.
+- `hunt/loop.go`: the engage inserts the recovery branch after the
+  losing fight check (an add grinding a repositioning character must
+  escalate into the flee, not into another detour leg); the stuck
+  timeout gate moved from !SelfEngaged to !SelfFighting with the
+  engage clock re-anchored while a fight runs fresh and the timeout
+  held while the recovery is armed; every target drop path (death,
+  flee, pile up, zone return, user commands, town trips) clears the
+  recovery bookkeeping.
+- `hunt/loop_los_test.go` (new): nine tests - the reposition walk on
+  the planning tick (vantage ring goal, first leg, no attack
+  requests), the arrival re-engage, the switch without geodata, the
+  switch with no vantage/route, the walk budget switch, the retry
+  budget (two attempts then switch), the stale attack stance firing
+  the stuck timeout (the live 53 minute hang reproduced in a test),
+  the timeout hold during the recovery, the stale refusal scoping and
+  the fresh fight guard.
+- `state/chat_test.go`: the refusal recording test (id 181 records,
+  other ids do not, the chat line still formats).
+
+### Verification
+
+- go build ./..., go vet ./... clean; go test ./... green (17
+  packages).
+- golangci-lint run: no new issues (the one pre-existing unparam on
+  pathfind/search_test.go predates this task).
+- Live against the deployed stack: `tools/mobius_e2e.sh 45` printed
+  E2E_OK; `BOT_FLAGS=-hunt tools/mobius_e2e.sh 90` hunted live - the
+  zone entry engage, 8 kills with looting, gear equipping and the
+  graceful shutdown all intact (the stuck timeout gate change did not
+  disturb the healthy engage flow).
+- The blind recovery itself is pinned by the unit tests (the live
+  reproduction needs a geodata obstacle between the bot and a mob -
+  the elven fields are open terrain; the unit tests drive the exact
+  packet conditions of the dump instead).
+
 ## Active task: item status tooltips on hover (paperdoll + inventory)
 
 Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.

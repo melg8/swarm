@@ -23,6 +23,7 @@ func (l *Loop) fleeFromTarget(targetID int32, now time.Time) {
 		l.tracker.SelfHealthPercent(), targetID)
 	l.target = 0
 	l.engageAt = time.Time{}
+	l.clearBlindRecovery()
 	l.noTargetSince = time.Time{}
 	if l.targetSkip == nil {
 		l.targetSkip = make(map[int32]time.Time)
@@ -173,6 +174,7 @@ func (l *Loop) panicPileUpRun(now time.Time) {
 			l.targetSkip[l.target] = now.Add(fleeSkipDelay)
 			l.target = 0
 			l.engageAt = time.Time{}
+			l.clearBlindRecovery()
 			l.noTargetSince = time.Time{}
 		}
 	}

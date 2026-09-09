@@ -138,6 +138,7 @@ func (l *Loop) returnToZone() {
 		return
 	}
 	l.target = 0
+	l.clearBlindRecovery()
 	l.lootID = 0
 	if l.zoneReturn && l.phase == phaseEngage {
 		// The previous pathfound return leg ended without reaching
