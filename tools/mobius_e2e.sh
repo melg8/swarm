@@ -39,8 +39,28 @@ mkdir -p "${LOGS_DIR}"
 
 log "Building the swarm bot"
 cd "${SWARM_ROOT}"
-go build -o "${LOGS_DIR}/swarm_bot" ./cmd/swarm
-log "Bot built: ${LOGS_DIR}/swarm_bot"
+# Идентичность сборки: её печатают стартовая строка лога бота и
+# state dump веб-интерфейса, так что дамп точно говорит, из какого
+# кода он получен. В не-git checkout значения пусты - коммит всё
+# равно несёт Go buildinfo.
+SWARM_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+if [ "${SWARM_BRANCH}" = "HEAD" ]; then
+    SWARM_BRANCH=""
+fi
+SWARM_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || true)"
+if [ -n "$(git status --porcelain 2>/dev/null || true)" ]; then
+    SWARM_DIRTY="true"
+else
+    SWARM_DIRTY="false"
+fi
+go build -ldflags "\
+-X github.com/melg8/swarm/internal/version.Branch=${SWARM_BRANCH} \
+-X github.com/melg8/swarm/internal/version.Commit=${SWARM_COMMIT} \
+-X github.com/melg8/swarm/internal/version.Dirty=${SWARM_DIRTY} \
+-X github.com/melg8/swarm/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    -o "${LOGS_DIR}/swarm_bot" ./cmd/swarm
+log "Bot built: ${LOGS_DIR}/swarm_bot \
+(branch ${SWARM_BRANCH:-unknown}, commit ${SWARM_COMMIT:-unknown})"
 
 log "Starting the server stack"
 bash "${SCRIPT_DIR}/mobius_start.sh"

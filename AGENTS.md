@@ -351,6 +351,14 @@ tools/mobius_start.sh       # start MariaDB + login (2106) + game (7777),
 tools/mobius_e2e.sh 45      # full E2E: bot in the world 45s, then SIGINT
 ```
 
+The `swarm_bot` binaries the scripts build carry the build identity
+baked in via `-ldflags -X` into `internal/version`: the branch, the
+commit, the tree state and the build time. The state dump of the web
+UI and the first line of the bot log then tell the exact code state
+they came from. A plain `go build`/`go run` identifies itself too,
+through the VCS stamp Go embeds plus the `.git/HEAD` of the working
+directory.
+
 What each script does:
 
 - `tools/mobius_env.sh` — shared configuration sourced by the other
@@ -889,6 +897,18 @@ the same variables).
   panel on the canvas (name, class, level, HP/MP bars, position,
   combat/rest chips, exp/sp) and the world is drawn around it; Log is
   the rolling event feed with a filter.
+- State dump: the Dump state button of the bot HUD copies a plain
+  text report of everything the tracker knows into the clipboard
+  (`GET /api/bots/{id}/dump`, `BuildStateDump` in
+  `internal/swarm/webserver/dump.go`) - the character sheet, the
+  attackers, the hunting zone, the inventory, the world objects with
+  their combat state, the walk plan, the recent combat/chat and a
+  600 event deep window (the hunt loop decisions mirror into it).
+  The second line of the report is the build identity - `build:
+  branch <name>, commit <hash> (dirty|clean), built <time>` - so a
+  live problem report always tells which exact code produced it (see
+  `internal/version`): the report plus a `git log` are all it takes
+  to line the behavior up with the source.
 - Bot list: every row shows the status dot, the name, `combat`/`rest`
   chips, the level and three mini bars (HP red, MP blue, XP silver,
   same gradients as the HUD) fed by the extended `/api/bots` payload -
@@ -1528,6 +1548,10 @@ From `docs/readme.md`:
 - Error messages start with `Error`.
 - Use `Println`-style output; only use `\n` with `Printf`-style multi-line
   output.
+- The bot log self-identifies: the line right after "Starting swarm
+  bot" is `Build: <identity>` from `internal/version` (the same line
+  the state dump carries) - every log tail pairs with the exact code
+  state.
 
 ## Testing conventions
 

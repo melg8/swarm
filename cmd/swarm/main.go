@@ -26,6 +26,7 @@ import (
 	"github.com/melg8/swarm/internal/swarm/proxy"
 	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/melg8/swarm/internal/swarm/webserver"
+	"github.com/melg8/swarm/internal/version"
 )
 
 // Default configuration values.
@@ -413,6 +414,9 @@ func main() {
 	}
 
 	log.Println("Starting swarm bot for account " + cfg.account)
+	// The identity line pairs every bot log with the exact code state
+	// - the state dump of the web UI carries the same line.
+	log.Printf("Build: %s", version.Identity())
 
 	registry := state.NewRegistry()
 	tracker := state.NewBot(cfg.account)

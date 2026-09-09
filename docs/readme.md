@@ -41,3 +41,6 @@ SPDX-License-Identifier: MIT
 - Periods not used at end of line
 - Errors start with "Error"
 - Only use \n at end of output text in case of Printf, otherwise use Println
+- The bot log self identifies: the line after the startup banner is
+  the build identity from internal/version (the same line the state
+  dump carries)

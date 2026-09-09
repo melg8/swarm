@@ -2222,3 +2222,77 @@ serveRelogin):
   proxy package, gofmt clean, golangci-lint (2 pre-existing gosec on
   the HEAD, no new issues), tools/mobius_e2e.sh E2E_OK,
   SWARM_PROXY_E2E=1 PASS.
+
+## Round 41: the build identity of the state dump (2026-09-09)
+
+Scope: a live problem report must tell which code produced it. The
+"Cannot see target" investigation opened with a state dump whose
+origin had to be inferred from the user's `git pull` output - the
+report itself said nothing about the branch or the commit it came
+from, and a parallel-session push moving the branch in between would
+have made any such inference a guess. This round pins the origin into
+the artifacts themselves: the second line of every state dump and the
+line right after the startup banner of every bot log now carry the
+exact build identity.
+
+### Design
+
+- New package `internal/version` with four link-time fields (Branch,
+  Commit, Dirty, BuildTime) that the build scripts fill via
+  `-ldflags -X`. Two fallback levels cover the binaries nobody
+  stamped: the `vcs.*` settings Go embeds into every binary built
+  from a git repository (the revision, the modified flag, the commit
+  time) and, for the branch - the one thing the VCS stamp does not
+  carry - the `.git/HEAD` of the working directory (the
+  "ref: refs/heads/<name>" form, the "gitdir: <path>" pointer of a
+  linked worktree, empty on a detached HEAD, since a stale branch
+  hint would be worse than none).
+- The state dump prints the identity right under the title:
+  `build: branch feature/proxy-server, commit 6a0c183 (dirty), built
+  ...`. The dirty flag matters as much as the hash - a dump from a
+  tree with uncommitted edits must not be mistaken for the clean
+  commit it names.
+- The identity renders unknown fields away instead of inventing them;
+  a binary with no git metadata at all reports
+  `unknown (built outside a git repository)`.
+
+### Engineering details
+
+- The three build sites bake the identity in: swarm_fast_deploy.sh
+  and mobius_fast_deploy.sh (byte-identical, as the deploy rule
+  requires) and mobius_e2e.sh - `git rev-parse --abbrev-ref HEAD`
+  (emptied on a detached HEAD), `git rev-parse --short HEAD`, `git
+  status --porcelain` for the dirty flag, `date -u` for the build
+  time. Branch names and the timestamp carry no spaces, so the
+  multi-word -ldflags value needs no quoting tricks, only the
+  in-quote line continuation. The e2e log echoes the identity right
+  after the build, before the stack even starts.
+- The dump endpoint test asserts only the `build: ` prefix: the
+  identity values of the test binary depend on the working tree of
+  the moment (vcs.modified flips to true the second a fix is being
+  written), pinning them would flake.
+- gosec flags the gitdir pointer read (G703, path traversal via
+  taint analysis) - nolint-ed with the justification that the pointer
+  comes from the `.git` file of the worktree being inspected, a
+  local build hint, not a user-supplied path.
+
+### Tests
+
+- New: the internal/version package tests - TestRenderIdentityLine
+  (the line layout: comma separated fields, the commit tree state,
+  the unknown fields dropping out), TestShortHash, TestWorktreeBranch
+  (the ref form with slashed branch names, the detached HEAD, the
+  gitdir pointer of a linked worktree, the missing .git),
+  TestIdentityPrefersLinkTimeFields (the link-time values win over
+  the embedded VCS stamp).
+- Updated: TestBotDumpEndpoint - the dump header carries the build
+  line.
+- Live verification on the deployed stack: both build paths produced
+  the identity in the dump of a bot in the world - the ldflags build
+  (`build: branch feature/proxy-server, commit 6a0c183 (dirty),
+  built 2026-09-09T21:24:29Z`, the build time of the link) and a
+  plain `go build` (the same line with the commit time from the VCS
+  stamp) - plus the matching `Build:` first line of the bot log in
+  both runs; tools/mobius_e2e.sh E2E_OK.
+- go build/vet, go test ./... (19 packages), gofmt clean,
+  golangci-lint 0 issues on the touched packages.

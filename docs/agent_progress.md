@@ -2465,3 +2465,29 @@ name the variant number that best fits the real bot UI.
   SWARM_PROXY_E2E=1 e2e PASS, tools/mobius_e2e.sh E2E_OK, go
   build/vet, go test ./... (18 packages), go test -race on the proxy
   package, golangci-lint (2 pre-existing gosec, no new issues).
+- 2026-09-09: the build identity of the state dump (round 6,
+  feature/proxy-server). A live problem report must tell which code
+  produced it: the "Cannot see target" investigation opened with a
+  dump whose origin had to be inferred from the user's `git pull`
+  output - the report itself said nothing about the branch or the
+  commit. Now the second line of every state dump and the line right
+  after the startup banner of the bot log carry `build: branch <name>,
+  commit <hash> (dirty|clean), built <time>`. New `internal/version`
+  package: the four link-time fields the build scripts bake in via
+  -ldflags -X (Branch, Commit, Dirty, BuildTime), with two fallback
+  levels for unstamped binaries - the vcs.* settings Go embeds into
+  every binary built from a git repository (revision, modified,
+  commit time) and, for the branch the VCS stamp does not carry, the
+  .git/HEAD of the working directory (the ref form, the gitdir
+  pointer of a linked worktree, empty on a detached HEAD - a stale
+  hint would be worse than none). Unknown fields drop out of the
+  rendered line. The three build sites bake the identity in
+  (swarm_fast_deploy.sh and mobius_fast_deploy.sh byte-identical,
+  mobius_e2e.sh echoes it right after the build); a plain
+  go build/go run still identifies itself through the VCS stamp plus
+  .git/HEAD. The dump test asserts only the `build: ` prefix (the
+  values depend on the working tree of the moment). Verified live on
+  the deployed stack: both build paths produced the identity line in
+  the dump of a bot in the world and in the bot log;
+  tools/mobius_e2e.sh E2E_OK, go build/vet, go test ./...
+  (19 packages), golangci-lint 0 issues on the touched packages.

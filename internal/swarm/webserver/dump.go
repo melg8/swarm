@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/state"
+	"github.com/melg8/swarm/internal/version"
 )
 
 // dumpEventLimit bounds the event window of the dump: the snapshot
@@ -70,9 +71,13 @@ func BuildStateDump(bot *state.Bot) string {
 	return b.String()
 }
 
-// writeDumpHeader writes the report title and the session summary.
+// writeDumpHeader writes the report title, the build identity and
+// the session summary. The build line pins the exact code state the
+// report came from - a live problem report never leaves room for
+// guessing which commit produced it.
 func writeDumpHeader(b *strings.Builder, snap state.Snapshot) {
 	fmt.Fprintf(b, "swarm state dump\n")
+	fmt.Fprintf(b, "build: %s\n", version.Identity())
 	fmt.Fprintf(b, "bot: %s (status %s, phase %s)\n",
 		snap.ID, snap.Status, snap.Phase)
 	fmt.Fprintf(b, "dumped: %s\n", time.Now().Format(time.RFC3339))

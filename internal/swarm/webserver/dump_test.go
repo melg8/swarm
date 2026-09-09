@@ -42,8 +42,9 @@ func TestBotDumpEndpoint(t *testing.T) {
 		recorder.Header().Get("Content-Type"))
 	report := recorder.Body.String()
 
-	// The header identifies the session.
+	// The header identifies the code state and the session.
 	require.Contains(t, report, "swarm state dump")
+	require.Contains(t, report, "build: ")
 	require.Contains(t, report, "bot: test1 (status online")
 
 	// The character sheet: the position, the vitals, the sit state.
