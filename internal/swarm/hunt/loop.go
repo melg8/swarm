@@ -396,6 +396,10 @@ type Loop struct {
 	buyRetries        int
 	shoppingPlanAt    time.Time
 	shoppingPlanCache []gear.Purchase
+	// shoppingPlanAdena holds the adena the cached queue was planned
+	// against: the widget view shows the planning wallet, not the
+	// live one drifting with the loot of the same tick.
+	shoppingPlanAdena int64
 	// The sell first step of the replacement purchases (see
 	// stepReplacementSales): the planned purchases that displace
 	// equipped gear sell the displaced pieces before buying, so the
@@ -498,6 +502,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		buyRetries:        0,
 		shoppingPlanAt:    time.Time{},
 		shoppingPlanCache: nil,
+		shoppingPlanAdena: 0,
 		replacePlanned:    false,
 		replaceDone:       false,
 		replaceQueue:      nil,
@@ -668,15 +673,22 @@ func (l *Loop) Run(ctx context.Context) {
 // first pickup happens on the same tick.
 // Pre-consolidation phase debt; the hunt loop cleanup is planned
 // (docs/quality_review_and_agent_prompts.md P07).
-func (l *Loop) tick() { //nolint:cyclop
+func (l *Loop) tick() { //nolint:cyclop,funlen
 	// Publish the hunt loop phase to the bot tracker so the web UI
 	// can show the human readable activity banner. SetPhase is a
 	// no-op when the phase has not changed, so the per tick call
 	// never churns the event stream. Runs on every return path
 	// through the defer. The closure captures l.phase by reference
 	// so the value at return time is published (a plain defer call
-	// evaluates its arguments at registration time).
-	defer func() { l.tracker.SetPhase(string(l.phase)) }()
+	// evaluates its arguments at registration time). The shopping
+	// view of the web UI widget rides the same defer: every tick
+	// republishes the queue (SetShoppingPlan no-ops on an identical
+	// view) so the widget never shows a stale plan whatever phase
+	// the tick ended in.
+	defer func() {
+		l.tracker.SetPhase(string(l.phase))
+		l.publishShoppingView()
+	}()
 	if l.tracker.SelfDead() {
 		l.recoverFromDeath()
 

@@ -401,3 +401,130 @@ func TestReplacementSalesSellBeforeBuy(t *testing.T) {
 	require.Len(t, game.uses, 1,
 		"no re-equip raced the sale")
 }
+
+// TestPublishShoppingViewQueue pins the widget view of the hunting
+// loop: the tick publishes the purchase queue with the trip flag off,
+// the affordable entries carry no missing amount, the wanted tail
+// entries do, and the entries resolve their names and merchants.
+func TestPublishShoppingViewQueue(t *testing.T) {
+	loop, _, bot, _ := newTripLoop()
+	// A bare character with 50 adena: the affordable plan buys the
+	// cheap fillers (under the 100 adena trip minimum, so no town trip
+	// starts) and the wanted tail shows the saves beyond the wallet.
+	bot.ApplyInventoryUpdate([]state.InventoryItem{
+		{ObjectID: 999, ItemID: 57, Count: 50, Type2: 4, Change: 1},
+	})
+
+	loop.tick()
+
+	plan := bot.Snapshot().Shopping
+	require.NotNil(t, plan, "the queue view must publish on the tick")
+	require.False(t, plan.Trip)
+	require.Equal(t, int64(50), plan.Adena,
+		"the view carries the planning wallet")
+	require.NotEmpty(t, plan.Entries)
+	affordable := 0
+	wanted := 0
+	for _, entry := range plan.Entries {
+		require.NotEmpty(t, entry.Name, "the entry name resolves")
+		require.NotEmpty(t, entry.Merchant, "the merchant name resolves")
+		require.NotEmpty(t, entry.Icon, "the entry icon resolves")
+		require.Positive(t, entry.Price)
+		if entry.Affordable {
+			affordable++
+			require.Zero(t, entry.Missing,
+				"an affordable entry misses no adena")
+		} else {
+			wanted++
+			require.Positive(t, entry.Missing,
+				"a wanted entry carries its missing adena")
+		}
+	}
+	require.Positive(t, affordable, "the wallet affords the fillers")
+	require.Positive(t, wanted, "the wanted tail follows the plan")
+	require.Equal(t, affordableTotal(plan.Entries), plan.Total,
+		"the total sums the affordable entries")
+}
+
+// TestPublishShoppingViewManualSessionClears pins the manual only
+// sessions: no autonomous trips are planned, so the widget view stays
+// unpublished.
+func TestPublishShoppingViewManualSessionClears(t *testing.T) {
+	loop, _, bot, _ := newTripLoop()
+	bot.ApplyInventoryUpdate([]state.InventoryItem{
+		{ObjectID: 999, ItemID: 57, Count: 50, Type2: 4, Change: 1},
+	})
+	loop.SetAutonomy(false)
+
+	loop.tick()
+
+	require.Nil(t, bot.Snapshot().Shopping,
+		"a manual session never plans a trip")
+}
+
+// TestPublishShoppingViewTripView pins the trip view: while a town
+// trip runs, the widget shows its remaining buys - the in-flight
+// batch marked buying first, then the pending purchases of the stops.
+func TestPublishShoppingViewTripView(t *testing.T) {
+	loop, _, bot, _ := newTripLoop()
+	bot.ApplyInventoryUpdate([]state.InventoryItem{
+		{ObjectID: 999, ItemID: 57, Count: 5000, Type2: 4, Change: 1},
+	})
+	loop.tripStart = time.Now()
+	loop.phase = phaseTownSell
+	loop.tripStops = []tripStop{
+		{merchant: townMerchants[1]},
+		{merchant: townMerchants[0]},
+	}
+	loop.buyRequested = []gear.Purchase{{
+		ItemID: 1121, ListID: 3014800, MerchantTemplateID: 7148,
+		Count: 1, Price: 9, Reason: "buying Apprentice's Shoes",
+		Affordable: true,
+	}}
+	loop.tripStops[0].buys = []gear.Purchase{{
+		ItemID: 1146, ListID: 3014800, MerchantTemplateID: 7148,
+		Count: 1, Price: 20, Reason: "buying Cloth Cap",
+		Affordable: true,
+	}}
+	loop.tripStops[1].buys = []gear.Purchase{{
+		ItemID: 1, ListID: 3014700, MerchantTemplateID: 7147,
+		Count: 1, Price: 883, Reason: "buying Short Sword",
+		Affordable: true,
+	}}
+
+	publishShoppingViewForTest(loop)
+
+	plan := bot.Snapshot().Shopping
+	require.NotNil(t, plan)
+	require.True(t, plan.Trip, "the running trip marks the view")
+	require.Len(t, plan.Entries, 3)
+	require.True(t, plan.Entries[0].Buying,
+		"the in-flight batch entry is marked buying")
+	require.False(t, plan.Entries[1].Buying)
+	require.False(t, plan.Entries[2].Buying)
+	require.Equal(t, int32(1121), plan.Entries[0].ItemID)
+	require.Equal(t, int32(1146), plan.Entries[1].ItemID)
+	require.Equal(t, int32(1), plan.Entries[2].ItemID)
+	require.Equal(t, int64(912), plan.Total,
+		"the total sums the remaining trip buys")
+	require.Equal(t, int64(5000), plan.Adena)
+}
+
+// publishShoppingViewForTest drives the publisher with the tick defer
+// semantics: the trip branch needs the phase bookkeeping of a tick
+// without running the trip state machine itself.
+func publishShoppingViewForTest(loop *Loop) {
+	loop.publishShoppingView()
+}
+
+// affordableTotal sums the prices of the affordable entries.
+func affordableTotal(entries []state.ShoppingEntryView) int64 {
+	var total int64
+	for _, entry := range entries {
+		if entry.Affordable {
+			total += entry.Price
+		}
+	}
+
+	return total
+}

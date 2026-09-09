@@ -288,13 +288,15 @@ func (l *Loop) maybeStartTownTrip() {
 		"% weight"
 	if !l.inventoryFull() {
 		reason = "the shop strategy plans purchases worth " +
-			strconv.FormatInt(
-				gear.AdenaSpent(l.shoppingPlanCache), 10) + " adena"
+			strconv.FormatInt(gear.AdenaSpent(
+				affordablePrefix(l.shoppingPlanCache)), 10) +
+			" adena"
 	}
 	// The trigger plan cache drops: the stop planning recomputes it
 	// with the fresh adena of the sales.
 	l.shoppingPlanCache = nil
 	l.shoppingPlanAt = time.Time{}
+	l.shoppingPlanAdena = 0
 	l.logger.Printf("Hunt: %s, walking to the trader %s", reason,
 		merchant.Name)
 	if !l.startWalkLeg(townNpcPosition(merchant)) {
@@ -834,6 +836,7 @@ func (l *Loop) endTownTrip(reason string) {
 	l.buyRetries = 0
 	l.shoppingPlanCache = nil
 	l.shoppingPlanAt = time.Time{}
+	l.shoppingPlanAdena = 0
 	l.resetReplacementSales()
 	l.tripEndedAt = time.Now()
 	l.logger.Printf("Hunt: town trip ended: " + reason)

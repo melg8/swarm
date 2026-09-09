@@ -98,33 +98,189 @@ func shopCatalog(merchants []townNpc) gear.Catalog {
 }
 
 // shoppingPlan plans the purchases against the current gear state.
-// The gear profile of the loop scores the items.
+// The gear profile of the loop scores the items; the returned plan
+// holds only the affordable purchases (the wanted tail of the queue
+// is the widget's save up view, the trip never buys it).
 func (l *Loop) shoppingPlan() []gear.Purchase {
+	return affordablePrefix(l.shoppingQueue())
+}
+
+// shoppingQueue computes the fresh purchase queue against the current
+// gear state: the affordable plan of the next trip plus the wanted
+// tail with the cumulative missing adena (see
+// gear.PlanPurchaseQueue).
+func (l *Loop) shoppingQueue() []gear.Purchase {
 	if l.equip == nil {
 		return nil
 	}
 	stats := l.tracker.InventoryStats()
 
-	return gear.PlanPurchases(
+	return gear.PlanPurchaseQueue(
 		l.equip.profile, l.equipment(), townShopCatalog,
 		int64(stats.Adena))
+}
+
+// refreshShoppingCache recomputes the cached purchase queue when the
+// shopping plan period elapsed. The cache drives both the trip
+// trigger (the affordable prefix, see shoppingWanted) and the widget
+// view of the loop publish, so one recompute serves both per period.
+// The adena the queue was planned against is cached with it: the
+// widget view must show the planning wallet, not a drifted one.
+func (l *Loop) refreshShoppingCache() {
+	now := time.Now()
+	if !l.shoppingPlanAt.IsZero() &&
+		now.Sub(l.shoppingPlanAt) < shoppingPlanPeriod {
+		return
+	}
+	l.shoppingPlanCache = l.shoppingQueue()
+	l.shoppingPlanAt = now
+	l.shoppingPlanAdena = int64(l.tracker.InventoryStats().Adena)
 }
 
 // shoppingWanted reports whether the shop strategy justifies a town
 // trip on its own: a cached plan with a total price above the trip
 // minimum. The inventory full trigger runs independently of it.
 func (l *Loop) shoppingWanted() bool {
-	now := time.Now()
-	if l.shoppingPlanAt.IsZero() ||
-		now.Sub(l.shoppingPlanAt) >= shoppingPlanPeriod {
-		l.shoppingPlanCache = l.shoppingPlan()
-		l.shoppingPlanAt = now
-	}
+	l.refreshShoppingCache()
 	if len(l.shoppingPlanCache) == 0 {
 		return false
 	}
 
-	return gear.AdenaSpent(l.shoppingPlanCache) >= shoppingTripMinValue
+	return gear.AdenaSpent(affordablePrefix(l.shoppingPlanCache)) >=
+		shoppingTripMinValue
+}
+
+// affordablePrefix filters the affordable buys of a purchase queue:
+// the trip executes only them, the wanted tail is the widget's save
+// up view.
+func affordablePrefix(queue []gear.Purchase) []gear.Purchase {
+	buys := make([]gear.Purchase, 0, len(queue))
+	for _, purchase := range queue {
+		if !purchase.Affordable {
+			break
+		}
+		buys = append(buys, purchase)
+	}
+
+	return buys
+}
+
+// publishShoppingView refreshes the shopping queue of the web UI
+// widget on every tick: the cached queue view while the loop hunts
+// (a fresh recompute per shoppingPlanPeriod through the shared cache)
+// and the remaining trip buys while a town trip runs (the in-flight
+// batch marked buying). Sessions without the shop strategy (no gear
+// profile, no merchant catalogs, the manual only mode) publish
+// nothing - the widget stays hidden.
+func (l *Loop) publishShoppingView() {
+	if !l.autonomous || !l.shoppingTripEnabled() {
+		l.tracker.ClearShoppingPlan()
+
+		return
+	}
+	if l.tripActive() {
+		l.tracker.SetShoppingPlan(l.tripShoppingView())
+
+		return
+	}
+	l.refreshShoppingCache()
+	l.tracker.SetShoppingPlan(shoppingQueueView(
+		l.shoppingPlanCache, l.shoppingPlanAdena))
+}
+
+// shoppingQueueView builds the widget view of a purchase queue: the
+// entries in the walked order (the affordable plan first, the wanted
+// tail behind) with the planning adena and the affordable total.
+func shoppingQueueView(
+	queue []gear.Purchase, adena int64,
+) state.ShoppingPlanView {
+	var total int64
+	entries := make([]state.ShoppingEntryView, 0, len(queue))
+	for _, purchase := range queue {
+		if purchase.Affordable {
+			total += purchase.Price
+		}
+		entries = append(entries, shoppingEntryView(purchase, false))
+	}
+
+	return state.ShoppingPlanView{
+		Entries: entries,
+		Adena:   adena,
+		Total:   total,
+		Trip:    false,
+	}
+}
+
+// tripShoppingView builds the widget view of a running town trip: the
+// in-flight buy batch (marked buying) first, then the pending
+// purchases of the current stop and the later stops. The entries are
+// the trip's own plan, the affordable fields of the walker hold.
+func (l *Loop) tripShoppingView() state.ShoppingPlanView {
+	var total int64
+	entries := make([]state.ShoppingEntryView, 0, 16)
+	for _, purchase := range l.buyRequested {
+		total += purchase.Price
+		entries = append(entries, shoppingEntryView(purchase, true))
+	}
+	for _, stop := range l.tripStops {
+		for _, purchase := range stop.buys {
+			total += purchase.Price
+			entries = append(entries, shoppingEntryView(
+				purchase, false))
+		}
+	}
+
+	return state.ShoppingPlanView{
+		Entries: entries,
+		Adena:   int64(l.tracker.InventoryStats().Adena),
+		Total:   total,
+		Trip:    true,
+	}
+}
+
+// shoppingEntryView converts one planned purchase into the tracker
+// view of the shop widget: the item stats resolve through the
+// generated npcdata dictionaries (name, icon, merchant, combat
+// stats) so the web tooltip of the widget reuses the item tooltip
+// shape.
+func shoppingEntryView(
+	purchase gear.Purchase, buying bool,
+) state.ShoppingEntryView {
+	stats, hasStats := npcdata.ItemGearStats(purchase.ItemID)
+	itemType := stats.Type
+	if !hasStats {
+		itemType = npcdata.ItemType(purchase.ItemID)
+	}
+
+	return state.ShoppingEntryView{
+		ItemID:     purchase.ItemID,
+		Name:       npcdata.ItemName(purchase.ItemID),
+		Icon:       npcdata.ItemIcon(purchase.ItemID),
+		MerchantID: purchase.MerchantTemplateID,
+		Merchant: npcdata.NPCName(
+			purchase.MerchantTemplateID + npcDisplayOffset),
+		Type:        itemType,
+		WeaponType:  stats.WeaponType,
+		ArmorType:   stats.ArmorType,
+		BodyPartKey: stats.BodyPart,
+		PAtk:        stats.PAtk,
+		MAtk:        stats.MAtk,
+		PDef:        stats.PDef,
+		MDef:        stats.MDef,
+		SDef:        stats.SDef,
+		RShld:       stats.RShld,
+		PAtkSpd:     stats.PAtkSpd,
+		SoulShots:   stats.SoulShots,
+		SpiritShots: stats.SpiritShots,
+		Weight:      npcdata.ItemWeight(purchase.ItemID),
+		Price:       purchase.Price,
+		SellCredit:  purchase.SellCredit,
+		Missing:     purchase.Missing,
+		Gain:        purchase.Gain,
+		Affordable:  purchase.Affordable,
+		Buying:      buying,
+		Reason:      purchase.Reason,
+	}
 }
 
 // replacementSellingActive reports whether the sell first step of
