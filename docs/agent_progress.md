@@ -4,6 +4,93 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: the zone switch sit freeze and the pathfinding return
+
+Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.
+The stack was redeployed and verified (STACK_READY: login :2106, game
+:7777, db :3306, 75 tables).
+
+### Goal
+
+Two live problems of the manual hunting zone switch plus a web UI
+feature: (1) a zone switch that lands on a sitting bot produces packet
+errors - the bot must wait out the sit, stand up and continue; (2) the
+bot does not pathfind on a zone switch and got stuck at
+x 42536 y 48648 z -2992 on the flying elven city heading to the
+Spore Fungus SW-d1 zone; (3) a Dump state button that copies the full
+debug state (character, inventory, position, the recent log) to the
+clipboard for live bug reports.
+
+### Diagnosis
+
+- The Mobius C1 server refuses every MoveToLocation while the
+  character sits: `PlayerAI.setIntentionMoveTo` answers ActionFailed
+  while the AI intention is REST. `sitDown`/`standUp` ignore toggles
+  inside the 2.5 s `_sittingInProgress` window, the `StandUpTask`
+  clears the paralysis and the REST intention 2.5 s after the stand
+  broadcast. The bot's `returnToZone` had NO stand-up gate (only the
+  town trip start and the flee had): a zone switch over a resting
+  character sent walk requests every 2 s, each refused with an
+  "Action failed" log line, forever - and nothing outside the zone
+  ever stood the character up.
+- `returnToZone` planned the search goal as
+  `Vec3{zone.CX, zone.CY, selfZ}` - the WALKER height at the zone
+  center. On the city deck (z -2992) against the spore zone ground
+  (z -3664) the 3D approach goal sat mid air: no cell ever came within
+  the 200 radius, the A* burned the whole 1M expansion cap (a 12-14 s
+  frozen hunt tick per attempt - reproduced on the real geodata), and
+  `startWalkLeg` fell back to the direct walk that ran the character
+  into the west city railing at (42536, 48648) - exactly the reported
+  stuck point (the deck ends there; the ground layer below is the
+  lake bottom).
+
+### Fix
+
+- `hunt/loop_safety`-side sit gate: `returnToZone` gates on
+  `standUpGuarded` before any walk planning, and `standUpGuarded`
+  gained the `standSettlePeriod` (3 s) window: after the stand
+  broadcast confirms, the caller waits out the server side stand
+  animation before the first walk request (the guard's settle applies
+  to the trip starts and the escapes too).
+- `pathfind.Engine.ClosestHeight` (new): resolves the layer height at
+  a world position closest to a reference z - the deck the server
+  itself picks for a destination. The hunt Navigator interface and
+  engineNavigator carry it; `returnToZone` resolves the real zone
+  center deck before `FindPathApproach` (a lookup failure keeps the
+  self height - the same-deck case). The city->spore route now plans
+  in ~0.5 s over the real geodata (regression test
+  `TestFindPathFromCityDeckToGroundZone`).
+- The dump: `GET /api/bots/{id}/dump` (webserver/dump.go) assembles a
+  plain text report - the character sheet, the aggro load, the zone,
+  the equipment with slot names, the bag, the distance sorted
+  objects, the walk plan, the combat beats, the chat and a 600 entry
+  event window (`state.Bot.NewestEvents`, the ring holds 512). The
+  HUD name row gained the copy button (clipboard API, textarea
+  fallback, new tab escape). The hunt loop logger mirrors its
+  decision lines into the tracker event log (`Loop.SetLogger` +
+  the MultiWriter wiring in cmd/swarm) - the log tab and the dump
+  carry the reasoning of the loop.
+
+### Verification
+
+- go build/vet, go test ./... (18 packages), gofmt clean,
+  golangci-lint: 0 new issues (6 pre-existing ones on the clean HEAD -
+  the golangci-lint v2.6.2 build of this sandbox is stricter than the
+  one the repo last ran).
+- New tests: `TestLoopStandsUpBeforeTheZoneReturnWalk`,
+  `TestLoopResolvesTheZoneReturnDeckHeight`,
+  `TestLoopKeepsSelfHeightWhenTheZoneDeckLookupFails`,
+  `TestTripStandsUpBeforeWalking` (re-pinned to the settle window),
+  `TestClosestHeight`, `TestFindPathFromCityDeckToGroundZone`,
+  `TestFindPathFailsOnAFabricatedGoalHeight`, `TestBotDumpEndpoint`,
+  `TestBuildStateDumpEventWindow`,
+  `TestHuntEventLoggerMirrorsHuntLines`,
+  `TestHuntEventLoggerKeepsTheConsoleFormat`.
+- Live: SWARM_PROXY_E2E=1 E2E PASS; tools/mobius_e2e.sh 45 E2E_OK; a
+  manual live run against the stack verified the dump endpoint end to
+  end (character, zone, equipment, objects, events with the mirrored
+  hunt lines).
+
 ## Active task: the deferred pile up logout and the two second relogin
 
 Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.

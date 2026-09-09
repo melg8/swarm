@@ -1945,3 +1945,107 @@ the farm.
 - Watch the live log for the new lines: "N mobs piled on us, running
   600 units from the aggro point before the logout", the distance
   report at the logout, and the reconnect after two seconds.
+
+## Round 38: the zone switch sit freeze, the mid air search goal and the dump state button (2026-09-09)
+
+Scope: two live problems of the manual hunting zone switch reported
+from the deployed bot plus a web UI feature for the live bug reports:
+a zone switch over a sitting bot spams packet errors, and the bot
+does not pathfind on a zone switch - it got stuck at
+x 42536 y 48648 z -2992 on the flying elven city heading to the
+Spore Fungus SW-d1 zone. Plus: a Dump state button that copies the
+full debug state to the clipboard.
+
+### Diagnosis
+
+- Mobius C1 move-vs-sit: `PlayerAI.setIntentionMoveTo` answers
+  ActionFailed while the AI intention is REST; `sitDown`/`standUp`
+  drop toggles inside the 2.5 s `_sittingInProgress` window;
+  `StandUpTask` clears the paralysis and the REST intention 2.5 s
+  AFTER the ChangeWaitType(WT_STANDING) broadcast. The bot's
+  `returnToZone` had no stand-up gate at all (only the town trip
+  start and the flee used `standUpGuarded`): a zone switch over a
+  resting character walked into the refusals every 2 s (the
+  "Action failed" packet error spam the user saw) and nothing
+  outside the zone ever stood the character up - the bot sat
+  outside its zone forever.
+- The zone return search goal: `returnToZone` built
+  `Vec3{zone.CX, zone.CY, selfZ}` and searched with the 200 3D
+  approach radius. The walker height at the zone center is a
+  fabricated z: the city deck (-2992) against the spore zone ground
+  (-3664) put the goal 600+ units mid air, no cell could satisfy the
+  radius, the A* burned the full 1M expansion cap - 12-14 s of a
+  FROZEN hunt tick per attempt (reproduced on the real geodata
+  pack), then `startWalkLeg` fell back to the single direct waypoint
+  and the character walked the straight line into the west city
+  railing - the exact reported stuck coordinates (the deck ends
+  there, x 42300 is already lake bottom).
+
+### Fix
+
+- `standUpGuarded` (hunt/town.go) gained `standSettlePeriod` (3 s):
+  after the stand broadcast confirms, the movement waits out the
+  server side stand animation - the first walk request of the return
+  lands on a movable character. `returnToZone` (hunt/
+  loop_movement.go) gates on the guard before any walk planning: the
+  zone switch over a resting bot waits out an in-flight sit
+  transition, stands up, settles, then plans - exactly the requested
+  "wait for the sit to finish, stand up, continue".
+- `pathfind.Engine.ClosestHeight(x, y, refZ)` (new): the layer
+  height at a world position closest to refZ - the deck the server
+  itself resolves a destination to. The hunt `Navigator` interface
+  carries it; `zoneReturnDestination` resolves the real zone center
+  deck before the approach search, a lookup failure keeps the self
+  height. The city->spore route plans in ~0.5 s (the waypoints drop
+  off the city edge onto the west lake shore - the geodata walk the
+  server itself accepts, no fall damage exists in C1).
+- The dump state button: `GET /api/bots/{id}/dump` (webserver/
+  dump.go) assembles the plain text report - the character sheet
+  (position, vitals, sit state, stats, load), the aggro load, the
+  hunting zone, the equipment with paperdoll slot names, the bag,
+  the objects sorted by distance with combat state and targets, the
+  walk plan, the combat beats, the chat, and a 600 entry event
+  window (`state.Bot.NewestEvents`, the snapshot streams 100 for
+  the log tail, the ring caps at 512). The HUD name row gained the
+  copy button (navigator.clipboard, the legacy textarea fallback, a
+  new tab escape for refusing clipboards, a copied/failed flash).
+- The hunt loop logger mirrors its decision lines into the tracker
+  event log (`Loop.SetLogger`, the MultiWriter wiring in
+  cmd/swarm/main.go, the console format untouched): the web UI log
+  tab and the dump carry the reasoning of the loop (zone switches,
+  escapes, stuck re-paths) next to the raw game events.
+
+### Verification
+
+- New tests: TestLoopStandsUpBeforeTheZoneReturnWalk (no walk, no
+  search while sitting; the stand request; the plan and the walk
+  after the settle), TestLoopResolvesTheZoneReturnDeckHeight (the
+  goal carries the resolved deck height),
+  TestLoopKeepsSelfHeightWhenTheZoneDeckLookupFails,
+  TestTripStandsUpBeforeWalking (re-pinned to the settle window),
+  TestClosestHeight (the multilayer resolution on a synthetic
+  world), TestFindPathFromCityDeckToGroundZone (the LIVE stuck case
+  against the real geodata: the route exists, plans under 5 s, ends
+  within the approach radius on dry ground),
+  TestFindPathFailsOnAFabricatedGoalHeight (the mid air goal starves
+  the search), TestBotDumpEndpoint, TestBuildStateDumpEventWindow,
+  TestHuntEventLoggerMirrorsHuntLines,
+  TestHuntEventLoggerKeepsTheConsoleFormat. The flaky
+  TestAppendSnapshotJSONEmptyBot compares without the serverTimeMs
+  clock race now.
+- go build/vet, go test ./... (18 packages), gofmt clean,
+  golangci-lint 0 new issues (6 pre-existing on the clean HEAD - the
+  v2.6.2 build of this sandbox is stricter than the repo's last
+  run).
+- Live: SWARM_PROXY_E2E=1 E2E PASS (0.6 s), tools/mobius_e2e.sh 45
+  E2E_OK, and a manual live run against the stack verified the dump
+  endpoint end to end (the character sheet, the zone, the equipment
+  with slot names, the sorted objects, the events with the mirrored
+  hunt lines).
+
+### Follow ups
+
+- The next live zone switch on a resting bot should log the stand
+  up, the ~3 s settle, then "outside the hunting zone,
+  pathfinding back" with a fast plan - and the dump button should
+  hand the user the full story for any new report.
