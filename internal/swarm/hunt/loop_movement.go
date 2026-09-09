@@ -6,10 +6,13 @@ package hunt
 
 // The movement phases of the hunt loop, split out of the loop.go
 // god file: closing on far packs, the idle patrol toward the zone
-// center and the geodata walk home.
+// center, the geodata walk home and the targetless diagnostic that
+// explains a standing hunter in the log.
 
 import (
+	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/pathfind"
@@ -47,6 +50,13 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
 		farTargetRange, l.zone(), l.activeSkips(now),
 		l.maxTargetLevel(), true, l.zoneMobPriority)
 	if !found {
+		// The far search scans the whole square: nothing in the zone
+		// is pickable at any distance. Explain the standing hunter in
+		// the log - the mobs the character sees, their positions and
+		// why the target search rejects them - instead of letting a
+		// fenced social pack look like a broken bot.
+		l.logNoPickableTargets(now)
+
 		return false
 	}
 	dist := math.Hypot(float64(pick.X-selfX), float64(pick.Y-selfY))
@@ -69,6 +79,45 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
 	}
 
 	return true
+}
+
+// logNoPickableTargets logs the targetless diagnostic: the nearest
+// mobs the character sees around itself, their positions and the
+// reasons the engage target search rejects them (a social clan pack,
+// the level ceiling, the zone square, the skip list). The caller
+// reaches here only after the far search confirmed that the whole
+// zone holds nothing pickable, so the line answers the "why is the
+// bot standing there" question directly in the log. The pacing
+// keeps it to one line per noPickLogPeriod while the state lasts; a
+// successful pick or a flee re-arms it.
+func (l *Loop) logNoPickableTargets(now time.Time) {
+	if !l.noPickLogAt.IsZero() && now.Sub(l.noPickLogAt) < noPickLogPeriod {
+		return
+	}
+	l.noPickLogAt = now
+	blocked := l.tracker.NearestBlockedTargets(
+		l.zone(), l.maxTargetLevel(), l.activeSkips(now), noPickLogLimit)
+	if len(blocked) == 0 {
+		l.logger.Printf("Hunt: no pickable target in the zone, " +
+			"no attackable npc in sight")
+
+		return
+	}
+	selfX, selfY, _, selfOK := l.tracker.SelfPosition()
+	var line strings.Builder
+	line.WriteString("Hunt: no pickable target in the zone:")
+	for i := range blocked {
+		entry := &blocked[i]
+		fmt.Fprintf(&line, " %s (%d) at %d %d %d",
+			entry.Name, entry.ObjectID, entry.X, entry.Y, entry.Z)
+		if selfOK {
+			dist := math.Hypot(
+				float64(entry.X-selfX), float64(entry.Y-selfY))
+			fmt.Fprintf(&line, ", %.0f units", dist)
+		}
+		fmt.Fprintf(&line, " - %s;", entry.Reason)
+	}
+	l.logger.Printf("%s", strings.TrimSuffix(line.String(), ";"))
 }
 
 // patrolToCenter walks a targetless hunter toward the zone center:

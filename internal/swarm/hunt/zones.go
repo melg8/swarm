@@ -432,14 +432,18 @@ func (l *Loop) selfZoneAnchor() (int32, int32) {
 // stands in the middle of a mob-less square for the rotate window
 // moves on to the nearest ground of the same band that is not
 // cooling down from an earlier rotation. The emptiness reading
-// only counts the mobs the character can actually fight (the level
-// filter of the engage - a square whose survivors all sit above the
-// max target level is as good as empty for this hunter) and only
-// while the character stands central (the tracker only knows the
-// mobs the server showed it, and the patrol walk brings the
-// character to the middle first); running fights, resting walks and
-// town trips reset the timer - a rotation never abandons any of
-// them.
+// counts the mobs the character can actually PICK: the level filter
+// of the engage, the skip list and the social clan fence - a square
+// whose only survivors sit in mutually fenced clan packs reads
+// empty even though mobs live in it, because the pick, the far
+// target walk and the center patrol all come up empty there and the
+// hunter would stand still forever (the reported stuck: a Kaboo Orc
+// pair 294 units apart inside the square, each fencing the other
+// out). The reading only applies while the character stands central
+// (the tracker only knows the mobs the server showed it, and the
+// patrol walk brings the character to the middle first); running
+// fights, resting walks and town trips reset the timer - a rotation
+// never abandons any of them.
 // The linear guard chain is the emptiness protocol itself: every
 // guard either resets or holds the empty timer, and splitting it
 // would scatter that contract over helpers.
@@ -470,7 +474,8 @@ func (l *Loop) maybeRotateEmptyZone(now time.Time) { //nolint:cyclop
 
 		return
 	}
-	if l.tracker.ZoneHasAttackableBelow(zone, l.maxTargetLevel()) {
+	if l.tracker.ZoneHasPickable(
+		zone, l.maxTargetLevel(), l.activeSkips(now)) {
 		l.zoneEmptySince = time.Time{}
 
 		return

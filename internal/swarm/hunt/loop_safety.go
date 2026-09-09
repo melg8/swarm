@@ -25,6 +25,7 @@ func (l *Loop) fleeFromTarget(targetID int32, now time.Time) {
 	l.engageAt = time.Time{}
 	l.clearBlindRecovery()
 	l.noTargetSince = time.Time{}
+	l.noPickLogAt = time.Time{}
 	if l.targetSkip == nil {
 		l.targetSkip = make(map[int32]time.Time)
 	}

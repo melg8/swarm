@@ -5,6 +5,8 @@
 package state
 
 import (
+	"cmp"
+	"fmt"
 	"math"
 	"slices"
 	"sync"
@@ -146,6 +148,133 @@ func (b *Bot) ZoneHasAttackableBelow(zone *Zone, maxLevel int32) bool {
 	}
 
 	return false
+}
+
+// ZoneHasPickable reports whether the engage target search could take
+// ANY npc of the zone right now: the pick's own filters apply - the
+// level ceiling, the skip list and the social clan fence - while the
+// distance plays no role (the far target walk covers the whole
+// square, a mob at any in-zone distance is reachable). The zone
+// rotation uses this as its emptiness reading: a square whose only
+// survivors stand in mutually fenced social packs reads EMPTY to the
+// picker even though mobs live in it, and a hunter that waits in such
+// a square forever - no pick, no far walk, no patrol leg off the
+// center - stalls the whole session. A nil zone never holds pickable
+// targets.
+func (b *Bot) ZoneHasPickable(
+	zone *Zone, maxLevel int32, skip []int32,
+) bool {
+	_, ok := b.nearestAttackable(
+		math.MaxFloat64, zone, skip, maxLevel, true, nil)
+
+	return ok
+}
+
+// BlockedTarget describes one living attackable npc the engage target
+// search rejected: the projected position and the human readable
+// rejection reason. The targetless diagnostic of the hunt loop logs
+// them, so a standing hunter shows WHICH mobs it sees around itself
+// and WHY it does not attack them.
+type BlockedTarget struct {
+	ObjectID int32
+	Name     string
+	X        int32
+	Y        int32
+	Z        int32
+	Reason   string
+}
+
+// NearestBlockedTargets classifies the living attackable npcs around
+// the character exactly the way the engage pick does and returns the
+// nearest ones the pick rejected, with the projected position and the
+// reason: the skip list, the level ceiling, the zone square or the
+// social clan fence (in the pick's own check order). Mobs that pass
+// every filter stay out of the list - the far target walk reaches
+// them, they are simply not engaged yet. The limit bounds the list:
+// the diagnostic logs a handful of the nearest mobs, not the whole
+// knownlist.
+func (b *Bot) NearestBlockedTargets(
+	zone *Zone, maxLevel int32, skip []int32, limit int,
+) []BlockedTarget {
+	if limit <= 0 {
+		return nil
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	selfX := float64(b.char.X)
+	selfY := float64(b.char.Y)
+	nowNano := time.Now().UnixNano()
+	scanPtr := npcScanPool.Get().(*[]npcScan)
+	scans := (*scanPtr)[:0]
+	defer func() {
+		*scanPtr = scans[:0]
+		npcScanPool.Put(scanPtr)
+	}()
+	scans = b.appendAttackableScans(scans, nowNano)
+	type rejectedEntry struct {
+		target BlockedTarget
+		dist   float64
+	}
+	entries := make([]rejectedEntry, 0, len(scans))
+	for i := range scans {
+		cand := &scans[i]
+		reason := blockedReason(
+			scans, cand, b.world.cold, zone, maxLevel, skip)
+		if reason == "" {
+			continue
+		}
+		entries = append(entries, rejectedEntry{
+			target: BlockedTarget{
+				ObjectID: cand.objectID,
+				Name:     b.world.cold[cand.slot].Name,
+				X:        int32(math.Round(cand.x)),
+				Y:        int32(math.Round(cand.y)),
+				Z:        cand.z,
+				Reason:   reason,
+			},
+			dist: math.Hypot(cand.x-selfX, cand.y-selfY),
+		})
+	}
+	slices.SortStableFunc(entries, func(a, b rejectedEntry) int {
+		return cmp.Compare(a.dist, b.dist)
+	})
+	if len(entries) > limit {
+		entries = entries[:limit]
+	}
+	blocked := make([]BlockedTarget, 0, len(entries))
+	for i := range entries {
+		blocked = append(blocked, entries[i].target)
+	}
+
+	return blocked
+}
+
+// blockedReason mirrors the rejection chain of the constrained target
+// search for one scan record and returns the human readable reason
+// (empty when the pick could take the mob). The order matches the
+// pick's own checks: the skip list, the level ceiling, the zone
+// square, the social clan fence. The world cold half resolves the
+// names the reasons print; the caller must hold the read lock.
+func blockedReason(
+	scans []npcScan, cand *npcScan, cold []objectCold,
+	zone *Zone, maxLevel int32, skip []int32,
+) string {
+	if skipContains(skip, cand.objectID) {
+		return "skipped by the engage"
+	}
+	if maxLevel > 0 && cand.level > maxLevel && cand.level > 0 {
+		return fmt.Sprintf("level %d above the ceiling %d",
+			cand.level, maxLevel)
+	}
+	if !zone.Contains(int32(math.Round(cand.x)), int32(math.Round(cand.y))) {
+		return "outside the hunting zone"
+	}
+	if helper := socialHelperRecord(scans, cand); helper != nil {
+		return fmt.Sprintf("clan pack with %s (%d)",
+			cold[helper.slot].Name, helper.objectID)
+	}
+
+	return ""
 }
 
 // targetPriorityBias converts one priority point of the zone mob
@@ -408,8 +537,17 @@ type npcScan struct {
 // positions of the flat scan array are the projected ones, so moving
 // pack mates are measured where they actually stand.
 func socialHelpersNear(scans []npcScan, cand *npcScan) bool {
+	return socialHelperRecord(scans, cand) != nil
+}
+
+// socialHelperRecord finds the clan mate that fences the candidate out
+// of the target search (the pack mate whose assistance the attack
+// would pull), nil for a loner. socialHelpersNear and the blocked
+// target diagnostic share it, so the fence semantics live in exactly
+// one place.
+func socialHelperRecord(scans []npcScan, cand *npcScan) *npcScan {
 	if cand.clanHelpRange <= 0 || cand.clanMask == 0 {
-		return false
+		return nil
 	}
 	reach := float64(cand.clanHelpRange) + socialHelpMargin
 	reachSq := reach * reach
@@ -431,11 +569,11 @@ func socialHelpersNear(scans []npcScan, cand *npcScan) bool {
 		dx := other.x - cand.x
 		dy := other.y - cand.y
 		if dx*dx+dy*dy <= reachSq {
-			return true
+			return other
 		}
 	}
 
-	return false
+	return nil
 }
 
 // clanMaskAssists mirrors the Mobius clan check of the assist call on

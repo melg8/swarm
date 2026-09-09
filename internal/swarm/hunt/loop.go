@@ -197,6 +197,15 @@ const (
 	// tracker only knows the mobs the server showed the character,
 	// so this stays inside the loaded region block anyway.
 	farTargetRange = 6000.0
+	// noPickLogPeriod paces the targetless diagnostic of the
+	// engage: the nearest rejected mobs with their positions and
+	// the rejection reasons print at most once per period while
+	// the pick comes up empty, so a standing hunter explains
+	// itself in the log without spamming every tick.
+	noPickLogPeriod = 5 * time.Second
+	// noPickLogLimit bounds the targetless diagnostic: the log
+	// lists the nearest rejected mobs, not the whole knownlist.
+	noPickLogLimit = 3
 	// panicLogoutHealthPercent is the HP level below which a
 	// character under attack logs out for a pause: the escape
 	// could not shake the chase, staying means dying (the
@@ -340,6 +349,10 @@ type Loop struct {
 	// empty: the patrol toward the zone center waits out the
 	// patience before it walks.
 	noTargetSince time.Time
+	// noPickLogAt paces the targetless diagnostic log (see
+	// logNoPickableTargets): zero means the next empty pick logs
+	// at once, a successful pick re-arms it.
+	noPickLogAt time.Time
 	// fleeAt paces the escape walk requests: the escape must not
 	// wait out the attack request pacing of the engage (the last
 	// forced attack fired moments before the threshold crossed).
@@ -544,6 +557,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		losTried:          0,
 		skipScratch:       nil,
 		noTargetSince:     time.Time{},
+		noPickLogAt:       time.Time{},
 		fleeAt:            time.Time{},
 		fleeSince:         time.Time{},
 		panicAt:           time.Time{},
@@ -1050,6 +1064,7 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 			return
 		}
 		l.noTargetSince = time.Time{}
+		l.noPickLogAt = time.Time{}
 		l.target = pick.ObjectID
 		l.engageAt = now
 		l.clearBlindRecovery()
