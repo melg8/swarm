@@ -1017,6 +1017,205 @@ body.mode-pathfind .gear-panel { display: none; }
 
 .inv-count { color: var(--text-dim); letter-spacing: 0; }
 
+/* ---- shop queue widget (the purchase plan of the bot) ----
+   A collapsible section of the floating equipment panel between the
+   paperdoll and the inventory: the collapsed state keeps one summary
+   line (the count, the affordable total and the missing adena of the
+   whole queue), the expanded state adds the scrollable purchase list
+   and the pinned buy/have/save foot. The rows are small (26px) so the
+   list reads at a glance, hover opens the rich purchase tooltip. */
+.shop-panel {
+  margin: 0 8px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.shop-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.shop-head:hover { color: var(--text); }
+
+.shop-title { font-weight: 600; }
+
+.shop-summary {
+  margin-left: auto;
+  letter-spacing: 0;
+  color: var(--text-dim);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shop-summary .sum-missing { color: var(--accent); }
+
+.shop-chev {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.shop-panel.collapsed .shop-body { display: none; }
+
+.shop-body {
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+}
+
+/* The purchase list: four rows visible, the scrollbar takes over
+   beyond them. */
+.shop-list {
+  list-style: none;
+  max-height: 112px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.shop-list::-webkit-scrollbar { width: 6px; }
+
+.shop-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-left: 2px solid transparent;
+}
+
+.shop-item:hover { background: var(--bg-panel-2); }
+
+.shop-item.want { opacity: 0.75; }
+
+.shop-item.buying {
+  border-left-color: var(--accent);
+  background: var(--bg-panel-2);
+}
+
+.shop-icon {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.shop-icon img {
+  width: 22px;
+  height: 22px;
+  image-rendering: pixelated;
+}
+
+.shop-icon .icon-glyph { font-size: 11px; }
+
+.shop-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.shop-name {
+  font-size: 10.5px;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shop-item.want .shop-name { color: var(--text); }
+
+.shop-meta {
+  font-size: 9px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shop-side {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-family: var(--mono);
+}
+
+.shop-price {
+  font-size: 10px;
+  color: var(--gold, #b0a244);
+  white-space: nowrap;
+}
+
+.shop-item.want .shop-price { color: var(--text-dim); }
+
+.shop-missing {
+  font-size: 9px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.shop-buying-chip {
+  font-size: 8.5px;
+  padding: 0.5px 4px;
+  border-radius: 3px;
+  color: #fff;
+  background: var(--accent);
+  white-space: nowrap;
+}
+
+/* The pinned foot of the shop section: the buy total, the wallet and
+   the missing adena of the whole queue. */
+.shop-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 8px 5px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.shop-key {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.shop-val {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text);
+}
+
 /* Paperdoll blocks: the wear and jewelry grids share the compact 36px
    cell metric of the inventory grid, so the blocks read as one
    widget. */
@@ -1851,4 +2050,14 @@ canvas.fxg-cell.picked {
 .item-tooltip .tip-foot span b {
   color: var(--text);
   font-weight: 600;
+}
+
+/* The planning block of the shop queue tooltip: the gain, the value
+   per adena, the sell credit, the missing adena and the pick status -
+   the optimality metrics of the shop strategy, separated from the
+   item stats by the same dashed divider as the foot. */
+.item-tooltip .tip-plan {
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px dashed var(--border-soft);
 }

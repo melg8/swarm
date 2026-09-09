@@ -299,6 +299,7 @@ function selectBot(botId) {
   renderBotList();
   resetPanels();
   resetGear();
+  resetShop();
 }
 
 function resetPanels() {
@@ -334,6 +335,7 @@ function renderSnapshot() {
   renderHUD(snap);
   renderTarget(snap);
   renderGear(snap);
+  renderShopping(snap);
   renderZones(snap);
   renderChat(snap);
   renderLog(snap);
@@ -1334,6 +1336,381 @@ function renderGearFoot(snap) {
   }
 }
 
+// ---- shop queue widget (the purchase plan of the bot) ----
+//
+// A collapsible section of the floating equipment widget between the
+// paperdoll and the bag: every entry of the published shopping queue
+// (snap.shopping, the affordable plan of the next trip plus the
+// wanted tail with the missing adena) renders as one compact row -
+// icon, name, merchant and gain, the buy price on the right and the
+// missing amount under it for the wanted entries. Hovering a row
+// opens the floating item tooltip extended with the purchase lines
+// (gain, value per adena, sell credit, missing, merchant), so a
+// suspicious pick is visible at a glance. The rows are keyed by the
+// item id and refreshed in place like the bag cells: an unchanged
+// queue never rebuilds the icon images.
+
+// ShopPanel holds the widget state: the collapse flag (expanded by
+// default - the point of the widget is the passive glance) and the
+// row registry keyed by item id.
+const ShopPanel = {
+  collapsed: false,
+  rows: new Map(),
+  order: "",
+  signature: ""
+};
+
+// initShopPanel wires the collapse toggle of the shop panel head.
+function initShopPanel() {
+  const head = document.getElementById("shop-head");
+  if (!head) { return; }
+  head.addEventListener("click", () => {
+    ShopPanel.collapsed = !ShopPanel.collapsed;
+    applyShopPanelState();
+  });
+}
+
+// applyShopPanelState syncs the panel DOM with the collapse flag.
+function applyShopPanelState() {
+  const panel = document.getElementById("shop-panel");
+  const chev = document.getElementById("shop-chev");
+  if (!panel) { return; }
+  panel.classList.toggle("collapsed", ShopPanel.collapsed);
+  if (chev) {
+    chev.textContent = ShopPanel.collapsed ? "\u25B8" : "\u25BE";
+  }
+}
+
+// shopRowSignature is the change signature of the whole queue view:
+// two snapshots with equal signatures leave the row DOM untouched.
+function shopRowSignature(plan) {
+  const parts = [
+    plan.trip ? "t" : "p", plan.adena, plan.total, plan.entries.length];
+  for (const entry of plan.entries) {
+    parts.push([entry.itemId, entry.price, entry.missing, entry.gain,
+      entry.affordable, entry.buying, entry.name, entry.merchant].join("|"));
+  }
+
+  return parts.join(";");
+}
+
+// resetShop drops the widget state and DOM: switching the observed
+// bot starts the queue from scratch (the tracker of the other bot
+// publishes its own plan).
+function resetShop() {
+  ShopPanel.rows.clear();
+  ShopPanel.order = "";
+  ShopPanel.signature = "";
+  const list = document.getElementById("shop-list");
+  if (list) { list.innerHTML = ""; }
+  const panel = document.getElementById("shop-panel");
+  if (panel) { panel.classList.add("hidden"); }
+  const summary = document.getElementById("shop-summary");
+  if (summary) { summary.textContent = ""; }
+}
+
+// renderShopping refreshes the shop queue widget from the published
+// shopping plan: hidden without a plan (nothing published, an expired
+// plan or a session without the shop strategy), the keyed rows and
+// the summary line otherwise.
+function renderShopping(snap) {
+  const panel = document.getElementById("shop-panel");
+  const list = document.getElementById("shop-list");
+  if (!panel || !list) { return; }
+  const plan = snap.shopping;
+  if (!plan || !plan.entries || plan.entries.length === 0) {
+    resetShop();
+
+    return;
+  }
+  panel.classList.remove("hidden");
+  applyShopPanelState();
+
+  const signature = shopRowSignature(plan);
+  if (ShopPanel.signature === signature) { return; }
+  ShopPanel.signature = signature;
+
+  const order = [];
+  const seen = new Set();
+  for (const entry of plan.entries) {
+    seen.add(entry.itemId);
+    order.push(entry.itemId);
+    let row = ShopPanel.rows.get(entry.itemId);
+    if (!row) {
+      row = makeShopRow();
+      ShopPanel.rows.set(entry.itemId, row);
+      list.append(row.item);
+    }
+    applyShopRow(row, entry);
+  }
+  for (const [id, row] of Array.from(ShopPanel.rows)) {
+    if (!seen.has(id)) {
+      if (TooltipState.cell === row.item) { hideItemTooltip(); }
+      row.item.remove();
+      ShopPanel.rows.delete(id);
+    }
+  }
+  // Reordering moves the persistent rows (appendChild keeps the icon
+  // image elements alive) and only when the order actually changed.
+  const orderSig = order.join(",");
+  if (ShopPanel.order !== orderSig) {
+    ShopPanel.order = orderSig;
+    for (const id of order) {
+      const row = ShopPanel.rows.get(id);
+      if (row) { list.append(row.item); }
+    }
+  }
+  renderShopSummary(plan);
+}
+
+// makeShopRow creates one keyed purchase row: the persistent DOM node
+// with its icon box, the info column (name, meta) and the price
+// column, plus the hover wiring of the rich purchase tooltip.
+function makeShopRow() {
+  const item = document.createElement("li");
+  item.className = "shop-item";
+  const icon = document.createElement("div");
+  icon.className = "shop-icon";
+  const info = document.createElement("div");
+  info.className = "shop-info";
+  const name = document.createElement("div");
+  name.className = "shop-name";
+  const meta = document.createElement("div");
+  meta.className = "shop-meta";
+  info.append(name, meta);
+  const side = document.createElement("div");
+  side.className = "shop-side";
+  const price = document.createElement("span");
+  price.className = "shop-price";
+  const missing = document.createElement("span");
+  missing.className = "shop-missing";
+  side.append(price, missing);
+  item.append(icon, info, side);
+  const row = {
+    item, icon, side, name, meta, price, missing,
+    img: null, glyph: null, chip: null, entry: null
+  };
+  item.addEventListener("mouseenter", () => {
+    showShoppingTooltip(row.entry, item);
+  });
+  item.addEventListener("mousemove", (event) => {
+    positionItemTooltip(event.clientX, event.clientY);
+  });
+  item.addEventListener("mouseleave", () => {
+    hideItemTooltip();
+  });
+
+  return row;
+}
+
+// applyShopRow refreshes one keyed purchase row to the entry: the
+// icon image is a static function of the item id (the generated icon
+// dictionary), so the row builds it once and the later refreshes
+// only rewrite the text badges and the classes (the keyed rendering
+// rule of the equipment widget - the icons never blink).
+function applyShopRow(row, entry) {
+  row.entry = entry;
+  if (!row.img && !row.glyph) {
+    if (entry.icon) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = "/icons/" + entry.icon + ".png";
+      img.addEventListener("error", () => img.remove());
+      row.icon.append(img);
+      row.img = img;
+    } else {
+      const glyph = document.createElement("span");
+      glyph.className = "icon-glyph glyph-" + (entry.type === "Weapon"
+        ? "t0" : "t1");
+      glyph.textContent = entry.type === "Weapon" ? "W" : "A";
+      row.icon.append(glyph);
+      row.glyph = glyph;
+    }
+  }
+  row.name.textContent = entry.name || ("item #" + entry.itemId);
+  row.meta.textContent = shopRowMeta(entry);
+  row.price.textContent = formatNumber(entry.price);
+  row.missing.textContent = entry.missing > 0
+    ? "need " + formatNumber(entry.missing) : "";
+  row.missing.classList.toggle("hidden", !(entry.missing > 0));
+  if (entry.buying && !row.chip) {
+    const chip = document.createElement("span");
+    chip.className = "shop-buying-chip";
+    chip.textContent = "buying";
+    row.side.append(chip);
+    row.chip = chip;
+  }
+  if (!entry.buying && row.chip) {
+    row.chip.remove();
+    row.chip = null;
+  }
+  row.item.classList.toggle("want", !entry.affordable && !entry.buying);
+  row.item.classList.toggle("buying", entry.buying);
+}
+
+// shopRowMeta builds the muted info line of one row: the merchant and
+// the score gain of the pick.
+function shopRowMeta(entry) {
+  const parts = [];
+  if (entry.merchant) { parts.push(entry.merchant); }
+  if (entry.gain) {
+    parts.push("+" + Number(entry.gain).toLocaleString("en-US",
+      { maximumFractionDigits: 1 }));
+  }
+
+  return parts.join(" · ");
+}
+
+// renderShopSummary refreshes the collapsed head summary and the
+// pinned buy/have/save foot of the expanded body: the buy total of
+// the affordable picks (the remaining trip buys during a trip), the
+// wallet the plan was computed against and the missing adena of the
+// last queue entry (what completes the whole queue).
+function renderShopSummary(plan) {
+  const summary = document.getElementById("shop-summary");
+  const entries = plan.entries;
+  const wanted = entries.filter((entry) => !entry.affordable);
+  const save = entries.length > 0
+    ? entries[entries.length - 1].missing : 0;
+  if (summary) {
+    summary.textContent = "";
+    const base = document.createElement("span");
+    base.textContent = entries.length + (plan.trip ? " left" : "") +
+      " \u00B7 " + formatNumber(plan.total);
+    summary.append(base);
+    if (wanted.length > 0 && save > 0) {
+      const saveSpan = document.createElement("span");
+      saveSpan.className = "sum-missing";
+      saveSpan.textContent = " \u00B7 save " + formatNumber(save);
+      summary.append(saveSpan);
+    }
+  }
+  const buy = document.getElementById("shop-buy");
+  if (buy) {
+    buy.textContent = formatNumber(plan.total);
+    buy.title = "the adena the " + (plan.trip
+      ? "trip still spends" : "next trip spends");
+  }
+  const have = document.getElementById("shop-have");
+  if (have) {
+    have.textContent = formatNumber(plan.adena);
+    have.title = "the adena the plan was computed with";
+  }
+  const saveText = document.getElementById("shop-save");
+  if (saveText) {
+    saveText.textContent = save > 0 ? formatNumber(save) : "\u2014";
+    saveText.title = save > 0
+      ? "the adena still missing for the whole queue"
+      : "the wallet covers the queue";
+  }
+}
+
+// renderShoppingTooltip builds the HTML payload of the purchase
+// tooltip: the item tooltip shape (family driven stat lines, weight,
+// price) extended with the planning lines - the score gain, the value
+// per adena (the optimality metric: a low value pick is the
+// suspicious one), the sell credit of the displaced gear and the
+// missing adena of the wanted entries.
+function renderShoppingTooltip(entry) {
+  if (!entry) { return ""; }
+  const family = itemFamily(entry);
+  const lines = [];
+  const nameText = entry.name || ("item #" + entry.itemId);
+  lines.push(`<div class="tip-name">${escapeHTML(nameText)}</div>`);
+  if (entry.merchant) {
+    lines.push(tooltipLine("Merchant", entry.merchant));
+  }
+  if (family === "weapon" && entry.weaponType) {
+    lines.push(tooltipLine("Type", entry.weaponType));
+  } else if (family === "armor" && entry.armorType) {
+    lines.push(tooltipLine("Armor Type", entry.armorType));
+  } else if (entry.type) {
+    lines.push(tooltipLine("Type",
+      ITEM_TYPE_LABELS[entry.type] || entry.type));
+  }
+  if (entry.bodyPartKey) {
+    const label = ITEM_BODY_PART_LABELS[entry.bodyPartKey] ||
+      entry.bodyPartKey;
+    lines.push(tooltipLine("Slot", label));
+  }
+  if (family === "weapon") {
+    if (entry.pAtk) { lines.push(tooltipLine("P. Atk", entry.pAtk)); }
+    if (entry.mAtk) { lines.push(tooltipLine("M. Atk", entry.mAtk)); }
+    if (entry.pAtkSpd) { lines.push(tooltipLine("Atk. Spd", entry.pAtkSpd)); }
+    if (entry.soulShots) {
+      lines.push(tooltipLine("SoulShot", "x" + entry.soulShots));
+    }
+    if (entry.spiritShots) {
+      lines.push(tooltipLine("Spiritshot", "x" + entry.spiritShots));
+    }
+  } else if (family === "armor") {
+    if (entry.pDef) { lines.push(tooltipLine("P. Def", entry.pDef)); }
+    if (entry.mDef) { lines.push(tooltipLine("M. Def", entry.mDef)); }
+    if (entry.sDef) { lines.push(tooltipLine("Shield Def", entry.sDef)); }
+    if (entry.rShld) {
+      lines.push(tooltipLine("Block Rate", entry.rShld + "%"));
+    }
+  } else if (family === "jewel") {
+    if (entry.mDef) { lines.push(tooltipLine("M. Def", entry.mDef)); }
+  }
+  // The planning block: the gain and the value per adena decide
+  // whether the pick is worth its price.
+  const plan = [];
+  if (entry.gain) {
+    plan.push(tooltipLine("Gain", "+" + Number(entry.gain).toLocaleString(
+      "en-US", { maximumFractionDigits: 2 })));
+  }
+  if (entry.price > 0 && entry.gain) {
+    plan.push(tooltipLine("Value / adena", (entry.gain / entry.price)
+      .toLocaleString("en-US", { maximumSignificantDigits: 3 })));
+  }
+  if (entry.sellCredit > 0) {
+    plan.push(tooltipLine("Sell first", formatNumber(entry.sellCredit)));
+  }
+  if (entry.missing > 0) {
+    plan.push(tooltipLine("Missing", formatNumber(entry.missing)));
+  }
+  if (entry.buying) {
+    plan.push(tooltipLine("Status", "buying now"));
+  } else {
+    plan.push(tooltipLine("Status", entry.affordable
+      ? "next trip" : "saving up"));
+  }
+  if (plan.length) {
+    lines.push(`<div class="tip-plan">${plan.join("")}</div>`);
+  }
+  const foot = [];
+  if (entry.weight) {
+    foot.push(`<span>Weight <b>${entry.weight}</b></span>`);
+  }
+  if (entry.price) {
+    foot.push(`<span>Buy <b>${formatNumber(entry.price)}</b></span>`);
+  }
+  if (foot.length) {
+    lines.push(`<div class="tip-foot">${foot.join("")}</div>`);
+  }
+
+  return `<div class="tip-inner tip-${family}">${lines.join("")}</div>`;
+}
+
+// showShoppingTooltip renders the purchase tooltip for one queue row
+// and positions the shared floating panel next to the hovered row.
+function showShoppingTooltip(entry, item) {
+  const el = tooltipElement();
+  if (!el) { return; }
+  if (!entry) {
+    hideItemTooltip();
+
+    return;
+  }
+  TooltipState.cell = item;
+  el.innerHTML = renderShoppingTooltip(entry);
+  el.className = "item-tooltip fam-" + itemFamily(entry);
+  el.setAttribute("aria-hidden", "false");
+  const rect = item.getBoundingClientRect();
+  positionItemTooltip(rect.left + rect.width, rect.top);
+}
+
 // ---- manual commands: map clicks, cell double clicks and drags ----
 
 // postCommand queues one manual command on the active bot: the hunt
@@ -1711,6 +2088,7 @@ function initTargetWidget() {
 // the body, the widget markup is parsed already.
 initGearInteractions();
 initTargetWidget();
+initShopPanel();
 
 // Chat window state: auto scroll follows the newest line while the
 // user stays at the bottom; scrolling up reads the history, scrolling

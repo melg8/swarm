@@ -144,9 +144,15 @@ town.
   keyed by the packet template id (from `data/buylists/*.xml` and
   the CT0 display id table).
 - `internal/swarm/gear/shopping.go` - the greedy planner
-  (`PlanPurchases`), the catalogs (`Shop`, `Catalog`) and the adena
-  budget handling.
+  (`PlanPurchases`), the purchase queue of the widget view
+  (`PlanPurchaseQueue`: the affordable plan plus the wanted tail
+  with the cumulative missing adena), the catalogs (`Shop`,
+  `Catalog`) and the adena budget handling.
 - `internal/swarm/hunt/shopping.go` - the trip trigger, the
-  multi-stop buy execution and the transaction pacing.
+  multi-stop buy execution, the transaction pacing and the widget
+  view publish (`publishShoppingView`: the queue while hunting, the
+  remaining trip buys while a town trip runs).
 - `internal/swarm/hunt/equip.go` - the auto equipment that wears
   everything the trips buy (and loot drops) immediately.
+- `internal/swarm/state/shopping.go` - the published shopping queue
+  of the web UI (`SetShoppingPlan`, the `shopping` snapshot field).

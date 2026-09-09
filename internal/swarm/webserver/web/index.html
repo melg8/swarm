@@ -250,6 +250,26 @@ SPDX-License-Identifier: MIT
               <div id="gear-wear" class="gear-wear"></div>
               <div id="gear-jewel" class="gear-jewel"></div>
             </div>
+            <div id="shop-panel" class="shop-panel hidden"
+              title="what the bot plans to buy next">
+              <button id="shop-head" class="shop-head" type="button"
+                title="collapse or expand the shopping queue">
+                <span class="shop-title">SHOP QUEUE</span>
+                <span id="shop-summary" class="shop-summary"></span>
+                <span id="shop-chev" class="shop-chev">&#9656;</span>
+              </button>
+              <div id="shop-body" class="shop-body">
+                <ul id="shop-list" class="shop-list"></ul>
+                <div class="shop-foot">
+                  <span class="shop-key">buy</span>
+                  <b id="shop-buy" class="shop-val">—</b>
+                  <span class="shop-key">have</span>
+                  <b id="shop-have" class="shop-val">—</b>
+                  <span class="shop-key">save</span>
+                  <b id="shop-save" class="shop-val">—</b>
+                </div>
+              </div>
+            </div>
             <div class="sidebar-title inv-title">
               INVENTORY
               <span id="inv-count" class="inv-count">0/80</span>

@@ -51,6 +51,24 @@ inspection tool, not a steering tool.
   (prefix-equals-plan, wanted tail missing accounting, sell credit of
   the tail, rich wallet has no tail). Next: the state view and the
   snapshot encoding.
+- Committed: the state view (`state.ShoppingPlanView` +
+  `SetShoppingPlan` with the no-op republish and the 10 s expiry,
+  the `shopping` snapshot field through the golden and the live
+  encoders, the ResetSession cleanup) and its tests.
+- Committed: the hunt publish - the tick defer republishes the
+  queue view (the 5 s recompute cache shared with the trip trigger,
+  the planning adena cached with it), the trip view mirrors the
+  remaining trip buys with the in-flight batch marked buying, the
+  manual-only sessions clear the view. The cache restructure keeps
+  the trigger semantics (the affordable prefix decides).
+- Committed: the web widget - the collapsible SHOP QUEUE section of
+  the equipment panel (keyed rows, summary line, buy/have/save foot,
+  the rich purchase tooltip with the Gain / Value-per-adena planning
+  block), the harness checks in repro_gear.js, the AGENTS.md and
+  shopping_strategy.md notes. Live verified on the deployed stack:
+  the queue publishes and tracks the wallet (the missing amounts
+  shrink with the looted adena), the page serves the markup.
+  Remaining: the final verify loop and the live trip-view check.
 
 ## Active task: the blind engage recovery (walk around the obstacle, then switch)
 

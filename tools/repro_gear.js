@@ -212,6 +212,14 @@ function loadAppJs(appFile) {
         " ? itemFamily : undefined," +
         " renderItemTooltip: typeof renderItemTooltip === 'function'" +
         " ? renderItemTooltip : undefined," +
+        " renderShopping: typeof renderShopping === 'function'" +
+        " ? renderShopping : undefined," +
+        " resetShop: typeof resetShop === 'function'" +
+        " ? resetShop : undefined," +
+        " renderShoppingTooltip: typeof renderShoppingTooltip ===" +
+        " 'function' ? renderShoppingTooltip : undefined," +
+        " ShopPanel: typeof ShopPanel !== 'undefined' ? ShopPanel" +
+        " : undefined," +
         " App: App, GearDrag: GearDrag };",
         sandbox);
 
@@ -251,6 +259,17 @@ function cellText(cell) {
     let text = cell.textContent || "";
     for (const child of cell.children) {
         text += " " + (child.textContent || "");
+    }
+    return text.trim();
+}
+
+// deepText recursively collects the text of a stub element and every
+// descendant: the shop queue rows nest their text nodes two levels
+// deep (li > div.info > div.name).
+function deepText(el) {
+    let text = el.textContent || "";
+    for (const child of el.children || []) {
+        text += " " + deepText(child);
     }
     return text.trim();
 }
@@ -1116,6 +1135,180 @@ function main() {
         enchantedTip.includes("tip-enchant") &&
         enchantedTip.includes("+3"),
         "tip: " + enchantedTip.slice(0, 120));
+
+    // ---- shop queue widget ----
+    //
+    // The purchase plan of the bot renders as a collapsible section
+    // of the equipment panel: the keyed rows of the published queue
+    // (snap.shopping), the collapsed head summary, the pinned
+    // buy/have/save foot and the rich purchase tooltip. The harness
+    // exercises the markup, the css, the rendering, the keying and
+    // the collapse toggle.
+
+    check(results, "shop queue markup lives inside the equipment panel",
+        html.includes('id="shop-panel"') &&
+        html.includes('id="shop-head"') &&
+        html.includes('id="shop-list"') &&
+        html.includes('id="shop-buy"') &&
+        html.includes('id="shop-have"') &&
+        html.includes('id="shop-save"') &&
+        html.indexOf('id="gear-panel"') < html.indexOf('id="shop-panel"') &&
+        html.indexOf('id="shop-panel"') < html.indexOf('id="inv-grid"'),
+        "missing shop queue markup or wrong placement");
+
+    check(results, "shop queue css covers the widget chrome",
+        css.includes(".shop-panel") &&
+        css.includes(".shop-panel.collapsed .shop-body") &&
+        css.includes(".shop-head") &&
+        css.includes(".shop-summary") &&
+        css.includes(".shop-list") &&
+        css.includes("overflow-y: auto") &&
+        css.includes(".shop-item") &&
+        css.includes(".shop-item.want") &&
+        css.includes(".shop-item.buying") &&
+        css.includes(".shop-foot") &&
+        css.includes(".item-tooltip .tip-plan"),
+        "missing shop queue css rules");
+
+    // The published plan: two affordable buys and one wanted entry.
+    const shopPlan = {
+        entries: [
+            {
+                itemId: 1121, name: "Apprentice's Shoes", icon: "icon1121",
+                merchant: "Ariel", type: "Armor", armorType: "LIGHT",
+                bodyPartKey: "feet", pDef: 8, weight: 210, price: 9,
+                sellCredit: 0, missing: 0, gain: 8, affordable: true,
+                buying: false
+            },
+            {
+                itemId: 1146, name: "Cloth Cap", icon: "icon1146",
+                merchant: "Ariel", type: "Armor", armorType: "LIGHT",
+                bodyPartKey: "head", pDef: 10, weight: 40, price: 20,
+                sellCredit: 0, missing: 0, gain: 10, affordable: true,
+                buying: false
+            },
+            {
+                itemId: 1, name: "Short Sword", icon: "icon1",
+                merchant: "Unoren", type: "Weapon", weaponType: "SWORD",
+                bodyPartKey: "rhand", pAtk: 8, pAtkSpd: 379, weight: 1600,
+                price: 883, sellCredit: 0, missing: 383, gain: 3.5,
+                affordable: false, buying: false
+            }
+        ],
+        adena: 500,
+        total: 29,
+        trip: false
+    };
+    const shopSnapshot = gearSnapshot([], 0, 80);
+    shopSnapshot.shopping = shopPlan;
+
+    gear.renderShopping(shopSnapshot);
+    const shopPanel = elements.get("shop-panel");
+    const shopList = elements.get("shop-list");
+    const shopSummary = elements.get("shop-summary");
+    check(results, "a published plan shows the shop panel",
+        !shopPanel.classList.contains("hidden"),
+        "the panel stays hidden with a plan");
+    check(results, "every queue entry renders its row",
+        shopList.children.length === 3,
+        "got " + shopList.children.length + " rows");
+    check(results, "the rows show the item names and prices",
+        deepText(shopList.children[0]).includes("Apprentice's Shoes") &&
+        deepText(shopList.children[0]).includes("9") &&
+        deepText(shopList.children[2]).includes("Short Sword") &&
+        deepText(shopList.children[2]).includes("883"),
+        "row text: " + deepText(shopList.children[0]));
+    check(results, "the wanted row carries the missing adena",
+        deepText(shopList.children[2]).includes("need 383") &&
+        shopList.children[2].classList.contains("want"),
+        "row text: " + deepText(shopList.children[2]));
+    check(results, "the affordable rows carry no missing adena",
+        !deepText(shopList.children[0]).includes("need") &&
+        !shopList.children[0].classList.contains("want"),
+        "row text: " + deepText(shopList.children[0]));
+    check(results, "the head summary carries the queue shape",
+        deepText(shopSummary).includes("3") &&
+        deepText(shopSummary).includes("29") &&
+        deepText(shopSummary).includes("save 383"),
+        "summary: " + deepText(shopSummary));
+    check(results, "the foot carries buy, have and save",
+        elements.get("shop-buy").textContent === "29" &&
+        elements.get("shop-have").textContent === "500" &&
+        elements.get("shop-save").textContent === "383",
+        "buy/have/save: " + elements.get("shop-buy").textContent +
+        "/" + elements.get("shop-have").textContent + "/" +
+        elements.get("shop-save").textContent);
+
+    // Keyed rendering: the same plan re-rendered keeps the row icon
+    // image elements alive (the icons never blink).
+    const rowImg = shopList.children[0].children[0].children[0];
+    gear.renderShopping(shopSnapshot);
+    check(results, "re-rendering the same plan keeps the icons",
+        shopList.children[0].children[0].children[0] === rowImg,
+        "the icon image element was recreated");
+
+    // A vanished entry drops its row; the remaining rows stay keyed.
+    const shrunk = JSON.parse(JSON.stringify(shopPlan));
+    shrunk.entries = shrunk.entries.slice(0, 2);
+    const shrunkSnapshot = gearSnapshot([], 0, 80);
+    shrunkSnapshot.shopping = shrunk;
+    gear.renderShopping(shrunkSnapshot);
+    check(results, "a vanished queue entry drops its row",
+        shopList.children.length === 2 &&
+        deepText(shopList.children[1]).includes("Cloth Cap"),
+        "got " + shopList.children.length + " rows");
+
+    // The trip view: the buying entry carries the chip.
+    const tripPlan = JSON.parse(JSON.stringify(shopPlan));
+    tripPlan.trip = true;
+    tripPlan.entries[0].buying = true;
+    const tripSnapshot = gearSnapshot([], 0, 80);
+    tripSnapshot.shopping = tripPlan;
+    gear.renderShopping(tripSnapshot);
+    check(results, "the buying entry of a trip carries its chip",
+        shopList.children[0].classList.contains("buying") &&
+        deepText(shopList.children[0]).includes("buying") &&
+        deepText(shopSummary).includes("left"),
+        "row text: " + deepText(shopList.children[0]));
+
+    // No plan hides the widget again.
+    gear.renderShopping(gearSnapshot([], 0, 80));
+    check(results, "no plan hides the shop panel",
+        shopPanel.classList.contains("hidden") &&
+        shopList.children.length === 0,
+        "the panel stays visible without a plan");
+
+    // The collapse toggle: the head click flips the collapsed class.
+    gear.renderShopping(shopSnapshot);
+    fire(elements.get("shop-head"), "click");
+    check(results, "the head click collapses the panel body",
+        shopPanel.classList.contains("collapsed"),
+        "the panel did not collapse");
+    fire(elements.get("shop-head"), "click");
+    check(results, "the second head click expands the panel again",
+        !shopPanel.classList.contains("collapsed"),
+        "the panel did not expand");
+
+    // The purchase tooltip: the item shape plus the planning lines
+    // (the gain, the value per adena, the sell credit, the missing
+    // adena and the pick status).
+    const swordShopTip = gear.renderShoppingTooltip(shopPlan.entries[2]);
+    check(results, "purchase tooltip renders the plan lines",
+        swordShopTip.includes("tip-name") &&
+        swordShopTip.includes("Short Sword") &&
+        swordShopTip.includes("Unoren") &&
+        swordShopTip.includes("Gain") &&
+        swordShopTip.includes("Value / adena") &&
+        swordShopTip.includes("Missing") &&
+        swordShopTip.includes("383") &&
+        swordShopTip.includes("saving up") &&
+        swordShopTip.includes("tip-plan"),
+        "tip: " + swordShopTip.slice(0, 200));
+    const shoesShopTip = gear.renderShoppingTooltip(shopPlan.entries[0]);
+    check(results, "affordable purchase tooltip shows the trip status",
+        shoesShopTip.includes("next trip") &&
+        !shoesShopTip.includes("Missing"),
+        "tip: " + shoesShopTip.slice(0, 200));
 
     let failed = 0;
     for (const result of results) {
