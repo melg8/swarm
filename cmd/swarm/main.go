@@ -9,6 +9,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -295,6 +296,11 @@ func runBot( //nolint:funlen // linear session script
 	// web UI (map clicks, equipment drags) so the interface stays
 	// interactive in both launch modes.
 	loop := hunt.NewLoop(game, tracker)
+	// The hunt decisions mirror into the tracker event log: the web UI
+	// log tab and the state dump button then carry the reasoning of
+	// the loop (zone switches, escapes, stuck re-paths) next to the
+	// raw game events - the debugging material of the live sessions.
+	loop.SetLogger(huntEventLogger(tracker))
 	if engine != nil {
 		loop.SetNavigator(hunt.NewNavigator(engine))
 	} else if cfg.hunt {
@@ -308,6 +314,38 @@ func runBot( //nolint:funlen // linear session script
 	go loop.Run(sessionCtx)
 
 	return game.Run(sessionCtx, cfg.charName)
+}
+
+// huntEventLogger builds the logger of the hunt loop: the console copy
+// keeps the standard format, and every hunt decision line mirrors into
+// the tracker event log (stripped of the timestamp prefix the console
+// format adds). The mirrored lines then stream to the web UI log tab
+// and travel inside the state dump.
+func huntEventLogger(tracker *state.Bot) *log.Logger {
+	mirror := huntEventMirror{tracker: tracker}
+
+	return log.New(io.MultiWriter(os.Stdout, mirror), "", log.LstdFlags)
+}
+
+// huntEventMirror writes hunt log lines into the bot event log.
+type huntEventMirror struct {
+	tracker *state.Bot
+}
+
+// Write implements io.Writer for the log package: one call carries one
+// complete line.
+func (m huntEventMirror) Write(p []byte) (int, error) {
+	line := strings.TrimSpace(string(p))
+	// The console prefix (date time) stays console only: the event log
+	// carries its own timestamps.
+	if at := strings.Index(line, "Hunt: "); at >= 0 {
+		line = line[at:]
+	}
+	if line != "" {
+		m.tracker.RecordEvent(line)
+	}
+
+	return len(p), nil
 }
 
 // runBotForever keeps the bot in the world around the clock: a lost

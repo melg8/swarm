@@ -435,6 +435,70 @@ function renderBotStatus(snap) {
   if (detail) { detail.textContent = label.detail || ""; }
 }
 
+// ---- dump state button ----
+
+// initDumpButton wires the HUD dump button: it fetches the plain text
+// state dump of the selected bot (character, inventory, objects, walk
+// plan, the deep event log) and copies it to the clipboard - the bug
+// report material of a live session in one click. The clipboard API
+// needs a secure context; the legacy textarea copy is the fallback,
+// and a clipboard that still refuses opens the dump in a new tab for
+// a manual select-all copy.
+function initDumpButton() {
+  const button = document.getElementById("hud-dump");
+  if (!button) { return; }
+  button.addEventListener("click", async () => {
+    if (!App.activeBotId) { flashDumpButton(button, "failed"); return; }
+    let text = null;
+    try {
+      const response = await fetch("/api/bots/" + App.activeBotId + "/dump");
+      if (!response.ok) { throw new Error("dump http " + response.status); }
+      text = await response.text();
+    } catch (err) {
+      flashDumpButton(button, "failed");
+      return;
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        flashDumpButton(button, "copied");
+
+        return;
+      } catch (err) { /* fall through to the legacy copy */ }
+    }
+    if (legacyCopyText(text)) {
+      flashDumpButton(button, "copied");
+    } else {
+      window.open("/api/bots/" + App.activeBotId + "/dump", "_blank");
+      flashDumpButton(button, "failed");
+    }
+  });
+}
+
+// legacyCopyText copies through a hidden textarea with the legacy
+// execCommand API (insecure http contexts without the clipboard API).
+function legacyCopyText(text) {
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.append(area);
+  area.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
+  area.remove();
+
+  return ok;
+}
+
+// flashDumpButton marks the dump button outcome for a moment.
+function flashDumpButton(button, kind) {
+  if (!button) { return; }
+  button.classList.remove("copied", "failed");
+  button.classList.add(kind);
+  setTimeout(() => { button.classList.remove(kind); }, 2500);
+}
+
 // ---- hunting zones panel ----
 
 // The zone panel starts collapsed: the map corner chip carries the

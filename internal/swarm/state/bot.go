@@ -1387,6 +1387,18 @@ func (b *Bot) RecordEvent(message string) {
 	b.recordLocked(message)
 }
 
+// NewestEvents returns up to limit newest events of the rolling log
+// in chronological order. The state dump reads a deeper window than
+// the snapshot carries (the web UI log tail keeps the last entries
+// only, the debug dump wants the whole story of the session).
+func (b *Bot) NewestEvents(limit int) []Event {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	events := make([]Event, 0, min(b.log.length, limit))
+
+	return b.log.appendNewest(events, limit)
+}
+
 // upsertLocked returns the pointers to the hot and cold records of
 // the object id or appends fresh ones (see objectStore.upsertLocked).
 // The caller must hold the write lock.

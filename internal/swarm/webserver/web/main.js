@@ -45,6 +45,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   initChat();
+  initDumpButton();
   MapView.init();
   refreshBots();
   setInterval(refreshBots, 2000);

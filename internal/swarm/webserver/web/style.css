@@ -624,6 +624,39 @@ body.mode-pathfind .bot-status { display: none; }
   white-space: nowrap;
 }
 
+/* The dump state button: copies the full debug report of the selected
+   bot to the clipboard. Sits quietly at the right of the name, turns
+   into a confirmation flash while the copy lands. */
+.hud-dump-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 3px 9px;
+  font: 600 11px/1.4 inherit;
+  font-family: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.hud-dump-btn:hover { color: var(--text-bright); border-color: var(--text-muted); }
+
+.hud-dump-btn.copied {
+  color: #2f9e44;
+  border-color: #2f9e44;
+}
+
+.hud-dump-btn.failed {
+  color: #d64545;
+  border-color: #d64545;
+}
+
+
 .hud-name-small { font-size: 14px; }
 
 /* The class text and the status chips share one line under the name
