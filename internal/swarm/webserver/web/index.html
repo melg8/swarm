@@ -250,26 +250,6 @@ SPDX-License-Identifier: MIT
               <div id="gear-wear" class="gear-wear"></div>
               <div id="gear-jewel" class="gear-jewel"></div>
             </div>
-            <div id="shop-panel" class="shop-panel hidden"
-              title="what the bot plans to buy next">
-              <button id="shop-head" class="shop-head" type="button"
-                title="collapse or expand the shopping queue">
-                <span class="shop-title">SHOP QUEUE</span>
-                <span id="shop-summary" class="shop-summary"></span>
-                <span id="shop-chev" class="shop-chev">&#9656;</span>
-              </button>
-              <div id="shop-body" class="shop-body">
-                <ul id="shop-list" class="shop-list"></ul>
-                <div class="shop-foot">
-                  <span class="shop-key">buy</span>
-                  <b id="shop-buy" class="shop-val">—</b>
-                  <span class="shop-key">have</span>
-                  <b id="shop-have" class="shop-val">—</b>
-                  <span class="shop-key">save</span>
-                  <b id="shop-save" class="shop-val">—</b>
-                </div>
-              </div>
-            </div>
             <div class="sidebar-title inv-title">
               INVENTORY
               <span id="inv-count" class="inv-count">0/80</span>
@@ -293,6 +273,29 @@ SPDX-License-Identifier: MIT
                   <path fill="currentColor" fill-rule="evenodd"
                     d="M9 2.5h6c.6 0 1 .4 1 1v1h4.5c.3 0 .5.2.5.5v1.5c0 .3-.2.5-.5.5H3.5a.5.5 0 0 1-.5-.5V5.5c0-.3.2-.5.5-.5H8v-1c0-.6.4-1 1-1zm-2.7 6h11.4l-.9 11.4c-.1 1.2-1.1 2.1-2.3 2.1H9.5c-1.2 0-2.2-.9-2.3-2.1L6.3 8.5zm3.2 2v8.2h1.4V10.5H9.5zm3.6 0v8.2h1.4V10.5H13z"/>
                 </svg>
+              </div>
+            </div>
+            <button id="shop-tab" class="shop-tab hidden" type="button"
+              aria-expanded="true"
+              title="the shopping queue of the bot - slide it out">
+              <span id="shop-tab-chev" class="shop-tab-chev">&#9666;</span>
+            </button>
+            <div id="shop-panel" class="shop-panel hidden"
+              title="what the bot plans to buy next">
+              <div id="shop-head" class="shop-head">
+                <span class="shop-title">SHOP QUEUE</span>
+                <span id="shop-summary" class="shop-summary"></span>
+              </div>
+              <div id="shop-body" class="shop-body">
+                <ul id="shop-list" class="shop-list"></ul>
+                <div class="shop-foot">
+                  <span class="shop-key">buy</span>
+                  <b id="shop-buy" class="shop-val">—</b>
+                  <span class="shop-key">have</span>
+                  <b id="shop-have" class="shop-val">—</b>
+                  <span class="shop-key">save</span>
+                  <b id="shop-save" class="shop-val">—</b>
+                </div>
               </div>
             </div>
           </div>

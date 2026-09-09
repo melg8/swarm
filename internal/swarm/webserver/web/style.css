@@ -1018,38 +1018,93 @@ body.mode-pathfind .gear-panel { display: none; }
 .inv-count { color: var(--text-dim); letter-spacing: 0; }
 
 /* ---- shop queue widget (the purchase plan of the bot) ----
-   A collapsible section of the floating equipment panel between the
-   paperdoll and the inventory: the collapsed state keeps one summary
-   line (the count, the affordable total and the missing adena of the
-   whole queue), the expanded state adds the scrollable purchase list
-   and the pinned buy/have/save foot. The rows are small (26px) so the
-   list reads at a glance, hover opens the rich purchase tooltip. */
+   A flyout of the floating equipment panel: a small triangle tab on
+   the left edge of the panel (aligned with the title row) slides the
+   queue out to the left of the panel. The flyout is absolutely
+   positioned, so the equipment panel itself never changes size - the
+   queue overlays the map instead of stretching the panel downward.
+   The open state keeps the summary head line (the count, the
+   affordable total and the missing adena of the whole queue), the
+   scrollable purchase list and the pinned buy/have/save foot. The rows
+   are small (26px) so the list reads at a glance, hover opens the rich
+   purchase tooltip. */
+
+/* The edge tab: the triangle toggle of the flyout. It sticks out of
+   the left border of the equipment panel (absolutely positioned, the
+   panel box never grows) and flips its direction with the state -
+   pointing left while the queue is hidden (the slide-out direction),
+   pointing right while it is out (the retract direction). */
+.shop-tab {
+  position: absolute;
+  left: -14px;
+  top: 3px;
+  width: 14px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-right: 0;
+  border-radius: 5px 0 0 5px;
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font-size: 9px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shop-tab:hover { color: var(--text); }
+
+.shop-tab-chev {
+  font-size: 9px;
+  line-height: 1;
+  color: inherit;
+}
+
+/* The flyout: docked to the left of the equipment panel with the tab
+   column as the gap, opened by the tab triangle. The closed state
+   slides it toward the panel edge and fades it out; the gear panel
+   dimensions stay untouched either way. */
 .shop-panel {
-  margin: 0 8px 8px;
-  border: 1px solid var(--border-soft);
+  position: absolute;
+  top: 0;
+  right: calc(100% + 14px);
+  width: 240px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--bg);
+  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transform: translateX(24px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 180ms ease-out, opacity 180ms ease-out,
+    visibility 180ms;
+  z-index: 5;
+}
+
+.shop-panel.open {
+  transform: none;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .shop-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  width: 100%;
-  padding: 5px 8px;
-  border: 0;
-  background: transparent;
+  padding: 6px 8px 5px;
+  border-bottom: 1px solid var(--border-soft);
   color: var(--text-dim);
   font-size: 10px;
   letter-spacing: 0.12em;
-  cursor: pointer;
-  text-align: left;
+  flex-shrink: 0;
 }
-
-.shop-head:hover { color: var(--text); }
 
 .shop-title { font-weight: 600; }
 
@@ -1065,17 +1120,7 @@ body.mode-pathfind .gear-panel { display: none; }
 
 .shop-summary .sum-missing { color: var(--accent); }
 
-.shop-chev {
-  font-size: 10px;
-  line-height: 1;
-  color: var(--text-dim);
-  flex-shrink: 0;
-}
-
-.shop-panel.collapsed .shop-body { display: none; }
-
 .shop-body {
-  border-top: 1px solid var(--border-soft);
   display: flex;
   flex-direction: column;
 }

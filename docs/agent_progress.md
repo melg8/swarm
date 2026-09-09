@@ -4,6 +4,66 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: the shop queue flyout slides out to the left (the equipment panel never resizes)
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+A follow-up round of the shop queue widget task (the widget itself is
+done and live verified - see the entry below). Other agents may push
+to the same branch concurrently - rebase before every push.
+
+### Goal
+
+The user report (2026-09-10): the queue must slide out to the LEFT
+side by a small triangle, without expanding the original equipment
+panel - not downward. The previous implementation was a collapsible
+section of the equipment panel between the paperdoll and the bag, so
+opening it grew the whole panel downward.
+
+### Changes
+
+- web/index.html: the shop panel left the panel flow - it is now the
+  last child of the gear panel (absolutely positioned, so the panel
+  box never grows), plus the new shop-tab button: the small triangle
+  tab sticking out of the left border, top aligned with the title
+  row, carrying the aria-expanded state.
+- web/style.css: the tab chrome (a 14x20 tab with its right border
+  merged into the panel edge, the glyph flipped by the state), the
+  flyout docked at `right: calc(100% + 14px)` (the tab column is the
+  gap) with a 180 ms translate + opacity + visibility slide, the head
+  a static label row instead of the toggle button.
+- web/app.js: `ShopPanel.open` (open by default - the passive glance
+  point of the widget), the tab click toggle, the tab hides without a
+  plan, the purchase tooltip anchors to the LEFT of the hovered row
+  (`positionItemTooltip` grew the side parameter with the viewport
+  fallback) so the queue tooltip never covers the equipment panel.
+- tools/repro_gear.js: the flyout checks (the markup placement after
+  the inventory, the css rules, the tab visibility with and without a
+  plan, the toggle with the glyph and the aria flips; the stub
+  element grew setAttribute/getAttribute).
+
+### Status: done (2026-09-10, live verified on the local stack)
+
+- The geometry pinned with a headless browser against the running
+  stack: the tab at [1161, 149, 14, 20] against the gear panel at
+  [1174, 145, 254, 395] (the tab sticks out of the left border), the
+  flyout right edge lands exactly at the tab, top aligned with the
+  panel; the tab click closes the flyout (the glyph flips to the
+  left-pointing triangle, aria-expanded false) and the gear panel
+  rect is identical before and after the toggle - the equipment
+  panel never resizes, the queue overlays the map to the left.
+- The queue published 9 rows live (the affordable picks plus the
+  wanted tail); the hover tooltip opened left of the rows (Magic
+  Ring, Creamees, M.Def 7, Gain +7, Value/adena 0.189) without
+  covering the equipment panel; the screenshots of the open, closed
+  and tooltip states passed a vision model layout check; no JS
+  console errors.
+- Verify loop: repro_gear (all checks incl. the new flyout ones),
+  repro_hud, repro_movement, repro_fight_ui pass; go build, go vet,
+  go test ./... (18 packages, no failures). The one repro_map_render
+  failure ("hunting zone carries the label") is the pre-existing map
+  label regression noted below - re-confirmed at HEAD with this
+  task's changes stashed.
+
 ## Active task: the web UI shop queue widget (what the bot plans to buy next)
 
 Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.

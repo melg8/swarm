@@ -1435,10 +1435,15 @@ the same variables).
   `tools/repro_gear.js` (`task repro:gear`) - it also pins the keyed
   rendering (image element identity across re-renders), the pinned
   footer values, the floating placement and the manual interactions.
-- Shop queue widget: a collapsible SHOP QUEUE section of the
-  equipment panel between the paperdoll and the bag (the inspection
-  tool of the shop strategy - what the bot plans to buy next, at what
-  price and how much adena is still missing). The snapshot field
+- Shop queue widget: a SHOP QUEUE flyout of the equipment panel (the
+  inspection tool of the shop strategy - what the bot plans to buy
+  next, at what price and how much adena is still missing). A small
+  triangle tab sticks out of the left edge of the panel (top aligned
+  with the title row); the click slides the queue out to the LEFT of
+  the panel as an absolutely positioned flyout, so the equipment
+  panel itself never changes size (the queue overlays the map, the
+  glyph points left while the queue is hidden and right while it is
+  out). The snapshot field
   `shopping` (null when nothing is published) carries the full
   purchase queue: the affordable plan of the next trip first, then
   the wanted tail - the best value-per-adena picks the wallet cannot
@@ -1452,18 +1457,21 @@ the same variables).
   10 s window expires like a walk plan); while a town trip runs the
   view switches to the remaining trip buys - the in-flight batch
   marked `buying` first, then the pending purchases of the stops.
-  The widget: the collapsed head keeps one summary line (entry count,
-  affordable total, the save-up missing of the whole queue), the
-  expanded body adds the scrollable row list (icon, name, merchant
+  The widget: the head of the flyout keeps one summary line (entry
+  count, affordable total, the save-up missing of the whole queue),
+  the body adds the scrollable row list (icon, name, merchant
   and score gain, price; the wanted rows dimmed with their missing
   amount, the buying rows accented with a chip) and the pinned
   buy/have/save foot. Every row hovers into the rich purchase
-  tooltip - the classic item tooltip stat lines plus the planning
+  tooltip anchored to the LEFT of the row (the queue sits left of
+  the equipment panel, so the tooltip never covers it) - the classic
+  item tooltip stat lines plus the planning
   block (Gain, Value/adena - the optimality metric that flags a
   suspicious pick, Sell first credit, Missing, the pick status). The
   rows are keyed by item id and refresh in place (the icon images
-  never blink); the panel hides when no plan is published (the
-  manual-only sessions, sessions without the shop strategy). The
+  never blink); the flyout and the tab hide when no plan is
+  published (the manual-only sessions, sessions without the shop
+  strategy). The
   widget checks live in `tools/repro_gear.js`.
 - The web UI is interactive in every launch mode: a double click on
   the map (move/attack/pickup - hit test over the interpolated object

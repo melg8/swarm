@@ -1079,10 +1079,13 @@ function showItemTooltip(item, cell) {
   positionItemTooltip(rect.left + rect.width, rect.top);
 }
 
-// positionItemTooltip places the floating panel so its top left
-// corner sits at (x, y), then flips it left of the cursor or above
-// when it would overflow the viewport right / bottom edge.
-function positionItemTooltip(x, y) {
+// positionItemTooltip pins the floating tooltip near the anchor: to
+// the right of the anchor point by default (the equipment cells sit
+// at the right edge of the map), to its left on side "left" (the shop
+// rows sit left of the equipment panel, so their tooltip must not
+// cover it). Both sides fall back to the opposite one when the
+// tooltip would leave the viewport, the bottom clamps at the edge.
+function positionItemTooltip(x, y, side) {
   const el = tooltipElement();
   if (!el || el.classList.contains("hidden")) { return; }
   const margin = 12;
@@ -1091,10 +1094,14 @@ function positionItemTooltip(x, y) {
   const vh = window.innerHeight;
   const rect = el.getBoundingClientRect();
   let left = x + pad;
-  let top = y + pad;
+  if (side === "left") {
+    left = x - rect.width - pad;
+    if (left < margin) { left = Math.min(x + pad, vw - rect.width - margin); }
+  }
   if (left + rect.width + margin > vw) {
     left = Math.max(margin, x - rect.width - pad);
   }
+  let top = y + pad;
   if (top + rect.height + margin > vh) {
     top = Math.max(margin, vh - rect.height - margin);
   }
@@ -1338,46 +1345,58 @@ function renderGearFoot(snap) {
 
 // ---- shop queue widget (the purchase plan of the bot) ----
 //
-// A collapsible section of the floating equipment widget between the
-// paperdoll and the bag: every entry of the published shopping queue
+// A flyout of the floating equipment widget: a small triangle tab on
+// the left edge of the panel (the shop-tab button) slides the queue
+// out to the left of the equipment panel, so the panel itself keeps
+// its size - the queue overlays the map instead of stretching the
+// panel downward. Every entry of the published shopping queue
 // (snap.shopping, the affordable plan of the next trip plus the
 // wanted tail with the missing adena) renders as one compact row -
 // icon, name, merchant and gain, the buy price on the right and the
 // missing amount under it for the wanted entries. Hovering a row
 // opens the floating item tooltip extended with the purchase lines
-// (gain, value per adena, sell credit, missing, merchant), so a
-// suspicious pick is visible at a glance. The rows are keyed by the
-// item id and refreshed in place like the bag cells: an unchanged
-// queue never rebuilds the icon images.
+// (gain, value per adena, sell credit, missing, merchant) to the left
+// of the row, so a suspicious pick is visible at a glance. The rows
+// are keyed by the item id and refreshed in place like the bag cells:
+// an unchanged queue never rebuilds the icon images.
 
-// ShopPanel holds the widget state: the collapse flag (expanded by
-// default - the point of the widget is the passive glance) and the
+// ShopPanel holds the widget state: the open flag of the flyout (open
+// by default - the point of the widget is the passive glance) and the
 // row registry keyed by item id.
 const ShopPanel = {
-  collapsed: false,
+  open: true,
   rows: new Map(),
   order: "",
   signature: ""
 };
 
-// initShopPanel wires the collapse toggle of the shop panel head.
+// initShopPanel wires the triangle tab of the flyout: the click
+// slides the queue out to the left of the equipment panel and back.
 function initShopPanel() {
-  const head = document.getElementById("shop-head");
-  if (!head) { return; }
-  head.addEventListener("click", () => {
-    ShopPanel.collapsed = !ShopPanel.collapsed;
+  const tab = document.getElementById("shop-tab");
+  if (!tab) { return; }
+  tab.addEventListener("click", () => {
+    ShopPanel.open = !ShopPanel.open;
     applyShopPanelState();
   });
 }
 
-// applyShopPanelState syncs the panel DOM with the collapse flag.
+// applyShopPanelState syncs the flyout DOM with the open flag: the
+// panel slides in or out and the edge triangle flips its direction -
+// pointing left while the queue is hidden (the slide-out direction),
+// pointing right while it is out (the retract direction).
 function applyShopPanelState() {
   const panel = document.getElementById("shop-panel");
-  const chev = document.getElementById("shop-chev");
-  if (!panel) { return; }
-  panel.classList.toggle("collapsed", ShopPanel.collapsed);
+  const tab = document.getElementById("shop-tab");
+  const chev = document.getElementById("shop-tab-chev");
+  if (panel) {
+    panel.classList.toggle("open", ShopPanel.open);
+  }
+  if (tab) {
+    tab.setAttribute("aria-expanded", ShopPanel.open ? "true" : "false");
+  }
   if (chev) {
-    chev.textContent = ShopPanel.collapsed ? "\u25B8" : "\u25BE";
+    chev.textContent = ShopPanel.open ? "\u25B8" : "\u25C2";
   }
 }
 
@@ -1405,14 +1424,16 @@ function resetShop() {
   if (list) { list.innerHTML = ""; }
   const panel = document.getElementById("shop-panel");
   if (panel) { panel.classList.add("hidden"); }
+  const tab = document.getElementById("shop-tab");
+  if (tab) { tab.classList.add("hidden"); }
   const summary = document.getElementById("shop-summary");
   if (summary) { summary.textContent = ""; }
 }
 
 // renderShopping refreshes the shop queue widget from the published
-// shopping plan: hidden without a plan (nothing published, an expired
-// plan or a session without the shop strategy), the keyed rows and
-// the summary line otherwise.
+// shopping plan: the edge tab and the flyout hide without a plan
+// (nothing published, an expired plan or a session without the shop
+// strategy), the keyed rows and the summary line otherwise.
 function renderShopping(snap) {
   const panel = document.getElementById("shop-panel");
   const list = document.getElementById("shop-list");
@@ -1424,6 +1445,8 @@ function renderShopping(snap) {
     return;
   }
   panel.classList.remove("hidden");
+  const tab = document.getElementById("shop-tab");
+  if (tab) { tab.classList.remove("hidden"); }
   applyShopPanelState();
 
   const signature = shopRowSignature(plan);
@@ -1494,7 +1517,7 @@ function makeShopRow() {
     showShoppingTooltip(row.entry, item);
   });
   item.addEventListener("mousemove", (event) => {
-    positionItemTooltip(event.clientX, event.clientY);
+    positionItemTooltip(event.clientX, event.clientY, "left");
   });
   item.addEventListener("mouseleave", () => {
     hideItemTooltip();
@@ -1694,7 +1717,9 @@ function renderShoppingTooltip(entry) {
 }
 
 // showShoppingTooltip renders the purchase tooltip for one queue row
-// and positions the shared floating panel next to the hovered row.
+// and positions the shared floating panel to the left of the hovered
+// row (the queue sits left of the equipment panel, so the tooltip
+// opens over the free map area instead of covering the panel).
 function showShoppingTooltip(entry, item) {
   const el = tooltipElement();
   if (!el) { return; }
@@ -1708,7 +1733,7 @@ function showShoppingTooltip(entry, item) {
   el.className = "item-tooltip fam-" + itemFamily(entry);
   el.setAttribute("aria-hidden", "false");
   const rect = item.getBoundingClientRect();
-  positionItemTooltip(rect.left + rect.width, rect.top);
+  positionItemTooltip(rect.left, rect.top, "left");
 }
 
 // ---- manual commands: map clicks, cell double clicks and drags ----

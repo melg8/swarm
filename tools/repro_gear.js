@@ -84,6 +84,12 @@ function makeElement() {
         },
         focus: () => {},
         select: () => {},
+        setAttribute(key, value) {
+            (this.attributes || (this.attributes = {}))[key] = value;
+        },
+        getAttribute(key) {
+            return (this.attributes || {})[key];
+        },
         classList: {
             _classes: new Set(),
             contains(cls) { return this._classes.has(cls); },
@@ -1138,27 +1144,33 @@ function main() {
 
     // ---- shop queue widget ----
     //
-    // The purchase plan of the bot renders as a collapsible section
-    // of the equipment panel: the keyed rows of the published queue
-    // (snap.shopping), the collapsed head summary, the pinned
-    // buy/have/save foot and the rich purchase tooltip. The harness
+    // The purchase plan of the bot renders as a flyout of the
+    // equipment panel: a small triangle tab on the left edge slides
+    // the queue out to the left (the equipment panel itself never
+    // resizes), the keyed rows of the published queue (snap.shopping),
+    // the head summary, the pinned buy/have/save foot and the rich
+    // purchase tooltip to the left of the hovered row. The harness
     // exercises the markup, the css, the rendering, the keying and
-    // the collapse toggle.
+    // the tab toggle.
 
-    check(results, "shop queue markup lives inside the equipment panel",
+    check(results, "shop queue markup lives in the equipment panel as an edge tab and a flyout",
+        html.includes('<button id="shop-tab"') &&
         html.includes('id="shop-panel"') &&
-        html.includes('id="shop-head"') &&
+        html.includes('<div id="shop-head"') &&
         html.includes('id="shop-list"') &&
         html.includes('id="shop-buy"') &&
         html.includes('id="shop-have"') &&
         html.includes('id="shop-save"') &&
-        html.indexOf('id="gear-panel"') < html.indexOf('id="shop-panel"') &&
-        html.indexOf('id="shop-panel"') < html.indexOf('id="inv-grid"'),
+        html.indexOf('id="gear-panel"') < html.indexOf('id="shop-tab"') &&
+        html.indexOf('id="inv-grid"') < html.indexOf('id="shop-tab"') &&
+        html.indexOf('id="shop-panel"') > html.indexOf('id="gear-trash"'),
         "missing shop queue markup or wrong placement");
 
-    check(results, "shop queue css covers the widget chrome",
+    check(results, "shop queue css covers the flyout chrome",
         css.includes(".shop-panel") &&
-        css.includes(".shop-panel.collapsed .shop-body") &&
+        css.includes(".shop-panel.open") &&
+        css.includes(".shop-tab") &&
+        css.includes("right: calc(100% + 14px)") &&
         css.includes(".shop-head") &&
         css.includes(".shop-summary") &&
         css.includes(".shop-list") &&
@@ -1206,9 +1218,12 @@ function main() {
     const shopPanel = elements.get("shop-panel");
     const shopList = elements.get("shop-list");
     const shopSummary = elements.get("shop-summary");
-    check(results, "a published plan shows the shop panel",
-        !shopPanel.classList.contains("hidden"),
-        "the panel stays hidden with a plan");
+    const shopTab = elements.get("shop-tab");
+    const shopTabChev = elements.get("shop-tab-chev");
+    check(results, "a published plan shows the flyout and its edge tab",
+        !shopPanel.classList.contains("hidden") &&
+        !shopTab.classList.contains("hidden"),
+        "the flyout or the tab stays hidden with a plan");
     check(results, "every queue entry renders its row",
         shopList.children.length === 3,
         "got " + shopList.children.length + " rows");
@@ -1271,23 +1286,34 @@ function main() {
         deepText(shopSummary).includes("left"),
         "row text: " + deepText(shopList.children[0]));
 
-    // No plan hides the widget again.
+    // No plan hides the widget again - the flyout and the tab both.
     gear.renderShopping(gearSnapshot([], 0, 80));
-    check(results, "no plan hides the shop panel",
+    check(results, "no plan hides the flyout and the edge tab",
         shopPanel.classList.contains("hidden") &&
+        shopTab.classList.contains("hidden") &&
         shopList.children.length === 0,
-        "the panel stays visible without a plan");
+        "the flyout or the tab stays visible without a plan");
 
-    // The collapse toggle: the head click flips the collapsed class.
+    // The tab toggle: the triangle click slides the flyout in and
+    // back out, the glyph flips with the state and the tab answers
+    // with the aria state.
     gear.renderShopping(shopSnapshot);
-    fire(elements.get("shop-head"), "click");
-    check(results, "the head click collapses the panel body",
-        shopPanel.classList.contains("collapsed"),
-        "the panel did not collapse");
-    fire(elements.get("shop-head"), "click");
-    check(results, "the second head click expands the panel again",
-        !shopPanel.classList.contains("collapsed"),
-        "the panel did not expand");
+    check(results, "the flyout starts slid out for the passive glance",
+        shopPanel.classList.contains("open") &&
+        shopTabChev.textContent === "\u25B8" &&
+        shopTab.getAttribute("aria-expanded") === "true",
+        "the flyout did not start open");
+    fire(shopTab, "click");
+    check(results, "the tab click slides the flyout in",
+        !shopPanel.classList.contains("open") &&
+        shopTabChev.textContent === "\u25C2" &&
+        shopTab.getAttribute("aria-expanded") === "false",
+        "the flyout did not slide in");
+    fire(shopTab, "click");
+    check(results, "the second tab click slides the flyout out again",
+        shopPanel.classList.contains("open") &&
+        shopTabChev.textContent === "\u25B8",
+        "the flyout did not slide out");
 
     // The purchase tooltip: the item shape plus the planning lines
     // (the gain, the value per adena, the sell credit, the missing
