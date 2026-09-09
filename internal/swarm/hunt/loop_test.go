@@ -402,7 +402,10 @@ func TestLoopPathfindsBackIntoTheZone(t *testing.T) {
 	bot := newTestBot()
 	game := &fakeGame{}
 	game.noTargets = true
-	nav := &fakeNavigator{found: true}
+	// The zone deck height the fake navigator resolves: the zone
+	// center sits on the same ground the character walks (-3539), so
+	// the 3D waypoint arrival of the follower accepts the arrival.
+	nav := &fakeNavigator{found: true, height: -3539}
 	loop := NewLoop(game, bot)
 	loop.SetNavigator(nav)
 	loop.SetHuntingZone(46112, 41500, 450)

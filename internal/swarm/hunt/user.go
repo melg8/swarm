@@ -428,12 +428,11 @@ func (l *Loop) followUserWaypoints(
 ) {
 	for l.userWpIndex < len(l.userWaypoints) {
 		wp := l.userWaypoints[l.userWpIndex]
-		dist := math.Hypot(wp.X-float64(selfX), wp.Y-float64(selfY))
+		dist := waypointDistance(wp, selfX, selfY, selfZ)
 		if dist > waypointArriveDist {
 			if l.userWpIndex+1 < len(l.userWaypoints) {
 				next := l.userWaypoints[l.userWpIndex+1]
-				nextDist := math.Hypot(
-					next.X-float64(selfX), next.Y-float64(selfY))
+				nextDist := waypointDistance(next, selfX, selfY, selfZ)
 				if nextDist < dist {
 					l.userWpIndex++
 					l.userMoveAt = time.Time{}

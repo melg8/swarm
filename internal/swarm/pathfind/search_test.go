@@ -426,17 +426,29 @@ func waterChannelSpec(bridge bool) (*regionSpec, Vec3, Vec3) {
 			spec.blocks[bx][by] = block
 		}
 	}
-	start := worldOf(100, 300, land)
-	end := worldOf(100, 800, land)
+	// The start and end sit 100 cells west of the bridge column: the
+	// bridge detour stays longer than the straight swim line (the
+	// assertion below) while the water cost of the 260 cell bed
+	// crossing beats the detour cost decisively - the margins of the
+	// old lx 100 fixture were inside the diagonal shortcut noise and
+	// the route flipped between the swim and the bridge.
+	start := worldOf(300, 300, land)
+	end := worldOf(300, 800, land)
 
 	return spec, start, end
 }
 
 // cellHeight returns the surface height of a channel band cell: the
-// bed below y 676, the 40 unit climb slope up to the land on y 676..700
-// and the land from y 701 on.
+// bed in the middle, 40 unit slopes on BOTH shores (the real geodata
+// lake shores descend gradually into the water - the measured elven
+// lake entries step 8..24 units per cell) and the land outside. The
+// north shore must slope too: a cliff there would seal the channel
+// for a surface-staying search, and only the drop planning of the
+// old asymmetric rule could enter the water over it.
 func cellHeight(ly int, land, bed int16) int16 {
 	switch {
+	case ly <= 424:
+		return int16(-3000 + (ly-400)*(-40))
 	case ly <= 675:
 		return bed
 	case ly <= 700:
@@ -490,13 +502,18 @@ func TestFindPathWaterOnlyRouteStillSwims(t *testing.T) {
 	require.True(t, result.Found, "water remains walkable at a cost")
 }
 
-// TestFindPathDownwardAnyHeight checks the server mirroring step rule:
-// a walk may drop any height (the Mobius movement validation only
-// gates upward steps), so a deck exit over a ledge still plans.
-func TestFindPathDownwardAnyHeight(t *testing.T) {
+// TestFindPathTerraceBoundaryNeedsARamp pins the surface rule of the
+// search: a height jump of hundreds of units between neighbouring
+// cells is a terrace boundary, not a walkable connection. The walk
+// from the upper terrace to the lower one must use a gradual ramp -
+// the elven city bridges between the floating deck and the ground
+// step 8..16 units per cell - and with no ramp at all the terraces
+// stay sealed for the search (the character cannot leave the deck
+// over the railing the geodata does not model).
+func TestFindPathTerraceBoundaryNeedsARamp(t *testing.T) {
+	// A high strip without a ramp: the drop at its end seals it.
 	spec := &regionSpec{}
 	spec.setFlat(0)
-	// A high plateau on the left half.
 	for lx := range 400 {
 		spec.setCell(lx, 1000, Layer{Height: 500, NSWE: nsweAll})
 	}
@@ -506,14 +523,45 @@ func TestFindPathDownwardAnyHeight(t *testing.T) {
 		worldOf(100, 1000, 500), worldOf(900, 1000, 0),
 		DefaultMaxPassableHeight)
 	require.NoError(t, err)
-	require.True(t, result.Found, "the 500 unit drop is walkable")
+	require.False(t, result.Found,
+		"a 500 unit drop is a terrace boundary, not a walkable step")
 
-	// The reverse walk cannot climb the ledge.
+	// The same strip with a gradual ramp at its east end connects
+	// the terraces: the descent plans and every raw step stays
+	// within the passable height.
+	spec = &regionSpec{}
+	spec.setFlat(0)
+	for lx := range 400 {
+		spec.setCell(lx, 1000, Layer{Height: 500, NSWE: nsweAll})
+	}
+	// The ramp: 30 cells descending 16 units each, then a 36 unit
+	// step onto the ground - every step within the 40 limit.
+	for lx := 370; lx < 400; lx++ {
+		spec.setCell(lx, 1000, Layer{
+			Height: int16(500 - (lx-370)*16), NSWE: nsweAll,
+		})
+	}
+	engine = newTestEngine(t, spec)
+
+	result, err = engine.FindPath(
+		worldOf(100, 1000, 500), worldOf(900, 1000, 0),
+		DefaultMaxPassableHeight)
+	require.NoError(t, err)
+	require.True(t, result.Found, "the ramp connects the terraces")
+	require.NotEmpty(t, result.RawPath)
+	for i := 1; i < len(result.RawPath); i++ {
+		step := math.Abs(result.RawPath[i].Z - result.RawPath[i-1].Z)
+		require.LessOrEqual(t, step, float64(DefaultMaxPassableHeight),
+			"raw path step %d drops %.0f units - a terrace boundary",
+			i, step)
+	}
+
+	// The reverse walk climbs the ramp back onto the strip.
 	back, err := engine.FindPath(
 		worldOf(900, 1000, 0), worldOf(100, 1000, 500),
 		DefaultMaxPassableHeight)
 	require.NoError(t, err)
-	require.False(t, back.Found, "the upward ledge stays blocked")
+	require.True(t, back.Found, "the ramp climbs back up")
 }
 
 // TestFindPathStepUpForty checks the climb gate matches the Mobius

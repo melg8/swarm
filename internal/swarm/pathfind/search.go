@@ -190,11 +190,13 @@ func (s *search) nextSeq() uint64 {
 // the server's own pathfinder does (PathFinding.findPath resolves
 // getHeight(tx, ty, tz)): a coordinate with several floors picks the
 // floor the destination names, not the floor the start stands on.
-// With a positive approachRadius the search succeeds on the first
-// node within that 3D distance of the end point (the merchant
-// interaction distance of the town trips); with zero it succeeds on
-// the first arrival on the target cell at any layer (the original
-// behavior).
+// The search answers the straight line of sight raster directly only
+// when the line is a dry minimum-rate walk (directOrAstar below);
+// every other route comes from the cost aware A*. With a positive
+// approachRadius the search succeeds on the first node within that
+// 3D distance of the end point (the merchant interaction distance
+// of the town trips); with zero it succeeds on the first arrival on
+// the target cell at any layer (the original behavior).
 func (s *search) run(start, end Vec3, approachRadius float64) (*Result, error) {
 	began := time.Now()
 	from, err := s.nodeAtWorld(start)
@@ -220,10 +222,7 @@ func (s *search) run(start, end Vec3, approachRadius float64) (*Result, error) {
 		OpenLeft:  0,
 		Length:    0,
 	}
-	raw := []*node{from, to}
-	if !s.lineOfSight(from, to) {
-		raw = s.astar(from)
-	}
+	raw, smooth := s.directOrAstar(from, to)
 	result.Duration = time.Since(began)
 	result.Explored = s.explored
 	result.OpenLeft = len(s.openSet)
@@ -233,7 +232,7 @@ func (s *search) run(start, end Vec3, approachRadius float64) (*Result, error) {
 	}
 	result.Found = true
 	result.RawPath = nodesToWorld(raw)
-	result.Waypoints = nodesToWorld(s.smoothPath(raw))
+	result.Waypoints = nodesToWorld(smooth)
 	result.Length = pathLength(result.Waypoints)
 
 	return result, nil
@@ -294,6 +293,56 @@ func (s *search) astar(from *node) []*node {
 	}
 
 	return nil
+}
+
+// directOrAstar answers the straight raster line between the start
+// and the target when it is a clean dry walk, and runs the full cost
+// aware A* otherwise. It returns the raw node path together with its
+// smoothed form. The old line of sight short circuit answered ANY
+// walkable straight line - including one that fords a lake bed - and
+// so bypassed the water cost entirely: the synthetic channel route
+// swam straight across while the bridge, cheaper by the water
+// penalty, sat unplanned. A dry line of sight is the safe case to
+// keep answering directly: it walks the minimum step rate the grid
+// allows, so no detour beats it by more than the wall proximity
+// noise, and skipping the search keeps the flat field walks (the
+// region crossing concurrent routes) instant instead of flooding
+// the A* ellipse and the quadratic smoothing cascade over them (the
+// accepted direct line is its own smoothing: the two endpoints). A
+// line that steps into water, hits a wall or a terrace boundary, or
+// ends short of the target (missing geodata truncated the raster)
+// defers to the A*, which weighs the swim against the bridge detour
+// and the walls against the detour itself.
+func (s *search) directOrAstar(from, to *node) ([]*node, []*node) {
+	direct := s.straightPath(from, to)
+	if len(direct) > 0 && direct[len(direct)-1].coords == to.coords &&
+		s.directLineDry(direct) {
+		return direct, []*node{direct[0], direct[len(direct)-1]}
+	}
+
+	raw := s.astar(from)
+	if raw == nil {
+		return nil, nil
+	}
+
+	return raw, s.smoothPath(raw)
+}
+
+// directLineDry reports whether every step of a raster line is
+// walkable at the plain step rate and lands on dry ground: the water
+// penalty is the one cost dimension that can make a walkable
+// straight line clearly worse than a detour.
+func (s *search) directLineDry(direct []*node) bool {
+	for i := 0; i+1 < len(direct); i++ {
+		if !s.canStep(direct[i], direct[i+1]) {
+			return false
+		}
+		if direct[i+1].layer.Height < waterLevel {
+			return false
+		}
+	}
+
+	return true
 }
 
 // nodeReached reports whether a popped node satisfies the goal of
@@ -374,20 +423,28 @@ func (s *search) obstacleMultiplier(ring []*node) float32 {
 	return float32(len(ring)) / float32(obstacles)
 }
 
-// canStep mirrors the Mobius movement validation of one cell step
-// (GeoEngine.getValidLocation): the walls of the source cell must be
-// open for the step direction, the height may rise at most
-// maxPassableHeight (the Mobius HEIGHT_INCREASE_LIMIT is 40) and any
-// drop is accepted - the server lets characters walk down cliffs and
-// into water, so the search may plan those steps too. The line of
-// sight keeps the stricter symmetric canMoveTo rule so the smoothing
-// never collapses a detour into a straight drop.
+// canStep mirrors the walkable surface rule of one cell step: the
+// walls of the source cell must be open for the step direction and the
+// height difference must stay within the passable limit in BOTH
+// directions (the Mobius HEIGHT_INCREASE_LIMIT of 40 gates the climb;
+// the drop uses the same bound). The Mobius movement validation
+// accepts any downward step, but a planned walk must stay on the
+// walkable surfaces: the world stacks terraces over each other (the
+// lake bed under the floating elven city deck) and the only walkable
+// connections between them are the gradual ramps - the bridges and
+// the shores, every ramp cell measured at 8..24 units of the real
+// geodata. A step that drops hundreds of units is a terrace boundary
+// (a deck edge behind a railing the geodata does not model, a cliff):
+// planning it sends the walker over the railing the server never
+// lets it cross or into a fall. The line of sight raster and the
+// smoothing share the same strict symmetric form so no leg of the
+// smoothed path ever leaves the surface either.
 func (s *search) canStep(from, to *node) bool {
 	if !s.wallsOpen(from, to) {
 		return false
 	}
 
-	return int(to.layer.Height)-int(from.layer.Height) <=
+	return heightDelta(from.layer.Height, to.layer.Height) <=
 		s.maxPassableHeight
 }
 
@@ -411,14 +468,14 @@ func (s *search) wallsOpen(from, to *node) bool {
 }
 
 // canMoveTo reports whether the straight walk from one cell to an
-// adjacent one is allowed by the walls of the source cell and a
-// symmetric height difference within the passable limit. The line of
-// sight raster and the smoothing use this strict form: a leg they
-// verify must stay on one walkable surface, never drop off it.
+// adjacent one stays on the walkable surface: the walls of the source
+// cell open for the direction and the symmetric height difference
+// within the passable limit - the same terrace rule canStep applies
+// to the search expansions. The line of sight raster and the
+// smoothing use this strict form: a leg they verify must stay on one
+// walkable surface, never drop off it.
 func (s *search) canMoveTo(from, to *node) bool {
-	return s.wallsOpen(from, to) &&
-		heightDelta(from.layer.Height, to.layer.Height) <=
-			s.maxPassableHeight
+	return s.canStep(from, to)
 }
 
 // heuristic is the Manhattan cell distance scaled like the step costs.

@@ -234,15 +234,20 @@ type Result struct {
 }
 
 // FindPath searches the walkable path from start to end. The max
-// passable height bounds the height difference the walker can climb
-// between neighbouring cells; downward steps of any height are
-// accepted like the server does. The target layer is selected as the
-// layer of the target cell closest to the target z, like the server's
-// own pathfinder does (getHeight(tx, ty, tz)), and the search succeeds
-// on the first arrival on the target cell at any layer. A search that
-// exhausts the grid returns Found=false with a nil error; hard
-// failures (no geodata at the start or target, corrupt regions)
-// return an error.
+// passable height bounds the height difference the walker can step
+// between neighbouring cells in BOTH directions: the climb gate is
+// the Mobius HEIGHT_INCREASE_LIMIT (40) and the drop uses the same
+// bound, because a walkable surface connects its cells gradually -
+// ramps, bridges and shores step 8..24 units per cell - while a
+// height jump of hundreds of units is a terrace boundary (the lake
+// bed under the floating elven city deck, a cliff behind a railing
+// the geodata does not model), not a walkable connection. The target
+// layer is selected as the layer of the target cell closest to the
+// target z, like the server's own pathfinder does
+// (getHeight(tx, ty, tz)), and the search succeeds on the first
+// arrival on the target cell at any layer. A search that exhausts
+// the grid returns Found=false with a nil error; hard failures (no
+// geodata at the start or target, corrupt regions) return an error.
 func (e *Engine) FindPath(
 	start, end Vec3, maxPassableHeight uint16,
 ) (*Result, error) {

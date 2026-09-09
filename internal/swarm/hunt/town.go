@@ -403,6 +403,24 @@ func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
 	return true
 }
 
+// waypointDistance measures the distance from the character to a
+// planned waypoint in full 3D. The arrival and skip decisions of the
+// waypoint followers must use it: a 2D-only radius once marked a deck
+// edge drop waypoint as reached - 80 units away horizontally but 920
+// units below the character - and the follower jumped straight to the
+// leg beyond the drop the character never walked, straight into the
+// city railing. The geodata waypoints carry the real layer height,
+// so the z axis is exact for them.
+func waypointDistance(
+	wp pathfind.Vec3, selfX, selfY, selfZ int32,
+) float64 {
+	dx := wp.X - float64(selfX)
+	dy := wp.Y - float64(selfY)
+	dz := wp.Z - float64(selfZ)
+
+	return math.Sqrt(dx*dx + dy*dy + dz*dz)
+}
+
 // walkTownWaypoints follows the planned waypoints with ground click
 // walks and returns true when the final waypoint is reached. Legs
 // longer than the server move request limit are split into straight
@@ -421,15 +439,14 @@ func (l *Loop) walkTownWaypoints() bool {
 	now := time.Now()
 	for l.wpIndex < len(l.waypoints) {
 		wp := l.waypoints[l.wpIndex]
-		dist := math.Hypot(wp.X-float64(selfX), wp.Y-float64(selfY))
+		dist := waypointDistance(wp, selfX, selfY, selfZ)
 		if dist > waypointArriveDist {
 			// The waypoint is not reached yet: skip it when the
 			// next one is closer - the character already passed
 			// it (a jump, a server correction).
 			if l.wpIndex+1 < len(l.waypoints) {
 				next := l.waypoints[l.wpIndex+1]
-				nextDist := math.Hypot(
-					next.X-float64(selfX), next.Y-float64(selfY))
+				nextDist := waypointDistance(next, selfX, selfY, selfZ)
 				if nextDist < dist {
 					l.wpIndex++
 					l.moveAt = time.Time{}
