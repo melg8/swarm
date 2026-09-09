@@ -577,6 +577,22 @@ func (b *Bot) ObjectAlive(objectID int32) bool {
 	return obj != nil && !obj.Dead
 }
 
+// KnownObjectIDs lists the object ids of the currently known world (the
+// known list of the session: npcs, players and ground items). The proxy
+// snapshots it when a bot session ends and replays a DeleteObject for
+// every entry before the resync onto the next session, so a held client
+// never keeps ghosts of the old world. The ids are unordered.
+func (b *Bot) KnownObjectIDs() []int32 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	ids := make([]int32, 0, len(b.world.hot))
+	for i := range b.world.hot {
+		ids = append(ids, b.world.hot[i].ObjectID)
+	}
+
+	return ids
+}
+
 // SelfHealthPercent returns the current HP of the character as a
 // percentage of the maximum (0..100). An unknown maximum (no UserInfo
 // yet) counts as healthy: resting forever on missing vitals is worse

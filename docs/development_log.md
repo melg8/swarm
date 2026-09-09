@@ -2118,3 +2118,107 @@ bridge routes.
   pins the 3D arrival against a realistic zone deck height.
 - go build/vet, go test ./... (18 packages), gofmt, golangci-lint (no
   new issues), tools/mobius_e2e.sh 45 E2E_OK, SWARM_PROXY_E2E=1 PASS.
+
+## Round 40: the bot relogin handoff - the client survives the session cycle (2026-09-09)
+
+Scope: the second half of the proxy contract. The live self state
+(round 4) answered "where is the character right now" for a client
+that reconnects on its own; this round answers the mirror question:
+what happens to a client that STAYS connected while the bot cycles
+its session. The hunt loop logs the character out when the situation
+turns hopeless (the emergency logout of the pile up escape) and the
+supervisor logs it back in seconds later - the user did nothing and
+must not be kicked to the login screen for a decision the bot made.
+
+### Design
+
+The relay of one client connection now streams a chain of bot
+sessions instead of exactly one (runRelay -> streamSession ->
+serveRelogin):
+
+- **The LeaveWorld suppression.** The `LeaveWorld` the real server
+  answers to the bot's logout is dropped from the live feed and from
+  the recorded history replay: a C1 client that processes it drops
+  itself to the login screen, which would break the hold. The
+  suppression is conditional on the logout NOT being the client's
+  own: the classic user logout keeps the relayed answer and the
+  session end closes the connection (the login screen is what the
+  user asked for).
+- **The hold.** The recorder close (the authority on the session end)
+  parks the relay instead of closing the client: it snapshots the old
+  known list (the tracker is cleared by the next login, so the sweep
+  must run against what the client actually saw - the new
+  `Bot.KnownObjectIDs`), then polls `Server.sessionByID` for a
+  replacement session of the same bot id (a fresh recorder, a fresh
+  send path, `StatusOnline`). The client packets in between are
+  swallowed: the character is offline and the world behind the client
+  is frozen, so every action is meaningless - except the `Logout`
+  itself, which the proxy answers with a synthesized `LeaveWorld`
+  (the server cannot answer, the character is gone). The hold
+  releases the client after 2 minutes of a missing bot (a frozen
+  world beats a login screen the user did not ask for, but not
+  forever).
+- **The resync.** The replacement session resyncs the client view: a
+  synthesized `TeleportToLocation` of the played character to its
+  live position (self object id, live x/y/z, the heading - the client
+  also clears its own known list on the teleport, but the sweep does
+  not rely on it), a `DeleteObject` for every object id of the old
+  known list (a delete of an unknown id is a no-op on the client, so
+  the sweep is safe either way), the enter world burst of the new
+  session replayed through the ordinary replay path (the live self
+  state patch of round 4 applies - the UserInfo, the inventory, the
+  new known list), and the session reference of the connection swaps
+  so the client packets transit to the live bot link again. The
+  result is exactly the view a fresh client would get, minus the
+  login screens the held client never sees. A replacement session
+  without a recorded `CharSelected` (the defensive path) keeps the
+  teleport resync and the live feed alone.
+
+### Engineering details
+
+- The session swap is mutex-guarded on the connection (`mu`,
+  `currentSession`/`setSession`, `setHolding`): the read loop keeps
+  reading and transiting client packets while the relay goroutine
+  performs the handoff - the two goroutines no longer share the
+  session field unsynchronized. The knob reads of the hold timing
+  are guarded the same way (the tests rewrite them while a previous
+  connection still unwinds).
+- The sender got a bounded shutdown flush: the packets queued at the
+  moment of the close (the synthesized `LeaveWorld` of the held
+  logout rides exactly this path) are encrypted and written before
+  the socket closes, and the sender itself closes the socket (the
+  reader is released by the close, not by the done flag). A stalled
+  write cannot hold the teardown hostage: shutdown waits one second
+  and force closes.
+- A transit failure no longer kills the client connection: it means
+  the bot session link died under the transit - the narrow window
+  before the relay noticed the recorder close and engaged the hold.
+  The recorder close is the authority; killing the client here would
+  break the hold it is about to start.
+
+### Tests
+
+- New: TestHandoffPacketBuilders (the byte layouts of the
+  synthesized TeleportToLocation/DeleteObject/LeaveWorld against the
+  Mobius C1 writeImpl bodies); TestGameServerHoldsClientThroughBotRelogin
+  (the core scenario end to end: the recorded and the live LeaveWorld
+  suppressed, the hold swallowing a client packet, the relogin, the
+  teleport, the sweep of the old known npcs, the replayed UserInfo at
+  the live place, the live feed of the new session, the client packet
+  transiting through the replacement link, the second hold);
+  TestGameServerUserLogoutReturnsToLoginScreen (the classic flow);
+  TestGameServerUserLogoutWhileHeldClosesClient (the frozen world
+  exit); TestGameServerHoldTimeoutReleasesClient (the dead bot path);
+  TestGameServerReloginWithoutCharSelectedServesLiveFeedOnly (the
+  defensive path).
+- Updated: TestGameServerServesFullClientFlow - the session end now
+  keeps the client open (the hold), unwound explicitly at the end.
+- One stack side note, not a code defect: the live E2E failed at the
+  bot login with `Session key incorrect` in game.log - the login
+  server (which survived a sandbox restart) held a stale session key
+  for the account. A login+game restart cleared it and both E2E
+  suites went green again.
+- go build/vet, go test ./... (18 packages), go test -race on the
+  proxy package, gofmt clean, golangci-lint (2 pre-existing gosec on
+  the HEAD, no new issues), tools/mobius_e2e.sh E2E_OK,
+  SWARM_PROXY_E2E=1 PASS.

@@ -129,7 +129,9 @@ needs `-proxy-login 0.0.0.0:2107 -proxy-game 0.0.0.0:7778` and the
    forwarded to the real game server through the bot session - the
    server cannot tell the difference. The hunt loop of the bot keeps
    running: autonomous actions and user actions interleave on the same
-   character.
+   character. A bot initiated logout does NOT end this phase: the
+   client is held through the bot relogin and resynced (see "The bot
+   relogin handoff" below).
 
 Character creation and deletion are refused by the emulation (the
 client manages exactly the one served character). The login phase
@@ -169,6 +171,56 @@ current through every UserInfo, movement and teleport packet):
 The live relay after the replay needs no patching: the real server
 already answers with the current state, and the two views converge on
 their own.
+
+## The bot relogin handoff (the client survives the session cycle)
+
+The relay answers the mirror question: *what happens to the client
+when the BOT disconnects?* The hunt loop logs the character out when
+the situation turns hopeless (the emergency logout), the supervisor
+logs it back in seconds later - the user client did nothing and must
+not be kicked to the login screen for a decision the bot made. The
+relay handles the whole cycle in `streamSession`/`serveRelogin`:
+
+- **The LeaveWorld suppression.** The `LeaveWorld` the real server
+  answers to the bot's logout is dropped - both from the live feed
+  and from the recorded history - because a client that processes it
+  returns to the login screen on its own, which would break the
+  hold. The suppression is conditional: a `LeaveWorld` that follows
+  the client's OWN `Logout` packet is relayed normally (the classic
+  flow must keep working - see below).
+- **The hold.** When the session's recorder closes (the bot session
+  ended), the connection stays open, the relay polls for a
+  replacement session of the same bot id (a fresh recorder, a fresh
+  send path, the character back `StatusOnline`), and the client
+  packets in between are swallowed: the character is offline and the
+  world behind the client is frozen, so every action is meaningless -
+  except the `Logout` itself: a user that wants out of the frozen
+  world gets a synthesized `LeaveWorld` from the proxy (the server
+  cannot answer, the character is gone) and the connection closes.
+  The hold gives up after 2 minutes (a dead bot releases the client
+  instead of holding a silent world forever).
+- **The resync.** Once the replacement session is online, the client
+  view is rebuilt: the played character receives a synthesized
+  `TeleportToLocation` to its live position (the client also clears
+  its own known list on the teleport), every object id of the OLD
+  known list is swept with a `DeleteObject` (the ids come from the
+  tracker snapshot taken at the hold start - `KnownObjectIDs`), and
+  the enter world burst of the NEW session replays through the
+  ordinary replay path with the live self state patch: the UserInfo,
+  the inventory, the new known list. The connection then swaps onto
+  the replacement session (the client packets transit through the
+  live bot link again) and follows its live feed. The result is
+  exactly the view a fresh client would get - minus the login
+  screens, which the held client never sees.
+
+A user initiated logout keeps the classic flow: the client's own
+`Logout` packet transits to the real server, the `LeaveWorld` answer
+is RELAYED (not suppressed - the suppression only covers bot
+initiated logouts), the client returns to the login screen by
+itself, and the session end then closes the connection instead of
+holding it. The defensive path: a replacement session whose
+`CharSelected` was never recorded cannot replay an enter world burst,
+so the client keeps the teleport resync and the live feed alone.
 
 ## Switching bots
 
@@ -230,6 +282,19 @@ maps the problem directly:
   made it through the full handshake, but no bot is online yet. Start
   the swarm with a bot that entered the world (the char list is built
   from its session).
+- **`game#N: the bot session ... ended, holding the client for its
+  relogin`**: not an error - the bot logged out (the emergency logout
+  of the hunt loop) and the client is held. The follow up lines tell
+  the outcome: `bot ... is back online, resyncing the held client`
+  (the teleport + sweep + replay of the new session), `the user
+  logged out while held for the bot relogin` (the user left the
+  frozen world by design) or `the bot ... did not return within 2m0s,
+  releasing the held client` (the hold window expired - a supervisor
+  stuck longer than two minutes is the thing to investigate).
+- **`game#N: leave world suppressed, the client stays for the bot
+  relogin`**: not an error - the real server answered the bot's logout
+  with `LeaveWorld` and the proxy dropped it so the held client stays
+  in the world. It appears once per bot logout of a connected client.
 
 The live verification harness of the whole path (against the deployed
 stack, with a fake C1 client that walks the same protocol as the real

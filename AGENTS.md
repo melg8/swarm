@@ -814,6 +814,22 @@ client log file) - the short form:
   actions: `GameClient.SendRaw` encrypts under the session writeMu, so
   proxied clicks and autonomous actions interleave without corrupting
   the cipher (see `TestGameClientConcurrentSendKeepsCipherOrder`).
+- The bot relogin handoff (see "The bot relogin handoff" in
+  docs/proxy.md): a bot initiated logout does NOT kick the client to
+  the login screen. The `LeaveWorld` answer of the bot logout is
+  suppressed (the replay and the live feed), the recorder close holds
+  the connection while swallowing the client packets (a user `Logout`
+  while held gets a synthesized `LeaveWorld` - the login screen beats
+  a swallowed intent), and once the replacement session of the same
+  bot id is back online the client is resynced: a synthesized
+  `TeleportToLocation` of the played character to its live position,
+  a `DeleteObject` sweep of the old known list (`Bot.KnownObjectIDs`),
+  the enter world burst of the new session replayed through the live
+  self state patch, and the connection swapped onto the new session
+  (streamSession/serveRelogin in proxy/game.go, handoff.go). A user
+  initiated logout keeps the classic flow: the `LeaveWorld` answer is
+  relayed and the session end closes the connection. The hold releases
+  the client after 2 minutes of a missing bot.
 - The login phase of the client never reaches the real servers
   (character management is refused by the emulation), the in world
   packets transit unchanged.

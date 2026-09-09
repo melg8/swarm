@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf16"
 
@@ -38,13 +39,24 @@ type gameConn struct {
 	state   gameState
 	readBuf []byte
 
-	session         *botSession
+	// mu guards the session handoff fields: the relay goroutine
+	// swaps the session when the held client is resynced onto the
+	// replacement bot session, while the read loop keeps reading
+	// the client packets and transiting them through the current
+	// session (or swallowing them while the client is held).
+	mu         sync.Mutex
+	session    *botSession
+	holding    bool
+	userLogout bool
+
 	charSelectedSeq int64
 	queue           [][]byte
 
-	outCh     chan []byte
-	done      chan struct{}
-	closeOnce sync.Once
+	outCh      chan []byte
+	done       chan struct{}
+	closeOnce  sync.Once
+	senderLive atomic.Bool
+	senderDone chan struct{}
 }
 
 // gameState mirrors the Mobius ConnectionState machine of the client.
@@ -84,6 +96,13 @@ const charCreateFailTooMany = 0x01
 // gameWriteTimeout bounds one client bound write of the sender.
 const gameWriteTimeout = 10 * time.Second
 
+// shutdownFlushWait bounds how long shutdown waits for the sender to
+// flush the queued packets before the socket is force closed: the
+// graceful flush of a shutdown (the LeaveWorld of the held logout)
+// takes one write on a live client, so a second is generous, and a
+// stalled write must not hold the connection teardown hostage.
+const shutdownFlushWait = time.Second
+
 // outboundQueueSize bounds the client bound packet queue of one client.
 const outboundQueueSize = 512
 
@@ -97,12 +116,17 @@ func (s *Server) handleGameConn(conn net.Conn) {
 		id:              id,
 		state:           gameStateHandshake,
 		readBuf:         nil,
+		mu:              sync.Mutex{},
 		session:         nil,
+		holding:         false,
+		userLogout:      false,
 		charSelectedSeq: 0,
 		queue:           nil,
 		outCh:           make(chan []byte, outboundQueueSize),
 		done:            make(chan struct{}),
 		closeOnce:       sync.Once{},
+		senderLive:      atomic.Bool{},
+		senderDone:      make(chan struct{}),
 	}
 	s.clients.Add(1)
 	s.logger.Printf("game#%d: client connected from %s", id, conn.RemoteAddr())
@@ -375,9 +399,93 @@ func (gc *gameConn) queueClientPacket(payload []byte) {
 	gc.queue = append(gc.queue, copied)
 }
 
+// currentSession returns the bot session the connection is attached to
+// right now (the read loop transits the client packets through it). The
+// relogin handoff swaps it under the same lock.
+func (gc *gameConn) currentSession() *botSession {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+
+	return gc.session
+}
+
+// setSession swaps the bot session the connection is attached to (the
+// resync of the relogin handoff).
+func (gc *gameConn) setSession(session *botSession) {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+	gc.session = session
+}
+
+// setHolding toggles the hold of the relogin handoff: while held, the
+// client packets are swallowed instead of transiting - the bot session
+// they would reach is gone and the world behind the client is frozen
+// anyway.
+func (gc *gameConn) setHolding(holding bool) {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+	gc.holding = holding
+}
+
+// isHolding reports whether the client is held for the bot relogin.
+func (gc *gameConn) isHolding() bool {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+
+	return gc.holding
+}
+
+// markUserLogout records that the client itself asked for the logout: the
+// LeaveWorld answer is then relayed (the client returns to the login
+// screen on its own) and the session end closes the connection instead
+// of holding it.
+func (gc *gameConn) markUserLogout() {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+	gc.userLogout = true
+}
+
+// clientLoggedOut reports whether the client asked for the logout.
+func (gc *gameConn) clientLoggedOut() bool {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+
+	return gc.userLogout
+}
+
 // transitToServer forwards one decrypted client packet to the real game
-// server through the bot session, applying the transformer seam.
+// server through the bot session, applying the transformer seam. A held
+// client (its bot session ended, the relogin pending) has its packets
+// swallowed: the character is offline, and the frozen world state behind
+// the client makes every action meaningless anyway - except the logout:
+// a user that wants out of the frozen world gets the login screen (the
+// synthesized LeaveWorld), not a swallowed intent.
+//
+// A send failure never kills the client connection: it means the bot
+// session link died under the transit (the narrow window before the
+// relay noticed the recorder close and engaged the hold). The recorder
+// close is the authority on the session end - it triggers the hold of
+// the relogin handoff, and killing the client here would break it.
 func (gc *gameConn) transitToServer(payload []byte) error {
+	if payload[0] == clientOpLogout {
+		gc.markUserLogout()
+		if gc.isHolding() {
+			// The user wants out of the frozen world: the character is
+			// offline, so the server cannot answer the logout - the
+			// proxy hands the client the login screen itself.
+			gc.relayToClient(buildLeaveWorldPacket())
+			gc.shutdown("the user logged out while held for the bot relogin")
+
+			return nil
+		}
+	}
+	if gc.isHolding() {
+		gc.server.logger.Printf(
+			"game#%d: client packet 0x%02x swallowed while held for the bot relogin",
+			gc.id, payload[0])
+
+		return nil
+	}
 	transformed, ok := gc.server.transformer.ClientToServer(payload)
 	if !ok {
 		gc.server.logger.Printf("game#%d: dropped client packet 0x%02x",
@@ -385,9 +493,13 @@ func (gc *gameConn) transitToServer(payload []byte) error {
 
 		return nil
 	}
-	if err := gc.session.client.SendRaw(transformed); err != nil {
-		return fmt.Errorf("failed to send client packet 0x%02x: %w",
-			payload[0], err)
+	if err := gc.currentSession().client.SendRaw(transformed); err != nil {
+		gc.server.logger.Printf(
+			"game#%d: client packet 0x%02x not sent, the bot "+
+				"session link is failing: %v",
+			gc.id, payload[0], err)
+
+		return nil
 	}
 	gc.server.logger.Printf("game#%d: client -> server 0x%02x (%d bytes)",
 		gc.id, payload[0], len(payload))
@@ -397,49 +509,112 @@ func (gc *gameConn) transitToServer(payload []byte) error {
 
 // runSender is the single writer of the client socket: it encrypts and
 // sends every outbound payload in order, so the outbound cipher chain
-// stays consistent no matter which goroutine produced the packet.
+// stays consistent no matter which goroutine produced the packet. On
+// the connection close it flushes the packets already queued (a
+// shutdown right behind a queued packet - the LeaveWorld of the held
+// logout - must still reach the client) and then closes the socket
+// itself: the reader is released by the close, not by the done flag.
 func (gc *gameConn) runSender() {
+	gc.senderLive.Store(true)
+	defer func() {
+		close(gc.senderDone)
+		_ = gc.conn.Close()
+	}()
+
 	buf := make([]byte, 0, 1024)
 	for {
 		select {
 		case <-gc.done:
+			gc.drainOutbound(buf)
+
 			return
 		case payload := <-gc.outCh:
-			// The payload may be shared with the recorder history: the
-			// encryption transforms in place, so it runs on the copy.
-			buf = append(buf[:0], payload...)
-			gc.crypt.Encrypt(buf)
-			if err := gc.conn.SetWriteDeadline(
-				time.Now().Add(gameWriteTimeout)); err != nil {
-				gc.shutdown("write deadline failed: " + err.Error())
-
-				return
-			}
-			if err := writeWirePacket(gc.conn, buf); err != nil {
-				gc.shutdown("client write failed: " + err.Error())
-
+			if !gc.writeOutbound(buf, payload) {
 				return
 			}
 		}
 	}
 }
 
-// runRelay brings the client up to the current world state (the
-// recorded stream of the bot session after its CharSelected packet) and
-// then continues with the live feed. Packets pass the transformer seam
-// in both cases.
-//
-// The replayed self-state is live-patched (see replay.go): every
-// UserInfo of the played character carries the current tracker
-// position and vitals, and the stale self movement packets are dropped
-// except the newest one (whose coordinates match the tracker by
-// construction). The world packets of other objects replay unchanged.
+// drainOutbound flushes the packets queued at the moment of the close;
+// a failed write aborts the drain (the socket is gone).
+func (gc *gameConn) drainOutbound(buf []byte) {
+	for {
+		select {
+		case payload := <-gc.outCh:
+			if !gc.writeOutbound(buf, payload) {
+				return
+			}
+		default:
+			return
+		}
+	}
+}
+
+// writeOutbound encrypts one payload on the scratch buffer and writes
+// it to the client socket. It reports false when the write failed: the
+// socket is closed right away (the reader must be released), the
+// remaining queue is dropped.
+func (gc *gameConn) writeOutbound(buf []byte, payload []byte) bool {
+	// The payload may be shared with the recorder history: the
+	// encryption transforms in place, so it runs on the copy.
+	buf = append(buf[:0], payload...)
+	gc.crypt.Encrypt(buf)
+	if err := gc.conn.SetWriteDeadline(
+		time.Now().Add(gameWriteTimeout)); err != nil {
+		gc.server.logger.Printf("game#%d: write deadline failed: %v",
+			gc.id, err)
+		_ = gc.conn.Close()
+
+		return false
+	}
+	if err := writeWirePacket(gc.conn, buf); err != nil {
+		gc.server.logger.Printf("game#%d: client write failed: %v",
+			gc.id, err)
+		_ = gc.conn.Close()
+
+		return false
+	}
+
+	return true
+}
+
+// runRelay streams the sessions of the client's bot until the
+// connection ends. Each cycle replays the recorded history of one bot
+// session and follows it with the live feed; when that session ends and
+// the client did not ask for the logout itself, the cycle performs the
+// relogin handoff (hold, resync) and the loop continues with the
+// replacement session.
 func (gc *gameConn) runRelay() {
-	recorder := gc.session.recorder
-	entries, sub := recorder.Attach(gc.charSelectedSeq)
+	fromSeq := gc.charSelectedSeq
+	for {
+		next, ok := gc.streamSession(fromSeq)
+		if !ok {
+			return
+		}
+		fromSeq = next
+	}
+}
+
+// streamSession serves one bot session cycle: the replay of everything
+// recorded after the given sequence (the enter world burst and the
+// history, live-patched for the played character) followed by the live
+// feed. It returns the replay start sequence of the next cycle (the
+// CharSelected of the replacement session) when the session ended and
+// the client was held through the relogin handoff, ok=false when the
+// connection is done.
+//
+// The LeaveWorld answer of a bot initiated logout is suppressed in both
+// the replay and the live feed (see handoff.go): a client that processes
+// it drops itself to the login screen, which breaks the hold. A client
+// that asked for the logout itself still receives it.
+func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
+	session := gc.currentSession()
+	recorder := session.recorder
+	entries, sub := recorder.Attach(fromSeq)
 	defer recorder.removeSubscriber(sub)
 
-	selfID := gc.session.tracker.SelfObjectID()
+	selfID := session.tracker.SelfObjectID()
 	lastSelfMoveSeq := lastSelfMovementSeq(entries, selfID)
 
 	replayBytes := 0
@@ -451,9 +626,83 @@ func (gc *gameConn) runRelay() {
 			"(self id %d), then live",
 		gc.id, len(entries), replayBytes, selfID)
 
+	gc.replayHistory(entries, selfID, lastSelfMoveSeq, session)
+	gc.server.logger.Printf("game#%d: replay done, live relay active", gc.id)
+
+	for {
+		select {
+		case <-gc.done:
+			return 0, false
+		case <-sub.poison:
+			gc.shutdown("the client fell behind the live feed")
+
+			return 0, false
+		case <-recorder.CloseSignal():
+			return gc.serveRelogin(session)
+		case update := <-sub.ch:
+			if isLeaveWorldPayload(update.payload) && !gc.clientLoggedOut() {
+				gc.server.logger.Printf(
+					"game#%d: leave world suppressed, the client stays for "+
+						"the bot relogin",
+					gc.id)
+
+				continue
+			}
+			if !gc.relayToClient(update.payload) {
+				return 0, false
+			}
+		}
+	}
+}
+
+// serveRelogin handles the end of the streamed bot session: a client
+// that asked for the logout itself is closed with the session, any
+// other client is held through the bot relogin and resynced onto the
+// replacement session. It returns the replay start sequence of the
+// replacement session (ok=true) or the end of the connection.
+func (gc *gameConn) serveRelogin(session *botSession) (int64, bool) {
+	if gc.clientLoggedOut() {
+		gc.shutdown("the bot session ended after the client logout")
+
+		return 0, false
+	}
+	next, oldKnowns := gc.holdForRelogin(session)
+	if next == nil {
+		return 0, false
+	}
+	if !gc.resyncWorld(next, oldKnowns) {
+		return 0, false
+	}
+	newSeq := next.recorder.FirstPacketSeq(charSelectedOpcode)
+	if newSeq == 0 {
+		// Defensive: an online session without a recorded CharSelected
+		// cannot be replayed from its enter world burst; the client
+		// keeps the teleport resync and the live feed alone.
+		gc.server.logger.Printf(
+			"game#%d: replacement session has no recorded char "+
+				"selected, continuing with the live feed only",
+			gc.id)
+		newSeq = maxReplaySeq
+	}
+
+	return newSeq, true
+}
+
+// replayHistory streams the recorded history of one session cycle: the
+// LeaveWorld of a bot logout is skipped (the hold depends on the client
+// staying in the world), the UserInfo of the played character carries
+// the live state and the stale self movement is dropped except the
+// newest packet.
+func (gc *gameConn) replayHistory(
+	entries []RecorderEntry, selfID int32, lastSelfMoveSeq int64,
+	session *botSession,
+) {
 	droppedMoves := 0
 	for i := range entries {
 		payload := entries[i].payload
+		if isLeaveWorldPayload(payload) && !gc.clientLoggedOut() {
+			continue
+		}
 		if isSelfMovementPayload(payload, selfID) &&
 			entries[i].seq != lastSelfMoveSeq {
 			droppedMoves++
@@ -462,7 +711,7 @@ func (gc *gameConn) runRelay() {
 		}
 		if payload[0] == replayOpUserInfo {
 			payload = patchUserInfoSelfLive(
-				payload, selfID, gc.session.tracker.SelfSnapshot())
+				payload, selfID, session.tracker.SelfSnapshot())
 		}
 		if !gc.relayToClient(payload) {
 			return
@@ -472,26 +721,6 @@ func (gc *gameConn) runRelay() {
 		gc.server.logger.Printf(
 			"game#%d: replay dropped %d stale self movement packets",
 			gc.id, droppedMoves)
-	}
-	gc.server.logger.Printf("game#%d: replay done, live relay active", gc.id)
-
-	for {
-		select {
-		case <-gc.done:
-			return
-		case <-sub.poison:
-			gc.shutdown("the client fell behind the live feed")
-
-			return
-		case <-recorder.CloseSignal():
-			gc.shutdown("the bot session ended")
-
-			return
-		case update := <-sub.ch:
-			if !gc.relayToClient(update.payload) {
-				return
-			}
-		}
 	}
 }
 
@@ -521,10 +750,22 @@ func (gc *gameConn) sendToClient(payload []byte) error {
 }
 
 // shutdown closes the client connection once with the given reason.
+// When the sender goroutine is live it flushes the queued packets and
+// closes the socket itself; shutdown only waits a bounded time for
+// that (a stalled write cannot hold the teardown hostage) and force
+// closes the socket afterwards. A connection without the sender (a
+// failed handshake) is closed directly.
 func (gc *gameConn) shutdown(reason string) {
 	gc.closeOnce.Do(func() {
 		gc.server.logger.Printf("game#%d: closing, %s", gc.id, reason)
 		close(gc.done)
+		if gc.senderLive.Load() {
+			select {
+			case <-gc.senderDone:
+			case <-time.After(shutdownFlushWait):
+				_ = gc.conn.Close()
+			}
+		}
 		_ = gc.conn.Close()
 	})
 }

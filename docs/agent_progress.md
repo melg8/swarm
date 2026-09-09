@@ -2121,3 +2121,45 @@ name the variant number that best fits the real bot UI.
   walked, the second client saw 46315 41341 -3440 with the real
   gear), go build/vet, go test ./... (16 packages), golangci-lint 0
   issues.
+- 2026-09-09: the bot relogin handoff (round 5, feature/proxy-server).
+  The second half of the proxy contract: the client must survive the
+  session cycle of its bot. The hunt loop logs the character out (the
+  emergency logout, the pile up escape) and the supervisor logs it
+  back in seconds later - the user did nothing and must not be kicked
+  to the login screen for a decision the bot made. Three pieces, all
+  in the relay (streamSession/serveRelogin of proxy/game.go, the new
+  proxy/handoff.go): (1) the LeaveWorld suppression - the answer of
+  the real server to the bot's logout is dropped from both the
+  recorded history and the live feed (a client that processes it drops
+  itself to the login screen), unless the client asked for the logout
+  itself (the classic flow keeps the relayed answer); (2) the hold -
+  the recorder close keeps the connection open while swallowing the
+  client packets (the character is offline, the world behind the
+  client is frozen), a user Logout while held gets a synthesized
+  LeaveWorld from the proxy itself (the login screen beats a
+  swallowed intent), and the hold gives up after 2 minutes of a
+  missing bot; (3) the resync - once the replacement session of the
+  same bot id is back online, the played character receives a
+  synthesized TeleportToLocation to its live position, every object
+  id of the old known list is swept with DeleteObject (the new
+  Bot.KnownObjectIDs accessor), the enter world burst of the new
+  session replays through the ordinary live self state patch, and the
+  connection swaps onto the new session (the client packets transit
+  through the live bot link again). The sender got a bounded shutdown
+  flush (the queued packets reach the client before the socket
+  closes - the synthesized LeaveWorld of the held logout rides it),
+  and a transit failure no longer kills the client connection (the
+  narrow window before the hold engages would have dropped it). New
+  tests: TestHandoffPacketBuilders (the byte layouts against the
+  Mobius writeImpl bodies), TestGameServerHoldsClientThroughBotRelogin
+  (the core scenario end to end), TestGameServerUserLogout*
+  (the classic flow and the held logout), TestGameServerHoldTimeout,
+  TestGameServerReloginWithoutCharSelected (the defensive live feed
+  only path); the full client flow test flipped to the hold contract.
+  One stack side note: the login server held a stale session key for
+  the account after a wedged run (`Session key incorrect` in
+  game.log), a login+game restart cleared it - the E2E failure was
+  stack staleness, not code. Verified against the redeployed stack:
+  SWARM_PROXY_E2E=1 e2e PASS, tools/mobius_e2e.sh E2E_OK, go
+  build/vet, go test ./... (18 packages), go test -race on the proxy
+  package, golangci-lint (2 pre-existing gosec, no new issues).

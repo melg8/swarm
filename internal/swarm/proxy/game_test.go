@@ -286,10 +286,14 @@ func TestGameServerServesFullClientFlow(t *testing.T) {
 		t.Fatal("the client packet never reached the bot session")
 	}
 
-	// The end of the bot session disconnects the client.
+	// The end of the bot session no longer disconnects the client:
+	// the relogin handoff holds it for the replacement session (see
+	// the handoff tests). The connection must stay open.
 	recorder.Close()
-	_, err := client.conn.Read(make([]byte, 1))
-	require.Error(t, err, "the client connection must close with the session")
+	requireConnOpen(t, client, 200*time.Millisecond)
+
+	// Unwind the hold before the test returns.
+	closeHeldClient(t, server, client)
 }
 
 // TestGameServerStaticKeyServesHardcodedKeyClient reproduces the real

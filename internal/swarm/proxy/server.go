@@ -286,6 +286,21 @@ func (s *Server) SessionIDs() []string {
 	return ids
 }
 
+// sessionByID returns the currently registered session of the given bot
+// id, nil when the id is not registered. The relogin handoff of a held
+// client polls it to notice the replacement session of the same bot.
+func (s *Server) sessionByID(id string) *botSession {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.sessions {
+		if s.sessions[i].id == id {
+			return s.sessions[i]
+		}
+	}
+
+	return nil
+}
+
 // ClientCount returns the number of connected game clients.
 func (s *Server) ClientCount() int {
 	return int(s.clients.Load())
