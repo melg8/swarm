@@ -374,6 +374,12 @@ type Bot struct {
 	// walk, the clicked destination last.
 	walkPath   []WalkPoint
 	walkPathAt time.Time
+	// shopping holds the published purchase queue of the shop
+	// strategy (see SetShoppingPlan): what the bot plans to buy next
+	// with the prices and the missing adena, nil while nothing is
+	// published. shoppingAt bounds its freshness (shoppingPlanTTL).
+	shopping   *ShoppingPlanView
+	shoppingAt time.Time
 	// loginCooldownUntil holds the reconnect pause the supervisor
 	// honors after an emergency logout. The tracker outlives the
 	// sessions, so the cooldown spans them (see SetLoginCooldown).
@@ -406,6 +412,8 @@ func NewBot(id string) *Bot {
 		commandQueue:       make(chan Command, commandQueueCapacity),
 		walkPath:           nil,
 		walkPathAt:         time.Time{},
+		shopping:           nil,
+		shoppingAt:         time.Time{},
 	}
 }
 
@@ -785,6 +793,7 @@ func (b *Bot) ResetSession() {
 	b.inventoryVersion++
 	b.walkPath = nil
 	b.walkPathAt = time.Time{}
+	b.clearShoppingPlanLocked()
 	b.phase = ""
 	b.status = StatusConnecting
 	b.touch()
@@ -1652,6 +1661,11 @@ type Snapshot struct {
 	Events    []Event                 `json:"events"`
 	Chat      []ChatEvent             `json:"chat"`
 	WalkPath  []WalkPoint             `json:"walkPath"`
+	// Shopping carries the published purchase queue of the shop
+	// strategy (see SetShoppingPlan): what the bot plans to buy next
+	// with the prices and the missing adena, null when nothing is
+	// published or the plan expired.
+	Shopping *ShoppingPlanView `json:"shopping"`
 	// CombatEvents carries the recent swings and damage
 	// landings of the animation layer: the last
 	// combatEventTTL window, in chronological order,
@@ -1756,6 +1770,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 		Events:       make([]Event, 0, min(b.log.length, snapshotEvents)),
 		Chat:         make([]ChatEvent, 0, b.chat.length),
 		WalkPath:     nil,
+		Shopping:     nil,
 		HuntingZone:  nil,
 		HuntingZones: nil,
 		Packets:      b.packets,
@@ -1767,6 +1782,16 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 	if b.walkPath != nil && time.Since(b.walkPathAt) <= walkPlanTTL {
 		snap.WalkPath = make([]WalkPoint, len(b.walkPath))
 		copy(snap.WalkPath, b.walkPath)
+	}
+	if b.shoppingPlanLive(now) {
+		entries := make([]ShoppingEntryView, len(b.shopping.Entries))
+		copy(entries, b.shopping.Entries)
+		snap.Shopping = &ShoppingPlanView{
+			Entries: entries,
+			Adena:   b.shopping.Adena,
+			Total:   b.shopping.Total,
+			Trip:    b.shopping.Trip,
+		}
 	}
 	nowNano := now.UnixNano()
 	for i := range b.world.hot {

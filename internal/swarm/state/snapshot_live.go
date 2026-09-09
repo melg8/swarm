@@ -60,6 +60,8 @@ func (b *Bot) appendSnapshotJSONLocked(dst []byte, now time.Time) []byte {
 	dst = b.appendLiveChatJSON(dst)
 	dst = append(dst, `],"walkPath":`...)
 	dst = b.appendLiveWalkPathJSON(dst)
+	dst = append(dst, `,"shopping":`...)
+	dst = b.appendLiveShoppingJSON(dst, now)
 	dst = append(dst, `,"combatEvents":[`...)
 	dst = b.appendLiveCombatJSON(dst, now)
 	dst = append(dst, `],"huntingZone":`...)
@@ -188,6 +190,17 @@ func (b *Bot) appendLiveWalkPathJSON(dst []byte) []byte {
 	}
 
 	return append(dst, ']')
+}
+
+// appendLiveShoppingJSON writes the published shopping plan (null
+// when none is fresh) exactly like the Snapshot view. The caller
+// must hold a lock.
+func (b *Bot) appendLiveShoppingJSON(dst []byte, now time.Time) []byte {
+	if !b.shoppingPlanLive(now) {
+		return append(dst, `null`...)
+	}
+
+	return appendShoppingPlanJSON(dst, b.shopping)
 }
 
 // appendLiveCombatJSON writes the combat animation beats of the TTL
@@ -350,6 +363,9 @@ func (b *Bot) snapshotJSONSizeLocked() int {
 	size += 96 * count
 	size += 96 * b.chat.length
 	size += 24 * len(b.walkPath)
+	if b.shopping != nil {
+		size += 256 * len(b.shopping.Entries)
+	}
 	size += 160 * len(b.combat.events)
 	size += 160 * len(b.zoneViews)
 	for i := count; i > 0; i-- {

@@ -172,6 +172,69 @@ func goldenSnapshot() Snapshot {
 			{Time: moment, Kind: "system", Text: "You earned 42 adena."},
 		},
 		WalkPath: []WalkPoint{{X: 45100, Y: 50100, Z: -3500}},
+		Shopping: &ShoppingPlanView{
+			Entries: []ShoppingEntryView{
+				{
+					ItemID:      1121,
+					Name:        "Apprentice's Shoes",
+					Icon:        "armor_t01_b_i00",
+					MerchantID:  7148,
+					Merchant:    "Ariel",
+					Type:        "Armor",
+					WeaponType:  "",
+					ArmorType:   "LIGHT",
+					BodyPartKey: "feet",
+					PAtk:        0,
+					MAtk:        0,
+					PDef:        8,
+					MDef:        0,
+					SDef:        0,
+					RShld:       0,
+					PAtkSpd:     0,
+					SoulShots:   0,
+					SpiritShots: 0,
+					Weight:      210,
+					Price:       9,
+					SellCredit:  0,
+					Missing:     0,
+					Gain:        8,
+					Affordable:  true,
+					Buying:      false,
+					Reason:      "buying Apprentice's Shoes (+8 for 9 adena)",
+				},
+				{
+					ItemID:      1,
+					Name:        "Short Sword",
+					Icon:        "weapon_small_sword_i00",
+					MerchantID:  7147,
+					Merchant:    "Unoren",
+					Type:        "Weapon",
+					WeaponType:  "SWORD",
+					ArmorType:   "",
+					BodyPartKey: "rhand",
+					PAtk:        8,
+					MAtk:        0,
+					PDef:        0,
+					MDef:        0,
+					SDef:        0,
+					RShld:       0,
+					PAtkSpd:     0,
+					SoulShots:   0,
+					SpiritShots: 0,
+					Weight:      1600,
+					Price:       883,
+					SellCredit:  0,
+					Missing:     383,
+					Gain:        3.5,
+					Affordable:  false,
+					Buying:      false,
+					Reason:      "buying Short Sword (+3.5 for 883 adena)",
+				},
+			},
+			Adena: 500,
+			Total: 9,
+			Trip:  false,
+		},
 		CombatEvents: []CombatEventView{
 			{
 				Seq:        7,
@@ -232,6 +295,7 @@ func TestSnapshotJSONNilSlicesMatchReflection(t *testing.T) {
 	snapshot.Events = nil
 	snapshot.Chat = nil
 	snapshot.WalkPath = nil
+	snapshot.Shopping = nil
 	snapshot.CombatEvents = nil
 	snapshot.HuntingZone = nil
 	snapshot.HuntingZones = nil

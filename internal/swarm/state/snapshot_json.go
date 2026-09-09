@@ -48,6 +48,9 @@ func snapshotJSONSize(s Snapshot) int {
 	size += 96 * len(s.Events)
 	size += 96 * len(s.Chat)
 	size += 24 * len(s.WalkPath)
+	if s.Shopping != nil {
+		size += 256 * len(s.Shopping.Entries)
+	}
 	size += 160 * len(s.CombatEvents)
 	size += 160 * len(s.HuntingZones)
 	for i := range s.Events {
@@ -81,6 +84,8 @@ func appendSnapshotJSON(dst []byte, s Snapshot) []byte {
 	dst = appendChatJSON(dst, s.Chat)
 	dst = append(dst, `,"walkPath":`...)
 	dst = appendWalkPathJSON(dst, s.WalkPath)
+	dst = append(dst, `,"shopping":`...)
+	dst = appendShoppingPlanJSON(dst, s.Shopping)
 	dst = append(dst, `,"combatEvents":`...)
 	dst = appendCombatEventsJSON(dst, s.CombatEvents)
 	dst = append(dst, `,"huntingZone":`...)
@@ -439,6 +444,100 @@ func appendWalkPointJSON(dst []byte, point WalkPoint) []byte {
 	dst = strconv.AppendInt(dst, int64(point.Z), 10)
 
 	return append(dst, '}')
+}
+
+// appendShoppingPlanJSON writes the published shopping plan object
+// (null when none is published). The live state encoder reuses it
+// with the published plan under the read lock; the entries array of
+// a live plan is never nil (SetShoppingPlan clears empty plans).
+func appendShoppingPlanJSON(dst []byte, plan *ShoppingPlanView) []byte {
+	if plan == nil {
+		return append(dst, `null`...)
+	}
+	if plan.Entries == nil {
+		dst = append(dst, `{"entries":null`...)
+	} else {
+		dst = append(dst, `{"entries":[`...)
+		for i := range plan.Entries {
+			if i > 0 {
+				dst = append(dst, ',')
+			}
+			dst = appendShoppingEntryJSON(dst, plan.Entries[i])
+		}
+		dst = append(dst, ']')
+	}
+	dst = append(dst, `,"adena":`...)
+	dst = strconv.AppendInt(dst, plan.Adena, 10)
+	dst = append(dst, `,"total":`...)
+	dst = strconv.AppendInt(dst, plan.Total, 10)
+	dst = append(dst, `,"trip":`...)
+	dst = strconv.AppendBool(dst, plan.Trip)
+	dst = append(dst, '}')
+
+	return dst
+}
+
+// appendShoppingEntryJSON writes one planned purchase of the shopping
+// plan. The field order mirrors the struct declaration like the
+// reflection encoder.
+//
+//nolint:funlen // linear field order
+func appendShoppingEntryJSON(dst []byte, entry ShoppingEntryView) []byte {
+	dst = append(dst, `{"itemId":`...)
+	dst = strconv.AppendInt(dst, int64(entry.ItemID), 10)
+	dst = append(dst, `,"name":`...)
+	dst = appendJSONString(dst, entry.Name)
+	dst = append(dst, `,"icon":`...)
+	dst = appendJSONString(dst, entry.Icon)
+	dst = append(dst, `,"merchantId":`...)
+	dst = strconv.AppendInt(dst, int64(entry.MerchantID), 10)
+	dst = append(dst, `,"merchant":`...)
+	dst = appendJSONString(dst, entry.Merchant)
+	dst = append(dst, `,"type":`...)
+	dst = appendJSONString(dst, entry.Type)
+	dst = append(dst, `,"weaponType":`...)
+	dst = appendJSONString(dst, entry.WeaponType)
+	dst = append(dst, `,"armorType":`...)
+	dst = appendJSONString(dst, entry.ArmorType)
+	dst = append(dst, `,"bodyPartKey":`...)
+	dst = appendJSONString(dst, entry.BodyPartKey)
+	dst = append(dst, `,"pAtk":`...)
+	dst = strconv.AppendInt(dst, int64(entry.PAtk), 10)
+	dst = append(dst, `,"mAtk":`...)
+	dst = strconv.AppendInt(dst, int64(entry.MAtk), 10)
+	dst = append(dst, `,"pDef":`...)
+	dst = strconv.AppendInt(dst, int64(entry.PDef), 10)
+	dst = append(dst, `,"mDef":`...)
+	dst = strconv.AppendInt(dst, int64(entry.MDef), 10)
+	dst = append(dst, `,"sDef":`...)
+	dst = strconv.AppendInt(dst, int64(entry.SDef), 10)
+	dst = append(dst, `,"rShld":`...)
+	dst = strconv.AppendInt(dst, int64(entry.RShld), 10)
+	dst = append(dst, `,"pAtkSpd":`...)
+	dst = strconv.AppendInt(dst, int64(entry.PAtkSpd), 10)
+	dst = append(dst, `,"soulShots":`...)
+	dst = strconv.AppendInt(dst, int64(entry.SoulShots), 10)
+	dst = append(dst, `,"spiritShots":`...)
+	dst = strconv.AppendInt(dst, int64(entry.SpiritShots), 10)
+	dst = append(dst, `,"weight":`...)
+	dst = strconv.AppendInt(dst, int64(entry.Weight), 10)
+	dst = append(dst, `,"price":`...)
+	dst = strconv.AppendInt(dst, entry.Price, 10)
+	dst = append(dst, `,"sellCredit":`...)
+	dst = strconv.AppendInt(dst, entry.SellCredit, 10)
+	dst = append(dst, `,"missing":`...)
+	dst = strconv.AppendInt(dst, entry.Missing, 10)
+	dst = append(dst, `,"gain":`...)
+	dst = appendJSONFloat(dst, entry.Gain)
+	dst = append(dst, `,"affordable":`...)
+	dst = strconv.AppendBool(dst, entry.Affordable)
+	dst = append(dst, `,"buying":`...)
+	dst = strconv.AppendBool(dst, entry.Buying)
+	dst = append(dst, `,"reason":`...)
+	dst = appendJSONString(dst, entry.Reason)
+	dst = append(dst, '}')
+
+	return dst
 }
 
 // appendCombatEventsJSON writes the combat animation feed array.
