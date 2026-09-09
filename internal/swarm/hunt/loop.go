@@ -196,23 +196,37 @@ const (
 	// farming).
 	panicLogoutHealthPercent = 12.0
 	// panicLogoutPause is the login cooldown of the emergency
-	// logout: the supervisor waits it out before the next session,
-	// so the mobs reset around the stored character and it
-	// regenerates sitting instead of logging into the same blows.
-	// Half a minute covers the fifteen second combat stance the
-	// server holds an offline character in plus the mob reset walk
-	// home, without idling the farm for minutes.
-	panicLogoutPause = 30 * time.Second
-	// panicLogoutAttackers is the aggro count that triggers the
-	// emergency logout on its own: two swinging mobs outdamage
-	// anything a lone farmer can answer, and a social pack only
-	// grows while the fight lasts.
+	// logout: the supervisor waits it out before the next session.
+	// The aggro resets the moment the character leaves the world -
+	// the chasing mobs drop the target and start their walk home -
+	// so a short pause that covers the logout round trip is all
+	// the reset needs (observed live: a two second relogin lands
+	// clean), and the character regenerates sitting through the
+	// sessions that follow. A failed early login (the server still
+	// holds the combat stance body) only costs one retry: the
+	// supervisor backoff doubles it.
+	panicLogoutPause = 2 * time.Second
+	// panicLogoutAttackers is the aggro count that starts the
+	// pile up run: two swinging mobs outdamage anything a lone
+	// farmer can answer, and a social pack only grows while the
+	// fight lasts - the fight is dropped and the logout happens
+	// at a distance instead (see panicRunDistance).
 	panicLogoutAttackers = 2
+	// panicRunDistance is the escape distance the pile up run
+	// must open from the aggro point before the logout fires:
+	// logged out there, the character leaves the chasing pack
+	// behind, the mobs walk home while the character is offline,
+	// and the short relogin lands far outside their aggro range
+	// instead of on top of the same pack.
+	panicRunDistance = 600.0
 	// fleeLogoutAfter bounds one flee episode: an escape that has
 	// not shaken the chase within this budget ends the session
 	// instead - the mobs keep the character running forever
 	// otherwise, and the relogin after the pause resets their
-	// aggro while the character regenerates sitting.
+	// aggro while the character regenerates sitting. The pile up
+	// run shares the budget: a run that cannot open the escape
+	// distance within it (a cornered or blocked escape) still
+	// ends the session rather than running forever.
 	fleeLogoutAfter = 20 * time.Second
 )
 
@@ -320,6 +334,19 @@ type Loop struct {
 	// the session logs out to reset the aggro instead of running
 	// forever. A recovered health or a fresh fight clears it.
 	fleeSince time.Time
+	// panicAt marks the armed pile up run (the loop run between
+	// the social pile up and its deferred logout): zero while no
+	// pile up forced one, otherwise the moment the pack was
+	// spotted. The run is committed once armed - the logout
+	// happens at panicRunDistance from the panic point no matter
+	// how the pack thins out on the way (see panicPileUpRun).
+	panicAt time.Time
+	// panicX and panicY anchor the pile up run: the aggro point
+	// the character was standing on when the pack piled up. The
+	// logout fires only after the run opened panicRunDistance
+	// units between the character and this point.
+	panicX int32
+	panicY int32
 	// logoutDone marks the one shot emergency logout: the session
 	// unwinds within a second of the request, the flag keeps the
 	// dying ticks quiet.
@@ -493,6 +520,9 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		noTargetSince:     time.Time{},
 		fleeAt:            time.Time{},
 		fleeSince:         time.Time{},
+		panicAt:           time.Time{},
+		panicX:            0,
+		panicY:            0,
 		logoutDone:        false,
 		userKind:          "",
 		userX:             0,
@@ -620,17 +650,29 @@ func (l *Loop) tick() { //nolint:cyclop
 		return
 	}
 	// The emergency logout: critical health with the blows still
-	// landing, or a social pile up - several mobs already hold the
-	// character as their target. The deleveling wants the deaths, a
-	// manual only session never decides on its own, and a request
-	// already sent stays one shot while the session unwinds.
-	if !l.logoutDone && l.autonomous && l.phase != phaseDelevel &&
-		((l.tracker.SelfHealthPercent() < panicLogoutHealthPercent &&
-			l.tracker.SelfUnderAttack()) ||
-			l.tracker.SelfAttackerCount() >= panicLogoutAttackers) {
-		l.emergencyLogout()
+	// landing ends the session at once (one hit from death, the
+	// run has nothing left to protect), while a social pile up -
+	// several mobs already hold the character as their target -
+	// starts the pile up run instead: the logout waits until the
+	// character opened the escape distance from the aggro point.
+	// The deleveling wants the deaths, a manual only session
+	// never decides on its own, and a request already sent stays
+	// one shot while the session unwinds. The armed run keeps
+	// driving the logout even after the pack thins out on the
+	// way: the escape distance, not the live mob count, ends it.
+	if !l.logoutDone && l.autonomous && l.phase != phaseDelevel {
+		if l.tracker.SelfHealthPercent() < panicLogoutHealthPercent &&
+			l.tracker.SelfUnderAttack() {
+			l.emergencyLogout()
 
-		return
+			return
+		}
+		if l.tracker.SelfAttackerCount() >= panicLogoutAttackers ||
+			!l.panicAt.IsZero() {
+			l.panicPileUpRun(time.Now())
+
+			return
+		}
 	}
 	if l.logoutDone {
 		return

@@ -131,13 +131,116 @@ func (l *Loop) threatPosition() (int32, int32, bool) {
 	return pick.X, pick.Y, true
 }
 
+// panicPileUpRun answers the social pile up (two or more mobs
+// hold the character as their target) with a run instead of the
+// instant logout. The first call anchors the aggro point - the
+// spot the pack piled up on - and drops the current fight (the
+// walk away must not re-engage it), every later call walks one
+// paced escape leg away from the threats. The logout fires only
+// once the run opened panicRunDistance units between the character
+// and the anchor: the chasing pack stays behind, the mobs drop the
+// target and walk home while the character is offline, and the
+// short relogin lands outside their aggro range instead of on top
+// of the same pack. A run that cannot open the distance within the
+// shared flee budget (a cornered or blocked escape) still logs out
+// wherever it got to - the session must not run forever. So does a
+// run whose pack dissolved on the way (no mob holds the target
+// anymore, nothing attackable stands near): nothing is left to
+// run from, the spot is as safe as the run gets.
+func (l *Loop) panicPileUpRun(now time.Time) {
+	if l.panicAt.IsZero() {
+		x, y, _, ok := l.tracker.SelfPosition()
+		if !ok {
+			// No known position to measure the run from:
+			// the instant logout is the only answer left.
+			l.emergencyLogout()
+
+			return
+		}
+		l.panicAt = now
+		l.panicX, l.panicY = x, y
+		l.logger.Printf("Hunt: %d mobs piled on us, running %.0f units "+
+			"from the aggro point before the logout",
+			l.tracker.SelfAttackerCount(), panicRunDistance)
+		// Drop the fight the pack joined: the dropped target
+		// lands on the long skip list (the run must not
+		// re-engage it), the pending engage bookkeeping
+		// clears - the same handoff fleeFromTarget makes.
+		if l.target != 0 {
+			if l.targetSkip == nil {
+				l.targetSkip = make(map[int32]time.Time)
+			}
+			l.targetSkip[l.target] = now.Add(fleeSkipDelay)
+			l.target = 0
+			l.engageAt = time.Time{}
+			l.noTargetSince = time.Time{}
+		}
+	}
+	if dist := l.panicAnchorDistance(); dist >= panicRunDistance {
+		l.logger.Printf("Hunt: %.0f units from the aggro point, "+
+			"logging out", dist)
+		l.emergencyLogout()
+
+		return
+	}
+	if now.Sub(l.panicAt) >= fleeLogoutAfter {
+		l.logger.Printf("Hunt: the pile up run could not open %.0f units "+
+			"within %.0fs, logging out anyway",
+			panicRunDistance, fleeLogoutAfter.Seconds())
+		l.emergencyLogout()
+
+		return
+	}
+	if !l.fleeAt.IsZero() && now.Sub(l.fleeAt) < selectPeriod {
+		return
+	}
+	l.fleeAt = now
+	if l.fleeSince.IsZero() {
+		l.fleeSince = now
+	}
+	if !l.standUpGuarded(now) {
+		return
+	}
+	moveX, moveY, moveZ, ok := l.escapeWalkDestination()
+	if !ok {
+		// No mob holds the target anymore and nothing
+		// attackable stands within the escape range: the
+		// pack dissolved, the chase is over wherever the
+		// run got to. Log out now instead of idling out the
+		// budget - the relogin spot is already clear.
+		l.logger.Printf("Hunt: the pile up run shook the chase "+
+			"at %.0f units, logging out", l.panicAnchorDistance())
+		l.emergencyLogout()
+
+		return
+	}
+	if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
+		l.logger.Printf("Hunt: pile up escape walk failed: %v", err)
+	}
+}
+
+// panicAnchorDistance measures how far the character stands from
+// the anchored aggro point of the pile up run (the planar distance:
+// the height of the terrain does not make a mob pack closer).
+func (l *Loop) panicAnchorDistance() float64 {
+	x, y, _, ok := l.tracker.SelfPosition()
+	if !ok {
+		return 0
+	}
+
+	return math.Hypot(float64(x-l.panicX), float64(y-l.panicY))
+}
+
 // emergencyLogout saves a character with no way out: the health
 // is critical, the blows keep landing and the escape could not
-// shake the chase. One last escape leg keeps the character moving
-// through the combat window the server holds an offline character
-// in the world (fifteen seconds), then the session logs out and
-// the supervisor reconnects after the armed login cooldown - by
-// then the mobs reset and the character regenerates sitting.
+// shake the chase, or the pile up run opened its escape distance
+// (or lapsed its budget) away from the pack. One last escape leg
+// keeps the character moving through the combat window the server
+// holds an offline character in the world (fifteen seconds), then
+// the session logs out and the supervisor reconnects after the
+// armed login cooldown - the aggro resets on the disappearance,
+// the mobs left behind walk home, and the character regenerates
+// sitting.
 func (l *Loop) emergencyLogout() {
 	l.logoutDone = true
 	reason := fmt.Sprintf("HP %.0f%% under attack",
@@ -153,6 +256,7 @@ func (l *Loop) emergencyLogout() {
 		}
 	}
 	l.tracker.SetLoginCooldown(panicLogoutPause)
+	l.panicAt = time.Time{}
 	if err := l.game.RequestLogout(); err != nil {
 		l.logger.Printf("Hunt: logout request failed: %v", err)
 	}

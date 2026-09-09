@@ -914,7 +914,7 @@ func TestLoopLogsOutWhenTheFleeNeverShakesTheChase(t *testing.T) {
 		"the endless chase ends the session")
 	require.True(t, loop.logoutDone)
 	require.GreaterOrEqual(t, bot.LoginCooldownRemaining(),
-		panicLogoutPause-time.Second,
+		panicLogoutPause-500*time.Millisecond,
 		"the relogin pause resets the mob aggro")
 
 	// A single fresh flee never logs out: the budget only fires on a
@@ -962,10 +962,11 @@ func TestLoopLogsOutAtCriticalHealthUnderAttack(t *testing.T) {
 	loop.tick()
 
 	require.Equal(t, 1, game.logouts, "the emergency logout fires")
-	require.Greater(t, bot.LoginCooldownRemaining(), 20*time.Second,
-		"the login cooldown covers the combat stance and the reset")
-	require.LessOrEqual(t, bot.LoginCooldownRemaining(), 30*time.Second,
-		"the login cooldown is half a minute, not minutes")
+	require.Greater(t, bot.LoginCooldownRemaining(), time.Second,
+		"the login cooldown outlives the logout round trip")
+	require.LessOrEqual(t, bot.LoginCooldownRemaining(), 2*time.Second,
+		"the login cooldown is two seconds - the aggro resets on "+
+			"the disappearance, a long pause would only idle the farm")
 	require.Len(t, game.walks, 1,
 		"the last escape leg keeps the offline character moving")
 	require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0])
@@ -978,7 +979,7 @@ func TestLoopLogsOutAtCriticalHealthUnderAttack(t *testing.T) {
 	require.Len(t, game.walks, 1)
 }
 
-func TestLoopLogsOutWhenTwoMobsAggro(t *testing.T) {
+func TestLoopRunsFromThePileUpBeforeLoggingOut(t *testing.T) {
 	bot := newTestBot()
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 7, TemplateID: 1000001, Attackable: true,
@@ -993,8 +994,10 @@ func TestLoopLogsOutWhenTwoMobsAggro(t *testing.T) {
 	loop.lastHit = time.Now().Add(-time.Minute)
 
 	// The social pile up: a second gremlin joins the fight while
-	// the character is still healthy - the pack only grows, the
-	// logout fires on the attacker count alone.
+	// the character is still healthy. The pack only grows, so the
+	// session will end - but not on the spot: the logout waits
+	// until the run opened the escape distance from the aggro
+	// point, so the relogin lands outside the pack's aggro range.
 	for _, id := range []int32{7, 8} {
 		bot.ApplyAttack(state.Attack{
 			AttackerID: id, X: 45500, Y: 50000, Z: -3500,
@@ -1006,14 +1009,81 @@ func TestLoopLogsOutWhenTwoMobsAggro(t *testing.T) {
 	loop.lastHit = time.Now().Add(-2 * time.Second)
 	loop.tick()
 
+	require.Zero(t, game.logouts,
+		"the pile up does not log the character out on the spot")
+	require.Len(t, game.walks, 1,
+		"the pile up run starts with an escape leg")
+	require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0],
+		"the leg runs away from the mob pack")
+	require.False(t, loop.panicAt.IsZero(), "the aggro anchor is armed")
+	require.Equal(t, int32(45000), loop.panicX)
+	require.Equal(t, int32(50000), loop.panicY)
+
+	// The pacing holds the legs to one per second: an immediate
+	// re-tick neither walks again nor logs out.
+	loop.tick()
+	require.Len(t, game.walks, 1)
+	require.Zero(t, game.logouts)
+
+	// The character covers the first leg (700 units west, past
+	// the 600 unit escape distance): the logout fires there.
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 44300, Y: 50000, Z: -3500,
+		DestX: 44300, DestY: 50000, DestZ: -3500,
+	})
+	loop.tick()
 	require.Equal(t, 1, game.logouts,
-		"two attackers trigger the emergency logout")
-	require.LessOrEqual(t, bot.LoginCooldownRemaining(),
-		30*time.Second, "the reconnect pause is half a minute")
+		"the escape distance made, the session ends")
+	require.Len(t, game.walks, 2,
+		"the logout keeps the offline character moving")
+	require.LessOrEqual(t, bot.LoginCooldownRemaining(), 2*time.Second,
+		"the reconnect pause is two seconds")
 
 	// The request stays one shot while the session unwinds.
 	loop.tick()
 	require.Equal(t, 1, game.logouts)
+	require.Len(t, game.walks, 2)
+}
+
+func TestLoopLogsOutWhenThePileUpRunNeverMakesDistance(t *testing.T) {
+	bot := newTestBot()
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 45600, Y: 50000, Name: "Gremlin",
+	})
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 8, TemplateID: 1000001, Attackable: true,
+		X: 45400, Y: 50200, Name: "Gremlin",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// A cornered run: the pack holds the character in place
+	// (the escape legs keep failing, the character never moves).
+	// The budget ends the session wherever it got to instead of
+	// running forever.
+	for _, id := range []int32{7, 8} {
+		bot.ApplyAttack(state.Attack{
+			AttackerID: id, X: 45500, Y: 50000, Z: -3500,
+			TargetCount: 1,
+			TargetIDs:   [state.AttackTargets]int32{100},
+			TargetX:     45000, TargetY: 50000, TargetZ: -3500,
+		})
+	}
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Zero(t, game.logouts, "the fresh run gets its budget")
+
+	// The run ages past the whole flee budget without the
+	// character moving a unit: the logout fires anyway.
+	loop.fleeAt = time.Now().Add(-2 * time.Second)
+	loop.panicAt = time.Now().Add(-fleeLogoutAfter - time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.logouts,
+		"a cornered pile up run still ends the session")
+	require.True(t, loop.logoutDone)
+	require.LessOrEqual(t, bot.LoginCooldownRemaining(), 2*time.Second)
 }
 
 func TestLoopKeepsFightingAgainstOneAttacker(t *testing.T) {
