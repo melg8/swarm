@@ -4,6 +4,68 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: the deferred pile up logout and the two second relogin
+
+Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.
+The stack was already deployed and verified (STACK_READY, login 2106,
+game 7777).
+
+### Goal
+
+The user called the emergency logout of the hunt loop too blunt in two
+ways: (1) a character with two or more aggro mobs on it logged out on
+the spot, so the relogin landed right back in the pack that piled up;
+(2) the 30 s login pause idled the farm for nothing - a two second
+relogin already resets the aggro on this stack (observed live). The new
+behavior: run at least 600 units away from the aggro point before
+logging out (the mobs stay behind, walk home while the character is
+offline, the relogin lands outside their aggro range) and cut the
+relogin pause to 2 seconds.
+
+### Fix
+
+- `hunt/loop_safety.go` `panicPileUpRun` (new): the attacker-count
+  branch of the emergency logout no longer logs out at once. The first
+  call anchors the aggro point (the position the pack piled up on),
+  drops the current fight (the target lands on the long skip list, the
+  engage bookkeeping clears - the same handoff `fleeFromTarget` makes)
+  and starts the paced escape legs away from the threats (the same
+  legs, pacing and zone clamping as the hurt flee). The logout fires
+  once the character opened `panicRunDistance` (600) units between
+  itself and the anchor.
+- The run is committed once armed: the anchor, not the live mob count,
+  drives the logout - a pack that thins out on the way cannot turn the
+  run back into a lost fight.
+- Two exits keep the run bounded: a cornered run (the legs never open
+  the distance within the shared 20 s `fleeLogoutAfter` budget) logs
+  out wherever it got to, and a run whose pack dissolved (no mob holds
+  the target anymore, nothing attackable within the escape range) logs
+  out at once instead of idling out the budget - nothing is left to
+  run from, the spot is as safe as the run gets.
+- The critical-health branch (HP under 12% with the blows landing)
+  still logs out at once: one hit from death, the run has nothing left
+  to protect.
+- `panicLogoutPause` 30 s -> 2 s: the aggro resets the moment the
+  character leaves the world, so the pause only needs to cover the
+  logout round trip. The supervisor (`cmd/swarm/main.go`
+  `runBotForever`) already retries a failed login with an exponential
+  backoff, so a too-early reconnect (the server still holding the
+  combat stance body) costs one retry, nothing more.
+
+### Verification
+
+- Unit tests: `TestLoopRunsFromThePileUpBeforeLoggingOut` (the pile up
+  arms the anchor, walks the first leg, no logout on the spot, the
+  pacing holds; after the character covers the leg past the 600 unit
+  mark the logout fires with the 2 s cooldown; one shot),
+  `TestLoopLogsOutWhenThePileUpRunNeverMakesDistance` (the cornered
+  budget still ends the session), the cooldown assertions of the
+  critical-health and endless-chase tests re-pinned to the 2 s pause.
+- go build/vet, go test ./... (16 packages), gofmt clean,
+  golangci-lint 0 issues.
+- The live proxy E2E PASS against the running stack (login 2106,
+  game 7777, 1.2 s) - the connection path is untouched by the change.
+
 ## Active task: silence the net ping answer log spam
 
 Started: 2026-09-09. Branch: `feature/proxy-server`. Commits as melg8.

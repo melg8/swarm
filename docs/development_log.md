@@ -1865,3 +1865,83 @@ and, if it is just a debug line, remove it.
 - The live proxy E2E PASS against the running stack (login 2106,
   game 7777) with the new ping burst leg: 10 requests sent, 10
   answers relayed back in 1.2 s, the session log silent about them.
+
+## Round 37: the deferred pile up logout and the two second relogin (2026-09-09)
+
+Scope: the user called the emergency logout of the hunt loop too
+blunt. A character with two or more aggro mobs on it logged out on
+the spot, and the relogin waited half a minute. The requested
+behavior: run at least 600 units away from the point the aggro
+happened on before logging out (the mobs stay behind and walk home
+while the character is offline, so the relogin lands outside their
+aggro range), and cut the relogin pause to two seconds - the aggro
+resets on the disappearance on this stack, a long pause only idles
+the farm.
+
+### Problem statement
+
+- The attacker-count branch of the emergency logout
+  (`hunt/loop.go` tick, `panicLogoutAttackers = 2`) called
+  `emergencyLogout` at once. The server stores the character where it
+  stood - in the middle of the pack - and the relogin (even after the
+  30 s pause) dropped the character right back into the same aggro.
+- `panicLogoutPause = 30 * time.Second` idled the farm: the pause was
+  sized to cover the fifteen second combat stance the server holds an
+  offline body in plus the mob walk home, but the aggro itself resets
+  the moment the character leaves the world - observed live, a two
+  second relogin lands clean.
+
+### Fix
+
+- `hunt/loop_safety.go` gained `panicPileUpRun`: the attacker-count
+  branch now starts a run instead of the instant logout. The first
+  call anchors the aggro point (`panicX`/`panicY`/`panicAt` on the
+  Loop), drops the current fight (the target lands on the long skip
+  list, the engage bookkeeping clears) and walks the paced escape
+  legs away from the threats - the same legs, pacing (one leg per
+  second) and zone clamping the hurt flee uses. The logout fires once
+  `panicAnchorDistance` reports `panicRunDistance` (600) units or
+  more between the character and the anchor.
+- The run is committed once armed: the panic block of `tick` re-enters
+  on the armed anchor (`!l.panicAt.IsZero()`), not on the live mob
+  count, so a pack that thins out mid-run cannot turn the run back
+  into a lost fight - the distance, not the count, ends it.
+- Two bounded exits: the run shares the `fleeLogoutAfter` (20 s)
+  budget, so a cornered run (the legs never open the distance) logs
+  out wherever it got to; and a run whose pack dissolved on the way
+  (no mob holds the target anymore, nothing attackable within the
+  escape range - `escapeWalkDestination` comes back empty) logs out
+  at once instead of idling out the budget.
+- The critical-health branch (HP under 12% with the blows landing)
+  stays instant: one hit from death, the run has nothing left to
+  protect.
+- `panicLogoutPause` 30 s -> 2 s. The supervisor
+  (`cmd/swarm/main.go` `runBotForever`) honors the cooldown only on
+  top of its 2 s minimum reconnect delay and retries a failed login
+  with an exponential backoff, so a too-early reconnect (the server
+  still holding the combat stance body) costs one retry, nothing
+  more.
+
+### Verification
+
+- New unit tests: `TestLoopRunsFromThePileUpBeforeLoggingOut` (the
+  pile up arms the anchor, walks the first leg away from the pack, no
+  logout on the spot, the one-leg-per-second pacing holds; after the
+  character covers the leg past the 600 unit mark the logout fires
+  with one last leg and the 2 s cooldown; the request stays one
+  shot), `TestLoopLogsOutWhenThePileUpRunNeverMakesDistance` (the
+  cornered budget ends the session).
+- The cooldown assertions of `TestLoopLogsOutAtCriticalHealthUnderAttack`
+  and `TestLoopLogsOutWhenTheFleeNeverShakesTheChase` re-pinned from
+  the half-minute to the 2 s pause.
+- go build/vet, go test ./... (16 packages), gofmt clean,
+  golangci-lint 0 issues.
+- The live proxy E2E PASS against the running stack (login 2106,
+  game 7777, 1.2 s): the connection path is untouched, the smoke run
+  confirms the deploy.
+
+### Follow ups
+
+- Watch the live log for the new lines: "N mobs piled on us, running
+  600 units from the aggro point before the logout", the distance
+  report at the logout, and the reconnect after two seconds.
