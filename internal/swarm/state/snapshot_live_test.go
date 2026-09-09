@@ -6,6 +6,7 @@ package state
 
 import (
 	"bytes"
+	"regexp"
 	"testing"
 	"time"
 
@@ -179,7 +180,13 @@ func TestAppendSnapshotJSONEmptyBot(t *testing.T) {
 	require.Contains(t, string(direct), `"huntingZone":null`)
 
 	viaCopy := bot.Snapshot().AppendJSON(nil)
-	require.Equal(t, string(viaCopy), string(direct))
+	// The serverTimeMs of the two encodes reads the clock
+	// independently: a millisecond rollover between the calls is not
+	// a state difference, the field stays out of the comparison.
+	serverTime := regexp.MustCompile(`"serverTimeMs":\d+,`)
+	require.Equal(t,
+		serverTime.ReplaceAllString(string(viaCopy), ""),
+		serverTime.ReplaceAllString(string(direct), ""))
 }
 
 // TestAppendSnapshotJSONExpiredWalkPlan pins the walk plan TTL gate:
