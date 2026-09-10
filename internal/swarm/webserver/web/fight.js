@@ -280,7 +280,7 @@ const VARIANTS = [
   {
     num: "01",
     name: "Floating numbers",
-    note: "как сейчас на карте: число всплывает и тает, крит крупнее и с меткой",
+    note: "as on the map today: the number pops and fades, the crit is bigger and badged",
     swingLife: 0.55,
     damageLife: 1.15,
     // The live map swing: a windup arc, a tapered streak toward the
@@ -365,7 +365,7 @@ const VARIANTS = [
   {
     num: "02",
     name: "Comic pop",
-    note: "звезда удара + число с рывком, крит трясёт всю клетку",
+    note: "impact star + number with a dash, the crit shakes the whole cell",
     swingLife: 0.5,
     damageLife: 1.0,
     swing(ctx, v, ev, p) {
@@ -423,7 +423,7 @@ const VARIANTS = [
   {
     num: "03",
     name: "Slash",
-    note: "белый разрез поперёк цели, крит — крест из двух разрезов",
+    note: "white slash across the target, the crit is a cross of two slashes",
     swingLife: 0.5,
     damageLife: 1.05,
     swing(ctx, v, ev, p) {
@@ -489,7 +489,7 @@ const VARIANTS = [
   {
     num: "04",
     name: "Spark spray",
-    note: "искры летят из цели в сторону удара, крит — золотой сноп",
+    note: "sparks fly out of the target toward the hit, the crit is a golden sheaf",
     swingLife: 0.5,
     damageLife: 1.0,
     swing: fightDefaultSwing,
@@ -533,7 +533,7 @@ const VARIANTS = [
   {
     num: "05",
     name: "Shockwave",
-    note: "ударная волна расходится кольцами, крит — три кольца",
+    note: "the shockwave spreads in rings, the crit is three rings",
     swingLife: 0.5,
     damageLife: 1.2,
     // The charge up: a shrinking ring gathers at the attacker.
@@ -573,7 +573,7 @@ const VARIANTS = [
   {
     num: "06",
     name: "HP bar chunk",
-    note: "урон отрывается куском полоски HP и падает, крит — золотой кусок",
+    note: "damage tears off a chunk of the HP bar and falls, the crit chunk is gold",
     swingLife: 0.5,
     swing: fightDefaultSwing,
     damageLife: 1.25,
@@ -621,7 +621,7 @@ VARIANTS.push(
   {
     num: "07",
     name: "Arrow",
-    note: "удар — летящая стрела, крит — огненная стрела со шлейфом",
+    note: "the hit is a flying arrow, the crit a fire arrow with a trail",
     swingLife: 0.6,
     damageLife: 0.9,
     swing(ctx, v, ev, p) {
@@ -702,7 +702,7 @@ VARIANTS.push(
   {
     num: "08",
     name: "Hit-stop",
-    note: "кинематографично: стоп-кадр с наездом камеры, крит дольше и с вспышкой",
+    note: "cinematic: a freeze frame with a camera push, the crit runs longer with a flash",
     swingLife: 0.5,
     swing: fightDefaultSwing,
     damageLife: 1.3,
@@ -751,7 +751,7 @@ VARIANTS.push(
   {
     num: "09",
     name: "Cell flash",
-    note: "вся клетка вспыхивает: синим — свой удар, красным — полученный",
+    note: "the whole cell flashes: blue for the own hit, red for the taken one",
     swingLife: 0.5,
     swing: fightDefaultSwing,
     damageLife: 0.85,
@@ -783,7 +783,7 @@ VARIANTS.push(
   {
     num: "10",
     name: "Dizzy stars",
-    note: "звёздочки кружат над головой пострадавшего, крит — пять золотых",
+    note: "stars circle above the victim head, the crit is five golden ones",
     swingLife: 0.5,
     swing: fightDefaultSwing,
     damageLife: 1.5,
@@ -817,7 +817,7 @@ VARIANTS.push(
   {
     num: "11",
     name: "Arcade banner",
-    note: "баннер сверху клетки: HIT / CRITICAL, слайдом как в аркаде",
+    note: "a banner on top of the cell: HIT / CRITICAL, sliding like an arcade",
     swingLife: 0.5,
     swing: fightDefaultSwing,
     damageLife: 1.3,
@@ -871,7 +871,7 @@ VARIANTS.push(
   {
     num: "12",
     name: "Combo counter",
-    note: "счётчик серии ударов, числа набегают снизу вверх, крит золотом",
+    note: "a hit streak counter, numbers rush in bottom-up, the crit in gold",
     swingLife: 0.5,
     swing: fightDefaultSwing,
     damageLife: 1.2,
@@ -935,8 +935,8 @@ const FightUI = {
   init() {
     const count = document.getElementById("fight-count");
     if (count) {
-      count.textContent = VARIANTS.length + " вариантов · цикл "
-        + FIGHT.loopSec + " с";
+      count.textContent = VARIANTS.length + " variants · cycle "
+        + FIGHT.loopSec + " s";
     }
     this.loadTile();
     this.buildColumns();

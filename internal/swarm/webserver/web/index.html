@@ -27,8 +27,19 @@ SPDX-License-Identifier: MIT
     <div class="header-right">
       <span id="live-indicator" class="live-dot offline" title="event stream state"></span>
       <span id="live-label">connecting</span>
-      <button id="theme-toggle" class="btn theme-btn" title="toggle light/dark theme">
-        <span id="theme-icon">◐</span>
+      <button id="theme-toggle" class="btn theme-btn" title="toggle light/dark theme (T)">
+        <svg id="theme-sun" class="theme-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.75"/>
+          <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+            <path d="M12 2.2v2.6"/><path d="M12 19.2v2.6"/>
+            <path d="M2.2 12h2.6"/><path d="M19.2 12h2.6"/>
+            <path d="M4.9 4.9l1.9 1.9"/><path d="M17.2 17.2l1.9 1.9"/>
+            <path d="M4.9 19.1l1.9-1.9"/><path d="M17.2 6.8l1.9-1.9"/>
+          </g>
+        </svg>
+        <svg id="theme-moon" class="theme-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+          <path d="M20.6 13.3A8.4 8.4 0 1 1 10.7 3.4a6.8 6.8 0 0 0 9.9 9.9z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+        </svg>
       </button>
     </div>
   </header>
@@ -71,7 +82,16 @@ SPDX-License-Identifier: MIT
       </div>
 
       <div class="sidebar-foot">
-        <div class="sidebar-title">Legend</div>
+        <button id="legend-head" class="legend-head" type="button"
+          aria-expanded="false"
+          title="tick = look direction · dashed square = server loaded zone (3×3 regions) · red ring = own target · violet link/ring = target of another player">
+          <span class="legend-title">Legend</span>
+          <span class="legend-chev" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="10" height="10">
+              <path d="M8 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
         <div class="legend">
           <div class="legend-item"><span class="dot self"></span>self</div>
           <div class="legend-item"><span class="dot friendly"></span>friendly npc</div>
@@ -81,9 +101,6 @@ SPDX-License-Identifier: MIT
           <div class="legend-item"><span class="dot dead"></span>dead</div>
           <div class="legend-item"><span class="dot player"></span>player</div>
           <div class="legend-item"><span class="dot item"></span>ground item</div>
-        </div>
-        <div class="legend-note">
-          tick = look direction · dashed square = server loaded zone (3×3 regions) · red ring = own target · violet link/ring = target of another player
         </div>
       </div>
     </aside>
@@ -96,18 +113,18 @@ SPDX-License-Identifier: MIT
             <span id="fight-count" class="fight-count"></span>
           </div>
           <div class="fight-sub">
-            Все варианты проигрывают один и тот же бой в одном такте: герой
-            бьёт врага, получает удар, наносит крит и получает крит —
-            четыре позиции врага по вертикали, идеи по горизонтали.
-            Прокрути ленту, посмотри и выбери номер, который больше
-            всего подходит для карты.
+            Every variant plays the same fight in one tick: the hero
+            hits, takes a hit, lands a crit and takes a crit - four
+            enemy positions vertically, the ideas horizontally. Scroll
+            the strip, watch them and pick the number that fits the
+            map best.
           </div>
           <div class="fight-legend">
-            <span class="fight-chip"><i class="dot dot-swing-self"></i>удар героя</span>
-            <span class="fight-chip"><i class="dot dot-swing-mob"></i>удар врага</span>
-            <span class="fight-chip"><i class="dot dot-dealt"></i>нанесённый урон</span>
-            <span class="fight-chip"><i class="dot dot-taken"></i>полученный урон</span>
-            <span class="fight-chip"><i class="dot dot-crit"></i>крит</span>
+            <span class="fight-chip"><i class="dot dot-swing-self"></i>hero hit</span>
+            <span class="fight-chip"><i class="dot dot-swing-mob"></i>enemy hit</span>
+            <span class="fight-chip"><i class="dot dot-dealt"></i>damage dealt</span>
+            <span class="fight-chip"><i class="dot dot-taken"></i>damage taken</span>
+            <span class="fight-chip"><i class="dot dot-crit"></i>crit</span>
           </div>
         </div>
         <div id="fight-strip" class="fight-strip"></div>
@@ -134,7 +151,7 @@ SPDX-License-Identifier: MIT
 
       <section id="tab-map" class="tab-content active">
         <div class="map-toolbar">
-          <label class="check follow-check"><input type="checkbox" id="follow" checked> follow</label>
+          <label class="check follow-check" title="keep the camera on the bot (F)"><input type="checkbox" id="follow" checked> follow</label>
           <span class="pf-only">
             <button id="set-a" class="btn pf-set-btn" title="arm: next click places A">set A</button>
             <button id="set-b" class="btn pf-set-btn" title="arm: next click places B">set B</button>
@@ -150,9 +167,13 @@ SPDX-License-Identifier: MIT
             title="map view layers: labels, paths, zones, targets, aggro, background">
             <button id="view-menu-btn" class="view-menu-btn" type="button"
               aria-expanded="false" aria-haspopup="true"
-              title="map view layers">
+              title="map view layers (V)">
               <span class="view-menu-label">view</span>
-              <span id="view-menu-caret" class="view-menu-caret">&#9662;</span>
+              <span id="view-menu-caret" class="view-menu-caret" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="10" height="10">
+                  <path d="M5 9l7 7 7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
             </button>
             <div id="view-menu-pop" class="view-menu-pop hidden" role="menu"
               title="toggle what the map draws">
@@ -172,6 +193,7 @@ SPDX-License-Identifier: MIT
         <div class="map-wrap">
           <canvas id="map-canvas"></canvas>
           <div id="map-tooltip" class="map-tooltip hidden"></div>
+          <div id="map-empty" class="map-empty">select a bot - waiting for its snapshot…</div>
           <div class="map-rose" title="north is up">
             <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">
               <path d="M6 1 L7.6 6.4 L6 5.2 L4.4 6.4 Z" fill="currentColor"/>
@@ -185,7 +207,7 @@ SPDX-License-Identifier: MIT
             <span id="bot-status-detail" class="bot-status-detail"></span>
           </div>
 
-          <div class="hud-stack">
+          <div class="hud-stack hidden">
             <div id="hud" class="hud">
               <div class="hud-head">
                 <div class="hud-name-row">
@@ -292,7 +314,11 @@ SPDX-License-Identifier: MIT
             <button id="shop-tab" class="shop-tab hidden" type="button"
               aria-expanded="true"
               title="the shopping queue of the bot - slide it out">
-              <span id="shop-tab-chev" class="shop-tab-chev">&#9666;</span>
+              <span id="shop-tab-chev" class="shop-tab-chev" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="9" height="9">
+                  <path d="M14.5 5.5L8 12l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
             </button>
             <div id="shop-panel" class="shop-panel hidden"
               title="what the bot plans to buy next">
@@ -320,7 +346,11 @@ SPDX-License-Identifier: MIT
               type="button" title="collapse or expand the zone list">
               <span class="zone-panel-title">Hunting zones</span>
               <span id="zone-panel-count" class="zone-panel-count"></span>
-              <span id="zone-panel-chev" class="zone-panel-chev">&#9656;</span>
+              <span id="zone-panel-chev" class="zone-panel-chev" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="10" height="10">
+                  <path d="M8 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
             </button>
             <div id="zone-panel-body" class="zone-panel-body">
               <ul id="zone-list" class="zone-list"></ul>
@@ -366,6 +396,7 @@ SPDX-License-Identifier: MIT
     <span id="foot-objects" class="foot-item">objects: —</span>
     <span id="foot-uptime" class="foot-item">uptime: —</span>
     <span id="foot-updated" class="foot-item">updated: —</span>
+    <span id="foot-keys" class="foot-item foot-keys">M map · L log · F follow · V view · T theme</span>
   </footer>
 
   <div id="item-tooltip" class="item-tooltip hidden" role="tooltip"

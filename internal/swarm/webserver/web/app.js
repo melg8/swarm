@@ -67,13 +67,13 @@ function formatDuration(fromISO, untilISO) {
 
 // ---- theme ----
 
-// applyTheme switches the color scheme and persists the choice. The light
-// theme is the default.
+// applyTheme switches the color scheme and persists the choice. The
+// light theme is the default. The sun/moon pair lives in the button
+// markup as two inline svgs - the [data-theme] attribute picks the
+// one to show, so no script touches the icon anymore.
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   window.localStorage.setItem("swarm.theme", theme);
-  const icon = document.getElementById("theme-icon");
-  if (icon) { icon.textContent = theme === "dark" ? "☾" : "☀"; }
   window.dispatchEvent(new Event("themechange"));
 }
 
@@ -305,6 +305,13 @@ function selectBot(botId) {
 function resetPanels() {
   document.getElementById("log-list").innerHTML = "";
   document.getElementById("log-count").textContent = "";
+  LogView.lastSecond = "";
+  // The empty states return while the next snapshot streams in (C10).
+  const stack = document.getElementById("hud-stack") ||
+    document.querySelector(".hud-stack");
+  if (stack) { stack.classList.add("hidden"); }
+  const empty = document.getElementById("map-empty");
+  if (empty) { empty.classList.remove("hidden"); }
 }
 
 // Subscribe to the SSE stream of the active bot.
@@ -332,6 +339,12 @@ function setLive(live) {
 function renderSnapshot() {
   const snap = App.snapshot;
   if (!snap) { return; }
+  // The first live data clears the empty states (C10): the HUD stack
+  // appears, the map placeholder goes.
+  const stack = document.querySelector(".hud-stack");
+  if (stack) { stack.classList.remove("hidden"); }
+  const empty = document.getElementById("map-empty");
+  if (empty) { empty.classList.add("hidden"); }
   renderHUD(snap);
   renderTarget(snap);
   renderGear(snap);
@@ -519,15 +532,13 @@ function initZonePanel() {
   });
 }
 
-// applyZonePanelState syncs the panel DOM with the collapse flag.
+// applyZonePanelState syncs the panel DOM with the collapse flag. The
+// chevron is an svg that rotates through the panel class, so the sync
+// only toggles the class.
 function applyZonePanelState() {
   const panel = document.getElementById("zone-panel");
-  const chev = document.getElementById("zone-panel-chev");
   if (!panel) { return; }
   panel.classList.toggle("collapsed", zonePanelCollapsed.value);
-  if (chev) {
-    chev.textContent = zonePanelCollapsed.value ? "\u25B8" : "\u25BE";
-  }
 }
 
 // renderZones refreshes the hunting zone list of the floating map
@@ -815,8 +826,33 @@ function itemTooltipFallback(item) {
 
 const TooltipState = {
   element: null,
-  cell: null
+  cell: null,
+  timer: null
 };
+
+// The hover answer waits a beat (C12): 100ms before the panel shows
+// so a fast pointer crossing the widget never flashes it; leaving
+// hides immediately.
+const TOOLTIP_SHOW_DELAY = 100;
+
+// cancelTooltipTimer drops a pending show.
+function cancelTooltipTimer() {
+  if (TooltipState.timer !== null) {
+    clearTimeout(TooltipState.timer);
+    TooltipState.timer = null;
+  }
+}
+
+// scheduleTooltipShow delays one show callback; a second call
+// replaces the pending one.
+function scheduleTooltipShow(show) {
+  cancelTooltipTimer();
+  if (typeof setTimeout !== "function") { show(); return; }
+  TooltipState.timer = setTimeout(() => {
+    TooltipState.timer = null;
+    show();
+  }, TOOLTIP_SHOW_DELAY);
+}
 
 // tooltipElement lazily fetches the singleton DOM node of the
 // floating panel. The node lives once on the page and is repurposed
@@ -840,12 +876,14 @@ function tooltipElement() {
 // current state of the cell, even after an equip / unequip swap.
 function attachGearCellTooltip(record) {
   record.cell.addEventListener("mouseenter", () => {
-    showItemTooltip(record.item, record.cell);
+    const cell = record.cell;
+    scheduleTooltipShow(() => { showItemTooltip(record.item, cell); });
   });
   record.cell.addEventListener("mousemove", (event) => {
     positionItemTooltip(event.clientX, event.clientY);
   });
   record.cell.addEventListener("mouseleave", () => {
+    cancelTooltipTimer();
     hideItemTooltip();
   });
   // The cell can be recycled for a different item without a
@@ -1112,6 +1150,7 @@ function positionItemTooltip(x, y, side) {
 // hideItemTooltip hides the floating panel. Called on mouseleave of a
 // cell or when a snapshot mutates the cell into an empty state.
 function hideItemTooltip() {
+  cancelTooltipTimer();
   const el = TooltipState.element;
   if (!el) { return; }
   if (el.classList.contains("hidden")) { return; }
@@ -1421,21 +1460,19 @@ function initShopPanel() {
 }
 
 // applyShopPanelState syncs the flyout DOM with the open flag: the
-// panel slides in or out and the edge triangle flips its direction -
-// pointing left while the queue is hidden (the slide-out direction),
-// pointing right while it is out (the retract direction).
+// panel slides in or out and the edge triangle svg flips its
+// rotation through the tab class - pointing left while the queue is
+// hidden (the slide-out direction), pointing right while it is out
+// (the retract direction).
 function applyShopPanelState() {
   const panel = document.getElementById("shop-panel");
   const tab = document.getElementById("shop-tab");
-  const chev = document.getElementById("shop-tab-chev");
   if (panel) {
     panel.classList.toggle("open", ShopPanel.open);
   }
   if (tab) {
+    tab.classList.toggle("open", ShopPanel.open);
     tab.setAttribute("aria-expanded", ShopPanel.open ? "true" : "false");
-  }
-  if (chev) {
-    chev.textContent = ShopPanel.open ? "\u25B8" : "\u25C2";
   }
 }
 
@@ -1553,12 +1590,14 @@ function makeShopRow() {
     img: null, glyph: null, chip: null, entry: null
   };
   item.addEventListener("mouseenter", () => {
-    showShoppingTooltip(row.entry, item);
+    const rowItem = item;
+    scheduleTooltipShow(() => { showShoppingTooltip(row.entry, rowItem); });
   });
   item.addEventListener("mousemove", (event) => {
     positionItemTooltip(event.clientX, event.clientY, "left");
   });
   item.addEventListener("mouseleave", () => {
+    cancelTooltipTimer();
     hideItemTooltip();
   });
 
@@ -2282,12 +2321,21 @@ function setExpVital(expPercent) {
 }
 
 // Log panel rendering with incremental append.
+//
+// LogView holds the render state of the strip: the last second stamp
+// drawn (smart timestamps - consecutive events of the same second
+// leave the stamp column blank instead of repeating it dozens of
+// times, the title of the line keeps the full time) and the seen
+// counter alias of App.seenEvents.
+const LogView = { lastSecond: "" };
+
 function renderLog(snap) {
   const list = document.getElementById("log-list");
   const events = snap.events || [];
   if (events.length < App.seenEvents) {
     list.innerHTML = "";
     App.seenEvents = 0;
+    LogView.lastSecond = "";
   }
   const filter = document.getElementById("log-filter").value.toLowerCase();
   const autoScroll = document.getElementById("log-scroll").checked;
@@ -2315,7 +2363,17 @@ function buildLogLine(event, filter) {
   const time = document.createElement("span");
   time.className = "log-time";
   const stamp = new Date(event.time);
-  time.textContent = stamp.toTimeString().slice(0, 8);
+  const stampText = stamp.toTimeString().slice(0, 8);
+  // Smart timestamp (A6): a run of events inside the same second
+  // prints the stamp once - the repeats leave the column blank, the
+  // line keeps the full time in its title.
+  if (stampText === LogView.lastSecond) {
+    time.textContent = "";
+    time.title = stampText;
+  } else {
+    time.textContent = stampText;
+    LogView.lastSecond = stampText;
+  }
   const msg = document.createElement("span");
   msg.className = "log-msg " + logLineClass(event.message);
   msg.textContent = event.message;
@@ -2333,9 +2391,12 @@ function logLineClass(message) {
   if (message.includes("combat") || message.startsWith("target selected")) {
     return "combat";
   }
+  // Loot and level up keep the green: the rare money moments stay
+  // loud while the spawn flood went neutral (A6).
   if (message.startsWith("picked up") || message.startsWith("received ")
-    || message.startsWith("lost ")) {
-    return "spawn";
+    || message.startsWith("lost ")
+    || message.startsWith("level up") || message.includes("leveled up")) {
+    return "loot";
   }
   if (message.startsWith("object removed") || message.startsWith("left")) {
     return "remove";

@@ -1308,25 +1308,29 @@ function main() {
         "the flyout or the tab stays visible without a plan");
 
     // The tab toggle: the triangle click slides the flyout in and
-    // back out, the glyph flips with the state and the tab answers
-    // with the aria state.
+    // back out, the svg chevron flips through the tab class and the
+    // tab answers with the aria state.
     gear.renderShopping(shopSnapshot);
     check(results, "the flyout starts slid out for the passive glance",
         shopPanel.classList.contains("open") &&
-        shopTabChev.textContent === "\u25B8" &&
+        shopTab.classList.contains("open") &&
         shopTab.getAttribute("aria-expanded") === "true",
         "the flyout did not start open");
     fire(shopTab, "click");
     check(results, "the tab click slides the flyout in",
         !shopPanel.classList.contains("open") &&
-        shopTabChev.textContent === "\u25C2" &&
+        !shopTab.classList.contains("open") &&
         shopTab.getAttribute("aria-expanded") === "false",
         "the flyout did not slide in");
     fire(shopTab, "click");
     check(results, "the second tab click slides the flyout out again",
         shopPanel.classList.contains("open") &&
-        shopTabChev.textContent === "\u25B8",
+        shopTab.classList.contains("open"),
         "the flyout did not slide out");
+    check(results, "the flyout chevron flips through the tab class css",
+        css.includes(".shop-tab.open .shop-tab-chev") &&
+        css.includes("transform: rotate(180deg)"),
+        "missing the chevron rotation css");
 
     // The purchase tooltip: the item shape plus the planning lines
     // (the gain, the value per adena, the sell credit, the missing

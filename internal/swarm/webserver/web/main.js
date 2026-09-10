@@ -13,6 +13,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   initTheme();
   initTabs();
   initZonePanel();
+  initHotkeys();
 
   let config = null;
   try {
@@ -46,6 +47,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   initChat();
   initDumpButton();
+  initLegend();
   MapView.init();
   refreshBots();
   setInterval(refreshBots, 2000);
@@ -55,6 +57,75 @@ window.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("log-filter")
     .addEventListener("input", () => { App.seenEvents = 0; resetPanels(); });
 });
+
+// initLegend wires the collapsible legend head of the sidebar foot
+// (C7): the aria-expanded flag carries the state, the css hides the
+// rows while it stays false. The note about ticks and rings lives on
+// the head tooltip.
+function initLegend() {
+  const head = document.getElementById("legend-head");
+  if (!head || !head.addEventListener) { return; }
+  head.addEventListener("click", () => {
+    const open = head.getAttribute("aria-expanded") === "true";
+    head.setAttribute("aria-expanded", open ? "false" : "true");
+  });
+}
+
+// Hotkeys (C1): M/L switch the Map/Log tabs, F toggles follow, V opens
+// the view layers dropdown, T flips the theme. The keys stay silent
+// while the focus sits in a text input, a select or a textarea, and
+// while a modifier rides along - the browser shortcuts keep working.
+// Every action checks its element exists and is visible (offsetParent),
+// so the pathfind and fight modes simply skip the missing pieces.
+function initHotkeys() {
+  document.addEventListener("keydown", (event) => {
+    if (event.ctrlKey || event.altKey || event.metaKey) { return; }
+    const active = document.activeElement;
+    const tag = active ? active.tagName : "";
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+      return;
+    }
+    const key = String(event.key || "").toLowerCase();
+    const visible = (el) =>
+      Boolean(el) && el.offsetParent !== null;
+    if (key === "m" || key === "l") {
+      const name = key === "m" ? "map" : "log";
+      const tab = document.querySelector('.tab[data-tab="' + name + '"]');
+      if (visible(tab) && typeof tab.click === "function") {
+        tab.click();
+        event.preventDefault();
+      }
+
+      return;
+    }
+    if (key === "f") {
+      const follow = document.getElementById("follow");
+      if (visible(follow)) {
+        follow.checked = !follow.checked;
+        follow.dispatchEvent(new Event("change"));
+        event.preventDefault();
+      }
+
+      return;
+    }
+    if (key === "v") {
+      const btn = document.getElementById("view-menu-btn");
+      if (visible(btn) && typeof btn.click === "function") {
+        btn.click();
+        event.preventDefault();
+      }
+
+      return;
+    }
+    if (key === "t") {
+      const btn = document.getElementById("theme-toggle");
+      if (btn && typeof btn.click === "function") {
+        btn.click();
+        event.preventDefault();
+      }
+    }
+  });
+}
 
 // Tab switching.
 function initTabs() {

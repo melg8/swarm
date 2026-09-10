@@ -200,7 +200,19 @@ body {
   height: 24px;
   font-size: 13px;
   margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
 }
+
+/* Theme icon pair (B6): the button carries the sun and the moon as
+   inline svgs, the active theme shows its own glyph. */
+.theme-icon { display: block; }
+
+html[data-theme="dark"] #theme-moon { display: none; }
+
+html:not([data-theme="dark"]) #theme-sun { display: none; }
 
 .live-dot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -240,6 +252,15 @@ body {
 }
 
 .bot-list { list-style: none; overflow-y: auto; flex: 1; }
+
+/* Empty states (C10): a bare list says why it is bare. */
+.bot-list:empty::after {
+  content: "no bots connected";
+  display: block;
+  padding: 10px 12px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
 
 /* Thin scrollbars (B4): every list of the chrome shares the slim
    thumb of the inventory grid, so the scrollbars stop switching
@@ -316,9 +337,17 @@ body.mode-pathfind .zone-panel { display: none; }
 }
 
 .zone-panel-chev {
+  display: inline-flex;
   font-size: 10px;
   line-height: 1;
   color: var(--text-dim);
+  transition: transform var(--t-fast);
+}
+
+/* Expanded head points the chevron down, the collapsed one right
+   (the list slid away). */
+.zone-panel:not(.collapsed) .zone-panel-chev {
+  transform: rotate(90deg);
 }
 
 .zone-panel-body {
@@ -604,7 +633,42 @@ body.mode-pathfind .bot-status { display: none; }
 .hidden { display: none; }
 
 .sidebar-foot { padding: 10px 12px; border-top: 1px solid var(--border-soft); }
-.sidebar-foot .sidebar-title { padding: 0 0 8px; }
+
+/* Collapsible legend (C7): the head is a title-case label with a
+   rotating chevron, collapsed by default - the eight marker rows and
+   the note (now the head tooltip) open on demand, so the sidebar foot
+   stops being permanent noise. */
+.legend-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.legend-title { font-weight: 600; }
+
+.legend-chev {
+  margin-left: auto;
+  display: inline-flex;
+  color: var(--text-dim);
+  transition: transform var(--t-fast);
+}
+
+.legend-head[aria-expanded="false"] .legend-chev {
+  transform: rotate(-90deg);
+}
+
+.legend-head[aria-expanded="false"] + .legend { display: none; }
 
 .legend { display: grid; grid-template-columns: 1fr; gap: 4px 10px; }
 
@@ -807,6 +871,26 @@ body.mode-pathfind .bot-status { display: none; }
 .map-objects { margin-left: 8px; }
 
 .map-wrap { position: relative; flex: 1; min-height: 0; background: var(--bg-map); }
+
+/* Empty state of the map (C10): before the first snapshot of the
+   selected bot lands, the map says so instead of showing an empty
+   world with a dashed HUD. */
+.map-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-dim);
+  font-size: 13px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.map-empty.hidden { display: none; }
+
+body.mode-pathfind .map-empty,
+body.mode-fight .map-empty,
+body.mode-test-fight .map-empty { display: none; }
 
 #map-canvas { display: block; width: 100%; height: 100%; cursor: default; }
 
@@ -1088,6 +1172,14 @@ body.mode-pathfind .bot-status { display: none; }
   font-size: 12px;
 }
 
+.log-list:empty::after {
+  content: "waiting for events…";
+  display: block;
+  padding: 10px 14px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
 .log-line {
   display: flex;
   gap: 10px;
@@ -1130,6 +1222,10 @@ body.mode-pathfind .bot-status { display: none; }
 }
 
 .foot-item { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Hotkey hint (C1): the footer carries the key map as a dim mono
+   line, hidden in the modes without tabs, follow or the view menu. */
+.foot-keys { color: var(--text-dim); opacity: 0.75; }
 
 /* ---- pathfind test mode ---- */
 
@@ -1267,7 +1363,8 @@ body.mode-pathfind #foot-updated {
 .pf-set-btn { white-space: nowrap; }
 
 body.mode-pathfind #live-indicator,
-body.mode-pathfind #live-label { display: none; }
+body.mode-pathfind #live-label,
+body.mode-pathfind #foot-keys { display: none; }
 
 /* Geodata visualization mode select of the pathfind toolbar. */
 .geo-select {
@@ -1356,10 +1453,16 @@ body.mode-pathfind .gear-panel { display: none; }
 .shop-tab:hover { color: var(--text); }
 
 .shop-tab-chev {
+  display: inline-flex;
   font-size: 9px;
   line-height: 1;
   color: inherit;
+  transition: transform var(--t-fast);
 }
+
+/* The triangle chevron points left while the queue is hidden and
+   flips right when the flyout is out (the open class of the tab). */
+.shop-tab.open .shop-tab-chev { transform: rotate(180deg); }
 
 /* The flyout: docked to the left of the equipment panel with the tab
    column as the gap, opened by the tab triangle. The closed state
@@ -1946,6 +2049,7 @@ body.mode-fight #foot-packets,
 body.mode-fight #foot-objects,
 body.mode-fight #foot-uptime,
 body.mode-fight #foot-updated,
+body.mode-fight #foot-keys,
 body.mode-fight .tab[data-tab="log"] {
   display: none;
 }
@@ -2131,7 +2235,8 @@ body.mode-test-fight #live-label,
 body.mode-test-fight #foot-packets,
 body.mode-test-fight #foot-objects,
 body.mode-test-fight #foot-uptime,
-body.mode-test-fight #foot-updated {
+body.mode-test-fight #foot-updated,
+body.mode-test-fight #foot-keys {
   display: none;
 }
 
@@ -2326,6 +2431,15 @@ canvas.fxg-cell.picked {
 }
 
 .item-tooltip.hidden { display: none; }
+
+/* The tooltip fades in on the 100ms delayed hover (C12): appearing
+   without a flash of layout. */
+.item-tooltip:not(.hidden) { animation: tip-in 120ms ease; }
+
+@keyframes tip-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
 .item-tooltip .tip-name {
   font-size: 12.5px;
