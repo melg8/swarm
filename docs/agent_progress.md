@@ -11,6 +11,264 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the hunting system redesign research (spot model)
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user request (2026-09-10, Russian): the current zone hunting system
+is unsatisfying. (1) The bot visibility follows the world region grid,
+so parts of a zone do not render their mobs when the bot stands on the
+opposite side. (2) The 227 zones overlap heavily and do not reflect the
+actual monster concentrations. (3) The bot either drifts across the map
+or wastes walking on premature zone rotations instead of waiting out
+the respawn; the gear-score gates and the per-band death demotion
+proved unreliable. The new system must farm white-green mobs (a few
+levels below the bot, full drops, fast kills, maximum gold for the
+equipment pipeline). Deliverable: the research/design document.
+
+### Method and findings
+
+- Deployed from the repo data only: GitLab returned HTTP 403 for every
+  endpoint of this sandbox (git clone, the archive API, even the site
+  root), so the live Mobius stack could not be brought up; the analysis
+  runs on the generated registry `hunt/zones_elven.go` (the parsed
+  ElvenStarting.xml), `npcdata/names.go` (aggressive flags, aggro and
+  clan help ranges) and the live-validated server facts of AGENTS.md.
+  The next session should retry `tools/swarm_fast_deploy.sh` first.
+- `tools/analyze_hunt_registry.py` (new) computes the numbers:
+  227 squares / 73 territories / 722 mobs, median 3.0 mobs per square,
+  same-band overlap mean 64% (192/227 squares >30% overlapped),
+  guaranteed visible radius 2048 vs zone corners 1840-2690 from the
+  center and 2800 median opposite-edge distance, rotation cost 10 s
+  patience + 14 s median walk against the 15-20 s respawn window
+  (the system always abandons squares that refill faster than it can
+  walk away), 33% aggressive spawn mass of which 86% sits in the 16-19
+  band the ladder pushes bots into, 55/227 squares farther than 15 000
+  units from the village.
+- The design (docs/hunting_system_redesign.md): Spot = anchor +
+  radius <= 2048 (visibility invariant) from a hotspot clustering of
+  the spawn mass (prototype: 30 spots vs 227 squares); a respawn-aware
+  overlay (kill position + death time -> predicted respawn, Mobius
+  schedules death + rnd[15,20 s] with fixed spawn points by default)
+  driving a wait-or-move expected-value decision with 15-20 s patience;
+  soft/hard leashes against drift; the white-green window [L-5, L]
+  with the [L-4, L-1] preference; safety and gear gating replaced by
+  measured efficiency (loot value per active minute, HP lost per kill,
+  per-spot death/flee EMAs with decay) in a hysteresis spot switch;
+  fleet capacity sharing (bots of one process divide the spots).
+
+### Status: research done, the design document is committed (2026-09-10)
+
+- Committed: docs/hunting_system_redesign.md, tools/analyze_hunt_registry.py
+  (+ the generated docs/hunt_analysis charts and summary.json).
+- The docx render of the design document goes to the user's Downloads
+  (outside the repo by convention).
+- Next steps for an implementation session: the phase 1 of the plan
+  (the spot registry generator + the hunt data model), then phase 2
+  (the respawn-aware wait-or-move in the engage loop).
+
+## Active task: the looted gear of the shopping list survives the junk flows
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+
+### Goal
+
+The user request (2026-09-10, Russian): verify that when an item that
+is on the shopping list drops for the bot, the bot does not sell it
+for its instant adena - it puts it on and uses it.
+
+### Root causes and fixes
+
+- The purchase side was already safe: `PlanPurchases` plans against
+  the simulated paperdoll (`SimulateInventory`), so a looted item id
+  the inventory carries is never bought twice ("nothing gets bought
+  that the inventory already carries" - pinned by
+  `gear` `TestPlanPurchasesSkipsInventoryItems`).
+- The sell side was NOT safe: `state.Bot.SellableItems` lists every
+  unequipped non-adena non-quest item, with no knowledge of what the
+  auto equipment is about to wear. The rescue was pure timing - the
+  auto equip request (paced 2 s, confirmed through the shared gate)
+  usually flips the equipped flag before the first sell batch leaves.
+  The race windows: the two-step pair swap (the better jewel waits
+  for its use request while the displaced piece already came off),
+  the confirmation window of an in-flight equip, a refused equip.
+  Reproduction: `hunt` `TestLootedGearSurvivesTheSellStop` failed -
+  the looted Short Sword went out in the first `SellItems` batch on
+  the very tick the equip request was sent.
+- The destroy side was worse: `DestroyableItems` ranks gear drops
+  FIRST (before common stackables), so the overflow cleanup
+  (70 percent slots) destroyed a freshly looted unequipped upgrade
+  before the junk mats. Reproduction:
+  `TestLootedGearSurvivesTheCleanupDestroy` failed - the destroy
+  batch ate the sword.
+- The fix introduces the planned equip keep set:
+  `gear.PlannedEquips(profile, equipment)` collects the object ids
+  the gear simulation places on the virtual paperdoll but that are
+  not equipped yet - exactly the pending wearables the auto
+  equipment walks through step by step. The hunt loop caches the set
+  per inventory mutation (`equipManager.keepsCache`,
+  `Loop.plannedEquipKeeps`) and passes it to the new junk filters
+  `state.Bot.SellableItemsExcluding(keep)` and
+  `state.Bot.DestroyableItemsExcluding(keep, limit)`; the plain
+  methods delegate with nil. The kept pieces: looted upgrades,
+  bought arrivals waiting for their paced equip, the better halves
+  of pair swaps mid flight. Still junk (correctly): duplicates,
+  looted downgrades, the displaced weaker halves of pair swaps.
+- Three hunt tests pin the behavior end to end: the sell stop keeps
+  the looted sword (the batches sell around it, the trip still
+  completes), the overflow cleanup destroys the stackables behind
+  the kept sword, and the pair swap window sells the displaced
+  apprentice earring while the looted mystic earring survives and
+  wears.
+
+### Status: done (2026-09-10)
+
+- Verify loop: go build/vet, gofmt clean, go test ./... (18
+  packages, 0 failures), golangci-lint 0 new issues in the touched
+  files (the pre-existing goconst on slots.go, the gofumpt on
+  version_test.go and the nolintlint/unparam findings in untouched
+  files remain).
+
+## Active task: the shop strategy rework - the purchase phases (jewel floor, weapon, defense)
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push (7 commits landed mid task: the packet reader/writer perf
+rounds; pulled cleanly, no conflicts).
+
+### Goal
+
+The user request (2026-09-10, Russian): the purchase order of the NG
+items is wrong for the starting locations. (1) Nothing there attacks
+with magic - the cheapest first jewel set suffices until level 15+,
+the jewel ladder is a waste below it. (2) The melee characters want
+the weapon first, then the armor with the maximum defense, then the
+next weapon tier. Rework the purchase order logic, study the server
+prices, and deliver the comparison table of every NG purchase from
+level 1 to 15+ as "was" and "is".
+
+### Root causes and fixes
+
+- The old planner ranked EVERY purchase by `gain / price` (greedy
+  value per adena). The cheap empty slot fillers (Apprentice's Shoes
+  8 pDef for 8 adena - 0.99 pDef per adena) outranked every weapon,
+  so a fresh character spent levels 1-4 on shoes, gloves, caps and
+  shields before the first Short Sword, bought the intermediate
+  weapon ladder (Heavy Chisel -> Knife -> Sickle) whose steps resell
+  at reference/2, and climbed the jewel ladder in magic-free zones.
+- The rework phases the walk (`shopStrategy.classify` in
+  gear/shopping.go): the jewel floor (the cheapest jewel per family
+  fills the empty slots at any level - the basic outfit), the weapon
+  milestone (only the best value STRICT weapon upgrade is eligible -
+  the saving target; a cheaper worse value weapon never intercepts
+  the save up) and the defense upgrades (ranked by the raw defense
+  gain, bounded by the weapon budget: the reference value of the
+  worn defense gear may not exceed the reference price of the worn
+  weapon - the weapon leads the progression, the defense follows
+  inside its tier budget). The jewel upgrades gate on level 15
+  (`jewelUpgradeLevel`): below it only the floor items are planned,
+  past it the upgrades join the defense phase.
+- `PlanPurchases`/`PlanPurchaseQueue` grew the character level
+  parameter (the hunt loop passes the tracker's `SelfLevel`), the
+  virtual paperdoll entries carry the item id (the anchor and the
+  defense pricing read them), and the whole file went through
+  gofmt (the working tree copy had lost its tabs).
+
+### Status: done (2026-09-10)
+
+- The journey simulation test
+  (`gear/shopping_strategy_test.go`:
+  TestShoppingStrategyJourneyComparison) walks the elven fighter
+  from the creation screen (the Squire's kit, zero adena) through
+  level 20 once per planner - the legacy greedy copy (pinned as the
+  comparison baseline) and the phased planner - with the income
+  model built from the Mobius data (experience.xml exp per level /
+  the mob exp of the level's ladder step, the npc adena drops at 70
+  percent), one town trip per level, the sells, the server-side
+  affordability re-check (the planner overprices the starter kit
+  credit the shops refuse) and the auto equipment walk. It prints
+  the was/is table and pins the ordering rules: the jewel floor
+  first, the first weapon before any armor, no jewel upgrade below
+  15, the jewel upgrades past 15, the greedy planner's filler
+  detour (10 non-weapon buys, the Apprentice's Shoes opening).
+- The comparison table and the waste analysis (the filler detour,
+  the intermediate weapon ladder, the jewel ladder in magic-free
+  zones, the shield ladder after the two-hander) live in
+  docs/shopping_strategy.md ("The was/is journey of an elven
+  fighter"); the strategy section describes the three phases.
+- Verify loop: go build/vet, gofmt clean, go test ./... (18
+  packages), golangci-lint on gear/hunt (only the pre-existing
+  goconst on slots.go and nolintlint on plan.go remain), the live
+  stack deployed fresh (STACK_READY: 2106/7777/3306, 75 tables) and
+  tools/mobius_e2e.sh E2E_OK.
+
+## Active task: rest at the kill spot, finish fights across the zone line, zone free loot
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push (one push landed mid task: the standing hunter round).
+
+### Goal
+
+The user report (2026-09-10, Russian), three hunt behavior complaints:
+(1) the character runs too far away after a fight before it sits down
+to rest; (2) the character stops interacting with the mobs when the
+fight carries it out of the hunting zone - it should finish them off;
+(3) the character does not always pick up ground items - the drops
+outside the hunting zone must be picked up regardless. The game server
+stack was already up on this Windows host (login 2106, game 7777,
+db 3306 verified) and had to stay untouched.
+
+### Root causes and fixes
+
+- The escape threat lookup fell back to the nearest living attackable
+  npc when no mob held the character as its target. A finished fight
+  leaves a fresh 3 s under attack window (the dying mob's last blow),
+  so the hurt character armed the flee against a passive bystander
+  and ran up to three 700 unit legs away from the kill spot before
+  resting. Fix: `threatPosition` drops the fallback - the escape runs
+  from the living engaged target or a real attacker only
+  (`NearestAttacker`), otherwise the rest happens where the fight
+  ended.
+- The zone leash of the engage dropped the fight the moment the
+  character stood outside the square (`returnToZone` cleared the
+  target and walked home through the blows). Fix:
+  `adoptOutZoneFight` (loop_movement.go) adopts a live fight before
+  the walk home - the own living target, the fresh server selection
+  or the nearest attacking chaser (never a flee-skipped target) - and
+  the engage flow finishes it outside the square; without a live
+  fight the leash walks home unchanged, new fights still start inside
+  the square only.
+- The loot search passed the hunting zone filter: drops past the
+  square line stayed on the ground forever. Fix: `loot()` searches
+  without the zone - anything within the 900 unit loot radius of the
+  character is picked up, wherever it lies.
+
+### Status: done (2026-09-10)
+
+- Four new tests pin the behaviors (rest at the kill spot, the fight
+  continues outside the zone, the chaser is fought back, the loot is
+  picked up past the line) - all four verified to fail on the old
+  code (stash round). The two flee tests grew the missing Attack
+  broadcast: the fleeing mob must actually hold the character as its
+  target for the escape direction.
+- Verify loop: go build/vet, gofmt clean, go test ./... (18 packages),
+  golangci-lint (only the pre-existing unparam on
+  pathfind/search_test.go).
+- Live: the bot hunted the deployed stack directly (the real login
+  server at 127.0.0.3:2106 - the proxy Recipe A layout of this host;
+  game 7777) for 3.5 minutes: zone pick, kill, loot and the rest 3 s
+  after the kill log line - the rest happened at the kill spot, no
+  escape run (fix 1 demonstrated live); the pile up safety layer
+  cycled its documented run + logout + relogin when the clanned orc
+  pack joined. Hard kill stop (the SIGINT pitfall), the shutdown path
+  is untouched by this round. Development log Round 45 carries the
+  full writeup.
+
 ## Active task: the webui modernization proposal (awaiting the user approval)
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
