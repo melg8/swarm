@@ -75,11 +75,12 @@ equipment pipeline). Deliverable: the research/design document.
   (the spot registry generator + the hunt data model), then phase 2
   (the respawn-aware wait-or-move in the engage loop).
 
-## Active task: the fleet UX round - proxy switch hardening, rest icons of every bot, armor-first shopping
+## Finished task: the fleet UX round - proxy switch hardening, rest icons of every bot, armor-first shopping
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
 Other agents may push to the same branch concurrently - rebase before
-every push.
+every push (three foreign commits landed mid task: 70d1664, 075069b,
+0ede8a3 - all pulled cleanly, no conflicts).
 
 ### Goal
 
@@ -191,6 +192,26 @@ The user request (2026-09-10, Russian), three items:
   opening trip of the journey buys cheap armor pieces only; no jewel is
   bought before the first weapon; the journey table and
   docs/shopping_strategy.md describe the new order.
+
+### Status: done (2026-09-10)
+
+- All three items landed as their own atomic commits (the rest icon
+  round, the armor-first shopping round, the proxy switch hardening),
+  each pushed right after its verify loop.
+- Verify loop of the final round: go build/vet, gofmt clean,
+  go test ./... -count=1 (18 packages, 0 failures), golangci-lint 0
+  new issues (the pre-existing unparam on pathfind/search_test.go and
+  the gofumpt finding on version_test.go remain).
+- Live: the deployed stack (STACK_READY 2106/7777/3306, 75 tables),
+  tools/mobius_e2e.sh E2E_OK, tools/proxy_e2e.sh PROXY_E2E_OK, and a
+  100 s smoke fleet of 3 bots (-bots 3 -hunt -proxy -web) hunting
+  with the proxy listeners up and the graceful SIGINT shutdown; the
+  live API carries the new object `sitting` field and the bots see
+  each other as player objects. The real C1 client check of the
+  cross-bot switch remains the user-side step (see docs/proxy.md).
+- The next agent note: the map render harness still carries the
+  pre-existing "hunting zone carries the label" failure (fails on the
+  clean tree too, not this round).
 
 ## Active task: the looted gear of the shopping list survives the junk flows
 
