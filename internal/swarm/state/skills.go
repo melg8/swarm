@@ -185,12 +185,15 @@ func buildSkillQueue(
 			continue
 		}
 		entry := SkillPlanEntry{
-			SkillID:  lesson.SkillID,
-			Level:    lesson.Level,
-			SpCost:   lesson.SpCost,
-			ReqLevel: lesson.GetLevel,
-			Passive:  false,
-			Category: npcdata.SkillCategoryOther,
+			SkillID:    lesson.SkillID,
+			Name:       "",
+			Icon:       "",
+			Level:      lesson.Level,
+			Passive:    false,
+			SpCost:     lesson.SpCost,
+			ReqLevel:   lesson.GetLevel,
+			Category:   npcdata.SkillCategoryOther,
+			Affordable: false,
 		}
 		if info, hasInfo := npcdata.SkillInfoOf(lesson.SkillID); hasInfo {
 			entry.Name = info.Name
@@ -226,6 +229,7 @@ func (b *Bot) skillSnapshotsLocked() []SkillSnapshot {
 			Level:   skill.level,
 			Passive: skill.passive,
 			Name:    fmt.Sprintf("skill #%d", id),
+			Icon:    "",
 		}
 		if info, ok := npcdata.SkillInfoOf(id); ok {
 			snapshot.Name = info.Name

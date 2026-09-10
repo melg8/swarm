@@ -229,6 +229,7 @@ func (b *Bot) appendLiveSkillsJSON(dst []byte) []byte {
 			Level:   skill.level,
 			Passive: skill.passive,
 			Name:    fmt.Sprintf("skill #%d", id),
+			Icon:    "",
 		}
 		if info, ok := npcdata.SkillInfoOf(id); ok {
 			snapshot.Name = info.Name
