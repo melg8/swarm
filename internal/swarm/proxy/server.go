@@ -79,6 +79,12 @@ type Server struct {
 	mu       sync.Mutex
 	sessions []*botSession
 	selected string
+	// selectionCh is closed and replaced whenever SelectBot changes the
+	// selection to a different id: the live relay goroutines select on
+	// the current channel so they wake up immediately and resync the
+	// connected client onto the newly selected bot without waiting for
+	// a reconnect.
+	selectionCh chan struct{}
 
 	rsaModulus     atomic.Value // []byte
 	connSeq        atomic.Int64
@@ -131,6 +137,7 @@ func NewServer(logger *log.Logger, opts ...Option) *Server {
 		mu:             sync.Mutex{},
 		sessions:       nil,
 		selected:       "",
+		selectionCh:    make(chan struct{}),
 		rsaModulus:     atomic.Value{},
 		connSeq:        atomic.Int64{},
 		clients:        atomic.Int64{},
@@ -215,14 +222,37 @@ func (s *Server) UnregisterSession(id string, recorder *Recorder) {
 	}
 }
 
-// SelectBot marks the bot the next connecting client attaches to. An
-// unknown id is stored anyway (the client falls back to the first
-// session until that bot registers).
+// SelectBot marks the bot the next connecting client attaches to, and
+// when the id differs from the current selection it wakes every live
+// relay goroutine so a connected C1 client resyncs onto the newly
+// selected bot immediately (no reconnect needed). An unknown id is
+// stored anyway (the client falls back to the first session until
+// that bot registers).
 func (s *Server) SelectBot(id string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	if s.selected == id {
+		s.mu.Unlock()
+
+		return
+	}
 	s.selected = id
+	// Close the current selection channel (wakes every relay waiting
+	// on it) and install a fresh one for the next change.
+	close(s.selectionCh)
+	s.selectionCh = make(chan struct{})
+	s.mu.Unlock()
 	s.logger.Printf("Proxy selection switched to bot %q", id)
+}
+
+// selectionChannel returns the current selection notification channel.
+// The caller uses it to detect a selection change: the returned channel
+// is closed when SelectBot picks a different id. A snapshot read under
+// the mutex keeps the channel stable for the select call.
+func (s *Server) selectionChannel() chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.selectionCh
 }
 
 // SelectedBot returns the stored selection ("" when nothing selected).

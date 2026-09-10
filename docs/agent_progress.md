@@ -3390,3 +3390,34 @@ name the variant number that best fits the real bot UI.
   warrior order (attack power -> defense -> the rest) comes from the
   Mobius skill effect stats. The learning function itself is display
   only, as requested.
+- 2026-09-10: the proxy cross-bot client switch (round 12,
+  feature/proxy-server). When a C1 client was connected to the proxy
+  and watching bot 3, switching the WebUI selection to bot 2 left the
+  client showing bot 3: SelectBot only affected the NEXT client to
+  connect, not the already-connected one (documented in docs/proxy.md
+  "The client switches bots by reconnecting after changing the
+  selection"). The fix adds a selection notification channel to the
+  proxy Server and a cross-bot resync case to streamSession.
+
+  Implementation:
+  1. Server.selectionCh: a chan struct{} that SelectBot closes and
+     replaces whenever the id changes. The live relay goroutines
+     select on a snapshot of the channel, so they wake immediately.
+  2. serveBotSwitch: when the selection channel fires, the relay
+     resolves the newly selected bot session. When it differs from the
+     current one and is online, it calls resyncWorld (the same
+     teleport + DeleteObject sweep + replay machinery the relogin
+     handoff uses) to bring the client onto the new bot. The client
+     sees the new character's position, appearance, race and class
+     through the replayed UserInfo of the new bot's enter world burst.
+  3. When the new selection is the same bot, an unregistered id or a
+     still-connecting bot, the relay stays on the current live feed.
+
+  New tests: TestProxySwitchesConnectedClientToSelectedBot (the full
+  cross-bot switch: teleport + sweep + enter world burst of bot B
+  arrives after selecting B), TestProxySelectBotSameIdDoesNotSwitch
+  (no spurious resync when re-selecting the current bot),
+  TestProxySwitchToOfflineBotStaysOnCurrent (selecting an unregistered
+  bot keeps the client on the current feed). Verified: go build/vet,
+  go test ./internal/swarm/proxy/ (all tests pass), golangci-lint 0
+  issues.

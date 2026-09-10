@@ -614,6 +614,11 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
 	entries, sub := recorder.Attach(fromSeq)
 	defer recorder.removeSubscriber(sub)
 
+	// Snapshot the selection channel at the start of the cycle: when
+	// SelectBot fires it (closes it), the live feed select wakes up
+	// and the client resyncs onto the newly selected bot.
+	selectionCh := gc.server.selectionChannel()
+
 	selfID := session.tracker.SelfObjectID()
 	lastSelfMoveSeq := lastSelfMovementSeq(entries, selfID)
 
@@ -639,6 +644,23 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
 			return 0, false
 		case <-recorder.CloseSignal():
 			return gc.serveRelogin(session)
+		case <-selectionCh:
+			if next := gc.serveBotSwitch(session); next != nil {
+				newSeq := next.recorder.FirstPacketSeq(charSelectedOpcode)
+				if newSeq == 0 {
+					gc.server.logger.Printf(
+						"game#%d: switched session has no recorded char "+
+							"selected, continuing with the live feed only",
+						gc.id)
+					newSeq = maxReplaySeq
+				}
+
+				return newSeq, true
+			}
+			// The selection did not resolve to a different online
+			// session (the new id is the current bot, is unregistered
+			// or is still connecting): stay on the current live feed.
+			selectionCh = gc.server.selectionChannel()
 		case update := <-sub.ch:
 			if isLeaveWorldPayload(update.payload) && !gc.clientLoggedOut() {
 				gc.server.logger.Printf(
@@ -653,6 +675,42 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
 			}
 		}
 	}
+}
+
+// serveBotSwitch handles a WebUI selection change while a client is
+// connected: it resolves the newly selected bot session and, when it
+// differs from the current one and is online, resyncs the client onto
+// it through the same teleport + DeleteObject sweep + replay machinery
+// the relogin handoff uses. The client sees the new character's
+// position, appearance, race and class without reconnecting. Returns
+// the new session when the switch happened, nil when the selection did
+// not resolve to a different online session (the caller stays on the
+// current live feed).
+func (gc *gameConn) serveBotSwitch(current *botSession) *botSession {
+	target := gc.server.SelectedBot()
+	if target == "" || target == current.id {
+		return nil
+	}
+	next := gc.server.sessionByID(target)
+	if next == nil || next == current ||
+		next.tracker.Status() != state.StatusOnline {
+		gc.server.logger.Printf(
+			"game#%d: selection switched to %q but the session is not "+
+				"online, staying on %q",
+			gc.id, target, current.id)
+
+		return nil
+	}
+	oldKnowns := current.tracker.KnownObjectIDs()
+	gc.server.logger.Printf(
+		"game#%d: selection switched from %q to %q, resyncing the client "+
+			"(%d known objects)",
+		gc.id, current.id, next.id, len(oldKnowns))
+	if !gc.resyncWorld(next, oldKnowns) {
+		return nil
+	}
+
+	return next
 }
 
 // serveRelogin handles the end of the streamed bot session: a client
