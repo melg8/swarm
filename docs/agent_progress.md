@@ -123,6 +123,31 @@ The user report (2026-09-10, Russian, three bugs):
   tools/repro_bot_switch.js harness (the map reset, the kill mark
   survival, the repaint) and the full webui harness set.
 
+### Status: done (2026-09-10)
+
+- Three commits pushed: the waypoint follower fix (d3a8316 after the
+  rebase onto the concurrent water guard round), the starter dagger
+  destroy (7a72993), the zone circles and the shop queue of the bot
+  switch (fbb5c59).
+- Verify loop per commit: go build, go vet, the full go test suite,
+  gofumpt clean, golangci-lint with zero findings in the touched
+  files (the pre-existing findings of the branch stay untouched),
+  -race green on the hunt, gear and state packages, all six webui
+  repro harnesses green.
+- Live validation on the local stack (E2E_OK with BOT_FLAGS=-hunt):
+  the fresh elven fighter equipped the Squire's Sword and the log
+  carries "gear: destroying Dagger (2165): the equipped Squire's
+  Sword (2274) replaced it (unsellable, undroppable)" - the reported
+  destroy request works; the web API snapshot of a hunting bot
+  answers 71 huntingZones (the registry from the login snapshot) and
+  a shopping queue of 9 entries (1 affordable + the wanted tail with
+  the cumulative missing), not a lone milestone.
+- The user-side check stays the project workflow: watch a town return
+  walk hold its plan through the bridge entry (no "town walk stuck"
+  re-paths at the railing), watch the dagger leave the bag after the
+  next weapon lands, switch bots in the web UI and see the circles
+  and the shop list of every bot.
+
 ## Active task: the delevel freeze under an attached client - the position ping pong
 )
 
