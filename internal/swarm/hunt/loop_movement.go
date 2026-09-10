@@ -46,9 +46,10 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
 	if !ok {
 		return false
 	}
-	pick, found := l.tracker.NearestAttackablePreferred(
+	pick, found := l.tracker.NearestAttackablePreferredWindowed(
 		farTargetRange, l.zone(), l.activeSkips(now),
-		l.maxTargetLevel(), true, l.zoneMobPriority)
+		l.minTargetLevel(), l.maxTargetLevel(), true,
+		l.zoneMobPriority)
 	if !found {
 		// The far search scans the whole square: nothing in the zone
 		// is pickable at any distance. Explain the standing hunter in
@@ -95,8 +96,9 @@ func (l *Loop) logNoPickableTargets(now time.Time) {
 		return
 	}
 	l.noPickLogAt = now
-	blocked := l.tracker.NearestBlockedTargets(
-		l.zone(), l.maxTargetLevel(), l.activeSkips(now), noPickLogLimit)
+	blocked := l.tracker.NearestBlockedTargetsWindowed(
+		l.zone(), l.minTargetLevel(), l.maxTargetLevel(),
+		l.activeSkips(now), noPickLogLimit)
 	if len(blocked) == 0 {
 		l.logger.Printf("Hunt: no pickable target in the zone, " +
 			"no attackable npc in sight")

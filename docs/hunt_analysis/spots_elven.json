@@ -1,0 +1,3003 @@
+{
+ "generated": "tools/generate_hunt_spots.py",
+ "source": "from the committed zone registry",
+ "village": {
+  "x": 46112,
+  "y": 41500
+ },
+ "visibilityRadius": 2048,
+ "spotCount": 71,
+ "spawnMass": 722.0,
+ "compositionMass": 656,
+ "respawnDefault": {
+  "min": 15,
+  "max": 20
+ },
+ "spots": [
+  {
+   "id": "elven-spot-22",
+   "name": "Red Keltir SE",
+   "region": "elven",
+   "anchor_x": 48083,
+   "anchor_y": 43069,
+   "radius": 2048,
+   "min_level": 1,
+   "max_level": 3,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 7.0,
+   "mobs": [
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20534,
+     "name": "Red Keltir",
+     "level": 2,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20530,
+     "name": "Young Red Keltir",
+     "level": 1,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_01-a1",
+    "elven-2119_01-b1",
+    "elven-2119_01-c1"
+   ]
+  },
+  {
+   "id": "elven-spot-46",
+   "name": "Elder Red Keltir SW",
+   "region": "elven",
+   "anchor_x": 43936,
+   "anchor_y": 43024,
+   "radius": 2048,
+   "min_level": 1,
+   "max_level": 3,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 8.0,
+   "mobs": [
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20534,
+     "name": "Red Keltir",
+     "level": 2,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20530,
+     "name": "Young Red Keltir",
+     "level": 1,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_08-a1",
+    "elven-2119_08-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-72",
+   "name": "Red Keltir W",
+   "region": "elven",
+   "anchor_x": 41658,
+   "anchor_y": 41591,
+   "radius": 2048,
+   "min_level": 1,
+   "max_level": 3,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 7.0,
+   "mobs": [
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20534,
+     "name": "Red Keltir",
+     "level": 2,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20530,
+     "name": "Young Red Keltir",
+     "level": 1,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_07-a1",
+    "elven-2119_07-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-71",
+   "name": "Red Keltir NW",
+   "region": "elven",
+   "anchor_x": 40888,
+   "anchor_y": 39028,
+   "radius": 2048,
+   "min_level": 1,
+   "max_level": 3,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 7.0,
+   "mobs": [
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20534,
+     "name": "Red Keltir",
+     "level": 2,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20530,
+     "name": "Young Red Keltir",
+     "level": 1,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_06-a1",
+    "elven-2119_06-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-24",
+   "name": "Red Keltir E",
+   "region": "elven",
+   "anchor_x": 52564,
+   "anchor_y": 41814,
+   "radius": 2048,
+   "min_level": 1,
+   "max_level": 3,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 5.2,
+   "mobs": [
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 1,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20534,
+     "name": "Red Keltir",
+     "level": 2,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20530,
+     "name": "Young Red Keltir",
+     "level": 1,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_02-a1",
+    "elven-2119_02-b1",
+    "elven-2119_02-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-59",
+   "name": "Elder Red Keltir NE",
+   "region": "elven",
+   "anchor_x": 47872,
+   "anchor_y": 37504,
+   "radius": 2048,
+   "min_level": 2,
+   "max_level": 3,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 6.0,
+   "mobs": [
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20534,
+     "name": "Red Keltir",
+     "level": 2,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_04-a1",
+    "elven-2119_04-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-49",
+   "name": "Elder Red Keltir NW",
+   "region": "elven",
+   "anchor_x": 44291,
+   "anchor_y": 37332,
+   "radius": 2048,
+   "min_level": 2,
+   "max_level": 3,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 6.0,
+   "mobs": [
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20534,
+     "name": "Red Keltir",
+     "level": 2,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_05-a1",
+    "elven-2119_05-b1",
+    "elven-2119_05-c1"
+   ]
+  },
+  {
+   "id": "elven-spot-23",
+   "name": "Elder Red Keltir NE",
+   "region": "elven",
+   "anchor_x": 50332,
+   "anchor_y": 38493,
+   "radius": 1656,
+   "min_level": 2,
+   "max_level": 3,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 4.0,
+   "mobs": [
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20534,
+     "name": "Red Keltir",
+     "level": 2,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_03"
+   ]
+  },
+  {
+   "id": "elven-spot-25",
+   "name": "Gray Wolf E",
+   "region": "elven",
+   "anchor_x": 52887,
+   "anchor_y": 41157,
+   "radius": 1556,
+   "min_level": 2,
+   "max_level": 4,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 3.0,
+   "mobs": [
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 1,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 1,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20534,
+     "name": "Red Keltir",
+     "level": 2,
+     "count": 1,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_02-c1",
+    "elven-2119_022s"
+   ]
+  },
+  {
+   "id": "elven-spot-58",
+   "name": "Gray Wolf N",
+   "region": "elven",
+   "anchor_x": 46270,
+   "anchor_y": 35058,
+   "radius": 2048,
+   "min_level": 3,
+   "max_level": 4,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 8.0,
+   "mobs": [
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_13-a1",
+    "elven-2119_13-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-66",
+   "name": "Gray Wolf W",
+   "region": "elven",
+   "anchor_x": 39040,
+   "anchor_y": 41727,
+   "radius": 2048,
+   "min_level": 3,
+   "max_level": 4,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 6.0,
+   "mobs": [
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_09-a1",
+    "elven-2119_09-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-48",
+   "name": "Gray Wolf NW",
+   "region": "elven",
+   "anchor_x": 42424,
+   "anchor_y": 34387,
+   "radius": 2048,
+   "min_level": 3,
+   "max_level": 4,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 7.0,
+   "mobs": [
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_12-a1",
+    "elven-2119_12-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-47",
+   "name": "Gray Wolf NW",
+   "region": "elven",
+   "anchor_x": 39468,
+   "anchor_y": 35920,
+   "radius": 2048,
+   "min_level": 3,
+   "max_level": 4,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 8.0,
+   "mobs": [
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_11-a1",
+    "elven-2119_11-b1",
+    "elven-2119_11-c1",
+    "elven-2119_11-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-57",
+   "name": "Elder Red Keltir W",
+   "region": "elven",
+   "anchor_x": 37890,
+   "anchor_y": 38586,
+   "radius": 2048,
+   "min_level": 3,
+   "max_level": 4,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 8.0,
+   "mobs": [
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20537,
+     "name": "Elder Red Keltir",
+     "level": 3,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_10-a1",
+    "elven-2119_10-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-21",
+   "name": "Goblin Raider SE",
+   "region": "elven",
+   "anchor_x": 50659,
+   "anchor_y": 46248,
+   "radius": 2048,
+   "min_level": 4,
+   "max_level": 5,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 11.0,
+   "mobs": [
+    {
+     "template_id": 20325,
+     "name": "Goblin Raider",
+     "level": 5,
+     "count": 7,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_15-a1",
+    "elven-2119_15-b1",
+    "elven-2119_15-c1",
+    "elven-2119_15-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-60",
+   "name": "Gray Wolf SW",
+   "region": "elven",
+   "anchor_x": 38913,
+   "anchor_y": 52587,
+   "radius": 1656,
+   "min_level": 4,
+   "max_level": 5,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 6.0,
+   "mobs": [
+    {
+     "template_id": 20325,
+     "name": "Goblin Raider",
+     "level": 5,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_31"
+   ]
+  },
+  {
+   "id": "elven-spot-50",
+   "name": "Gray Wolf SW",
+   "region": "elven",
+   "anchor_x": 39461,
+   "anchor_y": 54803,
+   "radius": 1656,
+   "min_level": 4,
+   "max_level": 5,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 9.0,
+   "mobs": [
+    {
+     "template_id": 20325,
+     "name": "Goblin Raider",
+     "level": 5,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 6,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_27-a1",
+    "elven-2119_28"
+   ]
+  },
+  {
+   "id": "elven-spot-03",
+   "name": "Goblin Raider S",
+   "region": "elven",
+   "anchor_x": 48771,
+   "anchor_y": 56339,
+   "radius": 2048,
+   "min_level": 4,
+   "max_level": 5,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 6.0,
+   "mobs": [
+    {
+     "template_id": 20325,
+     "name": "Goblin Raider",
+     "level": 5,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_20-a1",
+    "elven-2119_20-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-01",
+   "name": "Goblin Raider SE",
+   "region": "elven",
+   "anchor_x": 53504,
+   "anchor_y": 45249,
+   "radius": 2048,
+   "min_level": 4,
+   "max_level": 6,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 11.0,
+   "mobs": [
+    {
+     "template_id": 20468,
+     "name": "Kaboo Orc",
+     "level": 6,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20325,
+     "name": "Goblin Raider",
+     "level": 5,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_14-a1",
+    "elven-2119_14-b1",
+    "elven-2119_14-c1"
+   ]
+  },
+  {
+   "id": "elven-spot-02",
+   "name": "Gray Wolf SE",
+   "region": "elven",
+   "anchor_x": 52738,
+   "anchor_y": 55386,
+   "radius": 2048,
+   "min_level": 4,
+   "max_level": 6,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 12.0,
+   "mobs": [
+    {
+     "template_id": 20468,
+     "name": "Kaboo Orc",
+     "level": 6,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20325,
+     "name": "Goblin Raider",
+     "level": 5,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_19-a1",
+    "elven-2119_19-b1",
+    "elven-2119_19-c1",
+    "elven-2119_19-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-04",
+   "name": "Kaboo Orc S",
+   "region": "elven",
+   "anchor_x": 51147,
+   "anchor_y": 59548,
+   "radius": 2048,
+   "min_level": 4,
+   "max_level": 6,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 9.0,
+   "mobs": [
+    {
+     "template_id": 20468,
+     "name": "Kaboo Orc",
+     "level": 6,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20325,
+     "name": "Goblin Raider",
+     "level": 5,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20525,
+     "name": "Gray Wolf",
+     "level": 4,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_21-a1",
+    "elven-2119_21-b1",
+    "elven-2119_21-c1",
+    "elven-2119_21-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-27",
+   "name": "Kaboo Orc Grunt SE",
+   "region": "elven",
+   "anchor_x": 51558,
+   "anchor_y": 50575,
+   "radius": 2048,
+   "min_level": 5,
+   "max_level": 7,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 12.0,
+   "mobs": [
+    {
+     "template_id": 20470,
+     "name": "Kaboo Orc Grunt",
+     "level": 7,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20468,
+     "name": "Kaboo Orc",
+     "level": 6,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20325,
+     "name": "Goblin Raider",
+     "level": 5,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_18-a1",
+    "elven-2119_18-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-28",
+   "name": "Kaboo Orc SE",
+   "region": "elven",
+   "anchor_x": 54254,
+   "anchor_y": 50639,
+   "radius": 2048,
+   "min_level": 5,
+   "max_level": 7,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 10.0,
+   "mobs": [
+    {
+     "template_id": 20470,
+     "name": "Kaboo Orc Grunt",
+     "level": 7,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20468,
+     "name": "Kaboo Orc",
+     "level": 6,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20325,
+     "name": "Goblin Raider",
+     "level": 5,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_17-a1",
+    "elven-2119_17-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-67",
+   "name": "Kaboo Orc Grunt SW",
+   "region": "elven",
+   "anchor_x": 38553,
+   "anchor_y": 50080,
+   "radius": 2048,
+   "min_level": 7,
+   "max_level": 8,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 14.0,
+   "mobs": [
+    {
+     "template_id": 20336,
+     "name": "Green Dryad",
+     "level": 8,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20469,
+     "name": "Kaboo Orc Archer",
+     "level": 8,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20470,
+     "name": "Kaboo Orc Grunt",
+     "level": 7,
+     "count": 7,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_32-a1",
+    "elven-2119_32-b1",
+    "elven-2119_32-c1",
+    "elven-2119_32-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-26",
+   "name": "Kaboo Orc Grunt S",
+   "region": "elven",
+   "anchor_x": 42278,
+   "anchor_y": 56761,
+   "radius": 2048,
+   "min_level": 7,
+   "max_level": 8,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 15.0,
+   "mobs": [
+    {
+     "template_id": 20336,
+     "name": "Green Dryad",
+     "level": 8,
+     "count": 6,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20469,
+     "name": "Kaboo Orc Archer",
+     "level": 8,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20470,
+     "name": "Kaboo Orc Grunt",
+     "level": 7,
+     "count": 7,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_27-b1",
+    "elven-2119_27-c1",
+    "elven-2119_27-d1",
+    "elven-2119_27-e1",
+    "elven-2119_27-f1"
+   ]
+  },
+  {
+   "id": "elven-spot-05",
+   "name": "Kaboo Orc Grunt S",
+   "region": "elven",
+   "anchor_x": 44182,
+   "anchor_y": 60944,
+   "radius": 2048,
+   "min_level": 7,
+   "max_level": 8,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 12.8,
+   "mobs": [
+    {
+     "template_id": 20336,
+     "name": "Green Dryad",
+     "level": 8,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20469,
+     "name": "Kaboo Orc Archer",
+     "level": 8,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20470,
+     "name": "Kaboo Orc Grunt",
+     "level": 7,
+     "count": 6,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_22-a1",
+    "elven-2119_22-c1",
+    "elven-2119_22-d1",
+    "elven-2119_22-e1"
+   ]
+  },
+  {
+   "id": "elven-spot-68",
+   "name": "Kaboo Orc Fighter SW",
+   "region": "elven",
+   "anchor_x": 35214,
+   "anchor_y": 51358,
+   "radius": 2048,
+   "min_level": 7,
+   "max_level": 10,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 12.0,
+   "mobs": [
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20470,
+     "name": "Kaboo Orc Grunt",
+     "level": 7,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_30-a1",
+    "elven-2119_30-b1",
+    "elven-2119_30-c1",
+    "elven-2119_30-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-32",
+   "name": "Spore Fungus SW",
+   "region": "elven",
+   "anchor_x": 35414,
+   "anchor_y": 55403,
+   "radius": 2048,
+   "min_level": 7,
+   "max_level": 10,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 14.0,
+   "mobs": [
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 6,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20469,
+     "name": "Kaboo Orc Archer",
+     "level": 8,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20470,
+     "name": "Kaboo Orc Grunt",
+     "level": 7,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_26-a1",
+    "elven-2119_29-a1",
+    "elven-2119_29-b1",
+    "elven-2119_29-c1",
+    "elven-2119_29-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-30",
+   "name": "Spore Fungus SW",
+   "region": "elven",
+   "anchor_x": 38339,
+   "anchor_y": 46052,
+   "radius": 2048,
+   "min_level": 8,
+   "max_level": 10,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 13.0,
+   "mobs": [
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20336,
+     "name": "Green Dryad",
+     "level": 8,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20469,
+     "name": "Kaboo Orc Archer",
+     "level": 8,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_33-a1",
+    "elven-2119_33-b1",
+    "elven-2119_33-c1"
+   ]
+  },
+  {
+   "id": "elven-spot-29",
+   "name": "Spore Fungus SW",
+   "region": "elven",
+   "anchor_x": 35292,
+   "anchor_y": 46424,
+   "radius": 2048,
+   "min_level": 8,
+   "max_level": 10,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 14.0,
+   "mobs": [
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 6,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20469,
+     "name": "Kaboo Orc Archer",
+     "level": 8,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_34-a1",
+    "elven-2119_34-b1",
+    "elven-2119_34-c1",
+    "elven-2119_34-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-31",
+   "name": "Kaboo Orc Fighter SW",
+   "region": "elven",
+   "anchor_x": 37416,
+   "anchor_y": 59038,
+   "radius": 2048,
+   "min_level": 8,
+   "max_level": 10,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 9.6,
+   "mobs": [
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20336,
+     "name": "Green Dryad",
+     "level": 8,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20469,
+     "name": "Kaboo Orc Archer",
+     "level": 8,
+     "count": 1,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_26-b1",
+    "elven-2119_26-c1",
+    "elven-2119_26-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-06",
+   "name": "Kaboo Orc Fighter W",
+   "region": "elven",
+   "anchor_x": 24859,
+   "anchor_y": 37654,
+   "radius": 2048,
+   "min_level": 8,
+   "max_level": 10,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 12.0,
+   "mobs": [
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20469,
+     "name": "Kaboo Orc Archer",
+     "level": 8,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_05-a1",
+    "elven-2019_05-b1",
+    "elven-2019_05-c1",
+    "elven-2019_05-d1",
+    "elven-2019_05-e1"
+   ]
+  },
+  {
+   "id": "elven-spot-33",
+   "name": "Spore Fungus S",
+   "region": "elven",
+   "anchor_x": 39199,
+   "anchor_y": 61983,
+   "radius": 2048,
+   "min_level": 8,
+   "max_level": 10,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 12.0,
+   "mobs": [
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20336,
+     "name": "Green Dryad",
+     "level": 8,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20469,
+     "name": "Kaboo Orc Archer",
+     "level": 8,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_25-a1",
+    "elven-2119_25-b1",
+    "elven-2119_25-c1",
+    "elven-2119_25-d1",
+    "elven-2119_26-e1"
+   ]
+  },
+  {
+   "id": "elven-spot-36",
+   "name": "Spore Fungus SW",
+   "region": "elven",
+   "anchor_x": 34575,
+   "anchor_y": 61654,
+   "radius": 2048,
+   "min_level": 8,
+   "max_level": 10,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 21.0,
+   "mobs": [
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 8,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 10,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20469,
+     "name": "Kaboo Orc Archer",
+     "level": 8,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_24-a1",
+    "elven-2119_24-b1",
+    "elven-2119_24-c1",
+    "elven-2119_24-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-34",
+   "name": "Spore Fungus S",
+   "region": "elven",
+   "anchor_x": 41508,
+   "anchor_y": 64502,
+   "radius": 2048,
+   "min_level": 8,
+   "max_level": 10,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 12.0,
+   "mobs": [
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20336,
+     "name": "Green Dryad",
+     "level": 8,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20469,
+     "name": "Kaboo Orc Archer",
+     "level": 8,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2119_22-b1",
+    "elven-2119_23-a1",
+    "elven-2119_23-b1",
+    "elven-2119_23-c1"
+   ]
+  },
+  {
+   "id": "elven-spot-35",
+   "name": "Spore Fungus SW",
+   "region": "elven",
+   "anchor_x": 31700,
+   "anchor_y": 55825,
+   "radius": 1656,
+   "min_level": 9,
+   "max_level": 9,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 3.0,
+   "mobs": [
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_24-c1",
+    "elven-2019_24-d1",
+    "elven-2019_243s"
+   ]
+  },
+  {
+   "id": "elven-spot-39",
+   "name": "Spore Fungus SW",
+   "region": "elven",
+   "anchor_x": 26552,
+   "anchor_y": 63547,
+   "radius": 1656,
+   "min_level": 9,
+   "max_level": 9,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 3.0,
+   "mobs": [
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_18-a1",
+    "elven-2019_18-b1",
+    "elven-2019_18s"
+   ]
+  },
+  {
+   "id": "elven-spot-07",
+   "name": "Spore Fungus SW",
+   "region": "elven",
+   "anchor_x": 31455,
+   "anchor_y": 48531,
+   "radius": 2048,
+   "min_level": 9,
+   "max_level": 11,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 13.0,
+   "mobs": [
+    {
+     "template_id": 20473,
+     "name": "Kaboo Orc Fighter Lieutenant",
+     "level": 11,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_01-a1",
+    "elven-2019_01-b1",
+    "elven-2019_01-c1",
+    "elven-2019_01-d1",
+    "elven-2019_01-e1"
+   ]
+  },
+  {
+   "id": "elven-spot-08",
+   "name": "Kaboo Orc Fighter W",
+   "region": "elven",
+   "anchor_x": 25268,
+   "anchor_y": 41138,
+   "radius": 2048,
+   "min_level": 9,
+   "max_level": 11,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 11.0,
+   "mobs": [
+    {
+     "template_id": 20473,
+     "name": "Kaboo Orc Fighter Lieutenant",
+     "level": 11,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_04-a1",
+    "elven-2019_04-b1",
+    "elven-2019_04-c1",
+    "elven-2019_04-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-37",
+   "name": "Kaboo Orc Fighter Lieutenant SW",
+   "region": "elven",
+   "anchor_x": 31134,
+   "anchor_y": 62229,
+   "radius": 2048,
+   "min_level": 9,
+   "max_level": 11,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 13.0,
+   "mobs": [
+    {
+     "template_id": 20473,
+     "name": "Kaboo Orc Fighter Lieutenant",
+     "level": 11,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_23-a1",
+    "elven-2019_23-b1",
+    "elven-2019_23-c1",
+    "elven-2019_23-d1",
+    "elven-2019_23-e1"
+   ]
+  },
+  {
+   "id": "elven-spot-09",
+   "name": "Kaboo Orc Fighter Leader W",
+   "region": "elven",
+   "anchor_x": 19941,
+   "anchor_y": 40396,
+   "radius": 2048,
+   "min_level": 9,
+   "max_level": 12,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 12.0,
+   "mobs": [
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20473,
+     "name": "Kaboo Orc Fighter Lieutenant",
+     "level": 11,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_06-a1",
+    "elven-2019_06-b1",
+    "elven-2019_06-c1",
+    "elven-2019_06-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-52",
+   "name": "Kaboo Orc Fighter Leader W",
+   "region": "elven",
+   "anchor_x": 19400,
+   "anchor_y": 43433,
+   "radius": 2048,
+   "min_level": 9,
+   "max_level": 13,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 10.0,
+   "mobs": [
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20473,
+     "name": "Kaboo Orc Fighter Lieutenant",
+     "level": 11,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20509,
+     "name": "Spore Fungus",
+     "level": 9,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_07-a1",
+    "elven-2019_07-b1",
+    "elven-2019_07-c1"
+   ]
+  },
+  {
+   "id": "elven-spot-51",
+   "name": "Kaboo Orc Fighter Lieutenant SW",
+   "region": "elven",
+   "anchor_x": 28756,
+   "anchor_y": 55735,
+   "radius": 2048,
+   "min_level": 10,
+   "max_level": 11,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 3.2,
+   "mobs": [
+    {
+     "template_id": 20473,
+     "name": "Kaboo Orc Fighter Lieutenant",
+     "level": 11,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20471,
+     "name": "Kaboo Orc Fighter",
+     "level": 10,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_24-a1"
+   ]
+  },
+  {
+   "id": "elven-spot-38",
+   "name": "Kaboo Orc Fighter Lieutenant SW",
+   "region": "elven",
+   "anchor_x": 26907,
+   "anchor_y": 63452,
+   "radius": 2048,
+   "min_level": 11,
+   "max_level": 12,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 5.5,
+   "mobs": [
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20473,
+     "name": "Kaboo Orc Fighter Lieutenant",
+     "level": 11,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_18-c1",
+    "elven-2019_18-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-10",
+   "name": "Kaboo Orc Fighter Lieutenant SW",
+   "region": "elven",
+   "anchor_x": 25870,
+   "anchor_y": 50783,
+   "radius": 2048,
+   "min_level": 11,
+   "max_level": 13,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 14.0,
+   "mobs": [
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20473,
+     "name": "Kaboo Orc Fighter Lieutenant",
+     "level": 11,
+     "count": 6,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_02-a1",
+    "elven-2019_02-b1",
+    "elven-2019_02-c1",
+    "elven-2019_02-d1",
+    "elven-2019_02-e1"
+   ]
+  },
+  {
+   "id": "elven-spot-40",
+   "name": "Kaboo Orc Fighter Leader W",
+   "region": "elven",
+   "anchor_x": 22307,
+   "anchor_y": 46530,
+   "radius": 2048,
+   "min_level": 11,
+   "max_level": 13,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 14.0,
+   "mobs": [
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20473,
+     "name": "Kaboo Orc Fighter Lieutenant",
+     "level": 11,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_03-a1",
+    "elven-2019_03-b1",
+    "elven-2019_03-c1",
+    "elven-2019_03-d1",
+    "elven-2019_03-e1",
+    "elven-2019_03-f1"
+   ]
+  },
+  {
+   "id": "elven-spot-70",
+   "name": "Dryad SW",
+   "region": "elven",
+   "anchor_x": 24934,
+   "anchor_y": 59076,
+   "radius": 1756,
+   "min_level": 12,
+   "max_level": 13,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 2.0,
+   "mobs": [
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 1,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 1,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_19-c1",
+    "elven-2019_19-d1",
+    "elven-2019_19s"
+   ]
+  },
+  {
+   "id": "elven-spot-63",
+   "name": "Dryad W",
+   "region": "elven",
+   "anchor_x": 17157,
+   "anchor_y": 46089,
+   "radius": 1656,
+   "min_level": 12,
+   "max_level": 13,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 2.0,
+   "mobs": [
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 1,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 1,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_08-a1",
+    "elven-2019_08-b1",
+    "elven-2019_08-c1",
+    "elven-2019_08s"
+   ]
+  },
+  {
+   "id": "elven-spot-69",
+   "name": "Kaboo Orc Fighter Leader SW",
+   "region": "elven",
+   "anchor_x": 24162,
+   "anchor_y": 59111,
+   "radius": 2048,
+   "min_level": 12,
+   "max_level": 14,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 6.5,
+   "mobs": [
+    {
+     "template_id": 20019,
+     "name": "Dryad Elder",
+     "level": 14,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_19-a1",
+    "elven-2019_19-b1",
+    "elven-2019_20-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-41",
+   "name": "Kaboo Orc Fighter Leader W",
+   "region": "elven",
+   "anchor_x": 17990,
+   "anchor_y": 49828,
+   "radius": 2048,
+   "min_level": 12,
+   "max_level": 14,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 10.0,
+   "mobs": [
+    {
+     "template_id": 20019,
+     "name": "Dryad Elder",
+     "level": 14,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_08-e1",
+    "elven-2019_08-f1",
+    "elven-2019_09-a1",
+    "elven-2019_09-b1",
+    "elven-2019_09-c1"
+   ]
+  },
+  {
+   "id": "elven-spot-53",
+   "name": "Kaboo Orc Fighter Leader W",
+   "region": "elven",
+   "anchor_x": 16884,
+   "anchor_y": 52856,
+   "radius": 2048,
+   "min_level": 12,
+   "max_level": 14,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 7.0,
+   "mobs": [
+    {
+     "template_id": 20019,
+     "name": "Dryad Elder",
+     "level": 14,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_10-d1",
+    "elven-2019_10-e1",
+    "elven-2019_10-f1"
+   ]
+  },
+  {
+   "id": "elven-spot-11",
+   "name": "Kaboo Orc Fighter Leader W",
+   "region": "elven",
+   "anchor_x": 12454,
+   "anchor_y": 47625,
+   "radius": 2048,
+   "min_level": 12,
+   "max_level": 14,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 9.0,
+   "mobs": [
+    {
+     "template_id": 20019,
+     "name": "Dryad Elder",
+     "level": 14,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_17-a1",
+    "elven-2019_17-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-12",
+   "name": "Dryad Elder SW",
+   "region": "elven",
+   "anchor_x": 18182,
+   "anchor_y": 57020,
+   "radius": 2048,
+   "min_level": 12,
+   "max_level": 15,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 6.5,
+   "mobs": [
+    {
+     "template_id": 20460,
+     "name": "Crimson Spider",
+     "level": 15,
+     "count": 1,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20019,
+     "name": "Dryad Elder",
+     "level": 14,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20472,
+     "name": "Kaboo Orc Fighter Leader",
+     "level": 12,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_20-b1",
+    "elven-2019_20-c1"
+   ]
+  },
+  {
+   "id": "elven-spot-61",
+   "name": "Dryad SW",
+   "region": "elven",
+   "anchor_x": 28024,
+   "anchor_y": 57840,
+   "radius": 1656,
+   "min_level": 13,
+   "max_level": 13,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 3.0,
+   "mobs": [
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_24-b1",
+    "elven-2019_241s"
+   ]
+  },
+  {
+   "id": "elven-spot-55",
+   "name": "Crimson Spider W",
+   "region": "elven",
+   "anchor_x": 9226,
+   "anchor_y": 49297,
+   "radius": 2048,
+   "min_level": 13,
+   "max_level": 15,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 12.0,
+   "mobs": [
+    {
+     "template_id": 20460,
+     "name": "Crimson Spider",
+     "level": 15,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20019,
+     "name": "Dryad Elder",
+     "level": 14,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20013,
+     "name": "Dryad",
+     "level": 13,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_16-a1",
+    "elven-2019_16-b1",
+    "elven-2019_16-c1",
+    "elven-2019_16-d1",
+    "elven-2019_16s"
+   ]
+  },
+  {
+   "id": "elven-spot-54",
+   "name": "Crimson Spider W",
+   "region": "elven",
+   "anchor_x": 15936,
+   "anchor_y": 52218,
+   "radius": 1656,
+   "min_level": 14,
+   "max_level": 15,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 3.0,
+   "mobs": [
+    {
+     "template_id": 20460,
+     "name": "Crimson Spider",
+     "level": 15,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20019,
+     "name": "Dryad Elder",
+     "level": 14,
+     "count": 1,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_10-a1",
+    "elven-2019_10-b1",
+    "elven-2019_10-c1",
+    "elven-2019_10s"
+   ]
+  },
+  {
+   "id": "elven-spot-14",
+   "name": "Dryad Elder SW",
+   "region": "elven",
+   "anchor_x": 12638,
+   "anchor_y": 59812,
+   "radius": 1656,
+   "min_level": 14,
+   "max_level": 16,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 7.0,
+   "mobs": [
+    {
+     "template_id": 20308,
+     "name": "Hook Spider",
+     "level": 16,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20460,
+     "name": "Crimson Spider",
+     "level": 15,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20019,
+     "name": "Dryad Elder",
+     "level": 14,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_20-a1",
+    "elven-2019_21"
+   ]
+  },
+  {
+   "id": "elven-spot-13",
+   "name": "Hook Spider SW",
+   "region": "elven",
+   "anchor_x": 10929,
+   "anchor_y": 56364,
+   "radius": 2048,
+   "min_level": 14,
+   "max_level": 16,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 13.0,
+   "mobs": [
+    {
+     "template_id": 20308,
+     "name": "Hook Spider",
+     "level": 16,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20460,
+     "name": "Crimson Spider",
+     "level": 15,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20019,
+     "name": "Dryad Elder",
+     "level": 14,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_11-a1",
+    "elven-2019_11-b1",
+    "elven-2019_11-c1",
+    "elven-2019_11-d1",
+    "elven-2019_11-e1"
+   ]
+  },
+  {
+   "id": "elven-spot-42",
+   "name": "Dryad Elder W",
+   "region": "elven",
+   "anchor_x": 6171,
+   "anchor_y": 52368,
+   "radius": 2048,
+   "min_level": 14,
+   "max_level": 16,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 10.0,
+   "mobs": [
+    {
+     "template_id": 20308,
+     "name": "Hook Spider",
+     "level": 16,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20460,
+     "name": "Crimson Spider",
+     "level": 15,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20019,
+     "name": "Dryad Elder",
+     "level": 14,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_15-a1",
+    "elven-2019_15-b1",
+    "elven-2019_15-c1",
+    "elven-2019_15-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-44",
+   "name": "Lirein SW",
+   "region": "elven",
+   "anchor_x": 9722,
+   "anchor_y": 63285,
+   "radius": 2048,
+   "min_level": 16,
+   "max_level": 18,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 9.0,
+   "mobs": [
+    {
+     "template_id": 20036,
+     "name": "Lirein",
+     "level": 18,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20466,
+     "name": "Pincer Spider",
+     "level": 17,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20308,
+     "name": "Hook Spider",
+     "level": 16,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_22-b1",
+    "elven-2019_22-c1",
+    "elven-2019_22-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-43",
+   "name": "Hook Spider SW",
+   "region": "elven",
+   "anchor_x": 6826,
+   "anchor_y": 59986,
+   "radius": 2048,
+   "min_level": 16,
+   "max_level": 18,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 13.0,
+   "mobs": [
+    {
+     "template_id": 20036,
+     "name": "Lirein",
+     "level": 18,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20466,
+     "name": "Pincer Spider",
+     "level": 17,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20308,
+     "name": "Hook Spider",
+     "level": 16,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_12-a1",
+    "elven-2019_12-b1",
+    "elven-2019_12-c1",
+    "elven-2019_12-d1",
+    "elven-2019_12-e1",
+    "elven-2019_12-f1"
+   ]
+  },
+  {
+   "id": "elven-spot-15",
+   "name": "Lirein W",
+   "region": "elven",
+   "anchor_x": 3849,
+   "anchor_y": 55943,
+   "radius": 2048,
+   "min_level": 16,
+   "max_level": 18,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 11.0,
+   "mobs": [
+    {
+     "template_id": 20036,
+     "name": "Lirein",
+     "level": 18,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20466,
+     "name": "Pincer Spider",
+     "level": 17,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20308,
+     "name": "Hook Spider",
+     "level": 16,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_14-a1",
+    "elven-2019_14-b1",
+    "elven-2019_14-c1",
+    "elven-2019_14-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-16",
+   "name": "Pincer Spider SW",
+   "region": "elven",
+   "anchor_x": 7051,
+   "anchor_y": 66490,
+   "radius": 1656,
+   "min_level": 16,
+   "max_level": 18,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 7.0,
+   "mobs": [
+    {
+     "template_id": 20036,
+     "name": "Lirein",
+     "level": 18,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20466,
+     "name": "Pincer Spider",
+     "level": 17,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20308,
+     "name": "Hook Spider",
+     "level": 16,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_22-a1",
+    "elven-2020_01"
+   ]
+  },
+  {
+   "id": "elven-spot-64",
+   "name": "Lirein SW",
+   "region": "elven",
+   "anchor_x": 6396,
+   "anchor_y": 71742,
+   "radius": 2048,
+   "min_level": 16,
+   "max_level": 18,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 11.0,
+   "mobs": [
+    {
+     "template_id": 20036,
+     "name": "Lirein",
+     "level": 18,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20466,
+     "name": "Pincer Spider",
+     "level": 17,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20308,
+     "name": "Hook Spider",
+     "level": 16,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2020_03-a1",
+    "elven-2020_03-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-65",
+   "name": "Lirein SW",
+   "region": "elven",
+   "anchor_x": 4544,
+   "anchor_y": 74493,
+   "radius": 1656,
+   "min_level": 16,
+   "max_level": 18,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 6.0,
+   "mobs": [
+    {
+     "template_id": 20036,
+     "name": "Lirein",
+     "level": 18,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20466,
+     "name": "Pincer Spider",
+     "level": 17,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20308,
+     "name": "Hook Spider",
+     "level": 16,
+     "count": 2,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2020_05"
+   ]
+  },
+  {
+   "id": "elven-spot-17",
+   "name": "Pincer Spider SW",
+   "region": "elven",
+   "anchor_x": 3052,
+   "anchor_y": 62860,
+   "radius": 2048,
+   "min_level": 17,
+   "max_level": 19,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 14.0,
+   "mobs": [
+    {
+     "template_id": 20044,
+     "name": "Lirein Elder",
+     "level": 19,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20036,
+     "name": "Lirein",
+     "level": 18,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20466,
+     "name": "Pincer Spider",
+     "level": 17,
+     "count": 7,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2019_13-a1",
+    "elven-2019_13-b1",
+    "elven-2019_13-c1",
+    "elven-2019_13-d1",
+    "elven-2019_13-e1"
+   ]
+  },
+  {
+   "id": "elven-spot-18",
+   "name": "Pincer Spider SW",
+   "region": "elven",
+   "anchor_x": 2100,
+   "anchor_y": 67480,
+   "radius": 2048,
+   "min_level": 17,
+   "max_level": 19,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 12.0,
+   "mobs": [
+    {
+     "template_id": 20044,
+     "name": "Lirein Elder",
+     "level": 19,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20036,
+     "name": "Lirein",
+     "level": 18,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20466,
+     "name": "Pincer Spider",
+     "level": 17,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2020_02-a1",
+    "elven-2020_02-b1",
+    "elven-2020_02-c1"
+   ]
+  },
+  {
+   "id": "elven-spot-56",
+   "name": "Pincer Spider SW",
+   "region": "elven",
+   "anchor_x": 2500,
+   "anchor_y": 72343,
+   "radius": 2048,
+   "min_level": 17,
+   "max_level": 19,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 10.0,
+   "mobs": [
+    {
+     "template_id": 20044,
+     "name": "Lirein Elder",
+     "level": 19,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20036,
+     "name": "Lirein",
+     "level": 18,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20466,
+     "name": "Pincer Spider",
+     "level": 17,
+     "count": 4,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2020_04-a1",
+    "elven-2020_04-b1"
+   ]
+  },
+  {
+   "id": "elven-spot-45",
+   "name": "Lirein Elder SW",
+   "region": "elven",
+   "anchor_x": 4868,
+   "anchor_y": 77104,
+   "radius": 1656,
+   "min_level": 17,
+   "max_level": 19,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 6.0,
+   "mobs": [
+    {
+     "template_id": 20044,
+     "name": "Lirein Elder",
+     "level": 19,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20466,
+     "name": "Pincer Spider",
+     "level": 17,
+     "count": 3,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2020_07"
+   ]
+  },
+  {
+   "id": "elven-spot-19",
+   "name": "Pincer Spider SW",
+   "region": "elven",
+   "anchor_x": 5069,
+   "anchor_y": 82406,
+   "radius": 2048,
+   "min_level": 17,
+   "max_level": 19,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 15.0,
+   "mobs": [
+    {
+     "template_id": 20044,
+     "name": "Lirein Elder",
+     "level": 19,
+     "count": 7,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20466,
+     "name": "Pincer Spider",
+     "level": 17,
+     "count": 8,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2020_08-a1",
+    "elven-2020_08-b1",
+    "elven-2020_08-c1",
+    "elven-2020_08-d1"
+   ]
+  },
+  {
+   "id": "elven-spot-20",
+   "name": "Lirein Elder SW",
+   "region": "elven",
+   "anchor_x": 1708,
+   "anchor_y": 77534,
+   "radius": 2048,
+   "min_level": 18,
+   "max_level": 19,
+   "respawn_min": 15,
+   "respawn_max": 20,
+   "mass": 11.0,
+   "mobs": [
+    {
+     "template_id": 20044,
+     "name": "Lirein Elder",
+     "level": 19,
+     "count": 6,
+     "respawn_min": 15,
+     "respawn_max": 20
+    },
+    {
+     "template_id": 20036,
+     "name": "Lirein",
+     "level": 18,
+     "count": 5,
+     "respawn_min": 15,
+     "respawn_max": 20
+    }
+   ],
+   "zone_ids": [
+    "elven-2020_06-a1",
+    "elven-2020_06-b1"
+   ]
+  }
+ ]
+}

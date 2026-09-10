@@ -297,8 +297,9 @@ func (l *Loop) zoneByID(id string) (HuntingZone, bool) {
 // loop picks the zone for the character state on the next tick and
 // re-evaluates it as the level and the gear grow. Without a registry
 // the loop hunts with the plain SetHuntingZone square (or without a
-// zone at all).
+// zone at all). The legacy call stands the spot mode down.
 func (l *Loop) SetHuntingZones(zones []HuntingZone) {
+	l.spot = nil
 	l.zones = zones
 	l.zoneOverride = -1
 	l.zonePickedID = ""
@@ -312,11 +313,13 @@ func (l *Loop) SetHuntingZones(zones []HuntingZone) {
 }
 
 // SetHuntingZoneRegion installs the registry of one region by name
-// ("elven"): the map of the future deployments.
+// ("elven"): the map of the future deployments. The elven lands run
+// the spot anchored registry of the redesign (the square zones stay
+// available through SetHuntingZones for the legacy setups).
 func (l *Loop) SetHuntingZoneRegion(region string) {
 	switch region {
 	case regionElven, "":
-		l.SetHuntingZones(ElvenHuntingZones())
+		l.SetHuntingSpotRegion(regionElven)
 	default:
 		l.logger.Printf("Hunt: no zone registry for region %q, hunting "+
 			"without zones", region)
@@ -324,9 +327,16 @@ func (l *Loop) SetHuntingZoneRegion(region string) {
 }
 
 // userZoneSelect applies the manual zone selection of the web UI: the
-// index refers to the zone registry order. The selection overrides
-// the automatic picker until the character outgrows the band.
+// index refers to the zone registry order (the spot registry order in
+// the spot mode - the map view lists both through the same index
+// space). The selection overrides the automatic picker until the
+// character outgrows the band.
 func (l *Loop) userZoneSelect(index int32) {
+	if l.spot != nil {
+		l.userSpotSelect(index)
+
+		return
+	}
 	if len(l.zones) == 0 {
 		return
 	}
@@ -376,8 +386,14 @@ func (l *Loop) stopForZoneSwitch() {
 // square rotates to the next ground of its band, and the death
 // bookkeeping resets when the level changes. The ladder re-pick only
 // happens between the fights (no target, nobody attacks), so a
-// running fight always finishes in the old square.
+// running fight always finishes in the old square. The spot mode
+// branch replaces the whole ladder economy with the spot policy.
 func (l *Loop) maybeSwitchZone() {
+	if l.spot != nil {
+		l.spotEvaluate(time.Now())
+
+		return
+	}
 	if len(l.zones) == 0 {
 		return
 	}
@@ -590,8 +606,14 @@ func (l *Loop) rotationZone(
 // the zone band (the regression onto an easier ground) and the next
 // tick re-picks with the cap. The counting happens in
 // recoverFromDeath; the deleveling deaths are the point of that phase
-// and never count.
+// and never count. The spot mode replaces the band demotion with the
+// per spot death heat.
 func (l *Loop) noteZoneDeath() {
+	if l.spot != nil {
+		l.spotNoteDeath(time.Now())
+
+		return
+	}
 	zone, ok := l.deathZone()
 	if !ok {
 		return

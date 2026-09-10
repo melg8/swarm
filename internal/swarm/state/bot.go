@@ -613,6 +613,21 @@ func (b *Bot) ObjectName(objectID int32) string {
 	return cold.Name
 }
 
+// ObjectTemplateID returns the wire template id of a known npc (the
+// NpcInfo template id, display id plus the 1000000 offset), zero when
+// the object is unknown or not an npc. The spot respawn overlay keys
+// the kill records through it onto the mob lists of the registry.
+func (b *Bot) ObjectTemplateID(objectID int32) int32 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	obj, cold := b.objectLocked(objectID)
+	if obj == nil || cold == nil || obj.Kind != kindNPC {
+		return 0
+	}
+
+	return cold.TemplateID
+}
+
 // ObjectAlive reports whether the object is known around the character
 // and not dead.
 func (b *Bot) ObjectAlive(objectID int32) bool {
@@ -1737,10 +1752,13 @@ type Snapshot struct {
 	UpdatedAt    time.Time         `json:"updatedAt"`
 }
 
-// ZoneView is one hunting zone of the map view: the registry entry
-// of the deployment with the active marker of the zone the loop
-// hunts in, the death count the session paid in it and the demoted
-// marker of the bands the death regression locked out.
+// ZoneView is one hunting ground of the map view: the registry entry
+// of the deployment with the active marker of the ground the loop
+// hunts in, the death bookkeeping of the session and - for the spot
+// registries - the respawn window, the expected population, the
+// measured income rate and the next respawn prediction of the spot
+// economy. The legacy square entries leave the spot fields zero and
+// the kind empty.
 type ZoneView struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -1754,6 +1772,40 @@ type ZoneView struct {
 	Active   bool   `json:"active"`
 	Deaths   int32  `json:"deaths"`
 	Demoted  bool   `json:"demoted"`
+	// Kind marks the registry shape: "spot" for the spot anchored
+	// registry (circles on the map), empty for the legacy squares.
+	Kind string `json:"kind"`
+	// Radius is the spot circle (the leash square Half inscribes
+	// in it); zero for the legacy squares.
+	Radius int32 `json:"radius"`
+	// RespawnMinSec and RespawnMaxSec bound the respawn window of
+	// the ground.
+	RespawnMinSec int32 `json:"respawnMinSec"`
+	RespawnMaxSec int32 `json:"respawnMaxSec"`
+	// SpawnMass is the expected population of the spot ground.
+	SpawnMass int32 `json:"spawnMass"`
+	// AggroMass is the expected aggressive population (the static
+	// danger input of the spot safety).
+	AggroMass int32 `json:"aggroMass"`
+	// AdenaPerMin is the measured income rate of the session at
+	// the ground (the bootstrap prior stays out of the view - the
+	// measurement replaces it silently).
+	AdenaPerMin float64 `json:"adenaPerMin"`
+	// DeathHeat is the decayed death heat of the spot (the safety
+	// multiplier input, see the spot metrics).
+	DeathHeat float64 `json:"deathHeat"`
+	// NextRespawnSec is the predicted ETA of the earliest respawn
+	// of the spot overlay, -1 when the overlay holds no pending
+	// prediction.
+	NextRespawnSec int32 `json:"nextRespawnSec"`
+	// Occupancy is the number of hunters of the fleet holding the
+	// spot right now.
+	Occupancy int32 `json:"occupancy"`
+	// KillX and KillY are the live kill centroid of the session at
+	// the spot (the EMA of the kill positions, zero before the
+	// first kill).
+	KillX int32 `json:"killX"`
+	KillY int32 `json:"killY"`
 }
 
 // SelfSnapshot returns the live character view of the played character

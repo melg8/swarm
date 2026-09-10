@@ -435,8 +435,12 @@ type Loop struct {
 	replaceWaitAt    time.Time
 	replaceTried     int
 	// The multi zone hunting state (see zones.go): the registry of the
-	// deployment, the picked and the manually overridden zone.
+	// deployment, the picked and the manually overridden zone. The
+	// spot mode (see spot_policy.go) replaces the registry with the
+	// spot anchored alternative - the zone fields then mirror the
+	// leash square of the active spot.
 	zones        []HuntingZone
+	spot         *spotHunter
 	zonePickedID string
 	zoneOverride int
 	zoneCheckAt  time.Time
@@ -540,6 +544,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		tripStart:        time.Time{},
 		tripEndedAt:      time.Time{},
 		zones:            nil,
+		spot:             nil,
 		zonePickedID:     "",
 		zoneOverride:     -1,
 		zoneCheckAt:      time.Time{},
@@ -973,6 +978,9 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		l.target = serverTarget
 	}
 	if l.target != 0 && !l.tracker.ObjectAlive(l.target) {
+		if l.spot != nil {
+			l.spotNoteKill(l.target, now)
+		}
 		l.logger.Printf("Hunt: target %d died, looting", l.target)
 		l.target = 0
 		l.clearBlindRecovery()
@@ -1072,9 +1080,10 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		if now.Sub(l.lastHit) < selectPeriod {
 			return
 		}
-		pick, ok := l.tracker.NearestAttackablePreferred(
+		pick, ok := l.tracker.NearestAttackablePreferredWindowed(
 			attackNearestRange, l.zone(), l.activeSkips(now),
-			l.maxTargetLevel(), true, l.zoneMobPriority)
+			l.minTargetLevel(), l.maxTargetLevel(), true,
+			l.zoneMobPriority)
 		if !ok {
 			if l.walkToFarTarget(now) {
 				return

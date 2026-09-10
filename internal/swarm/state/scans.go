@@ -105,7 +105,7 @@ func (b *Bot) NearestAttackable(
 func (b *Bot) NearestAttackableExcept(
 	maxDistance float64, zone *Zone, skip []int32,
 ) (AttackTarget, bool) {
-	return b.nearestAttackable(maxDistance, zone, skip, 0, false, nil)
+	return b.nearestAttackable(maxDistance, zone, skip, 0, 0, false, nil)
 }
 
 // ZoneHasAttackable reports whether at least one living attackable
@@ -152,7 +152,7 @@ func (b *Bot) ZoneHasAttackableBelow(zone *Zone, maxLevel int32) bool {
 
 // ZoneHasPickable reports whether the engage target search could take
 // ANY npc of the zone right now: the pick's own filters apply - the
-// level ceiling, the skip list and the social clan fence - while the
+// level window, the skip list and the social clan fence - while the
 // distance plays no role (the far target walk covers the whole
 // square, a mob at any in-zone distance is reachable). The zone
 // rotation uses this as its emptiness reading: a square whose only
@@ -164,8 +164,21 @@ func (b *Bot) ZoneHasAttackableBelow(zone *Zone, maxLevel int32) bool {
 func (b *Bot) ZoneHasPickable(
 	zone *Zone, maxLevel int32, skip []int32,
 ) bool {
+	return b.ZoneHasPickableWindowed(zone, 0, maxLevel, skip)
+}
+
+// ZoneHasPickableWindowed extends ZoneHasPickable with the level
+// window floor of the spot hunting: mobs below minLevel pay no adena
+// at the character's level (the level gap penalty edge), so a ground
+// whose only survivors sit below the floor reads empty for the
+// wait-or-move economy - the same way the ceiling reads the too-high
+// survivors. Zero disables the floor (an unresolved template passes
+// both bounds, matching the ceiling semantics).
+func (b *Bot) ZoneHasPickableWindowed(
+	zone *Zone, minLevel int32, maxLevel int32, skip []int32,
+) bool {
 	_, ok := b.nearestAttackable(
-		math.MaxFloat64, zone, skip, maxLevel, true, nil)
+		math.MaxFloat64, zone, skip, minLevel, maxLevel, true, nil)
 
 	return ok
 }
@@ -187,7 +200,7 @@ type BlockedTarget struct {
 // NearestBlockedTargets classifies the living attackable npcs around
 // the character exactly the way the engage pick does and returns the
 // nearest ones the pick rejected, with the projected position and the
-// reason: the skip list, the level ceiling, the zone square or the
+// reason: the skip list, the level window, the zone square or the
 // social clan fence (in the pick's own check order). Mobs that pass
 // every filter stay out of the list - the far target walk reaches
 // them, they are simply not engaged yet. The limit bounds the list:
@@ -195,6 +208,15 @@ type BlockedTarget struct {
 // knownlist.
 func (b *Bot) NearestBlockedTargets(
 	zone *Zone, maxLevel int32, skip []int32, limit int,
+) []BlockedTarget {
+	return b.NearestBlockedTargetsWindowed(zone, 0, maxLevel, skip, limit)
+}
+
+// NearestBlockedTargetsWindowed extends NearestBlockedTargets with the
+// level window floor of the spot hunting: a mob below the floor shows
+// its reason like the ones above the ceiling.
+func (b *Bot) NearestBlockedTargetsWindowed(
+	zone *Zone, minLevel int32, maxLevel int32, skip []int32, limit int,
 ) []BlockedTarget {
 	if limit <= 0 {
 		return nil
@@ -219,7 +241,7 @@ func (b *Bot) NearestBlockedTargets(
 	for i := range scans {
 		cand := &scans[i]
 		reason := blockedReason(
-			scans, cand, b.world.cold, zone, maxLevel, skip)
+			scans, cand, b.world.cold, zone, minLevel, maxLevel, skip)
 		if reason == "" {
 			continue
 		}
@@ -252,15 +274,19 @@ func (b *Bot) NearestBlockedTargets(
 // blockedReason mirrors the rejection chain of the constrained target
 // search for one scan record and returns the human readable reason
 // (empty when the pick could take the mob). The order matches the
-// pick's own checks: the skip list, the level ceiling, the zone
+// pick's own checks: the skip list, the level window, the zone
 // square, the social clan fence. The world cold half resolves the
 // names the reasons print; the caller must hold the read lock.
 func blockedReason(
 	scans []npcScan, cand *npcScan, cold []objectCold,
-	zone *Zone, maxLevel int32, skip []int32,
+	zone *Zone, minLevel int32, maxLevel int32, skip []int32,
 ) string {
 	if skipContains(skip, cand.objectID) {
 		return "skipped by the engage"
+	}
+	if minLevel > 0 && cand.level < minLevel && cand.level > 0 {
+		return fmt.Sprintf("level %d below the window floor %d",
+			cand.level, minLevel)
 	}
 	if maxLevel > 0 && cand.level > maxLevel && cand.level > 0 {
 		return fmt.Sprintf("level %d above the ceiling %d",
@@ -300,7 +326,7 @@ func (b *Bot) NearestAttackableConstrained(
 	maxLevel int32, avoidSocial bool,
 ) (AttackTarget, bool) {
 	return b.nearestAttackable(
-		maxDistance, zone, skip, maxLevel, avoidSocial, nil)
+		maxDistance, zone, skip, 0, maxLevel, avoidSocial, nil)
 }
 
 // NearestAttackablePreferred extends NearestAttackableConstrained
@@ -314,22 +340,42 @@ func (b *Bot) NearestAttackablePreferred(
 	maxLevel int32, avoidSocial bool, priority map[int32]int32,
 ) (AttackTarget, bool) {
 	return b.nearestAttackable(
-		maxDistance, zone, skip, maxLevel, avoidSocial, priority)
+		maxDistance, zone, skip, 0, maxLevel, avoidSocial, priority)
+}
+
+// NearestAttackablePreferredWindowed extends the preferred pick with
+// the level window floor of the spot hunting: mobs below minLevel pay
+// no adena at the character's level and never enter a fight the spot
+// economy would count as income. Zero disables the floor; an
+// unresolved template (level 0) passes both bounds like everywhere in
+// the target search.
+func (b *Bot) NearestAttackablePreferredWindowed(
+	maxDistance float64, zone *Zone, skip []int32,
+	minLevel int32, maxLevel int32, avoidSocial bool,
+	priority map[int32]int32,
+) (AttackTarget, bool) {
+	return b.nearestAttackable(
+		maxDistance, zone, skip, minLevel, maxLevel,
+		avoidSocial, priority)
 }
 
 // nearestAttackable is the shared target search core of the public
 // pickers. The plain variant walks the dense hot storage directly; the
 // socially constrained variant flattens the living attackable npcs
-// into compact scan records first (see nearestAttackableSocial).
+// into compact scan records first (see nearestAttackableSocial). The
+// level window [minLevel, maxLevel] fences the worthless and the
+// deadly mobs out (zero bound = disabled, an unresolved template
+// passes).
 func (b *Bot) nearestAttackable(
 	maxDistance float64, zone *Zone, skip []int32,
-	maxLevel int32, avoidSocial bool, priority map[int32]int32,
+	minLevel int32, maxLevel int32, avoidSocial bool,
+	priority map[int32]int32,
 ) (AttackTarget, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	if avoidSocial {
 		return b.nearestAttackableSocial(
-			maxDistance, zone, skip, maxLevel, priority)
+			maxDistance, zone, skip, minLevel, maxLevel, priority)
 	}
 
 	//nolint:exhaustruct // zero value grows inside the loop
@@ -348,6 +394,9 @@ func (b *Bot) nearestAttackable(
 			continue
 		}
 		if maxLevel > 0 && obj.Level > maxLevel && obj.Level > 0 {
+			continue
+		}
+		if minLevel > 0 && obj.Level < minLevel && obj.Level > 0 {
 			continue
 		}
 		x, y := projectedPosition(obj, nowNano)
@@ -384,8 +433,8 @@ func (b *Bot) nearestAttackable(
 // implementation rescanned the whole world storage per candidate. The
 // caller must hold the read lock.
 func (b *Bot) nearestAttackableSocial(
-	maxDistance float64, zone *Zone, skip []int32, maxLevel int32,
-	priority map[int32]int32,
+	maxDistance float64, zone *Zone, skip []int32,
+	minLevel int32, maxLevel int32, priority map[int32]int32,
 ) (AttackTarget, bool) {
 	//nolint:exhaustruct // zero value grows inside the loop
 	best := AttackTarget{}
@@ -414,6 +463,9 @@ func (b *Bot) nearestAttackableSocial(
 			continue
 		}
 		if maxLevel > 0 && cand.level > maxLevel && cand.level > 0 {
+			continue
+		}
+		if minLevel > 0 && cand.level < minLevel && cand.level > 0 {
 			continue
 		}
 		if !zone.Contains(
