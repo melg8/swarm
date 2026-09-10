@@ -1367,23 +1367,38 @@ const MapView = {
   updateMapInfo() {
     const rect = this.canvas.getBoundingClientRect();
     const across = Math.round(rect.width / this.scale);
-    document.getElementById("map-scale").textContent =
-      "≈ " + across.toLocaleString("en-US") + " units across";
+    // Telemetry capsules (proposal C8): the toolbar carries the zoom
+    // ratio and the object count as compact chips; the long forms
+    // (units across, the threat breakdown) live on the hover titles.
+    const scaleEl = document.getElementById("map-scale");
+    if (scaleEl) {
+      scaleEl.textContent = "1:" +
+        (this.scale >= 1 ? this.scale.toFixed(1) : this.scale.toFixed(2));
+      scaleEl.title = "map zoom · ≈ " +
+        across.toLocaleString("en-US") + " units across";
+    }
+    const objectsEl = document.getElementById("map-objects");
     if (!this.lastSnap) {
-      document.getElementById("map-objects").textContent = "pathfind test";
+      if (objectsEl) {
+        objectsEl.textContent = "pathfind";
+        objectsEl.title = "pathfind test mode";
+      }
 
       return;
     }
     const objects = this.lastSnap.objects || [];
     const counts = { passive: 0, aggressive: 0, combat: 0, player: 0, item: 0 };
+    let total = 0;
     for (const obj of objects) {
       const threat = threatOf(obj);
-      if (counts[threat] !== undefined) { counts[threat]++; }
+      if (counts[threat] !== undefined) { counts[threat]++; total++; }
     }
-    document.getElementById("map-objects").textContent =
-      counts.passive + " passive · " + counts.aggressive + " aggro · "
-      + counts.combat + " fighting · " + counts.player + " players · "
-      + counts.item + " items";
+    if (objectsEl) {
+      objectsEl.textContent = total + " obj";
+      objectsEl.title = counts.passive + " passive · " + counts.aggressive +
+        " aggro · " + counts.combat + " fighting · " + counts.player +
+        " players · " + counts.item + " items";
+    }
   },
 
   // updatePathfindCursor keeps the mouse cursor meaningful over the

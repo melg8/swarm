@@ -629,8 +629,13 @@ function main() {
     check(results, "compass rose moved out of the panel corner",
         css.includes(".map-rose") &&
         !css.slice(css.indexOf(".map-rose {"),
-            css.indexOf(".map-rose {") + 200).includes("top: 10px"),
-        "the rose still sits at the top right");
+            css.indexOf(".map-rose {") + 200).includes("right: 12px") &&
+        css.slice(css.indexOf(".map-rose {"),
+            css.indexOf(".map-rose {") + 200).includes("left: 12px") &&
+        html.includes('class="map-rose"') &&
+        html.indexOf("<svg", html.indexOf('class="map-rose"')) <
+            html.indexOf("</div>", html.indexOf('class="map-rose"')),
+        "the rose still sits in the zone panel corner or lost its svg needle");
     check(results, "icons keep the 32px metric",
         css.includes(".pd-cell img, .inv-cell img") &&
         css.includes("width: 32px") && css.includes("height: 32px"),

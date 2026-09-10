@@ -29,7 +29,22 @@ SPDX-License-Identifier: MIT
   --grid-text: rgba(60, 72, 90, 0.55);
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --shadow: 0 1px 3px rgba(20, 30, 45, 0.12);
+  /* Layered panel shadow: the floating map overlays sit on a tight
+     contact shadow plus a soft ambient one, so they lift off the map
+     instead of hugging it with a single 1px smudge. */
+  --shadow: 0 1px 2px rgba(20, 30, 45, 0.10),
+    0 10px 28px rgba(20, 30, 45, 0.16);
+  /* Motion token: one easing family for every hover and toggle of
+     the chrome (B3). */
+  --t-fast: 140ms ease;
+  /* Log zebra tint (A6): odd rows sit on a washed panel-2 so the eye
+     tracks a line across the strip. */
+  --zebra: rgba(238, 241, 245, 0.6);
+  /* XP track (A4): the silver fill needs a darker rail behind it so
+     the light theme bar reads as a bar, not as a missing bar. */
+  --xp-track: #ccd3dc;
+  --xp-tick: rgba(21, 34, 50, 0.22);
+  --xp-fill-line: rgba(80, 92, 110, 0.45);
   /* Vital bar palette of the classic L2 C1 client, shared by the HUD
      bars and the sidebar mini bars: red HP, blue MP and the light
      silver experience bar (gold is the CP color of later chronicles). */
@@ -51,10 +66,10 @@ SPDX-License-Identifier: MIT
 html[data-theme="dark"] {
   --bg: #101318;
   --bg-map: #0c0f14;
-  --bg-panel: #171b22;
-  --bg-panel-2: #1d222b;
-  --border: #2a303c;
-  --border-soft: #232833;
+  --bg-panel: #1a1f27;
+  --bg-panel-2: #20262f;
+  --border: #333a47;
+  --border-soft: #2a3140;
   --text: #c9cdd6;
   --text-dim: #7d8590;
   --text-bright: #eef1f5;
@@ -67,10 +82,28 @@ html[data-theme="dark"] {
   --gray: #8b949e;
   --grid: rgba(58, 66, 82, 0.35);
   --grid-text: rgba(125, 133, 144, 0.5);
-  --shadow: none;
+  /* The dark theme keeps the layered shadow of the light one (A5):
+     the old --shadow: none glued every panel onto the map plane. */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.40),
+    0 8px 24px rgba(0, 0, 0, 0.40);
+  --zebra: rgba(32, 38, 47, 0.6);
+  --xp-track: #262d38;
+  --xp-tick: rgba(238, 241, 245, 0.18);
+  --xp-fill-line: rgba(238, 241, 245, 0.28);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Keyboard focus (C2): every interactive element answers the Tab key
+   with a visible accent ring; the two text inputs keep their border
+   recolor and skip the double ring. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+#log-filter:focus,
+.drop-input:focus { outline: none; }
 
 html, body { height: 100%; }
 
@@ -133,6 +166,26 @@ body {
 
 .tab.active { color: var(--accent); background: var(--bg-panel-2); }
 
+/* Active tab underline (B5): the 2px accent indicator slides in
+   under the label, the classic modern navigation cue. */
+.tab { position: relative; transition: color var(--t-fast), background-color var(--t-fast); }
+
+.tab::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 150ms ease;
+}
+
+.tab.active::after { transform: scaleX(1); }
+
 .header-right {
   display: flex;
   align-items: center;
@@ -187,6 +240,35 @@ body {
 }
 
 .bot-list { list-style: none; overflow-y: auto; flex: 1; }
+
+/* Thin scrollbars (B4): every list of the chrome shares the slim
+   thumb of the inventory grid, so the scrollbars stop switching
+   families between panels. */
+.bot-list,
+.zone-list,
+.chat-list,
+.log-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.bot-list::-webkit-scrollbar,
+.zone-list::-webkit-scrollbar,
+.chat-list::-webkit-scrollbar,
+.log-list::-webkit-scrollbar { width: 6px; }
+
+.bot-list::-webkit-scrollbar-thumb,
+.zone-list::-webkit-scrollbar-thumb,
+.chat-list::-webkit-scrollbar-thumb,
+.log-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.log-list::-webkit-scrollbar-track,
+.chat-list::-webkit-scrollbar-track,
+.bot-list::-webkit-scrollbar-track,
+.zone-list::-webkit-scrollbar-track { background: transparent; }
 
 /* The hunting zone panel: a floating collapsible list on the map
    (bottom right corner, the same chrome as the equipment widget) -
@@ -250,6 +332,7 @@ body.mode-pathfind .zone-panel { display: none; }
 .zone-item {
   padding: 6px 12px;
   border-left: 2px solid transparent;
+  transition: background-color var(--t-fast);
 }
 
 .zone-item.active {
@@ -299,10 +382,13 @@ body.mode-pathfind .zone-panel { display: none; }
   border-color: var(--accent);
 }
 
+.zone-hunt-btn { transition: background-color var(--t-fast), color var(--t-fast), border-color var(--t-fast); }
+
 .bot-item {
   padding: 7px 12px;
   cursor: pointer;
   border-left: 2px solid transparent;
+  transition: background-color var(--t-fast);
 }
 
 .bot-item:hover { background: var(--bg-panel-2); }
@@ -359,32 +445,53 @@ body.mode-pathfind .zone-panel { display: none; }
 .mini-fill.mp { background: var(--grad-mp); }
 .mini-fill.xp { background: var(--grad-xp); }
 
-/* Status chips: fighting (red) and resting (green) use the same
-   bordered chip style everywhere. */
+/* Status chips: fighting (red) and resting (green) share one chip
+   metric everywhere; combat carries a tinted background (B8) so the
+   critical state reads with peripheral vision, rest keeps the calm
+   outline. */
 .hud-chip {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+
+.chip-combat {
+  color: var(--red);
+  border: 1px solid color-mix(in srgb, var(--red) 35%, transparent);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+}
+
+.chip-rest {
+  color: var(--green);
+  border: 1px solid color-mix(in srgb, var(--green) 35%, transparent);
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+}
+
+.chip-level { color: var(--text); border: 1px solid var(--border); }
+
+.bot-chip {
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 1px;
-  border-radius: 3px;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
   padding: 1px 5px;
   flex-shrink: 0;
 }
 
-.chip-combat { color: var(--red); border: 1px solid var(--red); }
-.chip-rest { color: var(--green); border: 1px solid var(--green); }
-.chip-level { color: var(--text); border: 1px solid var(--border); }
-
-.bot-chip {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  border-radius: 3px;
-  padding: 0 4px;
-  flex-shrink: 0;
+.bot-chip.chip-combat {
+  color: var(--red);
+  border: 1px solid color-mix(in srgb, var(--red) 35%, transparent);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
 }
 
-.bot-chip.chip-combat { color: var(--red); border: 1px solid var(--red); }
-.bot-chip.chip-rest { color: var(--green); border: 1px solid var(--green); }
+.bot-chip.chip-rest {
+  color: var(--green);
+  border: 1px solid color-mix(in srgb, var(--green) 35%, transparent);
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+}
 /* The proxy chip marks the bot a connecting C1 game client attaches
    to: the link color of the classic tool look, distinct from the
    combat and rest states. */
@@ -410,16 +517,19 @@ body.mode-pathfind .zone-panel { display: none; }
   white-space: nowrap;
 }
 
-.bot-activity.kind-hunt { color: var(--green); border-left-color: var(--green); }
-.bot-activity.kind-combat { color: var(--red); border-left-color: var(--red); }
-.bot-activity.kind-loot { color: var(--accent); border-left-color: var(--accent); }
-.bot-activity.kind-town { color: var(--gold); border-left-color: var(--gold); }
-.bot-activity.kind-return { color: var(--blue); border-left-color: var(--blue); }
-.bot-activity.kind-delevel { color: var(--violet); border-left-color: var(--violet); }
-.bot-activity.kind-user { color: var(--accent); border-left-color: var(--accent); }
-.bot-activity.kind-idle { color: var(--text-dim); border-left-color: var(--gray); }
-.bot-activity.kind-connecting { color: var(--text-dim); border-left-color: var(--gray); }
-.bot-activity.kind-offline { color: var(--red); border-left-color: var(--red); }
+/* The activity banner keeps a neutral text tone (B7): the color lives
+   on the dot of the map banner and on the left stripe of the sidebar
+   rows, so the ten activity hues stop shouting from every label. */
+.bot-activity.kind-hunt { border-left-color: var(--green); }
+.bot-activity.kind-combat { border-left-color: var(--red); }
+.bot-activity.kind-loot { border-left-color: var(--accent); }
+.bot-activity.kind-town { border-left-color: var(--gold); }
+.bot-activity.kind-return { border-left-color: var(--blue); }
+.bot-activity.kind-delevel { border-left-color: var(--violet); }
+.bot-activity.kind-user { border-left-color: var(--accent); }
+.bot-activity.kind-idle { border-left-color: var(--gray); }
+.bot-activity.kind-connecting { border-left-color: var(--gray); }
+.bot-activity.kind-offline { border-left-color: var(--red); }
 
 /* Floating bot status banner on the map: a compact chip pinned to the
    top center of the map showing the current activity of the active
@@ -547,11 +657,13 @@ body.mode-pathfind .bot-status { display: none; }
   background: var(--bg-panel-2);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 6px;
   width: 26px; height: 24px;
   cursor: pointer;
   font-size: 14px;
   line-height: 1;
+  transition: background-color var(--t-fast), color var(--t-fast),
+    border-color var(--t-fast);
 }
 
 .btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -559,6 +671,51 @@ body.mode-pathfind .bot-status { display: none; }
 .check { display: flex; align-items: center; gap: 5px; color: var(--text-dim); cursor: pointer; font-size: 13px; user-select: none; }
 
 .check input { accent-color: var(--accent); }
+
+/* Follow switch (C11): the most used toggle of the toolbar renders
+   as a proper 34x18 switch instead of a 12px checkbox - the input
+   element itself stays (same id, same change events, map.js never
+   knows), only its skin changes. */
+.follow-check { gap: 7px; }
+
+.follow-check input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 34px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel-2);
+  position: relative;
+  cursor: pointer;
+  transition: background-color var(--t-fast), border-color var(--t-fast);
+}
+
+.follow-check input::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: transform var(--t-fast), background-color var(--t-fast);
+}
+
+.follow-check input:checked {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 20%, var(--bg-panel-2));
+}
+
+.follow-check input:checked::after {
+  transform: translateX(16px);
+  background: var(--accent);
+}
+
+.follow-check input:focus-visible { outline-offset: 1px; }
 
 /* The view layers dropdown of the map toolbar: the layer checkboxes
    (labels, paths, zones, targets, aggro, the background imagery) fold
@@ -589,7 +746,10 @@ body.mode-pathfind .bot-status { display: none; }
   color: var(--accent);
 }
 
+.view-menu-btn { transition: background-color var(--t-fast), color var(--t-fast), border-color var(--t-fast); }
+
 .view-menu-caret {
+  display: inline-flex;
   font-size: 10px;
   color: var(--text-dim);
   transition: transform 0.15s ease;
@@ -609,8 +769,17 @@ body.mode-pathfind .bot-status { display: none; }
   padding: 9px 12px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   box-shadow: var(--shadow);
+  transform-origin: top left;
+  animation: view-pop-in 120ms ease;
+}
+
+/* The pop grows out of its button (B3): a 2% scale with a fade,
+   anchored at the top left corner next to the trigger. */
+@keyframes view-pop-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .view-menu-pop.hidden { display: none; }
@@ -619,9 +788,23 @@ body.mode-pathfind .bot-status { display: none; }
 
 .view-sep { height: 1px; background: var(--border); margin: 1px 0; }
 
-.map-scale, .map-objects { color: var(--text-dim); font-family: var(--mono); font-size: 11px; margin-left: auto; white-space: nowrap; }
+/* Toolbar telemetry capsules (C8): the zoom ratio and the object
+   count read as compact mono chips with the breakdown on hover, not
+   as a bare dim line. */
+.map-scale, .map-objects {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  margin-left: auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  padding: 1px 7px;
+}
 
-.map-objects { margin-left: 10px; }
+.map-objects { margin-left: 8px; }
 
 .map-wrap { position: relative; flex: 1; min-height: 0; background: var(--bg-map); }
 
@@ -648,13 +831,22 @@ body.mode-pathfind .bot-status { display: none; }
 
 .map-rose {
   position: absolute;
-  bottom: 10px;
-  right: 12px;
+  left: 12px;
+  bottom: 170px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   pointer-events: none;
 }
+
+/* The compass needle (B6): a small SVG arrow instead of the bare N
+   glyph - crisp on hidpi and one icon language with the rest of the
+   chrome. The rose sits above the chat box (C3), clear of the zone
+   panel corner that used to cover it. */
+.map-rose svg { display: block; }
 
 /* Status HUD on the map: the map is the source of truth. The character
    panel and the target panel share one vertical stack on the top left,
@@ -751,6 +943,7 @@ body.mode-pathfind .bot-status { display: none; }
 .vital-text { font-family: var(--mono); font-size: 11.5px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
 
 .bar {
+  position: relative;
   height: 13px;
   background: var(--bg-panel-2);
   border: 1px solid var(--border);
@@ -772,6 +965,29 @@ body.mode-pathfind .bot-status { display: none; }
 .bar.mp .bar-fill { background: var(--grad-mp); }
 
 .bar.xp .bar-fill { background: var(--grad-xp); }
+
+/* XP bar visibility (A4): the silver fill keeps its classic palette,
+   but the track steps a tone darker than the panel so the bar reads
+   as a bar in the light theme (and a tone lighter in the dark one),
+   the fill carries a thin inner outline and the 25/50/75 ticks sit
+   on the rail - the third vital now scans like HP and MP. */
+.bar.xp { background: var(--xp-track); }
+
+.bar.xp .bar-fill { box-shadow: inset 0 0 0 1px var(--xp-fill-line); }
+
+.bar.xp::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(to right,
+    transparent calc(25% - 0.5px), var(--xp-tick) calc(25% - 0.5px),
+    var(--xp-tick) calc(25% + 0.5px), transparent calc(25% + 0.5px),
+    transparent calc(50% - 0.5px), var(--xp-tick) calc(50% - 0.5px),
+    var(--xp-tick) calc(50% + 0.5px), transparent calc(50% + 0.5px),
+    transparent calc(75% - 0.5px), var(--xp-tick) calc(75% - 0.5px),
+    var(--xp-tick) calc(75% + 0.5px), transparent calc(75% + 0.5px));
+}
 
 /* Target panel: shows who the bot currently selected, with its name,
    level and vitals. The panel exists only while there is a target: a
@@ -879,13 +1095,22 @@ body.mode-pathfind .bot-status { display: none; }
   line-height: 1.5;
 }
 
+/* Log zebra (A6): odd rows sit on the washed panel tint so the eye
+   holds a line while scanning; the hover rule follows it so the
+   pointer always repaints the row on top of the tint. */
+.log-line:nth-child(odd) { background: var(--zebra); }
+
 .log-line:hover { background: var(--bg-panel-2); }
 
 .log-time { color: var(--text-dim); flex-shrink: 0; }
 
 .log-msg { color: var(--text); word-break: break-word; }
 
-.log-msg.spawn { color: var(--green); }
+/* Log semantics (A6): green belongs to the loot and level events
+   only - the spawn flood reads as neutral text so the rare green
+   line carries actual signal again. */
+.log-msg.spawn { color: var(--text); }
+.log-msg.loot { color: var(--green); }
 .log-msg.combat { color: var(--red); }
 .log-msg.remove { color: var(--red); }
 .log-msg.packet { color: var(--text-dim); }
@@ -1074,7 +1299,7 @@ body.mode-pathfind #live-label { display: none; }
   width: 254px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
@@ -1147,7 +1372,7 @@ body.mode-pathfind .gear-panel { display: none; }
   width: 240px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
@@ -1215,12 +1440,15 @@ body.mode-pathfind .gear-panel { display: none; }
   border-radius: 3px;
 }
 
+.shop-list { scrollbar-color: var(--border) transparent; }
+
 .shop-item {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 3px 6px;
   border-left: 2px solid transparent;
+  transition: background-color var(--t-fast);
 }
 
 .shop-item:hover { background: var(--bg-panel-2); }
@@ -1241,7 +1469,7 @@ body.mode-pathfind .gear-panel { display: none; }
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border-soft);
-  border-radius: 4px;
+  border-radius: 6px;
   overflow: hidden;
 }
 
@@ -1372,7 +1600,7 @@ body.mode-pathfind .gear-panel { display: none; }
 .pd-cell {
   position: relative;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--bg);
   display: flex;
   align-items: center;
@@ -1423,7 +1651,7 @@ body.mode-pathfind .gear-panel { display: none; }
 .inv-cell {
   position: relative;
   border: 1px solid var(--border-soft);
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--bg);
   display: flex;
   align-items: center;
@@ -1494,10 +1722,11 @@ body.mode-pathfind .gear-panel { display: none; }
   align-items: center;
   justify-content: center;
   border: 1px dashed var(--border);
-  border-radius: 5px;
+  border-radius: 6px;
   color: var(--text-dim);
   background: var(--bg);
   margin-left: 2px;
+  transition: color var(--t-fast), border-color var(--t-fast);
 }
 
 .gear-trash:hover,
@@ -1528,7 +1757,7 @@ body.mode-pathfind .gear-panel { display: none; }
   background: var(--bg-panel-2);
   outline: 1px dashed var(--accent);
   outline-offset: -1px;
-  border-radius: 5px;
+  border-radius: 6px;
 }
 
 /* The stackable drop count dialog: a small modal over the map. */
@@ -1540,7 +1769,7 @@ body.mode-pathfind .gear-panel { display: none; }
   width: 252px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   box-shadow: 0 4px 18px rgba(20, 30, 45, 0.35);
   padding: 12px 14px;
   z-index: 6;
@@ -1576,7 +1805,7 @@ body.mode-pathfind .gear-panel { display: none; }
   width: 90px;
   background: var(--bg-panel-2);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--text);
   font-family: var(--mono);
   font-size: 13px;
@@ -2183,4 +2412,17 @@ canvas.fxg-cell.picked {
   margin-top: 5px;
   padding-top: 5px;
   border-top: 1px dashed var(--border-soft);
+}
+
+/* Reduced motion (B3): the chrome animations and transitions fold
+   to an instant state change for users who asked the system for
+   less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

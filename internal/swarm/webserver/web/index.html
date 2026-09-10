@@ -172,7 +172,12 @@ SPDX-License-Identifier: MIT
         <div class="map-wrap">
           <canvas id="map-canvas"></canvas>
           <div id="map-tooltip" class="map-tooltip hidden"></div>
-          <div class="map-rose"><span class="rose-n">N</span></div>
+          <div class="map-rose" title="north is up">
+            <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">
+              <path d="M6 1 L7.6 6.4 L6 5.2 L4.4 6.4 Z" fill="currentColor"/>
+            </svg>
+            <span class="rose-n">N</span>
+          </div>
 
           <div id="bot-status" class="bot-status" data-kind="connecting">
             <span class="bot-status-dot"></span>
