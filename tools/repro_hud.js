@@ -114,6 +114,10 @@ function loadAppJs(appFile) {
             getItem: () => null, setItem: () => {}
         } },
         document,
+        // app.js renderZones calls MapView.blurZone() (map.js owns the
+        // real one) when it rebuilds the zone list: a no-op stub keeps
+        // the harness free of the map bundle.
+        MapView: { blurZone: () => {} },
         EventSource: function () {
             this.addEventListener = () => {};
         },
