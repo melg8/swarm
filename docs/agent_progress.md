@@ -2835,3 +2835,44 @@ name the variant number that best fits the real bot UI.
   upcoming packet reader optimizations. Verified: go test
   ./internal/swarm/packets/from_game_server/ -bench . -benchmem
   passes, go build/vet clean.
+
+- 2026-09-10: the packet reader and writer rewritten for the 100 bot
+  fleet (round 2, feature/proxy-server, perf-and-coverage). The
+  packet.Reader used to embed *bytes.Reader and paid for every integer
+  read through the io.Reader interface dispatch plus a second bounds
+  check the caller did anyway (the n != expected length guard). The
+  new form is a plain struct { data []byte; offset int } that reads
+  through encoding/binary.LittleEndian directly - the Go compiler
+  turns the Uint32/Uint16/Uint64 calls into single unaligned loads on
+  little endian hosts, so ReadInt32 is now 0.71 ns/op (was 6.5) and
+  ReadInt64 is 0.72 ns/op (was 6.7), a 9x speedup on the integer hot
+  path. ReadBytes now returns a sub slice of the source buffer with no
+  copy (callers either copy into a destination array or just read for
+  comparison, never mutate), and Skip is a single offset bump instead
+  of a 64 byte chunk loop. ReadStringFromUtf16Format got a fast ASCII
+  path (the common case for L2 character and NPC names): it scans the
+  source slice directly for the null terminator, confirms every UTF-16
+  unit's high byte is zero, builds a byte buffer of the low bytes and
+  converts it to a string through unsafe.String (the strings.Builder
+  trick) - one allocation instead of the previous three (the growing
+  []byte, the string(data) copy and the x/text decoder output). The
+  BMP slow path now uses unicode/utf16.Decode so supplementary
+  characters produce correct surrogate pairs instead of the previous
+  byte(r) truncation that silently corrupted non Latin-1 names.
+  ErrNotEnoughBytes is a sentinel so the short-read error path pays
+  zero allocations. The Writer.WriteStringAsUtf16 got the same ASCII
+  fast path: it scans once, calls Grow so the buffer reuses its slab,
+  and writes pairs directly without the intermediate []byte allocation
+  the old form paid. The packet parsing benchmarks reflect the win:
+  ParseKeyPacket 61 ns/16 B/2 allocs -> 9 ns/0 B/0 allocs (6.8x, zero
+  alloc), ParseNpcInfoPacket 551 ns/608 B/10 allocs -> 105 ns/21 B/4
+  allocs (5.2x, 60 percent fewer allocations), ParseUserInfoPacket
+  532 ns/304 B/5 allocs -> 109 ns/10 B/2 allocs (4.9x, 60 percent
+  fewer allocations), ParseCharSelectInfoPacket 6293 ns/6048 B/71
+  allocs -> 1676 ns/1941 B/29 allocs (3.75x, 59 percent fewer
+  allocations). New benchmarks added: ReadInt8/16, ReadFloat64,
+  ReadBytes, Skip, ReadStringASCIIFastPath, ReadStringLongASCII,
+  ReadStringBMPSlowPath, ReadStringEmpty, ReadStringNoTerminator,
+  WriteStringAsUtf16ASCII/ReusedWriter/NonASCII, NewReader. Verified:
+  go build/vet, go test ./... (19 packages), golangci-lint 0 issues
+  on the touched packages.
