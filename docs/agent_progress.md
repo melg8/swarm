@@ -2971,3 +2971,22 @@ name the variant number that best fits the real bot UI.
   /1024 for the per byte cost at each realistic packet size,
   EncryptOnly and DecryptOnly for the isolated paths. Verified: go
   build/vet, go test ./... (19 packages), golangci-lint 0 issues.
+
+- 2026-09-10: the npcdata test coverage gap closed (round 4,
+  feature/proxy-server, perf-and-coverage). The npcdata package had
+  34.6 percent coverage - the dictionary lookup functions (NPCName,
+  NPCLevel, NPCAggroRange, NPCIsAggressive, NPCClanHelpRange,
+  NPCClans, NPCClanMask, NPCWireTemplateID, ItemName, ItemPrice,
+  ItemWeight, ItemIcon, ItemGearStats, ItemType, BuyListsOfNPC,
+  ItemsOfBuyList, SystemMessageText, SystemMessageName) had zero
+  tests, only benchmarks. New comprehensive test file
+  npcdata_test.go covers: the known npc and item resolution (goblin
+  template 1000003, keltir 1000532, short sword id 1, adena id 57),
+  the boundary conditions (template id at the npcTemplateOffset
+  boundary, below it, zero, negative), the unknown id fallbacks
+  (empty string, zero, nil, false), the pass through behavior of
+  NPCWireTemplateID for unmapped ids, the SystemMessageText fallback
+  text for unknown ids ("system message N"), and the SystemMessageName
+  enum name resolution. Coverage rose from 34.6 to 95.1 percent.
+  Verified: go build/vet, go test ./internal/swarm/npcdata/ -cover,
+  golangci-lint 0 issues.
