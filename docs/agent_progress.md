@@ -11,6 +11,50 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the spot-anchored hunting implementation
+
+Started: 2026-09-10. Branch: `feature/proxy-server` (implemented on
+the dedicated `feature/hunt-spots` branch born from it per the user
+request, kept rebased onto the base, then folded back into the base
+and the branch deleted). Commits as melg8.
+
+### Goal
+
+The user approved the hunting system redesign research (the docx
+round): implement it, and add a visualization so the spots, their
+sizes, the deaths and the timers read at a glance.
+
+### Method and state
+
+- The registry: `tools/generate_hunt_spots.py` clusters the 227
+  registry squares into 71 spot anchors (territory anchor adjacency,
+  recursive visibility split, mass weighted centroids, species
+  respawn windows; the Mobius spawn XML path stays ready - GitLab
+  throttled the clone of this session, the measured 15-20 s window
+  applies).
+- The engine: `hunt/spot*.go` - the leash square inscribed in the
+  2048 visibility circle, the respawn overlay over the kills, the
+  wait-or-move economy (patience 20 s, drift to the predicted corpse,
+  25 percent switch hysteresis, 60 s starvation), the measured adena
+  per active minute and the decayed per spot death heat replacing the
+  gear gates and the band demotion, the fleet occupancy division, the
+  white-green window wired into the windowed target search of state.
+- The views: ZoneView carries the spot economy (JSON encoder
+  extended), map.js draws the circles with the live labels,
+  `tools/visualize_hunt_spots.py` renders the standalone interactive
+  map (tiles embedded, tooltips, spot table, --simulate session demo).
+- The legacy square zones stay as the dual registry mode
+  (SetHuntingZones/SetHuntingSpots mutually stand down); all 40+ new
+  unit tests plus the full suite pass, gofumpt clean.
+
+### Status: done (2026-09-10)
+
+- Verify loop: go build ./..., go vet, go test ./... (all packages
+  green), gofumpt applied, the HTML map checked in a headless browser
+  (71 circles, 4 tiles, tooltips, table, zoom/pan, click-to-center).
+- The deliverable copy: download/hunt_spots_map.html (with the
+  simulated session) + spot_viz_overview.png / spot_viz_zoomed.png.
+
 ## Active task: the real C1 client switch - the restart dance
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
