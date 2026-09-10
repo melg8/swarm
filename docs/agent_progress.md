@@ -3297,3 +3297,18 @@ name the variant number that best fits the real bot UI.
   MB). The per-tick allocation churn is zero. Verified: go build/vet,
   go test ./... (19 packages), golangci-lint 0 issues, live fleet
   reaches 60/100 online sessions and 319K packets in 155 seconds.
+
+- 2026-09-10: NEW TASK started - the universal equipment window with
+  the skill lists and the skill learning queue (feature/proxy-server,
+  skills-display). Goal: the equipment widget shows the learned skills
+  (six per row with icons, active/passive tabs) without changing the
+  widget dimensions, a left flyout shows the skill learning queue with
+  the SP costs (by analogy with the item purchase queue), and the
+  queue orders the warrior priorities first: physical weapon attack
+  power skills, then defense, then everything else. The learning
+  function itself is NOT implemented - display only. Constraints: no
+  widget resize (flyouts and tabs only), keyed rendering rules of the
+  gear widget, harness repro_gear.js must pass, server behavior
+  untouched. Acceptance: repro_gear.js green with the new checks, go
+  test/lint green, the queue of an elven fighter shows attack power
+  skills first.
