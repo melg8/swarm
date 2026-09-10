@@ -306,3 +306,32 @@ The user report (2026-09-10, Russian, four bugs):
   carries the npc talk selection clearing, the spellbook keep and
   the skill list gate, and the water safety section carries the
   WaterCrossed raster story.
+
+### Status: done (2026-09-10)
+
+- All four fixes committed and pushed (six commits + the test follow
+  up): the npc talk selection clear (983437c), the spellbook keep of
+  the sell and destroy junk flows (ffd767d), the aggro answer of the
+  engage and the town trips (6c6463a), the teacher legs (407c8f2 then
+  d5428e3 - the water guard reads the pure water raster, the skill
+  list gate re-arms per session, the trust gamble reverted), the docs
+  (in d5428e3) and the rebase follow up for the concurrent water loop
+  round (64153f9).
+- The live stack validates the full learning cycle end to end (twice,
+  including on the merged tree with the concurrent dry search round):
+  the trip plans the learning stops, the spellbooks are bought at
+  Creamees, the teacher (Ellenia/Cobendell) is reached, clicked and
+  the lessons land - "learned Attack Aura level 1 for 920 sp",
+  "learned Defense Aura level 1 for 160 sp", the database holds skills
+  77 and 91 at level 1, the SP is charged, the books are consumed.
+  The E2E run prints E2E_OK with the graceful SIGINT shutdown.
+- Verify loop per commit: go build, go vet, the full go test suite,
+  gofmt clean, golangci-lint with no new findings in the touched
+  files (the pre-existing baseline of the newer local linter version
+  in untouched files stays).
+- The user-side check stays the project workflow: watch a bot talk to
+  its teacher (the "learn:" log lines, the SkillList bumps), watch
+  the emergency logout cycles of a piled up bot turn into fights (the
+  "is on us, fighting it" line), watch a bought spellbook survive a
+  sell trip (the junk batch without the book), and watch the hunt
+  after a town trip start cleanly (no 12 s stall on the talked npc).
