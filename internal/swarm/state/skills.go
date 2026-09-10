@@ -168,6 +168,40 @@ func (b *Bot) skillPlanViewLocked() *SkillPlanView {
 	}
 }
 
+// demandedBooksLocked collects the spellbook item ids the character
+// still needs for its near term lessons: every queued lesson whose
+// unlock level the character already reached demands its spellbook
+// (the learning trips buy exactly these books; a looted book of the
+// same lessons joins them). The sell and destroy junk flows keep the
+// collected items - a book sold for referencePrice/2 comes back as a
+// full priced buy of the next learning trip, and the lesson it feeds
+// waits forever without it. The result is cached per skills revision
+// and level; the stored queue may lag one rebuild behind a fresh
+// learn (the views rebuild it), which only keeps a consumed book one
+// cache cycle longer, never drops one. The caller must hold a lock.
+func (b *Bot) demandedBooksLocked() map[int32]bool {
+	if b.bookKeep != nil && b.bookKeepRevision == b.skillsRevision &&
+		b.bookKeepLevel == b.char.Level {
+		return b.bookKeep
+	}
+	var books map[int32]bool
+	for i := range b.skillQueue {
+		entry := &b.skillQueue[i]
+		if entry.BookItemID == 0 || entry.ReqLevel > b.char.Level {
+			continue
+		}
+		if books == nil {
+			books = make(map[int32]bool, 4)
+		}
+		books[entry.BookItemID] = true
+	}
+	b.bookKeep = books
+	b.bookKeepRevision = b.skillsRevision
+	b.bookKeepLevel = b.char.Level
+
+	return books
+}
+
 // buildSkillQueue computes the ordered learning queue of a class: the
 // remaining lessons (not learned yet, not auto granted) sorted by the
 // warrior priority - the attack power skills whose weapon condition

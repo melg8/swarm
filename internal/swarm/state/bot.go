@@ -415,6 +415,16 @@ type Bot struct {
 	skillQueueClass    int32
 	skillQueueRevision uint64
 	skillWeapons       []string
+	// bookKeep caches the demanded spellbook item ids of the unlocked
+	// queued lessons (see demandedBooksLocked): the junk flows of the
+	// sell trips and the overflow destroy read it under the read lock,
+	// so the per call walk of the queue stays cached between the
+	// skill list revisions. bookKeepRevision and bookKeepLevel key the
+	// cache - a learn bumps the revision, a level up shifts the
+	// unlock window.
+	bookKeep         map[int32]bool
+	bookKeepRevision uint64
+	bookKeepLevel    int32
 	// buffs holds the active effect list of the server
 	// AbnormalStatusUpdate packets (skillId -> level + seconds left
 	// at the arrival); buffsAt anchors the remaining seconds the
@@ -461,6 +471,9 @@ func NewBot(id string) *Bot {
 		skillQueueClass:    0,
 		skillQueueRevision: 0,
 		skillWeapons:       nil,
+		bookKeep:           nil,
+		bookKeepRevision:   0,
+		bookKeepLevel:      0,
 		buffs:              nil,
 		buffsAt:            time.Time{},
 	}

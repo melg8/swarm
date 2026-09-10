@@ -87,3 +87,19 @@ The user report (2026-09-10, Russian, four bugs):
   engage never attacks the talked Ellenia selection, the fresh mob
   pick replaces it), hunt/town_test.go (the sell stop end fires the
   clear while Herbiel stays selected).
+
+- Commit "the spellbooks of the queued lessons never sell": the sell
+  and destroy junk flows of the state tracker keep the spellbooks the
+  unlocked queued lessons demand (demandedBooksLocked walks the
+  stored learning queue, keeps the books of lessons with ReqLevel <=
+  the character level, cached per skills revision and level): a book
+  bought at the book stop or looted for a near term lesson no longer
+  re-enters the junk ranking - the reported loop bought the book,
+  sold it for referencePrice/2 at the next trip, re-bought it full
+  priced forever while the lesson it feeds waited. The planned
+  equips keep set stays unchanged (the object id map), the book keep
+  keys the ITEM id inside the state layer so both the sell batches
+  and the overflow destroy get it for free. Tests:
+  state/inventory_test.go (level 5: the books of locked lessons sell
+  as before; level 15: the Attack Aura and Defence Aura books stay
+  out of the sell list AND the destroy batch, only the stems sell).

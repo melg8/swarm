@@ -255,16 +255,20 @@ func (b *Bot) DestroyableItems(limit int) []InventoryItem {
 // set of object ids: the hunt loop passes the planned equips of the
 // auto equipment (the looted or bought upgrades waiting for their use
 // item request), and a kept item is never destroyed for bag space -
-// the bot wears it instead. The ranking of the rest is unchanged.
+// the bot wears it instead. The spellbooks of the unlocked queued
+// lessons stay out like the sell flow (a book burned for bag space
+// comes back as a full priced buy). The ranking of the rest is
+// unchanged.
 func (b *Bot) DestroyableItemsExcluding(
 	keep map[int32]bool, limit int,
 ) []InventoryItem {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
+	books := b.demandedBooksLocked()
 	candidates := make([]InventoryItem, 0, len(b.inventory.items))
 	for _, item := range b.inventory.items {
 		if item.Equipped || item.Type2 == itemType2Adena ||
-			keep[item.ObjectID] {
+			keep[item.ObjectID] || books[item.ItemID] {
 			continue
 		}
 		candidates = append(candidates, item)
@@ -313,18 +317,23 @@ func (b *Bot) SellableItems() []InventoryItem {
 // returned, and neither are the object ids of the keep set: the hunt
 // loop passes the planned equips of the auto equipment (the looted or
 // bought upgrades waiting for their use item request), so an item the
-// bot is about to wear is never sold for its instant adena. The server
-// silently skips items it refuses to sell, so the caller must tolerate
-// entries that come back.
+// bot is about to wear is never sold for its instant adena. The
+// spellbooks of the unlocked queued lessons stay out too (see
+// demandedBooksLocked): a bought or looted book feeds its lesson,
+// selling it for referencePrice/2 only buys it back full priced at
+// the next learning trip. The server silently skips items it refuses
+// to sell, so the caller must tolerate entries that come back.
 func (b *Bot) SellableItemsExcluding(keep map[int32]bool) []InventoryItem {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
+	books := b.demandedBooksLocked()
 	candidates := make([]InventoryItem, 0, len(b.inventory.items))
 	gearCount := make(map[int32]int)
 	gearKept := make(map[int32]int32)
 	for _, item := range b.inventory.items {
 		if item.Equipped || item.Type2 == itemType2Adena ||
-			item.Type2 == itemType2Quest || keep[item.ObjectID] {
+			item.Type2 == itemType2Quest || keep[item.ObjectID] ||
+			books[item.ItemID] {
 			continue
 		}
 		candidates = append(candidates, item)

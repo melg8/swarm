@@ -189,3 +189,75 @@ func TestDestroyableItemsExcludingKeepsPlannedEquips(t *testing.T) {
 	require.Equal(t, int32(1), destroyable[0].ObjectID)
 	require.Equal(t, int32(2), destroyable[1].ObjectID)
 }
+
+// TestSellableItemsKeepTheDemandedSpellbooks pins the book keep of the
+// shop sell selection: a spellbook an unlocked queued lesson demands -
+// bought at the learning trip or looted - never enters the junk, a
+// book of a lesson above the character level (not learnable yet) and
+// an unknown tome sell as before.
+func TestSellableItemsKeepTheDemandedSpellbooks(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	// Level 5 elven fighter, the level 5 lessons queued: the queue
+	// build needs the learned set and the skill tree of class 18.
+	bot.SetSkills([]LearnedSkill{
+		{SkillID: 142, Level: 1, Passive: true},
+		{SkillID: 194, Level: 1, Passive: true},
+	})
+	bot.ApplyUserInfo(UserInfo{Name: "test1", Level: 5, ClassID: 18})
+	bot.ApplyItemList([]InventoryItem{
+		// The Attack Aura spellbook of the level 15 lesson: above the
+		// level window, sellable junk.
+		{ObjectID: 1, ItemID: 1095, Count: 1, Type2: 5, Change: 1},
+		// Stems: plain junk.
+		{ObjectID: 2, ItemID: 1864, Count: 10, Type2: 5, Change: 1},
+	})
+	// The queue view builds the stored learning queue.
+	require.NotNil(t, bot.SkillPlan())
+
+	items := bot.SellableItems()
+	objects := make([]int32, 0, len(items))
+	for _, item := range items {
+		objects = append(objects, item.ObjectID)
+	}
+	require.Equal(t, []int32{1, 2}, objects,
+		"level 5: no book of the queue is demanded, both items sell")
+}
+
+// TestSellableItemsKeepTheUnlockedSpellbooks is the counterpart at
+// level 15: the Attack Aura and Defence Aura lessons are unlocked and
+// their spellbooks (bought at the book stop or looted) leave the junk
+// list whatever the sell ranking would do with them.
+func TestSellableItemsKeepTheUnlockedSpellbooks(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	// Level 15 with the strikes and masteries learned: the queue
+	// head is the Attack Aura lesson (spellbook 1095) and the Defence
+	// Aura lesson (spellbook 1294) - the same setup the learning
+	// trip tests use.
+	bot.SetSkills([]LearnedSkill{
+		{SkillID: 3, Level: 9, Passive: false},
+		{SkillID: 16, Level: 9, Passive: false},
+		{SkillID: 56, Level: 9, Passive: false},
+		{SkillID: 141, Level: 3, Passive: true},
+		{SkillID: 142, Level: 5, Passive: true},
+		{SkillID: 194, Level: 1, Passive: true},
+	})
+	bot.ApplyUserInfo(UserInfo{Name: "test1", Level: 15, ClassID: 18})
+	bot.ApplyItemList([]InventoryItem{
+		{ObjectID: 1, ItemID: 1095, Count: 1, Type2: 5, Change: 1},
+		{ObjectID: 2, ItemID: 1294, Count: 1, Type2: 5, Change: 1},
+		{ObjectID: 3, ItemID: 1864, Count: 10, Type2: 5, Change: 1},
+	})
+	require.NotNil(t, bot.SkillPlan())
+
+	items := bot.SellableItems()
+	require.Len(t, items, 1, "only the stems sell, the spellbooks stay")
+	require.Equal(t, int32(3), items[0].ObjectID)
+
+	// The overflow destroy keeps them too: the destroy batch falls
+	// through to the stackable behind the books.
+	destroyable := bot.DestroyableItems(3)
+	require.Len(t, destroyable, 1)
+	require.Equal(t, int32(3), destroyable[0].ObjectID)
+}
