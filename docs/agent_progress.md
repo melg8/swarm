@@ -2939,3 +2939,35 @@ name the variant number that best fits the real bot UI.
   WriteStringAsUtf16ASCII/ReusedWriter/NonASCII, NewReader. Verified:
   go build/vet, go test ./... (19 packages), golangci-lint 0 issues
   on the touched packages.
+
+- 2026-09-10: the game cipher SWAR optimization (round 3,
+  feature/proxy-server, perf-and-coverage). The GameCrypt Encrypt and
+  Decrypt loops ran one byte at a time through the running XOR chain,
+  which on the 100 bot fleet path means ~100 bytes per packet times
+  ~100 packets per second per bot = 1M byte iterations per second
+  just for the game protocol cipher. The optimized form processes 8
+  byte chunks through a SWAR (SIMD Within A Register) prefix XOR
+  scan: the key repeats every 8 bytes (i&7 mask), so a full chunk
+  XORs with one uint64 key load, then a three step shift-and-XOR
+  prefix scan (8, 16, 32 bit left shifts) produces the running XOR
+  of all 8 bytes in one register, and the chain value from the
+  previous chunk broadcasts into every byte through a multiply by
+  0x0101010101010101. The decrypt path is simpler: the chain uses
+  the ENCRYPTED bytes (the input), so a single enc<<8 shift aligns
+  byte i-1 with byte i's position, the chain value from the previous
+  chunk goes into byte 0 through an OR, and one XOR produces the
+  output. The remainder tail (1 to 7 bytes) falls back to the byte
+  loop. BenchmarkGameCryptEncrypt 80 ns/op -> 25 ns/op (3.2x),
+  BenchmarkGameCryptDecrypt 78 ns/op -> 25 ns/op (3.1x), both still
+  zero allocations. New tests: TestGameCryptSWARCorrectness sweeps
+  every size from 1 to 256 against a reference byte loop oracle and
+  verifies bit-exact equality on both encrypt and decrypt;
+  TestGameCryptSWARMultiPacket verifies the chain value carries
+  correctly across packet boundaries (the key advances between
+  packets through advanceOffset); TestGameCryptSWARAllZeroData
+  pins the known Mobius reference shape (zeros encrypt to the
+  running XOR of the key bytes); TestGameCryptSWARRandomLikeData
+  exercises all bit positions. New benchmarks: EncryptSizes/8/64/256
+  /1024 for the per byte cost at each realistic packet size,
+  EncryptOnly and DecryptOnly for the isolated paths. Verified: go
+  build/vet, go test ./... (19 packages), golangci-lint 0 issues.
