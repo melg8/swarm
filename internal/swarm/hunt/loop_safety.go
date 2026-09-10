@@ -112,12 +112,18 @@ func (l *Loop) escapeWalkDestination() (int32, int32, int32, bool) {
 }
 
 // threatPosition returns the position of the mob the escape runs
-// from: the current target while one is engaged, the nearest
-// attacker around otherwise (the mob whose blows land carries the
-// character as its target), the nearest living attackable npc as
-// the last resort (a hit from a mob that already switched away).
+// from: the living target while one is engaged, the nearest attacker
+// around otherwise (the mob whose blows land or whose chase steps
+// toward the character carry it as the target). A mob that merely
+// stands nearby is not a threat: the old last resort to the nearest
+// living attackable npc armed the escape against a passive bystander
+// the moment a finished fight left its fresh SelfUnderAttack window -
+// the hurt character ran several hundred units away from the kill
+// spot (sometimes out of the zone) before it sat down to rest. With
+// no mob holding the character as its target the escape has nothing
+// to run from and the rest happens where the fight ended.
 func (l *Loop) threatPosition() (int32, int32, bool) {
-	if l.target != 0 {
+	if l.target != 0 && l.tracker.ObjectAlive(l.target) {
 		if x, y, _, ok := l.tracker.ObjectPosition(l.target); ok {
 			return x, y, true
 		}
@@ -125,12 +131,8 @@ func (l *Loop) threatPosition() (int32, int32, bool) {
 	if pick, ok := l.tracker.NearestAttacker(); ok {
 		return pick.X, pick.Y, true
 	}
-	pick, ok := l.tracker.NearestAttackable(escapeThreatRange, nil)
-	if !ok {
-		return 0, 0, false
-	}
 
-	return pick.X, pick.Y, true
+	return 0, 0, false
 }
 
 // panicPileUpRun answers the social pile up (two or more mobs

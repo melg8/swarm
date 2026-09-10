@@ -4,6 +4,69 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: rest at the kill spot, finish fights across the zone line, zone free loot
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push (one push landed mid task: the standing hunter round).
+
+### Goal
+
+The user report (2026-09-10, Russian), three hunt behavior complaints:
+(1) the character runs too far away after a fight before it sits down
+to rest; (2) the character stops interacting with the mobs when the
+fight carries it out of the hunting zone - it should finish them off;
+(3) the character does not always pick up ground items - the drops
+outside the hunting zone must be picked up regardless. The game server
+stack was already up on this Windows host (login 2106, game 7777,
+db 3306 verified) and had to stay untouched.
+
+### Root causes and fixes
+
+- The escape threat lookup fell back to the nearest living attackable
+  npc when no mob held the character as its target. A finished fight
+  leaves a fresh 3 s under attack window (the dying mob's last blow),
+  so the hurt character armed the flee against a passive bystander
+  and ran up to three 700 unit legs away from the kill spot before
+  resting. Fix: `threatPosition` drops the fallback - the escape runs
+  from the living engaged target or a real attacker only
+  (`NearestAttacker`), otherwise the rest happens where the fight
+  ended.
+- The zone leash of the engage dropped the fight the moment the
+  character stood outside the square (`returnToZone` cleared the
+  target and walked home through the blows). Fix:
+  `adoptOutZoneFight` (loop_movement.go) adopts a live fight before
+  the walk home - the own living target, the fresh server selection
+  or the nearest attacking chaser (never a flee-skipped target) - and
+  the engage flow finishes it outside the square; without a live
+  fight the leash walks home unchanged, new fights still start inside
+  the square only.
+- The loot search passed the hunting zone filter: drops past the
+  square line stayed on the ground forever. Fix: `loot()` searches
+  without the zone - anything within the 900 unit loot radius of the
+  character is picked up, wherever it lies.
+
+### Status: done (2026-09-10)
+
+- Four new tests pin the behaviors (rest at the kill spot, the fight
+  continues outside the zone, the chaser is fought back, the loot is
+  picked up past the line) - all four verified to fail on the old
+  code (stash round). The two flee tests grew the missing Attack
+  broadcast: the fleeing mob must actually hold the character as its
+  target for the escape direction.
+- Verify loop: go build/vet, gofmt clean, go test ./... (18 packages),
+  golangci-lint (only the pre-existing unparam on
+  pathfind/search_test.go).
+- Live: the bot hunted the deployed stack directly (the real login
+  server at 127.0.0.3:2106 - the proxy Recipe A layout of this host;
+  game 7777) for 3.5 minutes: zone pick, kill, loot and the rest 3 s
+  after the kill log line - the rest happened at the kill spot, no
+  escape run (fix 1 demonstrated live); the pile up safety layer
+  cycled its documented run + logout + relogin when the clanned orc
+  pack joined. Hard kill stop (the SIGINT pitfall), the shutdown path
+  is untouched by this round. Development log Round 45 carries the
+  full writeup.
+
 ## Active task: the webui modernization proposal (awaiting the user approval)
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.

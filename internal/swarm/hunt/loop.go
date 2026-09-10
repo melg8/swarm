@@ -179,9 +179,6 @@ const (
 	fleeSkipDelay = 2 * time.Minute
 	// escapeWalkDistance is one escape leg of the flee flow.
 	escapeWalkDistance = 700.0
-	// escapeThreatRange bounds the nearest mob lookup of the escape
-	// direction: a mob farther than this is not on the character.
-	escapeThreatRange = 900.0
 	// noTargetPatience is the idle time before a targetless hunter
 	// patrols toward the zone center: entering a zone engages the
 	// first mob in reach, and only an empty radius keeps the
@@ -915,11 +912,16 @@ func (l *Loop) recoverFromDeath() {
 // character level slack or on social pulls whose clan mates stand
 // within the help range.
 func (l *Loop) engage() { //nolint:cyclop,funlen
-	// The hunting zone leash: attacks happen inside the square only,
-	// and a character outside of it (a long chase, a village respawn)
-	// walks back instead of hunting. A hurt character under attack
-	// flees even outside the square: the leash walk home would drag
-	// it through the chasing pack.
+	// The hunting zone leash: new fights start inside the square only,
+	// and a character outside of it (a village respawn, the walk home
+	// after a finished fight) walks back instead of hunting. Two
+	// exceptions: a hurt character under attack flees even outside the
+	// square (the leash walk home would drag it through the chasing
+	// pack), and a fight that crossed the square line is finished
+	// where it stands - the mob that dragged the character out (a
+	// chase, an aggressive pull) dies before the walk home, dropping
+	// the fight here would walk home through the blows and leave the
+	// loot on the ground (see adoptOutZoneFight).
 	now := time.Now()
 	if !l.inZoneSelf() {
 		if l.tracker.SelfUnderAttack() &&
@@ -928,9 +930,11 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 
 			return
 		}
-		l.returnToZone()
+		if !l.adoptOutZoneFight(now) {
+			l.returnToZone()
 
-		return
+			return
+		}
 	}
 	if l.zoneReturn {
 		l.zoneReturn = false

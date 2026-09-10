@@ -155,6 +155,46 @@ func (l *Loop) patrolToCenter(now time.Time) {
 	l.walkZoneLeg(zone, selfX, selfY, selfZ)
 }
 
+// adoptOutZoneFight keeps the fight that crossed the hunting zone
+// line running: the mob that dragged the character out of the square
+// (a chase, an aggressive pull) is finished where it stands before
+// the walk home. The adoption covers the own living target, the
+// fresh server side selection and the mob that currently holds the
+// character as its target; a target the flee flow held out (the skip
+// list) stays out - the escape decision of the flee keeps its
+// authority, the walk home is safer than a fight the character just
+// ran from. Reports whether a fight is live (the caller continues
+// the engage logic outside the zone); without one the leash walks
+// the character home.
+func (l *Loop) adoptOutZoneFight(now time.Time) bool {
+	if l.target != 0 && l.tracker.ObjectAlive(l.target) {
+		return true
+	}
+	serverTarget := l.tracker.SelfTargetID()
+	if serverTarget != 0 && l.tracker.ObjectAlive(serverTarget) &&
+		!l.targetSkipped(serverTarget, now) {
+		l.target = serverTarget
+		l.engageAt = now
+		l.clearBlindRecovery()
+
+		return true
+	}
+	if l.tracker.SelfUnderAttack() {
+		if pick, ok := l.tracker.NearestAttacker(); ok &&
+			!l.targetSkipped(pick.ObjectID, now) {
+			l.logger.Printf("Hunt: %s (%d) keeps attacking outside "+
+				"the zone, finishing it", pick.Name, pick.ObjectID)
+			l.target = pick.ObjectID
+			l.engageAt = now
+			l.clearBlindRecovery()
+
+			return true
+		}
+	}
+
+	return false
+}
+
 // returnToZone walks the character back into the hunting square over the
 // geodata waypoints: a village respawn after death or a deleveling guard
 // post sits behind the village walls, and a direct walk bumps into them,

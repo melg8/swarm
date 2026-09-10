@@ -156,6 +156,24 @@ func spawnMob(bot *state.Bot) {
 	})
 }
 
+// mobHitsCharacter models the attack broadcast of the mob: the blow
+// lands on the character, so the tracker holds the mob as a live
+// attacker (its target points at the character, the under attack
+// window refreshes).
+func mobHitsCharacter(bot *state.Bot) {
+	bot.ApplyAttack(state.Attack{
+		AttackerID:  7,
+		X:           45600,
+		Y:           50000,
+		Z:           -3500,
+		TargetX:     45000,
+		TargetY:     50000,
+		TargetZ:     -3500,
+		TargetIDs:   [state.AttackTargets]int32{100},
+		TargetCount: 1,
+	})
+}
+
 func TestLoopAttacksWhenIdle(t *testing.T) {
 	bot := newTestBot()
 	spawnMob(bot)
@@ -842,9 +860,11 @@ func TestLoopEscapesALosingFight(t *testing.T) {
 
 	// The fight runs on mob 7 and the health collapses under the
 	// escape threshold (the mob vitals stay unknown - the low own
-	// health alone triggers the escape).
+	// health alone triggers the escape). The mob fights back: the
+	// escape runs from the blows it lands.
 	loop.target = 7
 	bot.ApplySelfTarget(7)
+	mobHitsCharacter(bot)
 	bot.ApplyStatusUpdate(100, []state.Attribute{
 		{ID: state.AttrCurHP, Value: 20},
 	})
@@ -870,13 +890,15 @@ func TestLoopEscapesTheLevelGapFight(t *testing.T) {
 
 	// The mob keeps 90 percent of its health while the character sank
 	// to 45: the gap fight is a death risk even above the panic
-	// threshold, the escape opens early.
+	// threshold, the escape opens early. The mob fights back, so the
+	// escape direction measures against its blows.
 	loop.target = 7
 	bot.ApplySelfTarget(7)
 	bot.ApplyStatusUpdate(7, []state.Attribute{
 		{ID: state.AttrCurHP, Value: 90},
 		{ID: state.AttrMaxHP, Value: 100},
 	})
+	mobHitsCharacter(bot)
 	bot.ApplyStatusUpdate(100, []state.Attribute{
 		{ID: state.AttrCurHP, Value: 45},
 	})
@@ -1263,4 +1285,138 @@ func TestLoopDoesNotPanicLogoutWhileDeleveling(t *testing.T) {
 	loop.tick()
 	require.Zero(t, game.logouts, "the delevel deaths are the point")
 	require.Equal(t, phaseDelevel, loop.phase)
+}
+
+// TestLoopRestsAtTheKillSpot pins the post kill rest: the fight is
+// over (the target is dead, its last blow still fresh in the under
+// attack window), a passive bystander stands nearby but never
+// attacked. The hurt character must sit down where the kill happened
+// - the old code armed the escape against the nearest living mob (the
+// bystander) and ran several hundred units away before resting.
+func TestLoopRestsAtTheKillSpot(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 8, TemplateID: 1000001, Attackable: true,
+		X: 45200, Y: 50000, Name: "Dying Gremlin",
+	})
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 45600, Y: 50000, Name: "Bystander Gremlin",
+	})
+	// The dying mob lands its last blow and dies: the under attack
+	// window is fresh while no living mob holds the character as its
+	// target.
+	bot.ApplyAttack(state.Attack{
+		AttackerID: 8, X: 45200, Y: 50000, Z: -3500,
+		TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+		TargetIDs: [state.AttackTargets]int32{100}, TargetCount: 1,
+	})
+	bot.ApplyStatusUpdate(8, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 0},
+	})
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 20},
+	})
+	loop.target = 8
+
+	// The kill registers, the loot phase finds nothing and the engage
+	// runs into the hurt gate: no escape run from the bystander.
+	for range 4 {
+		loop.lastHit = time.Now().Add(-2 * time.Second)
+		loop.tick()
+	}
+	require.Empty(t, game.walks,
+		"no escape run from a passive bystander after the kill")
+	require.Empty(t, game.forces, "no new engage while hurt")
+
+	// The under attack window (3 s) expires: the character sits down
+	// right at the kill spot.
+	time.Sleep(3*time.Second + 300*time.Millisecond)
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, 1, game.sits, "the character rests at the kill spot")
+	require.Empty(t, game.walks, "the rest happens without running away")
+}
+
+// TestLoopFinishesTheFightOutsideTheZone pins the zone leash
+// exception: the chase dragged the character out of the square
+// mid-fight, the mob it fights stands outside too - the fight
+// continues (the kill is finished) instead of dropping the target and
+// walking home through the blows.
+func TestLoopFinishesTheFightOutsideTheZone(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZone(46112, 41500, 450)
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 49308, Y: 44213, Z: -3539,
+		DestX: 49308, DestY: 44213, DestZ: -3539,
+	})
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 8, TemplateID: 1000001, Attackable: true,
+		X: 49400, Y: 44213, Name: "Chasing Gremlin",
+	})
+	loop.target = 8
+	bot.ApplySelfTarget(8)
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, []int32{8}, game.forces,
+		"the fight that crossed the zone line continues")
+	require.Empty(t, game.walks, "no leash walk while the fight runs")
+}
+
+// TestLoopFightsBackOutsideTheZone pins the chaser adoption: the
+// character stands outside the square (the escape legs carried it
+// out) with healthy health and a mob keeps attacking it - fighting
+// back beats the walk home through the blows. A hurt character under
+// attack keeps fleeing instead (pinned by the escape tests above).
+func TestLoopFightsBackOutsideTheZone(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZone(46112, 41500, 450)
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 49308, Y: 44213, Z: -3539,
+		DestX: 49308, DestY: 44213, DestZ: -3539,
+	})
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 8, TemplateID: 1000001, Attackable: true,
+		X: 49400, Y: 44213, Name: "Chasing Gremlin",
+	})
+	bot.ApplyAttack(state.Attack{
+		AttackerID: 8, X: 49400, Y: 44213, Z: -3539,
+		TargetX: 49308, TargetY: 44213, TargetZ: -3539,
+		TargetIDs: [state.AttackTargets]int32{100}, TargetCount: 1,
+	})
+	loop.lastHit = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Equal(t, []int32{8}, game.forces,
+		"the chaser outside the zone is fought back")
+	require.Empty(t, game.walks, "no leash walk through the blows")
+}
+
+// TestLoopPicksUpLootOutsideTheZone pins the zone free loot search:
+// the kill scattered its drop past the square line (the character
+// stands outside too) - the pickup happens regardless of the zone
+// border. The old zone filter silently left the drop on the ground.
+func TestLoopPicksUpLootOutsideTheZone(t *testing.T) {
+	bot := newTestBot()
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetHuntingZone(46112, 41500, 450)
+	loop.phase = phaseLoot
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 46112, Y: 42100, Z: -3500,
+		DestX: 46112, DestY: 42100, DestZ: -3500,
+	})
+	bot.ApplySpawnItem(state.ItemInfo{
+		ObjectID: 9, TemplateID: 57, X: 46130, Y: 42110, Z: -3500,
+	})
+	loop.tick()
+	require.Equal(t, []int32{9}, game.pickups,
+		"the drop outside the zone is picked up")
+	require.Equal(t, phaseLoot, loop.phase,
+		"the loot phase continues past the zone line")
 }

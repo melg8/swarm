@@ -2533,3 +2533,105 @@ the log alone answers the "what does the bot see" question.
 - tools/mobius_e2e.sh 60 on the fix head fc2d95d -> E2E_OK (the
   standard live verification on the deployed stack: login, 60 s in
   the world, graceful shutdown, exit code 0).
+
+## Round 45: the fight follows out of the square - rest at the kill spot, finishing chases, zone free loot (2026-09-10)
+
+User report (2026-09-10, Russian), three behavior complaints of the
+hunt loop: (1) the character runs too far away after a fight before it
+sits down to rest; (2) the character stops interacting with the mobs
+when the fight carries it out of the hunting zone - it should finish
+them off; (3) the character does not always pick up the items on the
+ground - the drops outside the hunting zone stay there, they must be
+picked up regardless.
+
+### Root causes
+
+- The escape threat lookup kept a last resort: when no mob held the
+  character as its target, `threatPosition` fell back to the nearest
+  living attackable npc within 900 units. A finished fight leaves a
+  fresh 3 s `SelfUnderAttack` window (the dying mob landed its last
+  blow), so the hurt character right after the kill armed the flee
+  against the nearest PASSIVE bystander and ran 700 unit escape legs
+  away from it - up to three legs (about 2100 units, sometimes out of
+  the square) before the window expired and the rest finally
+  happened. The bystander never attacked; the run was pure loss.
+- The zone leash of the engage dropped everything the moment the
+  character stood outside the square: `returnToZone` cleared the
+  target, the loot reference and walked home over the geodata - while
+  the mob that dragged the character out (a chase, an aggressive
+  pull) kept hitting it on the way. The fight that crossed the square
+  line was abandoned instead of finished.
+- The loot search passed the hunting zone to
+  `NearestGroundItemExcluding`: a drop outside the square (the kill
+  happened past the line, the drop scatter carried it over) was
+  invisible to the loot phase forever - the Round 20 "drops outside
+  the zone are ignored" policy read as a pure loss for the kills the
+  chase dragged out of the square.
+
+### Fixes
+
+- `hunt/loop_safety.go` `threatPosition`: the last resort is gone.
+  The escape runs from the living engaged target or from a mob that
+  actually holds the character as its target (`NearestAttacker` -
+  the Attack and MoveToPawn broadcasts set the attacker's target id).
+  With no mob holding the target the escape has nothing to run from:
+  the flee legs stop, the under attack window expires within 3 s and
+  the rest happens at the kill spot. The pile up run and the
+  emergency logout share the lookup - a dissolved pack now reads as
+  "nothing to run from" instead of extending the run away from a
+  bystander. The `escapeThreatRange` constant left with the fallback.
+- `hunt/loop_movement.go` `adoptOutZoneFight` (new) + the leash branch
+  of `engage`: before `returnToZone` the loop adopts a live fight -
+  the own living target (the chase drag), the fresh server side
+  selection or the nearest attacker while the blows still land (the
+  chaser that followed out). All of them continue the normal engage
+  flow outside the square (the losing fight flee, the pile up run and
+  the stuck timeout still own their cases); a target the flee flow
+  held out (the skip list) stays out - the escape decision keeps its
+  authority. Without a live fight the leash walks home unchanged, and
+  new fights still start inside the square only (the target pick
+  keeps the zone filter).
+- `hunt/loop_actions.go` `loot`: the zone argument is gone - every
+  drop within the 900 unit loot radius of the character is picked up,
+  wherever it lies relative to the square. The radius (not the zone)
+  bounds the search, so the loot phase never wanders.
+
+### Tests
+
+- `TestLoopRestsAtTheKillSpot`: the dead target, its fresh last blow,
+  a passive bystander within 900 units, hurt health - no escape walk
+  across the under attack window, then the sit toggle fires right
+  there (fails on the old code: the bystander armed a 700 unit run).
+- `TestLoopFinishesTheFightOutsideTheZone`: the chase dragged the
+  character out mid-fight - the attack requests continue, no leash
+  walk (fails on the old code: returnToZone dropped the fight).
+- `TestLoopFightsBackOutsideTheZone`: a chaser attacks outside the
+  square with healthy health - the adoption picks it and the fight
+  back starts (fails on the old code: the walk home went through the
+  blows).
+- `TestLoopPicksUpLootOutsideTheZone`: a drop past the square line is
+  picked up and the loot phase keeps running (fails on the old code:
+  the zone filter hid the item).
+- `TestLoopEscapesALosingFight` and `TestLoopEscapesTheLevelGapFight`
+  grew the missing Attack broadcast: the fleeing mob must actually
+  hold the character as its target for the escape direction - the old
+  tests relied on the removed bystander fallback to find the threat.
+
+### Verification
+
+- go build/vet, gofmt clean, go test ./... (18 packages green),
+  golangci-lint: only the pre-existing unparam on
+  pathfind/search_test.go.
+- Live against the running Windows stack (the real login server at
+  127.0.0.3:2106 per the proxy Recipe A layout, game 7777, the test1
+  character at level 14): the bot picked the Kaboo ground, killed a
+  mob, looted it and sat down to regenerate 3 s after the kill log
+  line - the rest happened at the kill spot with mobs standing
+  nearby, no escape run (the old code armed the flee against the
+  nearest bystander right there). The full cycle played out: rest to
+  91 percent, stand up, re-engage; the pile up safety layer fired
+  when the clanned orc pack joined a fight and the session cycled
+  through its documented run + logout + relogin. The session was
+  stopped with a hard kill (the SIGINT sandbox pitfall), the
+  shutdown path itself is untouched by this round and stays covered
+  by tools/mobius_e2e.sh on the Linux deployments.

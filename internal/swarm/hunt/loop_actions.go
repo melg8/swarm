@@ -71,10 +71,13 @@ func (l *Loop) rest() {
 // within the loot radius, then hunts the next target. Farther items are
 // approached with an explicit walk first so the character visibly runs
 // toward the loot instead of trusting the click to start the whole
-// approach.
+// approach. The search carries no zone filter: the kill that produced
+// the drop often happens past the square line (the chase, the scatter
+// of the drop), and a drop left on the ground because a line on the
+// map crossed it is a pure loss - anything within the loot radius of
+// the character is picked up, wherever it lies.
 func (l *Loop) loot() {
-	item, ok := l.tracker.NearestGroundItemExcluding(lootRadius, l.skipped,
-		l.zone())
+	item, ok := l.tracker.NearestGroundItemExcluding(lootRadius, l.skipped, nil)
 	if !ok {
 		l.phase = phaseEngage
 		l.target = 0
