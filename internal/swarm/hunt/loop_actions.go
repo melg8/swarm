@@ -13,11 +13,27 @@ import (
 	"time"
 )
 
-// rest brings the resting character back to full health. Sitting
-// accelerates the regeneration, so the character sits down below the
-// sit threshold and stands up again once recovered. The sit/stand
-// action is a server side toggle, so every transition is confirmed by
-// the ChangeWaitType broadcast before the opposite one is ever sent.
+// restSittingHeld reports whether the resting logic still holds a
+// sitting character down: the health below the stand threshold, or a
+// caster whose mana has not recovered to the stand one yet.
+func (l *Loop) restSittingHeld(hp float64) bool {
+	if !l.tracker.SelfSitting() {
+		return false
+	}
+
+	return hp < standUpHealthPercent || l.mageManaLow()
+}
+
+// rest brings the resting character back to full health (and a
+// caster back to full mana). Sitting accelerates the regeneration,
+// so the character sits down below the sit threshold and stands up
+// again once recovered. The mana of a mystic rides the same toggles:
+// the dry caster sits down under the mana sit threshold and keeps
+// sitting until the mana recovered to the stand one (see
+// combat_skills.go), a fighter ignores the mana gates entirely. The
+// sit/stand action is a server side toggle, so every transition is
+// confirmed by the ChangeWaitType broadcast before the opposite one
+// is ever sent.
 func (l *Loop) rest() {
 	now := time.Now()
 	if now.Sub(l.lastHit) < selectPeriod {
@@ -27,12 +43,18 @@ func (l *Loop) rest() {
 	hp := l.tracker.SelfHealthPercent()
 	wantSit := false
 	switch {
-	case l.tracker.SelfSitting() && hp < standUpHealthPercent:
-		// The sit is confirmed and the regeneration is running.
+	case l.restSittingHeld(hp):
+		// The sit is confirmed and the regeneration is running -
+		// the health or the mana of the caster still holds it.
 		return
 	case l.tracker.SelfSitting():
 		// Sitting and recovered: stand up (wantSit stays false).
 	case hp < sitDownHealthPercent:
+		wantSit = true
+	case l.mageManaDry():
+		// The caster ran its mana dry: sitting regenerates several
+		// times faster than standing, the fights resume at the stand
+		// threshold.
 		wantSit = true
 	default:
 		l.logger.Printf("Hunt: resting, HP %.0f%% below %.0f%%",
@@ -53,8 +75,13 @@ func (l *Loop) rest() {
 		}
 	}
 	if wantSit {
-		l.logger.Printf("Hunt: HP %.0f%% below %.0f%%, sitting down to regenerate",
-			hp, sitDownHealthPercent)
+		if hp < sitDownHealthPercent {
+			l.logger.Printf("Hunt: HP %.0f%% below %.0f%%, sitting down to regenerate",
+				hp, sitDownHealthPercent)
+		} else {
+			l.logger.Printf("Hunt: mana %.0f%% below %.0f%%, sitting down to regenerate",
+				l.tracker.SelfManaPercent(), manaSitPercent)
+		}
 	} else {
 		l.logger.Printf("Hunt: HP %.0f%% recovered, standing up", hp)
 	}

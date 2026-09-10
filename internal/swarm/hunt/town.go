@@ -297,7 +297,7 @@ func (l *Loop) inventoryFull() bool {
 // cooldown is over. Everything that can block the trip (no navigator,
 // no geodata, no path) arms the cooldown, so a broken deployment does
 // not retry every tick.
-func (l *Loop) maybeStartTownTrip() {
+func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	shopping := l.shoppingTripEnabled() && l.shoppingWanted()
 	learning := l.learnTripWanted()
 	if l.navigator == nil || !l.tripCooldownOver() ||
@@ -328,6 +328,7 @@ func (l *Loop) maybeStartTownTrip() {
 		merchant: merchant,
 		sell:     true,
 		buys:     nil,
+		teach:    false,
 	}}
 	l.buysPlanned = false
 	l.buyAt = time.Time{}
@@ -895,7 +896,7 @@ func (l *Loop) enterSellPhase() {
 // the sale later). The fresh adena of the sales re-plans the
 // purchases, every buy stop completes when its purchases were
 // requested, and the return leg starts when no stop is left.
-func (l *Loop) tickTownSell() {
+func (l *Loop) tickTownSell() { //nolint:cyclop // legs of one trip
 	now := time.Now()
 	if l.teachStop() {
 		// The teacher stop: approach the class master, click it and

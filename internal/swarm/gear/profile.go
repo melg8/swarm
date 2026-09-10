@@ -97,6 +97,46 @@ func (MeleeFighter) WeaponPoints(stats npcdata.GearStats) int32 {
 	return stats.PAtk
 }
 
+// MysticFighter is the profile of a caster class: magic implements
+// (the staves) ranked by their magical damage output, armor by pDef,
+// jewels by mDef and shields by the expected block value. The melee
+// weapons of the fighter families score zero - a caster swings the
+// staff only when the mana runs dry.
+type MysticFighter struct{}
+
+// Name of the mystic fighter profile.
+func (MysticFighter) Name() string {
+	return "mystic fighter"
+}
+
+// WeaponScore ranks caster weapons by their magical damage output:
+// the magic attack of the implement scaled by its attack speed (the
+// casting itself is instant, the number only orders the purchases).
+func (MysticFighter) WeaponScore(stats npcdata.GearStats) float64 {
+	return float64(stats.MAtk) * float64(stats.PAtkSpd)
+}
+
+// ArmorScore ranks armor by its physical defense.
+func (MysticFighter) ArmorScore(stats npcdata.GearStats) float64 {
+	return float64(stats.PDef)
+}
+
+// JewelScore ranks jewels by their magical defense.
+func (MysticFighter) JewelScore(stats npcdata.GearStats) float64 {
+	return float64(stats.MDef)
+}
+
+// ShieldScore ranks shields by their expected block value.
+func (MysticFighter) ShieldScore(stats npcdata.GearStats) float64 {
+	return float64(stats.SDef) * float64(stats.RShld) / 100
+}
+
+// WeaponPoints is the zone gating value of a caster weapon: the
+// magical damage.
+func (MysticFighter) WeaponPoints(stats npcdata.GearStats) int32 {
+	return stats.MAtk
+}
+
 // scoreStats dispatches the profile scoring on the gear family of the
 // stats.
 func scoreStats(profile Profile, stats npcdata.GearStats) float64 {

@@ -97,6 +97,15 @@ func (b *Bot) SelfManaPercent() float64 {
 	return b.char.CurMP / b.char.MaxMP * 100
 }
 
+// SelfCurMP returns the current mana of the character: the combat
+// casting gates its picks on the exact cost.
+func (b *Bot) SelfCurMP() float64 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.CurMP
+}
+
 // SelfWeaponKind returns the weapon family of the equipped weapon
 // (SWORD, BLUNT, DAGGER, BOW, POLE): the weapon of the right hand
 // paperdoll slot resolved through the item stats of the generated

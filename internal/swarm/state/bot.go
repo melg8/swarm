@@ -6,6 +6,7 @@ package state
 
 import (
 	"math"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -750,6 +751,31 @@ func (b *Bot) SelfHealthPercent() float64 {
 	pct := b.char.CurHP / b.char.MaxHP * 100
 
 	return math.Min(100, math.Max(0, pct))
+}
+
+// ActiveSkills returns the learned active skills (the non passive
+// ones) in ascending skill id order: the combat casting of the hunt
+// loop picks its strikes, spells and buffs from the list. The answer
+// is a fresh slice - the caller owns it.
+func (b *Bot) ActiveSkills() []LearnedSkill {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	skills := make([]LearnedSkill, 0, len(b.skills))
+	for id, skill := range b.skills {
+		if skill.passive {
+			continue
+		}
+		skills = append(skills, LearnedSkill{
+			SkillID: id,
+			Level:   skill.level,
+			Passive: false,
+		})
+	}
+	sort.Slice(skills, func(i, j int) bool {
+		return skills[i].SkillID < skills[j].SkillID
+	})
+
+	return skills
 }
 
 // ObjectHealthPercent returns the HP of an observed object as a

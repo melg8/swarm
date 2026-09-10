@@ -147,6 +147,10 @@ func (l *Loop) refreshShoppingCache() {
 	l.shoppingPlanAdena = int64(l.tracker.InventoryStats().Adena)
 	l.shoppingViewCache = shoppingQueueView(
 		l.shoppingPlanCache, l.shoppingPlanAdena)
+	// The fresh plan re-feeds the weapon priority of the learning
+	// queue: the planned next weapon purchase swaps the preferred
+	// weapon family of the lesson order (see combat_skills.go).
+	l.publishSkillWeaponPriority()
 }
 
 // shoppingWanted reports whether the shop strategy justifies a town
@@ -603,6 +607,7 @@ func (l *Loop) planShoppingStops() {
 			merchant: stop.merchant,
 			buys:     stop.buys,
 			sell:     false,
+			teach:    false,
 		})
 	}
 }

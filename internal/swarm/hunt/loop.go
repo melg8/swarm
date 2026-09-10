@@ -466,6 +466,15 @@ type Loop struct {
 	learnRetries      int
 	learnAt           time.Time
 	learnRevision     uint64
+	// The combat casting state (see combat_skills.go): the pacing
+	// timestamps of the strike and spell requests and of the self
+	// buff casts, plus the locally tracked reuse windows of the
+	// cast skills (the server clock of the real windows starts at
+	// the cast start, the local one carries a jitter margin).
+	castAt        time.Time
+	buffAt        time.Time
+	skillReuse    map[int32]time.Time
+	profilePicked bool
 	// shoppingViewCache holds the built ShoppingPlanView that
 	// corresponds to shoppingPlanCache. The view is rebuilt from the
 	// cached plan every tick (200ms) without this cache, which on the
@@ -596,6 +605,10 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		learnRetries:      0,
 		learnAt:           time.Time{},
 		learnRevision:     0,
+		castAt:            time.Time{},
+		buffAt:            time.Time{},
+		skillReuse:        make(map[int32]time.Time),
+		profilePicked:     false,
 		shoppingViewCache: state.ShoppingPlanView{
 			Entries: nil,
 			Adena:   0,
@@ -877,6 +890,9 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
 	// The auto equipment runs in every phase of the hunt: the paperdoll
 	// stays current while a town trip buys its gear and while the loot
 	// drops arrive, so the combat stats never lag behind the inventory.
+	// The class profile pick runs before it: a mystic class scores the
+	// caster gear from its very first equip decision.
+	l.maybePickGearProfile()
 	l.maybeEquipGear()
 	// The replaced starter kit follows the equips: the unsellable,
 	// undroppable Squire's pieces leave the bag through the destroy
@@ -1057,6 +1073,19 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		l.zoneFails = 0
 		l.logger.Printf("Hunt: back in the hunting zone, resuming the hunt")
 	}
+	// The mana rest of the caster runs before the server target
+	// re-adopt: a caster whose mana sits under the re-engage
+	// threshold owns its fights until the bar recovers (the dry
+	// one drops the running fight, the standing one holds the new
+	// picks), and the re-adopt below would otherwise hand the
+	// dropped target straight back. Under attack the hold lifts:
+	// the caster answers the blows instead of sitting into them,
+	// and the safety nets further down stay armed whatever the
+	// mana says (see combat_skills.go).
+	manaHeld := l.mageManaLow() && !l.tracker.SelfUnderAttack()
+	if manaHeld && l.target != 0 {
+		l.dropFightForMana()
+	}
 	// Prefer the server view of the target while it lives: the
 	// MyTargetSelected answer of the last attack request arrives
 	// asynchronously, so the fresh value is read every tick. A stale
@@ -1066,9 +1095,12 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 	// loop into an engage/loot ping-pong where the next target was
 	// never selected. A target marked stuck (its repeated attack
 	// requests never started the fight) is not re-adopted either
-	// while its skip delay lasts.
+	// while its skip delay lasts. The mana held caster re-adopts
+	// nothing - the rest owns the selection until the mana stands
+	// back up.
 	serverTarget := l.tracker.SelfTargetID()
-	if serverTarget != 0 && l.tracker.ObjectAlive(serverTarget) &&
+	if serverTarget != 0 && !manaHeld &&
+		l.tracker.ObjectAlive(serverTarget) &&
 		!l.targetSkipped(serverTarget, now) {
 		l.target = serverTarget
 	}
@@ -1172,6 +1204,24 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 
 			return
 		}
+		if manaHeld {
+			// The mana rest of the caster: the dry one sits
+			// down (the rest toggles it), the one above the
+			// sit threshold stands and regenerates. The self
+			// buffs wait for the recovered bar - a cast now
+			// would spend the mana the rest is rebuilding.
+			if l.tracker.SelfManaPercent() < manaSitPercent {
+				l.rest()
+			}
+
+			return
+		}
+		if l.maybeSelfBuff(now) {
+			// The missing self buff just fired: the tick is
+			// spent on it, the next pick happens on the next
+			// tick (the select pacing gates it anyway).
+			return
+		}
 		if now.Sub(l.lastHit) < selectPeriod {
 			return
 		}
@@ -1210,6 +1260,12 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		if l.avoidImpendingAdd(now) {
 			return
 		}
+		// The combat casting of the running fight: the warrior
+		// strike of the weapon in hand, the mystic attack spell
+		// (see combat_skills.go). The casts share the human pacing
+		// of the loop, the auto attack keeps swinging whatever the
+		// cast request does.
+		l.maybeCastCombatSkill(now)
 		// The swings land right now: nothing to re-request. A stale
 		// engagement (the fight was interrupted, the auto attack flag
 		// and the combat window linger) falls through and keeps

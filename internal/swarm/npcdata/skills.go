@@ -117,6 +117,30 @@ func AllClassTeachers() map[int32][]TeacherNPC {
 	return skillTeachers
 }
 
+// ClassCastsMagic reports whether a class is a caster: its skill
+// tree grants a magic attack skill on its own (the mystic starting
+// classes know Wind Strike from level 1, the fighter classes never
+// see one). The gear profile and the combat casting of the hunt
+// loop key on it.
+func ClassCastsMagic(classID int32) bool {
+	tree, ok := SkillTree(classID)
+	if !ok {
+		return false
+	}
+	for _, lesson := range tree {
+		if !lesson.AutoGet {
+			continue
+		}
+		cast, castOK := SkillCastOf(lesson.SkillID)
+		if castOK && cast.Magic && cast.Operate == "A1" &&
+			cast.Target == "ONE" {
+			return true
+		}
+	}
+
+	return false
+}
+
 // SkillInfoOf returns the static display data of a skill id. The
 // second answer is false when the id is unknown to the generated
 // dictionary (a skill the server granted but the C1 stats do not
