@@ -521,7 +521,9 @@ function flashDumpButton(button, kind) {
 // sidebar stays the bots-only overview.
 const zonePanelCollapsed = { value: true };
 
-// initZonePanel wires the collapse toggle of the zone panel head.
+// initZonePanel wires the collapse toggle of the zone panel head. The
+// toggle persists its flag through the panel layout storage (the drag
+// wiring of initFloatingPanels owns the position).
 function initZonePanel() {
   const head = document.getElementById("zone-panel-head");
   const panel = document.getElementById("zone-panel");
@@ -529,6 +531,10 @@ function initZonePanel() {
   head.addEventListener("click", () => {
     zonePanelCollapsed.value = !zonePanelCollapsed.value;
     applyZonePanelState();
+    const wrap = document.querySelector(".map-wrap");
+    if (wrap && typeof wrap.getBoundingClientRect === "function") {
+      persistPanelLayout("zone", panel, wrap);
+    }
   });
 }
 
@@ -2187,17 +2193,294 @@ function initTargetWidget() {
   });
 }
 
+// ---- floating panel layout: drag, collapse, persistence ----
+//
+// Every floating map panel (the HUD stack, the equipment widget, the
+// chat window, the zone list) shares one pattern (C4): its head is
+// the drag handle, a chevron button collapses the body, the position
+// and the collapsed flag live in localStorage under one versioned
+// key, and a double click on the head returns the panel to its css
+// default spot. The drag never starts on the interactive children of
+// a head (the collapse chevron, the dump button), clamps the panel
+// inside the map wrap and swallows the click that follows a real
+// move, so the zone head still toggles its list on a plain click.
+
+const PANEL_LAYOUT_KEY = "swarm.panelLayout.v1";
+
+function loadPanelLayouts() {
+  try {
+    const raw = window.localStorage.getItem(PANEL_LAYOUT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function savePanelLayouts(layouts) {
+  try {
+    window.localStorage.setItem(PANEL_LAYOUT_KEY, JSON.stringify(layouts));
+  } catch (err) {
+    // A storage that refuses (private mode) keeps the layout for the
+    // session only.
+  }
+}
+
+// panelRect computes the panel offset inside the map wrap.
+function panelRect(panel, wrap) {
+  const pr = panel.getBoundingClientRect();
+  const wr = wrap.getBoundingClientRect();
+
+  return {
+    x: Math.round(pr.left - wr.left),
+    y: Math.round(pr.top - wr.top)
+  };
+}
+
+// persistPanelLayout stores the current position and collapsed flag.
+function persistPanelLayout(id, panel, wrap) {
+  const layouts = loadPanelLayouts();
+  const rect = panelRect(panel, wrap);
+  layouts[id] = {
+    x: rect.x,
+    y: rect.y,
+    collapsed: panel.classList.contains("collapsed")
+  };
+  savePanelLayouts(layouts);
+}
+
+// applyPanelPosition pins the panel to a saved offset and clears the
+// anchor edges the css default used.
+function applyPanelPosition(panel, wrap, x, y) {
+  const wr = wrap.getBoundingClientRect();
+  const maxX = Math.max(0, wr.width - 80);
+  const maxY = Math.max(0, wr.height - 40);
+  const clamp = (v, max) => Math.max(0, Math.min(v, max));
+  panel.style.left = clamp(x, maxX) + "px";
+  panel.style.top = clamp(y, maxY) + "px";
+  panel.style.right = "auto";
+  panel.style.bottom = "auto";
+}
+
+// swallowNextClick eats the click the browser fires right after a
+// pointer drag on the handle, so a head with a click action (the zone
+// toggle) never fires it after a move.
+function swallowNextClick(handle) {
+  const swallow = (event) => {
+    event.stopPropagation();
+    if (event.preventDefault) { event.preventDefault(); }
+  };
+  try {
+    handle.addEventListener("click", swallow, { capture: true, once: true });
+  } catch (err) {
+    // Older stub DOMs without options: remove after one tick.
+    handle.addEventListener("click", swallow);
+    setTimeout(() => {
+      handle.removeEventListener("click", swallow);
+    }, 0);
+  }
+}
+
+// wirePanelDrag arms the pointer drag of one panel and restores its
+// saved position. opts.onRestore runs after the state lands (the chat
+// resets its unread counter, the zone syncs its module flag).
+function wirePanelDrag(id, panel, handle, wrap, opts) {
+  if (!panel || !handle || !handle.addEventListener) { return; }
+  const layout = loadPanelLayouts()[id];
+  if (layout && typeof layout.x === "number") {
+    applyPanelPosition(panel, wrap, layout.x, layout.y);
+  }
+  if (layout && layout.collapsed) {
+    panel.classList.add("collapsed");
+  }
+  if (opts && opts.onRestore) { opts.onRestore(layout || null); }
+
+  let drag = null;
+  let moved = false;
+
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 && event.button !== undefined) { return; }
+    if (event.target && event.target !== handle &&
+        event.target.closest &&
+        event.target.closest("button, input, select, a")) { return; }
+    const pr = panel.getBoundingClientRect();
+    const wr = wrap.getBoundingClientRect();
+    drag = {
+      dx: event.clientX - pr.left,
+      dy: event.clientY - pr.top,
+      wrapW: wr.width,
+      wrapH: wr.height
+    };
+    moved = false;
+    if (event.preventDefault) { event.preventDefault(); }
+    if (handle.setPointerCapture) {
+      try { handle.setPointerCapture(event.pointerId); } catch (err) {
+        // A capture refusal just loses the outside-the-handle stretch.
+      }
+    }
+  });
+
+  handle.addEventListener("pointermove", (event) => {
+    if (!drag) { return; }
+    const wr = wrap.getBoundingClientRect();
+    const x = Math.max(0, Math.min(
+      event.clientX - wr.left - drag.dx, drag.wrapW - 80));
+    const y = Math.max(0, Math.min(
+      event.clientY - wr.top - drag.dy, drag.wrapH - 40));
+    if (!moved) {
+      moved = true;
+      panel.classList.add("panel-dragging");
+    }
+    panel.style.left = Math.round(x) + "px";
+    panel.style.top = Math.round(y) + "px";
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+  });
+
+  const endDrag = () => {
+    if (!drag) { return; }
+    const wasMoved = moved;
+    drag = null;
+    moved = false;
+    panel.classList.remove("panel-dragging");
+    if (wasMoved) {
+      persistPanelLayout(id, panel, wrap);
+      swallowNextClick(handle);
+    }
+  };
+  handle.addEventListener("pointerup", endDrag);
+  handle.addEventListener("pointercancel", endDrag);
+
+  handle.addEventListener("dblclick", () => {
+    panel.style.left = "";
+    panel.style.top = "";
+    panel.style.right = "";
+    panel.style.bottom = "";
+    const layouts = loadPanelLayouts();
+    delete layouts[id];
+    savePanelLayouts(layouts);
+  });
+}
+
+// wirePanelCollapse arms the chevron button of one panel: the body
+// hides through the collapsed class, the aria state follows and the
+// flag persists. opts.onToggle lets the chat reset its unread badge.
+function wirePanelCollapse(id, panel, wrap, button, opts) {
+  if (!button || !button.addEventListener) { return; }
+  const collapsed = panel.classList.contains("collapsed");
+  button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  button.addEventListener("click", () => {
+    panel.classList.toggle("collapsed");
+    const now = panel.classList.contains("collapsed");
+    button.setAttribute("aria-expanded", now ? "false" : "true");
+    if (opts && opts.onToggle) { opts.onToggle(now); }
+    persistPanelLayout(id, panel, wrap);
+  });
+}
+
+// initFloatingPanels wires the four overlays of the map: the HUD
+// stack drags by the character head, the equipment widget by its
+// title row, the chat by its head strip, the zone list by its
+// existing head button (its own collapse toggle stays, the drag only
+// moves it). Stub DOMs of the reproduction harnesses skip the wiring.
+function initFloatingPanels() {
+  if (typeof document.querySelector !== "function") { return; }
+  const wrap = document.querySelector(".map-wrap");
+  if (!wrap || typeof wrap.getBoundingClientRect !== "function") { return; }
+
+  const hudStack = document.getElementById("hud-stack") ||
+    document.querySelector(".hud-stack");
+  const hud = document.getElementById("hud");
+  const hudHead = hud ? hud.querySelector(".hud-head") : null;
+  if (hudStack && hudHead) {
+    wirePanelDrag("hud", hudStack, hudHead, wrap);
+    wirePanelCollapse("hud", hudStack, wrap,
+      document.getElementById("hud-collapse"),
+      { onRestore: null, onToggle: null });
+    // The collapsed flag lives on the stack (it hides the whole HUD
+    // column including the target panel); the body class of #hud is
+    // the css hook.
+    syncHudCollapseClass(hudStack);
+  }
+
+  const gearPanel = document.getElementById("gear-panel");
+  const gearHead = document.getElementById("gear-head");
+  if (gearPanel && gearHead) {
+    wirePanelDrag("gear", gearPanel, gearHead, wrap);
+    wirePanelCollapse("gear", gearPanel, wrap,
+      document.getElementById("gear-collapse"));
+  }
+
+  const chatBox = document.getElementById("chat-box");
+  const chatHead = document.getElementById("chat-head");
+  if (chatBox && chatHead) {
+    wirePanelDrag("chat", chatBox, chatHead, wrap, {
+      onRestore: (layout) => {
+        ChatWindow.collapsed = Boolean(layout && layout.collapsed);
+        if (!ChatWindow.collapsed) { ChatWindow.unread = 0; }
+      }
+    });
+    wirePanelCollapse("chat", chatBox, wrap,
+      document.getElementById("chat-collapse"), {
+        onToggle: (collapsed) => {
+          ChatWindow.collapsed = collapsed;
+          if (!collapsed) {
+            ChatWindow.unread = 0;
+            updateChatBadge();
+          }
+        }
+      });
+  }
+
+  const zonePanel = document.getElementById("zone-panel");
+  const zoneHead = document.getElementById("zone-panel-head");
+  if (zonePanel && zoneHead) {
+    wirePanelDrag("zone", zonePanel, zoneHead, wrap, {
+      onRestore: (layout) => {
+        zonePanelCollapsed.value = Boolean(layout && layout.collapsed);
+      }
+    });
+  }
+}
+
+// syncHudCollapseClass mirrors the stack collapsed flag onto the #hud
+// panel (the css hides the .hud-body through it).
+function syncHudCollapseClass(hudStack) {
+  const hud = document.getElementById("hud");
+  if (!hud || !hudStack) { return; }
+  hud.classList.toggle("collapsed", hudStack.classList.contains("collapsed"));
+}
+
 // Wire the interactions at script load: the scripts run at the end of
 // the body, the widget markup is parsed already.
 initGearInteractions();
 initTargetWidget();
 initViewMenu();
 initShopPanel();
+initFloatingPanels();
 
 // Chat window state: auto scroll follows the newest line while the
 // user stays at the bottom; scrolling up reads the history, scrolling
-// back to the bottom resumes the follow.
-const ChatWindow = { stick: true };
+// back to the bottom resumes the follow. A collapsed window counts
+// the lines it missed and carries them on the head badge (C5),
+// resetting when the user expands it again.
+const ChatWindow = {
+  stick: true,
+  collapsed: false,
+  unread: 0,
+  lastCount: 0
+};
+
+// updateChatBadge refreshes the unread chip of the chat head.
+function updateChatBadge() {
+  const badge = document.getElementById("chat-new");
+  if (!badge) { return; }
+  if (ChatWindow.unread > 0) {
+    badge.textContent = ChatWindow.unread + " new";
+    badge.classList.remove("hidden");
+  } else {
+    badge.classList.add("hidden");
+  }
+}
 
 // chatAtBottom reports whether the scroll position of the chat list is
 // within a few pixels of the newest line.
@@ -2219,6 +2502,13 @@ function initChat() {
 function renderChat(snap) {
   const list = document.getElementById("chat-list");
   const lines = snap.chat || [];
+  // A collapsed window counts the lines it missed (C5) instead of
+  // scrolling them past the user.
+  if (ChatWindow.collapsed && lines.length > ChatWindow.lastCount) {
+    ChatWindow.unread += lines.length - ChatWindow.lastCount;
+    updateChatBadge();
+  }
+  ChatWindow.lastCount = lines.length;
   list.innerHTML = "";
   for (const line of lines) {
     const row = document.createElement("div");

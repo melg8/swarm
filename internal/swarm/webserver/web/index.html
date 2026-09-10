@@ -207,11 +207,18 @@ SPDX-License-Identifier: MIT
             <span id="bot-status-detail" class="bot-status-detail"></span>
           </div>
 
-          <div class="hud-stack hidden">
+          <div class="hud-stack hidden" id="hud-stack">
             <div id="hud" class="hud">
               <div class="hud-head">
                 <div class="hud-name-row">
                   <span id="hud-name" class="hud-name">—</span>
+                  <button id="hud-collapse" class="panel-collapse-btn" type="button"
+                    aria-expanded="true"
+                    title="collapse the vitals and the stats">
+                    <svg viewBox="0 0 24 24" width="10" height="10">
+                      <path d="M5 9l7 7 7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
                   <button id="hud-dump" class="hud-dump-btn" type="button"
                     title="copy the full state dump (character, inventory, objects, walk plan, event log) to the clipboard for bug reports">
                     <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
@@ -228,34 +235,36 @@ SPDX-License-Identifier: MIT
                   </span>
                 </div>
               </div>
-              <div class="vitals">
-                <div class="vital-row">
-                  <span class="vital-label">HP</span>
-                  <div class="bar hp"><div id="hp-fill" class="bar-fill"></div></div>
-                  <span id="hp-text" class="vital-text">0/0</span>
+              <div class="hud-body">
+                <div class="vitals">
+                  <div class="vital-row">
+                    <span class="vital-label">HP</span>
+                    <div class="bar hp"><div id="hp-fill" class="bar-fill"></div></div>
+                    <span id="hp-text" class="vital-text">0/0</span>
+                  </div>
+                  <div class="vital-row">
+                    <span class="vital-label">MP</span>
+                    <div class="bar mp"><div id="mp-fill" class="bar-fill"></div></div>
+                    <span id="mp-text" class="vital-text">0/0</span>
+                  </div>
+                  <div class="vital-row">
+                    <span class="vital-label">XP</span>
+                    <div class="bar xp"><div id="xp-fill" class="bar-fill"></div></div>
+                    <span id="xp-text" class="vital-text">0%</span>
+                  </div>
                 </div>
-                <div class="vital-row">
-                  <span class="vital-label">MP</span>
-                  <div class="bar mp"><div id="mp-fill" class="bar-fill"></div></div>
-                  <span id="mp-text" class="vital-text">0/0</span>
+                <div class="kv-grid hud-grid">
+                  <div class="kv"><span>level</span><b id="hud-level">—</b></div>
+                  <div class="kv"><span>race</span><b id="hud-race">—</b></div>
+                  <div class="kv"><span>x</span><b id="pos-x">—</b></div>
+                  <div class="kv"><span>exp</span><b id="hud-exp">—</b></div>
+                  <div class="kv"><span>y</span><b id="pos-y">—</b></div>
+                  <div class="kv"><span>sp</span><b id="hud-sp">—</b></div>
+                  <div class="kv"><span>z</span><b id="pos-z">—</b></div>
+                  <div class="kv"><span>slots</span><b id="hud-slots">—</b></div>
+                  <div class="kv"><span>weight</span><b id="hud-weight">—</b></div>
+                  <div class="kv"><span>adena</span><b id="hud-adena">—</b></div>
                 </div>
-                <div class="vital-row">
-                  <span class="vital-label">XP</span>
-                  <div class="bar xp"><div id="xp-fill" class="bar-fill"></div></div>
-                  <span id="xp-text" class="vital-text">0%</span>
-                </div>
-              </div>
-              <div class="kv-grid hud-grid">
-                <div class="kv"><span>level</span><b id="hud-level">—</b></div>
-                <div class="kv"><span>race</span><b id="hud-race">—</b></div>
-                <div class="kv"><span>x</span><b id="pos-x">—</b></div>
-                <div class="kv"><span>exp</span><b id="hud-exp">—</b></div>
-                <div class="kv"><span>y</span><b id="pos-y">—</b></div>
-                <div class="kv"><span>sp</span><b id="hud-sp">—</b></div>
-                <div class="kv"><span>z</span><b id="pos-z">—</b></div>
-                <div class="kv"><span>slots</span><b id="hud-slots">—</b></div>
-                <div class="kv"><span>weight</span><b id="hud-weight">—</b></div>
-                <div class="kv"><span>adena</span><b id="hud-adena">—</b></div>
               </div>
             </div>
 
@@ -281,7 +290,18 @@ SPDX-License-Identifier: MIT
           </div>
 
           <div id="gear-panel" class="gear-panel">
-            <div class="sidebar-title">Equipment</div>
+            <div id="gear-head" class="panel-head gear-head"
+              title="drag to move · double click resets · the chevron collapses">
+              <span class="panel-title">Equipment</span>
+              <button id="gear-collapse" class="panel-collapse-btn" type="button"
+                aria-expanded="true"
+                title="collapse the paperdoll, the bag and the footer">
+                <svg viewBox="0 0 24 24" width="10" height="10">
+                  <path d="M5 9l7 7 7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            <div id="gear-body" class="panel-body">
             <div class="gear-slots">
               <div id="gear-wear" class="gear-wear"></div>
               <div id="gear-jewel" class="gear-jewel"></div>
@@ -310,6 +330,7 @@ SPDX-License-Identifier: MIT
                     d="M9 2.5h6c.6 0 1 .4 1 1v1h4.5c.3 0 .5.2.5.5v1.5c0 .3-.2.5-.5.5H3.5a.5.5 0 0 1-.5-.5V5.5c0-.3.2-.5.5-.5H8v-1c0-.6.4-1 1-1zm-2.7 6h11.4l-.9 11.4c-.1 1.2-1.1 2.1-2.3 2.1H9.5c-1.2 0-2.2-.9-2.3-2.1L6.3 8.5zm3.2 2v8.2h1.4V10.5H9.5zm3.6 0v8.2h1.4V10.5H13z"/>
                 </svg>
               </div>
+            </div>
             </div>
             <button id="shop-tab" class="shop-tab hidden" type="button"
               aria-expanded="true"
@@ -374,6 +395,17 @@ SPDX-License-Identifier: MIT
           </div>
 
           <div id="chat-box" class="chat-box">
+            <div id="chat-head" class="chat-head"
+              title="drag to move · double click resets · the chevron collapses">
+              <span class="chat-title">chat</span>
+              <span id="chat-new" class="chat-new hidden">0 new</span>
+              <button id="chat-collapse" class="panel-collapse-btn" type="button"
+                aria-expanded="true" title="collapse the chat window">
+                <svg viewBox="0 0 24 24" width="10" height="10">
+                  <path d="M5 9l7 7 7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
             <div id="chat-list" class="chat-list"></div>
           </div>
         </div>

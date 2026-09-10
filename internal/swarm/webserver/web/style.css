@@ -954,7 +954,67 @@ body.mode-test-fight .map-empty { display: none; }
   padding: 12px 14px;
 }
 
-.hud-head { margin-bottom: 10px; }
+.hud-head { margin-bottom: 10px; cursor: grab; user-select: none; }
+
+.hud-head:active { cursor: grabbing; }
+
+/* Floating panel pattern (C4): the head is the drag handle, the
+   chevron button collapses the body. The state lives on the panel
+   class; the drag adds a short opacity dip for feedback. */
+.panel-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color var(--t-fast), background-color var(--t-fast);
+}
+
+.panel-collapse-btn:hover { color: var(--text); background: var(--bg-panel-2); }
+
+.panel-collapse-btn svg {
+  display: block;
+  transition: transform var(--t-fast);
+}
+
+.collapsed > * .panel-collapse-btn svg,
+.collapsed .panel-collapse-btn svg { transform: rotate(-90deg); }
+
+.panel-dragging { opacity: 0.85; }
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: grab;
+  text-align: left;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.panel-head:active { cursor: grabbing; }
+
+.panel-title { font-weight: 600; }
+
+.panel-body { display: flex; flex-direction: column; }
+
+.collapsed > .panel-body { display: none; }
 
 .hud-name-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
@@ -1076,8 +1136,54 @@ body.mode-test-fight .map-empty { display: none; }
 /* Target panel: shows who the bot currently selected, with its name,
    level and vitals. The panel exists only while there is a target: a
    killed, removed or missing target hides it completely. */
+#hud.collapsed .hud-body { display: none; }
+
+#hud.collapsed .hud-head { margin-bottom: 0; }
+
 .hud-target .hud-name-row { margin-bottom: 8px; }
 
+/* Chat head strip (C4/C5): the drag handle of the window, the unread
+   badge of a collapsed window and the collapse chevron. Collapsed,
+   the window shrinks to the strip. */
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.chat-head:active { cursor: grabbing; }
+
+.chat-title { font-weight: 600; flex: 1; min-width: 0; }
+
+.chat-box.collapsed { height: auto; }
+
+.chat-box.collapsed .chat-list { display: none; }
+
+.chat-box.collapsed .chat-head { border-bottom: 0; }
+
+.chat-new {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.chat-new.hidden { display: none; }
 /* Chat window in the bottom left corner of the map: the parsed system
    messages (loot, status) and the social animations of the creatures
    around the bot. */
@@ -1728,8 +1834,9 @@ body.mode-pathfind .gear-panel { display: none; }
   z-index: 2;
 }
 
-/* Inventory grid: six columns of four visible rows, scrolling when the
-   bag grows past them. */
+/* Inventory grid: six columns, four visible rows at most, scrolling
+   when the bag grows past them (the actual height follows the items,
+   see the adaptive note below). */
 .inv-grid {
   display: grid;
   grid-template-columns: repeat(6, 36px);
@@ -1737,9 +1844,23 @@ body.mode-pathfind .gear-panel { display: none; }
   gap: 3px;
   padding: 0 8px;
   overflow-y: auto;
-  height: 153px;
+  max-height: 153px;
   align-content: start;
   scrollbar-width: thin;
+}
+
+/* Adaptive inventory (C6): the grid grows with its items instead of
+   reserving four rows - an empty bag shows one slim 'empty' row, the
+   footer follows right under the content. */
+.inv-grid:empty::after {
+  content: "empty";
+  display: flex;
+  align-items: center;
+  grid-column: 1 / -1;
+  min-height: 36px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
 }
 
 .inv-grid::-webkit-scrollbar {
@@ -2539,4 +2660,84 @@ canvas.fxg-cell.picked {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---- glass overlays (proposal B2) ----
+   The floating map panels get a frosted background so the map reads
+   through them: a translucent panel tint plus a 10px backdrop blur.
+   The effect degrades to the exact opaque look whenever the browser
+   lacks backdrop-filter, and one attribute - data-glass="off" on
+   <html> - kills it everywhere (the rollback switch of the proposal).
+   The modal drop dialog and the dense item tooltip stay opaque: they
+   need maximum contrast while the panels behind them keep moving. */
+@supports (backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px)) {
+  html:not([data-glass="off"]) .hud,
+  html:not([data-glass="off"]) .gear-panel,
+  html:not([data-glass="off"]) .zone-panel,
+  html:not([data-glass="off"]) .chat-box,
+  html:not([data-glass="off"]) .shop-panel,
+  html:not([data-glass="off"]) .view-menu-pop,
+  html:not([data-glass="off"]) .map-tooltip,
+  html:not([data-glass="off"]) .bot-status {
+    background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+}
+
+/* ---- responsive layout (proposal C9) ----
+   Two breakpoints keep the chrome alive on laptop and half-size
+   windows: below 1280 the sidebar and the floating panels shave a
+   little, below 1024 the sidebar collapses into a 34px icon rail of
+   bot dots that expands over the map on hover (the canvas never
+   resizes, the rail overlays it), and the corner panels step out of
+   the rail's way. */
+@media (max-width: 1279px) {
+  .sidebar { width: 176px; min-width: 176px; }
+  .hud, .gear-panel, .zone-panel, .chat-box, .shop-panel {
+    font-size: 13.5px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-body { position: relative; }
+  .sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 30;
+    width: 34px;
+    min-width: 34px;
+    overflow: visible;
+  }
+  .sidebar-title,
+  #pf-panel,
+  .sidebar-foot { display: none; }
+  .bot-list { padding-top: 6px; }
+  .bot-item { padding: 9px 0; }
+  .bot-item .bot-row { justify-content: center; gap: 0; }
+  .bot-item .bot-name,
+  .bot-item .bot-level,
+  .bot-chip,
+  .bot-activity,
+  .bot-bars { display: none; }
+  .sidebar:hover {
+    width: 200px;
+    min-width: 200px;
+    box-shadow: var(--shadow);
+  }
+  .sidebar:hover .bot-item { padding: 7px 12px; }
+  .sidebar:hover .bot-item .bot-row {
+    justify-content: flex-start;
+    gap: 8px;
+  }
+  .sidebar:hover .bot-item .bot-name { display: block; }
+  .sidebar:hover .bot-item .bot-level { display: block; }
+  .sidebar:hover .bot-chip { display: inline-flex; }
+  .sidebar:hover .bot-activity { display: block; }
+  .sidebar:hover .bot-bars { display: flex; }
+  .hud-stack { left: 44px; }
+  .chat-box { left: 44px; }
+  .map-rose { left: 44px; }
 }
