@@ -329,6 +329,7 @@ function selectBot(botId) {
   resetShop();
   resetSkills();
   resetSkillQueue();
+  resetBuffs();
 }
 
 function resetPanels() {
@@ -368,6 +369,7 @@ function renderSnapshot() {
   renderSkills(snap);
   renderSkillQueue(snap);
   renderZones(snap);
+  renderBuffs(snap);
   renderChat(snap);
   renderLog(snap);
   renderFooter(snap);
@@ -649,6 +651,161 @@ function renderZones(snap) {
     }
     list.appendChild(item);
   });
+}
+
+// ---- the effects panel (the server buff list) ----
+
+// The effects panel state: the collapse choice (persisted in the
+// localStorage like the gear mode) and the keyed rows of the effect
+// list. The rows are persistent DOM nodes keyed by the skill id - the
+// icon builds once per effect, the later refreshes only rewrite the
+// level badge and the countdown (the keyed rendering rule of the
+// equipment widget - the icons never blink).
+const BuffsPanel = {
+  rows: new Map(),
+  order: ""
+};
+
+// initBuffsPanel wires the collapse toggle of the effects panel head
+// and restores the stored collapse choice.
+function initBuffsPanel() {
+  const head = document.getElementById("buffs-panel-head");
+  if (!head) { return; }
+  const stored = window.localStorage.getItem("swarm.buffsCollapsed");
+  BuffsPanel.collapsed = stored === "1";
+  head.addEventListener("click", () => {
+    BuffsPanel.collapsed = !BuffsPanel.collapsed;
+    window.localStorage.setItem("swarm.buffsCollapsed",
+      BuffsPanel.collapsed ? "1" : "0");
+    applyBuffsPanelState();
+  });
+  applyBuffsPanelState();
+}
+
+// applyBuffsPanelState syncs the panel DOM with the collapse flag.
+function applyBuffsPanelState() {
+  const panel = document.getElementById("buffs-panel");
+  const chev = document.getElementById("buffs-panel-chev");
+  if (!panel) { return; }
+  panel.classList.toggle("collapsed", !!BuffsPanel.collapsed);
+  if (chev) {
+    chev.textContent = BuffsPanel.collapsed ? "\u25B8" : "\u25BE";
+  }
+}
+
+// buffLeftText formats the remaining seconds of an effect: the short
+// human form (90s, 12m 30s, 1h 05m), a dash for the ones the server
+// never times out (the clamped day-long list entries still tick down
+// but a fresh self buff never shows as expired).
+function buffLeftText(left) {
+  if (left >= 86400) { return "\u2014"; }
+  const secs = Math.max(0, left);
+  if (secs < 60) { return secs + "s"; }
+  if (secs < 3600) {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return m + "m" + (s > 0 ? " " + s + "s" : "");
+  }
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return h + "h" + (m > 0 ? " " + (m < 10 ? "0" : "") + m + "m" : "");
+}
+
+// makeBuffRow creates one keyed effect row: the icon box with its
+// level badge and the name plus the countdown line. The icon image
+// itself waits for the first snapshot entry (a missing icon leaves
+// the plain box).
+function makeBuffRow() {
+  const item = document.createElement("li");
+  item.className = "buff-item";
+  const icon = document.createElement("div");
+  icon.className = "buff-icon";
+  const level = document.createElement("span");
+  level.className = "badge-level";
+  icon.append(level);
+  const text = document.createElement("div");
+  text.className = "buff-text";
+  const name = document.createElement("div");
+  name.className = "buff-name";
+  const meta = document.createElement("div");
+  meta.className = "buff-meta";
+  text.append(name, meta);
+  item.append(icon, text);
+
+  return { item, icon, img: null, name, meta, level };
+}
+
+// applyBuffRow refreshes one keyed effect row to the snapshot entry:
+// the icon image builds once (a failing load removes it and leaves
+// the plain box), the name, the level badge and the countdown
+// rewrite on every snapshot (the server counts them down).
+function applyBuffRow(row, buff) {
+  if (!row.img && buff.icon) {
+    const img = document.createElement("img");
+    img.alt = "";
+    img.src = "/icons/" + buff.icon + ".png";
+    img.addEventListener("error", () => img.remove());
+    row.icon.append(img);
+    row.img = img;
+  }
+  row.name.textContent = buff.name || ("effect #" + buff.skillId);
+  row.level.textContent = String(buff.level);
+  row.meta.textContent = buffLeftText(buff.left);
+  row.meta.classList.toggle("fading", buff.left > 0 && buff.left < 60);
+  row.item.title = (buff.name || ("effect #" + buff.skillId)) +
+    " level " + buff.level + " \u00b7 " + buffLeftText(buff.left) +
+    " left";
+}
+
+// renderBuffs refreshes the effects panel of the map: every active
+// effect of the server list with its icon, level and the remaining
+// time. The panel hides while no effect runs; the head always carries
+// the count so the collapsed chip stays informative.
+function renderBuffs(snap) {
+  const section = document.getElementById("buffs-panel");
+  const list = document.getElementById("buffs-list");
+  const count = document.getElementById("buffs-panel-count");
+  if (!section || !list) { return; }
+  const buffs = Array.isArray(snap.buffs) ? snap.buffs : [];
+  if (buffs.length === 0) {
+    section.classList.add("hidden");
+    BuffsPanel.rows.clear();
+    BuffsPanel.order = "";
+    list.innerHTML = "";
+
+    return;
+  }
+  section.classList.remove("hidden");
+  applyBuffsPanelState();
+  if (count) { count.textContent = String(buffs.length); }
+
+  const order = buffs.map((buff) => buff.skillId).join(",");
+  if (order !== BuffsPanel.order) {
+    BuffsPanel.order = order;
+    list.innerHTML = "";
+    BuffsPanel.rows.clear();
+    for (const buff of buffs) {
+      const row = makeBuffRow();
+      BuffsPanel.rows.set(buff.skillId, row);
+      applyBuffRow(row, buff);
+      list.append(row.item);
+    }
+
+    return;
+  }
+  for (const buff of buffs) {
+    const row = BuffsPanel.rows.get(buff.skillId);
+    if (row) { applyBuffRow(row, buff); }
+  }
+}
+
+// resetBuffs drops the effect rows and DOM: switching the observed
+// bot starts the list from scratch.
+function resetBuffs() {
+  BuffsPanel.rows.clear();
+  BuffsPanel.order = "";
+  const list = document.getElementById("buffs-list");
+  if (list) { list.innerHTML = ""; }
 }
 
 // ---- equipment widget ----

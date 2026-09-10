@@ -261,6 +261,16 @@ function loadAppJs(appFile) {
         " 'function' ? renderSkillQueueTooltip : undefined," +
         " renderSkillTooltip: typeof renderSkillTooltip === 'function'" +
         " ? renderSkillTooltip : undefined," +
+        " renderBuffs: typeof renderBuffs === 'function'" +
+        " ? renderBuffs : undefined," +
+        " resetBuffs: typeof resetBuffs === 'function'" +
+        " ? resetBuffs : undefined," +
+        " initBuffsPanel: typeof initBuffsPanel === 'function'" +
+        " ? initBuffsPanel : undefined," +
+        " applyBuffsPanelState: typeof applyBuffsPanelState ===" +
+        " 'function' ? applyBuffsPanelState : undefined," +
+        " BuffsPanel: typeof BuffsPanel !== 'undefined' ? BuffsPanel" +
+        " : undefined," +
         " App: App, GearDrag: GearDrag };",
         sandbox);
 
@@ -1881,6 +1891,138 @@ function main() {
         badge.classList.contains("hidden") &&
         skillqPanel.classList.contains("hidden"),
         "the reset left state behind");
+
+    // ---- the effects panel (the server buff list) ----
+    // The panel hides while no effect runs, appears with the effect
+    // count, the keyed rows carry the icon, the level badge and the
+    // countdown; the head button collapses the body.
+    gear.initBuffsPanel();
+    check(results, "the effects panel starts expanded",
+        !elements.get("buffs-panel").classList.contains("collapsed") &&
+        elements.get("buffs-panel-chev").textContent === "\u25BE",
+        "chev " + elements.get("buffs-panel-chev").textContent);
+    gear.renderBuffs(skillsSnapshot());
+    check(results, "the effects panel hides without effects",
+        elements.get("buffs-panel").classList.contains("hidden"),
+        "the panel stayed visible");
+
+    const buffsPanel = elements.get("buffs-panel");
+    const buffsHead = elements.get("buffs-panel-head");
+    const buffsList = elements.get("buffs-list");
+    const buffsSnapshot = (buffs) => Object.assign(skillsSnapshot(),
+        { buffs });
+    gear.renderBuffs(buffsSnapshot([
+        { skillId: 77, level: 2, name: "Attack Aura",
+            icon: "skill0077", left: 600 },
+        { skillId: 91, level: 1, name: "Defense Aura",
+            icon: "skill0091", left: 45 }
+    ]));
+    check(results, "the effects panel appears with the count",
+        !buffsPanel.classList.contains("hidden") &&
+        elements.get("buffs-panel-count").textContent === "2",
+        "count " + elements.get("buffs-panel-count").textContent);
+    let buffRows = Array.from(buffsList.children);
+    check(results, "the effect rows render per buff",
+        buffRows.length === 2 &&
+        buffRows.every((row) => row.className === "buff-item"),
+        "rows " + buffRows.length);
+    const auraRow = buffRows[0];
+    check(results, "the effect row carries the icon image",
+        auraRow.children[0].children.some(
+            (child) => child.src === "/icons/skill0077.png") ||
+        (auraRow.children[0].children.length === 2 &&
+            auraRow.children[0].children[0].src === "/icons/skill0077.png"),
+        "icon children " + auraRow.children[0].children.length);
+    const auraText = deepText(auraRow);
+    check(results, "the effect row shows name, level and countdown",
+        auraText.includes("Attack Aura") &&
+        auraText.includes("2") && auraText.includes("10m"),
+        "row " + auraText);
+    const defenceRow = buffRows[1];
+    check(results, "a nearly expired effect marks the countdown",
+        deepText(defenceRow).includes("45s") &&
+        defenceRow.children[1].children[1].classList
+            .contains("fading"),
+        "row " + deepText(defenceRow));
+
+    // Keyed rendering: the same effect list reuses the row nodes and
+    // only rewrites the countdowns.
+    const reusedSnapshot = buffsSnapshot([
+        { skillId: 77, level: 2, name: "Attack Aura",
+            icon: "skill0077", left: 540 },
+        { skillId: 91, level: 1, name: "Defense Aura",
+            icon: "skill0091", left: 40 }
+    ]);
+    gear.renderBuffs(reusedSnapshot);
+    const reusedRows = Array.from(buffsList.children);
+    check(results, "the effect rows survive a refresh",
+        reusedRows.length === 2 &&
+        reusedRows[0] === auraRow && reusedRows[1] === defenceRow,
+        "the rows were rebuilt");
+    check(results, "the countdown rewrites on the refresh",
+        deepText(reusedRows[0]).includes("9m") &&
+        deepText(reusedRows[1]).includes("40s"),
+        "rows " + deepText(reusedRows[0]) + " / " +
+            deepText(reusedRows[1]));
+
+    // An expired effect leaves the list when the server drops it.
+    gear.renderBuffs(buffsSnapshot([
+        { skillId: 77, level: 2, name: "Attack Aura",
+            icon: "skill0077", left: 500 }
+    ]));
+    buffRows = Array.from(buffsList.children);
+    check(results, "a dropped effect drops its row",
+        buffRows.length === 1 &&
+        elements.get("buffs-panel-count").textContent === "1",
+        "rows " + buffRows.length);
+
+    // The collapse: the head click hides the body and flips the
+    // chevron, the second click restores it, the choice persists in
+    // the localStorage.
+    fire(buffsHead, "click");
+    check(results, "the effects head click collapses the body",
+        buffsPanel.classList.contains("collapsed") &&
+        elements.get("buffs-panel-chev").textContent === "\u25B8",
+        "the panel did not collapse");
+    check(results, "the collapsed choice persists",
+        gear.BuffsPanel.collapsed === true,
+        "the state flag stayed");
+    fire(buffsHead, "click");
+    check(results, "the second click expands it again",
+        !buffsPanel.classList.contains("collapsed") &&
+        elements.get("buffs-panel-chev").textContent === "\u25BE",
+        "the panel did not expand");
+
+    // The reset: switching the observed bot clears the rows.
+    gear.resetBuffs();
+    check(results, "the reset drops the effect rows",
+        gear.BuffsPanel.rows.size === 0 && buffsList.children.length === 0,
+        "the reset left rows behind");
+    gear.renderBuffs(skillsSnapshot());
+    check(results, "the empty effect list hides the panel again",
+        buffsPanel.classList.contains("hidden"),
+        "the panel stayed visible");
+
+    // The markup and the placement: the panel lives in the map wrap
+    // to the right of the equipment widget (the same top line, past
+    // the widget width plus a gap) and the pathfind mode hides it.
+    const buffsAt = html.indexOf('id="buffs-panel"');
+    check(results, "the effects panel markup sits after the widget",
+        buffsAt > gearAt && buffsAt < chatAt,
+        "buffs " + buffsAt);
+    const buffsCssBlock = css.slice(css.indexOf(".buffs-panel {"),
+        css.indexOf(".buffs-panel {") + 400);
+    check(results, "the effects panel floats right of the character",
+        buffsCssBlock.includes("position: absolute") &&
+        buffsCssBlock.includes("top: 10px") &&
+        buffsCssBlock.includes("right: 278px"),
+        "panel block: " + buffsCssBlock.slice(0, 140));
+    check(results, "the effects panel hides in the pathfind mode",
+        css.includes("body.mode-pathfind .buffs-panel"),
+        "the pathfind rule is missing");
+    check(results, "the collapsed state hides the effect body",
+        css.includes(".buffs-panel.collapsed .buffs-panel-body"),
+        "the collapse rule is missing");
 
     let failed = 0;
     for (const result of results) {

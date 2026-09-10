@@ -241,6 +241,133 @@ body.mode-pathfind .zone-panel { display: none; }
 
 .zone-list { list-style: none; max-height: 40vh; overflow-y: auto; }
 
+/* ---- the effects panel (the server buff list) ----
+   A floating collapsible list of the active effects of the bot
+   (the AbnormalStatusUpdate list: the self buffs the loop casts, the
+   debuffs the mobs land), docked to the RIGHT of the equipment
+   widget at the same height - the character block stays between its
+   paperdoll and its running effects. The head is one button (title,
+   effect count, collapse chevron); the collapsed state hides the
+   body, the collapsed choice persists in the localStorage like the
+   gear mode. The panel hides entirely while no effect runs. */
+.buffs-panel {
+  position: absolute;
+  top: 10px;
+  right: 278px;
+  width: 196px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  z-index: 4;
+}
+
+body.mode-pathfind .buffs-panel { display: none; }
+
+.buffs-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.buffs-panel-title { font-weight: 600; }
+
+.buffs-panel-count {
+  margin-left: auto;
+  color: var(--text-dim);
+  letter-spacing: 0;
+}
+
+.buffs-panel-chev {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.buffs-panel-body {
+  border-top: 1px solid var(--border);
+}
+
+.buffs-panel.collapsed .buffs-panel-body { display: none; }
+
+.buffs-list { list-style: none; max-height: 32vh; overflow-y: auto; }
+
+.buff-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-left: 2px solid transparent;
+}
+
+.buff-icon {
+  position: relative;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-panel-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.buff-icon img {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.buff-icon .badge-level {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 0 3px;
+  font-size: 9px;
+  line-height: 11px;
+  color: var(--text-bright);
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 3px 0 0 0;
+  pointer-events: none;
+}
+
+.buff-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.buff-name {
+  font-size: 11px;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buff-meta {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.buff-meta.fading { color: #e2b455; }
+
+
 .zone-item {
   padding: 6px 12px;
   border-left: 2px solid transparent;
