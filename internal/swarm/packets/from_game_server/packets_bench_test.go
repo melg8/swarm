@@ -5,149 +5,170 @@
 package fromgameserver
 
 import (
-	"encoding/binary"
-	"math"
-	"testing"
+        "encoding/binary"
+        "math"
+        "testing"
 )
 
 // buildBenchmarkCharList builds a char select info payload with n entries.
 func buildBenchmarkCharList(n int) []byte {
-	data := []byte{0x1F}
-	var count [4]byte
-	binary.LittleEndian.PutUint32(count[:], uint32(n))
-	data = append(data, count[:]...)
+        data := []byte{0x1F}
+        var count [4]byte
+        binary.LittleEndian.PutUint32(count[:], uint32(n))
+        data = append(data, count[:]...)
 
-	entry := utf16("test1")
-	entry = putInt32(entry, 100)
-	entry = append(entry, utf16("test1")...)
-	entry = putInt32(entry, 0) // session id
-	entry = putInt32(entry, 0) // clan id
-	entry = putInt32(entry, 0) // builder
-	entry = putInt32(entry, 0) // sex
-	entry = putInt32(entry, 1) // race
-	entry = putInt32(entry, 18)
-	entry = putInt32(entry, 1) // gs name
-	entry = putInt32(entry, 100)
-	entry = putInt32(entry, 200)
-	entry = putInt32(entry, 300)
-	var hp [8]byte
-	binary.LittleEndian.PutUint64(hp[:], math.Float64bits(50))
-	entry = append(entry, hp[:]...)
-	entry = append(entry, hp[:]...)
-	entry = putInt32(entry, 0) // sp
-	entry = putInt32(entry, 0) // exp
-	entry = putInt32(entry, 1) // level
-	for range 40 {
-		entry = putInt32(entry, 0)
-	}
-	entry = putInt32(entry, 2)      // hair style
-	entry = putInt32(entry, 1)      // hair color
-	entry = putInt32(entry, 0)      // face
-	entry = append(entry, hp[:]...) // max hp
-	entry = append(entry, hp[:]...) // max mp
-	entry = putInt32(entry, 0)      // delete timer
+        entry := utf16("test1")
+        entry = putInt32(entry, 100)
+        entry = append(entry, utf16("test1")...)
+        entry = putInt32(entry, 0) // session id
+        entry = putInt32(entry, 0) // clan id
+        entry = putInt32(entry, 0) // builder
+        entry = putInt32(entry, 0) // sex
+        entry = putInt32(entry, 1) // race
+        entry = putInt32(entry, 18)
+        entry = putInt32(entry, 1) // gs name
+        entry = putInt32(entry, 100)
+        entry = putInt32(entry, 200)
+        entry = putInt32(entry, 300)
+        var hp [8]byte
+        binary.LittleEndian.PutUint64(hp[:], math.Float64bits(50))
+        entry = append(entry, hp[:]...)
+        entry = append(entry, hp[:]...)
+        entry = putInt32(entry, 0) // sp
+        entry = putInt32(entry, 0) // exp
+        entry = putInt32(entry, 1) // level
+        for range 40 {
+                entry = putInt32(entry, 0)
+        }
+        entry = putInt32(entry, 2)      // hair style
+        entry = putInt32(entry, 1)      // hair color
+        entry = putInt32(entry, 0)      // face
+        entry = append(entry, hp[:]...) // max hp
+        entry = append(entry, hp[:]...) // max mp
+        entry = putInt32(entry, 0)      // delete timer
 
-	for range n {
-		data = append(data, entry...)
-	}
+        for range n {
+                data = append(data, entry...)
+        }
 
-	return data
+        return data
 }
 
 func BenchmarkParseCharSelectInfoPacket(b *testing.B) {
-	data := buildBenchmarkCharList(7)
+        data := buildBenchmarkCharList(7)
 
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		p := NewCharSelectInfoPacket()
-		if err := ParseCharSelectInfoPacket(p, data); err != nil {
-			b.Fatal(err)
-		}
-	}
+        b.ReportAllocs()
+        b.ResetTimer()
+        for range b.N {
+                p := NewCharSelectInfoPacket()
+                if err := ParseCharSelectInfoPacket(p, data); err != nil {
+                        b.Fatal(err)
+                }
+        }
 }
 
 func BenchmarkParseKeyPacket(b *testing.B) {
-	data := []byte{0x00, 0x01}
-	data = append(data, 0x94, 0x35, 0x00, 0x00, 0xa1, 0x6c, 0x54, 0x87)
-	data = putInt32(data, 2)
-	data = putInt32(data, 1)
+        data := []byte{0x00, 0x01}
+        data = append(data, 0x94, 0x35, 0x00, 0x00, 0xa1, 0x6c, 0x54, 0x87)
+        data = putInt32(data, 2)
+        data = putInt32(data, 1)
 
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		p := NewKeyPacket()
-		if err := ParseKeyPacket(p, data); err != nil {
-			b.Fatal(err)
-		}
-	}
+        b.ReportAllocs()
+        b.ResetTimer()
+        for range b.N {
+                p := NewKeyPacket()
+                if err := ParseKeyPacket(p, data); err != nil {
+                        b.Fatal(err)
+                }
+        }
 }
 
 // buildNpcInfoPayload builds a realistic NpcInfo packet.
 func buildNpcInfoPayload() []byte {
-	data := []byte{0x22}
-	data = putInt32(data, 268473919)
-	data = putInt32(data, 1001277)
-	data = putInt32(data, 1)
-	data = putInt32(data, 45000)
-	data = putInt32(data, 50000)
-	data = putInt32(data, -3500)
-	data = putInt32(data, 16384)
-	data = append(data, make([]byte, npcInfoSpeedLead)...)
-	data = putInt32(data, 165)
-	data = putInt32(data, 55)
-	data = append(data, make([]byte, npcInfoSpeedTrail)...)
-	data = putFloat64(data, 1.15)
-	data = append(data, make([]byte, npcInfoAtkSpeedTail)...)
-	data = putFloat64(data, 10)
-	data = append(data, make([]byte, npcInfoBodyTail)...)
-	data = append(data, 1, 1, 0, 0, 0)
-	data = append(data, utf16("Keltir")...)
-	data = append(data, utf16("Lv 1")...)
+        data := []byte{0x22}
+        data = putInt32(data, 268473919)
+        data = putInt32(data, 1001277)
+        data = putInt32(data, 1)
+        data = putInt32(data, 45000)
+        data = putInt32(data, 50000)
+        data = putInt32(data, -3500)
+        data = putInt32(data, 16384)
+        data = append(data, make([]byte, npcInfoSpeedLead)...)
+        data = putInt32(data, 165)
+        data = putInt32(data, 55)
+        data = append(data, make([]byte, npcInfoSpeedTrail)...)
+        data = putFloat64(data, 1.15)
+        data = append(data, make([]byte, npcInfoAtkSpeedTail)...)
+        data = putFloat64(data, 10)
+        data = append(data, make([]byte, npcInfoBodyTail)...)
+        data = append(data, 1, 1, 0, 0, 0)
+        data = append(data, utf16("Keltir")...)
+        data = append(data, utf16("Lv 1")...)
 
-	return data
+        return data
 }
 
-// buildUserInfoPayload builds a realistic UserInfo packet tail.
+// buildUserInfoPayload builds a complete realistic UserInfo packet
+// covering every field the parser reads: position, identity, vitals,
+// load, the 15 slot paperdoll block, the skipped stat trail and the
+// speed block including the move multiplier. The previous fixture
+// stopped after the level/exp block and the bench failed with an EOF
+// at the load field - the full shape lets the bench measure the real
+// per packet cost the bot fleet pays on every self state refresh.
 func buildUserInfoPayload() []byte {
-	data := []byte{0x04}
-	data = putInt32(data, 45000)
-	data = putInt32(data, 50000)
-	data = putInt32(data, -3500)
-	data = putInt32(data, 0)
-	data = putInt32(data, 268473919)
-	data = append(data, utf16("test1")...)
-	for _, value := range []int32{
-		1, 0, 18, 5, 2000, 36, 35, 36, 23, 14, 25, 122, 100, 40, 39,
-	} {
-		data = putInt32(data, value)
-	}
+        data := []byte{0x04}
+        data = putInt32(data, 45000)
+        data = putInt32(data, 50000)
+        data = putInt32(data, -3500)
+        data = putInt32(data, 0) // vehicle id
+        data = putInt32(data, 268473919)
+        data = append(data, utf16("test1")...)
+        for _, value := range []int32{
+                1, 0, 18, 5, 2000, // race, female, base class, level, exp
+                36, 35, 36, 23, 14, 25, // STR DEX CON INT WIT MEN
+                122, 100, 40, 39, // maxHp curHp maxMp curMp
+                10, 640, 6400000, // sp curLoad maxLoad
+        } {
+                data = putInt32(data, value)
+        }
+        // Weapon flag, 15 paperdoll display ids and 12 combat stat ints
+        // are skipped by the parser.
+        data = append(data, make([]byte, userInfoWeaponFlagSkip)...)
+        for index := range userInfoPaperdollSlots {
+                data = putInt32(data, int32(268473900+index))
+        }
+        data = append(data, make([]byte, userInfoStatsSkip)...)
+        data = putInt32(data, 165) // run speed
+        data = putInt32(data, 80)  // walk speed
+        // Swim and fly speeds trail.
+        data = append(data, make([]byte, userInfoSpeedTrail)...)
+        data = putFloat64(data, 1.1)
 
-	return data
+        return data
 }
 
 // BenchmarkParseNpcInfoPacket measures the npc spawn hot path.
 func BenchmarkParseNpcInfoPacket(b *testing.B) {
-	data := buildNpcInfoPayload()
-	packet := NewNpcInfoPacket()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		if err := ParseNpcInfoPacket(packet, data); err != nil {
-			b.Fatal(err)
-		}
-	}
+        data := buildNpcInfoPayload()
+        packet := NewNpcInfoPacket()
+        b.ReportAllocs()
+        b.ResetTimer()
+        for range b.N {
+                if err := ParseNpcInfoPacket(packet, data); err != nil {
+                        b.Fatal(err)
+                }
+        }
 }
 
 // BenchmarkParseUserInfoPacket measures the self state refresh path.
 func BenchmarkParseUserInfoPacket(b *testing.B) {
-	data := buildUserInfoPayload()
-	packet := NewUserInfoPacket()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		if err := ParseUserInfoPacket(packet, data); err != nil {
-			b.Fatal(err)
-		}
-	}
+        data := buildUserInfoPayload()
+        packet := NewUserInfoPacket()
+        b.ReportAllocs()
+        b.ResetTimer()
+        for range b.N {
+                if err := ParseUserInfoPacket(packet, data); err != nil {
+                        b.Fatal(err)
+                }
+        }
 }

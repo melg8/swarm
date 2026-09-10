@@ -2821,3 +2821,17 @@ name the variant number that best fits the real bot UI.
   degrade to a hunt without town trips otherwise. Verified: stack
   STACK_READY, gofmt, go build/vet, go test ./... (19 packages),
   golangci-lint 0 issues on hunt, tools/mobius_e2e.sh E2E_OK.
+
+- 2026-09-10: the broken UserInfo benchmark fixed (round 1,
+  feature/proxy-server, perf-and-coverage). The bench fixture
+  buildUserInfoPayload stopped after the level/exp block and the
+  bench failed with EOF at the load field - a stale fixture from
+  before the paperdoll and speed fields were added to the parser.
+  Now the fixture builds a complete packet matching the wire format
+  the TestParseUserInfoPacket test already covers (weapon flag, 15
+  paperdoll object ids, the skipped stats trail, run/walk speeds,
+  the swim/fly speed trail, the move multiplier). The bench now
+  runs: 532 ns/op, 304 B/op, 5 allocs/op - the baseline for the
+  upcoming packet reader optimizations. Verified: go test
+  ./internal/swarm/packets/from_game_server/ -bench . -benchmem
+  passes, go build/vet clean.
