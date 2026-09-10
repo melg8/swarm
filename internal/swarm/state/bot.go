@@ -741,13 +741,36 @@ func (b *Bot) SetHuntingZone(cx int32, cy int32, half int32) {
 
 // SetHuntingZones publishes the hunting zone registry of the map
 // view: every zone of the region with the active marker of the zone
-// the loop hunts in.
+// the loop hunts in. A repeated identical zone set only refreshes the
+// timestamp: the hunt loop republishes on every zone state change
+// (a zone pick, a death, a demotion), but the 227 zone registry is
+// the same on most of those calls, so the defensive copy was pure
+// allocation churn (4 MB over a 3 minute fleet run with 100 bots).
 func (b *Bot) SetHuntingZones(zones []ZoneView) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if zoneViewsEqual(b.zoneViews, zones) {
+		return
+	}
 	b.zoneViews = make([]ZoneView, len(zones))
 	copy(b.zoneViews, zones)
 	b.touch()
+}
+
+// zoneViewsEqual reports whether two zone view slices are element wise
+// equal. The comparison is used by SetHuntingZones to skip the
+// defensive copy when the published zones have not changed.
+func zoneViewsEqual(a, b []ZoneView) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 // SetLoginCooldown arms the login cooldown of the supervisor: an

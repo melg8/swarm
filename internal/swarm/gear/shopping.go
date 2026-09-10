@@ -203,7 +203,7 @@ func planPurchases(
 	candidates := catalogCandidates(profile, catalog)
 	strategy := &shopStrategy{
 		level:    level,
-		floorIDs: cheapestJewelIDs(candidates),
+		floorIDs: cachedCheapestJewelIDs(profile, catalog, candidates),
 	}
 	purchases := make([]Purchase, 0, len(candidates))
 	budget := adena
@@ -372,6 +372,32 @@ func cheapestJewelIDs(candidates []purchaseCandidate) map[int32]bool {
 
 	return ids
 }
+
+// cachedCheapestJewelIDs returns the cheapest jewel IDs for the
+// catalog and profile, cached per (catalog, profile) pair. The jewel
+// IDs are derived from the (cached) candidates, so they are static
+// for a given catalog and profile - the 100 bot fleet was rebuilding
+// the same map 100 times every 5 seconds.
+func cachedCheapestJewelIDs(
+	profile Profile, catalog Catalog, candidates []purchaseCandidate,
+) map[int32]bool {
+	key := candidateCacheKey{
+		catalog: &catalog,
+		profile: profile.Name(),
+		taxHash: catalogTaxHash(catalog),
+	}
+	if cached, ok := jewelIDCache.Load(key); ok {
+		return cached.(map[int32]bool)
+	}
+	ids := cheapestJewelIDs(candidates)
+	jewelIDCache.Store(key, ids)
+
+	return ids
+}
+
+// jewelIDCache holds the precomputed cheapest jewel IDs per (catalog,
+// profile) pair, paralleling candidateCache.
+var jewelIDCache sync.Map
 
 // bestWeaponValue resolves the value per adena of the best strict
 // weapon upgrade against the walked paperdoll: the weapon phase buys

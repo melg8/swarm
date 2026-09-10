@@ -3238,3 +3238,27 @@ name the variant number that best fits the real bot UI.
   encode sweep path. The BenchmarkFleetE2EEngageScanSweep improved
   from 64201 ns/op to 52072 ns/op (19 percent faster). Verified: go
   build/vet, go test ./... (19 packages), golangci-lint 0 issues.
+
+- 2026-09-10: the third fleet profiling round - SetHuntingZones dedup
+  and cheapestJewelIDs cache (round 9, feature/proxy-server,
+  perf-and-coverage). Re-ran the live 100 bot fleet with memory
+  profiling after round 8. The remaining hotspots were:
+  SetHuntingZones 4.08 MB (copied 227 ZoneView entries on every zone
+  state change even when nothing changed) and cheapestJewelIDs
+  (rebuilt the jewel floor map from the cached candidates every 5
+  seconds per bot).
+
+  Two optimizations applied:
+  1. SetHuntingZones dedup: the published zones are compared element
+     wise with the stored ones, and the defensive copy is skipped when
+     nothing changed. The hunt loop republishes on every zone state
+     change (a zone pick, a death, a demotion), but the 227 zone
+     registry is the same on most of those calls.
+  2. cachedCheapestJewelIDs: the cheapest jewel IDs are derived from
+     the (cached) candidates, so they are cached per (catalog, profile)
+     pair in a sync.Map paralleling candidateCache. The 100 bot fleet
+     now builds the jewel floor map once per (catalog, profile) pair
+     instead of 100 times every 5 seconds.
+
+  Verified: go build/vet, go test ./... (19 packages), golangci-lint
+  0 issues on the touched packages.
