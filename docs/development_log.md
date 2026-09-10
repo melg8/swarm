@@ -2642,3 +2642,112 @@ picked up regardless.
   stopped with a hard kill (the SIGINT sandbox pitfall), the
   shutdown path itself is untouched by this round and stays covered
   by tools/mobius_e2e.sh on the Linux deployments.
+
+## Round 46: the relogin ground loop - the leaked fleet claim and the aggro-aware movement (2026-09-10)
+
+User report (2026-09-10, Russian): the bot often runs to a hunting
+ground THROUGH aggressive mobs, arrives with the train, resets it with
+the emergency relogin - and the fresh session then walks straight to
+the NEXT ground, ignoring the one it just arrived at (the user's
+hypothesis: the mobs are invisible at the relogin moment). Plus the
+feature request: teach the bot to move from A to B AROUND aggressive
+mobs at a safe distance whenever they are not the walked-to target -
+between the grounds, on the town runs both ways, and while already
+fighting (stepping clear of a potential second opponent beats the pile
+up logout of the real one).
+
+### Root causes
+
+- The fleet occupancy claim of the hunted spot LEAKED on every session
+  death: `spotHunter.leave` only ran inside `apply` on a LIVE ground
+  switch, but `runBot` builds a fresh `Loop` (and a fresh
+  `spotHunter`) per session - nothing released the claim of the dead
+  loop. Every emergency relogin left one more ghost hunter in the
+  process wide `globalSpotHub`, and the occupancy division of the
+  picker halved the score of the standing ground with each cycle: the
+  fresh pick after the relogin preferred the neighbor ground, the
+  walk there pulled another train, the next relogin leaked another
+  claim - the reported "goes to the next zone right after the
+  relogin" loop, compounding with every aggro reset. The user's
+  invisible-mobs hypothesis pointed at the wrong layer: the relogin
+  knownlist rebuild costs seconds, but the wait-or-move economy paces
+  its emptiness reading in tens of seconds - the economy itself was
+  sound, its occupancy input was poisoned.
+- The fresh session re-contested the whole spot economy instead of
+  resuming the ground under its feet: the panic run of the emergency
+  logout ends a few hundred units off the anchor the character had
+  just walked to, and with the ghost claim discount the scored pick
+  had every reason to walk away.
+- Nothing watched the aggressive camps on the transit lines: the
+  Mobius AttackableAI attacks a passing player on sight inside the
+  effective aggro radius (the xml value clamped at the server wide
+  MaxAggroRange, 450 on this deployment) with a line of sight, so
+  every straight transit through a camp collected a chaser - the
+  train that forced the pile up run and the relogin in the first
+  place. And nothing watched the SECOND aggressive mob closing on a
+  running fight before its trigger fired - two attackers is exactly
+  the pile up threshold.
+
+### Fix
+
+- `Loop.Run` defers `releaseSpotClaim` (`spotHunter.releaseClaim`):
+  the claim lives exactly as long as the loop goroutine - the
+  emergency logout, a server restart and a lost connection all hand
+  it back through the same exit.
+- The first pick of a fresh session (`spotEvaluate`) checks
+  `standingGround` before the scored contest: a character entering
+  the world inside a spot circle (the panic run endpoint sits on the
+  ground it just walked to) resumes THAT ground while it stays inside
+  the level window; a relogin between the grounds still falls to the
+  scored pick, and an outgrown ground never resumes.
+- `state.AppendAggroThreats` scans the world for exactly the mobs
+  whose on-sight trigger could fire on a passing character: living
+  IDLE aggressive npcs at their projected positions (the scan skips
+  the chasers - the flee machinery owns them - and the busy fighters
+  of somebody else's fight). The callers hand reused buffers in, the
+  scan allocates nothing.
+- `hunt/loop_avoid.go` deflects one walk leg at a time onto the
+  tangent of the first threat circle its straight line would enter
+  (the effective aggro range plus a 150 unit clearance); a character
+  already inside the margin circle side-steps straight out first - no
+  tangent exists from inside. The walk followers re-issue their
+  requests every period from the live position, so the chained
+  tangent legs arc the route around the camp while the waypoint plan
+  stays untouched. Every autonomous transit walk passes through it
+  (the town trip follower, the direct zone return leg - the
+  inter-ground walks of the spot economy ride the same paths); the
+  mobs standing at the destination stay exempt (the ground the walk
+  deliberately enters is its content, the engage phase answers the
+  entry radius).
+- `avoidImpendingAdd` (the SelfFighting branch of the engage): an
+  idle aggressive mob inside its trigger band around a FIGHTING
+  character draws one paced reposition step (300 units straight away
+  from the deepest-band threat, every 4 s) that owns the movement for
+  its 2 s window - the forced attack re-request waits the window out
+  (the server interrupts a running walk on the attack order, and the
+  add would meet the character right back where it stood), the melee
+  target follows the stepping character, the swings resume, and the
+  distance to the add opened before its trigger fired. The leash
+  outranks the add (a step leaving the square is skipped) and another
+  deck never counts (the 3D gate).
+
+### Verification
+
+- go build, go vet, the full go test suite, gofumpt clean,
+  golangci-lint with zero new findings, -race green on the hunt and
+  state packages.
+- The new tests: `spot_relogin_test.go` (the claim released on the
+  session end, the reported scene end to end, the off-ground scored
+  pick, the outgrown ground, the overlap tie) and `loop_avoid_test.go`
+  (the core deflection, the tangent graze, the receding-horizon
+  simulation that never dips inside the raw trigger circle and still
+  passes the camp, the filters, the destination exemption, the other
+  deck gate, the projected position of a moving camp, the combat step
+  suite).
+- The live stack validation through `mobius_e2e.sh` (the GitLab
+  git-clone throttle of this sandbox broke the stock deploy at the
+  116K hang; the official GitLab API archive of the same repository -
+  the deploy script's own fallback channel - unblocked it): E2E_OK
+  with `BOT_FLAGS=-hunt`, the bot anchored the spot economy, walked
+  the pathfound return through the steering hooks and farmed the
+  keltir ground.

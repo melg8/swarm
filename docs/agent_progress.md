@@ -69,44 +69,33 @@ beats the pile up logout of the real one).
   its score), the off-ground scored pick, the outgrown ground never
   resumed, the nearest-anchor tie break of overlapping circles.
 
-### Status: in progress
+### Status: done (2026-09-10)
 
-- Commit 1 done: the claim leak fix + the standing-ground resume.
-- Commit 2 done: the aggro threat scan (`state.AppendAggroThreats` -
-  the living IDLE aggressive mobs at their projected positions, the
-  chasers and busy fighters excluded) and the receding-horizon leg
-  steering (`hunt/loop_avoid.go`): every autonomous transit walk (the
-  town trip follower `walkTownWaypoints`, the direct zone return leg
-  `walkZoneLeg` - the inter-ground walks of the spot economy ride the
-  same paths) deflects its leg onto the tangent of the first threat
-  circle its straight line would enter (the effective aggro range
-  plus a 150 unit clearance; a character already inside the margin
-  circle side-steps straight out first - no tangent exists from
-  inside). The mobs standing at the destination of the walk stay
-  exempt (the ground the walk deliberately enters is its content),
-  the movement projections feed the scan so the slow movers crossing
-  the line bend it too, and the diagnostic log names the camp once
-  per 5 s while a corridor bends.
-- Commit 3 done: the fighting character steps clear of an impending
-  aggressive add (`avoidImpendingAdd` in the SelfFighting branch of
-  the engage): an idle aggressive mob inside its trigger band (the
-  aggro range plus a 150 unit warning margin) around a FIGHTING
-  character draws one paced reposition step (300 units straight away,
-  every 4 s) that owns the movement for its 2 s window - the forced
-  attack re-request of the engage waits it out (the server interrupts
-  a walk on the attack order), the melee target follows the stepping
-  character and the swings resume, but the distance to the add opened
-  before its on-sight trigger fired. The leash outranks the add (a
-  step leaving the square is skipped), another deck never counts (the
-  3D gate), and the deepest-band threat steps first.
+- Three commits pushed: 3aa894c (the claim leak fix + the
+  standing-ground resume), 1143eb9 (the transit walk steering),
+  f8445e7 (the impending-add step of the running fight). The
+  permanent root-cause history lives in docs/development_log.md
+  Round 46.
+- Verify loop: go build, go vet, the full go test suite, gofumpt
+  clean, golangci-lint with zero new findings (the 26 pre-existing
+  findings of the branch reproduce on the untouched tree), -race
+  green on the hunt and state packages.
 - The live stack: the GitLab git-clone throttle of this sandbox broke
   the stock deploy (the clone hangs at 116K); the official API archive
   of the same repository unblocked it (the script's own fallback
   channel b), the stack then compiled and started - login 2106 up,
   75 tables loaded - but the sandbox reaps every background process
   once the invoking shell exits (the documented restricted-shell note
-  of mobius_start.sh), so the live validation runs through
-  mobius_e2e.sh in a single invocation.
+  of mobius_start.sh), so the live validation ran through
+  mobius_e2e.sh in a single invocation: E2E_OK with BOT_FLAGS=-hunt
+  (90 s), the spot anchoring, the pathfound return through the
+  steering hooks and the keltir farm cycle all observed in the bot
+  log.
+- The user-side check on the real C1 client stays the project
+  workflow: watch a bot that relogins through the emergency logout
+  resume the same ground (the "resuming the spot ... - the login
+  landed on its ground" log line) and watch a transit walk bend
+  around an aggressive camp (the "steering the walk around" line).
 
 ## Active task: the web map social, hover and fleet layers - the aggro truth of the server
 
