@@ -1,7 +1,7 @@
 # swarm documentation index
 
 <!--
-SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com
+SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
 
 SPDX-License-Identifier: MIT
 -->
@@ -59,5 +59,6 @@ Data folder notes: `data/geodata/Readme.txt` (geodata provenance) and
 `data/icons/Readme.txt` (icon pack provenance).
 
 The README screenshots live in [images/](images/) - captured from the
-live local stack (1600x900 headless browser against a running
-`-hunt -web` session).
+live local stack (a headless browser against a running `-hunt -bots 3 -web`
+session) and cropped to the interface region each feature shows, so the
+panels stay readable at the width the README renders at.
