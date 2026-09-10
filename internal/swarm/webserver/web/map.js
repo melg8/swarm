@@ -865,7 +865,11 @@ const MapView = {
     const zones = this.lastSnap.huntingZones;
     if (Array.isArray(zones) && zones.length > 0) {
       for (const zone of zones) {
-        this.drawHuntingZoneRect(ctx, zone);
+        if (zone.kind === "spot") {
+          this.drawHuntingSpotCircle(ctx, zone);
+        } else {
+          this.drawHuntingZoneRect(ctx, zone);
+        }
       }
       return;
     }
@@ -876,6 +880,97 @@ const MapView = {
       name: "hunting zone", minLevel: 0, maxLevel: 0, minGear: 0,
       active: true,
     });
+  },
+
+  // drawHuntingSpotCircle draws one hunting spot of the spot
+  // anchored registry: the visibility bounded circle of the ground
+  // (the radius), the anchor dot, the kill centroid cross and the
+  // economy labels - the respawn window of the ground, the measured
+  // adena per minute, the death heat and the next respawn ETA of the
+  // active spot. The death heat tints the fill red (a ground that
+  // killed the character recently reads hot), the occupancy dimmed
+  // grounds carry the fleet marker.
+  drawHuntingSpotCircle(ctx, zone) {
+    const active = zone.active;
+    const center = this.worldToScreen(zone.cx, zone.cy);
+    const radius = zone.radius * this.scale;
+    if (center.x + radius < 0 || center.y + radius < 0
+      || center.x - radius > this.canvas.clientWidth
+      || center.y - radius > this.canvas.clientHeight) {
+      return;
+    }
+    const drawLabel = active || radius >= 42;
+    let label = zone.name;
+    if (zone.maxLevel > 0) {
+      label += " · L" + zone.minLevel + "-" + zone.maxLevel;
+    }
+    if (zone.respawnMaxSec > 0) {
+      label += " · resp " + zone.respawnMinSec + "-"
+        + zone.respawnMaxSec + "s";
+    }
+    if (zone.occupancy > 1) {
+      label += " · " + zone.occupancy + " bots";
+    }
+    if (zone.deaths > 0) {
+      label += " · " + zone.deaths +
+        (zone.deaths === 1 ? " death" : " deaths");
+    }
+    if (zone.adenaPerMin > 0) {
+      label += " · " + Math.round(zone.adenaPerMin) + "a/min";
+    }
+    if (active) {
+      label += " · ACTIVE";
+      if (zone.nextRespawnSec >= 0) {
+        label += " · next " + zone.nextRespawnSec + "s";
+      }
+    }
+    ctx.save();
+    const heat = Math.min(0.55, (zone.deathHeat || 0) * 0.35);
+    const stroke = active ? "#f9ab00" : zoneFutureColor;
+    ctx.globalAlpha = active ? 0.95 : 0.75;
+    ctx.lineWidth = active ? 2.5 : 1.5;
+    ctx.setLineDash([10, 6]);
+    ctx.strokeStyle = stroke;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (heat > 0.02) {
+      // The death heat fill: the warmer the ground, the redder.
+      ctx.fillStyle = "rgba(217, 48, 37, " + heat.toFixed(2) + ")";
+      ctx.fill();
+    } else if (!active) {
+      ctx.fillStyle = zoneFutureFill;
+      ctx.globalAlpha = 0.35;
+      ctx.fill();
+    }
+    // The anchor dot of the spot.
+    ctx.fillStyle = stroke;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, active ? 4 : 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    // The kill centroid cross (where the kills actually happen).
+    if (zone.killX || zone.killY) {
+      const kill = this.worldToScreen(zone.killX, zone.killY);
+      ctx.strokeStyle = "#e37400";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(kill.x - 5, kill.y - 5);
+      ctx.lineTo(kill.x + 5, kill.y + 5);
+      ctx.moveTo(kill.x + 5, kill.y - 5);
+      ctx.lineTo(kill.x - 5, kill.y + 5);
+      ctx.stroke();
+    }
+    if (drawLabel) {
+      ctx.font = "600 10.5px " + (getComputedStyle(document.documentElement)
+        .getPropertyValue("--sans").trim() || "sans-serif");
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
+      ctx.strokeText(label, center.x + 8, center.y - 8);
+      ctx.fillStyle = stroke;
+      ctx.fillText(label, center.x + 8, center.y - 8);
+    }
+    ctx.restore();
   },
 
   // drawHuntingZoneRect draws one hunting zone square: the active

@@ -22,7 +22,7 @@ the area you are about to touch, not all of them.
 
 | Document | Area |
 | --- | --- |
-| [hunting.md](hunting.md) | The autonomous hunt: hunt loop, combat safety, blind engage recovery, multi-zone hunting, auto equipment, shop strategy execution, town trips, deleveling, live-validated facts |
+| [hunting.md](hunting.md) | The autonomous hunt: hunt loop, combat safety, blind engage recovery, spot-anchored hunting, multi-zone hunting, auto equipment, shop strategy execution, town trips, deleveling, live-validated facts |
 | [shopping_strategy.md](shopping_strategy.md) | The shop strategy reasoning, the prices, the purchase phases and the was/is level journey comparison |
 | [pathfinding.md](pathfinding.md) | The geodata pathfinder: format, engine, deviations from the original, test UI, benchmarks, geodata visualization |
 | [navigation_analysis.md](navigation_analysis.md) | The measured gaps on the road to universal A to B world navigation |
@@ -41,12 +41,12 @@ the area you are about to touch, not all of them.
 | [project_description.md](project_description.md) | The long term design goals and scalability ideas |
 | [development_log.md](development_log.md) | The permanent record of the development rounds with root cause analyses |
 | [quality_review_and_agent_prompts.md](quality_review_and_agent_prompts.md) | The 2026-09-07 architecture review and improvement program (historical snapshot) |
+| [hunting_system_redesign.md](hunting_system_redesign.md) | The spot-anchored farming research behind the implemented spot mode: respawn awareness, efficiency scoring, the zone visibility measurements (figures in [hunt_analysis/](hunt_analysis/)) |
 
 ## Pending redesigns (not implemented yet)
 
 | Document | Area |
 | --- | --- |
-| [hunting_system_redesign.md](hunting_system_redesign.md) | The spot-anchored farming research: respawn awareness, efficiency scoring, the zone visibility measurements (figures in [hunt_analysis/](hunt_analysis/)) |
 | [webui_modernization_proposal.md](webui_modernization_proposal.md) | The web UI modernization proposal (awaiting user approval) |
 
 ## The working process
