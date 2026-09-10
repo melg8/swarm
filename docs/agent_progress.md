@@ -11,6 +11,83 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the web map social, hover and fleet layers - the aggro truth of the server
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user request (2026-09-10, Russian): (1) the hunting zone names
+show only on the map hover; (2) hovering a zone of the selection list
+focuses the map on it, highlights it and shows its name; (3) the kill
+crosses must cover the whole map and all bots instead of vanishing on
+every bot switch; (4) find out why the map sometimes flashes white
+(the loaded base disappearing for a microsecond, follow mode on);
+(5) verify the exact monster aggro radii against the server (the map
+circles looked exaggerated); (6) draw the monster sociality - the clan
+assist links between neighbors, with warning links while they only
+approach the range.
+
+### Root causes (researched from the Mobius C1 sources)
+
+- The aggro radii: the xml ai data carries aggroRange 1000 for most
+  monsters, but the Mobius C1 NpcTemplate constructor clamps every
+  range at MaxAggroRange (dist/game/config/NPC.ini ships 450 against
+  the L2J default 1500) BEFORE the AttackableAI on-sight check
+  (isInsideRadius3D against getAggroRange, a GeoEngine line of sight
+  on top, and a 4-8 s blind window after spawn through rollGlobalAggro
+  counting _globalAggro up from -(Rnd.get(5)+4)). The map drew the raw
+  xml value - more than 2x the real trigger distance.
+- The white flash: drawMapBackground skipped tiles whose entry was
+  still loading with NO fallback to the coarser pyramid levels (the
+  ancestor walk only ran for 404-missing tiles). In follow mode the
+  camera pans with the walking bot, new blocks scroll into the view,
+  and every still-loading block left a blank strip reading as the page
+  background until the fine image landed.
+
+### Implementation
+
+- npcdata.NPCAggroRange caps at the server clamp (450): the tooltips
+  and the aggro circles now carry the number the server acts on.
+- The snapshot objects carry `clanHelpRange` and the clan `clanMask`
+  (a decimal string - the ALL bit exceeds the JavaScript safe integer
+  range, the map parses it with BigInt once per snapshot).
+- The map: zone names light up only under the pointer (map hover or
+  the list focus), the hovered/focused ground takes the highlight
+  stroke and the brighter fill; `focusZone`/`blurZone` pin the camera
+  on a list hover and restore it on leave; `drawSocialLinks` connects
+  the same-clan npcs inside their clan help range with solid teal
+  lines and the approaching pairs (within 1.25x) with dashed amber
+  warnings; `drawKillMarks` paints the fleet kill crosses.
+- The fleet kills: the hunt loop publishes its kill ring with the spot
+  view (`Bot.SetKillMarks`), the registry merges the rings of all bots
+  (`Registry.FleetKillMarks`, oldest first, capped at 400) and the web
+  app polls `/api/fleet/kills` with the bot list - the crosses live in
+  the map layer and survive the bot switches.
+- The tile flash: `mapTileAncestor`/`geoTileAncestor` now return the
+  finest READY pyramid entry - the loaded coarse ancestors paint the
+  block while the fine tile streams, so a panning camera never bares
+  the background.
+
+### Status: done (2026-09-10)
+
+- Verify loop: go build ./..., go vet, go test ./... (all packages
+  green), gofumpt clean; the node repro harnesses
+  `tools/repro_map_render.js` (the hunting zone scenario now pins the
+  hover-only labels) and the new `tools/repro_zone_hover.js` (five
+  scenarios: the list focus camera, the fleet crosses with the age
+  fade, the social link geometry, the tile ancestor fallback, the spot
+  hover) all pass; a headless browser check against
+  `tools/webui_preview_server.js` (the real web dir with stub bot
+  APIs) confirmed the rendering by pixel sampling: the aggro ring, the
+  kill crosses, the teal social links, the hover label of the spot and
+  the red coarse-ancestor fallback while the fine tile streams.
+- The live C1 stack stays unavailable from this sandbox (GitLab 403):
+  the Mobius C1 sources were fetched through the GitLab web raw
+  endpoints for the research above.
+
 ## Active task: the spot-anchored hunting implementation
 
 Started: 2026-09-10. Branch: `feature/proxy-server` (implemented on

@@ -100,7 +100,12 @@ colors from the same variables).
   viewport through the usual world to screen transform (follow and pan
   included) and lazy loads them via the static file server; a tile
   missing from the source set falls back to the closest existing
-  pyramid level of the same block stretched over the tile rect; the
+  pyramid level of the same block stretched over the tile rect, and a
+  tile still streaming falls back the same way - the ancestor walk of
+  `mapTileAncestor` returns the finest READY level, so the coarse
+  ancestors keep the ground painted while the fine tile loads and a
+  panning camera (the follow mode of a walking bot) never flashes the
+  bare background for the loading gap; the
   grid, the zone square, the units and the links draw on top.
 
 ## Map rendering
@@ -142,20 +147,54 @@ colors from the same variables).
 - Zone drawing: the map draws every zone (active amber, the future
   grounds in a bright soft blue with a light fill - the demonstration
   of where the bot will hunt next, dimmed hints do not read; demoted
-  bands red - labels only when the square is big enough on screen; the
+  bands red - the names read only while the pointer rests inside the
+  ground: a mousemove over a spot circle or a legacy square lights its
+  label with the economy suffixes and the highlight stroke, the far
+  zoom stays a clean shape field instead of a smeared label blob; the
   `hunt zones` row of the map toolbar view dropdown hides the whole
   layer like the targets and map background toggles) and the floating
   collapsible zone panel of the map (bottom right corner, collapsed by
   default, the count chip carries the registry total; the left sidebar
   lists bots only) carries the death counts and switches zones manually
   (the `zone` command, index in the Count field; the override holds
-  until the character outgrows the band or dies it out).
+  until the character outgrows the band or dies it out). Hovering a
+  list entry focuses the map on its ground (`focusZone` of
+  `web/map.js`): the camera pins to the zone center, the zoom fits the
+  ground span, the zone highlights with its name, and leaving the item
+  restores the camera the user had (the follow flag, the pan anchor,
+  the zoom).
 - Threat data: the npc level, `aggroRange` and `isAggressive` ai flags
   come from the generated `internal/swarm/npcdata` maps (the C1 data
   pack marks every monster `isAggressive=false`: they only defend). The
-  map draws the aggression radius of every living aggressive mob as a
-  dashed circle around its drawn position (amber idle, red once it
-  fights; the `aggro` toolbar checkbox hides the layer).
+  resolved aggro range caps at the server wide MaxAggroRange 450 of the
+  Mobius C1 NPC.ini (the NpcTemplate constructor clamps every xml
+  aggroRange, most monsters carry 1000, down to it before the
+  AttackableAI on-sight check ever runs), so the circles draw the
+  radius the server actually attacks from. The map draws the aggression
+  radius of every living aggressive mob as a dashed circle around its
+  drawn position (amber idle, red once it fights; the `aggro` toolbar
+  checkbox hides the layer).
+- Social links: every living npc carries its ai `clanHelpRange` and
+  clan bitmask in the snapshot (`clanMask` rides the wire as a decimal
+  string - the ALL clan bit of the top exceeds the safe integer range
+  of JavaScript, the map parses it with BigInt once per snapshot).
+  Two npcs of the same clan inside their clan help range connect with
+  a solid teal line (attacking one pulls the mate - the Mobius
+  notifyActionAttacked clan call walks the attackables within
+  clanHelpRange plus the collision radius), a pair that only approaches
+  the range (within 1.25x of it) connects with a dashed amber warning
+  line, so a spreading pack warns before it actually links. The links
+  connect the units, never radius circles - a pack reads as a pack. The
+  `social` toolbar checkbox hides the layer; the tooltips carry the
+  clan help range of the hovered npc.
+- Fleet kill crosses: every recent kill of every bot draws as a small
+  orange cross that melts away over five minutes. The marks come from
+  `/api/fleet/kills` (the hunt loop publishes its kill ring to the bot
+  state, `Bot.SetKillMarks`; the registry merges the rings of all bots
+  oldest first, capped at 400) which the web app polls with the bot
+  list - the crosses live in the map layer, so they survive the bot
+  switches of the view (the per zone kill centroid of the observed bot
+  alone did not). The `kills` toolbar checkbox hides the layer.
 
 ## Movement interpolation (map.js projectTickwise)
 
@@ -461,7 +500,8 @@ Mobius updates.
 One compact row (a 37 px bar, never a wrapped checkbox column). The
 old `-`/`+` zoom buttons are gone - the wheel owns the zoom alone
 (cursor-anchored, `onWheel` of `web/map.js`). The layer checkboxes
-(labels, paths, zone, targets, hunt zones, aggro, map background) fold
+(labels, paths, zone, targets, hunt zones, aggro, social, kills, map
+background) fold
 into a `view` dropdown (`web/app.js` `initViewMenu`): the button
 toggles the pop under it, a click anywhere else or Escape closes it,
 clicks inside the pop stop their propagation so several toggles survive
