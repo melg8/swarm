@@ -1493,6 +1493,38 @@ the same variables).
   published (the manual-only sessions, sessions without the shop
   strategy). The
   widget checks live in `tools/repro_gear.js`.
+- Skills view and the skill learning queue: the equipment widget is
+  a two view widget - the EQUIPMENT / SKILLS mode tabs replaced the
+  static title row. The gear content stays in the flow and keeps
+  sizing the panel, the skills view is an absolutely positioned
+  overlay of exactly that area (`visibility` swap, never `display
+  none` - the panel must not change its dimensions), so the
+  requirements of the task hold: the widget never grows. The skills
+  view carries the ACTIVE / PASSIVE filter tabs, the learned skill
+  grid (six 36px columns like the bag, one keyed cell per skill
+  with the icon and the green level badge - the icons never
+  re-decode, `SkillCells` of `web/app.js`), the pinned sp/next foot
+  (the SP wallet and the head of the learning queue); the mode and
+  the filter persist in localStorage. The data comes from the
+  SkillList packets (0x6D, `state.Bot.SetSkills`) enriched with the
+  generated skill dictionary (name, icon, passive flag). The skill
+  learning queue is a second flyout on the left edge (the triangle
+  tab below the shop tab; the flyout docks under the shop flyout
+  while it is out): one keyed row per remaining lesson of the class
+  tree (`snapshot.skillPlan`, at most 256 entries) with the icon,
+  the name with the learned level, the warrior priority category
+  (attack power / defense / other, from the effect stats of the
+  Mobius skill definitions), the unlock level and the SP cost with
+  the missing SP; the head summary and the pinned sp/need/save foot
+  mirror the shop queue. The queue order is the warrior priority:
+  the physical weapon attack power lessons first (the strikes and
+  the masteries), the defense lessons second, everything else
+  last; within a category by the unlock level. The learning
+  function itself is NOT implemented by design - the queue only
+  shows the planned order. The skill dictionary regenerates with
+  `tools/generate_skill_trees.sh` (skill stats + class trees of the
+  Mobius C1 datapack into `npcdata/skill_trees.go`). The widget
+  checks live in `tools/repro_gear.js`.
 - Map toolbar: one compact row (a 37 px bar, never a wrapped checkbox
   column). The old `-`/`+` zoom buttons are gone - the wheel owns the
   zoom alone (cursor-anchored, `onWheel` of `web/map.js`). The layer

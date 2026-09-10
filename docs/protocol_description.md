@@ -324,6 +324,19 @@ for before ever sending the opposite toggle.
 | 13 | 4 | Y |
 | 17 | 4 | Z |
 
+### SkillList (0x6D)
+
+The full learned skill list of the character (`SkillList.writeImpl`):
+sent on entering the world and after every skill learn. The bot parses
+it into the tracker skill map (the web UI renders the learned skills
+of the equipment widget and computes the learning queue from it).
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x6D |
+| 1 | 4 | Skill count |
+| 5 | 12 | Per skill: passive flag (0/1), level, skill id |
+
 ### GetItem (0x17) position semantics
 
 `GetItem` carries the position of the ITEM, not of the picker

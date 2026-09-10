@@ -123,6 +123,12 @@ tasks:
     cmds:
       - bash tools/generate_system_messages.sh
 
+  generate:skills:
+    desc: Regenerates the skill tree dictionary from the Mobius sources
+    aliases: [genskills]
+    cmds:
+      - bash tools/generate_skill_trees.sh
+
   tidy:
     desc: Runs go mod tidy
     cmds:

@@ -3374,3 +3374,19 @@ name the variant number that best fits the real bot UI.
   parsed (Lucky), the queue shows the 40 remaining lessons ordered
   attack power (31) -> defense (6) -> other (3) with the SP costs and
   the browser check confirmed the layout (no overlap, no overflow).
+
+- 2026-09-10: atomic commit 4 of the skills-display task - the
+  documentation. AGENTS.md documents the two view equipment widget
+  (the mode tabs, the overlay sizing rule, the learned grid, the
+  sp/next foot) and the skill learning queue flyout with the warrior
+  priority order and the regeneration entry of the skill dictionary;
+  docs/protocol_description.md documents the SkillList (0x6D) packet
+  (the byte layout and the Mobius class link); Taskfile.yml gains the
+  generate:skills task (tools/generate_skill_trees.sh). TASK
+  COMPLETE: the equipment window is universal (EQUIPMENT / SKILLS
+  tabs, no widget resize), the learned skills render six per row
+  with icons in the ACTIVE / PASSIVE tabs, the left flyout shows the
+  learning queue with the SP costs in the shop queue style, and the
+  warrior order (attack power -> defense -> the rest) comes from the
+  Mobius skill effect stats. The learning function itself is display
+  only, as requested.
