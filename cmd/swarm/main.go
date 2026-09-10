@@ -16,7 +16,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -92,6 +94,7 @@ type config struct {
 	proxyLogin    string
 	proxyGame     string
 	proxyLog      string
+	bots          int
 }
 
 func parseFlags() config {
@@ -111,6 +114,7 @@ func parseFlags() config {
 		proxyLogin:    "",
 		proxyGame:     "",
 		proxyLog:      "",
+		bots:          1,
 	}
 	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
 		"login server address")
@@ -140,6 +144,18 @@ func parseFlags() config {
 	flag.UintVar(&cfg.maxPassable, "max-passable",
 		uint(pathfind.DefaultMaxPassableHeight),
 		"maximum walkable height difference between neighbouring cells")
+	flag.IntVar(&cfg.bots, "bots", 1,
+		"number of concurrent bot sessions to launch in one process. "+
+			"When greater than 1, the bots share one web interface "+
+			"(the sidebar lists every bot) and one proxy (the web UI "+
+			"selects which bot a connecting C1 client attaches to). "+
+			"The account and char name of -account/-char become the "+
+			"base: bot 1 keeps them as-is, bot 2 appends '2', bot 3 "+
+			"'3' and so on (test1, test2, test3...). All bots are "+
+			"elven fighters, all share the same -login, -hunt, "+
+			"-geodata and proxy settings. The server auto-creates "+
+			"missing accounts, so the first run of -bots 3 makes "+
+			"test1, test2, test3 on the fly.")
 	flag.Parse()
 
 	return cfg
@@ -413,6 +429,12 @@ func main() {
 		return
 	}
 
+	if cfg.bots > 1 {
+		runFleet(cfg)
+
+		return
+	}
+
 	log.Println("Starting swarm bot for account " + cfg.account)
 	// The identity line pairs every bot log with the exact code state
 	// - the state dump of the web UI carries the same line.
@@ -456,6 +478,109 @@ func main() {
 	shutdownWebInterface(web)
 	shutdownProxy(proxyServer)
 	log.Println("Bot finished")
+}
+
+// runFleet launches multiple bot sessions in one process: each bot gets
+// its own account (the base -account/-char name plus the 1-based index,
+// so -account test1 -bots 3 makes test1, test2, test3), its own tracker
+// in a shared registry, and its own runBotForever goroutine. All bots
+// share one web interface (the sidebar lists every bot, clicking
+// switches the observed one), one proxy (the web UI selects which bot a
+// connecting C1 client attaches to) and one geodata engine. The process
+// stays alive until every bot supervisor returns (SIGINT/SIGTERM stops
+// them all through the shared context).
+func runFleet(cfg config) {
+	log.Printf("Starting swarm fleet of %d bots", cfg.bots)
+	log.Printf("Build: %s", version.Identity())
+
+	registry := state.NewRegistry()
+	trackers := make([]*state.Bot, 0, cfg.bots)
+	for i := range cfg.bots {
+		account := fleetAccountName(cfg.account, i)
+		tracker := state.NewBot(account)
+		registry.Add(tracker)
+		trackers = append(trackers, tracker)
+	}
+	log.Printf("Fleet accounts: %s", fleetAccountList(cfg.account, cfg.bots))
+
+	var proxyServer *proxy.Server
+	if cfg.proxy {
+		proxyServer = startProxy(cfg)
+	}
+
+	web := startWebInterface(cfg, registry, nil, proxyServer)
+
+	// The geodata engine is shared by all bots: the town trips and the
+	// manual long walks of every session read through the same LRU
+	// cache of parsed regions.
+	var engine *pathfind.Engine
+	dir := cfg.geodataDir
+	if dir == "" {
+		dir = detectGeodataDir()
+	}
+	engine = pathfind.NewEngine(dir)
+	engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+	stats := engine.Stats()
+	if stats.HasData {
+		log.Printf("Geodata ready: %d region files in %s, town trips "+
+			"and manual long walks enabled", stats.RegionFiles, stats.Dir)
+	} else {
+		log.Println("No geodata files found in " + stats.Dir +
+			", the bot hunts without town trips")
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+
+	// Launch every bot supervisor in its own goroutine. A per-bot
+	// config carries the derived account and char name; the rest of
+	// the flags (login, hunt, geodata, proxy) stay shared.
+	var wg sync.WaitGroup
+	for i, tracker := range trackers {
+		botCfg := cfg
+		botCfg.account = fleetAccountName(cfg.account, i)
+		botCfg.charName = botCfg.account
+		wg.Add(1)
+		go func(c config, t *state.Bot) {
+			defer wg.Done()
+			runBotForever(ctx, c, t, engine, proxyServer)
+		}(botCfg, tracker)
+	}
+	wg.Wait()
+	stop()
+	shutdownWebInterface(web)
+	shutdownProxy(proxyServer)
+	log.Println("Fleet finished")
+}
+
+// fleetAccountName derives the account name of bot i from the base
+// name. The base name (cfg.account, default "test1") is used as-is for
+// the first bot; subsequent bots get the base stripped of its trailing
+// digits plus the 1-based index (test1 -> test2, test3, ...). A base
+// without a trailing digit just appends the index (bot -> bot2, bot3).
+func fleetAccountName(base string, i int) string {
+	if i == 0 {
+		return base
+	}
+	stripped := strings.TrimRight(base, "0123456789")
+
+	return stripped + strconv.Itoa(i+1)
+}
+
+// fleetAccountList builds the comma separated account list for the
+// startup log line.
+func fleetAccountList(base string, count int) string {
+	if count <= 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString(fleetAccountName(base, 0))
+	for i := 1; i < count; i++ {
+		sb.WriteString(", ")
+		sb.WriteString(fleetAccountName(base, i))
+	}
+
+	return sb.String()
 }
 
 // startProxy builds and runs the client proxy with its own log file so

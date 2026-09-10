@@ -3312,3 +3312,25 @@ name the variant number that best fits the real bot UI.
   untouched. Acceptance: repro_gear.js green with the new checks, go
   test/lint green, the queue of an elven fighter shows attack power
   skills first.
+- 2026-09-10: the -bots N multi-bot launch flag (round 11,
+  feature/proxy-server). Added a -bots flag to cmd/swarm that launches
+  N concurrent bot sessions in one process. Each bot gets its own
+  account (the base -account name plus the 1-based index: test1 ->
+  test2, test3, ...), its own tracker in a shared registry, and its
+  own runBotForever goroutine. All bots share one web interface (the
+  sidebar lists every bot, clicking switches the observed one), one
+  proxy (the web UI selects which bot a connecting C1 client attaches
+  to) and one geodata engine. The server auto-creates missing
+  accounts, so the first run of -bots 3 makes test1, test2, test3 on
+  the fly.
+
+  Usage: go run ./cmd/swarm -hunt -proxy -login 127.0.0.3:2106 -web
+  127.0.0.1:8081 -bots 3
+
+  Verified live: launched -bots 2 against the deployed stack, both
+  test1 and test2 created as elven fighters, entered the world, and
+  started hunting (the /api/bots endpoint confirmed both online, in
+  the engage phase, fighting mobs). The initial EOF on one bot was the
+  login server flood protector (two simultaneous logins from one IP),
+  handled automatically by the reconnect backoff. go build/vet, go
+  test ./... (19 packages), golangci-lint 0 issues.
