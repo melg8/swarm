@@ -1096,6 +1096,13 @@ const MapView = {
           });
         this.drawSocialMarker(ctx, p.x, p.y, labelRadius,
           obj.socialUntilMs);
+        // The rest icon of every sitting unit, not only the observed
+        // bot: the other bots of the fleet appear as player objects of
+        // the watched bot's world, and their zZ marker must show them
+        // resting regardless of which bot the web UI focuses on.
+        if (obj.sitting) {
+          this.drawRestMarker(ctx, p.x, p.y, labelRadius);
+        }
       }
       if (showLabels && obj.name) {
         const suffix = obj.kind === "npc" && obj.level > 0
@@ -1321,19 +1328,7 @@ const MapView = {
     // The resting state of the character: a small breathing zZ over the
     // marker, matching the rest chips of the panels.
     if (c.sitting) {
-      ctx.save();
-      ctx.font = "700 " + Math.max(8, 10 * this.unitScale)
-        + "px sans-serif";
-      ctx.textAlign = "left";
-      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(performance.now() / 450);
-      const zx = p.x + selfRadius + 4 * this.unitScale;
-      const zy = p.y - selfRadius - 3 * this.unitScale;
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
-      ctx.strokeText("zZ", zx, zy);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText("zZ", zx, zy);
-      ctx.restore();
+      this.drawRestMarker(ctx, p.x, p.y, selfRadius);
     }
 
     if (document.getElementById("show-labels").checked) {
@@ -1344,6 +1339,25 @@ const MapView = {
         priority: -1
       });
     }
+  },
+
+  // drawRestMarker draws the breathing zZ over a resting unit (the
+  // own character and every observed creature that sits): the shared
+  // body of the marker, so the fleet-wide rest icons read identically.
+  drawRestMarker(ctx, x, y, radius) {
+    ctx.save();
+    ctx.font = "700 " + Math.max(8, 10 * this.unitScale)
+      + "px sans-serif";
+    ctx.textAlign = "left";
+    ctx.globalAlpha = 0.6 + 0.4 * Math.sin(performance.now() / 450);
+    const zx = x + radius + 4 * this.unitScale;
+    const zy = y - radius - 3 * this.unitScale;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
+    ctx.strokeText("zZ", zx, zy);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("zZ", zx, zy);
+    ctx.restore();
   },
 
   // drawSocialMarker draws a small fading ring above a creature that is

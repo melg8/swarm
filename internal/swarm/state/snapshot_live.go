@@ -399,6 +399,7 @@ func (b *Bot) objectSnapshotLocked(slot int, nowNano int64) ObjectSnapshot {
 		TargetID:        hot.TargetID,
 		InCombat:        hot.inCombat(nowNano),
 		Dead:            hot.Dead,
+		Sitting:         cold.Sitting,
 		Moving:          hot.Moving,
 		Running:         hot.Running,
 		Speed:           hot.effectiveSpeed(),

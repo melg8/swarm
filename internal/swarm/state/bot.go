@@ -221,9 +221,12 @@ type PlayerInfo struct {
 	Running         bool
 	InCombat        bool
 	Dead            bool
-	X               int32
-	Y               int32
-	Z               int32
+	// Sitting carries the wait state of the observed player: false
+	// while it stands, true while it sits (the rest icon of the map).
+	Sitting bool
+	X       int32
+	Y       int32
+	Z       int32
 }
 
 // ItemInfo carries the fields of a parsed DropItem packet.
@@ -1339,6 +1342,7 @@ func (b *Bot) ApplyPlayerInfo(info PlayerInfo) {
 	cold.CollisionRadius = info.CollisionRadius
 	obj.Running = info.Running
 	obj.Dead = info.Dead
+	cold.Sitting = info.Sitting
 	obj.Moving = false
 	obj.DestX = info.X
 	obj.DestY = info.Y
@@ -1653,6 +1657,7 @@ type ObjectSnapshot struct {
 	TargetID        int32      `json:"targetId"`
 	InCombat        bool       `json:"inCombat"`
 	Dead            bool       `json:"dead"`
+	Sitting         bool       `json:"sitting"`
 	Moving          bool       `json:"moving"`
 	Running         bool       `json:"running"`
 	Speed           float64    `json:"speed"`

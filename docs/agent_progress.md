@@ -71,6 +71,77 @@ equipment pipeline). Deliverable: the research/design document.
   (the spot registry generator + the hunt data model), then phase 2
   (the respawn-aware wait-or-move in the engage loop).
 
+## Active task: the fleet UX round - proxy switch hardening, rest icons of every bot, armor-first shopping
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user request (2026-09-10, Russian), three items:
+
+1. **The proxy client switch** (round 12 landed the live resync machinery:
+   `51e716a feat: proxy switches connected C1 client to the WebUI selected
+   bot`): a connected C1 client watching bot 3 must switch to bot 2 the
+   moment the WebUI selects it - correct position, appearance, race and
+   class. This round hardens the remaining gap: a target that is offline
+   (registered but still connecting) at the selection moment never
+   switches later, and re-clicking the same bot id is a no-op, so the
+   client stays on the wrong bot forever. The relay must keep serving the
+   current live feed while it polls for the target to come online and
+   resync then.
+2. **The rest icon of every bot**: the zZ marker of the map draws only
+   for the own character of the observed bot (`drawSelf` reads
+   `character.sitting`). The other bots of the fleet (player objects of
+   the observed bot's world) show no rest icon because the tracker drops
+   the ChangeWaitType broadcasts of foreign object ids
+   (`ApplyWaitType` returns early) and the CharInfo standing state byte
+   is not parsed. The icon must render for every bot on the web UI
+   regardless of the focus.
+3. **The armor-first shopping order**: the purchase phases must change -
+   at the start of the game the bots buy the CHEAP ARMOR first (not
+   jewelry), the jewel floor moves behind the weapon milestone, and
+   jewelry (the floor and the upgrades) is bought only after every armor
+   slot is filled and a new weapon was bought.
+
+### Progress (atomic commits)
+
+- 2026-09-10 (task 2 done): the rest icon of every bot. The tracker now
+  keeps the sit state of foreign creatures: `ApplyWaitType` updates the
+  world object when the broadcast is not the own character (it only
+  tracked `char.Sitting` before), `objectCold.Sitting` stores it, the
+  CharInfo standing state byte is parsed (`CharInfoPacket.Standing`,
+  previously skipped) and feeds `PlayerInfo.Sitting` of the player
+  objects, and the snapshot objects carry the new `sitting` field (the
+  golden append encoder, the live view and the reflection path stay
+  byte identical - pinned by the existing equality tests). map.js
+  extracts the breathing zZ into `drawRestMarker` and draws it over
+  every sitting unit of the observed bot's world (the other bots of the
+  fleet), not only over the own character; the sidebar rest chips
+  already covered all bots through the /api/bots payload. New tests:
+  `TestForeignWaitTypeTracksRest`, `TestCharInfoCarriesSitting`, the
+  CharInfo sitting subtest, and the two harness checks of
+  `tools/repro_map_render.js` (the sitting player object draws zZ). The
+  pre-existing harness failure "hunting zone carries the label" fails
+  on the clean tree too (not this round).
+
+### Acceptance criteria
+
+- Task 1: `serveBotSwitch` resolves an offline-but-registered target by
+  polling without stalling the live feed; the switch completes when the
+  target enters the world; docs/proxy.md documents the immediate switch;
+  tests cover the offline-then-online switch.
+- Task 2: `ApplyWaitType` tracks the sit state of foreign objects,
+  CharInfo's standing byte feeds the player object, the snapshot objects
+  carry `sitting`, and map.js draws the breathing zZ over every sitting
+  unit (the own character keeps its marker).
+- Task 3: `shopStrategy.classify` orders the phases armor floor -> weapon
+  -> jewel floor (gated on a worn non-starter weapon) -> defense; the
+  opening trip of the journey buys cheap armor pieces only; no jewel is
+  bought before the first weapon; the journey table and
+  docs/shopping_strategy.md describe the new order.
+
 ## Active task: the looted gear of the shopping list survives the junk flows
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.

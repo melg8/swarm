@@ -305,6 +305,39 @@ func TestParseCharInfoPacket(t *testing.T) {
 		require.True(t, p.Running)
 		require.False(t, p.InCombat)
 		require.False(t, p.Dead)
+		require.True(t, p.Standing, "the standing byte of a standing player")
+	})
+
+	t.Run("sitting player clears the standing byte", func(t *testing.T) {
+		data := []byte{0x03}
+		data = putInt32(data, 45000)
+		data = putInt32(data, 50000)
+		data = putInt32(data, -3500)
+		data = putInt32(data, 0)
+		data = putInt32(data, 7)
+		data = append(data, utf16("Player2")...)
+		data = putInt32(data, 0)
+		data = putInt32(data, 0)
+		data = putInt32(data, 10)
+		data = append(data, make([]byte, charInfoSpeedLead)...)
+		data = putInt32(data, 150)
+		data = putInt32(data, 75)
+		data = append(data, make([]byte, charInfoSpeedTrail)...)
+		data = putFloat64(data, 1.0)
+		data = append(data, make([]byte, charInfoAtkSpeedTail)...)
+		data = putFloat64(data, 9)
+		data = append(data, make([]byte, charInfoBodyTail)...)
+		data = append(data, utf16("Title")...)
+		data = append(data, make([]byte, charInfoClanTail)...)
+		// a resting player: the standing byte is 0.
+		data = append(data, 0, 1, 0, 0, 0, 0, 0)
+
+		p := NewCharInfoPacket()
+		err := ParseCharInfoPacket(p, data)
+		require.NoError(t, err)
+		require.False(t, p.Standing,
+			"the sitting player reports the rest state for the zZ icon")
+		require.True(t, p.Running)
 	})
 
 	t.Run("truncated after title keeps flags default", func(t *testing.T) {

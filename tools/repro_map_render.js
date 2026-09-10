@@ -501,6 +501,28 @@ function runScenarioRestMarker(mapFile) {
     check(results, "standing character draws no zZ marker",
         zStanding === 0, "unexpected zZ texts: " + zStanding);
 
+    // The fleet-wide rest icon: another bot of the fleet (a player
+    // object of the watched bot's world) draws the same zZ marker when
+    // it rests, so the overview shows every resting bot regardless of
+    // which one the web UI focuses on.
+    const sitting = loadMapJs(mapFile);
+    sitting.MapView.init();
+    const sittingSnap = buildSnapshot(0, false);
+    sittingSnap.objects[0].sitting = true;
+    sitting.MapView.update(sittingSnap);
+    sitting.MapView.draw();
+    const playerPos = worldToScreen(WORLD.player.x, WORLD.player.y);
+    const zPlayer = sitting.record.texts.filter((t) => t.text === "zZ"
+        && Math.abs(t.x - (playerPos.x + 4 + 4)) < 2
+        && Math.abs(t.y - (playerPos.y - 4 - 3)) < 2);
+    check(results, "sitting player object draws the zZ marker",
+        zPlayer.length > 0, "no zZ text near the player marker");
+    const sittingNoSelf = sitting.record.texts.filter(
+        (t) => t.text === "zZ").length;
+    check(results, "only the sitting player draws zZ (self stands)",
+        sittingNoSelf === zPlayer.length,
+        "unexpected extra zZ texts: " + sittingNoSelf);
+
     return results;
 }
 

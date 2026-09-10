@@ -11,6 +11,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestForeignWaitTypeTracksRest verifies the fleet-wide rest icon: the
+// ChangeWaitType broadcasts of OTHER creatures (the other bots of the
+// fleet resting around the watched one) update their world objects, so
+// the map draws the zZ marker for every sitting bot regardless of the
+// web UI focus.
+func TestForeignWaitTypeTracksRest(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	bot.ApplyPlayerInfo(PlayerInfo{ObjectID: 55, Name: "Bot2", X: 100, Y: 100})
+	bot.ApplyPlayerInfo(PlayerInfo{ObjectID: 56, Name: "Bot3", X: 120, Y: 100})
+
+	bot.ApplyWaitType(WaitType{ObjectID: 55, Sitting: true})
+	snap := bot.Snapshot()
+	require.True(t, snap.Objects[0].Sitting, "the resting bot2 shows the zZ icon")
+	require.False(t, snap.Objects[1].Sitting, "the standing bot3 shows no icon")
+	require.False(t, snap.Character.Sitting, "the own character is untouched")
+
+	// The wake up broadcast clears the marker.
+	bot.ApplyWaitType(WaitType{ObjectID: 55, Sitting: false})
+	snap = bot.Snapshot()
+	require.False(t, snap.Objects[0].Sitting, "the woken bot2 loses the zZ icon")
+}
+
+// TestCharInfoCarriesSitting pins the CharInfo standing byte of a newly
+// observed player: a bot that rests while out of sight appears sitting
+// the moment it walks into the known list.
+func TestCharInfoCarriesSitting(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+	bot.ApplyPlayerInfo(PlayerInfo{ObjectID: 55, Name: "Bot2", X: 100, Y: 100,
+		Sitting: true})
+	snap := bot.Snapshot()
+	require.True(t, snap.Objects[0].Sitting,
+		"a sitting player enters the known list as resting")
+	require.Len(t, snap.Objects[0].Name, 4)
+}
+
 func TestRotationPacketsTurnObjects(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)

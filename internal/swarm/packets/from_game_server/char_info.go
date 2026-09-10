@@ -19,7 +19,9 @@ const charInfoPacketID = 0x03
 // [swim and fly speeds: 24][moveMultiplier: 8][attack speed multiplier,
 // collision and hair fields: 36][title: str][clan and ally ids: 16]
 // [relation: 4][7 state bytes: standing, running, inCombat, alikeDead,
-// invisible, mountType, privateStore].
+// invisible, mountType, privateStore]. The standing byte tells a new
+// observer whether the player sits (0) or stands (1); the own
+// ChangeWaitType broadcasts keep it current afterwards.
 //
 // The transmitted runSpd and walkSpd are base values: the server divides
 // the real speeds by the move multiplier before writing them (see
@@ -37,12 +39,16 @@ type CharInfoPacket struct {
 	WalkSpeed       int32
 	MoveSpeedMult   float64
 	CollisionRadius float64
-	Running         bool
-	InCombat        bool
-	Dead            bool
-	X               int32
-	Y               int32
-	Z               int32
+	// Standing is the wait state byte of the packet: true while the
+	// player stands, false while it sits - the rest state the map marks
+	// with the zZ icon for every bot, not only the observed one.
+	Standing bool
+	Running  bool
+	InCombat bool
+	Dead     bool
+	X        int32
+	Y        int32
+	Z        int32
 }
 
 // NewCharInfoPacket creates a zero valued packet ready for parsing.
@@ -57,6 +63,7 @@ func NewCharInfoPacket() *CharInfoPacket {
 		WalkSpeed:       0,
 		MoveSpeedMult:   0,
 		CollisionRadius: 0,
+		Standing:        false,
 		Running:         false,
 		InCombat:        false,
 		Dead:            false,
@@ -177,6 +184,7 @@ func readCharStateFlags(reader *packet.Reader, p *CharInfoPacket) {
 		}
 		flags[i] = flag
 	}
+	p.Standing = flags[0] != 0
 	p.Running = flags[1] != 0
 	p.InCombat = flags[2] != 0
 	p.Dead = flags[3] != 0

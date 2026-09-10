@@ -250,6 +250,8 @@ func appendObjectJSON(dst []byte, o ObjectSnapshot) []byte {
 	dst = strconv.AppendBool(dst, o.InCombat)
 	dst = append(dst, `,"dead":`...)
 	dst = strconv.AppendBool(dst, o.Dead)
+	dst = append(dst, `,"sitting":`...)
+	dst = strconv.AppendBool(dst, o.Sitting)
 	dst = append(dst, `,"moving":`...)
 	dst = strconv.AppendBool(dst, o.Moving)
 	dst = append(dst, `,"running":`...)

@@ -117,6 +117,7 @@ func (gc *GameClient) applyCharInfo(payload []byte) {
 			Running:         info.Running,
 			InCombat:        info.InCombat,
 			Dead:            info.Dead,
+			Sitting:         !info.Standing,
 			X:               info.X,
 			Y:               info.Y,
 			Z:               info.Z,

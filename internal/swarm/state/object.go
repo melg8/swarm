@@ -133,6 +133,10 @@ type objectCold struct {
 	Count           int32
 	AggroRange      int32
 	CollisionRadius float64
+	// Sitting marks the rest state of the creature (the zZ icon of
+	// the map): a player object sits through its own ChangeWaitType
+	// broadcast or the standing byte of its CharInfo.
+	Sitting bool
 	// SocialUntil is the end of the social animation marker as unix
 	// nanoseconds, 0 = none.
 	SocialUntil int64

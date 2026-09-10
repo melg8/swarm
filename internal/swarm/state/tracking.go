@@ -48,13 +48,25 @@ type WaitType struct {
 	Sitting  bool
 }
 
-// ApplyWaitType tracks the sit/stand state of the played character. The
-// packet is broadcast through Player.broadcastPacket, so the acting
-// client receives its own transitions (see Player.sitDown/standUp).
+// ApplyWaitType tracks the sit/stand state of the played character and
+// of every observed creature. The packet is broadcast through
+// Player.broadcastPacket, so the acting client receives its own
+// transitions (see Player.sitDown/standUp) and the transitions of every
+// player around: the own rest drives the hunt logic and the HUD, the
+// foreign ones draw the zZ rest icon of the map for every bot of the
+// fleet, not only the observed one.
 func (b *Bot) ApplyWaitType(w WaitType) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if w.ObjectID != b.selfID {
+		_, cold := b.objectLocked(w.ObjectID)
+		if cold == nil {
+			return
+		}
+		cold.Sitting = w.Sitting
+		cold.UpdatedAt = time.Now().UnixNano()
+		b.touch()
+
 		return
 	}
 	b.char.Sitting = w.Sitting
