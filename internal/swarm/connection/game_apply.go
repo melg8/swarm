@@ -559,6 +559,36 @@ func (gc *GameClient) convertSkills(
 	return skills
 }
 
+// applyAbnormalStatusUpdate parses AbnormalStatusUpdate and replaces
+// the active effect list of the tracker: the buff casting of the hunt
+// loop skips the buffs that already run, the web UI buffs widget
+// renders the list with the remaining durations. The server sends
+// the whole list whenever an effect changes, so a merge is never
+// needed.
+func (gc *GameClient) applyAbnormalStatusUpdate(payload []byte) {
+	if err := fromgameserver.ParseAbnormalStatusUpdatePacket(
+		&gc.abnormalStatus, payload); err != nil {
+		gc.logger.Printf("Failed to parse abnormal status: %v", err)
+
+		return
+	}
+	if gc.tracker == nil {
+		return
+	}
+	buffs := make([]state.BuffEntry, 0, len(gc.abnormalStatus.Buffs))
+	for _, buff := range gc.abnormalStatus.Buffs {
+		buffs = append(buffs, state.BuffEntry{
+			SkillID: buff.SkillID,
+			Level:   buff.Level,
+			Time:    buff.Time,
+		})
+	}
+	gc.tracker.SetBuffs(buffs)
+	if gc.trace {
+		gc.logger.Printf("Abnormal status with %d buffs", len(buffs))
+	}
+}
+
 // applyInventoryUpdate parses InventoryUpdate and applies the changes.
 func (gc *GameClient) applyInventoryUpdate(payload []byte) {
 	if err := fromgameserver.ParseInventoryUpdatePacket(

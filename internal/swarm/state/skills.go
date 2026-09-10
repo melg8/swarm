@@ -47,11 +47,11 @@ type SkillSnapshot struct {
 
 // SkillPlanEntry is one queued lesson of the learning plan: the next
 // level of the skill the bot has not learned yet, with the SP cost,
-// the character level that unlocks the lesson, the warrior priority
-// category (npcdata.SkillCategory*), the tooltip text of the level
-// being learned and the affordability against the SP the plan was
-// computed with. The learning function itself is not implemented -
-// the queue only shows the planned order.
+// the character level that unlocks the lesson, the skill book the
+// lesson consumes (zero - no book), the book display name, the
+// warrior priority category (npcdata.SkillCategory*), the tooltip
+// text of the level being learned and the affordability against the
+// SP the plan was computed with.
 type SkillPlanEntry struct {
 	SkillID    int32  `json:"skillId"`
 	Name       string `json:"name"`
@@ -61,6 +61,8 @@ type SkillPlanEntry struct {
 	Passive    bool   `json:"passive"`
 	SpCost     int32  `json:"spCost"`
 	ReqLevel   int32  `json:"reqLevel"`
+	BookItemID int32  `json:"bookItemId"`
+	BookName   string `json:"bookName"`
 	Category   int    `json:"category"`
 	Affordable bool   `json:"affordable"`
 }
@@ -118,14 +120,14 @@ func skillTotals(entries []SkillPlanEntry, sp int64) (total, missing int64) {
 }
 
 // ensureSkillQueueLocked rebuilds the stored learning queue when the
-// class or the learned set changed since the last build. A nil skills
-// map (never listed, or cleared by a session reset) keeps the queue
-// empty: the server lists the learned skills on entering the world,
-// so a queue without them would plan lessons the character may
-// already know. The stored queue carries the order only - the
-// affordability flag stays meaningless on it and is computed by every
-// view against the SP it reads under the same lock. The caller must
-// hold a lock.
+// class, the learned set or the weapon priority changed since the
+// last build. A nil skills map (never listed, or cleared by a session
+// reset) keeps the queue empty: the server lists the learned skills on
+// entering the world, so a queue without them would plan lessons the
+// character may already know. The stored queue carries the order only -
+// the affordability flag stays meaningless on it and is computed by
+// every view against the SP it reads under the same lock. The caller
+// must hold a lock.
 func (b *Bot) ensureSkillQueueLocked() {
 	if b.skillQueueClass == b.char.ClassID &&
 		b.skillQueueRevision == b.skillsRevision {
@@ -133,7 +135,8 @@ func (b *Bot) ensureSkillQueueLocked() {
 	}
 	b.skillQueue = nil
 	if b.skills != nil {
-		b.skillQueue = buildSkillQueue(b.char.ClassID, b.skills)
+		b.skillQueue = buildSkillQueue(
+			b.char.ClassID, b.skills, b.skillWeapons)
 	}
 	b.skillQueueClass = b.char.ClassID
 	b.skillQueueRevision = b.skillsRevision
@@ -167,13 +170,16 @@ func (b *Bot) skillPlanViewLocked() *SkillPlanView {
 
 // buildSkillQueue computes the ordered learning queue of a class: the
 // remaining lessons (not learned yet, not auto granted) sorted by the
-// warrior priority - the physical weapon attack power skills first,
-// the defense skills second, everything else last; within a category
-// by the unlock level, then the skill id, then the level (the order
-// of the generated tree). The returned slice is the stored queue; the
-// affordability flag is filled by the views, never here.
+// warrior priority - the attack power skills whose weapon condition
+// accepts one of the preferred weapon families first (the weapon in
+// hand and the next weapon of the purchase plan), the other attack
+// power skills second, the defense skills third, everything else
+// last; within a priority group the stable tree order (the unlock
+// level, then the skill id, then the level) survives. The returned
+// slice is the stored queue; the affordability flag is filled by the
+// views, never here.
 func buildSkillQueue(
-	classID int32, learned map[int32]learnedSkill,
+	classID int32, learned map[int32]learnedSkill, weapons []string,
 ) []SkillPlanEntry {
 	tree, ok := npcdata.SkillTree(classID)
 	if !ok {
@@ -198,6 +204,8 @@ func buildSkillQueue(
 			Passive:    false,
 			SpCost:     lesson.SpCost,
 			ReqLevel:   lesson.GetLevel,
+			BookItemID: lesson.BookItem,
+			BookName:   npcdata.ItemName(lesson.BookItem),
 			Category:   npcdata.SkillCategoryOther,
 			Affordable: false,
 		}
@@ -212,13 +220,42 @@ func buildSkillQueue(
 		queue = append(queue, entry)
 	}
 	// The tree is sorted by (getLevel, skillId, level); the queue
-	// resorts by the warrior priority category first. The sort is
-	// stable so the tree order survives inside a category.
+	// resorts by the warrior priority groups. The sort is stable so
+	// the tree order survives inside a group.
 	sort.SliceStable(queue, func(i, j int) bool {
-		return queue[i].Category < queue[j].Category
+		return skillPlanPriority(queue[i], weapons) <
+			skillPlanPriority(queue[j], weapons)
 	})
 
 	return queue
+}
+
+// skillPlanPriority maps one queued lesson onto the warrior priority
+// group: 0 the attack power skills usable with a preferred weapon
+// (the masteries carry no weapon condition and match every weapon),
+// 1 the attack power skills of other weapons, 2 the defense skills,
+// 3 the rest.
+func skillPlanPriority(entry SkillPlanEntry, weapons []string) int {
+	if entry.Category == npcdata.SkillCategoryAttack {
+		if len(weapons) == 0 {
+			return 0
+		}
+		cast, ok := npcdata.SkillCastOf(entry.SkillID)
+		if ok {
+			for _, weapon := range weapons {
+				if cast.UsableWithWeapon(weapon) {
+					return 0
+				}
+			}
+		}
+
+		return 1
+	}
+	if entry.Category == npcdata.SkillCategoryDefense {
+		return 2
+	}
+
+	return 3
 }
 
 // skillSnapshotsLocked builds the learned skill list of the snapshot

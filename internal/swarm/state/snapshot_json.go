@@ -101,6 +101,8 @@ func appendSnapshotJSON(dst []byte, s Snapshot) []byte {
 	dst = appendSkillsJSON(dst, s.Skills)
 	dst = append(dst, `,"skillPlan":`...)
 	dst = appendSkillPlanJSON(dst, s.SkillPlan)
+	dst = append(dst, `,"buffs":`...)
+	dst = appendBuffsJSON(dst, s.Buffs)
 	dst = append(dst, `,"combatEvents":`...)
 	dst = appendCombatEventsJSON(dst, s.CombatEvents)
 	dst = append(dst, `,"huntingZone":`...)
@@ -676,10 +678,50 @@ func appendSkillPlanEntryJSON(dst []byte, entry SkillPlanEntry) []byte {
 	dst = strconv.AppendInt(dst, int64(entry.SpCost), 10)
 	dst = append(dst, `,"reqLevel":`...)
 	dst = strconv.AppendInt(dst, int64(entry.ReqLevel), 10)
+	dst = append(dst, `,"bookItemId":`...)
+	dst = strconv.AppendInt(dst, int64(entry.BookItemID), 10)
+	dst = append(dst, `,"bookName":`...)
+	dst = appendJSONString(dst, entry.BookName)
 	dst = append(dst, `,"category":`...)
 	dst = strconv.AppendInt(dst, int64(entry.Category), 10)
 	dst = append(dst, `,"affordable":`...)
 	dst = strconv.AppendBool(dst, entry.Affordable)
+	dst = append(dst, '}')
+
+	return dst
+}
+
+// appendBuffsJSON writes the active effect list (null when the
+// character runs no effects).
+func appendBuffsJSON(dst []byte, buffs []BuffSnapshot) []byte {
+	if buffs == nil {
+		return append(dst, `null`...)
+	}
+	dst = append(dst, '[')
+	for i := range buffs {
+		if i > 0 {
+			dst = append(dst, ',')
+		}
+		dst = appendBuffSnapshotJSON(dst, buffs[i])
+	}
+	dst = append(dst, ']')
+
+	return dst
+}
+
+// appendBuffSnapshotJSON writes one active effect. The field order
+// mirrors the struct declaration like the reflection encoder.
+func appendBuffSnapshotJSON(dst []byte, buff BuffSnapshot) []byte {
+	dst = append(dst, `{"skillId":`...)
+	dst = strconv.AppendInt(dst, int64(buff.SkillID), 10)
+	dst = append(dst, `,"level":`...)
+	dst = strconv.AppendInt(dst, int64(buff.Level), 10)
+	dst = append(dst, `,"name":`...)
+	dst = appendJSONString(dst, buff.Name)
+	dst = append(dst, `,"icon":`...)
+	dst = appendJSONString(dst, buff.Icon)
+	dst = append(dst, `,"left":`...)
+	dst = strconv.AppendInt(dst, int64(buff.Left), 10)
 	dst = append(dst, '}')
 
 	return dst

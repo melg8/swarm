@@ -403,14 +403,23 @@ type Bot struct {
 	shoppingAt time.Time
 	// skills holds the learned skill list of the server packet
 	// (id -> level + passive). skillsRevision counts the SetSkills
-	// calls; skillQueue caches the ordered learning queue and
-	// rebuilds when the class or the revision moves (see
-	// ensureSkillQueueLocked).
+	// calls and the weapon priority changes; skillQueue caches the
+	// ordered learning queue and rebuilds when the class or the
+	// revision moves (see ensureSkillQueueLocked). skillWeapons
+	// holds the weapon families the queue prefers (the weapon in
+	// hand and the next weapon of the purchase plan).
 	skills             map[int32]learnedSkill
 	skillsRevision     uint64
 	skillQueue         []SkillPlanEntry
 	skillQueueClass    int32
 	skillQueueRevision uint64
+	skillWeapons       []string
+	// buffs holds the active effect list of the server
+	// AbnormalStatusUpdate packets (skillId -> level + seconds left
+	// at the arrival); buffsAt anchors the remaining seconds the
+	// views count down from (see SetBuffs).
+	buffs   map[int32]buffRecord
+	buffsAt time.Time
 	// loginCooldownUntil holds the reconnect pause the supervisor
 	// honors after an emergency logout. The tracker outlives the
 	// sessions, so the cooldown spans them (see SetLoginCooldown).
@@ -450,6 +459,9 @@ func NewBot(id string) *Bot {
 		skillQueue:         nil,
 		skillQueueClass:    0,
 		skillQueueRevision: 0,
+		skillWeapons:       nil,
+		buffs:              nil,
+		buffsAt:            time.Time{},
 	}
 }
 
@@ -929,6 +941,9 @@ func (b *Bot) ResetSession() {
 	b.skillQueue = nil
 	b.skillQueueClass = 0
 	b.skillQueueRevision = 0
+	b.skillWeapons = nil
+	b.buffs = nil
+	b.buffsAt = time.Time{}
 	b.walkPlan = nil
 	b.walkPlanAt = time.Time{}
 	b.clearShoppingPlanLocked()
@@ -1875,6 +1890,11 @@ type Snapshot struct {
 	// order with the SP costs, null when the class is unknown or
 	// nothing is left to learn.
 	SkillPlan *SkillPlanView `json:"skillPlan"`
+	// Buffs carries the active effect list of the character (see
+	// SetBuffs): the running buffs with their levels and remaining
+	// seconds, resolved with the display data of the generated
+	// dictionary. The web UI buffs widget renders it.
+	Buffs []BuffSnapshot `json:"buffs"`
 	// CombatEvents carries the recent swings and damage
 	// landings of the animation layer: the last
 	// combatEventTTL window, in chronological order,
@@ -2037,6 +2057,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 		Shopping:     nil,
 		Skills:       nil,
 		SkillPlan:    nil,
+		Buffs:        nil,
 		HuntingZone:  nil,
 		HuntingZones: nil,
 		Packets:      b.packets,
@@ -2064,6 +2085,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 	}
 	snap.Skills = b.skillSnapshotsLocked()
 	snap.SkillPlan = b.skillPlanViewLocked()
+	snap.Buffs = b.buffSnapshotsLocked(now)
 	nowNano := now.UnixNano()
 	for i := range b.world.hot {
 		snap.Objects = append(snap.Objects,

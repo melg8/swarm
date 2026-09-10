@@ -43,6 +43,8 @@ func (gc *GameClient) handleServerPacket(payload []byte) {
 		gc.applySystemMessage(payload)
 	case skillListID:
 		gc.applySkillList(payload)
+	case abnormalStatusID:
+		gc.applyAbnormalStatusUpdate(payload)
 	case socialActionID:
 		gc.applySocialAction(payload)
 	case actionFailedID:

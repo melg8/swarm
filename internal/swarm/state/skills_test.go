@@ -218,3 +218,97 @@ func TestSkillPlanJSONShape(t *testing.T) {
 	require.Contains(t, first["desc"],
 		"Gathers power for a fierce strike")
 }
+
+// TestSkillPlanCarriesTheBooks pins the book fields of the queued
+// lessons: the aura lessons of the elven fighter demand their
+// spellbooks (the item id and the resolved name), the strikes learn
+// without one.
+func TestSkillPlanCarriesTheBooks(t *testing.T) {
+	bot := NewBot("test1")
+	bot.ApplyUserInfo(UserInfo{
+		Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
+	})
+	bot.SetSkills([]LearnedSkill{{SkillID: 142, Level: 1, Passive: true}})
+
+	plan := bot.Snapshot().SkillPlan
+	require.NotNil(t, plan)
+
+	var aura, strike *SkillPlanEntry
+	for i := range plan.Entries {
+		switch plan.Entries[i].SkillID {
+		case 91:
+			aura = &plan.Entries[i]
+		case 3:
+			strike = &plan.Entries[i]
+		}
+	}
+	require.NotNil(t, aura, "Defence Aura must stay queued")
+	require.Equal(t, int32(1294), aura.BookItemID)
+	require.Equal(t, "Spellbook: Advanced Defense Power",
+		aura.BookName)
+	require.NotNil(t, strike, "Power Strike must stay queued")
+	require.Zero(t, strike.BookItemID)
+	require.Empty(t, strike.BookName)
+}
+
+// TestSkillPlanWeaponPriority pins the warrior weapon
+// specialization: the attack lessons usable with the preferred
+// weapon families (the weapon in hand and the next weapon of the
+// purchase plan) sort before the attack lessons of the other
+// weapons; the defense and the rest stay behind.
+func TestSkillPlanWeaponPriority(t *testing.T) {
+	bot := NewBot("test1")
+	bot.ApplyUserInfo(UserInfo{
+		Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
+	})
+	bot.SetSkills([]LearnedSkill{{SkillID: 142, Level: 1, Passive: true}})
+
+	// The boundary helpers: the first and the last queue index of a
+	// skill id.
+	indexOf := func(plan *SkillPlanView, skillID int32) int {
+		for i := range plan.Entries {
+			if plan.Entries[i].SkillID == skillID {
+				return i
+			}
+		}
+
+		return -1
+	}
+	lastIndexOf := func(plan *SkillPlanView, skillID int32) int {
+		for i := len(plan.Entries) - 1; i >= 0; i-- {
+			if plan.Entries[i].SkillID == skillID {
+				return i
+			}
+		}
+
+		return -1
+	}
+
+	// A sword in hand: Power Strike (sword/blunt) leads the queue
+	// ahead of the bow and the dagger lessons, Power Shot (bow)
+	// stays behind the sword group with Mortal Blow (dagger).
+	bot.SetSkillWeaponPriority([]string{"SWORD"})
+	plan := bot.Snapshot().SkillPlan
+	require.NotNil(t, plan)
+	require.Equal(t, int32(3), plan.Entries[0].SkillID,
+		"Power Strike leads with a sword")
+	require.Greater(t, indexOf(plan, 56), lastIndexOf(plan, 3),
+		"Power Shot stays behind the sword lessons")
+	require.Greater(t, indexOf(plan, 16), lastIndexOf(plan, 3),
+		"Mortal Blow stays behind the sword lessons")
+
+	// A bow as the next weapon: Power Shot joins the sword group,
+	// Mortal Blow stays behind it.
+	bot.SetSkillWeaponPriority([]string{"SWORD", "BOW"})
+	plan = bot.Snapshot().SkillPlan
+	require.NotNil(t, plan)
+	require.Greater(t, indexOf(plan, 16), lastIndexOf(plan, 56),
+		"Mortal Blow stays behind the sword and bow lessons")
+
+	// Without a weapon preference the plain category order returns.
+	bot.SetSkillWeaponPriority(nil)
+	plan = bot.Snapshot().SkillPlan
+	require.NotNil(t, plan)
+	require.Equal(t, npcdata.SkillCategoryAttack,
+		plan.Entries[0].Category)
+}

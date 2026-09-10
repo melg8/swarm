@@ -66,8 +66,7 @@ func (b *Bot) appendSnapshotJSONLocked(dst []byte, now time.Time) []byte {
 	dst = b.appendLiveShoppingJSON(dst, now)
 	dst = append(dst, `,"skills":`...)
 	dst = b.appendLiveSkillsJSON(dst)
-	dst = append(dst, `,"skillPlan":`...)
-	dst = b.appendLiveSkillPlanJSON(dst)
+	dst = b.appendLiveSkillBlockJSON(dst, now)
 	dst = append(dst, `,"combatEvents":[`...)
 	dst = b.appendLiveCombatJSON(dst, now)
 	dst = append(dst, `],"huntingZone":`...)
@@ -204,6 +203,17 @@ func (b *Bot) appendLiveShoppingJSON(dst []byte, now time.Time) []byte {
 	return appendShoppingPlanJSON(dst, b.shopping)
 }
 
+// appendLiveSkillBlockJSON writes the learning queue and the active
+// effect list that follow the learned skills in the live view. The
+// caller must hold a lock.
+func (b *Bot) appendLiveSkillBlockJSON(dst []byte, now time.Time) []byte {
+	dst = append(dst, `,"skillPlan":`...)
+	dst = b.appendLiveSkillPlanJSON(dst)
+	dst = append(dst, `,"buffs":`...)
+
+	return b.appendLiveBuffsJSON(dst, now)
+}
+
 // appendLiveSkillsJSON writes the learned skill list (null when the
 // character knows no skills, the nil semantics of the Snapshot view).
 // The caller must hold a lock.
@@ -283,6 +293,55 @@ func (b *Bot) appendLiveSkillPlanJSON(dst []byte) []byte {
 	dst = append(dst, `]}`...)
 
 	return dst
+}
+
+// appendLiveBuffsJSON writes the active effect list (null when the
+// character runs no effects, the nil semantics of the Snapshot
+// view) with the remaining seconds counted down from the arrival
+// of the last server list. The caller must hold a lock.
+func (b *Bot) appendLiveBuffsJSON(
+	dst []byte, now time.Time,
+) []byte {
+	if len(b.buffs) == 0 {
+		return append(dst, `null`...)
+	}
+	elapsed := int32(now.Sub(b.buffsAt).Seconds())
+	dst = append(dst, '[')
+	first := true
+	for _, id := range b.sortedBuffIDsLocked() {
+		if !first {
+			dst = append(dst, ',')
+		}
+		first = false
+		buff := b.buffs[id]
+		snapshot := BuffSnapshot{
+			SkillID: id,
+			Level:   buff.level,
+			Name:    fmt.Sprintf("skill #%d", id),
+			Icon:    "",
+			Left:    buffLeftCapped(buff.left - elapsed),
+		}
+		if info, ok := npcdata.SkillInfoOf(id); ok {
+			snapshot.Name = info.Name
+			snapshot.Icon = info.Icon
+		}
+		dst = appendBuffSnapshotJSON(dst, snapshot)
+	}
+
+	return append(dst, ']')
+}
+
+// sortedBuffIDsLocked returns the active effect skill ids in
+// ascending order (the Snapshot view order). The caller must hold a
+// lock.
+func (b *Bot) sortedBuffIDsLocked() []int32 {
+	ids := make([]int32, 0, len(b.buffs))
+	for id := range b.buffs {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+
+	return ids
 }
 
 // appendLiveCombatJSON writes the combat animation beats of the TTL
