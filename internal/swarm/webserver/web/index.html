@@ -254,34 +254,77 @@ SPDX-License-Identifier: MIT
           </div>
 
           <div id="gear-panel" class="gear-panel">
-            <div class="sidebar-title">EQUIPMENT</div>
-            <div class="gear-slots">
-              <div id="gear-wear" class="gear-wear"></div>
-              <div id="gear-jewel" class="gear-jewel"></div>
+            <div class="gear-mode" role="tablist"
+              aria-label="equipment widget mode">
+              <button id="gear-mode-equip" class="gear-mode-btn active"
+                type="button" role="tab" aria-selected="true"
+                title="the paperdoll and the inventory of the bot">
+                EQUIPMENT
+              </button>
+              <button id="gear-mode-skills" class="gear-mode-btn"
+                type="button" role="tab" aria-selected="false"
+                title="the learned skills of the bot and the learning plan">
+                SKILLS
+                <span id="gear-mode-skill-badge"
+                  class="gear-mode-badge hidden"></span>
+              </button>
             </div>
-            <div class="sidebar-title inv-title">
-              INVENTORY
-              <span id="inv-count" class="inv-count">0/80</span>
-            </div>
-            <div id="inv-grid" class="inv-grid"></div>
-            <div class="gear-foot">
-              <div class="gear-foot-cols">
-                <div class="gear-row adena-row">
-                  <span class="gear-key">adena</span>
-                  <b id="gear-adena" class="gear-adena">—</b>
+            <div class="gear-main">
+              <div id="gear-view" class="gear-view">
+                <div class="gear-slots">
+                  <div id="gear-wear" class="gear-wear"></div>
+                  <div id="gear-jewel" class="gear-jewel"></div>
                 </div>
-                <div id="gear-weight-row" class="gear-row weight-row">
-                  <span class="gear-key">weight</span>
-                  <div class="load-bar"><div id="gear-load-fill" class="load-fill"></div></div>
-                  <b id="gear-load-text" class="gear-load-text">—</b>
+                <div class="sidebar-title inv-title">
+                  INVENTORY
+                  <span id="inv-count" class="inv-count">0/80</span>
+                </div>
+                <div id="inv-grid" class="inv-grid"></div>
+                <div class="gear-foot">
+                  <div class="gear-foot-cols">
+                    <div class="gear-row adena-row">
+                      <span class="gear-key">adena</span>
+                      <b id="gear-adena" class="gear-adena">—</b>
+                    </div>
+                    <div id="gear-weight-row" class="gear-row weight-row">
+                      <span class="gear-key">weight</span>
+                      <div class="load-bar"><div id="gear-load-fill" class="load-fill"></div></div>
+                      <b id="gear-load-text" class="gear-load-text">—</b>
+                    </div>
+                  </div>
+                  <div id="gear-trash" class="gear-trash"
+                    title="drag an item here to destroy it">
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <path fill="currentColor" fill-rule="evenodd"
+                        d="M9 2.5h6c.6 0 1 .4 1 1v1h4.5c.3 0 .5.2.5.5v1.5c0 .3-.2.5-.5.5H3.5a.5.5 0 0 1-.5-.5V5.5c0-.3.2-.5.5-.5H8v-1c0-.6.4-1 1-1zm-2.7 6h11.4l-.9 11.4c-.1 1.2-1.1 2.1-2.3 2.1H9.5c-1.2 0-2.2-.9-2.3-2.1L6.3 8.5zm3.2 2v8.2h1.4V10.5H9.5zm3.6 0v8.2h1.4V10.5H13z"/>
+                    </svg>
+                  </div>
                 </div>
               </div>
-              <div id="gear-trash" class="gear-trash"
-                title="drag an item here to destroy it">
-                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                  <path fill="currentColor" fill-rule="evenodd"
-                    d="M9 2.5h6c.6 0 1 .4 1 1v1h4.5c.3 0 .5.2.5.5v1.5c0 .3-.2.5-.5.5H3.5a.5.5 0 0 1-.5-.5V5.5c0-.3.2-.5.5-.5H8v-1c0-.6.4-1 1-1zm-2.7 6h11.4l-.9 11.4c-.1 1.2-1.1 2.1-2.3 2.1H9.5c-1.2 0-2.2-.9-2.3-2.1L6.3 8.5zm3.2 2v8.2h1.4V10.5H9.5zm3.6 0v8.2h1.4V10.5H13z"/>
-                </svg>
+              <div id="skills-view" class="skills-view hidden"
+                title="the learned skills of the bot">
+                <div class="skill-filter" role="tablist"
+                  aria-label="learned skill filter">
+                  <button id="skill-tab-active" class="skill-filter-btn active"
+                    type="button" role="tab" aria-selected="true"
+                    title="the learned active skills">ACTIVE</button>
+                  <button id="skill-tab-passive" class="skill-filter-btn"
+                    type="button" role="tab" aria-selected="false"
+                    title="the learned passive skills">PASSIVE</button>
+                  <span id="skill-count" class="skill-count">0</span>
+                </div>
+                <div id="skill-grid" class="skill-grid"></div>
+                <div class="skill-foot">
+                  <div class="gear-row sp-row">
+                    <span class="gear-key">sp</span>
+                    <b id="skill-sp" class="skill-sp-val">—</b>
+                  </div>
+                  <div id="skill-next-row" class="gear-row skill-next-row"
+                    title="the next planned lesson of the queue">
+                    <span class="gear-key">next</span>
+                    <b id="skill-next" class="skill-next-val">—</b>
+                  </div>
+                </div>
               </div>
             </div>
             <button id="shop-tab" class="shop-tab hidden" type="button"
@@ -304,6 +347,29 @@ SPDX-License-Identifier: MIT
                   <b id="shop-have" class="shop-val">—</b>
                   <span class="shop-key">save</span>
                   <b id="shop-save" class="shop-val">—</b>
+                </div>
+              </div>
+            </div>
+            <button id="skillq-tab" class="skillq-tab hidden" type="button"
+              aria-expanded="true"
+              title="the skill learning queue of the bot - slide it out">
+              <span id="skillq-tab-chev" class="shop-tab-chev">&#9666;</span>
+            </button>
+            <div id="skillq-panel" class="skillq-panel hidden"
+              title="the planned skill learning order - what the bot will learn and in which order">
+              <div class="skillq-head">
+                <span class="shop-title">SKILL QUEUE</span>
+                <span id="skillq-summary" class="shop-summary"></span>
+              </div>
+              <div class="skillq-body">
+                <ul id="skillq-list" class="shop-list skillq-list"></ul>
+                <div class="shop-foot">
+                  <span class="shop-key">sp</span>
+                  <b id="skillq-sp" class="shop-val">—</b>
+                  <span class="shop-key">need</span>
+                  <b id="skillq-need" class="shop-val">—</b>
+                  <span class="shop-key">save</span>
+                  <b id="skillq-save" class="shop-val">—</b>
                 </div>
               </div>
             </div>

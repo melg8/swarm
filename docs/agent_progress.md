@@ -3350,3 +3350,27 @@ name the variant number that best fits the real bot UI.
   JSON encoders mirror the reflection output (appendSkillsJSON,
   appendSkillPlanJSON in snapshot_json.go, the live variants in
   snapshot_live.go). ResetSession clears both. All go tests green.
+
+- 2026-09-10: atomic commit 3 of the skills-display task - the web
+  UI. The equipment widget became a two view widget without changing
+  its size: the EQUIPMENT / SKILLS mode tabs replace the static title
+  row, the gear content stays in the flow and keeps sizing the panel,
+  the skills view is an absolute overlay of exactly that area
+  (visibility swap, never display none - the panel must not shrink).
+  The skills view carries the ACTIVE / PASSIVE filter tabs, the
+  learned skill grid (six 36px columns like the bag, keyed cells with
+  icons and level badges - the icons never re-decode), the pinned
+  sp/next foot. The skill learning queue is a second flyout on the
+  left edge (below the shop tab, docking under the shop flyout while
+  it is out): one keyed row per lesson with the icon, the name with
+  the level, the warrior priority category + unlock level meta and
+  the SP cost with the missing SP; the head summary and the pinned
+  sp/need/save foot mirror the shop queue. Tooltips reuse the shared
+  floating panel (the learned cell and the lesson rows). The mode and
+  the filter persist in localStorage. Verified: repro_gear.js 150
+  checks green (32 new), repro_hud/fight/movement green,
+  golangci-lint v2 0 issues on the touched files, live run against
+  the stack - the SkillList packet of the level 1 elven fighter
+  parsed (Lucky), the queue shows the 40 remaining lessons ordered
+  attack power (31) -> defense (6) -> other (3) with the SP costs and
+  the browser check confirmed the layout (no overlap, no overflow).

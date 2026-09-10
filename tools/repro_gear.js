@@ -158,6 +158,7 @@ function fire(element, type, event) {
 function loadAppJs(appFile) {
     const elements = new Map();
     const posts = [];
+    const storage = new Map();
     const document = {
         getElementById: (id) => {
             if (!elements.has(id)) {
@@ -183,7 +184,9 @@ function loadAppJs(appFile) {
     const sandbox = {
         Math, JSON, Number, Date, isNaN,
         window: { localStorage: {
-            getItem: () => null, setItem: () => {}
+            getItem: (key) => (storage.has(key)
+                ? storage.get(key) : null),
+            setItem: (key, value) => storage.set(key, String(value))
         } },
         document,
         fetch: (url, options) => {
@@ -234,6 +237,26 @@ function loadAppJs(appFile) {
         " 'function' ? renderShoppingTooltip : undefined," +
         " ShopPanel: typeof ShopPanel !== 'undefined' ? ShopPanel" +
         " : undefined," +
+        " renderSkills: typeof renderSkills === 'function'" +
+        " ? renderSkills : undefined," +
+        " resetSkills: typeof resetSkills === 'function'" +
+        " ? resetSkills : undefined," +
+        " renderSkillQueue: typeof renderSkillQueue === 'function'" +
+        " ? renderSkillQueue : undefined," +
+        " resetSkillQueue: typeof resetSkillQueue === 'function'" +
+        " ? resetSkillQueue : undefined," +
+        " setGearMode: typeof setGearMode === 'function'" +
+        " ? setGearMode : undefined," +
+        " setSkillFilter: typeof setSkillFilter === 'function'" +
+        " ? setSkillFilter : undefined," +
+        " GearMode: typeof GearMode !== 'undefined' ? GearMode" +
+        " : undefined," +
+        " SkillCells: typeof SkillCells !== 'undefined' ? SkillCells" +
+        " : undefined," +
+        " SkillQueuePanel: typeof SkillQueuePanel !== 'undefined'" +
+        " ? SkillQueuePanel : undefined," +
+        " renderSkillQueueTooltip: typeof renderSkillQueueTooltip ===" +
+        " 'function' ? renderSkillQueueTooltip : undefined," +
         " App: App, GearDrag: GearDrag };",
         sandbox);
 
@@ -1426,6 +1449,305 @@ function main() {
         viewPop.classList.contains("hidden") &&
         viewBtn.getAttribute("aria-expanded") === "false",
         "the escape key did not close it");
+
+    // ---- the skills view and the skill learning queue ----
+    //
+    // The markup and css contract: the mode tabs replace the static
+    // EQUIPMENT title, the skills view overlays the gear content
+    // without changing the panel size (the gear view keeps the flow,
+    // the overlay covers it), the six column grid mirrors the bag and
+    // the queue flyout follows the shop pattern.
+
+    // The learned skills snapshot: three learned skills of an elven
+    // fighter (two active strikes, one passive mastery) plus the
+    // learning plan with the warrior priorities.
+    const skillsSnapshot = () => ({
+        id: "acc1",
+        character: {
+            objectId: 100, name: "test1", classId: 18, race: 1,
+            level: 5, sp: 200
+        },
+        skills: [
+            { skillId: 3, level: 3, passive: false,
+                name: "Power Strike", icon: "skill0003" },
+            { skillId: 16, level: 2, passive: false,
+                name: "Mortal Blow", icon: "skill0016" },
+            { skillId: 142, level: 1, passive: true,
+                name: "Armor Mastery", icon: "skill0142" }
+        ],
+        skillPlan: {
+            sp: 200, total: 460, missing: 260,
+            entries: [
+                { skillId: 141, name: "Weapon Mastery",
+                    icon: "skill0141", level: 1, passive: true,
+                    spCost: 160, reqLevel: 5, category: 0,
+                    affordable: true },
+                { skillId: 91, name: "Defense Aura",
+                    icon: "skill0091", level: 1, passive: false,
+                    spCost: 160, reqLevel: 5, category: 1,
+                    affordable: true },
+                { skillId: 58, name: "Elemental Heal",
+                    icon: "skill0058", level: 1, passive: false,
+                    spCost: 140, reqLevel: 15, category: 2,
+                    affordable: false }
+            ]
+        },
+        inventory: [], objects: [], events: [], status: "online"
+    });
+
+    // Warm up the element map (the stub creates the nodes lazily on
+    // the first getElementById call) before the checks read them.
+    gear.renderSkills(skillsSnapshot());
+    gear.renderSkillQueue(skillsSnapshot());
+
+    const skillsModeBtn = elements.get("gear-mode-skills");
+    const gearMain = elements.get("gear-main");
+    const skillsView = elements.get("skills-view");
+    const skillGrid = elements.get("skill-grid");
+    check(results, "the mode tabs and the skills view exist",
+        Boolean(elements.get("gear-mode-equip")) &&
+        Boolean(skillsModeBtn) && Boolean(gearMain) &&
+        Boolean(skillsView) && Boolean(skillGrid) &&
+        Boolean(elements.get("skill-tab-active")) &&
+        Boolean(elements.get("skill-tab-passive")),
+        "the skills view markup is incomplete");
+    check(results, "the skills view overlays the gear content",
+        css.includes(".skills-view") &&
+        css.includes(".gear-main { position: relative; }") &&
+        css.includes(".gear-main.mode-skills #gear-view") &&
+        css.includes("visibility: hidden") &&
+        !css.includes("#gear-view { display: none; }"),
+        "the overlay pattern is not pinned in the css");
+    check(results, "the skill grid keeps the six column bag metric",
+        css.includes(".skill-grid") &&
+        css.includes("grid-template-columns: repeat(6, 36px)") &&
+        css.includes(".skill-cell img"),
+        "the skill grid css drifted from the bag metric");
+    check(results, "the skill queue flyout follows the shop pattern",
+        html.includes('<button id="skillq-tab"') &&
+        html.includes('id="skillq-panel"') &&
+        css.includes(".skillq-panel") &&
+        css.includes(".skillq-panel.open") &&
+        css.includes(".skillq-panel.below-shop") &&
+        css.includes(".skillq-tab"),
+        "the skill queue flyout is not pinned");
+    check(results, "the queue flyout markup follows the gear panel",
+        html.indexOf('id="gear-panel"') <
+        html.indexOf('id="skillq-tab"') &&
+        html.indexOf('id="shop-panel"') <
+        html.indexOf('id="skillq-panel"'),
+        "the flyout markup order changed");
+
+    // The badge counts the learned skills even in gear mode.
+    const badge = elements.get("gear-mode-skill-badge");
+    check(results, "the skills tab badge carries the learned count",
+        badge.textContent === "3" &&
+        !badge.classList.contains("hidden"),
+        "badge: " + badge.textContent);
+
+    // Switching to the skills mode: the overlay appears, the gear
+    // content keeps the flow (the panel size stays).
+    gear.setGearMode("skills");
+    check(results, "the skills mode shows the overlay",
+        gearMain.classList.contains("mode-skills") &&
+        !skillsView.classList.contains("hidden") &&
+        elements.get("gear-mode-skills").classList.contains("active"),
+        "the mode switch did not toggle the overlay");
+    check(results, "the mode persists in localStorage",
+        sandbox.window.localStorage.getItem("swarm.gearMode") ===
+        "skills",
+        "the mode was not stored");
+
+    // The learned grid renders the ACTIVE tab: the two active skills
+    // with their icons and level badges, the passive one filtered
+    // out.
+    const activeCells = () => Array.from(skillGrid.children)
+        .filter((cell) => cell.className === "skill-cell");
+    let active = activeCells();
+    check(results, "the active tab renders the learned actives",
+        active.length === 2,
+        "cells: " + active.length);
+    check(results, "the learned cells carry the icons",
+        active[0].children.some((child) => child.src ===
+            "/icons/skill0003.png") &&
+        active[1].children.some((child) => child.src ===
+            "/icons/skill0016.png"),
+        "the icon images are missing");
+    const powerStrikeCell = active[0];
+    check(results, "the learned level badge shows the level",
+        powerStrikeCell.children.some((child) =>
+            child.className === "badge-level" &&
+            child.textContent === "3"),
+        "the level badge is wrong");
+
+    // Keyed rendering: an unchanged re-render keeps the icon image
+    // elements (the icons never blink).
+    const firstImg = powerStrikeCell.children.find(
+        (child) => child.src === "/icons/skill0003.png");
+    gear.renderSkills(skillsSnapshot());
+    active = activeCells();
+    check(results, "the skill cells survive a re-render",
+        active.length === 2 && active[0] === powerStrikeCell &&
+        active[0].children.includes(firstImg),
+        "the cells were rebuilt");
+
+    // A level up rewrites the badge in place.
+    const leveled = skillsSnapshot();
+    leveled.skills[0].level = 4;
+    gear.renderSkills(leveled);
+    check(results, "the level badge updates in place",
+        powerStrikeCell.children.some((child) =>
+            child.className === "badge-level" &&
+            child.textContent === "4") &&
+        powerStrikeCell.children.includes(firstImg),
+        "the level badge did not update");
+
+    // The PASSIVE filter switch: the passive mastery appears, the
+    // actives drop their cells.
+    gear.setSkillFilter("passive");
+    gear.renderSkills(skillsSnapshot());
+    const passiveCells = activeCells();
+    check(results, "the passive tab renders the learned passives",
+        passiveCells.length === 1 &&
+        passiveCells[0].children.some((child) =>
+            child.src === "/icons/skill0142.png"),
+        "cells: " + passiveCells.length);
+    check(results, "the filter persists in localStorage",
+        sandbox.window.localStorage.getItem("swarm.skillFilter") ===
+        "passive",
+        "the filter was not stored");
+    gear.setSkillFilter("active");
+    gear.renderSkills(skillsSnapshot());
+
+    // The pinned foot of the skills view: the SP wallet and the next
+    // planned lesson (the head of the queue).
+    check(results, "the skills foot shows the SP wallet",
+        elements.get("skill-sp").textContent === "200",
+        "sp: " + elements.get("skill-sp").textContent);
+    check(results, "the skills foot shows the next lesson",
+        elements.get("skill-next").textContent === "Weapon Mastery 1",
+        "next: " + elements.get("skill-next").textContent);
+
+    // The skill queue flyout: the edge tab and the panel appear with
+    // a plan, the rows carry the icon, the name with the level, the
+    // warrior priority category meta and the SP cost, the locked
+    // lessons dim.
+    const skillqPanel = elements.get("skillq-panel");
+    const skillqTab = elements.get("skillq-tab");
+    const skillqList = elements.get("skillq-list");
+    check(results, "the skill queue flyout appears with a plan",
+        !skillqPanel.classList.contains("hidden") &&
+        !skillqTab.classList.contains("hidden") &&
+        skillqPanel.classList.contains("open"),
+        "the flyout did not appear");
+    check(results, "the skill queue starts slid out",
+        skillqTab.getAttribute("aria-expanded") === "true",
+        "the tab is collapsed");
+    const queueRows = Array.from(skillqList.children);
+    check(results, "the queue renders one row per lesson",
+        queueRows.length === 3,
+        "rows: " + queueRows.length);
+    const firstQueueRow = queueRows[0];
+    const queueRowText = deepText(firstQueueRow);
+    check(results, "the first lesson carries the warrior priority",
+        queueRowText.includes("Weapon Mastery 1") &&
+        queueRowText.includes("attack power") &&
+        queueRowText.includes("160"),
+        "row: " + queueRowText);
+    const thirdQueueRow = queueRows[2];
+    check(results, "the locked lesson dims with the unlock level",
+        thirdQueueRow.classList.contains("locked") &&
+        deepText(thirdQueueRow).includes("at 15"),
+        "row: " + deepText(thirdQueueRow));
+    const secondQueueRow = queueRows[1];
+    check(results, "the defense lesson follows the attack power",
+        deepText(secondQueueRow).includes("Defense Aura") &&
+        deepText(secondQueueRow).includes("defense"),
+        "row: " + deepText(secondQueueRow));
+
+    // Keyed rendering of the queue rows: a changed plan reuses the
+    // icon image elements.
+    const queueImg = firstQueueRow.children[0].children.find(
+        (child) => child.src === "/icons/skill0141.png");
+    const replan = skillsSnapshot();
+    replan.skillPlan.sp = 500;
+    replan.skillPlan.missing = 0;
+    replan.character.sp = 500;
+    for (const entry of replan.skillPlan.entries) {
+        entry.affordable = entry.spCost <= 500;
+    }
+    gear.renderSkillQueue(replan);
+    const replannedRows = Array.from(skillqList.children);
+    check(results, "the queue rows survive a replan",
+        replannedRows.length === 3 &&
+        replannedRows[0] === firstQueueRow &&
+        replannedRows[0].children[0].children.includes(queueImg),
+        "the queue rows were rebuilt");
+    check(results, "the queue foot follows the wallet",
+        elements.get("skillq-sp").textContent === "500" &&
+        elements.get("skillq-need").textContent === "460" &&
+        elements.get("skillq-save").textContent === "\u2014",
+        "the foot values did not refresh");
+
+    // The tab click collapses the flyout.
+    fire(skillqTab, "click");
+    check(results, "the queue tab click slides the flyout in",
+        !skillqPanel.classList.contains("open") &&
+        skillqTab.getAttribute("aria-expanded") === "false",
+        "the flyout did not collapse");
+    fire(skillqTab, "click");
+    check(results, "the second queue tab click slides it out again",
+        skillqPanel.classList.contains("open"),
+        "the flyout did not reopen");
+
+    // The queue dock: below the shop flyout while it is out, back to
+    // the top edge when the shop plan disappears.
+    const dockShopPlan = {
+        entries: [{ itemId: 1121, name: "Shoes", icon: "", price: 9,
+            gain: 8, affordable: true }],
+        adena: 500, total: 9, trip: false
+    };
+    gear.renderShopping(Object.assign(skillsSnapshot(),
+        { shopping: dockShopPlan }));
+    check(results, "the queue docks below the shop flyout",
+        skillqPanel.classList.contains("below-shop"),
+        "the dock class is missing");
+    gear.renderShopping(Object.assign(skillsSnapshot(),
+        { shopping: null }));
+    check(results, "the queue re-docks without the shop flyout",
+        !skillqPanel.classList.contains("below-shop"),
+        "the dock class stayed");
+
+    // The lesson tooltip: the category, the cost and the status.
+    const queueTooltip = gear.renderSkillQueueTooltip
+        ? gear.renderSkillQueueTooltip(replan.skillPlan.entries[2], 5,
+            replan.skillPlan)
+        : "";
+    check(results, "the lesson tooltip carries the plan lines",
+        queueTooltip.includes("Elemental Heal") &&
+        queueTooltip.includes("attack") === false &&
+        queueTooltip.includes("locked until level 15") &&
+        queueTooltip.includes("140 sp"),
+        "tooltip: " + queueTooltip.replace(/\s+/g, " ").slice(0, 120));
+
+    // Switching back to the gear mode: the overlay hides, the gear
+    // content returns.
+    gear.setGearMode("gear");
+    check(results, "the gear mode restores the equipment view",
+        !gearMain.classList.contains("mode-skills") &&
+        skillsView.classList.contains("hidden"),
+        "the overlay did not hide");
+
+    // The resets: no plan and no skills hide the queue and clear the
+    // badge.
+    gear.resetSkills();
+    gear.resetSkillQueue();
+    check(results, "the reset drops the skills view state",
+        gear.SkillCells.cells.size === 0 &&
+        skillGrid.children.length === 0 &&
+        badge.classList.contains("hidden") &&
+        skillqPanel.classList.contains("hidden"),
+        "the reset left state behind");
 
     let failed = 0;
     for (const result of results) {

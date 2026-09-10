@@ -1322,6 +1322,318 @@ body.mode-pathfind .gear-panel { display: none; }
   color: var(--text);
 }
 
+/* ---- skills view of the equipment widget ----
+   The EQUIPMENT / SKILLS mode tabs turn the floating gear panel into
+   a two-view widget without changing its size: the gear content (the
+   paperdoll, the bag, the adena/weight footer) stays in the flow and
+   always defines the panel height, the skills view is an absolutely
+   positioned overlay of exactly that area - its grid scrolls inside
+   the fixed footprint, the own pinned footer shows the SP wallet and
+   the next planned lesson. */
+
+/* The mode tab row replaces the static EQUIPMENT title: two segmented
+   buttons of the same height, the SKILLS button carries the learned
+   count badge. */
+.gear-mode {
+  display: flex;
+  gap: 5px;
+  padding: 8px 8px 7px;
+}
+
+.gear-mode-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 6px 3px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text-dim);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gear-mode-btn:hover { color: var(--text); }
+
+.gear-mode-btn.active {
+  background: var(--bg-panel-2);
+  color: var(--text-bright);
+  border-color: var(--accent);
+}
+
+.gear-mode-badge {
+  font-size: 8.5px;
+  font-family: var(--mono);
+  padding: 0.5px 4px;
+  border-radius: 3px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  letter-spacing: 0;
+}
+
+.gear-mode-btn.active .gear-mode-badge {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.gear-mode-badge.hidden { display: none; }
+
+/* The content area of the two views: the gear view stays in the flow
+   (it sizes the panel), the skills view overlays it exactly. */
+.gear-main { position: relative; }
+
+/* In skills mode the gear content only hides visually: display none
+   would collapse the flow and shrink the panel - the forbidden size
+   change. */
+.gear-main.mode-skills #gear-view { visibility: hidden; }
+
+.skills-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  overflow: hidden;
+}
+
+.skills-view.hidden { display: none; }
+
+/* The ACTIVE / PASSIVE filter row of the learned list, the same
+   chrome height as the INVENTORY title row it replaces. */
+.skill-filter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 8px 6px;
+}
+
+.skill-filter-btn {
+  padding: 2.5px 7px 2px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.skill-filter-btn:hover { color: var(--text); }
+
+.skill-filter-btn.active {
+  background: var(--bg-panel-2);
+  color: var(--text-bright);
+  border-color: var(--accent);
+}
+
+.skill-count {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-family: var(--mono);
+}
+
+/* The learned skill grid: six columns of 36px cells like the
+   inventory bag, the grid scrolls inside the fixed overlay area. */
+.skill-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 36px);
+  grid-auto-rows: 36px;
+  gap: 3px;
+  padding: 0 8px;
+  overflow-y: auto;
+  flex: 1;
+  align-content: start;
+  scrollbar-width: thin;
+}
+
+.skill-grid::-webkit-scrollbar { width: 6px; }
+
+.skill-grid::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.skill-cell {
+  position: relative;
+  border: 1px solid var(--border-soft);
+  border-radius: 5px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: default;
+}
+
+.skill-cell img {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+  position: relative;
+  z-index: 2;
+}
+
+/* The learned level badge over the skill cell corner (the same
+   overlay style as the enchant badge of the bag). */
+.skill-cell .badge-level {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  z-index: 3;
+  font-size: 8.5px;
+  font-family: var(--mono);
+  line-height: 1;
+  padding: 1.5px 2.5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #8ef2a0;
+}
+
+.skill-cell .icon-glyph { font-size: 13px; }
+
+/* The empty filter note: a muted line when the tab has no skills. */
+.skill-empty {
+  grid-column: 1 / -1;
+  padding: 14px 6px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+/* The pinned footer of the skills view: the SP wallet and the next
+   planned lesson stay visible whatever the grid scroll is. */
+.skill-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px 9px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.skill-sp-val,
+.skill-next-val {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 11.5px;
+  color: var(--accent);
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.skill-next-val {
+  color: var(--text);
+  font-weight: 400;
+  font-size: 11px;
+}
+
+/* ---- skill learning queue widget (the lesson plan of the bot) ----
+   A flyout of the floating equipment panel like the shop queue: a
+   triangle tab on the left edge (below the shop tab) slides the
+   queue out to the left of the panel, so the panel itself keeps its
+   size. Every entry of the published learning plan (snap.skillPlan,
+   the remaining lessons ordered by the warrior priorities) renders
+   as one compact row - icon, name, the category and the unlock level
+   meta, the SP cost on the right with the missing SP under it. The
+   queue docks below the shop flyout when both are open. */
+
+.skillq-tab {
+  position: absolute;
+  left: -14px;
+  top: 27px;
+  width: 14px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-right: 0;
+  border-radius: 5px 0 0 5px;
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font-size: 9px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.skillq-tab:hover { color: var(--text); }
+
+.skillq-panel {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 14px);
+  width: 240px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateX(24px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 180ms ease-out, opacity 180ms ease-out,
+    visibility 180ms;
+  z-index: 5;
+}
+
+.skillq-panel.open {
+  transform: none;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* Below an open shop flyout the queue docks under it instead of
+   overlapping (the shop flyout tops out at ~166px). */
+.skillq-panel.below-shop { top: 175px; }
+
+.skillq-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 5px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  flex-shrink: 0;
+}
+
+.skillq-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.skillq-list { max-height: 150px; }
+
+/* The queue rows keep the shop row shape; the SP cost takes the
+   accent and the not yet affordable lessons dim like the shop
+   wanted tail. */
+.skillq-item.locked {
+  border-left-color: var(--border);
+  opacity: 0.6;
+}
+
+.skillq-item .skillq-cost { color: var(--accent); }
+
+.skillq-item.locked .skillq-cost { color: var(--text-dim); }
+
 /* Paperdoll blocks: the wear and jewelry grids share the compact 36px
    cell metric of the inventory grid, so the blocks read as one
    widget. */

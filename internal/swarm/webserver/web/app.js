@@ -300,6 +300,8 @@ function selectBot(botId) {
   resetPanels();
   resetGear();
   resetShop();
+  resetSkills();
+  resetSkillQueue();
 }
 
 function resetPanels() {
@@ -336,6 +338,8 @@ function renderSnapshot() {
   renderTarget(snap);
   renderGear(snap);
   renderShopping(snap);
+  renderSkills(snap);
+  renderSkillQueue(snap);
   renderZones(snap);
   renderChat(snap);
   renderLog(snap);
@@ -1467,6 +1471,10 @@ function resetShop() {
   if (tab) { tab.classList.add("hidden"); }
   const summary = document.getElementById("shop-summary");
   if (summary) { summary.textContent = ""; }
+  // The skill queue flyout re-docks when the shop flyout disappears.
+  if (typeof syncSkillQueueDock === "function") {
+    syncSkillQueueDock();
+  }
 }
 
 // renderShopping refreshes the shop queue widget from the published
@@ -1487,6 +1495,11 @@ function renderShopping(snap) {
   const tab = document.getElementById("shop-tab");
   if (tab) { tab.classList.remove("hidden"); }
   applyShopPanelState();
+  // The skill queue flyout re-docks when the shop flyout appears or
+  // disappears above it.
+  if (typeof syncSkillQueueDock === "function") {
+    syncSkillQueueDock();
+  }
 
   const signature = shopRowSignature(plan);
   if (ShopPanel.signature === signature) { return; }
@@ -1770,6 +1783,712 @@ function showShoppingTooltip(entry, item) {
   TooltipState.cell = item;
   el.innerHTML = renderShoppingTooltip(entry);
   el.className = "item-tooltip fam-" + itemFamily(entry);
+  el.setAttribute("aria-hidden", "false");
+  const rect = item.getBoundingClientRect();
+  positionItemTooltip(rect.left, rect.top, "left");
+}
+
+// ---- skills view of the equipment widget ----
+//
+// The EQUIPMENT / SKILLS mode tabs make the floating gear widget
+// universal: the gear content (paperdoll, bag, adena/weight footer)
+// stays in the flow and keeps defining the panel size, the skills
+// view is an absolutely positioned overlay of exactly that area (see
+// .skills-view) - the widget never changes its dimensions. The
+// overlay carries the ACTIVE / PASSIVE filter tabs, the learned skill
+// grid (six columns of 36px cells like the bag, one keyed cell per
+// skill - the icons never re-decode on re-renders, the same rule as
+// the GearCells of the bag) and the pinned foot with the SP wallet
+// and the next planned lesson.
+
+// GearMode holds the widget mode and the learned list filter, both
+// persisted in localStorage like the zone panel collapse.
+const GearMode = {
+  mode: "gear",
+  filter: "active",
+  gridSignature: ""
+};
+
+// SkillCells is the keyed cell registry of the learned skill grid:
+// one persistent record per skill id, refreshed in place; the empty
+// note is the persistent placeholder of the empty filter state.
+const SkillCells = {
+  cells: new Map(),
+  order: "",
+  emptyNote: null
+};
+
+// SKILL_CATEGORY_LABELS names the warrior priority categories of the
+// generated skill dictionary (0 attack power, 1 defense, 2 other).
+const SKILL_CATEGORY_LABELS = ["attack power", "defense", "other"];
+
+// initGearMode wires the mode tabs of the equipment widget and the
+// ACTIVE / PASSIVE filter of the learned list, restoring both from
+// localStorage.
+function initGearMode() {
+  const equipBtn = document.getElementById("gear-mode-equip");
+  const skillsBtn = document.getElementById("gear-mode-skills");
+  if (equipBtn && skillsBtn) {
+    equipBtn.addEventListener("click", () => {
+      setGearMode("gear");
+    });
+    skillsBtn.addEventListener("click", () => {
+      setGearMode("skills");
+    });
+  }
+  const activeBtn = document.getElementById("skill-tab-active");
+  const passiveBtn = document.getElementById("skill-tab-passive");
+  if (activeBtn && passiveBtn) {
+    activeBtn.addEventListener("click", () => {
+      setSkillFilter("active");
+    });
+    passiveBtn.addEventListener("click", () => {
+      setSkillFilter("passive");
+    });
+  }
+  try {
+    const storedMode = window.localStorage.getItem("swarm.gearMode");
+    if (storedMode === "skills") { GearMode.mode = "skills"; }
+    const storedFilter = window.localStorage.getItem("swarm.skillFilter");
+    if (storedFilter === "passive") { GearMode.filter = "passive"; }
+  } catch (err) { /* storage unavailable - defaults stay */ }
+  applyGearMode();
+}
+
+// setGearMode switches the widget mode and persists it.
+function setGearMode(mode) {
+  if (GearMode.mode === mode) { return; }
+  GearMode.mode = mode;
+  try {
+    window.localStorage.setItem("swarm.gearMode", mode);
+  } catch (err) { /* storage unavailable - skip */ }
+  applyGearMode();
+}
+
+// setSkillFilter switches the ACTIVE / PASSIVE tab of the learned
+// list and persists it.
+function setSkillFilter(filter) {
+  if (GearMode.filter === filter) { return; }
+  GearMode.filter = filter;
+  try {
+    window.localStorage.setItem("swarm.skillFilter", filter);
+  } catch (err) { /* storage unavailable - skip */ }
+  applyGearMode();
+}
+
+// applyGearMode syncs the tab buttons, the view visibility and the
+// filter buttons with the GearMode state.
+function applyGearMode() {
+  const main = document.getElementById("gear-main");
+  const equipBtn = document.getElementById("gear-mode-equip");
+  const skillsBtn = document.getElementById("gear-mode-skills");
+  const skillsView = document.getElementById("skills-view");
+  if (main) {
+    main.classList.toggle("mode-skills", GearMode.mode === "skills");
+  }
+  if (equipBtn) {
+    equipBtn.classList.toggle("active", GearMode.mode !== "skills");
+    equipBtn.setAttribute("aria-selected",
+      GearMode.mode !== "skills" ? "true" : "false");
+  }
+  if (skillsBtn) {
+    skillsBtn.classList.toggle("active", GearMode.mode === "skills");
+    skillsBtn.setAttribute("aria-selected",
+      GearMode.mode === "skills" ? "true" : "false");
+  }
+  if (skillsView) {
+    skillsView.classList.toggle("hidden", GearMode.mode !== "skills");
+  }
+  const activeBtn = document.getElementById("skill-tab-active");
+  const passiveBtn = document.getElementById("skill-tab-passive");
+  if (activeBtn) {
+    activeBtn.classList.toggle("active", GearMode.filter === "active");
+    activeBtn.setAttribute("aria-selected",
+      GearMode.filter === "active" ? "true" : "false");
+  }
+  if (passiveBtn) {
+    passiveBtn.classList.toggle("active", GearMode.filter === "passive");
+    passiveBtn.setAttribute("aria-selected",
+      GearMode.filter === "passive" ? "true" : "false");
+  }
+}
+
+// skillGridSignature is the change signature of the learned grid: the
+// filter plus the id:level pairs of the snapshot list. Two snapshots
+// with equal signatures leave the cell DOM untouched.
+function skillGridSignature(skills, filter) {
+  const parts = [filter];
+  for (const skill of skills) {
+    if (filter === "active" ? !skill.passive : skill.passive) {
+      parts.push(skill.skillId + ":" + skill.level);
+    }
+  }
+
+  return parts.join(",");
+}
+
+// renderSkills refreshes the learned skill view of the equipment
+// widget: the tab badge carries the learned count, the keyed grid
+// renders the filter tab (six per row with icons and the level
+// badge), the pinned foot shows the SP wallet and the next planned
+// lesson of the queue.
+function renderSkills(snap) {
+  const grid = document.getElementById("skill-grid");
+  const skills = snap.skills || [];
+  const plan = snap.skillPlan;
+
+  const badge = document.getElementById("gear-mode-skill-badge");
+  if (badge) {
+    badge.textContent = String(skills.length);
+    badge.classList.toggle("hidden", skills.length === 0);
+  }
+  if (!grid) { return; }
+
+  const signature = skillGridSignature(skills, GearMode.filter);
+  if (GearMode.gridSignature === signature) {
+    renderSkillsFoot(snap, plan);
+
+    return;
+  }
+  GearMode.gridSignature = signature;
+
+  const wanted = skills.filter((skill) =>
+    GearMode.filter === "active" ? !skill.passive : skill.passive);
+
+  const order = [];
+  const seen = new Set();
+  for (const skill of wanted) {
+    seen.add(skill.skillId);
+    order.push(skill.skillId);
+    let record = SkillCells.cells.get(skill.skillId);
+    if (!record) {
+      record = makeSkillCell(skill);
+      SkillCells.cells.set(skill.skillId, record);
+      grid.append(record.cell);
+    }
+    applySkillCell(record, skill);
+  }
+  for (const [id, record] of Array.from(SkillCells.cells)) {
+    if (!seen.has(id)) {
+      if (TooltipState.cell === record.cell) { hideItemTooltip(); }
+      record.cell.remove();
+      SkillCells.cells.delete(id);
+    }
+  }
+  const orderSig = order.join(",");
+  if (SkillCells.order !== orderSig) {
+    SkillCells.order = orderSig;
+    for (const id of order) {
+      const record = SkillCells.cells.get(id);
+      if (record) { grid.append(record.cell); }
+    }
+  }
+
+  const note = SkillCells.emptyNote;
+  if (wanted.length === 0) {
+    if (!note) {
+      const empty = document.createElement("div");
+      empty.className = "skill-empty";
+      grid.append(empty);
+      SkillCells.emptyNote = empty;
+    }
+    SkillCells.emptyNote.textContent = skills.length === 0
+      ? "no skills yet" : "no " + GearMode.filter + " skills";
+  } else if (note) {
+    note.remove();
+    SkillCells.emptyNote = null;
+  }
+
+  const count = document.getElementById("skill-count");
+  if (count) {
+    count.textContent = wanted.length + "/" + skills.length;
+  }
+  renderSkillsFoot(snap, plan);
+}
+
+// makeSkillCell creates one keyed learned skill cell: the persistent
+// DOM node with its icon and level badge, plus the hover wiring of
+// the skill tooltip.
+function makeSkillCell(skill) {
+  const cell = document.createElement("div");
+  cell.className = "skill-cell";
+  const row = { cell, img: null, glyph: null, level: null, skill: null };
+  cell.addEventListener("mouseenter", () => {
+    showSkillTooltip(row.skill, cell);
+  });
+  cell.addEventListener("mousemove", (event) => {
+    positionItemTooltip(event.clientX, event.clientY, "left");
+  });
+  cell.addEventListener("mouseleave", () => {
+    hideItemTooltip();
+  });
+
+  return row;
+}
+
+// applySkillCell refreshes one keyed learned skill cell to the
+// snapshot entry: the icon image is a static function of the skill id
+// (the generated icon dictionary), so the cell builds it once and the
+// later refreshes only rewrite the level badge (the keyed rendering
+// rule of the equipment widget - the icons never blink).
+function applySkillCell(record, skill) {
+  record.skill = skill;
+  if (!record.img && !record.glyph) {
+    if (skill.icon) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = "/icons/" + skill.icon + ".png";
+      img.addEventListener("error", () => img.remove());
+      record.cell.append(img);
+      record.img = img;
+    } else {
+      const glyph = document.createElement("span");
+      glyph.className = "icon-glyph";
+      glyph.textContent = skill.passive ? "P" : "A";
+      record.cell.append(glyph);
+      record.glyph = glyph;
+    }
+  }
+  if (!record.level) {
+    const level = document.createElement("span");
+    level.className = "badge-level";
+    record.cell.append(level);
+    record.level = level;
+  }
+  record.level.textContent = String(skill.level);
+  record.cell.title = (skill.name || ("skill #" + skill.skillId)) +
+    " lvl " + skill.level;
+}
+
+// renderSkillsFoot refreshes the pinned footer of the skills view:
+// the SP wallet of the character and the next planned lesson (the
+// head of the learning queue).
+function renderSkillsFoot(snap, plan) {
+  const c = snap.character || {};
+  const sp = document.getElementById("skill-sp");
+  if (sp) {
+    sp.textContent = formatNumber(c.sp);
+    sp.title = "skill points: " + formatNumber(c.sp);
+  }
+  const next = document.getElementById("skill-next");
+  const nextRow = document.getElementById("skill-next-row");
+  if (next && nextRow) {
+    const first = plan && plan.entries && plan.entries[0];
+    if (first) {
+      next.textContent = (first.name || ("skill #" + first.skillId)) +
+        " " + first.level;
+      nextRow.title = "the next planned lesson: " +
+        (first.name || ("skill #" + first.skillId)) +
+        " level " + first.level + " for " + formatNumber(first.spCost) +
+        " sp" + (first.reqLevel > c.level
+          ? " (unlocks at level " + first.reqLevel + ")" : "");
+    } else {
+      next.textContent = "—";
+      nextRow.title = "nothing left to learn";
+    }
+  }
+}
+
+// resetSkills drops the learned grid state and DOM: switching the
+// observed bot starts the list from scratch.
+function resetSkills() {
+  SkillCells.cells.clear();
+  SkillCells.order = "";
+  SkillCells.emptyNote = null;
+  GearMode.gridSignature = "";
+  const grid = document.getElementById("skill-grid");
+  if (grid) { grid.innerHTML = ""; }
+  const badge = document.getElementById("gear-mode-skill-badge");
+  if (badge) { badge.textContent = ""; badge.classList.add("hidden"); }
+  const count = document.getElementById("skill-count");
+  if (count) { count.textContent = "0"; }
+  const sp = document.getElementById("skill-sp");
+  if (sp) { sp.textContent = "—"; sp.title = ""; }
+  const next = document.getElementById("skill-next");
+  if (next) { next.textContent = "—"; }
+  const nextRow = document.getElementById("skill-next-row");
+  if (nextRow) { nextRow.title = ""; }
+}
+
+// ---- skill learning queue widget (the lesson plan of the bot) ----
+//
+// A flyout of the floating equipment panel like the shop queue: the
+// triangle tab on the left edge (below the shop tab) slides the queue
+// out to the left of the panel, so the panel itself keeps its size.
+// Every lesson of the published learning plan (snap.skillPlan - the
+// remaining class tree lessons ordered by the warrior priorities:
+// physical weapon attack power first, defense second, the rest last)
+// renders as one compact row with the SP cost; the not yet
+// affordable and the level locked lessons dim like the shop wanted
+// tail. The learning itself is not implemented - the queue only
+// shows the planned order.
+
+// SkillQueuePanel holds the flyout state: the open flag (open by
+// default - the point of the widget is the passive glance) and the
+// keyed row registry.
+const SkillQueuePanel = {
+  open: true,
+  rows: new Map(),
+  order: "",
+  signature: ""
+};
+
+// initSkillQueuePanel wires the triangle tab of the flyout: the click
+// slides the queue out to the left of the equipment panel and back.
+function initSkillQueuePanel() {
+  const tab = document.getElementById("skillq-tab");
+  if (!tab) { return; }
+  tab.addEventListener("click", () => {
+    SkillQueuePanel.open = !SkillQueuePanel.open;
+    applySkillQueueState();
+  });
+}
+
+// applySkillQueueState syncs the flyout DOM with the open flag: the
+// panel slides in or out and the edge triangle flips its direction.
+function applySkillQueueState() {
+  const panel = document.getElementById("skillq-panel");
+  const tab = document.getElementById("skillq-tab");
+  const chev = document.getElementById("skillq-tab-chev");
+  if (panel) {
+    panel.classList.toggle("open", SkillQueuePanel.open);
+  }
+  if (tab) {
+    tab.setAttribute("aria-expanded", SkillQueuePanel.open ? "true" : "false");
+  }
+  if (chev) {
+    chev.textContent = SkillQueuePanel.open ? "\u25B8" : "\u25C2";
+  }
+}
+
+// syncSkillQueueDock positions the flyout under the shop queue when
+// the shop flyout is out (both dock to the left of the equipment
+// panel and would overlap otherwise).
+function syncSkillQueueDock() {
+  const panel = document.getElementById("skillq-panel");
+  if (!panel) { return; }
+  const shop = document.getElementById("shop-panel");
+  const shopOpen = shop && !shop.classList.contains("hidden");
+  panel.classList.toggle("below-shop", Boolean(shopOpen));
+}
+
+// skillQueueSignature is the change signature of the whole queue
+// view: two snapshots with equal signatures leave the row DOM
+// untouched.
+function skillQueueSignature(plan, level) {
+  const parts = [plan.sp, plan.total, plan.missing, level,
+    plan.entries.length];
+  for (const entry of plan.entries) {
+    parts.push([entry.skillId, entry.level, entry.spCost, entry.reqLevel,
+      entry.affordable, entry.passive, entry.name].join("|"));
+  }
+
+  return parts.join(";");
+}
+
+// resetSkillQueue drops the widget state and DOM: switching the
+// observed bot starts the queue from scratch.
+function resetSkillQueue() {
+  SkillQueuePanel.rows.clear();
+  SkillQueuePanel.order = "";
+  SkillQueuePanel.signature = "";
+  const list = document.getElementById("skillq-list");
+  if (list) { list.innerHTML = ""; }
+  const panel = document.getElementById("skillq-panel");
+  if (panel) {
+    panel.classList.add("hidden");
+    panel.classList.remove("below-shop", "open");
+  }
+  const tab = document.getElementById("skillq-tab");
+  if (tab) { tab.classList.add("hidden"); }
+  const summary = document.getElementById("skillq-summary");
+  if (summary) { summary.textContent = ""; }
+}
+
+// renderSkillQueue refreshes the learning queue flyout from the
+// published plan: the edge tab and the flyout hide without a plan
+// (nothing published or a class the dictionary does not know), the
+// keyed rows and the summary line otherwise.
+function renderSkillQueue(snap) {
+  const panel = document.getElementById("skillq-panel");
+  const list = document.getElementById("skillq-list");
+  if (!panel || !list) { return; }
+  const plan = snap.skillPlan;
+  if (!plan || !plan.entries || plan.entries.length === 0) {
+    resetSkillQueue();
+
+    return;
+  }
+  panel.classList.remove("hidden");
+  const tab = document.getElementById("skillq-tab");
+  if (tab) { tab.classList.remove("hidden"); }
+  syncSkillQueueDock();
+  applySkillQueueState();
+
+  const level = snap.character ? snap.character.level : 0;
+  const signature = skillQueueSignature(plan, level);
+  if (SkillQueuePanel.signature === signature) { return; }
+  SkillQueuePanel.signature = signature;
+
+  const order = [];
+  const seen = new Set();
+  for (const entry of plan.entries) {
+    const key = entry.skillId + ":" + entry.level;
+    seen.add(key);
+    order.push(key);
+    let row = SkillQueuePanel.rows.get(key);
+    if (!row) {
+      row = makeSkillQueueRow();
+      SkillQueuePanel.rows.set(key, row);
+      list.append(row.item);
+    }
+    applySkillQueueRow(row, entry, level, plan.sp);
+  }
+  for (const [key, row] of Array.from(SkillQueuePanel.rows)) {
+    if (!seen.has(key)) {
+      if (TooltipState.cell === row.item) { hideItemTooltip(); }
+      row.item.remove();
+      SkillQueuePanel.rows.delete(key);
+    }
+  }
+  // Reordering moves the persistent rows (appendChild keeps the icon
+  // image elements alive) and only when the order actually changed.
+  const orderSig = order.join(",");
+  if (SkillQueuePanel.order !== orderSig) {
+    SkillQueuePanel.order = orderSig;
+    for (const key of order) {
+      const row = SkillQueuePanel.rows.get(key);
+      if (row) { list.append(row.item); }
+    }
+  }
+  renderSkillQueueSummary(plan, level);
+}
+
+// makeSkillQueueRow creates one keyed lesson row: the persistent DOM
+// node with its icon box, the info column and the SP cost column,
+// plus the hover wiring of the lesson tooltip.
+function makeSkillQueueRow() {
+  const item = document.createElement("li");
+  item.className = "shop-item skillq-item";
+  const icon = document.createElement("div");
+  icon.className = "shop-icon";
+  const info = document.createElement("div");
+  info.className = "shop-info";
+  const name = document.createElement("div");
+  name.className = "shop-name";
+  const meta = document.createElement("div");
+  meta.className = "shop-meta";
+  info.append(name, meta);
+  const side = document.createElement("div");
+  side.className = "shop-side";
+  const cost = document.createElement("span");
+  cost.className = "shop-price skillq-cost";
+  const missing = document.createElement("span");
+  missing.className = "shop-missing";
+  side.append(cost, missing);
+  item.append(icon, info, side);
+  const row = {
+    item, icon, side, name, meta, cost, missing,
+    img: null, glyph: null, entry: null, locked: false
+  };
+  item.addEventListener("mouseenter", () => {
+    showSkillQueueTooltip(row.entry, item);
+  });
+  item.addEventListener("mousemove", (event) => {
+    positionItemTooltip(event.clientX, event.clientY, "left");
+  });
+  item.addEventListener("mouseleave", () => {
+    hideItemTooltip();
+  });
+
+  return row;
+}
+
+// applySkillQueueRow refreshes one keyed lesson row to the plan
+// entry: the icon image is a static function of the skill id, so the
+// row builds it once and the later refreshes only rewrite the text
+// badges and the classes (the keyed rendering rule - the icons never
+// blink). The wallet argument is the SP the plan was computed with,
+// the missing line under the cost shows how much of it the lesson
+// still needs.
+function applySkillQueueRow(row, entry, level, wallet) {
+  row.entry = entry;
+  if (!row.img && !row.glyph) {
+    if (entry.icon) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = "/icons/" + entry.icon + ".png";
+      img.addEventListener("error", () => img.remove());
+      row.icon.append(img);
+      row.img = img;
+    } else {
+      const glyph = document.createElement("span");
+      glyph.className = "icon-glyph";
+      glyph.textContent = entry.passive ? "P" : "A";
+      row.icon.append(glyph);
+      row.glyph = glyph;
+    }
+  }
+  row.name.textContent = (entry.name || ("skill #" + entry.skillId)) +
+    " " + entry.level;
+  row.meta.textContent = skillQueueRowMeta(entry, level);
+  row.cost.textContent = formatNumber(entry.spCost);
+  const missingSp = Math.max(0, entry.spCost - wallet);
+  row.missing.textContent = !entry.affordable && missingSp > 0
+    ? "need " + formatNumber(missingSp) : "";
+  row.missing.classList.toggle("hidden", entry.affordable);
+  row.locked = entry.reqLevel > level;
+  row.item.classList.toggle("locked", row.locked);
+  row.item.classList.toggle("want", !entry.affordable && !row.locked);
+}
+
+// skillQueueRowMeta builds the muted info line of one lesson row: the
+// warrior priority category, the level being learned and the unlock
+// level when the character is below it.
+function skillQueueRowMeta(entry, level) {
+  const category = SKILL_CATEGORY_LABELS[entry.category] || "other";
+  const parts = ["lvl " + entry.level, category];
+  if (entry.reqLevel > level) {
+    parts.push("at " + entry.reqLevel);
+  }
+
+  return parts.join(" \u00B7 ");
+}
+
+// renderSkillQueueSummary refreshes the head summary line and the
+// pinned sp/need/save foot of the flyout: the lesson count with the
+// queue total, the SP wallet, the whole queue cost and the SP still
+// missing for it.
+function renderSkillQueueSummary(plan, level) {
+  const summary = document.getElementById("skillq-summary");
+  if (summary) {
+    summary.textContent = "";
+    const base = document.createElement("span");
+    base.textContent = plan.entries.length + " lessons \u00B7 " +
+      formatNumber(plan.total) + " sp";
+    summary.append(base);
+    if (plan.missing > 0) {
+      const saveSpan = document.createElement("span");
+      saveSpan.className = "sum-missing";
+      saveSpan.textContent = " \u00B7 save " + formatNumber(plan.missing);
+      summary.append(saveSpan);
+    }
+  }
+  const sp = document.getElementById("skillq-sp");
+  if (sp) {
+    sp.textContent = formatNumber(plan.sp);
+    sp.title = "the skill points the plan was computed with";
+  }
+  const need = document.getElementById("skillq-need");
+  if (need) {
+    need.textContent = formatNumber(plan.total);
+    need.title = "the sp the whole queue costs";
+  }
+  const save = document.getElementById("skillq-save");
+  if (save) {
+    save.textContent = plan.missing > 0
+      ? formatNumber(plan.missing) : "\u2014";
+    save.title = plan.missing > 0
+      ? "the sp still missing for the whole queue"
+      : "the wallet covers the queue";
+  }
+}
+
+// renderSkillTooltip builds the HTML payload of the learned skill
+// tooltip: the name, the passive/active kind with the warrior
+// priority category and the learned level.
+function renderSkillTooltip(skill) {
+  if (!skill) { return ""; }
+  const lines = [];
+  const nameText = skill.name || ("skill #" + skill.skillId);
+  lines.push(`<div class="tip-name">${escapeHTML(nameText)}</div>`);
+  lines.push(tooltipLine("Type",
+    (skill.passive ? "Passive" : "Active") + " skill"));
+  lines.push(tooltipLine("Level", skill.level));
+  const family = skill.passive ? "armor" : "weapon";
+
+  return `<div class="tip-inner tip-${family}">${lines.join("")}</div>`;
+}
+
+// showSkillTooltip renders the learned skill tooltip for one grid
+// cell and positions the shared floating panel to the left of the
+// hovered cell.
+function showSkillTooltip(skill, cell) {
+  const el = tooltipElement();
+  if (!el) { return; }
+  if (!skill) {
+    hideItemTooltip();
+
+    return;
+  }
+  TooltipState.cell = cell;
+  el.innerHTML = renderSkillTooltip(skill);
+  el.className = "item-tooltip fam-armor";
+  el.setAttribute("aria-hidden", "false");
+  const rect = cell.getBoundingClientRect();
+  positionItemTooltip(rect.left, rect.top, "left");
+}
+
+// renderSkillQueueTooltip builds the HTML payload of the lesson
+// tooltip: the name, the lesson level with the category, the unlock
+// level, the SP cost, the status (learnable now, saving up or locked
+// until the level) and the queue totals.
+function renderSkillQueueTooltip(entry, level, plan) {
+  if (!entry) { return ""; }
+  const lines = [];
+  const nameText = (entry.name || ("skill #" + entry.skillId)) +
+    " " + entry.level;
+  lines.push(`<div class="tip-name">${escapeHTML(nameText)}</div>`);
+  lines.push(tooltipLine("Lesson",
+    (entry.passive ? "Passive" : "Active") + " \u00B7 " +
+    (SKILL_CATEGORY_LABELS[entry.category] || "other")));
+  lines.push(tooltipLine("Learn to level", entry.level));
+  if (entry.reqLevel > level) {
+    lines.push(tooltipLine("Unlocks at", "level " + entry.reqLevel));
+  } else {
+    lines.push(tooltipLine("Unlocked", "at level " + entry.reqLevel));
+  }
+  lines.push(tooltipLine("Cost", formatNumber(entry.spCost) + " sp"));
+  let status;
+  if (entry.reqLevel > level) {
+    status = "locked until level " + entry.reqLevel;
+  } else if (entry.affordable) {
+    status = "learnable now";
+  } else {
+    status = "saving up " +
+      formatNumber(Math.max(0, entry.spCost - plan.sp)) + " sp";
+  }
+  lines.push(tooltipLine("Status", status));
+  const foot = [];
+  if (plan) {
+    foot.push(`<span>Queue <b>${plan.entries.length} lessons</b></span>`);
+    foot.push(`<span>Missing <b>${formatNumber(plan.missing)} sp</b></span>`);
+  }
+  if (foot.length) {
+    lines.push(`<div class="tip-foot">${foot.join("")}</div>`);
+  }
+  const family = entry.passive ? "armor" : "weapon";
+
+  return `<div class="tip-inner tip-${family}">${lines.join("")}</div>`;
+}
+
+// showSkillQueueTooltip renders the lesson tooltip for one queue row
+// and positions the shared floating panel to the left of the hovered
+// row.
+function showSkillQueueTooltip(entry, item) {
+  const el = tooltipElement();
+  if (!el) { return; }
+  if (!entry) {
+    hideItemTooltip();
+
+    return;
+  }
+  const snap = App.snapshot;
+  const level = snap && snap.character ? snap.character.level : 0;
+  const plan = snap ? snap.skillPlan : null;
+  TooltipState.cell = item;
+  el.innerHTML = renderSkillQueueTooltip(entry, level, plan);
+  el.className = "item-tooltip fam-" + (entry.passive ? "armor" : "weapon");
   el.setAttribute("aria-hidden", "false");
   const rect = item.getBoundingClientRect();
   positionItemTooltip(rect.left, rect.top, "left");
@@ -2154,6 +2873,8 @@ initGearInteractions();
 initTargetWidget();
 initViewMenu();
 initShopPanel();
+initGearMode();
+initSkillQueuePanel();
 
 // Chat window state: auto scroll follows the newest line while the
 // user stays at the bottom; scrolling up reads the history, scrolling
