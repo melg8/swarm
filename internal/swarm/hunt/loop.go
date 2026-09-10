@@ -350,6 +350,14 @@ type Loop struct {
 	// logNoPickableTargets): zero means the next empty pick logs
 	// at once, a successful pick re-arms it.
 	noPickLogAt time.Time
+	// avoidScratch is the reused threat buffer of the aggro-aware
+	// walk steering (see loop_avoid.go): the scan refills it in
+	// place, so the per leg danger pass costs no allocation.
+	avoidScratch []state.AggroThreat
+	// avoidLogAt paces the detour diagnostic of the walk steering:
+	// a busy corridor bends every leg, the log names it once per
+	// period instead of every request.
+	avoidLogAt time.Time
 	// fleeAt paces the escape walk requests: the escape must not
 	// wait out the attack request pacing of the engage (the last
 	// forced attack fired moments before the threshold crossed).
@@ -576,6 +584,8 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		skipScratch:      nil,
 		noTargetSince:    time.Time{},
 		noPickLogAt:      time.Time{},
+		avoidScratch:     nil,
+		avoidLogAt:       time.Time{},
 		fleeAt:           time.Time{},
 		fleeSince:        time.Time{},
 		panicAt:          time.Time{},

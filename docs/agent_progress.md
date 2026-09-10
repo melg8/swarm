@@ -72,10 +72,23 @@ beats the pile up logout of the real one).
 ### Status: in progress
 
 - Commit 1 done: the claim leak fix + the standing-ground resume.
-- Next: commit 2 - the aggro threat scan of the tracker state plus the
-  receding-horizon leg steering of the autonomous walks (the town
-  trips, the zone returns); commit 3 - the fighting character steps
-  clear of an impending aggressive add.
+- Commit 2 done: the aggro threat scan (`state.AppendAggroThreats` -
+  the living IDLE aggressive mobs at their projected positions, the
+  chasers and busy fighters excluded) and the receding-horizon leg
+  steering (`hunt/loop_avoid.go`): every autonomous transit walk (the
+  town trip follower `walkTownWaypoints`, the direct zone return leg
+  `walkZoneLeg` - the inter-ground walks of the spot economy ride the
+  same paths) deflects its leg onto the tangent of the first threat
+  circle its straight line would enter (the effective aggro range
+  plus a 150 unit clearance; a character already inside the margin
+  circle side-steps straight out first - no tangent exists from
+  inside). The mobs standing at the destination of the walk stay
+  exempt (the ground the walk deliberately enters is its content),
+  the movement projections feed the scan so the slow movers crossing
+  the line bend it too, and the diagnostic log names the camp once
+  per 5 s while a corridor bends.
+- Next: commit 3 - the fighting character steps clear of an impending
+  aggressive add before its on-sight trigger fires.
 
 ## Active task: the web map social, hover and fleet layers - the aggro truth of the server
 

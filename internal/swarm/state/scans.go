@@ -183,6 +183,67 @@ func (b *Bot) ZoneHasPickableWindowed(
 	return ok
 }
 
+// AggroThreat describes one aggressive npc an autonomous walk must
+// not pass close to: the projected position (a moving mob counts
+// where it actually is), the effective on-sight aggro range - the
+// server clamped number the tracker stores with the spawn - and the
+// identity for the logs. The walk steering of the hunt loop collects
+// its dangers through this record.
+type AggroThreat struct {
+	ObjectID   int32
+	TemplateID int32
+	Name       string
+	X          float64
+	Y          float64
+	Z          int32
+	// AggroRange is the effective on-sight trigger radius of the mob
+	// (the xml aggroRange capped at the Mobius MaxAggroRange clamp).
+	AggroRange float64
+}
+
+// AppendAggroThreats appends the aggressive npcs whose on-sight
+// trigger could fire on a passing character to dst and returns the
+// grown slice: living idle aggressive mobs within maxDistance of the
+// character, at their projected positions. A mob that already holds a
+// target is not a steering problem - one chasing the character
+// belongs to the flee machinery of the hunt loop, one chasing
+// somebody else is busy with its own fight - so only the idle ones
+// (TargetID 0) list. The excludeID drops one object from the result
+// (the current fight target of the hunt loop). The callers hand their
+// reused buffers in, so the scan itself allocates nothing.
+func (b *Bot) AppendAggroThreats(
+	dst []AggroThreat, excludeID int32, maxDistance float64,
+) []AggroThreat {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	selfX := float64(b.char.X)
+	selfY := float64(b.char.Y)
+	nowNano := time.Now().UnixNano()
+	for i := range b.world.hot {
+		obj := &b.world.hot[i]
+		if obj.Kind != kindNPC || !obj.Attackable || obj.Dead ||
+			!obj.Aggressive || obj.TargetID != 0 ||
+			obj.ObjectID == excludeID {
+			continue
+		}
+		x, y := projectedPosition(obj, nowNano)
+		if math.Hypot(x-selfX, y-selfY) >= maxDistance {
+			continue
+		}
+		dst = append(dst, AggroThreat{
+			ObjectID:   obj.ObjectID,
+			TemplateID: b.world.cold[i].TemplateID,
+			Name:       b.world.cold[i].Name,
+			X:          x,
+			Y:          y,
+			Z:          obj.Z,
+			AggroRange: float64(b.world.cold[i].AggroRange),
+		})
+	}
+
+	return dst
+}
+
 // BlockedTarget describes one living attackable npc the engage target
 // search rejected: the projected position and the human readable
 // rejection reason. The targetless diagnostic of the hunt loop logs
