@@ -23,6 +23,9 @@ set -euo pipefail
 
 BASE="${BASE:-/home/z/my-project}"
 SWARM="${SWARM:-${BASE}/swarm}"
+# Ветка клона swarm для сборки бота. Историческая ветка разработки
+# mobius-c1-client-1 слита в main и удалена с remote - дефолт main.
+SWARM_BRANCH="${SWARM_BRANCH:-main}"
 MOBIUS_ROOT="${MOBIUS_ROOT:-${BASE}/l2j_mobius}"
 MOBIUS_C1="${MOBIUS_ROOT}/L2J_Mobius_C1_HarbingersOfWar"
 OPT="${OPT:-${HOME}/opt}"
@@ -48,12 +51,12 @@ t1() { echo ">>> шаг занял $((SECONDS - STEP_T0)) с"; }
 mkdir -p "${LOGS_DIR}"
 
 # ---------------------------------------------------------------------------
-step "1/8. Клонирование swarm (ветка mobius-c1-client-1)"
+step "1/8. Клонирование swarm (ветка ${SWARM_BRANCH})"
 if [ -d "${SWARM}/.git" ]; then
     echo "swarm уже склонирован"
 else
     t0
-    git clone --depth 1 --branch mobius-c1-client-1 \
+    git clone --depth 1 --branch "${SWARM_BRANCH}" \
         https://github.com/melg8/swarm "${SWARM}"
     t1
 fi

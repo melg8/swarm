@@ -19,15 +19,17 @@ bash tools/swarm_fast_deploy.sh
 The script is idempotent (finished steps are detected and skipped,
 re-running is always safe), needs no root and brings the whole stack
 up from a blank z.ai-style sandbox (Debian 13, no javac/go/MariaDB
-preinstalled) in about 90 seconds: it clones this repo at
-`mobius-c1-client-1`, sparse-clones the Mobius C1 module, unpacks
-OpenJDK 25, MariaDB and Go 1.24 from `deb.debian.org` into `~/opt`,
-compiles the server, loads the 75-table database and starts the stack.
-All paths can be overridden through the same-named environment
-variables (`BASE`, `SWARM`, `MOBIUS_ROOT`, `OPT`, ...), see the script
-header. The script is byte-identical to `tools/mobius_fast_deploy.sh`;
-`swarm_fast_deploy.sh` is the canonical name referenced by the
-mandatory first step rule.
+preinstalled) in about 90 seconds: it clones this repo (the branch of
+the build clone is configurable through `SWARM_BRANCH`, default
+`main` - the historical `mobius-c1-client-1` development branch was
+merged and deleted from the remote), sparse-clones the Mobius C1
+module, unpacks OpenJDK 25, MariaDB and Go 1.24 from `deb.debian.org`
+into `~/opt`, compiles the server, loads the 75-table database and
+starts the stack. All paths can be overridden through the same-named
+environment variables (`BASE`, `SWARM`, `SWARM_BRANCH`, `MOBIUS_ROOT`,
+`OPT`, ...), see the script header. The script is byte-identical to
+`tools/mobius_fast_deploy.sh`; `swarm_fast_deploy.sh` is the canonical
+name referenced by the mandatory first step rule.
 
 The deploy is considered successful only when ALL of these checks pass:
 
