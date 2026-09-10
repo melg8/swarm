@@ -6,6 +6,16 @@ SPDX-License-Identifier: MIT
 
 # Description of client-server protocol
 
+> **Currency note.** This document was originally written against the
+> l2j-lisvus emulator and still carries its vocabulary in the login
+> section. The current reference server of the project is **Mobius C1
+> (`L2J_Mobius_C1_HarbingersOfWar`, game protocol version 419)**; the
+> Mobius Java sources are authoritative wherever the two disagree.
+> The behavioral summary the packet work actually builds on (framing,
+> flows, equip semantics, shop and logout protocol, vanilla quirks)
+> lives in the "Protocol notes (Mobius C1)" section of AGENTS.md.
+> Treat the lisvus-specific detail below as historical background.
+
 Description client-server communication protocol based on [L2JLisvus](https://gitlab.com/TheDnR/l2j-lisvus/) server emulator.
 
 

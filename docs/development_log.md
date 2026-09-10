@@ -4,6 +4,13 @@ Running log of the work on the `mobius-c1-client-1` branch. Newest entries at
 the bottom. This file exists so the context does not have to be repeated in
 agent prompts: read this file first.
 
+Navigation: the rounds are `## Round N: title (date)` headers, so
+`grep -n "^## " docs/development_log.md` lists the whole index; jump
+to the round you need. The newest rounds describe the current
+subsystem behavior - the older ones the root cause history behind it
+(the current behavior summary lives in the docs/ modules referenced
+from AGENTS.md).
+
 Entry format:
 
 - date, scope

@@ -6,6 +6,14 @@ SPDX-License-Identifier: MIT
 
 # Architecture and code quality review with agent improvement prompts
 
+> **Historical snapshot.** This review reflects the repository state
+> of 2026-09-07; the branch has moved substantially since (the fleet
+> supervisor, the SoA state store, the shop strategy, the zone
+> registry, the proxy handoff all landed after it). Verify a finding
+> against the current code before acting on it, and prefer the
+> AGENTS.md rules plus the docs/ modules as the living reference. The
+> prompts below remain useful as session-sized work packages.
+
 Date: 2026-09-07. Scope: the whole repository on `mobius-c1-client-1`
 (post-MVP state, rounds 1-30 of `docs/development_log.md`).
 
@@ -807,7 +815,7 @@ numbers.
 ### P12 - Pathfind engine hardening for concurrent bots
 
 ```
-Read AGENTS.md (Pathfinding section) and docs/development_log.md first.
+Read AGENTS.md plus docs/pathfinding.md and docs/development_log.md first.
 Work on a feature branch. Depends on: P01 (the layerPool race fix).
 Note: the AI-agent-written analysis may be wrong in details - verify
 each claim in code before acting.
@@ -851,7 +859,7 @@ with capacity/memory/latency numbers for the chosen default.
 ### P13 - Web layer consolidation
 
 ```
-Read AGENTS.md (Web interface section) and docs/development_log.md
+Read AGENTS.md plus docs/webui.md and docs/development_log.md
 first. Work on a feature branch. The web UI must stay plain
 HTML/CSS/JS without a build step.
 

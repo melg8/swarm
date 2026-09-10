@@ -5,6 +5,14 @@ SPDX-License-Identifier: MIT
 -->
 
 # Goal
+> **Status note (2026-09-10).** The language choice has settled on Go
+> and the target server is the locally hosted **Mobius C1
+> (`L2J_Mobius_C1_HarbingersOfWar`)** emulator (protocol 419), not the
+> l2j-lisvus C4 emulator the text below originally assumed. The goals,
+> scalability ideas and the party/synchronization vision below are
+> unchanged and remain the architectural north star; read the concrete
+> current state in AGENTS.md and the docs/ modules.
+
 Main goal of this project is to give me motivation to learn and apply programming languages while having in mind development of concrete application with special requirements from botting l2 subject area.
 
 Currently i haven't made clear choice of final language of implementation. Main considirations are: golang looks promising with support of goroutines out of the box, but might be not best in case of need to optimize every part of bot for support of large number of connections at same time from not that powerfull pc. Other language might be C++, which i have at least development experience with. And know that it can be finetuned to greater extend than go. But golang has simplicity on its pros as well. So i might go back and forth on this in future. Maybe middle ground would be like critical paths implemented in C++ for higher speeds, and main asynchronous part of bots implemented in golang.

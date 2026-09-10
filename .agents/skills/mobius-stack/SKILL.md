@@ -30,9 +30,11 @@ listen and the schema has 75 tables. Deeper check: `task` equivalent of
 graceful SIGINT shutdown).
 
 On the Windows dev host the stack runs from the manual deployment in
-`E:\work\lineage_workspace_fresh` (see the AGENTS.md section "Windows
-host deployment" for the layout, launchers and caveats - XAMPP
-MariaDB, dist `.vbs` launchers, `PathFinding = 2`).
+`E:\work\lineage_workspace_fresh` (see `docs/deployment.md`, the
+"Windows host deployment" section, for the layout, launchers and
+caveats - XAMPP MariaDB, dist `.vbs` launchers, `PathFinding = 2`).
+The full deployment procedures, the script inventory, the stack logs
+and the tunables also live in `docs/deployment.md`.
 
 ## Operational pitfalls (each was a real debugging session)
 
