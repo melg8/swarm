@@ -251,6 +251,17 @@ body.mode-pathfind .zone-panel { display: none; }
   border-left-color: var(--accent);
 }
 
+/* The list entry under the pointer (or the fresh item that took the
+   focus back after a rebuild): hovering a zone focuses the map on its
+   ground, so the entry itself reads as armed while the pointer rests
+   on it. */
+.zone-item:hover,
+.zone-item.hovered {
+  background: var(--bg-panel-2);
+  border-left-color: var(--blue);
+  cursor: pointer;
+}
+
 .zone-item.lost .zone-name { color: #ff5c5c; }
 
 .zone-item.lost .zone-meta { color: #b97070; }

@@ -87,7 +87,9 @@ function initTheme() {
   });
 }
 
-// Fetch the bot list and keep the sidebar in sync.
+// Fetch the bot list and keep the sidebar in sync. The same poll
+// carries the fleet kill ring of the map: the crosses of every bot
+// live in the map layer, so they survive the bot switches.
 async function refreshBots() {
   try {
     const response = await fetch("/api/bots");
@@ -95,12 +97,32 @@ async function refreshBots() {
   } catch (err) {
     return;
   }
+  refreshFleetKills();
   await refreshProxy();
   renderBotList();
   if (!App.activeBotId && App.bots.length > 0) {
     const saved = window.localStorage.getItem("swarm.activeBot");
     const exists = App.bots.some((bot) => bot.id === saved);
     selectBot(exists ? saved : App.bots[0].id);
+  }
+}
+
+// Fetch the fleet wide kill marks of /api/fleet/kills: every recent
+// kill of every bot of the process (the hunt loops publish their kill
+// rings to the bot state, the registry merges them). The map draws
+// them as the crosses of the whole deployment - switching the
+// observed bot never loses them again. An older server without the
+// endpoint answers 404 and the layer simply stays empty.
+async function refreshFleetKills() {
+  try {
+    const response = await fetch("/api/fleet/kills");
+    if (!response.ok) { return; }
+    const marks = await response.json();
+    if (Array.isArray(marks)) {
+      MapView.setKillMarks(marks);
+    }
+  } catch (err) {
+    // The endpoint is absent on the pathfind and fight servers.
   }
 }
 
@@ -295,6 +317,11 @@ function selectBot(botId) {
     App.source.close();
     App.source = null;
   }
+  // The zone focus of the list panel belongs to the previous bot's
+  // registry: release it before the new stream repaints the map (the
+  // list rebuild never fires the mouseleave of the removed item).
+  MapView.blurZone();
+  MapView.hoverZone = null;
   openEventStream(botId);
   renderBotList();
   resetPanels();
@@ -553,13 +580,39 @@ function renderZones(snap) {
   section.classList.remove("hidden");
   if (count) { count.textContent = String(zones.length); }
   applyZonePanelState();
-  if (renderZones.lastKey === JSON.stringify(zones)) { return; }
-  renderZones.lastKey = JSON.stringify(zones);
+  // The rebuild key covers only the fields the items actually show:
+  // the volatile economy of the registry (the respawn countdown, the
+  // adena rate, the occupancy) changes every second but never reaches
+  // this DOM, so a stable key keeps the list (and the hover focus of
+  // the entries) alive between the real registry changes.
+  const domKey = zones.map((zone) => [
+    zone.id, zone.name, zone.region, zone.minLevel, zone.maxLevel,
+    zone.minGear, zone.active, zone.demoted, zone.deaths
+  ].join("|")).join(";");
+  if (renderZones.lastKey === domKey) { return; }
+  renderZones.lastKey = domKey;
+  // The rebuilt list destroys the hovered item without a mouseleave:
+  // release the focus, then re-focus the same zone when the pointer
+  // still rests on the list.
+  MapView.blurZone();
   list.textContent = "";
   zones.forEach((zone, index) => {
     const item = document.createElement("li");
     item.className = "zone-item" + (zone.active ? " active" : "") +
       (zone.demoted ? " lost" : "");
+    // Hovering the list entry focuses the map on its zone: the camera
+    // pins to the ground, the zone highlights and carries its name
+    // (see MapView.focusZone). Leaving the item restores the camera.
+    item.addEventListener("mouseenter", () => {
+      renderZones.hoveredId = zone.id;
+      MapView.focusZone(zone);
+    });
+    item.addEventListener("mouseleave", () => {
+      if (renderZones.hoveredId === zone.id) {
+        renderZones.hoveredId = null;
+      }
+      MapView.blurZone();
+    });
     const row = document.createElement("div");
     row.className = "zone-row";
     const info = document.createElement("div");
@@ -588,6 +641,12 @@ function renderZones(snap) {
     row.appendChild(info);
     row.appendChild(button);
     item.appendChild(row);
+    if (renderZones.hoveredId === zone.id) {
+      // The pointer still rests on the list over this zone: the fresh
+      // item takes the focus back after the rebuild.
+      item.classList.add("hovered");
+      MapView.focusZone(zone);
+    }
     list.appendChild(item);
   });
 }

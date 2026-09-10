@@ -41,6 +41,33 @@ const MapView = {
   // regular bot mode so every hook below stays a no-op.
   pathfind: null,
 
+  // The hunting zone under the map cursor: null unless the mouse
+  // rests inside a zone shape (spot circle or legacy square). The
+  // hovered zone draws its name label - the zone names stay hidden
+  // otherwise, the far zoom showed a smeared blob of labels.
+  hoverZone: null,
+
+  // The zone focused from the zone list panel (see focusZone): the
+  // camera pins to the zone center, the zone highlights and carries
+  // its name label. zoneFocusSaved holds the camera state to restore
+  // on blurZone.
+  zoneFocus: null,
+  zoneFocusSaved: null,
+
+  // The fleet wide kill marks of /api/fleet/kills (every recent kill
+  // of every bot): drawn as the crosses of the whole deployment so
+  // they survive the bot switches of the view (the per zone kill
+  // centroid of the observed bot alone does not).
+  killMarks: [],
+
+  // The parsed clan masks of the current snapshot (objectId to
+  // {low, all}): the low 44 bits carry the clan alphabet as a plain
+  // number (the pairwise AND stays a cheap integer op), the all flag
+  // marks the ALL clan that links with every clan carrier. Rebuilt
+  // per snapshot - the mask strings would otherwise parse to BigInt
+  // on every frame of the social layer.
+  socialMasks: new Map(),
+
   // The world point of the last manual command (a map double click):
   // drawn as a fading ring so the click answer stays visible while
   // the bot walks there.
@@ -104,7 +131,7 @@ const MapView = {
       if (!follow.checked) { this.syncPanAnchor(); }
       this.draw();
     });
-    for (const id of ["show-labels", "show-dest", "show-zone", "show-targets", "show-hunt-zones", "show-aggro", "show-map", "show-geo"]) {
+    for (const id of ["show-labels", "show-dest", "show-zone", "show-targets", "show-hunt-zones", "show-aggro", "show-social", "show-kills", "show-map", "show-geo"]) {
       document.getElementById(id).addEventListener("change", () => {
         this.draw();
       });
@@ -182,8 +209,30 @@ const MapView = {
     }
     this.ingestCombatEvents(snapshot);
     this.lastSnap = snapshot;
+    this.rebuildSocialMasks(snapshot);
     this.kickAnimation();
     this.draw();
+  },
+
+  // rebuildSocialMasks parses the clan mask strings of the fresh
+  // snapshot once: the masks ride the wire as decimal strings (the
+  // ALL bit of the top exceeds the safe integer range of JavaScript),
+  // the social layer needs them as numbers on every frame.
+  rebuildSocialMasks(snapshot) {
+    this.socialMasks.clear();
+    for (const obj of snapshot.objects || []) {
+      if (obj.kind !== "npc" || !obj.clanMask) { continue; }
+      let mask;
+      try {
+        mask = BigInt(obj.clanMask);
+      } catch (err) {
+        continue;
+      }
+      this.socialMasks.set(obj.objectId, {
+        low: Number(mask & 0xFFFFFFFFFFFn),
+        all: (mask & 0x8000000000000000n) !== 0n
+      });
+    }
   },
 
   zoom(factor) {
@@ -568,16 +617,17 @@ const MapView = {
     }
   },
 
-  // geoTileAncestor returns the deepest available pyramid entry of a
-  // tile: the requested level when it exists, otherwise the next lower
-  // resolution levels (regions missing from the geodata pack fall
-  // through to the plain background).
+  // geoTileAncestor returns the finest READY pyramid entry of a
+  // geodata tile (the same progressive rule as the map pyramid: a
+  // coarser loaded region paints while the fine one renders).
   geoTileAncestor(level, bx, by) {
     let entry = this.geoTile(level, bx, by);
+    if (entry && entry.ready) { return entry; }
     let lvl = level;
-    while (entry && entry.missing && lvl + 1 < this.geoTilePixels.length) {
+    while (lvl + 1 < this.geoTilePixels.length) {
       lvl += 1;
-      entry = this.geoTile(lvl, bx, by);
+      const parent = this.geoTile(lvl, bx, by);
+      if (parent && parent.ready) { return parent; }
     }
 
     return entry;
@@ -613,15 +663,22 @@ const MapView = {
     return entry;
   },
 
-  // mapTileAncestor returns the deepest available pyramid entry of a
-  // tile: the requested level when it exists, otherwise the next lower
-  // resolution levels (same block, more upscale on draw).
+  // mapTileAncestor returns the finest READY pyramid entry of a
+  // tile. The requested level comes first; while it streams (or
+  // where it is missing from the shipped world) the walk climbs to
+  // the coarser levels and returns the first loaded one, so a
+  // panning camera (the follow mode of a walking bot) never shows a
+  // blank strip where a coarse ancestor could paint - the microsecond
+  // white flash of the old not-ready skip. The entry of the finest
+  // level still wins the next frames once its load lands.
   mapTileAncestor(level, bx, by) {
     let entry = this.mapTile(level, bx, by);
+    if (entry && entry.ready) { return entry; }
     let lvl = level;
-    while (entry && entry.missing && lvl + 1 < this.mapTilePixels.length) {
+    while (lvl + 1 < this.mapTilePixels.length) {
       lvl += 1;
-      entry = this.mapTile(lvl, bx, by);
+      const parent = this.mapTile(lvl, bx, by);
+      if (parent && parent.ready) { return parent; }
     }
 
     return entry;
@@ -823,10 +880,12 @@ const MapView = {
       return;
     }
     this.drawHuntingZone(ctx);
+    this.drawKillMarks(ctx, rect);
     this.drawGrid(ctx, rect);
     this.drawZone(ctx, rect);
     this.drawTargetLinks(ctx);
     this.drawAggroRanges(ctx, rect);
+    this.drawSocialLinks(ctx, rect);
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
     this.drawCombatEffects(ctx);
@@ -882,6 +941,60 @@ const MapView = {
     });
   },
 
+  // zoneLabeled reports whether a zone carries its name label right
+  // now: only the zone under the map cursor (hoverZone) and the zone
+  // focused from the list panel (zoneFocus) read their names - the
+  // always-on labels of the far zoom smeared into one unreadable
+  // blob, so the names wait for the pointer.
+  zoneLabeled(zone) {
+    return (this.hoverZone && this.hoverZone.id === zone.id
+        && this.hoverZone.kind === zone.kind)
+      || (this.zoneFocus && this.zoneFocus.id === zone.id
+        && this.zoneFocus.kind === zone.kind);
+  },
+
+  // zoneHighlighted reports whether a zone draws its hover or focus
+  // emphasis: a thicker stroke with the brighter fill so the hovered
+  // or listed ground reads at a glance.
+  zoneHighlighted(zone) {
+    return this.zoneLabeled(zone);
+  },
+
+  // zoneAt hit tests the hunting zones at one client point: the
+  // world point of the cursor lands in the smallest containing shape
+  // (spots beat squares on overlap, the smaller spot wins). Null
+  // when the cursor rests outside every zone of the registry.
+  zoneAt(clientX, clientY) {
+    const snap = this.lastSnap;
+    if (!snap) { return null; }
+    const zones = snap.huntingZones;
+    if (!Array.isArray(zones) || zones.length === 0) {
+      return snap.huntingZone || null;
+    }
+    const world = this.screenToWorld(
+      clientX - this.canvas.getBoundingClientRect().left,
+      clientY - this.canvas.getBoundingClientRect().top);
+    let best = null;
+    let bestArea = Infinity;
+    for (const zone of zones) {
+      const inside = zone.kind === "spot"
+        ? Math.hypot(world.x - zone.cx, world.y - zone.cy)
+          <= (zone.radius || zone.half)
+        : Math.abs(world.x - zone.cx) <= zone.half
+          && Math.abs(world.y - zone.cy) <= zone.half;
+      if (!inside) { continue; }
+      const area = zone.kind === "spot"
+        ? Math.PI * Math.pow(zone.radius || zone.half, 2)
+        : Math.pow(zone.half * 2, 2);
+      if (area < bestArea) {
+        bestArea = area;
+        best = zone;
+      }
+    }
+
+    return best;
+  },
+
   // drawHuntingSpotCircle draws one hunting spot of the spot
   // anchored registry: the visibility bounded circle of the ground
   // (the radius), the anchor dot, the kill centroid cross and the
@@ -892,6 +1005,7 @@ const MapView = {
   // grounds carry the fleet marker.
   drawHuntingSpotCircle(ctx, zone) {
     const active = zone.active;
+    const highlighted = this.zoneHighlighted(zone);
     const center = this.worldToScreen(zone.cx, zone.cy);
     const radius = zone.radius * this.scale;
     if (center.x + radius < 0 || center.y + radius < 0
@@ -899,7 +1013,9 @@ const MapView = {
       || center.y - radius > this.canvas.clientHeight) {
       return;
     }
-    const drawLabel = active || radius >= 42;
+    // The name (with its economy suffixes) only reads while the
+    // pointer rests on the ground or the list focuses it.
+    const drawLabel = this.zoneLabeled(zone);
     let label = zone.name;
     if (zone.maxLevel > 0) {
       label += " · L" + zone.minLevel + "-" + zone.maxLevel;
@@ -927,8 +1043,8 @@ const MapView = {
     ctx.save();
     const heat = Math.min(0.55, (zone.deathHeat || 0) * 0.35);
     const stroke = active ? "#f9ab00" : zoneFutureColor;
-    ctx.globalAlpha = active ? 0.95 : 0.75;
-    ctx.lineWidth = active ? 2.5 : 1.5;
+    ctx.globalAlpha = active ? 0.95 : highlighted ? 0.95 : 0.75;
+    ctx.lineWidth = active || highlighted ? 2.5 : 1.5;
     ctx.setLineDash([10, 6]);
     ctx.strokeStyle = stroke;
     ctx.beginPath();
@@ -940,8 +1056,8 @@ const MapView = {
       ctx.fillStyle = "rgba(217, 48, 37, " + heat.toFixed(2) + ")";
       ctx.fill();
     } else if (!active) {
-      ctx.fillStyle = zoneFutureFill;
-      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = highlighted ? zoneHoverFill : zoneFutureFill;
+      ctx.globalAlpha = highlighted ? 0.5 : 0.35;
       ctx.fill();
     }
     // The anchor dot of the spot.
@@ -977,21 +1093,20 @@ const MapView = {
   // zone in amber with the level band and the gear gate of its
   // ladder step, the inactive zones in a bright soft blue with a
   // light fill so the future grounds read at a glance, the demoted
-  // bands in red. The label only draws when the square is
-  // big enough on screen or active: the thirty granular grounds of
-  // the registry would smear into one unreadable blob when zoomed
-  // out, so the far zoom shows the squares and the level colors,
-  // the labels wait for the zoom in.
+  // bands in red. The zone names wait for the pointer (the map hover
+  // or the list focus): the always-on labels of the far zoom smeared
+  // into one blob, so the far view shows the shapes alone.
   drawHuntingZoneRect(ctx, zone) {
     const active = zone.active;
     const demoted = zone.demoted;
+    const highlighted = this.zoneHighlighted(zone);
     const p1 = this.worldToScreen(zone.cx - zone.half, zone.cy - zone.half);
     const size = zone.half * 2 * this.scale;
     if (p1.x > this.canvas.clientWidth || p1.y > this.canvas.clientHeight
       || p1.x + size < 0 || p1.y + size < 0) {
       return;
     }
-    const drawLabel = active || size >= 80;
+    const drawLabel = this.zoneLabeled(zone);
     let label = zone.name;
     if (zone.maxLevel > 0) {
       label += " · L" + zone.minLevel + "-" + zone.maxLevel;
@@ -1013,12 +1128,13 @@ const MapView = {
     const stroke = active
       ? "#f9ab00" : demoted ? "#ff5c5c" : zoneFutureColor;
     ctx.strokeStyle = stroke;
-    ctx.globalAlpha = active ? 0.9 : demoted ? 0.75 : 0.7;
-    ctx.lineWidth = active ? 2 : 1.5;
+    ctx.globalAlpha = active ? 0.9 : demoted ? 0.75 : highlighted ? 0.95 : 0.7;
+    ctx.lineWidth = active ? 2 : highlighted ? 2 : 1.5;
     if (!active && !demoted) {
       // A light fill demonstrates the future grounds even at the far
-      // zoom where a thin dashed outline alone melts into the map.
-      ctx.fillStyle = zoneFutureFill;
+      // zoom where a thin dashed outline alone melts into the map; the
+      // hovered or listed zone brightens its fill.
+      ctx.fillStyle = highlighted ? zoneHoverFill : zoneFutureFill;
       ctx.fillRect(p1.x, p1.y, size, size);
     }
     ctx.setLineDash([10, 6]);
@@ -1040,6 +1156,169 @@ const MapView = {
       ctx.fillText(label, p1.x + 6, p1.y + 14);
     }
     ctx.restore();
+  },
+
+  // drawKillMarks paints the fleet wide kill crosses: every recent
+  // kill of every bot (the /api/fleet/kills ring) draws as a small
+  // orange cross that melts away with its age. The layer survives
+  // the bot switches of the view - the marks live in the map, not in
+  // the snapshot of the observed bot.
+  drawKillMarks(ctx, rect) {
+    if (!document.getElementById("show-kills").checked) { return; }
+    if (!this.killMarks || this.killMarks.length === 0) { return; }
+    const nowMs = Date.now() + this.clockOffsetMs;
+    ctx.save();
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = "round";
+    for (const mark of this.killMarks) {
+      const age = nowMs - mark.atMs;
+      if (!(age >= 0) || age > killMarkTTLms) { continue; }
+      const p = this.worldToScreen(mark.x, mark.y);
+      if (p.x < -8 || p.y < -8
+        || p.x > rect.width + 8 || p.y > rect.height + 8) {
+        continue;
+      }
+      // The fresh kills read full strength, the old ones melt toward
+      // a quarter opacity before the ring drops them.
+      const fade = age / killMarkTTLms;
+      ctx.globalAlpha = 0.95 - 0.7 * fade;
+      ctx.strokeStyle = killMarkColor;
+      const size = 4 - 1.5 * fade;
+      ctx.beginPath();
+      ctx.moveTo(p.x - size, p.y - size);
+      ctx.lineTo(p.x + size, p.y + size);
+      ctx.moveTo(p.x + size, p.y - size);
+      ctx.lineTo(p.x - size, p.y + size);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
+  // setKillMarks ingests the fleet kill ring of /api/fleet/kills (the
+  // web app polls it with the bot list). The crosses draw on the next
+  // frame - the poll period paces the fade steps well enough.
+  setKillMarks(marks) {
+    this.killMarks = Array.isArray(marks) ? marks : [];
+    this.draw();
+  },
+
+  // drawSocialLinks paints the clan assist network of the living
+  // mobs: two npcs of the same clan inside their clan help range
+  // connect with a solid line (attacking one pulls the mate - the
+  // Mobius notifyActionAttacked clan call), a pair that only
+  // approaches the range connects with a dashed warning line. The
+  // links connect the units, not a radius circle, so a pack reads
+  // as a pack without burying the map under circles.
+  drawSocialLinks(ctx, rect) {
+    if (!document.getElementById("show-social").checked) { return; }
+    const snap = this.lastSnap;
+    if (!snap || !snap.objects) { return; }
+    const units = [];
+    for (const obj of snap.objects) {
+      if (obj.kind !== "npc" || obj.dead) { continue; }
+      const mask = this.socialMasks.get(obj.objectId);
+      if (!mask || !(obj.clanHelpRange > 0)) { continue; }
+      const rt = this.runtime.get(obj.objectId);
+      units.push({
+        x: rt ? rt.drawX : obj.x,
+        y: rt ? rt.drawY : obj.y,
+        low: mask.low, all: mask.all,
+        range: obj.clanHelpRange
+      });
+    }
+    if (units.length < 2) { return; }
+    ctx.save();
+    for (let i = 0; i < units.length; i++) {
+      const a = units[i];
+      for (let j = i + 1; j < units.length; j++) {
+        const b = units[j];
+        // The ALL clan links with every clan carrier, the plain
+        // clans need a shared bit of the alphabet.
+        const linked = (a.all && (b.all || b.low)) || (b.all && a.low)
+          || ((a.low & b.low) !== 0);
+        if (!linked) { continue; }
+        // The assist range of the pair: the wider clan help range of
+        // the two governs (the Mobius faction walk of the caller).
+        const range = Math.max(a.range, b.range);
+        const warn = range * socialWarnFactor;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > warn) { continue; }
+        const pa = this.worldToScreen(a.x, a.y);
+        const pb = this.worldToScreen(b.x, b.y);
+        if ((pa.x < -40 && pb.x < -40) || (pa.y < -40 && pb.y < -40)
+          || (pa.x > rect.width + 40 && pb.x > rect.width + 40)
+          || (pa.y > rect.height + 40 && pb.y > rect.height + 40)) {
+          continue;
+        }
+        if (dist <= range) {
+          // Inside the assist range: the pair answers as one.
+          ctx.globalAlpha = 0.5;
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([]);
+          ctx.strokeStyle = socialLinkColor;
+        } else {
+          // Approaching the range: the dashed warning line.
+          ctx.globalAlpha = 0.38;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = socialWarnColor;
+        }
+        ctx.beginPath();
+        ctx.moveTo(pa.x, pa.y);
+        ctx.lineTo(pb.x, pb.y);
+        ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+  },
+
+  // focusZone pins the map on one hunting zone (the hover of the
+  // zone list panel): the camera centers on the zone, the zoom fits
+  // its span, the zone highlights and carries its name label. The
+  // camera state is saved once so a chain of hovers restores the
+  // view the user had before the first one.
+  focusZone(zone) {
+    if (!zone || !this.lastSnap) { return; }
+    if (!this.zoneFocusSaved) {
+      this.zoneFocusSaved = {
+        follow: document.getElementById("follow").checked,
+        panAnchor: { x: this.panAnchor.x, y: this.panAnchor.y },
+        scale: this.scale
+      };
+    }
+    this.zoneFocus = zone;
+    const rect = this.canvas.getBoundingClientRect();
+    const span = zone.kind === "spot"
+      ? Math.max(zone.radius || 0, zone.half || 0) * 2
+      : zone.half * 2;
+    const fit = Math.min(rect.width, rect.height) * 0.55
+      / Math.max(span, 1);
+    this.scale = Math.max(0.008, Math.min(1.5, fit));
+    this.panAnchor = { x: zone.cx, y: zone.cy };
+    this.kickAnimation();
+    this.draw();
+  },
+
+  // blurZone releases the zone focus of the list panel and restores
+  // the saved camera: the follow flag, the free pan anchor and the
+  // zoom the user had before the hover chain began.
+  blurZone() {
+    if (!this.zoneFocus) { return; }
+    this.zoneFocus = null;
+    const saved = this.zoneFocusSaved;
+    this.zoneFocusSaved = null;
+    if (saved) {
+      document.getElementById("follow").checked = saved.follow;
+      if (!saved.follow) {
+        this.panAnchor = saved.panAnchor;
+      }
+      this.scale = saved.scale;
+    }
+    this.kickAnimation();
+    this.draw();
   },
 
   drawGrid(ctx, rect) {
@@ -1518,16 +1797,20 @@ const MapView = {
       return;
     }
     const best = this.objectAt(event.clientX, event.clientY);
+    const zone = this.zoneAt(event.clientX, event.clientY);
     const rect = this.canvas.getBoundingClientRect();
     const mx = event.clientX - rect.left;
     const my = event.clientY - rect.top;
-    if (best !== this.hover) {
+    if (best !== this.hover || zone !== this.hoverZone) {
       this.hover = best;
+      this.hoverZone = zone;
       if (best) {
         this.showTooltip(best, mx, my);
       } else {
         this.hideTooltip();
       }
+      // The zone hover repaints the highlight and the name label.
+      this.draw();
     }
   },
 
@@ -1704,6 +1987,8 @@ const MapView = {
       obj.kind === "npc" && obj.aggroRange > 0
         ? "aggro range: " + obj.aggroRange
           + (obj.aggressive ? " (attacks on sight)" : " (defensive)") : "",
+      obj.kind === "npc" && obj.clanHelpRange > 0
+        ? "clan help range: " + obj.clanHelpRange : "",
       obj.moving
         ? "moving to " + Math.round(obj.destX) + " " + Math.round(obj.destY) : "",
       obj.kind === "item" ? "count: " + obj.count : ""
@@ -2008,7 +2293,7 @@ const MapView = {
   },
 
   followEnabled() {
-    if (this.pathfindEnabled()) { return false; }
+    if (this.pathfindEnabled() || this.zoneFocus) { return false; }
 
     return document.getElementById("follow").checked;
   }
@@ -2064,6 +2349,36 @@ const zoneFutureColor = "#5b9bd5";
 // demonstrates the future grounds at the far zoom where a thin
 // outline alone melts into the map imagery.
 const zoneFutureFill = "rgba(91, 155, 213, 0.07)";
+
+// zoneHoverFill is the brighter fill of the hovered or listed zone:
+// the pointer (map hover) or the list focus marks the ground among
+// its neighbors at a glance.
+const zoneHoverFill = "rgba(91, 155, 213, 0.22)";
+
+// killMarkColor is the stroke of the fleet kill crosses (the same
+// orange the per spot kill centroid cross uses, so every kill marker
+// on the map reads as one family).
+const killMarkColor = "#e37400";
+
+// killMarkTTLms bounds the life of a fleet kill cross: the fresh kill
+// reads full strength and melts away before the server ring drops
+// it (the hunt loop keeps five minutes of kills per bot).
+const killMarkTTLms = 5 * 60 * 1000;
+
+// socialLinkColor connects the clan mates inside their clan help
+// range: a calm teal, distinct from every threat color of the units
+// (attacking one of the pair pulls its mate - the Mobius clan call).
+const socialLinkColor = "#0aa5a5";
+
+// socialWarnColor marks the pairs that only approach their clan help
+// range: the dashed amber warning that the link is one step away.
+const socialWarnColor = "#e37400";
+
+// socialWarnFactor bounds the warning band of the social links: a
+// pair within range times this factor but outside the range itself
+// draws as approaching (the dashed line), so a spreading pack warns
+// before it actually links.
+const socialWarnFactor = 1.25;
 
 // swing a second, so the effects of a running fight never overlap
 // into one smear).

@@ -531,7 +531,7 @@ function runScenarioRestMarker(mapFile) {
 // plus the hunting zone label, and a snapshot without a zone draws
 // nothing.
 function runScenarioHuntingZone(mapFile) {
-    const { MapView, record } = loadMapJs(mapFile);
+    const { MapView, record, fireCanvas } = loadMapJs(mapFile);
     MapView.init();
     const snap = buildSnapshot(0, false);
     snap.huntingZone = { cx: WORLD.self.x, cy: WORLD.self.y, half: 450 };
@@ -559,17 +559,43 @@ function runScenarioHuntingZone(mapFile) {
         topEdge.length > 0,
         "expected dashed segments along the top edge at y="
         + left.y);
-    const label = record.texts.filter((t) => t.text === "hunting zone"
+    // The zone names wait for the pointer: without a hover the square
+    // stays silent, a mousemove inside it lights the label up.
+    const labelIdle = record.texts.filter(
+        (t) => t.text.startsWith("hunting zone")).length;
+    check(results, "zone label stays hidden without the pointer",
+        labelIdle === 0, "zone label drawn without a hover");
+
+    // Hover the middle of the square (no object sits there, so the
+    // tooltip never touches the DOM).
+    fireCanvas("mousemove", {
+        clientX: CANVAS_W / 2, clientY: CANVAS_H / 2
+    });
+    const label = record.texts.filter(
+        (t) => t.text.startsWith("hunting zone")
         && Math.abs(t.x - (left.x + 6)) < 2);
-    check(results, "hunting zone carries the label",
+    check(results, "hunting zone carries the label on hover",
         label.length > 0, "no label at the square corner");
+    check(results, "the hovered zone reads the highlight stroke",
+        record.strokes.some((stroke) => stroke.style === "#f9ab00"
+            && stroke.width === 2),
+        "no highlighted zone stroke");
+
+    // Moving out of the square hides the label again (the record
+    // resets between the draws so only the fresh pass counts).
+    record.texts.length = 0;
+    fireCanvas("mousemove", { clientX: 10, clientY: 10 });
+    const labelAfter = record.texts.filter(
+        (t) => t.text.startsWith("hunting zone")).length;
+    check(results, "leaving the zone hides the label",
+        labelAfter === 0, "label still drawn after the leave");
 
     const plain = loadMapJs(mapFile);
     plain.MapView.init();
     plain.MapView.update(buildSnapshot(0, false));
     plain.MapView.draw();
     const labelPlain = plain.record.texts.filter(
-        (t) => t.text === "hunting zone").length;
+        (t) => t.text.startsWith("hunting zone")).length;
     check(results, "no hunting zone without the configuration",
         labelPlain === 0, "unexpected zone label");
 
