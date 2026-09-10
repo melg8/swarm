@@ -33,7 +33,6 @@ the area you are about to touch, not all of them.
 | Document | Area |
 | --- | --- |
 | [webui.md](webui.md) | The web interface: launch modes, map rendering, movement interpolation, HUD, equipment and shop queue widgets, interactivity, snapshot encoding, state tracker internals, repro harnesses |
-| [webui_modernization_proposal.md](webui_modernization_proposal.md) | The pending web UI modernization proposal (awaiting user approval) |
 
 ## History and plans
 
@@ -42,6 +41,13 @@ the area you are about to touch, not all of them.
 | [project_description.md](project_description.md) | The long term design goals and scalability ideas |
 | [development_log.md](development_log.md) | The permanent record of the development rounds with root cause analyses |
 | [quality_review_and_agent_prompts.md](quality_review_and_agent_prompts.md) | The 2026-09-07 architecture review and improvement program (historical snapshot) |
+
+## Pending redesigns (not implemented yet)
+
+| Document | Area |
+| --- | --- |
+| [hunting_system_redesign.md](hunting_system_redesign.md) | The spot-anchored farming research: respawn awareness, efficiency scoring, the zone visibility measurements (figures in [hunt_analysis/](hunt_analysis/)) |
+| [webui_modernization_proposal.md](webui_modernization_proposal.md) | The web UI modernization proposal (awaiting user approval) |
 
 ## The working process
 
