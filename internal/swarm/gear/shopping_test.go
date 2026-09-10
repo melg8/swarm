@@ -58,32 +58,34 @@ func TestPlanPurchasesEmptyWithoutAdena(t *testing.T) {
 	require.Empty(t, purchases)
 }
 
-// TestPlanPurchasesJewelFloorFirst pins the opening pick of a bare
-// character: the jewel floor (the cheapest set filling the empty
-// slots) comes before everything - no armor filler runs ahead of the
-// first weapon, the empty slots fill with the cheapest rings,
-// earrings and necklace the jewel trader sells.
-func TestPlanPurchasesJewelFloorFirst(t *testing.T) {
+// TestPlanPurchasesArmorFloorFirst pins the opening picks of a bare
+// character: the armor floor (the cheapest armor pieces filling the
+// empty armor slots) comes before everything - the cheap armor runs
+// ahead of the weapon and the jewels, and the jewelry never appears
+// while no real weapon is worn (the jewel floor waits for the
+// milestone).
+func TestPlanPurchasesArmorFloorFirst(t *testing.T) {
 	profile := MeleeFighter{}
 	// A bare character with 500 adena: the floor buys the cheapest
-	// jewel set (one ring, one earring, one necklace this trip - the
-	// pair halves wait for the next), nothing else (the weapon at 883
-	// stays out of reach, the armor needs a worn weapon).
+	// armor set of the empty armor slots (the chest, legs, head,
+	// gloves and feet pieces, cheapest first), nothing else - the
+	// weapon at 883 stays out of reach and the jewel floor stays
+	// closed behind the missing real weapon.
 	equipment := equipmentWith(nil, nil)
 	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 500, 1)
 	require.NotEmpty(t, purchases)
 	require.LessOrEqual(t, AdenaSpent(purchases), int64(500))
 	first := purchases[0]
-	require.Equal(t, int32(116), first.ItemID,
-		"the magic ring (7 mDef for 37 adena) is the cheapest floor fill")
-	require.Equal(t, buyPrice(116), first.Price)
-	require.Equal(t, int32(3014900), first.ListID)
-	require.Equal(t, int32(7149), first.MerchantTemplateID)
+	require.Equal(t, int32(1121), first.ItemID,
+		"the apprentice's shoes are the cheapest armor floor fill")
+	require.Equal(t, buyPrice(1121), first.Price)
+	require.Equal(t, int32(3014800), first.ListID)
+	require.Equal(t, int32(7148), first.MerchantTemplateID)
 	for _, purchase := range purchases {
 		stats, ok := npcdata.ItemGearStats(purchase.ItemID)
 		require.True(t, ok)
-		require.Equal(t, CategoryJewel, CategoryOf(stats),
-			"no armor piece runs before the first weapon")
+		require.Equal(t, CategoryArmor, CategoryOf(stats),
+			"the opening plan buys the cheap armor floor only")
 	}
 
 	// The plan never buys the same item twice.
@@ -91,6 +93,50 @@ func TestPlanPurchasesJewelFloorFirst(t *testing.T) {
 	for _, purchase := range purchases {
 		require.False(t, seen[purchase.ItemID])
 		seen[purchase.ItemID] = true
+	}
+
+	// A worn real weapon opens the jewel floor behind the armor: the
+	// same bare character now wields the short sword, and the plan
+	// fills the empty armor slots first, then the cheapest jewel set
+	// (one ring, one earring, one necklace this trip - the pair
+	// halves wait for the next) and the defense upgrades that fit
+	// the short sword budget (the leather shield). The next weapon
+	// milestone (the knife at 14374) stays out of reach of the 1000
+	// adena wallet.
+	equipped := equipmentWith(
+		[]state.InventoryItem{item(100, 1)},
+		map[Slot]int32{SlotRHand: 100})
+	plan := PlanPurchases(profile, equipped, elvenCatalog(), 1000, 1)
+	require.NotEmpty(t, plan)
+	require.LessOrEqual(t, AdenaSpent(plan), int64(1000))
+	armorSeen, jewelSeen := 0, 0
+	for _, purchase := range plan {
+		category := CategoryOf(candidateStats(t, purchase.ItemID))
+		switch category {
+		case CategoryArmor, CategoryShield:
+			armorSeen++
+		case CategoryJewel:
+			jewelSeen++
+		default:
+			t.Fatalf("unexpected purchase category %d of item %d",
+				category, purchase.ItemID)
+		}
+	}
+	require.Positive(t, armorSeen, "the armor floor still fills the slots")
+	require.Positive(t, jewelSeen,
+		"the jewel floor opens behind the worn real weapon")
+	jewelStart := -1
+	for index, purchase := range plan {
+		if CategoryOf(candidateStats(t, purchase.ItemID)) == CategoryJewel {
+			jewelStart = index
+
+			break
+		}
+	}
+	for _, purchase := range plan[:jewelStart] {
+		require.Equal(t, CategoryArmor,
+			CategoryOf(candidateStats(t, purchase.ItemID)),
+			"the armor fills run ahead of the jewels")
 	}
 }
 

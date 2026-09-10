@@ -126,6 +126,29 @@ The user request (2026-09-10, Russian), three items:
   pre-existing harness failure "hunting zone carries the label" fails
   on the clean tree too (not this round).
 
+- 2026-09-10 (task 3 done): the armor-first purchase order. The
+  phases of `shopStrategy.classify` are now armor floor (0) -> weapon
+  milestone (1) -> jewel floor (2) -> defense upgrades (3): the
+  cheapest armor piece of every empty armor family (chest, legs,
+  head, gloves, feet - `cheapestArmorIDs`, cached like the jewel
+  floor) opens the journey ahead of every weapon and jewel; the jewel
+  floor gate moved from "any level" to "a real weapon is worn"
+  (`view.anchor > 0`, the starter kit anchors zero), so no jewel is
+  ever planned before the armor is assembled and the first weapon
+  milestone landed. The shield stays OUT of the armor floor (it
+  shares the hand family with the two hand milestones - a floor
+  shield would block the same-trip two-hander; it remains a defense
+  upgrade inside the weapon budget). The journey table: levels 1-3
+  buy the shoes/gloves/cap, level 5 lands the Short Sword and only
+  then the Magic Ring / Apprentice's Earring / Necklace of Magic,
+  the tiers past it unchanged. Tests: the jewel-floor-first pin
+  became `TestPlanPurchasesArmorFloorFirst` (the armor-only opening
+  + the jewel floor opening behind a worn real weapon), the journey
+  rules now pin "the opening trip buys armor only" and "no jewel
+  before the first weapon", the two hunt trip tests follow the new
+  stop (Ariel instead of Creamees). docs/shopping_strategy.md
+  describes the four phases and the new was/is table.
+
 ### Acceptance criteria
 
 - Task 1: `serveBotSwitch` resolves an offline-but-registered target by

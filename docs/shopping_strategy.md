@@ -37,23 +37,25 @@ source):
 
 ## The strategy
 
-**Rule 1 - the purchase phases: the jewel floor, the weapon
-milestone, the defense upgrades.** The planner walks the candidates
-in three phases; every pick ranks by its phase first, the phase
-specific order second (the melee fighter scoring stays: weapon pAtk x
-attack speed, armor pDef, jewel mDef, shield expected block value):
+**Rule 1 - the purchase phases: the armor floor, the weapon
+milestone, the jewel floor, the defense upgrades.** The planner
+walks the candidates in four phases; every pick ranks by its phase
+first, the phase specific order second (the melee fighter scoring
+stays: weapon pAtk x attack speed, armor pDef, jewel mDef, shield
+expected block value):
 
-1. **The jewel floor** - the cheapest jewel offer of every bodypart
-   family (ring, earring, necklace: Magic Ring 37, Apprentice's
-   Earring 56, Necklace of Magic 75, all with tax) fills the EMPTY
-   jewel slots. The starting locations barely attack with magic (the
-   keltirs, wolves, goblins and kaboo orcs of the elven lands are
-   pure melee - their magical attack data is zero), so the cheapest
-   set covers the mDef needs until level 15 (`jewelUpgradeLevel`):
-   below that level NO jewel upgrade is ever planned, past it the
-   jewel upgrades join the defense phase below. The floor fills, it
-   never replaces: a worn jewel blocks its family until the gate
-   opens.
+1. **The armor floor** - the cheapest armor offer of every bodypart
+   family (chest, legs, head, gloves, feet: Apprentice's Shoes 8,
+   Short Gloves 42, Cloth Cap 63, Pants 105, Shirt 169, all with
+   tax) fills the EMPTY armor slots. The floor is the opening of the
+   journey: the cheap armor comes first, ahead of every weapon and
+   jewel - the empty defense slots of the Squire's kit (head,
+   gloves, feet) fill with the cheapest pieces the armor trader
+   sells while the wallet saves for the weapon. The floor fills, it
+   never replaces: a worn piece blocks its family until the defense
+   phase opens. The shield has no floor entry - it shares the hand
+   family with the weapons (a two hand milestone displaces it), so
+   it stays a defense upgrade inside the weapon budget.
 2. **The weapon milestone** - the best value STRICT weapon upgrade
    (the highest `gain / price` among the weapons that beat the worn
    one) is the saving target. Only that one weapon is eligible: a
@@ -64,17 +66,29 @@ attack speed, armor pDef, jewel mDef, shield expected block value):
    the Broadsword's 11 x 379 per adena) -> Brandish (62214, the two
    hand sword: 21 x 325, the best value of the 54k tier) -> Long
    Sword (156400).
-3. **The defense upgrades** - the armor, shield and (past the jewel
+3. **The jewel floor** - the cheapest jewel offer of every bodypart
+   family (ring, earring, necklace: Magic Ring 37, Apprentice's
+   Earring 56, Necklace of Magic 75, all with tax) fills the EMPTY
+   jewel slots - only after a real weapon is worn: the floor gate is
+   the reference price of the worn weapon, and a starter weapon (or
+   none) anchors zero, so no jewel is ever bought before the armor
+   is assembled and the first weapon milestone landed (the user
+   rule of the opening game). The floor fills, it never replaces: a
+   worn jewel blocks its family until the gate opens.
+4. **The defense upgrades** - the armor, shield and (past the jewel
    gate) jewel upgrades, ranked by the raw defense gain (the
    maximum defense per buy, not per adena) and **bounded by the
    weapon budget**: the reference value of the whole worn defense
    gear after a swap may not exceed the reference price of the worn
-   weapon. A starter weapon (or none) anchors zero - the first real
-   weapon comes before any armor buy; after every weapon tier the
-   defense may grow inside its budget, the next weapon tier always
-   outranks it. Consequence: the Shirt travels with the Short Sword,
-   the wooden set with the Knife, the bone set with the Brandish,
-   the jewels with the Long Sword.
+   weapon. After every weapon tier the defense may grow inside its
+   budget, the next weapon tier always outranks it. Consequence:
+   the Shirt travels with the Short Sword, the wooden set with the
+   Knife, the bone set with the Brandish, the wisdom jewels with
+   the Long Sword. The jewel UPGRADES additionally gate on level
+   15 (`jewelUpgradeLevel`): below it only the floor items are
+   planned, past it the upgrades join this phase (the starting
+   locations barely attack with magic, the cheapest set covers the
+   mDef needs until then).
 
 Supporting rules that survived the rework unchanged:
 
@@ -188,16 +202,18 @@ percent chance - gear drops not counted) and shops once per level
 through both planners: the legacy greedy value-per-adena walk the
 rework replaced and the phased walk. The full table prints with
 `go test -run TestShoppingStrategyJourneyComparison -v
-./internal/swarm/gear/`; the condensed comparison:
+./internal/swarm/gear/`; the condensed comparison (the phased column
+shows the armor-floor-first order: the cheap armor opens the
+journey, the weapon follows, the jewels wait for both):
 
-| Level | WAS (greedy value/adena) | IS (phased) |
+| Level | WAS (greedy value/adena) | IS (phased: armor first) |
 | --- | --- | --- |
-| 1 | Apprentice's Shoes 8 | - (saving the floor) |
-| 2 | Leather Shield 34 | Magic Ring 37 |
-| 3 | Short Gloves 42, Cloth Cap 63, Magic Ring 37 | Magic Ring 37 (2nd), Apprentice's Earring 56 |
-| 4 | Necklace of Magic 75, Apprentice's Earring 56, Magic Ring 37, Cloth Shoes 42, Pants 105 | Apprentice's Earring 56 (2nd), Necklace of Magic 75 |
-| 5 | Short Sword 883, Apprentice's Earring 56 | **Short Sword 883**, Cloth Cap 63, Leather Shield 34, Cloth Shoes 42, Short Gloves 42, Pants 105 |
-| 6 | Shirt 169, Ring of Knowledge 621, Leather Cap 1047 | Shirt 169, Pants 105 |
+| 1 | Apprentice's Shoes 8 | **Apprentice's Shoes 8** (the armor floor opens) |
+| 2 | Leather Shield 34 | **Short Gloves 42** |
+| 3 | Short Gloves 42, Cloth Cap 63, Magic Ring 37 | **Cloth Cap 63** (the empty armor slots are filled) |
+| 4 | Necklace of Magic 75, Apprentice's Earring 56, Magic Ring 37, Cloth Shoes 42, Pants 105 | - (saving the Short Sword) |
+| 5 | Short Sword 883, Apprentice's Earring 56 | **Short Sword 883** (the weapon milestone lands), Magic Ring 37, Apprentice's Earring 56, Necklace of Magic 75 (the jewel floor opens behind the weapon), Leather Shield 34, Shirt 169, Pants 105 |
+| 6 | Shirt 169, Ring of Knowledge 621, Leather Cap 1047 | Magic Ring 37 (2nd), Apprentice's Earring 56 (2nd), Pants 105, Cloth Shoes 42 |
 | 7 | Ring of Knowledge 621 (2nd), Short Leather Gloves 698, Cotton Shoes 698, Small Shield 733 | - (saving the Knife) |
 | 8 | Leather Pants 1747, Leather Shirt 2794, Necklace of Knowledge 1242, Mystic's Earring 932 | - (saving the Knife) |
 | 9 | **Heavy Chisel 9280**, Mystic's Earring 932 | **Knife 14374**, Leather Shirt 2794, Wooden Helmet 4577 |
@@ -210,12 +226,13 @@ rework replaced and the phased walk. The full table prints with
 | 16 | Ring of Wisdom 6807 | **Long Sword 156400**, Round Shield 8176, Cat's Eye Earring 10223, Earring of Strength 4036, Ring of Wisdom 6807, Ring of Anguish 2691, Necklace of Wisdom 13684 |
 | 17 | **Long Sword 156400**, Leather Shield 34 | Cat's Eye Earring 10223 (2nd), Bone Gaiters 14604, Ring of Wisdom 6807 (2nd) |
 
-The wastes the rework removes, visible in the WAS column:
+The wastes the phase rework removes, visible in the WAS column:
 
-- **The cheap filler detour**: 10 non-weapon buys (372 adena of
-  shoes, gloves, caps, shields) run before the first weapon at
-  level 5 - a whole sword tier of income spent on pieces that score
-  nothing against the mob ladder.
+- **The greedy filler soup**: the value per adena mixes the piece
+  families with no order - the jewel floor items (Magic Ring 37 at
+  level 3-4) run BEFORE the first weapon while the armor fillers
+  dribble in around them, exactly the ordering the armor-first rule
+  replaces (cheap armor, then the weapon, then the jewels).
 - **The intermediate weapon ladder**: Heavy Chisel 9280 -> Knife
   14374 -> Sickle 21275 -> Brandish 62214 - every step resells at
   reference/2, the chisel alone wastes 5.2k adena (the buy pays
@@ -227,13 +244,15 @@ The wastes the rework removes, visible in the WAS column:
   Small Shield -> Buckler -> Round Shield, one shield per trip at
   levels 17-20 while the two-hander keeps displacing them.
 
-The IS column buys the jewel floor once (levels 2-4), one weapon
-per tier with the armor inside each tier's budget, no jewel upgrade
-before level 15 and the defense burst (the bone set, the shield,
-the wisdom jewels) inside the Long Sword budget at level 16-17 -
-the same 251 gear points of the full dress reached without the
-detours, roughly 60k adena (about 17 percent of the journey income)
-saved by level 17.
+The IS column opens with the cheap armor floor (levels 1-3: the
+shoes, the gloves, the cap - the empty slots of the Squire's kit),
+saves into the Short Sword, buys the jewel floor ONLY after the
+sword landed (level 5: the weapon first, the jewels behind it),
+then walks the weapon tiers with the armor inside each tier's
+budget, no jewel upgrade before level 15 and the defense burst (the
+bone set, the shield, the wisdom jewels) inside the Long Sword
+budget at level 16-17 - the same 251 gear points of the full dress
+reached without the detours.
 
 ## Where each piece lives
 
@@ -245,8 +264,9 @@ saved by level 17.
 - `internal/swarm/gear/shopping.go` - the phased planner
   (`PlanPurchases`, `PlanPurchaseQueue`: the affordable plan plus
   the wanted tail with the cumulative missing adena), the strategy
-  phases (`shopStrategy.classify`: the jewel floor, the weapon
-  milestone, the defense budget), the catalogs (`Shop`,
+  phases (`shopStrategy.classify`: the armor floor, the weapon
+  milestone, the jewel floor behind a real weapon, the defense
+  budget), the catalogs (`Shop`,
   `Catalog`) and the adena budget handling.
 - `internal/swarm/gear/shopping_strategy_test.go` - the level
   journey simulation and the was/is comparison table (the legacy

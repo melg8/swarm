@@ -20,7 +20,9 @@ import (
 // twice - once through the legacy greedy planner (the value per
 // adena walk the strategy replaced) and once through the phased
 // planner - so the test prints the was/is comparison of every trip
-// and asserts the ordering rules of the new strategy.
+// and asserts the ordering rules of the new strategy: the cheap armor
+// floor opens the journey, the weapon milestone follows, the jewelry
+// waits for the filled armor slots and the worn weapon.
 
 // journeyIncome models the adena the mob ladder of the elven lands
 // pays per level: the exp table of the Mobius C1 experience.xml
@@ -307,36 +309,40 @@ func (e *Equipment) setItemEquipped(objectID int32, equipped bool) {
 
 // TestShoppingStrategyJourneyComparison walks the level journey
 // through both planners and pins the ordering rules of the phased
-// strategy: the jewel floor first, the weapon before any armor, the
-// defense inside the weapon budget, no jewel upgrade below level 15.
+// strategy: the armor floor opens the journey, the weapon milestone
+// follows, no jewel runs before the first weapon, the defense stays
+// inside the weapon budget and no jewel upgrade runs below level 15.
 func TestShoppingStrategyJourneyComparison(t *testing.T) {
 	wasTrips := runLegacyJourney(t)
 	isTrips := runJourney(t, PlanPurchases)
 
 	printJourney(t, "WAS (greedy value per adena)", wasTrips)
-	printJourney(t, "IS (phased: floor, weapon, defense)", isTrips)
+	printJourney(t, "IS (phased: armor floor, weapon, jewel floor, defense)",
+		isTrips)
 
-	// Rule 1: the first trip buys jewel floor items only.
+	// Rule 1: the opening trips buy the cheap armor floor only - the
+	// empty armor slots fill with the cheapest shop pieces ahead of
+	// every weapon and jewel.
 	first := isTrips[0]
 	require.NotEmpty(t, first.is)
 	for _, purchase := range first.is {
-		require.Equal(t, CategoryJewel,
+		require.Equal(t, CategoryArmor,
 			CategoryOf(candidateStats(t, purchase.ItemID)),
-			"the opening trip buys the jewel floor only")
+			"the opening trip buys the cheap armor floor only")
 	}
 
-	// Rule 2: the first weapon purchase comes before any armor or
-	// shield purchase of the whole journey.
+	// Rule 2: the first weapon purchase comes before any jewel
+	// purchase of the whole journey - the jewelry waits for the
+	// filled armor slots and the worn weapon (the user rule of the
+	// opening game).
 	weaponFirst := firstWeaponIndex(t, isTrips)
 	require.Positive(t, weaponFirst,
 		"the journey must buy a weapon")
 	flattened := flattenTrips(isTrips)
 	for _, purchase := range flattened[:weaponFirst] {
-		category := CategoryOf(candidateStats(t, purchase.ItemID))
-		require.NotEqual(t, CategoryArmor, category,
-			"no armor runs before the first weapon")
-		require.NotEqual(t, CategoryShield, category,
-			"no shield runs before the first weapon")
+		require.NotEqual(t, CategoryJewel,
+			CategoryOf(candidateStats(t, purchase.ItemID)),
+			"no jewel runs before the first weapon")
 	}
 
 	// Rule 3: no jewel upgrade below the jewel gate - the only
@@ -378,10 +384,11 @@ func TestShoppingStrategyJourneyComparison(t *testing.T) {
 		"the jewel upgrades must open past level %d",
 		jewelUpgradeLevel)
 
-	// Rule 5: the legacy strategy bought armor before the first
-	// weapon (the greedy value per adena favored the cheap fillers:
-	// the apprentice's shoes at 8 adena open the journey) - the
-	// regression the phased strategy fixes.
+	// Rule 5: the legacy strategy bought the cheap fillers in a greedy
+	// value per adena soup with no phases (the apprentice's shoes at
+	// 8 adena open the journey) - the phased strategy now opens with
+	// the same cheap armor deliberately, but the order behind it is
+	// the phase walk, not the value soup.
 	wasFlattened := flattenTrips(wasTrips)
 	wasWeapon := firstWeaponIndex(t, wasTrips)
 	require.Positive(t, wasWeapon,

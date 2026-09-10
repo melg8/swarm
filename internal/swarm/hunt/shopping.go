@@ -108,9 +108,11 @@ func (l *Loop) shoppingPlan() []gear.Purchase {
 // shoppingQueue computes the fresh purchase queue against the current
 // gear state: the affordable plan of the next trip plus the wanted
 // tail with the cumulative missing adena (see
-// gear.PlanPurchaseQueue). The character level drives the jewel gate
-// of the strategy (the cheapest set serves until level 15, the
-// upgrades open past it).
+// gear.PlanPurchaseQueue). The character level drives the jewel
+// upgrade gate of the strategy (the cheapest set serves until level
+// 15, the upgrades open past it); the armor floor and the weapon
+// milestone order the opening game (the jewels wait for the filled
+// armor slots and the worn weapon).
 func (l *Loop) shoppingQueue() []gear.Purchase {
 	if l.equip == nil {
 		return nil

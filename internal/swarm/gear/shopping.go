@@ -116,14 +116,23 @@ const shopTaxLimit = 2.0
 const jewelUpgradeLevel = 15
 
 // The purchase phases of the shop strategy: every pick of the walk
-// ranks by its phase first, the phase specific order second.
+// ranks by its phase first, the phase specific order second. The order
+// is the user rule of the opening game: the cheap armor fills every
+// empty defense slot first, the weapon milestone follows, the jewels
+// wait for a worn non-starter weapon, the upgrades close the walk.
 const (
-	// phaseFloor fills the empty jewel slots with the cheapest offers
-	// of the catalogs (the basic outfit, level independent).
-	phaseFloor = iota
+	// phaseArmorFloor fills the empty armor slots with the cheapest
+	// offers of the catalogs (the basic defense outfit, level
+	// independent): the opening buys of a fresh character.
+	phaseArmorFloor = iota
 	// phaseWeapon buys the next weapon milestone: the best value
 	// strict upgrade, the saving target the wallet hoards for.
 	phaseWeapon
+	// phaseFloor fills the empty jewel slots with the cheapest offers
+	// of the catalogs (the basic mDef outfit) - only after a real
+	// weapon is worn: a starter weapon (or none) keeps the jewel
+	// slots empty until the milestone lands.
+	phaseFloor
 	// phaseDefense upgrades the armor, the shield and (past the jewel
 	// level gate) the jewels inside the budget of the worn weapon.
 	phaseDefense
@@ -140,19 +149,22 @@ const shoppingQueueTail = 8
 const unboundedBudget = math.MaxInt64 / 2
 
 // PlanPurchases plans the purchases of the catalog for the equipment
-// within the adena budget, ranked by the strategy phases: the jewel
-// floor (the cheapest jewel set filling the empty slots - the basic
-// outfit of the starting locations), the weapon milestone (the best
-// value strict weapon upgrade - the saving target; the wallet hoards
-// for it, a cheaper worse value weapon never intercepts the save up)
-// and the defense upgrades (the armor, shield and jewel buys ranked
-// by their defense gain and bounded by the value of the worn weapon:
-// after every weapon tier the defense may grow inside its budget,
-// the next weapon tier always outranks it). Nothing gets bought that
-// the inventory already carries (the free upgrades are simulated
-// first). Simulated equips keep the plan consistent: after a planned
-// purchase the virtual paperdoll carries the bought item and the
-// next pick compares against it.
+// within the adena budget, ranked by the strategy phases: the armor
+// floor (the cheapest armor pieces filling the empty armor slots -
+// the opening buys of a fresh character), the weapon
+// milestone (the best value strict weapon upgrade - the saving target;
+// the wallet hoards for it, a cheaper worse value weapon never
+// intercepts the save up), the jewel floor (the cheapest jewel set
+// filling the empty slots, opened only after a real weapon is worn:
+// the jewels never run ahead of the armor and the weapon) and the
+// defense upgrades (the armor, shield and jewel buys ranked by their
+// defense gain and bounded by the value of the worn weapon: after
+// every weapon tier the defense may grow inside its budget, the next
+// weapon tier always outranks it). Nothing gets bought that the
+// inventory already carries (the free upgrades are simulated first).
+// Simulated equips keep the plan consistent: after a planned purchase
+// the virtual paperdoll carries the bought item and the next pick
+// compares against it.
 //
 // Every slot gets at most ONE purchase per trip: each pick marks the
 // slots it fills or clears (the family interplay included) and the
@@ -202,8 +214,9 @@ func planPurchases(
 	virtual := SimulateInventory(profile, equipment)
 	candidates := catalogCandidates(profile, catalog)
 	strategy := &shopStrategy{
-		level:    level,
-		floorIDs: cachedCheapestJewelIDs(profile, catalog, candidates),
+		level:         level,
+		floorIDs:      cachedCheapestJewelIDs(profile, catalog, candidates),
+		armorFloorIDs: cachedCheapestArmorIDs(profile, catalog, candidates),
 	}
 	purchases := make([]Purchase, 0, len(candidates))
 	budget := adena
@@ -272,22 +285,27 @@ type walkView struct {
 }
 
 // shopStrategy drives the candidate classification of the purchase
-// walk: the jewel floor (the cheapest set fills the empty slots at
-// any level), the jewel freeze below jewelUpgradeLevel (the starting
-// locations barely attack with magic, the upgrades wait for the
-// level) and the defense budget rule (the reference value of the
-// worn defense gear - armor, shield, jewels - may not exceed the
-// reference value of the worn weapon: the weapon leads the gear
-// progression, the defense follows inside its budget).
+// walk: the armor floor (the cheapest armor pieces fill the empty
+// armor slots first - the opening buys of a fresh character), the
+// jewel floor behind a real weapon (the cheapest set
+// fills the empty slots only once the worn weapon is not the starter
+// kit: the jewels never run ahead of the armor and the weapon), the
+// jewel freeze below jewelUpgradeLevel (the starting locations barely
+// attack with magic, the upgrades wait for the level) and the defense
+// budget rule (the reference value of the worn defense gear - armor,
+// shield, jewels - may not exceed the reference value of the worn
+// weapon: the weapon leads the gear progression, the defense follows
+// inside its budget).
 type shopStrategy struct {
-	level    int32
-	floorIDs map[int32]bool
+	level         int32
+	floorIDs      map[int32]bool
+	armorFloorIDs map[int32]bool
 }
 
 // classify resolves the phase and the rank of one candidate against
 // the walked paperdoll; ok is false when the strategy skips the
 // candidate. The rank orders the picks inside the phase (higher
-// wins): the floor by the price (the cheapest offers first), the
+// wins): the floors by the price (the cheapest offers first), the
 // weapon by the value per adena (only the best value strict upgrade
 // is eligible - the strategy never buys a worse value weapon just
 // because it is cheaper, the wallet saves for the milestone), the
@@ -297,8 +315,12 @@ func (s *shopStrategy) classify(
 ) (int, float64, bool) {
 	switch CategoryOf(candidate.stats) {
 	case CategoryJewel:
-		if s.floorIDs[candidate.itemID] && floorSlotEmpty(
-			view.virtual, candidate.stats.BodyPart) {
+		// The jewel floor opens only behind a real weapon: the anchor
+		// is the reference price of the worn weapon and stays zero
+		// for the starter kit (or an empty hand), so no jewel runs
+		// ahead of the armor and the weapon.
+		if s.floorIDs[candidate.itemID] && view.anchor > 0 &&
+			floorSlotEmpty(view.virtual, candidate.stats.BodyPart) {
 			return phaseFloor, -float64(candidate.price), true
 		}
 		if s.level < jewelUpgradeLevel || !defenseFits(view, candidate) {
@@ -317,6 +339,15 @@ func (s *shopStrategy) classify(
 
 		return phaseWeapon, value, true
 	case CategoryArmor, CategoryShield:
+		// The armor floor outranks everything: the cheapest piece of
+		// every empty armor family fills it before the weapon and the
+		// jewels, the weapon budget rule does not gate the basic
+		// outfit (the shield has no floor entry - it stays a defense
+		// upgrade inside the weapon budget).
+		if s.armorFloorIDs[candidate.itemID] &&
+			floorSlotEmpty(view.virtual, candidate.stats.BodyPart) {
+			return phaseArmorFloor, -float64(candidate.price), true
+		}
 		if !defenseFits(view, candidate) {
 			return phaseDefense, 0, false
 		}
@@ -372,6 +403,75 @@ func cheapestJewelIDs(candidates []purchaseCandidate) map[int32]bool {
 
 	return ids
 }
+
+// cheapestArmorIDs resolves the cheapest armor offer per armor
+// family (the chest, legs, head, gloves, feet and back bodyparts):
+// the armor floor buys these only, so the empty armor slots fill
+// with the cheapest pieces the shops sell - the opening buys of a
+// fresh character, ahead of the weapon and the jewels.
+func cheapestArmorIDs(candidates []purchaseCandidate) map[int32]bool {
+	type cheapest struct {
+		itemID int32
+		price  int64
+	}
+	best := make(map[string]*cheapest, 8)
+	for index := range candidates {
+		candidate := &candidates[index]
+		if !armorFloorBodyPart(candidate.stats) {
+			continue
+		}
+		family := candidate.stats.BodyPart
+		current, seen := best[family]
+		if !seen || candidate.price < current.price ||
+			(candidate.price == current.price &&
+				candidate.itemID < current.itemID) {
+			best[family] = &cheapest{
+				itemID: candidate.itemID,
+				price:  candidate.price,
+			}
+		}
+	}
+	ids := make(map[int32]bool, len(best))
+	for _, entry := range best {
+		ids[entry.itemID] = true
+	}
+
+	return ids
+}
+
+// armorFloorBodyPart reports whether the bodypart belongs to the
+// armor floor families: the equippable armor pieces (the chest, legs,
+// head, gloves, feet and back slots). The shield stays out - it
+// shares the hand family with the weapons (a two hand milestone
+// displaces it), so it belongs to the defense phase behind the
+// weapon budget like every other upgrade.
+func armorFloorBodyPart(stats npcdata.GearStats) bool {
+	return CategoryOf(stats) == CategoryArmor
+}
+
+// cachedCheapestArmorIDs returns the cheapest armor floor IDs for the
+// catalog and profile, cached per (catalog, profile) pair the same
+// way the jewel floor cache works (see cachedCheapestJewelIDs).
+func cachedCheapestArmorIDs(
+	profile Profile, catalog Catalog, candidates []purchaseCandidate,
+) map[int32]bool {
+	key := candidateCacheKey{
+		catalog: &catalog,
+		profile: profile.Name(),
+		taxHash: catalogTaxHash(catalog),
+	}
+	if cached, ok := armorIDCache.Load(key); ok {
+		return cached.(map[int32]bool)
+	}
+	ids := cheapestArmorIDs(candidates)
+	armorIDCache.Store(key, ids)
+
+	return ids
+}
+
+// armorIDCache holds the precomputed cheapest armor floor IDs per
+// (catalog, profile) pair, paralleling jewelIDCache.
+var armorIDCache sync.Map
 
 // cachedCheapestJewelIDs returns the cheapest jewel IDs for the
 // catalog and profile, cached per (catalog, profile) pair. The jewel
@@ -657,8 +757,9 @@ func buildCatalogCandidates(
 }
 
 // bestPurchase picks the best candidate of the walk iteration under
-// the strategy phases: the jewel floor, the weapon milestone and the
-// defense upgrades (see shopStrategy.classify). The candidates that
+// the strategy phases: the armor floor, the weapon milestone, the
+// jewel floor and the defense upgrades (see shopStrategy.classify).
+// The candidates that
 // would write into a slot this plan already bought for are skipped
 // (one purchase per slot per trip). The affordability counts the sell
 // credit of the pieces the purchase displaces (the trip sells them
