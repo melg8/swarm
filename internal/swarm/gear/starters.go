@@ -11,17 +11,29 @@ import (
 	"github.com/melg8/swarm/internal/swarm/state"
 )
 
-// starterSet lists the item ids of the Squire's starter kit the server
-// never takes back: the Mobius item xml flags them is_sellable=false
-// and is_dropable=false, so no shop buys them and the ground refuses
+// starterSet lists the item ids of the newbie kits the server never
+// takes back: the Mobius item xml flags them is_sellable=false and
+// is_dropable=false, so no shop buys them and the ground refuses
 // them - the destroy request is the only way they ever leave the
-// character. Every kit piece the paperdoll no longer needs is dead
-// weight (the shirt alone weighs 3300), the hunt loop destroys them
-// through ReplacedStarterItems.
+// character. The elven fighter starts with the Dagger (item 10, the
+// weapon of the creation kit) plus the Squire's armor set; every kit
+// piece the paperdoll no longer needs is dead weight (the shirt alone
+// weighs 3300, the dagger 1160), the hunt loop destroys them through
+// ReplacedStarterItems once a better weapon or armor piece is worn.
 var starterSet = map[int32]bool{
+	10:   true, // Dagger (the elven fighter's starter weapon)
 	1146: true, // Squire's Shirt
 	1147: true, // Squire's Pants
 	2369: true, // Squire's Sword
+}
+
+// IsStarterItem reports whether the item id belongs to the newbie kit
+// the shops refuse to buy and the ground refuses to take: the planner
+// must never count its sell value and the junk flows must never offer
+// it - the destroy request is its only way out (see
+// ReplacedStarterItems).
+func IsStarterItem(itemID int32) bool {
+	return starterSet[itemID]
 }
 
 // StarterDrop is one replaced starter item scheduled for destruction.

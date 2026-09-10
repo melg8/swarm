@@ -1077,15 +1077,34 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 	return true
 }
 
+// sellableJunk lists the inventory junk of the sell trips without
+// the newbie kit: the starter items are unsellable on the server
+// (is_sellable=false - every offer of them is silently skipped), so
+// offering them only wastes a transaction window of the flood
+// protector once per trip - the destroy flow of the replaced starters
+// owns them instead.
+func (l *Loop) sellableJunk() []state.InventoryItem {
+	junk := make([]state.InventoryItem, 0, 8)
+	for _, entry := range l.tracker.SellableItemsExcluding(
+		l.plannedEquipKeeps()) {
+		if gear.IsStarterItem(entry.ItemID) {
+			continue
+		}
+		junk = append(junk, entry)
+	}
+
+	return junk
+}
+
 // junkRemaining reports whether sellable inventory items are left the
 // trip has not offered yet: every vendor visit sells the accumulated
 // junk completely, batch after batch, whatever started the trip. The
 // planned equips of the auto equipment stay out of the junk (a looted
 // or bought upgrade waits for its use item request, the sell stop
-// must not eat it).
+// must not eat it) and so does the unsellable newbie kit (the destroy
+// flow owns it).
 func (l *Loop) junkRemaining() bool {
-	for _, item := range l.tracker.SellableItemsExcluding(
-		l.plannedEquipKeeps()) {
+	for _, item := range l.sellableJunk() {
 		if !l.sold[item.ObjectID] {
 			return true
 		}
@@ -1104,7 +1123,7 @@ func (l *Loop) sellJunk() {
 		return
 	}
 	l.sellAt = now
-	junk := l.tracker.SellableItemsExcluding(l.plannedEquipKeeps())
+	junk := l.sellableJunk()
 	batch := make([]state.InventoryItem, 0, sellBatchSize)
 	for _, item := range junk {
 		if l.sold[item.ObjectID] {

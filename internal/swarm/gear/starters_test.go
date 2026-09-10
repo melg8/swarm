@@ -160,3 +160,54 @@ func TestReplacedStarterItemsIgnorePlainDrops(t *testing.T) {
 	require.Empty(t, ReplacedStarterItems(profile, equipment),
 		"plain inventory items are never destroyed")
 }
+
+// TestReplacedStarterItemsDestroyTheDagger covers the reported loop:
+// the bot sold its sword, the auto equipment fell back to the starter
+// dagger, the next trip bought a better weapon - and the unequipped
+// dagger must leave the character through the destroy request (no shop
+// buys it, no ground takes it) instead of lingering forever.
+func TestReplacedStarterItemsDestroyTheDagger(t *testing.T) {
+	profile := MeleeFighter{}
+	// The short sword (8 x 379 = 3032) replaced the dagger
+	// (5 x 433 = 2165): the unequipped dagger is dead weight.
+	equipment := equipmentWith([]state.InventoryItem{
+		item(910, daggerID),
+		equippedItem(555, shortSwordID),
+	}, map[Slot]int32{SlotRHand: 555})
+
+	replaced := ReplacedStarterItems(profile, equipment)
+	require.Len(t, replaced, 1, "the replaced dagger must be listed")
+	require.Equal(t, int32(910), replaced[0].Item.ObjectID)
+	require.Equal(t, int32(1160), replaced[0].Weight,
+		"the dagger drop must report its weight")
+	require.Contains(t, replaced[0].Reason, "Short Sword",
+		"the reason must name the worn replacement")
+}
+
+// TestReplacedStarterItemsDaggerSurvivesWhileWorn pins the equip guard
+// of the dagger itself: while it is still the worn weapon (nothing
+// better arrived), it is never destroyed - the auto equipment still
+// uses it.
+func TestReplacedStarterItemsDaggerSurvivesWhileWorn(t *testing.T) {
+	profile := MeleeFighter{}
+	equipment := equipmentWith([]state.InventoryItem{
+		equippedItem(910, daggerID),
+	}, map[Slot]int32{SlotRHand: 910})
+
+	require.Empty(t, ReplacedStarterItems(profile, equipment),
+		"the worn starter dagger survives until a better weapon arrives")
+}
+
+// TestIsStarterItem pins the newbie kit membership the planner and the
+// junk flows consult: the elven fighter's four unsellable, undroppable
+// pieces.
+func TestIsStarterItem(t *testing.T) {
+	for _, id := range []int32{10, 1146, 1147, 2369} {
+		require.True(t, IsStarterItem(id),
+			"item %d belongs to the newbie kit", id)
+	}
+	for _, id := range []int32{1, 7, 21, 28, 41} {
+		require.False(t, IsStarterItem(id),
+			"item %d is plain sellable gear", id)
+	}
+}

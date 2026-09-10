@@ -474,3 +474,48 @@ func TestPlannedEquipsListsThePendingWearables(t *testing.T) {
 		"the looted mystic earring is the pending equip, the displaced "+
 			"apprentice earring stays junk")
 }
+
+// TestPlanPurchasesStarterWeaponCarriesNoCredit pins the phantom
+// credit fix of the reported loop: a character wearing the starter
+// dagger plans the short sword milestone, but no shop ever buys the
+// dagger (is_sellable=false), so the plan carries neither its
+// SellFirst id nor its sell value - the affordability needs the full
+// carried adena. The legacy credit of 69 adena once let an 850 adena
+// wallet plan the 883 adena sword, walk to town and walk back empty.
+func TestPlanPurchasesStarterWeaponCarriesNoCredit(t *testing.T) {
+	profile := MeleeFighter{}
+	// The character wears the starter dagger (10) and nothing else
+	// of the weapon family.
+	equipment := equipmentWith(
+		[]state.InventoryItem{item(910, 10)},
+		map[Slot]int32{SlotRHand: 910})
+
+	// 850 adena + the phantom 69 credit covered the 883 sword
+	// before: the plan must stay empty without the credit.
+	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 850, 1)
+	for _, purchase := range purchases {
+		stats, ok := npcdata.ItemGearStats(purchase.ItemID)
+		require.True(t, ok)
+		require.NotEqual(t, "rhand", stats.BodyPart,
+			"the 883 sword stays out of reach of an 850 wallet")
+	}
+
+	// With the armor floor (387 adena) plus the full sword price on
+	// hand the milestone is planned - without any sell-first step
+	// or credit for the unsellable dagger.
+	purchases = PlanPurchases(profile, equipment, elvenCatalog(), 1300, 1)
+	var weapon *Purchase
+	for index := range purchases {
+		stats, ok := npcdata.ItemGearStats(purchases[index].ItemID)
+		require.True(t, ok)
+		if stats.BodyPart == "rhand" || stats.BodyPart == "lrhand" {
+			weapon = &purchases[index]
+		}
+	}
+	require.NotNil(t, weapon, "the affordable sword milestone is planned")
+	require.Empty(t, weapon.SellFirst,
+		"the unsellable dagger never feeds a sell-first step")
+	require.Zero(t, weapon.SellCredit,
+		"the unsellable dagger never credits the budget")
+	require.Equal(t, buyPrice(1), weapon.Price)
+}

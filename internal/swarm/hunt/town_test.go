@@ -767,3 +767,31 @@ func TestReturnWalksOnWithoutZoneTargets(t *testing.T) {
 		"the return continues without targets")
 	require.Len(t, game.walks, 1, "the waypoint walk goes on")
 }
+
+// TestSellableJunkSkipsStarterKit pins the newbie kit exclusion of the
+// sell trips: the server silently refuses the unsellable starter
+// pieces, so offering them only burns a transaction window of the
+// flood protector - the destroy flow of the replaced starters owns
+// them instead.
+func TestSellableJunkSkipsStarterKit(t *testing.T) {
+	loop, _, bot, _ := newTripLoop()
+	bot.ApplyItemList([]state.InventoryItem{
+		{ObjectID: 910, ItemID: 10, Count: 1, Type2: 0, Change: 1},
+		{ObjectID: 911, ItemID: 2369, Count: 1, Type2: 0, Change: 1},
+		{ObjectID: 912, ItemID: 1060, Count: 1, Type2: 5, Change: 1},
+		{ObjectID: 913, ItemID: 1060, Count: 1, Type2: 5, Change: 1},
+	})
+
+	junk := loop.sellableJunk()
+	require.Len(t, junk, 2, "only the potions are offered")
+	for _, entry := range junk {
+		require.Equal(t, int32(1060), entry.ItemID,
+			"the starter dagger and sword never enter the junk")
+	}
+	require.True(t, loop.junkRemaining(),
+		"the unoffered potions keep the junk phase running")
+	loop.sold[junk[0].ObjectID] = true
+	loop.sold[junk[1].ObjectID] = true
+	require.False(t, loop.junkRemaining(),
+		"nothing sellable remains once the junk is offered")
+}

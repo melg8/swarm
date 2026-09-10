@@ -77,8 +77,27 @@ The user report (2026-09-10, Russian, three bugs):
   hunt/waypoint_follow_test.go (the pass geometry table, the two
   radii, the reported railing-side scene, the 60-units-short scene).
   A gofmt-only commit fixed the space-indented loop_movement.go
-  another session left behind.
+  another session left behind. (The rebase onto the concurrent water
+  guard round moved the follower core into the shared followWaypoints
+  of the water escape refactor - the arrival and pass rules apply
+  there, the manual and blind followers keep their own copies.)
 
+- Commit "the starter dagger leaves through the destroy request":
+  the Dagger (item 10, the elven fighter's creation weapon,
+  is_sellable=false, is_dropable=false in the Mobius item xml) joined
+  gear.starterSet - ReplacedStarterItems destroys it once a better
+  weapon is worn (the reported loop: the sword sold, the dagger
+  equipped, the shop re-planning the old sword forever). The
+  displacedValue sell credit of the newbie kit items dropped to zero
+  (the phantom 69 adena of the dagger once armed an 850 adena wallet
+  against the 883 sword - the trip walked to town and back empty
+  every time), gear.IsStarterItem exported for the hunt layer, and
+  the junk flows (junkRemaining/sellJunk through sellableJunk) never
+  offer the kit pieces anymore. Tests:
+  gear/starters_test.go (the dagger destroy, the worn guard, the kit
+  membership), gear/shopping_test.go (no phantom credit: 850 adena
+  plans no sword, 1300 plans it without SellFirst/SellCredit),
+  hunt/town_test.go (the junk excludes the kit).
 
 ## Active task: the delevel freeze under an attached client - the position ping pong
 )
