@@ -63,12 +63,15 @@ const (
 )
 
 // tripStop is one merchant visit of a town trip: the merchant to
-// walk to, the purchases to buy there (grouped by their list ids)
-// and whether the junk selling happens at this stop.
+// walk to, the purchases to buy there (grouped by their list ids),
+// whether the junk selling happens at this stop and whether this is
+// the skill teacher stop that learns the queued lessons (see
+// learning.go).
 type tripStop struct {
 	merchant townNpc
 	buys     []gear.Purchase
 	sell     bool
+	teach    bool
 }
 
 // townShopCatalog is the static gear catalog of the town merchants,
@@ -766,6 +769,7 @@ func (l *Loop) advanceTripStop() {
 	l.buyRequested = nil
 	l.buyConfirmAt = time.Time{}
 	l.buyRetries = 0
+	l.resetLearnState()
 	if len(l.tripStops) == 0 {
 		l.startReturnLeg()
 

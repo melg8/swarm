@@ -31,6 +31,9 @@ func (b *benchGame) BuyItems(_ int32, _ []gear.Purchase) error {
 	return nil
 }
 func (b *benchGame) UseItem(_ int32) error              { return nil }
+func (b *benchGame) ClickObject(_ int32) error          { return nil }
+func (b *benchGame) AcquireSkill(_, _ int32) error      { return nil }
+func (b *benchGame) UseMagicSkill(_ int32) error        { return nil }
 func (b *benchGame) DropItem(_, _, _, _, _ int32) error { return nil }
 func (b *benchGame) RequestLogout() error               { return nil }
 

@@ -299,8 +299,9 @@ func (l *Loop) inventoryFull() bool {
 // not retry every tick.
 func (l *Loop) maybeStartTownTrip() {
 	shopping := l.shoppingTripEnabled() && l.shoppingWanted()
+	learning := l.learnTripWanted()
 	if l.navigator == nil || !l.tripCooldownOver() ||
-		(!l.inventoryFull() && !shopping) {
+		(!l.inventoryFull() && !shopping && !learning) {
 		return
 	}
 	// The walk needs a standing character: a resting one stands up
@@ -334,6 +335,13 @@ func (l *Loop) maybeStartTownTrip() {
 	l.buyConfirmAt = time.Time{}
 	l.buyRetries = 0
 	l.resetReplacementSales()
+	l.resetLearnState()
+	if learning {
+		// The learning stops ride behind the sell stop: the books
+		// after the junk sold (the fresh adena funds them), the
+		// teacher behind them, the gear shopping behind the teacher.
+		l.planLearnStops()
+	}
 	l.phase = phaseTownWalk
 	stats := l.tracker.InventoryStats()
 	reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
@@ -344,6 +352,19 @@ func (l *Loop) maybeStartTownTrip() {
 			strconv.FormatInt(gear.AdenaSpent(
 				affordablePrefix(l.shoppingPlanCache)), 10) +
 			" adena"
+	}
+	if learning {
+		// The learning contributes its lesson budget to the reason:
+		// a learning-only trip names it, a combined one appends it.
+		lessons := l.learnableLessons()
+		lessonReason := strconv.Itoa(len(lessons)) + " lessons worth " +
+			strconv.FormatInt(spTotal(lessons), 10) + " sp wait at " +
+			"the teacher"
+		if l.inventoryFull() || shopping {
+			reason += ", " + lessonReason
+		} else {
+			reason = lessonReason
+		}
 	}
 	// The trigger plan cache drops: the stop planning recomputes it
 	// with the fresh adena of the sales.
@@ -876,6 +897,24 @@ func (l *Loop) enterSellPhase() {
 // requested, and the return leg starts when no stop is left.
 func (l *Loop) tickTownSell() {
 	now := time.Now()
+	if l.teachStop() {
+		// The teacher stop: approach the class master, click it and
+		// learn the queued lessons (see learning.go). The stop carries
+		// no buys and never sells - the junk selling belongs to the
+		// first stop of the trip. A teacher that never showed up (or
+		// stands out of reach) skips the lessons - the requests
+		// resolve their trainer through the last folk npc and cannot
+		// run without it.
+		if !l.handleTeacher(now) {
+			return
+		}
+		if l.teacherID > 0 && !l.tickTeacherLessons(now) {
+			return
+		}
+		l.advanceTripStop()
+
+		return
+	}
 	if l.sellableStop() {
 		if l.junkRemaining() {
 			if !l.handleMerchant(now, merchantTemplates()) {
@@ -1161,6 +1200,7 @@ func (l *Loop) endTownTrip(reason string) {
 	l.shoppingPlanAt = time.Time{}
 	l.shoppingPlanAdena = 0
 	l.resetReplacementSales()
+	l.resetLearnState()
 	l.tripEndedAt = time.Now()
 	l.logger.Printf("Hunt: town trip ended: " + reason)
 }
@@ -1192,6 +1232,7 @@ func (l *Loop) resetTownTrip() {
 	l.buyConfirmAt = time.Time{}
 	l.buyRetries = 0
 	l.resetReplacementSales()
+	l.resetLearnState()
 	l.tripEndedAt = time.Time{}
 }
 

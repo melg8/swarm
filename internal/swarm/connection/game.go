@@ -500,6 +500,65 @@ func (gc *GameClient) ActionSitStand() error {
 	return nil
 }
 
+// ClickObject selects a world object through the plain client click
+// (Action 0x04): the NpcClick handler of the server selects the npc
+// AND remembers it as the last folk the character talked to - the
+// RequestAcquireSkill learning resolves its trainer through exactly
+// that. The hunt loop clicks the skill teacher with it before the
+// lesson requests.
+func (gc *GameClient) ClickObject(objectID int32) error {
+	if objectID == 0 {
+		return nil
+	}
+	x, y, z, ok := gc.tracker.ObjectPosition(objectID)
+	if !ok {
+		return fmt.Errorf(
+			"failed to click object %d: object unknown", objectID)
+	}
+	request := togameserver.NewActionRequestPacket()
+	request.ObjectID = objectID
+	request.X = x
+	request.Y = y
+	request.Z = z
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to click object: %w", err)
+	}
+	gc.tracker.RecordEvent("talking to the teacher")
+
+	return nil
+}
+
+// AcquireSkill learns one lesson of the class skill tree at the
+// teacher the character last talked to (see ClickObject): the server
+// charges the SP, consumes the required skill book and answers with
+// a fresh SkillList.
+func (gc *GameClient) AcquireSkill(skillID int32, level int32) error {
+	request := togameserver.NewRequestAcquireSkillPacket()
+	request.SkillID = skillID
+	request.Level = level
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to acquire skill: %w", err)
+	}
+	gc.tracker.RecordEvent(fmt.Sprintf(
+		"learning skill %d level %d", skillID, level))
+
+	return nil
+}
+
+// UseMagicSkill casts a learned active skill: a strike at the
+// selected target, a self buff on the caster. The server runs the
+// cast flow (the range check, the mana cost, the reuse delay) and
+// answers the refusals with ActionFailed.
+func (gc *GameClient) UseMagicSkill(skillID int32) error {
+	request := togameserver.NewRequestMagicSkillUsePacket()
+	request.SkillID = skillID
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to use magic skill: %w", err)
+	}
+
+	return nil
+}
+
 // RestartAtVillage revives a dead character at the nearest village
 // restart point, exactly like the death dialog of the official client
 // (RequestRestartPoint 0x6D type 0). The server refuses the request

@@ -562,6 +562,47 @@ func (b *Bot) SelfLevel() int32 {
 	return b.char.Level
 }
 
+// SelfClassID returns the class id of the played character: the skill
+// teachers and the learning queue resolve through it. Zero before the
+// first UserInfo.
+func (b *Bot) SelfClassID() int32 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.ClassID
+}
+
+// SelfSp returns the current skill points of the played character:
+// the learning trigger and the per lesson budget of the teacher stop
+// read it.
+func (b *Bot) SelfSp() int32 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.Sp
+}
+
+// SkillsRevision returns the count of the SetSkills calls (and the
+// weapon priority changes): the teacher stop of the hunt loop waits
+// on its bump as the learn confirmation - the server answers every
+// learned lesson with a fresh SkillList.
+func (b *Bot) SkillsRevision() uint64 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.skillsRevision
+}
+
+// SkillPlan returns a copy of the current learning queue view (nil
+// when the class is unknown or nothing is left to learn). The hunt
+// loop plans its teacher trips on it.
+func (b *Bot) SkillPlan() *SkillPlanView {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.skillPlanViewLocked()
+}
+
 // SelfExp returns the last observed experience of the played character.
 // The server refreshes the value in the UserInfo packet after every
 // experience change (the PlayerStat add and remove paths both call

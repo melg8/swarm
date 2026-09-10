@@ -110,6 +110,13 @@ func TeachersOfClass(classID int32) []TeacherNPC {
 	return skillTeachers[classID]
 }
 
+// AllClassTeachers returns the complete class teacher dictionary of
+// the deployment village: the class ids that have at least one
+// teacher in the village mapped to their teachers.
+func AllClassTeachers() map[int32][]TeacherNPC {
+	return skillTeachers
+}
+
 // SkillInfoOf returns the static display data of a skill id. The
 // second answer is false when the id is unknown to the generated
 // dictionary (a skill the server granted but the C1 stats do not

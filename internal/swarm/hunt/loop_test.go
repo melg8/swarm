@@ -29,6 +29,9 @@ type fakeGame struct {
 	buys      [][]gear.Purchase
 	uses      []int32
 	drops     [][5]int32
+	clicks    []int32
+	lessons   [][2]int32
+	casts     []int32
 	noTargets bool
 	logouts   int
 	lastError error
@@ -120,6 +123,33 @@ func (f *fakeGame) RequestLogout() error {
 		return f.lastError
 	}
 	f.logouts++
+
+	return nil
+}
+
+func (f *fakeGame) ClickObject(objectID int32) error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.clicks = append(f.clicks, objectID)
+
+	return nil
+}
+
+func (f *fakeGame) AcquireSkill(skillID int32, level int32) error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.lessons = append(f.lessons, [2]int32{skillID, level})
+
+	return nil
+}
+
+func (f *fakeGame) UseMagicSkill(skillID int32) error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.casts = append(f.casts, skillID)
 
 	return nil
 }

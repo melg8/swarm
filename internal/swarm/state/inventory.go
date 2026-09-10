@@ -143,6 +143,21 @@ func (b *Bot) InventoryItems() []InventoryItem {
 	return items
 }
 
+// InventoryHasItem reports whether the character carries at least
+// one item of the display id: the spellbook gate of the learning
+// walk reads it.
+func (b *Bot) InventoryHasItem(itemID int32) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	for _, item := range b.inventory.items {
+		if item.ItemID == itemID {
+			return true
+		}
+	}
+
+	return false
+}
+
 // ApplyInventoryUpdate applies added, modified and removed inventory
 // items from the InventoryUpdate packet. The batch restores the
 // canonical order once at its end (see inventoryStore).

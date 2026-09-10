@@ -50,6 +50,19 @@ type GameAPI interface {
 	// DropItem drops an inventory item on the ground at the given
 	// position (the server accepts drops at the feet only).
 	DropItem(objectID int32, count int32, x int32, y int32, z int32) error
+	// ClickObject selects a world object through the plain client
+	// click: the server NpcClick handler selects the npc and
+	// remembers it as the last folk the character talked to -
+	// the teacher the lesson requests resolve their trainer
+	// through.
+	ClickObject(objectID int32) error
+	// AcquireSkill learns one lesson of the class skill tree at
+	// the last folk teacher: the SP is charged and the demanded
+	// spellbook consumed.
+	AcquireSkill(skillID int32, level int32) error
+	// UseMagicSkill casts a learned active skill - a strike at
+	// the selected target or a self buff.
+	UseMagicSkill(skillID int32) error
 	// RequestLogout ends the session: the logout packet goes out
 	// first (the server answers it while the combat stance lapsed)
 	// and the connection closes either way (the server stores a
@@ -437,6 +450,22 @@ type Loop struct {
 	// against: the widget view shows the planning wallet, not the
 	// live one drifting with the loot of the same tick.
 	shoppingPlanAdena int64
+	// The skill learning state (see learning.go): the cached learning
+	// queue of the trip trigger, the selected village teacher with
+	// its click pacing and deck retry window, and the in-flight
+	// lesson awaiting its SkillList confirmation with the retry
+	// budget.
+	learnPlanCache    []state.SkillPlanEntry
+	learnPlanAt       time.Time
+	learnPlanRevision uint64
+	teacherID         int32
+	teacherPick       time.Time
+	teacherDeckUntil  time.Time
+	learnRequested    *lessonTarget
+	learnConfirmAt    time.Time
+	learnRetries      int
+	learnAt           time.Time
+	learnRevision     uint64
 	// shoppingViewCache holds the built ShoppingPlanView that
 	// corresponds to shoppingPlanCache. The view is rebuilt from the
 	// cached plan every tick (200ms) without this cache, which on the
@@ -556,6 +585,17 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		shoppingPlanAt:    time.Time{},
 		shoppingPlanCache: nil,
 		shoppingPlanAdena: 0,
+		learnPlanCache:    nil,
+		learnPlanAt:       time.Time{},
+		learnPlanRevision: 0,
+		teacherID:         0,
+		teacherPick:       time.Time{},
+		teacherDeckUntil:  time.Time{},
+		learnRequested:    nil,
+		learnConfirmAt:    time.Time{},
+		learnRetries:      0,
+		learnAt:           time.Time{},
+		learnRevision:     0,
 		shoppingViewCache: state.ShoppingPlanView{
 			Entries: nil,
 			Adena:   0,
