@@ -41,8 +41,10 @@ func TestCharInfoCarriesSitting(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
 
-	bot.ApplyPlayerInfo(PlayerInfo{ObjectID: 55, Name: "Bot2", X: 100, Y: 100,
-		Sitting: true})
+	bot.ApplyPlayerInfo(PlayerInfo{
+		ObjectID: 55, Name: "Bot2", X: 100, Y: 100,
+		Sitting: true,
+	})
 	snap := bot.Snapshot()
 	require.True(t, snap.Objects[0].Sitting,
 		"a sitting player enters the known list as resting")
