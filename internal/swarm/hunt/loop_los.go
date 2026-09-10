@@ -224,35 +224,39 @@ func (l *Loop) blindVantagePoint(
 
 // walkBlindWaypoints follows the planned reposition route with paced
 // ground click walks: one leg per walk request period, the long legs
-// split at the server move limit like every hunt walk. Reaching the
-// final waypoint clears the attempt bookkeeping - the engage takes
-// over from the new standing point and re-requests the attack, and a
-// persisting block re-arms the recovery with the remaining attempt
-// budget.
+// split at the server move limit like every hunt walk. A waypoint
+// counts as reached within its arrival radius (tight for the
+// intermediate turns, wide for the vantage goal) and only a waypoint
+// the character passed ON THE ROUTE skips ahead (the projection pass
+// test of the town walker). Reaching the final waypoint clears the
+// attempt bookkeeping - the engage takes over from the new standing
+// point and re-requests the attack, and a persisting block re-arms
+// the recovery with the remaining attempt budget.
 func (l *Loop) walkBlindWaypoints(now time.Time) {
 	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
 	if !ok {
 		return
 	}
 	for l.losWpIndex < len(l.losWaypoints) {
-		wp := l.losWaypoints[l.losWpIndex]
-		dist := waypointDistance(wp, selfX, selfY, selfZ)
-		if dist > waypointArriveDist {
-			if l.losWpIndex+1 < len(l.losWaypoints) {
-				next := l.losWaypoints[l.losWpIndex+1]
-				nextDist := waypointDistance(next, selfX, selfY, selfZ)
-				if nextDist < dist {
-					l.losWpIndex++
-					l.losMoveAt = time.Time{}
+		if waypointArrived(l.losWaypoints, l.losWpIndex,
+			selfX, selfY, selfZ) {
+			l.losWpIndex++
+			l.losMoveAt = time.Time{}
 
-					continue
-				}
-			}
-
-			break
+			continue
 		}
-		l.losWpIndex++
-		l.losMoveAt = time.Time{}
+		// Not reached: skip it only when the character already
+		// passed it on the route towards the next waypoint.
+		if l.losWpIndex+1 < len(l.losWaypoints) &&
+			waypointPassed(l.losWaypoints[l.losWpIndex],
+				l.losWaypoints[l.losWpIndex+1], selfX, selfY) {
+			l.losWpIndex++
+			l.losMoveAt = time.Time{}
+
+			continue
+		}
+
+		break
 	}
 	if l.losWpIndex >= len(l.losWaypoints) {
 		// Arrived: hand the engage back with a fresh attempt clock,

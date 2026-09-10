@@ -39,9 +39,29 @@ const (
 	// walkRequestPeriod paces the ground click walks of the waypoint
 	// follower and the merchant approach.
 	walkRequestPeriod = 2 * time.Second
-	// waypointArriveDist is the distance within which a waypoint counts
-	// as reached: two geodata cells of slack.
+	// waypointArriveDist is the distance within which the FINAL
+	// waypoint of a walk plan counts as reached: the wide trip
+	// arrival radius (two geodata cells of slack) so a leg ends
+	// even when the server stops the character slightly short of
+	// the clicked point.
 	waypointArriveDist = 150.0
+	// waypointPassDist is the tighter arrival radius of the
+	// INTERMEDIATE waypoints: a bridge ramp entry or a detour turn
+	// must be walked THROUGH, not merely seen from the side. The
+	// legacy wide radius here let the follower accept an entry
+	// waypoint it never reached, cut the corner and grind into the
+	// bridge railing side (the 2026-09-10 report: the plan held
+	// the smooth semicircle onto the bridge, the follower skipped
+	// it). Three geodata cells of slack.
+	waypointPassDist = 50.0
+	// waypointCorridor is the lateral distance from the segment
+	// towards the next waypoint within which a character counts
+	// as having PASSED the waypoint: only a character that moved
+	// past the waypoint on the route itself may skip it (a server
+	// correction, a jump), a character standing BESIDE the route
+	// - the bridge railing side - has not passed anything and
+	// walks back to the entry it missed.
+	waypointCorridor = 100.0
 	// maxMoveLeg splits the walk legs: the server refuses move requests
 	// with a target farther than 9900 units (MoveToLocation readImpl),
 	// and the smoothed geodata paths happily produce longer legs over
@@ -471,6 +491,62 @@ func waypointDistance(
 	return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }
 
+// waypointArrived reports whether the follower counts the waypoint at
+// the index as reached from the character position: the intermediate
+// waypoints need the tight pass radius (a detour turn or a bridge ramp
+// entry must be walked through - the wide radius let the follower cut
+// the corner into the railing), the final waypoint keeps the wide trip
+// arrival radius (the search goal of the leg, the server may stop the
+// character slightly short of the click).
+func waypointArrived(
+	waypoints []pathfind.Vec3, index int, selfX, selfY, selfZ int32,
+) bool {
+	radius := waypointPassDist
+	if index == len(waypoints)-1 {
+		radius = waypointArriveDist
+	}
+
+	return waypointDistance(waypoints[index], selfX, selfY, selfZ) <=
+		radius
+}
+
+// waypointPassed reports whether the character already moved past the
+// waypoint along the route towards the next one: the projection of the
+// character onto the wp -> next segment is beyond the waypoint and the
+// character stays within the corridor of the segment. A raw "the next
+// waypoint is closer" test once let the follower skip the bridge entry
+// waypoints while the character stood at the RAILING SIDE of the deck -
+// the waypoint across the bridge was closer through the railing than
+// the entry around the ramp - and the bot ground into the railing
+// instead of walking the planned detour. The projection test keeps the
+// skip working for its real purpose (a server correction or a restart
+// jump placing the character ahead ON the route) while a character off
+// to the side of the segment keeps targeting the waypoint it missed.
+// The test is planar on purpose: the z axis belongs to the arrival
+// distance, and a segment that degenerates in the plane (a vertical
+// drop) never passes the character by the lateral logic.
+func waypointPassed(
+	wp, next pathfind.Vec3, selfX, selfY int32,
+) bool {
+	segX := next.X - wp.X
+	segY := next.Y - wp.Y
+	segLen := math.Hypot(segX, segY)
+	if segLen < 1 {
+		// A vertical drop segment: no planar pass geometry.
+		return false
+	}
+	selfDX := float64(selfX) - wp.X
+	selfDY := float64(selfY) - wp.Y
+	along := (selfDX*segX + selfDY*segY) / segLen
+	if along <= 0 {
+		// Still before the waypoint: nothing passed yet.
+		return false
+	}
+	lateral := math.Abs(selfDX*segY-selfDY*segX) / segLen
+
+	return lateral <= waypointCorridor
+}
+
 // walkTownWaypoints follows the planned waypoints with ground click
 // walks and returns true when the final waypoint is reached. The water
 // guards run first: a character standing over a lake bed enters the
@@ -484,9 +560,9 @@ func waypointDistance(
 // own pathfinding carries no water cost and swimming move requests
 // skip the geodata validation entirely), so a click whose line would
 // enter the water is never sent - the walk re-paths around the shore
-// instead. Waypoints the character already passed are skipped: a
-// server position correction or a restart jump can place the
-// character ahead of the follower, and walking back to a passed
+// instead. A waypoint the character already passed ON THE ROUTE is
+// skipped: a server position correction or a restart jump can place
+// the character ahead of the follower, and walking back to a passed
 // waypoint would loop. A walk that stands still re-paths from the
 // current position to the leg destination, bounded by the re-path
 // budget of the trip.
@@ -523,37 +599,36 @@ func (l *Loop) walkTownWaypoints() bool {
 }
 
 // followWaypoints is the shared waypoint follower core of the town
-// legs and the water escapes: the passed waypoint skipping, the stuck
-// tracking, the leg splitting and the click pacing. The waterGuard
-// switch tells whether the click lines must verify dry before they
-// are sent (the town legs: the character is ashore and must stay so)
-// or not (the water escape: its legs intentionally cross the water
-// back to the shore).
+// legs and the water escapes: the waypoint arrival (tight for the
+// intermediate turns, wide for the final goal), the passed waypoint
+// skipping, the stuck tracking, the leg splitting and the click
+// pacing. The waterGuard switch tells whether the click lines must
+// verify dry before they are sent (the town legs: the character is
+// ashore and must stay so) or not (the water escape: its legs
+// intentionally cross the water back to the shore).
 func (l *Loop) followWaypoints(
 	selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
 ) bool {
 	for l.wpIndex < len(l.waypoints) {
-		wp := l.waypoints[l.wpIndex]
-		dist := waypointDistance(wp, selfX, selfY, selfZ)
-		if dist > waypointArriveDist {
-			// The waypoint is not reached yet: skip it when the
-			// next one is closer - the character already passed
-			// it (a jump, a server correction).
-			if l.wpIndex+1 < len(l.waypoints) {
-				next := l.waypoints[l.wpIndex+1]
-				nextDist := waypointDistance(next, selfX, selfY, selfZ)
-				if nextDist < dist {
-					l.wpIndex++
-					l.moveAt = time.Time{}
+		if waypointArrived(l.waypoints, l.wpIndex,
+			selfX, selfY, selfZ) {
+			l.wpIndex++
+			l.moveAt = time.Time{}
 
-					continue
-				}
-			}
-
-			break
+			continue
 		}
-		l.wpIndex++
-		l.moveAt = time.Time{}
+		// Not reached: skip it only when the character already
+		// passed it on the route towards the next waypoint.
+		if l.wpIndex+1 < len(l.waypoints) &&
+			waypointPassed(l.waypoints[l.wpIndex],
+				l.waypoints[l.wpIndex+1], selfX, selfY) {
+			l.wpIndex++
+			l.moveAt = time.Time{}
+
+			continue
+		}
+
+		break
 	}
 	if l.wpIndex >= len(l.waypoints) {
 		return true

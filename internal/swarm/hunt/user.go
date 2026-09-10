@@ -428,32 +428,35 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
 // followUserWaypoints walks the planned legs of a long manual move:
 // every waypoint gets a ground click walk, legs longer than the server
 // move limit split into straight intermediate points (the smoothing
-// keeps the line of sight of every leg), and waypoints the character
-// already passed skip ahead. The walk ends when the last waypoint is
+// keeps the line of sight of every leg), and a waypoint the character
+// already passed ON THE ROUTE skips ahead (the projection pass test of
+// the town walker - a character beside the route keeps targeting the
+// waypoint it missed). The walk ends when the last waypoint is
 // reached or the manual deadline passes; a leg that stalls (the server
 // stopped the character short) re-issues at the walk request period.
 func (l *Loop) followUserWaypoints(
 	now time.Time, selfX int32, selfY int32, selfZ int32,
 ) {
 	for l.userWpIndex < len(l.userWaypoints) {
-		wp := l.userWaypoints[l.userWpIndex]
-		dist := waypointDistance(wp, selfX, selfY, selfZ)
-		if dist > waypointArriveDist {
-			if l.userWpIndex+1 < len(l.userWaypoints) {
-				next := l.userWaypoints[l.userWpIndex+1]
-				nextDist := waypointDistance(next, selfX, selfY, selfZ)
-				if nextDist < dist {
-					l.userWpIndex++
-					l.userMoveAt = time.Time{}
+		if waypointArrived(l.userWaypoints, l.userWpIndex,
+			selfX, selfY, selfZ) {
+			l.userWpIndex++
+			l.userMoveAt = time.Time{}
 
-					continue
-				}
-			}
-
-			break
+			continue
 		}
-		l.userWpIndex++
-		l.userMoveAt = time.Time{}
+		// Not reached: skip it only when the character already
+		// passed it on the route towards the next waypoint.
+		if l.userWpIndex+1 < len(l.userWaypoints) &&
+			waypointPassed(l.userWaypoints[l.userWpIndex],
+				l.userWaypoints[l.userWpIndex+1], selfX, selfY) {
+			l.userWpIndex++
+			l.userMoveAt = time.Time{}
+
+			continue
+		}
+
+		break
 	}
 	if l.userWpIndex >= len(l.userWaypoints) {
 		l.logger.Printf("Hunt: manual walk arrived (path done)")

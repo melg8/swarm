@@ -11,8 +11,78 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the bridge entry, the starter dagger and the shop queue floor
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (2026-09-10, Russian, three bugs):
+
+1. The bot rams the village bridge from the railing side on the town
+   returns: the pathfinder plans the smooth detour (the semicircle
+   onto the bridge ramp) but the waypoint follower accepted or skipped
+   the entry waypoints it never walked through - the arrival radius
+   (150 units, ~9 geodata cells) plus the "the next waypoint is
+   closer" skip rule let the cursor jump past the bridge entry while
+   the character stood beside the deck, and the straight leg then
+   ground into the railing (state dump: "town walk stuck, re-pathing
+   1..3 of 3", "aborted, walk stuck").
+2. The bot sold its sword, auto-equipped the starter dagger and the
+   shop strategy plans to buy the old sword back forever: the elven
+   fighter's Dagger (item 10) is the fourth unsellable, undroppable
+   newbie item (is_sellable=false, is_dropable=false in the Mobius
+   item xml - verified) but it is missing from gear.starterSet, so the
+   destroy machinery ignores it and displacedValue credits its phantom
+   sell value into every weapon plan.
+3. The web UI: switching between bots sometimes shows no farming zone
+   circles (the spot registry publishes only after the first spot
+   pick - a bot that starts a town trip or a delevel at login never
+   runs the picker) and no shop queue at all (the trip view is empty
+   while the walk to town runs: the stops are planned only at the
+   shop, so publishShoppingView clears the plan); the queue must also
+   hold at least 3-4 entries instead of the lone sword milestone.
+
+### Acceptance criteria
+
+- The follower only counts a waypoint reached within the tight
+  intermediate radius (50) and only skips one the character passed ON
+  the route (projection past the waypoint, lateral within the
+  corridor); the final waypoint keeps the wide arrival radius. The
+  same rule in all three followers (town, manual, blind recovery).
+- The Dagger joins the starter set: destroyed once a better weapon is
+  worn, never credited as sell value, never offered as junk.
+- SetHuntingSpots publishes the registry view at install; the shop
+  widget keeps the triggering plan through the town walk; the widget
+  queue never falls below 4 entries while candidates remain.
+
+### Status: in progress (2026-09-10)
+
+- The environment deployed (STACK_READY), the code surveyed, the
+  Mobius item xml and RequestSellItem/RequestBuyItem verified for the
+  unsellability and the price truncation parity (Go and Java truncate
+  the same IEEE double - no price fix needed).
+
+- Commit "the waypoint follower walks the bridge entry, not past it":
+  the intermediate waypoints of all three followers (the town trips,
+  the manual moves, the blind engage recovery) now count as reached
+  only within the tight 50 unit radius (the final waypoint keeps the
+  wide 150 trip arrival) and the legacy "the next waypoint is closer"
+  skip rule became the projection pass test (the character must stand
+  PAST the waypoint within the 100 unit corridor of the wp -> next
+  segment - a character beside the route, the bridge railing side,
+  keeps targeting the entry it missed). Covered by
+  hunt/waypoint_follow_test.go (the pass geometry table, the two
+  radii, the reported railing-side scene, the 60-units-short scene).
+  A gofmt-only commit fixed the space-indented loop_movement.go
+  another session left behind.
+
+
 ## Active task: the delevel freeze under an attached client - the position ping pong
 )
+
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
 Other agents may push to the same branch concurrently - rebase before
