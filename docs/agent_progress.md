@@ -11,7 +11,94 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
-## Active task: the hunting system redesign research (spot model)
+## Active task: the real C1 client switch - the restart dance
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (2026-09-10, Russian): the cross-bot switch of
+`51e716a`/`ae48f04` breaks on the REAL C1 client (the fake harness
+client of the E2E never caught it). Switching between distant
+characters crashes the client with `General protection fault!
+History: UNetworkHandler::Tick <- Function Name=UserInfoPacket <- ...`;
+switching between nearby characters does not change the character and
+renders as if many monsters around died at once. The task: research
+what the C1 client actually needs to allow a mid-session character
+switch (the teleport hypothesis included) and implement it together
+with the correct position, appearance, class and itemization.
+
+### Root cause (researched from the Mobius C1 sources + the symptoms)
+
+- The C1 client binds its PlayerPawn (the "self") to the object id of
+  the login flow; a `UserInfo` (0x04) is only ever about the SELF
+  character. The switch machinery sent a `UserInfo` carrying the NEW
+  bot's object id:
+  - Distant target: the id is unknown to the client's actor table ->
+    the `UserInfoPacket` handler dereferences a missing pawn -> GPF.
+  - Nearby target: the id exists as a remote pawn (CharInfo) -> the
+    client updates that actor but keeps controlling its old pawn ->
+    "the character does not change"; the full-history replay of the
+    new bot (every Die/Attack/MoveToLocation of its session) plays
+    the deaths "at once".
+  - The `TeleportToLocation` for the unknown id is meaningless and
+    the DeleteObject sweep never removed the old self pawn anyway
+    (KnownObjectIDs excludes the self).
+- There is NO packet that swaps the in-world self pawn of a C1 client
+  onto a different object id. The only mid-session identity change the
+  client implements is the **Restart flow** (the in-game Restart
+  button): `RequestRestart(0x46)` -> the server answers
+  `RestartResponse(0x74, result=1)` followed by `CharSelectionInfo`
+  (the exact pair of `RequestRestart.handlePacket` of the Mobius C1
+  server) -> the client tears its own world down and returns to the
+  char select screen -> the character is picked
+  (`CharacterSelect 0x0D`) -> `CharSelected(0x21)` -> `EnterWorld
+  (0x03)` -> the full enter world burst (UserInfo with the new
+  race/class/paperdoll, ItemList, SkillList, spawns). Position,
+  appearance, race, class and items all arrive through the packets
+  designed for exactly this transition.
+
+### Implementation (the restart dance)
+
+- `beginRestartSwitch` plays the official pair (`RestartResponse` +
+  the char list of the target bot), swaps the session and arms the
+  **auto select**: after 1.5 s the proxy itself serves the
+  live-patched `CharSelected` - the exact answer the user's own double
+  click of the only listed character would produce. The user's click
+  also still works (it cancels the timer; both paths are idempotent).
+- The relay parks at the char select screen (`parkAtCharSelect`) and
+  waits for the read loop to report the re-entry; newer WebUI
+  selections re-offer the newest char list, and the served
+  `CharSelected` always re-resolves the newest selection. The relay
+  goroutine stays the single owner of the stream for the whole life
+  of the connection (no second relay, no lost selections).
+- The relogin handoff rides the same dance (a relogged character gets
+  a fresh object id from the server's id factory, so the old teleport
+  resync had the same GPF): the held client is restarted onto the
+  replacement session with the auto select - the AFK user re-enters
+  the world of the same character without clicking anything.
+- The teleport + DeleteObject sweep machinery is removed
+  (`resyncWorld`, `buildTeleportToLocationPacket`,
+  `buildDeleteObjectPacket`, `maxReplaySeq`, the oldKnowns hold
+  snapshot); `holdForRelogin` waits for the replacement to be online
+  WITH its `CharSelected` recorded before it dances.
+
+### Status: done (2026-09-10)
+
+- The switch tests rewritten for the dance (the packet pair, the char
+  list content, the live-patched answer, the re-entry replay, the
+  manual-click fallback, the mid-dance re-selection, the pending
+  target), the relogin handoff tests rewritten (the dance of the
+  replacement, the late-CharSelected hold), go test ./... -count=1
+  green, -race green, golangci-lint clean, the live stack
+  `proxy_e2e.sh` -> PROXY_E2E_OK.
+- The real C1 client check of the dance is the user-side step per the
+  project workflow; the auto select delay (1.5 s) is the knob to tune
+  if the client needs more time to render the char select screen.
+
+## Finished task: the hunting system redesign research (spot model)
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
 Other agents may push to the same branch concurrently - rebase before

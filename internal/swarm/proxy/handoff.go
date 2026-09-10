@@ -5,9 +5,7 @@
 package proxy
 
 import (
-	"encoding/binary"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -27,23 +25,22 @@ import (
 //     open and swallows the client packets (the character is offline, the
 //     world behind the client is frozen);
 //   - once the replacement session of the same bot enters the world, the
-//     held client is resynced: the played character teleports to its live
-//     position, every object of the old known list is deleted, and the
-//     enter world stream of the new session replays with the live self
-//     state patch - exactly the view a fresh client would get, minus the
-//     login screens.
+//     held client is taken through the restart dance (see
+//     beginRestartSwitch): the proxy answers the restart the user never
+//     clicked, offers the character list of the replacement and serves
+//     the char selected answer on its own, so the client re-enters the
+//     world of the same character without anyone clicking anything.
 //
 // A user initiated logout keeps the classic flow: the client's own Logout
 // packet transits to the real server, the LeaveWorld answer is relayed so
-// the client returns to the login screen itself, and the session end then
-// closes the client connection.
+//     the client returns to the login screen itself, and the session end
+// then closes the client connection.
 
 // Server packet opcodes the handoff synthesizes or suppresses (the C1
 // values of the Mobius ServerPackets enum).
 const (
-	handoffOpLeaveWorld    = 0x96
-	handoffOpDeleteObject  = 0x1E
-	handoffOpTeleportToLoc = 0x38
+	handoffOpLeaveWorld      = 0x96
+	handoffOpRestartResponse = 0x74
 )
 
 // Client game packet opcode of the logout request.
@@ -76,44 +73,54 @@ func holdTimings() (timeout time.Duration, poll time.Duration) {
 	return clientHoldTimeout, holdPollPeriod
 }
 
-// maxReplaySeq is the sequence sentinel that starts a stream at the live
-// feed alone (no recorded entry can follow it): the defensive path of
-// the handoff for a replacement session whose CharSelected was never
-// recorded.
-const maxReplaySeq = math.MaxInt64
+// botSwitchAutoSelectDelay is how long the restart dance waits before
+// the proxy serves the char selected answer of the offered character
+// itself: the client needs the time to tear its world down and render
+// the char select screen, and the unsolicited answer lands exactly like
+// the user's own double click of the only listed character. A variable
+// so the tests can shorten it.
+var botSwitchAutoSelectDelay = 1500 * time.Millisecond
+
+// switchTimings snapshots the switch tunables under the knob mutex (the
+// same guard pattern as holdTimings: the tests rewrite the delay while a
+// relay of a previous connection may still be arming a timer).
+func switchTimings() time.Duration {
+	holdKnobsMu.Lock()
+	defer holdKnobsMu.Unlock()
+
+	return botSwitchAutoSelectDelay
+}
 
 // holdForRelogin parks the relay of a client whose bot session ended:
-// it snapshots the old known list (the tracker of the old session is
-// cleared by the next login, and the sweep must run against what the
-// client actually saw), then waits for a replacement session of the same
-// bot to enter the world. It returns the replacement session together
-// with the old known object ids, or nil when the client went away or the
-// hold timed out (the connection is already closed then).
-func (gc *gameConn) holdForRelogin(old *botSession) (*botSession, []int32) {
+// it waits for a replacement session of the same bot to enter the world
+// with its char selected answer recorded (the login handshake precedes
+// the world entry, so an online session always has it). It returns the
+// replacement session, or nil when the client went away or the hold
+// timed out (the connection is already closed then).
+func (gc *gameConn) holdForRelogin(old *botSession) *botSession {
 	timeout, poll := holdTimings()
-	oldKnowns := old.tracker.KnownObjectIDs()
 	gc.setHolding(true)
 	defer gc.setHolding(false)
 
 	gc.server.logger.Printf(
 		"game#%d: the bot session %q ended, holding the client for its relogin "+
-			"(%d known objects, up to %s)",
-		gc.id, old.id, len(oldKnowns), timeout)
+			"(up to %s)",
+		gc.id, old.id, timeout)
 
 	deadline := time.Now().Add(timeout)
 	for {
 		if next := gc.server.sessionByID(old.id); next != nil &&
 			next != old && next.recorder != old.recorder &&
-			next.tracker.Status() == state.StatusOnline {
+			switchReady(next) {
 			gc.server.logger.Printf(
-				"game#%d: bot %q is back online, resyncing the held client",
+				"game#%d: bot %q is back online, restarting the held client onto it",
 				gc.id, next.id)
 
-			return next, oldKnowns
+			return next
 		}
 		select {
 		case <-gc.done:
-			return nil, nil
+			return nil
 		case <-time.After(poll):
 		}
 		if time.Now().After(deadline) {
@@ -121,81 +128,18 @@ func (gc *gameConn) holdForRelogin(old *botSession) (*botSession, []int32) {
 				"the bot %q did not return within %s, releasing the held client",
 				old.id, timeout))
 
-			return nil, nil
+			return nil
 		}
 	}
 }
 
-// resyncWorld brings the held client onto the replacement session: the
-// played character teleports to its live position (the client also clears
-// its own known list on the teleport, but the sweep below does not rely
-// on it), every object of the old known list is deleted (a DeleteObject
-// of an unknown id is a no-op on the client, so the sweep is safe either
-// way), and the session reference of the connection swaps so the client
-// packets transit to the live bot connection again. The enter world
-// stream of the new session replays right after (streamSession), which
-// re-populates the surroundings with the live objects.
-func (gc *gameConn) resyncWorld(
-	next *botSession, oldKnowns []int32,
-) bool {
-	live := next.tracker.SelfSnapshot()
-	selfID := live.ObjectID
-	if selfID == 0 {
-		selfID = next.tracker.SelfObjectID()
-	}
-
-	teleport := buildTeleportToLocationPacket(
-		selfID, live.X, live.Y, live.Z, live.Heading)
-	if !gc.relayToClient(teleport) {
-		return false
-	}
-
-	swept := 0
-	for _, objectID := range oldKnowns {
-		if objectID == selfID {
-			continue
-		}
-		if !gc.relayToClient(buildDeleteObjectPacket(objectID)) {
-			return false
-		}
-		swept++
-	}
-
-	gc.setSession(next)
-	gc.server.logger.Printf(
-		"game#%d: held client resynced to %d %d %d (self id %d), "+
-			"swept %d old objects",
-		gc.id, live.X, live.Y, live.Z, selfID, swept)
-
-	return true
-}
-
-// buildTeleportToLocationPacket builds the C1 TeleportToLocation packet:
-// [opcode 0x38][target object id][x][y][z][fade 0/instant 1][heading]
-// (see TeleportToLocation.writeImpl of the Mobius C1 server).
-func buildTeleportToLocationPacket(
-	objectID int32, x int32, y int32, z int32, heading int32,
-) []byte {
-	payload := make([]byte, 0, 25)
-	payload = append(payload, handoffOpTeleportToLoc)
-	payload = binary.LittleEndian.AppendUint32(payload, uint32(objectID))
-	payload = binary.LittleEndian.AppendUint32(payload, uint32(x))
-	payload = binary.LittleEndian.AppendUint32(payload, uint32(y))
-	payload = binary.LittleEndian.AppendUint32(payload, uint32(z))
-	payload = binary.LittleEndian.AppendUint32(payload, 0) // fade
-	payload = binary.LittleEndian.AppendUint32(payload, uint32(heading))
-
-	return payload
-}
-
-// buildDeleteObjectPacket builds the C1 DeleteObject packet:
-// [opcode 0x1E][object id] (see DeleteObject.writeImpl).
-func buildDeleteObjectPacket(objectID int32) []byte {
-	payload := make([]byte, 0, 5)
-	payload = append(payload, handoffOpDeleteObject)
-	payload = binary.LittleEndian.AppendUint32(payload, uint32(objectID))
-
-	return payload
+// switchReady reports whether a bot session can take a client through
+// the restart dance right now: the character is in the world and the
+// char selected answer of its login is recorded (the dance serves it to
+// the client as the double click answer, so it must exist).
+func switchReady(session *botSession) bool {
+	return session.tracker.Status() == state.StatusOnline &&
+		session.recorder.FirstPacketSeq(charSelectedOpcode) != 0
 }
 
 // buildLeaveWorldPacket builds the C1 LeaveWorld packet: the bare opcode
@@ -203,6 +147,18 @@ func buildDeleteObjectPacket(objectID int32) []byte {
 // that processes it returns to the login screen on its own.
 func buildLeaveWorldPacket() []byte {
 	return []byte{handoffOpLeaveWorld}
+}
+
+// buildRestartResponsePacket builds the C1 RestartResponse packet the
+// real server answers the in-game Restart button with (see
+// RequestRestart.handlePacket and RestartResponse.writeImpl of the
+// Mobius C1 server): [opcode 0x74][result: 1]. The client that processes
+// it tears its world down and returns to the character select screen on
+// its own - the one mid-session state transition the C1 client is
+// designed to make, and the carrier of every character switch the proxy
+// performs.
+func buildRestartResponsePacket() []byte {
+	return []byte{handoffOpRestartResponse, 0x01, 0x00, 0x00, 0x00}
 }
 
 // isLeaveWorldPayload reports whether the payload is the LeaveWorld

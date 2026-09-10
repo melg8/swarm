@@ -5,6 +5,8 @@
 package proxy
 
 import (
+	"errors"
+
 	fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
 	"github.com/melg8/swarm/internal/swarm/packets/packet"
 	"github.com/melg8/swarm/internal/swarm/state"
@@ -17,8 +19,19 @@ const charListOpcode = 0x1F
 // emulated game server answers with: the character actually played by
 // the attached bot session.
 func (gc *gameConn) buildCharacterList() ([]byte, error) {
-	snapshot := gc.session.tracker.Snapshot()
-	info := gc.characterInfo(snapshot.Character, gc.session.id)
+	return buildCharacterListFor(gc.currentSession())
+}
+
+// buildCharacterListFor serializes the one character CharSelectionInfo
+// of the given bot session (the session is resolved under the connection
+// lock by the caller - the char list is built from the relay and the
+// timer goroutines while the read loop may swap the session).
+func buildCharacterListFor(session *botSession) ([]byte, error) {
+	if session == nil {
+		return nil, errors.New("no bot session attached")
+	}
+	snapshot := session.tracker.Snapshot()
+	info := characterInfoFor(session, snapshot.Character, session.id)
 
 	list := &fromgameserver.CharSelectInfoPacket{
 		Count:      1,
@@ -32,16 +45,16 @@ func (gc *gameConn) buildCharacterList() ([]byte, error) {
 	return writer.Bytes(), nil
 }
 
-// characterInfo builds the char list entry of the played character. The
-// appearance fields (sex, race, class, hair, face) come from the last
-// recorded real char list of the session that contains the played
-// character, so the client renders the same look the real server would;
-// the vitals, the position and the paperdoll come from the live tracker
-// (they are fresher than anything recorded at login time: the C1 client
-// renders the selection screen model from the paperdoll item ids, so
-// the zeroed table showed a naked character).
-func (gc *gameConn) characterInfo(
-	character state.CharacterSnapshot, account string,
+// characterInfoFor builds the char list entry of the played character
+// of the given session. The appearance fields (sex, race, class, hair,
+// face) come from the last recorded real char list of the session that
+// contains the played character, so the client renders the same look
+// the real server would; the vitals, the position and the paperdoll
+// come from the live tracker (they are fresher than anything recorded
+// at login time: the C1 client renders the selection screen model from
+// the paperdoll item ids, so the zeroed table showed a naked character).
+func characterInfoFor(
+	session *botSession, character state.CharacterSnapshot, account string,
 ) fromgameserver.CharacterInfo {
 	//nolint:exhaustruct // the paperdoll is filled below
 	info := fromgameserver.CharacterInfo{
@@ -67,7 +80,7 @@ func (gc *gameConn) characterInfo(
 		DeleteTimer: 0,
 	}
 
-	if recorded := gc.recordedCharacter(character.Name); recorded != nil {
+	if recorded := recordedCharacter(session, character.Name); recorded != nil {
 		info.Sex = recorded.Sex
 		info.Race = recorded.Race
 		info.BaseClassID = recorded.BaseClassID
@@ -78,25 +91,27 @@ func (gc *gameConn) characterInfo(
 			info.Name = recorded.Name
 		}
 	}
-	gc.fillLivePaperdoll(&info)
+	fillLivePaperdoll(session, &info)
 
 	return info
 }
 
 // fillLivePaperdoll resolves the equipped gear of the played character
-// from the live tracker: the paperdoll object ids of the slots come from
-// the last UserInfo broadcast the server sent (it refreshes the block on
-// every equip and unequip), and the item ids are looked up in the
-// tracked inventory. The two tables share the Mobius wire slot order,
-// so the mapping is index to index (the right hand duplicate repeats
-// in both).
-func (gc *gameConn) fillLivePaperdoll(info *fromgameserver.CharacterInfo) {
-	if gc.session == nil {
+// of the given session from its live tracker: the paperdoll object ids
+// of the slots come from the last UserInfo broadcast the server sent
+// (it refreshes the block on every equip and unequip), and the item ids
+// are looked up in the tracked inventory. The two tables share the
+// Mobius wire slot order, so the mapping is index to index (the right
+// hand duplicate repeats in both).
+func fillLivePaperdoll(
+	session *botSession, info *fromgameserver.CharacterInfo,
+) {
+	if session == nil {
 		return
 	}
 
-	paperdoll := gc.session.tracker.PaperdollSlotObjectIDs()
-	inventory := gc.session.tracker.InventoryItems()
+	paperdoll := session.tracker.PaperdollSlotObjectIDs()
+	inventory := session.tracker.InventoryItems()
 	itemIDs := make(map[int32]int32, len(inventory))
 	for _, item := range inventory {
 		itemIDs[item.ObjectID] = item.ItemID
@@ -110,17 +125,17 @@ func (gc *gameConn) fillLivePaperdoll(info *fromgameserver.CharacterInfo) {
 }
 
 // recordedCharacter returns the entry of the played character from the
-// newest recorded real char list of the bot session, or nil.
-func (gc *gameConn) recordedCharacter(
-	name string,
+// newest recorded real char list of the given bot session, or nil.
+func recordedCharacter(
+	session *botSession, name string,
 ) *fromgameserver.CharacterInfo {
-	if gc.session == nil {
+	if session == nil {
 		return nil
 	}
 
 	var match *fromgameserver.CharacterInfo
 	list := fromgameserver.NewCharSelectInfoPacket()
-	gc.session.recorder.Walk(func(_ int64, payload []byte) bool {
+	session.recorder.Walk(func(_ int64, payload []byte) bool {
 		if len(payload) == 0 || payload[0] != charListOpcode {
 			return true
 		}

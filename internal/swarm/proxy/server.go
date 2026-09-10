@@ -304,6 +304,27 @@ func (s *Server) resolveSession() *botSession {
 	}
 }
 
+// tryResolveSelectedSession returns the online session of the currently
+// selected bot, or nil when the selection is empty, unregistered or not
+// in the world yet. A char selected answer served right after a
+// selection change re-resolves through it, so the client always enters
+// the newest WebUI selection even when it fired mid dance or mid load.
+func (s *Server) tryResolveSelectedSession() *botSession {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.selected == "" {
+		return nil
+	}
+	for i := range s.sessions {
+		if s.sessions[i].id == s.selected &&
+			s.sessions[i].tracker.Status() == state.StatusOnline {
+			return s.sessions[i]
+		}
+	}
+
+	return nil
+}
+
 // SessionIDs lists the registered bot session ids in registration order.
 func (s *Server) SessionIDs() []string {
 	s.mu.Lock()

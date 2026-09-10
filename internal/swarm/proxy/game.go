@@ -31,6 +31,17 @@ import (
 // EnterWorld the client receives the recorded server packet stream of
 // the bot (the replay) followed by the live feed, and every client
 // packet transits to the real game server through the bot connection.
+//
+// A mid-session switch onto another bot (the WebUI selection) or onto
+// the replacement session of the same bot (the relogin handoff) rides
+// the restart flow: the proxy plays the server side of the in-game
+// Restart button - RestartResponse moves the client to its char select
+// screen (the client tears its own world down there, so no ghost
+// objects and no stale self pawn survive), the char list of the target
+// bot is offered, and the unsolicited CharSelected answer follows
+// shortly after, exactly as the user's own double click of the only
+// listed character. The client then loads and sends its EnterWorld, and
+// the relay continues with the replay and the live feed of the target.
 type gameConn struct {
 	server  *Server
 	conn    net.Conn
@@ -51,6 +62,17 @@ type gameConn struct {
 
 	charSelectedSeq int64
 	queue           [][]byte
+
+	// relayLive, autoSelect and enterWorldCh are guarded by mu:
+	// relayLive marks the relay goroutine as the owner of the
+	// stream (the read loop signals instead of starting a second
+	// one when a restart dance hands the flow back), autoSelect is
+	// the pending unsolicited char selected answer of a dance, and
+	// enterWorldCh carries the replay sequence the read loop hands
+	// the parked relay when the client re-enters the world.
+	relayLive    bool
+	autoSelect   *time.Timer
+	enterWorldCh chan int64
 
 	outCh      chan []byte
 	done       chan struct{}
@@ -131,6 +153,9 @@ func (s *Server) handleGameConn(conn net.Conn) {
 		userLogout:      false,
 		charSelectedSeq: 0,
 		queue:           nil,
+		relayLive:       false,
+		autoSelect:      nil,
+		enterWorldCh:    make(chan int64, 1),
 		outCh:           make(chan []byte, outboundQueueSize),
 		done:            make(chan struct{}),
 		closeOnce:       sync.Once{},
@@ -252,7 +277,7 @@ func (gc *gameConn) sendRawKeyPacket(
 // handleClientPacket dispatches one decrypted client packet by state.
 func (gc *gameConn) handleClientPacket(payload []byte) error {
 	opcode := payload[0]
-	switch gc.state {
+	switch gc.currentState() {
 	case gameStateHandshake:
 		// The handshake completes before the read loop starts; a packet
 		// arriving here means a desynchronized client.
@@ -280,6 +305,14 @@ func (gc *gameConn) handleClientPacket(payload []byte) error {
 	case gameStateSelected:
 		if opcode == gameOpEnterWorld {
 			return gc.handleEnterWorld()
+		}
+		if opcode == gameOpCharacterSelect {
+			// The client is still at (or back on) the char
+			// select screen: the unsolicited answer of the
+			// auto select may not have taken (the packet raced
+			// the client state), and the user's own double
+			// click is served the same way - idempotent.
+			return gc.handleCharacterSelect(payload)
 		}
 		gc.queueClientPacket(payload)
 
@@ -327,41 +360,83 @@ func (gc *gameConn) handleAuthLogin(payload []byte) error {
 	if err := gc.sendToClient(charList); err != nil {
 		return err
 	}
-	gc.state = gameStateChars
+	gc.setState(gameStateChars)
 
 	return nil
 }
 
-// handleCharacterSelect answers with the recorded CharSelected packet
-// of the bot session patched to the live tracker state: the slot index
-// itself is irrelevant (the client asked for the only offered slot), but
-// the recorded coordinates are the login-time place of the bot. A client
-// reconnecting after the bot walked away must spawn where the character
-// actually stands, so the position, vitals and progression fields are
-// rewritten from the live snapshot (see patchCharSelectedLive).
+// handleCharacterSelect answers a client character select with the
+// recorded CharSelected packet of the bot session patched to the live
+// tracker state (see serveCharSelectedLive). The slot index itself is
+// irrelevant (the client asked for the only offered slot), but the
+// answer must carry the live place of the character: a client picking
+// the char after a restart dance lands where the bot actually stands.
+// A user click cancels the pending auto select of a dance (the user
+// wins the race against the proxy's own double click).
 func (gc *gameConn) handleCharacterSelect(payload []byte) error {
 	slot := int32(0)
 	if len(payload) >= 5 {
 		slot = int32(uint32(payload[1]) | uint32(payload[2])<<8 |
 			uint32(payload[3])<<16 | uint32(payload[4])<<24)
 	}
-	gc.charSelectedSeq = gc.session.recorder.FirstPacketSeq(charSelectedOpcode)
-	selected := gc.session.recorder.Entry(gc.charSelectedSeq)
-	if selected == nil {
-		return errors.New("no char selected packet recorded for the session")
+	gc.cancelAutoSelect()
+	if err := gc.serveCharSelectedLive(); err != nil {
+		return err
 	}
-	live := gc.session.tracker.SelfSnapshot()
-	answer := patchCharSelectedLive(selected, live)
+
+	live := gc.currentSession().tracker.SelfSnapshot()
 	gc.server.logger.Printf(
 		"game#%d: char select (slot %d) answered with the recorded packet, "+
 			"live state %d %d %d hp %.0f/%.0f level %d",
-		gc.id, slot, live.X, live.Y, live.Z, live.CurHP, live.MaxHP, live.Level)
-	if err := gc.sendToClient(answer); err != nil {
-		return err
-	}
-	gc.state = gameStateSelected
+		gc.id, slot, live.X, live.Y, live.Z, live.CurHP, live.MaxHP,
+		live.Level)
 
 	return nil
+}
+
+// serveCharSelectedLive serves the char selected answer of the current
+// bot session: the newest WebUI selection wins (a selection change that
+// fired while the client was loading or sitting on the char select
+// screen redirects the entry onto the newly selected bot), then the
+// recorded CharSelected packet of the resolved session is rewritten with
+// the live snapshot (the position, vitals and progression fields, see
+// patchCharSelectedLive) and queued to the client. Idempotent: the read
+// loop (the user's double click), the auto select timer of a restart
+// dance and a re-click after a lost answer all ride this one path.
+func (gc *gameConn) serveCharSelectedLive() error {
+	if next := gc.server.tryResolveSelectedSession(); next != nil {
+		gc.setSession(next)
+	}
+	session := gc.currentSession()
+	if session == nil {
+		return errors.New("no bot session available for the char selection")
+	}
+
+	gc.mu.Lock()
+	if gc.state != gameStateChars && gc.state != gameStateSelected {
+		gc.mu.Unlock()
+
+		return nil // the client is not selecting a character
+	}
+	seq := session.recorder.FirstPacketSeq(charSelectedOpcode)
+	if seq == 0 {
+		gc.mu.Unlock()
+
+		return errors.New("no char selected packet recorded for the session")
+	}
+	selected := session.recorder.Entry(seq)
+	if selected == nil {
+		gc.mu.Unlock()
+
+		return errors.New("the recorded char selected entry is gone")
+	}
+	live := session.tracker.SelfSnapshot()
+	answer := patchCharSelectedLive(selected, live)
+	gc.charSelectedSeq = seq
+	gc.state = gameStateSelected
+	gc.mu.Unlock()
+
+	return gc.sendToClient(answer)
 }
 
 // handleCharacterCreate refuses creation attempts: the emulated account
@@ -382,18 +457,43 @@ func (gc *gameConn) handleCharacterCreate() error {
 }
 
 // handleEnterWorld flushes the client packets queued between the char
-// selection and the world entry, then starts the replay and the live
-// relay of the bot session.
+// selection and the world entry, then hands the stream to the relay: a
+// fresh connection starts the relay goroutine, while a re-entry after a
+// restart dance wakes the parked relay (it owns the lifecycle) with the
+// replay sequence of the just served char selected answer.
 func (gc *gameConn) handleEnterWorld() error {
 	gc.server.logger.Printf("game#%d: enter world, starting the session relay",
 		gc.id)
+
+	gc.mu.Lock()
+	if gc.state != gameStateSelected {
+		gc.mu.Unlock()
+
+		return nil // not selecting: a stray re-entry
+	}
 	gc.state = gameStateWorld
+	seq := gc.charSelectedSeq
+	relayLive := gc.relayLive
+	gc.relayLive = true
+	gc.mu.Unlock()
+
 	for _, queued := range gc.queue {
 		if err := gc.transitToServer(queued); err != nil {
 			return err
 		}
 	}
 	gc.queue = nil
+
+	if relayLive {
+		// A restart dance parked the relay on this connection:
+		// the re-entry is its signal to continue.
+		select {
+		case gc.enterWorldCh <- seq:
+		case <-gc.done:
+		}
+
+		return nil
+	}
 
 	go gc.runRelay()
 
@@ -592,9 +692,13 @@ func (gc *gameConn) writeOutbound(buf []byte, payload []byte) bool {
 // connection ends. Each cycle replays the recorded history of one bot
 // session and follows it with the live feed; when that session ends and
 // the client did not ask for the logout itself, the cycle performs the
-// relogin handoff (hold, resync) and the loop continues with the
-// replacement session.
+// relogin handoff (hold, restart dance) and the loop continues with the
+// replacement session. A WebUI selection change mid cycle swaps the
+// client onto the newly selected bot through the same dance, so the
+// relay goroutine stays the single owner of the stream for the whole
+// life of the connection.
 func (gc *gameConn) runRelay() {
+	defer gc.setRelayLive(false)
 	fromSeq := gc.charSelectedSeq
 	for {
 		next, ok := gc.streamSession(fromSeq)
@@ -609,9 +713,8 @@ func (gc *gameConn) runRelay() {
 // recorded after the given sequence (the enter world burst and the
 // history, live-patched for the played character) followed by the live
 // feed. It returns the replay start sequence of the next cycle (the
-// CharSelected of the replacement session) when the session ended and
-// the client was held through the relogin handoff, ok=false when the
-// connection is done.
+// CharSelected the client was served after a restart dance) when the
+// session switched, ok=false when the connection is done.
 //
 // The LeaveWorld answer of a bot initiated logout is suppressed in both
 // the replay and the live feed (see handoff.go): a client that processes
@@ -625,13 +728,13 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
 
 	// Snapshot the selection channel at the start of the cycle: when
 	// SelectBot fires it (closes it), the live feed select wakes up
-	// and the client resyncs onto the newly selected bot.
+	// and the client switches onto the newly selected bot.
 	selectionCh := gc.server.selectionChannel()
 
 	// A selection whose target bot is not online yet (registered but
 	// still connecting, or not registered at all) arms a pending
 	// switch: the live feed keeps flowing while the poll ticker below
-	// retries the resync, so the client lands on the target the
+	// retries the switch, so the client lands on the target the
 	// moment it enters the world. Without the pending the relay would
 	// stay on the current bot forever: SelectBot of the same id is a
 	// no-op that never refires the channel.
@@ -667,7 +770,7 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
 		case <-selectionCh:
 			target, next := gc.serveBotSwitch(session)
 			if next != nil {
-				return gc.botSwitchReplaySeq(next), true
+				return gc.parkAtCharSelect()
 			}
 			// The selection did not resolve to a different online
 			// session: stay on the current live feed, and arm the
@@ -682,7 +785,7 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
 				return 0, false
 			}
 			if next != nil {
-				return gc.botSwitchReplaySeq(next), true
+				return gc.parkAtCharSelect()
 			}
 		case update := <-sub.ch:
 			if isLeaveWorldPayload(update.payload) && !gc.clientLoggedOut() {
@@ -702,23 +805,24 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
 
 // serveBotSwitch handles a WebUI selection change while a client is
 // connected: it resolves the newly selected bot session and, when it
-// differs from the current one and is online, resyncs the client onto
-// it through the same teleport + DeleteObject sweep + replay machinery
-// the relogin handoff uses. The client sees the new character's
-// position, appearance, race and class without reconnecting. Returns
-// the target id together with the new session when the switch
-// happened; the target id with a nil session when the target is not
-// online yet (the caller arms the pending switch and keeps serving
-// the current live feed); "" with a nil session when the selection
-// resolves to the current bot or nothing at all.
+// differs from the current one and is ready (online with its char
+// selected answer recorded), starts the restart dance onto it. The
+// client returns to its char select screen, is auto selected onto the
+// new character and re-enters the world on it: the position, the
+// appearance, the race, the class and the equipment all arrive through
+// the enter world packets of the new bot - no reconnect needed. Returns
+// the target id together with the new session when the dance started;
+// the target id with a nil session when the target is not ready yet
+// (the caller arms the pending switch and keeps serving the current
+// live feed); "" with a nil session when the selection resolves to the
+// current bot or nothing at all.
 func (gc *gameConn) serveBotSwitch(current *botSession) (string, *botSession) {
 	target := gc.server.SelectedBot()
 	if target == "" || target == current.id {
 		return "", nil
 	}
 	next := gc.server.sessionByID(target)
-	if next == nil || next == current ||
-		next.tracker.Status() != state.StatusOnline {
+	if next == nil || next == current || !switchReady(next) {
 		gc.server.logger.Printf(
 			"game#%d: selection switched to %q but the bot is not online "+
 				"yet, serving %q until it enters the world",
@@ -726,29 +830,23 @@ func (gc *gameConn) serveBotSwitch(current *botSession) (string, *botSession) {
 
 		return target, nil
 	}
-	oldKnowns := current.tracker.KnownObjectIDs()
 	gc.server.logger.Printf(
-		"game#%d: selection switched from %q to %q, resyncing the client "+
-			"(%d known objects)",
-		gc.id, current.id, next.id, len(oldKnowns))
-	if !gc.resyncWorld(next, oldKnowns) {
+		"game#%d: selection switched from %q to %q, starting the restart dance",
+		gc.id, current.id, next.id)
+	if !gc.beginRestartSwitch(next) {
 		return "", nil
 	}
 
 	return target, next
 }
 
-// botSwitchReplaySeq resolves the replay start of a switched
-// session: the CharSelected packet of the new bot (the enter world
-// burst follows it), or the live feed alone when the session has no
-// recorded CharSelected (the defensive path of the handoff).
-// retryPendingSwitch resolves one poll tick of the pending bot
-// switch: the WebUI selection named a bot that was not online yet
-// when it fired, and the tick checks whether the target entered the
-// world in the meantime. It resyncs the client onto it and returns
-// the new session with ok=true, returns nil with ok=true while the
-// target is still not online (the live feed keeps flowing), and
-// ok=false when the connection died mid resync.
+// retryPendingSwitch resolves one poll tick of the pending bot switch:
+// the WebUI selection named a bot that was not online yet when it
+// fired, and the tick checks whether the target entered the world in
+// the meantime. It starts the restart dance onto it and returns the
+// new session with ok=true, returns nil with ok=true while the target
+// is still not online (the live feed keeps flowing), and ok=false when
+// the connection died mid dance.
 func (gc *gameConn) retryPendingSwitch(
 	session *botSession, pending string,
 ) (*botSession, bool) {
@@ -756,67 +854,277 @@ func (gc *gameConn) retryPendingSwitch(
 		return nil, true
 	}
 	next := gc.server.sessionByID(pending)
-	if next == nil || next == session ||
-		next.tracker.Status() != state.StatusOnline {
+	if next == nil || next == session || !switchReady(next) {
 		return nil, true
 	}
-	oldKnowns := session.tracker.KnownObjectIDs()
 	gc.server.logger.Printf(
 		"game#%d: the pending switch target %q entered the world, "+
-			"resyncing the client (%d known objects)",
-		gc.id, pending, len(oldKnowns))
-	if !gc.resyncWorld(next, oldKnowns) {
+			"starting the restart dance",
+		gc.id, pending)
+	if !gc.beginRestartSwitch(next) {
 		return nil, false
 	}
 
 	return next, true
 }
 
-func (gc *gameConn) botSwitchReplaySeq(next *botSession) int64 {
-	newSeq := next.recorder.FirstPacketSeq(charSelectedOpcode)
-	if newSeq == 0 {
-		gc.server.logger.Printf(
-			"game#%d: switched session has no recorded char selected, "+
-				"continuing with the live feed only",
-			gc.id)
+// beginRestartSwitch starts the restart dance for a live in-world
+// client: the exact packet pair the real server answers the in-game
+// Restart button with (RestartResponse followed by the char list - see
+// RequestRestart.handlePacket of the Mobius C1 server) moves the client
+// to its own char select screen, and the session of the connection
+// swaps to the target bot so the char list, the char selected answer
+// and the following replay all serve the new character. The dance
+// cannot fail on a live connection: the synthesized packets are fixed
+// layout and the char list builder degrades gracefully.
+//
+// The C1 client tears its whole world down when it processes the
+// RestartResponse - that is what makes the dance the only correct
+// switch: the teleport + DeleteObject sweep approach crashes the client
+// (a UserInfo of an object id the client never spawned dereferences a
+// missing pawn in the UserInfoPacket handler - the reported General
+// protection fault), and a UserInfo of a nearby known object leaves the
+// client controlling its old pawn. A restart is the one mid-session
+// identity change the client is designed to process.
+func (gc *gameConn) beginRestartSwitch(next *botSession) bool {
+	gc.setSession(next)
+	gc.setState(gameStateChars)
 
-		return maxReplaySeq
+	if err := gc.sendToClient(buildRestartResponsePacket()); err != nil {
+		gc.server.logger.Printf(
+			"game#%d: the restart answer did not reach the client: %v",
+			gc.id, err)
+
+		return false
+	}
+	list, err := gc.buildCharacterList()
+	if err != nil {
+		gc.server.logger.Printf(
+			"game#%d: the char list of %q could not be built (%v), "+
+				"continuing with the dance",
+			gc.id, next.id, err)
+	} else if err := gc.sendToClient(list); err != nil {
+		gc.server.logger.Printf(
+			"game#%d: the char list of %q did not reach the client: %v",
+			gc.id, next.id, err)
+
+		return false
+	}
+	gc.armAutoSelect()
+	gc.server.logger.Printf(
+		"game#%d: restart dance onto %q offered (auto select in %s)",
+		gc.id, next.id, switchTimings())
+
+	return true
+}
+
+// offerCharList re-points a parked client at the given session: the
+// client already sits on its char select screen, so the dance only
+// swaps the session, pushes the char list of the newly selected bot and
+// re-arms the auto select - the screen re-renders the model of the new
+// character and the unsolicited answer follows as before.
+func (gc *gameConn) offerCharList(next *botSession) bool {
+	gc.setSession(next)
+	list, err := gc.buildCharacterList()
+	if err != nil {
+		gc.server.logger.Printf(
+			"game#%d: the char list of %q could not be built: %v",
+			gc.id, next.id, err)
+
+		return true // the auto select still lands on the new session
+	}
+	if err := gc.sendToClient(list); err != nil {
+		gc.server.logger.Printf(
+			"game#%d: the char list of %q did not reach the client: %v",
+			gc.id, next.id, err)
+
+		return false
+	}
+	gc.armAutoSelect()
+	gc.server.logger.Printf(
+		"game#%d: the parked char select screen re-offered onto %q",
+		gc.id, next.id)
+
+	return true
+}
+
+// parkAtCharSelect parks the relay while the client sits on the char
+// select screen of a restart dance: it waits for the read loop to
+// report the re-entry (the EnterWorld after the served char selected
+// answer), tracks newer WebUI selections (the screen re-offers the
+// newest char list) and polls for a pending target that was offline at
+// the selection time. It returns the replay sequence of the entered
+// session, or ok=false when the connection ended.
+func (gc *gameConn) parkAtCharSelect() (int64, bool) {
+	// Drain any stale re-entry report before parking: a duplicate
+	// EnterWorld of the previous cycle must not leak into this one.
+	for len(gc.enterWorldCh) > 0 {
+		<-gc.enterWorldCh
 	}
 
-	return newSeq
+	pending := ""
+	poll := time.NewTicker(botSwitchPollPeriod)
+	defer poll.Stop()
+	for {
+		selectionCh := gc.server.selectionChannel()
+		select {
+		case <-gc.done:
+			return 0, false
+		case seq := <-gc.enterWorldCh:
+			return seq, true
+		case <-selectionCh:
+			target, next := parkSelectionTarget(
+				gc.server, gc.currentSession().id)
+			if next != nil {
+				if !gc.offerCharList(next) {
+					return 0, false
+				}
+				pending = ""
+			} else {
+				pending = target
+			}
+		case <-poll.C:
+			var ok bool
+			pending, ok = gc.parkPendingOffer(pending)
+			if !ok {
+				return 0, false
+			}
+		}
+	}
+}
+
+// parkSelectionTarget resolves what a selection change means for a
+// parked client: the ready session of the newest selection to
+// re-offer, or the pending target id when the selection is not ready
+// yet ("" when the selection names the current bot or nothing - the
+// park keeps offering what it has).
+func parkSelectionTarget(s *Server, currentID string) (string, *botSession) {
+	target := s.SelectedBot()
+	if target == "" || target == currentID {
+		return "", nil
+	}
+	if next := s.sessionByID(target); next != nil && switchReady(next) {
+		return "", next
+	}
+
+	return target, nil
+}
+
+// parkPendingOffer completes one poll tick of a pending target armed
+// while the client is parked: when the target became ready, the char
+// list is re-offered onto it and the pending clears. It reports ok=false
+// only when the re-offer failed (the client connection is gone).
+func (gc *gameConn) parkPendingOffer(pending string) (string, bool) {
+	if pending == "" || pending == gc.currentSession().id {
+		return pending, true
+	}
+	next := gc.server.sessionByID(pending)
+	if next == nil || !switchReady(next) {
+		return pending, true
+	}
+	if !gc.offerCharList(next) {
+		return "", false
+	}
+
+	return "", true
+}
+
+// armAutoSelect schedules the unsolicited char selected answer of the
+// dance: after the delay the proxy plays the double click of the only
+// listed character itself, so the WebUI selection alone carries the
+// client into the world of the new bot (a hands-off switch). The user's
+// own double click cancels the pending answer (see cancelAutoSelect);
+// whichever fires first wins and the other becomes a no-op.
+func (gc *gameConn) armAutoSelect() {
+	delay := switchTimings()
+	gc.mu.Lock()
+	if gc.autoSelect != nil {
+		gc.autoSelect.Stop()
+	}
+	gc.autoSelect = time.AfterFunc(delay, gc.autoSelectCharSelected)
+	gc.mu.Unlock()
+}
+
+// cancelAutoSelect drops the pending unsolicited answer: the user's own
+// double click arrived first.
+func (gc *gameConn) cancelAutoSelect() {
+	gc.mu.Lock()
+	if gc.autoSelect != nil {
+		gc.autoSelect.Stop()
+		gc.autoSelect = nil
+	}
+	gc.mu.Unlock()
+}
+
+// autoSelectCharSelected is the proxy's own double click: it serves the
+// char selected answer of the offered character while the client still
+// sits on the char select screen. A client that moved on (the state
+// left the chars screen - the user clicked first or the connection is
+// gone) makes the timer a no-op.
+func (gc *gameConn) autoSelectCharSelected() {
+	gc.mu.Lock()
+	gc.autoSelect = nil
+	if gc.state != gameStateChars {
+		gc.mu.Unlock()
+
+		return
+	}
+	gc.mu.Unlock()
+
+	gc.server.logger.Printf(
+		"game#%d: auto selecting the offered character, serving the char "+
+			"selected answer",
+		gc.id)
+	if err := gc.serveCharSelectedLive(); err != nil {
+		gc.shutdown("the auto char select failed: " + err.Error())
+	}
+}
+
+// setRelayLive records whether the relay goroutine owns the stream of
+// the connection (the read loop signals a parked relay instead of
+// starting a second one).
+func (gc *gameConn) setRelayLive(live bool) {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+	gc.relayLive = live
+}
+
+// setState transitions the client state machine of the connection.
+func (gc *gameConn) setState(state gameState) {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+	gc.state = state
+}
+
+// currentState snapshots the client state machine of the connection.
+func (gc *gameConn) currentState() gameState {
+	gc.mu.Lock()
+	defer gc.mu.Unlock()
+
+	return gc.state
 }
 
 // serveRelogin handles the end of the streamed bot session: a client
 // that asked for the logout itself is closed with the session, any
-// other client is held through the bot relogin and resynced onto the
-// replacement session. It returns the replay start sequence of the
-// replacement session (ok=true) or the end of the connection.
+// other client is held through the bot relogin and taken through the
+// restart dance onto the replacement session (the same character
+// re-enters its fresh world). It returns the replay start sequence of
+// the replacement session (ok=true) or the end of the connection.
 func (gc *gameConn) serveRelogin(session *botSession) (int64, bool) {
 	if gc.clientLoggedOut() {
 		gc.shutdown("the bot session ended after the client logout")
 
 		return 0, false
 	}
-	next, oldKnowns := gc.holdForRelogin(session)
+	next := gc.holdForRelogin(session)
 	if next == nil {
 		return 0, false
 	}
-	if !gc.resyncWorld(next, oldKnowns) {
+	if !gc.beginRestartSwitch(next) {
 		return 0, false
 	}
-	newSeq := next.recorder.FirstPacketSeq(charSelectedOpcode)
-	if newSeq == 0 {
-		// Defensive: an online session without a recorded CharSelected
-		// cannot be replayed from its enter world burst; the client
-		// keeps the teleport resync and the live feed alone.
-		gc.server.logger.Printf(
-			"game#%d: replacement session has no recorded char "+
-				"selected, continuing with the live feed only",
-			gc.id)
-		newSeq = maxReplaySeq
-	}
 
-	return newSeq, true
+	return gc.parkAtCharSelect()
 }
 
 // replayHistory streams the recorded history of one session cycle: the
@@ -889,6 +1197,7 @@ func (gc *gameConn) sendToClient(payload []byte) error {
 func (gc *gameConn) shutdown(reason string) {
 	gc.closeOnce.Do(func() {
 		gc.server.logger.Printf("game#%d: closing, %s", gc.id, reason)
+		gc.cancelAutoSelect()
 		close(gc.done)
 		if gc.senderLive.Load() {
 			select {

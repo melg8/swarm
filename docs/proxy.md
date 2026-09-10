@@ -130,8 +130,8 @@ needs `-proxy-login 0.0.0.0:2107 -proxy-game 0.0.0.0:7778` and the
    server cannot tell the difference. The hunt loop of the bot keeps
    running: autonomous actions and user actions interleave on the same
    character. A bot initiated logout does NOT end this phase: the
-   client is held through the bot relogin and resynced (see "The bot
-   relogin handoff" below).
+   client is held through the bot relogin and restarted onto the
+   replacement (see "The bot relogin handoff" below).
 
 Character creation and deletion are refused by the emulation (the
 client manages exactly the one served character). The login phase
@@ -199,19 +199,20 @@ relay handles the whole cycle in `streamSession`/`serveRelogin`:
   cannot answer, the character is gone) and the connection closes.
   The hold gives up after 2 minutes (a dead bot releases the client
   instead of holding a silent world forever).
-- **The resync.** Once the replacement session is online, the client
-  view is rebuilt: the played character receives a synthesized
-  `TeleportToLocation` to its live position (the client also clears
-  its own known list on the teleport), every object id of the OLD
-  known list is swept with a `DeleteObject` (the ids come from the
-  tracker snapshot taken at the hold start - `KnownObjectIDs`), and
-  the enter world burst of the NEW session replays through the
-  ordinary replay path with the live self state patch: the UserInfo,
-  the inventory, the new known list. The connection then swaps onto
-  the replacement session (the client packets transit through the
-  live bot link again) and follows its live feed. The result is
-  exactly the view a fresh client would get - minus the login
-  screens, which the held client never sees.
+- **The resync (the restart dance).** Once the replacement session
+  is online with its `CharSelected` recorded, the client is taken
+  through the restart dance (see "Switching bots" below): the
+  synthesized `RestartResponse` + the char list pair moves the client
+  to its own char select screen (the client tears its whole world
+  down there - no ghost objects, no stale self pawn), and the auto
+  select serves the `CharSelected` answer of the same character
+  live-patched to the fresh place. The client then re-enters the world
+  by itself and the ordinary replay path serves the enter world burst
+  of the replacement session (the UserInfo, the inventory, the new
+  known list) followed by its live feed, and the connection transits
+  the client packets through the live bot link again. The result is
+  exactly the view a fresh client would get - plus a brief char
+  select screen the user never has to click.
 
 A user initiated logout keeps the classic flow: the client's own
 `Logout` packet transits to the real server, the `LeaveWorld` answer
@@ -219,8 +220,11 @@ is RELAYED (not suppressed - the suppression only covers bot
 initiated logouts), the client returns to the login screen by
 itself, and the session end then closes the connection instead of
 holding it. The defensive path: a replacement session whose
-`CharSelected` was never recorded cannot replay an enter world burst,
-so the client keeps the teleport resync and the live feed alone.
+`CharSelected` was never recorded cannot serve a dance (there is no
+answer for the double click), so the hold keeps waiting until the
+login handshake lands in the recorder - which is the production
+order anyway: the `CharSelected` is recorded before the character
+enters the world.
 
 ## Switching bots
 
@@ -230,22 +234,48 @@ clicking a bot in the sidebar marks it with a `proxy` chip and POSTs
 `/api/proxy/select`. With no selection (or the web UI off) the first
 registered session serves. `GET /api/proxy` reports the state.
 
-A selection change switches an **already connected** client
-immediately: the live relay of the connection wakes on the selection
-notification, resyncs the client onto the newly selected bot (the
-teleport to the live position, the DeleteObject sweep of the old
-known list and the enter world burst of the new bot - the same
-machinery the relogin handoff uses) and follows the new bot's live
-feed, so the client sees the new character's position, appearance,
-race and class without reconnecting. Selecting the bot the client
-already watches changes nothing.
+A selection change switches an **already connected** client through the
+**restart flow - the official C1 mechanism** the in-game Restart button
+rides: the relay wakes on the selection notification, resolves the
+newly selected bot, and plays the exact packet pair the real server
+answers a restart with (see `RequestRestart.handlePacket` of the Mobius
+C1 server): `RestartResponse` followed by the `CharSelectionInfo` of
+the new bot. The C1 client processes the `RestartResponse` by tearing
+its whole world down and returning to the character select screen on
+its own - and that teardown is what makes the switch correct: the
+teleport + DeleteObject sweep approach of the earlier implementation
+crashed the real client (a `UserInfo` carrying an object id the client
+never spawned dereferences a missing pawn inside the
+`UserInfoPacket` handler - the reported `General protection fault` when
+switching between distant characters; a `UserInfo` of a nearby known
+object left the client controlling its old pawn while the replayed
+history of the new bot played every death and fight of its session -
+the "monsters died at once" effect). A restart is the one mid-session
+identity change the C1 client is designed to process.
+
+To keep the switch hands-off, the proxy then plays the **double click
+itself**: after 1.5 s (enough for the client to render the char select
+screen) the auto select serves the live-patched `CharSelected` of the
+new bot - the exact answer the user's own double click of the only
+listed character would produce. The user's own click also still works
+(it cancels the timer; both paths are idempotent). The client loads,
+sends its `EnterWorld`, and the ordinary replay + live feed of the new
+bot streams: the new character's position, appearance, race, class and
+equipment all arrive through the enter world packets that exist for
+exactly this purpose - without a reconnect.
+
+Selecting the bot the client already watches changes nothing.
 
 A selected bot that is not online yet (registered but still
 connecting, or not registered at all) does not disconnect or stall
 the client either: the relay keeps serving the current live feed and
 polls for the target, switching the moment the target enters the
 world - the client never needs a reconnect or a re-click (selecting
-the same id twice is a no-op).
+the same id twice is a no-op). A selection change that fires while
+the client sits on the char select screen of a dance re-offers the
+char list of the newest target, and the served `CharSelected` always
+re-resolves the newest selection, so the client lands on the bot the
+WebUI shows even if the user raced the dance with a click.
 
 ## Packet transformation (the debug seam)
 
@@ -301,12 +331,26 @@ maps the problem directly:
 - **`game#N: the bot session ... ended, holding the client for its
   relogin`**: not an error - the bot logged out (the emergency logout
   of the hunt loop) and the client is held. The follow up lines tell
-  the outcome: `bot ... is back online, resyncing the held client`
-  (the teleport + sweep + replay of the new session), `the user
+  the outcome: `bot ... is back online, restarting the held client
+  onto it` (the restart dance: the char select screen, the auto
+  select, the replay of the new session), `the user
   logged out while held for the bot relogin` (the user left the
   frozen world by design) or `the bot ... did not return within 2m0s,
   releasing the held client` (the hold window expired - a supervisor
   stuck longer than two minutes is the thing to investigate).
+- **`game#N: restart dance onto ... offered (auto select in ...)`**:
+  not an error - a WebUI selection change (or a completed bot
+  relogin) moved the client onto another character: the client
+  received the `RestartResponse` + the char list of the target and
+  the auto select timer is running. The next lines trace the entry:
+  `auto selecting the offered character` (the proxy's own double
+  click), then the ordinary `replaying ... then live` of the new
+  bot. The dance of a bot switch logs as `selection switched from
+  ... to ..., starting the restart dance`.
+- **`game#N: auto selecting the offered character, serving the char
+  selected answer`**: not an error - the hands-off part of every
+  switch: the proxy served the `CharSelected` of the offered
+  character without the user clicking anything.
 - **`game#N: leave world suppressed, the client stays for the bot
   relogin`**: not an error - the real server answered the bot's logout
   with `LeaveWorld` and the proxy dropped it so the held client stays

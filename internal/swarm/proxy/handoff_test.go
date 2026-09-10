@@ -106,18 +106,9 @@ func closeHeldClient(t *testing.T, server *Server, client *fakeGameClient) {
 // TestHandoffPacketBuilders pins the byte layouts of the synthesized
 // handoff packets against the Mobius C1 writeImpl bodies.
 func TestHandoffPacketBuilders(t *testing.T) {
-	teleport := buildTeleportToLocationPacket(1055, 60000, 61000, -2500, 1000)
-	require.Equal(t, []byte{0x38}, teleport[:1], "the teleport opcode")
-	require.Len(t, teleport, 25, "opcode plus six int32 fields")
-	require.EqualValues(t, 1055, int32(binary.LittleEndian.Uint32(teleport[1:5])))
-	require.EqualValues(t, 60000, int32(binary.LittleEndian.Uint32(teleport[5:9])))
-	require.EqualValues(t, 61000, int32(binary.LittleEndian.Uint32(teleport[9:13])))
-	require.EqualValues(t, -2500, int32(binary.LittleEndian.Uint32(teleport[13:17])))
-	require.Zero(t, binary.LittleEndian.Uint32(teleport[17:21]), "the fade field")
-	require.EqualValues(t, 1000, int32(binary.LittleEndian.Uint32(teleport[21:25])))
-
-	deleted := buildDeleteObjectPacket(42)
-	require.Equal(t, []byte{0x1E, 0x2A, 0x00, 0x00, 0x00}, deleted)
+	require.Equal(t, []byte{0x74, 0x01, 0x00, 0x00, 0x00},
+		buildRestartResponsePacket(),
+		"the restart response: opcode plus the true result int")
 
 	require.Equal(t, []byte{0x96}, buildLeaveWorldPacket())
 }
@@ -127,12 +118,15 @@ func TestHandoffPacketBuilders(t *testing.T) {
 // relogs while the user client sits in the world. The client must not
 // drop to the login screen: the LeaveWorld of the bot logout is
 // suppressed, the connection is held and swallows the client packets,
-// and the replacement session resyncs the view - the character
-// teleports to its live position, the old world objects are swept and
-// the enter world burst of the new session replays, followed by its
-// live feed and the client packet transit.
+// and the replacement session takes the client through the restart
+// dance - the client returns to its char select screen, is auto
+// selected onto the same character (live patched to the fresh place)
+// and re-enters the world of the replacement session: its enter world
+// burst replays, followed by its live feed and the client packet
+// transit.
 func TestGameServerHoldsClientThroughBotRelogin(t *testing.T) {
 	tightenHoldTimings(t, 2*time.Second)
+	tightenAutoSelectTimings(t, 150*time.Millisecond)
 	server := startTestServer(t)
 	recorder, tracker, sender := registerFakeBot(t, server, "HeldChar")
 
@@ -207,37 +201,24 @@ func TestGameServerHoldsClientThroughBotRelogin(t *testing.T) {
 	reloginRecorder.Record(buildTestUserInfoPacket())
 	reloginRecorder.Record(buildTestWorldPacket(0x22, 77)) // a new npc
 
-	// The resync: the character teleports to the live position.
-	teleport := client.readPacket()
-	require.Equal(t, byte(0x38), teleport[0], "the teleport opcode")
-	require.Len(t, teleport, 25)
-	require.EqualValues(t, 1055, int32(binary.LittleEndian.Uint32(teleport[1:5])),
-		"the self object id")
-	require.EqualValues(t, 60000, int32(binary.LittleEndian.Uint32(teleport[5:9])),
-		"the live x")
-	require.EqualValues(t, 61000, int32(binary.LittleEndian.Uint32(teleport[9:13])),
-		"the live y")
-	require.EqualValues(t, -2500, int32(binary.LittleEndian.Uint32(teleport[13:17])),
-		"the live z")
-	require.Zero(t, binary.LittleEndian.Uint32(teleport[17:21]), "the fade field")
-	require.EqualValues(t, 1000, int32(binary.LittleEndian.Uint32(teleport[21:25])),
-		"the live heading")
+	// The restart dance of the replacement: the restart answer moves
+	// the client to the char select screen, the char list of the same
+	// character is offered and the auto select answers with the
+	// CharSelected live patched to the fresh place.
+	list, selected := readDance(t, client)
+	require.Len(t, list.Characters, 1)
+	require.Equal(t, "HeldChar", list.Characters[0].Name,
+		"the dance of a relogin offers the same character")
+	require.EqualValues(t, 60000, charSelectedField(t, selected, 0),
+		"the live patched x of the relogin answer")
+	require.EqualValues(t, 61000, charSelectedField(t, selected, 4),
+		"the live patched y of the relogin answer")
+	require.EqualValues(t, -2500, charSelectedField(t, selected, 8),
+		"the live patched z of the relogin answer")
 
-	// The old world is swept: the known npcs are deleted (the order of
-	// the sweep follows the world store, so both ids must simply
-	// appear).
-	swept := map[int32]bool{}
-	for range 2 {
-		deleted := client.readPacket()
-		require.Equal(t, byte(0x1E), deleted[0], "the delete object opcode")
-		require.Len(t, deleted, 5)
-		swept[int32(binary.LittleEndian.Uint32(deleted[1:5]))] = true
-	}
-	require.True(t, swept[42] && swept[43],
-		"the known npcs 42 and 43 must both be swept, got %v", swept)
-
-	// The enter world burst of the replacement session replays with the
-	// live self state: the played character renders at its new place.
+	// The client re-enters the world: the enter world burst of the
+	// replacement session replays with the live self state.
+	client.sendPacket([]byte{0x03})
 	replayedUserInfo := fromgameserver.NewUserInfoPacket()
 	require.NoError(t, fromgameserver.ParseUserInfoPacket(
 		replayedUserInfo, client.readPacket()))
@@ -369,12 +350,16 @@ func TestGameServerHoldTimeoutReleasesClient(t *testing.T) {
 	closeHeldClient(t, server, client)
 }
 
-// TestGameServerReloginWithoutCharSelectedServesLiveFeedOnly pins the
-// defensive path of the resync: a replacement session whose CharSelected
-// was never recorded cannot replay its enter world burst, so the held
-// client keeps the teleport resync and follows the live feed alone.
-func TestGameServerReloginWithoutCharSelectedServesLiveFeedOnly(t *testing.T) {
+// TestGameServerReloginWithoutCharSelectedKeepsHold pins the defensive
+// path of the restart dance: a replacement session whose CharSelected
+// answer was never recorded cannot take a client through the dance
+// (there is nothing to serve as the double click answer), so the held
+// client keeps waiting until the login handshake lands in the recorder
+// - which is the production order anyway: the char selected answer is
+// recorded before the character enters the world.
+func TestGameServerReloginWithoutCharSelectedKeepsHold(t *testing.T) {
 	tightenHoldTimings(t, 2*time.Second)
+	tightenAutoSelectTimings(t, 150*time.Millisecond)
 	server := startTestServer(t)
 	recorder, tracker, _ := registerFakeBot(t, server, "LiveChar")
 
@@ -394,7 +379,8 @@ func TestGameServerReloginWithoutCharSelectedServesLiveFeedOnly(t *testing.T) {
 	requireConnOpen(t, client, 250*time.Millisecond)
 
 	// The replacement session enters the world with no recorded
-	// CharSelected at all.
+	// CharSelected at all: the hold keeps waiting (no dance can be
+	// served), the frozen world stays.
 	tracker.ResetSession()
 	tracker.SetCharacter("LiveChar", 1055, 18, 61000, 62000, -2600, 80, 35)
 	tracker.SetOnline("LiveChar")
@@ -403,20 +389,20 @@ func TestGameServerReloginWithoutCharSelectedServesLiveFeedOnly(t *testing.T) {
 	reloginRecorder := server.RegisterSession("testbot", reloginSender, tracker)
 	t.Cleanup(func() { server.UnregisterSession("testbot", reloginRecorder) })
 
-	// The resync: the teleport and the sweep, then nothing else - the
-	// history is not replayable.
-	teleport := client.readPacket()
-	require.Equal(t, byte(0x38), teleport[0], "the teleport opcode")
-	deleted := client.readPacket()
-	require.Equal(t, byte(0x1E), deleted[0], "the delete object opcode")
+	requireNoPacket(t, client, 400*time.Millisecond)
 
-	// Give the relay a moment to finish the attach, then the live feed
-	// alone carries the new world.
-	requireConnOpen(t, client, 100*time.Millisecond)
-	reloginRecorder.Record(buildTestWorldPacket(0x22, 99))
-	liveSpawn := client.readPacket()
-	require.Equal(t, byte(0x22), liveSpawn[0], "the live feed only")
-	require.EqualValues(t, 99, int32(binary.LittleEndian.Uint32(liveSpawn[1:5])))
+	// The login handshake lands in the recorder: the dance completes
+	// on its own.
+	reloginRecorder.Record(buildTestCharSelected("LiveChar"))
+	reloginRecorder.Record(buildTestUserInfoPacket())
+
+	list, _ := readDance(t, client)
+	require.Equal(t, "LiveChar", list.Characters[0].Name,
+		"the dance of the late char selected")
+
+	client.sendPacket([]byte{0x03})
+	require.Equal(t, byte(0x04), client.readPacket()[0],
+		"the replayed user info after the late dance")
 
 	// Unwind the live relay before the test returns.
 	closeHeldClient(t, server, client)
