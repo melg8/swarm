@@ -197,10 +197,67 @@ func TestDelevelFinishesAtTarget(t *testing.T) {
 		"the delevel cooldown is armed")
 }
 
+// TestDelevelMissStreakExtendsFightStage verifies the miss streak
+// protection of the fight stage: the town guards sit around level 70
+// while the deleveling character is in the low tens, the vanilla hit
+// chance floors at 20 percent there, and a whole timeout window
+// without a single landed blow is the normal variance of that gap.
+// The stage extends instead of blacklisting the guard - the guard had
+// nothing to retaliate against, and once a blow finally lands the
+// guard always answers, so the deleveling never aborts on the miss
+// streak alone.
+func TestDelevelMissStreakExtendsFightStage(t *testing.T) {
+	loop, game, bot, _ := newDelevelLoop(11)
+	spawnZoneMobs(bot)
+
+	loop.tick()
+	moveSelfTo(bot, stardenPos[0], stardenPos[1], stardenPos[2])
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 77, TemplateID: 7220 + 1000000,
+		X: stardenPos[0], Y: stardenPos[1], Z: stardenPos[2],
+		Name: "Starden",
+	})
+	loop.tick()
+	require.Equal(t, int32(77), loop.delevelGuard)
+	walksBefore := len(game.walks)
+
+	// The whole stage lands nothing (every swing of the level gap
+	// misses): the timeout extends the stage, the guard stays picked,
+	// the provocation keeps going and no re-path burns the budget.
+	for range 5 {
+		provokeAndTimeout(t, loop, bot)
+		require.Equal(t, int32(77), loop.delevelGuard,
+			"the miss streak keeps the guard")
+		require.Equal(t, 0, loop.rePaths,
+			"the miss streak burns no re-path budget")
+		require.Nil(t, loop.delevelTried,
+			"the miss streak marks no guard as tried")
+		require.Equal(t, phaseDelevel, loop.phase)
+	}
+
+	// The provocation itself continues: the fight stage keeps
+	// re-requesting the attack.
+	require.NotEmpty(t, game.forces,
+		"the provocation keeps attacking through the streak")
+	require.Len(t, game.walks, walksBefore,
+		"the miss streak replans no walk")
+
+	// A landed blow moves the stage into the normal fight tracking:
+	// the guard that answers keeps the stage alive, the guard that
+	// ignores it gets switched (the coverage above).
+	selfBlowLandsOnGuard(bot, 77, stardenPos)
+	loop.tick()
+	require.Equal(t, int32(77), loop.delevelGuard,
+		"the landed blow keeps the picked guard")
+}
+
 // TestDelevelFightTimeoutSwitchesGuard verifies the guard fight
-// protection: a guard that never fights back is marked as tried and the
-// deleveling switches to the next guard, aborting into the walk home
-// when every guard ignored the provocation.
+// protection: a guard that ignores landed damage is marked as tried and
+// the deleveling switches to the next guard, aborting into the walk
+// home when every guard ignored the provocation. A stage without a
+// single landed blow (the level gap miss streak of the level 70 town
+// guards) never blacklists the guard - the extension lives in its own
+// test below.
 func TestDelevelFightTimeoutSwitchesGuard(t *testing.T) {
 	loop, game, bot, nav := newDelevelLoop(11)
 	spawnZoneMobs(bot)
@@ -216,8 +273,10 @@ func TestDelevelFightTimeoutSwitchesGuard(t *testing.T) {
 	require.Equal(t, int32(77), loop.delevelGuard)
 	callsBefore := nav.calls
 
-	// The guard never hits back: past the fight timeout the guard is
-	// dropped, marked as tried and the walk replans to the next guard.
+	// The blows land but the guard never hits back: past the fight
+	// timeout the guard is dropped, marked as tried and the walk
+	// replans to the next guard.
+	selfBlowLandsOnGuard(bot, 77, stardenPos)
 	provokeAndTimeout(t, loop, bot)
 	require.Equal(t, int32(0), loop.delevelGuard, "the guard is dropped")
 	require.Equal(t, 1, loop.rePaths)
@@ -238,9 +297,10 @@ func TestDelevelFightTimeoutSwitchesGuard(t *testing.T) {
 		Z: float64(kendellPos[2]),
 	}), game.walks[1], "the walk starts the leg toward the Kendell spawn")
 
-	// Kendell ignores the provocation too: with every archer guard
-	// marked as tried there is nothing left to walk to.
+	// Kendell ignores the landed provocation too: with every archer
+	// guard marked as tried there is nothing left to walk to.
 	arriveAndProvoke(loop, bot, 79, 7218+1000000, kendellPos, "Kendell")
+	selfBlowLandsOnGuard(bot, 79, kendellPos)
 	provokeAndTimeout(t, loop, bot)
 	require.True(t, loop.delevelTried["Kendell"])
 	require.Equal(t, 2, loop.rePaths)
@@ -355,6 +415,24 @@ func provokeAndTimeout(t *testing.T, loop *Loop, _ *state.Bot) {
 	loop.delevelFight = time.Now().Add(-delevelFightTimeout - time.Second)
 	loop.moveAt = time.Time{}
 	loop.tick()
+}
+
+// selfBlowLandsOnGuard feeds one non missed own swing on the guard
+// into the tracker: the deleveling fight stage reads the landed hit
+// pair to tell a guard that ignores real damage from a stage without
+// any landed blow yet.
+func selfBlowLandsOnGuard(bot *state.Bot, guardID int32, pos [3]int32) {
+	bot.ApplyAttack(state.Attack{
+		AttackerID:  100,
+		X:           pos[0],
+		Y:           pos[1],
+		Z:           pos[2],
+		TargetX:     pos[0],
+		TargetY:     pos[1],
+		TargetZ:     pos[2],
+		TargetIDs:   [state.AttackTargets]int32{guardID},
+		TargetCount: 1,
+	})
 }
 
 // arriveAndProvoke moves the character to the guard spawn, publishes the

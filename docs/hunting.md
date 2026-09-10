@@ -478,9 +478,17 @@ cooldown.
 The deleveling stops at the target level = median zone mob level + 5
 (the last level with the full item drop chance, floored at 9) and
 re-triggers after hunting raised the level back above the trigger. The
-fight stage re-paths when the guard does not fight back within 20 s
-and aborts the deleveling after 3 failed re-paths; the whole deleveling
-is bounded by a 60 min timeout and a 1 min cooldown after it ends. The
+fight stage re-paths when the guard ignores landed damage within 20 s
+and aborts the deleveling after 3 failed re-paths; a stage without a
+single landed blow never counts - the town guards sit at level 70
+while the deleveling character climbs down from the low tens, the
+vanilla `calcHitMiss` floors the hit chance at 20 percent there
+(`(80 + 2 * (accuracy - evasion)) * 10` clamped to 200..980), so a
+whole timeout window of misses is the normal variance of the gap and
+the stage extends instead of blacklisting a guard that had no damage
+to retaliate against (internal/swarm/state SelfLandedHit feeds the
+distinction). The whole deleveling is bounded by a 60 min timeout and
+a 1 min cooldown after it ends. The
 walk legs are split into at most 1000 unit steps because the server
 refuses move requests with a target farther than 9900 units
 (MoveToLocation readImpl); the smoothed geodata routes happily exceed

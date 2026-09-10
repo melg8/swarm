@@ -100,52 +100,63 @@ type CharacterState struct {
 	TargetID          int32
 	Sitting           bool
 	LastHitAt         time.Time
-	CurrentLoad       int32
-	MaxLoad           int32
+	// LastLandedHitAt and LastLandedHitTarget record the last blow of
+	// the played character that actually landed (the miss flagged
+	// swings of the Attack packet skip): the deleveling provocation
+	// separates a guard that ignores landed damage (a stale AI state,
+	// worth switching the guard) from a fight stage where not a
+	// single blow landed yet (the level gap miss streak of the town
+	// guards, worth keep provoking).
+	LastLandedHitAt     time.Time
+	LastLandedHitTarget int32
+	CurrentLoad         int32
+	MaxLoad             int32
 }
 
 // newCharacterState creates a zero valued character state.
 func newCharacterState() CharacterState {
 	return CharacterState{
-		Name:              "",
-		Level:             0,
-		Race:              0,
-		ClassID:           0,
-		X:                 0,
-		Y:                 0,
-		Z:                 0,
-		Heading:           0,
-		STR:               0,
-		DEX:               0,
-		CON:               0,
-		INT:               0,
-		WIT:               0,
-		MEN:               0,
-		Exp:               0,
-		Sp:                0,
-		CurHP:             0,
-		MaxHP:             0,
-		CurMP:             0,
-		MaxMP:             0,
-		Moving:            false,
-		DestX:             0,
-		DestY:             0,
-		DestZ:             0,
-		RunSpeed:          defaultRunSpeed,
-		WalkSpeed:         defaultWalkSpeed,
-		CollisionRadius:   defaultSelfCollision,
-		MoveAt:            time.Time{},
-		SocialUntil:       time.Time{},
-		AutoAttacking:     false,
-		CombatUntil:       time.Time{},
-		CombatActiveAt:    time.Time{},
-		CannotSeeTargetAt: time.Time{},
-		FightingTargetID:  0,
-		TargetID:          0,
-		Sitting:           false,
-		LastHitAt:         time.Time{},
-		CurrentLoad:       0,
-		MaxLoad:           0,
+		Name:                "",
+		Level:               0,
+		Race:                0,
+		ClassID:             0,
+		X:                   0,
+		Y:                   0,
+		Z:                   0,
+		Heading:             0,
+		STR:                 0,
+		DEX:                 0,
+		CON:                 0,
+		INT:                 0,
+		WIT:                 0,
+		MEN:                 0,
+		Exp:                 0,
+		Sp:                  0,
+		CurHP:               0,
+		MaxHP:               0,
+		CurMP:               0,
+		MaxMP:               0,
+		Moving:              false,
+		DestX:               0,
+		DestY:               0,
+		DestZ:               0,
+		RunSpeed:            defaultRunSpeed,
+		WalkSpeed:           defaultWalkSpeed,
+		CollisionRadius:     defaultSelfCollision,
+		MoveAt:              time.Time{},
+		SocialUntil:         time.Time{},
+		AutoAttacking:       false,
+		CombatUntil:         time.Time{},
+		CombatActiveAt:      time.Time{},
+		CannotSeeTargetAt:   time.Time{},
+		FightingTargetID:    0,
+		TargetID:            0,
+		Sitting:             false,
+		LastHitAt:           time.Time{},
+		LastLandedHitAt:     time.Time{},
+		LastLandedHitTarget: 0,
+		CurrentLoad:         0,
+		MaxLoad:             0,
 	}
 }
 
@@ -560,6 +571,17 @@ func (b *Bot) SelfUnderAttack() bool {
 	last := b.char.LastHitAt
 
 	return !last.IsZero() && time.Since(last) < underAttackWindow
+}
+
+// SelfLandedHit returns the target of the last blow of the played
+// character that actually landed, with the time it landed. The miss
+// flagged swings never update the pair, so a zero target means no
+// landed blow yet (or since the last tracker reset).
+func (b *Bot) SelfLandedHit() (int32, time.Time) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.LastLandedHitTarget, b.char.LastLandedHitAt
 }
 
 // SelfAttackerCount returns how many living attackable npcs hold
@@ -1333,6 +1355,13 @@ func (b *Bot) recordSwingEventsLocked(a Attack, now time.Time) {
 	for i := range a.TargetCount {
 		if a.HitFlags[i]&attackHitMissFlag != 0 {
 			continue
+		}
+		if a.AttackerID == b.selfID {
+			// A landed blow of the played character: the deleveling
+			// fight stage reads the pair to tell a guard that ignores
+			// real damage from a stage without any landed blow yet.
+			b.char.LastLandedHitAt = now
+			b.char.LastLandedHitTarget = a.TargetIDs[i]
 		}
 		//nolint:exhaustruct // the ring assigns Seq, a swing carries no amount
 		b.recordCombatEventLocked(CombatEvent{

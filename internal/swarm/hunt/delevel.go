@@ -287,7 +287,7 @@ func (l *Loop) nearestDelevelGuard() (townNpc, bool) {
 // provocation.
 // Pre-consolidation phase debt; the hunt loop cleanup is planned
 // (docs/quality_review_and_agent_prompts.md P07).
-func (l *Loop) fightDelevelGuard(now time.Time) { //nolint:cyclop
+func (l *Loop) fightDelevelGuard(now time.Time) { //nolint:cyclop,funlen
 	if l.delevelGuard == 0 || !l.tracker.ObjectAlive(l.delevelGuard) {
 		guard, ok := l.tracker.NearestNpcByTemplates(
 			delevelGuardTemplates(), merchantFindRadius)
@@ -328,6 +328,21 @@ func (l *Loop) fightDelevelGuard(now time.Time) { //nolint:cyclop
 	if l.tracker.SelfUnderAttack() {
 		l.delevelFight = now
 	} else if now.Sub(l.delevelFight) > delevelFightTimeout {
+		hitTarget, hitAt := l.tracker.SelfLandedHit()
+		if hitTarget != l.delevelGuard || !hitAt.After(l.delevelFight) {
+			// Not a single blow of this stage landed: the town guards
+			// sit around level 70 while the deleveling character
+			// climbs down from the low tens, and the vanilla
+			// calcHitMiss floors the hit chance at 20 percent there -
+			// a whole timeout window without a landed blow is the
+			// normal miss streak of that gap, not a stuck guard (the
+			// guard has no damage to retaliate against yet). Extending
+			// the stage keeps the provocation going: the guard that
+			// gets hit always answers, the streak always ends.
+			l.delevelFight = now
+
+			return
+		}
 		l.delevelFight = now
 		l.rePaths++
 		if l.rePaths > maxRePaths {
@@ -335,7 +350,7 @@ func (l *Loop) fightDelevelGuard(now time.Time) { //nolint:cyclop
 
 			return
 		}
-		// The guard never joined the fight. Marking it as tried and
+		// The guard ignored landed damage. Marking it as tried and
 		// replanning the walk switches the deleveling to a fresh
 		// guard: a guard with a stale AI state (an attack intention
 		// from before the last death, a stuck follow task) keeps

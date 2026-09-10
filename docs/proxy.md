@@ -177,6 +177,53 @@ live stack: before the fix the attached bot's inbound rate climbed
 from single digits to 8000+ packets per second within seconds, after
 the fix both phases stay at the ambient world rate.
 
+## The client position reports (the position ping pong)
+
+The C1 client also reports its local view of the played character
+periodically (`ValidatePosition`, 0x48) and the Mobius handler trusts
+it with no distance bound: a report more than one move speed (~150
+units) from the server side position hits the "Check out of sync"
+branch of `ValidatePosition.runImpl` and the server **snaps the
+character to the reported place**. A client that rides the proxy as a
+spectator of a bot-driven character holds a local view the bot's own
+actions leave behind - the death spot held across the bot's village
+restart (the client pawn freezes at the guard post), the frozen view
+of a teleport screen, the stale spot of a long walk - and every
+periodic report then dragged the server side character back to that
+stale place.
+
+That was the reported deleveling breakdown: the bot died at the guard,
+the bot's restart teleported the character to the village, the
+attached client kept reporting the death spot, the server snapped the
+character back to the guard post, the bot's walk legs pulled it toward
+the village again, the next report snapped it back - an endless
+position ping pong (the WebUI event log showed the known object list
+flipping between the village and the guard camp every second). The
+delevel fight stage never converged: the bot's tracker believed the
+melee range while the character stood 3000+ units away, the attacks
+swung and missed from afar (the "animation without damage" the user
+saw on the client), the guards "never fought back", the fight
+timeouts marked both guards as tried, the delevel aborted, and the
+return walk stalled in the same ping pong - the reported "bot stands
+and does nothing for a long time".
+
+The fix severs that loop with the same seam the keepalive uses: a
+client position report is compared against the live tracker position
+of the attached bot session, and a report that contradicts it beyond
+one walk leg plus slack (2000 units - a live client that follows the
+own character through the broadcasts stays within one leg even mid
+movement) never transits. Instead the proxy answers the client
+locally with the same `ValidateLocation` (0x76) correction the server
+itself sends for an out of sync report, carrying the live place of the
+played character - the client view heals, the next reports come back
+in range and transit again, and the diverged report never reaches the
+out of sync branch. In-sync reports transit unchanged (the manual
+control of the client keeps the full server contract). Covered by
+internal/swarm/proxy/validateposition_test.go (the stale report
+corrected locally and never transiting, the healed report transiting
+again, the moved tracker moving the acceptance window, the live
+report transiting unchanged).
+
 ## The live self state (reconnection correctness)
 
 The replay answers one hard question: *where is the character right
