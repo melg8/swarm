@@ -5,6 +5,7 @@
 package proxy
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -30,7 +31,12 @@ import (
 // CharSelected answer is the recorded packet of the bot session. After
 // EnterWorld the client receives the recorded server packet stream of
 // the bot (the replay) followed by the live feed, and every client
-// packet transits to the real game server through the bot connection.
+// packet transits to the real game server through the bot connection -
+// except the keepalive: the RequestNetPing of the client is answered by
+// the proxy itself and never reaches the server (the NetPing answers of
+// the bot session are filtered out of the relay, see
+// isNetPingAnswerPayload - transit plus relay would close a ping
+// feedback loop that accelerates without bound).
 //
 // A mid-session switch onto another bot (the WebUI selection) or onto
 // the replacement session of the same bot (the relogin handoff) rides
@@ -54,11 +60,15 @@ type gameConn struct {
 	// swaps the session when the held client is resynced onto the
 	// replacement bot session, while the read loop keeps reading
 	// the client packets and transiting them through the current
-	// session (or swallowing them while the client is held).
-	mu         sync.Mutex
-	session    *botSession
-	holding    bool
-	userLogout bool
+	// session (or swallowing them while the client is held). It also
+	// guards netPingTime, the game time harvested from the suppressed
+	// NetPing answers of the bot session and carried by the locally
+	// synthesized client answers.
+	mu          sync.Mutex
+	session     *botSession
+	holding     bool
+	userLogout  bool
+	netPingTime int32
 
 	charSelectedSeq int64
 	queue           [][]byte
@@ -161,6 +171,7 @@ func (s *Server) handleGameConn(conn net.Conn) {
 		closeOnce:       sync.Once{},
 		senderLive:      atomic.Bool{},
 		senderDone:      make(chan struct{}),
+		netPingTime:     0,
 	}
 	s.clients.Add(1)
 	s.logger.Printf("game#%d: client connected from %s", id, conn.RemoteAddr())
@@ -563,12 +574,16 @@ func (gc *gameConn) clientLoggedOut() bool {
 }
 
 // transitToServer forwards one decrypted client packet to the real game
-// server through the bot session, applying the transformer seam. A held
-// client (its bot session ended, the relogin pending) has its packets
-// swallowed: the character is offline, and the frozen world state behind
-// the client makes every action meaningless anyway - except the logout:
-// a user that wants out of the frozen world gets the login screen (the
-// synthesized LeaveWorld), not a swallowed intent.
+// server through the bot session, applying the transformer seam. The
+// keepalive (RequestNetPing) is the one exception: it is answered by the
+// proxy itself and never transits (see answerNetPingLocally) - a held
+// client gets its answer too, the keepalive must survive the freeze.
+// Every other packet of a held client (its bot session ended, the
+// relogin pending) is swallowed: the character is offline, and the
+// frozen world state behind the client makes every action meaningless
+// anyway - except the logout: a user that wants out of the frozen world
+// gets the login screen (the synthesized LeaveWorld), not a swallowed
+// intent.
 //
 // A send failure never kills the client connection: it means the bot
 // session link died under the transit (the narrow window before the
@@ -587,6 +602,18 @@ func (gc *gameConn) transitToServer(payload []byte) error {
 
 			return nil
 		}
+	}
+	if payload[0] == clientOpNetPing {
+		// The client keepalive never reaches the real server: the bot
+		// session already keeps that connection alive with its own ping
+		// cycle, and a transit would close the ping feedback loop (the
+		// server answer would be recorded and relayed, an answer driven
+		// client would re-ping per answer, and the loop would accelerate
+		// without bound on the attached bot session). The proxy answers
+		// the keepalive itself, exactly like the server would.
+		gc.answerNetPingLocally()
+
+		return nil
 	}
 	if gc.isHolding() {
 		gc.server.logger.Printf(
@@ -614,6 +641,37 @@ func (gc *gameConn) transitToServer(payload []byte) error {
 		gc.id, payload[0], len(payload))
 
 	return nil
+}
+
+// answerNetPingLocally serves the client keepalive without a server
+// round trip: the synthesized NetPing answer carries the game time the
+// relay harvested from the last real answer of the bot session (the
+// C1 client uses it for its clock cosmetics; before the first harvest
+// it is zero, which only delays the day-night rendering). A send
+// failure is silent: the connection teardown owns the reporting, and
+// the answer rate of an answer driven client forbids per packet logs.
+func (gc *gameConn) answerNetPingLocally() {
+	gc.mu.Lock()
+	gameTime := gc.netPingTime
+	gc.mu.Unlock()
+
+	answer := make([]byte, 5)
+	answer[0] = serverOpNetPing
+	binary.LittleEndian.PutUint32(answer[1:], uint32(gameTime))
+	_ = gc.sendToClient(answer)
+}
+
+// noteNetPingGameTime harvests the game time of one suppressed NetPing
+// answer of the bot session so the locally synthesized client answers
+// carry the value the real server would have sent.
+func (gc *gameConn) noteNetPingGameTime(payload []byte) {
+	if len(payload) < 5 {
+		return
+	}
+	gameTime := int32(binary.LittleEndian.Uint32(payload[1:5]))
+	gc.mu.Lock()
+	gc.netPingTime = gameTime
+	gc.mu.Unlock()
 }
 
 // runSender is the single writer of the client socket: it encrypts and
@@ -788,19 +846,36 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
 				return gc.parkAtCharSelect()
 			}
 		case update := <-sub.ch:
-			if isLeaveWorldPayload(update.payload) && !gc.clientLoggedOut() {
-				gc.server.logger.Printf(
-					"game#%d: leave world suppressed, the client stays for "+
-						"the bot relogin",
-					gc.id)
-
-				continue
-			}
-			if !gc.relayToClient(update.payload) {
+			if !gc.deliverLiveUpdate(update.payload) {
 				return 0, false
 			}
 		}
 	}
+}
+
+// deliverLiveUpdate applies the live feed policy of one recorded
+// packet: the LeaveWorld of a bot logout is suppressed (the client
+// stays for the relogin hold), the NetPing answers of the bot session
+// are filtered out with their game time harvested (the keepalive round
+// trips carry no world state and relaying them arms the ping feedback
+// loop, see isNetPingAnswerPayload), and everything else is relayed to
+// the client. It reports false when the connection is done.
+func (gc *gameConn) deliverLiveUpdate(payload []byte) bool {
+	if isLeaveWorldPayload(payload) && !gc.clientLoggedOut() {
+		gc.server.logger.Printf(
+			"game#%d: leave world suppressed, the client stays for "+
+				"the bot relogin",
+			gc.id)
+
+		return true
+	}
+	if isNetPingAnswerPayload(payload) {
+		gc.noteNetPingGameTime(payload)
+
+		return true
+	}
+
+	return gc.relayToClient(payload)
 }
 
 // serveBotSwitch handles a WebUI selection change while a client is
@@ -1129,9 +1204,10 @@ func (gc *gameConn) serveRelogin(session *botSession) (int64, bool) {
 
 // replayHistory streams the recorded history of one session cycle: the
 // LeaveWorld of a bot logout is skipped (the hold depends on the client
-// staying in the world), the UserInfo of the played character carries
-// the live state and the stale self movement is dropped except the
-// newest packet.
+// staying in the world), the NetPing answers of the bot session are
+// skipped with their game time harvested (see isNetPingAnswerPayload),
+// the UserInfo of the played character carries the live state and the
+// stale self movement is dropped except the newest packet.
 func (gc *gameConn) replayHistory(
 	entries []RecorderEntry, selfID int32, lastSelfMoveSeq int64,
 	session *botSession,
@@ -1140,6 +1216,11 @@ func (gc *gameConn) replayHistory(
 	for i := range entries {
 		payload := entries[i].payload
 		if isLeaveWorldPayload(payload) && !gc.clientLoggedOut() {
+			continue
+		}
+		if isNetPingAnswerPayload(payload) {
+			gc.noteNetPingGameTime(payload)
+
 			continue
 		}
 		if isSelfMovementPayload(payload, selfID) &&

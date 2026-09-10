@@ -182,12 +182,15 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
 	require.Equal(t, byte(0x01), echo[0])
 
 	// --- the client keepalive: the C1 client pings continuously ---
-	// A burst of RequestNetPing packets transits through the bot
-	// session and every answer must return through the relay (the
-	// connection stays alive). The session log must stay silent
-	// about them: one log line per answer used to flood the
-	// process log with several "Net ping with game time" lines
-	// per second whenever a real client was attached.
+	// A burst of RequestNetPing packets is answered by the proxy
+	// itself: the keepalive never transits to the real server through
+	// the bot session (a transit plus the relay of the server
+	// answers closed the ping feedback loop that exploded the
+	// attached bot's packet counter), and the NetPing answers of
+	// the bot session never reach the client. The session log must
+	// stay silent about the requests: one log line per answer used
+	// to flood the process log with several "Net ping with game
+	// time" lines per second whenever a real client was attached.
 	const pingBurst = 10
 	for range pingBurst {
 		gameClient.sendPacket([]byte{0xA8})
@@ -195,8 +198,9 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
 	for range pingBurst {
 		reply := readPacketUntil(t, gameClient, e2eLiveWait,
 			func(payload []byte) bool { return payload[0] == 0xEC },
-			"the net ping answer through the live relay")
+			"the locally answered net ping")
 		require.Equal(t, byte(0xEC), reply[0])
+		require.Len(t, reply, 5)
 	}
 
 	// --- the reconnection: the client drops and a new one enters while
@@ -273,7 +277,8 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
 	require.Contains(t, logText, "auth login accepted")
 	require.Contains(t, logText, "replaying")
 	require.Contains(t, logText, "client -> server 0x01")
-	require.Contains(t, logText, "client -> server 0xa8")
+	require.NotContains(t, logText, "client -> server 0xa8",
+		"the client keepalive must be answered locally, not transitted")
 	require.NotContains(t, logText, "Net ping with game time",
 		"the net ping answers must stay silent in the session log")
 

@@ -131,11 +131,51 @@ needs `-proxy-login 0.0.0.0:2107 -proxy-game 0.0.0.0:7778` and the
    running: autonomous actions and user actions interleave on the same
    character. A bot initiated logout does NOT end this phase: the
    client is held through the bot relogin and restarted onto the
-   replacement (see "The bot relogin handoff" below).
+   replacement (see "The bot relogin handoff" below). The one exception
+   is the keepalive: the `RequestNetPing` of the client is answered by
+   the proxy itself and never reaches the server (see "The client
+   keepalive" below).
 
 Character creation and deletion are refused by the emulation (the
 client manages exactly the one served character). The login phase
 packets never reach the real server, so the bot account is untouched.
+
+## The client keepalive (the ping feedback loop)
+
+The C1 client sends `RequestNetPing` (0xA8) as its keepalive and its
+scheduler re-arms on every `NetPing` answer (0xEC) it receives. In the
+proxy topology both halves of that round trip exist separately - the
+bot session pings the real server on its own 25 s cycle, and the
+client's pings would transit through the bot session - so relaying the
+server's answers to the client closes a feedback loop: one relayed
+answer makes the client re-ping, the transit reaches the server
+through the bot session, the new answer is recorded and relayed again,
+and the loop accelerates without bound. That was the reported packet
+explosion: the WebUI counter of the attached character grew by ~1
+million packets in under 30 seconds (the flood is pure `0xEC`/`0xA8`
+round trips) and the recorder entries behind it loaded the memory.
+
+The fix severs the loop on both sides while keeping the client's
+keepalive semantics intact:
+
+- the client's `RequestNetPing` is answered by the proxy itself
+  (locally, no server round trip, no recording) with a synthesized
+  `NetPing` carrying the game time harvested from the last real
+  answer of the bot session - the field the client uses for its
+  clock cosmetics;
+- the `NetPing` answers of the bot session are filtered out of the
+  replay and the live feed (they are per-connection keepalive
+  artifacts, they describe no world state), and their game time is
+  harvested on the way;
+- a client held for the bot relogin gets its keepalive answered too -
+  the held connection must not time out on the client side.
+
+The regression harness `TestProxyPacketGrowthRepro` drives a fake
+client with the answer driven ping behavior (one new ping per received
+answer) through the attach and the WebUI switch phases against the
+live stack: before the fix the attached bot's inbound rate climbed
+from single digits to 8000+ packets per second within seconds, after
+the fix both phases stay at the ambient world rate.
 
 ## The live self state (reconnection correctness)
 

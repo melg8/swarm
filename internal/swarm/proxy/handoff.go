@@ -46,6 +46,28 @@ const (
 // Client game packet opcode of the logout request.
 const clientOpLogout = 0x09
 
+// Client game packet opcode of the keepalive request (RequestNetPing)
+// and the server packet opcode of its answer (NetPing) - the C1 values
+// of the Mobius ClientPackets/ServerPackets enums.
+const (
+	clientOpNetPing = 0xA8
+	serverOpNetPing = 0xEC
+)
+
+// isNetPingAnswerPayload reports whether the payload is the NetPing
+// answer of the bot session's own keepalive. Those answers are per
+// connection round trips between the bot and the real server: they
+// describe no world state, so the relay never forwards them to a
+// client (the client keepalive is answered locally instead, see
+// transitToServer - relaying them arms the ping feedback loop where an
+// answer driven client re-pings per delivered answer, the transit
+// reaches the server through the bot session, the new answer is
+// recorded and relayed again, and the loop accelerates to tens of
+// thousands of packets per second on the attached bot).
+func isNetPingAnswerPayload(payload []byte) bool {
+	return len(payload) > 0 && payload[0] == serverOpNetPing
+}
+
 // clientHoldTimeout bounds how long a held client waits for its bot to
 // come back before the connection is closed. The supervisor reconnects
 // with a 2..30 s backoff plus the emergency logout cooldown, so a healthy

@@ -169,8 +169,13 @@ func TestGameServerHoldsClientThroughBotRelogin(t *testing.T) {
 	requireConnOpen(t, client, 250*time.Millisecond)
 
 	// The held client packets are swallowed: nothing reaches the dead
-	// session link.
+	// session link. The keepalive is the one exception - it is
+	// answered by the proxy itself (a held connection must not time
+	// out on the client side), so the ping reads back a locally
+	// synthesized NetPing answer.
 	client.sendPacket([]byte{0xA8})
+	require.Equal(t, byte(serverOpNetPing), client.readPacket()[0],
+		"the held client keepalive is answered locally")
 	select {
 	case received := <-sender.sent:
 		t.Fatalf("a held client packet reached the dead session: 0x%02x",
