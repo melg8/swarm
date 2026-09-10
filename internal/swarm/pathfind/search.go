@@ -80,7 +80,14 @@ type search struct {
 	// approachRadius terminates the search on the first node within
 	// this 3D distance of targetWorld. Zero keeps the plain cell
 	// arrival semantics (any layer of the target cell).
-	approachRadius  float64
+	approachRadius float64
+	// dry blocks every step onto an underwater cell: the shore
+	// walks of the hunt loop (the town trips, the deleveling, the
+	// zone returns) must never plan a swim - the click guard of the
+	// walker refuses wet legs, so a wet plan burns the re-path
+	// budget on identical refused routes and aborts (the delevel
+	// water loop of the 2026-09-10 state dump).
+	dry             bool
 	neighborScratch []*node
 	ringScratch     []*node
 	region          *Region
@@ -104,6 +111,7 @@ func newSearch(engine *Engine, maxPassableHeight uint16) *search {
 		targetKey:         nodeKey{p: Point{X: 0, Y: 0}, h: 0},
 		targetWorld:       Vec3{X: 0, Y: 0, Z: 0},
 		approachRadius:    0,
+		dry:               false,
 		neighborScratch:   nil,
 		ringScratch:       nil,
 		region:            nil,
@@ -511,6 +519,12 @@ func (s *search) costTo(current, next *node, ring []*node) float32 {
 		cost = diagonalScore
 	}
 	if next.layer.Height < waterLevel {
+		if s.dry {
+			// The dry searches treat the water as a wall: a
+			// shore walk with a wet leg is a plan the click
+			// guard refuses before it is ever sent.
+			return impassableScore
+		}
 		// The step lands underwater: swimming costs several land
 		// steps, so bridges and shores beat water crossings.
 		cost *= waterCostMultiplier

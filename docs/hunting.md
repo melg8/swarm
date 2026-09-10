@@ -393,7 +393,15 @@ The short form:
   village deck resolved onto a layer the lake bed has no walkable
   connection to (the server answers such moves with the character's own
   position - a 0 length walk) and the re-paths replanned from the same
-  floating spot. Three defenses keep the trips ashore now: (1) the
+  floating spot. Four defenses keep the trips ashore now: (0) the
+  planning itself is dry (FindPathApproachDry, the 2026-09-10 delevel
+  water loop): the water is a wall for the trip leg searches, a
+  destination only swimming reaches aborts the leg at once (the
+  cooldowns arm) instead of planning a route the walker refuses leg by
+  leg - the wet route of the ordinary search is exactly what looped the
+  deleveling "walking to the guard" -> "the walk would enter water" ->
+  "aborted, the walk would cross water" every 1.3 s in the reported
+  state dump, (1) the
   smoothing never collapses a leg between two dry points across water
   (pathfind legDry), (2) the follower verifies every click line with
   pathfind.DryLine before sending it - a wet click is refused and the
@@ -404,22 +412,35 @@ The short form:
   (FindWaterEscape, a breadth first flood over the walkable surface)
   replaces the leg, a stuck escape re-plans itself, and once the
   character stands dry the interrupted leg re-plans from the shore with
-  a fresh re-path budget. The dump and the map carry the whole leg -
+  a fresh re-path budget. An abort of a walk machinery that runs during
+  the deleveling aborts the deleveling itself (abortTownTrip
+  delegates to abortDelevel): the plain trip end left the delevel
+  state armed without a cooldown and the next tick restarted the walk
+  into the same blocker. One release valve exists for the geodata
+  raster artifacts on a planned route (the village plaza cells
+  without a modeled floor resolve to the lake layer below them, every
+  straight line over the plaza center fails the dry raster while the
+  points stand dry): when the re-path budget exhausts without an
+  escape on the trip, the plan is trusted for the rest of the leg and
+  walks over the server routing (wetPlanTrusted; the standing water
+  check and the shore escape stay armed, and a next budget exhaustion
+  after an escape ends the trip for real). The dump and the map carry the whole leg -
   origin, every waypoint with the passed markers, the TARGET marker on
   the current waypoint and the destination - for exactly this class of
   debugging (see docs/webui.md).
 - Path layer selection: the trip legs navigate with
-  pathfind.Engine.FindPathApproach and the trip approach radius (200
+  pathfind.Engine.FindPathApproachDry and the trip approach radius (200
   units, under the interaction distance): the walk ends on the deck
   ring around the merchant, which handles the C1 shop interiors (the
   geodata holds no floor layer at the real merchant z - only a raised
   surface and the water below) and the counters the same way, while the
   water deck below the shop never satisfies the radius (the z difference
-  counts in the 3D distance). The water cost of the search keeps the
-  routes on bridges and shores, so the walks cross the village ramps
-  instead of swimming the lake under the floating island (the
-  2026-09-09 fix; regression tests `TestFindPathToShopDeck` and the
-  synthetic water tests of `search_test.go`). approachMerchant also
+  counts in the 3D distance). The water is a wall for the search, so
+  the walks cross the village ramps instead of swimming the lake under
+  the floating island (the 2026-09-09 fix; regression tests
+  `TestFindPathToShopDeck`, the synthetic water tests of
+  `search_test.go` and the dry search tests of `dry_search_test.go`).
+  approachMerchant also
   gives up targeting when the merchant stands more than the interaction
   distance above or below the character.
 - Merchants: townMerchants carries the shop npcs of the known towns

@@ -11,6 +11,108 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the delevel water loop - the walk the planner planned as a swim
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (2026-09-10, Russian): the bot hangs cycling forever.
+The state dump (build 6255088) shows the exact cycle, 1.3 s per turn,
+25+ minutes non stop: "level 11 is too high for level 2 mobs,
+deleveling to 9 at the town guards" -> "walking to the guard Starden"
+-> "the walk would enter water at 40648 43432, re-pathing around the
+shore (1..3 of 3)" -> "town trip ended: aborted, the walk would cross
+water" -> the deleveling restarts. The character (test3, level 11)
+stands dry at the elven village shore (40648 43432 -3624), HP full,
+not moving, the hunting zone behind the bay.
+
+### Root cause
+
+Two defects chained:
+
+1. The planner planned water crossing routes for the shore walks: the
+   water step of the search only costs three land steps
+   (waterCostMultiplier), so the cheapest route from the shore to the
+   guard swam across the bay (the dump walk plan: wp1 z -3800, below
+   the water level -3780). The click guard of the walker
+   (clickWouldEnterWater) refused the first leg, and the "re-path
+   around the shore" re-planned the IDENTICAL route - the search is
+   deterministic and its water tolerance did not change - three times,
+   then aborted. The planned wet route and the refusing walker could
+   never agree.
+2. The abort of a walk that runs during the deleveling ended only the
+   town trip: abortTownTrip left the delevel state armed without any
+   cooldown, the phase flipped to engage, and the very next tick
+   delevelWanted() fired again (level 11 over median 2, no cooldown)
+   -> startDelevel -> the identical wet plan -> the identical abort.
+   An infinite tight loop.
+
+### Fix
+
+- pathfind: the search carries a dry mode (FindPathApproachDry) - a
+  step onto an underwater cell costs impassable, so every waypoint of
+  a found route stands above the water level (a wet start exits to the
+  shore first). The water cost search stays for everything that is
+  allowed to swim.
+- hunt: startWalkLeg (the shared planner of the town trips, the
+  deleveling, the zone returns, the shore re-plans) navigates with the
+  dry search; a destination the dry geodata cannot reach reports a
+  planning failure - the callers abort the leg and arm their
+  cooldowns. The old not-found fallback (a single direct walk the
+  server routes itself) is gone: it planned the swim by definition,
+  the click guard refused it leg by leg, and the direct walk itself
+  runs the character into the lake the guard exists to keep it out of.
+- hunt: abortTownTrip during the delevel phase delegates to
+  abortDelevel - the cooldown arms (delevelEnd) and the walk home
+  starts. Any future walk blocker breaks the restart cycle the same
+  way.
+
+### Status: done (2026-09-10)
+
+- Commit "hunt: the shore walks plan dry paths and the water abort
+  breaks the deleveling": the dry approach search of the pathfind
+  engine (FindPathApproachDry), the shared shore leg planner
+  (startWalkLeg) navigates with it, the not-found server-routing
+  fallback is gone, and abortTownTrip during the delevel phase
+  delegates to abortDelevel (the cooldown arms, the walk home
+  starts). Tests: pathfind dry_search_test.go (the channel detour,
+  the swim-only strait refusal, the real pack shore route) and hunt
+  water_loop_test.go (the delevel walk abort ends the deleveling into
+  the cooldown, no refused click reaches the server before the trust,
+  the dry miss aborts the deleveling at the planning tick, the town
+  trip variant arms the trip cooldown; the two old fallback tests
+  rewritten to pin the honest abort). Docs: hunting.md water safety
+  and path layer selection paragraphs, development_log.md Round 48.
+- Rebase onto the concurrent village water raster round (407c8f2):
+  the two rounds compose - the dry planner removes the deliberate
+  swims from the plans, the trusted-leg release of that round answers
+  the geodata raster artifacts of a planned route (the village plaza
+  cells), and the abort of a delevel walk lands in abortDelevel with
+  its cooldown. The hunt suite re-verified green on the rebased
+  tree.
+- Verify loop: go build, go vet, the full go test suite (18 packages
+  green), -race green on the hunt package, gofumpt clean,
+  golangci-lint zero new findings in the touched files (the 19
+  pre-existing branch findings of the spot/zones code stay
+  untouched).
+- Live validation on the local stack: mobius_e2e.sh 45 and
+  BOT_FLAGS=-hunt 90 both E2E_OK - the bot equips, anchors spots,
+  pathfinds through the dry planner, engages and loots with no water
+  incidents. The real pack probe: the ordinary search plans exactly
+  the dump route (wp1 40328 44408 -3800, the swim), the dry search
+  plans an all-dry bypass around the bay (15831 units against 11837)
+  - the shore detour the "re-pathing around the shore" always
+  claimed to do.
+- The user-side check stays the project workflow: run a deleveling
+  bot from the elven village shore and watch it walk around the bay
+  (the planned waypoints all above z -3780) instead of cycling
+  "deleveling to 9" / "the walk would cross water"; any trip that
+  still cannot find a dry route aborts once with a cooldown instead
+  of spinning.
+
 ## Active task: the npc talk target, the spellbook junk, the teacher walk and the aggro answer
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.

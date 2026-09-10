@@ -144,6 +144,14 @@ type Navigator interface {
 	FindPathApproach(start, end pathfind.Vec3, approachRadius float64) (
 		*pathfind.Result, error,
 	)
+	// FindPathApproachDry plans the same walk with the water walled
+	// off: every waypoint of a found route stands above the water
+	// level, a target only swimming reaches answers not found. The
+	// shore walks navigate with it - a planned swim is a plan the
+	// click guard refuses leg by leg.
+	FindPathApproachDry(start, end pathfind.Vec3, approachRadius float64) (
+		*pathfind.Result, error,
+	)
 	// FindPath plans a walk to the target cell arriving on whatever
 	// deck of it the walk reaches first.
 	FindPath(start, end pathfind.Vec3) (*pathfind.Result, error)
@@ -191,6 +199,15 @@ func (e engineNavigator) FindPathApproach(
 	start, end pathfind.Vec3, approachRadius float64,
 ) (*pathfind.Result, error) {
 	return e.engine.FindPathApproach(
+		start, end, approachRadius, e.engine.MaxPassableHeight())
+}
+
+// FindPathApproachDry searches the water walled path with the engine
+// settings and the approach radius goal.
+func (e engineNavigator) FindPathApproachDry(
+	start, end pathfind.Vec3, approachRadius float64,
+) (*pathfind.Result, error) {
+	return e.engine.FindPathApproachDry(
 		start, end, approachRadius, e.engine.MaxPassableHeight())
 }
 
@@ -510,13 +527,16 @@ func (l *Loop) interruptTripForAttacker(now time.Time) bool {
 }
 
 // startWalkLeg plans the walk to the destination and arms the waypoint
-// follower. The search goal is the approach radius of the destination
-// (the merchant interaction distance): a destination behind a counter
-// or on a floor layer the geodata does not model is still reached on
-// the surrounding deck, and unreachable destinations leave a fallback
-// direct walk the server routes itself (its own pathfinder reaches
-// what the pack misses, proven by the death leash of the earlier
-// sessions). The planning position publishes as the leg origin of the
+// follower. The search is dry (the water walled off): a planned swim
+// is a plan the click guard refuses leg by leg - the walker would burn
+// its re-path budget re-planning the identical wet route and abort,
+// the delevel water loop of the 2026-09-10 state dump. The search goal
+// is the approach radius of the destination (the merchant interaction
+// distance): a destination behind a counter or on a floor layer the
+// geodata does not model is still reached on the surrounding deck. A
+// destination the dry geodata cannot reach reports false - the callers
+// abort the trip and arm their cooldowns instead of walking into the
+// water. The planning position publishes as the leg origin of the
 // walk plan view - the dump shows the whole walk from it. It reports
 // whether the leg was planned.
 func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
@@ -529,19 +549,20 @@ func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
 		Y: float64(selfY),
 		Z: float64(selfZ),
 	}
-	result, err := l.navigator.FindPathApproach(from, dest, tripApproachRadius)
+	result, err := l.navigator.FindPathApproachDry(
+		from, dest, tripApproachRadius)
 	if err != nil {
 		l.logger.Printf("Hunt: town trip path search failed: %v", err)
 
 		return false
 	}
-	if result != nil && result.Found && len(result.Waypoints) > 0 {
-		l.waypoints = result.Waypoints
-	} else {
-		l.logger.Printf("Hunt: no geodata path to %d %d, walking by "+
-			"server routing", int(dest.X), int(dest.Y))
-		l.waypoints = []pathfind.Vec3{dest}
+	if result == nil || !result.Found || len(result.Waypoints) == 0 {
+		l.logger.Printf("Hunt: no dry path to %d %d, the walk would "+
+			"swim", int(dest.X), int(dest.Y))
+
+		return false
 	}
+	l.waypoints = result.Waypoints
 	l.wpIndex = 0
 	l.legDest = dest
 	l.legStart = from
@@ -1332,8 +1353,18 @@ func (l *Loop) endTownTrip(reason string) {
 	l.logger.Printf("Hunt: town trip ended: " + reason)
 }
 
-// abortTownTrip finishes a failed trip with a log line.
+// abortTownTrip finishes a failed trip with a log line. A deleveling
+// walking through the shared machinery aborts the deleveling itself:
+// the plain trip end would leave the delevel state armed without a
+// cooldown, and the next tick restarted the walk into the same
+// blocker - the reported bot hung cycling "deleveling to 9" and
+// "the walk would cross water" forever (the 2026-09-10 state dump).
 func (l *Loop) abortTownTrip(reason string) {
+	if l.phase == phaseDelevel {
+		l.abortDelevel(reason)
+
+		return
+	}
 	l.endTownTrip("aborted, " + reason)
 }
 

@@ -274,6 +274,26 @@ func (e *Engine) FindPathApproach(
 	return search.run(start, end, approachRadius)
 }
 
+// FindPathApproachDry is the water walled form of FindPathApproach:
+// every step of the search onto an underwater cell costs impassable,
+// so the waypoints of a found route all stand above the water level (a
+// start below it exits to the shore first). The shore walks of the
+// hunt loop navigate with it: a planned swim is a plan the click guard
+// refuses leg by leg, and the walker burned its whole re-path budget
+// re-planning the identical wet route before it aborted (the delevel
+// water loop of the 2026-09-10 state dump, stuck at the elven village
+// shore). A target only swimming reaches answers Found=false: the
+// caller aborts the leg and arms its cooldown instead of walking into
+// the water.
+func (e *Engine) FindPathApproachDry(
+	start, end Vec3, approachRadius float64, maxPassableHeight uint16,
+) (*Result, error) {
+	search := newSearch(e, maxPassableHeight)
+	search.dry = true
+
+	return search.run(start, end, approachRadius)
+}
+
 // FindWaterEscape plans the way out of the water for a position whose
 // geodata surface lies below the C1 water level: the walk to the
 // nearest shore cell standing above the water surface. The hunt loop

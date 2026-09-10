@@ -48,6 +48,9 @@ type fakeNavigator struct {
 	// approachEnds records the destinations the approach searches
 	// received (the zone return goal checks live here).
 	approachEnds []pathfind.Vec3
+	// dryMiss makes the dry approach searches answer not found: the
+	// walk would need a swim (the water loop regression tests).
+	dryMiss bool
 }
 
 func (f *fakeNavigator) result(
@@ -100,6 +103,31 @@ func (f *fakeNavigator) FindPathApproach(
 	start, end pathfind.Vec3, _ float64,
 ) (*pathfind.Result, error) {
 	f.approachEnds = append(f.approachEnds, end)
+
+	return f.result(start, end)
+}
+
+// FindPathApproachDry plans the water walled approach search: it
+// shares the routes of the ordinary search unless dryMiss is armed -
+// the swim only destination answers not found.
+func (f *fakeNavigator) FindPathApproachDry(
+	start, end pathfind.Vec3, _ float64,
+) (*pathfind.Result, error) {
+	f.approachEnds = append(f.approachEnds, end)
+	if f.dryMiss {
+		f.calls++
+
+		return &pathfind.Result{
+			Found:     false,
+			Aborted:   false,
+			Waypoints: nil,
+			RawPath:   nil,
+			Duration:  0,
+			Explored:  0,
+			OpenLeft:  0,
+			Length:    0,
+		}, nil
+	}
 
 	return f.result(start, end)
 }
@@ -332,44 +360,28 @@ func TestTripNoPathArmsCooldown(t *testing.T) {
 	require.Equal(t, 2, nav.calls, "a new trip starts after the cooldown")
 }
 
-// TestTripDirectWalkWhenNoGeodataPath verifies the last resort of the
-// walk planning: when no geodata path exists (the approach search
-// reports not found) the leg becomes a single direct walk the server
-// routes itself.
-func TestTripDirectWalkWhenNoGeodataPath(t *testing.T) {
-	loop, game, bot, nav := newTripLoop()
+// TestTripDryMissArmsCooldown verifies the not found handling of the
+// dry planning: the approach search reports no dry route (the walk
+// would need a swim), the trip aborts at once with the trigger
+// cooldown armed - the old fallback planned the swim anyway and the
+// click guard refused it leg by leg until the budget exhausted (the
+// town trip variant of the delevel water loop).
+func TestTripDryMissArmsCooldown(t *testing.T) {
+	loop, _, bot, nav := newTripLoop()
 	nav.found = false
 	fillInventory(bot)
 
 	loop.tick()
-	require.Equal(t, phaseTownWalk, loop.phase)
-	require.Equal(t, [][3]int32{legWalkTarget(
-		[3]int32{45000, 50000, -3500}, pathfind.Vec3{X: float64(herbielPos[0]), Y: float64(herbielPos[1]), Z: float64(herbielPos[2])})},
-		game.walks, "the direct walk aims at the nearest town trader")
-	require.Equal(t, 1, nav.calls,
-		"the approach search ran")
-	require.Len(t, loop.waypoints, 1,
-		"the fallback leg is the destination only")
-}
-
-// TestTripFallsBackWhenApproachNotFound verifies the not found
-// fallback: the approach search reports no reachable cell within the
-// radius, the trip still happens with the direct server routed walk -
-// the sale does not need the geodata path.
-func TestTripFallsBackWhenApproachNotFound(t *testing.T) {
-	loop, game, bot, nav := newTripLoop()
-	nav.found = false
-	fillInventory(bot)
-
+	require.Equal(t, phaseEngage, loop.phase,
+		"no trip without a dry path")
+	require.False(t, loop.tripCooldownOver(), "the cooldown is armed")
+	require.Equal(t, 1, nav.calls, "the dry search ran once")
 	loop.tick()
-	require.Equal(t, phaseTownWalk, loop.phase)
-	require.Equal(t, [][3]int32{legWalkTarget(
-		[3]int32{45000, 50000, -3500},
-		pathfind.Vec3{
-			X: float64(herbielPos[0]),
-			Y: float64(herbielPos[1]), Z: float64(herbielPos[2]),
-		})},
-		game.walks, "the fallback plans the walk to the shop")
+	require.Equal(t, 1, nav.calls, "no retry while the cooldown runs")
+
+	loop.tripEndedAt = time.Now().Add(-tripCooldown - time.Second)
+	loop.tick()
+	require.Equal(t, 2, nav.calls, "a new trip starts after the cooldown")
 }
 
 // TestTripFullFlow walks the whole trip: farm to shop, the merchant

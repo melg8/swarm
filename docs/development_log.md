@@ -2837,3 +2837,115 @@ remaining plan pointing at the village cliff top 45480 46680 -2992).
   golangci-lint: zero new findings over the base (the shared branch
   carries 19 pre-existing ones in the spot/zones code of the parallel
   agents).
+
+## Round 48: the delevel water loop - the shore walks plan dry (2026-09-10)
+
+Scope: the hang the user reported against build 6255088 (state dump:
+bot test3, level 11, phase delevel, stuck at the elven village shore
+40648 43432 -3624 for 25+ minutes).
+
+### Problem statement
+
+The bot cycles forever, 1.3 s per turn: "level 11 is too high for
+level 2 mobs, deleveling to 9 at the town guards" -> "walking to the
+guard Starden" -> "the walk would enter water at 40648 43432,
+re-pathing around the shore (1 of 3)" (2 of 3, 3 of 3) -> "town trip
+ended: aborted, the walk would cross water" -> the deleveling
+restarts. The character stands dry, HP full, never moves a step.
+
+### Root cause analysis
+
+Two defects chained:
+
+1. The planner and the walker disagreed about the water. The leg
+   searches ran with the water tolerance of the ordinary
+   FindPathApproach: a step onto an underwater cell only costs three
+   land steps (search.go waterCostMultiplier), so from the shore the
+   cheapest route to Starden swims across the bay - the dump walk
+   plan carries wp1 40328 44408 -3800, below the C1 water level
+   -3780 (reproduced byte identical on the real pack: the ordinary
+   search plans exactly the dump route). The click guard of the
+   follower (clickWouldEnterWater, Round 47) refuses the wet first
+   leg, and the "re-path around the shore" re-planned the IDENTICAL
+   route: the search is deterministic and nothing changed between the
+   runs - three wasted re-paths, then the abort. A plan the walker
+   refuses leg by leg can never execute.
+2. The abort of a walk that runs during the deleveling ended only the
+   town trip. The water guard lives in the shared town walk
+   machinery and calls abortTownTrip, which ended the trip (phase
+   back to engage) but left the whole delevel state armed without any
+   cooldown: the very next tick delevelWanted() fired again (level 11
+   over median 2, delevelEnd never armed), startDelevel reset the
+   state, planDelevelWalk planned the same wet route, the same guard
+   refused it. An infinite tight loop with no backoff anywhere.
+
+### Reproduction
+
+Real pack pathfind probe (now a regression test): FindPathApproach
+from 40648 43432 -3624 to the Starden spawn 42971 51372 -2992 returns
+the dump route with the wet leg; the unit loop: a delevel loop with a
+navigator that answers wet lines cycles the dump log forever before
+the fix, aborts into the walk home with the cooldown armed after it.
+
+### Fix
+
+- pathfind: the search carries a dry mode; FindPathApproachDry walls
+  the water off (a step onto an underwater cell costs impassable), so
+  every waypoint of a found route stands above the water level. The
+  water cost search stays for everything allowed to swim.
+- hunt: startWalkLeg - the shared planner of the town trips, the
+  deleveling, the zone returns and the shore re-plans - navigates
+  with the dry search. A destination the dry geodata cannot reach
+  reports a planning failure; the callers abort the leg and arm their
+  cooldowns. The old not-found fallback (a single direct walk the
+  server routes itself) is gone: it planned the swim by definition
+  and the direct walk itself runs the character into the lake.
+- hunt: abortTownTrip during the delevel phase delegates to
+  abortDelevel - the delevel cooldown arms (delevelEnd, 1 min) and
+  the walk home starts. Any future walk blocker breaks the restart
+  cycle the same way instead of looping.
+
+### Tests
+
+- pathfind: TestDryApproachDetoursAroundAChannel (the dry search
+  still finds the land detour), TestDryApproachRefusesASwimOnlyTarget
+  (the strait: the ordinary search swims, the dry one refuses),
+  TestDelevelShoreRouteStaysDry (the real pack: the ordinary search
+  plans the dump route with a wet leg, the dry route stays dry leg by
+  leg).
+- hunt: TestDelevelWaterAbortArmsCooldown (a deleveling whose walk
+  machinery aborts - a character standing over water without a shore
+  path - ends the deleveling into the walk home with the cooldown
+  armed, and no tick restarts it while the cooldown runs),
+  TestDelevelWetPlanTrustsAfterBudget (wet click lines on a planned
+  leg exhaust the budget into the trust of the parallel village water
+  raster round - the deleveling keeps walking over the server routing
+  instead of the old refuse-and-restart cycle), TestDelevelWetClicks
+  NeverWalk (no refused click reaches the server before the trust),
+  TestDelevelDryMissAborts (a guard without a dry path aborts at the
+  planning tick), TestTripDryMissArmsCooldown (the town trip variant:
+  the old not-found fallback tests rewritten - the fallback planned
+  the swim and is gone).
+
+Composition with the concurrent village water raster round (rebased
+onto 407c8f2): the dry planner removes the deliberate swims from the
+plans, and the trusted-leg release of that round stays as the answer
+to the geodata raster artifacts on a planned route (the plaza cells
+without a modeled floor); a genuine swim still runs the standing
+water check and the shore escape, and the abort of a delevel walk
+lands in abortDelevel with its cooldown.
+
+### Verification
+
+- go build/vet, gofumpt clean, go test ./... (18 packages green);
+  -race green on the hunt package; golangci-lint: zero new findings
+  in the touched files (the 19 pre-existing branch findings in the
+  spot/zones code stay untouched).
+- Live stack: mobius_e2e.sh 45 and BOT_FLAGS=-hunt 90 both E2E_OK -
+  the fresh elven fighter equips, pathfinds (through the dry planner),
+  engages and loots with no water incidents.
+- The real pack probe: the wet search plans the dump route (the
+  regression is real), the dry search plans an all-dry bypass around
+  the bay through the village deck (15831 units against the swim's
+  11837 - the shore detour the "re-pathing around the shore" always
+  claimed to do).
