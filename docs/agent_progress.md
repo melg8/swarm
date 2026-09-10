@@ -3015,3 +3015,18 @@ name the variant number that best fits the real bot UI.
   packet/ -cover (100.0 percent), golangci-lint 0 issues, the string
   benchmarks unchanged (ReadStringASCIIFastPath 27 ns/1 alloc,
   ReadStringBMPSlowPath 69 ns/2 allocs).
+
+- 2026-09-10: the to_game_server outbound packet benchmarks (round 6,
+  feature/proxy-server, perf-and-coverage). The to_game_server package
+  had benchmarks for only 5 of its 14 packet types. New benchmarks
+  cover: MoveToLocation (the most frequent outbound packet, 170 ns/3
+  allocs), AttackRequest (158 ns/3 allocs), RequestActionUse (93 ns/2
+  allocs), RequestBuyItem (250 ns/4 allocs), RequestDestroyItem (87
+  ns/2 allocs), RequestItemList (32 ns/1 alloc), CharacterSelect (40
+  ns/1 alloc), the session lifecycle packets together (EnterWorld +
+  RequestNetPing + Logout, 102 ns/3 allocs), and BenchmarkFleetOutboundTick
+  which measures the aggregate outbound serialization cost of one hunt
+  tick (move + attack + action + list = 432 ns/9 allocs) - the 100
+  bot fleet pays this 100 times per tick, so the per packet allocation
+  cost multiplies directly into GC pressure. Verified: go build/vet,
+  go test, golangci-lint 0 issues.
