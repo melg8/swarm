@@ -2432,3 +2432,104 @@ reproduction test with the same positions.
   returning the concrete engine and renaming).
 - tools/mobius_e2e.sh 45 -> E2E_OK (the standard live verification on
   the same stack).
+
+## Round 44: the standing hunter - the socially fenced square and the dead zone mob priorities (2026-09-10)
+
+Scope: the user report (2026-09-10 02:11:07 state dump, the bot test1)
+asked why the hunter stands in the phase engage without attacking
+anyone - find the problem, fix it and log the opponent positions so
+the log alone answers the "what does the bot see" question.
+
+### The root cause (read straight out of the dump)
+
+- The dump object list held 22 npcs with their exact positions, the
+  character stood at the exact center of the elven-2019_23-b1 square
+  (30502 62755 -3576), full hp, no attackers, zero recent combat for
+  49 seconds after the last kill and loot.
+- The square itself was NOT empty: two living attackable mobs stood
+  inside it - a Kaboo Orc Fighter at 31126 61892 -3560 and a Kaboo
+  Orc Fighter Lieutenant at 31137 61598 -3523, 294 units apart. Both
+  carry the ORC clan with the 300 unit help range, and the engage
+  pick skips any mob whose clan mate stands within help range + 200:
+  the pair fenced each other out of the target search completely.
+- The deadlock chain: no pickable target -> no far target walk; no
+  far walk -> no patrol leg off the center; the plain emptiness
+  reading of the zone rotation still counted the two fenced mobs as
+  "the square has mobs" -> no rotation; and the aggressive fighter
+  sat 1065 units out, just past its 1000 unit aggro range, so it
+  never opened the fight either. The hunter stood still forever.
+
+### The fix 1: the emptiness reads through the pick's own filters
+
+- internal/swarm/state.ZoneHasPickable: the new emptiness probe runs
+  the pick's own filters (the level ceiling, the skip list, the
+  social clan fence) over the whole square - the distance plays no
+  role because the far target walk covers the whole square.
+- internal/swarm/hunt maybeRotateEmptyZone uses the pick-shaped
+  reading: a socially fenced square rotates away after the regular
+  10 s window exactly like a cleared-out one and the hunt moves to
+  the next square instead of standing.
+
+### The fix 1b: the targetless diagnostic (the opponent positions in the log)
+
+- internal/swarm/state.NearestBlockedTargets classifies the living
+  attackable npcs around the character the way the pick does and
+  returns the nearest rejected ones with the projected position and
+  the reason: the skip list, the level ceiling, the zone square or
+  the social clan fence with the blocking pack mate.
+- internal/swarm/hunt logNoPickableTargets: once the far search
+  confirms that nothing in the square is pickable, the hunt log
+  names the nearest opponents with their positions and reasons
+  (one line per 5 s pacing) - the object list of the dump no longer
+  lives only in the dump.
+
+### The fix 2: the zone mob priorities resolve through the wire template ids
+
+- The zone mob priority bias was silently dead since its
+  introduction: the generated zone registries carry the Mobius CT0
+  xml template ids of the spawn data (20471 for the Kaboo Orc
+  Fighter) while the NpcInfo packets identify the same npc by the C4
+  display id plus the 1000000 offset (1000471), so the priority map
+  keys never matched a scan template id and every pick fell back to
+  plain nearest-first.
+- internal/swarm/npcdata gained the generated npcInternalWireIDs map
+  (5781 entries from CT0_to_C4_ids.txt - the converter table is NOT
+  a uniform offset, the deltas spread across 20000, 22000 and a
+  dozen more values) and the NPCWireTemplateID accessor;
+  zoneMobPriority translates the registry ids onto their wire keys
+  at build time. An id outside the table passes through unchanged,
+  so the hand written wire-id zones of the tests keep working. The
+  regenerated dictionary also resyncs one aggression flag (display
+  445, the Uthanka Pirate) with the current pack data.
+
+### The reproduction tests (the dump scene verbatim)
+
+- internal/swarm/hunt/engage_repro_test.go rebuilds the dump scene
+  1:1: the character test1 at 30502 62755 -3576 (level 13, hp
+  306/321) and the 22 dumped npcs at their exact positions with the
+  wire template ids. TestReproDumpStandingBotExplainsItselfInLog
+  pins the diagnostic (the opponents named with the dump's own
+  coordinates and reasons, the pacing repeat, no attack and no walk
+  request); TestReproDumpStandingBotRotatesOutOfTheFencedSquare pins
+  the fix (the empty-window expiry rotates the hunter out of the
+  fenced square, the next square engages).
+- internal/swarm/state/scans_blocked_test.go pins the reading gap
+  (TestZoneHasPickableTreatsTheFencedClanPackAsEmpty: the plain
+  reading sees the fenced pair, the pick-shaped one does not, the
+  broken-up pair becomes pickable again), the filter parity
+  (TestZoneHasPickableAppliesLevelCeilingAndSkips) and the blocked
+  list itself (TestNearestBlockedTargetsReportsTheClanPack).
+- internal/swarm/hunt/zones_test.go
+  TestZoneMobPriorityTranslatesTheRegistryIDs pins the id
+  translation: a registry-style zone (the xml ids of the elven
+  Kaboo grounds) builds the priority map on the wire keys and the
+  priority 2 lieutenant wins the pick over the priority 1 fighter
+  from farther out through the translated bias.
+
+### Verification
+
+- gofmt clean, go build/vet, go test ./... (19 packages, all green
+  on the fix commits and re-run after the docs round).
+- tools/mobius_e2e.sh 60 on the fix head fc2d95d -> E2E_OK (the
+  standard live verification on the deployed stack: login, 60 s in
+  the world, graceful shutdown, exit code 0).

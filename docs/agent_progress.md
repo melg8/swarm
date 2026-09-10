@@ -47,6 +47,66 @@ changes land before the approval.
   approved item lands as its own atomic commit with the repro suite
   updates and the live agent-browser verification, as the previous
   rounds did.
+## Finished task: the standing hunter - the socially fenced square and the dead zone mob priorities
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+The user report: the 2026-09-10 02:11:07 state dump of the bot test1 -
+the hunter stood in the phase engage at the exact center of the
+elven-2019_23-b1 square (30502 62755 -3576), full hp, zero attackers,
+no combat for 49 s - "why is the bot standing and not attacking
+anyone? find it, fix it, and log the opponent positions". Other agents
+push to the same branch concurrently - rebased onto their commits
+(c01bb65, fc82ed4) before the push.
+
+### Goal
+
+Diagnose the standing hunter from the dump, fix the standing (the
+hunt must move again), and make the hunt log name the opponents with
+their positions so a fresh "the bot just stands there" report answers
+itself from the log alone.
+
+### Root cause (the dump held the answer)
+
+- Only two living attackable npcs stood inside the square: a Kaboo
+  Orc Fighter at 31126 61892 -3560 and a Kaboo Orc Fighter
+  Lieutenant at 31137 61598 -3523 - 294 units apart, both of the ORC
+  clan with the 300 unit help range. The engage pick skips any mob
+  whose clan mate stands within help range + 200, so the pair fenced
+  each other out of the target search.
+- The deadlock chain: no pick -> no far target walk -> no patrol leg;
+  the plain zone emptiness reading still counted the fenced pair ->
+  no rotation; the aggressive fighter sat 1065 units out (past its
+  1000 aggro range) -> no incoming attack either. Standing forever.
+- Bonus find during the round: the zone mob priority bias was dead -
+  the registries carry the CT0 xml ids (20471) while the wire sends
+  the C4 display ids + 1000000 (1000471), so the priority keys never
+  matched.
+
+### Changes (commits 312ecfa, fc2d95d)
+
+- state: ZoneHasPickable (the pick's own filters as the emptiness
+  reading) + NearestBlockedTargets (the nearest rejected opponents
+  with positions and reasons); hunt: maybeRotateEmptyZone rotates out
+  of a fenced square after the regular 10 s window, and
+  logNoPickableTargets logs the targetless diagnostic (1 line / 5 s).
+- npcdata: the generated npcInternalWireIDs map (5781 entries,
+  CT0_to_C4_ids.txt) + NPCWireTemplateID; zoneMobPriority translates
+  the registry ids onto the wire keys; one aggression flag resynced
+  (the Uthanka Pirate).
+- Tests: engage_repro_test.go (the dump scene verbatim - 22 npcs at
+  their exact dump positions, the character at the zone center; the
+  diagnostic line test and the rotation test), scans_blocked_test.go
+  (the reading gap, the filter parity, the blocked list),
+  zones_test.go (the id translation pick bias test).
+
+### Status: done (2026-09-10, verified)
+
+- gofmt clean, go build/vet, go test ./... (19 packages) green;
+  tools/mobius_e2e.sh 60 on the fix head fc2d95d -> E2E_OK.
+- The live hunt from the dump scene now rotates out of the fenced
+  square and the log names the blocked opponents with positions and
+  reasons - the dump's object list no longer lives only in the dump.
+- Round 44 of docs/development_log.md carries the full analysis.
 
 ## Active task: the map toolbar folds into one row (zoom buttons gone, layer checkboxes in a dropdown)
 
