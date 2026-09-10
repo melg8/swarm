@@ -340,14 +340,21 @@ grow by the 2 s window, so the payload stays small.
   launch the bot from the repo root; the item id to icon mapping is
   generated into `npcdata/item_icons.go`
   (`tools/generate_item_icons.sh`).
-- Shop queue widget: a SHOP QUEUE flyout of the equipment panel (the
+- Queue flyout widget: a SHOP QUEUE flyout of the equipment panel (the
   inspection tool of the shop strategy - what the bot plans to buy
-  next, at what price and how much adena is still missing). A small
-  triangle tab sticks out of the left edge of the panel (top aligned
-  with the title row); the click slides the queue out to the LEFT of
+  next, at what price and how much adena is still missing). A single
+  small triangle tab sticks out of the left edge of the panel (top
+  aligned with the title row) and owns BOTH queues - whichever view
+  the widget tab shows (see the skills view below): the shop plan
+  under EQUIPMENT, the learning plan under SKILLS, never both at once;
+  the click slides the queue of the current view out to the LEFT of
   the panel as an absolutely positioned flyout, so the equipment panel
   itself never changes size (the queue overlays the map, the glyph
   points left while the queue is hidden and right while it is out).
+  Switching the widget mode re-docks the flyout: the open state is
+  shared (`QueueFlyout` of web/app.js), so the queue of the new view
+  slides out from the same dock and the other one closes; the tab
+  hides while the current view owns no queue.
   The snapshot field `shopping` (null when nothing is published)
   carries the full purchase queue: the affordable plan of the next trip
   first, then the wanted tail - the best value-per-adena picks the
@@ -377,27 +384,41 @@ grow by the 2 s window, so the payload stays small.
 
 ## Skills view and the skill learning queue
 
-The equipment widget is a two view widget - the EQUIPMENT / SKILLS
-mode tabs replaced the static title row. The gear content stays in the
-flow and keeps sizing the panel, the skills view is an absolutely
-positioned overlay of exactly that area (`visibility` swap, never
-`display none` - the panel must not change its dimensions), so the
-requirements of the task hold: the widget never grows. The skills view
-carries the ACTIVE / PASSIVE filter tabs, the learned skill grid (six
-36px columns like the bag, one keyed cell per skill with the icon and
-the green level badge - the icons never re-decode, `SkillCells` of
-`web/app.js`), the pinned sp/next foot (the SP wallet and the head of
-the learning queue); the mode and the filter persist in localStorage.
+The equipment widget is a two view widget that behaves like real tabs
+- switching the mode fully replaces the visible content. The EQUIPMENT
+/ SKILLS mode tabs replaced the static title row. The gear content
+stays in the flow and keeps sizing the panel, the skills view is an
+absolutely positioned overlay of exactly that area: the hidden view
+turns invisible (`visibility` swap, never `display none` - the panel
+must not change its dimensions) AND the overlay carries `z-index: 4`
+so it paints above every gear child - the paperdoll icon, glyph and
+badge cells stack at z-index 1..3 and would otherwise bleed through a
+z-index auto sibling (the mode class lands on `#gear-main`, which
+must carry that id in the markup). The skills view carries the ACTIVE
+/ PASSIVE filter tabs, the learned skill grid and the pinned sp/next
+foot (the SP wallet and the head of the learning queue, anchored at
+the panel bottom like the adena/weight footer); the mode and the
+filter persist in localStorage. The learned grid is a small fixed
+grid - the same six 36px column metric as the bag and the same four
+visible rows (153px) - one keyed cell per skill with the icon and the
+green level badge (the icons never re-decode, `SkillCells` of
+`web/app.js`); the trailing cells are dashed EMPTY placeholders, the
+future slots of the queued lessons: the grid always holds complete
+rows (at least the four visible ones, `SKILL_GRID_MIN_CELLS`), so the
+few learned skills sit in a ready cell grid instead of hanging in the
+air, and it scrolls once the learned list outgrows the four rows. An
+entirely empty filter tab shows the muted note instead of the slots.
 The data comes from the SkillList packets (0x6D, `state.Bot.SetSkills`)
 enriched with the generated skill dictionary (name, icon, passive
 flag).
 
-The skill learning queue is a second flyout on the left edge (the
-triangle tab below the shop tab; the flyout docks under the shop
-flyout while it is out): one keyed row per remaining lesson of the
-class tree (`snapshot.skillPlan`, at most 256 entries) with the icon,
-the name with the learned level, the warrior priority category (attack
-power / defense / other, from the effect stats of the Mobius skill
+The skill learning queue is the second content of the single queue
+flyout dock (see the shop queue widget above): in SKILLS mode the same
+triangle tab slides the lesson plan out to the left edge instead of
+the shop plan - one keyed row per remaining lesson of the class tree
+(`snapshot.skillPlan`, at most 256 entries) with the icon, the name
+with the learned level, the warrior priority category (attack power /
+defense / other, from the effect stats of the Mobius skill
 definitions), the unlock level and the SP cost with the missing SP;
 the head summary and the pinned sp/need/save foot mirror the shop
 queue. The queue order is the warrior priority: the physical weapon

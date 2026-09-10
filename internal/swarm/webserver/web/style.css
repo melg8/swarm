@@ -1078,17 +1078,19 @@ body.mode-pathfind .gear-panel { display: none; }
 
 .inv-count { color: var(--text-dim); letter-spacing: 0; }
 
-/* ---- shop queue widget (the purchase plan of the bot) ----
-   A flyout of the floating equipment panel: a small triangle tab on
-   the left edge of the panel (aligned with the title row) slides the
-   queue out to the left of the panel. The flyout is absolutely
-   positioned, so the equipment panel itself never changes size - the
-   queue overlays the map instead of stretching the panel downward.
-   The open state keeps the summary head line (the count, the
-   affordable total and the missing adena of the whole queue), the
-   scrollable purchase list and the pinned buy/have/save foot. The rows
-   are small (26px) so the list reads at a glance, hover opens the rich
-   purchase tooltip. */
+/* ---- queue flyout widgets (the shop plan and the skill lessons) ----
+   One flyout dock of the floating equipment panel: a single small
+   triangle tab on the left edge (the shop-tab button) slides the
+   queue out to the left of the panel. Which queue slides out follows
+   the widget tab - the shop plan under EQUIPMENT, the learning plan
+   under SKILLS - so the single tab always means "the queue of what I
+   am looking at". The flyout is absolutely positioned, so the
+   equipment panel itself never changes size - the queue overlays the
+   map instead of stretching the panel downward. The open state keeps
+   the summary head line (the count, the affordable total and the
+   missing amount of the whole queue), the scrollable entry list and
+   the pinned foot. The rows are small (26px) so the list reads at a
+   glance, hover opens the rich purchase tooltip. */
 
 /* The edge tab: the triangle toggle of the flyout. It sticks out of
    the left border of the equipment panel (absolutely positioned, the
@@ -1392,6 +1394,10 @@ body.mode-pathfind .gear-panel { display: none; }
    change. */
 .gear-main.mode-skills #gear-view { visibility: hidden; }
 
+/* The overlay paints above every gear child: the paperdoll icons,
+   glyphs and badges carry positive z-index values (1..3) that would
+   otherwise bleed through a z-index auto sibling - the tab switch
+   must fully replace the visible content, not mix it. */
 .skills-view {
   position: absolute;
   inset: 0;
@@ -1399,6 +1405,7 @@ body.mode-pathfind .gear-panel { display: none; }
   flex-direction: column;
   background: var(--bg-panel);
   overflow: hidden;
+  z-index: 4;
 }
 
 .skills-view.hidden { display: none; }
@@ -1439,8 +1446,12 @@ body.mode-pathfind .gear-panel { display: none; }
   font-family: var(--mono);
 }
 
-/* The learned skill grid: six columns of 36px cells like the
-   inventory bag, the grid scrolls inside the fixed overlay area. */
+/* The learned skill grid: a small fixed grid of six 36px columns -
+   the same cell metric and the same four visible rows as the
+   inventory bag (153px), so the learned skills sit in ready cells
+   instead of hanging in the air while the list is still short. The
+   empty trailing cells are the future slots the queue will fill; the
+   grid scrolls once the learned list outgrows the four rows. */
 .skill-grid {
   display: grid;
   grid-template-columns: repeat(6, 36px);
@@ -1448,7 +1459,8 @@ body.mode-pathfind .gear-panel { display: none; }
   gap: 3px;
   padding: 0 8px;
   overflow-y: auto;
-  flex: 1;
+  flex: 0 0 auto;
+  height: 153px;
   align-content: start;
   scrollbar-width: thin;
 }
@@ -1498,6 +1510,15 @@ body.mode-pathfind .gear-panel { display: none; }
 
 .skill-cell .icon-glyph { font-size: 13px; }
 
+/* The empty placeholder cell: the future slot a queued lesson will
+   fill once learned. Dashed border and no fill mark it as reserved
+   space, so the few learned skills sit in a ready cell grid instead
+   of hanging in the air. */
+.skill-cell.empty {
+  border-style: dashed;
+  background: transparent;
+}
+
 /* The empty filter note: a muted line when the tab has no skills. */
 .skill-empty {
   grid-column: 1 / -1;
@@ -1509,13 +1530,16 @@ body.mode-pathfind .gear-panel { display: none; }
 }
 
 /* The pinned footer of the skills view: the SP wallet and the next
-   planned lesson stay visible whatever the grid scroll is. */
+   planned lesson sit flush at the panel bottom whatever the grid
+   scroll is - the same anchor as the adena/weight footer of the
+   equipment view, while the small fixed grid leaves the growing room
+   between them. */
 .skill-foot {
   display: flex;
   flex-direction: column;
   gap: 5px;
   padding: 8px 10px 9px;
-  margin-top: 6px;
+  margin-top: auto;
   border-top: 1px solid var(--border-soft);
 }
 
@@ -1540,36 +1564,16 @@ body.mode-pathfind .gear-panel { display: none; }
 }
 
 /* ---- skill learning queue widget (the lesson plan of the bot) ----
-   A flyout of the floating equipment panel like the shop queue: a
-   triangle tab on the left edge (below the shop tab) slides the
-   queue out to the left of the panel, so the panel itself keeps its
-   size. Every entry of the published learning plan (snap.skillPlan,
-   the remaining lessons ordered by the warrior priorities) renders
-   as one compact row - icon, name, the category and the unlock level
-   meta, the SP cost on the right with the missing SP under it. The
-   queue docks below the shop flyout when both are open. */
-
-.skillq-tab {
-  position: absolute;
-  left: -14px;
-  top: 27px;
-  width: 14px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-right: 0;
-  border-radius: 5px 0 0 5px;
-  background: var(--bg-panel);
-  color: var(--text-dim);
-  font-size: 9px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.skillq-tab:hover { color: var(--text); }
+   The flyout shares the single left edge tab with the shop queue:
+   whichever queue belongs to the current widget tab (EQUIPMENT ->
+   the shop plan, SKILLS -> the learning plan) slides out to the left
+   of the panel from the same dock position - only one of the two
+   flyouts is ever visible at a time, so the panel itself keeps its
+   size and the two contents never stack. Every entry of the published
+   learning plan (snap.skillPlan, the remaining lessons ordered by the
+   warrior priorities) renders as one compact row - icon, name, the
+   category and the unlock level meta, the SP cost on the right with
+   the missing SP under it. */
 
 .skillq-panel {
   position: absolute;
@@ -1598,10 +1602,6 @@ body.mode-pathfind .gear-panel { display: none; }
   visibility: visible;
   pointer-events: auto;
 }
-
-/* Below an open shop flyout the queue docks under it instead of
-   overlapping (the shop flyout tops out at ~166px). */
-.skillq-panel.below-shop { top: 175px; }
 
 .skillq-head {
   display: flex;

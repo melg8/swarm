@@ -1347,28 +1347,33 @@ function renderGearFoot(snap) {
   }
 }
 
-// ---- shop queue widget (the purchase plan of the bot) ----
+// ---- queue flyout widgets (the shop plan and the skill lessons) ----
 //
-// A flyout of the floating equipment widget: a small triangle tab on
-// the left edge of the panel (the shop-tab button) slides the queue
+// One flyout dock of the floating equipment widget: a single small
+// triangle tab on the left edge (the shop-tab button) slides a queue
 // out to the left of the equipment panel, so the panel itself keeps
 // its size - the queue overlays the map instead of stretching the
-// panel downward. Every entry of the published shopping queue
-// (snap.shopping, the affordable plan of the next trip plus the
-// wanted tail with the missing adena) renders as one compact row -
-// icon, name, merchant and gain, the buy price on the right and the
-// missing amount under it for the wanted entries. Hovering a row
-// opens the floating item tooltip extended with the purchase lines
-// (gain, value per adena, sell credit, missing, merchant) to the left
-// of the row, so a suspicious pick is visible at a glance. The rows
-// are keyed by the item id and refreshed in place like the bag cells:
-// an unchanged queue never rebuilds the icon images.
+// panel downward. Which queue belongs to the tab follows the widget
+// mode: EQUIPMENT slides the shopping queue (snap.shopping, the
+// affordable plan of the next trip plus the wanted tail), SKILLS
+// slides the learning queue (snap.skillPlan, the remaining lessons
+// ordered by the warrior priorities). Every queue entry renders as
+// one compact row - icon, name, meta, the cost on the right - and
+// hovering a row opens the floating tooltip. The rows are keyed and
+// refreshed in place like the bag cells: an unchanged queue never
+// rebuilds the icon images.
 
-// ShopPanel holds the widget state: the open flag of the flyout (open
-// by default - the point of the widget is the passive glance) and the
-// row registry keyed by item id.
+// QueueFlyout holds the shared open state of the single queue tab:
+// the same triangle toggle, the same dock position, whichever queue
+// the current widget tab owns. Open by default - the point of the
+// widget is the passive glance.
+const QueueFlyout = {
+  open: true
+};
+
+// ShopPanel holds the shop queue state: the row registry keyed by
+// item id.
 const ShopPanel = {
-  open: true,
   rows: new Map(),
   order: "",
   signature: ""
@@ -1413,33 +1418,51 @@ function initViewMenu() {
   close();
 }
 
-// initShopPanel wires the triangle tab of the flyout: the click
-// slides the queue out to the left of the equipment panel and back.
+// initShopPanel wires the single triangle tab of the flyout dock: the
+// click slides the queue of the current widget tab (the shop plan or
+// the learning plan) out to the left of the equipment panel and back.
 function initShopPanel() {
   const tab = document.getElementById("shop-tab");
   if (!tab) { return; }
   tab.addEventListener("click", () => {
-    ShopPanel.open = !ShopPanel.open;
-    applyShopPanelState();
+    QueueFlyout.open = !QueueFlyout.open;
+    applyQueueFlyoutState();
   });
 }
 
-// applyShopPanelState syncs the flyout DOM with the open flag: the
-// panel slides in or out and the edge triangle flips its direction -
-// pointing left while the queue is hidden (the slide-out direction),
-// pointing right while it is out (the retract direction).
-function applyShopPanelState() {
-  const panel = document.getElementById("shop-panel");
+// applyQueueFlyoutState syncs the flyout DOM with the shared open
+// flag and the widget mode: exactly one of the two panels slides out -
+// the shop queue in EQUIPMENT mode, the skill queue in SKILLS mode -
+// while the other stays closed at the same dock position, so the two
+// contents never stack and the panel keeps its size. The edge
+// triangle hides while the current mode owns no queue, flips its
+// direction with the state - pointing left while the queue is hidden
+// (the slide-out direction), pointing right while it is out (the
+// retract direction).
+function applyQueueFlyoutState() {
+  const shopPanel = document.getElementById("shop-panel");
+  const skillqPanel = document.getElementById("skillq-panel");
   const tab = document.getElementById("shop-tab");
   const chev = document.getElementById("shop-tab-chev");
-  if (panel) {
-    panel.classList.toggle("open", ShopPanel.open);
+  const skillsMode = GearMode.mode === "skills";
+  const shopReady = Boolean(shopPanel) &&
+    !shopPanel.classList.contains("hidden");
+  const queueReady = skillsMode
+    ? (Boolean(skillqPanel) && !skillqPanel.classList.contains("hidden"))
+    : shopReady;
+  const out = QueueFlyout.open && queueReady;
+  if (shopPanel) {
+    shopPanel.classList.toggle("open", out && !skillsMode);
+  }
+  if (skillqPanel) {
+    skillqPanel.classList.toggle("open", out && skillsMode);
   }
   if (tab) {
-    tab.setAttribute("aria-expanded", ShopPanel.open ? "true" : "false");
+    tab.classList.toggle("hidden", !queueReady);
+    tab.setAttribute("aria-expanded", out ? "true" : "false");
   }
   if (chev) {
-    chev.textContent = ShopPanel.open ? "\u25B8" : "\u25C2";
+    chev.textContent = out ? "\u25B8" : "\u25C2";
   }
 }
 
@@ -1467,20 +1490,17 @@ function resetShop() {
   if (list) { list.innerHTML = ""; }
   const panel = document.getElementById("shop-panel");
   if (panel) { panel.classList.add("hidden"); }
-  const tab = document.getElementById("shop-tab");
-  if (tab) { tab.classList.add("hidden"); }
+  applyQueueFlyoutState();
   const summary = document.getElementById("shop-summary");
   if (summary) { summary.textContent = ""; }
-  // The skill queue flyout re-docks when the shop flyout disappears.
-  if (typeof syncSkillQueueDock === "function") {
-    syncSkillQueueDock();
-  }
 }
 
 // renderShopping refreshes the shop queue widget from the published
-// shopping plan: the edge tab and the flyout hide without a plan
-// (nothing published, an expired plan or a session without the shop
-// strategy), the keyed rows and the summary line otherwise.
+// shopping plan: the flyout hides without a plan (nothing published,
+// an expired plan or a session without the shop strategy), the keyed
+// rows and the summary line otherwise. The flyout only slides out in
+// EQUIPMENT mode - applyQueueFlyoutState picks the queue of the
+// current widget tab.
 function renderShopping(snap) {
   const panel = document.getElementById("shop-panel");
   const list = document.getElementById("shop-list");
@@ -1492,14 +1512,7 @@ function renderShopping(snap) {
     return;
   }
   panel.classList.remove("hidden");
-  const tab = document.getElementById("shop-tab");
-  if (tab) { tab.classList.remove("hidden"); }
-  applyShopPanelState();
-  // The skill queue flyout re-docks when the shop flyout appears or
-  // disappears above it.
-  if (typeof syncSkillQueueDock === "function") {
-    syncSkillQueueDock();
-  }
+  applyQueueFlyoutState();
 
   const signature = shopRowSignature(plan);
   if (ShopPanel.signature === signature) { return; }
@@ -1791,15 +1804,22 @@ function showShoppingTooltip(entry, item) {
 // ---- skills view of the equipment widget ----
 //
 // The EQUIPMENT / SKILLS mode tabs make the floating gear widget
-// universal: the gear content (paperdoll, bag, adena/weight footer)
-// stays in the flow and keeps defining the panel size, the skills
-// view is an absolutely positioned overlay of exactly that area (see
-// .skills-view) - the widget never changes its dimensions. The
-// overlay carries the ACTIVE / PASSIVE filter tabs, the learned skill
-// grid (six columns of 36px cells like the bag, one keyed cell per
-// skill - the icons never re-decode on re-renders, the same rule as
-// the GearCells of the bag) and the pinned foot with the SP wallet
-// and the next planned lesson.
+// universal and behave like real tabs: switching the mode fully
+// replaces the visible content. The gear content (paperdoll, bag,
+// adena/weight footer) stays in the flow and keeps defining the panel
+// size, the skills view is an absolutely positioned overlay of
+// exactly that area (see .skills-view) - the widget never changes its
+// dimensions - while the hidden tab content turns invisible
+// (visibility, never display none - the flow keeps sizing the panel)
+// and the overlay paints above every gear child (z-index, see the
+// paperdoll icon rules). The overlay carries the ACTIVE / PASSIVE
+// filter tabs, the learned skill grid (six columns of 36px cells like
+// the bag, one keyed cell per skill - the icons never re-decode on
+// re-renders, the same rule as the GearCells of the bag; the grid is
+// a small fixed 4-row area padded with dashed future-slot cells, so
+// the few learned skills sit in a ready cell grid instead of hanging
+// in the air) and the pinned foot with the SP wallet and the next
+// planned lesson.
 
 // GearMode holds the widget mode and the learned list filter, both
 // persisted in localStorage like the zone panel collapse.
@@ -1811,11 +1831,14 @@ const GearMode = {
 
 // SkillCells is the keyed cell registry of the learned skill grid:
 // one persistent record per skill id, refreshed in place; the empty
-// note is the persistent placeholder of the empty filter state.
+// note is the persistent placeholder of the empty filter state, the
+// blanks pool pads the grid with the future slot cells so the few
+// learned skills never hang in the air.
 const SkillCells = {
   cells: new Map(),
   order: "",
-  emptyNote: null
+  emptyNote: null,
+  blanks: []
 };
 
 // SKILL_CATEGORY_LABELS names the warrior priority categories of the
@@ -1877,7 +1900,8 @@ function setSkillFilter(filter) {
 }
 
 // applyGearMode syncs the tab buttons, the view visibility and the
-// filter buttons with the GearMode state.
+// filter buttons with the GearMode state, then re-docks the queue
+// flyout: the single edge tab now owns the queue of the new mode.
 function applyGearMode() {
   const main = document.getElementById("gear-main");
   const equipBtn = document.getElementById("gear-mode-equip");
@@ -1911,6 +1935,7 @@ function applyGearMode() {
     passiveBtn.setAttribute("aria-selected",
       GearMode.filter === "passive" ? "true" : "false");
   }
+  applyQueueFlyoutState();
 }
 
 // skillGridSignature is the change signature of the learned grid: the
@@ -1930,8 +1955,9 @@ function skillGridSignature(skills, filter) {
 // renderSkills refreshes the learned skill view of the equipment
 // widget: the tab badge carries the learned count, the keyed grid
 // renders the filter tab (six per row with icons and the level
-// badge), the pinned foot shows the SP wallet and the next planned
-// lesson of the queue.
+// badge, padded to complete rows with the future-slot cells), the
+// pinned foot shows the SP wallet and the next planned lesson of the
+// queue.
 function renderSkills(snap) {
   const grid = document.getElementById("skill-grid");
   const skills = snap.skills || [];
@@ -1984,8 +2010,13 @@ function renderSkills(snap) {
     }
   }
 
+  // The empty trailing cells are the future slots of the queued
+  // lessons: the grid always holds complete rows (at least the four
+  // visible ones), so the learned skills sit in a ready cell grid
+  // instead of hanging in the air while the list is still short.
   const note = SkillCells.emptyNote;
   if (wanted.length === 0) {
+    setSkillBlanks(0);
     if (!note) {
       const empty = document.createElement("div");
       empty.className = "skill-empty";
@@ -1994,9 +2025,14 @@ function renderSkills(snap) {
     }
     SkillCells.emptyNote.textContent = skills.length === 0
       ? "no skills yet" : "no " + GearMode.filter + " skills";
-  } else if (note) {
-    note.remove();
-    SkillCells.emptyNote = null;
+  } else {
+    if (note) {
+      note.remove();
+      SkillCells.emptyNote = null;
+    }
+    const rows = Math.ceil(wanted.length / SKILL_GRID_COLUMNS);
+    const cells = Math.max(SKILL_GRID_MIN_CELLS, rows * SKILL_GRID_COLUMNS);
+    setSkillBlanks(cells - wanted.length);
   }
 
   const count = document.getElementById("skill-count");
@@ -2004,6 +2040,35 @@ function renderSkills(snap) {
     count.textContent = wanted.length + "/" + skills.length;
   }
   renderSkillsFoot(snap, plan);
+}
+
+// SKILL_GRID_COLUMNS is the fixed column count of the learned grid
+// (six cells per row, the bag metric); SKILL_GRID_MIN_CELLS is the
+// minimum padded cell count (four full rows - the fixed grid height
+// of the skills view).
+const SKILL_GRID_COLUMNS = 6;
+const SKILL_GRID_MIN_CELLS = 24;
+
+// setSkillBlanks syncs the trailing placeholder cells of the learned
+// grid: inert dashed cells (no icon, no tooltip - nothing is learned
+// there yet) that pad the grid to complete rows. They always follow
+// the real cells in the DOM, so a reordered learned list never
+// interleaves with the future slots.
+function setSkillBlanks(count) {
+  const grid = document.getElementById("skill-grid");
+  if (!grid) { return; }
+  const pool = SkillCells.blanks;
+  while (pool.length < count) {
+    const blank = document.createElement("div");
+    blank.className = "skill-cell empty";
+    pool.push(blank);
+  }
+  while (pool.length > count) {
+    pool.pop().remove();
+  }
+  for (const blank of pool) {
+    grid.append(blank);
+  }
 }
 
 // makeSkillCell creates one keyed learned skill cell: the persistent
@@ -2095,6 +2160,7 @@ function resetSkills() {
   SkillCells.cells.clear();
   SkillCells.order = "";
   SkillCells.emptyNote = null;
+  SkillCells.blanks = [];
   GearMode.gridSignature = "";
   const grid = document.getElementById("skill-grid");
   if (grid) { grid.innerHTML = ""; }
@@ -2112,65 +2178,24 @@ function resetSkills() {
 
 // ---- skill learning queue widget (the lesson plan of the bot) ----
 //
-// A flyout of the floating equipment panel like the shop queue: the
-// triangle tab on the left edge (below the shop tab) slides the queue
-// out to the left of the panel, so the panel itself keeps its size.
-// Every lesson of the published learning plan (snap.skillPlan - the
-// remaining class tree lessons ordered by the warrior priorities:
-// physical weapon attack power first, defense second, the rest last)
-// renders as one compact row with the SP cost; the not yet
-// affordable and the level locked lessons dim like the shop wanted
-// tail. The learning itself is not implemented - the queue only
-// shows the planned order.
+// The second content of the single queue flyout dock: in SKILLS mode
+// the triangle tab on the left edge slides the learning queue out to
+// the left of the panel instead of the shop plan, so the panel keeps
+// its size. Every lesson of the published learning plan
+// (snap.skillPlan - the remaining class tree lessons ordered by the
+// warrior priorities: physical weapon attack power first, defense
+// second, the rest last) renders as one compact row with the SP cost;
+// the not yet affordable and the level locked lessons dim like the
+// shop wanted tail. The learning itself is not implemented - the
+// queue only shows the planned order.
 
-// SkillQueuePanel holds the flyout state: the open flag (open by
-// default - the point of the widget is the passive glance) and the
-// keyed row registry.
+// SkillQueuePanel holds the lesson queue state: the keyed row
+// registry.
 const SkillQueuePanel = {
-  open: true,
   rows: new Map(),
   order: "",
   signature: ""
 };
-
-// initSkillQueuePanel wires the triangle tab of the flyout: the click
-// slides the queue out to the left of the equipment panel and back.
-function initSkillQueuePanel() {
-  const tab = document.getElementById("skillq-tab");
-  if (!tab) { return; }
-  tab.addEventListener("click", () => {
-    SkillQueuePanel.open = !SkillQueuePanel.open;
-    applySkillQueueState();
-  });
-}
-
-// applySkillQueueState syncs the flyout DOM with the open flag: the
-// panel slides in or out and the edge triangle flips its direction.
-function applySkillQueueState() {
-  const panel = document.getElementById("skillq-panel");
-  const tab = document.getElementById("skillq-tab");
-  const chev = document.getElementById("skillq-tab-chev");
-  if (panel) {
-    panel.classList.toggle("open", SkillQueuePanel.open);
-  }
-  if (tab) {
-    tab.setAttribute("aria-expanded", SkillQueuePanel.open ? "true" : "false");
-  }
-  if (chev) {
-    chev.textContent = SkillQueuePanel.open ? "\u25B8" : "\u25C2";
-  }
-}
-
-// syncSkillQueueDock positions the flyout under the shop queue when
-// the shop flyout is out (both dock to the left of the equipment
-// panel and would overlap otherwise).
-function syncSkillQueueDock() {
-  const panel = document.getElementById("skillq-panel");
-  if (!panel) { return; }
-  const shop = document.getElementById("shop-panel");
-  const shopOpen = shop && !shop.classList.contains("hidden");
-  panel.classList.toggle("below-shop", Boolean(shopOpen));
-}
 
 // skillQueueSignature is the change signature of the whole queue
 // view: two snapshots with equal signatures leave the row DOM
@@ -2197,18 +2222,18 @@ function resetSkillQueue() {
   const panel = document.getElementById("skillq-panel");
   if (panel) {
     panel.classList.add("hidden");
-    panel.classList.remove("below-shop", "open");
+    panel.classList.remove("open");
   }
-  const tab = document.getElementById("skillq-tab");
-  if (tab) { tab.classList.add("hidden"); }
+  applyQueueFlyoutState();
   const summary = document.getElementById("skillq-summary");
   if (summary) { summary.textContent = ""; }
 }
 
 // renderSkillQueue refreshes the learning queue flyout from the
-// published plan: the edge tab and the flyout hide without a plan
-// (nothing published or a class the dictionary does not know), the
-// keyed rows and the summary line otherwise.
+// published plan: the flyout hides without a plan (nothing published
+// or a class the dictionary does not know), the keyed rows and the
+// summary line otherwise. The flyout only slides out in SKILLS mode -
+// applyQueueFlyoutState picks the queue of the current widget tab.
 function renderSkillQueue(snap) {
   const panel = document.getElementById("skillq-panel");
   const list = document.getElementById("skillq-list");
@@ -2220,10 +2245,7 @@ function renderSkillQueue(snap) {
     return;
   }
   panel.classList.remove("hidden");
-  const tab = document.getElementById("skillq-tab");
-  if (tab) { tab.classList.remove("hidden"); }
-  syncSkillQueueDock();
-  applySkillQueueState();
+  applyQueueFlyoutState();
 
   const level = snap.character ? snap.character.level : 0;
   const signature = skillQueueSignature(plan, level);
@@ -2874,7 +2896,6 @@ initTargetWidget();
 initViewMenu();
 initShopPanel();
 initGearMode();
-initSkillQueuePanel();
 
 // Chat window state: auto scroll follows the newest line while the
 // user stays at the bottom; scrolling up reads the history, scrolling

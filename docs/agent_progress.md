@@ -685,3 +685,62 @@ duplication, make it maximally convenient for agent use.
   the rebase into docs/webui.md (no content lost).
 
 ### Status: done (2026-09-10, live verified)
+## Active task: the equipment widget skills view review fixes
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+
+### Goal
+
+The user review (2026-09-10, Russian) of the skills-display task found
+three defects: (1) the sidebar had TWO queue toggles - it must have
+exactly one, and the left flyout it opens must follow the widget tab
+(the item purchase queue under EQUIPMENT, the skill learning queue
+under SKILLS); (2) switching to the SKILLS tab kept the equipped gear
+pictures visible - the widget must behave like real tabs, the switch
+fully replacing the visible content (weapons/armor/weight on one tab,
+skills only on the other); (3) the learned skills hung in the air when
+few - the skills tab needs a small grid of ready cells with the
+placeholder slots of the future elements.
+
+### Root causes and fixes
+
+- Defect (2) had two roots. The `applyGearMode` toggler targets
+  `document.getElementById("gear-main")`, but the markup div carried
+  only the class - the id was missing, so the `mode-skills` class
+  never landed and `#gear-view` never turned invisible (the harness
+  stub DOM lazily fabricates any id, which masked it: the harness was
+  green while the real browser showed the bug). Even with the
+  visibility fixed, the paperdoll icon/glyph/badge cells stack at
+  z-index 1..3 and would still paint ABOVE a z-index auto sibling
+  overlay. The fix: the markup gains `id="gear-main"`, and
+  `.skills-view` gets `z-index: 4` so the overlay paints above every
+  gear child - the tab switch now fully replaces the content, and the
+  harness pins the id and the z-index against the real html/css
+  strings.
+- Defect (1): the second `skillq-tab` triangle (and its below-shop
+  docking) is gone; the single `shop-tab` triangle now owns BOTH
+  queues through the shared `QueueFlyout` open state and
+  `applyQueueFlyoutState`: exactly one flyout is out at a time - the
+  shop plan in EQUIPMENT mode, the lesson plan in SKILLS mode - and
+  switching the widget mode re-docks the open state to the queue of
+  the new view. The tab hides while the current view owns no queue.
+- Defect (3): the learned grid became a small fixed grid (the bag
+  metric: six 36px columns, four visible rows, 153px) padded with
+  dashed `.skill-cell.empty` placeholders - complete rows, at least
+  `SKILL_GRID_MIN_CELLS` (24) - so the learned skills sit in ready
+  cells and the trailing slots read as the future lessons; an entirely
+  empty filter tab shows the muted note instead. The sp/next foot is
+  anchored to the panel bottom (`margin-top: auto`) like the
+  adena/weight footer of the equipment view.
+
+### Status: done (2026-09-10)
+
+- Verify loop: repro_gear.js 157 checks green, repro_hud/fight/movement
+  green (repro_map_render has one pre-existing failure - the hunting
+  zone label - present on the clean tree too), go build/vet, go test
+  ./... (all packages), golangci-lint 0 new issues (9 pre-existing in
+  untouched files), live browser check: the mode swap swaps the flyout
+  (shop out in gear, skill queue out in skills), no gear icon bleeds
+  through the overlay (elementFromPoint returns only skills view
+  nodes), the passive tab renders 1 learned cell + 23 placeholders,
+  the foot sits flush at the bottom.
