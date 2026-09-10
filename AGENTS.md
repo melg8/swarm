@@ -1505,6 +1505,35 @@ the same variables).
   map background row stays there), the whole toolbar hides in the
   fight modes. The `follow` checkbox and the pathfind arm buttons
   stay inline; the scale and object counters pin to the right.
+- The web UI chrome is modernized (the `feature/webui_modern`
+  implementation of `docs/webui_modernization_proposal.md`, 2026-09-10):
+  14 px body type with a 10 px floor and title-case 11 px panel
+  headers, two-layer panel shadows, 10/6 px radii, one `--t-fast`
+  hover motion token with a `prefers-reduced-motion` opt-out, inline
+  SVG icons everywhere (the theme sun/moon pair, the dropdown and
+  flyout chevrons, the compass needle above the chat window), the
+  M/L/F/V/T hotkeys (tabs, follow, view menu, theme - silent while a
+  text input holds the focus, the key map sits in the footer), the
+  follow switch skin, telemetry capsules for the zoom and object
+  counts, a global `:focus-visible` ring, log zebra with smart
+  second timestamps (loot/level-up keeps the green, spawns read
+  neutral), thin scrollbars on every list, and empty states for the
+  map, the log and the bot list. The floating overlays ride a
+  frosted glass background (`backdrop-filter: blur(10px)`, one kill
+  switch: the `data-glass="off"` attribute on `<html>`, degrading to
+  the opaque look without support). The HUD stack, the equipment
+  widget, the chat and the zone list drag by their heads (pointer
+  events, clamped into the map wrap) and collapse through their
+  chevron buttons; the layout persists under the versioned
+  `swarm.panelLayout.v1` localStorage key and a double click on a
+  head resets the panel to its CSS home. The collapsed chat counts
+  missed lines on a `N new` head badge. The inventory grid sizes
+  itself to its rows (four rows stay the scroll ceiling, an empty
+  bag shows one slim `empty` row). Below 1280 px the sidebar and the
+  panels shave a step; below 1024 px the sidebar folds into a 34 px
+  bot-dot rail that expands over the map on hover while the canvas
+  keeps its size. The repro coverage of these behaviors lives in
+  `tools/repro_gear.js`.
 - The web UI is interactive in every launch mode: a double click on
   the map (move/attack/pickup - hit test over the interpolated object
   positions) or on the target HUD panel (attack the shown target),

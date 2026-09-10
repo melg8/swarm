@@ -68,11 +68,89 @@ db 3306 verified) and had to stay untouched.
   full writeup.
 
 ## Active task: the webui modernization proposal (awaiting the user approval)
+## Active task: the webui modernization implementation (feature/webui_modern)
+
+Started: 2026-09-10. Branch: `feature/webui_modern` (off
+`feature/proxy-server` at aefbeb8). Commits as melg8. The user
+approved the whole proposal for implementation on a dedicated branch
+so the result is easy to evaluate visually; `feature/proxy-server`
+keeps evolving independently.
+
+### Goal
+
+Implement every item of docs/webui_modernization_proposal.md (the
+30 checklist rows A1-A7, B1-B8, C1-C12, G1-G2) on
+`feature/webui_modern`, with the repo standards: repro suite updates,
+go build/vet/test, live agent-browser verification of every behavior
+and VLM screenshot reviews.
+
+### Landed waves
+
+1. fcdf0f2 - the typography pass (A1 A2 A3 G2): body 13->14px with
+   line-height 1.45, the 10px font floor, the 4px log row rhythm, the
+   11px semibold title-case headers, pathfind stats at 12px bold
+   values, tabular-nums on the runtime counters.
+2. c925deb - the chrome pass (A4 A5 A7 B1 B3 B4 B5 B7 B8 C2 C3 C8
+   C11): two-layer --shadow, the dark theme depth, the XP bar track
+   + ticks + fill outline, panel radius 10/6, --t-fast hover motion,
+   the tab underline indicator, thin scrollbars everywhere, the
+   :focus-visible ring, the SVG compass needle above the chat, the
+   telemetry capsules (1:0.12 / 27 obj), the follow switch skin, the
+   neutral activity colors and the tinted status chips.
+3. 0fa52bc - the living pass (A6 B6 C1 C7 C10 C12 G1): log zebra +
+   smart timestamps + loot-only green, the inline SVG icon family
+   (theme sun/moon, carets, chevrons), the M/L/F/V/T hotkeys with the
+   footer hint, the collapsible Legend, the map/log/bots empty
+   states, the 100ms tooltip delay with fade-in, the English fight
+   showcase texts.
+4. 3afd052 - the operator freedom pass (B2 C4 C5 C6 C9): the glass
+   overlays (backdrop blur, data-glass="off" kill switch), the
+   draggable + collapsible panels with localStorage persistence
+   (swarm.panelLayout.v1, double-click resets), the chat unread
+   badge, the adaptive inventory height, the 1280/1024 responsive
+   breakpoints with the bot-dot icon rail.
+5. dfa6165 - the live-verification fixes: the inverted sun/moon pair,
+   the temporal-dead-zone abort of app.js (the chat panel restore
+   touched ChatWindow before its declaration - every renderer died
+   with it), the HUD stack collapse hooks.
+
+### Verification
+
+- node repro_gear (118+ checks), repro_hud, repro_fight_ui,
+  repro_movement: PASS; go build/vet; go test ./... 18 packages OK.
+- Live (scripts/live_verify_webui_modern.sh + the follow-up script,
+  screenshots in /home/z/my-project/download/modern/): glass
+  blur(10px) active, body 14px, the compass clear above the chat,
+  the capsules filled (1:0.12 / 27 obj), the follow switch metrics,
+  71 log rows with 61 blank smart stamps and the zebra tint, all
+  five hotkeys, the legend toggle, all six SVG icon slots, hud/gear/
+  chat collapsing to 71/36/30px heads, the chat drag persisting
+  {x:0,y:583}, the unread badge (2 new), the adaptive inventory
+  (36px empty row), the XP track, the 176px sidebar at 1279 and the
+  34px rail with the full-width map at 1000, the pathfind mode, no
+  console errors.
+- VLM reviews (vlm_*.json): light - clean glass SaaS look, readable
+  hierarchy; dark - panels lift off the map, tuned frosted glass; log
+  - scannable, subtle zebra, smart stamps reduce clutter; collapsed
+  panels - clean heads; the rail reads as intentional collapsed
+  navigation.
+
+### Status: done (2026-09-10)
+
+- All 30 checklist items implemented and live verified; the branch is
+  pushed and awaits the visual evaluation of the user. The kill
+  switches: html[data-glass="off"] for the frosted panels, the
+  localStorage key swarm.panelLayout.v1 for the panel layout, a
+  double click on any panel head resets its position.
+
+## Finished task: the webui modernization proposal (approved as-is)
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
 The analysis-and-proposal round of the web UI work (the map toolbar
 round below is done and live verified). Other agents may push to the
-same branch concurrently - rebase before every push.
+same branch concurrently - rebase before every push. The proposal
+was approved in full by the user on 2026-09-10 and moved to the
+implementation task above.
 
 ### Goal
 
@@ -102,12 +180,12 @@ changes land before the approval.
   pathfind) cross-checked against the code before landing in the
   document.
 
-### Status: awaiting the user approval (2026-09-10)
+### Status: superseded by the implementation task above (2026-09-10)
 
 - Nothing in internal/swarm/webserver/web/ changed this round; the
-  deliverable is the proposal file itself.
+  deliverable was the proposal file itself.
 - The implementation waves live in the proposal's section 9; every
-  approved item lands as its own atomic commit with the repro suite
+  approved item landed as an atomic commit with the repro suite
   updates and the live agent-browser verification, as the previous
   rounds did.
 ## Finished task: the standing hunter - the socially fenced square and the dead zone mob priorities
