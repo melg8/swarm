@@ -249,6 +249,22 @@ func (l *Loop) spotEvaluate(now time.Time) {
 		}
 		if x, y, _, ok := l.tracker.SelfPosition(); ok {
 			hunter.selfX, hunter.selfY, hunter.selfKnown = x, y, true
+			if ground, onGround := hunter.standingGround(x, y); onGround {
+				// The relogin handoff: a character that
+				// enters the world ON a hunting ground
+				// resumes it instead of re-contesting
+				// the economy - the position IS the
+				// intent (the emergency logout left it
+				// where the panic run ended, on the
+				// ground it had just walked to).
+				hunter.apply(l, ground, now)
+				spot := hunter.spots[ground]
+				l.logger.Printf("Hunt: level %d: resuming "+
+					"the spot %s - the login landed "+
+					"on its ground", level, spot.Name)
+
+				return
+			}
 		}
 		best, _ := hunter.pickBest(-1, now)
 		if best >= 0 {
@@ -273,6 +289,54 @@ func (l *Loop) spotEvaluate(now time.Time) {
 func (h *spotHunter) readSelf(l *Loop) {
 	if x, y, _, ok := l.tracker.SelfPosition(); ok {
 		h.selfX, h.selfY, h.selfKnown = x, y, true
+	}
+}
+
+// standingGround resolves the hunting ground the character stands
+// on after a fresh login: the relogin handoff of the spot economy.
+// The ground counts as standing ground while the character stays
+// inside the spot circle (the spawn mass the spot covers, a little
+// wider than the leash square - the panic run of the emergency
+// logout leaves the character a few hundred units off the anchor it
+// had just walked to), the ground must stay inside the level window
+// of the character (an outgrown ground never resumes), and the
+// nearest anchor wins where the circles of adjacent grounds overlap.
+// A character that logs in between the grounds (a relogin mid-walk)
+// falls through to the scored pick.
+func (h *spotHunter) standingGround(x int32, y int32) (int, bool) {
+	best := -1
+	bestDist := math.MaxFloat64
+	for index := range h.spots {
+		spot := h.spots[index]
+		if !spotEligible(spot, h.level) {
+			continue
+		}
+		dist := spotDistance(spot, x, y)
+		if dist > float64(spot.Radius) {
+			continue
+		}
+		if dist < bestDist {
+			best, bestDist = index, dist
+		}
+	}
+
+	return best, best >= 0
+}
+
+// releaseClaim drops the fleet occupancy claim of the current spot:
+// the loop goroutine owns the claim, and the session end (the
+// emergency logout, a server restart, a lost connection) must hand
+// it back - the 24/7 supervisor builds a fresh spotHunter on every
+// relogin, and a claim that dies with the old loop would stay in the
+// process wide hub forever. Every ghost hunter halved the score of
+// its ground in the occupancy division, so a bot that relogged on
+// the same spot over and over watched the picker walk its fresh
+// sessions onto the neighbor grounds - the reported "goes to the
+// next zone right after the relogin" loop.
+func (h *spotHunter) releaseClaim() {
+	if h.leave != nil {
+		h.leave()
+		h.leave = nil
 	}
 }
 

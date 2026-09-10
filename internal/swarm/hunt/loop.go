@@ -690,6 +690,12 @@ func DefaultHuntingZone() (cx int32, cy int32, half int32) {
 func (l *Loop) Run(ctx context.Context) {
 	ticker := time.NewTicker(tickPeriod)
 	defer ticker.Stop()
+	// The fleet claim of the hunted spot dies with this goroutine: a
+	// session end (the emergency logout of the safety layer, a server
+	// restart, a lost connection) unwinds the whole loop together
+	// with its spotHunter, and the claim must not outlive it (see
+	// spotHunter.releaseClaim).
+	defer l.releaseSpotClaim()
 	for {
 		select {
 		case <-ctx.Done():
@@ -697,6 +703,15 @@ func (l *Loop) Run(ctx context.Context) {
 		case <-ticker.C:
 			l.tick()
 		}
+	}
+}
+
+// releaseSpotClaim hands the fleet occupancy claim of the hunted spot
+// back to the hub when the loop stops. Idempotent: a second call (a
+// stop after a spot release) is a no-op.
+func (l *Loop) releaseSpotClaim() {
+	if l.spot != nil {
+		l.spot.releaseClaim()
 	}
 }
 

@@ -11,6 +11,72 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the relogin ground fix and the aggro-aware movement
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (2026-09-10, Russian): the bot often runs to a hunting
+ground THROUGH aggressive mobs, arrives with the train, resets it with
+the emergency relogin - and the fresh session then walks straight to
+the NEXT ground, ignoring the one it just arrived at (the user's
+hypothesis: the mobs are invisible at the relogin moment). Plus the
+feature request: teach the bot to move from A to B AROUND aggressive
+mobs at a safe distance whenever they are not the walked-to target -
+between the grounds, on the town runs in both directions, and while
+already fighting (stepping clear of an impending second opponent
+beats the pile up logout of the real one).
+
+### Root causes (found in the spot economy)
+
+- The fleet occupancy claim of the hunted spot LEAKS on every session
+  death: `spotHunter.leave` is only invoked inside `apply` when a LIVE
+  session switches grounds, but `runBot` builds a fresh Loop (and a
+  fresh spotHunter) per session - nothing releases the claim of the
+  dead loop. Every emergency relogin left one more ghost hunter in the
+  process wide `globalSpotHub`, and the occupancy division of the
+  picker halved the score of the standing ground with each cycle: the
+  fresh pick after the relogin preferred the neighbor ground - exactly
+  the reported "goes to the next zone right after the relogin" loop,
+  compounding with every aggro reset.
+- The fresh session also re-contested the whole spot economy instead
+  of resuming the ground the character stands on: the panic run leaves
+  it a few hundred units off the anchor it had just walked to, and
+  with the ghost claim discount the scored pick had every reason to
+  walk away.
+
+### Implementation (commit 1 of 3: the relogin ground fix)
+
+- `Loop.Run` releases the spot claim through a deferred
+  `releaseSpotClaim` (`spotHunter.releaseClaim`): the claim lives
+  exactly as long as the loop goroutine, so the 24/7 supervisor's
+  session cycle (the emergency logout, a server restart, a lost
+  connection) hands every claim back.
+- The first pick of a fresh session (`spotEvaluate`) checks
+  `standingGround` first: a character entering the world inside a
+  spot's circle (the spawn mass the spot covers, wider than the leash
+  square - the panic run endpoint) resumes THAT ground when it stays
+  inside the character's level window; the log line
+  "resuming the spot ... - the login landed on its ground" names the
+  handoff. A relogin between the grounds (a session that died
+  mid-walk) still falls to the scored pick.
+- Tests: `spot_relogin_test.go` - the claim released on the session
+  end (the Run cancel path), the reported scene end to end (the
+  relogin on the ground resumes it even with a ghost claim halving
+  its score), the off-ground scored pick, the outgrown ground never
+  resumed, the nearest-anchor tie break of overlapping circles.
+
+### Status: in progress
+
+- Commit 1 done: the claim leak fix + the standing-ground resume.
+- Next: commit 2 - the aggro threat scan of the tracker state plus the
+  receding-horizon leg steering of the autonomous walks (the town
+  trips, the zone returns); commit 3 - the fighting character steps
+  clear of an impending aggressive add.
+
 ## Active task: the web map social, hover and fleet layers - the aggro truth of the server
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
