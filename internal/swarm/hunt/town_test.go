@@ -795,3 +795,62 @@ func TestSellableJunkSkipsStarterKit(t *testing.T) {
 	require.False(t, loop.junkRemaining(),
 		"nothing sellable remains once the junk is offered")
 }
+
+// TestTripClearsTheTalkedNpcSelection pins the target hygiene of the
+// npc talks: the merchant select and the teacher click leave the
+// villager selected server side (the server never clears a selection,
+// only the next selection replaces it), and the trip machinery drops
+// it when the conversation is over - the self click of the clear (one
+// ClearTarget per stop end and trip end) so the hunting engage that
+// follows never adopts the friendly npc as its target.
+func TestTripClearsTheTalkedNpcSelection(t *testing.T) {
+	loop, game, bot, _ := newTripLoop()
+	fillInventory(bot)
+
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+	moveSelfTo(bot, herbielPos[0], herbielPos[1], herbielPos[2])
+	loop.tick()
+	require.Equal(t, phaseTownSell, loop.phase)
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 55, TemplateID: 7150 + 1000000,
+		X: herbielPos[0], Y: herbielPos[1], Z: herbielPos[2],
+		Name: "Herbiel",
+	})
+	loop.tick()
+	require.Equal(t, int32(55), loop.merchantID)
+	// The merchant is selected and confirmed: the sale may run.
+	loop.merchantPick = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	bot.ApplySelfTarget(55)
+	loop.tick()
+	require.Len(t, game.sells, 1, "the first sell batch ran")
+
+	// The whole junk sells in two confirmed batches, then the trip
+	// ends (nothing worth buying for the test wallet).
+	updates := make([]state.InventoryItem, 0, sellBatchSize)
+	for _, item := range game.sells[0] {
+		updates = append(updates, state.InventoryItem{
+			ObjectID: item.ObjectID, ItemID: item.ItemID,
+			Count: item.Count, Type2: 5, Change: 3,
+		})
+	}
+	bot.ApplyInventoryUpdate(updates)
+	loop.sellAt = time.Now().Add(-sellPause - time.Second)
+	loop.tick()
+	updates = make([]state.InventoryItem, 0, 41-sellBatchSize)
+	for _, item := range game.sells[1] {
+		updates = append(updates, state.InventoryItem{
+			ObjectID: item.ObjectID, ItemID: item.ItemID,
+			Count: item.Count, Type2: 5, Change: 3,
+		})
+	}
+	bot.ApplyInventoryUpdate(updates)
+	loop.tick()
+
+	// The stop ends with Herbiel still selected: the clear fires
+	// before the return leg starts.
+	require.Equal(t, phaseTownReturn, loop.phase)
+	require.GreaterOrEqual(t, game.clears, 1,
+		"the stop end dropped the merchant selection")
+}

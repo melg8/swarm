@@ -364,3 +364,50 @@ func TestSelfFightingFreshness(t *testing.T) {
 	require.True(t, bot.SelfEngaged(7),
 		"the stale fight stays engaged for the loose view")
 }
+
+func TestObjectAttackableSplitsVillagersFromMobs(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	// A gremlin and the teacher Ellenia: the same npc kind, only the
+	// attackable flag splits them.
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 46000, Y: 50000, Name: "Gremlin",
+	})
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 55, TemplateID: 1007155, Attackable: false,
+		X: 45725, Y: 52105, Name: "Ellenia",
+	})
+
+	require.True(t, bot.ObjectAttackable(7), "the monster is attackable")
+	require.False(t, bot.ObjectAttackable(55),
+		"the friendly villager is not a hunt target")
+	require.False(t, bot.ObjectAttackable(100),
+		"the own object id is not a known npc")
+	require.False(t, bot.ObjectAttackable(9999),
+		"an unknown object is not attackable")
+
+	// A corpse stops being attackable the moment it drops.
+	bot.ApplyStatusUpdate(7, []Attribute{
+		{ID: AttrCurHP, Value: 0},
+		{ID: AttrMaxHP, Value: 30},
+	})
+	require.False(t, bot.ObjectAttackable(7))
+}
+
+func TestObjectLevelReadsTheNpcLevel(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 46000, Y: 50000, Name: "Gremlin",
+	})
+
+	// The template id resolves the level through the generated
+	// dictionary (display id 1, the gremlin, is a level 1 mob).
+	level, ok := bot.ObjectLevel(7)
+	require.True(t, ok)
+	require.Equal(t, int32(1), level)
+	_, ok = bot.ObjectLevel(9999)
+	require.False(t, ok, "an unknown object has no level")
+}

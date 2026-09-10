@@ -56,6 +56,11 @@ type GameAPI interface {
 	// the teacher the lesson requests resolve their trainer
 	// through.
 	ClickObject(objectID int32) error
+	// ClearTarget drops the npc selection a conversation left
+	// behind: the self click replaces the server side selection
+	// (see GameClient.ClearTarget), so the leftover villager
+	// never reads as a hunt target of the next engage.
+	ClearTarget() error
 	// AcquireSkill learns one lesson of the class skill tree at
 	// the last folk teacher: the SP is charged and the demanded
 	// spellbook consumed.
@@ -1097,10 +1102,18 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 	// requests never started the fight) is not re-adopted either
 	// while its skip delay lasts. The mana held caster re-adopts
 	// nothing - the rest owns the selection until the mana stands
-	// back up.
+	// back up. The adoption also requires an attackable npc: the
+	// server side selection a town trip leaves behind (the talked
+	// teacher or merchant) points at a friendly villager, and the
+	// forced attack requests on it only burn the engage stuck
+	// timeout before the skip - the trip end clears the selection
+	// (see GameClient.ClearTarget), this gate keeps the engage
+	// clean even when a selection lingers (a talk without the trip
+	// end, a self selection of the clear click itself).
 	serverTarget := l.tracker.SelfTargetID()
 	if serverTarget != 0 && !manaHeld &&
 		l.tracker.ObjectAlive(serverTarget) &&
+		l.tracker.ObjectAttackable(serverTarget) &&
 		!l.targetSkipped(serverTarget, now) {
 		l.target = serverTarget
 	}

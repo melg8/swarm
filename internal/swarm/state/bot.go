@@ -721,6 +721,33 @@ func (b *Bot) ObjectAlive(objectID int32) bool {
 	return obj != nil && !obj.Dead
 }
 
+// ObjectAttackable reports whether the object is a known living npc
+// the server marked attackable (the NpcInfo flag of monsters; the
+// villagers, guards and teachers carry false). The own object id and
+// every object outside the known list answer false.
+func (b *Bot) ObjectAttackable(objectID int32) bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	obj, _ := b.objectLocked(objectID)
+
+	return obj != nil && obj.Kind == kindNPC && obj.Attackable && !obj.Dead
+}
+
+// ObjectLevel returns the observed level of a known object, false when
+// the object is unknown or its level never arrived (a zero level of an
+// unresolved template is indistinguishable and reports true, level 0 -
+// the callers treat it as passable like the target search does).
+func (b *Bot) ObjectLevel(objectID int32) (int32, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	obj, _ := b.objectLocked(objectID)
+	if obj == nil {
+		return 0, false
+	}
+
+	return obj.Level, true
+}
+
 // KnownObjectIDs lists the object ids of the currently known world (the
 // known list of the session: npcs, players and ground items). The proxy
 // snapshots it when a bot session ends and replays a DeleteObject for

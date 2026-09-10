@@ -1201,8 +1201,24 @@ func (l *Loop) startReturnLeg() {
 	l.logger.Printf("Hunt: walking back to the farm spot")
 }
 
+// clearTalkedTarget drops the npc selection a stop or a whole trip
+// left behind (the merchant select, the teacher talk click): the self
+// click of the clear replaces the server side selection, so the
+// hunting engage that follows the trip never adopts the friendly
+// villager as its target (the forced attacks on it only burn the
+// stuck timeout). The call is a no-op without a selection.
+func (l *Loop) clearTalkedTarget() {
+	if l.tracker.SelfTargetID() == 0 {
+		return
+	}
+	if err := l.game.ClearTarget(); err != nil {
+		l.logger.Printf("Hunt: target clear failed: %v", err)
+	}
+}
+
 // endTownTrip finishes the trip and arms the trigger cooldown.
 func (l *Loop) endTownTrip(reason string) {
+	l.clearTalkedTarget()
 	l.phase = phaseEngage
 	l.target = 0
 	l.clearBlindRecovery()

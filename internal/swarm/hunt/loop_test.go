@@ -30,6 +30,7 @@ type fakeGame struct {
 	uses      []int32
 	drops     [][5]int32
 	clicks    []int32
+	clears    int
 	lessons   [][2]int32
 	casts     []int32
 	noTargets bool
@@ -132,6 +133,15 @@ func (f *fakeGame) ClickObject(objectID int32) error {
 		return f.lastError
 	}
 	f.clicks = append(f.clicks, objectID)
+
+	return nil
+}
+
+func (f *fakeGame) ClearTarget() error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.clears++
 
 	return nil
 }
@@ -1449,4 +1459,30 @@ func TestLoopPicksUpLootOutsideTheZone(t *testing.T) {
 		"the drop outside the zone is picked up")
 	require.Equal(t, phaseLoot, loop.phase,
 		"the loot phase continues past the zone line")
+}
+
+func TestEngageIgnoresTheTalkedVillagerSelection(t *testing.T) {
+	bot := newTestBot()
+	// A hunting mob in reach and the teacher the last trip talked to:
+	// the server side selection still points at the villager (the
+	// server never clears it, only the next selection replaces it).
+	spawnMob(bot)
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 55, TemplateID: 1007155, Attackable: false,
+		X: 45725, Y: 52105, Name: "Ellenia",
+	})
+	bot.ApplySelfTarget(55)
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	// The engage must not adopt the friendly villager: the forced
+	// attack requests on it only burn the stuck timeout, the fresh
+	// mob pick replaces the stale selection on the server instead.
+	loop.tick()
+	require.NotContains(t, game.forces, int32(55),
+		"the villager selection is never attacked")
+	require.Equal(t, []int32{7}, game.forces,
+		"the fresh mob pick replaces the villager selection")
+	require.Equal(t, int32(7), loop.target)
 }

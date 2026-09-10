@@ -785,6 +785,10 @@ func (l *Loop) advanceTripStop() {
 	l.buyConfirmAt = time.Time{}
 	l.buyRetries = 0
 	l.resetLearnState()
+	// The finished stop talked to its npc: drop the selection the
+	// talk left behind, the next stop selects its own npc and the
+	// trip end walks home with a clean engage.
+	l.clearTalkedTarget()
 	if len(l.tripStops) == 0 {
 		l.startReturnLeg()
 

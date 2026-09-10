@@ -528,6 +528,39 @@ func (gc *GameClient) ClickObject(objectID int32) error {
 	return nil
 }
 
+// ClearTarget drops the selection a conversation with an npc left
+// behind (the teacher or the merchant the trip talked to): the client
+// cannot unselect directly - the C1 protocol has no deselect request
+// and the server never clears a selection on its own (only the next
+// selection replaces it) - so the self click is the official client
+// way out: Action 0x04 on the own object id runs through the
+// PlayerClick handler, selects the character itself (MyTargetSelected
+// of the own id, the friendly npc selection is gone) and the follow
+// intention on self moves nothing. The hunt loop calls it when a trip
+// stop finishes talking, so the leftover villager selection never
+// reaches the hunting engage.
+func (gc *GameClient) ClearTarget() error {
+	objectID := gc.tracker.SelfObjectID()
+	if objectID == 0 || gc.tracker.SelfTargetID() == 0 {
+		return nil
+	}
+	x, y, z, ok := gc.tracker.SelfPosition()
+	if !ok {
+		x, y, z = 0, 0, 0
+	}
+	request := togameserver.NewActionRequestPacket()
+	request.ObjectID = objectID
+	request.X = x
+	request.Y = y
+	request.Z = z
+	if err := gc.sendPacket(request); err != nil {
+		return fmt.Errorf("failed to clear the target: %w", err)
+	}
+	gc.tracker.RecordEvent("clearing the target after the talk")
+
+	return nil
+}
+
 // AcquireSkill learns one lesson of the class skill tree at the
 // teacher the character last talked to (see ClickObject): the server
 // charges the SP, consumes the required skill book and answers with
