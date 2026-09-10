@@ -1238,23 +1238,51 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		if now.Sub(l.lastHit) < selectPeriod {
 			return
 		}
-		pick, ok := l.tracker.NearestAttackablePreferredWindowed(
-			attackNearestRange, l.zone(), l.activeSkips(now),
-			l.minTargetLevel(), l.maxTargetLevel(), true,
-			l.zoneMobPriority)
-		if !ok {
-			if l.walkToFarTarget(now) {
+		// The aggro answer of the targetless pick: a mob
+		// already holds the character as its target (its swings
+		// or its chase - both carry the character as the target
+		// id), so walking to a fresh mob only drags the chase
+		// into a second opponent and the fights pile up (the
+		// reported deaths). A healthy character with a winnable
+		// attacker engages it at once - the fight answers the
+		// aggro where it stands; anything else (hurt, the
+		// attacker above the level ceiling) stays with the
+		// defensive flow: the standard escape walk that logs
+		// out when it never shakes the chase.
+		if attacker, ok := l.tracker.NearestAttacker(); ok {
+			if !l.attackerEngageable(attacker.ObjectID) {
+				l.fleeFromThreat(now)
+
 				return
 			}
-			l.patrolToCenter(now)
+			l.target = attacker.ObjectID
+			l.engageAt = now
+			l.clearBlindRecovery()
+			l.logger.Printf("Hunt: %s is on us, fighting it "+
+				"instead of picking a new target",
+				attacker.Name)
+			// Falls through: the forced attack request below
+			// fires on this very tick, the chase stops where
+			// it stands.
+		} else {
+			pick, ok := l.tracker.NearestAttackablePreferredWindowed(
+				attackNearestRange, l.zone(), l.activeSkips(now),
+				l.minTargetLevel(), l.maxTargetLevel(), true,
+				l.zoneMobPriority)
+			if !ok {
+				if l.walkToFarTarget(now) {
+					return
+				}
+				l.patrolToCenter(now)
 
-			return
+				return
+			}
+			l.noTargetSince = time.Time{}
+			l.noPickLogAt = time.Time{}
+			l.target = pick.ObjectID
+			l.engageAt = now
+			l.clearBlindRecovery()
 		}
-		l.noTargetSince = time.Time{}
-		l.noPickLogAt = time.Time{}
-		l.target = pick.ObjectID
-		l.engageAt = now
-		l.clearBlindRecovery()
 	}
 	if l.tracker.SelfFighting(l.target) {
 		// A running fight ends the flee episode: the character

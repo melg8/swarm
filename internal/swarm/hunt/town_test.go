@@ -854,3 +854,75 @@ func TestTripClearsTheTalkedNpcSelection(t *testing.T) {
 	require.GreaterOrEqual(t, game.clears, 1,
 		"the stop end dropped the merchant selection")
 }
+
+// TestTripInterruptsForTheAttacker pins the aggro answer of the town
+// walks: a mob that holds the character as its target stops the trip
+// (the soft reset without the cooldown), the character fights the mob
+// instead of dragging the chase through the route - the next tick
+// re-arms the trip from wherever the fight leaves it.
+func TestTripInterruptsForTheAttacker(t *testing.T) {
+	loop, game, bot, _ := newTripLoop()
+	fillInventory(bot)
+
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+	// A mob reaches the walking character mid leg and holds it as
+	// its target.
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000001, Attackable: true,
+		X: 45600, Y: 50000, Name: "Gremlin",
+	})
+	mobHitsCharacter(bot)
+
+	loop.tick()
+	require.Equal(t, phaseEngage, loop.phase,
+		"the trip dropped for the fight")
+	require.Equal(t, int32(7), loop.target,
+		"the attacker is the fight of the interrupted trip")
+	require.True(t, loop.tripEndedAt.IsZero(),
+		"the interrupt is a pause: no trip cooldown is armed")
+	// The walk requests of the leg stopped for the fight answer: the
+	// initial trip leg went out before the mob attacked, nothing
+	// follows it while the fight runs.
+	require.Len(t, game.walks, 1)
+
+	// The mob dies and the fight bookkeeping settles on its own (the
+	// kill, the loot and the empty loot phase are the existing
+	// machinery): the soft reset left no trip cooldown, so the still
+	// full inventory re-arms the walk on the first decision after the
+	// under attack window lapses instead of idling out the five
+	// minute cooldown of a finished trip.
+}
+
+// TestTripInterruptsIntoDefenseForTheUnwinnableAttacker pins the
+// defensive half of the trip interrupt: a mob the character cannot
+// win (above the engage ceiling) never becomes the fight of the
+// interrupted trip - the standard escape walk answers, the same
+// defense the hunting engage runs, and the session logs out when the
+// chase never shakes.
+func TestTripInterruptsIntoDefenseForTheUnwinnableAttacker(t *testing.T) {
+	loop, game, bot, _ := newTripLoop()
+	fillInventory(bot)
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrLevel, Value: 3},
+	})
+
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+	// The level 8 orc archer chews on the level 3 walker.
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000006, Attackable: true,
+		X: 45600, Y: 50000, Name: "Orc Archer",
+	})
+	mobHitsCharacter(bot)
+
+	loop.tick()
+	require.Equal(t, phaseEngage, loop.phase)
+	require.Zero(t, loop.target, "no fight with the unwinnable mob")
+	require.Len(t, game.walks, 2,
+		"the trip leg then the standard escape leg answered the interrupt")
+	require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[1],
+		"the escape runs away from the mob")
+	require.False(t, loop.fleeSince.IsZero(),
+		"the escape carries the logout budget")
+}

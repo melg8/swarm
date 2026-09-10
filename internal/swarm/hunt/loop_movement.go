@@ -184,6 +184,17 @@ func (l *Loop) adoptOutZoneFight(now time.Time) bool {
 	if l.tracker.SelfUnderAttack() {
 		if pick, ok := l.tracker.NearestAttacker(); ok &&
 			!l.targetSkipped(pick.ObjectID, now) {
+			if !l.attackerEngageable(pick.ObjectID) {
+				// The chase is too strong to answer with a fight (the
+				// attacker sits above the level ceiling, the character
+				// is hurt): the defensive escape - the standard run
+				// that logs out when the chase never shakes - beats
+				// both walking home through the blows and pressing a
+				// losing fight.
+				l.fleeFromThreat(now)
+
+				return true
+			}
 			l.logger.Printf("Hunt: %s (%d) keeps attacking outside "+
 				"the zone, finishing it", pick.Name, pick.ObjectID)
 			l.target = pick.ObjectID

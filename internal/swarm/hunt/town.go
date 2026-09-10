@@ -429,6 +429,9 @@ func (l *Loop) tickTownTrip() {
 
 		return
 	}
+	if l.interruptTripForAttacker(time.Now()) {
+		return
+	}
 	switch l.phase {
 	case phaseTownWalk:
 		if l.walkTownWaypoints() {
@@ -450,6 +453,41 @@ func (l *Loop) tickTownTrip() {
 		// The non-town phases never reach the town tick (the trip
 		// trigger starts the walk phase first).
 	}
+}
+
+// interruptTripForAttacker answers the aggro that reaches the
+// character mid trip: a mob holds it as the target (the blows of a
+// social pull, an aggressive camp the steering could not dodge) and
+// walking on only drags the chase through every camp on the route -
+// the pile up the emergency logout then answers too late. The trip
+// drops instead (the soft reset: no cooldown, the next tick re-arms
+// the walk from wherever the answer leaves the character - the junk,
+// the books and the sold proceeds all survive) and the mob gets the
+// same aggro answer the hunting engage gives: a healthy character
+// with a winnable attacker fights it at once, everything else keeps
+// the defensive flow (the standard escape walk, the logout when the
+// chase never shakes). It reports whether the tick was consumed by
+// the answer.
+func (l *Loop) interruptTripForAttacker(now time.Time) bool {
+	attacker, ok := l.tracker.NearestAttacker()
+	if !ok {
+		return false
+	}
+	l.resetTownTrip()
+	if l.attackerEngageable(attacker.ObjectID) {
+		l.target = attacker.ObjectID
+		l.engageAt = now
+		l.clearBlindRecovery()
+		l.logger.Printf("Hunt: town trip interrupted: %s is on us, "+
+			"fighting it", attacker.Name)
+
+		return true
+	}
+	l.logger.Printf("Hunt: town trip interrupted: %s is on us and "+
+		"cannot be won, switching to the defense", attacker.Name)
+	l.fleeFromThreat(now)
+
+	return true
 }
 
 // startWalkLeg plans the walk to the destination and arms the waypoint

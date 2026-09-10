@@ -276,6 +276,27 @@ func (l *Loop) targetSkipped(objectID int32, now time.Time) bool {
 	return ok && now.Before(until)
 }
 
+// attackerEngageable reports whether the character may answer the
+// attacker by fighting it: the mob level sits inside the engage
+// ceiling (the character level plus the slack) and the character is
+// healthy enough to press a fight - the winnable half of the aggro
+// answer. An unresolved template (level 0 or unknown) passes like
+// every level filter of the target search; an attacker above the
+// ceiling never becomes winnable and the defense flow answers
+// instead (the escape walk and, when the chase holds, the logout).
+func (l *Loop) attackerEngageable(objectID int32) bool {
+	if l.tracker.SelfHealthPercent() < reengageHealthPercent {
+		return false
+	}
+	level, ok := l.tracker.ObjectLevel(objectID)
+	if !ok || level <= 0 {
+		return true
+	}
+	maxLevel := l.maxTargetLevel()
+
+	return maxLevel <= 0 || level <= maxLevel
+}
+
 // activeSkips collects the object ids whose skip expiry has not
 // passed yet into the reused dense scratch list (see skipScratch).
 func (l *Loop) activeSkips(now time.Time) []int32 {

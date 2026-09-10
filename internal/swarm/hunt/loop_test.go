@@ -1486,3 +1486,56 @@ func TestEngageIgnoresTheTalkedVillagerSelection(t *testing.T) {
 		"the fresh mob pick replaces the villager selection")
 	require.Equal(t, int32(7), loop.target)
 }
+
+func TestEngageFightsTheAttackerOverAFreshMob(t *testing.T) {
+	bot := newTestBot()
+	// A fresh gremlin nearer than the attacking orc archer: the
+	// attacker holds the character as its target, the answer is the
+	// fight with IT - walking to the fresh mob would drag the chase
+	// into a second opponent.
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 8, TemplateID: 1000001, Attackable: true,
+		X: 45300, Y: 50000, Name: "Gremlin",
+	})
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000003, Attackable: true,
+		X: 45800, Y: 50000, Name: "Orc",
+	})
+	mobHitsCharacter(bot)
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	loop.tick()
+	require.Equal(t, int32(7), loop.target,
+		"the attacker is the target, not the nearer fresh mob")
+	require.Equal(t, []int32{7}, game.forces,
+		"the forced attack request answers the attacker at once")
+}
+
+func TestEngageFleesTheUnwinnableAttacker(t *testing.T) {
+	bot := newTestBot()
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrLevel, Value: 3},
+	})
+	// The level 8 orc archer holds the level 3 character as its
+	// target: the fight is not winnable (five levels above the two
+	// level slack), the defense flow answers - the escape walk away
+	// from the mob.
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000006, Attackable: true,
+		X: 45600, Y: 50000, Name: "Orc Archer",
+	})
+	mobHitsCharacter(bot)
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.lastHit = time.Now().Add(-time.Minute)
+
+	loop.tick()
+	require.Zero(t, loop.target, "no fight with an unwinnable attacker")
+	require.Empty(t, game.forces)
+	require.Len(t, game.walks, 1, "the standard escape leg runs")
+	require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0])
+	require.False(t, loop.fleeSince.IsZero(),
+		"the flee episode is armed with its logout budget")
+}

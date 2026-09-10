@@ -103,3 +103,27 @@ The user report (2026-09-10, Russian, four bugs):
   state/inventory_test.go (level 5: the books of locked lessons sell
   as before; level 15: the Attack Aura and Defence Aura books stay
   out of the sell list AND the destroy batch, only the stems sell).
+
+- Commit "the aggro on the character is answered, never walked
+  past": (1) The targetless pick of the engage answers an attacker
+  that holds the character as its target (NearestAttacker - the
+  swings or the chase both carry the character as the mob's target
+  id): a healthy character with a winnable attacker (the level
+  ceiling of the engage covers it, see attackerEngageable) fights it
+  at once - the forced attack request fires on the same tick; a hurt
+  character or an unwinnable one keeps the defensive flow (the
+  standard escape walk of fleeFromThreat with its flee budget and
+  the emergency logout behind it). (2) The town trips interrupt the
+  same way (interruptTripForAttacker runs first in tickTownTrip): a
+  mob on the walking seller drops the trip through the SOFT reset
+  (resetTownTrip - no cooldown, the junk/books/sold state survives)
+  and answers with the fight or the defense instead of dragging the
+  chase through every camp on the route - the reported pile up death
+  of the walkers. (3) adoptOutZoneFight checks the winnability of
+  the attacker it finishes outside the zone: an unbeatable chase
+  switches to the escape instead of pressing a losing fight.
+  Tests: hunt/loop_test.go (the attacker beats the nearer fresh mob
+  of the pick; the level 8 attacker of a level 3 character arms the
+  escape instead of a fight), hunt/town_test.go (the trip drops
+  without a cooldown and fights the attacker; the unwinnable
+  attacker gets the escape walk).
