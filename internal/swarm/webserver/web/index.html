@@ -10,40 +10,11 @@ SPDX-License-Identifier: MIT
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>swarm · bot control</title>
+<title>swarm</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="app">
-  <header class="app-header">
-    <div class="brand">
-      <span class="brand-mark">SWARM</span>
-      <span class="brand-sub">bot control</span>
-    </div>
-    <nav class="tabs">
-      <button class="tab active" data-tab="map">Map</button>
-      <button class="tab" data-tab="log">Log</button>
-    </nav>
-    <div class="header-right">
-      <span id="live-indicator" class="live-dot offline" title="event stream state"></span>
-      <span id="live-label">connecting</span>
-      <button id="theme-toggle" class="btn theme-btn" title="toggle light/dark theme (T)">
-        <svg id="theme-sun" class="theme-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-          <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.75"/>
-          <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
-            <path d="M12 2.2v2.6"/><path d="M12 19.2v2.6"/>
-            <path d="M2.2 12h2.6"/><path d="M19.2 12h2.6"/>
-            <path d="M4.9 4.9l1.9 1.9"/><path d="M17.2 17.2l1.9 1.9"/>
-            <path d="M4.9 19.1l1.9-1.9"/><path d="M17.2 6.8l1.9-1.9"/>
-          </g>
-        </svg>
-        <svg id="theme-moon" class="theme-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-          <path d="M20.6 13.3A8.4 8.4 0 1 1 10.7 3.4a6.8 6.8 0 0 0 9.9 9.9z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
-        </svg>
-      </button>
-    </div>
-  </header>
-
   <div class="app-body">
     <aside class="sidebar">
       <div id="bot-section">
@@ -104,6 +75,35 @@ SPDX-License-Identifier: MIT
         </div>
       </div>
     </aside>
+
+    <div class="main-col">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-mark">SWARM</span>
+        </div>
+        <nav class="tabs">
+          <button class="tab active" data-tab="map">Map</button>
+          <button class="tab" data-tab="log">Log</button>
+        </nav>
+        <div class="header-right">
+          <span id="live-indicator" class="live-dot offline" title="event stream state"></span>
+          <span id="live-label">connecting</span>
+          <button id="theme-toggle" class="btn theme-btn" title="toggle light/dark theme (T)">
+            <svg id="theme-sun" class="theme-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+              <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.75"/>
+              <g stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+                <path d="M12 2.2v2.6"/><path d="M12 19.2v2.6"/>
+                <path d="M2.2 12h2.6"/><path d="M19.2 12h2.6"/>
+                <path d="M4.9 4.9l1.9 1.9"/><path d="M17.2 17.2l1.9 1.9"/>
+                <path d="M4.9 19.1l1.9-1.9"/><path d="M17.2 6.8l1.9-1.9"/>
+              </g>
+            </svg>
+            <svg id="theme-moon" class="theme-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+              <path d="M20.6 13.3A8.4 8.4 0 1 1 10.7 3.4a6.8 6.8 0 0 0 9.9 9.9z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </header>
 
     <main class="main">
       <section id="fight-panel" class="fight-panel">
@@ -420,6 +420,7 @@ SPDX-License-Identifier: MIT
         <div id="log-list" class="log-list"></div>
       </section>
     </main>
+    </div>
   </div>
 
   <footer class="app-footer">

@@ -164,23 +164,30 @@ function renderBotList() {
     name.className = "bot-name";
     name.textContent = bot.name || bot.id;
     row.append(dot, name);
-    if (bot.inCombat) {
-      row.append(makeChip("bot-chip chip-combat", "combat"));
-    }
-    if (bot.sitting) {
-      row.append(makeChip("bot-chip chip-rest", "rest"));
-    }
-    // The proxy chip marks the bot a connecting C1 game client attaches
-    // to (the proxy falls back to the first bot when nothing is
-    // selected - the first row carries the chip implicitly then).
-    if (App.proxy && App.proxy.enabled && bot.id === proxyTargetId()) {
-      row.append(makeChip("bot-chip chip-proxy", "proxy"));
-    }
     const level = document.createElement("span");
     level.className = "bot-level";
     level.textContent = bot.level > 0 ? "lv " + bot.level : bot.status;
     row.append(level);
     item.append(row);
+
+    // The meta line under the name row: the status chips and the
+    // activity text live here, so the name row above keeps its full
+    // width for the name - the name stays readable no matter how
+    // many chips the row carries.
+    const meta = document.createElement("div");
+    meta.className = "bot-meta";
+    if (bot.inCombat) {
+      meta.append(makeChip("bot-chip chip-combat", "combat"));
+    }
+    if (bot.sitting) {
+      meta.append(makeChip("bot-chip chip-rest", "rest"));
+    }
+    // The proxy chip marks the bot a connecting C1 game client attaches
+    // to (the proxy falls back to the first bot when nothing is
+    // selected - the first row carries the chip implicitly then).
+    if (App.proxy && App.proxy.enabled && bot.id === proxyTargetId()) {
+      meta.append(makeChip("bot-chip chip-proxy", "proxy"));
+    }
 
     // The activity banner of the sidebar row: a compact one line
     // summary of the bot phase so the overview shows at a glance
@@ -189,11 +196,12 @@ function renderBotList() {
     // (the manual only sessions and the pre-world sessions).
     const activity = botActivityLabel(bot);
     if (activity) {
-      const act = document.createElement("div");
+      const act = document.createElement("span");
       act.className = "bot-activity kind-" + activity.kind;
       act.textContent = activity.text;
-      item.append(act);
+      meta.append(act);
     }
+    item.append(meta);
 
     // The mini HP/MP/XP bars share the HUD palette: one look at the
     // sidebar shows what every session is doing.
@@ -530,10 +538,13 @@ function initZonePanel() {
   if (!head || !panel) { return; }
   head.addEventListener("click", () => {
     zonePanelCollapsed.value = !zonePanelCollapsed.value;
-    applyZonePanelState();
     const wrap = document.querySelector(".map-wrap");
     if (wrap && typeof wrap.getBoundingClientRect === "function") {
-      persistPanelLayout("zone", panel, wrap);
+      // The zone list folds DOWN to its bottom right home instead of
+      // leaving the strip wherever the expanded list was.
+      setPanelCollapsed("zone", panel, wrap, zonePanelCollapsed.value);
+    } else {
+      applyZonePanelState();
     }
   });
 }
@@ -2207,6 +2218,11 @@ function initTargetWidget() {
 
 const PANEL_LAYOUT_KEY = "swarm.panelLayout.v1";
 
+// A press turns into a drag only after this many pixels of travel:
+// a plain click on a head (with the natural few pixels of jitter)
+// stays a click and never detaches the panel from its css anchor.
+const PANEL_DRAG_THRESHOLD = 5;
+
 function loadPanelLayouts() {
   try {
     const raw = window.localStorage.getItem(PANEL_LAYOUT_KEY);
@@ -2237,13 +2253,31 @@ function panelRect(panel, wrap) {
 }
 
 // persistPanelLayout stores the current position and collapsed flag.
-function persistPanelLayout(id, panel, wrap) {
+// The collapsed argument overrides the class read - setPanelCollapsed
+// captures the expanded spot BEFORE folding the class in.
+function persistPanelLayout(id, panel, wrap, collapsed) {
   const layouts = loadPanelLayouts();
   const rect = panelRect(panel, wrap);
   layouts[id] = {
     x: rect.x,
     y: rect.y,
-    collapsed: panel.classList.contains("collapsed")
+    collapsed: collapsed === undefined
+      ? panel.classList.contains("collapsed")
+      : Boolean(collapsed)
+  };
+  savePanelLayouts(layouts);
+}
+
+// persistPanelFlag updates the collapsed flag of a panel that carries
+// no pinned coordinates (it lives at its css default), keeping any
+// saved x/y of a previous drag untouched.
+function persistPanelFlag(id, collapsed) {
+  const layouts = loadPanelLayouts();
+  const prev = layouts[id] || {};
+  layouts[id] = {
+    x: prev.x,
+    y: prev.y,
+    collapsed: Boolean(collapsed)
   };
   savePanelLayouts(layouts);
 }
@@ -2259,6 +2293,51 @@ function applyPanelPosition(panel, wrap, x, y) {
   panel.style.top = clamp(y, maxY) + "px";
   panel.style.right = "auto";
   panel.style.bottom = "auto";
+}
+
+// clearPanelInline returns a panel to its css default anchor (the
+// chat to the bottom left corner, the zones to the bottom right
+// one), dropping every inline position the drag or the restore set.
+function clearPanelInline(panel) {
+  panel.style.left = "";
+  panel.style.top = "";
+  panel.style.right = "";
+  panel.style.bottom = "";
+}
+
+// setPanelCollapsed folds a bottom anchored panel (the chat window,
+// the zone list) DOWN to its css home instead of leaving the strip
+// wherever the expanded window happened to be: collapsing saves the
+// expanded spot first, then the strip docks to the bottom edge;
+// expanding again restores the saved spot (or the css default when
+// the panel was never dragged). Top anchored panels (the HUD stack,
+// the equipment widget) collapse in place through the plain class
+// toggle.
+function setPanelCollapsed(id, panel, wrap, collapsed) {
+  if (!panel) { return; }
+  if (collapsed) {
+    // A dragged panel remembers its expanded spot (the inline coords
+    // mark it), a css-default one keeps no coordinates at all - so
+    // the expand lands back on the anchored default instead of a
+    // pinned top that would drift on resize.
+    const pinned = Boolean(panel.style.top || panel.style.left);
+    if (pinned) {
+      persistPanelLayout(id, panel, wrap, true);
+    } else {
+      persistPanelFlag(id, true);
+    }
+    panel.classList.add("collapsed");
+    clearPanelInline(panel);
+  } else {
+    panel.classList.remove("collapsed");
+    const layout = loadPanelLayouts()[id];
+    if (layout && typeof layout.x === "number") {
+      applyPanelPosition(panel, wrap, layout.x, layout.y);
+    } else {
+      clearPanelInline(panel);
+    }
+    persistPanelFlag(id, false);
+  }
 }
 
 // swallowNextClick eats the click the browser fires right after a
@@ -2291,6 +2370,10 @@ function wirePanelDrag(id, panel, handle, wrap, opts) {
   }
   if (layout && layout.collapsed) {
     panel.classList.add("collapsed");
+    // A folded bottom anchored panel docks at its css home (the
+    // bottom edge) - the saved x/y belongs to the expanded window,
+    // pinning the strip there would leave it hanging mid map.
+    if (opts && opts.dockBottom) { clearPanelInline(panel); }
   }
   if (opts && opts.onRestore) { opts.onRestore(layout || null); }
 
@@ -2307,6 +2390,8 @@ function wirePanelDrag(id, panel, handle, wrap, opts) {
     drag = {
       dx: event.clientX - pr.left,
       dy: event.clientY - pr.top,
+      startX: event.clientX,
+      startY: event.clientY,
       wrapW: wr.width,
       wrapH: wr.height
     };
@@ -2321,6 +2406,13 @@ function wirePanelDrag(id, panel, handle, wrap, opts) {
 
   handle.addEventListener("pointermove", (event) => {
     if (!drag) { return; }
+    // The travel gate: a few pixels of jitter during a plain click
+    // never detach the panel from its anchor, only a real pull does.
+    if (!moved &&
+        Math.hypot(event.clientX - drag.startX,
+          event.clientY - drag.startY) < PANEL_DRAG_THRESHOLD) {
+      return;
+    }
     const wr = wrap.getBoundingClientRect();
     const x = Math.max(0, Math.min(
       event.clientX - wr.left - drag.dx, drag.wrapW - 80));
@@ -2363,17 +2455,24 @@ function wirePanelDrag(id, panel, handle, wrap, opts) {
 
 // wirePanelCollapse arms the chevron button of one panel: the body
 // hides through the collapsed class, the aria state follows and the
-// flag persists. opts.onToggle lets the chat reset its unread badge.
+// flag persists. Bottom anchored panels (opts.dockBottom - the chat
+// window) fold DOWN to the bottom edge through setPanelCollapsed;
+// the top anchored ones shrink in place. opts.onToggle lets the chat
+// reset its unread badge.
 function wirePanelCollapse(id, panel, wrap, button, opts) {
   if (!button || !button.addEventListener) { return; }
   const collapsed = panel.classList.contains("collapsed");
   button.setAttribute("aria-expanded", collapsed ? "false" : "true");
   button.addEventListener("click", () => {
-    panel.classList.toggle("collapsed");
-    const now = panel.classList.contains("collapsed");
+    const now = !panel.classList.contains("collapsed");
+    if (opts && opts.dockBottom) {
+      setPanelCollapsed(id, panel, wrap, now);
+    } else {
+      panel.classList.toggle("collapsed");
+      persistPanelLayout(id, panel, wrap);
+    }
     button.setAttribute("aria-expanded", now ? "false" : "true");
     if (opts && opts.onToggle) { opts.onToggle(now); }
-    persistPanelLayout(id, panel, wrap);
   });
 }
 
@@ -2414,6 +2513,7 @@ function initFloatingPanels() {
   const chatHead = document.getElementById("chat-head");
   if (chatBox && chatHead) {
     wirePanelDrag("chat", chatBox, chatHead, wrap, {
+      dockBottom: true,
       onRestore: (layout) => {
         ChatWindow.collapsed = Boolean(layout && layout.collapsed);
         if (!ChatWindow.collapsed) { ChatWindow.unread = 0; }
@@ -2421,6 +2521,7 @@ function initFloatingPanels() {
     });
     wirePanelCollapse("chat", chatBox, wrap,
       document.getElementById("chat-collapse"), {
+        dockBottom: true,
         onToggle: (collapsed) => {
           ChatWindow.collapsed = collapsed;
           if (!collapsed) {
@@ -2435,8 +2536,10 @@ function initFloatingPanels() {
   const zoneHead = document.getElementById("zone-panel-head");
   if (zonePanel && zoneHead) {
     wirePanelDrag("zone", zonePanel, zoneHead, wrap, {
+      dockBottom: true,
       onRestore: (layout) => {
         zonePanelCollapsed.value = Boolean(layout && layout.collapsed);
+        applyZonePanelState();
       }
     });
   }

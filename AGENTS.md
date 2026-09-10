@@ -907,7 +907,11 @@ CSS variable sets on `html[data-theme]`; the canvas reads its colors from
 the same variables).
 
 - Header: brand, Map/Log tabs and the live indicator share one compact
-  34 px row - the working area must not lose vertical space to chrome.
+  34 px row that lives INSIDE the main column (right of the sidebar) -
+  the Bots sidebar runs the full working height on the left, so the
+  two zones read as separate blocks and the working area must not
+  lose vertical space to chrome. The header carries no subtitle words
+  (the bare SWARM brand mark).
 - Tabs: Map is the source of truth: the character status lives as a HUD
   panel on the canvas (name, class, level, HP/MP bars, position,
   combat/rest chips, exp/sp) and the world is drawn around it; Log is
@@ -924,10 +928,14 @@ the same variables).
   <time>` - so a live problem report always tells which exact code
   produced it (see `internal/version`): the report plus a `git log`
   are all it takes to line the behavior up with the source.
-- Bot list: every row shows the status dot, the name, `combat`/`rest`
-  chips, the level and three mini bars (HP red, MP blue, XP silver,
-  same gradients as the HUD) fed by the extended `/api/bots` payload -
-  the overview shows at a glance what every session is doing.
+- Bot list: every row shows the status dot, the name and the level on
+  the name line, then a meta line under it with the `combat`/`rest`/
+  `proxy` chips and the activity banner, then three mini bars (HP red,
+  MP blue, XP silver, same gradients as the HUD) fed by the extended
+  `/api/bots` payload - the chips never share the name line, so the
+  name keeps the full row width and stays readable. The sidebar keeps
+  its full 200/176 px rows at every window width (no icon rail -
+  hidden bot names are worse than a slightly narrower map).
 - Camera: follow mode centers on the interpolated character position;
   free mode (follow unchecked or a map drag) pins the view to a pan
   anchor captured at the moment follow was disabled and never moves on
@@ -1524,15 +1532,22 @@ the same variables).
   the opaque look without support). The HUD stack, the equipment
   widget, the chat and the zone list drag by their heads (pointer
   events, clamped into the map wrap) and collapse through their
-  chevron buttons; the layout persists under the versioned
+  chevron buttons; a press turns into a drag only after 5 px of
+  travel, so a plain click (with the natural few pixels of jitter)
+  never detaches a panel from its css anchor. The chat and the zone
+  list are bottom anchored and FOLD DOWN: collapsing docks the strip
+  to its css home at the bottom edge (a dragged panel remembers its
+  expanded spot first), expanding grows the window back up from the
+  edge. The layout persists under the versioned
   `swarm.panelLayout.v1` localStorage key and a double click on a
   head resets the panel to its CSS home. The collapsed chat counts
-  missed lines on a `N new` head badge. The inventory grid sizes
-  itself to its rows (four rows stay the scroll ceiling, an empty
-  bag shows one slim `empty` row). Below 1280 px the sidebar and the
-  panels shave a step; below 1024 px the sidebar folds into a 34 px
-  bot-dot rail that expands over the map on hover while the canvas
-  keeps its size. The repro coverage of these behaviors lives in
+  missed lines on a `N new` head badge. The HUD reads at the chat
+  density (11.5 px mono values, 13.5 px name). The inventory grid
+  reserves its four rows unconditionally - the in-game window metric:
+  an empty bag shows the four empty rows, a fuller bag scrolls the
+  grid on the right scrollbar. Below 1280 px the sidebar and the
+  panels shave a step; the sidebar keeps its readable rows at every
+  width. The repro coverage of these behaviors lives in
   `tools/repro_gear.js`.
 - The web UI is interactive in every launch mode: a double click on
   the map (move/attack/pickup - hit test over the interpolated object

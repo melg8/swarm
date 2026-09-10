@@ -122,8 +122,10 @@ body {
   height: 100vh;
 }
 
-/* Header: one compact row with the brand, the tabs and the live state,
-   so the working area keeps as much height as possible. */
+/* Header: one compact row with the brand, the tabs and the live state
+   inside the main column (right of the sidebar), so the working
+   area keeps as much height as possible and the Bots zone stays a
+   separate full-height block on the left. */
 .app-header {
   display: flex;
   align-items: center;
@@ -142,8 +144,6 @@ body {
   letter-spacing: 2px;
   color: var(--accent);
 }
-
-.brand-sub { color: var(--text-dim); font-size: 11.5px; }
 
 .tabs {
   display: flex;
@@ -224,10 +224,22 @@ html:not([data-theme="dark"]) #theme-moon { display: none; }
 .live-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .live-dot.offline { background: var(--red); box-shadow: 0 0 6px var(--red); }
 
-/* Body layout */
+/* Body layout: the sidebar column runs the full height of the
+   working area on the left, the main column on the right carries
+   its own header strip (brand + map/log tabs + live state) - the
+   Bots zone never shares a row with the tabs, the two zones read
+   as separate blocks. */
 .app-body {
   display: flex;
   flex: 1;
+  min-height: 0;
+}
+
+.main-col {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -502,6 +514,20 @@ body.mode-pathfind .zone-panel { display: none; }
 
 .chip-level { color: var(--text); border: 1px solid var(--border); }
 
+/* The meta line under the name row: the status chips and the
+   activity text share it, so the name row itself keeps its full
+   width for the name - the most important cell of the column. */
+.bot-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  min-height: 0;
+}
+
+.bot-meta:empty { display: none; }
+
 .bot-chip {
   font-size: 10px;
   font-weight: 700;
@@ -533,7 +559,8 @@ body.mode-pathfind .zone-panel { display: none; }
    The kind-* classes color the row by activity, mirroring the bot
    status banner of the map. */
 .bot-activity {
-  margin-top: 4px;
+  flex: 1;
+  min-width: 0;
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.3px;
@@ -940,10 +967,10 @@ body.mode-test-fight .map-empty { display: none; }
   position: absolute;
   top: 10px;
   left: 12px;
-  width: 252px;
+  width: 240px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   z-index: 4;
 }
 
@@ -952,10 +979,10 @@ body.mode-test-fight .map-empty { display: none; }
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: var(--shadow);
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
-.hud-head { margin-bottom: 10px; cursor: grab; user-select: none; }
+.hud-head { margin-bottom: 8px; cursor: grab; user-select: none; }
 
 .hud-head:active { cursor: grabbing; }
 
@@ -1020,7 +1047,7 @@ body.mode-test-fight .map-empty { display: none; }
 .hud-name-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 
 .hud-name {
-  font-size: 17px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-bright);
   overflow: hidden;
@@ -1034,10 +1061,10 @@ body.mode-test-fight .map-empty { display: none; }
 .hud-dump-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   margin-left: auto;
-  padding: 3px 9px;
-  font: 600 11px/1.4 inherit;
+  padding: 2px 7px;
+  font: 600 10px/1.4 inherit;
   font-family: inherit;
   color: var(--text-muted);
   background: transparent;
@@ -1061,7 +1088,7 @@ body.mode-test-fight .map-empty { display: none; }
 }
 
 
-.hud-name-small { font-size: 14.5px; }
+.hud-name-small { font-size: 12.5px; }
 
 /* The class text and the status chips share one line under the name
    heading, so the chips never crowd the name. */
@@ -1075,21 +1102,21 @@ body.mode-test-fight .map-empty { display: none; }
 
 .hud-chips { display: flex; gap: 4px; }
 
-.hud-class { color: var(--accent); font-size: 12.5px; }
+.hud-class { color: var(--accent); font-size: 11.5px; }
 
-.vitals { display: grid; gap: 8px; margin-bottom: 10px; }
+.vitals { display: grid; gap: 5px; margin-bottom: 8px; }
 
 .vitals-target { margin-bottom: 0; }
 
-.vital-row { display: grid; grid-template-columns: 24px 1fr 64px; align-items: center; gap: 8px; }
+.vital-row { display: grid; grid-template-columns: 20px 1fr 64px; align-items: center; gap: 6px; }
 
-.vital-label { color: var(--text-dim); font-size: 11.5px; }
+.vital-label { color: var(--text-dim); font-size: 10.5px; }
 
-.vital-text { font-family: var(--mono); font-size: 11.5px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+.vital-text { font-family: var(--mono); font-size: 10.5px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
 
 .bar {
   position: relative;
-  height: 13px;
+  height: 10px;
   background: var(--bg-panel-2);
   border: 1px solid var(--border);
   border-radius: 3px;
@@ -1137,7 +1164,7 @@ body.mode-test-fight .map-empty { display: none; }
 /* Target panel: shows who the bot currently selected, with its name,
    level and vitals. The panel exists only while there is a target: a
    killed, removed or missing target hides it completely. */
-.hud-target .hud-name-row { margin-bottom: 8px; }
+.hud-target .hud-name-row { margin-bottom: 6px; }
 
 /* HUD stack collapse (C4): the collapsed flag lives on the stack, so
    the whole column folds - the character body, the target panel and
@@ -1227,21 +1254,22 @@ body.mode-test-fight .map-empty { display: none; }
 
 .chat-line.chat-social .chat-msg { color: var(--violet); }
 
-.kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
+.kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 12px; }
 
 .kv {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 3px 0;
+  padding: 2px 0;
   border-bottom: 1px dotted var(--border-soft);
 }
 
-.kv span { color: var(--text-dim); font-size: 11.5px; flex-shrink: 0; }
+.kv span { color: var(--text-dim); font-size: 11px; flex-shrink: 0; }
 
 .kv b {
   font-family: var(--mono);
   font-weight: 400;
+  font-size: 11.5px;
   color: var(--text-bright);
   min-width: 0;
   overflow: hidden;
@@ -1840,9 +1868,10 @@ body.mode-pathfind .gear-panel { display: none; }
   z-index: 2;
 }
 
-/* Inventory grid: six columns, four visible rows at most, scrolling
-   when the bag grows past them (the actual height follows the items,
-   see the adaptive note below). */
+/* Inventory grid: six columns and exactly four visible rows - the
+   in-game window metric. The height is fixed, an empty or half full
+   bag still reserves the four rows and a fuller bag scrolls the
+   grid on the right scrollbar, like the game inventory. */
 .inv-grid {
   display: grid;
   grid-template-columns: repeat(6, 36px);
@@ -1850,20 +1879,20 @@ body.mode-pathfind .gear-panel { display: none; }
   gap: 3px;
   padding: 0 8px;
   overflow-y: auto;
-  max-height: 153px;
+  height: 153px;
   align-content: start;
   scrollbar-width: thin;
 }
 
-/* Adaptive inventory (C6): the grid grows with its items instead of
-   reserving four rows - an empty bag shows one slim 'empty' row, the
-   footer follows right under the content. */
+/* The empty bag keeps the four reserved rows: the label sits in the
+   middle of the reserved space instead of collapsing it. */
 .inv-grid:empty::after {
   content: "empty";
   display: flex;
   align-items: center;
+  justify-content: center;
   grid-column: 1 / -1;
-  min-height: 36px;
+  min-height: 153px;
   color: var(--text-dim);
   font-size: 10.5px;
   letter-spacing: 0.4px;
@@ -2691,13 +2720,12 @@ canvas.fxg-cell.picked {
   }
 }
 
-/* ---- responsive layout (proposal C9) ----
-   Two breakpoints keep the chrome alive on laptop and half-size
-   windows: below 1280 the sidebar and the floating panels shave a
-   little, below 1024 the sidebar collapses into a 34px icon rail of
-   bot dots that expands over the map on hover (the canvas never
-   resizes, the rail overlays it), and the corner panels step out of
-   the rail's way. */
+/* ---- responsive layout ----
+   One breakpoint below 1280: the sidebar and the floating panels
+   shave a little. The sidebar keeps its full bot rows at every
+   width - the bot names must stay readable, so the old sub-1024
+   icon rail is gone; narrow windows just get the compact 176px
+   column and a slimmer chat window. */
 @media (max-width: 1279px) {
   .sidebar { width: 176px; min-width: 176px; }
   .hud, .gear-panel, .zone-panel, .chat-box, .shop-panel {
@@ -2706,44 +2734,7 @@ canvas.fxg-cell.picked {
 }
 
 @media (max-width: 1023px) {
-  .app-body { position: relative; }
-  .sidebar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    z-index: 30;
-    width: 34px;
-    min-width: 34px;
-    overflow: visible;
-  }
-  .sidebar-title,
-  #pf-panel,
-  .sidebar-foot { display: none; }
-  .bot-list { padding-top: 6px; }
-  .bot-item { padding: 9px 0; }
-  .bot-item .bot-row { justify-content: center; gap: 0; }
-  .bot-item .bot-name,
-  .bot-item .bot-level,
-  .bot-chip,
-  .bot-activity,
-  .bot-bars { display: none; }
-  .sidebar:hover {
-    width: 200px;
-    min-width: 200px;
-    box-shadow: var(--shadow);
-  }
-  .sidebar:hover .bot-item { padding: 7px 12px; }
-  .sidebar:hover .bot-item .bot-row {
-    justify-content: flex-start;
-    gap: 8px;
-  }
-  .sidebar:hover .bot-item .bot-name { display: block; }
-  .sidebar:hover .bot-item .bot-level { display: block; }
-  .sidebar:hover .bot-chip { display: inline-flex; }
-  .sidebar:hover .bot-activity { display: block; }
-  .sidebar:hover .bot-bars { display: flex; }
-  .hud-stack { left: 44px; }
-  .chat-box { left: 44px; }
-  .map-rose { left: 44px; }
+  .chat-box { width: 320px; height: 120px; }
+  .zone-panel { width: 220px; }
+  .hud-stack { width: 220px; }
 }

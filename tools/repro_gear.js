@@ -362,6 +362,7 @@ function main() {
         process.exit(1);
     }
     const { gear, elements, sandbox, posts } = loadAppJs(appFile);
+    const appSource = fs.readFileSync(appFile, "utf8");
     const results = [];
 
     // The manual interactions need an active bot to post to.
@@ -664,6 +665,72 @@ function main() {
     check(results, "weightPenalty mirrors the server thresholds",
         JSON.stringify(penalties) === '[null,1,2,3,4]',
         "penalties: " + JSON.stringify(penalties));
+
+    // ---- the evaluation round (2026-09-10 user feedback) ----
+
+    // Inventory: the grid reserves its four rows unconditionally -
+    // the in-game window metric (fixed height, the right scrollbar).
+    const invGridBlock = css.slice(css.indexOf(".inv-grid {"),
+        css.indexOf(".inv-grid {") + 300);
+    check(results, "inventory grid reserves the four game rows",
+        invGridBlock.includes("height: 153px") &&
+        !invGridBlock.includes("max-height: 153px") &&
+        invGridBlock.includes("overflow-y: auto"),
+        "inv grid block: " + invGridBlock.slice(0, 160));
+    check(results, "adaptive inventory height is gone",
+        !css.includes("the grid grows with its items"),
+        "the adaptive note is still in the css");
+
+    // Layout: the header lives inside the main column, the sidebar
+    // runs the full height - the Bots zone and the tabs never share a
+    // row. No "bot control" subtitle words anywhere.
+    const sidebarAt = html.indexOf('<aside class="sidebar">');
+    const mainColAt = html.indexOf('<div class="main-col">');
+    const headerAt = html.indexOf('<header class="app-header">');
+    const bodyAt = html.indexOf('<div class="app-body">');
+    check(results, "header sits inside the main column right of the sidebar",
+        bodyAt >= 0 && sidebarAt > bodyAt && mainColAt > sidebarAt &&
+        headerAt > mainColAt,
+        "body " + bodyAt + ", sidebar " + sidebarAt +
+        ", main col " + mainColAt + ", header " + headerAt);
+    check(results, "no bot control words in the chrome",
+        !html.includes("bot control") &&
+        !html.includes('class="brand-sub"'),
+        "the subtitle is still around");
+
+    // HUD density: the values match the chat text size (11.5px mono),
+    // the name is 13.5px.
+    const kvBoldBlock = css.slice(css.indexOf(".kv b {"),
+        css.indexOf(".kv b {") + 300);
+    check(results, "hud kv values read at the chat size",
+        kvBoldBlock.includes("font-size: 11.5px"),
+        "kv b block: " + kvBoldBlock.slice(0, 140));
+    check(results, "hud name shrank to 13.5px",
+        css.includes(".hud-name {") &&
+        css.slice(css.indexOf(".hud-name {"),
+            css.indexOf(".hud-name {") + 200).includes("font-size: 13.5px"),
+        "the name font grew back");
+
+    // Sidebar rows: the chips and the activity moved to the meta line
+    // under the name, so the name keeps the full row width.
+    check(results, "bot rows carry a meta line for chips and activity",
+        css.includes(".bot-meta {") &&
+        appSource.includes('meta.className = "bot-meta"'),
+        "the meta line is missing");
+
+    // Panel docking: a 5px travel gate before a drag, the bottom
+    // anchored chat and zone list fold DOWN to their css homes.
+    check(results, "drag needs real travel before it detaches a panel",
+        appSource.includes("PANEL_DRAG_THRESHOLD = 5") &&
+        appSource.includes("Math.hypot"),
+        "the travel gate is gone");
+    check(results, "collapsing docks the bottom panels down",
+        appSource.includes("function setPanelCollapsed") &&
+        appSource.includes("dockBottom: true"),
+        "the dock collapse is gone");
+    check(results, "css-default panels persist no coordinates",
+        appSource.includes("function persistPanelFlag"),
+        "the flag-only persist is gone");
 
     // ---- manual interactions ----
 

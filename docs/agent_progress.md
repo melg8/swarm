@@ -4,6 +4,71 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: the webui evaluation round - five fixes on feature/webui_modern
+
+Started: 2026-09-10. Branch: `feature/webui_modern` (rebased onto
+`feature/proxy-server` at 55477b2). Commits as melg8. The user reviewed
+the modernized web UI live and reported five concrete complaints (in
+Russian); this round fixes all five on the dedicated webui branch so
+the result stays easy to evaluate visually.
+
+### Goal
+
+1. Left column: the bot name must read properly in the vertical
+   column at every window width.
+2. The chat and the hunting zones must fold DOWN to the bottom edge
+   when clicked, not hang in the middle of the map.
+3. The character widget is too big: the value digits must match the
+   chat text size.
+4. The equipment widget must always show four inventory rows with the
+   right scrollbar (the in-game window mode); drop the "bot control"
+   words.
+5. The Map/Log tabs must sit right of the Bots zone - the two zones
+   read as visually separate blocks.
+
+### Approach and fixes
+
+- Sidebar: the sub-1024px 34px icon rail (which hid every bot name
+  behind a hover) is gone; the sidebar keeps readable 200/176px rows
+  at every width. The status chips (combat/rest/proxy) and the
+  activity banner moved from the name line to a dedicated
+  `.bot-meta` line, so the name keeps the full row width.
+- Panel docking: a 5px travel gate before a pointer press becomes a
+  drag (a jittery click no longer detaches a panel from its css
+  anchor and no longer pins it into the localStorage layout);
+  `setPanelCollapsed` folds the bottom anchored chat and zone list
+  DOWN to their css homes - the collapsed strip docks at the bottom
+  edge, the expand grows the window back up (a dragged panel
+  remembers its expanded spot, a css-default one keeps no
+  coordinates, so the expand stays resize-proof); the reload of a
+  saved collapsed layout docks the strip instead of pinning it at
+  the saved x/y.
+- HUD density: the widget shrank 309px -> 248px tall, 252px ->
+  240px wide (name 17px -> 13.5px, kv values 14px -> 11.5px mono -
+  exactly the chat text size, bars 13px -> 10px, tighter paddings
+  and gaps).
+- Inventory: the grid reserves its four rows unconditionally
+  (height 153px, overflow-y auto - the in-game window metric;
+  the adaptive height of proposal C6 is reverted by user request).
+- Header: the app-header moved inside the main column (new
+  `.main-col` wrapper), so the Bots sidebar runs the full working
+  height and the brand + Map/Log tabs sit only over the map area;
+  the "bot control" subtitle words are gone (title tag included).
+
+### Verification
+
+- repro suite: repro_gear, repro_hud, repro_fight_ui pass;
+  repro_map_render keeps its one pre-existing failure (the hunting
+  zone label, unrelated to this round); repro_movement passes.
+- Live run (`-hunt`, 1440x900 and 1000x700): tabs.left=279 vs
+  sidebar.right=200 (the separation), bot name visible at 1000px,
+  HUD fonts 13.5/11.5/11.5, inv grid exactly 153px/4 rows, the
+  jitter click keeps the chat bottom-anchored, the collapse + reload
+  cycle docks the strip at gap 10px with no inline styles, the
+  drag-then-collapse-then-expand cycle returns the window to its
+  dragged spot, no console errors (scripts/verify_round2*.sh,
+  /home/z/my-project/download/round2/).
+
 ## Active task: rest at the kill spot, finish fights across the zone line, zone free loot
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
