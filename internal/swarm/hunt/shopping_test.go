@@ -64,9 +64,9 @@ func settleMerchant(
 func TestShoppingTripBuysAfterSelling(t *testing.T) {
 	loop, game, bot, _ := newTripLoop()
 	fillInventory(bot)
-	// The adena of the character: 100 adena buys the apprentice's
-	// shoes, the short gloves and the magic ring of the elven
-	// catalogs.
+	// The adena of the character: 100 adena buys the jewel floor of
+	// the cheapest set (the magic ring and the apprentice's earring of
+	// the jewel trader Creamees).
 	bot.ApplyInventoryUpdate([]state.InventoryItem{
 		{ObjectID: 999, ItemID: 57, Count: 100, Type2: 4, Change: 1},
 	})
@@ -110,12 +110,12 @@ func TestShoppingTripBuysAfterSelling(t *testing.T) {
 	loop.tick()
 	require.True(t, loop.buysPlanned,
 		"the purchase planning must run after the selling")
-	// The plan of 100 adena buys the shoes, the shield and the gloves
-	// of the armor trader Ariel: the sell stop is done, the trip
-	// advances to the single buy stop.
+	// The plan of 100 adena buys the jewel floor of the jewel trader
+	// Creamees: the sell stop is done, the trip advances to the single
+	// buy stop.
 	require.Equal(t, phaseTownWalk, loop.phase)
 	require.Len(t, loop.tripStops, 1)
-	require.Equal(t, int32(7148), loop.tripStops[0].merchant.TemplateID)
+	require.Equal(t, int32(7149), loop.tripStops[0].merchant.TemplateID)
 	boughtAdena := int64(0)
 	for _, stop := range loop.tripStops {
 		for _, purchase := range stop.buys {
@@ -126,16 +126,16 @@ func TestShoppingTripBuysAfterSelling(t *testing.T) {
 		"the plan must respect the adena budget")
 	require.Positive(t, boughtAdena)
 
-	// The character walks to Ariel and the armor list buys.
-	ariel := townMerchants[1]
-	settleMerchant(t, loop, game, bot, ariel, 57)
+	// The character walks to Creamees and the jewel list buys.
+	creamees := townMerchants[2]
+	settleMerchant(t, loop, game, bot, creamees, 57)
 	loop.buyAt = time.Now().Add(-12 * time.Second)
 	loop.merchantPick = time.Now().Add(-2 * time.Second)
 	loop.tick()
-	require.NotEmpty(t, game.buys, "the armor list must be bought")
+	require.NotEmpty(t, game.buys, "the jewel list must be bought")
 	for _, purchase := range game.buys[0] {
-		require.Equal(t, int32(3014800), purchase.ListID)
-		require.Equal(t, int32(7148), purchase.MerchantTemplateID)
+		require.Equal(t, int32(3014900), purchase.ListID)
+		require.Equal(t, int32(7149), purchase.MerchantTemplateID)
 	}
 
 	// The server confirms the buys: the inventory update carries the
@@ -288,9 +288,13 @@ func TestPlanShoppingStopsMergesCurrentMerchant(t *testing.T) {
 
 	loop.planShoppingStops()
 	require.True(t, loop.buysPlanned)
-	if len(loop.tripStops) == 1 {
-		require.Empty(t, loop.tripStops[0].buys,
-			"the jewel purchases merge into the current stop")
+	require.Len(t, loop.tripStops, 1,
+		"the jewel floor needs no second merchant")
+	require.Len(t, loop.tripStops[0].buys, 3,
+		"the jewel purchases merge into the current stop")
+	for _, purchase := range loop.tripStops[0].buys {
+		require.Equal(t, int32(7149), purchase.MerchantTemplateID)
+		require.Equal(t, int32(3014900), purchase.ListID)
 	}
 
 	// A plan of another merchant only appends stops, never rewalks

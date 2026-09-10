@@ -108,7 +108,9 @@ func (l *Loop) shoppingPlan() []gear.Purchase {
 // shoppingQueue computes the fresh purchase queue against the current
 // gear state: the affordable plan of the next trip plus the wanted
 // tail with the cumulative missing adena (see
-// gear.PlanPurchaseQueue).
+// gear.PlanPurchaseQueue). The character level drives the jewel gate
+// of the strategy (the cheapest set serves until level 15, the
+// upgrades open past it).
 func (l *Loop) shoppingQueue() []gear.Purchase {
 	if l.equip == nil {
 		return nil
@@ -117,7 +119,7 @@ func (l *Loop) shoppingQueue() []gear.Purchase {
 
 	return gear.PlanPurchaseQueue(
 		l.equip.profile, l.equipment(), townShopCatalog,
-		int64(stats.Adena))
+		int64(stats.Adena), l.tracker.SelfLevel())
 }
 
 // refreshShoppingCache recomputes the cached purchase queue when the

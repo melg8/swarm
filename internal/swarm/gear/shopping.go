@@ -108,6 +108,26 @@ type purchaseCandidate struct {
 // this margin is rejected as broken data.
 const shopTaxLimit = 2.0
 
+// jewelUpgradeLevel gates the jewel upgrades of the shop strategy:
+// the starting locations barely attack with magic, so the cheapest
+// jewel set covers the mDef needs until the character reaches this
+// level.
+const jewelUpgradeLevel = 15
+
+// The purchase phases of the shop strategy: every pick of the walk
+// ranks by its phase first, the phase specific order second.
+const (
+	// phaseFloor fills the empty jewel slots with the cheapest offers
+	// of the catalogs (the basic outfit, level independent).
+	phaseFloor = iota
+	// phaseWeapon buys the next weapon milestone: the best value
+	// strict upgrade, the saving target the wallet hoards for.
+	phaseWeapon
+	// phaseDefense upgrades the armor, the shield and (past the jewel
+	// level gate) the jewels inside the budget of the worn weapon.
+	phaseDefense
+)
+
 // shoppingQueueTail bounds the wanted tail of a purchase queue: the
 // save up entries the shop widget shows beyond the affordable plan of
 // the next trip.
@@ -118,61 +138,72 @@ const shoppingQueueTail = 8
 // overflow safe while every shop price fits it with room to spare.
 const unboundedBudget = math.MaxInt64 / 2
 
-// PlanPurchases greedily plans the best value per adena purchases of
-// the catalog for the equipment within the adena budget. The score
-// gain per adena decides every pick, so the cheap empty slot fillers
-// (a cloth cap for a handful of adena) come before the expensive
-// weapon upgrades unless the weapon gain outweighs them, and nothing
-// gets bought that the inventory already carries (the free upgrades
-// are simulated first). Simulated equips keep the plan consistent:
-// after a planned purchase the virtual paperdoll carries the bought
-// item and the next pick compares against it.
+// PlanPurchases plans the purchases of the catalog for the equipment
+// within the adena budget, ranked by the strategy phases: the jewel
+// floor (the cheapest jewel set filling the empty slots - the basic
+// outfit of the starting locations), the weapon milestone (the best
+// value strict weapon upgrade - the saving target; the wallet hoards
+// for it, a cheaper worse value weapon never intercepts the save up)
+// and the defense upgrades (the armor, shield and jewel buys ranked
+// by their defense gain and bounded by the value of the worn weapon:
+// after every weapon tier the defense may grow inside its budget,
+// the next weapon tier always outranks it). Nothing gets bought that
+// the inventory already carries (the free upgrades are simulated
+// first). Simulated equips keep the plan consistent: after a planned
+// purchase the virtual paperdoll carries the bought item and the
+// next pick compares against it.
 //
 // Every slot gets at most ONE purchase per trip: each pick marks the
 // slots it fills or clears (the family interplay included) and the
 // next picks skip the candidates that would write into them. Without
-// the guard the greedy planner buys the whole upgrade chain of a slot
-// in a single walk (a knife, a short sword and a sickle together, two
+// the guard the planner buys the whole upgrade chain of a slot in a
+// single walk (a knife, a short sword and a sickle together, two
 // necklaces with only the better one ever worn) and the unused steps
 // are pure adena waste - the next trip re-plans against the paperdoll
 // the previous purchases reached and upgrades from there.
 func PlanPurchases(
 	profile Profile, equipment Equipment, catalog Catalog, adena int64,
+	level int32,
 ) []Purchase {
-	return planPurchases(profile, equipment, catalog, adena, 0)
+	return planPurchases(profile, equipment, catalog, adena, level, 0)
 }
 
 // PlanPurchaseQueue plans the full purchase queue of the shop widget:
 // the affordable plan of the next trip first (exactly the
-// PlanPurchases picks), then the wanted tail - the best value per
-// adena picks the wallet cannot pay for yet, in the order the
-// strategy wants them. Every tail entry carries the adena still
-// missing before everything through it becomes affordable, so the
-// widget shows what the bot saves up for and how far away it is. The
-// tail picks obey the same one purchase per slot per trip guard, so
-// the queue reads as the single progression the trips walk over time.
+// PlanPurchases picks), then the wanted tail - the picks the wallet
+// cannot pay for yet, in the order the strategy wants them. Every
+// tail entry carries the adena still missing before everything
+// through it becomes affordable, so the widget shows what the bot
+// saves up for and how far away it is. The tail picks obey the same
+// one purchase per slot per trip guard, so the queue reads as the
+// single progression the trips walk over time.
 func PlanPurchaseQueue(
 	profile Profile, equipment Equipment, catalog Catalog, adena int64,
+	level int32,
 ) []Purchase {
 	return planPurchases(
-		profile, equipment, catalog, adena, shoppingQueueTail)
+		profile, equipment, catalog, adena, level, shoppingQueueTail)
 }
 
-// planPurchases walks the greedy planner. The tail parameter appends
+// planPurchases walks the phased planner. The tail parameter appends
 // the wanted entries beyond the budget (0 keeps the plain affordable
 // plan, shoppingQueueTail serves the widget queue); the walker
 // switches into the tail mode when the wallet cannot pay for any
 // remaining candidate and widens the budget to unboundedBudget, so
-// the same value ordering continues past the affordability gate. The
+// the same phase ordering continues past the affordability gate. The
 // affordable picks of the walk stay byte identical to the plain
 // planner: the budget gate and the pick loop are unchanged while the
 // wallet lasts.
 func planPurchases(
 	profile Profile, equipment Equipment, catalog Catalog, adena int64,
-	tail int,
+	level int32, tail int,
 ) []Purchase {
 	virtual := SimulateInventory(profile, equipment)
 	candidates := catalogCandidates(profile, catalog)
+	strategy := &shopStrategy{
+		level:    level,
+		floorIDs: cheapestJewelIDs(candidates),
+	}
 	purchases := make([]Purchase, 0, len(candidates))
 	budget := adena
 	planned := make(map[int32]bool)
@@ -190,7 +221,8 @@ func planPurchases(
 			budget = unboundedBudget
 		}
 		best, gain, credit, sellFirst := bestPurchase(
-			virtual, candidates, budget, planned, boughtSlots, equipment)
+			virtual, candidates, budget, planned, boughtSlots, equipment,
+			strategy)
 		if best == nil || gain <= 0 {
 			if !tailMode && tailLeft > 0 {
 				// Nothing affordable remains: the wanted
@@ -214,11 +246,7 @@ func planPurchases(
 		for _, slot := range affectedSlots(virtual, best.stats.BodyPart) {
 			boughtSlots[slot] = true
 		}
-		//nolint:exhaustruct // a bought item has no inventory entry yet
-		applyToVirtual(&virtual, ScoredItem{
-			Stats: best.stats,
-			Score: best.score,
-		})
+		applyToVirtual(&virtual, boughtEntry(best))
 		if tailMode {
 			tailLeft--
 			if tailLeft <= 0 {
@@ -228,6 +256,215 @@ func planPurchases(
 	}
 
 	return purchases
+}
+
+// walkView is the per-iteration snapshot of the walk the candidate
+// classification reads: the walked virtual paperdoll, the best value
+// of the strict weapon upgrades (the saving target), the weapon
+// priced ceiling of the defense phase and the reference value of the
+// worn defense gear.
+type walkView struct {
+	virtual [slotCount]ScoredItem
+	target  float64
+	anchor  int64
+	defense int64
+}
+
+// shopStrategy drives the candidate classification of the purchase
+// walk: the jewel floor (the cheapest set fills the empty slots at
+// any level), the jewel freeze below jewelUpgradeLevel (the starting
+// locations barely attack with magic, the upgrades wait for the
+// level) and the defense budget rule (the reference value of the
+// worn defense gear - armor, shield, jewels - may not exceed the
+// reference value of the worn weapon: the weapon leads the gear
+// progression, the defense follows inside its budget).
+type shopStrategy struct {
+	level    int32
+	floorIDs map[int32]bool
+}
+
+// classify resolves the phase and the rank of one candidate against
+// the walked paperdoll; ok is false when the strategy skips the
+// candidate. The rank orders the picks inside the phase (higher
+// wins): the floor by the price (the cheapest offers first), the
+// weapon by the value per adena (only the best value strict upgrade
+// is eligible - the strategy never buys a worse value weapon just
+// because it is cheaper, the wallet saves for the milestone), the
+// defense by the raw gain (the maximum defense per buy).
+func (s *shopStrategy) classify(
+	view walkView, candidate *purchaseCandidate, gain float64,
+) (int, float64, bool) {
+	switch CategoryOf(candidate.stats) {
+	case CategoryJewel:
+		if s.floorIDs[candidate.itemID] && floorSlotEmpty(
+			view.virtual, candidate.stats.BodyPart) {
+			return phaseFloor, -float64(candidate.price), true
+		}
+		if s.level < jewelUpgradeLevel || !defenseFits(view, candidate) {
+			return phaseDefense, 0, false
+		}
+
+		return phaseDefense, gain, true
+	case CategoryWeapon:
+		if candidate.price <= 0 {
+			return phaseWeapon, 0, false
+		}
+		value := gain / float64(candidate.price)
+		if value < view.target {
+			return phaseWeapon, 0, false
+		}
+
+		return phaseWeapon, value, true
+	case CategoryArmor, CategoryShield:
+		if !defenseFits(view, candidate) {
+			return phaseDefense, 0, false
+		}
+
+		return phaseDefense, gain, true
+	default:
+		return phaseDefense, 0, false
+	}
+}
+
+// boughtEntry builds the virtual paperdoll entry of a planned
+// purchase: the item id drives the anchor and defense pricing of the
+// later picks, the object id stays zero (nothing equips it yet).
+func boughtEntry(best *purchaseCandidate) ScoredItem {
+	//nolint:exhaustruct // a planned buy has no inventory object yet
+	return ScoredItem{
+		Item:  state.InventoryItem{ItemID: best.itemID},
+		Stats: best.stats,
+		Score: best.score,
+	}
+}
+
+// cheapestJewelIDs resolves the cheapest jewel offer per family (the
+// ring, earring and necklace bodyparts): the jewel floor buys these
+// only, so the empty slots fill with the cheapest pieces the shops
+// sell.
+func cheapestJewelIDs(candidates []purchaseCandidate) map[int32]bool {
+	type cheapest struct {
+		itemID int32
+		price  int64
+	}
+	best := make(map[string]*cheapest, 3)
+	for index := range candidates {
+		candidate := &candidates[index]
+		family := candidate.stats.BodyPart
+		if !jewelBodyPart(family) {
+			continue
+		}
+		current, seen := best[family]
+		if !seen || candidate.price < current.price ||
+			(candidate.price == current.price &&
+				candidate.itemID < current.itemID) {
+			best[family] = &cheapest{
+				itemID: candidate.itemID,
+				price:  candidate.price,
+			}
+		}
+	}
+	ids := make(map[int32]bool, len(best))
+	for _, entry := range best {
+		ids[entry.itemID] = true
+	}
+
+	return ids
+}
+
+// bestWeaponValue resolves the value per adena of the best strict
+// weapon upgrade against the walked paperdoll: the weapon phase buys
+// only this one, the wallet hoards for it while it stays
+// unaffordable.
+func bestWeaponValue(
+	virtual [slotCount]ScoredItem, candidates []purchaseCandidate,
+	planned map[int32]bool,
+) float64 {
+	best := float64(0)
+	for index := range candidates {
+		candidate := &candidates[index]
+		if planned[candidate.itemID] ||
+			CategoryOf(candidate.stats) != CategoryWeapon {
+			continue
+		}
+		gain, ok := purchaseGain(virtual, candidate.stats, candidate.score)
+		if !ok || candidate.price <= 0 {
+			continue
+		}
+		if value := gain / float64(candidate.price); value > best {
+			best = value
+		}
+	}
+
+	return best
+}
+
+// weaponAnchor prices the defense ceiling of the current stage: the
+// reference price of the worn weapon. A starter weapon (or none)
+// anchors zero - the first real weapon comes before any armor buy.
+func weaponAnchor(virtual [slotCount]ScoredItem) int64 {
+	weapon := virtual[SlotRHand]
+	if paperdollEmpty(weapon) || starterSet[weapon.Item.ItemID] {
+		return 0
+	}
+
+	return npcdata.ItemPrice(weapon.Item.ItemID)
+}
+
+// defenseValue sums the reference prices of the worn defense gear:
+// the armor, shield and jewel entries of the virtual paperdoll.
+func defenseValue(virtual [slotCount]ScoredItem) int64 {
+	total := int64(0)
+	for slot := Slot(0); slot < slotCount; slot++ {
+		entry := virtual[slot]
+		if paperdollEmpty(entry) {
+			continue
+		}
+		switch CategoryOf(entry.Stats) {
+		case CategoryArmor, CategoryShield, CategoryJewel:
+			total += npcdata.ItemPrice(entry.Item.ItemID)
+		case CategoryUnusable, CategoryWeapon:
+			// the carried weapon prices into the anchor, not here
+		}
+	}
+
+	return total
+}
+
+// defenseFits reports whether the defense purchase stays inside the
+// weapon budget: the reference value of the worn defense gear after
+// the swap may not exceed the anchor of the worn weapon.
+func defenseFits(view walkView, candidate *purchaseCandidate) bool {
+	if view.anchor <= 0 {
+		return false
+	}
+	displaced := int64(0)
+	for _, slot := range affectedSlots(view.virtual,
+		candidate.stats.BodyPart) {
+		entry := view.virtual[slot]
+		if !paperdollEmpty(entry) {
+			displaced += npcdata.ItemPrice(entry.Item.ItemID)
+		}
+	}
+
+	return view.defense-displaced+npcdata.ItemPrice(candidate.itemID) <=
+		view.anchor
+}
+
+// floorSlotEmpty reports whether the jewel bodypart still has an
+// empty slot to fill: the floor only fills, it never replaces a worn
+// jewel.
+func floorSlotEmpty(virtual [slotCount]ScoredItem, bodyPart string) bool {
+	slots := SlotsForBodyPart(bodyPart)
+	if len(slots) == 0 {
+		return false
+	}
+	if len(slots) == 1 {
+		return paperdollEmpty(virtual[slots[0]])
+	}
+	slot := pairSlot(virtual, slots)
+
+	return slot != slotInvalid && paperdollEmpty(virtual[slot])
 }
 
 // walkedPurchase builds one entry of the queue walk: the cumulative
@@ -318,34 +555,36 @@ func catalogCandidates(
 	return candidates
 }
 
-// bestPurchase picks the affordable candidate with the highest score
-// gain per adena; the plain gain breaks ties between equally priced
-// offers. The candidates that would write into a slot this plan
-// already bought for are skipped (one purchase per slot per trip).
-// The affordability counts the sell credit of the pieces the
-// purchase displaces (the trip sells them before buying, see
-// displacedValue): a replacement is within reach as soon as the
-// adena plus the proceeds cover it, so the character shops for it
-// immediately instead of hoarding the full price first. The winner
-// returns with its credit and the SellFirst object ids.
+// bestPurchase picks the best candidate of the walk iteration under
+// the strategy phases: the jewel floor, the weapon milestone and the
+// defense upgrades (see shopStrategy.classify). The candidates that
+// would write into a slot this plan already bought for are skipped
+// (one purchase per slot per trip). The affordability counts the sell
+// credit of the pieces the purchase displaces (the trip sells them
+// before buying, see displacedValue): a replacement is within reach
+// as soon as the adena plus the proceeds cover it, so the character
+// shops for it immediately instead of hoarding the full price first.
+// The winner returns with its credit and the SellFirst object ids.
 func bestPurchase(
 	virtual [slotCount]ScoredItem, candidates []purchaseCandidate,
 	budget int64, planned map[int32]bool, boughtSlots map[Slot]bool,
-	equipment Equipment,
+	equipment Equipment, strategy *shopStrategy,
 ) (*purchaseCandidate, float64, int64, []int32) {
+	view := walkView{
+		virtual: virtual,
+		target:  bestWeaponValue(virtual, candidates, planned),
+		anchor:  weaponAnchor(virtual),
+		defense: defenseValue(virtual),
+	}
 	var best *purchaseCandidate
-	bestValue := float64(0)
+	bestPhase := phaseDefense + 1
+	bestRank := float64(0)
 	bestGain := float64(0)
 	var bestCredit int64
 	var bestSellFirst []int32
 	for index := range candidates {
 		candidate := &candidates[index]
 		if planned[candidate.itemID] {
-			continue
-		}
-		credit, sellFirst := displacedValue(equipment, affectedSlots(
-			virtual, candidate.stats.BodyPart))
-		if candidate.price > budget+credit {
 			continue
 		}
 		gain, ok := purchaseGain(virtual, candidate.stats, candidate.score)
@@ -355,13 +594,20 @@ func bestPurchase(
 		if slotBlocked(virtual, candidate.stats.BodyPart, boughtSlots) {
 			continue
 		}
-		value := gain
-		if candidate.price > 0 {
-			value = gain / float64(candidate.price)
+		credit, sellFirst := displacedValue(equipment, affectedSlots(
+			virtual, candidate.stats.BodyPart))
+		if candidate.price > budget+credit {
+			continue
 		}
-		if value > bestValue || (value == bestValue && gain > bestGain) {
+		phase, rank, ok := strategy.classify(view, candidate, gain)
+		if !ok {
+			continue
+		}
+		if phaseBeats(phase, rank, gain, candidate, best, bestPhase,
+			bestRank, bestGain) {
 			best = candidate
-			bestValue = value
+			bestPhase = phase
+			bestRank = rank
 			bestGain = gain
 			bestCredit = credit
 			bestSellFirst = sellFirst
@@ -369,6 +615,33 @@ func bestPurchase(
 	}
 
 	return best, bestGain, bestCredit, bestSellFirst
+}
+
+// phaseBeats reports whether the classified candidate outranks the
+// current best pick of the walk: the phase first, the phase rank
+// second (higher wins), then the gain, the price and the item id
+// break the remaining ties.
+func phaseBeats(
+	phase int, rank, gain float64, candidate *purchaseCandidate,
+	best *purchaseCandidate, bestPhase int, bestRank, bestGain float64,
+) bool {
+	if best == nil {
+		return true
+	}
+	if phase != bestPhase {
+		return phase < bestPhase
+	}
+	if rank != bestRank {
+		return rank > bestRank
+	}
+	if gain != bestGain {
+		return gain > bestGain
+	}
+	if candidate.price != best.price {
+		return candidate.price < best.price
+	}
+
+	return candidate.itemID < best.itemID
 }
 
 // purchaseGain computes the score gain the stats would bring to the
@@ -607,7 +880,7 @@ func SellCreditOf(purchases []Purchase) int64 {
 // fillers replace no one.
 func displacedValue(equipment Equipment, slots []Slot) (int64, []int32) {
 	var credit int64
-	var ids []int32
+	ids := make([]int32, 0, len(slots))
 	for _, slot := range slots {
 		objectID := equipment.Slots[slot]
 		if objectID == 0 {

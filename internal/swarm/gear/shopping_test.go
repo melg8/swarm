@@ -54,26 +54,37 @@ func TestCatalogCandidatesCheapestOffer(t *testing.T) {
 func TestPlanPurchasesEmptyWithoutAdena(t *testing.T) {
 	profile := MeleeFighter{}
 	equipment := equipmentWith(nil, nil)
-	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 0)
+	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 0, 1)
 	require.Empty(t, purchases)
 }
 
-func TestPlanPurchasesCheapFillersFirst(t *testing.T) {
+// TestPlanPurchasesJewelFloorFirst pins the opening pick of a bare
+// character: the jewel floor (the cheapest set filling the empty
+// slots) comes before everything - no armor filler runs ahead of the
+// first weapon, the empty slots fill with the cheapest rings,
+// earrings and necklace the jewel trader sells.
+func TestPlanPurchasesJewelFloorFirst(t *testing.T) {
 	profile := MeleeFighter{}
-	// A bare character with 500 adena: the greedy strategy fills the
-	// empty slots with the best value per adena first. The
-	// apprentice's shoes (8 pDef for 9 adena with tax) are the best
-	// opening pick of the elven catalogs.
+	// A bare character with 500 adena: the floor buys the cheapest
+	// jewel set (one ring, one earring, one necklace this trip - the
+	// pair halves wait for the next), nothing else (the weapon at 883
+	// stays out of reach, the armor needs a worn weapon).
 	equipment := equipmentWith(nil, nil)
-	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 500)
+	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 500, 1)
 	require.NotEmpty(t, purchases)
 	require.LessOrEqual(t, AdenaSpent(purchases), int64(500))
 	first := purchases[0]
-	require.Equal(t, int32(1121), first.ItemID,
-		"the apprentice's shoes (8 pDef for 9 adena) are the best pick")
-	require.Equal(t, buyPrice(1121), first.Price)
-	require.Equal(t, int32(3014800), first.ListID)
-	require.Equal(t, int32(7148), first.MerchantTemplateID)
+	require.Equal(t, int32(116), first.ItemID,
+		"the magic ring (7 mDef for 37 adena) is the cheapest floor fill")
+	require.Equal(t, buyPrice(116), first.Price)
+	require.Equal(t, int32(3014900), first.ListID)
+	require.Equal(t, int32(7149), first.MerchantTemplateID)
+	for _, purchase := range purchases {
+		stats, ok := npcdata.ItemGearStats(purchase.ItemID)
+		require.True(t, ok)
+		require.Equal(t, CategoryJewel, CategoryOf(stats),
+			"no armor piece runs before the first weapon")
+	}
 
 	// The plan never buys the same item twice.
 	seen := make(map[int32]bool)
@@ -85,13 +96,14 @@ func TestPlanPurchasesCheapFillersFirst(t *testing.T) {
 
 func TestPlanPurchasesOneWeaponPerTrip(t *testing.T) {
 	profile := MeleeFighter{}
-	// A rich character buys ONE weapon per trip: the best value per
-	// adena pick (the short sword) takes the weapon slot and the upgrade
-	// chain (the knife, the broadsword, the sickle, the long sword) is
-	// cut - the next trip re-plans against the sword this one reached.
+	// A rich character buys ONE weapon per trip: the best value
+	// weapon milestone (the short sword from bare fists) takes the
+	// weapon slot and the upgrade chain (the knife, the broadsword,
+	// the sickle, the long sword) is cut - the next trip re-plans
+	// against the sword this one reached.
 	equipment := equipmentWith(nil, nil)
 	purchases := PlanPurchases(
-		profile, equipment, elvenCatalog(), 10_000_000)
+		profile, equipment, elvenCatalog(), 10_000_000, 1)
 	require.NotEmpty(t, purchases)
 	weapons := 0
 	foundShortSword := false
@@ -127,7 +139,7 @@ func TestPlanPurchasesOneWeaponPerTrip(t *testing.T) {
 func TestPlanPurchasesNoDuplicateNecklace(t *testing.T) {
 	profile := MeleeFighter{}
 	equipment := equipmentWith(nil, nil)
-	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 40_000)
+	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 40_000, 1)
 	require.NotEmpty(t, purchases)
 	necks := 0
 	for _, purchase := range purchases {
@@ -147,11 +159,13 @@ func TestPlanPurchasesSkipsInventoryItems(t *testing.T) {
 	// The inventory carries an unequipped broadsword (3): the free
 	// upgrade is simulated first, so the shop broadsword is never
 	// planned and the single weapon purchase of the trip is the best
-	// value upgrade over it (the dirk).
+	// value upgrade over it (the brandish: the two hand sword gains
+	// more score per adena than the dirk and nothing blocked its left
+	// hand slot ahead of the weapon phase).
 	equipment := equipmentWith(
 		[]state.InventoryItem{item(100, 3)}, nil)
 	purchases := PlanPurchases(
-		profile, equipment, elvenCatalog(), 10_000_000)
+		profile, equipment, elvenCatalog(), 10_000_000, 1)
 	weapons := 0
 	for _, purchase := range purchases {
 		require.NotEqual(t, int32(3), purchase.ItemID,
@@ -165,12 +179,12 @@ func TestPlanPurchasesSkipsInventoryItems(t *testing.T) {
 	require.Equal(t, 1, weapons, "one weapon purchase per trip")
 	found := false
 	for _, purchase := range purchases {
-		if purchase.ItemID == 216 {
+		if purchase.ItemID == 1333 {
 			found = true
 		}
 	}
 	require.True(t, found,
-		"the dirk, the best value upgrade over the broadsword, is planned")
+		"the brandish, the best value upgrade over the broadsword, is planned")
 }
 
 func TestPlanPurchasesSkipsEquippedGear(t *testing.T) {
@@ -182,7 +196,7 @@ func TestPlanPurchasesSkipsEquippedGear(t *testing.T) {
 		[]state.InventoryItem{item(100, 3), item(101, 21)},
 		map[Slot]int32{SlotRHand: 100, SlotChest: 101})
 	purchases := PlanPurchases(
-		profile, equipment, elvenCatalog(), 10_000_000)
+		profile, equipment, elvenCatalog(), 10_000_000, 1)
 	for _, purchase := range purchases {
 		require.NotEqual(t, int32(3), purchase.ItemID)
 	}
@@ -212,7 +226,7 @@ func TestPlanPurchasesCreditsDisplacedGear(t *testing.T) {
 	equipment := equipmentWith(
 		[]state.InventoryItem{item(100, 153)},
 		map[Slot]int32{SlotRHand: 100})
-	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 56000)
+	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 56000, 1)
 	var weapon *Purchase
 	for index := range purchases {
 		stats, ok := npcdata.ItemGearStats(purchases[index].ItemID)
@@ -236,7 +250,7 @@ func TestPlanPurchasesCreditsDisplacedGear(t *testing.T) {
 func TestPlanPurchasesNoCreditWithoutEquippedGear(t *testing.T) {
 	profile := MeleeFighter{}
 	equipment := equipmentWith(nil, nil)
-	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 56000)
+	purchases := PlanPurchases(profile, equipment, elvenCatalog(), 56000, 1)
 	require.LessOrEqual(t, AdenaSpent(purchases), int64(56000))
 	require.Zero(t, SellCreditOf(purchases))
 	for _, purchase := range purchases {
@@ -252,9 +266,9 @@ func TestPlanPurchaseQueueMatchesPlainPlan(t *testing.T) {
 	profile := MeleeFighter{}
 	for _, adena := range []int64{0, 500, 56000, 10_000_000} {
 		equipment := equipmentWith(nil, nil)
-		plan := PlanPurchases(profile, equipment, elvenCatalog(), adena)
+		plan := PlanPurchases(profile, equipment, elvenCatalog(), adena, 1)
 		queue := PlanPurchaseQueue(profile, equipment, elvenCatalog(),
-			adena)
+			adena, 1)
 		affordable := affordablePurchases(queue)
 		require.Equal(t, plan, affordable,
 			"the queue prefix must match the plain plan")
@@ -277,7 +291,7 @@ func TestPlanPurchaseQueueMatchesPlainPlan(t *testing.T) {
 func TestPlanPurchaseQueueWantedTail(t *testing.T) {
 	profile := MeleeFighter{}
 	equipment := equipmentWith(nil, nil)
-	queue := PlanPurchaseQueue(profile, equipment, elvenCatalog(), 0)
+	queue := PlanPurchaseQueue(profile, equipment, elvenCatalog(), 0, 1)
 	require.NotEmpty(t, queue, "a bare character still wants gear")
 	adena := int64(0)
 	cumulative := int64(0)
@@ -304,7 +318,7 @@ func TestPlanPurchaseQueueRichNeedsNoTail(t *testing.T) {
 	profile := MeleeFighter{}
 	equipment := equipmentWith(nil, nil)
 	queue := PlanPurchaseQueue(
-		profile, equipment, elvenCatalog(), 10_000_000)
+		profile, equipment, elvenCatalog(), 10_000_000, 1)
 	require.NotEmpty(t, queue)
 	for _, purchase := range queue {
 		require.True(t, purchase.Affordable)
@@ -329,7 +343,7 @@ func TestPlanPurchaseQueueCreditsDisplacedGear(t *testing.T) {
 	// A long tail: the weapon upgrade ranks low on the value per
 	// adena scale, the shoppingQueueTail bound of the widget queue
 	// would cut it before the dirk's turn.
-	queue := planPurchases(profile, equipment, elvenCatalog(), 0, 40)
+	queue := planPurchases(profile, equipment, elvenCatalog(), 0, 1, 40)
 	adena := int64(0)
 	cumulative := int64(0)
 	credit := int64(0)
