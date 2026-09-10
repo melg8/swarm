@@ -322,6 +322,15 @@ function selectBot(botId) {
   // list rebuild never fires the mouseleave of the removed item).
   MapView.blurZone();
   MapView.hoverZone = null;
+  // The map state of the previous bot (its world objects, its zones,
+  // its walk line, its combat effects) must not linger under the new
+  // bot's HUD while the event stream reconnects - the blank frame
+  // reads as loading, the stale frame as wrong data.
+  MapView.resetBot();
+  // The zone list cache belongs to the previous registry: an equal
+  // rebuild key would keep its DOM alive across the switch.
+  renderZones.lastKey = null;
+  renderZones.hoveredId = null;
   openEventStream(botId);
   renderBotList();
   resetPanels();

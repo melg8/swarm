@@ -214,6 +214,21 @@ const MapView = {
     this.draw();
   },
 
+  // resetBot drops the observed bot state ahead of the first snapshot
+  // of a bot switch: the map must not keep painting the previous
+  // bot's world (its zones, its objects, its walk line) under the new
+  // bot's HUD while the event stream reconnects. The fleet wide kill
+  // marks stay - they belong to the whole deployment, not to one bot.
+  resetBot() {
+    this.lastSnap = null;
+    this.runtime.clear();
+    this.socialMasks.clear();
+    this.combatAnims = [];
+    this.lastCombatSeq = 0;
+    this.userMark = null;
+    this.draw();
+  },
+
   // rebuildSocialMasks parses the clan mask strings of the fresh
   // snapshot once: the masks ride the wire as decimal strings (the
   // ALL bit of the top exceeds the safe integer range of JavaScript),

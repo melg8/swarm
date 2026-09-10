@@ -143,6 +143,18 @@ const (
 // the next trip.
 const shoppingQueueTail = 8
 
+// shoppingQueueMin is the minimum entry count of the widget purchase
+// queue: the shop list reads as the progression the trips walk over
+// time (the affordable plan plus the wanted tail), never a lone
+// milestone - the user rule of the widget view (the reported bot
+// wearing the starter kit showed a single sword line while the whole
+// progression waited behind it). When the plain walk ends short of
+// the floor, the wishlist extension continues it: the one purchase
+// per slot guard stands down and the weapon phase accepts every
+// strict upgrade ranked by its value per adena, so the milestones
+// and the defense upgrades inside their grown anchors fill the list.
+const shoppingQueueMin = 4
+
 // unboundedBudget widens the budget of the wanted tail walk: half the
 // int64 range keeps the price plus credit addition of the walker
 // overflow safe while every shop price fits it with room to spare.
@@ -206,7 +218,11 @@ func PlanPurchaseQueue(
 // the same phase ordering continues past the affordability gate. The
 // affordable picks of the walk stay byte identical to the plain
 // planner: the budget gate and the pick loop are unchanged while the
-// wallet lasts.
+// wallet lasts. A queue walk that still ends short of shoppingQueueMin
+// entries extends through the wishlist mode: the one purchase per slot
+// guard stands down and the weapon value gate opens (see
+// shopStrategy.wishlist), so the progression the widget shows never
+// collapses into a lone milestone.
 func planPurchases(
 	profile Profile, equipment Equipment, catalog Catalog, adena int64,
 	level int32, tail int,
@@ -223,6 +239,7 @@ func planPurchases(
 	planned := make(map[int32]bool)
 	boughtSlots := make(map[Slot]bool)
 	tailMode := false
+	wishlist := false
 	tailLeft := tail
 	spent := int64(0)
 	credited := int64(0)
@@ -242,6 +259,22 @@ func planPurchases(
 				// Nothing affordable remains: the wanted
 				// tail continues the walk beyond the wallet.
 				tailMode = true
+				budget = unboundedBudget
+
+				continue
+			}
+			if !wishlist && tail > 0 && len(purchases) < shoppingQueueMin {
+				// The queue came out short (the worn gear
+				// leaves no empty floor slots and the defense
+				// fits no budget): the wishlist extension
+				// continues the progression past the one
+				// purchase per slot guard.
+				wishlist = true
+				strategy.wishlist = true
+				boughtSlots = make(map[Slot]bool)
+				if tailLeft < shoppingQueueMin-len(purchases) {
+					tailLeft = shoppingQueueMin - len(purchases)
+				}
 				budget = unboundedBudget
 
 				continue
@@ -295,11 +328,16 @@ type walkView struct {
 // budget rule (the reference value of the worn defense gear - armor,
 // shield, jewels - may not exceed the reference value of the worn
 // weapon: the weapon leads the gear progression, the defense follows
-// inside its budget).
+// inside its budget). The wishlist switch relaxes the weapon value
+// gate for the extension walk of a short queue (see
+// shoppingQueueMin): every strict upgrade enters the ranking, the
+// widget shows the milestone ladder instead of its best value step
+// alone.
 type shopStrategy struct {
 	level         int32
 	floorIDs      map[int32]bool
 	armorFloorIDs map[int32]bool
+	wishlist      bool
 }
 
 // classify resolves the phase and the rank of one candidate against
@@ -333,7 +371,7 @@ func (s *shopStrategy) classify(
 			return phaseWeapon, 0, false
 		}
 		value := gain / float64(candidate.price)
-		if value < view.target {
+		if value < view.target && !s.wishlist {
 			return phaseWeapon, 0, false
 		}
 

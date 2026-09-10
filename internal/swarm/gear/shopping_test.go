@@ -519,3 +519,53 @@ func TestPlanPurchasesStarterWeaponCarriesNoCredit(t *testing.T) {
 		"the unsellable dagger never credits the budget")
 	require.Equal(t, buyPrice(1), weapon.Price)
 }
+
+// TestPlanPurchaseQueueMinEntries pins the queue floor of the widget:
+// a character whose basic outfit covers every slot and whose starter
+// weapon blocks the defense budget plans the sword milestone alone -
+// the wishlist extension continues the progression (the weapon ladder
+// ranked by the value per adena, the defense inside the grown
+// anchors) so the queue never reads as a lone milestone. The
+// affordable prefix stays exactly the plain plan.
+func TestPlanPurchaseQueueMinEntries(t *testing.T) {
+	profile := MeleeFighter{}
+	// The reported scene: every armor slot already worn, the starter
+	// dagger in the hand (the anchor stays zero until a real weapon
+	// is planned), a wallet that covers the sword milestone.
+	equipment := equipmentWith([]state.InventoryItem{
+		equippedItem(910, daggerID),
+		equippedItem(911, shirtID),
+		equippedItem(912, pantsID),
+		equippedItem(913, clothCapID),
+		equippedItem(914, 48), // Short Gloves
+		equippedItem(915, 35), // Cloth Shoes
+		equippedItem(916, smallShieldID),
+		equippedItem(917, apprenticeEarringID),
+		equippedItem(918, necklaceOfMagicID),
+	}, map[Slot]int32{
+		SlotChest: 911, SlotLegs: 912, SlotHead: 913, SlotGloves: 914,
+		SlotFeet: 915, SlotLHand: 916, SlotREar: 917, SlotNeck: 918,
+		SlotRHand: 910,
+	})
+
+	queue := PlanPurchaseQueue(profile, equipment, elvenCatalog(), 5000, 1)
+	require.GreaterOrEqual(t, len(queue), shoppingQueueMin,
+		"the widget queue holds at least the floor count of entries")
+	// The affordable prefix is exactly the plain plan.
+	plan := PlanPurchases(profile, equipment, elvenCatalog(), 5000, 1)
+	require.Equal(t, plan, affordablePurchases(queue),
+		"the wishlist extension never touches the affordable prefix")
+	// Every entry past the plan is a wanted save up entry.
+	for _, purchase := range queue[len(plan):] {
+		require.False(t, purchase.Affordable)
+		require.Positive(t, purchase.Price)
+	}
+	// The wanted tail keeps its bound.
+	wanted := 0
+	for _, purchase := range queue {
+		if !purchase.Affordable {
+			wanted++
+		}
+	}
+	require.LessOrEqual(t, wanted, shoppingQueueTail)
+}

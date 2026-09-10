@@ -721,3 +721,7 @@ changes the direction immediately.
   the keyed rendering, the pinned footer values, the floating placement
   and the manual interactions) and the shop queue widget.
 - `tools/repro_fight_ui.js` for the fight FX gallery harness.
+- `tools/repro_bot_switch.js` for the observed bot switch: the map
+  resets the previous bot's world (snapshot, runtime objects, social
+  masks, combat effects) ahead of the new stream, keeps the fleet
+  kill marks and repaints the new bot's zones on its first snapshot.

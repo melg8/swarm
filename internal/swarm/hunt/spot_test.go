@@ -471,3 +471,26 @@ func TestSpotMobRespawnLookup(t *testing.T) {
 	_, _, ok = spotMobRespawn(spots, 999123)
 	require.False(t, ok)
 }
+
+// TestSetHuntingSpotsPublishesRegistryAtInstall pins the install time
+// publication of the spot registry: a bot that starts a town trip, a
+// delevel or a manual walk before its first pick never runs the
+// picker (those phases consume every tick ahead of maybeSwitchZone),
+// so the registry view must exist from the SetHuntingSpots call
+// itself - the map shows the farming circles of a fresh session
+// immediately, the active marker only after the first pick.
+func TestSetHuntingSpotsPublishesRegistryAtInstall(t *testing.T) {
+	bot := newTestBot()
+	loop := NewLoop(&fakeGame{}, bot)
+
+	loop.SetHuntingSpots(testSpots())
+
+	snap := bot.Snapshot()
+	require.Len(t, snap.HuntingZones, 2,
+		"the registry view publishes at install time")
+	for _, zone := range snap.HuntingZones {
+		require.False(t, zone.Active,
+			"no spot is active before the first pick")
+		require.Equal(t, "spot", zone.Kind)
+	}
+}

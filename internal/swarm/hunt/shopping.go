@@ -195,11 +195,16 @@ func affordablePrefix(queue []gear.Purchase) []gear.Purchase {
 // widget on every tick: the cached queue view while the loop hunts
 // (a fresh recompute per shoppingPlanPeriod through the shared cache)
 // and the remaining trip buys while a town trip runs (the in-flight
-// batch marked buying). Sessions without the shop strategy (no gear
-// profile, no merchant catalogs, the manual only mode) publish
-// nothing - the widget stays hidden. The built view is reused from
-// the cache between recomputes so the per tick publish pays no
-// allocation.
+// batch marked buying). A trip that has no buys to show yet - the
+// walk to town before the stop planning runs at the shop - falls back
+// to the cached queue view instead of publishing an empty view: the
+// plan that triggered the trip is exactly what the observer wants to
+// see, and clearing the widget for the whole walk read as "the
+// shopping list is missing" (the 2026-09-10 report). Sessions without
+// the shop strategy (no gear profile, no merchant catalogs, the
+// manual only mode) publish nothing - the widget stays hidden. The
+// built view is reused from the cache between recomputes so the per
+// tick publish pays no allocation.
 func (l *Loop) publishShoppingView() {
 	if !l.autonomous || !l.shoppingTripEnabled() {
 		l.tracker.ClearShoppingPlan()
@@ -207,9 +212,14 @@ func (l *Loop) publishShoppingView() {
 		return
 	}
 	if l.tripActive() {
-		l.tracker.SetShoppingPlan(l.tripShoppingView())
+		view := l.tripShoppingView()
+		if len(view.Entries) > 0 {
+			l.tracker.SetShoppingPlan(view)
 
-		return
+			return
+		}
+		// No trip buys in flight yet (the walk to the shop, the sell
+		// phase before the stop planning): the triggering plan stays.
 	}
 	l.refreshShoppingCache()
 	l.tracker.SetShoppingPlan(l.shoppingViewCache)

@@ -146,7 +146,12 @@ func newSpotHunter(spots []Spot, hub *spotHub) *spotHunter {
 // loop hunts the spot mode (the picker, the respawn aware pacing and
 // the measured scoring replace the band ladder, the gear gates and
 // the rotation of the legacy zones). The first pick happens on the
-// next tick.
+// next tick. The registry view publishes IMMEDIATELY: a bot that
+// starts a town trip, a delevel or a manual walk before its first
+// pick would otherwise never run the picker (those phases consume
+// every tick ahead of maybeSwitchZone) and the map of the web UI
+// showed no farming circles at all until the first hunt resumed -
+// the reported "the zone circles are missing after the bot switch".
 func (l *Loop) SetHuntingSpots(spots []Spot) {
 	if len(spots) == 0 {
 		return
@@ -163,6 +168,7 @@ func (l *Loop) SetHuntingSpots(spots []Spot) {
 	l.zoneEmptySince = time.Time{}
 	l.zoneEmptyUntil = nil
 	l.zoneMobPriority = nil
+	l.spot.publishView(l, time.Now())
 }
 
 // SetHuntingSpotRegion installs the spot registry of one region by

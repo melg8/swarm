@@ -263,11 +263,13 @@ reached without the detours.
   the CT0 display id table).
 - `internal/swarm/gear/shopping.go` - the phased planner
   (`PlanPurchases`, `PlanPurchaseQueue`: the affordable plan plus
-  the wanted tail with the cumulative missing adena), the strategy
-  phases (`shopStrategy.classify`: the armor floor, the weapon
-  milestone, the jewel floor behind a real weapon, the defense
-  budget), the catalogs (`Shop`,
-  `Catalog`) and the adena budget handling.
+  the wanted tail with the cumulative missing adena, the queue floor
+  of `shoppingQueueMin` entries through the wishlist extension), the
+  strategy phases (`shopStrategy.classify`: the armor floor, the
+  weapon milestone, the jewel floor behind a real weapon, the
+  defense budget), the catalogs (`Shop`, `Catalog`) and the adena
+  budget handling (the sell credit of `displacedValue` never counts
+  the unsellable newbie kit - `gear.IsStarterItem`).
 - `internal/swarm/gear/shopping_strategy_test.go` - the level
   journey simulation and the was/is comparison table (the legacy
   greedy planner copy, the income model, the ordering pins).

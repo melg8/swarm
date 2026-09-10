@@ -368,9 +368,14 @@ The short form:
   hunt.Navigator interface (set in main.go with hunt.NewNavigator from
   the auto detected geodata directory; without geodata the bot hunts
   without trips). A waypoint follower walks the smoothed path with
-  ground click walks (one per 2 s, arrival within 150 units) and
-  re-paths around obstacles after 15 s of standing still (3 re-paths
-  abort the trip); a trip timeout (20 min) and a trigger cooldown
+  ground click walks (one per 2 s; an intermediate waypoint counts as
+  reached within 50 units - a bridge ramp entry or a detour turn must
+  be walked through, not seen from the side - and the final waypoint
+  within the 150 unit trip arrival radius; a waypoint the character
+  already passed ON the route skips ahead through the projection pass
+  test, while a character beside the route keeps targeting the
+  waypoint it missed). The walker re-paths around obstacles after
+  15 s of standing still (3 re-paths abort the trip); a trip timeout (20 min) and a trigger cooldown
   (5 min after every trip end) bound the whole feature, and a death -
   mid trip or not - clears the cooldown: the village restart lands next
   to the shops and a full inventory sells right after the revival

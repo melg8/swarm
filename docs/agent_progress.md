@@ -99,6 +99,30 @@ The user report (2026-09-10, Russian, three bugs):
   plans no sword, 1300 plans it without SellFirst/SellCredit),
   hunt/town_test.go (the junk excludes the kit).
 
+- Commit "the zone circles and the shop queue survive the bot
+  switch": (1) SetHuntingSpots publishes the registry view at install
+  time - a bot that starts a town trip, a delevel or a manual walk
+  before its first pick never runs the picker (those phases consume
+  the ticks ahead of maybeSwitchZone), so the circles exist from the
+  login snapshot instead of appearing only after the first hunt
+  resumed. (2) publishShoppingView keeps the triggering plan on the
+  widget through the town walk: the trip view is empty until the
+  stop planning runs at the shop and the empty view cleared the plan
+  for the whole leg (the "the shopping list is missing" report).
+  (3) The widget queue never falls below gear.shoppingQueueMin (4)
+  entries: the wishlist extension of planPurchases continues the
+  walk past the one purchase per slot guard with the weapon value
+  gate open, so the list reads as the full save-up progression
+  (the affordable prefix stays byte identical to the plain plan).
+  (4) selectBot resets the map state of the previous bot
+  (MapView.resetBot: the snapshot, the runtime objects, the social
+  masks, the combat effects drop; the fleet kill marks stay) and the
+  zone list cache. Tests: hunt/spot_test.go (the install publish),
+  hunt/shopping_test.go (the plan holds through the walk),
+  gear/shopping_test.go (the queue floor), the new
+  tools/repro_bot_switch.js harness (the map reset, the kill mark
+  survival, the repaint) and the full webui harness set.
+
 ## Active task: the delevel freeze under an attached client - the position ping pong
 )
 

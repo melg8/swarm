@@ -533,3 +533,32 @@ func affordableTotal(entries []state.ShoppingEntryView) int64 {
 
 	return total
 }
+
+// TestTripShoppingViewHoldsThePlanDuringWalk pins the widget view of
+// the town walk: the trip stops are planned only at the shop (after
+// the junk selling), so the walk to town carried an EMPTY trip view
+// and the widget went blank for the whole leg - the reported "the
+// shopping list is missing after the bot switch". The plan that
+// triggered the trip (the cached hunt queue) stays on the widget
+// until the stop planning replaces it.
+func TestTripShoppingViewHoldsThePlanDuringWalk(t *testing.T) {
+	loop, _, bot, _ := newTripLoop()
+	fillInventory(bot)
+	bot.ApplyInventoryUpdate([]state.InventoryItem{
+		{ObjectID: 999, ItemID: 57, Count: 100, Type2: 4, Change: 1},
+	})
+
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase,
+		"the full inventory starts the town trip")
+	require.Empty(t, loop.tripStops[0].buys,
+		"the trip stops are planned only at the shop")
+
+	snap := bot.Snapshot()
+	require.NotNil(t, snap.Shopping,
+		"the triggering plan stays on the widget during the walk")
+	require.NotEmpty(t, snap.Shopping.Entries,
+		"the queue view carries the planned purchases")
+	require.False(t, snap.Shopping.Trip,
+		"the walk view is the hunt queue, not a trip batch")
+}
