@@ -67,7 +67,7 @@ func legacyBestPurchase(
 			continue
 		}
 		credit, sellFirst := displacedValue(equipment, affectedSlots(
-			virtual, candidate.stats.BodyPart))
+			virtual, candidate.stats.BodyPart).slice())
 		if candidate.price > budget+credit {
 			continue
 		}
@@ -121,7 +121,7 @@ func legacyPlanPurchases(
 		credited += credit
 		purchases = append(purchases, walkedPurchase(
 			best, gain, credit, sellFirst, adena, spent, credited, true))
-		for _, slot := range affectedSlots(virtual, best.stats.BodyPart) {
+		for _, slot := range affectedSlots(virtual, best.stats.BodyPart).slice() {
 			boughtSlots[slot] = true
 		}
 		applyToVirtual(&virtual, boughtEntry(best))

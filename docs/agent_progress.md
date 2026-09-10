@@ -3142,3 +3142,37 @@ name the variant number that best fits the real bot UI.
   Verified: go build/vet, go test ./... (19 packages), golangci-lint
   0 issues on the touched packages, the live fleet reaches 60/100
   online sessions and 319K packets in 155 seconds.
+
+- 2026-09-10: the second fleet profiling round and the affordablePrefix
+  / affectedSlots / displacedValue allocation sweep (round 8,
+  feature/proxy-server, perf-and-coverage). Re-ran the live 100 bot
+  fleet with memory profiling after the round 7 optimizations. The
+  remaining hotspots were: affordablePrefix 4.50 MB (called every
+  tick from shoppingWanted just to sum prices), affectedSlots 3 MB
+  (allocated a []Slot on every call, 200-600 times per plan
+  computation), displacedValue 5 MB (allocated a []int32 for the sell
+  first ids).
+
+  Three optimizations applied:
+  1. shoppingWanted zero-alloc: the affordable total is now summed
+     directly over the cached plan without allocating an
+     affordablePrefix slice. affordablePrefix: 4.50 MB -> 0 MB
+     (100 percent reduction on the per tick path).
+  2. affectedSlots slotBuf: the function returns a stack-allocated
+     slotBuf struct { data [2]Slot; n int } instead of a []Slice.
+     The Go compiler keeps the struct on the stack, and the .slice()
+     method creates a slice header pointing to the stack array. All
+     four callers updated to use .slice(). affectedSlots: 3 MB ->
+     0 MB (100 percent reduction).
+  3. displacedValue capacity hint: the ids slice is pre-sized to
+     len(slots) (at most 2) so the common case of 0-2 displaced items
+     pays one small allocation. displacedValue: 5 MB -> 2.50 MB
+     (50 percent reduction).
+
+  Total fleet allocations: 75 MB -> 70 MB (53 percent reduction from
+  the original 148 MB). The BenchmarkFleetE2ELiveEncodeSweep benchmark
+  now reports 0 B/op, 0 allocs/op (was 29724 B/op, 275 allocs/op) -
+  the shopping view cache eliminated every allocation on the snapshot
+  encode sweep path. The BenchmarkFleetE2EEngageScanSweep improved
+  from 64201 ns/op to 52072 ns/op (19 percent faster). Verified: go
+  build/vet, go test ./... (19 packages), golangci-lint 0 issues.

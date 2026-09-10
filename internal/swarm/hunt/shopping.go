@@ -147,14 +147,24 @@ func (l *Loop) refreshShoppingCache() {
 // shoppingWanted reports whether the shop strategy justifies a town
 // trip on its own: a cached plan with a total price above the trip
 // minimum. The inventory full trigger runs independently of it.
+// The affordable total is summed directly over the cached plan
+// without allocating an affordablePrefix slice: the per tick call
+// was allocating a []Purchase on every bot every 200ms (4.5 MB over
+// a 3 minute fleet run) just to sum prices and throw the slice away.
 func (l *Loop) shoppingWanted() bool {
 	l.refreshShoppingCache()
 	if len(l.shoppingPlanCache) == 0 {
 		return false
 	}
+	var total int64
+	for _, purchase := range l.shoppingPlanCache {
+		if !purchase.Affordable {
+			break
+		}
+		total += purchase.Price
+	}
 
-	return gear.AdenaSpent(affordablePrefix(l.shoppingPlanCache)) >=
-		shoppingTripMinValue
+	return total >= shoppingTripMinValue
 }
 
 // affordablePrefix filters the affordable buys of a purchase queue:
