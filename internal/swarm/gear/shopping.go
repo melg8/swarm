@@ -929,6 +929,37 @@ func SimulateInventory(
 	return virtual
 }
 
+// PlannedEquips lists the object ids of the inventory items the auto
+// equipment will wear: the unequipped pieces SimulateInventory places
+// on the virtual paperdoll (the free upgrades - the very drops and
+// buys the shop plan treats as already owned). The junk flows of the
+// hunt loop consult the set before selling or destroying: an item
+// scheduled for wearing is never offered for its instant adena or
+// destroyed for bag space, the bot puts it on and uses it instead.
+// Pieces the simulation leaves off the paperdoll (duplicates, downgrades,
+// the displaced halves of pair swaps) stay plain junk.
+func PlannedEquips(
+	profile Profile, equipment Equipment,
+) map[int32]bool {
+	equipped := make(map[int32]bool, slotCount)
+	for _, objectID := range equipment.Slots {
+		if objectID != 0 {
+			equipped[objectID] = true
+		}
+	}
+	keeps := make(map[int32]bool, len(equipment.Items))
+	virtual := SimulateInventory(profile, equipment)
+	for slot := Slot(0); slot < slotCount; slot++ {
+		entry := virtual[slot]
+		if paperdollEmpty(entry) || equipped[entry.Item.ObjectID] {
+			continue
+		}
+		keeps[entry.Item.ObjectID] = true
+	}
+
+	return keeps
+}
+
 // describe renders the candidate for purchase logs.
 func (c *purchaseCandidate) describe(gain float64) string {
 	name := npcdata.ItemName(c.itemID)

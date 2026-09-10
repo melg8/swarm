@@ -233,11 +233,23 @@ func (b *Bot) InventoryStats() InventoryStats {
 // equipped, not adena, preferring non stackable equipment drops and
 // quest items over common stackables.
 func (b *Bot) DestroyableItems(limit int) []InventoryItem {
+	return b.DestroyableItemsExcluding(nil, limit)
+}
+
+// DestroyableItemsExcluding filters the destroy candidates with a keep
+// set of object ids: the hunt loop passes the planned equips of the
+// auto equipment (the looted or bought upgrades waiting for their use
+// item request), and a kept item is never destroyed for bag space -
+// the bot wears it instead. The ranking of the rest is unchanged.
+func (b *Bot) DestroyableItemsExcluding(
+	keep map[int32]bool, limit int,
+) []InventoryItem {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	candidates := make([]InventoryItem, 0, len(b.inventory.items))
 	for _, item := range b.inventory.items {
-		if item.Equipped || item.Type2 == itemType2Adena {
+		if item.Equipped || item.Type2 == itemType2Adena ||
+			keep[item.ObjectID] {
 			continue
 		}
 		candidates = append(candidates, item)
@@ -273,13 +285,23 @@ func isGearFamily(type2 int16) bool {
 }
 
 // SellableItems returns the inventory items a shop trip sells, sorted
-// most junky first: duplicate gear drops (all pieces of an item id but
-// one) first, then the lowest sell value per unit weight - the cheap
-// heavy items the user of the inventory wants to get rid of first.
-// Equipped gear, adena and quest items are never returned; the server
+// most junky first (see SellableItemsExcluding).
+func (b *Bot) SellableItems() []InventoryItem {
+	return b.SellableItemsExcluding(nil)
+}
+
+// SellableItemsExcluding returns the inventory items a shop trip
+// sells, sorted most junky first: duplicate gear drops (all pieces of
+// an item id but one) first, then the lowest sell value per unit
+// weight - the cheap heavy items the user of the inventory wants to
+// get rid of first. Equipped gear, adena and quest items are never
+// returned, and neither are the object ids of the keep set: the hunt
+// loop passes the planned equips of the auto equipment (the looted or
+// bought upgrades waiting for their use item request), so an item the
+// bot is about to wear is never sold for its instant adena. The server
 // silently skips items it refuses to sell, so the caller must tolerate
 // entries that come back.
-func (b *Bot) SellableItems() []InventoryItem {
+func (b *Bot) SellableItemsExcluding(keep map[int32]bool) []InventoryItem {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	candidates := make([]InventoryItem, 0, len(b.inventory.items))
@@ -287,7 +309,7 @@ func (b *Bot) SellableItems() []InventoryItem {
 	gearKept := make(map[int32]int32)
 	for _, item := range b.inventory.items {
 		if item.Equipped || item.Type2 == itemType2Adena ||
-			item.Type2 == itemType2Quest {
+			item.Type2 == itemType2Quest || keep[item.ObjectID] {
 			continue
 		}
 		candidates = append(candidates, item)

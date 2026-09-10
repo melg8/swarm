@@ -383,3 +383,48 @@ func affordablePurchases(queue []Purchase) []Purchase {
 
 	return affordable
 }
+
+// TestPlannedEquipsListsThePendingWearables pins the keep set of the
+// junk flows: the looted upgrades the simulation places on the virtual
+// paperdoll are pending equips (never sold, never destroyed), while
+// the duplicates, the downgrades and the displaced halves of pair
+// swaps stay plain junk.
+func TestPlannedEquipsListsThePendingWearables(t *testing.T) {
+	profile := MeleeFighter{}
+	// The short sword is worn, the looted broadsword upgrades it and
+	// the second broadsword is a surplus duplicate.
+	equipment := equipmentWith(
+		[]state.InventoryItem{
+			item(100, shortSwordID), item(101, broadswordID),
+			item(102, broadswordID),
+		},
+		map[Slot]int32{SlotRHand: 100})
+	keeps := PlannedEquips(profile, equipment)
+	require.Equal(t, map[int32]bool{101: true}, keeps,
+		"the looted broadsword upgrade is the pending equip, its "+
+			"duplicate and the worn sword are not")
+
+	// A looted downgrade never becomes a pending equip: the worn
+	// broadsword beats it.
+	equipment = equipmentWith(
+		[]state.InventoryItem{item(100, broadswordID), item(101, shortSwordID)},
+		map[Slot]int32{SlotRHand: 100})
+	require.Empty(t, PlannedEquips(profile, equipment),
+		"the looted downgrade stays junk")
+
+	// The pair swap mid flight: one apprentice earring is worn, the
+	// weaker one already came off, the looted mystic earring waits for
+	// its equip behind the pacing window. The mystic is the pending
+	// equip, the displaced apprentice stays junk (it is about to be
+	// sold anyway).
+	equipment = equipmentWith(
+		[]state.InventoryItem{
+			item(100, apprenticeEarringID), item(101, apprenticeEarringID),
+			item(102, mysticEarringID),
+		},
+		map[Slot]int32{SlotREar: 100})
+	require.Equal(t, map[int32]bool{102: true},
+		PlannedEquips(profile, equipment),
+		"the looted mystic earring is the pending equip, the displaced "+
+			"apprentice earring stays junk")
+}

@@ -132,3 +132,60 @@ func TestSnapshotInventoryEnchant(t *testing.T) {
 	require.Len(t, snap.Inventory, 1)
 	require.Equal(t, int16(3), snap.Inventory[0].Enchant)
 }
+
+// TestSellableItemsExcludingKeepsPlannedEquips pins the keep set of
+// the shop sell selection: the object ids the hunt loop passes (the
+// planned equips of the auto equipment - the looted or bought upgrades
+// waiting for their use item request) never enter the sell list, the
+// rest of the junk keeps its order. A kept duplicate also stops
+// counting toward the duplicate rank of its item id: the surviving
+// piece is the kept one, the surplus stays the sellable duplicate.
+func TestSellableItemsExcludingKeepsPlannedEquips(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	bot.ApplyItemList([]InventoryItem{
+		{ObjectID: 1, ItemID: 17, Count: 500, Type2: 5, Change: 1},
+		{ObjectID: 5, ItemID: 35, Count: 1, Type2: 1, Change: 1},
+		{ObjectID: 6, ItemID: 35, Count: 1, Type2: 1, Change: 1},
+	})
+
+	// Without the keep set both short bows sell (the duplicate first).
+	items := bot.SellableItems()
+	require.Len(t, items, 3)
+
+	// The looted upgrade 5 is a planned equip: only the surplus 6 and
+	// the arrows remain, and 6 loses its duplicate rank (its item id
+	// has no other candidate left). The bow is the cheaper value per
+	// weight unit (0.014 against 0.17), so it sells before the arrows.
+	items = bot.SellableItemsExcluding(map[int32]bool{5: true})
+	objects := make([]int32, 0, len(items))
+	for _, item := range items {
+		objects = append(objects, item.ObjectID)
+	}
+	require.Equal(t, []int32{6, 1}, objects,
+		"the planned equip never sells, the duplicate order adapts")
+}
+
+// TestDestroyableItemsExcludingKeepsPlannedEquips pins the keep set of
+// the overflow destroy: a planned equip never enters the destroy
+// candidates even though the gear ranking prefers it, the stackable
+// junk behind it takes the destroy batch instead.
+func TestDestroyableItemsExcludingKeepsPlannedEquips(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	bot.ApplyItemList([]InventoryItem{
+		{ObjectID: 1, ItemID: 1864, Count: 10, Type2: 5, Change: 1},
+		{ObjectID: 2, ItemID: 1864, Count: 10, Type2: 5, Change: 1},
+		{ObjectID: 3, ItemID: 34, Count: 1, Type2: 1, Change: 1},
+	})
+
+	// The plain ranking destroys the gear drop first.
+	require.Equal(t, int32(3), bot.DestroyableItems(1)[0].ObjectID)
+
+	// The gear drop is a planned equip: the destroy batch falls through
+	// to the stackables behind it.
+	destroyable := bot.DestroyableItemsExcluding(map[int32]bool{3: true}, 2)
+	require.Len(t, destroyable, 2)
+	require.Equal(t, int32(1), destroyable[0].ObjectID)
+	require.Equal(t, int32(2), destroyable[1].ObjectID)
+}
