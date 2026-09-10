@@ -61,12 +61,16 @@ equipment pipeline). Deliverable: the research/design document.
   per-spot death/flee EMAs with decay) in a hysteresis spot switch;
   fleet capacity sharing (bots of one process divide the spots).
 
-### Status: research done, the design document is committed (2026-09-10)
+### Status: done (2026-09-10)
 
 - Committed: docs/hunting_system_redesign.md, tools/analyze_hunt_registry.py
   (+ the generated docs/hunt_analysis charts and summary.json).
-- The docx render of the design document goes to the user's Downloads
-  (outside the repo by convention).
+- The docx render of the design document is delivered to the user's
+  Downloads as hunting_system_redesign.docx (19 pages, cover + TOC +
+  6 charts + 5 tables, postcheck 0 errors).
+- GitLab remained HTTP 403 for the whole session (retried at wrap up);
+  the live respawn-position verification is the first task of the next
+  session together with the phase 1 implementation.
 - Next steps for an implementation session: the phase 1 of the plan
   (the spot registry generator + the hunt data model), then phase 2
   (the respawn-aware wait-or-move in the engage loop).
