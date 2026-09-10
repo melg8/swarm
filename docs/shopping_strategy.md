@@ -81,7 +81,22 @@ Supporting rules that survived the rework unchanged:
 - **Nothing is bought twice** and **nothing the inventory already
   carries is bought** (the free upgrades are simulated first, the
   purchases compare against the paperdoll the auto equipment will
-  reach anyway).
+  reach anyway). A drop on the shopping list therefore satisfies the
+  plan for free: the looted item id occupies the simulated slot, the
+  plan moves on to the next step past it.
+- **A looted or bought item the bot is about to wear never becomes
+  junk** (`gear.PlannedEquips`, the planned equip keep set): the
+  simulation's pending equips - the looted upgrades waiting for their
+  paced use item request, the buy arrivals, the better halves of pair
+  swaps mid flight - are excluded from both the shop sell list
+  (`SellableItemsExcluding`) and the overflow destroy list
+  (`DestroyableItemsExcluding`). Only the real junk sells: the
+  duplicates beyond one copy per slot, the looted downgrades and the
+  displaced weaker halves of pair swaps. Without the keep set the
+  first sell batch could race the pair swap window and eat the very
+  jewel the bot was putting on, and the overflow destroy (which
+  ranks gear drops before stackables) could destroy a fresh upgrade
+  for bag space.
 - **One item per slot per trip**: each purchase marks the paperdoll
   slots it fills or clears (the family interplay included - a
   two-hander owns both hands, a one-piece owns chest and legs) and the
@@ -241,6 +256,12 @@ saved by level 17.
   view publish (`publishShoppingView`: the queue while hunting, the
   remaining trip buys while a town trip runs).
 - `internal/swarm/hunt/equip.go` - the auto equipment that wears
-  everything the trips buy (and loot drops) immediately.
+  everything the trips buy (and loot drops) immediately, and the
+  planned equip keep set cache (`Loop.plannedEquipKeeps`) the junk
+  flows consult.
+- `internal/swarm/state/inventory.go` - the junk selection with the
+  keep set filters (`SellableItemsExcluding`,
+  `DestroyableItemsExcluding`) that keep the pending wearables out
+  of the shop batches and the overflow destroys.
 - `internal/swarm/state/shopping.go` - the published shopping queue
   of the web UI (`SetShoppingPlan`, the `shopping` snapshot field).

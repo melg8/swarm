@@ -4,6 +4,68 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: the looted gear of the shopping list survives the junk flows
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+
+### Goal
+
+The user request (2026-09-10, Russian): verify that when an item that
+is on the shopping list drops for the bot, the bot does not sell it
+for its instant adena - it puts it on and uses it.
+
+### Root causes and fixes
+
+- The purchase side was already safe: `PlanPurchases` plans against
+  the simulated paperdoll (`SimulateInventory`), so a looted item id
+  the inventory carries is never bought twice ("nothing gets bought
+  that the inventory already carries" - pinned by
+  `gear` `TestPlanPurchasesSkipsInventoryItems`).
+- The sell side was NOT safe: `state.Bot.SellableItems` lists every
+  unequipped non-adena non-quest item, with no knowledge of what the
+  auto equipment is about to wear. The rescue was pure timing - the
+  auto equip request (paced 2 s, confirmed through the shared gate)
+  usually flips the equipped flag before the first sell batch leaves.
+  The race windows: the two-step pair swap (the better jewel waits
+  for its use request while the displaced piece already came off),
+  the confirmation window of an in-flight equip, a refused equip.
+  Reproduction: `hunt` `TestLootedGearSurvivesTheSellStop` failed -
+  the looted Short Sword went out in the first `SellItems` batch on
+  the very tick the equip request was sent.
+- The destroy side was worse: `DestroyableItems` ranks gear drops
+  FIRST (before common stackables), so the overflow cleanup
+  (70 percent slots) destroyed a freshly looted unequipped upgrade
+  before the junk mats. Reproduction:
+  `TestLootedGearSurvivesTheCleanupDestroy` failed - the destroy
+  batch ate the sword.
+- The fix introduces the planned equip keep set:
+  `gear.PlannedEquips(profile, equipment)` collects the object ids
+  the gear simulation places on the virtual paperdoll but that are
+  not equipped yet - exactly the pending wearables the auto
+  equipment walks through step by step. The hunt loop caches the set
+  per inventory mutation (`equipManager.keepsCache`,
+  `Loop.plannedEquipKeeps`) and passes it to the new junk filters
+  `state.Bot.SellableItemsExcluding(keep)` and
+  `state.Bot.DestroyableItemsExcluding(keep, limit)`; the plain
+  methods delegate with nil. The kept pieces: looted upgrades,
+  bought arrivals waiting for their paced equip, the better halves
+  of pair swaps mid flight. Still junk (correctly): duplicates,
+  looted downgrades, the displaced weaker halves of pair swaps.
+- Three hunt tests pin the behavior end to end: the sell stop keeps
+  the looted sword (the batches sell around it, the trip still
+  completes), the overflow cleanup destroys the stackables behind
+  the kept sword, and the pair swap window sells the displaced
+  apprentice earring while the looted mystic earring survives and
+  wears.
+
+### Status: done (2026-09-10)
+
+- Verify loop: go build/vet, gofmt clean, go test ./... (18
+  packages, 0 failures), golangci-lint 0 new issues in the touched
+  files (the pre-existing goconst on slots.go, the gofumpt on
+  version_test.go and the nolintlint/unparam findings in untouched
+  files remain).
+
 ## Active task: the shop strategy rework - the purchase phases (jewel floor, weapon, defense)
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
