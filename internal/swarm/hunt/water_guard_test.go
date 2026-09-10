@@ -156,15 +156,76 @@ func TestTripWetClickRepatsAroundShore(t *testing.T) {
 	require.Len(t, nav.approachEnds, 2,
 		"the trip planned its leg and re-planned around the shore")
 
-	// The second wet click re-paths again, the third and fourth
-	// exhaust the budget and abort the trip (the walk cannot cross
-	// the water and no shore route exists).
-	loop.tick()
+	// The second and third wet clicks re-path again, the fourth
+	// exhausts the budget: the re-paths keep reproducing the same wet
+	// line, which means the geodata pack itself routes through the
+	// water (the disconnected village decks under the plaza). The
+	// plan is trusted - the click goes out and the server routing
+	// carries the walk over the real plaza (the teacher legs of the
+	// learning trips died on this abort before).
 	loop.tick()
 	loop.tick()
 	require.Empty(t, game.walks)
+	require.False(t, loop.wetPlanTrusted,
+		"the re-path budget is not exhausted yet")
+	loop.tick()
+	require.True(t, loop.wetPlanTrusted,
+		"the exhausted budget trusts the plan of the leg")
+	require.Len(t, game.walks, 1,
+		"the trusted click goes out over the server routing")
+
+	// The trust holds for the whole leg: the next clicks skip the
+	// guard (the follower clicks the remaining waypoints directly,
+	// paced by the walk request period).
+	loop.moveAt = time.Now().Add(-2 * walkRequestPeriod)
+	loop.tick()
+	require.Len(t, game.walks, 2)
+}
+
+// TestTripWetBudgetAbortsAfterATrustedSwim pins the trust bounds: the
+// released leg plan is a gamble on the server routing - when the
+// character genuinely ends up in the water (the standing check trips
+// and the shore escape runs), a SECOND exhausted budget aborts the
+// trip instead of looping the trust into the same lake forever.
+func TestTripWetBudgetAbortsAfterATrustedSwim(t *testing.T) {
+	loop, game, bot, nav := newTripLoop()
+	fillInventory(bot)
+	nav.wetLine = true
+	nav.overWater = true
+	nav.escapeRoute = []pathfind.Vec3{
+		{X: 45000, Y: 50000, Z: -3850},
+		{X: 45600, Y: 50400, Z: -3770},
+	}
+	moveSelfTo(bot, 45000, 50000, -3800)
+
+	// The leg exhausts its budget and trusts the plan (no escape ran
+	// yet), but the character actually stands over the lake bed: the
+	// standing water check wins over the follower and the shore
+	// escape takes over the tick.
+	for range 4 {
+		loop.tick()
+	}
+	require.True(t, loop.waterEscape,
+		"the standing water check must own the tick over the trusted plan")
+	require.Equal(t, 1, loop.waterEscapes,
+		"the escape counts against the trust of the running trip")
+	require.False(t, loop.wetPlanTrusted,
+		"the escape re-arms the guard for the re-planned leg")
+
+	// The character walks onto the shore, the leg re-plans, every
+	// click of the new leg stays wet and the budget exhausts again:
+	// this time an escape already ran, the trip aborts.
+	nav.overWater = false
+	moveSelfTo(bot, 45600, 50400, -3770)
+	loop.tick()
+	require.False(t, loop.waterEscape, "back on the shore")
+	for range 6 {
+		loop.tick()
+	}
 	require.Equal(t, phaseEngage, loop.phase,
-		"the trip must abort when every dry re-path crosses water")
+		"the second exhaustion after a trusted swim aborts the trip")
+	require.True(t, loop.tripEndedAt.After(loop.tripStart))
+	_ = game
 }
 
 // TestTripDryClickStillWalks pins the guard neutral path: a dry click

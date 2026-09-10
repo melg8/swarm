@@ -278,3 +278,47 @@ func TestTeacherTimeoutSkipsTheLessons(t *testing.T) {
 	require.Empty(t, game.lessons,
 		"no lesson request without the teacher")
 }
+
+// TestTripWaitsForTheSkillList pins the enter world race the learning
+// stops died on: the packet burst of the login (UserInfo, ItemList,
+// SkillList) races the first hunt ticks, and a trip that starts between
+// the ItemList and the SkillList would plan without the learning - the
+// sessions shopped on their first walk and the teach stop never came.
+// The trip start now holds until the skill list arrived (bounded, so a
+// server that never lists skills keeps the trips working).
+func TestTripWaitsForTheSkillList(t *testing.T) {
+	// The fresh session state: the character entered the world, the
+	// vitals arrived, the skills have NOT been listed yet.
+	bot := state.NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrMaxHP, Value: 100},
+		{ID: state.AttrCurHP, Value: 90},
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetNavigator(&fakeNavigator{found: true})
+	loop.lastHit = time.Now().Add(-time.Minute)
+	fillInventory(bot)
+
+	// The inventory is full, but the skill list has not arrived: the
+	// trip start holds.
+	loop.tick()
+	require.False(t, loop.tripActive(),
+		"the first trip waits for the server skill list")
+
+	// The list lands (the enter world burst finishes): the trip
+	// starts and carries the learning stops of the fresh queue.
+	bot.SetSkills([]state.LearnedSkill{
+		{SkillID: 142, Level: 1, Passive: true},
+		{SkillID: 194, Level: 1, Passive: true},
+	})
+	bot.ApplyUserInfo(state.UserInfo{
+		Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
+	})
+	loop.tick()
+	require.True(t, loop.tripActive(),
+		"the trip starts once the skill list arrived")
+	require.Greater(t, len(loop.tripStops), 1,
+		"the learning stops ride the trip")
+}

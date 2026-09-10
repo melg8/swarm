@@ -127,3 +127,37 @@ The user report (2026-09-10, Russian, four bugs):
   escape instead of a fight), hunt/town_test.go (the trip drops
   without a cooldown and fights the attacker; the unwinnable
   attacker gets the escape walk).
+
+- Root causes of the teacher walks (reproduced live on the local
+  stack, a level 15 elven fighter with 2000 SP and the Attack/Defence
+  Aura lessons queued injected through the database): (1) the first
+  town trip of a session races the enter world packet burst - a trip
+  that starts between the ItemList and the SkillList plans without
+  the learning stops (the observed sessions shopped on their first
+  walk and never carried the teach stop); (2) the teacher leg dies on
+  the water guard: the deployed geodata pack models holes under the
+  village plaza (cells without a floor layer resolve to the lake
+  layer below them - the probe: every straight line Creamees ->
+  Cobendell/Ellenia fails the dry raster while both endpoints stand
+  dry at -2984/-2792), every re-path reproduces the same wet line and
+  the third exhausts the budget into "town trip ended: aborted, the
+  walk would cross water" - the books were bought (the book stop
+  comes first), the teacher stop never ran.
+
+- Commit "the teacher legs survive the skill list race and the
+  village water raster": (1) maybeStartTownTrip holds its start until
+  the server skill list arrived (state.SkillsListed, bounded by
+  skillListWaitLimit 10s through state.StartedAt so a server that
+  never lists skills keeps the trips selling). (2) The water guard
+  releases a plan the geodata itself routes through water: past the
+  re-path budget the leg is trusted (wetPlanTrusted, the clicks skip
+  the dry check for the rest of the leg and the server routing
+  carries the walk over the real plaza) while the standing water
+  check and the shore escape stay armed - a genuine swim counts
+  (waterEscapes per trip) and the SECOND exhausted budget aborts as
+  before, so the open water case cannot loop the trust. Tests:
+  hunt/learning_test.go (the trip waits for the skill list, then
+  carries the learning stops), hunt/water_guard_test.go (the budget
+  exhaustion trusts the plan and the clicks go out; the trusted plan
+  that actually swims re-arms the guard and the next exhaustion
+  aborts).

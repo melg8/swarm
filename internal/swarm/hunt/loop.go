@@ -300,25 +300,34 @@ type Loop struct {
 	// loot, town trip and delevel logic. A manual only session (started
 	// without -hunt) keeps it off, the loop then drains the manual web
 	// commands and otherwise stays idle.
-	autonomous        bool
-	target            int32
-	lastHit           time.Time
-	lootID            int32
-	lootAt            time.Time
-	lootMoveAt        time.Time
-	skipped           map[int32]time.Time
-	restActionAt      time.Time
-	restActionSit     bool
-	restartAt         time.Time
-	zoneCX            int32
-	zoneCY            int32
-	zoneHalf          int32
-	navigator         Navigator
-	waypoints         []pathfind.Vec3
-	wpIndex           int
-	legDest           pathfind.Vec3
-	legStart          pathfind.Vec3
-	waterEscape       bool
+	autonomous    bool
+	target        int32
+	lastHit       time.Time
+	lootID        int32
+	lootAt        time.Time
+	lootMoveAt    time.Time
+	skipped       map[int32]time.Time
+	restActionAt  time.Time
+	restActionSit bool
+	restartAt     time.Time
+	zoneCX        int32
+	zoneCY        int32
+	zoneHalf      int32
+	navigator     Navigator
+	waypoints     []pathfind.Vec3
+	wpIndex       int
+	legDest       pathfind.Vec3
+	legStart      pathfind.Vec3
+	waterEscape   bool
+	// wetPlanTrusted marks the walk leg whose plan the water guard
+	// released: the geodata pack routes through water it models under
+	// the disconnected village decks, the re-paths reproduce the same
+	// wet line, and the server routing knows the real plaza. The
+	// standing water check and the shore escape still answer a genuine
+	// swim, and waterEscapes counts those of the running trip so the
+	// SECOND budget exhaustion aborts instead of looping the trust.
+	wetPlanTrusted    bool
+	waterEscapes      int
 	moveAt            time.Time
 	stuckAt           time.Time
 	stuckX            int32
@@ -576,6 +585,8 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		legDest:           pathfind.Vec3{X: 0, Y: 0, Z: 0},
 		legStart:          pathfind.Vec3{X: 0, Y: 0, Z: 0},
 		waterEscape:       false,
+		wetPlanTrusted:    false,
+		waterEscapes:      0,
 		moveAt:            time.Time{},
 		stuckAt:           time.Time{},
 		stuckX:            0,

@@ -97,6 +97,11 @@ const (
 	// merchant deck the geodata pack cannot reach (the village
 	// ramps): the ground clicks retry until the window closes.
 	merchantDeckWindow = 30 * time.Second
+	// skillListWaitLimit bounds the hold the first town trip of a
+	// session puts on its start while the server skill list has not
+	// arrived: the list lands within a second of the enter world, and
+	// a trip started ahead of it drops the learning stops silently.
+	skillListWaitLimit = 10 * time.Second
 )
 
 // townNpc is a town npc the trip machinery navigates to: a shop
@@ -298,6 +303,18 @@ func (l *Loop) inventoryFull() bool {
 // no geodata, no path) arms the cooldown, so a broken deployment does
 // not retry every tick.
 func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
+	// The first trip of a session waits for the server skill list:
+	// the learning stops plan on the skill queue and the packet burst
+	// of the enter world (UserInfo, ItemList, SkillList) races the
+	// first hunt ticks - a trip that starts between the ItemList and
+	// the SkillList silently plans without the learning (the observed
+	// sessions shopped on their first walk and never carried the
+	// teach stop). The wait is bounded: a server that never lists
+	// skills keeps the trips selling and shopping.
+	if !l.tracker.SkillsListed() &&
+		time.Since(l.tracker.StartedAt()) < skillListWaitLimit {
+		return
+	}
 	shopping := l.shoppingTripEnabled() && l.shoppingWanted()
 	learning := l.learnTripWanted()
 	if l.navigator == nil || !l.tripCooldownOver() ||
@@ -324,6 +341,8 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	l.tripStart = time.Now()
 	l.sold = make(map[int32]bool)
 	l.rePaths = 0
+	l.wetPlanTrusted = false
+	l.waterEscapes = 0
 	l.tripStops = []tripStop{{
 		merchant: merchant,
 		sell:     true,
@@ -527,6 +546,7 @@ func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
 	l.legDest = dest
 	l.legStart = from
 	l.waterEscape = false
+	l.wetPlanTrusted = false
 	l.moveAt = time.Time{}
 	l.stuckAt = time.Time{}
 
@@ -723,9 +743,8 @@ func (l *Loop) followWaypoints(
 		moveX, moveY = float64(ax), float64(ay)
 	}
 	// The water guard runs after the steering so the line it verifies
-	// is the one actually being sent; without a navigator it stays
-	// off (the walk was planned elsewhere, the follower only walks it).
-	if waterGuard && l.navigator != nil && l.clickWouldEnterWater(
+	// is the one actually being sent (see legWaterGuarded).
+	if l.legWaterGuarded(waterGuard) && l.clickWouldEnterWater(
 		selfX, selfY, selfZ, moveX, moveY, moveZ) {
 		return false
 	}
@@ -735,6 +754,17 @@ func (l *Loop) followWaypoints(
 	}
 
 	return false
+}
+
+// legWaterGuarded reports whether the follower must dry-check the
+// click line of the current leg before sending it: the guard stays
+// off without a navigator (the walk was planned elsewhere, the
+// follower only walks it) and on a leg whose plan the guard already
+// released (the trusted village plaza decks - the re-paths kept
+// reproducing the same geodata water while the server routing knows
+// the real plaza).
+func (l *Loop) legWaterGuarded(waterGuard bool) bool {
+	return waterGuard && !l.wetPlanTrusted && l.navigator != nil
 }
 
 // clickWouldEnterWater verifies the straight line of a ground click
@@ -764,9 +794,30 @@ func (l *Loop) clickWouldEnterWater(
 	l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
 	l.rePaths++
 	if l.rePaths > maxRePaths {
-		l.abortTownTrip("the walk would cross water")
+		if l.waterEscapes > 0 {
+			// A trusted plan already swam on this trip (the escape ran):
+			// the geodata water on the route is real, the guard keeps its
+			// old answer and ends the trip.
+			l.abortTownTrip("the walk would cross water")
 
-		return true
+			return true
+		}
+		// The re-paths keep reproducing the same wet line: the geodata
+		// pack itself routes through it (the disconnected village decks
+		// - the plaza cells without a modeled floor resolve to the lake
+		// layer below them, every straight line over the plaza center
+		// fails the dry raster while the points themselves stand dry).
+		// The plan is trusted for the rest of the leg: the server
+		// routing knows the real plaza, and the standing water check
+		// (OverWater) plus the shore escape still catch a genuine swim
+		// - an escape on the trusted leg re-arms the abort above for
+		// the next budget exhaustion.
+		l.wetPlanTrusted = true
+		l.logger.Printf("Hunt: the planned walk crosses geodata water "+
+			"at %d %d with no dry re-route, trusting the plan over the "+
+			"server routing", selfX, selfY)
+
+		return false
 	}
 	l.logger.Printf("Hunt: the walk would enter water at %d %d, "+
 		"re-pathing around the shore (%d of %d)",
@@ -838,6 +889,8 @@ func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
 	l.waypoints = result.Waypoints
 	l.wpIndex = 0
 	l.waterEscape = true
+	l.wetPlanTrusted = false
+	l.waterEscapes++
 	l.moveAt = time.Time{}
 	l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
 	last := result.Waypoints[len(result.Waypoints)-1]

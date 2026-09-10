@@ -487,6 +487,28 @@ func (b *Bot) SelfObjectID() int32 {
 	return b.selfID
 }
 
+// SkillsListed reports whether the server skill list of the character
+// arrived: the learning queue builds on it, and the first town trip
+// of a session waits for it - the packet burst of the enter world
+// (UserInfo, ItemList, SkillList) races the first hunt ticks, and a
+// trip started between the ItemList and the SkillList would silently
+// plan without the learning stops.
+func (b *Bot) SkillsListed() bool {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.skills != nil
+}
+
+// StartedAt returns the session start of the tracker: bounded waits
+// (the skill list gate of the first town trip) measure against it.
+func (b *Bot) StartedAt() time.Time {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.started
+}
+
 // SelfTargetID returns the object id of the current target of the
 // character, zero when nothing is targeted.
 func (b *Bot) SelfTargetID() int32 {

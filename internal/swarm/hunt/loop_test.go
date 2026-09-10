@@ -184,6 +184,12 @@ func newTestBot() *state.Bot {
 		{ID: state.AttrMaxHP, Value: 100},
 		{ID: state.AttrCurHP, Value: 90},
 	})
+	// The server lists the skills of the character on the enter world
+	// (Lucky is auto granted at the creation): the town trip trigger
+	// holds its start until the list arrived.
+	bot.SetSkills([]state.LearnedSkill{
+		{SkillID: 194, Level: 1, Passive: true},
+	})
 
 	return bot
 }
