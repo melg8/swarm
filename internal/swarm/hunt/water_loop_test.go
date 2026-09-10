@@ -48,31 +48,39 @@ func TestDelevelWaterAbortArmsCooldown(t *testing.T) {
 	}
 }
 
-// TestDelevelWetPlanTrustsAfterBudget pins the composition with the
-// plaza raster artifacts (the geodata cells without a modeled floor
-// resolving to the lake layer below): wet click lines on a planned
-// delevel walk exhaust the budget, the plan is trusted for the leg
-// and the deleveling keeps walking over the server routing - the old
-// refuse-and-restart cycle is gone. A genuine swim mid-route still
-// ends the trip: the standing water check runs the shore escape, and
-// the next budget exhaustion aborts (into the deleveling itself, see
-// TestDelevelWaterAbortArmsCooldown).
-func TestDelevelWetPlanTrustsAfterBudget(t *testing.T) {
+// TestDelevelWetBudgetAbortsIntoCooldown pins the composition with
+// the pure water raster of the click guard: wet click lines on a
+// planned delevel walk exhaust the budget and the deleveling aborts
+// into its cooldown - the guard fires on REAL water only (the plaza
+// height steps of the village ramps walk fine under the server
+// routing, the old line of sight half of the dry check misread them
+// as water), so a refused delevel click means a genuine lake and the
+// abort with the armed cooldown beats both the swim and the old
+// refuse-and-restart cycle.
+func TestDelevelWetBudgetAbortsIntoCooldown(t *testing.T) {
 	loop, game, _, nav := newDelevelLoop(11)
 	spawnZoneMobs(loop.tracker)
 	nav.wetLine = true
 
 	// The trigger tick burns the first re-path, three more exhaust
-	// the budget of 3 and trust the planned leg.
+	// the budget of 3 and abort the deleveling.
 	for range 4 {
 		loop.tick()
 	}
-	require.True(t, loop.wetPlanTrusted,
-		"the budget exhaustion trusts the planned leg")
-	require.Equal(t, phaseDelevel, loop.phase,
-		"the trusted leg keeps the deleveling walking")
-	require.NotEmpty(t, game.walks,
-		"the trusted legs send their click walks")
+	require.NotEqual(t, phaseDelevel, loop.phase,
+		"the exhausted wet budget aborts the deleveling")
+	require.False(t, loop.delevelCooldownOver(),
+		"the abort arms the delevel cooldown")
+	require.Empty(t, game.walks,
+		"no wet click line ever reached the server")
+
+	// The cooldown holds: no tick restarts the deleveling while it
+	// runs (the old loop re-entered the delevel phase every 1.3 s).
+	for range 8 {
+		loop.tick()
+		require.NotEqual(t, phaseDelevel, loop.phase,
+			"the deleveling must stay down while the cooldown runs")
+	}
 }
 
 // TestDelevelWetClicksNeverWalk pins the walk side of the same scene:
