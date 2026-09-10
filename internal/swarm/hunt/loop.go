@@ -640,7 +640,6 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		userDistAt:        time.Time{},
 		engLastDist:       0,
 		engDistAt:         time.Time{},
-
 	}
 }
 
