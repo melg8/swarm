@@ -2417,13 +2417,18 @@ function renderSkillQueueSummary(plan, level) {
 }
 
 // renderSkillTooltip builds the HTML payload of the learned skill
-// tooltip: the name, the passive/active kind with the warrior
-// priority category and the learned level.
+// tooltip: the name, the description of the learned level (the
+// classic client tooltip text the generated dictionary carries from
+// the Mobius C1 skill stats), the passive/active kind with the
+// warrior priority category and the learned level.
 function renderSkillTooltip(skill) {
   if (!skill) { return ""; }
   const lines = [];
   const nameText = skill.name || ("skill #" + skill.skillId);
   lines.push(`<div class="tip-name">${escapeHTML(nameText)}</div>`);
+  if (skill.desc) {
+    lines.push(`<div class="tip-desc">${escapeHTML(skill.desc)}</div>`);
+  }
   lines.push(tooltipLine("Type",
     (skill.passive ? "Passive" : "Active") + " skill"));
   lines.push(tooltipLine("Level", skill.level));
@@ -2452,15 +2457,22 @@ function showSkillTooltip(skill, cell) {
 }
 
 // renderSkillQueueTooltip builds the HTML payload of the lesson
-// tooltip: the name, the lesson level with the category, the unlock
-// level, the SP cost, the status (learnable now, saving up or locked
-// until the level) and the queue totals.
+// tooltip: the name, the description of the level being learned, the
+// lesson level with the category, the unlock level, the SP cost, the
+// status (learnable now, saving up or locked until the level) and the
+// position of the lesson in the queue. The plan wide totals (the
+// lesson count, the SP totals) stay in the pinned summary of the
+// flyout - repeating them in every lesson tooltip said nothing about
+// the hovered lesson.
 function renderSkillQueueTooltip(entry, level, plan) {
   if (!entry) { return ""; }
   const lines = [];
   const nameText = (entry.name || ("skill #" + entry.skillId)) +
     " " + entry.level;
   lines.push(`<div class="tip-name">${escapeHTML(nameText)}</div>`);
+  if (entry.desc) {
+    lines.push(`<div class="tip-desc">${escapeHTML(entry.desc)}</div>`);
+  }
   lines.push(tooltipLine("Lesson",
     (entry.passive ? "Passive" : "Active") + " \u00B7 " +
     (SKILL_CATEGORY_LABELS[entry.category] || "other")));
@@ -2481,13 +2493,21 @@ function renderSkillQueueTooltip(entry, level, plan) {
       formatNumber(Math.max(0, entry.spCost - plan.sp)) + " sp";
   }
   lines.push(tooltipLine("Status", status));
-  const foot = [];
-  if (plan) {
-    foot.push(`<span>Queue <b>${plan.entries.length} lessons</b></span>`);
-    foot.push(`<span>Missing <b>${formatNumber(plan.missing)} sp</b></span>`);
-  }
-  if (foot.length) {
-    lines.push(`<div class="tip-foot">${foot.join("")}</div>`);
+  if (plan && plan.entries) {
+    // The position matches by the queue key (skillId:level), not by
+    // the object identity: the poll replaces App.snapshot with fresh
+    // entry objects while the keyed rows keep the entry of the render
+    // pass they were last refreshed with, so indexOf would answer -1
+    // between the refreshes.
+    const key = entry.skillId + ":" + entry.level;
+    for (let i = 0; i < plan.entries.length; i++) {
+      if (plan.entries[i].skillId + ":" + plan.entries[i].level === key) {
+        lines.push(tooltipLine("In queue",
+          "#" + (i + 1) + " of " + plan.entries.length));
+
+        break;
+      }
+    }
   }
   const family = entry.passive ? "armor" : "weapon";
 

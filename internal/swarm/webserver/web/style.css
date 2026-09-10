@@ -2440,6 +2440,13 @@ canvas.fxg-cell.picked {
   font-style: italic;
   margin-top: 5px;
   word-break: break-word;
+  /* A description clamps to seven lines: the skill tooltips carry the
+     classic client text of the level (a few lines), and a future
+     longer source must not grow the floating panel without end. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 7;
+  overflow: hidden;
 }
 
 /* The enchanted weapon name wears the classic L2 yellow tint. The

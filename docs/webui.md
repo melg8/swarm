@@ -410,7 +410,12 @@ air, and it scrolls once the learned list outgrows the four rows. An
 entirely empty filter tab shows the muted note instead of the slots.
 The data comes from the SkillList packets (0x6D, `state.Bot.SetSkills`)
 enriched with the generated skill dictionary (name, icon, passive
-flag).
+flag, the description of the learned level - the classic client
+tooltip texts the Mobius C1 skill stats carry as XML comments, one
+run per changing level, `npcdata.SkillDescription`). Hovering a cell
+shows the floating tooltip with the name, the description (clamped to
+seven lines by the css) and the passive/active kind with the learned
+level.
 
 The skill learning queue is the second content of the single queue
 flyout dock (see the shop queue widget above): in SKILLS mode the same
@@ -421,7 +426,12 @@ with the learned level, the warrior priority category (attack power /
 defense / other, from the effect stats of the Mobius skill
 definitions), the unlock level and the SP cost with the missing SP;
 the head summary and the pinned sp/need/save foot mirror the shop
-queue. The queue order is the warrior priority: the physical weapon
+queue. Hovering a lesson row shows the floating tooltip with the
+name, the description of the level being learned, the category, the
+unlock level, the cost, the status and the position of the lesson in
+the queue (`In queue #N of M`) - the plan wide totals (the lesson
+count, the missing SP) live in the pinned summary of the flyout head
+and foot, they never repeat in every lesson tooltip. The queue order is the warrior priority: the physical weapon
 attack power lessons first (the strikes and the masteries), the
 defense lessons second, everything else last; within a category by the
 unlock level. The learning function itself is NOT implemented by

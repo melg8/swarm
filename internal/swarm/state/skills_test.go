@@ -43,12 +43,18 @@ func TestSetSkillsPublishesTheSnapshot(t *testing.T) {
 	require.False(t, first.Passive)
 	require.Equal(t, "Power Strike", first.Name)
 	require.Equal(t, "skill0003", first.Icon)
+	require.Equal(t,
+		"Gathers power for a fierce strike. Used when equipped "+
+			"with a sword or blunt type weapon. Over-hit is "+
+			"possible. Power 30.",
+		first.Desc)
 
 	mastery := snap.Skills[3]
 	require.Equal(t, int32(142), mastery.SkillID)
 	require.True(t, mastery.Passive)
 	require.Equal(t, "Armor Mastery", mastery.Name)
 	require.Equal(t, "skill0142", mastery.Icon)
+	require.Equal(t, "Defense increases.", mastery.Desc)
 }
 
 // TestSkillPlanOrdersWarriorPriorities pins the learning order of the
@@ -92,6 +98,12 @@ func TestSkillPlanOrdersWarriorPriorities(t *testing.T) {
 	require.Equal(t, int32(310), strike.SpCost)
 	require.Equal(t, int32(10), strike.ReqLevel)
 	require.False(t, strike.Affordable, "100 sp cannot pay 310")
+	require.Equal(t,
+		"Gathers power for a fierce strike. Used when equipped "+
+			"with a sword or blunt type weapon. Over-hit is "+
+			"possible. Power 39.",
+		strike.Desc, "the description must answer with the "+
+			"level being learned")
 
 	// The auto granted Lucky never enters the queue.
 	for _, entry := range plan.Entries {
@@ -187,6 +199,7 @@ func TestSkillPlanJSONShape(t *testing.T) {
 	require.Equal(t, true, skill["passive"])
 	require.Equal(t, "Armor Mastery", skill["name"])
 	require.Equal(t, "skill0142", skill["icon"])
+	require.Equal(t, "Defense increases.", skill["desc"])
 
 	plan, ok := raw["skillPlan"].(map[string]any)
 	require.True(t, ok)
@@ -202,4 +215,6 @@ func TestSkillPlanJSONShape(t *testing.T) {
 	require.Equal(t, false, first["passive"])
 	require.Equal(t, true, first["affordable"])
 	require.InDelta(t, 0, first["category"], 0.0001)
+	require.Contains(t, first["desc"],
+		"Gathers power for a fierce strike")
 }

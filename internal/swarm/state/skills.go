@@ -33,26 +33,30 @@ type learnedSkill struct {
 
 // SkillSnapshot is one learned skill of the snapshot: the level the
 // server confirmed plus the display data resolved from the generated
-// skill dictionary (name, icon, passive flag). The web UI renders the
-// learned list in active/passive tabs.
+// skill dictionary (name, icon, passive flag, the tooltip text of the
+// learned level). The web UI renders the learned list in active /
+// passive tabs.
 type SkillSnapshot struct {
 	SkillID int32  `json:"skillId"`
 	Level   int32  `json:"level"`
 	Passive bool   `json:"passive"`
 	Name    string `json:"name"`
 	Icon    string `json:"icon"`
+	Desc    string `json:"desc"`
 }
 
 // SkillPlanEntry is one queued lesson of the learning plan: the next
 // level of the skill the bot has not learned yet, with the SP cost,
 // the character level that unlocks the lesson, the warrior priority
-// category (npcdata.SkillCategory*) and the affordability against the
-// SP the plan was computed with. The learning function itself is not
-// implemented - the queue only shows the planned order.
+// category (npcdata.SkillCategory*), the tooltip text of the level
+// being learned and the affordability against the SP the plan was
+// computed with. The learning function itself is not implemented -
+// the queue only shows the planned order.
 type SkillPlanEntry struct {
 	SkillID    int32  `json:"skillId"`
 	Name       string `json:"name"`
 	Icon       string `json:"icon"`
+	Desc       string `json:"desc"`
 	Level      int32  `json:"level"`
 	Passive    bool   `json:"passive"`
 	SpCost     int32  `json:"spCost"`
@@ -185,9 +189,11 @@ func buildSkillQueue(
 			continue
 		}
 		entry := SkillPlanEntry{
-			SkillID:    lesson.SkillID,
-			Name:       "",
-			Icon:       "",
+			SkillID: lesson.SkillID,
+			Name:    "",
+			Icon:    "",
+			Desc: npcdata.SkillDescription(lesson.SkillID,
+				lesson.Level),
 			Level:      lesson.Level,
 			Passive:    false,
 			SpCost:     lesson.SpCost,
@@ -230,11 +236,15 @@ func (b *Bot) skillSnapshotsLocked() []SkillSnapshot {
 			Passive: skill.passive,
 			Name:    fmt.Sprintf("skill #%d", id),
 			Icon:    "",
+			Desc:    "",
 		}
 		if info, ok := npcdata.SkillInfoOf(id); ok {
 			snapshot.Name = info.Name
 			snapshot.Icon = info.Icon
 			snapshot.Passive = info.Passive
+		}
+		if desc := npcdata.SkillDescription(id, skill.level); desc != "" {
+			snapshot.Desc = desc
 		}
 		snapshots = append(snapshots, snapshot)
 	}

@@ -339,7 +339,11 @@ for before ever sending the opposite toggle.
 The full learned skill list of the character (`SkillList.writeImpl`):
 sent on entering the world and after every skill learn. The bot parses
 it into the tracker skill map (the web UI renders the learned skills
-of the equipment widget and computes the learning queue from it).
+of the equipment widget and computes the learning queue from it). The
+snapshot entries of `skills` and `skillPlan.entries` also carry the
+`desc` field - the classic client tooltip text of the level, resolved
+from the level comment runs the generated dictionary extracted out of
+the Mobius C1 skill stats (`npcdata.SkillDescription`).
 
 | Offset | Size | Field |
 |--------|------|-------|

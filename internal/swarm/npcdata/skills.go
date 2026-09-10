@@ -16,6 +16,16 @@ type SkillInfo struct {
 	Category int
 }
 
+// SkillDesc is one level description run of a skill: the text covers
+// every level from Level up to the next run of the skill (the
+// generator collapses the consecutive identical level comments into
+// one run). The text is the classic client tooltip the Mobius C1
+// skill stats carry as XML comments. Generated into skill_trees.go.
+type SkillDesc struct {
+	Level int32
+	Text  string
+}
+
 // The warrior priority categories of the skill learning queue: a
 // fighter learns the physical weapon attack power skills first, then
 // the defense skills, then everything else. The categories come from
@@ -56,6 +66,29 @@ func SkillInfoOf(id int32) (SkillInfo, bool) {
 	info, ok := skillInfos[id]
 
 	return info, ok
+}
+
+// SkillDescription returns the tooltip text of one level of a skill:
+// the run that covers the level (the runs walk the level comments of
+// the Mobius C1 skill stats, so the exact level answers - the power
+// numbers of a strike match the level being learned). A level below
+// the first run or beyond the last one clamps to the nearest run, an
+// unknown skill answers empty (the web UI drops the description
+// block instead of guessing).
+func SkillDescription(id, level int32) string {
+	runs := skillDescs[id]
+	if len(runs) == 0 {
+		return ""
+	}
+	text := runs[0].Text
+	for i := range runs {
+		if runs[i].Level > level {
+			break
+		}
+		text = runs[i].Text
+	}
+
+	return text
 }
 
 // SkillTree returns the complete skill tree of a class id (the class

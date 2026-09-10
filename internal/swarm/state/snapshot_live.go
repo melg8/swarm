@@ -230,11 +230,15 @@ func (b *Bot) appendLiveSkillsJSON(dst []byte) []byte {
 			Passive: skill.passive,
 			Name:    fmt.Sprintf("skill #%d", id),
 			Icon:    "",
+			Desc:    "",
 		}
 		if info, ok := npcdata.SkillInfoOf(id); ok {
 			snapshot.Name = info.Name
 			snapshot.Icon = info.Icon
 			snapshot.Passive = info.Passive
+		}
+		if desc := npcdata.SkillDescription(id, skill.level); desc != "" {
+			snapshot.Desc = desc
 		}
 		dst = appendSkillSnapshotJSON(dst, snapshot)
 	}
@@ -450,8 +454,8 @@ func (b *Bot) snapshotJSONSizeLocked() int {
 	if b.shopping != nil {
 		size += 256 * len(b.shopping.Entries)
 	}
-	size += 64 * len(b.skills)
-	size += 160 * len(b.skillQueue)
+	size += 160 * len(b.skills)
+	size += 256 * len(b.skillQueue)
 	size += 160 * len(b.combat.events)
 	size += 160 * len(b.zoneViews)
 	for i := count; i > 0; i-- {

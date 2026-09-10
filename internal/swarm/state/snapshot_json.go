@@ -51,9 +51,9 @@ func snapshotJSONSize(s Snapshot) int {
 	if s.Shopping != nil {
 		size += 256 * len(s.Shopping.Entries)
 	}
-	size += 64 * len(s.Skills)
+	size += 160 * len(s.Skills)
 	if s.SkillPlan != nil {
-		size += 160 * len(s.SkillPlan.Entries)
+		size += 256 * len(s.SkillPlan.Entries)
 	}
 	size += 160 * len(s.CombatEvents)
 	size += 160 * len(s.HuntingZones)
@@ -580,6 +580,8 @@ func appendSkillSnapshotJSON(dst []byte, skill SkillSnapshot) []byte {
 	dst = appendJSONString(dst, skill.Name)
 	dst = append(dst, `,"icon":`...)
 	dst = appendJSONString(dst, skill.Icon)
+	dst = append(dst, `,"desc":`...)
+	dst = appendJSONString(dst, skill.Desc)
 	dst = append(dst, '}')
 
 	return dst
@@ -623,6 +625,8 @@ func appendSkillPlanEntryJSON(dst []byte, entry SkillPlanEntry) []byte {
 	dst = appendJSONString(dst, entry.Name)
 	dst = append(dst, `,"icon":`...)
 	dst = appendJSONString(dst, entry.Icon)
+	dst = append(dst, `,"desc":`...)
+	dst = appendJSONString(dst, entry.Desc)
 	dst = append(dst, `,"level":`...)
 	dst = strconv.AppendInt(dst, int64(entry.Level), 10)
 	dst = append(dst, `,"passive":`...)

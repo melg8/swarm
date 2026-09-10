@@ -8,10 +8,18 @@
 # the dictionary:
 #
 #   skill stats:   dist/game/data/stats/skills/*.xml
-#                  (skill id, name, icon, operateType, effect stats -
-#                  the effect stats drive the warrior priority class:
-#                  pAtk/physical damage -> attack power, pDef/sDef ->
-#                  defense, everything else -> other)
+#                  (skill id, name, icon, operateType, effect stats,
+#                  level descriptions - the effect stats drive the
+#                  warrior priority category: pAtk/physical damage ->
+#                  attack power, pDef/sDef -> defense, everything
+#                  else -> other; the descriptions are the XML
+#                  comments of the skill blocks, the classic client
+#                  tooltips carried by the server data - "Level N:"
+#                  comments cover one level each and collapse into
+#                  runs, a single unlabeled comment covers the whole
+#                  skill, the enchant route comments "(+N Cost)" and
+#                  levels beyond the declared level count never
+#                  enter the dictionary)
 #   skill trees:   dist/game/data/stats/players/skillTrees/
 #                  {StartingClass,1stClass,2ndClass,3rdClass}/*.xml
 #                  (classId, parentClassId, per skill: id, level,
@@ -65,16 +73,21 @@ import sys
 skill_stats, skill_trees_dir, icons, out = sys.argv[1:5]
 
 # ---------------------------------------------------------------- skill info
-# One <skill id="N" name="..."> block: the icon, the operate type and
-# the effect stats/effect names drive the display and the warrior
-# priority category (0 attack power, 1 defense, 2 other).
+# One <skill id="N" name="..."> block: the icon, the operate type,
+# the effect stats/effect names and the level descriptions drive the
+# display (the tooltip text) and the warrior priority category (0
+# attack power, 1 defense, 2 other).
 skill_infos = {}
+skill_descs = {}
 for path in sorted(glob.glob(os.path.join(skill_stats, '*.xml'))):
     text = open(path, encoding='utf-8').read()
     for m in re.finditer(
             r'<skill id="(\d+)"[^>]*?name="([^"]*)"[^>]*>(.*?)</skill>',
             text, re.S):
         skill_id, name, body = int(m.group(1)), m.group(2), m.group(3)
+        tag = m.group(0)[:m.start(3) - m.start(0)]
+        lv = re.search(r'levels="(\d+)"', tag)
+        max_level = int(lv.group(1)) if lv else 1 << 30
         im = re.search(r'<icon>([^<]+)</icon>', body)
         op = re.search(r'<operateType>([^<]+)</operateType>', body)
         # The #icons table entries (level dependent icons): the first
@@ -109,6 +122,41 @@ for path in sorted(glob.glob(os.path.join(skill_stats, '*.xml'))):
             'operate': op.group(1) if op else '',
             'category': category,
         }
+
+        # -------------------------------------------------------- descriptions
+        # The XML comments of the block are the classic client tooltip
+        # texts. "Level N: text" comments describe one level each (the
+        # enchant route comments "Level N (+k Cost)" and the levels
+        # beyond the declared level count never count); a single
+        # unlabeled comment describes the whole skill (the masteries,
+        # the NPC effects) and only leads when no level comment came
+        # before it. Consecutive levels with the same text collapse
+        # into one run, so the masteries cost one entry instead of
+        # their level count.
+        runs = []
+        for cm in re.finditer(r'<!--\s*(.*?)\s*-->', body):
+            comment = cm.group(1)
+            dm = re.match(r'Level (\d+)(\s*\([^)]*\))?:\s*(.*)',
+                          comment)
+            if dm:
+                if dm.group(2):
+                    continue
+                level = int(dm.group(1))
+                if level < 1 or level > max_level:
+                    continue
+                desc = dm.group(3).strip()
+            elif not runs:
+                level = 1
+                desc = comment.strip()
+            else:
+                continue
+            if not desc or desc.startswith(('FIXME:', 'TODO:')):
+                continue
+            if runs and runs[-1][1] == desc:
+                continue
+            runs.append((level, desc))
+        if runs:
+            skill_descs[skill_id] = runs
 
 # ---------------------------------------------------------------- class trees
 # One skillTree block per class: the entries plus the parentClassId
@@ -222,6 +270,22 @@ for skill_id in sorted(skill_infos):
                     passive, info['category']))
 lines.append('}')
 lines.append('')
+lines.append('// skillDescs maps the skill id to the level description runs')
+lines.append('// of the skill: the Mobius C1 skill stats XML comments - the')
+lines.append('// classic client tooltip texts the server data carries. Every')
+lines.append('// run covers the levels from its Level up to the next run (the')
+lines.append('// consecutive levels with the same text collapse into one run,')
+lines.append('// so the masteries cost one entry). SkillDescription in skills.go')
+lines.append('// walks the runs and answers with the text of the exact level.')
+lines.append('var skillDescs = map[int32][]SkillDesc{')
+for skill_id in sorted(skill_descs):
+    runs = skill_descs[skill_id]
+    lines.append('\t%d: {' % skill_id)
+    for level, desc in runs:
+        lines.append('\t\t{Level: %d, Text: %s},' % (level, go_str(desc)))
+    lines.append('\t},')
+lines.append('}')
+lines.append('')
 lines.append('// skillTrees maps the class id to the complete skill tree of')
 lines.append('// the class (its own entries plus the parent chain): every')
 lines.append('// learnable (skillId, level) pair with the character level')
@@ -251,8 +315,23 @@ icon_hits = sum(1 for e in
                 [entry for v in complete_trees.values() for entry in v]
                 if resolve_icon(e[0], skill_infos.get(e[0], {})
                                 .get('icon', '')))
+desc_skills = len(skill_descs)
+desc_runs = sum(len(v) for v in skill_descs.values())
+desc_bytes = sum(len(t) for v in skill_descs.values() for _, t in v)
+tree_desc_hits = sum(1 for sid in {e[0] for v in
+                     complete_trees.values() for e in v}
+                     if skill_descs.get(sid))
 print('skill stats: %d skills, class trees: %d classes, %d entries,'
       % (len(skill_infos), tree_classes, tree_entries))
 print('tree entries with a resolved icon: %d' % icon_hits)
+print('descriptions: %d skills, %d runs, %d chars; tree skills with'
+      ' a description: %d' % (desc_skills, desc_runs, desc_bytes,
+                              tree_desc_hits))
 print('written: %s' % out)
 PYEOF
+
+# The emitted map literals need the tab alignment of the repository
+# style - gofmt fixes the spacing when the toolchain is around.
+if command -v gofmt >/dev/null 2>&1; then
+    gofmt -w "${OUT}"
+fi

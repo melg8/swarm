@@ -259,6 +259,8 @@ function loadAppJs(appFile) {
         " ? SkillQueuePanel : undefined," +
         " renderSkillQueueTooltip: typeof renderSkillQueueTooltip ===" +
         " 'function' ? renderSkillQueueTooltip : undefined," +
+        " renderSkillTooltip: typeof renderSkillTooltip === 'function'" +
+        " ? renderSkillTooltip : undefined," +
         " App: App, GearDrag: GearDrag };",
         sandbox);
 
@@ -1471,11 +1473,18 @@ function main() {
         },
         skills: [
             { skillId: 3, level: 3, passive: false,
-                name: "Power Strike", icon: "skill0003" },
+                name: "Power Strike", icon: "skill0003",
+                desc: "Gathers power for a fierce strike. Used when" +
+                    " equipped with a sword or blunt type weapon." +
+                    " Over-hit is possible. Power 37." },
             { skillId: 16, level: 2, passive: false,
-                name: "Mortal Blow", icon: "skill0016" },
+                name: "Mortal Blow", icon: "skill0016",
+                desc: "Potentially deadly attack upon the enemy. This" +
+                    " skill can be used when equipped with a dagger." +
+                    " Power 84." },
             { skillId: 142, level: 1, passive: true,
-                name: "Armor Mastery", icon: "skill0142" }
+                name: "Armor Mastery", icon: "skill0142",
+                desc: "Defense increases." }
         ],
         skillPlan: {
             sp: 200, total: 460, missing: 260,
@@ -1483,15 +1492,17 @@ function main() {
                 { skillId: 141, name: "Weapon Mastery",
                     icon: "skill0141", level: 1, passive: true,
                     spCost: 160, reqLevel: 5, category: 0,
-                    affordable: true },
+                    affordable: true, desc: "Attack power increases." },
                 { skillId: 91, name: "Defense Aura",
                     icon: "skill0091", level: 1, passive: false,
                     spCost: 160, reqLevel: 5, category: 1,
-                    affordable: true },
+                    affordable: true,
+                    desc: "Temporarily increases P. Def. Effect 1." },
                 { skillId: 58, name: "Elemental Heal",
                     icon: "skill0058", level: 1, passive: false,
                     spCost: 140, reqLevel: 15, category: 2,
-                    affordable: false }
+                    affordable: false,
+                    desc: "Regenerates one's HP. Power 71." }
             ]
         },
         inventory: [], objects: [], events: [], status: "online"
@@ -1605,6 +1616,27 @@ function main() {
             child.className === "badge-level" &&
             child.textContent === "3"),
         "the level badge is wrong");
+
+    // The learned skill tooltip: the name with the description of the
+    // learned level (the classic client text the Mobius C1 skill
+    // stats comments feed the dictionary) and the passive/active kind.
+    const strikeTooltip = gear.renderSkillTooltip
+        ? gear.renderSkillTooltip(skillsSnapshot().skills[0])
+        : "";
+    check(results, "the learned tooltip carries the level description",
+        strikeTooltip.includes("tip-name") &&
+        strikeTooltip.includes("tip-desc") &&
+        strikeTooltip.includes("Gathers power for a fierce strike") &&
+        strikeTooltip.includes("Power 37") &&
+        strikeTooltip.includes("Active skill"),
+        "tooltip: " + strikeTooltip.replace(/\s+/g, " ").slice(0, 120));
+    const noDescTooltip = gear.renderSkillTooltip
+        ? gear.renderSkillTooltip(
+            Object.assign({}, skillsSnapshot().skills[0], { desc: "" }))
+        : "";
+    check(results, "the learned tooltip drops an empty description",
+        !noDescTooltip.includes("tip-desc"),
+        "an empty description rendered a block");
 
     // Keyed rendering: an unchanged re-render keeps the icon image
     // elements (the icons never blink).
@@ -1775,7 +1807,11 @@ function main() {
         !shopPanel.classList.contains("open"),
         "the tab stayed visible without a queue");
 
-    // The lesson tooltip: the category, the cost and the status.
+    // The lesson tooltip: the description of the level being learned,
+    // the category, the cost, the status and the position of the
+    // lesson in the queue - the plan wide totals (the lesson count,
+    // the missing SP) stay in the pinned flyout summary, they never
+    // repeat in every tooltip.
     const queueTooltip = gear.renderSkillQueueTooltip
         ? gear.renderSkillQueueTooltip(replan.skillPlan.entries[2], 5,
             replan.skillPlan)
@@ -1786,6 +1822,45 @@ function main() {
         queueTooltip.includes("locked until level 15") &&
         queueTooltip.includes("140 sp"),
         "tooltip: " + queueTooltip.replace(/\s+/g, " ").slice(0, 120));
+    check(results, "the lesson tooltip carries the level description",
+        queueTooltip.includes("tip-desc") &&
+        queueTooltip.includes("Regenerates one's HP. Power 71."),
+        "tooltip: " + queueTooltip.replace(/\s+/g, " ").slice(0, 120));
+    check(results, "the lesson tooltip answers with the queue position",
+        queueTooltip.includes("In queue") &&
+        queueTooltip.includes("#3 of 3"),
+        "tooltip: " + queueTooltip.replace(/\s+/g, " ").slice(0, 160));
+    check(results, "the lesson tooltip drops the plan wide totals",
+        !queueTooltip.includes("tip-foot") &&
+        !queueTooltip.includes("lessons") &&
+        !queueTooltip.includes("Missing"),
+        "the queue totals still repeat in the tooltip: " +
+            queueTooltip.replace(/\s+/g, " ").slice(0, 160));
+    const firstLessonTooltip = gear.renderSkillQueueTooltip
+        ? gear.renderSkillQueueTooltip(replan.skillPlan.entries[0], 5,
+            replan.skillPlan)
+        : "";
+    check(results, "the first lesson answers with the queue head",
+        firstLessonTooltip.includes("#1 of 3"),
+        "tooltip: " +
+            firstLessonTooltip.replace(/\s+/g, " ").slice(0, 160));
+    // The poll replaces App.snapshot with fresh entry objects while
+    // the keyed rows keep the entry of the render pass they were last
+    // refreshed with: a clone of the same lesson (an equal key, a
+    // different object) must still resolve its position.
+    const clonedLesson = gear.renderSkillQueueTooltip
+        ? gear.renderSkillQueueTooltip(
+            Object.assign({}, replan.skillPlan.entries[2]), 5,
+            replan.skillPlan)
+        : "";
+    check(results, "the queue position survives the object identity change",
+        clonedLesson.includes("#3 of 3"),
+        "tooltip: " +
+            clonedLesson.replace(/\s+/g, " ").slice(0, 160));
+    check(results, "the tooltip css clamps a long description",
+        css.includes(".item-tooltip .tip-desc") &&
+        css.includes("-webkit-line-clamp: 7"),
+        "the description clamp is missing");
 
     // Switching back to the gear mode: the overlay hides, the gear
     // content returns.
