@@ -106,6 +106,15 @@ const shutdownFlushWait = time.Second
 // outboundQueueSize bounds the client bound packet queue of one client.
 const outboundQueueSize = 512
 
+// botSwitchPollPeriod is how often the live relay retries a pending
+// bot switch: the WebUI selection fired but the target bot was not
+// online yet (registered but still connecting, or not registered at
+// all), so the relay keeps serving the current live feed and polls
+// for the target to enter the world - the client lands on the newly
+// selected bot within one period of it appearing, without a stalled
+// feed or a reconnect.
+const botSwitchPollPeriod = 250 * time.Millisecond
+
 // handleGameConn runs the game server emulation for one client.
 func (s *Server) handleGameConn(conn net.Conn) {
 	id := s.nextConnID()
@@ -619,6 +628,17 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
 	// and the client resyncs onto the newly selected bot.
 	selectionCh := gc.server.selectionChannel()
 
+	// A selection whose target bot is not online yet (registered but
+	// still connecting, or not registered at all) arms a pending
+	// switch: the live feed keeps flowing while the poll ticker below
+	// retries the resync, so the client lands on the target the
+	// moment it enters the world. Without the pending the relay would
+	// stay on the current bot forever: SelectBot of the same id is a
+	// no-op that never refires the channel.
+	pendingSwitch := ""
+	switchPoll := time.NewTicker(botSwitchPollPeriod)
+	defer switchPoll.Stop()
+
 	selfID := session.tracker.SelfObjectID()
 	lastSelfMoveSeq := lastSelfMovementSeq(entries, selfID)
 
@@ -645,22 +665,25 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
 		case <-recorder.CloseSignal():
 			return gc.serveRelogin(session)
 		case <-selectionCh:
-			if next := gc.serveBotSwitch(session); next != nil {
-				newSeq := next.recorder.FirstPacketSeq(charSelectedOpcode)
-				if newSeq == 0 {
-					gc.server.logger.Printf(
-						"game#%d: switched session has no recorded char "+
-							"selected, continuing with the live feed only",
-						gc.id)
-					newSeq = maxReplaySeq
-				}
-
-				return newSeq, true
+			target, next := gc.serveBotSwitch(session)
+			if next != nil {
+				return gc.botSwitchReplaySeq(next), true
 			}
 			// The selection did not resolve to a different online
-			// session (the new id is the current bot, is unregistered
-			// or is still connecting): stay on the current live feed.
+			// session: stay on the current live feed, and arm the
+			// pending switch when the target is not online yet
+			// ("" when the selection names the current bot or
+			// nothing).
+			pendingSwitch = target
 			selectionCh = gc.server.selectionChannel()
+		case <-switchPoll.C:
+			next, ok := gc.retryPendingSwitch(session, pendingSwitch)
+			if !ok {
+				return 0, false
+			}
+			if next != nil {
+				return gc.botSwitchReplaySeq(next), true
+			}
 		case update := <-sub.ch:
 			if isLeaveWorldPayload(update.payload) && !gc.clientLoggedOut() {
 				gc.server.logger.Printf(
@@ -683,23 +706,25 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
 // it through the same teleport + DeleteObject sweep + replay machinery
 // the relogin handoff uses. The client sees the new character's
 // position, appearance, race and class without reconnecting. Returns
-// the new session when the switch happened, nil when the selection did
-// not resolve to a different online session (the caller stays on the
-// current live feed).
-func (gc *gameConn) serveBotSwitch(current *botSession) *botSession {
+// the target id together with the new session when the switch
+// happened; the target id with a nil session when the target is not
+// online yet (the caller arms the pending switch and keeps serving
+// the current live feed); "" with a nil session when the selection
+// resolves to the current bot or nothing at all.
+func (gc *gameConn) serveBotSwitch(current *botSession) (string, *botSession) {
 	target := gc.server.SelectedBot()
 	if target == "" || target == current.id {
-		return nil
+		return "", nil
 	}
 	next := gc.server.sessionByID(target)
 	if next == nil || next == current ||
 		next.tracker.Status() != state.StatusOnline {
 		gc.server.logger.Printf(
-			"game#%d: selection switched to %q but the session is not "+
-				"online, staying on %q",
+			"game#%d: selection switched to %q but the bot is not online "+
+				"yet, serving %q until it enters the world",
 			gc.id, target, current.id)
 
-		return nil
+		return target, nil
 	}
 	oldKnowns := current.tracker.KnownObjectIDs()
 	gc.server.logger.Printf(
@@ -707,10 +732,58 @@ func (gc *gameConn) serveBotSwitch(current *botSession) *botSession {
 			"(%d known objects)",
 		gc.id, current.id, next.id, len(oldKnowns))
 	if !gc.resyncWorld(next, oldKnowns) {
-		return nil
+		return "", nil
 	}
 
-	return next
+	return target, next
+}
+
+// botSwitchReplaySeq resolves the replay start of a switched
+// session: the CharSelected packet of the new bot (the enter world
+// burst follows it), or the live feed alone when the session has no
+// recorded CharSelected (the defensive path of the handoff).
+// retryPendingSwitch resolves one poll tick of the pending bot
+// switch: the WebUI selection named a bot that was not online yet
+// when it fired, and the tick checks whether the target entered the
+// world in the meantime. It resyncs the client onto it and returns
+// the new session with ok=true, returns nil with ok=true while the
+// target is still not online (the live feed keeps flowing), and
+// ok=false when the connection died mid resync.
+func (gc *gameConn) retryPendingSwitch(
+	session *botSession, pending string,
+) (*botSession, bool) {
+	if pending == "" || pending == session.id {
+		return nil, true
+	}
+	next := gc.server.sessionByID(pending)
+	if next == nil || next == session ||
+		next.tracker.Status() != state.StatusOnline {
+		return nil, true
+	}
+	oldKnowns := session.tracker.KnownObjectIDs()
+	gc.server.logger.Printf(
+		"game#%d: the pending switch target %q entered the world, "+
+			"resyncing the client (%d known objects)",
+		gc.id, pending, len(oldKnowns))
+	if !gc.resyncWorld(next, oldKnowns) {
+		return nil, false
+	}
+
+	return next, true
+}
+
+func (gc *gameConn) botSwitchReplaySeq(next *botSession) int64 {
+	newSeq := next.recorder.FirstPacketSeq(charSelectedOpcode)
+	if newSeq == 0 {
+		gc.server.logger.Printf(
+			"game#%d: switched session has no recorded char selected, "+
+				"continuing with the live feed only",
+			gc.id)
+
+		return maxReplaySeq
+	}
+
+	return newSeq
 }
 
 // serveRelogin handles the end of the streamed bot session: a client

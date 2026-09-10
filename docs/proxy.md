@@ -228,8 +228,24 @@ Multiple bot sessions can run in one swarm process (the fleet). The bot
 **selected in the web UI** is the one a connecting client attaches to -
 clicking a bot in the sidebar marks it with a `proxy` chip and POSTs
 `/api/proxy/select`. With no selection (or the web UI off) the first
-registered session serves. The client switches bots by reconnecting
-after changing the selection. `GET /api/proxy` reports the state.
+registered session serves. `GET /api/proxy` reports the state.
+
+A selection change switches an **already connected** client
+immediately: the live relay of the connection wakes on the selection
+notification, resyncs the client onto the newly selected bot (the
+teleport to the live position, the DeleteObject sweep of the old
+known list and the enter world burst of the new bot - the same
+machinery the relogin handoff uses) and follows the new bot's live
+feed, so the client sees the new character's position, appearance,
+race and class without reconnecting. Selecting the bot the client
+already watches changes nothing.
+
+A selected bot that is not online yet (registered but still
+connecting, or not registered at all) does not disconnect or stall
+the client either: the relay keeps serving the current live feed and
+polls for the target, switching the moment the target enters the
+world - the client never needs a reconnect or a re-click (selecting
+the same id twice is a no-op).
 
 ## Packet transformation (the debug seam)
 

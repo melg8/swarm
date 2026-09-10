@@ -153,6 +153,29 @@ The user request (2026-09-10, Russian), three items:
   stop (Ariel instead of Creamees). docs/shopping_strategy.md
   describes the four phases and the new was/is table.
 
+- 2026-10-10 (task 1 done): the proxy switch hardening on top of the
+  round 12 machinery. The gap: a selection whose target bot was not
+  online yet (registered but still connecting) logged "not online,
+  staying" and the client NEVER switched - the target entering the
+  world later refires nothing, and SelectBot of the same id is a
+  no-op, so the client stayed on the wrong bot forever. The fix:
+  `serveBotSwitch` now returns the target id together with the
+  resolved session; an unresolvable target arms `pendingSwitch` on
+  the relay cycle, and a 250 ms poll ticker
+  (`retryPendingSwitch`) retries the resync while the current live
+  feed keeps flowing - the client lands on the target within one
+  period of it entering the world, without a reconnect or a re-click.
+  A new selection supersedes the pending (the channel fires and
+  overwrites it), the relogin handoff re-delivers it through the
+  closed channel of the next cycle, and the replay start of the
+  switched session moved into `botSwitchReplaySeq`. The new test
+  `TestProxySwitchToOfflineTargetCompletesWhenOnline` pins the full
+  offline-then-online path (the teleport carries the live position
+  and the new self id). docs/proxy.md "Switching bots" documents the
+  immediate switch and the pending behavior (it still described the
+  old reconnect-only flow). Live: PROXY_E2E_OK against the deployed
+  stack after the change.
+
 ### Acceptance criteria
 
 - Task 1: `serveBotSwitch` resolves an offline-but-registered target by

@@ -221,3 +221,82 @@ func requireNoPacket(t *testing.T, client *fakeGameClient, d time.Duration) {
 	t.Helper()
 	requireConnOpen(t, client, d)
 }
+
+// TestProxySwitchToOfflineTargetCompletesWhenOnline pins the pending
+// switch: a WebUI selection of a bot that is registered but not
+// online yet (still connecting) keeps the client on the current live
+// feed, and the switch completes by itself the moment the target
+// enters the world - without the user re-clicking anything (a second
+// SelectBot of the same id is a no-op that never refires).
+func TestProxySwitchToOfflineTargetCompletesWhenOnline(t *testing.T) {
+	server := startTestServer(t)
+
+	// Bot A: the initially selected, online bot.
+	recorderA, _ := registerFakeBotWithID(t, server, "botA", "CharA", 1001)
+	recorderA.Record(buildCharSelectedWithID("CharA", 1001))
+	recorderA.Record(buildUserInfoWithID("CharA", 1001))
+
+	// Bot B: registered with a recorded history, but the tracker never
+	// reached the world yet (the connecting state of a session login).
+	trackerB := state.NewBot("botB")
+	trackerB.SetCharacter("CharB", 2002, 18, 46000, 51000, -3500, 90, 40)
+	trackerB.ApplyUserInfo(state.UserInfo{
+		Name:    "CharB",
+		Level:   7,
+		Race:    1,
+		ClassID: 18,
+		X:       46000,
+		Y:       51000,
+		Z:       -3500,
+		CurHP:   90,
+		MaxHP:   120,
+		CurMP:   40,
+		MaxMP:   50,
+		Sp:      5,
+		Exp:     1000,
+	})
+	senderB := newFakeRawSender()
+	recorderB := server.RegisterSession("botB", senderB, trackerB)
+	t.Cleanup(func() { server.UnregisterSession("botB", recorderB) })
+	recorderB.Record(buildCharSelectedWithID("CharB", 2002))
+	recorderB.Record(buildUserInfoWithID("CharB", 2002))
+
+	// The client connects and watches bot A.
+	server.SelectBot("botA")
+	client := enterWorldAsClient(t, server)
+	require.Equal(t, byte(0x04), client.readPacket()[0],
+		"the replayed user info of bot A")
+
+	// The selection moves to the still connecting bot B: no resync
+	// happens (the client stays on bot A's live feed), the pending
+	// switch arms silently.
+	server.SelectBot("botB")
+	requireNoPacket(t, client, 300*time.Millisecond)
+
+	// Bot B enters the world: the pending switch completes on its own
+	// - the client receives the teleport to bot B's position, the
+	// DeleteObject sweep of bot A's known list and the enter world
+	// burst of bot B.
+	trackerB.SetOnline("CharB")
+
+	teleport := client.readPacket()
+	require.Equal(t, byte(0x38), teleport[0],
+		"the teleport to bot B's position once it is online")
+	selfID := binary.LittleEndian.Uint32(teleport[1:5])
+	require.Equal(t, uint32(2002), selfID, "the teleport moves onto bot B's character")
+	x := binary.LittleEndian.Uint32(teleport[5:9])
+	require.Equal(t, uint32(46000), x, "the teleport lands at bot B's live x")
+
+	for {
+		pkt := client.readPacket()
+		if pkt[0] != 0x1E {
+			require.Equal(t, byte(0x04), pkt[0],
+				"the replayed user info of bot B after the switch")
+
+			break
+		}
+	}
+
+	// The client connection stays open.
+	requireConnOpen(t, client, 250*time.Millisecond)
+}
