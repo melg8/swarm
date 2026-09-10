@@ -722,9 +722,13 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 
 // junkRemaining reports whether sellable inventory items are left the
 // trip has not offered yet: every vendor visit sells the accumulated
-// junk completely, batch after batch, whatever started the trip.
+// junk completely, batch after batch, whatever started the trip. The
+// planned equips of the auto equipment stay out of the junk (a looted
+// or bought upgrade waits for its use item request, the sell stop
+// must not eat it).
 func (l *Loop) junkRemaining() bool {
-	for _, item := range l.tracker.SellableItems() {
+	for _, item := range l.tracker.SellableItemsExcluding(
+		l.plannedEquipKeeps()) {
 		if !l.sold[item.ObjectID] {
 			return true
 		}
@@ -743,7 +747,7 @@ func (l *Loop) sellJunk() {
 		return
 	}
 	l.sellAt = now
-	junk := l.tracker.SellableItems()
+	junk := l.tracker.SellableItemsExcluding(l.plannedEquipKeeps())
 	batch := make([]state.InventoryItem, 0, sellBatchSize)
 	for _, item := range junk {
 		if l.sold[item.ObjectID] {

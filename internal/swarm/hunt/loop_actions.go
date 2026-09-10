@@ -121,14 +121,18 @@ func (l *Loop) loot() {
 }
 
 // cleanupInventory destroys junk items when the slots or the weight of
-// the character approach the server limits.
+// the character approach the server limits. The planned equips of the
+// auto equipment stay out of the destroy candidates: a looted upgrade
+// waiting for its paced use item request is never destroyed for bag
+// space - the bot wears it instead.
 func (l *Loop) cleanupInventory() {
 	stats := l.tracker.InventoryStats()
 	if stats.SlotPercent < cleanupSlotPercent &&
 		stats.WeightPercent < cleanupWeightPercent {
 		return
 	}
-	junk := l.tracker.DestroyableItems(destroyBatch)
+	junk := l.tracker.DestroyableItemsExcluding(
+		l.plannedEquipKeeps(), destroyBatch)
 	if len(junk) == 0 {
 		return
 	}

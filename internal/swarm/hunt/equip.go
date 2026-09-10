@@ -38,6 +38,14 @@ type equipManager struct {
 	// scan the same way.
 	starterScanVersion uint64
 	starterScanNone    bool
+	// keepsCache holds the planned equip object ids of the last keeps
+	// scan and keepsVersion the tracker inventory version it ran
+	// against: the junk flows (the shop selling, the overflow destroy)
+	// consult the set on every tick, so the scan is cached per
+	// inventory mutation like the upgrade scan.
+	keepsCache   map[int32]bool
+	keepsVersion uint64
+	keepsScanned bool
 }
 
 // equipActionPeriod paces the auto equipment requests: the Mobius
@@ -61,7 +69,34 @@ func newEquipManager(profile gear.Profile) *equipManager {
 		equipScanNone:      false,
 		starterScanVersion: 0,
 		starterScanNone:    false,
+		keepsCache:         nil,
+		keepsVersion:       0,
+		keepsScanned:       false,
 	}
+}
+
+// plannedEquipKeeps resolves the object ids the auto equipment will
+// wear: the unequipped inventory items the gear simulation places on
+// the paperdoll (see gear.PlannedEquips). The junk flows of the town
+// trips and the overflow cleanup exclude them - a looted or bought
+// upgrade waiting for its paced use item request (a pair swap in
+// flight, the confirmation window) is never sold for its instant
+// adena and never destroyed for bag space. The set is cached per
+// inventory mutation; sessions without a gear profile keep nothing.
+func (l *Loop) plannedEquipKeeps() map[int32]bool {
+	manager := l.equip
+	if manager == nil || l.game == nil {
+		return nil
+	}
+	version := l.tracker.InventoryVersion()
+	if manager.keepsScanned && version == manager.keepsVersion {
+		return manager.keepsCache
+	}
+	manager.keepsCache = gear.PlannedEquips(manager.profile, l.equipment())
+	manager.keepsVersion = version
+	manager.keepsScanned = true
+
+	return manager.keepsCache
 }
 
 // equipment builds the planner working set from the tracker.
