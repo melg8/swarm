@@ -4,6 +4,50 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: the webui modernization proposal (awaiting the user approval)
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+The analysis-and-proposal round of the web UI work (the map toolbar
+round below is done and live verified). Other agents may push to the
+same branch concurrently - rebase before every push.
+
+### Goal
+
+The user report (2026-09-10, Russian): analyze the webui and propose
+how to make the interface more readable, more modern and more
+ergonomic; deliver the proposals as a file for the approval. No UI
+changes land before the approval.
+
+### Changes
+
+- docs/webui_modernization_proposal.md: the proposal document (in
+  Russian, the approval audience) - the analysis method, what stays
+  untouched, the three-axis diagnosis (readability, modern feel,
+  ergonomics), 30 numbered proposals in phases A/B/C plus the dev-mode
+  minors, a three-wave rollout order with effort estimates and the
+  per-item approval checklist at the end.
+
+### Analysis inputs
+
+- Live captures of every mode at 1440x900 (Mobius stack + `bot -hunt`,
+  pathfind 8081, fight showcase v1 8082, fight gallery 8083): light and
+  dark bot themes, the open view dropdown, the log tab, the open shop
+  flyout, the expanded zone panel - /home/z/my-project/download/audit/.
+- Full pass of style.css (2169 lines), index.html (377) and the UI
+  logic of app.js/map.js/main.js; geometry measurements of every panel.
+- Vision model reviews of the key screenshots (light, dark, log,
+  pathfind) cross-checked against the code before landing in the
+  document.
+
+### Status: awaiting the user approval (2026-09-10)
+
+- Nothing in internal/swarm/webserver/web/ changed this round; the
+  deliverable is the proposal file itself.
+- The implementation waves live in the proposal's section 9; every
+  approved item lands as its own atomic commit with the repro suite
+  updates and the live agent-browser verification, as the previous
+  rounds did.
+
 ## Active task: the map toolbar folds into one row (zoom buttons gone, layer checkboxes in a dropdown)
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
