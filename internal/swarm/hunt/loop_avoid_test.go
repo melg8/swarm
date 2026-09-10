@@ -5,6 +5,8 @@
 package hunt
 
 import (
+	"bytes"
+	"log"
 	"math"
 	"testing"
 	"time"
@@ -307,4 +309,123 @@ func TestSteerUsesProjectedThreatPosition(t *testing.T) {
 		48000, 50000, time.Now())
 	require.False(t, dodged,
 		"a camp projected clear of the line never bends the leg")
+}
+
+// fightingScene builds a hunting loop mid-fight: the character at
+// 45000 50000 swings at a passive keltir next to it (object 8) while
+// an aggressive Kaboo Orc Fighter stalks at the given offset.
+func fightingScene(addOffsetX int32) (*Loop, *fakeGame, *bytes.Buffer) {
+	bot := newTestBot()
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 8, TemplateID: 1000534, Attackable: true,
+		X: 45100, Y: 50000, Z: -3500, Name: "Red Keltir",
+	})
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000471, Attackable: true,
+		X: 45000 + addOffsetX, Y: 50000, Z: -3500, Name: "Kaboo Orc Fighter",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	logBuf := &bytes.Buffer{}
+	loop.SetLogger(log.New(logBuf, "", 0))
+	loop.target = 8
+	// The fight runs: our own attack broadcast holds the fresh fight
+	// window on the keltir.
+	bot.ApplyAttack(state.Attack{
+		AttackerID: 100, X: 45000, Y: 50000, Z: -3500,
+		TargetX: 45100, TargetY: 50000, TargetZ: -3500,
+		TargetIDs:   [state.AttackTargets]int32{8},
+		TargetCount: 1,
+	})
+
+	return loop, game, logBuf
+}
+
+// TestFightStepsClearOfImpendingAdd pins the combat half of the
+// steering: a healthy fighting character with an idle aggressive mob
+// stalking inside the on-sight trigger band (its aggro range plus the
+// warning margin) steps straight away from it - the melee target
+// follows, the fight resumes through the re-request, but the distance
+// to the impending add opened before its trigger fired.
+func TestFightStepsClearOfImpendingAdd(t *testing.T) {
+	loop, game, logBuf := fightingScene(550)
+	loop.tick()
+	require.Len(t, game.walks, 1)
+	walk := game.walks[0]
+	require.Equal(t, int32(44700), walk[0])
+	require.Equal(t, int32(50000), walk[1])
+	require.True(t, time.Now().Before(loop.combatAvoidUntil),
+		"the step owns the movement window")
+	require.Contains(t, logBuf.String(),
+		"Kaboo Orc Fighter stalks the fight 550 units out, stepping clear")
+}
+
+// TestFightIgnoresFarAdd pins the warning band: an aggressive mob
+// beyond the band (800 units out against the 600 band edge) never
+// disturbs a running fight.
+func TestFightIgnoresFarAdd(t *testing.T) {
+	loop, game, _ := fightingScene(800)
+	loop.tick()
+	require.Empty(t, game.walks)
+}
+
+// TestFightStepPacesItself pins the step pacing: the immediate
+// re-ticks of the running fight never stack a second step on the
+// window of the first.
+func TestFightStepPacesItself(t *testing.T) {
+	loop, game, _ := fightingScene(550)
+	loop.tick()
+	require.Len(t, game.walks, 1)
+	loop.tick()
+	loop.tick()
+	require.Len(t, game.walks, 1)
+}
+
+// TestFightStepHoldsTheAttackRequests pins the movement window: while
+// the step walks, the forced attack re-request of the engage waits -
+// the server interrupts a running walk on the attack order, and the
+// add would meet the character right back where it stood. The gate is
+// observable through the issued attack requests on a target without a
+// fresh fight window (the exact state a stepping character has once
+// its attack broadcast lapses mid-step).
+func TestFightStepHoldsTheAttackRequests(t *testing.T) {
+	bot := newTestBot()
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 8, TemplateID: 1000534, Attackable: true,
+		X: 45100, Y: 50000, Z: -3500, Name: "Red Keltir",
+	})
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.target = 8
+	loop.combatAvoidUntil = time.Now().Add(2 * time.Second)
+	loop.tick()
+	require.Empty(t, game.forces,
+		"the step window holds the forced attack re-request")
+	loop.combatAvoidUntil = time.Now().Add(-time.Second)
+	loop.tick()
+	require.NotEmpty(t, game.forces,
+		"the lapsed window releases the re-request")
+}
+
+// TestFightStepRespectsTheLeash pins the leash priority: a step that
+// would leave the hunting square is skipped - the leash outranks the
+// add.
+func TestFightStepRespectsTheLeash(t *testing.T) {
+	loop, game, _ := fightingScene(550)
+	loop.SetHuntingZone(45000, 50000, 200)
+	loop.tick()
+	require.Empty(t, game.walks)
+}
+
+// TestFightStepSkipsAnotherDeck pins the 3D gate of the combat scan:
+// an add standing on another deck (700 units above the fight) cannot
+// fire its trigger across the gap, and the fight never steps for it.
+func TestFightStepSkipsAnotherDeck(t *testing.T) {
+	loop, game, _ := fightingScene(550)
+	loop.tracker.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7, TemplateID: 1000471, Attackable: true,
+		X: 45550, Y: 50000, Z: -2800, Name: "Kaboo Orc Fighter",
+	})
+	loop.tick()
+	require.Empty(t, game.walks)
 }

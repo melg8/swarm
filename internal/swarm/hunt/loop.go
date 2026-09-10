@@ -358,6 +358,20 @@ type Loop struct {
 	// a busy corridor bends every leg, the log names it once per
 	// period instead of every request.
 	avoidLogAt time.Time
+	// combatAvoidScanAt paces the impending-add threat scan of the
+	// running fight (see avoidImpendingAdd): the engage ticks four
+	// times a second, the scan pass over the hot records runs at the
+	// target search cadence.
+	combatAvoidScanAt time.Time
+	// combatAvoidAt paces the reposition steps away from an impending
+	// aggressive add: one step per period, the walk costs the fight a
+	// second of swings.
+	combatAvoidAt time.Time
+	// combatAvoidUntil marks the movement window the impending-add
+	// step owns: a forced attack request interrupts a running walk
+	// server-side, so the engage holds its re-requests until the step
+	// finished.
+	combatAvoidUntil time.Time
 	// fleeAt paces the escape walk requests: the escape must not
 	// wait out the attack request pacing of the engage (the last
 	// forced attack fired moments before the threshold crossed).
@@ -541,77 +555,80 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 			Total:   0,
 			Trip:    false,
 		},
-		replacePlanned:   false,
-		replaceDone:      false,
-		replaceQueue:     nil,
-		replaceSelling:   nil,
-		replaceSellSent:  false,
-		replaceUnequipAt: time.Time{},
-		replaceWaitAt:    time.Time{},
-		replaceTried:     0,
-		tripStart:        time.Time{},
-		tripEndedAt:      time.Time{},
-		zones:            nil,
-		spot:             nil,
-		zonePickedID:     "",
-		zoneOverride:     -1,
-		zoneCheckAt:      time.Time{},
-		zoneDeaths:       nil,
-		zoneDeathCap:     -1,
-		zoneDeathLevel:   0,
-		zoneEmptySince:   time.Time{},
-		zoneEmptyUntil:   nil,
-		zoneMobPriority:  nil,
-		zoneReturn:       false,
-		zoneFails:        0,
-		delevelTarget:    0,
-		delevelGuard:     0,
-		delevelTried:     nil,
-		delevelFight:     time.Time{},
-		delevelEnd:       time.Time{},
-		delevelExp:       0,
-		delevelLevel:     0,
-		delevelFree:      0,
-		delevelWait:      time.Time{},
-		delevelCounted:   false,
-		engageAt:         time.Time{},
-		targetSkip:       nil,
-		losAt:            time.Time{},
-		losWaypoints:     nil,
-		losWpIndex:       0,
-		losMoveAt:        time.Time{},
-		losTried:         0,
-		skipScratch:      nil,
-		noTargetSince:    time.Time{},
-		noPickLogAt:      time.Time{},
-		avoidScratch:     nil,
-		avoidLogAt:       time.Time{},
-		fleeAt:           time.Time{},
-		fleeSince:        time.Time{},
-		panicAt:          time.Time{},
-		panicX:           0,
-		panicY:           0,
-		logoutDone:       false,
-		userKind:         "",
-		userX:            0,
-		userY:            0,
-		userZ:            0,
-		userTarget:       0,
-		userStart:        time.Time{},
-		userMoveAt:       time.Time{},
-		userWaypoints:    nil,
-		userWpIndex:      0,
-		userPathTried:    false,
-		userRedirect:     false,
-		userPendingItem:  0,
-		userPendingEquip: false,
-		userPendingCount: 0,
-		userPendingAt:    time.Time{},
-		userDeferred:     nil,
-		userLastDist:     0,
-		userDistAt:       time.Time{},
-		engLastDist:      0,
-		engDistAt:        time.Time{},
+		replacePlanned:    false,
+		replaceDone:       false,
+		replaceQueue:      nil,
+		replaceSelling:    nil,
+		replaceSellSent:   false,
+		replaceUnequipAt:  time.Time{},
+		replaceWaitAt:     time.Time{},
+		replaceTried:      0,
+		tripStart:         time.Time{},
+		tripEndedAt:       time.Time{},
+		zones:             nil,
+		spot:              nil,
+		zonePickedID:      "",
+		zoneOverride:      -1,
+		zoneCheckAt:       time.Time{},
+		zoneDeaths:        nil,
+		zoneDeathCap:      -1,
+		zoneDeathLevel:    0,
+		zoneEmptySince:    time.Time{},
+		zoneEmptyUntil:    nil,
+		zoneMobPriority:   nil,
+		zoneReturn:        false,
+		zoneFails:         0,
+		delevelTarget:     0,
+		delevelGuard:      0,
+		delevelTried:      nil,
+		delevelFight:      time.Time{},
+		delevelEnd:        time.Time{},
+		delevelExp:        0,
+		delevelLevel:      0,
+		delevelFree:       0,
+		delevelWait:       time.Time{},
+		delevelCounted:    false,
+		engageAt:          time.Time{},
+		targetSkip:        nil,
+		losAt:             time.Time{},
+		losWaypoints:      nil,
+		losWpIndex:        0,
+		losMoveAt:         time.Time{},
+		losTried:          0,
+		skipScratch:       nil,
+		noTargetSince:     time.Time{},
+		noPickLogAt:       time.Time{},
+		avoidScratch:      nil,
+		avoidLogAt:        time.Time{},
+		combatAvoidScanAt: time.Time{},
+		combatAvoidAt:     time.Time{},
+		combatAvoidUntil:  time.Time{},
+		fleeAt:            time.Time{},
+		fleeSince:         time.Time{},
+		panicAt:           time.Time{},
+		panicX:            0,
+		panicY:            0,
+		logoutDone:        false,
+		userKind:          "",
+		userX:             0,
+		userY:             0,
+		userZ:             0,
+		userTarget:        0,
+		userStart:         time.Time{},
+		userMoveAt:        time.Time{},
+		userWaypoints:     nil,
+		userWpIndex:       0,
+		userPathTried:     false,
+		userRedirect:      false,
+		userPendingItem:   0,
+		userPendingEquip:  false,
+		userPendingCount:  0,
+		userPendingAt:     time.Time{},
+		userDeferred:      nil,
+		userLastDist:      0,
+		userDistAt:        time.Time{},
+		engLastDist:       0,
+		engDistAt:         time.Time{},
 	}
 }
 
@@ -1132,6 +1149,14 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		// activity, not from the original pick - a slow but
 		// living fight must never trip it.
 		l.engageAt = now
+		// The impending add: an aggressive neighbor about to
+		// join the fight gets a step of clearance BEFORE its
+		// on-sight trigger fires (see loop_avoid.go) - backing
+		// off a potential second opponent beats the pile up
+		// run and the emergency relogin of the real one.
+		if l.avoidImpendingAdd(now) {
+			return
+		}
 		// The swings land right now: nothing to re-request. A stale
 		// engagement (the fight was interrupted, the auto attack flag
 		// and the combat window linger) falls through and keeps
@@ -1161,6 +1186,13 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 			}
 		}
 
+		return
+	}
+	if now.Before(l.combatAvoidUntil) {
+		// The impending-add step owns the movement for its
+		// short window: a forced attack request interrupts a
+		// running walk server-side, and the add would meet the
+		// character right back where it stood.
 		return
 	}
 	if now.Sub(l.lastHit) < engageRetryPeriod {
