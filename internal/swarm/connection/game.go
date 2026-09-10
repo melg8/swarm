@@ -86,6 +86,7 @@ const (
 	stopRotationID     = 0x78
 	myTargetSelectedID = 0xBF
 	systemMessageID    = 0x7A
+	skillListID        = 0x6D
 	socialActionID     = 0x3D
 	actionFailedID     = 0x35
 )
@@ -150,7 +151,9 @@ type GameClient struct {
 	actionFailed   fromgameserver.ActionFailedPacket
 	itemList       fromgameserver.ItemListPacket
 	invUpdate      fromgameserver.InventoryUpdatePacket
+	skillList      fromgameserver.SkillListPacket
 	invItems       []state.InventoryItem
+	skills         []state.LearnedSkill
 	statusAttrs    [statusAttrsCapacity]state.Attribute
 }
 
@@ -219,7 +222,9 @@ func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
 		actionFailed:   *fromgameserver.NewActionFailedPacket(),
 		itemList:       *fromgameserver.NewItemListPacket(),
 		invUpdate:      *fromgameserver.NewInventoryUpdatePacket(),
+		skillList:      *fromgameserver.NewSkillListPacket(),
 		invItems:       nil,
+		skills:         nil,
 		statusAttrs:    [statusAttrsCapacity]state.Attribute{},
 	}
 

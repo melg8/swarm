@@ -51,6 +51,10 @@ func snapshotJSONSize(s Snapshot) int {
 	if s.Shopping != nil {
 		size += 256 * len(s.Shopping.Entries)
 	}
+	size += 64 * len(s.Skills)
+	if s.SkillPlan != nil {
+		size += 160 * len(s.SkillPlan.Entries)
+	}
 	size += 160 * len(s.CombatEvents)
 	size += 160 * len(s.HuntingZones)
 	for i := range s.Events {
@@ -86,6 +90,10 @@ func appendSnapshotJSON(dst []byte, s Snapshot) []byte {
 	dst = appendWalkPathJSON(dst, s.WalkPath)
 	dst = append(dst, `,"shopping":`...)
 	dst = appendShoppingPlanJSON(dst, s.Shopping)
+	dst = append(dst, `,"skills":`...)
+	dst = appendSkillsJSON(dst, s.Skills)
+	dst = append(dst, `,"skillPlan":`...)
+	dst = appendSkillPlanJSON(dst, s.SkillPlan)
 	dst = append(dst, `,"combatEvents":`...)
 	dst = appendCombatEventsJSON(dst, s.CombatEvents)
 	dst = append(dst, `,"huntingZone":`...)
@@ -535,6 +543,96 @@ func appendShoppingEntryJSON(dst []byte, entry ShoppingEntryView) []byte {
 	dst = strconv.AppendBool(dst, entry.Buying)
 	dst = append(dst, `,"reason":`...)
 	dst = appendJSONString(dst, entry.Reason)
+	dst = append(dst, '}')
+
+	return dst
+}
+
+// appendSkillsJSON writes the learned skill array (null when the
+// character knows no skills yet).
+func appendSkillsJSON(dst []byte, skills []SkillSnapshot) []byte {
+	if skills == nil {
+		return append(dst, `null`...)
+	}
+	dst = append(dst, '[')
+	for i := range skills {
+		if i > 0 {
+			dst = append(dst, ',')
+		}
+		dst = appendSkillSnapshotJSON(dst, skills[i])
+	}
+
+	return append(dst, ']')
+}
+
+// appendSkillSnapshotJSON writes one learned skill. The field order
+// mirrors the struct declaration like the reflection encoder.
+func appendSkillSnapshotJSON(dst []byte, skill SkillSnapshot) []byte {
+	dst = append(dst, `{"skillId":`...)
+	dst = strconv.AppendInt(dst, int64(skill.SkillID), 10)
+	dst = append(dst, `,"level":`...)
+	dst = strconv.AppendInt(dst, int64(skill.Level), 10)
+	dst = append(dst, `,"passive":`...)
+	dst = strconv.AppendBool(dst, skill.Passive)
+	dst = append(dst, `,"name":`...)
+	dst = appendJSONString(dst, skill.Name)
+	dst = append(dst, `,"icon":`...)
+	dst = appendJSONString(dst, skill.Icon)
+	dst = append(dst, '}')
+
+	return dst
+}
+
+// appendSkillPlanJSON writes the learning queue (null when the class
+// is unknown or nothing is left to learn).
+func appendSkillPlanJSON(dst []byte, plan *SkillPlanView) []byte {
+	if plan == nil {
+		return append(dst, `null`...)
+	}
+	dst = append(dst, `{"sp":`...)
+	dst = strconv.AppendInt(dst, plan.Sp, 10)
+	dst = append(dst, `,"total":`...)
+	dst = strconv.AppendInt(dst, plan.Total, 10)
+	dst = append(dst, `,"missing":`...)
+	dst = strconv.AppendInt(dst, plan.Missing, 10)
+	if plan.Entries == nil {
+		dst = append(dst, `,"entries":null`...)
+	} else {
+		dst = append(dst, `,"entries":[`...)
+		for i := range plan.Entries {
+			if i > 0 {
+				dst = append(dst, ',')
+			}
+			dst = appendSkillPlanEntryJSON(dst, plan.Entries[i])
+		}
+		dst = append(dst, ']')
+	}
+	dst = append(dst, '}')
+
+	return dst
+}
+
+// appendSkillPlanEntryJSON writes one queued lesson. The field order
+// mirrors the struct declaration like the reflection encoder.
+func appendSkillPlanEntryJSON(dst []byte, entry SkillPlanEntry) []byte {
+	dst = append(dst, `{"skillId":`...)
+	dst = strconv.AppendInt(dst, int64(entry.SkillID), 10)
+	dst = append(dst, `,"name":`...)
+	dst = appendJSONString(dst, entry.Name)
+	dst = append(dst, `,"icon":`...)
+	dst = appendJSONString(dst, entry.Icon)
+	dst = append(dst, `,"level":`...)
+	dst = strconv.AppendInt(dst, int64(entry.Level), 10)
+	dst = append(dst, `,"passive":`...)
+	dst = strconv.AppendBool(dst, entry.Passive)
+	dst = append(dst, `,"spCost":`...)
+	dst = strconv.AppendInt(dst, int64(entry.SpCost), 10)
+	dst = append(dst, `,"reqLevel":`...)
+	dst = strconv.AppendInt(dst, int64(entry.ReqLevel), 10)
+	dst = append(dst, `,"category":`...)
+	dst = strconv.AppendInt(dst, int64(entry.Category), 10)
+	dst = append(dst, `,"affordable":`...)
+	dst = strconv.AppendBool(dst, entry.Affordable)
 	dst = append(dst, '}')
 
 	return dst

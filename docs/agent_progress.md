@@ -3334,3 +3334,19 @@ name the variant number that best fits the real bot UI.
   login server flood protector (two simultaneous logins from one IP),
   handled automatically by the reconnect backoff. go build/vet, go
   test ./... (19 packages), golangci-lint 0 issues.
+
+- 2026-09-10: atomic commit 2 of the skills-display task - the
+  SkillList packet and the state layer. from_game_server/skill_list.go
+  parses the 0x6D SkillList packet ([count][passive][level][id] per
+  entry, see Mobius SkillList.writeImpl) with the implausible count
+  guard and the reusable entry buffer; the dispatch routes it through
+  GameClient.applySkillList -> state.Bot.SetSkills. state/skills.go
+  stores the learned map (id -> level + passive), builds the learning
+  queue lazily (cached, rebuilt when the class or the learned set
+  changes, empty while no skill list arrived), and the snapshot
+  carries the enriched learned list (skills) plus the queue view
+  (skillPlan: sp, total, missing, entries with the warrior priority
+  category and the affordability flag computed under the lock). The
+  JSON encoders mirror the reflection output (appendSkillsJSON,
+  appendSkillPlanJSON in snapshot_json.go, the live variants in
+  snapshot_live.go). ResetSession clears both. All go tests green.

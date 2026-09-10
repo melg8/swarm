@@ -41,6 +41,8 @@ func (gc *GameClient) handleServerPacket(payload []byte) {
 		gc.logger.Println("Server is closing the connection")
 	case systemMessageID:
 		gc.applySystemMessage(payload)
+	case skillListID:
+		gc.applySkillList(payload)
 	case socialActionID:
 		gc.applySocialAction(payload)
 	case actionFailedID:

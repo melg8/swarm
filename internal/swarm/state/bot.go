@@ -380,6 +380,16 @@ type Bot struct {
 	// published. shoppingAt bounds its freshness (shoppingPlanTTL).
 	shopping   *ShoppingPlanView
 	shoppingAt time.Time
+	// skills holds the learned skill list of the server packet
+	// (id -> level + passive). skillsRevision counts the SetSkills
+	// calls; skillQueue caches the ordered learning queue and
+	// rebuilds when the class or the revision moves (see
+	// ensureSkillQueueLocked).
+	skills             map[int32]learnedSkill
+	skillsRevision     uint64
+	skillQueue         []SkillPlanEntry
+	skillQueueClass    int32
+	skillQueueRevision uint64
 	// loginCooldownUntil holds the reconnect pause the supervisor
 	// honors after an emergency logout. The tracker outlives the
 	// sessions, so the cooldown spans them (see SetLoginCooldown).
@@ -414,6 +424,11 @@ func NewBot(id string) *Bot {
 		walkPathAt:         time.Time{},
 		shopping:           nil,
 		shoppingAt:         time.Time{},
+		skills:             nil,
+		skillsRevision:     0,
+		skillQueue:         nil,
+		skillQueueClass:    0,
+		skillQueueRevision: 0,
 	}
 }
 
@@ -814,6 +829,11 @@ func (b *Bot) ResetSession() {
 	b.world = newObjectStore()
 	b.inventory = newInventoryStore()
 	b.inventoryVersion++
+	b.skills = nil
+	b.skillsRevision++
+	b.skillQueue = nil
+	b.skillQueueClass = 0
+	b.skillQueueRevision = 0
 	b.walkPath = nil
 	b.walkPathAt = time.Time{}
 	b.clearShoppingPlanLocked()
@@ -1689,6 +1709,15 @@ type Snapshot struct {
 	// with the prices and the missing adena, null when nothing is
 	// published or the plan expired.
 	Shopping *ShoppingPlanView `json:"shopping"`
+	// Skills carries the learned skill list of the server SkillList
+	// packets enriched with the display data of the generated
+	// dictionary (name, icon, passive flag).
+	Skills []SkillSnapshot `json:"skills"`
+	// SkillPlan carries the learning queue of the class tree (see
+	// skillPlanViewLocked): the remaining lessons in the planned
+	// order with the SP costs, null when the class is unknown or
+	// nothing is left to learn.
+	SkillPlan *SkillPlanView `json:"skillPlan"`
 	// CombatEvents carries the recent swings and damage
 	// landings of the animation layer: the last
 	// combatEventTTL window, in chronological order,
@@ -1794,6 +1823,8 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 		Chat:         make([]ChatEvent, 0, b.chat.length),
 		WalkPath:     nil,
 		Shopping:     nil,
+		Skills:       nil,
+		SkillPlan:    nil,
 		HuntingZone:  nil,
 		HuntingZones: nil,
 		Packets:      b.packets,
@@ -1816,6 +1847,8 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 			Trip:    b.shopping.Trip,
 		}
 	}
+	snap.Skills = b.skillSnapshotsLocked()
+	snap.SkillPlan = b.skillPlanViewLocked()
 	nowNano := now.UnixNano()
 	for i := range b.world.hot {
 		snap.Objects = append(snap.Objects,

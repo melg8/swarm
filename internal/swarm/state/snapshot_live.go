@@ -5,6 +5,8 @@
 package state
 
 import (
+	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -62,6 +64,10 @@ func (b *Bot) appendSnapshotJSONLocked(dst []byte, now time.Time) []byte {
 	dst = b.appendLiveWalkPathJSON(dst)
 	dst = append(dst, `,"shopping":`...)
 	dst = b.appendLiveShoppingJSON(dst, now)
+	dst = append(dst, `,"skills":`...)
+	dst = b.appendLiveSkillsJSON(dst)
+	dst = append(dst, `,"skillPlan":`...)
+	dst = b.appendLiveSkillPlanJSON(dst)
 	dst = append(dst, `,"combatEvents":[`...)
 	dst = b.appendLiveCombatJSON(dst, now)
 	dst = append(dst, `],"huntingZone":`...)
@@ -201,6 +207,82 @@ func (b *Bot) appendLiveShoppingJSON(dst []byte, now time.Time) []byte {
 	}
 
 	return appendShoppingPlanJSON(dst, b.shopping)
+}
+
+// appendLiveSkillsJSON writes the learned skill list (null when the
+// character knows no skills, the nil semantics of the Snapshot view).
+// The caller must hold a lock.
+func (b *Bot) appendLiveSkillsJSON(dst []byte) []byte {
+	if len(b.skills) == 0 {
+		return append(dst, `null`...)
+	}
+	dst = append(dst, '[')
+	first := true
+	for _, id := range b.sortedSkillIDsLocked() {
+		if !first {
+			dst = append(dst, ',')
+		}
+		first = false
+		skill := b.skills[id]
+		snapshot := SkillSnapshot{
+			SkillID: id,
+			Level:   skill.level,
+			Passive: skill.passive,
+			Name:    fmt.Sprintf("skill #%d", id),
+		}
+		if info, ok := npcdata.SkillInfoOf(id); ok {
+			snapshot.Name = info.Name
+			snapshot.Icon = info.Icon
+			snapshot.Passive = info.Passive
+		}
+		dst = appendSkillSnapshotJSON(dst, snapshot)
+	}
+
+	return append(dst, ']')
+}
+
+// sortedSkillIDsLocked returns the learned skill ids in ascending
+// order (the Snapshot view order). The caller must hold a lock.
+func (b *Bot) sortedSkillIDsLocked() []int32 {
+	ids := make([]int32, 0, len(b.skills))
+	for id := range b.skills {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+
+	return ids
+}
+
+// appendLiveSkillPlanJSON writes the learning queue (null when the
+// class is unknown or nothing is left to learn) exactly like the
+// Snapshot view. The affordability flag is computed inline against
+// the SP read under the same lock - the stored queue never carries a
+// valid flag. The caller must hold a lock.
+func (b *Bot) appendLiveSkillPlanJSON(dst []byte) []byte {
+	b.ensureSkillQueueLocked()
+	if len(b.skillQueue) == 0 {
+		return append(dst, `null`...)
+	}
+	sp := int64(b.char.Sp)
+	total, missing := skillTotals(b.skillQueue, sp)
+	dst = append(dst, `{"sp":`...)
+	dst = strconv.AppendInt(dst, sp, 10)
+	dst = append(dst, `,"total":`...)
+	dst = strconv.AppendInt(dst, total, 10)
+	dst = append(dst, `,"missing":`...)
+	dst = strconv.AppendInt(dst, missing, 10)
+	dst = append(dst, `,"entries":[`...)
+	for i := range b.skillQueue {
+		if i > 0 {
+			dst = append(dst, ',')
+		}
+		entry := b.skillQueue[i]
+		entry.Affordable = sp >= int64(entry.SpCost)
+		dst = appendSkillPlanEntryJSON(dst, entry)
+	}
+	dst = append(dst, `]}`...)
+
+	return dst
 }
 
 // appendLiveCombatJSON writes the combat animation beats of the TTL
@@ -366,6 +448,8 @@ func (b *Bot) snapshotJSONSizeLocked() int {
 	if b.shopping != nil {
 		size += 256 * len(b.shopping.Entries)
 	}
+	size += 64 * len(b.skills)
+	size += 160 * len(b.skillQueue)
 	size += 160 * len(b.combat.events)
 	size += 160 * len(b.zoneViews)
 	for i := count; i > 0; i-- {

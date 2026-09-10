@@ -520,6 +520,44 @@ func (gc *GameClient) applyItemList(payload []byte) {
 	gc.logger.Printf("Inventory listed with %d items", len(items))
 }
 
+// applySkillList parses SkillList and replaces the learned skill set
+// of the tracker (the web UI renders it and computes the learning
+// queue from it). The server sends the whole list, so a merge is
+// never needed.
+func (gc *GameClient) applySkillList(payload []byte) {
+	if err := fromgameserver.ParseSkillListPacket(
+		&gc.skillList, payload); err != nil {
+		gc.logger.Printf("Failed to parse skill list: %v", err)
+
+		return
+	}
+	if gc.tracker == nil {
+		return
+	}
+	skills := gc.convertSkills(gc.skillList.Skills)
+	gc.tracker.SetSkills(skills)
+	gc.logger.Printf("Skill list with %d skills", len(skills))
+}
+
+// convertSkills copies the parsed entries into state entries through
+// a fresh slice: the state layer stores its own map, but the parse
+// buffer is reused by the next packet, so the values must not alias
+// it.
+func (gc *GameClient) convertSkills(
+	source []fromgameserver.SkillListEntry,
+) []state.LearnedSkill {
+	skills := make([]state.LearnedSkill, 0, len(source))
+	for _, skill := range source {
+		skills = append(skills, state.LearnedSkill{
+			SkillID: skill.SkillID,
+			Level:   skill.Level,
+			Passive: skill.Passive,
+		})
+	}
+
+	return skills
+}
+
 // applyInventoryUpdate parses InventoryUpdate and applies the changes.
 func (gc *GameClient) applyInventoryUpdate(payload []byte) {
 	if err := fromgameserver.ParseInventoryUpdatePacket(
