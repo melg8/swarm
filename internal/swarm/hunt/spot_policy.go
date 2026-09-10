@@ -753,4 +753,16 @@ func (h *spotHunter) publishView(l *Loop, now time.Time) {
 		views = append(views, view)
 	}
 	l.tracker.SetHuntingZones(views)
+
+	// The kill ring rides along: the positions of the recent kills
+	// feed the fleet wide cross layer of the map (every kill of every
+	// bot, independent of the observed bot - see Bot.SetKillMarks).
+	marks := make([]state.KillMarkView, 0, len(h.kills))
+	for index := range h.kills {
+		kill := &h.kills[index]
+		marks = append(marks, state.KillMarkView{
+			X: kill.x, Y: kill.y, AtMs: kill.at.UnixMilli(),
+		})
+	}
+	l.tracker.SetKillMarks(marks)
 }

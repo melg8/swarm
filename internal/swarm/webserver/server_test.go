@@ -96,6 +96,40 @@ func TestBotListEndpoint(t *testing.T) {
 	require.Equal(t, state.StatusOnline, bots[0].Status)
 }
 
+func TestFleetKillsEndpoint(t *testing.T) {
+	server, bot := newTestServer(t)
+	bot.SetKillMarks([]state.KillMarkView{
+		{X: 45000, Y: 50000, AtMs: 1000},
+		{X: 45100, Y: 50100, AtMs: 2000},
+	})
+
+	recorder := httptest.NewRecorder()
+	server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
+		http.MethodGet, "/api/fleet/kills", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Equal(t,
+		"application/json", recorder.Header().Get("Content-Type"))
+
+	var marks []state.KillMarkView
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &marks))
+	require.Len(t, marks, 2)
+	require.Equal(t, "test1", marks[0].BotID)
+	require.Equal(t, int32(45000), marks[0].X)
+	require.Equal(t, int64(2000), marks[1].AtMs)
+}
+
+func TestFleetKillsEndpointEmpty(t *testing.T) {
+	server, _ := newTestServer(t)
+
+	recorder := httptest.NewRecorder()
+	server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
+		http.MethodGet, "/api/fleet/kills", nil))
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Equal(t, "[]\n", recorder.Body.String())
+}
+
 func TestBotStateEndpoint(t *testing.T) {
 	server, _ := newTestServer(t)
 	recorder := httptest.NewRecorder()

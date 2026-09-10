@@ -41,6 +41,11 @@ const (
 	// defaultPathfindScale is the initial map zoom of the pathfind
 	// test, a bit closer than the bot map default.
 	defaultPathfindScale = 0.06
+
+	// fleetKillMarkLimit bounds the fleet kill ring served by
+	// /api/fleet/kills: the cross layer of the map fades the marks
+	// after ten minutes, so an older mark would only waste wire.
+	fleetKillMarkLimit = 400
 )
 
 // Poll intervals of the event stream.
@@ -138,6 +143,7 @@ func NewServer(
 
 	mux := server.httpServer.Handler.(*http.ServeMux)
 	mux.HandleFunc("GET /api/bots", server.handleBotList)
+	mux.HandleFunc("GET /api/fleet/kills", server.handleFleetKills)
 	mux.HandleFunc("GET /api/bots/{id}/state", server.handleBotState)
 	mux.HandleFunc("GET /api/bots/{id}/dump", server.handleBotDump)
 	mux.HandleFunc("GET /api/bots/{id}/events", server.handleBotEvents)
@@ -286,6 +292,21 @@ func (s *Server) Shutdown(ctx context.Context) error {
 // handleBotList responds with the compact info of all bots.
 func (s *Server) handleBotList(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, s.logger, s.registry.List())
+}
+
+// handleFleetKills responds with the recent kill marks of every bot
+// of the registry: the web map polls it for the fleet wide cross
+// layer, so the kills stay on the map across the bot switches (the
+// observed bot's snapshot alone would only carry its own kills). An
+// empty registry answers an empty array.
+func (s *Server) handleFleetKills(w http.ResponseWriter, _ *http.Request) {
+	marks := s.registry.FleetKillMarks(fleetKillMarkLimit)
+	if marks == nil {
+		// An idle fleet serves an empty array, not a null: the web
+		// layer feeds the array straight into the map layer.
+		marks = []state.KillMarkView{}
+	}
+	writeJSON(w, s.logger, marks)
 }
 
 // handleBotState responds with the full snapshot of one bot. The

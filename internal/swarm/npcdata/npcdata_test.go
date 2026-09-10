@@ -84,6 +84,22 @@ func TestNPCAggroRange(t *testing.T) {
 		require.Equal(t, int32(0), NPCAggroRange(0))
 		require.Equal(t, int32(0), NPCAggroRange(-1))
 	})
+
+	t.Run("xml ranges above the server clamp resolve to the clamp", func(t *testing.T) {
+		// The Mobius C1 NpcTemplate caps every ai aggroRange at
+		// MaxAggroRange (NPC.ini ships 450), so the xml 1000 of the
+		// aggressive monsters never reaches the world: the resolved
+		// range must draw the number the server acts on.
+		require.Equal(t, int32(450), NPCAggroRange(1000000+12))
+		require.Equal(t, int32(450), NPCAggroRange(1000000+17))
+	})
+
+	t.Run("no resolved range exceeds the server clamp", func(t *testing.T) {
+		for id := int32(1); id < 20000; id++ {
+			require.LessOrEqual(t,
+				NPCAggroRange(1000000+id), int32(450))
+		}
+	})
 }
 
 func TestNPCIsAggressive(t *testing.T) {

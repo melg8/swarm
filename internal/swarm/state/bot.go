@@ -362,11 +362,16 @@ type Bot struct {
 	// log is the rolling packet event log, chat the chat window
 	// ring, combat the web view animation feed (one component
 	// value each, see their types for the layout contracts).
-	log          eventLog
-	chat         chatLog
-	combat       combatFeed
-	zone         *Zone
-	zoneViews    []ZoneView
+	log       eventLog
+	chat      chatLog
+	combat    combatFeed
+	zone      *Zone
+	zoneViews []ZoneView
+	// killMarks carries the recent kills of the hunt loop (the kill
+	// ring of the spot hunter): the positions feed the fleet wide
+	// cross layer of the map, so the crosses survive the bot switches
+	// of the web view.
+	killMarks    []KillMarkView
 	packets      int64
 	version      uint64
 	started      time.Time
@@ -788,6 +793,54 @@ func (b *Bot) SetHuntingZones(zones []ZoneView) {
 	b.zoneViews = make([]ZoneView, len(zones))
 	copy(b.zoneViews, zones)
 	b.touch()
+}
+
+// SetKillMarks publishes the recent kill ring of the hunt loop: the
+// ground positions where the bot's targets died. The marks feed the
+// fleet wide cross layer of the map (Registry.FleetKillMarks serves
+// them for every bot of the process), so the crosses accumulate
+// across the bot switches of the web view. A repeated identical set
+// only refreshes the timestamp: the hunt loop republishes the ring
+// with every spot view refresh.
+func (b *Bot) SetKillMarks(marks []KillMarkView) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if killMarksEqual(b.killMarks, marks) {
+		return
+	}
+	b.killMarks = make([]KillMarkView, len(marks))
+	copy(b.killMarks, marks)
+	b.touch()
+}
+
+// KillMarks returns a defensive copy of the recent kill marks of the
+// bot (the registry aggregates them for the fleet endpoint).
+func (b *Bot) KillMarks() []KillMarkView {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if len(b.killMarks) == 0 {
+		return nil
+	}
+	marks := make([]KillMarkView, len(b.killMarks))
+	copy(marks, b.killMarks)
+
+	return marks
+}
+
+// killMarksEqual reports whether two kill mark slices are element
+// wise equal. The comparison lets SetKillMarks skip the defensive
+// copy while the hunt ring holds the same kills.
+func killMarksEqual(a, b []KillMarkView) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 // zoneViewsEqual reports whether two zone view slices are element wise
@@ -1660,37 +1713,48 @@ type InventoryItemSnapshot struct {
 
 // ObjectSnapshot is the JSON view of a world object.
 type ObjectSnapshot struct {
-	ObjectID        int32      `json:"objectId"`
-	Kind            ObjectKind `json:"kind"`
-	Name            string     `json:"name"`
-	Title           string     `json:"title"`
-	TemplateID      int32      `json:"templateId"`
-	Attackable      bool       `json:"attackable"`
-	Aggressive      bool       `json:"aggressive"`
-	AggroRange      int32      `json:"aggroRange"`
-	Level           int32      `json:"level"`
-	TargetID        int32      `json:"targetId"`
-	InCombat        bool       `json:"inCombat"`
-	Dead            bool       `json:"dead"`
-	Sitting         bool       `json:"sitting"`
-	Moving          bool       `json:"moving"`
-	Running         bool       `json:"running"`
-	Speed           float64    `json:"speed"`
-	CollisionRadius float64    `json:"collisionRadius"`
-	SocialUntilMs   int64      `json:"socialUntilMs"`
-	Count           int32      `json:"count"`
-	X               int32      `json:"x"`
-	Y               int32      `json:"y"`
-	Z               int32      `json:"z"`
-	Heading         int32      `json:"heading"`
-	DestX           int32      `json:"destX"`
-	DestY           int32      `json:"destY"`
-	DestZ           int32      `json:"destZ"`
-	MoveAtMs        int64      `json:"moveAtMs"`
-	CurHP           float64    `json:"curHp"`
-	MaxHP           float64    `json:"maxHp"`
-	CurMP           float64    `json:"curMp"`
-	MaxMP           float64    `json:"maxMp"`
+	ObjectID   int32      `json:"objectId"`
+	Kind       ObjectKind `json:"kind"`
+	Name       string     `json:"name"`
+	Title      string     `json:"title"`
+	TemplateID int32      `json:"templateId"`
+	Attackable bool       `json:"attackable"`
+	Aggressive bool       `json:"aggressive"`
+	AggroRange int32      `json:"aggroRange"`
+	// ClanHelpRange is the distance within the attacked npc calls
+	// its clan mates to help (0 for loners): the map draws the
+	// social links between clan mates inside it.
+	ClanHelpRange int32 `json:"clanHelpRange"`
+	// ClanMask is the clan bitmask of the npc as a decimal string
+	// (see npcdata.NPCClanMask: the low bits are the clan alphabet,
+	// the top bit marks the ALL clan that matches everything). A
+	// string because the ALL bit exceeds the safe integer range of
+	// JavaScript; the map parses it with BigInt for the pairwise
+	// link test.
+	ClanMask        string  `json:"clanMask"`
+	Level           int32   `json:"level"`
+	TargetID        int32   `json:"targetId"`
+	InCombat        bool    `json:"inCombat"`
+	Dead            bool    `json:"dead"`
+	Sitting         bool    `json:"sitting"`
+	Moving          bool    `json:"moving"`
+	Running         bool    `json:"running"`
+	Speed           float64 `json:"speed"`
+	CollisionRadius float64 `json:"collisionRadius"`
+	SocialUntilMs   int64   `json:"socialUntilMs"`
+	Count           int32   `json:"count"`
+	X               int32   `json:"x"`
+	Y               int32   `json:"y"`
+	Z               int32   `json:"z"`
+	Heading         int32   `json:"heading"`
+	DestX           int32   `json:"destX"`
+	DestY           int32   `json:"destY"`
+	DestZ           int32   `json:"destZ"`
+	MoveAtMs        int64   `json:"moveAtMs"`
+	CurHP           float64 `json:"curHp"`
+	MaxHP           float64 `json:"maxHp"`
+	CurMP           float64 `json:"curMp"`
+	MaxMP           float64 `json:"maxMp"`
 }
 
 // CombatEventView is the JSON view of one combat animation beat
@@ -1806,6 +1870,21 @@ type ZoneView struct {
 	// first kill).
 	KillX int32 `json:"killX"`
 	KillY int32 `json:"killY"`
+}
+
+// KillMarkView is one recent kill of the fleet kill ring: the ground
+// position where a bot's target died with the time of the kill. The
+// web map draws the marks as the crosses of the whole deployment -
+// they accumulate across the bots (every kill of every bot stays
+// visible) instead of the per zone centroid that the observed bot
+// alone carries.
+type KillMarkView struct {
+	// BotID names the bot that landed the kill (the tooltip of
+	// the cross).
+	BotID string `json:"botId"`
+	X     int32  `json:"x"`
+	Y     int32  `json:"y"`
+	AtMs  int64  `json:"atMs"`
 }
 
 // SelfSnapshot returns the live character view of the played character

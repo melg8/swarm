@@ -242,6 +242,13 @@ func appendObjectJSON(dst []byte, o ObjectSnapshot) []byte {
 	dst = strconv.AppendBool(dst, o.Aggressive)
 	dst = append(dst, `,"aggroRange":`...)
 	dst = strconv.AppendInt(dst, int64(o.AggroRange), 10)
+	// The social fields of the npc: the clan help range draws the
+	// assist links of the map, the mask string pairs the clan mates
+	// (the empty mask of the clan less npcs costs a pair of quotes).
+	dst = append(dst, `,"clanHelpRange":`...)
+	dst = strconv.AppendInt(dst, int64(o.ClanHelpRange), 10)
+	dst = append(dst, `,"clanMask":`...)
+	dst = appendJSONString(dst, o.ClanMask)
 	dst = append(dst, `,"level":`...)
 	dst = strconv.AppendInt(dst, int64(o.Level), 10)
 	dst = append(dst, `,"targetId":`...)

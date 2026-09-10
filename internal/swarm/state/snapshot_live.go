@@ -383,6 +383,18 @@ func (b *Bot) characterSnapshotLocked(
 	}
 }
 
+// clanMaskString renders the clan bitmask for the snapshot view: a
+// decimal string for a clan carrier, an empty string for the clan
+// less npcs (most objects carry no clans, the empty string keeps the
+// wire lean and doubles as the falsy check of the web layer).
+func clanMaskString(mask uint64) string {
+	if mask == 0 {
+		return ""
+	}
+
+	return strconv.FormatUint(mask, 10)
+}
+
 // objectSnapshotLocked builds the object view of the snapshot from
 // the live hot and cold records. The value stays on the stack of the
 // caller. The caller must hold a lock.
@@ -399,6 +411,8 @@ func (b *Bot) objectSnapshotLocked(slot int, nowNano int64) ObjectSnapshot {
 		Attackable:      hot.Attackable,
 		Aggressive:      hot.Aggressive,
 		AggroRange:      cold.AggroRange,
+		ClanHelpRange:   hot.ClanHelpRange,
+		ClanMask:        clanMaskString(hot.ClanMask),
 		Level:           hot.Level,
 		TargetID:        hot.TargetID,
 		InCombat:        hot.inCombat(nowNano),

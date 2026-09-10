@@ -144,7 +144,10 @@ func TestNpcInfoCarriesSpeedAndAggro(t *testing.T) {
 	require.True(t, obj.Running)
 	require.InDelta(t, 165*1.2, obj.Speed, 0.001)
 	require.False(t, obj.Aggressive)
-	require.Equal(t, int32(1000), obj.AggroRange)
+	// The xml ai aggroRange of the keltir is 1000, but the Mobius C1
+	// NpcTemplate caps every range at MaxAggroRange 450 (NPC.ini): the
+	// snapshot carries the number the server actually attacks from.
+	require.Equal(t, int32(450), obj.AggroRange)
 	require.Equal(t, int32(2), obj.Level)
 	//nolint:testifylint // Positive is unavailable in testify 1.4
 	require.True(t, snap.ServerTimeMs > 0)
@@ -333,6 +336,73 @@ func TestSnapshotJSONShape(t *testing.T) {
 	require.Len(t, objects, 1)
 }
 
+func TestSnapshotCarriesClanAndClampedAggro(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 1, 2, 3, 50, 30)
+	bot.SetOnline("test1")
+	// A werewolf of the xml data: aggroRange 1000 (clamped to the
+	// server MaxAggroRange 450), clanHelpRange 300, the WEREWOLF clan.
+	bot.ApplyNpcInfo(NpcInfo{
+		ObjectID: 1, TemplateID: 1000000 + 12,
+		Attackable: true, X: 10, Y: 20,
+	})
+
+	snap := bot.Snapshot()
+	require.Len(t, snap.Objects, 1)
+	obj := snap.Objects[0]
+	require.Equal(t, int32(450), obj.AggroRange)
+	require.Equal(t, int32(300), obj.ClanHelpRange)
+	require.NotEmpty(t, obj.ClanMask)
+
+	data, err := json.Marshal(snap)
+	require.NoError(t, err)
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(data, &decoded))
+	objects, ok := decoded["objects"].([]any)
+	require.True(t, ok)
+	require.Len(t, objects, 1)
+	viewed, ok := objects[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, float64(450), viewed["aggroRange"])
+	require.Equal(t, float64(300), viewed["clanHelpRange"])
+	// The mask rides the wire as a decimal string: the ALL bit of the
+	// top exceeds the safe integer range of JavaScript.
+	mask, ok := viewed["clanMask"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, mask)
+
+	// The direct append encoder must write the same fields.
+	direct := bot.AppendSnapshotJSON(nil)
+	require.Contains(t, string(direct), `"clanMask":"`+mask+`"`)
+	require.Contains(t, string(direct), `"clanHelpRange":300`)
+}
+
+func TestKillMarksPublishAndRead(t *testing.T) {
+	bot := NewBot("acc1")
+	require.Nil(t, bot.KillMarks())
+
+	bot.SetKillMarks([]KillMarkView{
+		{BotID: "", X: 45000, Y: 50000, AtMs: 1000},
+		{BotID: "", X: 45100, Y: 50100, AtMs: 2000},
+	})
+	marks := bot.KillMarks()
+	require.Len(t, marks, 2)
+	require.Equal(t, int32(45100), marks[1].X)
+
+	// A repeated identical set keeps the stored ring (the version
+	// stays put - the hunt loop republishes every view refresh).
+	before := bot.Version()
+	bot.SetKillMarks([]KillMarkView{
+		{BotID: "", X: 45000, Y: 50000, AtMs: 1000},
+		{BotID: "", X: 45100, Y: 50100, AtMs: 2000},
+	})
+	require.Equal(t, before, bot.Version())
+
+	// The read copy is detached from the stored ring.
+	marks[0].X = 1
+	require.Equal(t, int32(45000), bot.KillMarks()[0].X)
+}
+
 func TestVersionBumpsOnChanges(t *testing.T) {
 	bot := NewBot("acc1")
 	before := bot.Version()
@@ -408,6 +478,41 @@ func TestRegistry(t *testing.T) {
 	infos = registry.List()
 	require.Len(t, infos, 2)
 	require.Same(t, botA2, registry.mustGet("a"))
+}
+
+func TestRegistryFleetKillMarks(t *testing.T) {
+	registry := NewRegistry()
+	require.Nil(t, registry.FleetKillMarks(100))
+
+	botA := NewBot("a")
+	botB := NewBot("b")
+	registry.Add(botA)
+	registry.Add(botB)
+	botA.SetKillMarks([]KillMarkView{
+		{X: 45000, Y: 50000, AtMs: 3000},
+		{X: 45100, Y: 50100, AtMs: 1000},
+	})
+	botB.SetKillMarks([]KillMarkView{
+		{X: 46000, Y: 51000, AtMs: 2000},
+	})
+
+	marks := registry.FleetKillMarks(100)
+	require.Len(t, marks, 3)
+	// The merged ring orders by kill time, the bot ids fill in.
+	require.Equal(t, int64(1000), marks[0].AtMs)
+	require.Equal(t, "a", marks[0].BotID)
+	require.Equal(t, int64(2000), marks[1].AtMs)
+	require.Equal(t, "b", marks[1].BotID)
+	require.Equal(t, int64(3000), marks[2].AtMs)
+
+	// The limit drops the oldest marks, not the unlucky bots.
+	limited := registry.FleetKillMarks(2)
+	require.Len(t, limited, 2)
+	require.Equal(t, int64(2000), limited[0].AtMs)
+	require.Equal(t, int64(3000), limited[1].AtMs)
+
+	// A non positive limit serves nothing.
+	require.Nil(t, registry.FleetKillMarks(0))
 }
 
 func TestBotInfo(t *testing.T) {

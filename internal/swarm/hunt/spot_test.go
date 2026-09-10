@@ -416,6 +416,34 @@ func TestSpotViewCarriesTheEconomy(t *testing.T) {
 	require.NotEqual(t, 0, views[active].KillX)
 }
 
+func TestSpotViewPublishesKillMarks(t *testing.T) {
+	loop, _, hunter := pickedSpotLoop(t)
+	bot := loop.tracker
+	now := time.Now()
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: 7001, TemplateID: npcdata.NPCWireTemplateID(20534),
+		X: 46912, Y: 41500, Z: -3500, Attackable: true,
+	})
+	require.Nil(t, bot.KillMarks())
+	loop.spotNoteKill(7001, now)
+	hunter.publishView(loop, now.Add(time.Second))
+
+	// The kill ring rides the view refresh: the fleet cross layer of
+	// the map reads the positions of the recent kills.
+	marks := bot.KillMarks()
+	require.Len(t, marks, 1)
+	require.Equal(t, int32(46912), marks[0].X)
+	require.Equal(t, int32(41500), marks[0].Y)
+	require.Equal(t, now.UnixMilli(), marks[0].AtMs)
+
+	// The registry aggregation stamps the bot id over the marks.
+	registry := state.NewRegistry()
+	registry.Add(bot)
+	merged := registry.FleetKillMarks(100)
+	require.Len(t, merged, 1)
+	require.Equal(t, bot.ID(), merged[0].BotID)
+}
+
 func TestSpotUserSelectOverridesEconomy(t *testing.T) {
 	loop, _, hunter := pickedSpotLoop(t)
 	loop.userZoneSelect(1)

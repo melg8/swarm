@@ -4,7 +4,10 @@
 
 package state
 
-import "sync"
+import (
+	"sort"
+	"sync"
+)
 
 // Registry keeps the bot sessions known to the process so that the web
 // interface can enumerate and switch between them.
@@ -83,4 +86,42 @@ func (r *Registry) List() []BotInfo {
 	r.mu.RUnlock()
 
 	return infos
+}
+
+// FleetKillMarks aggregates the recent kill marks of every bot of the
+// registry, oldest first: the web map draws them as the fleet wide
+// crosses of the deployment, so every kill of every bot stays visible
+// no matter which bot the view observes. The limit bounds the merged
+// ring (the oldest marks drop when the fleet outgrows it).
+func (r *Registry) FleetKillMarks(limit int) []KillMarkView {
+	if limit <= 0 {
+		return nil
+	}
+	r.mu.RLock()
+	bots := make([]*Bot, len(r.bots))
+	copy(bots, r.bots)
+	r.mu.RUnlock()
+
+	// The per bot marks come back under each bot's own read lock; the
+	// copies are merged and sorted by kill time so the ring drops the
+	// oldest marks, not the marks of the unlucky last bots.
+	var marks []KillMarkView
+	for _, bot := range bots {
+		for _, mark := range bot.KillMarks() {
+			mark.BotID = bot.id
+			marks = append(marks, mark)
+		}
+	}
+	sort.Slice(marks, func(i, j int) bool {
+		if marks[i].AtMs != marks[j].AtMs {
+			return marks[i].AtMs < marks[j].AtMs
+		}
+
+		return marks[i].BotID < marks[j].BotID
+	})
+	if len(marks) > limit {
+		marks = marks[len(marks)-limit:]
+	}
+
+	return marks
 }

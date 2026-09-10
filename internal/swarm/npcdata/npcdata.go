@@ -33,14 +33,31 @@ func NPCLevel(templateID int32) int32 {
 	return npcLevels[templateID-npcTemplateOffset]
 }
 
-// NPCAggroRange resolves the ai aggroRange of an npc by the raw NpcInfo
-// template id. It returns zero when the template is unknown or passive.
+// mobiusMaxAggroRange is the MaxAggroRange clamp of the Mobius C1
+// server (dist/game/config/NPC.ini, "Maximum distance mobs can get
+// aggro": L2jMobius ships 450 against the L2J default 1500). The
+// NpcTemplate constructor caps every npc's ai aggroRange at it, so
+// the xml values above it (most monsters carry 1000) never reach the
+// world: the on-sight attack check of AttackableAI
+// (isInsideRadius3D against getAggroRange) runs against the clamped
+// value. The map circles and the tooltips must draw the same number
+// the server actually acts on.
+const mobiusMaxAggroRange = 450
+
+// NPCAggroRange resolves the effective on-sight aggro range of an npc
+// by the raw NpcInfo template id: the ai aggroRange of the xml data
+// capped at the server wide MaxAggroRange clamp. It returns zero when
+// the template is unknown or passive.
 func NPCAggroRange(templateID int32) int32 {
 	if templateID <= npcTemplateOffset {
 		return 0
 	}
+	value := npcAggroRanges[templateID-npcTemplateOffset]
+	if value > mobiusMaxAggroRange {
+		return mobiusMaxAggroRange
+	}
 
-	return npcAggroRanges[templateID-npcTemplateOffset]
+	return value
 }
 
 // NPCIsAggressive resolves the ai isAggressive flag of an npc by the raw
