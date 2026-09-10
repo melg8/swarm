@@ -189,12 +189,19 @@ func (r *Reader) ReadStringFromUtf16Format() (string, error) {
 	unitCount := byteLen / 2
 	r.offset = end + 2
 
-	// Fast path: every UTF-16 unit fits in ASCII (high byte is 0).
-	// L2 names are overwhelmingly ASCII, so this is the common case
-	// and collapses three allocations into one (the final string).
+	// Fast path: every UTF-16 unit fits in ASCII (the low byte is
+	// below 0x80 and the high byte is 0). L2 names are overwhelmingly
+	// ASCII, so this is the common case and collapses three
+	// allocations into one (the final string). The high byte check
+	// alone is not enough: a Latin-1 character like U+00E9 ('é')
+	// encodes as [0xE9, 0x00] in UTF-16LE, which has a zero high byte
+	// but a low byte above 0x80 - extracting just the low byte would
+	// produce a byte 0xE9 that is not valid UTF-8, so the resulting
+	// string would display as the replacement character instead of
+	// the original character.
 	ascii := true
-	for i := start + 1; i < end; i += 2 {
-		if data[i] != 0 {
+	for i := start; i < end; i += 2 {
+		if data[i] >= 0x80 || data[i+1] != 0 {
 			ascii = false
 
 			break

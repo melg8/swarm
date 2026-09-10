@@ -2990,3 +2990,28 @@ name the variant number that best fits the real bot UI.
   enum name resolution. Coverage rose from 34.6 to 95.1 percent.
   Verified: go build/vet, go test ./internal/swarm/npcdata/ -cover,
   golangci-lint 0 issues.
+
+- 2026-09-10: the packet reader ASCII fast path correctness fix and
+  100 percent coverage (round 5, feature/proxy-server,
+  perf-and-coverage). The reader rewrite introduced a Latin-1
+  handling bug: the ASCII fast path checked only the high byte of
+  each UTF-16 unit (the byte at position start+1, start+3, ...).
+  A Latin-1 character like U+00E9 ('é') encodes as [0xE9, 0x00] in
+  UTF-16LE, which has a zero high byte, so the fast path triggered
+  and extracted just the low byte 0xE9. The resulting byte 0xE9 is
+  not valid UTF-8, so the string displayed as the replacement
+  character instead of the original character. The fix checks both
+  bytes: the low byte must be below 0x80 (true ASCII) AND the high
+  byte must be 0. Non-ASCII characters now correctly fall through to
+  the BMP slow path that uses unicode/utf16.Decode. New tests cover:
+  the BMP slow path (Cyrillic "Эльф"), supplementary characters
+  (surrogate pair emoji "🌟"), mixed ASCII and BMP ("café" and
+  "test café" - the regression case), the missing null terminator
+  error path, the odd length buffer edge case, the WriteStringAsUtf16
+  slow path (non-ASCII, supplementary, Cyrillic), the WriteFloat64
+  round trip, the Reset method, and the negative count error paths
+  for ReadBytes and Skip. Packet package coverage: 77.5 -> 100.0
+  percent. Verified: go build/vet, go test ./internal/swarm/packets/
+  packet/ -cover (100.0 percent), golangci-lint 0 issues, the string
+  benchmarks unchanged (ReadStringASCIIFastPath 27 ns/1 alloc,
+  ReadStringBMPSlowPath 69 ns/2 allocs).
