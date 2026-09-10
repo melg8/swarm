@@ -128,6 +128,9 @@ func (l *Loop) shoppingQueue() []gear.Purchase {
 // view of the loop publish, so one recompute serves both per period.
 // The adena the queue was planned against is cached with it: the
 // widget view must show the planning wallet, not a drifted one.
+// The built ShoppingPlanView is cached alongside the plan so the per
+// tick publish does not rebuild it (the rebuild was the dominant
+// allocation source of the 100 bot fleet under live profiling).
 func (l *Loop) refreshShoppingCache() {
 	now := time.Now()
 	if !l.shoppingPlanAt.IsZero() &&
@@ -137,6 +140,8 @@ func (l *Loop) refreshShoppingCache() {
 	l.shoppingPlanCache = l.shoppingQueue()
 	l.shoppingPlanAt = now
 	l.shoppingPlanAdena = int64(l.tracker.InventoryStats().Adena)
+	l.shoppingViewCache = shoppingQueueView(
+		l.shoppingPlanCache, l.shoppingPlanAdena)
 }
 
 // shoppingWanted reports whether the shop strategy justifies a town
@@ -173,7 +178,9 @@ func affordablePrefix(queue []gear.Purchase) []gear.Purchase {
 // and the remaining trip buys while a town trip runs (the in-flight
 // batch marked buying). Sessions without the shop strategy (no gear
 // profile, no merchant catalogs, the manual only mode) publish
-// nothing - the widget stays hidden.
+// nothing - the widget stays hidden. The built view is reused from
+// the cache between recomputes so the per tick publish pays no
+// allocation.
 func (l *Loop) publishShoppingView() {
 	if !l.autonomous || !l.shoppingTripEnabled() {
 		l.tracker.ClearShoppingPlan()
@@ -186,8 +193,7 @@ func (l *Loop) publishShoppingView() {
 		return
 	}
 	l.refreshShoppingCache()
-	l.tracker.SetShoppingPlan(shoppingQueueView(
-		l.shoppingPlanCache, l.shoppingPlanAdena))
+	l.tracker.SetShoppingPlan(l.shoppingViewCache)
 }
 
 // shoppingQueueView builds the widget view of a purchase queue: the

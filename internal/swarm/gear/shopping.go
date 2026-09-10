@@ -8,6 +8,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/melg8/swarm/internal/swarm/npcdata"
 	"github.com/melg8/swarm/internal/swarm/state"
@@ -499,7 +500,81 @@ func walkedPurchase(
 // catalogCandidates joins the shop offers with the item gear stats,
 // keeping the cheapest offer per item id (the same item can appear in
 // several buylists) and dropping everything the profile cannot use.
+// The result is cached per (catalog pointer, profile name) pair: the
+// catalog and the profile are both static for a given bot class and
+// region (the elven village merchants never change their stock, the
+// melee fighter profile scores items the same way every call), so the
+// 100 bot fleet was rebuilding the same offers map 100 times every 5
+// seconds - 17 MB of allocations over a 3 minute fleet run. The cache
+// collapses that to one build per (catalog, profile) pair for the
+// lifetime of the process.
 func catalogCandidates(
+	profile Profile, catalog Catalog,
+) []purchaseCandidate {
+	key := candidateCacheKey{
+		catalog: &catalog,
+		profile: profile.Name(),
+		taxHash: catalogTaxHash(catalog),
+	}
+	if cached, ok := candidateCache.Load(key); ok {
+		return cached.([]purchaseCandidate)
+	}
+	candidates := buildCatalogCandidates(profile, catalog)
+	candidateCache.Store(key, candidates)
+
+	return candidates
+}
+
+// candidateCacheKey is the composite key of the candidate cache: the
+// catalog pointer (stable for the package level townShopCatalog var),
+// the profile name (the melee fighter profile is a singleton) and a
+// hash of the tax rates (a future region config with a different tax
+// table invalidates the cache).
+type candidateCacheKey struct {
+	catalog *Catalog
+	profile string
+	taxHash uint64
+}
+
+// candidateCache holds the precomputed candidates per (catalog,
+// profile) pair. The cache is never cleared: the catalogs and profiles
+// are process lifetime singletons, and the number of distinct pairs is
+// bounded by the number of bot classes times the number of regions
+// (one for the elven deployment today).
+var candidateCache sync.Map
+
+// catalogTaxHash computes a stable hash of the tax rates of the catalog
+// shops so a different tax table (a future region) invalidates the
+// candidate cache. The hash is a simple FNV-1a over the merchant id
+// and tax rate pairs.
+func catalogTaxHash(catalog Catalog) uint64 {
+	var h uint64 = 14695981039346656037
+	for _, shop := range catalog.Shops {
+		for _, b := range []byte{
+			byte(shop.MerchantTemplateID),
+			byte(shop.MerchantTemplateID >> 8),
+			byte(shop.MerchantTemplateID >> 16),
+			byte(shop.MerchantTemplateID >> 24),
+		} {
+			h ^= uint64(b)
+			h *= 1099511628211
+		}
+		bits := math.Float64bits(shop.TaxRate)
+		for range 8 {
+			h ^= bits & 0xFF
+			h *= 1099511628211
+			bits >>= 8
+		}
+	}
+
+	return h
+}
+
+// buildCatalogCandidates is the uncached implementation of
+// catalogCandidates: joins the shop offers with the item gear stats,
+// keeping the cheapest offer per item id and dropping everything the
+// profile cannot use.
+func buildCatalogCandidates(
 	profile Profile, catalog Catalog,
 ) []purchaseCandidate {
 	type offer struct {

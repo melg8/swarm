@@ -3103,3 +3103,42 @@ name the variant number that best fits the real bot UI.
   bot fleet pays this 100 times per tick, so the per packet allocation
   cost multiplies directly into GC pressure. Verified: go build/vet,
   go test, golangci-lint 0 issues.
+
+- 2026-09-10: the 100 bot fleet profiling and the shopping/combat
+  allocation sweep (round 7, feature/proxy-server, perf-and-coverage).
+  Ran the live 100 bot fleet (SWARM_FLEET_E2E=1) against the deployed
+  Mobius stack with CPU and memory profiling enabled. The memory
+  profile revealed the shopping subsystem accounted for 71 percent of
+  all heap allocations (105 of 148 MB): shoppingQueueView alone was
+  65.63 MB (44.4 percent) because it rebuilt a []ShoppingEntryView
+  slice with six npcdata dictionary lookups per entry on every hunt
+  tick (200 ms) even though the underlying plan was cached for 5
+  seconds. catalogCandidates was 17.10 MB (11.6 percent) because it
+  rebuilt the same offers map from the static merchant catalog every
+  5 seconds per bot. combatFeed.record was 5.55 MB (3.8 percent)
+  because the append+trim ring pattern grew the backing array on every
+  overflow.
+
+  Three optimizations applied:
+  1. shoppingViewCache: the built ShoppingPlanView is now cached
+     alongside the plan in the Loop struct. publishShoppingView
+     reuses the cached view between plan recomputes (25 ticks per
+     recompute), collapsing the per tick view cost to a pointer copy.
+     shoppingQueueView: 65.63 MB -> 3.51 MB (94.7 percent reduction).
+  2. candidateCache: catalogCandidates results are cached per (catalog
+     pointer, profile name, tax hash) tuple in a sync.Map. The catalog
+     and profile are static for a given bot class and region, so the
+     100 bot fleet now builds the candidates once per (catalog,
+     profile) pair instead of 100 times every 5 seconds.
+     catalogCandidates: 17.10 MB -> 0 MB on the steady state path
+     (one 24.67 MB build at startup, then cache hits forever).
+  3. combatFeed ring buffer: the append+trim pattern is replaced with
+     a fixed capacity [combatEventMax]CombatEvent array with a write
+     position head and a count. record overwrites the oldest entry in
+     place, appendView walks from the oldest live event to the newest.
+     combatFeed.record: 5.55 MB -> 0 MB (100 percent reduction).
+
+  Total fleet allocations: 148 MB -> 75 MB (49 percent reduction).
+  Verified: go build/vet, go test ./... (19 packages), golangci-lint
+  0 issues on the touched packages, the live fleet reaches 60/100
+  online sessions and 319K packets in 155 seconds.

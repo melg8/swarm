@@ -11,14 +11,30 @@ import "time"
 // damage of the HP deltas, bounded by combatEventMax and read with
 // the combatEventTTL window by the snapshot. The sequence numbers
 // are monotonic per bot so the client can dedupe across snapshots.
+//
+// The feed uses a fixed capacity ring buffer instead of append+trim:
+// the append+trim pattern grew the backing array on every overflow
+// (append to len 64 reallocs to cap 128, then the trim reslices to
+// [1:65] which keeps the 128 cap, so the next append to 65 reallocs
+// again after the capacity drifts down through the reslices). The
+// ring buffer preallocates combatEventMax entries once and overwrites
+// the oldest in place, so a hundred hunting bots (each with a live
+// combat feed) pay zero allocations after the initial fill.
 type combatFeed struct {
-	events []CombatEvent
+	events [combatEventMax]CombatEvent
+	head   int // write position, next record goes here
+	count  int // number of live events (<= combatEventMax)
 	seq    uint64
 }
 
 // newCombatFeed creates the empty feed.
 func newCombatFeed() combatFeed {
-	return combatFeed{events: nil, seq: 0}
+	return combatFeed{
+		events: [combatEventMax]CombatEvent{},
+		head:   0,
+		count:  0,
+		seq:    0,
+	}
 }
 
 // record appends one combat animation beat with the next sequence
@@ -28,19 +44,29 @@ func (f *combatFeed) record(e CombatEvent, now time.Time) {
 	f.seq++
 	e.Seq = f.seq
 	e.At = now
-	f.events = append(f.events, e)
-	if len(f.events) > combatEventMax {
-		f.events = f.events[len(f.events)-combatEventMax:]
+	f.events[f.head] = e
+	f.head = (f.head + 1) % combatEventMax
+	if f.count < combatEventMax {
+		f.count++
 	}
 }
 
 // appendView copies the beats of the live TTL window onto dst in
-// chronological order and returns the grown slice.
+// chronological order and returns the grown slice. The ring buffer
+// is walked from the oldest live event (the write position minus
+// count, wrapping) to the newest (the write position minus one),
+// so the snapshot sees the events in the order they were recorded.
 func (f *combatFeed) appendView(
 	dst []CombatEventView, now time.Time,
 ) []CombatEventView {
+	if f.count == 0 {
+		return dst
+	}
 	cut := now.Add(-combatEventTTL)
-	for _, ev := range f.events {
+	start := (f.head - f.count + combatEventMax) % combatEventMax
+	for i := range f.count {
+		index := (start + i) % combatEventMax
+		ev := f.events[index]
 		if ev.At.Before(cut) {
 			continue
 		}
