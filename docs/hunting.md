@@ -104,6 +104,23 @@ would have paid for.
   ALL clan of the attacked mob matches everything, a 600 unit z
   distance blocks the assist, the projected positions measure moving
   packs, a 200 unit margin covers the mates wandering mid fight).
+- The aggro answer (2026-09-10): a mob that already holds the
+  character as its target (its swings or its chase - both carry the
+  character as the mob's target id, `NearestAttacker`) owns the
+  targetless pick: a healthy character with a winnable attacker
+  (inside the engage level ceiling, `attackerEngageable`) engages it
+  at once - the forced attack request fires on the same tick and the
+  fight answers the aggro where it stands - while anything else (a
+  hurt character, an attacker above the ceiling) keeps the defensive
+  flow, the standard escape walk with its logout budget. The town
+  trips answer the same way (`interruptTripForAttacker` runs first
+  in the trip tick): a mob on the walking seller drops the trip
+  through the soft reset (no cooldown, the junk, the books and the
+  sold proceeds survive) and fights or runs instead of dragging the
+  chase through every camp on the route - the reported pile up
+  deaths of the walkers. `adoptOutZoneFight` checks the same
+  winnability before it finishes an attacker outside the zone: an
+  unbeatable chase switches to the escape instead of a losing fight.
 - A running fight that turns into a death risk is fled: under 25%
   health, or under 60% while the target holds a 25+ percent health
   lead, the target is dropped with a two minute skip and paced escape
@@ -404,9 +421,14 @@ The short form:
   state dump, (1) the
   smoothing never collapses a leg between two dry points across water
   (pathfind legDry), (2) the follower verifies every click line with
-  pathfind.DryLine before sending it - a wet click is refused and the
-  walk re-paths around the shore (the refusals share the 3 re-path
-  budget), and (3) a character that still ends up over a lake bed
+  pathfind.WaterCrossed before sending it - the pure water raster, NOT
+  the DryLine answer: the line of sight half of DryLine fails on the
+  height steps of the village deck ramps, the teacher legs of the
+  learning trips read as water that way and every trip that carried
+  them aborted on the 3 re-path budget (the 2026-09-10 teacher round) -
+  a wet click is refused and the walk re-paths around the shore (the
+  refusals share the 3 re-path budget), and (3) a character that still
+  ends up over a lake bed
   (the geodata surface under it below the water level, OverWater)
   enters the water escape: the walk to the nearest shore
   (FindWaterEscape, a breadth first flood over the walkable surface)
@@ -443,6 +465,19 @@ The short form:
   approachMerchant also
   gives up targeting when the merchant stands more than the interaction
   distance above or below the character.
+- The npc talk selection clears when the conversation ends: the
+  merchant select and the teacher talk click leave the villager
+  selected server side (the server never clears a selection, only the
+  next selection replaces it), and the hunting engage that follows the
+  trip would re-adopt it - the forced attack requests on a friendly
+  npc only burn the 12 s engage stuck timeout. The trip machinery
+  sends the self click (Action 0x04 on the own object id, the official
+  client way of dropping a selection, `GameClient.ClearTarget`) when a
+  stop finishes (`advanceTripStop`) and when the whole trip ends
+  (`endTownTrip`), and the engage adoption itself requires an
+  attackable npc (`ObjectAttackable`) so a lingering selection
+  (a talk outside the trip end, the self selection of the clear click)
+  never becomes a hunt target.
 - Merchants: townMerchants carries the shop npcs of the known towns
   with their spawn coordinates; the C1 spawn ids map to the client
   display ids the NpcInfo packets carry (30147..30150 -> 7147..7150
@@ -463,7 +498,18 @@ The short form:
   an item id but one), then the lowest sell value per unit weight (the
   generated npcdata.ItemPrice/ItemWeight dictionaries, see
   tools/generate_item_stats.sh); equipped gear, adena and quest items
-  never sell.
+  never sell, and neither do the spellbooks of the unlocked queued
+  lessons (demandedBooksLocked walks the stored learning queue): a
+  book bought at the book stop or looted for a near term lesson feeds
+  it, selling it for referencePrice/2 only buys it back full priced
+  at the next learning trip - the 2026-09-10 report loop. The
+  overflow destroy (DestroyableItemsExcluding) keeps them the same
+  way. The first town trip of a session also waits for the server
+  skill list (state.SkillsListed, bounded by 10 s from the session
+  start, re-armed on every reconnect): the enter world packet burst
+  (UserInfo, ItemList, SkillList) races the first hunt ticks, and a
+  trip that starts between the ItemList and the SkillList plans
+  without the learning stops.
 - The live verified cycle (2026-09-07): trigger at 55 slots/73% weight,
   walk to the trader ~18k units in ~60 s, one batch of 25 items sold
   (55 -> 30 slots, 73% -> 36% weight), walk back and hunting resumed;

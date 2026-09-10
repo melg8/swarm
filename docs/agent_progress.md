@@ -263,3 +263,46 @@ The user report (2026-09-10, Russian, four bugs):
   exhaustion trusts the plan and the clicks go out; the trusted plan
   that actually swims re-arms the guard and the next exhaustion
   aborts).
+
+- Refinement of the water guard half (the trust gamble replaced by
+  the real root cause): the live re-run with the trust fallback let
+  the character swim west toward a far hunting spot across a REAL
+  lake (the spot walks have no dry route at all - the geodata A* is
+  water blind). The measurement that split the cases: sampling
+  OverWater along the lines - the plaza teacher lines cross ZERO wet
+  cells, the lake lines 736-2640 units. The plaza failure was never
+  water: the line of sight half of DryLine fails on the height step
+  between the village decks (-2984 shop deck -> -2792 teacher plaza,
+  192 units against the passable 30) and the guard misread it. The
+  guard now reads pathfind.WaterCrossed (the pure water raster, no
+  sight gate): the teacher legs walk (the server routing handles the
+  ramps), the real lake refusals keep the old abort. The wetPlanTrusted
+  trust machinery was reverted entirely. The session gate also
+  re-arms on every reconnect now (state.sessionAt - ResetSession
+  drops the skill list and the relogin burst re-delivers it a second
+  later; the reconnect loops of the emergency logout made every
+  relogin trip a shopping trip, the gate keyed on the tracker uptime
+  never held). Engine test:
+  pathfind/water_escape_test.go (WaterCrossed splits the channel
+  from the tall dry step), hunt tests: the reconnected session
+  re-arms the wait, the abort-on-budget stays for real water.
+
+- Live verification (the local stack, a level 15 elven fighter with
+  2000 SP and the queued book lessons injected through the database):
+  the full cycle ran - the trip planned the learning stops (2
+  spellbooks at Creamees, the teacher Ellenia), the books were
+  bought ("Spellbook: Advanced Attack Power/Advanced Defense
+  Power"), the character walked to Ellenia (the plaza leg survived
+  the guard), the teacher was found and clicked, and both lessons
+  landed: "learned Attack Aura level 1 for 920 sp", "learned Defense
+  Aura level 1 for 160 sp" - the database holds skills 77 and 91 at
+  level 1, the SP dropped to 938 and the books were consumed by the
+  server. The E2E shutdown stayed graceful (exit 0 on SIGINT).
+
+- Commit "the npc talks, the books and the aggro own their rules in
+  the docs": docs/hunting.md updated - the combat safety section
+  carries the aggro answer (the attacker pick, the trip interrupt,
+  the winnability gate of adoptOutZoneFight), the town trip section
+  carries the npc talk selection clearing, the spellbook keep and
+  the skill list gate, and the water safety section carries the
+  WaterCrossed raster story.

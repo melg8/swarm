@@ -333,6 +333,28 @@ func (e *Engine) DryLine(start, end Vec3) (bool, error) {
 	return search.lineOfSight(from, to) && search.dryLine(from, to), nil
 }
 
+// WaterCrossed reports whether the straight line between two world
+// positions crosses cells whose resolved surface lies below the
+// water level: the pure water raster of DryLine without its line of
+// sight gate. The water guard of the town trips needs exactly this -
+// the sight gate exists to validate a walkable leg (the height steps
+// of the smoothing), but a click line that merely crosses a height
+// step (the village deck ramps, the plaza over the shops) routes
+// fine through the server pathfinder and must not read as water.
+func (e *Engine) WaterCrossed(start, end Vec3) (bool, error) {
+	search := newSearch(e, e.maxPass)
+	from, err := search.nodeAtWorld(start)
+	if err != nil {
+		return false, err
+	}
+	to, err := search.nodeAtWorld(end)
+	if err != nil {
+		return false, err
+	}
+
+	return !search.dryLine(from, to), nil
+}
+
 // OverWater reports whether the walkable surface under a world
 // position lies below the C1 water level: the character stands (or
 // swims) over a lake or sea bed. The layer is the one closest to the

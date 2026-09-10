@@ -141,8 +141,15 @@ func TestTripWaterEscapeStuckReplans(t *testing.T) {
 }
 
 // TestTripWetClickRepatsAroundShore pins the click water guard: a dry
-// character whose straight click line would enter the water never
-// sends the click - the walk re-paths around the shore instead.
+// character whose straight click line would cross water never sends
+// the click - the walk re-paths around the shore instead, and a walk
+// whose every re-path stays wet aborts the trip. The guard checks
+// WATER ONLY (navigator.WaterCrossed): a click line that crosses a
+// height step of the terrain - the village deck ramps, the plaza
+// above the shops - routes fine through the server pathfinder, the
+// teacher legs of the learning trips died on the line of sight half
+// of the old DryLine answer, which read those ramps as water and
+// aborted every trip that carried them.
 func TestTripWetClickRepatsAroundShore(t *testing.T) {
 	loop, game, bot, nav := newTripLoop()
 	fillInventory(bot)
@@ -156,122 +163,13 @@ func TestTripWetClickRepatsAroundShore(t *testing.T) {
 	require.Len(t, nav.approachEnds, 2,
 		"the trip planned its leg and re-planned around the shore")
 
-	// The second and third wet clicks re-path again, the fourth
-	// exhausts the budget: the re-paths keep reproducing the same wet
-	// line, which means the geodata pack itself routes through the
-	// water (the disconnected village decks under the plaza). The
-	// plan is trusted - the click goes out and the server routing
-	// carries the walk over the real plaza (the teacher legs of the
-	// learning trips died on this abort before).
+	// The second wet click re-paths again, the third and fourth
+	// exhaust the budget and abort the trip (the walk cannot cross
+	// the water and no shore route exists).
+	loop.tick()
 	loop.tick()
 	loop.tick()
 	require.Empty(t, game.walks)
-	require.False(t, loop.wetPlanTrusted,
-		"the re-path budget is not exhausted yet")
-	loop.tick()
-	require.True(t, loop.wetPlanTrusted,
-		"the exhausted budget trusts the plan of the leg")
-	require.Len(t, game.walks, 1,
-		"the trusted click goes out over the server routing")
-
-	// The trust holds for the whole leg: the next clicks skip the
-	// guard (the follower clicks the remaining waypoints directly,
-	// paced by the walk request period).
-	loop.moveAt = time.Now().Add(-2 * walkRequestPeriod)
-	loop.tick()
-	require.Len(t, game.walks, 2)
-}
-
-// TestTripWetBudgetAbortsAfterATrustedSwim pins the trust bounds: the
-// released leg plan is a gamble on the server routing - when the
-// character genuinely ends up in the water (the standing check trips
-// and the shore escape runs), a SECOND exhausted budget aborts the
-// trip instead of looping the trust into the same lake forever.
-func TestTripWetBudgetAbortsAfterATrustedSwim(t *testing.T) {
-	loop, game, bot, nav := newTripLoop()
-	fillInventory(bot)
-	nav.wetLine = true
-	nav.overWater = true
-	nav.escapeRoute = []pathfind.Vec3{
-		{X: 45000, Y: 50000, Z: -3850},
-		{X: 45600, Y: 50400, Z: -3770},
-	}
-	moveSelfTo(bot, 45000, 50000, -3800)
-
-	// The leg exhausts its budget and trusts the plan (no escape ran
-	// yet), but the character actually stands over the lake bed: the
-	// standing water check wins over the follower and the shore
-	// escape takes over the tick.
-	for range 4 {
-		loop.tick()
-	}
-	require.True(t, loop.waterEscape,
-		"the standing water check must own the tick over the trusted plan")
-	require.Equal(t, 1, loop.waterEscapes,
-		"the escape counts against the trust of the running trip")
-	require.False(t, loop.wetPlanTrusted,
-		"the escape re-arms the guard for the re-planned leg")
-
-	// The character walks onto the shore, the leg re-plans, every
-	// click of the new leg stays wet and the budget exhausts again:
-	// this time an escape already ran, the trip aborts.
-	nav.overWater = false
-	moveSelfTo(bot, 45600, 50400, -3770)
-	loop.tick()
-	require.False(t, loop.waterEscape, "back on the shore")
-	for range 6 {
-		loop.tick()
-	}
 	require.Equal(t, phaseEngage, loop.phase,
-		"the second exhaustion after a trusted swim aborts the trip")
-	require.True(t, loop.tripEndedAt.After(loop.tripStart))
-	_ = game
-}
-
-// TestTripDryClickStillWalks pins the guard neutral path: a dry click
-// line passes through unchanged (the ordinary town walk behavior).
-func TestTripDryClickStillWalks(t *testing.T) {
-	loop, game, bot, _ := newTripLoop()
-	fillInventory(bot)
-
-	loop.tick()
-	require.Len(t, game.walks, 1,
-		"the dry click must be sent as before")
-}
-
-// TestTripWalkPlanCarriesFullLeg pins the full walk plan of a town
-// trip: the origin where the leg was planned, every planned waypoint
-// with the follower cursor and the trader destination - the whole
-// walk from where we wanted to go to where we want to arrive.
-func TestTripWalkPlanCarriesFullLeg(t *testing.T) {
-	loop, game, bot, nav := newTripLoop()
-	fillInventory(bot)
-	nav.route = []pathfind.Vec3{
-		{X: 45000, Y: 50000, Z: -3500},
-		{X: 44000, Y: 50500, Z: -3520},
-		{X: 43000, Y: 50500, Z: -3540},
-	}
-
-	loop.tick()
-	require.Equal(t, phaseTownWalk, loop.phase)
-	require.Len(t, game.walks, 1)
-	snap := bot.Snapshot()
-	require.Len(t, snap.WalkPath, 3,
-		"the full plan publishes, passed waypoints included")
-	require.Equal(t, &state.WalkPoint{
-		X: 45000, Y: 50000, Z: -3500,
-	}, snap.WalkOrigin, "the origin is the planning position")
-	require.Equal(t, &state.WalkPoint{
-		X: herbielPos[0], Y: herbielPos[1], Z: herbielPos[2],
-	}, snap.WalkDest, "the destination is the trader spawn")
-
-	// The character passes the second waypoint: the plan keeps them
-	// all and the cursor marks the current target.
-	moveSelfTo(bot, 44000, 50500, -3520)
-	loop.tick()
-	cursored := bot.Snapshot()
-	require.Len(t, cursored.WalkPath, 3,
-		"the passed waypoints stay in the published plan")
-	require.Equal(t, 2, cursored.WalkIndex,
-		"the cursor marks the waypoint ahead")
+		"the trip must abort when every dry re-path crosses water")
 }

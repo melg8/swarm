@@ -248,3 +248,54 @@ func TestElvenLakeStuckEscape(t *testing.T) {
 			i-1, route.Waypoints[i-1].X, route.Waypoints[i-1].Y)
 	}
 }
+
+// TestWaterCrossedSplitsWaterFromHeightSteps pins the water-only
+// raster the town walker's click guard reads: a line across a real
+// channel trips it, a line that merely climbs a tall dry step (the
+// village deck ramps) does not. The guard's old DryLine answer
+// conflated the two - the line of sight gate fails on the height
+// step, the guard read it as water and aborted the teacher legs of
+// the learning trips although the server routing walks those ramps
+// fine.
+func TestWaterCrossedSplitsWaterFromHeightSteps(t *testing.T) {
+	// The channel engine of the smoothing test: water between the
+	// dry shores.
+	channel := &regionSpec{}
+	channel.setFlat(shoreLand)
+	for x := 300; x <= 500; x++ {
+		for y := 500; y <= 900; y++ {
+			channel.setCell(x, y, Layer{Height: shoreBed, NSWE: nsweAll})
+		}
+	}
+	channelEngine := newTestEngine(t, channel)
+
+	across := worldOf(200, 700, shoreLand)
+	beyond := worldOf(600, 700, shoreLand)
+	crossed, err := channelEngine.WaterCrossed(across, beyond)
+	require.NoError(t, err)
+	require.True(t, crossed,
+		"the line across the channel crosses water")
+
+	// The ramp engine: a dry step too tall for the line of sight
+	// (the deck ramps of the elven village, ~190 units against the
+	// passable 30), no water anywhere.
+	ramp := &regionSpec{}
+	ramp.setFlat(shoreLand)
+	for x := 400; x <= 600; x++ {
+		for y := 500; y <= 900; y++ {
+			ramp.setCell(x, y, Layer{Height: shoreLand + 190, NSWE: nsweAll})
+		}
+	}
+	rampEngine := newTestEngine(t, ramp)
+
+	below := worldOf(200, 700, shoreLand)
+	above := worldOf(700, 700, shoreLand+190)
+	dry, err := rampEngine.DryLine(below, above)
+	require.NoError(t, err)
+	require.False(t, dry,
+		"the tall dry step breaks the walkable line answer")
+	crossed, err = rampEngine.WaterCrossed(below, above)
+	require.NoError(t, err)
+	require.False(t, crossed,
+		"the tall dry step is terrain, not water")
+}

@@ -322,3 +322,46 @@ func TestTripWaitsForTheSkillList(t *testing.T) {
 	require.Greater(t, len(loop.tripStops), 1,
 		"the learning stops ride the trip")
 }
+
+// TestTripWaitsForTheSkillListAfterAReconnect pins the reconnect half
+// of the race: ResetSession drops the skill list and the relogin
+// packet burst re-delivers it a second later - a trip that starts in
+// that window plans without the learning (the reconnect loops of the
+// emergency logout made every trip a shopping trip). The gate keys on
+// the SESSION clock, so every reconnect re-arms the wait.
+func TestTripWaitsForTheSkillListAfterAReconnect(t *testing.T) {
+	bot := learnTestBot(500)
+	game := &fakeGame{}
+	loop := NewLoop(game, bot)
+	loop.SetNavigator(&fakeNavigator{found: true})
+	loop.lastHit = time.Now().Add(-time.Minute)
+	fillInventory(bot)
+
+	// The skills were listed long ago. The session drops and
+	// reconnects: the skill list is gone until the enter world burst
+	// re-delivers it.
+	bot.ResetSession()
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	bot.ApplyStatusUpdate(100, []state.Attribute{
+		{ID: state.AttrMaxHP, Value: 100},
+		{ID: state.AttrCurHP, Value: 90},
+	})
+	fillInventory(bot)
+	loop.tick()
+	require.False(t, loop.tripActive(),
+		"the reconnect re-arms the skill list wait")
+
+	// The list lands: the trip starts with the learning stops.
+	bot.SetSkills([]state.LearnedSkill{
+		{SkillID: 142, Level: 1, Passive: true},
+		{SkillID: 194, Level: 1, Passive: true},
+	})
+	bot.ApplyUserInfo(state.UserInfo{
+		Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
+	})
+	loop.lastHit = time.Now().Add(-time.Minute)
+	loop.tick()
+	require.True(t, loop.tripActive())
+	require.Greater(t, len(loop.tripStops), 1,
+		"the learning stops ride the reconnected trip")
+}

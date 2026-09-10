@@ -383,10 +383,16 @@ type Bot struct {
 	// ring of the spot hunter): the positions feed the fleet wide
 	// cross layer of the map, so the crosses survive the bot switches
 	// of the web view.
-	killMarks    []KillMarkView
-	packets      int64
-	version      uint64
-	started      time.Time
+	killMarks []KillMarkView
+	packets   int64
+	version   uint64
+	started   time.Time
+	// sessionAt is the moment of the current login: ResetSession
+	// refreshes it, so the bounded waits of the hunt loop (the skill
+	// list gate of the first town trip) re-arm on every reconnect -
+	// the enter world packet burst races the first ticks of every
+	// session, not only the first one of the tracker.
+	sessionAt    time.Time
 	updated      time.Time
 	commandQueue chan Command
 	// The published walk plan of the web UI and the state dump
@@ -459,6 +465,7 @@ func NewBot(id string) *Bot {
 		packets:            0,
 		version:            0,
 		started:            time.Now(),
+		sessionAt:          time.Now(),
 		updated:            time.Time{},
 		commandQueue:       make(chan Command, commandQueueCapacity),
 		walkPlan:           nil,
@@ -500,13 +507,15 @@ func (b *Bot) SkillsListed() bool {
 	return b.skills != nil
 }
 
-// StartedAt returns the session start of the tracker: bounded waits
-// (the skill list gate of the first town trip) measure against it.
-func (b *Bot) StartedAt() time.Time {
+// SessionStartedAt returns the moment of the current login (the
+// uptime anchor Started survives the reconnects): the bounded waits
+// of the hunt loop - the skill list gate of the first town trip -
+// measure against it so every reconnect re-arms them.
+func (b *Bot) SessionStartedAt() time.Time {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	return b.started
+	return b.sessionAt
 }
 
 // SelfTargetID returns the object id of the current target of the
@@ -1060,6 +1069,7 @@ func (b *Bot) ResetSession() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.drainCommands()
+	b.sessionAt = time.Now()
 	b.selfID = 0
 	b.char = newCharacterState()
 	b.world = newObjectStore()

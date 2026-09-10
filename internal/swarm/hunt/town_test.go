@@ -33,9 +33,9 @@ type fakeNavigator struct {
 	// the water escape tests arm it to drop the character into a
 	// lake.
 	overWater bool
-	// wetLine marks the DryLine answer as wet: the click guard tests
-	// arm it to refuse the clicks, every other walk stays dry by
-	// default (the zero value answers a dry line).
+	// wetLine marks the WaterCrossed answer as wet: the click guard
+	// tests arm it to refuse the clicks, every other walk stays dry
+	// by default (the zero value answers a dry line).
 	wetLine bool
 	// escapeRoute overrides the waypoints of the water escape search.
 	escapeRoute []pathfind.Vec3
@@ -166,14 +166,14 @@ func (f *fakeNavigator) OverWater(_, _ float64, _ int16) bool {
 	return f.overWater
 }
 
-// DryLine answers the configured dry click lines: the water guard
+// WaterCrossed answers the configured water raster: the water guard
 // tests arm the wet flag to make the follower refuse the clicks.
-func (f *fakeNavigator) DryLine(_, _ pathfind.Vec3) (bool, error) {
+func (f *fakeNavigator) WaterCrossed(_, _ pathfind.Vec3) (bool, error) {
 	if f.heightErr {
 		return false, errors.New("no geodata")
 	}
 
-	return !f.wetLine, nil
+	return f.wetLine, nil
 }
 
 // FindWaterEscape answers the configured shore escape.
