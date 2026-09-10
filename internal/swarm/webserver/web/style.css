@@ -207,12 +207,13 @@ body {
 }
 
 /* Theme icon pair (B6): the button carries the sun and the moon as
-   inline svgs, the active theme shows its own glyph. */
+   inline svgs, the active theme shows its own glyph (light = sun,
+   dark = moon). */
 .theme-icon { display: block; }
 
-html[data-theme="dark"] #theme-moon { display: none; }
+html[data-theme="dark"] #theme-sun { display: none; }
 
-html:not([data-theme="dark"]) #theme-sun { display: none; }
+html:not([data-theme="dark"]) #theme-moon { display: none; }
 
 .live-dot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -1136,11 +1137,16 @@ body.mode-test-fight .map-empty { display: none; }
 /* Target panel: shows who the bot currently selected, with its name,
    level and vitals. The panel exists only while there is a target: a
    killed, removed or missing target hides it completely. */
-#hud.collapsed .hud-body { display: none; }
-
-#hud.collapsed .hud-head { margin-bottom: 0; }
-
 .hud-target .hud-name-row { margin-bottom: 8px; }
+
+/* HUD stack collapse (C4): the collapsed flag lives on the stack, so
+   the whole column folds - the character body, the target panel and
+   the stack spacing - while the head rows stay. */
+.hud-stack.collapsed .hud-body { display: none; }
+
+.hud-stack.collapsed .hud-target { display: none; }
+
+.hud-stack.collapsed #hud .hud-head { margin-bottom: 0; }
 
 /* Chat head strip (C4/C5): the drag handle of the window, the unread
    badge of a collapsed window and the collapse chevron. Collapsed,

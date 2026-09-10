@@ -2443,7 +2443,7 @@ function initFloatingPanels() {
 }
 
 // syncHudCollapseClass mirrors the stack collapsed flag onto the #hud
-// panel (the css hides the .hud-body through it).
+// panel (kept for the collapse button aria sync of external callers).
 function syncHudCollapseClass(hudStack) {
   const hud = document.getElementById("hud");
   if (!hud || !hudStack) { return; }
@@ -2451,12 +2451,19 @@ function syncHudCollapseClass(hudStack) {
 }
 
 // Wire the interactions at script load: the scripts run at the end of
-// the body, the widget markup is parsed already.
-initGearInteractions();
-initTargetWidget();
-initViewMenu();
-initShopPanel();
-initFloatingPanels();
+// the body, the widget markup is parsed already. The wiring block sits
+// at the very END of the file on purpose: initFloatingPanels restores
+// the saved chat collapse into ChatWindow, so the const must already
+// exist - calling it earlier would abort the whole script evaluation
+// through the temporal dead zone and take every renderer down with
+// it.
+function wireInitialInteractions() {
+  initGearInteractions();
+  initTargetWidget();
+  initViewMenu();
+  initShopPanel();
+  initFloatingPanels();
+}
 
 // Chat window state: auto scroll follows the newest line while the
 // user stays at the bottom; scrolling up reads the history, scrolling
@@ -2711,3 +2718,6 @@ function renderFooter(snap) {
   document.getElementById("foot-updated").textContent =
     "updated: " + (isNaN(stamp.getTime()) ? "—" : stamp.toTimeString().slice(0, 8));
 }
+
+// The script-load wiring runs last (see wireInitialInteractions).
+wireInitialInteractions();
