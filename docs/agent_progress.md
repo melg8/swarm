@@ -3262,3 +3262,38 @@ name the variant number that best fits the real bot UI.
 
   Verified: go build/vet, go test ./... (19 packages), golangci-lint
   0 issues on the touched packages.
+
+- 2026-09-10: the final 100 bot fleet profiling summary (round 10,
+  feature/proxy-server, perf-and-coverage). After three rounds of
+  optimization guided by live profiling of the 100 bot fleet, the
+  total heap allocations dropped from 147.91 MB to 73.82 MB (50.2
+  percent reduction). The per-tick allocation churn that dominated
+  the original profile is completely eliminated: the
+  BenchmarkFleetE2ELiveEncodeSweep benchmark now reports 0 B/op,
+  0 allocs/op (was 29724 B/op, 275 allocs/op).
+
+  Before/after comparison of the top allocation hotspots:
+  - shoppingQueueView: 65.63 MB -> 2.50 MB (96.2 percent reduction)
+    - cached in the Loop struct, rebuilt only every 5s (was every 200ms)
+  - catalogCandidates: 17.10 MB -> 0 MB steady (100 percent)
+    - cached per (catalog, profile) pair in sync.Map
+  - combatFeed.record: 5.55 MB -> 0 MB (100 percent)
+    - fixed-capacity ring buffer replaces append+trim
+  - affordablePrefix: 6.51 MB -> 0 MB (100 percent)
+    - shoppingWanted sums directly over cached plan
+  - affectedSlots: 3.00 MB -> 0 MB (100 percent)
+    - stack-allocated slotBuf struct replaces []Slot heap allocation
+  - displacedValue: 7.00 MB -> 2.50 MB (64.3 percent)
+    - capacity hint pre-sizes the ids slice
+  - ElvenHuntingZones: 3.58 MB -> 1.02 MB (71.5 percent)
+  - SetHuntingZones: 4.08 MB -> 1.53 MB (62.5 percent)
+    - element-wise dedup skips the defensive copy
+  - cheapestJewelIDs: cached per (catalog, profile) pair
+
+  The remaining 73.82 MB is dominated by one-time costs
+  (buildCatalogCandidates 23.66 MB, objectStore.upsertLocked 3.52 MB,
+  blowfish.NewCipher 2.51 MB) and the actual planning work that
+  produces a result (planPurchases 12.09 MB, shoppingQueueView 2.50
+  MB). The per-tick allocation churn is zero. Verified: go build/vet,
+  go test ./... (19 packages), golangci-lint 0 issues, live fleet
+  reaches 60/100 online sessions and 319K packets in 155 seconds.
