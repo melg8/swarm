@@ -37,22 +37,47 @@ source):
 
 ## The strategy
 
-**Rule 1 - value per adena decides every purchase.** The marginal
-value of a purchase is the score gain it brings to the paperdoll
-(the melee fighter scoring: weapon pAtk x attack speed, armor pDef,
-jewel mDef, shield expected block value). The planner picks the
-purchase with the highest `gain / price` first, applies it to a
-virtual paperdoll and repeats. Consequences that match the data:
+**Rule 1 - the purchase phases: the jewel floor, the weapon
+milestone, the defense upgrades.** The planner walks the candidates
+in three phases; every pick ranks by its phase first, the phase
+specific order second (the melee fighter scoring stays: weapon pAtk x
+attack speed, armor pDef, jewel mDef, shield expected block value):
 
-- The **empty slot fillers come first**: Apprentice's Shoes are 8
-  pDef for 8.05 adena (0.99 pDef per adena) - the single best buy of
-  the whole village. Cloth Cap, Short Gloves, Magic Ring follow in
-  the 0.18-0.21 range. A fresh character with 100-500 adena fills
-  every slot long before it can afford a real weapon.
-- The **weapon ladder waits for the wallet**: Short Sword (883 with
-  tax) brings 3 pAtk over bare fists - good value once the fillers
-  are done; the Long Sword (156k) only wins when nothing cheaper
-  remains.
+1. **The jewel floor** - the cheapest jewel offer of every bodypart
+   family (ring, earring, necklace: Magic Ring 37, Apprentice's
+   Earring 56, Necklace of Magic 75, all with tax) fills the EMPTY
+   jewel slots. The starting locations barely attack with magic (the
+   keltirs, wolves, goblins and kaboo orcs of the elven lands are
+   pure melee - their magical attack data is zero), so the cheapest
+   set covers the mDef needs until level 15 (`jewelUpgradeLevel`):
+   below that level NO jewel upgrade is ever planned, past it the
+   jewel upgrades join the defense phase below. The floor fills, it
+   never replaces: a worn jewel blocks its family until the gate
+   opens.
+2. **The weapon milestone** - the best value STRICT weapon upgrade
+   (the highest `gain / price` among the weapons that beat the worn
+   one) is the saving target. Only that one weapon is eligible: a
+   cheaper but worse value weapon never intercepts the wallet, so
+   the bot either buys the milestone or keeps the money. The
+   milestone ladder of the elven catalogs plays out as Short Sword
+   (883) -> Knife (14374, daggers swing faster: 10 pAtk x 433 beats
+   the Broadsword's 11 x 379 per adena) -> Brandish (62214, the two
+   hand sword: 21 x 325, the best value of the 54k tier) -> Long
+   Sword (156400).
+3. **The defense upgrades** - the armor, shield and (past the jewel
+   gate) jewel upgrades, ranked by the raw defense gain (the
+   maximum defense per buy, not per adena) and **bounded by the
+   weapon budget**: the reference value of the whole worn defense
+   gear after a swap may not exceed the reference price of the worn
+   weapon. A starter weapon (or none) anchors zero - the first real
+   weapon comes before any armor buy; after every weapon tier the
+   defense may grow inside its budget, the next weapon tier always
+   outranks it. Consequence: the Shirt travels with the Short Sword,
+   the wooden set with the Knife, the bone set with the Brandish,
+   the jewels with the Long Sword.
+
+Supporting rules that survived the rework unchanged:
+
 - **Nothing is bought twice** and **nothing the inventory already
   carries is bought** (the free upgrades are simulated first, the
   purchases compare against the paperdoll the auto equipment will
@@ -61,8 +86,8 @@ virtual paperdoll and repeats. Consequences that match the data:
   slots it fills or clears (the family interplay included - a
   two-hander owns both hands, a one-piece owns chest and legs) and the
   later picks skip the candidates that would write into them. The
-  upgrade chains are cut: a rich bot buys ONE weapon (the best value
-  pick), not the knife/short sword/sickle ladder in a single walk, and
+  upgrade chains are cut: a rich bot buys ONE weapon (the milestone),
+  not the knife/short sword/sickle ladder in a single walk, and
   never two necklaces of which only the better one gets worn. The next
   trip re-plans against the paperdoll the purchases reached and takes
   the next step - the progression converges over the trips without
@@ -136,6 +161,65 @@ brings 251 gear points. A character reaches that around mob level
 level 13-18 zone) is unlocked and pays for the D grade of the next
 town.
 
+## The was/is journey of an elven fighter
+
+The level journey simulation lives in
+`internal/swarm/gear/shopping_strategy_test.go`
+(`TestShoppingStrategyJourneyComparison`): the character starts with
+the Squire's kit and zero adena, farms the elven lands mob ladder
+(the income model = the experience.xml exp per level divided by the
+exp of the level's mob, the adena drops of the npc data at 70
+percent chance - gear drops not counted) and shops once per level
+through both planners: the legacy greedy value-per-adena walk the
+rework replaced and the phased walk. The full table prints with
+`go test -run TestShoppingStrategyJourneyComparison -v
+./internal/swarm/gear/`; the condensed comparison:
+
+| Level | WAS (greedy value/adena) | IS (phased) |
+| --- | --- | --- |
+| 1 | Apprentice's Shoes 8 | - (saving the floor) |
+| 2 | Leather Shield 34 | Magic Ring 37 |
+| 3 | Short Gloves 42, Cloth Cap 63, Magic Ring 37 | Magic Ring 37 (2nd), Apprentice's Earring 56 |
+| 4 | Necklace of Magic 75, Apprentice's Earring 56, Magic Ring 37, Cloth Shoes 42, Pants 105 | Apprentice's Earring 56 (2nd), Necklace of Magic 75 |
+| 5 | Short Sword 883, Apprentice's Earring 56 | **Short Sword 883**, Cloth Cap 63, Leather Shield 34, Cloth Shoes 42, Short Gloves 42, Pants 105 |
+| 6 | Shirt 169, Ring of Knowledge 621, Leather Cap 1047 | Shirt 169, Pants 105 |
+| 7 | Ring of Knowledge 621 (2nd), Short Leather Gloves 698, Cotton Shoes 698, Small Shield 733 | - (saving the Knife) |
+| 8 | Leather Pants 1747, Leather Shirt 2794, Necklace of Knowledge 1242, Mystic's Earring 932 | - (saving the Knife) |
+| 9 | **Heavy Chisel 9280**, Mystic's Earring 932 | **Knife 14374**, Leather Shirt 2794, Wooden Helmet 4577 |
+| 10 | **Knife 14374**, Earring of Strength 4036, Ring of Anguish 2691 | Hard Leather Pants 5715, Short Leather Gloves 698 |
+| 11 | **Sickle 21275**, Earring of Strength 4036, Ring of Anguish 2691 | - (saving the Brandish) |
+| 12 | Buckler 3196, Leather Shoes 3047, Gloves 3047, Wooden Helmet 4577, Necklace of Anguish 5382, Wooden Breastplate 9154 | **Brandish 62214**, Cotton Shoes 698 |
+| 13 | Hard Leather Pants 5715, Leather Helmet 11730, Round Shield 8176, Cat's Eye Earring 10223, Low Boots 7785 | Bone Breastplate 23345, Low Boots 7785, Leather Gloves 7785 |
+| 14 | **Brandish 62214** | Leather Helmet 11730 |
+| 15 | Cat's Eye Earring 10223, Necklace of Wisdom 13684, Leather Gloves 7785, Bone Gaiters 14604, Ring of Wisdom 6807, Bone Breastplate 23345 | Necklace of Anguish 5382 (the jewel gate opens) |
+| 16 | Ring of Wisdom 6807 | **Long Sword 156400**, Round Shield 8176, Cat's Eye Earring 10223, Earring of Strength 4036, Ring of Wisdom 6807, Ring of Anguish 2691, Necklace of Wisdom 13684 |
+| 17 | **Long Sword 156400**, Leather Shield 34 | Cat's Eye Earring 10223 (2nd), Bone Gaiters 14604, Ring of Wisdom 6807 (2nd) |
+
+The wastes the rework removes, visible in the WAS column:
+
+- **The cheap filler detour**: 10 non-weapon buys (372 adena of
+  shoes, gloves, caps, shields) run before the first weapon at
+  level 5 - a whole sword tier of income spent on pieces that score
+  nothing against the mob ladder.
+- **The intermediate weapon ladder**: Heavy Chisel 9280 -> Knife
+  14374 -> Sickle 21275 -> Brandish 62214 - every step resells at
+  reference/2, the chisel alone wastes 5.2k adena (the buy pays
+  x1.15, the sale returns x0.5).
+- **The jewel ladder in magic-free zones**: Ring of Knowledge at
+  level 6, Mystic's Earring at 8, Earring of Strength at 10 - mDef
+  buys while nothing attacks with magic.
+- **The shield ladder after the two-hander**: Leather Shield ->
+  Small Shield -> Buckler -> Round Shield, one shield per trip at
+  levels 17-20 while the two-hander keeps displacing them.
+
+The IS column buys the jewel floor once (levels 2-4), one weapon
+per tier with the armor inside each tier's budget, no jewel upgrade
+before level 15 and the defense burst (the bone set, the shield,
+the wisdom jewels) inside the Long Sword budget at level 16-17 -
+the same 251 gear points of the full dress reached without the
+detours, roughly 60k adena (about 17 percent of the journey income)
+saved by level 17.
+
 ## Where each piece lives
 
 - `tools/generate_item_stats.sh` - the prices, weights and combat
@@ -143,11 +227,15 @@ town.
 - `tools/generate_shop_catalogs.sh` - the buylists of every merchant
   keyed by the packet template id (from `data/buylists/*.xml` and
   the CT0 display id table).
-- `internal/swarm/gear/shopping.go` - the greedy planner
-  (`PlanPurchases`), the purchase queue of the widget view
-  (`PlanPurchaseQueue`: the affordable plan plus the wanted tail
-  with the cumulative missing adena), the catalogs (`Shop`,
+- `internal/swarm/gear/shopping.go` - the phased planner
+  (`PlanPurchases`, `PlanPurchaseQueue`: the affordable plan plus
+  the wanted tail with the cumulative missing adena), the strategy
+  phases (`shopStrategy.classify`: the jewel floor, the weapon
+  milestone, the defense budget), the catalogs (`Shop`,
   `Catalog`) and the adena budget handling.
+- `internal/swarm/gear/shopping_strategy_test.go` - the level
+  journey simulation and the was/is comparison table (the legacy
+  greedy planner copy, the income model, the ordering pins).
 - `internal/swarm/hunt/shopping.go` - the trip trigger, the
   multi-stop buy execution, the transaction pacing and the widget
   view publish (`publishShoppingView`: the queue while hunting, the

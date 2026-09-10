@@ -4,6 +4,79 @@ Crash-safe task tracking: the current task, its full context and per-commit
 progress live here (see the "Work protocol" section in AGENTS.md). Entries
 are append-only; a new agent resumes the newest unfinished entry.
 
+## Active task: the shop strategy rework - the purchase phases (jewel floor, weapon, defense)
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push (7 commits landed mid task: the packet reader/writer perf
+rounds; pulled cleanly, no conflicts).
+
+### Goal
+
+The user request (2026-09-10, Russian): the purchase order of the NG
+items is wrong for the starting locations. (1) Nothing there attacks
+with magic - the cheapest first jewel set suffices until level 15+,
+the jewel ladder is a waste below it. (2) The melee characters want
+the weapon first, then the armor with the maximum defense, then the
+next weapon tier. Rework the purchase order logic, study the server
+prices, and deliver the comparison table of every NG purchase from
+level 1 to 15+ as "was" and "is".
+
+### Root causes and fixes
+
+- The old planner ranked EVERY purchase by `gain / price` (greedy
+  value per adena). The cheap empty slot fillers (Apprentice's Shoes
+  8 pDef for 8 adena - 0.99 pDef per adena) outranked every weapon,
+  so a fresh character spent levels 1-4 on shoes, gloves, caps and
+  shields before the first Short Sword, bought the intermediate
+  weapon ladder (Heavy Chisel -> Knife -> Sickle) whose steps resell
+  at reference/2, and climbed the jewel ladder in magic-free zones.
+- The rework phases the walk (`shopStrategy.classify` in
+  gear/shopping.go): the jewel floor (the cheapest jewel per family
+  fills the empty slots at any level - the basic outfit), the weapon
+  milestone (only the best value STRICT weapon upgrade is eligible -
+  the saving target; a cheaper worse value weapon never intercepts
+  the save up) and the defense upgrades (ranked by the raw defense
+  gain, bounded by the weapon budget: the reference value of the
+  worn defense gear may not exceed the reference price of the worn
+  weapon - the weapon leads the progression, the defense follows
+  inside its tier budget). The jewel upgrades gate on level 15
+  (`jewelUpgradeLevel`): below it only the floor items are planned,
+  past it the upgrades join the defense phase.
+- `PlanPurchases`/`PlanPurchaseQueue` grew the character level
+  parameter (the hunt loop passes the tracker's `SelfLevel`), the
+  virtual paperdoll entries carry the item id (the anchor and the
+  defense pricing read them), and the whole file went through
+  gofmt (the working tree copy had lost its tabs).
+
+### Status: done (2026-09-10)
+
+- The journey simulation test
+  (`gear/shopping_strategy_test.go`:
+  TestShoppingStrategyJourneyComparison) walks the elven fighter
+  from the creation screen (the Squire's kit, zero adena) through
+  level 20 once per planner - the legacy greedy copy (pinned as the
+  comparison baseline) and the phased planner - with the income
+  model built from the Mobius data (experience.xml exp per level /
+  the mob exp of the level's ladder step, the npc adena drops at 70
+  percent), one town trip per level, the sells, the server-side
+  affordability re-check (the planner overprices the starter kit
+  credit the shops refuse) and the auto equipment walk. It prints
+  the was/is table and pins the ordering rules: the jewel floor
+  first, the first weapon before any armor, no jewel upgrade below
+  15, the jewel upgrades past 15, the greedy planner's filler
+  detour (10 non-weapon buys, the Apprentice's Shoes opening).
+- The comparison table and the waste analysis (the filler detour,
+  the intermediate weapon ladder, the jewel ladder in magic-free
+  zones, the shield ladder after the two-hander) live in
+  docs/shopping_strategy.md ("The was/is journey of an elven
+  fighter"); the strategy section describes the three phases.
+- Verify loop: go build/vet, gofmt clean, go test ./... (18
+  packages), golangci-lint on gear/hunt (only the pre-existing
+  goconst on slots.go and nolintlint on plan.go remain), the live
+  stack deployed fresh (STACK_READY: 2106/7777/3306, 75 tables) and
+  tools/mobius_e2e.sh E2E_OK.
+
 ## Active task: rest at the kill spot, finish fights across the zone line, zone free loot
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
