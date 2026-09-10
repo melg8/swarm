@@ -78,7 +78,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.45;
   overflow: hidden;
 }
 
@@ -109,7 +110,7 @@ body {
   color: var(--accent);
 }
 
-.brand-sub { color: var(--text-dim); font-size: 11px; }
+.brand-sub { color: var(--text-dim); font-size: 11.5px; }
 
 .tabs {
   display: flex;
@@ -122,10 +123,10 @@ body {
   border: none;
   color: var(--text-dim);
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 13px;
   padding: 5px 12px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .tab:hover { color: var(--text); background: var(--bg-panel-2); }
@@ -136,7 +137,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-dim);
   margin-left: auto;
 }
@@ -174,9 +175,13 @@ body {
   flex-direction: column;
 }
 
+/* Section titles: 11px semibold with a light tracking - the compact
+   panel headers read as modern labels instead of the heavy 2000s
+   ALL-CAPS micro captions (the words themselves stay title case). */
 .sidebar-title {
-  font-size: 10px;
-  letter-spacing: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   color: var(--text-dim);
   padding: 10px 12px 6px;
 }
@@ -195,7 +200,7 @@ body {
   width: 254px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
@@ -213,8 +218,9 @@ body.mode-pathfind .zone-panel { display: none; }
   border: 0;
   background: transparent;
   color: var(--text-dim);
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   cursor: pointer;
   text-align: left;
 }
@@ -263,7 +269,7 @@ body.mode-pathfind .zone-panel { display: none; }
 }
 
 .zone-name {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-bright);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -273,18 +279,18 @@ body.mode-pathfind .zone-panel { display: none; }
 .zone-item.active .zone-name { color: var(--accent); }
 
 .zone-meta {
-  font-size: 10px;
+  font-size: 10.5px;
   color: var(--text-dim);
 }
 
 .zone-hunt-btn {
-  font-size: 10px;
+  font-size: 11px;
   padding: 2px 8px;
   cursor: pointer;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .zone-hunt-btn:hover {
@@ -329,7 +335,7 @@ body.mode-pathfind .zone-panel { display: none; }
   text-overflow: ellipsis;
 }
 
-.bot-item .bot-level { color: var(--text-dim); font-size: 11px; }
+.bot-item .bot-level { color: var(--text-dim); font-size: 11.5px; }
 
 /* Mini vital bars of the sidebar rows: the same red/blue/silver palette
    as the HUD bars, so the overview reads in one visual language. */
@@ -391,12 +397,12 @@ body.mode-pathfind .zone-panel { display: none; }
    status banner of the map. */
 .bot-activity {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.3px;
   color: var(--text-dim);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--bg-panel-2);
   border-left: 3px solid var(--gray);
   overflow: hidden;
@@ -458,7 +464,7 @@ body.mode-pathfind .zone-panel { display: none; }
 
 .bot-status-detail {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 11.5px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -492,7 +498,7 @@ body.mode-pathfind .bot-status { display: none; }
 
 .legend { display: grid; grid-template-columns: 1fr; gap: 4px 10px; }
 
-.legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 11px; }
+.legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 11.5px; }
 
 .legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; border: 1px solid var(--border); flex-shrink: 0; }
 /* The legend uses the fixed map marker palette - the same colors the
@@ -509,7 +515,7 @@ body.mode-pathfind .bot-status { display: none; }
 .legend-note {
   margin-top: 8px;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: 10.5px;
   line-height: 1.5;
 }
 
@@ -550,7 +556,7 @@ body.mode-pathfind .bot-status { display: none; }
 
 .btn:hover { border-color: var(--accent); color: var(--accent); }
 
-.check { display: flex; align-items: center; gap: 5px; color: var(--text-dim); cursor: pointer; font-size: 12px; user-select: none; }
+.check { display: flex; align-items: center; gap: 5px; color: var(--text-dim); cursor: pointer; font-size: 13px; user-select: none; }
 
 .check input { accent-color: var(--accent); }
 
@@ -570,9 +576,9 @@ body.mode-pathfind .bot-status { display: none; }
   background: var(--bg-panel-2);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   font-family: inherit;
   line-height: 1;
 }
@@ -627,9 +633,9 @@ body.mode-pathfind .bot-status { display: none; }
   background: var(--bg-panel);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 6px 9px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-family: var(--mono);
   z-index: 5;
   max-width: 260px;
@@ -638,7 +644,7 @@ body.mode-pathfind .bot-status { display: none; }
 
 .map-tooltip.hidden { display: none; }
 
-.map-tooltip .tt-name { color: var(--text-bright); font-size: 12px; }
+.map-tooltip .tt-name { color: var(--text-bright); font-size: 12.5px; }
 
 .map-rose {
   position: absolute;
@@ -667,9 +673,9 @@ body.mode-pathfind .bot-status { display: none; }
 .hud {
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   box-shadow: var(--shadow);
-  padding: 10px 12px;
+  padding: 12px 14px;
 }
 
 .hud-head { margin-bottom: 10px; }
@@ -718,7 +724,7 @@ body.mode-pathfind .bot-status { display: none; }
 }
 
 
-.hud-name-small { font-size: 14px; }
+.hud-name-small { font-size: 14.5px; }
 
 /* The class text and the status chips share one line under the name
    heading, so the chips never crowd the name. */
@@ -732,7 +738,7 @@ body.mode-pathfind .bot-status { display: none; }
 
 .hud-chips { display: flex; gap: 4px; }
 
-.hud-class { color: var(--accent); font-size: 12px; }
+.hud-class { color: var(--accent); font-size: 12.5px; }
 
 .vitals { display: grid; gap: 8px; margin-bottom: 10px; }
 
@@ -740,9 +746,9 @@ body.mode-pathfind .bot-status { display: none; }
 
 .vital-row { display: grid; grid-template-columns: 24px 1fr 64px; align-items: center; gap: 8px; }
 
-.vital-label { color: var(--text-dim); font-size: 11px; }
+.vital-label { color: var(--text-dim); font-size: 11.5px; }
 
-.vital-text { font-family: var(--mono); font-size: 11px; text-align: right; color: var(--text); }
+.vital-text { font-family: var(--mono); font-size: 11.5px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
 
 .bar {
   height: 13px;
@@ -783,19 +789,22 @@ body.mode-pathfind .bot-status { display: none; }
   height: 150px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   box-shadow: var(--shadow);
-  padding: 6px 10px;
   z-index: 4;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.6;
+  display: flex;
+  flex-direction: column;
 }
 
 /* The list is the scroll container: the auto scroll logic scrolls it. */
 .chat-list {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  padding: 4px 10px 6px;
 }
 
 .chat-line { display: flex; gap: 8px; }
@@ -812,11 +821,11 @@ body.mode-pathfind .bot-status { display: none; }
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 2px 0;
+  padding: 3px 0;
   border-bottom: 1px dotted var(--border-soft);
 }
 
-.kv span { color: var(--text-dim); font-size: 11px; flex-shrink: 0; }
+.kv span { color: var(--text-dim); font-size: 11.5px; flex-shrink: 0; }
 
 .kv b {
   font-family: var(--mono);
@@ -827,6 +836,7 @@ body.mode-pathfind .bot-status { display: none; }
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Log tab */
@@ -843,30 +853,30 @@ body.mode-pathfind .bot-status { display: none; }
   background: var(--bg-panel-2);
   border: 1px solid var(--border);
   color: var(--text);
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: 13px;
   width: 220px;
   outline: none;
 }
 
 #log-filter:focus { border-color: var(--accent); }
 
-.log-count { margin-left: auto; color: var(--text-dim); font-family: var(--mono); font-size: 11px; }
+.log-count { margin-left: auto; color: var(--text-dim); font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; }
 
 .log-list {
   flex: 1;
   overflow-y: auto;
   padding: 6px 0;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .log-line {
   display: flex;
   gap: 10px;
-  padding: 2.5px 14px;
-  border-bottom: 1px solid var(--border-soft);
+  padding: 4px 14px;
+  line-height: 1.5;
 }
 
 .log-line:hover { background: var(--bg-panel-2); }
@@ -894,7 +904,7 @@ body.mode-pathfind .bot-status { display: none; }
   font-family: var(--mono);
 }
 
-.foot-item { white-space: nowrap; }
+.foot-item { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* ---- pathfind test mode ---- */
 
@@ -931,7 +941,7 @@ body.mode-pathfind #foot-updated {
   flex-direction: column;
   gap: 10px;
   padding: 12px 14px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
 }
 
@@ -953,13 +963,13 @@ body.mode-pathfind #foot-updated {
   border-radius: 50%;
   color: #ffffff;
   font-weight: 700;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
 .pf-key-a { background: var(--blue); }
 .pf-key-b { background: var(--red); }
 
-.pf-value { font-size: 11.5px; word-break: break-all; }
+.pf-value { font-size: 12px; word-break: break-all; }
 
 .pf-status {
   padding: 6px 9px;
@@ -967,7 +977,7 @@ body.mode-pathfind #foot-updated {
   background: var(--bg-panel-2);
   border: 1px solid var(--border-soft);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   word-break: break-word;
 }
 
@@ -983,16 +993,19 @@ body.mode-pathfind #foot-updated {
 
 .pf-stats .kv { display: flex; justify-content: space-between; gap: 6px; }
 
-.pf-stats .kv span { color: var(--text-dim); }
+/* Search statistics of the pathfind panel: the labels read at 12px
+   and the values carry their own weight, so the numbers stand out
+   against the labels of the grid. */
+.pf-stats .kv span { color: var(--text-dim); font-size: 12px; }
 
-.pf-stats .kv b { font-family: var(--mono); font-weight: 600; }
+.pf-stats .kv b { font-family: var(--mono); font-weight: 600; font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .pf-legend {
   display: flex;
   flex-direction: column;
   gap: 5px;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 11.5px;
 }
 
 .pf-legend div { display: flex; align-items: center; gap: 7px; }
@@ -1016,7 +1029,7 @@ body.mode-pathfind #foot-updated {
 
 .pf-note {
   color: var(--text-dim);
-  font-size: 10.5px;
+  font-size: 11px;
   font-family: var(--mono);
   word-break: break-all;
 }
@@ -1037,7 +1050,7 @@ body.mode-pathfind #live-label { display: none; }
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-family: var(--mono);
   padding: 2.5px 4px;
 }
@@ -1162,8 +1175,8 @@ body.mode-pathfind .gear-panel { display: none; }
   padding: 6px 8px 5px;
   border-bottom: 1px solid var(--border-soft);
   color: var(--text-dim);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
   flex-shrink: 0;
 }
 
@@ -1173,7 +1186,7 @@ body.mode-pathfind .gear-panel { display: none; }
   margin-left: auto;
   letter-spacing: 0;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: 10.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1249,7 +1262,7 @@ body.mode-pathfind .gear-panel { display: none; }
 }
 
 .shop-name {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text-bright);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1259,7 +1272,7 @@ body.mode-pathfind .gear-panel { display: none; }
 .shop-item.want .shop-name { color: var(--text); }
 
 .shop-meta {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1276,23 +1289,24 @@ body.mode-pathfind .gear-panel { display: none; }
 }
 
 .shop-price {
-  font-size: 10px;
+  font-size: 10.5px;
   color: var(--gold, #b0a244);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .shop-item.want .shop-price { color: var(--text-dim); }
 
 .shop-missing {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--accent);
   white-space: nowrap;
 }
 
 .shop-buying-chip {
-  font-size: 8.5px;
-  padding: 0.5px 4px;
-  border-radius: 3px;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
   color: #fff;
   background: var(--accent);
   white-space: nowrap;
@@ -1310,16 +1324,17 @@ body.mode-pathfind .gear-panel { display: none; }
 }
 
 .shop-key {
-  font-size: 9px;
-  letter-spacing: 0.5px;
+  font-size: 10px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
   color: var(--text-dim);
 }
 
 .shop-val {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 10.5px;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Paperdoll blocks: the wear and jewelry grids share the compact 36px
@@ -1368,7 +1383,7 @@ body.mode-pathfind .gear-panel { display: none; }
 /* Slot label of an empty paperdoll cell: a persistent span toggled by
    display, so filling or clearing a slot never rebuilds the cell. */
 .slot-label {
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -1441,13 +1456,14 @@ body.mode-pathfind .gear-panel { display: none; }
 .icon-badge {
   position: absolute;
   z-index: 3;
-  font-size: 8.5px;
+  font-size: 10px;
   font-family: var(--mono);
   line-height: 1;
-  padding: 1.5px 2.5px;
-  border-radius: 3px;
+  padding: 1px 3px;
+  border-radius: 4px;
   background: rgba(0, 0, 0, 0.55);
   color: #f2f2f2;
+  font-variant-numeric: tabular-nums;
 }
 
 .badge-enchant { left: 2px; top: 2px; color: #8ef2a0; }
@@ -1536,9 +1552,8 @@ body.mode-pathfind .gear-panel { display: none; }
 .drop-dialog.hidden { display: none; }
 
 .drop-head {
-  font-size: 10px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 1px;
   color: var(--text-dim);
 }
 
@@ -1576,19 +1591,19 @@ body.mode-pathfind .gear-panel { display: none; }
 .drop-max {
   color: var(--text-dim);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 11.5px;
 }
 
 .drop-note {
   color: var(--text-dim);
-  font-size: 10.5px;
+  font-size: 11px;
 }
 
 /* Keyboard and wheel hints of the count dialog. */
 .drop-hint {
   color: var(--text-dim);
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 10.5px;
   letter-spacing: 0.4px;
 }
 
@@ -1621,8 +1636,8 @@ body.mode-pathfind .gear-panel { display: none; }
 
 .gear-key {
   color: var(--text-dim);
-  font-size: 10px;
-  letter-spacing: 1px;
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
   flex-shrink: 0;
 }
@@ -1635,6 +1650,7 @@ body.mode-pathfind .gear-panel { display: none; }
   color: var(--gold);
   margin-left: auto;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Weight bar: the fill width is the load percentage, the inline
@@ -1662,11 +1678,12 @@ body.mode-pathfind .gear-panel { display: none; }
 .gear-load-text {
   font-family: var(--mono);
   font-weight: 400;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text);
   min-width: 30px;
   text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ============================================================
@@ -2068,10 +2085,10 @@ canvas.fxg-cell.picked {
   max-width: 280px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   box-shadow: 0 6px 22px rgba(15, 22, 35, 0.4);
   padding: 8px 10px 9px;
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.45;
   color: var(--text);
   pointer-events: none;
@@ -2149,7 +2166,7 @@ canvas.fxg-cell.picked {
   display: flex;
   gap: 12px;
   color: var(--text-dim);
-  font-size: 10.5px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
