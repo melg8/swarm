@@ -19,11 +19,18 @@
 #                  runs, a single unlabeled comment covers the whole
 #                  skill, the enchant route comments "(+N Cost)" and
 #                  levels beyond the declared level count never
-#                  enter the dictionary)
+#                  enter the dictionary; the cast block - target
+#                  type, cast range, reuse delay, hit time, the
+#                  per level mana cost, the magic flag, the abnormal
+#                  time of the timed buffs and the weapon kinds of
+#                  the <using> conditions - feeds the combat skill
+#                  casting of the hunt loop)
 #   skill trees:   dist/game/data/stats/players/skillTrees/
 #                  {StartingClass,1stClass,2ndClass,3rdClass}/*.xml
 #                  (classId, parentClassId, per skill: id, level,
-#                  getLevel, levelUpSp, autoGet)
+#                  getLevel, levelUpSp, autoGet, the required item
+#                  id of the skill books - the <item> children of
+#                  the lesson entries)
 #
 # The script merges every class tree with its parent chain (the C1
 # trees list only the skills of their own class window, the parent
@@ -79,6 +86,7 @@ skill_stats, skill_trees_dir, icons, out = sys.argv[1:5]
 # attack power, 1 defense, 2 other).
 skill_infos = {}
 skill_descs = {}
+skill_casts = {}
 for path in sorted(glob.glob(os.path.join(skill_stats, '*.xml'))):
     text = open(path, encoding='utf-8').read()
     for m in re.finditer(
@@ -123,6 +131,53 @@ for path in sorted(glob.glob(os.path.join(skill_stats, '*.xml'))):
             'category': category,
         }
 
+        # ------------------------------------------------------------- cast
+        # The cast block of the skill stats feeds the combat casting:
+        # the target type picks the cast target (ONE attacks the
+        # selected target, SELF buffs always land), the cast range
+        # and the reuse delay pace the requests, the per level mana
+        # cost gates the casting (the mage out of mana rest), the
+        # magic flag marks the spells of the mystics, the abnormal
+        # time bounds the timed buffs and the weapon kinds of the
+        # <using> conditions match the skill to the weapon in hand
+        # (Power Strike wants a sword or blunt, Power Shot a bow).
+        # The #mpConsume table entries resolve per level here; a
+        # static value repeats for every level of the skill.
+        tg = re.search(r'<targetType>([^<]+)</targetType>', body)
+        cr = re.search(r'<castRange>(\d+)</castRange>', body)
+        rd = re.search(r'<reuseDelay>(\d+)</reuseDelay>', body)
+        ht = re.search(r'<hitTime>(\d+)</hitTime>', body)
+        mag = re.search(r'<isMagic>\s*1', body)
+        abt = re.search(r'<abnormalTime>(\d+)</abnormalTime>', body)
+        mp = re.search(r'<mpConsume>([^<]+)</mpConsume>', body)
+        costs = []
+        if mp:
+            ref = mp.group(1).strip()
+            if ref.startswith('#'):
+                tab = re.search(
+                    r'<table name="%s">([^<]+)</table>' % re.escape(ref),
+                    body)
+                if tab:
+                    costs = [int(x) for x in tab.group(1).split()]
+            else:
+                costs = [int(ref)] * max(1, min(max_level, 100))
+        kinds = re.findall(r'<using kind="([^"]+)"', body)
+        weapons = []
+        if kinds:
+            weapons = sorted({k.strip() for k in
+                              kinds[0].split(',') if k.strip()})
+        skill_casts[skill_id] = {
+            'operate': op.group(1) if op else '',
+            'target': tg.group(1) if tg else '',
+            'mp': costs,
+            'range': int(cr.group(1)) if cr else 0,
+            'reuse': int(rd.group(1)) if rd else 0,
+            'hit': int(ht.group(1)) if ht else 0,
+            'magic': bool(mag),
+            'buff': int(abt.group(1)) if abt else 0,
+            'weapons': weapons,
+        }
+
         # -------------------------------------------------------- descriptions
         # The XML comments of the block are the classic client tooltip
         # texts. "Level N: text" comments describe one level each (the
@@ -161,7 +216,10 @@ for path in sorted(glob.glob(os.path.join(skill_stats, '*.xml'))):
 # ---------------------------------------------------------------- class trees
 # One skillTree block per class: the entries plus the parentClassId
 # chain that completes the tree (a 1st class tree only lists its own
-# window, the starting class entries come from the parent).
+# window, the starting class entries come from the parent). The
+# lesson entries carry the skill book requirement as <item> children
+# (only the level that needs the book lists it - Defence Aura level
+# 1 wants the spellbook, levels 2+ do not).
 class_entries = {}
 class_parent = {}
 for group in ('StartingClass', '1stClass', '2ndClass', '3rdClass'):
@@ -182,14 +240,23 @@ for group in ('StartingClass', '1stClass', '2ndClass', '3rdClass'):
             entries = class_entries.setdefault(class_id, [])
             for sm in re.finditer(
                     r'<skill skillName="[^"]*" skillId="(\d+)"'
-                    r' skillLevel="(\d+)" getLevel="(\d+)"'
-                    r'(?: levelUpSp="(\d+)")?'
-                    r'[^>]*?(/?)>', body):
+                    r' skillLevel="(\d+)" getLevel="(\d+)"[^>]*?'
+                    r'(?:/>|>)', body):
+                attrs = sm.group(0)
                 skill_id, level = int(sm.group(1)), int(sm.group(2))
-                get_level, sp = int(sm.group(3)), sm.group(4)
-                auto = 'autoGet="true"' in sm.group(0)
+                get_level = int(sm.group(3))
+                sp = re.search(r'levelUpSp="(\d+)"', attrs)
+                auto = 'autoGet="true"' in attrs
+                book = 0
+                if not attrs.endswith('/>'):
+                    close = body.find('</skill>', sm.end())
+                    inner = body[sm.end():close if close > 0 else sm.end()]
+                    bm = re.search(r'<item id="(\d+)"', inner)
+                    if bm:
+                        book = int(bm.group(1))
                 entries.append((skill_id, level, get_level,
-                                int(sp) if sp else 0, auto))
+                                int(sp.group(1)) if sp else 0, auto,
+                                book))
 
 # The complete tree of a class: its own entries plus the parent chain,
 # deduped by (skillId, skillLevel) with the lowest getLevel winning
@@ -201,10 +268,10 @@ def complete_tree(class_id, seen=None):
     seen.add(class_id)
     merged = {}
     for chain_id in ([class_id] + walk_parents(class_parent.get(class_id))):
-        for skill_id, level, get_level, sp, auto in class_entries[chain_id]:
+        for skill_id, level, get_level, sp, auto, book in class_entries[chain_id]:
             key = (skill_id, level)
             if key not in merged or get_level < merged[key][2]:
-                merged[key] = (skill_id, level, get_level, sp, auto)
+                merged[key] = (skill_id, level, get_level, sp, auto, book)
     return merged.values()
 
 def walk_parents(parent):
@@ -289,20 +356,47 @@ lines.append('')
 lines.append('// skillTrees maps the class id to the complete skill tree of')
 lines.append('// the class (its own entries plus the parent chain): every')
 lines.append('// learnable (skillId, level) pair with the character level')
-lines.append('// it unlocks at, the SP cost and the autoGet flag. The')
-lines.append('// entries are sorted by (getLevel, skillId, level).')
+lines.append('// it unlocks at, the SP cost, the autoGet flag and the skill')
+lines.append('// book item the lesson consumes (0 - no book). The entries are')
+lines.append('// sorted by (getLevel, skillId, level).')
 lines.append('var skillTrees = map[int32][]SkillLearn{')
 for class_id in sorted(complete_trees):
     entries = complete_trees[class_id]
     if not entries:
         continue
     lines.append('\t%d: {' % class_id)
-    for skill_id, level, get_level, sp, auto in entries:
+    for skill_id, level, get_level, sp, auto, book in entries:
         lines.append('\t\t{SkillID: %d, Level: %d, GetLevel: %d, '
-                     'SpCost: %d, AutoGet: %s},'
+                     'SpCost: %d, AutoGet: %s, BookItem: %d},'
                      % (skill_id, level, get_level, sp,
-                        'true' if auto else 'false'))
+                        'true' if auto else 'false', book))
     lines.append('\t},')
+lines.append('}')
+lines.append('')
+lines.append('// skillCasts maps the skill id to the cast data of the skill:')
+lines.append('// the operate type (A1 active damage, A2 timed buff, P passive),')
+lines.append('// the target type (ONE attacks the selected target, SELF lands')
+lines.append('// on the caster), the per level mana cost, the cast range, the')
+lines.append('// reuse delay and the hit time in milliseconds, the magic flag')
+lines.append('// of the spells, the abnormal time of the timed buffs in')
+lines.append('// seconds and the weapon kinds the <using> condition demands')
+lines.append('// (empty - any weapon). See SkillCast in skills.go.')
+lines.append('var skillCasts = map[int32]SkillCast{')
+for skill_id in sorted(skill_casts):
+    cast = skill_casts[skill_id]
+    if cast['operate'] == 'P':
+        continue
+    mp = cast['mp']
+    mp_list = ', '.join(str(x) for x in mp)
+    weapons = ', '.join(go_str(k) for k in cast['weapons'])
+    lines.append('\t%d: {Operate: %s, Target: %s, MPCost: []int32{%s}, '
+                 'CastRange: %d, ReuseDelay: %d, HitTime: %d, '
+                 'Magic: %s, BuffTime: %d, Weapons: []string{%s}},'
+                 % (skill_id, go_str(cast['operate']),
+                    go_str(cast['target']), mp_list, cast['range'],
+                    cast['reuse'], cast['hit'],
+                    'true' if cast['magic'] else 'false', cast['buff'],
+                    weapons))
 lines.append('}')
 lines.append('')
 
@@ -311,6 +405,11 @@ with open(out, 'w', encoding='utf-8') as fh:
 
 tree_classes = len(complete_trees)
 tree_entries = sum(len(v) for v in complete_trees.values())
+book_entries = sum(1 for e in
+                   [entry for v in complete_trees.values() for entry in v]
+                   if e[5])
+cast_skills = sum(1 for c in skill_casts.values()
+                  if c['operate'] != 'P')
 icon_hits = sum(1 for e in
                 [entry for v in complete_trees.values() for entry in v]
                 if resolve_icon(e[0], skill_infos.get(e[0], {})
@@ -324,6 +423,8 @@ tree_desc_hits = sum(1 for sid in {e[0] for v in
 print('skill stats: %d skills, class trees: %d classes, %d entries,'
       % (len(skill_infos), tree_classes, tree_entries))
 print('tree entries with a resolved icon: %d' % icon_hits)
+print('lessons requiring a book: %d, active skills with cast data: %d'
+      % (book_entries, cast_skills))
 print('descriptions: %d skills, %d runs, %d chars; tree skills with'
       ' a description: %d' % (desc_skills, desc_runs, desc_bytes,
                               tree_desc_hits))

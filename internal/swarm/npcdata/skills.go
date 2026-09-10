@@ -47,15 +47,67 @@ const (
 
 // SkillLearn is one learnable (skillId, level) pair of a class skill
 // tree: the character level the pair unlocks at, the SP cost of the
-// lesson and the autoGet flag (the pairs the server grants on its own
-// - Lucky, Expertise - never enter the learning queue). Generated
-// into skill_trees.go.
+// lesson, the autoGet flag (the pairs the server grants on its own
+// - Lucky, Expertise - never enter the learning queue) and the
+// skill book item id the lesson consumes (0 - no book needed; only
+// specific levels demand one, the Defence Aura level 1 wants its
+// spellbook while levels 2+ do not). Generated into skill_trees.go.
 type SkillLearn struct {
 	SkillID  int32
 	Level    int32
 	GetLevel int32
 	SpCost   int32
 	AutoGet  bool
+	BookItem int32
+}
+
+// SkillCast is the cast data of one active skill: what the combat
+// casting of the hunt loop needs to fire the skill at the right
+// moment. Generated into skill_trees.go.
+type SkillCast struct {
+	// Operate is the operate type of the Mobius skill stats: A1 an
+	// active skill (a strike, a spell), A2 a timed buff, P a passive
+	// skill (never enters the cast map).
+	Operate string
+	// Target is the target type: ONE casts at the selected target,
+	// SELF lands on the caster (the auras, the heals).
+	Target string
+	// MPCost is the mana cost per skill level (the list indexes
+	// level minus one; shorter lists clamp to the last entry).
+	MPCost []int32
+	// CastRange is the cast range in world units (40 - melee).
+	CastRange int32
+	// ReuseDelay is the reuse cooldown in milliseconds.
+	ReuseDelay int32
+	// HitTime is the cast animation time in milliseconds.
+	HitTime int32
+	// Magic marks the spells of the mystics (the mana regen and the
+	// out of mana rest key on them).
+	Magic bool
+	// BuffTime is the abnormal time of a timed buff in seconds (0 -
+	// not a timed buff).
+	BuffTime int32
+	// Weapons lists the weapon kinds the using condition demands
+	// (SWORD, BLUNT, DAGGER, BOW, POLE); empty - any weapon.
+	Weapons []string
+}
+
+// TeacherNPC is one skill teacher of the deployment village: the
+// packet display id of the NpcInfo packet, the resolved name and the
+// spawn point it stands at. Generated into skill_teachers.go.
+type TeacherNPC struct {
+	TemplateID int32
+	Name       string
+	X          int32
+	Y          int32
+	Z          int32
+}
+
+// TeachersOfClass returns the village teachers of a class id. The
+// list is empty when the class has no teacher in the deployment
+// village (an unknown class, a class of another village).
+func TeachersOfClass(classID int32) []TeacherNPC {
+	return skillTeachers[classID]
 }
 
 // SkillInfoOf returns the static display data of a skill id. The
@@ -99,4 +151,47 @@ func SkillTree(classID int32) ([]SkillLearn, bool) {
 	tree, ok := skillTrees[classID]
 
 	return tree, ok
+}
+
+// SkillCastOf returns the cast data of an active skill id. The
+// second answer is false for passive skills and unknown ids - the
+// combat casting never fires them.
+func SkillCastOf(id int32) (SkillCast, bool) {
+	cast, ok := skillCasts[id]
+
+	return cast, ok
+}
+
+// MPCostOf returns the mana cost of one level of the skill: the
+// per level list clamps to its last entry (shorter tables cover the
+// declared levels of the skill), an empty list answers 0.
+func (c SkillCast) MPCostOf(level int32) int32 {
+	if len(c.MPCost) == 0 {
+		return 0
+	}
+	index := int(level) - 1
+	if index < 0 {
+		index = 0
+	}
+	if index >= len(c.MPCost) {
+		index = len(c.MPCost) - 1
+	}
+
+	return c.MPCost[index]
+}
+
+// UsableWithWeapon reports whether the skill accepts the given
+// weapon kind: an empty weapon list accepts every weapon, otherwise
+// the kind must be one of the demanded ones.
+func (c SkillCast) UsableWithWeapon(kind string) bool {
+	if len(c.Weapons) == 0 {
+		return true
+	}
+	for _, weapon := range c.Weapons {
+		if weapon == kind {
+			return true
+		}
+	}
+
+	return false
 }
