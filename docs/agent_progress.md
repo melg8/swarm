@@ -11,13 +11,79 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
-## Active task: the relogin ground fix and the aggro-aware movement
+## Active task: the town trip water stuck - the lake under the elven village
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
 Other agents may push to the same branch concurrently - rebase before
 every push.
 
 ### Goal
+
+The user report (2026-09-10, Russian): the bot got stuck trying to
+return to the town - it ran into the water below the elven village
+plateau and stood there (the state dump: the character at 47136 46564
+-3738 floating over the lake bed, phase townWalk, the three re-path
+budget burned, the plan pointing at the village cliff top). Three
+asks: (1) how to correctly walk out of that point, (2) how the
+character ended up there at all (the possible paths that produced the
+final route), (3) a walk plan dump that shows the whole walk from
+where we wanted to go to where we want to arrive, with a marker on
+the current target waypoint - to debug such cases at a glance.
+
+### Root cause (researched from the Mobius C1 sources + the geodata)
+
+- The server never refuses water: swimming move requests skip the
+  geodata validation entirely (straight to the click, clamped to 700
+  units), the lake beds are ordinary walkable slopes to
+  getValidLocation, and a failed server pathfind falls back to a
+  straight blind walk.
+- The swim z (-3738) floats ABOVE the water zone bound (-3780): the
+  zone membership flip flops, and in the dry phases every click
+  toward the village deck resolves onto a layer the lake bed has no
+  walkable connection to - getValidLocation answers with the
+  character's own position (a zero length walk), so the character
+  never moves again and every re-path replans the same geometry.
+- The skip rule aimed the follower at the closest waypoint (the
+  unclimbable cliff top) instead of the planned northern escape leg -
+  and the dump only showed the remaining tail, hiding the escape.
+- The planner itself always routed dry (verified from every zone
+  position): the character entered the water through the server side
+  routing of the per click legs. The bot's own smoothing could,
+  however, collapse dry legs across water (line of sight is water
+  blind) - fixed as part of the defense in depth.
+
+### Implementation
+
+- pathfind: the smoothing keeps the shore detours (legDry - a
+  collapsed leg between two dry points must stay dry); new engine
+  queries OverWater, DryLine and FindWaterEscape (the BFS flood to
+  the nearest shore over the walkable surface).
+- hunt: the town walker refuses wet click lines (DryLine before every
+  WalkTo, the re-paths share the trip budget) and recovers through
+  the water escape (OverWater arms the shore walk, a stuck escape
+  re-plans itself, a dry character re-plans the interrupted leg from
+  the shore with a fresh budget).
+- The walk plan (state, dump, map): the origin, the FULL waypoint
+  list, the follower cursor (the `<-- TARGET` marker / the map ring)
+  and the destination - plus `(passed)` markers in the dump.
+
+### Status: done (2026-09-10)
+
+- Verify loop: go build/vet, gofumpt clean, go test ./... (all
+  packages green), golangci-lint: zero new findings over the branch
+  base (19 pre-existing in the parallel agents' spot/zones code).
+- Regression tests: the real geodata pack (the reported stuck position
+  escapes to a shore, the route to Ariel stays dry leg by leg) and
+  the synthetic engine/walker suites of water_escape_test.go and
+  water_guard_test.go; the dump format pinned in webserver.
+- See docs/development_log.md round 46 for the full root cause chain.
+
+
+## Active task: the relogin ground fix and the aggro-aware movement
+
+Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
 
 The user report (2026-09-10, Russian): the bot often runs to a hunting
 ground THROUGH aggressive mobs, arrives with the train, resets it with

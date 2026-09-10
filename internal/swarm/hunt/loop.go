@@ -299,6 +299,8 @@ type Loop struct {
 	waypoints         []pathfind.Vec3
 	wpIndex           int
 	legDest           pathfind.Vec3
+	legStart          pathfind.Vec3
+	waterEscape       bool
 	moveAt            time.Time
 	stuckAt           time.Time
 	stuckX            int32
@@ -403,6 +405,9 @@ type Loop struct {
 	userX         int32
 	userY         int32
 	userZ         int32
+	userPlanX     int32
+	userPlanY     int32
+	userPlanZ     int32
 	userTarget    int32
 	userStart     time.Time
 	userMoveAt    time.Time
@@ -526,6 +531,8 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		waypoints:         nil,
 		wpIndex:           0,
 		legDest:           pathfind.Vec3{X: 0, Y: 0, Z: 0},
+		legStart:          pathfind.Vec3{X: 0, Y: 0, Z: 0},
+		waterEscape:       false,
 		moveAt:            time.Time{},
 		stuckAt:           time.Time{},
 		stuckX:            0,
@@ -555,6 +562,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 			Total:   0,
 			Trip:    false,
 		},
+
 		replacePlanned:    false,
 		replaceDone:       false,
 		replaceQueue:      nil,
@@ -613,6 +621,9 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		userX:             0,
 		userY:             0,
 		userZ:             0,
+		userPlanX:         0,
+		userPlanY:         0,
+		userPlanZ:         0,
 		userTarget:        0,
 		userStart:         time.Time{},
 		userMoveAt:        time.Time{},
@@ -629,6 +640,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		userDistAt:        time.Time{},
 		engLastDist:       0,
 		engDistAt:         time.Time{},
+
 	}
 }
 
@@ -932,6 +944,8 @@ func (l *Loop) recoverFromDeath() {
 		// the deleveling once the character is alive again.
 		l.noteDelevelDeath()
 		l.waypoints = nil
+		l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+		l.waterEscape = false
 	} else {
 		if l.autonomous {
 			l.phase = phaseEngage

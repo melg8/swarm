@@ -274,6 +274,65 @@ func (e *Engine) FindPathApproach(
 	return search.run(start, end, approachRadius)
 }
 
+// FindWaterEscape plans the way out of the water for a position whose
+// geodata surface lies below the C1 water level: the walk to the
+// nearest shore cell standing above the water surface. The hunt loop
+// arms it when the character stands over a lake or sea bed (the
+// town trip stuck under the elven village plateau swam there) - the
+// ordinary destination searches are meaningless until the character
+// is back ashore, because the server refuses move requests from a
+// floating character onto decks the water has no walkable connection
+// to. A start already on dry ground answers Found=false without an
+// error: no escape is needed.
+func (e *Engine) FindWaterEscape(start Vec3) (*Result, error) {
+	search := newSearch(e, e.maxPass)
+
+	return search.runEscape(start)
+}
+
+// DryLine reports whether the straight segment between two world
+// positions is a clean dry walk: walkable by the surface rules (the
+// same raster the line of sight uses) and never dipping under the
+// water level anywhere along the line. The town walker checks every
+// click target with it before sending the move request: the server
+// moves characters into water without any hesitation (its own
+// pathfinding carries no water cost, and swimming move requests skip
+// the geodata validation entirely), so keeping the character ashore
+// is the walker's own job.
+func (e *Engine) DryLine(start, end Vec3) (bool, error) {
+	search := newSearch(e, e.maxPass)
+	from, err := search.nodeAtWorld(start)
+	if err != nil {
+		return false, err
+	}
+	to, err := search.nodeAtWorld(end)
+	if err != nil {
+		return false, err
+	}
+
+	return search.lineOfSight(from, to) && search.dryLine(from, to), nil
+}
+
+// OverWater reports whether the walkable surface under a world
+// position lies below the C1 water level: the character stands (or
+// swims) over a lake or sea bed. The layer is the one closest to the
+// reference z - the deck the character itself is on. A position
+// without geodata answers false (never over water) so a broken pack
+// cannot trap the walker in an endless escape.
+func (e *Engine) OverWater(x, y float64, refZ int16) bool {
+	coords := WorldToCell(x, y)
+	entry, err := e.entry(CellToRegion(coords))
+	if err != nil || entry.region == nil {
+		return false
+	}
+	layer, ok := entry.region.ClosestLayer(LocalCell(coords), refZ)
+	if !ok {
+		return false
+	}
+
+	return layer.Height < waterLevel
+}
+
 // ClosestHeight resolves the height of the geodata layer at the world
 // position that is closest to refZ: the deck the server itself would
 // pick for a destination at (x, y) named with z = refZ (its own

@@ -117,10 +117,15 @@ func liveSnapshotBot(t *testing.T) *Bot {
 		{ID: AttrCurHP, Value: 40},
 		{ID: AttrMaxHP, Value: 95},
 	})
-	bot.SetWalkPlan([]WalkPoint{
-		{X: 45010, Y: 50010, Z: -3500},
-		{X: 45020, Y: 50025, Z: -3498},
-		{X: 45040, Y: 50044, Z: -3497},
+	bot.SetWalkPlan(WalkPlan{
+		Origin: &WalkPoint{X: 45000, Y: 50000, Z: -3500},
+		Points: []WalkPoint{
+			{X: 45010, Y: 50010, Z: -3500},
+			{X: 45020, Y: 50025, Z: -3498},
+			{X: 45040, Y: 50044, Z: -3497},
+		},
+		Index: 1,
+		Dest:  &WalkPoint{X: 45045, Y: 50050, Z: -3496},
 	})
 
 	return bot
@@ -177,6 +182,9 @@ func TestAppendSnapshotJSONEmptyBot(t *testing.T) {
 	require.Contains(t, string(direct), `"combatEvents":[]`)
 	require.Contains(t, string(direct), `"huntingZones":[]`)
 	require.Contains(t, string(direct), `"walkPath":null`)
+	require.Contains(t, string(direct), `"walkOrigin":null`)
+	require.Contains(t, string(direct), `"walkIndex":0`)
+	require.Contains(t, string(direct), `"walkDest":null`)
 	require.Contains(t, string(direct), `"huntingZone":null`)
 
 	viaCopy := bot.Snapshot().AppendJSON(nil)
@@ -194,10 +202,10 @@ func TestAppendSnapshotJSONEmptyBot(t *testing.T) {
 func TestAppendSnapshotJSONExpiredWalkPlan(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 100, 50)
-	bot.SetWalkPlan([]WalkPoint{{X: 1, Y: 2, Z: 3}})
+	bot.SetWalkPlan(WalkPlan{Points: []WalkPoint{{X: 1, Y: 2, Z: 3}}})
 
 	bot.mu.Lock()
-	bot.walkPathAt = time.Now().Add(-2 * walkPlanTTL)
+	bot.walkPlanAt = time.Now().Add(-2 * walkPlanTTL)
 	bot.mu.Unlock()
 
 	require.Contains(t, string(bot.AppendSnapshotJSON(nil)), `"walkPath":null`)

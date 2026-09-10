@@ -171,7 +171,10 @@ func goldenSnapshot() Snapshot {
 		Chat: []ChatEvent{
 			{Time: moment, Kind: "system", Text: "You earned 42 adena."},
 		},
-		WalkPath: []WalkPoint{{X: 45100, Y: 50100, Z: -3500}},
+		WalkPath:   []WalkPoint{{X: 45100, Y: 50100, Z: -3500}},
+		WalkOrigin: &WalkPoint{X: 45000, Y: 50000, Z: -3500},
+		WalkIndex:  0,
+		WalkDest:   &WalkPoint{X: 45110, Y: 50110, Z: -3500},
 		Shopping: &ShoppingPlanView{
 			Entries: []ShoppingEntryView{
 				{

@@ -377,11 +377,13 @@ type Bot struct {
 	started      time.Time
 	updated      time.Time
 	commandQueue chan Command
-	// The published manual walk plan of the web UI (see
-	// SetWalkPlan): the remaining waypoints of a double click
-	// walk, the clicked destination last.
-	walkPath   []WalkPoint
-	walkPathAt time.Time
+	// The published walk plan of the web UI and the state dump
+	// (see SetWalkPlan): the planning origin, the full waypoint
+	// list of the leg, the waypoint the follower currently heads
+	// to and the final destination - the whole walk reads at a
+	// glance in the dump.
+	walkPlan   *WalkPlan
+	walkPlanAt time.Time
 	// shopping holds the published purchase queue of the shop
 	// strategy (see SetShoppingPlan): what the bot plans to buy next
 	// with the prices and the missing adena, nil while nothing is
@@ -428,8 +430,8 @@ func NewBot(id string) *Bot {
 		started:            time.Now(),
 		updated:            time.Time{},
 		commandQueue:       make(chan Command, commandQueueCapacity),
-		walkPath:           nil,
-		walkPathAt:         time.Time{},
+		walkPlan:           nil,
+		walkPlanAt:         time.Time{},
 		shopping:           nil,
 		shoppingAt:         time.Time{},
 		skills:             nil,
@@ -905,8 +907,8 @@ func (b *Bot) ResetSession() {
 	b.skillQueue = nil
 	b.skillQueueClass = 0
 	b.skillQueueRevision = 0
-	b.walkPath = nil
-	b.walkPathAt = time.Time{}
+	b.walkPlan = nil
+	b.walkPlanAt = time.Time{}
 	b.clearShoppingPlanLocked()
 	b.phase = ""
 	b.status = StatusConnecting
@@ -915,40 +917,62 @@ func (b *Bot) ResetSession() {
 
 // walkPlanTTL bounds how long a published walk plan survives
 // without a refresh: the hunt loop re-publishes the plan every
-// tick while the manual walk runs, so an expired plan means the
+// tick while the walk runs, so an expired plan means the
 // loop moved on (or died) and the map must stop drawing the line
 // and the marker.
 const walkPlanTTL = 2 * time.Second
 
-// WalkPoint is one waypoint of the published walk plan of the
-// manual web UI: the remaining waypoints of a double click walk,
-// the clicked destination last.
+// WalkPoint is one waypoint of the published walk plan: a planned
+// geodata waypoint, the planning origin or the final destination of
+// the walk.
 type WalkPoint struct {
 	X int32 `json:"x"`
 	Y int32 `json:"y"`
 	Z int32 `json:"z"`
 }
 
-// SetWalkPlan publishes the manual walk plan of the web UI: the
-// remaining waypoints, the clicked destination last. An empty
-// plan clears it. Republishing the same plan only refreshes its
-// lifetime, so the steady per tick refresh of the hunt loop never
-// churns the event stream.
-func (b *Bot) SetWalkPlan(points []WalkPoint) {
+// WalkPlan is the published walk plan of a running leg: where the
+// leg was planned from (Origin), the full waypoint list of the plan
+// (Points), the waypoint the follower currently heads to (Index) and
+// the final destination of the walk (Dest). The state dump prints
+// the whole thing - a stuck trip reads at a glance - and the map
+// draws the planned line against the live character position.
+type WalkPlan struct {
+	// Origin is the position the leg was planned from, nil when the
+	// publisher does not know it (the manual direct walks).
+	Origin *WalkPoint `json:"origin"`
+	// Points lists every planned waypoint of the leg in walk order,
+	// including the passed ones.
+	Points []WalkPoint `json:"points"`
+	// Index is the position in Points the follower currently aims
+	// at: the waypoints before it are passed, the rest lies ahead.
+	Index int `json:"index"`
+	// Dest is the final destination of the walk (the merchant
+	// spawn, the farm spot, the clicked point), nil when the plan
+	// itself carries it.
+	Dest *WalkPoint `json:"dest"`
+}
+
+// SetWalkPlan publishes the walk plan of a running leg: the planning
+// origin, the full waypoint list, the current target index and the
+// final destination. A plan without points clears it. Republishing
+// an equal plan only refreshes its lifetime, so the steady per tick
+// refresh of the hunt loop never churns the event stream.
+func (b *Bot) SetWalkPlan(plan WalkPlan) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if len(points) == 0 {
+	if len(plan.Points) == 0 {
 		b.clearWalkPlanLocked()
 
 		return
 	}
-	if walkPointsEqual(b.walkPath, points) {
-		b.walkPathAt = time.Now()
+	if b.walkPlan != nil && walkPlansEqual(*b.walkPlan, plan) {
+		b.walkPlanAt = time.Now()
 
 		return
 	}
-	b.walkPath = points
-	b.walkPathAt = time.Now()
+	b.walkPlan = &plan
+	b.walkPlanAt = time.Now()
 	b.touch()
 }
 
@@ -963,21 +987,30 @@ func (b *Bot) ClearWalkPlan() {
 // clearWalkPlanLocked drops the walk plan, the caller must hold
 // the state write lock.
 func (b *Bot) clearWalkPlanLocked() {
-	if b.walkPath == nil {
+	if b.walkPlan == nil {
 		return
 	}
-	b.walkPath = nil
-	b.walkPathAt = time.Time{}
+	b.walkPlan = nil
+	b.walkPlanAt = time.Time{}
 	b.touch()
 }
 
-// walkPointsEqual compares two walk plans element wise.
-func walkPointsEqual(a []WalkPoint, b []WalkPoint) bool {
-	if len(a) != len(b) {
+// walkPlansEqual compares two walk plans field by field, the points
+// element wise.
+func walkPlansEqual(a, b WalkPlan) bool {
+	if (a.Origin == nil) != (b.Origin == nil) ||
+		(a.Dest == nil) != (b.Dest == nil) ||
+		a.Index != b.Index || len(a.Points) != len(b.Points) {
 		return false
 	}
-	for i := range a {
-		if a[i] != b[i] {
+	if a.Origin != nil && *a.Origin != *b.Origin {
+		return false
+	}
+	if a.Dest != nil && *a.Dest != *b.Dest {
+		return false
+	}
+	for i := range a.Points {
+		if a.Points[i] != b.Points[i] {
 			return false
 		}
 	}
@@ -1788,6 +1821,17 @@ type Snapshot struct {
 	Events    []Event                 `json:"events"`
 	Chat      []ChatEvent             `json:"chat"`
 	WalkPath  []WalkPoint             `json:"walkPath"`
+	// WalkOrigin is the position the published leg was planned
+	// from (the "where we wanted to go from" of the dump), null
+	// when the publisher carries no origin.
+	WalkOrigin *WalkPoint `json:"walkOrigin"`
+	// WalkIndex is the position in WalkPath the follower
+	// currently aims at: the waypoints before it are passed, the
+	// rest lies ahead.
+	WalkIndex int `json:"walkIndex"`
+	// WalkDest is the final destination of the published walk,
+	// null when the plan itself carries it.
+	WalkDest *WalkPoint `json:"walkDest"`
 	// Shopping carries the published purchase queue of the shop
 	// strategy (see SetShoppingPlan): what the bot plans to buy next
 	// with the prices and the missing adena, null when nothing is
@@ -1958,6 +2002,9 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 		Events:       make([]Event, 0, min(b.log.length, snapshotEvents)),
 		Chat:         make([]ChatEvent, 0, b.chat.length),
 		WalkPath:     nil,
+		WalkOrigin:   nil,
+		WalkIndex:    0,
+		WalkDest:     nil,
 		Shopping:     nil,
 		Skills:       nil,
 		SkillPlan:    nil,
@@ -1969,9 +2016,12 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 		StartedAt:    b.started,
 		UpdatedAt:    b.updated,
 	}
-	if b.walkPath != nil && time.Since(b.walkPathAt) <= walkPlanTTL {
-		snap.WalkPath = make([]WalkPoint, len(b.walkPath))
-		copy(snap.WalkPath, b.walkPath)
+	if b.walkPlan != nil && time.Since(b.walkPlanAt) <= walkPlanTTL {
+		snap.WalkPath = make([]WalkPoint, len(b.walkPlan.Points))
+		copy(snap.WalkPath, b.walkPlan.Points)
+		snap.WalkOrigin = b.walkPlan.Origin
+		snap.WalkIndex = b.walkPlan.Index
+		snap.WalkDest = b.walkPlan.Dest
 	}
 	if b.shoppingPlanLive(now) {
 		entries := make([]ShoppingEntryView, len(b.shopping.Entries))

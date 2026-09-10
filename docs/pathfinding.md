@@ -53,7 +53,29 @@ below the C1 water surface (waterLevel -3780, the maxZ of the water
 zones) cost `waterCostMultiplier` (3x) per step so bridges and shores
 beat swimming whenever they exist. The line of sight raster keeps the
 strict symmetric height rule, so the smoothing never collapses a
-detour into a straight drop.
+detour into a straight drop. The smoothing is also water aware
+(`legDry`): a leg between two dry points must stay above the water
+surface - the string pulling only asks the line of sight, and the
+sight lines across the gradual lake beds stay open, so without the
+rule the smoothed path would ford the very bays the cost aware search
+paid to route around (the 2026-09-10 elven lake regression,
+`TestSmoothedLegsStayDry`). Legs that start or end in the water are
+exempt: they belong to the swim escape below.
+
+The engine answers three water queries besides the searches:
+`OverWater(x, y, refZ)` tells whether the walkable surface under a
+position lies below the water level (the layer closest to the
+reference z decides, so a swimmer above a lake bed reports over water
+while a character on the deck above the same cell does not);
+`DryLine(start, end)` verifies that the straight segment between two
+world points is a clean dry walk (walkable and never below the water
+level - the town walker checks every click line with it before sending
+the move request, because the server walks characters into water
+without any hesitation); `FindWaterEscape(start)` plans the way out of
+the water for a position standing over a lake or sea bed: a breadth
+first flood over the walkable surface (the same canStep rules) that
+stops on the first node above the water level - the nearest shore. A
+start already on dry ground answers Found=false.
 
 ## Deliberate deviations from the original
 

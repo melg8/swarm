@@ -635,23 +635,30 @@ func TestUserMoveRedirectsARunningWalk(t *testing.T) {
 }
 
 // TestUserWalkPlanPublishesAndClears pins the walk plan view: a manual
-// move publishes the clicked destination, a planned walk publishes the
-// remaining waypoints with the destination last, and finishing the walk
-// clears the plan again.
+// move publishes the origin, the waypoints, the follower cursor and
+// the clicked destination, and finishing the walk clears the plan
+// again.
 func TestUserWalkPlanPublishesAndClears(t *testing.T) {
 	bot := newTestBot()
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 
-	// A near click: the plan is just the clicked destination.
+	// A near click: the plan is just the clicked destination with the
+	// character origin.
 	pushCommand(bot, state.Command{
 		Kind: state.CommandMove, X: 45600, Y: 50400, Z: -3500,
 	})
 	loop.tick()
+	direct := bot.Snapshot()
 	require.Equal(t, []state.WalkPoint{
 		{X: 45600, Y: 50400, Z: -3500},
-	}, bot.Snapshot().WalkPath,
+	}, direct.WalkPath,
 		"the direct walk plan must be the clicked point")
+	require.Equal(t, &state.WalkPoint{X: 45000, Y: 50000, Z: -3500},
+		direct.WalkOrigin, "the origin is the character at the click")
+	require.Equal(t, &state.WalkPoint{X: 45600, Y: 50400, Z: -3500},
+		direct.WalkDest, "the destination is the clicked point")
+	require.Zero(t, direct.WalkIndex)
 
 	// The character arrives: the plan clears.
 	bot.ApplyMovement(state.Movement{
@@ -662,8 +669,8 @@ func TestUserWalkPlanPublishesAndClears(t *testing.T) {
 	require.Empty(t, bot.Snapshot().WalkPath,
 		"the finished walk must clear the plan")
 
-	// A far click plans a geodata path: the plan carries the remaining
-	// waypoints with the destination last.
+	// A far click plans a geodata path: the plan carries every planned
+	// waypoint with the cursor and the clicked destination of its own.
 	navigator := &fakeNavigator{found: true}
 	loop.SetNavigator(navigator)
 	pushCommand(bot, state.Command{
@@ -672,21 +679,25 @@ func TestUserWalkPlanPublishesAndClears(t *testing.T) {
 	loop.tick()
 	require.NotNil(t, loop.userWaypoints,
 		"the far click must plan a geodata path")
-	plan := bot.Snapshot().WalkPath
-	require.NotEmpty(t, plan)
-	require.Equal(t, state.WalkPoint{X: 48000, Y: 45000, Z: -3500},
-		plan[len(plan)-1],
-		"the clicked destination must close the plan")
+	planned := bot.Snapshot()
+	require.NotEmpty(t, planned.WalkPath)
+	require.Equal(t, &state.WalkPoint{X: 48000, Y: 45000, Z: -3500},
+		planned.WalkDest, "the clicked destination travels as the dest")
+	require.Equal(t, state.WalkPoint{
+		X: 48000, Y: 45000, Z: -3500,
+	}, planned.WalkPath[len(planned.WalkPath)-1],
+		"the geodata plan ends on its planned arrival")
 
-	// Waypoints the character passes drop out of the published plan.
+	// The full plan stays published while the cursor moves on: the
+	// waypoints before the cursor read as passed, the dump prints
+	// them all with the target marker on the current one.
 	loop.userWpIndex = len(loop.userWaypoints) - 1
 	loop.tick()
-	trimmed := bot.Snapshot().WalkPath
-	require.Len(t, trimmed, 1,
-		"the passed waypoints must leave the plan")
-	require.Equal(t, state.WalkPoint{X: 48000, Y: 45000, Z: -3500},
-		trimmed[0],
-		"the remaining plan must keep the destination last")
+	cursored := bot.Snapshot()
+	require.Len(t, cursored.WalkPath, len(planned.WalkPath),
+		"the passed waypoints stay in the plan")
+	require.Equal(t, len(planned.WalkPath)-1, cursored.WalkIndex,
+		"the follower cursor marks the waypoint ahead")
 }
 
 // TestUserAttackWalksStalledChase pins the chase progress watchdog: a

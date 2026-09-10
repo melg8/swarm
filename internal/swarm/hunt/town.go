@@ -131,6 +131,20 @@ type Navigator interface {
         // line between two world positions: the blind engage recovery uses
         // it to find a standing point that sees the obstructed target.
         LineOfSight(start, end pathfind.Vec3) (bool, error)
+        // OverWater reports whether the walkable surface under the world
+        // position lies below the C1 water level: the character stands
+        // over a lake or sea bed (swimming or floating on it).
+        OverWater(x, y float64, refZ int16) bool
+        // DryLine reports whether the straight segment between two world
+        // positions is a clean dry walk: walkable by the surface rules and
+        // never dipping under the water level. The town walker checks
+        // every click target with it before sending the move request.
+        DryLine(start, end pathfind.Vec3) (bool, error)
+        // FindWaterEscape plans the walk out of the water to the nearest
+        // shore: a character standing over a lake bed cannot reach decks
+        // the water has no walkable connection to, so the only sensible
+        // walk is the one back to the shore.
+        FindWaterEscape(start pathfind.Vec3) (*pathfind.Result, error)
 }
 
 // engineNavigator adapts a geodata engine to the Navigator interface,
@@ -174,6 +188,25 @@ func (e engineNavigator) LineOfSight(
         start, end pathfind.Vec3,
 ) (bool, error) {
         return e.engine.LineOfSight(start, end, e.engine.MaxPassableHeight())
+}
+
+// OverWater answers the geodata water surface check with the engine.
+func (e engineNavigator) OverWater(x, y float64, refZ int16) bool {
+        return e.engine.OverWater(x, y, refZ)
+}
+
+// DryLine answers the geodata dry line check with the engine settings.
+func (e engineNavigator) DryLine(
+        start, end pathfind.Vec3,
+) (bool, error) {
+        return e.engine.DryLine(start, end)
+}
+
+// FindWaterEscape plans the nearest shore walk with the engine.
+func (e engineNavigator) FindWaterEscape(
+        start pathfind.Vec3,
+) (*pathfind.Result, error) {
+        return e.engine.FindWaterEscape(start)
 }
 
 // nearestMerchant returns the town merchant closest to the point.
@@ -384,7 +417,9 @@ func (l *Loop) tickTownTrip() {
 // the surrounding deck, and unreachable destinations leave a fallback
 // direct walk the server routes itself (its own pathfinder reaches
 // what the pack misses, proven by the death leash of the earlier
-// sessions). It reports whether the leg was planned.
+// sessions). The planning position publishes as the leg origin of the
+// walk plan view - the dump shows the whole walk from it. It reports
+// whether the leg was planned.
 func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
         selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
         if !ok {
@@ -410,6 +445,8 @@ func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
         }
         l.wpIndex = 0
         l.legDest = dest
+        l.legStart = from
+        l.waterEscape = false
         l.moveAt = time.Time{}
         l.stuckAt = time.Time{}
 
@@ -435,21 +472,66 @@ func waypointDistance(
 }
 
 // walkTownWaypoints follows the planned waypoints with ground click
-// walks and returns true when the final waypoint is reached. Legs
-// longer than the server move request limit are split into straight
-// intermediate points (the smoothing guarantees the line of sight of
-// every leg, so the intermediate points stay on the verified segment).
-// Waypoints the character already passed are skipped: a server position
-// correction or a restart jump can place the character ahead of the
-// follower, and walking back to a passed waypoint would loop. A walk
-// that stands still re-paths from the current position to the leg
-// destination, bounded by the re-path budget of the trip.
+// walks and returns true when the final waypoint is reached. The water
+// guards run first: a character standing over a lake bed enters the
+// shore escape (the water escape state below), and a character that
+// walked out of one re-plans the interrupted leg from the shore.
+// Legs longer than the server move request limit are split into
+// straight intermediate points (the smoothing guarantees the line of
+// sight of every leg, so the intermediate points stay on the verified
+// segment). Every click of a dry walk is verified against the water:
+// the server moves characters into water without any hesitation (its
+// own pathfinding carries no water cost and swimming move requests
+// skip the geodata validation entirely), so a click whose line would
+// enter the water is never sent - the walk re-paths around the shore
+// instead. Waypoints the character already passed are skipped: a
+// server position correction or a restart jump can place the
+// character ahead of the follower, and walking back to a passed
+// waypoint would loop. A walk that stands still re-paths from the
+// current position to the leg destination, bounded by the re-path
+// budget of the trip.
 func (l *Loop) walkTownWaypoints() bool {
         selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
         if !ok {
                 return false
         }
-        now := time.Now()
+        if l.navigator == nil {
+                return false
+        }
+        if l.navigator.OverWater(float64(selfX), float64(selfY), int16(selfZ)) {
+                return l.walkWaterEscape(selfX, selfY, selfZ)
+        }
+        if l.waterEscape {
+                // The character is back on dry ground: the escape is done,
+                // the interrupted leg re-plans from the shore with a fresh
+                // re-path budget (the escape was a recovery, not a failure).
+                l.waterEscape = false
+                l.rePaths = 0
+                l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
+                l.logger.Printf("Hunt: back on the shore at %d %d %d, "+
+                        "re-planning the walk", selfX, selfY, selfZ)
+                if !l.startWalkLeg(l.legDest) {
+                        l.abortTownTrip("no walkable path from the shore")
+
+                        return false
+                }
+
+                return false
+        }
+
+        return l.followWaypoints(selfX, selfY, selfZ, time.Now(), true)
+}
+
+// followWaypoints is the shared waypoint follower core of the town
+// legs and the water escapes: the passed waypoint skipping, the stuck
+// tracking, the leg splitting and the click pacing. The waterGuard
+// switch tells whether the click lines must verify dry before they
+// are sent (the town legs: the character is ashore and must stay so)
+// or not (the water escape: its legs intentionally cross the water
+// back to the shore).
+func (l *Loop) followWaypoints(
+        selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
+) bool {
         for l.wpIndex < len(l.waypoints) {
                 wp := l.waypoints[l.wpIndex]
                 dist := waypointDistance(wp, selfX, selfY, selfZ)
@@ -505,6 +587,12 @@ func (l *Loop) walkTownWaypoints() bool {
                 int32(l.legDest.X), int32(l.legDest.Y), now); dodged {
                 moveX, moveY = float64(ax), float64(ay)
         }
+        // The water guard runs after the steering so the line it verifies
+        // is the one actually being sent.
+        if waterGuard && l.clickWouldEnterWater(
+                selfX, selfY, selfZ, moveX, moveY, moveZ) {
+                return false
+        }
         l.moveAt = now
         if err := l.game.WalkTo(int32(moveX), int32(moveY), int32(moveZ)); err != nil {
                 l.logger.Printf("Hunt: town walk request failed: %v", err)
@@ -513,9 +601,122 @@ func (l *Loop) walkTownWaypoints() bool {
         return false
 }
 
+// clickWouldEnterWater verifies the straight line of a ground click
+// before it is sent and re-paths the walk around the shore when the
+// line would enter the water: the server walks characters into lakes
+// (its own routing has no water cost at all, its move validation
+// accepts the gradual underwater beds, and once the character swims
+// its move requests skip the geodata checks entirely - the reported
+// trip swam below the elven village plateau this way and stood
+// paralyzed under its cliff). It reports whether the click was
+// refused and the walk re-planned.
+func (l *Loop) clickWouldEnterWater(
+        selfX, selfY, selfZ int32, moveX, moveY, moveZ float64,
+) bool {
+        dry, err := l.navigator.DryLine(
+                pathfind.Vec3{
+                        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+                },
+                pathfind.Vec3{X: moveX, Y: moveY, Z: moveZ},
+        )
+        if err != nil || dry {
+                // A line the geodata cannot verify stays on the old behavior:
+                // the walk was planned over the same data, the drift the
+                // guard exists for shows up as a wet line, not an error.
+                return false
+        }
+        l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
+        l.rePaths++
+        if l.rePaths > maxRePaths {
+                l.abortTownTrip("the walk would cross water")
+
+                return true
+        }
+        l.logger.Printf("Hunt: the walk would enter water at %d %d, "+
+                "re-pathing around the shore (%d of %d)",
+                selfX, selfY, l.rePaths, maxRePaths)
+        if !l.startWalkLeg(l.legDest) {
+                l.abortTownTrip("re-path failed")
+
+                return true
+        }
+
+        return true
+}
+
+// walkWaterEscape drives the shore recovery while the character
+// stands over water: the first entry plans the nearest shore walk
+// (the water escape search of the navigator), the following ticks
+// walk it with the plain waypoint follower (no click guard - the
+// escape legs cross the water by design), and an escape whose
+// waypoints are walked out while the character still stands wet
+// re-plans from the current position: the arrival slack may have
+// stopped the character a wet cell short of the waterline. It never
+// reports the trip leg complete - the leg re-plans from the shore
+// once the character is dry (walkTownWaypoints routes back to the
+// normal follower then).
+func (l *Loop) walkWaterEscape(
+        selfX, selfY, selfZ int32,
+) bool {
+        if !l.waterEscape {
+                if !l.planWaterEscape(selfX, selfY, selfZ) {
+                        l.abortTownTrip("stuck in the water without a shore path")
+                }
+
+                return false
+        }
+        if !l.followWaypoints(selfX, selfY, selfZ, time.Now(), false) {
+                return false
+        }
+        l.rePaths++
+        if l.rePaths > maxRePaths {
+                l.abortTownTrip("the water escape could not leave the water")
+
+                return false
+        }
+        if !l.planWaterEscape(selfX, selfY, selfZ) {
+                l.abortTownTrip("stuck in the water without a shore path")
+        }
+
+        return false
+}
+
+// planWaterEscape arms the walk out of the water to the nearest
+// shore: the escape waypoints replace the current leg, the follower
+// cursor restarts and the stuck tracking clears so the slow swim
+// gets a fresh stuck window. It reports whether an escape was found.
+func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
+        from := pathfind.Vec3{
+                X: float64(selfX),
+                Y: float64(selfY),
+                Z: float64(selfZ),
+        }
+        result, err := l.navigator.FindWaterEscape(from)
+        if err != nil || result == nil || !result.Found ||
+                len(result.Waypoints) == 0 {
+                l.logger.Printf("Hunt: no walkable shore from %d %d %d: %v",
+                        selfX, selfY, selfZ, err)
+
+                return false
+        }
+        l.waypoints = result.Waypoints
+        l.wpIndex = 0
+        l.waterEscape = true
+        l.moveAt = time.Time{}
+        l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
+        last := result.Waypoints[len(result.Waypoints)-1]
+        l.logger.Printf("Hunt: character stands in the water at %d %d %d, "+
+                "escaping to the shore at %d %d %d",
+                selfX, selfY, selfZ, int32(last.X), int32(last.Y), int32(last.Z))
+
+        return true
+}
+
 // walkStuck tracks the movement progress of the walker and re-paths
-// around the obstacle once the character stands still for too long. It
-// reports whether the trip had to abort.
+// around the obstacle once the character stands still for too long.
+// A stuck water escape re-plans the escape itself - the town leg is
+// meaningless until the character is back ashore. It reports whether
+// the trip had to abort.
 func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
         if l.stuckAt.IsZero() {
                 l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
@@ -537,6 +738,20 @@ func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
 
                 return true
         }
+        if l.waterEscape {
+                // The escape itself stands still: re-plan it from the current
+                // position (the swim may need a different shore click than the
+                // first plan offered).
+                l.logger.Printf("Hunt: water escape stuck, re-planning "+
+                        "(%d of %d)", l.rePaths, maxRePaths)
+                if !l.planWaterEscape(selfX, selfY, l.selfZForEscape()) {
+                        l.abortTownTrip("water escape re-plan failed")
+
+                        return true
+                }
+
+                return false
+        }
         l.logger.Printf("Hunt: town walk stuck, re-pathing (%d of %d)",
                 l.rePaths, maxRePaths)
         if !l.startWalkLeg(l.legDest) {
@@ -546,6 +761,20 @@ func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
         }
 
         return false
+}
+
+// selfZForEscape returns the current character z for the escape
+// re-planning of walkStuck: the escape needs the full position and
+// the stuck tracker only carries x and y, so the z comes from the
+// tracker on demand (0 when the position is not known yet - the
+// escape planner resolves the layer of the standing cell anyway).
+func (l *Loop) selfZForEscape() int32 {
+        _, _, z, ok := l.tracker.SelfPosition()
+        if !ok {
+                return 0
+        }
+
+        return z
 }
 
 // enterSellPhase switches into the selling and shopping state at the
@@ -845,6 +1074,8 @@ func (l *Loop) endTownTrip(reason string) {
         l.lootID = 0
         l.waypoints = nil
         l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.waterEscape = false
         l.tripStops = nil
         l.buysPlanned = false
         l.buyRequested = nil
@@ -877,6 +1108,8 @@ func (l *Loop) resetTownTrip() {
         l.lootID = 0
         l.waypoints = nil
         l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.waterEscape = false
         l.tripStops = nil
         l.buysPlanned = false
         l.buyRequested = nil

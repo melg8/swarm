@@ -29,6 +29,19 @@ type fakeNavigator struct {
 	// sight is the LineOfSight answer for every queried standing
 	// point (the blind engage recovery asks it per candidate).
 	sight bool
+	// overWater is the OverWater answer for the character position:
+	// the water escape tests arm it to drop the character into a
+	// lake.
+	overWater bool
+	// wetLine marks the DryLine answer as wet: the click guard tests
+	// arm it to refuse the clicks, every other walk stays dry by
+	// default (the zero value answers a dry line).
+	wetLine bool
+	// escapeRoute overrides the waypoints of the water escape search.
+	escapeRoute []pathfind.Vec3
+	// escapeErr makes the water escape search fail hard.
+	escapeErr   bool
+	escapeCalls int
 	// route overrides the planned waypoints of a successful search
 	// (the blind reposition tests pin the leg following on a detour).
 	route []pathfind.Vec3
@@ -117,6 +130,55 @@ func (f *fakeNavigator) LineOfSight(
 	}
 
 	return f.sight, nil
+}
+
+// OverWater answers the configured water surface: the tests that walk
+// a character into a lake arm it, everything else stays ashore.
+func (f *fakeNavigator) OverWater(_, _ float64, _ int16) bool {
+	return f.overWater
+}
+
+// DryLine answers the configured dry click lines: the water guard
+// tests arm the wet flag to make the follower refuse the clicks.
+func (f *fakeNavigator) DryLine(_, _ pathfind.Vec3) (bool, error) {
+	if f.heightErr {
+		return false, errors.New("no geodata")
+	}
+
+	return !f.wetLine, nil
+}
+
+// FindWaterEscape answers the configured shore escape.
+func (f *fakeNavigator) FindWaterEscape(
+	_ pathfind.Vec3,
+) (*pathfind.Result, error) {
+	f.escapeCalls++
+	if f.escapeErr {
+		return nil, errors.New("no geodata")
+	}
+	if f.escapeRoute != nil {
+		return &pathfind.Result{
+			Found:     true,
+			Aborted:   false,
+			Waypoints: f.escapeRoute,
+			RawPath:   f.escapeRoute,
+			Duration:  0,
+			Explored:  0,
+			OpenLeft:  0,
+			Length:    0,
+		}, nil
+	}
+
+	return &pathfind.Result{
+		Found:     false,
+		Aborted:   false,
+		Waypoints: nil,
+		RawPath:   nil,
+		Duration:  0,
+		Explored:  0,
+		OpenLeft:  0,
+		Length:    0,
+	}, nil
 }
 
 // herbielPos is the spawn point of the Elven village trader Herbiel,

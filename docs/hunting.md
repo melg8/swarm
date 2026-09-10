@@ -375,6 +375,34 @@ The short form:
   mid trip or not - clears the cooldown: the village restart lands next
   to the shops and a full inventory sells right after the revival
   instead of walking to the farm spot with the junk first.
+- Water safety of the trips (the 2026-09-10 stuck regression): the
+  server moves characters into water without any hesitation - its own
+  move routing carries no water cost, its getValidLocation accepts the
+  gradual underwater beds, and every move request of a character it
+  considers swimming (inside a water zone: the whole elven region below
+  z -3780) skips the geodata validation entirely and just walks the
+  character straight at the click, clamped to 700 units. A town trip
+  once swam below the elven village plateau this way and stood
+  paralyzed under its cliff: the swim z floated above the water zone
+  bound, so the zone flipped in and out while every click toward the
+  village deck resolved onto a layer the lake bed has no walkable
+  connection to (the server answers such moves with the character's own
+  position - a 0 length walk) and the re-paths replanned from the same
+  floating spot. Three defenses keep the trips ashore now: (1) the
+  smoothing never collapses a leg between two dry points across water
+  (pathfind legDry), (2) the follower verifies every click line with
+  pathfind.DryLine before sending it - a wet click is refused and the
+  walk re-paths around the shore (the refusals share the 3 re-path
+  budget), and (3) a character that still ends up over a lake bed
+  (the geodata surface under it below the water level, OverWater)
+  enters the water escape: the walk to the nearest shore
+  (FindWaterEscape, a breadth first flood over the walkable surface)
+  replaces the leg, a stuck escape re-plans itself, and once the
+  character stands dry the interrupted leg re-plans from the shore with
+  a fresh re-path budget. The dump and the map carry the whole leg -
+  origin, every waypoint with the passed markers, the TARGET marker on
+  the current waypoint and the destination - for exactly this class of
+  debugging (see docs/webui.md).
 - Path layer selection: the trip legs navigate with
   pathfind.Engine.FindPathApproach and the trip approach radius (200
   units, under the interaction distance): the walk ends on the deck

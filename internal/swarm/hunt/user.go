@@ -283,6 +283,14 @@ func (l *Loop) userMovement(cmd state.Command) {
 	l.userWaypoints = nil
 	l.userWpIndex = 0
 	l.userPathTried = false
+	// The walk plan origin: where the character stood when the click
+	// arrived (the dump prints the whole walk from it). Unknown
+	// positions keep the zero sentinel and publish no origin.
+	if selfX, selfY, selfZ, ok := l.tracker.SelfPosition(); ok {
+		l.userPlanX, l.userPlanY, l.userPlanZ = selfX, selfY, selfZ
+	} else {
+		l.userPlanX, l.userPlanY, l.userPlanZ = 0, 0, 0
+	}
 	l.resetChaseSamples()
 	l.target = 0
 	l.clearBlindRecovery()
@@ -490,99 +498,119 @@ func (l *Loop) followUserWaypoints(
 
 // publishWalkPlan refreshes the walk plan view of the web UI: while a
 // walk runs (a manual move, a town trip leg or a deleveling guard
-// walk), the remaining waypoints of the plan publish with the
-// clicked destination or the leg destination last (the map draws the
-// path line and the destination marker from it). Every other state of
-// the loop clears the plan; the tracker also expires it on its own, so
-// an abrupt exit never leaves a stale line.
+// walk), the full plan of the current leg publishes - the planning
+// origin, every planned waypoint with the follower cursor and the
+// final destination - so the map draws the planned line against the
+// live character position and the state dump reads the whole walk at
+// a glance. Every other state of the loop clears the plan; the tracker
+// also expires it on its own, so an abrupt exit never leaves a stale
+// line.
 func (l *Loop) publishWalkPlan() {
-	pts := l.activeWalkPlan()
-	if len(pts) == 0 {
+	plan := l.activeWalkPlan()
+	if plan == nil {
 		l.tracker.ClearWalkPlan()
 
 		return
 	}
-	l.tracker.SetWalkPlan(pts)
+	l.tracker.SetWalkPlan(*plan)
 }
 
-// activeWalkPlan returns the remaining waypoints of the walk the loop
-// is currently following, with the final destination last. Returns
-// nil when the loop is not walking a planned path right now. The
-// manual move plan is the user clicked destination; the town trip and
-// deleveling plans are the geodata waypoints to their target.
-func (l *Loop) activeWalkPlan() []state.WalkPoint {
+// activeWalkPlan returns the walk plan of the leg the loop is
+// currently following: the planning origin, the full waypoint list,
+// the waypoint the follower currently heads to and the final
+// destination. Returns nil when the loop is not walking a planned
+// path right now. The manual move plan carries the clicked
+// destination; the town trip and deleveling plans carry the geodata
+// waypoints to their target.
+func (l *Loop) activeWalkPlan() *state.WalkPlan {
 	switch l.phase {
 	case phaseUser:
 		if l.userKind != state.CommandMove {
 			return nil
 		}
 
-		return l.userWalkPlanTail()
+		return l.userWalkPlan()
 	case phaseTownWalk, phaseTownReturn, phaseDelevel:
-		return l.geodataWalkPlanTail()
+		return l.geodataWalkPlan()
 	default:
 		return nil
 	}
 }
 
-// userWalkPlanTail builds the walk plan of a manual move: the
-// remaining geodata waypoints (when the planner armed them) plus the
-// clicked destination last. A direct walk (no planned waypoints) is
-// just the clicked target.
-func (l *Loop) userWalkPlanTail() []state.WalkPoint {
-	pts := make([]state.WalkPoint, 0,
-		len(l.userWaypoints)-l.userWpIndex+1)
-	for _, wp := range l.userWaypoints[l.userWpIndex:] {
+// userWalkPlan builds the walk plan of a manual move: the position of
+// the character at the click (the origin), the full geodata waypoints
+// of the planned walk (a direct walk carries the clicked destination
+// alone), the follower cursor and the clicked destination. The
+// destination stays its own field even when the waypoints carry it -
+// the map destination marker pins the click itself.
+func (l *Loop) userWalkPlan() *state.WalkPlan {
+	dest := state.WalkPoint{X: l.userX, Y: l.userY, Z: l.userZ}
+	pts := []state.WalkPoint{}
+	for _, wp := range l.userWaypoints {
 		pts = append(pts, state.WalkPoint{
 			X: int32(wp.X), Y: int32(wp.Y), Z: int32(wp.Z),
 		})
 	}
-	// The clicked destination always closes the plan: a planned
-	// path ends on its last waypoint, a direct walk is just the
-	// target.
-	if n := len(pts); n == 0 || math.Hypot(
-		float64(pts[n-1].X-l.userX),
-		float64(pts[n-1].Y-l.userY)) > 100 {
-		pts = append(pts, state.WalkPoint{
-			X: l.userX, Y: l.userY, Z: l.userZ,
-		})
+	if len(pts) == 0 {
+		pts = append(pts, dest)
+	}
+	var origin *state.WalkPoint
+	if l.userPlanX != 0 || l.userPlanY != 0 {
+		origin = &state.WalkPoint{
+			X: l.userPlanX, Y: l.userPlanY, Z: l.userPlanZ,
+		}
 	}
 
-	return pts
+	return &state.WalkPlan{
+		Origin: origin,
+		Points: pts,
+		Index:  min(l.userWpIndex, len(pts)-1),
+		Dest:   &dest,
+	}
 }
 
-// geodataWalkPlanTail builds the walk plan of a town trip or a
-// deleveling guard walk: the remaining geodata waypoints (shared
-// l.waypoints slice, l.wpIndex cursor) plus the leg destination last.
-// startWalkLeg arms l.legDest with the destination it planned the
-// walk to (the merchant spawn, the farm spot, the guard spawn), so
+// geodataWalkPlan builds the walk plan of a town trip or a deleveling
+// guard walk: the planning origin (the position startWalkLeg planned
+// from, the point where we wanted to go), the full waypoint list
+// (shared l.waypoints slice, l.wpIndex cursor) and the leg destination
+// last. startWalkLeg arms l.legDest with the destination it planned
+// the walk to (the merchant spawn, the farm spot, the guard spawn), so
 // the map can draw the final target even when the smoothing collapsed
 // it into the last waypoint. Returns nil when the loop is between
 // legs (no waypoints, no destination).
-func (l *Loop) geodataWalkPlanTail() []state.WalkPoint {
+func (l *Loop) geodataWalkPlan() *state.WalkPlan {
 	if len(l.waypoints) == 0 {
 		return nil
 	}
-	pts := make([]state.WalkPoint, 0, len(l.waypoints)-l.wpIndex+1)
-	for _, wp := range l.waypoints[l.wpIndex:] {
+	pts := make([]state.WalkPoint, 0, len(l.waypoints))
+	for _, wp := range l.waypoints {
 		pts = append(pts, state.WalkPoint{
 			X: int32(wp.X), Y: int32(wp.Y), Z: int32(wp.Z),
 		})
 	}
-	destX, destY, destZ := int32(l.legDest.X), int32(l.legDest.Y),
-		int32(l.legDest.Z)
-	if destX == 0 && destY == 0 {
-		return pts
+	var origin *state.WalkPoint
+	if l.legStart.X != 0 || l.legStart.Y != 0 {
+		origin = &state.WalkPoint{
+			X: int32(l.legStart.X),
+			Y: int32(l.legStart.Y),
+			Z: int32(l.legStart.Z),
+		}
 	}
-	if n := len(pts); n == 0 ||
-		math.Hypot(float64(pts[n-1].X-destX),
-			float64(pts[n-1].Y-destY)) > 100 {
-		pts = append(pts, state.WalkPoint{
-			X: destX, Y: destY, Z: destZ,
-		})
+	var dest *state.WalkPoint
+	if l.legDest.X != 0 || l.legDest.Y != 0 {
+		dest = &state.WalkPoint{
+			X: int32(l.legDest.X),
+			Y: int32(l.legDest.Y),
+			Z: int32(l.legDest.Z),
+		}
 	}
 
-	return pts
+	return &state.WalkPlan{
+		Origin: origin,
+		Points: pts,
+		Index:  min(l.wpIndex, len(pts)-1),
+		Dest:   dest,
+	}
 }
 
 // tickUserAttack forces the attack on the clicked object until the

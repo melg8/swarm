@@ -48,6 +48,12 @@ func snapshotJSONSize(s Snapshot) int {
 	size += 96 * len(s.Events)
 	size += 96 * len(s.Chat)
 	size += 24 * len(s.WalkPath)
+	if s.WalkOrigin != nil {
+		size += 32
+	}
+	if s.WalkDest != nil {
+		size += 32
+	}
 	if s.Shopping != nil {
 		size += 256 * len(s.Shopping.Entries)
 	}
@@ -87,7 +93,8 @@ func appendSnapshotJSON(dst []byte, s Snapshot) []byte {
 	dst = append(dst, `,"chat":`...)
 	dst = appendChatJSON(dst, s.Chat)
 	dst = append(dst, `,"walkPath":`...)
-	dst = appendWalkPathJSON(dst, s.WalkPath)
+	dst = appendWalkPlanFieldsJSON(dst, s.WalkPath, s.WalkOrigin,
+		s.WalkIndex, s.WalkDest)
 	dst = append(dst, `,"shopping":`...)
 	dst = appendShoppingPlanJSON(dst, s.Shopping)
 	dst = append(dst, `,"skills":`...)
@@ -433,6 +440,23 @@ func appendChatEventJSON(dst []byte, line ChatEvent) []byte {
 	return append(dst, '}')
 }
 
+// appendWalkPlanFieldsJSON writes the walk plan field group of the
+// snapshot: the waypoint array plus the origin, the follower cursor
+// and the destination (the Snapshot and the live state encoders share
+// the exact field order).
+func appendWalkPlanFieldsJSON(
+	dst []byte, points []WalkPoint, origin *WalkPoint, index int, dest *WalkPoint,
+) []byte {
+	dst = appendWalkPathJSON(dst, points)
+	dst = append(dst, `,"walkOrigin":`...)
+	dst = appendWalkPointPtrJSON(dst, origin)
+	dst = append(dst, `,"walkIndex":`...)
+	dst = strconv.AppendInt(dst, int64(index), 10)
+	dst = append(dst, `,"walkDest":`...)
+
+	return appendWalkPointPtrJSON(dst, dest)
+}
+
 // appendWalkPathJSON writes the walk plan array.
 func appendWalkPathJSON(dst []byte, points []WalkPoint) []byte {
 	if points == nil {
@@ -448,6 +472,16 @@ func appendWalkPathJSON(dst []byte, points []WalkPoint) []byte {
 	dst = append(dst, ']')
 
 	return dst
+}
+
+// appendWalkPointPtrJSON writes an optional walk point (null when
+// absent).
+func appendWalkPointPtrJSON(dst []byte, point *WalkPoint) []byte {
+	if point == nil {
+		return append(dst, `null`...)
+	}
+
+	return appendWalkPointJSON(dst, *point)
 }
 
 // appendWalkPointJSON writes one walk plan waypoint. The live state

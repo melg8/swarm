@@ -279,12 +279,43 @@ func writeDumpObjects(b *strings.Builder, snap state.Snapshot) {
 	fmt.Fprintln(b)
 }
 
-// writeDumpWalkPlan writes the active walk plan of the hunt loop.
+// writeDumpWalkPlan writes the active walk plan of the hunt loop: the
+// whole leg from the planning origin (where we wanted to go from) to
+// the final destination (where we want to arrive), with every passed
+// waypoint marked and the waypoint the follower currently aims at
+// emphasized - a stuck or drifting walk reads at a glance.
 func writeDumpWalkPlan(b *strings.Builder, snap state.Snapshot) {
-	fmt.Fprintf(b, "walk plan (%d waypoints):\n", len(snap.WalkPath))
+	if snap.WalkPath == nil {
+		fmt.Fprintf(b, "walk plan: none\n\n")
+
+		return
+	}
+	target := snap.WalkIndex
+	if target < 0 || target >= len(snap.WalkPath) {
+		target = len(snap.WalkPath) - 1
+	}
+	fmt.Fprintf(b, "walk plan (%d waypoints, aiming at wp %d):\n",
+		len(snap.WalkPath), target)
+	if snap.WalkOrigin != nil {
+		fmt.Fprintf(b, "  from %d %d %d\n",
+			snap.WalkOrigin.X, snap.WalkOrigin.Y, snap.WalkOrigin.Z)
+	}
 	for i := range snap.WalkPath {
 		wp := &snap.WalkPath[i]
-		fmt.Fprintf(b, "  wp %d: %d %d %d\n", i, wp.X, wp.Y, wp.Z)
+		switch {
+		case i == target:
+			fmt.Fprintf(b, "  wp %d: %d %d %d  <-- TARGET\n",
+				i, wp.X, wp.Y, wp.Z)
+		case i < target:
+			fmt.Fprintf(b, "  wp %d: %d %d %d (passed)\n",
+				i, wp.X, wp.Y, wp.Z)
+		default:
+			fmt.Fprintf(b, "  wp %d: %d %d %d\n", i, wp.X, wp.Y, wp.Z)
+		}
+	}
+	if snap.WalkDest != nil {
+		fmt.Fprintf(b, "  dest %d %d %d\n",
+			snap.WalkDest.X, snap.WalkDest.Y, snap.WalkDest.Z)
 	}
 	fmt.Fprintln(b)
 }

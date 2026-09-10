@@ -345,6 +345,39 @@ func (s *search) directLineDry(direct []*node) bool {
 	return true
 }
 
+// dryLine reports whether the whole raster line between two nodes
+// stays above the water level - the strict form the click guard uses:
+// a line that touches a lake or sea bed anywhere is wet, whatever
+// its endpoints stand on.
+func (s *search) dryLine(from, to *node) bool {
+	for _, step := range s.straightPath(from, to) {
+		if step.layer.Height < waterLevel {
+			return false
+		}
+	}
+
+	return true
+}
+
+// legDry reports whether the smoothing may replace the walk between
+// two nodes with a straight leg: a leg between two dry points must
+// stay above the water surface. The string pulling itself is water
+// blind - it only asks the line of sight - and the line of sight
+// happily crosses a lake bed whose shores step within the passable
+// height, so without this rule the smoothed path fords bays the cost
+// aware search routed around and hands the walker water crossing
+// legs (the elven village lake sent the town trips swimming). A leg
+// that starts or ends in the water is exempt: it belongs to the swim
+// escape of a character that already stands in a lake, and the water
+// is the only surface such a walk can use.
+func (s *search) legDry(from, to *node) bool {
+	if from.layer.Height < waterLevel || to.layer.Height < waterLevel {
+		return true
+	}
+
+	return s.dryLine(from, to)
+}
+
 // nodeReached reports whether a popped node satisfies the goal of
 // the search: an approach run accepts the first node within the 3D
 // approach radius of the target point (the exact target node sits
@@ -361,6 +394,88 @@ func (s *search) nodeReached(current *node) bool {
 	}
 
 	return current.coords == s.target
+}
+
+// runEscape plans the way out of the water for a position whose
+// geodata surface lies below the water level: a breadth first flood
+// over the walkable surface (the same canStep rules as the A*) that
+// stops on the first node standing above the water surface - the
+// nearest shore. A character floating over a lake bed cannot trust
+// the ordinary searches: the server refuses move requests whose
+// target resolves onto a deck the bed has no walkable connection to
+// (the terrace under the elven village), so the only sensible walk
+// is the one back to the shore the terrain itself offers. The start
+// must be resolved by the caller; a start already above the water
+// level needs no escape and answers Found=false.
+func (s *search) runEscape(start Vec3) (*Result, error) {
+	began := time.Now()
+	from, err := s.nodeAtWorld(start)
+	if err != nil {
+		return nil, err
+	}
+	result := &Result{
+		Found:     false,
+		Aborted:   false,
+		Waypoints: nil,
+		RawPath:   nil,
+		Duration:  0,
+		Explored:  0,
+		OpenLeft:  0,
+		Length:    0,
+	}
+	if from.layer.Height >= waterLevel {
+		return result, nil
+	}
+	raw := s.escape(from)
+	result.Duration = time.Since(began)
+	result.Explored = s.explored
+	result.Aborted = s.aborted
+	if raw == nil {
+		return result, nil
+	}
+	result.Found = true
+	result.RawPath = nodesToWorld(raw)
+	result.Waypoints = nodesToWorld(s.smoothPath(raw))
+	result.Length = pathLength(result.Waypoints)
+
+	return result, nil
+}
+
+// escape floods the walkable surface from the start and returns the
+// raw node path to the first node above the water level. The flood
+// breathes outward step by step (a plain BFS - the escape wants the
+// nearest shore, not the cheapest one), never re-enters a node it
+// already touched and stops at the expansion cap so a lake without a
+// walkable shore cannot loop forever.
+func (s *search) escape(from *node) []*node {
+	queue := []*node{from}
+	seen := map[nodeKey]bool{from.key: true}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if current.layer.Height >= waterLevel {
+			return s.reconstruct(current)
+		}
+		if s.explored >= MaxSearchExpansions {
+			s.aborted = true
+
+			return nil
+		}
+		s.explored++
+		for _, next := range s.neighbors(current, 1) {
+			if seen[next.key] {
+				continue
+			}
+			if !s.canStep(current, next) {
+				continue
+			}
+			seen[next.key] = true
+			next.parent = current
+			queue = append(queue, next)
+		}
+	}
+
+	return nil
 }
 
 // push inserts a node into the open set.
@@ -578,7 +693,10 @@ func (s *search) straightPath(from, to *node) []*node {
 // every leg between two waypoints was verified with a line of sight -
 // the original jumped the anchor one node past the commit, which left
 // the leg between two waypoints unchecked and let the smoothed path cut
-// wall corners near gaps.
+// wall corners near gaps. Every leg between two dry points must also
+// stay dry (legDry): the cost aware search may have walked around a
+// lake while the sight lines across its bed stay open, and collapsing
+// them back would reintroduce the swim the search paid to avoid.
 func (s *search) smoothPath(path []*node) []*node {
 	if len(path) == 0 {
 		return nil
@@ -586,7 +704,7 @@ func (s *search) smoothPath(path []*node) []*node {
 	result := []*node{path[0]}
 	current := path[0]
 	for i := 1; i < len(path); i++ {
-		if s.lineOfSight(current, path[i]) {
+		if s.lineOfSight(current, path[i]) && s.legDry(current, path[i]) {
 			continue
 		}
 		current = path[i-1]

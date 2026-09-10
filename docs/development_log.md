@@ -2751,3 +2751,89 @@ up logout of the real one).
   with `BOT_FLAGS=-hunt`, the bot anchored the spot economy, walked
   the pathfound return through the steering hooks and farmed the
   keltir ground.
+
+## Round 47: the town trip water stuck - the lake under the elven village (2026-09-10)
+
+### The report
+
+The bot swam below the elven village plateau on its way to the trader
+Ariel and stood paralyzed in the water (the state dump: the character
+at 47136 46564 -3738, phase townWalk, three re-paths burned, the
+remaining plan pointing at the village cliff top 45480 46680 -2992).
+
+### The root cause chain (researched against the Mobius C1 sources)
+
+- The server side has no water awareness at all: `Creature.
+  moveToLocation` clamps a swimming click to 700 units and SKIPS the
+  geodata validation entirely for a character inside a water zone (the
+  whole elven region below z -3780, `21_19_water1` of water.xml);
+  `GeoEngine.getValidLocation` walks the gradual lake beds like any
+  other slope; `PathFinding.findPath` (7000 iteration budget, windowed
+  buffer) returns null on failure and `moveToLocation` then moves the
+  character STRAIGHT at the click (disregardingGeodata).
+- The drowning swim z floats the character ABOVE the water zone bound
+  (-3738 vs -3780): the zone membership flips with every step, so the
+  character alternates between the swim semantics (straight, no
+  geodata) and the dry semantics (full geodata pathfinding).
+- A dry-semantics click from the floating position toward the village
+  deck resolves the target cell onto the deck layer while the walk
+  runs on the lake bed - `getValidLocation` ends with `previousZ !=
+  nearestToZ` and returns the CHARACTER'S OWN position: the move
+  request becomes a zero length walk, the character never moves
+  again, and every re-path replans the same geometry from the same
+  floating spot (the re-path budget burned in three 15 s stuck
+  windows).
+- The waypoint skip rule ("the next waypoint is closer") made it
+  worse: from the water, the village cliff top waypoint (1818 units)
+  beat the planned northern shore escape waypoints (4616 units), so
+  the follower aimed at the unclimbable cliff and never followed the
+  escape the re-path had planned - the dump only showed the tail, the
+  northern leg was invisible to the debugging.
+- The trip that entered the lake at all: the server's own routing of
+  the per click legs (no water cost, straight fallbacks, the swim
+  semantics above) - the bot's own planner always routed north around
+  the lake (verified: every plan from the hunting zone is dry), but
+  the follower only aimed its clicks at waypoints and let the server
+  route the ground between them.
+
+### The fix (three defenses plus observability)
+
+- pathfind: the smoothing verifies every collapsed leg between two dry
+  points stays dry (`legDry`) - the water blind string pulling used to
+  ford the very bays the cost aware search paid to route around; the
+  exemption for water endpoints keeps the escape legs legal.
+- hunt: the follower verifies every click line with
+  `Navigator.DryLine` before sending it (a clean dry walk or nothing):
+  a wet click is refused and the walk re-paths around the shore; the
+  refusals share the trip re-path budget.
+- hunt: the water escape - a character whose geodata surface lies
+  below the water level (`Navigator.OverWater`) replaces the current
+  leg with `Navigator.FindWaterEscape` (the BFS flood to the nearest
+  dry cell over the walkable surface), walks it without the click
+  guard, re-plans a stuck escape itself, and re-plans the interrupted
+  town leg from the shore with a fresh budget once dry.
+- The walk plan dump and map now carry the WHOLE leg: the origin
+  (where we wanted to go from), every planned waypoint with `(passed)`
+  markers, the `<-- TARGET` marker on the current waypoint and the
+  `dest` line - the exact debugging ask of the report.
+
+### Tests
+
+- pathfind: `TestSmoothedLegsStayDry` (the synthetic bay the old
+  smoothing forded), `TestFindWaterEscape` / `TestFindWaterEscapeSealed
+  Lake` / `TestFindWaterEscapeDryStart`, `TestDryLine`, `TestOverWater`
+  and the real pack regression `TestElvenLakeStuckEscape` (the reported
+  stuck position: the escape finds the shore, the route to Ariel stays
+  dry leg by leg, OverWater separates the lake from the deck).
+- hunt: `TestTripWaterEscapePlansShoreWalk`, `TestTripWaterEscape
+  ReplansLegOnShore`, `TestTripWaterEscapeWithoutShoreAborts`,
+  `TestTripWaterEscapeStuckReplans`, `TestTripWetClickRepatsAround
+  Shore`, `TestTripDryClickStillWalks`, `TestTripWalkPlanCarries
+  FullLeg` - and the dump format pinned in webserver.
+
+### Verification
+
+- go build/vet, gofumpt clean, go test ./... (18 packages green);
+  golangci-lint: zero new findings over the base (the shared branch
+  carries 19 pre-existing ones in the spot/zones code of the parallel
+  agents).

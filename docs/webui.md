@@ -313,25 +313,34 @@ grow by the 2 s window, so the payload stays small.
   manual only sessions never set the phase): the banner falls back to
   the connecting/offline text. The dot pulses while the bot is active
   so the banner reads as live; the pathfind test mode hides it.
-- Walk path view: the map draws the manual walk plan
-  (`snapshot.walkPath`) as a blue dashed line from the character to the
-  clicked destination. The publishWalkPlan path covers every walking
-  phase of the hunt loop, not only the manual move: town trips (the
-  walk to the trader and the walk back to the farm spot) and the
-  deleveling guard walks publish their remaining geodata waypoints too,
-  so the map draws the planned path of every autonomous walk. The plan
-  clears on the non walking phases (engage, loot, sell, idle) through
-  the `ClearWalkPlan` call of the tick. The destination marker (the
-  pulsing blue dot) draws at the last waypoint of the published plan.
+- Walk path view: the map draws the published walk plan
+  (`snapshot.walkPath`) as a blue dashed polyline from the planning
+  origin (`snapshot.walkOrigin`, falling back to the character when
+  absent) through every planned waypoint - the passed ones included,
+  so the drift of the character against its own plan is the debugging
+  signal. The publishWalkPlan path covers every walking phase of the
+  hunt loop, not only the manual move: town trips (the walk to the
+  trader and the walk back to the farm spot) and the deleveling guard
+  walks publish their full geodata leg too, so the map draws the
+  planned path of every autonomous walk. The follower cursor
+  (`snapshot.walkIndex`) carries a small ring on the waypoint the
+  walker currently aims at, and the plan clears on the non walking
+  phases (engage, loot, sell, idle) through the `ClearWalkPlan` call
+  of the tick. The destination marker (the pulsing blue dot) draws at
+  `snapshot.walkDest` (the merchant spawn, the farm spot, the clicked
+  point), falling back to the last waypoint when the plan carries it.
   While a manual move runs, the loop publishes the walk plan into the
-  tracker (`state.Bot.SetWalkPlan`: the remaining waypoints with the
-  clicked destination last, refreshed every tick, expiring on its own
-  after 2 s without a refresh); the map draws it while the paths toggle
-  is on - a blue dashed polyline from the character through the
-  remaining waypoints - plus the always visible destination marker
-  shared with the click ripple: a light blue dot with a pulsing
-  breathing ring (the self character also gets the same dashed
-  destination line as every other moving object while it runs).
+  tracker (`state.Bot.SetWalkPlan`: the origin, the full waypoint
+  list, the follower cursor and the destination, refreshed every tick,
+  expiring on its own after 2 s without a refresh); the map draws it
+  while the paths toggle is on. The state dump
+  (`/api/bots/<id>/dump`) prints the same whole leg with the origin
+  ("from"), every waypoint marked `(passed)` and the `<-- TARGET`
+  marker on the current one, and the `dest` line last - a stuck or
+  drifting walk reads at a glance (the 2026-09-10 water stuck report
+  drove the format: the walk plan (3 waypoints) of the dump hid the
+  northern escape leg the re-path had planned and the character had
+  skipped past).
 
 ## Equipment widget and the shop queue flyout
 

@@ -37,6 +37,8 @@ package hunt
 import (
 	"math"
 	"time"
+
+	"github.com/melg8/swarm/internal/swarm/pathfind"
 )
 
 // Timing and threshold constants of the deleveling.
@@ -183,6 +185,8 @@ func (l *Loop) startDelevel() {
 	l.delevelFree = 0
 	l.delevelCounted = false
 	l.waypoints = nil
+	l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+	l.waterEscape = false
 	l.phase = phaseDelevel
 	l.logger.Printf("Hunt: level %d is too high for level %d mobs, "+
 		"deleveling to %d at the town guards", l.tracker.SelfLevel(),
@@ -352,6 +356,8 @@ func (l *Loop) fightDelevelGuard(now time.Time) { //nolint:cyclop
 			l.delevelTried[guardName] = true
 		}
 		l.waypoints = nil
+		l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+		l.waterEscape = false
 
 		return
 	}

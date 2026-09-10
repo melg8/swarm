@@ -700,24 +700,35 @@ func TestNearestAttackableTreatsAllClanAsUniversal(t *testing.T) {
 	require.Equal(t, int32(7), target.ObjectID)
 }
 
-// TestWalkPlanPublishesAndClears pins the manual walk plan view of the
-// web UI: SetWalkPlan publishes the remaining waypoints with the
-// snapshot, republishing the same plan only refreshes the lifetime
-// without churning the version, and ClearWalkPlan (or an empty plan)
-// drops it again.
+// TestWalkPlanPublishesAndClears pins the walk plan view of the web
+// UI and the state dump: SetWalkPlan publishes the whole leg (the
+// origin, the waypoints, the follower cursor and the destination),
+// republishing the same plan only refreshes the lifetime without
+// churning the version, and ClearWalkPlan (or an empty plan) drops
+// it again.
 func TestWalkPlanPublishesAndClears(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
 
 	require.Empty(t, bot.Snapshot().WalkPath)
 
-	plan := []WalkPoint{
-		{X: 45600, Y: 50400, Z: -3500},
-		{X: 46000, Y: 51000, Z: -3500},
+	origin := WalkPoint{X: 45000, Y: 50000, Z: -3500}
+	dest := WalkPoint{X: 46200, Y: 51100, Z: -3500}
+	plan := WalkPlan{
+		Origin: &origin,
+		Points: []WalkPoint{
+			{X: 45600, Y: 50400, Z: -3500},
+			{X: 46000, Y: 51000, Z: -3500},
+		},
+		Index: 1,
+		Dest:  &dest,
 	}
 	bot.SetWalkPlan(plan)
 	snap := bot.Snapshot()
-	require.Equal(t, plan, snap.WalkPath)
+	require.Equal(t, plan.Points, snap.WalkPath)
+	require.Equal(t, plan.Origin, snap.WalkOrigin)
+	require.Equal(t, plan.Index, snap.WalkIndex)
+	require.Equal(t, plan.Dest, snap.WalkDest)
 
 	// The same plan republishes without a version bump: the steady
 	// per tick refresh of the hunt loop must not wake the event
@@ -728,11 +739,15 @@ func TestWalkPlanPublishesAndClears(t *testing.T) {
 		"an unchanged plan must not bump the version")
 
 	// A changed plan publishes and bumps.
-	bot.SetWalkPlan(plan[1:])
-	require.Equal(t, plan[1:], bot.Snapshot().WalkPath)
+	bot.SetWalkPlan(WalkPlan{Points: plan.Points[1:]})
+	changed := bot.Snapshot()
+	require.Equal(t, plan.Points[1:], changed.WalkPath)
+	require.Nil(t, changed.WalkOrigin)
+	require.Zero(t, changed.WalkIndex)
+	require.Nil(t, changed.WalkDest)
 
 	// Clearing drops the plan (an empty list clears too).
-	bot.SetWalkPlan(nil)
+	bot.SetWalkPlan(WalkPlan{})
 	require.Empty(t, bot.Snapshot().WalkPath)
 	bot.SetWalkPlan(plan)
 	bot.ClearWalkPlan()
@@ -746,10 +761,10 @@ func TestWalkPlanExpires(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
 
-	bot.SetWalkPlan([]WalkPoint{{X: 1, Y: 2, Z: 3}})
+	bot.SetWalkPlan(WalkPlan{Points: []WalkPoint{{X: 1, Y: 2, Z: 3}}})
 	require.Len(t, bot.Snapshot().WalkPath, 1)
 
-	bot.walkPathAt = time.Now().Add(-2 * walkPlanTTL)
+	bot.walkPlanAt = time.Now().Add(-2 * walkPlanTTL)
 	require.Empty(t, bot.Snapshot().WalkPath,
 		"the stale plan must expire out of the snapshot")
 	// The expired plan still clears without a panic and without a
@@ -763,7 +778,7 @@ func TestWalkPlanExpires(t *testing.T) {
 func TestResetSessionClearsWalkPlan(t *testing.T) {
 	bot := NewBot("acc1")
 	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-	bot.SetWalkPlan([]WalkPoint{{X: 1, Y: 2, Z: 3}})
+	bot.SetWalkPlan(WalkPlan{Points: []WalkPoint{{X: 1, Y: 2, Z: 3}}})
 
 	bot.ResetSession()
 

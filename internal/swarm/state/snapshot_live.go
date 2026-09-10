@@ -181,21 +181,16 @@ func (b *Bot) appendLiveChatJSON(dst []byte) []byte {
 }
 
 // appendLiveWalkPathJSON writes the published walk plan (null when
-// none is fresh) exactly like the Snapshot view. The caller must hold
-// a lock.
+// none is fresh) exactly like the Snapshot view: the full waypoint
+// array plus the origin, the current target index and the final
+// destination. The caller must hold a lock.
 func (b *Bot) appendLiveWalkPathJSON(dst []byte) []byte {
-	if b.walkPath == nil || time.Since(b.walkPathAt) > walkPlanTTL {
-		return append(dst, `null`...)
-	}
-	dst = append(dst, '[')
-	for i := range b.walkPath {
-		if i > 0 {
-			dst = append(dst, ',')
-		}
-		dst = appendWalkPointJSON(dst, b.walkPath[i])
+	if b.walkPlan != nil && time.Since(b.walkPlanAt) <= walkPlanTTL {
+		return appendWalkPlanFieldsJSON(dst, b.walkPlan.Points,
+			b.walkPlan.Origin, b.walkPlan.Index, b.walkPlan.Dest)
 	}
 
-	return append(dst, ']')
+	return appendWalkPlanFieldsJSON(dst, nil, nil, 0, nil)
 }
 
 // appendLiveShoppingJSON writes the published shopping plan (null
@@ -464,7 +459,15 @@ func (b *Bot) snapshotJSONSizeLocked() int {
 	count := min(b.log.length, snapshotEvents)
 	size += 96 * count
 	size += 96 * b.chat.length
-	size += 24 * len(b.walkPath)
+	if b.walkPlan != nil {
+		size += 24 * len(b.walkPlan.Points)
+		if b.walkPlan.Origin != nil {
+			size += 32
+		}
+		if b.walkPlan.Dest != nil {
+			size += 32
+		}
+	}
 	if b.shopping != nil {
 		size += 256 * len(b.shopping.Entries)
 	}

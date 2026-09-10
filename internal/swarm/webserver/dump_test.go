@@ -28,9 +28,14 @@ func TestBotDumpEndpoint(t *testing.T) {
 	bot.RecordEvent("sat down to rest")
 	bot.RecordEvent("Hunt: outside the hunting zone, pathfinding back")
 	bot.SetHuntingZone(46112, 41500, 450)
-	bot.SetWalkPlan([]state.WalkPoint{
-		{X: 46000, Y: 41600, Z: -3500},
-		{X: 46112, Y: 41500, Z: -3510},
+	bot.SetWalkPlan(state.WalkPlan{
+		Origin: &state.WalkPoint{X: 45800, Y: 41700, Z: -3500},
+		Points: []state.WalkPoint{
+			{X: 46000, Y: 41600, Z: -3500},
+			{X: 46112, Y: 41500, Z: -3510},
+		},
+		Index: 1,
+		Dest:  &state.WalkPoint{X: 46150, Y: 41480, Z: -3512},
 	})
 
 	recorder := httptest.NewRecorder()
@@ -54,8 +59,12 @@ func TestBotDumpEndpoint(t *testing.T) {
 
 	// The objects around, the walk plan and the zone.
 	require.Contains(t, report, "Keltir")
-	require.Contains(t, report, "walk plan (2 waypoints)")
-	require.Contains(t, report, "wp 0: 46000 41600 -3500")
+	require.Contains(t, report,
+		"walk plan (2 waypoints, aiming at wp 1):")
+	require.Contains(t, report, "  from 45800 41700 -3500")
+	require.Contains(t, report, "wp 0: 46000 41600 -3500 (passed)")
+	require.Contains(t, report, "wp 1: 46112 41500 -3510  <-- TARGET")
+	require.Contains(t, report, "  dest 46150 41480 -3512")
 	require.Contains(t, report, "hunting zone: center 46112 41500, half 450")
 
 	// The event log mirrors the game events and the hunt decisions.

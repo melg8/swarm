@@ -1919,34 +1919,54 @@ const MapView = {
     this.drawUserMarker(ctx, p.x, p.y, performance.now(), fade);
   },
 
-  // drawWalkPlan renders the manual walk plan of a map double click:
-  // while the paths toggle is on, the remaining waypoints draw as a
-  // blue dashed line from the character to the clicked destination,
-  // and the destination itself carries the pulsing blue marker.
+  // drawWalkPlan renders the walk plan of a running leg: while the
+  // paths toggle is on, the full planned line draws as a blue dashed
+  // polyline from the planning origin through every waypoint (the
+  // passed ones included - the drift of the character against its
+  // plan is the debugging signal), the waypoint the follower aims at
+  // carries a small ring and the destination itself carries the
+  // pulsing blue marker.
   drawWalkPlan(ctx) {
     const plan = this.lastSnap.walkPath;
     if (!plan || plan.length === 0) { return; }
-    const c = this.lastSnap.character;
-    if (document.getElementById("show-dest").checked && c && c.x) {
-      const rt = this.runtime.get("self");
-      const p = this.worldToScreen(
-        rt ? rt.drawX : c.x, rt ? rt.drawY : c.y);
+    const origin = this.lastSnap.walkOrigin;
+    const target = this.lastSnap.walkIndex >= 0 &&
+      this.lastSnap.walkIndex < plan.length
+      ? plan[this.lastSnap.walkIndex] : null;
+    const dest = this.lastSnap.walkDest ||
+      plan[plan.length - 1];
+    if (document.getElementById("show-dest").checked) {
       ctx.save();
       ctx.strokeStyle = this.mapColors.userPath;
       ctx.globalAlpha = 0.8;
       ctx.lineWidth = 1.5;
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
+      let head;
+      if (origin) {
+        head = this.worldToScreen(origin.x, origin.y);
+      } else {
+        const c = this.lastSnap.character;
+        const rt = this.runtime.get("self");
+        head = this.worldToScreen(
+          rt ? rt.drawX : (c && c.x) || 0, rt ? rt.drawY : (c && c.y) || 0);
+      }
+      ctx.moveTo(head.x, head.y);
       for (const wp of plan) {
         const q = this.worldToScreen(wp.x, wp.y);
         ctx.lineTo(q.x, q.y);
       }
       ctx.stroke();
+      if (target && plan.length > 1) {
+        const t = this.worldToScreen(target.x, target.y);
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, 6, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.restore();
     }
-    const last = plan[plan.length - 1];
-    const t = this.worldToScreen(last.x, last.y);
+    const t = this.worldToScreen(dest.x, dest.y);
     this.drawUserMarker(ctx, t.x, t.y, performance.now(), 1);
   },
 
