@@ -138,6 +138,25 @@ A trip also never interrupts a running fight: it waits for the kill,
 the loot pickup and the between-fights window, because the drops of
 the kill are the point of the fight.
 
+**Rule 2a - the weapon outranks the trip itself (the 2026-09-11
+bare-handed report).** The weapon purchase is the highest priority of
+the strategy: a plan with an affordable weapon routes the trip's sell
+stop to the weapon's merchant (the junk sells at any merchant), so
+the sell-first credit of the replaced weapon and the replacement buy
+share ONE stop - the replacement lands seconds after the sale instead
+of a village walk later. A character with NO weapon (nothing the
+profile can fight with, equipped or bagged - see `gear.HasWeapon`)
+runs the weapon errand alone: the teach stops and the books wait for
+the next trip, the retry cooldown shortens to 45 seconds
+(`weaponRunCooldown`), and the hunt loop holds its fresh target picks
+while the run is pending (the 2 damage fists never farm when the plan
+offers a sword). The weaponless past explains the rule: the sell-first
+flow once sold the worn weapon at the nearest merchant and the buy
+stop walked the village behind the teacher stop - the stuck teacher
+leg of the report aborted the trip with the weapon already sold, and
+the bot farmed bare-handed for hours while every retry carried the
+same fragile order.
+
 **Rule 3 - the gear feeds the zone ladder.** The hunting zones gate
 on gear points (`gear.TotalGearPoints`: the weapon damage per hit
 plus the defenses, in character-stat-sheet units). The intended

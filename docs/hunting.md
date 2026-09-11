@@ -364,6 +364,28 @@ The short form:
   between-fights window, and a resting character is stood up first
   (the server refuses move requests while sitting; the stand toggle
   shares the pending transition gate with the rest logic).
+- **The weapon leads every trip that buys one** (the 2026-09-11
+  bare-handed report): a plan with an affordable weapon purchase
+  routes its sell stop to the weapon's merchant (the junk sells at
+  any merchant), so the sell-first of the replaced weapon and the buy
+  share ONE stop and the replacement lands seconds after the sale -
+  the old order sold the weapon at the nearest merchant and walked
+  the village for the replacement, and every trip killer in between
+  (a stuck teacher leg, an attacker interrupt, a merchant no-show)
+  left the character bare-handed. A character with NO weapon at all
+  runs the weapon errand alone (`weaponlessRunWanted`: no profile
+  usable weapon in the inventory and an affordable weapon in the plan
+  - see `gear.HasWeapon`): no teach stops ride the run, the lessons
+  wait for the next trip, and the retry cooldown shortens to 45
+  seconds (`weaponRunCooldown`) instead of the five minute trip
+  cooldown. While the weapon run is pending the engage holds its
+  fresh target picks (`logWeaponWait` paces the hold line) and the
+  zone entry engage of the return leg skips the same way - the fists
+  land 2 damage and nothing outranks fixing that; the attacker self
+  defense answer stays armed whatever the weapon state is. A wallet
+  that cannot afford any weapon keeps farming: the gate only holds
+  when the plan offers a weapon, so a fresh bot still punches
+  keltirs until the wallet crosses the cheapest offer.
 - The trip **sells all the accumulated junk first** (the selling ends
   when nothing sellable is left, not at the 50 percent trigger),
   **sells the replaced gear before the buys** (a planned purchase that

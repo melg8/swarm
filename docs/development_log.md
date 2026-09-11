@@ -3032,3 +3032,112 @@ reverse wall check was missing from the port of the L2jGeodataPathFinder.
   the plaza detour at z -2792 that the old route climbed and dropped
   back from - the detour that triggered the stuck loop.
 
+
+## Round 50: the bare-handed bot - the weapon run owns the town trips (2026-09-11)
+
+### The report
+
+The user report (Russian): the bot never may fight with bare hands,
+buying a weapon is the highest priority whenever no weapon exists, and
+the reason why it sold its weapon without buying the replacement right
+away had to be found.
+
+The state dump (build 36bfe99, bot test2, level 11, 14814 adena, the
+same session family as Round 48/49) shows the character punching Kaboo
+Orc Grunts for 2 damage with an empty right hand - the chat window is
+a wall of "You did 2 damage" against "Kaboo Orc Grunt gave you 14
+damage", the bot flees at 23 percent health and emergency logs out
+from a level 7 mob it would shred with any weapon. The plan line says
+"the shop strategy plans purchases worth 883 adena" - the Short Sword,
+the first weapon milestone from an empty hand - and the trip carrying
+that buy dies on the teacher walk: "town walk stuck, re-pathing (1..3
+of 3)" -> "town trip ended: aborted, walk stuck", with the weapon buy
+stop appended BEHIND the Ellenia teach stop, never reached.
+
+### The root cause
+
+Two defects chained, one strategic and one mechanical:
+
+1. The sell-first replacement flow banks the worn weapon's
+   referencePrice/2 credit before the buy lands (stepReplacementSales
+   unequips and sells the displaced piece at the FIRST stop), but the
+   buy of the replacement ran LAST: the sell stop walked to the
+   NEAREST merchant (junk sells anywhere), the learning stops rode
+   behind it, and planShoppingStops appended the buy groups by walking
+   distance at the shop. The weapon sale and the weapon purchase were
+   separated by a village walk through the stuck plaza of Round 49 -
+   and by every other trip killer (an attacker interrupt drops the
+   stops through resetTownTrip, a merchant that never showed up skips
+   them, an exhausted buy retry budget gives them up). Whatever killed
+   the leg in between, the character kept farming bare-handed: nothing
+   tied the weapon sale to the weapon purchase.
+2. Nothing in the hunt loop treated "no weapon" as the emergency it
+   is. The trip trigger would eventually re-plan the Short Sword, but
+   the 100 adena trip minimum was satisfied by any junk plan, the five
+   minute trip cooldown held the retries back after each abort, and
+   the engage happily punched mobs for 2 damage in between - for
+   hours, as the dump uptime shows.
+
+### The fix
+
+The weapon now leads everything:
+
+- gear.HasWeapon probes the whole inventory (equipped or bagged) for
+  any weapon the profile scores positively - a bow is no weapon for
+  the melee fighter, the starter dagger is one.
+- A plan that buys a weapon routes the trip's sell stop to the
+  weapon's merchant (the junk sells at any merchant): the sell-first
+  of the replaced weapon and the buy share ONE stop, so the
+  replacement lands seconds after the sale instead of a village walk
+  later.
+- The weapon run: a character with NO weapon and an affordable weapon
+  in the plan runs the errand alone - no teach stops, no books, and a
+  45 second retry cooldown (weaponRunCooldown) instead of the five
+  minute trip cooldown, so an aborted run retries instead of punching
+  mobs through it.
+- The bare-handed engage gate: while the weapon run is pending, the
+  targetless pick holds (logWeaponWait paces the hold line) and the
+  zone entry engage of the return leg skips the same way. The attacker
+  answer stays armed - a mob already on the character is fought
+  whatever the weapon state is, self defense outranks shopping.
+- A wallet that cannot afford any weapon keeps farming: the gate only
+  holds when the plan actually offers a weapon, so a fresh bot with no
+  adena still punches keltirs (the intended opening game) and the gate
+  arms itself the moment the wallet crosses the cheapest offer.
+
+### Tests
+
+- gear/gear_test.go TestHasWeapon: the equipped sword, the bagged
+  sword, the bow that is no melee weapon, the empty inventory, the
+  starter dagger.
+- hunt/weapon_run_test.go: the weapon run starts the trip at the
+  weapon merchant with the sell stop only; the queued lessons never
+  ride it; the fresh picks hold while the weapon run is pending and
+  the attacker still gets fought; the pick proceeds when no weapon is
+  affordable; the weapon run cooldown is 45 s while an armed character
+  waits out the ordinary five minutes; the weapon upgrade routes its
+  sell stop to the weapon merchant; the zone entry engage holds.
+- webserver/dump_test.go TestDumpSlotNames: the body part mask labels
+  of the equipment lines mirror the Mobius BodyPart enum (the old
+  dumpSlotNames table shifted the jewel and armor labels - a Cloth Cap
+  printed as [lfinger], a Necklace of Magic as [lear ear], Pants as
+  [part 0x800] - which made the healthy paperdoll of the report read
+  like corrupted equipment; the masks are verified against
+  entity/item/enums/BodyPart.java).
+
+### Verification
+
+- go build, go vet, the full go test suite (18 packages green), -race
+  green on the hunt package, gofmt/gofumpt clean, golangci-lint zero
+  new findings in the touched files (the pre-existing branch findings
+  stay untouched).
+- Live validation on the local stack: the dump state injected through
+  the database (level 11, 14814 adena, the full armor floor of the
+  report, NO weapon, standing at the dump hunting spot). The bot held
+  its target picks, ran the weapon errand at once ("no weapon in hand,
+  the weapon run comes first, walking to the trader Unoren"), sold the
+  junk at Unoren, bought the Short Sword two seconds later (list
+  3014700), equipped it into the empty right hand and walked back to
+  the farm spot - the database holds the sword in PAPERDOLL slot 7 and
+  the wallet at 14005 (the 883 price plus the loot of the walk back).
+  The SIGINT shutdown stayed graceful (exit 0).

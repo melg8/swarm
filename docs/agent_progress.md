@@ -136,7 +136,7 @@ treated "no weapon" as the emergency it is.
 - An aborted weapon run retries after 45 seconds, not after 5
   minutes.
 
-### Status: in progress (2026-09-11)
+### Progress (2026-09-11)
 
 - The environment deployed (STACK_READY, ports 2106/7777/3306, 75
   tables), the shopping/town/learning/equip code surveyed, the dump
@@ -176,6 +176,42 @@ treated "no weapon" as the emergency it is.
   green), -race green on the hunt package, gofmt clean, gofumpt
   clean, golangci-lint zero new findings in the touched files (the
   pre-existing branch findings stay untouched).
+- Live validation on the local stack: the dump state injected through
+  the database (level 11, 14814 adena, the full armor floor, NO
+  weapon, standing at the dump hunting spot 51558 50575). The bot
+  held its target picks, ran the weapon errand at once ("no weapon in
+  hand, the weapon run comes first, walking to the trader Unoren"),
+  sold the junk at Unoren, bought the Short Sword two seconds later
+  (list 3014700, 883 adena), equipped it into the empty right hand
+  and walked back to the farm spot - the database holds the sword in
+  PAPERDOLL slot 7 and the wallet at 14005. The SIGINT shutdown
+  stayed graceful (exit 0).
+- Commit "docs: the weapon rules of the shop strategy": hunting.md
+  (the weapon-first paragraph of the town trips section),
+  shopping_strategy.md (Rule 2a - the weapon outranks the trip
+  itself, with the root cause story of the sold weapon),
+  development_log.md Round 50.
+
+### Status: done (2026-09-11)
+
+- All three commits pushed: the round opener (a8b4788 after the
+  rebase onto the concurrent reverse wall round), the weapon run fix
+  (982bafd: gear.HasWeapon, the weapon stop routing, the weaponless
+  engage gate, the short cooldown, the dump slot name fix, the
+  tests) and the docs (hunting.md, shopping_strategy.md Rule 2a,
+  development_log.md Round 50).
+- The live stack validates the full weapon run end to end: the
+  bare-handed character with 14814 adena walks straight to the weapon
+  merchant Unoren, buys the Short Sword two seconds after the junk
+  sale, equips it and resumes hunting - the exact dump scenario
+  replayed with the opposite outcome.
+- The user-side check stays the project workflow: watch a bot that
+  lost its weapon (or a fresh one whose wallet crossed the cheapest
+  weapon offer) drop its targets and walk for the sword at once (the
+  "no weapon in hand, the weapon run comes first" log line), and
+  watch a weapon upgrade trip sell the old weapon and buy the
+  replacement at the same npc (no village walk between the sale and
+  the buy).
 
 ## Active task: the delevel water loop - the walk the planner planned as a swim
 
