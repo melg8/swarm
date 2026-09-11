@@ -20,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/melg8/swarm/internal/swarm/acceptance"
 	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/state"
 )
@@ -109,6 +110,7 @@ type Server struct {
 	geodataTiles *geodataTileCache
 	iconsDir     atomic.Value // string, the icon pack directory or ""
 	proxy        ProxyController
+	acceptance   *acceptance.Manager
 	logger       *log.Logger
 	httpServer   *http.Server
 	eventsDone   chan struct{}
@@ -233,6 +235,7 @@ func newServer(address string, logger *log.Logger) *Server {
 		geodataTiles: newGeodataTileCache(),
 		iconsDir:     atomic.Value{},
 		proxy:        nil,
+		acceptance:   nil,
 		logger:       logger,
 		httpServer:   nil,
 		eventsDone:   make(chan struct{}),

@@ -40,6 +40,21 @@ SPDX-License-Identifier: MIT
         <ul id="bot-list" class="bot-list"></ul>
       </div>
 
+      <div id="acceptance-panel" class="acceptance-panel hidden">
+        <div class="sidebar-title">TESTS</div>
+        <div class="acc-actions">
+          <button id="acc-run-seq" class="btn acc-runall-btn" type="button"
+            title="run every scenario one after another - a fresh temp bot each, the next starts when the previous finishes">
+            run all &#9654;
+          </button>
+          <button id="acc-run-par" class="btn acc-runall-btn" type="button"
+            title="start every scenario at the same time - each on its own temp account (temp1, temp2, temp3)">
+            run all &#8741;
+          </button>
+        </div>
+        <ul id="acc-list" class="acc-list"></ul>
+      </div>
+
       <div id="pf-panel" class="pf-panel">
         <div class="sidebar-title">PATHFIND TEST</div>
         <div class="pf-hint">
@@ -440,6 +455,8 @@ SPDX-License-Identifier: MIT
   </footer>
 
   <div id="item-tooltip" class="item-tooltip hidden" role="tooltip"
+    aria-hidden="true"></div>
+  <div id="acc-tooltip" class="acc-tooltip hidden" role="tooltip"
     aria-hidden="true"></div>
 </div>
 

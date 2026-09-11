@@ -3407,3 +3407,222 @@ function renderFooter(snap) {
   document.getElementById("foot-updated").textContent =
     "updated: " + (isNaN(stamp.getTime()) ? "—" : stamp.toTimeString().slice(0, 8));
 }
+
+// ---- acceptance tests panel ----
+
+// The acceptance test list of /api/acceptance/tests: null when the
+// endpoint is absent (the panel then stays hidden - the older
+// processes without the acceptance manager).
+App.acceptance = null;
+let lastAcceptanceJSON = "";
+let accTooltipPinned = null;
+
+// refreshAcceptance polls the scenario list with the live status,
+// the checks and the log tail.
+async function refreshAcceptance() {
+  try {
+    const response = await fetch("/api/acceptance/tests");
+    if (!response.ok) {
+      App.acceptance = null;
+    } else {
+      App.acceptance = await response.json();
+    }
+  } catch (err) {
+    App.acceptance = null;
+  }
+  renderAcceptance();
+}
+
+// accStatusText renders the compact status word of a scenario row.
+function accStatusText(test) {
+  switch (test.status) {
+  case "running": {
+    const done = (test.checks || []).filter((c) => c.done).length;
+    return done + "/" + (test.checks || []).length;
+  }
+  case "passed":
+    return "passed";
+  case "failed":
+    return "failed";
+  default:
+    return "idle";
+  }
+}
+
+// renderAcceptance rebuilds the test panel. The rebuild is keyed on
+// the payload identity: unchanged polls never touch the DOM, so the
+// row hover (and its tooltip) stays perfectly stable.
+function renderAcceptance() {
+  const panel = document.getElementById("acceptance-panel");
+  const list = document.getElementById("acc-list");
+  if (!panel || !list) { return; }
+  if (!App.acceptance) {
+    panel.classList.add("hidden");
+
+    return;
+  }
+  panel.classList.remove("hidden");
+  const payload = JSON.stringify(App.acceptance);
+  if (payload === lastAcceptanceJSON) { return; }
+  lastAcceptanceJSON = payload;
+  list.innerHTML = "";
+
+  for (const test of App.acceptance) {
+    const item = document.createElement("li");
+    item.className = "acc-item status-" + test.status;
+    item.dataset.id = test.id;
+
+    const row = document.createElement("div");
+    row.className = "acc-row";
+    const dot = document.createElement("span");
+    dot.className = "acc-dot";
+    const name = document.createElement("span");
+    name.className = "acc-name";
+    name.textContent = test.title;
+    const status = document.createElement("span");
+    status.className = "acc-status-text";
+    status.textContent = accStatusText(test);
+    const run = document.createElement("button");
+    run.className = "btn acc-run-btn";
+    run.type = "button";
+    run.textContent = test.status === "passed" ? "passed \u2713" : "run";
+    run.title = "start (or restart) the scenario: the temp bot is " +
+      "recreated with the same name and the same path";
+    run.dataset.id = test.id;
+    run.addEventListener("click", () => runAcceptanceTest(test.id));
+    row.append(dot, name, status, run);
+    item.append(row);
+
+    // The check list: the narrative of the scenario with the live
+    // state of every condition.
+    const checks = document.createElement("ul");
+    checks.className = "acc-checks";
+    for (const check of test.checks || []) {
+      const rowEl = document.createElement("li");
+      rowEl.className = "acc-check" + (check.done ? " done" : "");
+      const mark = document.createElement("span");
+      mark.className = "acc-check-mark";
+      const label = document.createElement("span");
+      label.className = "acc-check-label";
+      label.textContent = check.label;
+      rowEl.append(mark, label);
+      if (check.detail) {
+        const detail = document.createElement("span");
+        detail.className = "acc-check-detail";
+        detail.textContent = check.detail;
+        detail.title = check.detail;
+        rowEl.append(detail);
+      }
+      checks.append(rowEl);
+    }
+    item.append(checks);
+
+    if (test.status === "failed" && test.failReason) {
+      const fail = document.createElement("div");
+      fail.className = "acc-failreason";
+      fail.textContent = test.failReason;
+      item.append(fail);
+    }
+
+    // The hover tooltip: the scenario description with the start
+    // values and the success criteria.
+    item.addEventListener("mouseenter", (event) => {
+      showAccTooltip(test, event);
+    });
+    item.addEventListener("mousemove", (event) => {
+      if (accTooltipPinned === test.id) { moveAccTooltip(event); }
+    });
+    item.addEventListener("mouseleave", hideAccTooltip);
+
+    list.append(item);
+  }
+}
+
+// runAcceptanceTest starts (or restarts) one scenario.
+async function runAcceptanceTest(id) {
+  try {
+    await fetch("/api/acceptance/tests/" + encodeURIComponent(id) +
+      "/run", { method: "POST" });
+  } catch (err) {
+    // The next poll reports the truth anyway.
+  }
+  await refreshAcceptance();
+}
+
+// runAllAcceptanceTests starts every scenario the requested way.
+async function runAllAcceptanceTests(mode) {
+  try {
+    await fetch("/api/acceptance/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode })
+    });
+  } catch (err) {
+    // The next poll reports the truth anyway.
+  }
+  await refreshAcceptance();
+}
+
+// initAcceptance binds the run all buttons of the panel.
+function initAcceptance() {
+  const seq = document.getElementById("acc-run-seq");
+  const par = document.getElementById("acc-run-par");
+  if (seq) {
+    seq.addEventListener("click", () => runAllAcceptanceTests("sequential"));
+  }
+  if (par) {
+    par.addEventListener("click", () => runAllAcceptanceTests("parallel"));
+  }
+}
+
+// showAccTooltip renders the scenario description near the cursor.
+function showAccTooltip(test, event) {
+  const el = document.getElementById("acc-tooltip");
+  if (!el) { return; }
+  accTooltipPinned = test.id;
+  el.innerHTML = "";
+  const title = document.createElement("div");
+  title.className = "acc-tip-title";
+  title.textContent = test.title;
+  const body = document.createElement("div");
+  body.textContent = test.description;
+  const meta = document.createElement("div");
+  meta.className = "acc-tip-meta";
+  meta.textContent = "account " + test.account + " \u00B7 timeout " +
+    test.timeoutSec + "s \u00B7 press run to recreate the temp bot";
+  el.append(title, body, meta);
+  el.classList.remove("hidden");
+  el.setAttribute("aria-hidden", "false");
+  moveAccTooltip(event);
+}
+
+// moveAccTooltip keeps the tooltip near the cursor inside the
+// viewport.
+function moveAccTooltip(event) {
+  const el = document.getElementById("acc-tooltip");
+  if (!el || el.classList.contains("hidden")) { return; }
+  const margin = 12;
+  const pad = 14;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const rect = el.getBoundingClientRect();
+  let left = event.clientX + pad;
+  if (left + rect.width + margin > vw) {
+    left = Math.max(margin, event.clientX - rect.width - pad);
+  }
+  let top = event.clientY + pad;
+  if (top + rect.height + margin > vh) {
+    top = Math.max(margin, event.clientY - rect.height - pad);
+  }
+  el.style.left = left + "px";
+  el.style.top = top + "px";
+}
+
+// hideAccTooltip hides the floating description.
+function hideAccTooltip() {
+  accTooltipPinned = null;
+  const el = document.getElementById("acc-tooltip");
+  if (!el || el.classList.contains("hidden")) { return; }
+  el.classList.add("hidden");
+  el.setAttribute("aria-hidden", "true");
+}

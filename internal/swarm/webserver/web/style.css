@@ -1103,6 +1103,7 @@ body.mode-pathfind .pf-only { display: inline-flex; }
 body.mode-pathfind #pf-panel { display: block; }
 
 body.mode-pathfind #bot-section,
+body.mode-pathfind #acceptance-panel,
 body.mode-pathfind .sidebar-foot,
 body.mode-pathfind .hud-stack,
 body.mode-pathfind .chat-box,
@@ -2198,6 +2199,7 @@ body.mode-fight #fight-panel {
 body.mode-fight #tab-map,
 body.mode-fight .map-toolbar,
 body.mode-fight #bot-section,
+body.mode-fight #acceptance-panel,
 body.mode-fight .sidebar-foot,
 body.mode-fight .hud-stack,
 body.mode-fight .chat-box,
@@ -2681,4 +2683,181 @@ canvas.fxg-cell.picked {
   margin-top: 5px;
   padding-top: 5px;
   border-top: 1px dashed var(--border-soft);
+}
+
+/* ---- acceptance tests panel ---- */
+
+/* The panel sits under the bot list of the sidebar: the run buttons
+   and the per scenario rows with the status dot, the check list and
+   the run/restart button. The hover tooltip with the scenario
+   description floats over everything (see .acc-tooltip). */
+.acceptance-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.acceptance-panel.hidden { display: none; }
+
+.acc-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px;
+}
+
+.acc-runall-btn {
+  flex: 1;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 4px 6px;
+}
+
+.acc-list { list-style: none; }
+
+.acc-item {
+  padding: 6px 12px 7px;
+  border-left: 2px solid transparent;
+}
+
+.acc-item:hover { background: var(--bg-panel-2); }
+
+.acc-item.status-passed { border-left-color: var(--green); }
+.acc-item.status-failed { border-left-color: var(--red); }
+.acc-item.status-running { border-left-color: var(--accent); }
+
+.acc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.acc-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--gray); flex-shrink: 0;
+}
+
+.acc-item.status-running .acc-dot {
+  background: var(--accent);
+  animation: acc-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes acc-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(217, 119, 6, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+}
+
+.acc-item.status-passed .acc-dot { background: var(--green); }
+.acc-item.status-failed .acc-dot { background: var(--red); }
+
+.acc-name {
+  flex: 1;
+  color: var(--text-bright);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.acc-status-text {
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.acc-item.status-passed .acc-status-text { color: var(--green); }
+.acc-item.status-failed .acc-status-text { color: var(--red); }
+
+.acc-run-btn {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.acc-item.status-passed .acc-run-btn {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.acc-checks {
+  list-style: none;
+  margin: 4px 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.acc-check {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.acc-check.done { color: var(--text); }
+
+.acc-check-mark {
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.acc-check .acc-check-mark::before { content: "\25CB"; }
+.acc-check.done .acc-check-mark::before {
+  content: "\2713";
+  color: var(--green);
+}
+
+.acc-check-label { flex-shrink: 0; }
+
+.acc-check-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.acc-failreason {
+  margin: 4px 0 0 16px;
+  font-size: 10px;
+  color: var(--red);
+}
+
+/* The floating scenario description: anchored near the cursor, never
+   covering the hovered row (it follows the pointer within the row
+   hover, the position clamps at the viewport edges the same way the
+   item tooltip does). */
+.acc-tooltip {
+  position: fixed;
+  z-index: 300;
+  max-width: 340px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.acc-tooltip.hidden { display: none; }
+
+.acc-tooltip .acc-tip-title {
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 4px;
+}
+
+.acc-tooltip .acc-tip-meta {
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 10px;
 }

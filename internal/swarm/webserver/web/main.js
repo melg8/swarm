@@ -47,9 +47,12 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   initChat();
   initDumpButton();
+  initAcceptance();
   MapView.init();
   refreshBots();
+  refreshAcceptance();
   setInterval(refreshBots, 2000);
+  setInterval(refreshAcceptance, 2000);
   setInterval(() => {
     if (App.snapshot) { renderFooter(App.snapshot); }
   }, 1000);
