@@ -142,39 +142,37 @@ func TestPlanPurchasesArmorFloorFirst(t *testing.T) {
 
 func TestPlanPurchasesOneWeaponPerTrip(t *testing.T) {
 	profile := MeleeFighter{}
-	// A rich character buys ONE weapon per trip: the best value
-	// weapon milestone (the short sword from bare fists) takes the
-	// weapon slot and the upgrade chain (the knife, the broadsword,
-	// the sickle, the long sword) is cut - the next trip re-plans
-	// against the sword this one reached.
+	// A rich character buys ONE weapon per trip: the top-tier guard
+	// keeps the slot ladder at its best affordable step, so the Long
+	// Sword (24 pAtk, the top shop weapon) is bought directly - never
+	// the cheap ladder rungs the value per adena ranking would aim at
+	// (the knife, the short sword, the sickle).
 	equipment := equipmentWith(nil, nil)
 	purchases := PlanPurchases(
 		profile, equipment, elvenCatalog(), 10_000_000, 1)
 	require.NotEmpty(t, purchases)
 	weapons := 0
-	foundShortSword := false
+	foundLongSword := false
 	for _, purchase := range purchases {
 		stats, ok := npcdata.ItemGearStats(purchase.ItemID)
 		require.True(t, ok, "every purchase must carry gear stats")
 		if stats.BodyPart == "rhand" || stats.BodyPart == "lrhand" {
 			weapons++
+			foundLongSword = purchase.ItemID == 2
 		}
-		if purchase.ItemID == 1 {
-			foundShortSword = true
-		}
+		require.NotEqual(t, int32(1), purchase.ItemID,
+			"the short sword intermediate must not be bought")
+		require.NotEqual(t, int32(12), purchase.ItemID,
+			"the knife intermediate must not be bought")
+		require.NotEqual(t, int32(153), purchase.ItemID,
+			"the sickle intermediate must not be bought")
+		require.NotEqual(t, int32(3), purchase.ItemID,
+			"the broadsword intermediate must not be bought")
 	}
 	require.Equal(t, 1, weapons,
 		"one weapon purchase per trip, the chain is cut")
-	require.True(t, foundShortSword,
-		"the short sword is the value pick of the weapon slot")
-	for _, purchase := range purchases {
-		require.NotEqual(t, int32(2), purchase.ItemID,
-			"the long sword upgrade waits for the next trip")
-		require.NotEqual(t, int32(12), purchase.ItemID,
-			"the knife upgrade waits for the next trip")
-		require.NotEqual(t, int32(153), purchase.ItemID,
-			"the sickle upgrade waits for the next trip")
-	}
+	require.True(t, foundLongSword,
+		"the Long Sword is the top tier of the affordable weapon ladder")
 	require.LessOrEqual(t, AdenaSpent(purchases), int64(10_000_000))
 }
 
@@ -204,10 +202,10 @@ func TestPlanPurchasesSkipsInventoryItems(t *testing.T) {
 	profile := MeleeFighter{}
 	// The inventory carries an unequipped broadsword (3): the free
 	// upgrade is simulated first, so the shop broadsword is never
-	// planned and the single weapon purchase of the trip is the best
-	// value upgrade over it (the brandish: the two hand sword gains
-	// more score per adena than the dirk and nothing blocked its left
-	// hand slot ahead of the weapon phase).
+	// planned and the single weapon purchase of the trip is the top
+	// affordable tier over it (the Long Sword) - the cheaper rungs
+	// (the dirk and the brandish among them) are intermediate steps
+	// the top-tier guard drops.
 	equipment := equipmentWith(
 		[]state.InventoryItem{item(100, 3)}, nil)
 	purchases := PlanPurchases(
@@ -220,17 +218,13 @@ func TestPlanPurchasesSkipsInventoryItems(t *testing.T) {
 		require.True(t, ok)
 		if stats.BodyPart == "rhand" || stats.BodyPart == "lrhand" {
 			weapons++
+			require.Equal(t, int32(2), purchase.ItemID,
+				"the Long Sword is the top tier over the carried broadsword")
 		}
+		require.NotEqual(t, int32(216), purchase.ItemID,
+			"the dirk intermediate must not be bought")
 	}
 	require.Equal(t, 1, weapons, "one weapon purchase per trip")
-	found := false
-	for _, purchase := range purchases {
-		if purchase.ItemID == 1333 {
-			found = true
-		}
-	}
-	require.True(t, found,
-		"the brandish, the best value upgrade over the broadsword, is planned")
 }
 
 func TestPlanPurchasesSkipsEquippedGear(t *testing.T) {
@@ -264,8 +258,9 @@ func TestSimulateInventoryAppliesFreeUpgrades(t *testing.T) {
 // replacement planning: a purchase that displaces an equipped piece
 // carries its SellFirst object ids and its sell value, and the
 // affordability counts the credit - 56000 adena alone cannot pay the
-// dirk (62214), the 9250 credit of the equipped sickle closes the
-// gap, so the plan spends past the carried adena.
+// top tier brandish (62215), the 9250 credit of the equipped sickle
+// closes the gap, so the plan spends past the carried adena and
+// buys the top affordable tier, never an intermediate rung.
 func TestPlanPurchasesCreditsDisplacedGear(t *testing.T) {
 	profile := MeleeFighter{}
 	// The character wears the sickle (18500 reference price).
@@ -282,7 +277,9 @@ func TestPlanPurchasesCreditsDisplacedGear(t *testing.T) {
 		}
 	}
 	require.NotNil(t, weapon,
-		"the dirk upgrade appears only through the sell credit")
+		"the brandish upgrade appears only through the sell credit")
+	require.Equal(t, int32(1333), weapon.ItemID,
+		"the brandish is the top tier the adena plus the credit reaches")
 	require.Equal(t, []int32{100}, weapon.SellFirst,
 		"the equipped sickle is sold before the buy")
 	require.Equal(t, npcdata.ItemPrice(153)/2, weapon.SellCredit)
@@ -568,4 +565,107 @@ func TestPlanPurchaseQueueMinEntries(t *testing.T) {
 		}
 	}
 	require.LessOrEqual(t, wanted, shoppingQueueTail)
+}
+
+// weaponCatalog is the weapon shop slice of the elven catalog (the
+// Unoren buylist only): the weapon ladder tests plan against it, so
+// the armor and jewel fillers of the other merchants stay out of the
+// picture.
+func weaponCatalog() Catalog {
+	return Catalog{Shops: []Shop{
+		{MerchantTemplateID: 7147, TaxRate: 0.15, Lists: []int32{3014700}},
+	}}
+}
+
+// weaponPurchases returns the weapon purchases of the plan.
+func weaponPurchases(purchases []Purchase) []Purchase {
+	var weapons []Purchase
+	for _, purchase := range purchases {
+		stats, ok := npcdata.ItemGearStats(purchase.ItemID)
+		if ok && (stats.BodyPart == "rhand" || stats.BodyPart == "lrhand") {
+			weapons = append(weapons, purchase)
+		}
+	}
+
+	return weapons
+}
+
+// TestPlanPurchasesTopTierAfterSaleReplan reproduces the reported
+// round: a bot sold its replaced weapon and re-plans at the shop with
+// the fresh adena and the EMPTY weapon slot. The value per adena
+// target of the old planner aimed at the 883 adena short sword over
+// the empty hand (3.43 against the knife's 0.30) and bought the sold
+// sword right back. The top-tier guard plans the top affordable tier
+// of the ladder - no intermediate rung in between.
+func TestPlanPurchasesTopTierAfterSaleReplan(t *testing.T) {
+	profile := MeleeFighter{}
+	// The post sale wallet: the carried adena covers the brandish
+	// (54100 reference, 62215 with the tax, the 21x325 = 6825 score
+	// tops the same price dirk's 6495) with 35 adena to spare.
+	equipment := equipmentWith(nil, nil)
+	purchases := PlanPurchases(
+		profile, equipment, weaponCatalog(), 62250, 1)
+	weapons := weaponPurchases(purchases)
+	require.Len(t, weapons, 1, "one weapon purchase per trip")
+	require.Equal(t, int32(1333), weapons[0].ItemID,
+		"the brandish, the top affordable tier, is bought directly")
+	require.NotEqual(t, int32(1), weapons[0].ItemID,
+		"the 1k short sword intermediate must never be bought")
+	require.Empty(t, weapons[0].SellFirst,
+		"the empty slot displaces nothing")
+	require.LessOrEqual(t, AdenaSpent(purchases), int64(62250))
+}
+
+// TestPlanPurchasesReplacedWeaponTargetsTopTier pins the hunt side of
+// the same story: the bot wears the broadsword (12500 reference, the
+// 14k class weapon) and the carried adena plus its sale credit
+// reaches the ~62k brandish. The plan must carry the top tier with
+// the SellFirst sale of the worn weapon - the trip then sells the
+// broadsword and the re-planned buys buy the brandish, never an
+// intermediate sword.
+func TestPlanPurchasesReplacedWeaponTargetsTopTier(t *testing.T) {
+	profile := MeleeFighter{}
+	equipment := equipmentWith(
+		[]state.InventoryItem{item(100, 3)},
+		map[Slot]int32{SlotRHand: 100})
+	purchases := PlanPurchases(
+		profile, equipment, weaponCatalog(), 56000, 1)
+	weapons := weaponPurchases(purchases)
+	require.Len(t, weapons, 1, "one weapon purchase per trip")
+	require.Equal(t, int32(1333), weapons[0].ItemID,
+		"the brandish is the top tier the adena plus the credit reaches")
+	require.Equal(t, []int32{100}, weapons[0].SellFirst,
+		"the worn broadsword is sold before the buy")
+	require.Equal(t, npcdata.ItemPrice(3)/2, weapons[0].SellCredit,
+		"the credit is the Mobius sell value of the broadsword")
+	require.Greater(t, AdenaSpent(purchases), int64(56000),
+		"the plan spends past the carried adena through the credit")
+}
+
+// TestPlanPurchasesIntermediateNeverFitsUnderTopTier pins the cross
+// round guard: the plan buys the cheap armor floor of the other
+// slots first (the documented opening rule) and the eroded budget no
+// longer reaches the top weapon - the weapon slot stays unpurchased
+// and waits for the next trip instead of buying the intermediate
+// rung the eroded budget suddenly fits.
+func TestPlanPurchasesIntermediateNeverFitsUnderTopTier(t *testing.T) {
+	profile := MeleeFighter{}
+	// The bare character: the armor floors go out first and push the
+	// budget under the brandish price; the short sword must not
+	// slide in behind them.
+	equipment := equipmentWith(nil, nil)
+	purchases := PlanPurchases(
+		profile, equipment, elvenCatalog(), 62250, 1)
+	weapons := weaponPurchases(purchases)
+	for _, weapon := range weapons {
+		require.NotEqual(t, int32(1), weapon.ItemID,
+			"the 1k short sword intermediate must never be bought")
+		require.NotEqual(t, int32(12), weapon.ItemID,
+			"the knife intermediate must never be bought")
+	}
+	if len(weapons) > 0 {
+		require.Equal(t, int32(1333), weapons[0].ItemID,
+			"when a weapon fits the plan, it is the top tier")
+	}
+	require.LessOrEqual(t, AdenaSpent(purchases), int64(62250))
 }

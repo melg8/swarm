@@ -125,8 +125,10 @@ const (
 	// offers of the catalogs (the basic defense outfit, level
 	// independent): the opening buys of a fresh character.
 	phaseArmorFloor = iota
-	// phaseWeapon buys the next weapon milestone: the best value
-	// strict upgrade, the saving target the wallet hoards for.
+	// phaseWeapon buys the next weapon milestone: the top
+	// affordable strict upgrade - the top-tier guard of
+	// bestPurchase keeps the cheaper rungs of the hand slots out
+	// of the ranking, whatever their value per adena.
 	phaseWeapon
 	// phaseFloor fills the empty jewel slots with the cheapest offers
 	// of the catalogs (the basic mDef outfit) - only after a real
@@ -164,9 +166,12 @@ const unboundedBudget = math.MaxInt64 / 2
 // within the adena budget, ranked by the strategy phases: the armor
 // floor (the cheapest armor pieces filling the empty armor slots -
 // the opening buys of a fresh character), the weapon
-// milestone (the best value strict weapon upgrade - the saving target;
-// the wallet hoards for it, a cheaper worse value weapon never
-// intercepts the save up), the jewel floor (the cheapest jewel set
+// milestone (the top affordable strict weapon upgrade - the best tier
+// the wallet plus the sale credits reach; the top-tier guard of
+// bestPurchase drops every cheaper rung of the same slots whatever
+// their value per adena, so the bot that sold its replaced weapon
+// buys the tier its adena now covers instead of the intermediate
+// sword it just sold), the jewel floor (the cheapest jewel set
 // filling the empty slots, opened only after a real weapon is worn:
 // the jewels never run ahead of the armor and the weapon) and the
 // defense upgrades (the armor, shield and jewel buys ranked by their
@@ -243,6 +248,7 @@ func planPurchases(
 	budget := adena
 	planned := make(map[int32]bool)
 	boughtSlots := make(map[Slot]bool)
+	ladderTop := make(map[Slot]float64)
 	tailMode := false
 	wishlist := false
 	tailLeft := tail
@@ -255,16 +261,24 @@ func planPurchases(
 			}
 			tailMode = true
 			budget = unboundedBudget
+			// The wanted tail walks without the top-tier guard: the
+			// unbounded budget would collapse the wanted ladder of a
+			// slot to its top step and hide the milestones the widget
+			// shows (see viableCandidates).
+			ladderTop = nil
 		}
 		best, gain, credit, sellFirst := bestPurchase(
 			virtual, candidates, budget, planned, boughtSlots, equipment,
-			strategy)
+			strategy, ladderTop)
 		if best == nil || gain <= 0 {
 			if !tailMode && tailLeft > 0 {
 				// Nothing affordable remains: the wanted
 				// tail continues the walk beyond the wallet.
 				tailMode = true
 				budget = unboundedBudget
+				// The tail walks without the guard, see the budget
+				// flip above.
+				ladderTop = nil
 
 				continue
 			}
@@ -277,6 +291,9 @@ func planPurchases(
 				wishlist = true
 				strategy.wishlist = true
 				boughtSlots = make(map[Slot]bool)
+				// The wishlist extension walks without the guard, see
+				// the budget flip above.
+				ladderTop = nil
 				if tailLeft < shoppingQueueMin-len(purchases) {
 					tailLeft = shoppingQueueMin - len(purchases)
 				}
@@ -312,9 +329,9 @@ func planPurchases(
 
 // walkView is the per-iteration snapshot of the walk the candidate
 // classification reads: the walked virtual paperdoll, the best value
-// of the strict weapon upgrades (the saving target), the weapon
-// priced ceiling of the defense phase and the reference value of the
-// worn defense gear.
+// of the surviving weapon upgrades (the milestone the top-tier guard
+// leaves viable), the weapon priced ceiling of the defense phase and
+// the reference value of the worn defense gear.
 type walkView struct {
 	virtual [slotCount]ScoredItem
 	target  float64
@@ -547,26 +564,21 @@ func cachedCheapestJewelIDs(
 // profile) pair, paralleling candidateCache.
 var jewelIDCache sync.Map
 
-// bestWeaponValue resolves the value per adena of the best strict
-// weapon upgrade against the walked paperdoll: the weapon phase buys
-// only this one, the wallet hoards for it while it stays
-// unaffordable.
-func bestWeaponValue(
-	virtual [slotCount]ScoredItem, candidates []purchaseCandidate,
-	planned map[int32]bool,
-) float64 {
+// bestWeaponValue resolves the value per adena of the best weapon
+// candidate among the walk survivors: the weapon phase buys only this
+// one (the value gate of classify). The survivors already carry the
+// top-tier guard - the top affordable tier of the hand slots - so the
+// milestone the ranking aims at is the best tier the wallet reaches,
+// never a cheaper rung below it.
+func bestWeaponValue(survivors []walkCandidate) float64 {
 	best := float64(0)
-	for index := range candidates {
-		candidate := &candidates[index]
-		if planned[candidate.itemID] ||
-			CategoryOf(candidate.stats) != CategoryWeapon {
+	for index := range survivors {
+		item := &survivors[index]
+		if CategoryOf(item.candidate.stats) != CategoryWeapon ||
+			item.candidate.price <= 0 {
 			continue
 		}
-		gain, ok := purchaseGain(virtual, candidate.stats, candidate.score)
-		if !ok || candidate.price <= 0 {
-			continue
-		}
-		if value := gain / float64(candidate.price); value > best {
+		if value := item.gain / float64(item.candidate.price); value > best {
 			best = value
 		}
 	}
@@ -804,34 +816,127 @@ func buildCatalogCandidates(
 	return candidates
 }
 
+// walkCandidate is one candidate that passed the viability gates of
+// a walk round, with the precomputed data the classification and the
+// phase ranking need.
+type walkCandidate struct {
+	candidate *purchaseCandidate
+	gain      float64
+	credit    int64
+	sellFirst []int32
+}
+
 // bestPurchase picks the best candidate of the walk iteration under
 // the strategy phases: the armor floor, the weapon milestone, the
 // jewel floor and the defense upgrades (see shopStrategy.classify).
-// The candidates that
-// would write into a slot this plan already bought for are skipped
-// (one purchase per slot per trip). The affordability counts the sell
-// credit of the pieces the purchase displaces (the trip sells them
-// before buying, see displacedValue): a replacement is within reach
-// as soon as the adena plus the proceeds cover it, so the character
-// shops for it immediately instead of hoarding the full price first.
-// The winner returns with its credit and the SellFirst object ids.
+// The candidates that would write into a slot this plan already
+// bought for are skipped (one purchase per slot per trip). The
+// affordability counts the sell credit of the pieces the purchase
+// displaces (the trip sells them before buying, see displacedValue):
+// a replacement is within reach as soon as the adena plus the
+// proceeds cover it, so the character shops for it immediately
+// instead of hoarding the full price first. The winner returns with
+// its credit and the SellFirst object ids.
+//
+// The top-tier guard of viableCandidates runs before the
+// classification: a viable candidate that another viable candidate
+// outgains on an overlapping set of paperdoll slots is dropped,
+// whatever its value per adena. Without the guard the weapon
+// milestone aims at the cheap ladder steps (over an empty slot the
+// full weapon gain over the 883 adena short sword beats every
+// expensive tier by an order of magnitude), so the bot that sold its
+// replaced weapon re-planned against the fresh adena and the empty
+// weapon slot and bought the sold sword right back instead of the
+// top affordable tier. A nil ladderTop switches the guard off (the
+// tail and wishlist modes of the widget queue walk the unbounded
+// budget).
 func bestPurchase(
 	virtual [slotCount]ScoredItem, candidates []purchaseCandidate,
 	budget int64, planned map[int32]bool, boughtSlots map[Slot]bool,
-	equipment Equipment, strategy *shopStrategy,
+	equipment Equipment, strategy *shopStrategy, ladderTop map[Slot]float64,
 ) (*purchaseCandidate, float64, int64, []int32) {
+	survivors := viableCandidates(virtual, candidates, budget, planned,
+		boughtSlots, equipment, strategy, ladderTop)
 	view := walkView{
 		virtual: virtual,
-		target:  bestWeaponValue(virtual, candidates, planned),
+		target:  bestWeaponValue(survivors),
 		anchor:  weaponAnchor(virtual),
 		defense: defenseValue(virtual),
 	}
-	var best *purchaseCandidate
+	var best *walkCandidate
+	var bestCandidate *purchaseCandidate
 	bestPhase := phaseDefense + 1
 	bestRank := float64(0)
 	bestGain := float64(0)
-	var bestCredit int64
-	var bestSellFirst []int32
+	for index := range survivors {
+		item := &survivors[index]
+		phase, rank, ok := strategy.classify(
+			view, item.candidate, item.gain)
+		if !ok {
+			continue
+		}
+		if phaseBeats(phase, rank, item.gain, item.candidate,
+			bestCandidate, bestPhase, bestRank, bestGain) {
+			best = item
+			bestCandidate = item.candidate
+			bestPhase = phase
+			bestRank = rank
+			bestGain = item.gain
+		}
+	}
+	if best == nil {
+		return nil, 0, 0, nil
+	}
+
+	return best.candidate, best.gain, best.credit, best.sellFirst
+}
+
+// viableCandidates filters the catalog offers down to the ones this
+// walk round can take: not planned yet, a strict paperdoll
+// improvement, not writing into a slot the plan already bought for
+// and affordable (the sell credit of the displaced pieces included).
+// The top-tier guard runs here, before the phase ranking: a viable
+// candidate that another viable candidate outgains on an overlapping
+// set of paperdoll slots is dropped, whatever its gain per adena.
+// Without the guard the cheap ladder steps of a slot win the ranking
+// (the full weapon gain over the 883 adena short sword beats the same
+// slot's 62k top tier by an order of magnitude), so after selling the
+// replaced weapon the plan bought the 1k intermediate sword back and
+// the one-per-slot guard blocked the affordable top tier for the
+// trip. With the guard a slot ladder contributes only its best viable
+// step and the phase ranking decides between the per-slot winners -
+// the cheap fillers of the other slots keep their documented
+// priority.
+//
+// The guard holds across the whole plan, not only one walk round:
+// ladderTop carries the best gain ever seen per slot, and a later
+// round whose budget no longer reaches the top step leaves the slot
+// unpurchased instead of buying the intermediate rung the budget
+// suddenly fits again (the other picks of the plan must not crowd
+// the top tier out and push a cheaper rung in - the bot would spend
+// the sale proceeds of its replaced weapon on a downgrade). A nil
+// ladderTop switches the guard off: the tail and wishlist modes of
+// the widget queue walk the unbounded budget, where the guard would
+// collapse the wanted ladder of a slot to its top step and hide the
+// milestones the widget shows. The floor offers bypass the guard too
+// (see floorOffer): the armor and jewel floors deliberately buy the
+// cheapest offers of the empty families, the guard governs the
+// upgrade phases only. The gain (the net paperdoll delta with the
+// family clears) is the dominance measure, so the two hand versus
+// one hand plus shield tradeoffs keep their semantics: the strictly
+// better end state dominates, an equal gain at a lower price does not
+// (the phase ranking keeps the cheaper pick). The survivors return
+// with their credits and SellFirst ids.
+func viableCandidates(
+	virtual [slotCount]ScoredItem, candidates []purchaseCandidate,
+	budget int64, planned map[int32]bool, boughtSlots map[Slot]bool,
+	equipment Equipment, strategy *shopStrategy, ladderTop map[Slot]float64,
+) []walkCandidate {
+	survivors := make([]walkCandidate, 0, len(candidates))
+	// The anchor of the floor probe is the same reference price of
+	// the worn weapon the classification reads (see walkView): the
+	// jewel floor opens only behind a real weapon.
+	anchor := weaponAnchor(virtual)
 	for index := range candidates {
 		candidate := &candidates[index]
 		if planned[candidate.itemID] {
@@ -841,30 +946,81 @@ func bestPurchase(
 		if !ok {
 			continue
 		}
+		slots := affectedSlots(virtual, candidate.stats.BodyPart)
 		if slotBlocked(virtual, candidate.stats.BodyPart, boughtSlots) {
 			continue
 		}
-		credit, sellFirst := displacedValue(equipment, affectedSlots(
-			virtual, candidate.stats.BodyPart).slice())
+		credit, sellFirst := displacedValue(equipment, slots.slice())
 		if candidate.price > budget+credit {
 			continue
 		}
-		phase, rank, ok := strategy.classify(view, candidate, gain)
-		if !ok {
-			continue
+		if ladderTop != nil && !floorOffer(strategy, virtual, anchor,
+			candidate) {
+			if aspiredAbove(ladderTop, slots.slice(), gain) {
+				continue
+			}
+			for _, slot := range slots.slice() {
+				if gain > ladderTop[slot] {
+					ladderTop[slot] = gain
+				}
+			}
 		}
-		if phaseBeats(phase, rank, gain, candidate, best, bestPhase,
-			bestRank, bestGain) {
-			best = candidate
-			bestPhase = phase
-			bestRank = rank
-			bestGain = gain
-			bestCredit = credit
-			bestSellFirst = sellFirst
+		survivors = append(survivors, walkCandidate{
+			candidate: candidate,
+			gain:      gain,
+			credit:    credit,
+			sellFirst: sellFirst,
+		})
+	}
+
+	return survivors
+}
+
+// floorOffer reports whether the candidate is the floor offer of its
+// family this round: the cheapest armor piece of an empty armor
+// family, or the cheapest jewel of an empty jewel family behind a
+// real weapon (the anchor above zero). The conditions mirror the
+// floor branches of shopStrategy.classify - keep the two in sync.
+// The floor offers bypass the top-tier guard of viableCandidates:
+// the floors deliberately buy the cheapest offers of the empty
+// families (the opening outfit rule of the strategy, the floor fills
+// and never replaces), the guard governs the upgrade phases only.
+func floorOffer(
+	strategy *shopStrategy, virtual [slotCount]ScoredItem, anchor int64,
+	candidate *purchaseCandidate,
+) bool {
+	switch CategoryOf(candidate.stats) {
+	case CategoryArmor:
+		return strategy.armorFloorIDs[candidate.itemID] &&
+			floorSlotEmpty(virtual, candidate.stats.BodyPart)
+	case CategoryJewel:
+		return strategy.floorIDs[candidate.itemID] && anchor > 0 &&
+			floorSlotEmpty(virtual, candidate.stats.BodyPart)
+	default:
+		return false
+	}
+}
+
+// aspiredAbove reports whether the slots of the candidate carry the
+// recorded gain of a better tier this plan already considered: the
+// ladder keeps aiming at that top step, so the intermediate rung
+// stays out of the plan even when the eroding budget of the later
+// walk rounds would fit it again. The recording runs in the score
+// descending scan order of the candidates, so within one walk round
+// the scan itself drops every same-slot rung below the best viable
+// tier (a lower score item can never outgain a higher score one on
+// overlapping slots - the shared displacement subtracts the same
+// scores), and the persistence of the map extends the guard over the
+// later rounds. A gain equal to the record is not aspired - the
+// phase ranking keeps the cheaper of two equal tiers.
+func aspiredAbove(ladderTop map[Slot]float64, slots []Slot, gain float64) bool {
+	for _, slot := range slots {
+		if ladderTop[slot] > gain {
+			return true
 		}
 	}
 
-	return best, bestGain, bestCredit, bestSellFirst
+	return false
 }
 
 // phaseBeats reports whether the classified candidate outranks the

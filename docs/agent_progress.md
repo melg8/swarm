@@ -77,6 +77,33 @@ while the wallet already covers the 60k tier.
 - `go build ./...`, `go vet ./...`, the gear tests,
   `golangci-lint run` and `gofmt -l` are clean.
 
+### Progress
+
+- 2026-09-11, commit "shop: the planner buys the top affordable tier
+  of an upgrade slot, never an intermediate rung": `bestPurchase`
+  walks three passes now - the viability pass (`viableCandidates`
+  with the top-tier guard: the `ladderTop` map records the best
+  viable gain per slot in the score descending scan order,
+  `aspiredAbove` drops the rungs below the record; the floor offers
+  bypass through `floorOffer`), the view pass (the weapon target
+  computed from the survivors only) and the classification pass
+  (the unchanged `classify` matrix and `phaseBeats`). The tail and
+  wishlist modes drop `ladderTop` at their flips, so the widget
+  queue keeps its wanted ladder. Tests: the three acceptance
+  regression scenarios ported (`TestPlanPurchasesTopTierAfterSaleReplan`,
+  `TestPlanPurchasesReplacedWeaponTargetsTopTier`,
+  `TestPlanPurchasesIntermediateNeverFitsUnderTopTier`),
+  `OneWeaponPerTrip` and `SkipsInventoryItems` pin the Long Sword
+  top tier now, `CreditsDisplacedGear` pins the brandish through the
+  sickle credit. Verified: go build, go vet, the full go test suite
+  green (16 packages), gofmt clean; the journey comparison shows the
+  new ladder (the chisel at 8, the knife at 9 through the sell-first
+  credit, the sickle at 10, the brandish at 13, the Long Sword at
+  16 - the same top gear, the save up trips gone).
+- Next: the docs commit (the Rule 1 milestone wording and the
+  regenerated IS journey table of `docs/shopping_strategy.md`), then
+  `golangci-lint run` and the wrap up.
+
 ## Active task: the round 56 building stuck - the skip gate and the re-planned self-click (2026-09-11)
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
