@@ -187,12 +187,25 @@ func (l *Loop) adoptOutZoneFight(now time.Time) bool {
 	if l.target != 0 && l.tracker.ObjectAlive(l.target) {
 		return true
 	}
+	// The road budget: the aggressive territory on the walk home
+	// feeds a fresh attacker every respawn window - adopting each
+	// one holds the character on the road forever (the 2026-09-11
+	// 08:04 parallel round: the farm leg timed out on the road
+	// fights, the walk home never resumed). Past the budget no new
+	// fight starts: the walk home continues through the blows, the
+	// flee flow above owns the hurt case and the mobs leash back
+	// once the character leaves the aggro radius. The budget resets
+	// on the zone entry.
+	if l.roadFights >= roadFightBudget {
+		return false
+	}
 	serverTarget := l.tracker.SelfTargetID()
 	if serverTarget != 0 && l.tracker.ObjectAlive(serverTarget) &&
 		!l.targetSkipped(serverTarget, now) {
 		l.target = serverTarget
 		l.engageAt = now
 		l.clearBlindRecovery()
+		l.roadFights++
 
 		return true
 	}
@@ -215,6 +228,7 @@ func (l *Loop) adoptOutZoneFight(now time.Time) bool {
 			l.target = pick.ObjectID
 			l.engageAt = now
 			l.clearBlindRecovery()
+			l.roadFights++
 
 			return true
 		}

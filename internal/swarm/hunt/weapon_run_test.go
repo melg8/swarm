@@ -281,3 +281,65 @@ func TestWeaponlessHoldBlocksTheZoneReturn(t *testing.T) {
 	require.Contains(t, logBuf.String(),
 		"no weapon in hand, the weapon run comes first")
 }
+
+// TestRoadFightBudgetResumesTheWalkHome pins the road fight budget of
+// the out of zone adoption: the fight that dragged the character out
+// is finished and a few road attackers are answered, but the
+// aggressive territory feeds a fresh attacker every respawn window -
+// past the budget no new fight starts and the leash walks the
+// character home through the blows (the 2026-09-11 08:04 parallel
+// round: the adoption held the character on the road forever, the
+// farm leg timed out with the walk home never resumed).
+func TestRoadFightBudgetResumesTheWalkHome(t *testing.T) {
+	loop, _, bot, _ := newTripLoop()
+	bot.ApplyUserInfo(weaponRunUserInfo(11))
+	// Armed: the weapon run stays out of the picture - the road
+	// budget is the walk home policy of an armed character.
+	bot.ApplyInventoryUpdate([]state.InventoryItem{
+		{ObjectID: 100, ItemID: 1, Count: 1, Equipped: true, Change: 1},
+	})
+	loop.SetHuntingZone(40000, 40000, 1000)
+	loop.tripEndedAt = time.Now()
+
+	attack := func(id int32) {
+		bot.ApplyNpcInfo(state.NpcInfo{
+			ObjectID: id, TemplateID: 1000001, Attackable: true,
+			X: 45600, Y: 50000, Name: "Road Orc",
+		})
+		bot.ApplyAttack(state.Attack{
+			AttackerID: id,
+			X:          45600, Y: 50000, Z: -3500,
+			TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+			TargetIDs:   [state.AttackTargets]int32{100},
+			TargetCount: 1,
+		})
+	}
+	die := func(id int32) {
+		bot.ApplyNpcInfo(state.NpcInfo{
+			ObjectID: id, TemplateID: 1000001, Attackable: true,
+			Dead: true, X: 45600, Y: 50000, Name: "Road Orc",
+		})
+	}
+
+	// While the budget holds, every road attacker is adopted in turn.
+	for i := range roadFightBudget {
+		id := int32(7 + i)
+		attack(id)
+		loop.tick()
+		require.Equal(t, id, loop.target,
+			"road attacker %d is adopted while the budget holds", i)
+		die(id)
+		loop.target = 0
+	}
+
+	// The budget spent: the next attacker is left alone, the leash
+	// walks the character home instead.
+	attack(7 + roadFightBudget)
+	loop.lastHit = time.Now().Add(-time.Minute)
+	loop.tick()
+
+	require.Equal(t, int32(0), loop.target,
+		"no road fight starts past the budget")
+	require.Equal(t, phaseTownReturn, loop.phase,
+		"the leash walks the character home")
+}

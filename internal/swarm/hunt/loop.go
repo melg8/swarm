@@ -150,6 +150,17 @@ const (
 	// leg): past the budget the return falls back to the direct legacy
 	// legs, which at least keep the character moving home.
 	zoneReturnFailBudget = 3
+	// roadFightBudget bounds the consecutive fights the out of zone
+	// adoption may start during one walk home: the aggressive
+	// territory on the road feeds a fresh attacker every respawn
+	// window, so without a cap the adoption holds the character on
+	// the road forever (the 2026-09-11 08:04 parallel round: the
+	// walk home never resumed, the farm leg timed out on the road
+	// fights). Past the budget the walk home continues through the
+	// blows - the flee flow owns the hurt case, the mobs leash back
+	// once the character leaves the aggro radius. The budget resets
+	// on the zone entry.
+	roadFightBudget = 3
 	// engageStuckTimeout bounds how long the engage keeps re-requesting
 	// a target that never actually starts the fight: the usual cause
 	// is a stale server side selection (an abrupt disconnect left the
@@ -343,6 +354,7 @@ type Loop struct {
 	tripEndedAt       time.Time
 	zoneReturn        bool
 	zoneFails         int
+	roadFights        int
 	delevelTarget     int32
 	delevelGuard      int32
 	delevelTried      map[string]bool
@@ -659,6 +671,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		zoneMobPriority:   nil,
 		zoneReturn:        false,
 		zoneFails:         0,
+		roadFights:        0,
 		delevelTarget:     0,
 		delevelGuard:      0,
 		delevelTried:      nil,
@@ -1121,6 +1134,7 @@ func (l *Loop) engage() {
 	if l.zoneReturn {
 		l.zoneReturn = false
 		l.zoneFails = 0
+		l.roadFights = 0
 		l.logger.Printf("Hunt: back in the hunting zone, resuming the hunt")
 	}
 	// The mana rest of the caster runs before the server target
