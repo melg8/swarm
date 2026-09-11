@@ -324,7 +324,7 @@ func (s *search) astar(from *node) []*node {
 func (s *search) directOrAstar(from, to *node) ([]*node, []*node) {
 	direct := s.straightPath(from, to)
 	if len(direct) > 0 && direct[len(direct)-1].coords == to.coords &&
-		s.directLineDry(direct) {
+		s.directLineDry(direct) && s.serverLegVerified(from, to) {
 		return direct, []*node{direct[0], direct[len(direct)-1]}
 	}
 
@@ -591,6 +591,22 @@ func (s *search) canStep(from, to *node) bool {
 // and the deterministic re-path planned the identical route (the
 // 2026-09-11 town walk stuck loop of the elven village teacher plaza
 // trips).
+// wallsOpen reports whether the walls of the source node allow the
+// step to the adjacent node. The cardinal directions check the source
+// layer's own wall; a diagonal step additionally needs BOTH flanking
+// cells to allow the crossing - the anti corner cut rule every server
+// movement channel applies (GeoEngine.checkNearestNsweAntiCornerCut of
+// the click validation and the NodeBuffer diagonal expansion of the
+// server pathfinder agree on it: the SW step needs (x, y+1) open to
+// the west and (x-1, y) open to the south). A route that cuts a
+// walled corner plans a walk the server refuses wholesale: its click
+// validation walks the Bresenham line of the click, refuses the first
+// corner cut and collapses the destination back onto the walker cell -
+// the character freezes in place re-clicking the same waypoint (the
+// village plaza edge of the 2026-09-10 town walk stuck report: the
+// smoothed plan climbed the plaza wall through the corner the terrace
+// deck had walled off, every click came back ActionFailed and the
+// distance collapsed to zero).
 func (s *search) wallsOpen(from, to *node) bool {
 	if from.coords.Y > to.coords.Y && !from.layer.IsNorthOpen() {
 		return false
@@ -621,6 +637,43 @@ func (s *search) wallsOpen(from, to *node) bool {
 	}
 	if from.coords.X > to.coords.X && !to.layer.IsEastOpen() {
 		return false
+	}
+	if from.coords.X != to.coords.X && from.coords.Y != to.coords.Y {
+		return s.diagonalFlanksOpen(from, to)
+	}
+
+	return true
+}
+
+// diagonalFlanksOpen mirrors the anti corner cut of the server for a
+// diagonal step: the two orthogonal cells the step cuts across must
+// each allow the crossing direction, their layers resolved against the
+// source height - the running z the server line validation carries.
+// The SW step (x-1, y+1) needs the vertical flank (x, y+1) open to the
+// west and the horizontal flank (x-1, y) open to the south; the other
+// diagonals rotate the same pair. A flank cell without geodata counts
+// as open: the server reads no wall from a region it has no data for.
+func (s *search) diagonalFlanksOpen(from, to *node) bool {
+	south := to.coords.Y > from.coords.Y
+	east := to.coords.X > from.coords.X
+	vertical := s.node(Point{X: from.coords.X, Y: to.coords.Y}, from.layer.Height)
+	if vertical != nil {
+		if east && !vertical.layer.IsEastOpen() {
+			return false
+		}
+		if !east && !vertical.layer.IsWestOpen() {
+			return false
+		}
+	}
+	horizontal := s.node(
+		Point{X: to.coords.X, Y: from.coords.Y}, from.layer.Height)
+	if horizontal != nil {
+		if south && !horizontal.layer.IsSouthOpen() {
+			return false
+		}
+		if !south && !horizontal.layer.IsNorthOpen() {
+			return false
+		}
 	}
 
 	return true
@@ -693,7 +746,34 @@ func (s *search) lineOfSight(from, to *node) bool {
 		}
 	}
 
-	return true
+	return s.serverLegVerified(from, to)
+}
+
+// serverLegVerified answers whether the game server's click
+// validation walks the straight line between two nodes: the smoothing
+// may only collapse turns into legs the follower can click. The
+// server rasterizes the click with its Bresenham iterator whose
+// diagonal double steps pass the anti corner cut rule, while the t/k
+// supercover raster of straightPath decomposes the same line into
+// cardinal steps and never cuts the diagonals - a leg verified by the
+// supercover alone can still be refused wholesale by the server (the
+// click collapses onto the walker, every re-click comes back
+// ActionFailed and the character freezes - the village plaza corner
+// of the 2026-09-10 town walk stuck report).
+func (s *search) serverLegVerified(from, to *node) bool {
+	fromX, fromY, fromZ := nodeClickWorld(from)
+	toX, toY, toZ := nodeClickWorld(to)
+	vx, vy, vz := s.engine.validLocation(fromX, fromY, fromZ, toX, toY, toZ)
+
+	return vx == toX && vy == toY && vz == toZ
+}
+
+// nodeClickWorld returns the world position of a node the way the
+// server names a click target: the cell center with the layer height.
+func nodeClickWorld(node *node) (int32, int32, int32) {
+	return node.coords.X*cellSize + worldMinX + cellSize/2,
+		node.coords.Y*cellSize + worldMinY + cellSize/2,
+		int32(node.layer.Height)
 }
 
 // straightPath walks the supercover line between two nodes in cell
