@@ -1548,3 +1548,27 @@ semantics.
 ### Status
 
 - In progress: the planner fix, the tests and the docs round.
+- 2026-09-11: the planner fix. bestPurchase filters the catalog offers
+  through viableCandidates (planned, affordability with the sell
+  credit, strict gain, slot free) and records the best viable gain per
+  paperdoll slot in ladderTop (the scan runs in the score descending
+  order, so a lower score item can never outgain a higher score one on
+  overlapping slots - the shared displacement subtracts the same
+  scores); aspiredAbove drops every rung below the record, and the
+  record persists across the pick rounds of the plan, so the eroding
+  budget of the later rounds never pushes an intermediate rung in.
+  The value per adena ranking decides between the per-slot winners
+  only. Tests: the post sale re-plan state (empty weapon slot, 62250
+  adena) plans the Brandish (1333) directly, never the 883 adena short
+  sword; the hunt side plan (broadsword worn, 56000 adena) carries the
+  Brandish with the SellFirst sale of the broadsword and its 6250
+  credit; the intermediate never fits under the top tier when the
+  armor fillers erode the budget; the rich bare character buys one
+  weapon - the Long Sword; the neck ladder buys the Wisdom or nothing.
+  Updated the semantics-dependent tests (CheapFillersFirst asserts the
+  per-slot top tier instead of the value pick; NoDuplicateNecklace
+  allows the Wisdom-or-nothing outcome). go build, go vet, go test
+  ./... (16 packages), golangci-lint run (0 issues) green. Docs:
+  shopping_strategy.md Rule 1 and the AGENTS.md shop strategy
+  paragraph describe the top-tier guard. Pending: the live stack E2E
+  and the push to feature/acceptance.
