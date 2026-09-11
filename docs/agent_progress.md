@@ -852,3 +852,61 @@ files.
 - Follow ups (not blocking): the manual walk follower (hunt/user.go)
   and the blind engage walker (loop_los.go) still send unvalidated
   clicks and could adopt the same gate.
+
+## Task: acceptance tests runnable from the live swarm web UI - 2026-09-11
+
+Goal: the user must be able to verify swarm behavior straight from the
+running web interface. Add a run test button with a test selection
+list, per test hover descriptions (essence, start values, success
+criteria), automatic test character provisioning and a green marker
+when the scenario completes. The tests must also run one after another
+(sequential mode) or all at once (parallel mode, one bot per test).
+
+Constraints: all changes on feature/proxy-server, atomic commits
+pushed as melg8 (rebase before push, other agents commit to the same
+branch); the server is the spec - no server behavior patches, the
+test character setup uses direct database injection of OFFLINE temp
+characters only; test characters never collide with the -bots fleet
+accounts (they live on temp1/temp2/temp3 accounts with passwords
+temp1/temp2/temp3, character names temp1/temp2/temp3); the rest of the
+UI keeps working - the test bot stays in the left bot list, the C1
+client can attach through the proxy; re-pressing the run button during
+or after a run recreates the bot with the same name and the same
+scenario path.
+
+The scenarios:
+- farm readiness (temp1): a level 15 elven fighter with 20,000 SP and
+  100,000 adena spawns at the elven creation point (46045 41251
+  -3440, first node of the ElvenFighter template creationPoints),
+  empty inventory, no learned skills. The bot must buy proper gear
+  (weapon + armor) and the demanded spellbooks, learn every affordable
+  lesson (Attack Aura 77 and Defence Aura 91 included), leave town for
+  its farm zone and kill at least one mob there under both auras.
+- bot lifetime (temp2): mirrors tools/mobius_e2e.sh in-process - the
+  bot enters the world, stays online 30s and shuts down gracefully.
+- proxy relay (temp3): mirrors tools/proxy_e2e.sh in-process - the
+  bot session plus a dedicated proxy on ephemeral ports; a fake C1
+  client passes the emulated login, the char list, the world entry
+  replay, a live move echo and the locally answered net pings.
+
+Acceptance criteria: the TESTS panel renders in the web UI with hover
+descriptions and status colors; every scenario can be started by one
+button, re-pressed to recreate the bot; sequential and parallel run
+all modes work; the farm readiness scenario passes end to end on the
+live stack; go build/vet/test/lint stay green.
+
+### Status: in progress (2026-09-11)
+
+- Environment: swarm_fast_deploy.sh brought the stack up
+  (STACK_READY: login 2106, game 7777, db 3306; 75 tables; the
+  GitLab clone channel hung, the official API archive channel was
+  used instead - the sanctioned fallback of the deploy script).
+- Design: internal/swarm/acceptance package - a minimal MariaDB wire
+  client (TCP 127.0.0.1:3306, root, empty password), the character
+  reset SQL (level/exp/sp/position UPDATE, items/skills/buffs/shortcuts
+  wipes, an adena INSERT with an object id below FIRST_OBJECT_ID so
+  the running IdManager never collides), the manager (per test status,
+  checks, log ring, restart generations, sequential/parallel run all)
+  and the session runner (the same wiring runBot uses).
+- Next: implement the db client, the manager, the runner, the checks,
+  the webserver endpoints and the web UI panel.
