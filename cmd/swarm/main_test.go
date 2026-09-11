@@ -8,6 +8,7 @@ import (
 	"log"
 	"testing"
 
+	"github.com/melg8/swarm/internal/swarm/acceptance"
 	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/stretchr/testify/require"
 )
@@ -55,4 +56,38 @@ func (l *linesRecorder) Write(p []byte) (int, error) {
 	l.lines = append(l.lines, string(p))
 
 	return len(p), nil
+}
+
+// TestNewAcceptanceManagerRegistersTempBots pins the CLI wiring: the
+// headless -acceptance mode builds the manager from the same
+// constructor as the live web UI path, so the temp bots land in the
+// shared registry and the manager knows every shipped scenario. The
+// CLI then drives them through Run / RunAll without a fleet bot
+// supervisor running.
+func TestNewAcceptanceManagerRegistersTempBots(t *testing.T) {
+	registry := state.NewRegistry()
+	cfg := config{
+		loginAddress:  "127.0.0.1:2106",
+		acceptanceRun: "list",
+	}
+	manager := newAcceptanceManager(registry, cfg, nil, nil)
+	require.NotNil(t, manager)
+
+	// The shipped scenario ids come back in the same order the web UI
+	// shows them; the CLI uses this for `-acceptance list`.
+	require.Equal(t, acceptance.DefinitionsIDs(), manager.IDs())
+
+	// Every temp bot of every scenario lands in the shared registry:
+	// the sidebar split (long-running vs acceptance) reads the kind
+	// tag the manager set on construction.
+	ids := map[string]bool{}
+	for _, info := range registry.List() {
+		ids[info.ID] = true
+		require.Equal(t, state.KindAcceptance, info.Kind,
+			"the temp bot "+info.ID+" carries the acceptance kind")
+	}
+	for _, def := range acceptance.Definitions() {
+		require.True(t, ids[def.Account],
+			"the temp bot "+def.Account+" is missing")
+	}
 }

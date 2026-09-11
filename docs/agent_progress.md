@@ -57,7 +57,27 @@ Three user requests in one session:
   (`KindLongRunning`, `KindAcceptance`) and the `Kind` field on
   `BotInfo`; the acceptance manager tags its temp bots and the main
   entry tags the fleet bots. Added `TestBotKind` next to the change.
-- Status: in progress - the sidebar UI split is the next commit.
+- Commit "webui: split sidebar bot list into long-running and
+  acceptance groups": the sidebar `#bot-list` now renders two
+  sub-groups (long-running and acceptance) under sub-titles, the
+  empty group hides. The `buildBotItem` helper builds one plaque
+  shared by both groups.
+- Commit "webui: grow acceptance panel run buttons past the 26px
+  icon tile": the run all and the per scenario run buttons grew a
+  comfortable click target (font-size 11px, padding 6px 12px and
+  4px 12px, min-height 28px and 24px, width auto, hover lift).
+  The base `.btn` (26x24 px icon tile) had been cropping the text.
+- Commit "acceptance: add -acceptance CLI flag for headless
+  runs": a new `-acceptance <id|all|list>` flag drives the
+  scenarios without the web UI. Added `Manager.Run` and
+  `Manager.RunAll` (block until terminal state, return an error on
+  fail), `Manager.IDs` and `DefinitionsIDs` (the CLI discovery),
+  and `runAcceptanceCLI` in `cmd/swarm/main.go` (builds the
+  registry, the optional proxy, the geodata engine and the manager;
+  prints the result; exit code 1 on fail). Added tests for `Run`,
+  `RunAll`, `IDs` and `newAcceptanceManager` next to the changes.
+- Status: done (2026-09-11). `go build ./...`, the affected
+  packages tests and `golangci-lint run --new` are green.
 
 ## Active task: the dump state diagnostics for stuck bot reports
 

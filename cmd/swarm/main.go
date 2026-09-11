@@ -96,6 +96,13 @@ type config struct {
 	proxyGame     string
 	proxyLog      string
 	bots          int
+	// acceptanceRun selects the headless acceptance test mode: the
+	// process launches no fleet bot supervisor, just the acceptance
+	// manager and the requested scenario. "list" prints the available
+	// scenario ids and exits; "all" runs every scenario in order, a
+	// specific id runs just that one. The exit code reflects the
+	// outcome (0 for a pass, 1 for a fail).
+	acceptanceRun string
 }
 
 func parseFlags() config {
@@ -116,6 +123,7 @@ func parseFlags() config {
 		proxyGame:     "",
 		proxyLog:      "",
 		bots:          1,
+		acceptanceRun: "",
 	}
 	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
 		"login server address")
@@ -157,6 +165,16 @@ func parseFlags() config {
 			"-geodata and proxy settings. The server auto-creates "+
 			"missing accounts, so the first run of -bots 3 makes "+
 			"test1, test2, test3 on the fly.")
+	flag.StringVar(&cfg.acceptanceRun, "acceptance", "",
+		"run an acceptance scenario headless instead of the bot: "+
+			"the value is a scenario id (farm-readiness, "+
+			"bot-lifetime, proxy-relay) or 'all' to run every "+
+			"scenario in definition order, or 'list' to print "+
+			"the available ids and exit. No fleet bot supervisor "+
+			"runs; the acceptance manager launches the temp bot "+
+			"of the scenario, runs it and exits. Pass an empty "+
+			"-web to keep the UI off; the result prints to the "+
+			"log. Exit code: 0 for a pass, 1 for a fail.")
 	flag.Parse()
 
 	return cfg
@@ -428,6 +446,12 @@ func main() {
 
 	if cfg.testFightUIV1 {
 		runTestFightUIV1(cfg)
+
+		return
+	}
+
+	if cfg.acceptanceRun != "" {
+		runAcceptanceCLI(cfg)
 
 		return
 	}
@@ -829,7 +853,21 @@ func attachAcceptance(
 	if web == nil {
 		return
 	}
-	manager := acceptance.NewManager(acceptance.ManagerDeps{
+	manager := newAcceptanceManager(registry, cfg, engine, proxyServer)
+	web.SetAcceptance(manager)
+	log.Printf("Acceptance tests ready: %d scenarios on the accounts %s",
+		len(acceptance.Definitions()), acceptance.AccountList())
+}
+
+// newAcceptanceManager builds the acceptance manager from the shared
+// dependencies. The headless CLI path and the live web UI path share
+// the same construction so the scenarios see the same wiring either
+// way.
+func newAcceptanceManager(
+	registry *state.Registry, cfg config,
+	engine *pathfind.Engine, proxyServer *proxy.Server,
+) *acceptance.Manager {
+	return acceptance.NewManager(acceptance.ManagerDeps{
 		Registry: registry,
 		Login:    cfg.loginAddress,
 		Engine:   engine,
@@ -837,9 +875,78 @@ func attachAcceptance(
 		Logger:   log.Default(),
 		DBConfig: acceptance.DefaultDBConfig(),
 	}, acceptance.Definitions())
-	web.SetAcceptance(manager)
-	log.Printf("Acceptance tests ready: %d scenarios on the accounts %s",
-		len(acceptance.Definitions()), acceptance.AccountList())
+}
+
+// runAcceptanceCLI drives the acceptance scenarios headless: the
+// process launches no fleet bot supervisor, only the acceptance
+// manager. The "list" value prints the available scenario ids and
+// exits; "all" runs every scenario in definition order; a specific id
+// runs just that one. The exit code reflects the outcome (0 for a
+// pass, 1 for a fail) so an agent or a CI gate can drive the suite
+// without the web UI.
+//
+// The web interface stays optional: pass `-web 127.0.0.1:8080` to
+// watch the run from the UI, or `-web ""` to keep the process silent.
+// The proxy and the geodata engine load only when the scenarios need
+// them (the proxy relay scenario arms its own ephemeral proxy through
+// the manager, so the main -proxy flag stays off here).
+func runAcceptanceCLI(cfg config) {
+	log.Println("Starting swarm acceptance CLI")
+	log.Printf("Build: %s", version.Identity())
+
+	if cfg.acceptanceRun == "list" {
+		for _, id := range acceptance.DefinitionsIDs() {
+			log.Println("  " + id)
+		}
+
+		return
+	}
+
+	registry := state.NewRegistry()
+	var proxyServer *proxy.Server
+	if cfg.proxy {
+		proxyServer = startProxy(cfg)
+	}
+	var engine *pathfind.Engine
+	dir := cfg.geodataDir
+	if dir == "" {
+		dir = detectGeodataDir()
+	}
+	engine = pathfind.NewEngine(dir)
+	engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+
+	manager := newAcceptanceManager(registry, cfg, engine, proxyServer)
+	web := startWebInterface(cfg, registry, nil, proxyServer)
+	if web != nil {
+		web.SetAcceptance(manager)
+	}
+
+	// The signal context stops the manager on SIGINT/SIGTERM. The
+	// stop call lands on the explicit cleanup path below (no defer)
+	// because os.Exit skips the deferred calls - the shutdown chain
+	// stays straight on both the pass and the fail path.
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+
+	var err error
+	switch cfg.acceptanceRun {
+	case "all":
+		log.Printf("Acceptance: running %d scenarios sequentially",
+			len(manager.IDs()))
+		err = manager.RunAll(ctx)
+	default:
+		log.Printf("Acceptance: running scenario %s",
+			cfg.acceptanceRun)
+		err = manager.Run(ctx, cfg.acceptanceRun)
+	}
+	stop()
+	shutdownWebInterface(web)
+	shutdownProxy(proxyServer)
+	if err != nil {
+		log.Printf("Acceptance: FAIL %s", err.Error())
+		os.Exit(1)
+	}
+	log.Println("Acceptance: PASS")
 }
 
 // shutdownWebInterface gracefully stops the web server.

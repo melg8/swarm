@@ -123,3 +123,17 @@ func AccountList() string {
 
 	return list.String()
 }
+
+// DefinitionsIDs returns the ids of the registered scenarios in
+// definition order. The CLI uses this for `-acceptance list` so an
+// agent discovers the scenarios without a Manager instance (and
+// without the temp bots landing in a registry).
+func DefinitionsIDs() []string {
+	defs := Definitions()
+	ids := make([]string, 0, len(defs))
+	for _, def := range defs {
+		ids = append(ids, def.ID)
+	}
+
+	return ids
+}

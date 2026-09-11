@@ -303,6 +303,92 @@ func (m *Manager) Start(id string) error {
 	return fmt.Errorf("unknown test %q", id)
 }
 
+// Run launches one scenario and blocks until it reaches the terminal
+// state (passed or failed). Returns nil when the scenario passed, an
+// error wrapping the fail reason otherwise. The CLI path uses this
+// to run a scenario without the web UI: the launch path is the same
+// as Start, the manager just waits for the run done channel before
+// returning. The wait is bounded by the scenario timeout plus the
+// restart window so a stuck run still unwinds.
+func (m *Manager) Run(ctx context.Context, id string) error {
+	test, err := m.findTest(id)
+	if err != nil {
+		return err
+	}
+	if err := m.Start(id); err != nil {
+		return err
+	}
+	// The done channel of the just-armed run: launch writes it under
+	// the test lock right before going off, so reading it back here is
+	// the run we wait on (a concurrent restart would reassign the
+	// field, but the channel we hold stays the channel launch created).
+	test.mu.Lock()
+	done := test.done
+	test.mu.Unlock()
+	if done == nil {
+		return fmt.Errorf("test %q did not arm a run", id)
+	}
+	timeoutCtx, cancel := context.WithTimeout(ctx,
+		test.def.Timeout+restartWait)
+	defer cancel()
+	select {
+	case <-done:
+	case <-timeoutCtx.Done():
+		return fmt.Errorf("test %q did not finish: %w",
+			id, timeoutCtx.Err())
+	}
+	test.mu.Lock()
+	status := test.status
+	failReason := test.failReason
+	test.mu.Unlock()
+	switch status {
+	case StatusPassed:
+		return nil
+	case StatusFailed:
+		return fmt.Errorf("test %q failed: %s", id, failReason)
+	default:
+		return fmt.Errorf("test %q ended in status %q", id, status)
+	}
+}
+
+// RunAll launches every scenario one after another and blocks until
+// they all reach their terminal state. The first failing scenario
+// stops the run and its error is returned; the rest stay unrun. The
+// CLI uses this for `-acceptance all` so an agent can drive the full
+// suite headless.
+func (m *Manager) RunAll(ctx context.Context) error {
+	for _, test := range m.tests {
+		if err := m.Run(ctx, test.def.ID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// findTest resolves the test by id.
+func (m *Manager) findTest(id string) (*Test, error) {
+	for _, test := range m.tests {
+		if test.def.ID == id {
+			return test, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unknown test %q", id)
+}
+
+// IDs returns the list of registered scenario ids in definition order.
+// The CLI prints this for `-acceptance list` so an agent discovers the
+// available scenarios without reading the web UI.
+func (m *Manager) IDs() []string {
+	ids := make([]string, 0, len(m.tests))
+	for _, test := range m.tests {
+		ids = append(ids, test.def.ID)
+	}
+
+	return ids
+}
+
 // launch arms one run of the test: it bumps the generation, cancels
 // the previous run and schedules the new one behind it.
 func (m *Manager) launch(test *Test) {

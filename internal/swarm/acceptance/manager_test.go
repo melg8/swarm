@@ -308,3 +308,157 @@ func waitStatus(
 
 	return TestView{}
 }
+
+// TestRunBlocksUntilPassed pins the CLI contract: Run launches a
+// scenario and blocks until it reaches the terminal state, returning
+// nil when the scenario passed.
+func TestRunBlocksUntilPassed(t *testing.T) {
+	defs := []TestDef{{
+		ID: "passes", Title: "passes", Description: "passes",
+		Account: "temp9", Timeout: 5 * time.Second,
+		Scenario: func(context.Context, *Manager, *Test) error {
+			return nil
+		},
+	}}
+	manager := testManager(t, defs)
+
+	require.NoError(t, manager.Run(context.Background(), "passes"))
+	view := manager.Tests()[0]
+	require.Equal(t, StatusPassed, view.Status)
+}
+
+// TestRunBlocksUntilFailed pins the CLI contract: a failing scenario
+// makes Run return an error that wraps the fail reason.
+func TestRunBlocksUntilFailed(t *testing.T) {
+	defs := []TestDef{{
+		ID: "fails", Title: "fails", Description: "fails",
+		Account: "temp8", Timeout: 5 * time.Second,
+		Scenario: func(context.Context, *Manager, *Test) error {
+			return errors.New("the scenario broke")
+		},
+	}}
+	manager := testManager(t, defs)
+
+	err := manager.Run(context.Background(), "fails")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "the scenario broke")
+	require.Equal(t, StatusFailed, manager.Tests()[0].Status)
+}
+
+// TestRunRejectsUnknownID pins the api error path of Run.
+func TestRunRejectsUnknownID(t *testing.T) {
+	manager := testManager(t, Definitions())
+	err := manager.Run(context.Background(), "no-such-test")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no-such-test")
+}
+
+// TestRunAllStopsAtFirstFailure pins the CLI contract: RunAll runs
+// every scenario in definition order and stops at the first failing
+// one, the rest stay unrun.
+func TestRunAllStopsAtFirstFailure(t *testing.T) {
+	calls := make(map[string]int)
+	var mu sync.Mutex
+	defs := []TestDef{
+		{
+			ID: "a", Title: "a", Description: "a", Account: "temp5",
+			Timeout: 5 * time.Second,
+			Scenario: func(context.Context, *Manager, *Test) error {
+				mu.Lock()
+				calls["a"]++
+				mu.Unlock()
+
+				return nil
+			},
+		},
+		{
+			ID: "b", Title: "b", Description: "b", Account: "temp4",
+			Timeout: 5 * time.Second,
+			Scenario: func(context.Context, *Manager, *Test) error {
+				mu.Lock()
+				calls["b"]++
+				mu.Unlock()
+
+				return errors.New("b broke")
+			},
+		},
+		{
+			ID: "c", Title: "c", Description: "c", Account: "temp3",
+			Timeout: 5 * time.Second,
+			Scenario: func(context.Context, *Manager, *Test) error {
+				mu.Lock()
+				calls["c"]++
+				mu.Unlock()
+
+				return nil
+			},
+		},
+	}
+	manager := testManager(t, defs)
+
+	err := manager.RunAll(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "b broke")
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, 1, calls["a"], "a ran once before b failed")
+	require.Equal(t, 1, calls["b"], "b ran and failed")
+	require.Equal(t, 0, calls["c"], "c stayed unrun after b failed")
+}
+
+// TestRunAllPassesEveryScenario pins the happy path: every scenario
+// passing leaves RunAll returning nil.
+func TestRunAllPassesEveryScenario(t *testing.T) {
+	defs := []TestDef{
+		{
+			ID: "a", Title: "a", Description: "a", Account: "temp5",
+			Timeout: 5 * time.Second,
+			Scenario: func(context.Context, *Manager, *Test) error {
+				return nil
+			},
+		},
+		{
+			ID: "b", Title: "b", Description: "b", Account: "temp4",
+			Timeout: 5 * time.Second,
+			Scenario: func(context.Context, *Manager, *Test) error {
+				return nil
+			},
+		},
+	}
+	manager := testManager(t, defs)
+
+	require.NoError(t, manager.RunAll(context.Background()))
+	require.Equal(t, StatusPassed, manager.Tests()[0].Status)
+	require.Equal(t, StatusPassed, manager.Tests()[1].Status)
+}
+
+// TestIDsReturnsDefinitionOrder pins the discovery contract of the
+// CLI: the IDs come back in the registration order, the order the
+// manager and the web UI show.
+func TestIDsReturnsDefinitionOrder(t *testing.T) {
+	defs := []TestDef{
+		{
+			ID:          "z",
+			Title:       "z",
+			Description: "z",
+			Account:     "temp5",
+			Timeout:     5 * time.Second,
+			Scenario: func(context.Context, *Manager, *Test) error {
+				return nil
+			},
+		},
+		{
+			ID:          "a",
+			Title:       "a",
+			Description: "a",
+			Account:     "temp4",
+			Timeout:     5 * time.Second,
+			Scenario: func(context.Context, *Manager, *Test) error {
+				return nil
+			},
+		},
+	}
+	manager := testManager(t, defs)
+	require.Equal(t, []string{"z", "a"}, manager.IDs())
+}
