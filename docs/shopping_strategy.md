@@ -56,16 +56,20 @@ expected block value):
    phase opens. The shield has no floor entry - it shares the hand
    family with the weapons (a two hand milestone displaces it), so
    it stays a defense upgrade inside the weapon budget.
-2. **The weapon milestone** - the best value STRICT weapon upgrade
-   (the highest `gain / price` among the weapons that beat the worn
-   one) is the saving target. Only that one weapon is eligible: a
-   cheaper but worse value weapon never intercepts the wallet, so
-   the bot either buys the milestone or keeps the money. The
-   milestone ladder of the elven catalogs plays out as Short Sword
-   (883) -> Knife (14374, daggers swing faster: 10 pAtk x 433 beats
-   the Broadsword's 11 x 379 per adena) -> Brandish (62214, the two
-   hand sword: 21 x 325, the best value of the 54k tier) -> Long
-   Sword (156400).
+2. **The weapon milestone** - the top affordable STRICT weapon
+   upgrade: the best tier the wallet plus the sale credits reach,
+   never a rung below it. The top-tier slot guard of the planner
+   (see the supporting rules) drops every candidate that another
+   viable candidate outgains on the same paperdoll slots, whatever
+   its `gain / price` - the value per adena ranking only decides
+   between the per-slot winners afterwards. The ladder of the elven
+   catalogs plays out as Short Sword (883) -> Heavy Chisel (9280) ->
+   Knife (14374) -> Sickle (21275) -> Brandish (62214, the two hand
+   sword: 21 x 325) -> Long Sword (156400), and every trip buys the
+   highest tier its adena covers: the bot that sold its replaced 14k
+   weapon plans the 62k tier directly (the sale proceeds included)
+   instead of the 1k sword it just sold - the reported round the
+   guard fixes.
 3. **The jewel floor** - the cheapest jewel offer of every bodypart
    family (ring, earring, necklace: Magic Ring 37, Apprentice's
    Earring 56, Necklace of Magic 75, all with tax) fills the EMPTY
@@ -121,6 +125,21 @@ Supporting rules that survived the rework unchanged:
   trip re-plans against the paperdoll the purchases reached and takes
   the next step - the progression converges over the trips without
   ever paying for a step that ends up in the sale bag instead.
+- **The top-tier slot guard** (the 2026-09-11 sold-weapon round):
+  within the upgrade phases the guard records the best viable gain
+  per paperdoll slot (the scan runs in the score descending order,
+  so a lower score item can never outgain a higher score one on
+  overlapping slots - the shared displacement subtracts the same
+  scores) and drops every candidate aspired above that record,
+  whatever its value per adena. The guard persists across the pick
+  rounds of one plan: the eroding budget of the later rounds must
+  not crowd the top tier out and push a cheaper rung in - the slot
+  stays unpurchased and waits for the next trip. The floors bypass
+  it (they deliberately buy the cheapest offers of the empty
+  families - the opening outfit rule above) and the widget queue's
+  wanted tail walks without it (the unbounded budget of the tail
+  would collapse the displayed ladder of a slot to its top step and
+  hide the milestones the bot saves for).
 
 **Rule 2 - buy at the town trip, sell first - and sell everything.**
 The purchases run inside the town trips the loop already makes: the
@@ -231,19 +250,20 @@ journey, the weapon follows, the jewels wait for both):
 | 2 | Leather Shield 34 | **Short Gloves 42** |
 | 3 | Short Gloves 42, Cloth Cap 63, Magic Ring 37 | **Cloth Cap 63** (the empty armor slots are filled) |
 | 4 | Necklace of Magic 75, Apprentice's Earring 56, Magic Ring 37, Cloth Shoes 42, Pants 105 | - (saving the Short Sword) |
-| 5 | Short Sword 883, Apprentice's Earring 56 | **Short Sword 883** (the weapon milestone lands), Magic Ring 37, Apprentice's Earring 56, Necklace of Magic 75 (the jewel floor opens behind the weapon), Leather Shield 34, Shirt 169, Pants 105 |
-| 6 | Shirt 169, Ring of Knowledge 621, Leather Cap 1047 | Magic Ring 37 (2nd), Apprentice's Earring 56 (2nd), Pants 105, Cloth Shoes 42 |
-| 7 | Ring of Knowledge 621 (2nd), Short Leather Gloves 698, Cotton Shoes 698, Small Shield 733 | - (saving the Knife) |
-| 8 | Leather Pants 1747, Leather Shirt 2794, Necklace of Knowledge 1242, Mystic's Earring 932 | - (saving the Knife) |
-| 9 | **Heavy Chisel 9280**, Mystic's Earring 932 | **Knife 14374**, Leather Shirt 2794, Wooden Helmet 4577 |
-| 10 | **Knife 14374**, Earring of Strength 4036, Ring of Anguish 2691 | Hard Leather Pants 5715, Short Leather Gloves 698 |
-| 11 | **Sickle 21275**, Earring of Strength 4036, Ring of Anguish 2691 | - (saving the Brandish) |
-| 12 | Buckler 3196, Leather Shoes 3047, Gloves 3047, Wooden Helmet 4577, Necklace of Anguish 5382, Wooden Breastplate 9154 | **Brandish 62214**, Cotton Shoes 698 |
-| 13 | Hard Leather Pants 5715, Leather Helmet 11730, Round Shield 8176, Cat's Eye Earring 10223, Low Boots 7785 | Bone Breastplate 23345, Low Boots 7785, Leather Gloves 7785 |
-| 14 | **Brandish 62214** | Leather Helmet 11730 |
-| 15 | Cat's Eye Earring 10223, Necklace of Wisdom 13684, Leather Gloves 7785, Bone Gaiters 14604, Ring of Wisdom 6807, Bone Breastplate 23345 | Necklace of Anguish 5382 (the jewel gate opens) |
-| 16 | Ring of Wisdom 6807 | **Long Sword 156400**, Round Shield 8176, Cat's Eye Earring 10223, Earring of Strength 4036, Ring of Wisdom 6807, Ring of Anguish 2691, Necklace of Wisdom 13684 |
-| 17 | **Long Sword 156400**, Leather Shield 34 | Cat's Eye Earring 10223 (2nd), Bone Gaiters 14604, Ring of Wisdom 6807 (2nd) |
+| 5 | Short Sword 883, Apprentice's Earring 56 | **Short Sword 883** (the weapon milestone lands), Magic Ring 37, Apprentice's Earring 56, Necklace of Magic 75 (the jewel floor opens behind the weapon), Shirt 169 (the defense inside the sword budget) |
+| 6 | Shirt 169, Ring of Knowledge 621, Leather Cap 1047 | Magic Ring 37 (2nd), Apprentice's Earring 56 (2nd) |
+| 7 | Ring of Knowledge 621 (2nd), Short Leather Gloves 698, Cotton Shoes 698, Small Shield 733 | - (the wallet climbs the weapon ladder) |
+| 8 | Leather Pants 1747, Leather Shirt 2794, Necklace of Knowledge 1242, Mystic's Earring 932 | **Heavy Chisel 9280** (the top affordable tier) |
+| 9 | **Heavy Chisel 9280**, Mystic's Earring 932 | **Knife 14374** (the chisel's sell-first credit closes the gap) |
+| 10 | **Knife 14374**, Earring of Strength 4036, Ring of Anguish 2691 | **Sickle 21275** (the knife's sell-first credit closes the gap) |
+| 11 | **Sickle 21275**, Earring of Strength 4036, Ring of Anguish 2691 | Round Shield 8176, Leather Helmet 11730 (the defense inside the sickle budget) |
+| 12 | Buckler 3196, Leather Shoes 3047, Gloves 3047, Wooden Helmet 4577, Necklace of Anguish 5382, Wooden Breastplate 9154 | - (the wallet climbs to the 62k tier) |
+| 13 | Hard Leather Pants 5715, Leather Helmet 11730, Round Shield 8176, Cat's Eye Earring 10223, Low Boots 7785 | **Brandish 62214**, Bone Gaiters 14604 |
+| 14 | **Brandish 62214** | Bone Breastplate 23345, Low Boots 7785 |
+| 15 | Cat's Eye Earring 10223, Necklace of Wisdom 13684, Leather Gloves 7785, Bone Gaiters 14604, Ring of Wisdom 6807, Bone Breastplate 23345 | - |
+| 16 | Ring of Wisdom 6807 | **Long Sword 156400**, Round Shield 8176, Necklace of Wisdom 13684, Cat's Eye Earring 10223, Mystic's Earring 932 (the defense burst inside the sword budget) |
+| 17 | **Long Sword 156400**, Leather Shield 34 | Leather Gloves 7785, Cat's Eye Earring 10223 (2nd), Ring of Wisdom 6807, Ring of Anguish 2691 |
+| 18 | - | Ring of Wisdom 6807 (2nd) |
 
 The wastes the phase rework removes, visible in the WAS column:
 
@@ -265,13 +285,18 @@ The wastes the phase rework removes, visible in the WAS column:
 
 The IS column opens with the cheap armor floor (levels 1-3: the
 shoes, the gloves, the cap - the empty slots of the Squire's kit),
-saves into the Short Sword, buys the jewel floor ONLY after the
-sword landed (level 5: the weapon first, the jewels behind it),
-then walks the weapon tiers with the armor inside each tier's
-budget, no jewel upgrade before level 15 and the defense burst (the
-bone set, the shield, the wisdom jewels) inside the Long Sword
-budget at level 16-17 - the same 251 gear points of the full dress
-reached without the detours.
+buys the Short Sword the moment its wallet reaches it, the jewel
+floor ONLY after the sword landed (level 5: the weapon first, the
+jewels behind it) and then the TOP affordable weapon tier of every
+trip: the chisel at 8, the knife at 9 through the chisel's
+sell-first credit, the sickle at 10 through the knife's credit, the
+brandish at 13, the Long Sword at 16 - the intermediate rungs are
+bought only while they ARE the top affordable tier, never below a
+reachable better one, and the replaced weapon funds the next tier
+through its sale. The armor and the jewels follow inside each
+tier's budget, no jewel upgrade before level 15, the defense bursts
+behind the sickle, the brandish and the Long Sword - the same 251
+gear points of the full dress reached without the save up trips.
 
 ## Where each piece lives
 
@@ -286,9 +311,12 @@ reached without the detours.
   of `shoppingQueueMin` entries through the wishlist extension), the
   strategy phases (`shopStrategy.classify`: the armor floor, the
   weapon milestone, the jewel floor behind a real weapon, the
-  defense budget), the catalogs (`Shop`, `Catalog`) and the adena
-  budget handling (the sell credit of `displacedValue` never counts
-  the unsellable newbie kit - `gear.IsStarterItem`).
+  defense budget), the top-tier slot guard (`viableCandidates` and
+  `aspiredAbove`: the best viable gain per slot drops the
+  intermediate rungs of the upgrade phases, the floors and the
+  widget tail bypass it), the catalogs (`Shop`, `Catalog`) and the
+  adena budget handling (the sell credit of `displacedValue` never
+  counts the unsellable newbie kit - `gear.IsStarterItem`).
 - `internal/swarm/gear/shopping_strategy_test.go` - the level
   journey simulation and the was/is comparison table (the legacy
   greedy planner copy, the income model, the ordering pins).

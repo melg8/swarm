@@ -100,9 +100,32 @@ while the wallet already covers the 60k tier.
   new ladder (the chisel at 8, the knife at 9 through the sell-first
   credit, the sickle at 10, the brandish at 13, the Long Sword at
   16 - the same top gear, the save up trips gone).
-- Next: the docs commit (the Rule 1 milestone wording and the
-  regenerated IS journey table of `docs/shopping_strategy.md`), then
-  `golangci-lint run` and the wrap up.
+- 2026-09-11, commit "docs: the shop strategy documents the
+  top-tier slot guard": the Rule 1 weapon milestone wording (the top
+  affordable tier, the guard semantics, the ladder with the chisel
+  rung), the supporting rules bullet (the guard, its persistence,
+  the floor and widget-tail bypasses), the regenerated IS journey
+  table (the chisel at 8, the knife at 9 through the sell-first
+  credit, the sickle at 10, the brandish at 13, the Long Sword at
+  16 - the save up trips gone) and the shopping.go bullet of the
+  piece map. Verified: `golangci-lint run` - 0 issues on the gear
+  package (the only --new-from-rev findings on the tree live in the
+  untracked reprodump diagnostic, which never ships), gofmt clean.
+
+### Status: done (2026-09-11)
+
+- The top-tier guard ported from feature/acceptance: the empty
+  weapon slot plans the top affordable tier (the knife at the dump's
+  post-sale wallet, the brandish when the wallet reaches it), the
+  replaced weapon plans the top tier with the SellFirst sale, and
+  the intermediate rungs never slide in behind the eroding budget of
+  the later pick rounds.
+- The widget purchase queue keeps its wanted ladder (the tail and
+  wishlist modes walk without the guard) and the affordable prefix
+  stays byte identical to the plain plan.
+- All the checks green: go build ./..., go vet ./..., the full go
+  test suite (16 packages), gofmt -l, golangci-lint run (0 issues on
+  the gear package).
 
 ## Active task: the round 56 building stuck - the skip gate and the re-planned self-click (2026-09-11)
 
