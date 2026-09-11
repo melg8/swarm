@@ -731,6 +731,36 @@ func (l *Loop) walkTownWaypoints() bool {
 	return l.followWaypoints(selfX, selfY, selfZ, time.Now(), true)
 }
 
+// advanceWaypoints walks the waypoint cursor forward as far as the
+// character's position allows: a waypoint counts as passed when it is
+// reached within its radius or already bypassed along the route AND
+// the straight line from the actual standing cell to the successor
+// waypoint is walkable. The arrival radius is wide enough to cover
+// the tight waypoints of a ramp climb, but the line from the actual
+// standing cell to the next waypoint may still cross a closed wall -
+// skipping ahead would click through it and the server cancels the
+// move at the character's own position (the 2026-09-11 teacher walk
+// stuck: the follower skipped the 16 unit ramp steps and clicked the
+// plaza waypoint through the railing). The gated waypoint stays the
+// target: walking onto it re-opens the line.
+func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
+	for l.wpIndex < len(l.waypoints) {
+		arrived := waypointArrived(
+			l.waypoints, l.wpIndex, selfX, selfY, selfZ)
+		passed := !arrived && l.wpIndex+1 < len(l.waypoints) &&
+			waypointPassed(l.waypoints[l.wpIndex],
+				l.waypoints[l.wpIndex+1], selfX, selfY)
+		if !arrived && !passed {
+			return
+		}
+		if !l.legAdvanceClear(selfX, selfY, selfZ, l.wpIndex+1) {
+			return
+		}
+		l.wpIndex++
+		l.moveAt = time.Time{}
+	}
+}
+
 // followWaypoints is the shared waypoint follower core of the town
 // legs and the water escapes: the waypoint arrival (tight for the
 // intermediate turns, wide for the final goal), the passed waypoint
@@ -742,27 +772,7 @@ func (l *Loop) walkTownWaypoints() bool {
 func (l *Loop) followWaypoints(
 	selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
 ) bool {
-	for l.wpIndex < len(l.waypoints) {
-		if waypointArrived(l.waypoints, l.wpIndex,
-			selfX, selfY, selfZ) {
-			l.wpIndex++
-			l.moveAt = time.Time{}
-
-			continue
-		}
-		// Not reached: skip it only when the character already
-		// passed it on the route towards the next waypoint.
-		if l.wpIndex+1 < len(l.waypoints) &&
-			waypointPassed(l.waypoints[l.wpIndex],
-				l.waypoints[l.wpIndex+1], selfX, selfY) {
-			l.wpIndex++
-			l.moveAt = time.Time{}
-
-			continue
-		}
-
-		break
-	}
+	l.advanceWaypoints(selfX, selfY, selfZ)
 	if l.wpIndex >= len(l.waypoints) {
 		return true
 	}
@@ -925,6 +935,44 @@ func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
 		selfX, selfY, selfZ, int32(last.X), int32(last.Y), int32(last.Z))
 
 	return true
+}
+
+// legAdvanceClear reports whether the follower may advance past the
+// waypoint whose successor sits at the index: the straight line from
+// the CURRENT character position to that next waypoint must be
+// walkable over the geodata. The server validates every ground click
+// as a straight line (GeoEngine.getValidLocation, the deployment runs
+// PathFinding = 0 so no server side routing exists): a click whose
+// first step hits a closed wall resolves to the character's own
+// position, the move is canceled at once and the character never
+// moves. The old follower skipped any waypoint inside the 50 unit
+// pass radius - tighter than the 16 unit ramp steps of the trainer
+// plaza approach - and clicked the far waypoint straight through the
+// plaza railing: the click canceled, the 15 s stuck detector
+// re-planned the identical deterministic route, the follower skipped
+// the same tight waypoints again and the third budget burned into
+// "town trip ended: aborted, walk stuck" (the 2026-09-11 teacher
+// walk, the lessons never reached the teacher). The gate keeps the
+// skipped-from waypoint as the target until walking onto it re-opens
+// the line. A line the geodata cannot verify stays clear - the
+// follower then keeps the pre-gate behavior.
+func (l *Loop) legAdvanceClear(
+	selfX, selfY, selfZ int32, next int,
+) bool {
+	if next >= len(l.waypoints) || l.navigator == nil {
+		return true
+	}
+	walkable, err := l.navigator.LineOfSight(
+		pathfind.Vec3{
+			X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+		},
+		l.waypoints[next],
+	)
+	if err != nil {
+		return true
+	}
+
+	return walkable
 }
 
 // walkStuck tracks the movement progress of the walker and re-paths

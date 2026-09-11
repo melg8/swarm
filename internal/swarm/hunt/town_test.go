@@ -26,9 +26,15 @@ type fakeNavigator struct {
 	// (zero: the lookup fails and the self height stays).
 	height    int16
 	heightErr bool
-	// sight is the LineOfSight answer for every queried standing
-	// point (the blind engage recovery asks it per candidate).
-	sight bool
+	// blind marks the LineOfSight answer as blocked for every
+	// queried line (the blind engage recovery asks it per candidate
+	// standing point): the default answers a clear line - the
+	// follower leg gate of the town walks needs one.
+	blind bool
+	// sightFunc answers the LineOfSight queries per line: the
+	// waypoint follower gate tests pin the exact blocked corner
+	// (nil: every line answers the blind flag).
+	sightFunc func(from, to pathfind.Vec3) (bool, error)
 	// overWater is the OverWater answer for the character position:
 	// the water escape tests arm it to drop the character into a
 	// lake.
@@ -151,13 +157,16 @@ func (f *fakeNavigator) ClosestHeight(_, _ float64, _ int16) (int16, error) {
 // LineOfSight answers the configured sight lines: the blind engage
 // recovery tests decide which standing points see the target.
 func (f *fakeNavigator) LineOfSight(
-	_, _ pathfind.Vec3,
+	from, to pathfind.Vec3,
 ) (bool, error) {
 	if f.heightErr {
 		return false, errors.New("no geodata")
 	}
+	if f.sightFunc != nil {
+		return f.sightFunc(from, to)
+	}
 
-	return f.sight, nil
+	return !f.blind, nil
 }
 
 // OverWater answers the configured water surface: the tests that walk

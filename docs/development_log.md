@@ -3141,3 +3141,98 @@ The weapon now leads everything:
   the farm spot - the database holds the sword in PAPERDOLL slot 7 and
   the wallet at 14005 (the 883 price plus the loot of the walk back).
   The SIGINT shutdown stayed graceful (exit 0).
+
+## Round 51: the teacher walk stuck - the walled skip of the follower, the walkable line gate (2026-09-11)
+
+The user report (Russian): the bots freeze and never learn - the
+state dump (build 36bfe99, level 11 elven fighter test2, phase
+townWalk) showed the learning trip walking to the teacher Ellenia,
+passing waypoints 0..10 of the plan and then standing frozen at
+46152 51656 -2808 aiming at wp 11 (45992 52040 -2792) while the
+re-path budget burned ("town walk stuck, re-pathing (1..3 of 3)" ->
+"town trip ended: aborted, walk stuck"). The character then walked
+back to the hunting zone, fought bare-handed (no weapon - the
+planned 883 adena Short Sword purchase never ran either), nearly
+died to a level 7 Kaboo Orc Grunt, emergency-logged-out, relogged
+and restarted the identical trip - forever, no lesson ever learned.
+
+### Root cause
+
+The server (Mobius C1, the deployment sets PathFinding = 0) never
+routes a ground click: `Creature.moveToLocation` runs the
+`getValidLocation` straight line raster, and a click whose first
+step hits a closed cell wall resolves to the character's own
+position - the distance collapses under 1 and the move is canceled
+silently (setIntentionIdle + ActionFailed, nothing in the log). The
+waypoint follower of the town trips skipped waypoints inside the 50
+unit pass radius without checking the line ahead: the trainer plaza
+approach climbs a ramp whose smoothed steps sit 16..48 units apart,
+the server stopped the character one cell east of the ramp top
+(46152 51656 -2808), the follower skipped wp 9 AND wp 10 (both
+within 50 units) and clicked wp 11 - the straight line from that
+pocket cell crosses the closed NORTH wall of the standing cell (the
+plaza railing; the WEST wall of the same cell is closed too, the
+only way out is south). The click canceled, the character never
+moved a unit, the 15 s stuck detector re-planned - and the
+deterministic search reproduced the identical route, the follower
+skipped the same tight waypoints from the same pocket, the third
+budget burned and the trip aborted before the teacher stop ever
+ran. The cooldown did not even damp the loop: a fresh Loop per
+session carries no tripEndedAt, so the emergency-logout relogin
+re-armed the walk within ~100 s.
+
+Probed against the real geodata pack (pathfind/teacher_walk_test.go
+pins the exact geometry): LineOfSight(pocket -> plaza) is false,
+LineOfSight(pocket -> ramp top) is false, the south line to the
+ramp foot is clear, the climb from the foot is clear, and the
+re-plan from the pocket finds the detour through the foot. The
+engine and the server read the same NSWE cells.
+
+### Fix
+
+The follower gates every waypoint skip on the walkable line
+(`legAdvanceClear` through the Navigator.LineOfSight the blind
+engage already uses): a waypoint only counts as passed when the
+straight line from the CURRENT standing cell to the successor
+waypoint passes the geodata line of sight. A gated waypoint stays
+the target - walking onto it re-opens the line - and the follower
+never again clicks a line the server would cancel at its first
+step. A line the geodata cannot verify stays clear (the pre-gate
+behavior), and the skip cursor moved into `advanceWaypoints` to
+keep the follower under the complexity limit. The stuck detector
+stays the backstop for a truly off-route position (a teleport, a
+chase), where the re-path now also works: the fresh route's tight
+steps no longer get blindly skipped.
+
+### Composition with the concurrent rounds
+
+The parallel session of 2026-09-11 fixed the same user report from a
+second dump: Round 49 added the reverse wall rule to the pathfinder
+(a route never steps onto a cell whose reverse wall is closed - the
+planning level) and the stuck waypoint skip (a stuck walk advances
+past its current waypoint before re-planning - the recovery level).
+This round adds the missing prevention level: the follower never
+skips a waypoint whose successor line is not walkable from the
+actual standing cell, so the walk never clicks through a wall in the
+first place. The three fixes compose: the routes avoid reverse
+walled cells, the follower only skips along verified lines, and a
+genuinely off-route position still recovers through the stuck
+machinery. Round 50 (the weapon run) fixed the bare-handed half of
+the report: the Short Sword purchase now leads the town trips.
+
+### Tests
+
+- pathfind/teacher_walk_test.go (the real pack): the dump route
+  reproduces exactly (TestTeacherRouteMatchesTheDumpPlan), the
+  pocket corner walls (TestTeacherCornerWallBlocksTheStraightClick)
+  and the re-plan detour (TestTeacherReplanFromTheStuckCorner).
+- hunt/teacher_walk_test.go: the gate itself on the exact dump state
+  (TestTeacherWalkKeepsTheWaypointWhenTheLineAheadIsWalled - the
+  fake navigator answers the probed lines; the first click goes
+  south to the ramp foot, never to the walled plaza; the walk then
+  advances through the corner) and the end-to-end recovery under the
+  simulated server from the reported stuck spot
+  (TestTeacherWalkRecoversFromTheDumpStuckSpot - the leg completes
+  into the stop phase within one recovery re-path). The fake
+  navigator's LineOfSight default flipped to clear (the `blind`
+  flag) because the follower gate now queries it on every walk.

@@ -39,7 +39,7 @@ func TestEngageRepositionsBlindTarget(t *testing.T) {
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	nav := &fakeNavigator{
-		found: true, sight: true,
+		found: true,
 		route: []pathfind.Vec3{
 			{X: 45300, Y: 50300, Z: -3500},
 			{X: 45600, Y: 50600, Z: -3500},
@@ -80,7 +80,7 @@ func TestEngageBlindRepositionArrivesAndReEngages(t *testing.T) {
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
 	nav := &fakeNavigator{
-		found: true, sight: true,
+		found: true,
 		route: []pathfind.Vec3{{X: 45300, Y: 50300, Z: -3500}},
 	}
 	loop.SetNavigator(nav)
@@ -156,7 +156,7 @@ func TestEngageSwitchesBlindTargetWhenNoRoute(t *testing.T) {
 	})
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
-	loop.SetNavigator(&fakeNavigator{found: false, sight: false})
+	loop.SetNavigator(&fakeNavigator{found: false, blind: true})
 	armBlindEngage(t, bot, loop)
 
 	loop.tick()
@@ -179,7 +179,7 @@ func TestEngageBlindWalkBudgetSwitchesTarget(t *testing.T) {
 	})
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
-	loop.SetNavigator(&fakeNavigator{found: true, sight: true})
+	loop.SetNavigator(&fakeNavigator{found: true})
 	armBlindEngage(t, bot, loop)
 	loop.losAt = time.Now().Add(-(blindWalkBudget + time.Second))
 	loop.losWaypoints = []pathfind.Vec3{
@@ -204,7 +204,7 @@ func TestEngageBlindRecoveryRetriesOnce(t *testing.T) {
 	spawnCloseMob(bot)
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
-	loop.SetNavigator(&fakeNavigator{found: true, sight: true})
+	loop.SetNavigator(&fakeNavigator{found: true})
 	armBlindEngage(t, bot, loop)
 
 	// Attempt one: the trivial route (start at the character, the
@@ -286,7 +286,7 @@ func TestEngageStuckTimeoutHeldDuringBlindRecovery(t *testing.T) {
 	spawnCloseMob(bot)
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
-	loop.SetNavigator(&fakeNavigator{found: true, sight: true})
+	loop.SetNavigator(&fakeNavigator{found: true})
 	bot.ApplySelfTarget(7)
 	loop.target = 7
 	loop.lastHit = time.Now().Add(-time.Minute)

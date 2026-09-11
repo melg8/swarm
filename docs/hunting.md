@@ -413,7 +413,19 @@ The short form:
   within the 150 unit trip arrival radius; a waypoint the character
   already passed ON the route skips ahead through the projection pass
   test, while a character beside the route keeps targeting the
-  waypoint it missed). The walker re-paths around obstacles after
+  waypoint it missed). Every skip is gated on the walkable line: the
+  straight line from the actual standing cell to the successor
+  waypoint must pass the geodata line of sight, else the waypoint
+  stays the target until walking onto it re-opens the line - the
+  server (the deployment runs PathFinding = 0) validates every click
+  as a straight line and cancels a move whose first step hits a
+  closed wall at the character's own position, and the 2026-09-11
+  teacher walk stuck exactly that way (the follower skipped the 16
+  unit ramp steps of the trainer plaza approach inside the 50 unit
+  pass radius and clicked the plaza waypoint through the railing;
+  every re-path reproduced the identical route, the budget burned
+  and the trip aborted before the teacher - the lessons never
+  landed). The walker re-paths around obstacles after
   15 s of standing still (3 re-paths abort the trip); a trip timeout (20 min) and a trigger cooldown
   (5 min after every trip end) bound the whole feature, and a death -
   mid trip or not - clears the cooldown: the village restart lands next
