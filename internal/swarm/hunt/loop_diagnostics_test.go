@@ -105,12 +105,21 @@ func TestLoopDiagnosticsAges(t *testing.T) {
 	loop.fleeSince = time.Time{}
 	loop.stuckAt = now.Add(-(31 * time.Second))
 
+	// The hunt phases carry no planned walk: the residual stuck and
+	// trip stamps stay out of the report.
+	loop.phase = phaseEngage
 	report := loop.diagnostics(now)
 	require.Equal(t, int64(2000), report.TargetForMs)
-	require.Equal(t, int64(65000), report.TripForMs)
+	require.Equal(t, int64(0), report.TripForMs)
+	require.Equal(t, int64(0), report.StuckForMs)
 	require.Equal(t, int64(0), report.FleeForMs)
-	require.Equal(t, int64(31000), report.StuckForMs)
 	require.Equal(t, 0, report.WaypointsLeft)
+
+	// The walking phases carry both walk clocks.
+	loop.phase = phaseTownReturn
+	report = loop.diagnostics(now)
+	require.Equal(t, int64(65000), report.TripForMs)
+	require.Equal(t, int64(31000), report.StuckForMs)
 }
 
 // TestLoopRemainingWaypoints pins the waypoint counting per phase:

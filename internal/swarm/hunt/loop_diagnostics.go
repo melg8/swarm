@@ -31,15 +31,15 @@ func (l *Loop) logf(format string, args ...any) {
 // relative to now. The tick defer publishes the values on every
 // decision of the state machine.
 func (l *Loop) diagnostics(now time.Time) state.HuntDiagnostics {
-	return state.HuntDiagnostics{
+	report := state.HuntDiagnostics{
 		TargetID:       l.target,
 		TargetForMs:    state.AgeMs(since(now, l.engageAt)),
 		SkippedTargets: l.activeSkipCount(now),
 		NoTargetForMs:  state.AgeMs(since(now, l.noTargetSince)),
 		RePaths:        l.rePaths,
-		StuckForMs:     state.AgeMs(since(now, l.stuckAt)),
+		StuckForMs:     0,
 		WaypointsLeft:  l.remainingWaypoints(),
-		TripForMs:      state.AgeMs(since(now, l.tripStart)),
+		TripForMs:      0,
 		FleeForMs:      state.AgeMs(since(now, l.fleeSince)),
 		BuyRetries:     l.buyRetries,
 		// The last action and the publication age belong to the
@@ -48,6 +48,32 @@ func (l *Loop) diagnostics(now time.Time) state.HuntDiagnostics {
 		LastAction:      "",
 		LastActionAgoMs: 0,
 		TickAgoMs:       0,
+	}
+	// The stuck watchdog and the trip clock only run while the loop
+	// follows a planned walk: outside those phases the residual
+	// stamps would grow into misleading ages for a report.
+	if l.walkPhase() {
+		report.StuckForMs = state.AgeMs(since(now, l.stuckAt))
+	}
+	if l.tripActive() || l.phase == phaseDelevel {
+		report.TripForMs = state.AgeMs(since(now, l.tripStart))
+	}
+
+	return report
+}
+
+// walkPhase reports whether the loop follows a planned geodata walk
+// right now: the phases whose diagnostics carry the stuck watchdog
+// age (the sell stop stands still by design, the hunt phases have no
+// planned path).
+func (l *Loop) walkPhase() bool {
+	switch l.phase {
+	case phaseTownWalk, phaseTownReturn, phaseDelevel:
+
+		return true
+	default:
+
+		return false
 	}
 }
 
