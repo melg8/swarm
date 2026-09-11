@@ -1087,6 +1087,7 @@ body.mode-pathfind .bot-status { display: none; }
 
 .log-msg { color: var(--text); word-break: break-word; }
 
+.log-msg.hunt { color: var(--accent); }
 .log-msg.spawn { color: var(--green); }
 .log-msg.combat { color: var(--red); }
 .log-msg.remove { color: var(--red); }
@@ -1129,7 +1130,9 @@ body.mode-pathfind .tab[data-tab="log"],
 body.mode-pathfind #foot-packets,
 body.mode-pathfind #foot-objects,
 body.mode-pathfind #foot-uptime,
-body.mode-pathfind #foot-updated {
+body.mode-pathfind #foot-updated,
+body.mode-pathfind #foot-phase,
+body.mode-pathfind #foot-rate {
   display: none;
 }
 
@@ -2226,6 +2229,8 @@ body.mode-fight #foot-packets,
 body.mode-fight #foot-objects,
 body.mode-fight #foot-uptime,
 body.mode-fight #foot-updated,
+body.mode-fight #foot-phase,
+body.mode-fight #foot-rate,
 body.mode-fight .tab[data-tab="log"] {
   display: none;
 }
@@ -2411,7 +2416,9 @@ body.mode-test-fight #live-label,
 body.mode-test-fight #foot-packets,
 body.mode-test-fight #foot-objects,
 body.mode-test-fight #foot-uptime,
-body.mode-test-fight #foot-updated {
+body.mode-test-fight #foot-updated,
+body.mode-test-fight #foot-phase,
+body.mode-test-fight #foot-rate {
   display: none;
 }
 

@@ -65,6 +65,27 @@ function formatDuration(fromISO, untilISO) {
   return pad(hours) + ":" + pad(minutes) + ":" + pad(secs);
 }
 
+// formatAgeMs renders a diagnostics age (milliseconds, floored to
+// whole seconds by the server) as a compact human string: 0 renders
+// as the fresh marker, longer spans grow to minutes and hours.
+function formatAgeMs(ms) {
+  if (ms === null || ms === undefined) { return "—"; }
+  const secs = Math.floor(ms / 1000);
+  if (secs === 0) { return "now"; }
+  if (secs < 60) { return secs + "s"; }
+  if (secs < 3600) {
+    return Math.floor(secs / 60) + "m " + (secs % 60) + "s";
+  }
+
+  return Math.floor(secs / 3600) + "h " +
+    pad2(Math.floor((secs % 3600) / 60)) + "m";
+}
+
+// pad2 left-pads a number to two digits.
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
 // ---- theme ----
 
 // applyTheme switches the color scheme and persists the choice. The light
@@ -453,7 +474,8 @@ function renderSnapshot() {
 function phaseLabel(snap) {
   const status = snap.status;
   if (status === "offline") {
-    return { kind: "offline", text: "offline", detail: "session ended" };
+    const offlineDetail = offlineDetailFor(snap);
+    return { kind: "offline", text: "offline", detail: offlineDetail };
   }
   if (status === "connecting") {
     return { kind: "connecting", text: "connecting",
@@ -461,29 +483,30 @@ function phaseLabel(snap) {
   }
   const c = snap.character || {};
   const phase = snap.phase || "";
+  const hunt = snap.diagnostics && snap.diagnostics.hunt;
   switch (phase) {
   case "engage":
     if (c.inCombat) {
       return { kind: "combat", text: "hunting",
-        detail: "fighting a target in the zone" };
+        detail: engageFightDetail(c, hunt) };
     }
     return { kind: "hunt", text: "hunting",
-      detail: "looking for the next target" };
+      detail: engageSearchDetail(hunt) };
   case "loot":
     return { kind: "loot", text: "looting",
       detail: "picking up the drops of the last kill" };
   case "townWalk":
     return { kind: "town", text: "walking to town",
-      detail: "heading to the trader to sell junk" };
+      detail: walkDetail("heading to the trader to sell junk", hunt) };
   case "townSell":
     return { kind: "town", text: "selling",
-      detail: "selling the inventory at the trader" };
+      detail: sellDetail(hunt) };
   case "townReturn":
     return { kind: "return", text: "walking to farm spot",
-      detail: "heading back to the hunting zone" };
+      detail: walkDetail("heading back to the hunting zone", hunt) };
   case "delevel":
     return { kind: "delevel", text: "deleveling",
-      detail: "dying at the town guards to drop levels" };
+      detail: walkDetail("dying at the town guards to drop levels", hunt) };
   case "user":
     return userPhaseLabel(snap);
   case "idle":
@@ -492,6 +515,74 @@ function phaseLabel(snap) {
   default:
     return { kind: "online", text: status || "online", detail: "" };
   }
+}
+
+// offlineDetailFor explains an offline session through the
+// diagnostics: a login cooldown shows the pause left, a stale
+// offline session shows the age of the last state change.
+function offlineDetailFor(snap) {
+  const diag = snap.diagnostics;
+  if (diag && diag.loginCooldownMs > 0) {
+    return "login cooldown " + formatAgeMs(diag.loginCooldownMs);
+  }
+
+  return "session ended";
+}
+
+// engageFightDetail describes a running fight: the target id and its
+// engagement age when the diagnostics arrived.
+function engageFightDetail(c, hunt) {
+  const target = c.targetId ? ("#" + c.targetId) : "a target";
+  let detail = "fighting " + target;
+  if (hunt && hunt.targetId) {
+    detail += " for " + formatAgeMs(hunt.targetForMs);
+  }
+
+  return detail + " in the zone";
+}
+
+// engageSearchDetail describes the target search: the patience age
+// and the skip list when the diagnostics arrived.
+function engageSearchDetail(hunt) {
+  if (!hunt) {
+    return "looking for the next target";
+  }
+  let detail = "looking for the next target";
+  if (hunt.noTargetForMs > 0) {
+    detail += " for " + formatAgeMs(hunt.noTargetForMs);
+  }
+  if (hunt.skippedTargets > 0) {
+    detail += ", " + hunt.skippedTargets + " skipped";
+  }
+
+  return detail;
+}
+
+// walkDetail describes a planned walk: the remaining waypoints and
+// the trip age when the diagnostics arrived.
+function walkDetail(fallback, hunt) {
+  if (!hunt) {
+    return fallback;
+  }
+  let detail = fallback;
+  if (hunt.waypointsLeft > 0) {
+    detail += ", " + hunt.waypointsLeft + " waypoints left";
+  }
+  if (hunt.tripForMs > 0) {
+    detail += " (" + formatAgeMs(hunt.tripForMs) + " trip)";
+  }
+
+  return detail;
+}
+
+// sellDetail describes the sell stop: the buy retries of the
+// shopping plan when they accumulated.
+function sellDetail(hunt) {
+  if (hunt && hunt.buyRetries > 0) {
+    return "selling the inventory, buy retry " + hunt.buyRetries;
+  }
+
+  return "selling the inventory at the trader";
 }
 
 // userPhaseLabel describes the manual command the loop is executing:
@@ -3424,6 +3515,9 @@ function buildLogLine(event, filter) {
 }
 
 function logLineClass(message) {
+  if (message.startsWith("Hunt:")) {
+    return "hunt";
+  }
   if (message.startsWith("npc spawned") || message.startsWith("player appeared")
     || message.startsWith("item dropped") || message.startsWith("item appeared")
     || message.startsWith("entered")) {
@@ -3449,15 +3543,42 @@ function logLineClass(message) {
 // Footer rendering.
 function renderFooter(snap) {
   document.getElementById("foot-status").textContent = "status: " + snap.status;
+  const diag = snap.diagnostics;
+  const phase = document.getElementById("foot-phase");
+  if (diag) {
+    phase.textContent = "phase: " + (snap.phase || "—") + " " +
+      formatAgeMs(diag.phaseForMs);
+  } else {
+    phase.textContent = "phase: " + (snap.phase || "—");
+  }
+  const rate = document.getElementById("foot-rate");
+  if (diag) {
+    rate.textContent = "rate: " +
+      Number(diag.packetsPerSecond || 0).toFixed(1) + "/s";
+  } else {
+    rate.textContent = "rate: —";
+  }
   document.getElementById("foot-packets").textContent =
     "packets: " + formatNumber(snap.packets);
-  document.getElementById("foot-objects").textContent =
-    "objects: " + (snap.objects ? snap.objects.length : 0);
+  const objects = snap.objects ? snap.objects.length : 0;
+  if (diag && diag.objects) {
+    document.getElementById("foot-objects").textContent =
+      "objects: " + objects + " (" + diag.objects.npcs + " npc, " +
+      diag.objects.items + " loot, " + diag.objects.dead + " dead)";
+  } else {
+    document.getElementById("foot-objects").textContent =
+      "objects: " + objects;
+  }
   document.getElementById("foot-uptime").textContent =
     "uptime: " + formatDuration(snap.startedAt, null);
-  const stamp = new Date(snap.updatedAt);
-  document.getElementById("foot-updated").textContent =
-    "updated: " + (isNaN(stamp.getTime()) ? "—" : stamp.toTimeString().slice(0, 8));
+  if (diag) {
+    document.getElementById("foot-updated").textContent =
+      "updated: " + formatAgeMs(diag.updatedAgoMs) + " ago";
+  } else {
+    const stamp = new Date(snap.updatedAt);
+    document.getElementById("foot-updated").textContent =
+      "updated: " + (isNaN(stamp.getTime()) ? "—" : stamp.toTimeString().slice(0, 8));
+  }
 }
 
 // ---- acceptance tests panel ----
