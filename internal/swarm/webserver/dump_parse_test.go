@@ -186,3 +186,152 @@ func TestParseDumpNoHuntingZone(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, snap.HuntingZone)
 }
+
+// TestApplyDumpRebuildsCharacter pins the ApplyDump contract: a
+// parsed snapshot replays into a fresh bot through the Apply API so
+// the character fields the hunt loop reads (level, HP, position) hold
+// exactly like a live session built them.
+func TestApplyDumpRebuildsCharacter(t *testing.T) {
+	source := state.NewBot("source")
+	source.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	source.ApplyUserInfo(state.UserInfo{
+		Name:  "test1",
+		Level: 5,
+		Race:  1,
+		X:     45000, Y: 50000, Z: -3500,
+		MaxHP: 113, CurHP: 80,
+		MaxMP: 39, CurMP: 30,
+	})
+	dump := BuildStateDump(source)
+	snap, err := ParseDump(dump)
+	require.NoError(t, err)
+
+	rebuilt := state.NewBot("rebuilt")
+	ApplyDump(rebuilt, snap)
+
+	// The rebuilt character carries the level and the vitals the
+	// source bot had, through the Apply API round trip.
+	view := rebuilt.Snapshot()
+	require.Equal(t, int32(5), view.Character.Level)
+	require.Equal(t, int32(45000), view.Character.X)
+	require.Equal(t, int32(50000), view.Character.Y)
+	require.InDelta(t, 80, view.Character.CurHP, 0.5)
+	require.InDelta(t, 113, view.Character.MaxHP, 0.5)
+}
+
+// TestApplyDumpRebuildsObjects pins the ApplyDump contract for the
+// world objects: the npc the source bot observed reappears in the
+// rebuilt bot with the same object id, position and HP.
+func TestApplyDumpRebuildsObjects(t *testing.T) {
+	source := state.NewBot("source")
+	source.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	source.ApplyNpcInfo(state.NpcInfo{
+		ObjectID:   200,
+		Name:       "Keltir",
+		Attackable: true,
+		X:          45200, Y: 50100, Z: -3500,
+	})
+	source.ApplyStatusUpdate(200, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 50},
+		{ID: state.AttrMaxHP, Value: 50},
+	})
+	dump := BuildStateDump(source)
+	snap, err := ParseDump(dump)
+	require.NoError(t, err)
+
+	rebuilt := state.NewBot("rebuilt")
+	ApplyDump(rebuilt, snap)
+
+	view := rebuilt.Snapshot()
+	require.Len(t, view.Objects, 1)
+	obj := view.Objects[0]
+	require.Equal(t, int32(200), obj.ObjectID)
+	require.Equal(t, state.KindNPC, obj.Kind)
+	require.Equal(t, int32(45200), obj.X)
+	require.Equal(t, int32(50100), obj.Y)
+	require.InDelta(t, 50, obj.CurHP, 0.5)
+	require.InDelta(t, 50, obj.MaxHP, 0.5)
+	require.True(t, obj.Attackable)
+}
+
+// TestApplyDumpRebuildsHuntingZone pins the hunting zone round trip
+// through ApplyDump.
+func TestApplyDumpRebuildsHuntingZone(t *testing.T) {
+	source := state.NewBot("source")
+	source.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	source.SetHuntingZone(46112, 41500, 450)
+	dump := BuildStateDump(source)
+	snap, err := ParseDump(dump)
+	require.NoError(t, err)
+
+	rebuilt := state.NewBot("rebuilt")
+	ApplyDump(rebuilt, snap)
+
+	view := rebuilt.Snapshot()
+	require.NotNil(t, view.HuntingZone)
+	require.Equal(t, int32(46112), view.HuntingZone.CX)
+	require.Equal(t, int32(41500), view.HuntingZone.CY)
+	require.Equal(t, int32(450), view.HuntingZone.Half)
+}
+
+// TestApplyDumpRebuildsWalkPlan pins the walk plan round trip through
+// ApplyDump: the origin, the waypoints, the destination and the
+// aiming index all survive.
+func TestApplyDumpRebuildsWalkPlan(t *testing.T) {
+	source := state.NewBot("source")
+	source.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	source.SetWalkPlan(state.WalkPlan{
+		Origin: &state.WalkPoint{X: 45800, Y: 41700, Z: -3500},
+		Points: []state.WalkPoint{
+			{X: 46000, Y: 41600, Z: -3500},
+			{X: 46112, Y: 41500, Z: -3510},
+		},
+		Index: 1,
+		Dest:  &state.WalkPoint{X: 46150, Y: 41480, Z: -3512},
+	})
+	dump := BuildStateDump(source)
+	snap, err := ParseDump(dump)
+	require.NoError(t, err)
+
+	rebuilt := state.NewBot("rebuilt")
+	ApplyDump(rebuilt, snap)
+
+	view := rebuilt.Snapshot()
+	require.Len(t, view.WalkPath, 2)
+	require.NotNil(t, view.WalkOrigin)
+	require.Equal(t, int32(45800), view.WalkOrigin.X)
+	require.Equal(t, int32(46112), view.WalkPath[1].X)
+	require.NotNil(t, view.WalkDest)
+	require.Equal(t, int32(46150), view.WalkDest.X)
+	require.Equal(t, 1, view.WalkIndex)
+}
+
+// TestApplyDumpEnablesHuntScan pins the storage invariant contract:
+// after ApplyDump the rebuilt bot carries the npc in the dense hot
+// array and the index map, so the hunt tick target search works
+// against it (the whole point of the Apply API replay).
+func TestApplyDumpEnablesHuntScan(t *testing.T) {
+	source := state.NewBot("source")
+	source.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	source.ApplyNpcInfo(state.NpcInfo{
+		ObjectID:   200,
+		Name:       "Keltir",
+		Attackable: true,
+		X:          45100, Y: 50100, Z: -3500,
+	})
+	source.ApplyStatusUpdate(200, []state.Attribute{
+		{ID: state.AttrCurHP, Value: 50},
+		{ID: state.AttrMaxHP, Value: 50},
+	})
+	dump := BuildStateDump(source)
+	snap, err := ParseDump(dump)
+	require.NoError(t, err)
+
+	rebuilt := state.NewBot("rebuilt")
+	ApplyDump(rebuilt, snap)
+
+	// The nearest attackable scan finds the npc the dump carried.
+	target, found := rebuilt.NearestAttackableConstrained(1500, nil, nil, 0, false)
+	require.True(t, found, "the rebuilt bot should find the dumped npc")
+	require.Equal(t, int32(200), target.ObjectID)
+}

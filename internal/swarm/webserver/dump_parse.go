@@ -43,6 +43,132 @@ func ParseDump(dump string) (state.Snapshot, error) {
 	return p.parse()
 }
 
+// ApplyDump replays a parsed snapshot into a fresh state.Bot through
+// the public Apply API, so the storage invariants (the SoA split of
+// the world store, the object id index map, the version counter) hold
+// exactly like a live session built them. Use this when a dump-driven
+// repro test needs the real storage layout (the hunt tick scans the
+// dense hot array, the target search walks the index map); use
+// ParseDump alone when the test only asserts on the view fields.
+//
+// The replay covers the character, the world objects, the hunting
+// zone, the walk plan and the rolling events. The inventory, the
+// combat events and the chat are view-only projections of the live
+// state (they carry presentation fields the Apply API does not take),
+// so they stay on the snapshot and do not round-trip through the bot.
+// A test that needs them reads them off the returned snapshot.
+func ApplyDump(bot *state.Bot, snap state.Snapshot) {
+	applyDumpCharacter(bot, snap.Character)
+	applyDumpObjects(bot, snap.Objects)
+	if snap.HuntingZone != nil {
+		bot.SetHuntingZone(snap.HuntingZone.CX, snap.HuntingZone.CY,
+			snap.HuntingZone.Half)
+	}
+	if len(snap.WalkPath) > 0 {
+		bot.SetWalkPlan(state.WalkPlan{
+			Origin: snap.WalkOrigin,
+			Points: snap.WalkPath,
+			Index:  snap.WalkIndex,
+			Dest:   snap.WalkDest,
+		})
+	}
+	for _, ev := range snap.Events {
+		bot.RecordEvent(ev.Message)
+	}
+}
+
+// applyDumpCharacter replays the character view into the bot. The
+// SetCharacter call seeds the identity and the position; the
+// ApplyUserInfo call fills the level, the stats, the max HP/MP and
+// the load; the ApplyStatusUpdate calls set the current HP/MP. The
+// target id and the sit/stand state ride along through ApplyUserInfo
+// (the dump does not carry them as separate fields, the hunt loop
+// derives them from the packets).
+func applyDumpCharacter(bot *state.Bot, c state.CharacterSnapshot) {
+	bot.SetCharacter(c.Name, c.ObjectID, c.ClassID, c.X, c.Y, c.Z,
+		c.CurHP, c.CurMP)
+	//nolint:exhaustruct_v5 // the dump carries a subset of UserInfo
+	bot.ApplyUserInfo(state.UserInfo{
+		Name:        c.Name,
+		Level:       c.Level,
+		Race:        c.Race,
+		ClassID:     c.ClassID,
+		X:           c.X,
+		Y:           c.Y,
+		Z:           c.Z,
+		STR:         c.STR,
+		DEX:         c.DEX,
+		CON:         c.CON,
+		INT:         c.INT,
+		WIT:         c.WIT,
+		MEN:         c.MEN,
+		Exp:         c.Exp,
+		Sp:          c.Sp,
+		MaxHP:       int32(c.MaxHP),
+		CurHP:       int32(c.CurHP),
+		MaxMP:       int32(c.MaxMP),
+		CurMP:       int32(c.CurMP),
+		CurrentLoad: c.CurrentLoad,
+		MaxLoad:     c.MaxLoad,
+		RunSpeed:    int32(c.Speed),
+	})
+}
+
+// applyDumpObjects replays the world object views into the bot. Each
+// object becomes an ApplyNpcInfo (for npcs) or ApplyItemInfo (for
+// items) call, followed by an ApplyStatusUpdate that sets the current
+// HP/MP (the ApplyNpcInfo call only seeds the max from the template).
+// The dead flag drops the object to 0 HP; the attackable flag stays
+// on the hot record.
+func applyDumpObjects(bot *state.Bot, objects []state.ObjectSnapshot) {
+	for i := range objects {
+		o := &objects[i]
+		switch o.Kind {
+		case state.KindNPC:
+			applyDumpNpc(bot, o)
+		case state.KindItem:
+			applyDumpItem(bot, o)
+		default:
+			// Players and unknown kinds: the dump carries no
+			// Apply API path for them, skip.
+		}
+	}
+}
+
+// applyDumpNpc replays one npc object view into the bot.
+//
+//nolint:exhaustruct_v5 // the dump carries a subset of NpcInfo fields
+func applyDumpNpc(bot *state.Bot, o *state.ObjectSnapshot) {
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID:   o.ObjectID,
+		Name:       o.Name,
+		Title:      o.Title,
+		Attackable: o.Attackable,
+		X:          o.X,
+		Y:          o.Y,
+		Z:          o.Z,
+	})
+	bot.ApplyStatusUpdate(o.ObjectID, []state.Attribute{
+		{ID: state.AttrCurHP, Value: int32(o.CurHP)},
+		{ID: state.AttrMaxHP, Value: int32(o.MaxHP)},
+		{ID: state.AttrCurMP, Value: int32(o.CurMP)},
+		{ID: state.AttrMaxMP, Value: int32(o.MaxMP)},
+	})
+}
+
+// applyDumpItem replays one item object view into the bot.
+func applyDumpItem(bot *state.Bot, o *state.ObjectSnapshot) {
+	//nolint:exhaustruct_v5 // the dump carries a subset of ItemInfo
+	bot.ApplyItemInfo(state.ItemInfo{
+		ObjectID:   o.ObjectID,
+		TemplateID: o.TemplateID,
+		Count:      o.Count,
+		X:          o.X,
+		Y:          o.Y,
+		Z:          o.Z,
+	})
+}
+
 // dumpParser walks the dump line by line, tracking the current
 // section and dispatching the indented key:value lines to the
 // matching field reader. The section header switches the dispatch
