@@ -433,7 +433,18 @@ The short form:
   shortening first, then the hop back to the nearest swallowed plan
   bend - the escape out of the geodata trap cells - and finally the
   re-path). The walker re-paths around obstacles after
-  15 s of standing still (3 re-paths abort the trip); a trip timeout (20 min) and a trigger cooldown
+  15 s of standing still (the later stucks fire on the 4 s fast
+  window; 3 re-paths abort the trip): the stuck skip only jumps onto a
+  waypoint with a walkable line from the standing cell (the same gate
+  as the cursor advance - the 2026-09-11 06:19 trainer hall aisle
+  dump: the blind skip armed the east hall waypoint whose click the
+  server collapsed onto the first step, and the partial clicks crept
+  the character 16 units at a time into the dead-end pocket cell east
+  of the aisle whose closed east wall then refused the click
+  wholesale), and the re-planned leg advances its cursor past the
+  fresh plan's wp 0 (the standing cell itself) before the click fires
+  - a click at the character's own position is a guaranteed server
+  refusal that would burn the re-path budget on nothing. A trip timeout (20 min) and a trigger cooldown
   (5 min after every trip end) bound the whole feature, and a death -
   mid trip or not - clears the cooldown: the village restart lands next
   to the shops and a full inventory sells right after the revival

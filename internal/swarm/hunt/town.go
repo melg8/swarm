@@ -917,7 +917,7 @@ func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
 // followWaypoints is the shared waypoint follower core of the town
 // legs and the water escapes: the waypoint arrival (tight for the
 // intermediate turns, wide for the final goal), the passed waypoint
-// skipping, the stuck tracking and the click pacing. The waterGuard
+// skipping, the stuck tracking and the click pace. The waterGuard
 // switch tells whether the click lines must verify dry before they
 // are sent (the town legs: the character is ashore and must stay so)
 // or not (the water escape: its legs intentionally cross the water
@@ -931,6 +931,17 @@ func (l *Loop) followWaypoints(
 	}
 	if l.walkStuck(now, selfX, selfY) {
 		return false
+	}
+	// The stuck handling may have re-planned the leg: the fresh plan
+	// starts at the standing cell, so its wp 0 IS the character's own
+	// position and a click at it is the self-click the server always
+	// collapses (distance below the cancellation limit) - the round 56
+	// reproduction caught the recovery burning a second re-path on
+	// exactly that refusal. Re-run the cursor advance so the click
+	// below aims the fresh plan's first real waypoint instead.
+	l.advanceWaypoints(selfX, selfY, selfZ)
+	if l.wpIndex >= len(l.waypoints) {
+		return true
 	}
 	if !l.moveAt.IsZero() && now.Sub(l.moveAt) < walkRequestPeriod {
 		return false
@@ -1329,17 +1340,30 @@ func (l *Loop) stuckWaterEscape(_ time.Time, selfX int32, selfY int32) bool {
 }
 
 // stuckTownWalk drives the town leg stuck recovery: first try to SKIP
-// the current waypoint (the next one may be reachable through a cell
-// the server accepts), and when no more waypoints remain to skip,
-// re-plan the whole leg from the current position. The skip does NOT
-// consume the re-path budget - it advances the cursor without
-// re-planning, so the walker can skip several waypoints in a row while
-// looking for one the server accepts. The fast timeout flag arms
-// after the first skip so subsequent stuck detections fire on the
-// shorter window.
+// the current waypoint (a further one may be reachable through a cell
+// the server accepts), and when no waypoint ahead has a walkable line
+// from the standing cell, re-plan the whole leg from the current
+// position. The skip does NOT consume the re-path budget - it advances
+// the cursor without re-planning, so the walker can skip several
+// waypoints in a row while looking for one the server accepts. The
+// skip only jumps onto a waypoint whose straight line from the
+// standing cell is walkable (the same gate the cursor advance
+// applies): a blind skip arms the follower with a target whose click
+// the server collapses partway - the Bresenham line stops at the
+// first walled flank and the partial click creeps the character cell
+// by cell toward the nearest trap pocket instead of walking the
+// route (the 2026-09-11 06:19 aisle dump: the skip jumped from the
+// aisle entrance onto the east hall waypoint, every click crept the
+// character 16 units east into the dead-end pocket cell at 44776
+// 51992 and the pocket's closed east wall then refused the click
+// wholesale - "the server would refuse the walk click" - burning the
+// re-path budget on the recovery). The fast timeout flag arms after
+// the first skip so subsequent stuck detections fire on the shorter
+// window.
 func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
-	if l.wpIndex+1 < len(l.waypoints) {
-		l.wpIndex++
+	next := l.nextClearWaypoint(selfX, selfY, l.selfZForEscape())
+	if next > l.wpIndex {
+		l.wpIndex = next
 		l.moveAt = time.Time{}
 		l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
 		l.stuckFast = true
@@ -1363,6 +1387,22 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 	}
 
 	return false
+}
+
+// nextClearWaypoint scans the plan ahead for the first waypoint the
+// standing cell can click directly: the stuck skip must only arm
+// targets the server walks, never a line it would collapse partway
+// into a trap cell (the legAdvanceClear gate of the cursor advance).
+// It returns the index of the first clear successor, or the current
+// cursor when no successor ahead is reachable.
+func (l *Loop) nextClearWaypoint(selfX, selfY, selfZ int32) int {
+	for next := l.wpIndex + 1; next < len(l.waypoints); next++ {
+		if l.legAdvanceClear(selfX, selfY, selfZ, next) {
+			return next
+		}
+	}
+
+	return l.wpIndex
 }
 
 // selfZForEscape returns the current character z for the escape

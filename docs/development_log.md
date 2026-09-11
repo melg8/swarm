@@ -3751,3 +3751,102 @@ The freeze was in the RECOVERY BUDGET. Two compounding design flaws:
 - The exact round 53 dump walk replays with zero refused clicks and
   zero re-paths (TestReproRound53ZoneReturnWalksThePlan). The skip-no-
   budget and fast-timeout behavior pinned by the walk_stuck_skip tests.
+
+## Round 56: the building stuck - the skip gate and the re-planned self-click (2026-09-11)
+
+The user report (the 06:19 state dump, build 896865d, bot test2, phase
+townWalk): the bot froze trying to enter the elven village trainer
+hall on the teach walk to Ellenia - the plan aimed at wp 2 (44728
+52040 -2792), 48 units south of the character standing in the aisle
+entrance (44728 51992 -2792), and the events showed "town walk stuck,
+skipping waypoint (1 of 3)" -> "the server would refuse the walk click
+to 45160 52120, re-pathing (2 of 3)" - the trip burning its budget
+the way to an abort. The user asked how the building is represented,
+why an impassable path to the NPC gets planned (suspecting the roof
+and floor z coordinates), a fix, and a test-proven guarantee that the
+bot reaches this NPC from different positions in town.
+
+### The building in the geodata
+
+The trainer hall cells carry three layers: the sloped roof
+(-2600..-2448, NSWE mostly 0xB), the walkable floor (-2792..-2832,
+the walls encoded in the floor NSWE flags) and the water deck (-3928)
+under everything. The west aisle column (x 44712..44744) is fully
+open down to the south hall (rows y 52040+), the south hall row
+(y 52040..52055) has the north wall closed east of the aisle (the
+building's south wall), and the interior east of the aisle
+(x 44744..44792, y 52008..52039) has NO floor layer at all - only
+the roof and the water. The dump's route through the aisle is
+walkable (the 48 unit south leg validates in full against the
+ported server rules and the live server walks it - verified on the
+local stack), so the plan itself was never impassable.
+
+### Root cause
+
+Two follower defects composed:
+
+1. The blind stuck skip: `stuckTownWalk` advanced the cursor to the
+   next waypoint without checking the line from the standing cell.
+   From the aisle entrance the click to the east hall waypoint
+   (45160 52120) is a PARTIAL under the server rules - the Bresenham
+   line's SW diagonal flank (44760 51992) carries the building's
+   north wall (its south wall is closed), the anti corner cut stops
+   the line at the first step and the server walks the character 16
+   units east only. Every re-click crept the character one cell
+   further along the building's north wall row into the dead-end
+   pocket cell (44776 51992 -2808, its east and south walls closed),
+   and from the pocket the click to the hall waypoint collapses onto
+   the walker itself - the refused click the dump logged.
+
+2. The re-planned self-click: after a stuck re-path the follower
+   clicked the fresh plan's wp 0 - the standing cell itself - in the
+   same tick. The server always refuses a click whose destination is
+   the character's own position (the distance is below the
+   cancellation limit), so the recovery burned a second re-path on
+   the guaranteed refusal. The round 56 reproduction caught this
+   live: the first freeze tick fired the re-path, the same-tick
+   self-click was refused, and the budget sat at 2 of 3 before the
+   walk even restarted.
+
+### Fix
+
+1. `hunt/town.go`: `stuckTownWalk` skips only onto a waypoint with a
+   walkable line from the standing cell - the new `nextClearWaypoint`
+   scans the plan ahead through the same `legAdvanceClear` gate the
+   cursor advance uses. When no successor is reachable, the leg
+   re-plans at once (the fresh aisle route starts with the 48 unit
+   south click the server always accepts) instead of arming the
+   partial click that creeps into the pocket.
+2. `hunt/town.go`: `followWaypoints` re-runs the cursor advance after
+   the stuck handling, so a re-planned leg aims its first real
+   waypoint, never the standing-cell wp 0.
+
+### Verification
+
+- go build/vet, gofmt clean, golangci-lint --new zero findings, the
+  full go test suite green.
+- The exact dump walk replays against the real geodata pack with the
+  simulated server: the aisle entrance walk to Ellenia arrives with
+  zero refused clicks and zero re-paths
+  (TestReproRound56AisleWalksToEllenia), and the frozen-aisle
+  simulation (the clicks silenced, the stuck armed) recovers through
+  exactly one re-path with the character never creeping east of the
+  aisle entrance and no click ever refused
+  (TestReproRound56StuckSkipNeverCreepsIntoThePocket).
+- The Ellenia reach acceptance: the dry approach search from seven
+  village positions (the dump aisle entrance, the trap pocket, the
+  north terrace bend, the south approach, the east plaza, the shop
+  deck, the southwest shore path) all find routes whose every leg
+  validates in full against the ported server rules
+  (TestElleniaReachableFromEveryVillageApproach), the aisle route
+  pinned to the dump plan (TestElleniaAisleRouteMatchesTheDumpPlan)
+  and the pocket/aisle click geometry pinned to the refusal answers
+  (TestElleniaPocketLinesRefuseTheHallClick).
+- The live stack validation: the full dump scenario (the character
+  injected into the east hunting zone, level 11, 934 SP, Power Strike
+  wiped, the spellbook unbought) ran the whole town trip - the junk
+  sale, the book purchase at Creamees, the walk to Ellenia - and the
+  teacher was reached and all the lessons landed with no stuck and
+  no refused click; the raw surgical clicks of the aisle legs
+  (44728 51992 -> 44728 52200 -> 45160 52120 -> 45725 52105) all
+  walked on the live server.

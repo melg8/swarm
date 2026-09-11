@@ -11,6 +11,86 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the round 56 building stuck - the skip gate and the re-planned self-click (2026-09-11)
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (2026-09-11, Russian, the 06:19 state dump, build
+896865d, bot test2, phase townWalk): the bot gets stuck trying to
+enter the elven village trainer hall building on the teach walk to
+Ellenia - explain how the building is represented in the geodata
+(the user suspected the roof and floor z coordinates), find why an
+impassable path to the NPC gets planned, fix it and prove with tests
+that the bot now reliably reaches this NPC from different positions
+in the town.
+
+### Root cause (probed against the real geodata pack and the live stack)
+
+The trainer hall cells carry three layers (the sloped roof
+-2600..-2448, the walkable floor -2792 with the walls in the NSWE
+flags, the water deck -3928) and the interior east of the aisle has no
+floor layer at all. The dump's aisle route is walkable - the 48 unit
+south leg validates in full and the live server walks every leg of it
+(proven with raw clicks and a full live town trip). The failure was
+in the follower recovery, not the plan:
+
+1. The blind stuck skip armed the east hall waypoint whose click the
+   server collapses onto the first step (the diagonal flank carries
+   the building's north wall); the partial clicks crept the
+   character 16 units at a time into the dead-end pocket cell
+   (44776 51992) and from the pocket the click was refused wholesale
+   - the dump's "the server would refuse the walk click" line.
+2. After a stuck re-path the follower clicked the fresh plan's wp 0 -
+   the standing cell itself - in the same tick; the server always
+   refuses a self-click, so the recovery burned a second re-path on
+   the guaranteed refusal (caught by the round 56 reproduction).
+
+### Fix
+
+1. `hunt/town.go`: the stuck skip only jumps onto a waypoint with a
+   walkable line from the standing cell (`nextClearWaypoint` scans
+   the plan through the `legAdvanceClear` gate); with no reachable
+   successor the leg re-plans at once.
+2. `hunt/town.go`: `followWaypoints` re-runs the cursor advance after
+   the stuck handling, so a re-planned leg never clicks its own
+   standing-cell wp 0.
+
+### Acceptance criteria
+
+- The exact dump walk (the aisle entrance to Ellenia) arrives with
+  zero refused clicks and zero re-paths.
+- A frozen aisle (the clicks silenced) recovers through exactly one
+  re-path, the character never creeps east of the aisle entrance and
+  no click is ever refused.
+- The dry approach search from seven village positions (the aisle,
+  the pocket, the north terrace, the south approach, the east plaza,
+  the shop deck, the southwest shore path) all reach Ellenia with
+  every leg fully validated against the ported server rules.
+
+### Status: done (2026-09-11)
+
+- Commit "hunt: the round 56 building stuck - the skip gate and the
+  re-planned self-click": (1) the gated skip (`nextClearWaypoint`) and
+  the post-stuck cursor advance (town.go); (2) tests:
+  `hunt/round56_repro_test.go` (the aisle walk, the frozen-aisle
+  recovery), `hunt/walk_stuck_skip_test.go` (the clear-line gate, the
+  forward scan), `pathfind/teacher_aisle_test.go` (the seven-position
+  Ellenia reach, the dump plan pin, the pocket refusal geometry);
+  (3) docs: hunting.md (the follower paragraph), development_log.md
+  Round 56, agent_progress.md this entry.
+- Verify loop: go build, go vet, the full go test suite green,
+  gofmt clean, golangci-lint --new zero findings.
+- Live validation on the local stack: the full dump scenario (the
+  east hunting zone, level 11, 934 SP, Power Strike wiped, the book
+  unbought) ran the complete trip - the junk sale, the book purchase
+  at Creamees, the walk to Ellenia - and all the lessons landed; the
+  surgical raw clicks of the aisle legs all walked on the live
+  server (44728 51992 -> 44728 52200 -> 45160 52120 -> 45725 52105).
+
 ## Active task: the round 53 town walk stuck - the shared re-path budget and the slow skip recovery (2026-09-11)
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.

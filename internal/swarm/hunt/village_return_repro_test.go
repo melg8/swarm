@@ -53,6 +53,11 @@ type villageClickServer struct {
 	requests int
 	target   [3]int32
 	refused  int
+	// frozen suppresses the movement application: the clicks still
+	// validate against the ported server rules, but the character
+	// never moves - the simulation of a stuck the dump reported (the
+	// frozen aisle entry of the 2026-09-11 06:19 dump).
+	frozen bool
 }
 
 // consume takes the newest walk request of the fake game, validates
@@ -83,6 +88,9 @@ func (s *villageClickServer) consume(game *fakeGame, bot *state.Bot) {
 	if !ok {
 		s.refused++
 
+		return
+	}
+	if s.frozen {
 		return
 	}
 	bot.ApplyMovement(state.Movement{

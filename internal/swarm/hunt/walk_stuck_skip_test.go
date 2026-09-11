@@ -109,14 +109,17 @@ func TestWalkStuckRepathsAfterAllWaypointsSkipped(t *testing.T) {
 
 	// Second stuck: the last waypoint is the final one (no more to
 	// skip), so the leg re-plans from the current position. The re-plan
-	// consumes the re-path budget.
+	// consumes the re-path budget. The follower cursor resets and
+	// immediately advances past the fresh plan's wp 0 (the standing
+	// cell itself - a click at it is the self-click the server always
+	// refuses) onto the first real waypoint.
 	armStuck(loop, bot)
 	nav.calls = 0
 	loop.tick()
 	require.Equal(t, 1, loop.rePaths,
 		"the re-plan must consume the re-path budget")
-	require.Equal(t, 0, loop.wpIndex,
-		"the re-plan must reset the follower cursor")
+	require.Equal(t, 1, loop.wpIndex,
+		"the re-planned cursor must advance past the standing wp 0 onto the first real waypoint")
 	require.False(t, loop.stuckFast,
 		"the re-plan must clear the fast stuck flag")
 	require.Positive(t, nav.calls,
@@ -217,4 +220,76 @@ func TestWalkStuckDoesNotSkipWaterEscape(t *testing.T) {
 	require.True(t, loop.waterEscape,
 		"the water escape must stay active through the re-plan")
 	require.Equal(t, 1, loop.rePaths)
+}
+
+// TestWalkStuckSkipNeedsAClearLine pins the skip gate of the 06:19
+// aisle dump: a stuck may only skip onto a waypoint whose straight
+// line from the standing cell is walkable. When every successor line
+// is blocked, the skip must NOT advance the cursor (a blind skip arms
+// the follower with a click the server collapses partway - the
+// character creeps cell by cell into a trap pocket) and the leg
+// re-plans instead, consuming the re-path budget.
+func TestWalkStuckSkipNeedsAClearLine(t *testing.T) {
+	loop, _, bot, nav := newTripLoop()
+	nav.found = true
+	nav.route = []pathfind.Vec3{
+		{X: 45000, Y: 50000, Z: -3500},
+		{X: 44800, Y: 50200, Z: -3500},
+		{X: 44600, Y: 50400, Z: -3500},
+	}
+	nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
+		// The cursor advance onto wp1 stays clear, every successor
+		// line ahead of wp1 is blocked.
+		return int32(to.X) == 44800, nil
+	}
+	fillInventory(bot)
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+	require.Equal(t, 1, loop.wpIndex)
+
+	// The stuck fires with every successor line blocked: the skip must
+	// refuse to arm the blocked waypoint and re-plan the leg instead.
+	// The re-planned cursor advances past the standing wp 0 onto the
+	// first real waypoint in the same tick (no self-click).
+	armStuck(loop, bot)
+	loop.tick()
+	require.Equal(t, 1, loop.rePaths,
+		"the blocked successor lines must force the re-path")
+	require.Equal(t, 1, loop.wpIndex,
+		"the re-planned cursor must advance onto the first real waypoint")
+	require.False(t, loop.stuckFast,
+		"the re-plan must clear the fast stuck flag")
+}
+
+// TestWalkStuckSkipJumpsToTheFirstClearWaypoint pins the forward scan
+// of the skip gate: the skip jumps onto the FIRST successor with a
+// walkable line, not the immediate next one - the blocked successors
+// in between would arm collapsed clicks just the same.
+func TestWalkStuckSkipJumpsToTheFirstClearWaypoint(t *testing.T) {
+	loop, _, bot, nav := newTripLoop()
+	nav.found = true
+	nav.route = []pathfind.Vec3{
+		{X: 45000, Y: 50000, Z: -3500},
+		{X: 44800, Y: 50200, Z: -3500},
+		{X: 44600, Y: 50400, Z: -3500},
+		{X: 44400, Y: 50600, Z: -3500},
+	}
+	// The cursor line to wp1 is clear, the line to wp2 is blocked, the
+	// line to wp3 is clear again.
+	nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
+		return int32(to.X) != 44600, nil
+	}
+	fillInventory(bot)
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+	require.Equal(t, 1, loop.wpIndex)
+
+	armStuck(loop, bot)
+	loop.tick()
+	require.Zero(t, loop.rePaths,
+		"the skip onto the clear waypoint must not consume the budget")
+	require.Equal(t, 3, loop.wpIndex,
+		"the skip must jump over the blocked wp2 onto the clear wp3")
+	require.True(t, loop.stuckFast,
+		"the skip must arm the fast stuck timeout")
 }
