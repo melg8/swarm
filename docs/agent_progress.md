@@ -268,7 +268,7 @@ The follower gates every waypoint skip on the walkable line
 stays the target until walking onto it re-opens the line; the skip
 cursor moved into advanceWaypoints (the complexity limit).
 
-### Status: in progress (2026-09-11)
+### Status: done (2026-09-11)
 
 - Commit "hunt: the waypoint skip needs a walkable line ahead":
   the follower gate (legAdvanceClear), the skip cursor extraction
@@ -282,6 +282,26 @@ cursor moved into advanceWaypoints (the complexity limit).
   spot under the simulated server). The gate test fails on the
   pre-fix code (wpIndex jumps to 11 - the dump signature). Docs:
   hunting.md follower paragraph, development_log.md Round 49.
-- Next: the live validation on the local stack (a level 11 elven
-  fighter with 1951 SP injected near the shop walking the teacher
-  leg and learning), then the report to the user.
+- Rebase onto the concurrent rounds (74a38b9: the reverse wall
+  check of the pathfinder, the stuck waypoint skip and the weapon
+  run): the three fixes compose - the routes avoid reverse walled
+  cells (planning), the follower only skips along walkable lines
+  (prevention), a stuck walk skips its waypoint then re-plans
+  (recovery). The teacher_walk tests adapted to the stricter engine
+  rules (the plaza leg no longer collapses into one straight click,
+  the route inserts verified steps instead); the whole suite and
+  golangci-lint stay green (zero findings in the touched files).
+- Live validation on the local stack (the exact dump scenario
+  reproduced): test2 injected through the database as a level 11
+  elven fighter with 1951 SP standing at the reported stuck pocket
+  (46152 51656 -2808). The bot hunted, the learning trip planned
+  "6 lessons worth 1110 sp wait at the teacher", sold the junk at
+  Creamees, walked to the teacher Cobendell (no "town walk stuck"
+  line in the whole session), found and clicked it and learned all
+  six lessons - "learned Power Strike level 1..6 for 60/310 sp" -
+  the database holds skill 3 at level 6 with 856 SP left; then it
+  bought and equipped two armor pieces at Ariel and walked back to
+  the farm spot. The SIGTERM shutdown stayed graceful.
+- The user-side check stays the project workflow: watch a learning
+  bot reach its teacher and print the "learned <skill> level N"
+  lines instead of cycling "town walk stuck, re-pathing".
