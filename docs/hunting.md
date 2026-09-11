@@ -425,7 +425,14 @@ The short form:
   pass radius and clicked the plaza waypoint through the railing;
   every re-path reproduced the identical route, the budget burned
   and the trip aborted before the teacher - the lessons never
-  landed). The walker re-paths around obstacles after
+  landed). Every click is gated through the server click validation
+  port (`Navigator.ValidateClick`, see round 52): the server refuses
+  whole lines its Bresenham raster walks into walled corners - a
+  refused click collapses onto the walker and never moves the
+  character, so the follower reacts instead of sending it (the leg
+  shortening first, then the hop back to the nearest swallowed plan
+  bend - the escape out of the geodata trap cells - and finally the
+  re-path). The walker re-paths around obstacles after
   15 s of standing still (3 re-paths abort the trip); a trip timeout (20 min) and a trigger cooldown
   (5 min after every trip end) bound the whole feature, and a death -
   mid trip or not - clears the cooldown: the village restart lands next

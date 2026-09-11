@@ -3236,3 +3236,166 @@ the report: the Short Sword purchase now leads the town trips.
   into the stop phase within one recovery re-path). The fake
   navigator's LineOfSight default flipped to clear (the `blind`
   flag) because the follower gate now queries it on every walk.
+
+---
+
+## Round 52: the town walk click collapse - the server refuses what the plan crosses (2026-09-11)
+
+Composition with the concurrent rounds of the same report: round 49
+(the reverse wall check of the search) and round 51 (the walkable
+line gate of the waypoint skip) closed the loops their dumps showed;
+this round closes the mechanism underneath all of them - the click
+itself. The server click validation collapses a click whose
+Bresenham line cuts a walled corner (the anti corner cut) or lands
+on the wrong layer, and no planned route, skip gate or reverse wall
+check survives that: the plan itself must only contain legs the
+server accepts. The three fixes compose (the reverse walls, the
+gated skips and the validated clicks each answer a distinct refusal
+channel of the same server pipeline).
+
+Scope: the 2026-09-10 state dump report - the bot test1 (level 13,
+phase townReturn) stood frozen at 44440 51688 -2832 (the elven village
+terrace east of the plaza) with "Hunt: town walk stuck, re-pathing
+(1 of 3) .. (3 of 3)" grinding the whole budget while the character
+never moved a single unit.
+
+### Problem statement
+
+The zone return after a relogin planned an 11 waypoint route over the
+village plaza (wp1 z -2792, wp2 z -2832, 58 units away), the follower
+clicked wp2 every 2 seconds and the server never executed any of the
+clicks: no movement broadcast, no position change, three re-paths
+reproducing the same plan and the trip aborting into the same frozen
+state again (the returnToZone re-trigger loop visible in the dump).
+
+### Root cause analysis
+
+The live server log (the MOVEDBG diagnostics patch of the local
+Mobius checkout, MoveToLocation.runImpl + Creature.moveToLocation)
+names the mechanism exactly:
+
+```
+MOVEDBG: test1 click 44408 51736 -2832 from 44440 51688 -2832 mode 1
+MOVEDBG: test1 move CANCELED, distance=0.0 (geodata collapsed the
+target onto the walker), cur 44440 51688 -2832 -> 44440 51688 -2832
+```
+
+The Mobius C1 click pipeline (all references in
+`L2J_Mobius_C1_HarbingersOfWar/java`):
+
+1. `MoveToLocation.runImpl` hands the click to the AI, which calls
+   `Creature.moveToLocation(x, y, z, 0)`.
+2. With `PathFinding > 0` (the reference deployment runs 2) the
+   destination is corrected by `GeoEngine.getValidLocation(cur, target)`:
+   it walks the Bresenham cell line of `GridLineIterator2D` with the
+   running height of `getNearestZ`, refuses a step that climbs more
+   than `HEIGHT_INCREASE_LIMIT` (40) without a near neighbour layer,
+   refuses a blocked cell and applies `checkNearestNsweAntiCornerCut`
+   to every step - a DIAGONAL step needs both flanking cells to allow
+   the crossing (the SW step wants (x, y+1) open west and (x-1, y)
+   open south). The line of the stuck click cuts the plaza corner:
+   its first diagonal step (43737,40094)->(43736,40095) needs cell
+   (43737,40095)@-2832 open west, and that cell carries nswe 0x0d -
+   the terrace wall. The validation stops BEFORE the first step and
+   collapses the destination onto the walker cell center - which for
+   the relogin position (44440 51688, the exact cell center) IS the
+   character position: distance 0, the move is canceled, ActionFailed
+   is sent, the character never moves.
+3. The click distance of 58 units is NOT the trigger - any click whose
+   straight line crosses the walled corner collapses the same way
+   (longer lines to the same heading refused identically in the
+   traces). The user hypothesis ("too close to walk") was close in
+   effect (the collapsed target equals the walker only for short
+   in-cell clicks) but the mechanism is the line validation, not the
+   distance.
+
+Why the bot planned a route the server refuses: two raster
+mismatches between the pathfind engine and the server.
+
+- The A* expands 8 neighbors but `wallsOpen` checked only the SOURCE
+  cell walls of the diagonal - the server (both the click validation
+  and its own `NodeBuffer.expandNeighbors` diagonal gating) requires
+  the flanking cells too. The planned route climbed the plaza wall
+  through the corner the terrace had walled off.
+- The smoothing verified its collapsed legs with the t/k supercover
+  raster, which decomposes a diagonal line into cardinal steps -
+  the server Bresenham steps diagonally and applies the anti corner
+  cut. A leg can be supercover-legal and Bresenham-refused at once
+  (the second boxed spot of the offline replay: a 700 unit leg over
+  the field terraces).
+
+### Reproduction
+
+- Live: place test1 at 44440 51688 -2832 with level 13 (the dump
+  state), run the bot with -hunt against a stack with `PathFinding = 2`
+  and the 21_19 geodata region loaded (the reference deployment
+  layout; the sandbox fast deploy defaults to `PathFinding = 0`, which
+  skips the whole validation - the bug cannot reproduce there). The
+  old build: "town walk stuck" three times, "town trip ended: aborted,
+  walk stuck", the character frozen. The MOVEDBG patch (diagnostics
+  only, the server integrity rules allow logging) prints the
+  CANCELED line above for every refused click.
+- Offline: `TestReproVillageZoneReturnWalksThePlan`
+  (hunt/village_return_repro_test.go) replays the exact dump position
+  against the real geodata pack with the server click semantics
+  ported into the test sim.
+
+### Fix
+
+The bot adapts to the server (no server behavior changes - the
+MOVEDBG patch is logging only):
+
+1. `pathfind/search.go`: the diagonal step rule of the search mirrors
+   the server anti corner cut (`wallsOpen` -> `diagonalFlanksOpen`):
+   the A*, the line of sight raster, the direct line answers and the
+   step costs all refuse a corner cut the server would refuse. The
+   planned routes stop relying on walled diagonals.
+2. `pathfind/click_validate.go` (new): `Engine.ValidateClick` - a
+   faithful port of the server click pipeline (the Bresenham
+   `GridLineIterator2D` raster, the running `getNearestZ` height
+   resolution, the 40 unit climb limit with the neighbour layer
+   step-over, the blocked cell check, the anti corner cut, the final
+   layer match rule that collapses a line arriving on the wrong deck,
+   and the far click rule beyond 3000 units). The smoothing now
+   verifies every collapsed leg with it (`serverLegVerified`) - a
+   planned leg is a click the server accepts, by construction.
+3. `hunt/town.go`: the follower gates every click through the port
+   (`Navigator.ValidateClick`): a refused click is never sent. The
+   reaction chain: shorten the leg (the Bresenham prefix of a split
+   leg is not a prefix of the full raster, a shorter line often
+   validates), hop back to the nearest plan bend the arrival slack
+   swallowed (the escape step out of the geodata trap cells - cells
+   entered legally whose own walls box the walker in), and finally
+   the re-path of the stuck path, bounded by the same budget.
+
+### Verification
+
+- go build/vet, gofmt clean, go test ./... (19 packages green);
+  golangci-lint: zero new findings in the touched files.
+- Offline regression: the full village walk replays against the
+  ported server rules in 13 clicks with zero refused clicks and zero
+  re-paths (`TestReproVillageZoneReturnWalksThePlan`), the synthetic
+  wall corner and layer collapse cases pin the port itself
+  (`click_validate_test.go`), the follower reactions pin the
+  shorten/hop/re-path chain (`click_guard_test.go`).
+- Live: the same dump scenario on the fixed build walks 44440 51688
+  -> the Kaboo Orc Grunt S zone in 54 seconds (16 clicks, all
+  ACCEPTED on the server MOVEDBG log, zero CANCELED, zero stuck
+  re-paths), engages and kills on the zone entry, E2E_OK on the
+  graceful shutdown. The mobius_e2e.sh 45 run stays E2E_OK.
+- Note: tools/repro_stuck_trip.sh (the round 35 harness) fails on
+  BOTH the baseline and the fixed build with the current test1 state
+  (a level 13 character with equipped gear - the auto equipment
+  destroys the injected junk daggers one per 2 s before the trip
+  sells them); the failure predates this round and reproduces on the
+  unmodified commit 36bfe99 build.
+
+### Follow ups
+
+- The manual long walk follower (hunt/user.go) and the blind engage
+  recovery walker (hunt/loop_los.go) still send unvalidated clicks;
+  the same gate would harden them (they have the same freeze risk on
+  walled corners).
+- The server MOVEDBG logging patch stays in the local Mobius checkout
+  only (never committed to the swarm repository - the server
+  integrity rules).

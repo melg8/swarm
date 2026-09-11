@@ -92,6 +92,21 @@ start already on dry ground answers Found=false.
 - The open set is a binary heap instead of the linear scan, ties
   broken by remaining distance and insertion order for deterministic
   paths.
+- A diagonal step needs BOTH flanking cells to allow the crossing -
+  the anti corner cut rule every server movement channel applies
+  (`GeoEngine.checkNearestNsweAntiCornerCut` of the click validation
+  and the `NodeBuffer` diagonal expansion of the server pathfinder
+  agree on it). A route that cuts a walled corner plans a walk the
+  server refuses wholesale (round 52: the town walk click collapse
+  onto the walker).
+- The smoothing verifies every collapsed leg against the server click
+  validation port (`Engine.ValidateClick`, the faithful port of the
+  MoveToLocation geodata correction): the server rasterizes a click
+  with its Bresenham iterator whose diagonal double steps carry the
+  anti corner cut, while the t/k supercover raster of the line of
+  sight splits the same line into cardinal steps and never cuts the
+  diagonals - a supercover-legal leg can still be refused by the
+  server, so a planned leg must survive the server rules themselves.
 
 ## Pathfind test UI
 

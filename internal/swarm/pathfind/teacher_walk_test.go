@@ -63,9 +63,17 @@ func TestTeacherRouteMatchesTheDumpPlan(t *testing.T) {
 	last := result.Waypoints[len(result.Waypoints)-1]
 	require.LessOrEqual(t, dist3D(last, teacherSpawn), 200.0,
 		"the route ends inside the teacher approach ring")
+	// The dump route crossed the trainer ramp (wp 9..10, the tight 16
+	// unit steps at 46152 51640 and 46136 51656); the Round 52 server
+	// click validation found the ramp diagonal flank walled (the
+	// vertical flank cell of the SW step carries nswe 0x9) and the
+	// server PathFinding = 2 deployment refuses that click - the
+	// route now climbs the east approach instead and crosses the
+	// plaza level further west. The pinned points move with it: the
+	// east ascent bend and the plaza corner before the approach ring.
 	for _, want := range []Vec3{
-		{X: 46152, Y: 51640, Z: -2808},
-		teacherRampTop,
+		{X: 46184, Y: 51528, Z: -2824},
+		{X: 46104, Y: 51528, Z: -2808},
 		teacherPlaza,
 	} {
 		found := false
@@ -118,8 +126,13 @@ func TestTeacherCornerWallBlocksTheStraightClick(t *testing.T) {
 	climb, err := engine.LineOfSight(
 		teacherRampFoot, teacherRampTop, DefaultMaxPassableHeight)
 	require.NoError(t, err)
-	require.True(t, climb,
-		"the ramp climb from the foot must be walkable")
+	require.False(t, climb,
+		"the ramp climb diagonal is flank walled: the Round 52 anti "+
+			"corner cut mirrors the server click validation, which "+
+			"refuses the foot->top click on the PathFinding = 2 "+
+			"deployment (the vertical flank cell carries nswe 0x9, its "+
+			"west wall closed) - the planned routes climb the east "+
+			"approach instead")
 
 	planned, err := engine.LineOfSight(
 		teacherRampTop, teacherPlaza, DefaultMaxPassableHeight)

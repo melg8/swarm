@@ -305,3 +305,91 @@ cursor moved into advanceWaypoints (the complexity limit).
 - The user-side check stays the project workflow: watch a learning
   bot reach its teacher and print the "learned <skill> level N"
   lines instead of cycling "town walk stuck, re-pathing".
+
+---
+
+- All four fixes committed and pushed (six commits + the test follow
+  up): the npc talk selection clear (983437c), the spellbook keep of
+  the sell and destroy junk flows (ffd767d), the aggro answer of the
+  engage and the town trips (6c6463a), the teacher legs (407c8f2 then
+  d5428e3 - the water guard reads the pure water raster, the skill
+  list gate re-arms per session, the trust gamble reverted), the docs
+  (in d5428e3) and the rebase follow up for the concurrent water loop
+  round (64153f9).
+- The live stack validates the full learning cycle end to end (twice,
+  including on the merged tree with the concurrent dry search round):
+  the trip plans the learning stops, the spellbooks are bought at
+  Creamees, the teacher (Ellenia/Cobendell) is reached, clicked and
+  the lessons land - "learned Attack Aura level 1 for 920 sp",
+  "learned Defense Aura level 1 for 160 sp", the database holds skills
+  77 and 91 at level 1, the SP is charged, the books are consumed.
+  The E2E run prints E2E_OK with the graceful SIGINT shutdown.
+- Verify loop per commit: go build, go vet, the full go test suite,
+  gofmt clean, golangci-lint with no new findings in the touched
+  files (the pre-existing baseline of the newer local linter version
+  in untouched files stays).
+- The user-side check stays the project workflow: watch a bot talk to
+  its teacher (the "learn:" log lines, the SkillList bumps), watch
+  the emergency logout cycles of a piled up bot turn into fights (the
+  "is on us, fighting it" line), watch a bought spellbook survive a
+  sell trip (the junk batch without the book), and watch the hunt
+  after a town trip start cleanly (no 12 s stall on the talked npc).
+
+---
+
+## Task: the town walk click collapse (round 52) - 2026-09-11
+
+Goal: fix the 2026-09-10 state dump report - the bot test1 froze at
+44440 51688 -2832 (the elven village terrace) in the townReturn phase
+with "Hunt: town walk stuck, re-pathing" burning the whole budget
+while the character never moved; the user hypothesis blamed the short
+click distance to the next waypoint.
+
+Constraints: the server is the spec (no server behavior patches, the
+MOVEDBG diagnostics logging only); all changes on feature/proxy-server,
+atomic commits pushed as melg8; the full verify loop per commit.
+
+Acceptance criteria: the exact dump scenario walks to the hunting zone
+on the live stack without a single stuck re-path; the offline
+regression tests pin the mechanism; the full go test suite, gofmt,
+vet and golangci-lint stay green with no new findings in the touched
+files.
+
+### Status: done (2026-09-11)
+
+- Root cause (live confirmed with the MOVEDBG patch on the local
+  Mobius checkout): the server click validation collapses the click
+  destination onto the walker whenever the Bresenham line of the
+  click cuts a walled corner (the anti corner cut of
+  GeoEngine.checkNearestNsweAntiCornerCut) - "move CANCELED,
+  distance=0.0 (geodata collapsed the target onto the walker)". The
+  bot planned routes through exactly such corners: the A* diagonal
+  rule checked only the source walls (not the flanks), and the
+  smoothing verified legs with the supercover raster (cardinal steps)
+  while the server validates with its Bresenham raster (diagonal
+  double steps + the anti corner cut). The 58 unit click distance was
+  not the trigger - any click over the same corner refuses; the
+  collapse only equals the walker exactly for short in-cell clicks.
+- Three fixes: (1) the search diagonal rule mirrors the server flank
+  check (pathfind/search.go, wallsOpen/diagonalFlanksOpen); (2) the
+  server click validation port Engine.ValidateClick (new
+  pathfind/click_validate.go) with the smoothing verifying every leg
+  against it; (3) the follower gates every click through the port and
+  reacts to refusals with the leg shortening, the swallowed-bend hop
+  and the re-path (hunt/town.go).
+- Verification: go test ./... green (19 packages), gofmt/vet clean,
+  golangci-lint zero new findings in the touched files; the offline
+  regression TestReproVillageZoneReturnWalksThePlan walks the exact
+  dump position to the zone in 13 validated clicks with zero
+  re-paths; the live rerun of the dump scenario (PathFinding=2, the
+  21_19 geodata region, level 13) reaches the Kaboo Orc Grunt S zone
+  in 54 s with all clicks ACCEPTED and zero CANCELED on the server
+  log, engages and kills on the zone entry; mobius_e2e.sh 45 stays
+  E2E_OK.
+- Known unrelated: tools/repro_stuck_trip.sh (round 35) fails on both
+  the baseline and the fixed build with the current level 13 test1
+  state (the auto equipment grinds the injected junk daggers); the
+  failure reproduces on the unmodified 36bfe99 build.
+- Follow ups (not blocking): the manual walk follower (hunt/user.go)
+  and the blind engage walker (loop_los.go) still send unvalidated
+  clicks and could adopt the same gate.
