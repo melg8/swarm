@@ -164,10 +164,11 @@ const MapView = {
       combat: "#d93025",
       dead: "#80868b",
       // The manual command feedback of the user: the walk plan line and
-      // the destination marker share the light blue so a click answer
-      // reads over both the light imagery and the dark fill.
-      userPath: "#4da3ff",
-      userMark: "#4da3ff",
+      // the destination marker use a bright magenta so they read on
+      // both the light map imagery and the dark fill, and stay
+      // distinct from the blue self marker and the red combat path.
+      userPath: "#ff44cc",
+      userMark: "#ff44cc",
       // The outline and the direction tick of the markers: a middle
       // slate that reads over the light map imagery and over both
       // theme fills alike.
@@ -1935,12 +1936,14 @@ const MapView = {
   },
 
   // drawWalkPlan renders the walk plan of a running leg: while the
-  // paths toggle is on, the full planned line draws as a blue dashed
-  // polyline from the planning origin through every waypoint (the
-  // passed ones included - the drift of the character against its
-  // plan is the debugging signal), the waypoint the follower aims at
-  // carries a small ring and the destination itself carries the
-  // pulsing blue marker.
+  // paths toggle is on (always on by default now), the full planned
+  // line draws as a bright magenta dashed polyline from the planning
+  // origin through every waypoint (the passed ones included - the
+  // drift of the character against its plan is the debugging signal),
+  // each waypoint carries a filled dot with a white outline and a
+  // text label of its (x, y) coordinates, the waypoint the follower
+  // aims at carries a larger ring and the destination itself carries
+  // the pulsing marker.
   drawWalkPlan(ctx) {
     const plan = this.lastSnap.walkPath;
     if (!plan || plan.length === 0) { return; }
@@ -1953,9 +1956,9 @@ const MapView = {
     if (document.getElementById("show-dest").checked) {
       ctx.save();
       ctx.strokeStyle = this.mapColors.userPath;
-      ctx.globalAlpha = 0.8;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([6, 4]);
+      ctx.globalAlpha = 0.95;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([7, 4]);
       ctx.beginPath();
       let head;
       if (origin) {
@@ -1972,9 +1975,38 @@ const MapView = {
         ctx.lineTo(q.x, q.y);
       }
       ctx.stroke();
+      // The waypoint dots and the coordinate labels: a filled magenta
+      // disc with a white outline at every waypoint, plus a small
+      // text label "(x, y)" offset above and right of the disc. The
+      // label has a dark stroke and a bright fill so it reads over
+      // any map background.
+      ctx.setLineDash([]);
+      ctx.lineWidth = 2;
+      ctx.font = "10px Consolas, \"Liberation Mono\", monospace";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "left";
+      for (const wp of plan) {
+        const q = this.worldToScreen(wp.x, wp.y);
+        ctx.beginPath();
+        ctx.fillStyle = this.mapColors.userPath;
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+        ctx.arc(q.x, q.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        const label = "(" + Math.round(wp.x) + ", " + Math.round(wp.y) + ")";
+        const tx = q.x + 7;
+        const ty = q.y - 9;
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+        ctx.strokeText(label, tx, ty);
+        ctx.fillStyle = this.mapColors.userPath;
+        ctx.fillText(label, tx, ty);
+        ctx.restore();
+      }
       if (target && plan.length > 1) {
         const t = this.worldToScreen(target.x, target.y);
-        ctx.setLineDash([]);
         ctx.beginPath();
         ctx.arc(t.x, t.y, 6, 0, Math.PI * 2);
         ctx.stroke();

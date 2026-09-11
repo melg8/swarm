@@ -175,7 +175,11 @@ function renderBotList() {
   list.innerHTML = "";
   for (const bot of App.bots) {
     const item = document.createElement("li");
-    item.className = "bot-item" + (bot.id === App.activeBotId ? " active" : "");
+    const isProxy = App.proxy && App.proxy.enabled &&
+      bot.id === proxyTargetId();
+    item.className = "bot-item" +
+      (bot.id === App.activeBotId ? " active" : "") +
+      (isProxy ? " is-proxy" : "");
     item.dataset.id = bot.id;
 
     const row = document.createElement("div");
@@ -192,12 +196,10 @@ function renderBotList() {
     if (bot.sitting) {
       row.append(makeChip("bot-chip chip-rest", "rest"));
     }
-    // The proxy chip marks the bot a connecting C1 game client attaches
-    // to (the proxy falls back to the first bot when nothing is
-    // selected - the first row carries the chip implicitly then).
-    if (App.proxy && App.proxy.enabled && bot.id === proxyTargetId()) {
-      row.append(makeChip("bot-chip chip-proxy", "proxy"));
-    }
+    // The proxy target bot now carries the `is-proxy` class on the
+    // bot-item instead of a "proxy" text chip: the four corner accents
+    // (drawn with CSS pseudo-elements) frame the whole plaque, so the
+    // proxy bot reads at a glance without taking space on the row.
     const level = document.createElement("span");
     level.className = "bot-level";
     level.textContent = bot.level > 0 ? "lv " + bot.level : bot.status;
@@ -2111,6 +2113,10 @@ function setGearMode(mode) {
     window.localStorage.setItem("swarm.gearMode", mode);
   } catch (err) { /* storage unavailable - skip */ }
   applyGearMode();
+  // The grid rebuild must not wait for the next snapshot tick: the
+  // tab switch feels instant only when the visibility swap and the
+  // cell reorder land on the same frame as the tab highlight.
+  renderSkillsNow();
 }
 
 // setSkillFilter switches the ACTIVE / PASSIVE tab of the learned
@@ -2122,6 +2128,27 @@ function setSkillFilter(filter) {
     window.localStorage.setItem("swarm.skillFilter", filter);
   } catch (err) { /* storage unavailable - skip */ }
   applyGearMode();
+  // Same instant-rebuild rationale as setGearMode: the new filter's
+  // cells (or the previously cached ones) must show up on the same
+  // frame as the tab highlight, otherwise the tab feels sluggish.
+  renderSkillsNow();
+}
+
+// renderSkillsNow is the synchronous entry point of the skills grid
+// for tab-switch events: it invalidates the grid signature cache (so
+// the filter change is picked up even when the snapshot data did not
+// change) and calls renderSkills with the last snapshot. The cells
+// already cached in SkillCells.cells keep their loaded icons, so a
+// filter swap that returns to a previously visited filter is fully
+// instant. The snapshot guard avoids clearing the grid when the
+// snapshot has no skills payload (a harness setup, or the very first
+// load before the first snapshot arrives): nothing to render, leave
+// the grid alone.
+function renderSkillsNow() {
+  GearMode.gridSignature = "";
+  if (App.snapshot && Array.isArray(App.snapshot.skills)) {
+    renderSkills(App.snapshot);
+  }
 }
 
 // applyGearMode syncs the tab buttons, the view visibility and the
@@ -2182,7 +2209,13 @@ function skillGridSignature(skills, filter) {
 // renders the filter tab (six per row with icons and the level
 // badge, padded to complete rows with the future-slot cells), the
 // pinned foot shows the SP wallet and the next planned lesson of the
-// queue.
+// queue. The keyed cell cache (SkillCells.cells) keeps cells for
+// both the active and the passive skills: the snapshot carries both
+// lists, the cells are created once, and the filter switch only
+// toggles which subset is attached to the grid DOM. This is what
+// makes the ACTIVE/PASSIVE tab switch feel instant - the icon
+// fetches happen once on the first snapshot, never on a filter
+// swap.
 function renderSkills(snap) {
   const grid = document.getElementById("skill-grid");
   const skills = snap.skills || [];
@@ -2203,22 +2236,29 @@ function renderSkills(snap) {
   }
   GearMode.gridSignature = signature;
 
+  // The wanted cells: the skills that match the current filter. The
+  // seen set still covers every skill in the snapshot (both filters)
+  // so the cells of the opposite filter stay cached in the Map with
+  // their loaded icons - the next filter switch does not refetch
+  // them.
   const wanted = skills.filter((skill) =>
     GearMode.filter === "active" ? !skill.passive : skill.passive);
-
-  const order = [];
   const seen = new Set();
+  for (const skill of skills) { seen.add(skill.skillId); }
+
+  // The order of the visible (wanted) cells in the grid.
+  const order = [];
   for (const skill of wanted) {
-    seen.add(skill.skillId);
     order.push(skill.skillId);
     let record = SkillCells.cells.get(skill.skillId);
     if (!record) {
       record = makeSkillCell(skill);
       SkillCells.cells.set(skill.skillId, record);
-      grid.append(record.cell);
     }
     applySkillCell(record, skill);
   }
+  // Drop cells whose skill left the snapshot entirely (the learned
+  // skill list changed). Cells of the opposite filter stay cached.
   for (const [id, record] of Array.from(SkillCells.cells)) {
     if (!seen.has(id)) {
       if (TooltipState.cell === record.cell) { hideItemTooltip(); }
@@ -2226,12 +2266,32 @@ function renderSkills(snap) {
       SkillCells.cells.delete(id);
     }
   }
+  // Re-attach the wanted cells in order. Cells of the opposite
+  // filter stay in the Map but detached from the grid DOM, so they
+  // never appear visually but their icons stay loaded.
   const orderSig = order.join(",");
   if (SkillCells.order !== orderSig) {
     SkillCells.order = orderSig;
     for (const id of order) {
       const record = SkillCells.cells.get(id);
       if (record) { grid.append(record.cell); }
+    }
+  } else {
+    // Even when the order did not change, ensure every wanted cell
+    // is attached (a filter swap back to this filter re-attaches
+    // the previously detached cells).
+    for (const id of order) {
+      const record = SkillCells.cells.get(id);
+      if (record) { grid.append(record.cell); }
+    }
+  }
+  // Detach the cells of the opposite filter from the grid DOM (but
+  // keep them in the Map with their icons loaded). The remove()
+  // method is a no-op when the element has no parent (a fresh cell
+  // that was never attached, or one already detached).
+  for (const [id, record] of Array.from(SkillCells.cells)) {
+    if (!order.includes(id)) {
+      record.cell.remove();
     }
   }
 

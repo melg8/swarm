@@ -252,8 +252,13 @@ body.mode-pathfind .zone-panel { display: none; }
    gear mode. The panel hides entirely while no effect runs. */
 .buffs-panel {
   position: absolute;
+  /* The effects panel sits to the right of the character HUD (top
+     left of the map): the HUD is at left:12 width:252, so its right
+     edge sits at 264. The effects panel docks at left:272 (an 8px
+     gap), decoupled from the equipment widget on the top right.
+     The gear-panel collapse no longer moves it. */
   top: 10px;
-  right: 278px;
+  left: 272px;
   width: 196px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
@@ -462,9 +467,14 @@ body.mode-pathfind .buffs-panel { display: none; }
 .bot-item .bot-name {
   flex: 1;
   color: var(--text-bright);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* The full character nickname must always be visible: wrap the
+     name onto two lines instead of clipping it with ellipsis. The
+     bot-row aligns the dot, the name, the chips and the level on
+     the first line; a long second name line drops under the row. */
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 .bot-item .bot-level { color: var(--text-dim); font-size: 11px; }
@@ -517,10 +527,68 @@ body.mode-pathfind .buffs-panel { display: none; }
 
 .bot-chip.chip-combat { color: var(--red); border: 1px solid var(--red); }
 .bot-chip.chip-rest { color: var(--green); border: 1px solid var(--green); }
-/* The proxy chip marks the bot a connecting C1 game client attaches
-   to: the link color of the classic tool look, distinct from the
-   combat and rest states. */
-.bot-chip.chip-proxy { color: var(--accent); border: 1px solid var(--accent); }
+/* The proxy target bot now carries the `is-proxy` class on the
+   bot-item itself: four bright corner accents frame the whole
+   plaque (top-left, top-right, bottom-left, bottom-right) so the
+   proxy bot reads at a glance from anywhere in the list, without
+   taking space on the row. The active row keeps its own accent
+   border, the proxy corners layer on top. */
+.bot-item.is-proxy {
+  position: relative;
+}
+.bot-item.is-proxy::before,
+.bot-item.is-proxy::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  width: 10px;
+  height: 10px;
+  border-color: var(--accent);
+  border-style: solid;
+  border-width: 0;
+}
+.bot-item.is-proxy::before {
+  top: 3px;
+  left: 3px;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+.bot-item.is-proxy::after {
+  bottom: 3px;
+  right: 3px;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}
+/* The other two corners: a second pseudo-element pair would be ideal,
+   but a bot-item is one element. Use the bot-row's ::before/::after
+   for the top-right and bottom-left corners, scoped to the proxy
+   item only. */
+.bot-item.is-proxy .bot-row {
+  position: relative;
+}
+.bot-item.is-proxy .bot-row::before,
+.bot-item.is-proxy .bot-row::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  width: 10px;
+  height: 10px;
+  border-color: var(--accent);
+  border-style: solid;
+  border-width: 0;
+}
+.bot-item.is-proxy .bot-row::before {
+  top: -1px;
+  right: -1px;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+.bot-item.is-proxy .bot-row::after {
+  bottom: -1px;
+  left: -1px;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
 
 /* Activity banner of the sidebar bot row: a compact one line summary
    of the bot phase so the overview shows at a glance what every
@@ -542,7 +610,7 @@ body.mode-pathfind .buffs-panel { display: none; }
   white-space: nowrap;
 }
 
-.bot-activity.kind-hunt { color: var(--green); border-left-color: var(--green); }
+.bot-activity.kind-hunt { color: var(--green); border-left-color: transparent; }
 .bot-activity.kind-combat { color: var(--red); border-left-color: var(--red); }
 .bot-activity.kind-loot { color: var(--accent); border-left-color: var(--accent); }
 .bot-activity.kind-town { color: var(--gold); border-left-color: var(--gold); }
@@ -824,20 +892,21 @@ body.mode-pathfind .bot-status { display: none; }
 }
 
 /* The dump state button: copies the full debug report of the selected
-   bot to the clipboard. Sits quietly at the right of the name, turns
-   into a confirmation flash while the copy lands. */
+   bot to the clipboard. Lives in the map toolbar next to the follow /
+   view controls (moved out of the HUD name row); the confirmation
+   flash still marks a successful copy. */
 .hud-dump-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-left: auto;
   padding: 3px 9px;
-  font: 600 11px/1.4 inherit;
+  height: 24px;
+  font: 600 11px/1 inherit;
   font-family: inherit;
   color: var(--text-muted);
-  background: transparent;
+  background: var(--bg-panel-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   flex-shrink: 0;
   transition: color 0.15s, border-color 0.15s, background 0.15s;

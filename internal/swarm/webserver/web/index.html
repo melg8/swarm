@@ -146,6 +146,13 @@ SPDX-License-Identifier: MIT
               <option value="layers">layers</option>
             </select>
           </span>
+          <button id="hud-dump" class="hud-dump-btn" type="button"
+            title="copy the full state dump (character, inventory, objects, walk plan, event log) to the clipboard for bug reports">
+            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+              <path fill="currentColor" d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/>
+            </svg>
+            dump state
+          </button>
           <div id="view-menu" class="view-menu"
             title="map view layers: labels, paths, zones, targets, aggro, background">
             <button id="view-menu-btn" class="view-menu-btn" type="button"
@@ -157,7 +164,7 @@ SPDX-License-Identifier: MIT
             <div id="view-menu-pop" class="view-menu-pop hidden" role="menu"
               title="toggle what the map draws">
               <label class="check view-row bot-layer"><input type="checkbox" id="show-labels" checked> labels</label>
-              <label class="check view-row bot-layer"><input type="checkbox" id="show-dest"> paths</label>
+              <label class="check view-row bot-layer"><input type="checkbox" id="show-dest" checked> paths</label>
               <label class="check view-row bot-layer"><input type="checkbox" id="show-zone" checked> zone</label>
               <label class="check view-row bot-layer"><input type="checkbox" id="show-targets" checked> targets</label>
               <label class="check view-row bot-layer"><input type="checkbox" id="show-hunt-zones" checked> hunt zones</label>
@@ -187,13 +194,6 @@ SPDX-License-Identifier: MIT
               <div class="hud-head">
                 <div class="hud-name-row">
                   <span id="hud-name" class="hud-name">—</span>
-                  <button id="hud-dump" class="hud-dump-btn" type="button"
-                    title="copy the full state dump (character, inventory, objects, walk plan, event log) to the clipboard for bug reports">
-                    <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-                      <path fill="currentColor" d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z"/>
-                    </svg>
-                    dump state
-                  </button>
                 </div>
                 <div class="hud-class-line">
                   <span id="hud-class" class="hud-class">—</span>

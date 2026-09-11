@@ -11,6 +11,85 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the webui polish pass - proxy accent, full bot name, instant skills, bright path
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (2026-09-11, Russian) asked for a batch of small
+webui adjustments:
+
+- Remove the "proxy" word from the left panel bot row; mark the
+  proxy target bot with brighter accents (corner brackets around the
+  whole bot plaque).
+- Always show the full bot character nickname in the left panel (no
+  truncation).
+- Remove the green vertical stripe left of the "hunting" activity
+  banner.
+- Move the "dump state" button from the bot HUD (left of the map) up
+  to the map toolbar next to follow / view.
+- In the view menu, make the paths layer always active by default.
+- Brighten the path color (the walk plan line and the destination
+  marker) - the previous light blue blended with the self marker;
+  use a bright non-blue color and label every waypoint with its
+  coordinates.
+- Move the effects (buffs) panel to the right of the character HUD
+  (top left of the map), decoupled from the equipment widget.
+- Make the ACTIVE / PASSIVE skills tab switch instant: previously the
+  grid rebuild waited for the next snapshot, so the tab highlight
+  landed a tick before the cell list.
+
+### Status: in progress (2026-09-11)
+
+- Edit 1: dropped the `chip-proxy` text chip from `renderBotList`,
+  added the `is-proxy` class on the `bot-item` and four bright
+  corner accents through CSS pseudo-elements (`style.css` +
+  `app.js`).
+- Edit 2: removed the `text-overflow: ellipsis` truncation of
+  `.bot-item .bot-name`, allowed the name to wrap so the full
+  nickname always shows.
+- Edit 3: removed the green left border of `.bot-activity.kind-hunt`
+  (set `border-left-color: transparent`).
+- Edit 4: moved the `hud-dump` button markup from `.hud-name-row`
+  into `.map-toolbar` next to the follow checkbox, updated the
+  button CSS to fit the toolbar height (24px, bg-panel-2 surface).
+- Edit 5: flipped `<input id="show-dest">` to `checked` by default
+  so paths always render on first load.
+- Edit 6: changed `mapColors.userPath` and `userMark` from
+  `#4da3ff` (light blue) to `#ff44cc` (bright magenta) - distinct
+  from the blue self marker and the red combat path. Added waypoint
+  dots and coordinate labels `(x, y)` at every waypoint in
+  `drawWalkPlan` with a dark stroke for readability over any
+  background.
+- Edit 7: moved `.buffs-panel` from `right: 278px` (just left of
+  `gear-panel`, top right) to `left: 272px` (just right of the
+  character HUD, top left), decoupling it from the equipment widget.
+- Edit 8: instant skills tab switch - added `renderSkillsNow()` and
+  called it from `setGearMode` and `setSkillFilter` so the grid
+  rebuilds on the same frame as the tab highlight. Reworked
+  `renderSkills` so the keyed cell cache (`SkillCells.cells`) keeps
+  cells for both the active and the passive skills: the opposite
+  filter's cells stay in the Map with their loaded icons and only
+  detach from the grid DOM, so a switch back is fully instant (no
+  new icon fetches).
+- Updated `tools/repro_gear.js` to match the new buffs panel
+  placement (`left: 272px` instead of `right: 278px`).
+- Verify loop (no Go toolchain in this sandbox): all 7 repro
+  harnesses pass (`repro_gear`, `repro_hud`, `repro_map_render`,
+  `repro_movement`, `repro_bot_switch`, `repro_zone_hover`,
+  `repro_fight_ui`). `node --check` confirms app.js and map.js are
+  syntactically clean.
+
+### Next
+
+- Push this batch as one atomic commit on `feature/proxy-server`.
+- A future round should run the live stack (`tools/mobius_e2e.sh`)
+  and a real bot snapshot to confirm the new magenta path color
+  reads over the actual elven map imagery.
+
 ## Active task: the town walk stuck loop - the reverse wall check and the waypoint skip
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.

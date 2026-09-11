@@ -2004,18 +2004,19 @@ function main() {
         "the panel stayed visible");
 
     // The markup and the placement: the panel lives in the map wrap
-    // to the right of the equipment widget (the same top line, past
-    // the widget width plus a gap) and the pathfind mode hides it.
+    // to the right of the character HUD (top left of the map) and is
+    // decoupled from the equipment widget on the top right; the
+    // pathfind mode still hides it.
     const buffsAt = html.indexOf('id="buffs-panel"');
     check(results, "the effects panel markup sits after the widget",
         buffsAt > gearAt && buffsAt < chatAt,
         "buffs " + buffsAt);
     const buffsCssBlock = css.slice(css.indexOf(".buffs-panel {"),
         css.indexOf(".buffs-panel {") + 400);
-    check(results, "the effects panel floats right of the character",
+    check(results, "the effects panel floats right of the character HUD",
         buffsCssBlock.includes("position: absolute") &&
         buffsCssBlock.includes("top: 10px") &&
-        buffsCssBlock.includes("right: 278px"),
+        buffsCssBlock.includes("left: 272px"),
         "panel block: " + buffsCssBlock.slice(0, 140));
     check(results, "the effects panel hides in the pathfind mode",
         css.includes("body.mode-pathfind .buffs-panel"),
