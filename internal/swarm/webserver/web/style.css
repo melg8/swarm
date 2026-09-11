@@ -2720,16 +2720,33 @@ canvas.fxg-cell.picked {
 .acc-actions {
   display: flex;
   gap: 6px;
-  padding: 0 12px;
+  padding: 0 12px 4px;
 }
 
+/* The run all and the per scenario run buttons of the acceptance
+   panel need a comfortable click target: the base .btn is sized for
+   small icon tiles (26x24 px), so the text buttons override the
+   width to auto and grow the padding and the font-size for a
+   readable label and a stable hit area. The active hover lift
+   echoes the .btn:hover border accent. */
 .acc-runall-btn {
   flex: 1;
-  font-size: 10px;
+  width: auto;
+  min-height: 28px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  padding: 4px 6px;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.acc-runall-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .acc-list { list-style: none; }
@@ -2787,13 +2804,23 @@ canvas.fxg-cell.picked {
 .acc-item.status-failed .acc-status-text { color: var(--red); }
 
 .acc-run-btn {
-  font-size: 10px;
+  width: auto;
+  min-height: 24px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  padding: 2px 8px;
+  padding: 4px 12px;
   flex-shrink: 0;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.acc-run-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .acc-item.status-passed .acc-run-btn {
