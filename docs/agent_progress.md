@@ -11,6 +11,54 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the sidebar split, the test widget buttons and the CLI acceptance flag (2026-09-11)
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+Three user requests in one session:
+1. Split the left sidebar tab into the long-running bots and the
+   acceptance test bots. The fleet bots (`test1`, `test2`, ...) and
+   the temp bots of the acceptance manager (`temp1`, `temp2`, `temp3`)
+   land in the same flat list today; the user wants them grouped.
+2. Fix the test widget buttons - they are too short ("куцые") in the
+   sidebar acceptance panel.
+3. Add a CLI flag so an agent can launch an acceptance test without
+   entering the web UI (the same scenario the run button starts).
+
+### Acceptance criteria
+
+- A `kind` field on `state.Bot` tags the role of every bot; the
+  acceptance manager tags its temp bots, the main entry tags the
+  fleet bots.
+- The sidebar `#bot-list` splits into two groups (long-running and
+  acceptance) under a sub-title each; the empty group hides.
+- The run all and the per scenario run buttons of the acceptance
+  panel grow a comfortable click target (font-size, padding).
+- A new `-acceptance <id|all>` flag launches the scenarios headless:
+  no bot supervisor runs, the result prints to the log and the exit
+  code reflects the pass/fail of the run.
+- Every change ships with its unit test; the lint gate stays clean
+  on the new lines.
+
+### Progress (2026-09-11)
+
+- Environment deployed per AGENTS.md before touching the code:
+  `tools/swarm_fast_deploy.sh` ran in the foreground with a 10
+  minute call timeout - `STACK_READY`, 75 tables, login 2106 /
+  game 7777 / db 3306 listening; `tools/install_dev_tools.sh check`
+  green (task, golangci-lint, gci; gofumpt missing but gofmt +
+  gci cover the change); `go build ./...` green.
+- Commit "state: tag bot role with Kind for the sidebar split":
+  added `kind` field on `Bot`, `SetKind`, the `Kind` constants
+  (`KindLongRunning`, `KindAcceptance`) and the `Kind` field on
+  `BotInfo`; the acceptance manager tags its temp bots and the main
+  entry tags the fleet bots. Added `TestBotKind` next to the change.
+- Status: in progress - the sidebar UI split is the next commit.
+
 ## Active task: the foreground execution rule in the agent docs (2026-09-11)
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.

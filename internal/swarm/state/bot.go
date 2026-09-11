@@ -357,7 +357,13 @@ type Bot struct {
 	// selling, deleveling). Empty until the loop publishes its
 	// first phase; the manual only sessions stay empty (the loop
 	// never sets it) and the UI falls back to the status text.
-	phase  string
+	phase string
+	// kind tags the role of the bot in the process: the empty
+	// default reads as long-running, the acceptance manager tags
+	// its temp bots with KindAcceptance so the web UI can split
+	// them out of the fleet bot list. Set once at construction;
+	// the sidebar reads it through Info().
+	kind   string
 	selfID int32
 	char   CharacterState
 	// world is the dense object storage (see objectStore): the
@@ -920,6 +926,17 @@ func (b *Bot) SetPhase(phase string) {
 	}
 	b.phase = phase
 	b.touch()
+}
+
+// SetKind tags the role of the bot in the process: KindLongRunning
+// for the 24/7 fleet bots, KindAcceptance for the temp bots of the
+// acceptance test manager. The kind is set once at construction and
+// never changes; the web UI reads it through Info() to split the bot
+// list of the sidebar into the long-running and the acceptance groups.
+func (b *Bot) SetKind(kind string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.kind = kind
 }
 
 // SetOnline marks the character as being inside the world.
@@ -2323,6 +2340,16 @@ func compareInventoryItems(
 	return 0
 }
 
+// Bot kind constants: the role of a bot in the process. The empty
+// kind (the default of NewBot) is treated by the web UI as a regular
+// long-running bot - the explicit KindLongRunning lets the main entry
+// tag the fleet bots, the acceptance manager tags its temp bots with
+// KindAcceptance so the sidebar can split them into two groups.
+const (
+	KindLongRunning = "long-running"
+	KindAcceptance  = "acceptance"
+)
+
 // BotInfo is the compact JSON view used by the bot list endpoint. The
 // vitals and the combat flag let the sidebar show the mini HP/MP/XP bars
 // and the fighting state of every session at a glance.
@@ -2333,7 +2360,12 @@ type BotInfo struct {
 	// Phase mirrors the hunt loop phase so the sidebar bot row can
 	// show the same activity banner as the map HUD. Empty for the
 	// manual only sessions and the pre-world sessions.
-	Phase      string  `json:"phase"`
+	Phase string `json:"phase"`
+	// Kind is the role of the bot in the process: KindLongRunning
+	// for the 24/7 fleet bots, KindAcceptance for the temp bots of
+	// the acceptance test manager. The empty string is the default
+	// of an untagged bot and reads as long-running.
+	Kind       string  `json:"kind"`
 	Level      int32   `json:"level"`
 	CurHP      float64 `json:"curHp"`
 	MaxHP      float64 `json:"maxHp"`
@@ -2354,6 +2386,7 @@ func (b *Bot) Info() BotInfo {
 		Name:       b.char.Name,
 		Status:     b.status,
 		Phase:      b.phase,
+		Kind:       b.kind,
 		Level:      b.char.Level,
 		CurHP:      b.char.CurHP,
 		MaxHP:      b.char.MaxHP,

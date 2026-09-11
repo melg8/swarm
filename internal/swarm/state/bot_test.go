@@ -528,6 +528,40 @@ func TestBotInfo(t *testing.T) {
 	require.Equal(t, int32(5), info.Level)
 }
 
+// TestBotKind verifies the kind tagging of the bot: the default of
+// NewBot is empty (the web UI reads it as long-running), SetKind
+// stores the role and Info() carries it for the sidebar split.
+func TestBotKind(t *testing.T) {
+	t.Run("default empty", func(t *testing.T) {
+		bot := NewBot("acc1")
+		info := bot.Info()
+		require.Empty(t, info.Kind,
+			"an untagged bot reports an empty kind")
+	})
+
+	t.Run("acceptance tag survives Info", func(t *testing.T) {
+		bot := NewBot("temp1")
+		bot.SetKind(KindAcceptance)
+		info := bot.Info()
+		require.Equal(t, KindAcceptance, info.Kind)
+	})
+
+	t.Run("long-running tag survives Info", func(t *testing.T) {
+		bot := NewBot("test1")
+		bot.SetKind(KindLongRunning)
+		info := bot.Info()
+		require.Equal(t, KindLongRunning, info.Kind)
+	})
+
+	t.Run("SetKind overrides the previous value", func(t *testing.T) {
+		bot := NewBot("temp1")
+		bot.SetKind(KindAcceptance)
+		bot.SetKind(KindLongRunning)
+		info := bot.Info()
+		require.Equal(t, KindLongRunning, info.Kind)
+	})
+}
+
 // TestSetPhase verifies the hunt loop phase publication: SetPhase
 // stores the phase on the tracker, the Snapshot and the BotInfo carry
 // it for the web UI, a same phase refresh is a no-op (no version

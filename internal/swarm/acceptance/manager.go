@@ -244,6 +244,7 @@ func NewManager(deps ManagerDeps, defs []TestDef) *Manager {
 	for i := range defs {
 		def := defs[i]
 		tracker := state.NewBot(def.Account)
+		tracker.SetKind(state.KindAcceptance)
 		tracker.SetOffline()
 		deps.Registry.Add(tracker)
 		manager.tests = append(manager.tests, &Test{

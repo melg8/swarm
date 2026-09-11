@@ -445,6 +445,7 @@ func main() {
 
 	registry := state.NewRegistry()
 	tracker := state.NewBot(cfg.account)
+	tracker.SetKind(state.KindLongRunning)
 	registry.Add(tracker)
 
 	var proxyServer *proxy.Server
@@ -502,6 +503,7 @@ func runFleet(cfg config) {
 	for i := range cfg.bots {
 		account := fleetAccountName(cfg.account, i)
 		tracker := state.NewBot(account)
+		tracker.SetKind(state.KindLongRunning)
 		registry.Add(tracker)
 		trackers = append(trackers, tracker)
 	}
