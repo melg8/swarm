@@ -248,6 +248,44 @@ func TestStartAllParallel(t *testing.T) {
 	require.Equal(t, StatusRunning, manager.Tests()[1].Status)
 }
 
+// TestStartAllSequential pins the sequential mode: the scenarios run
+// one after another in definition order - the second test stays idle
+// until the first one passed.
+func TestStartAllSequential(t *testing.T) {
+	releaseA := make(chan struct{})
+	defs := []TestDef{
+		{
+			ID: "a", Title: "a", Description: "a", Account: "temp5",
+			Timeout: 5 * time.Second,
+			Scenario: func(_ context.Context, _ *Manager,
+				_ *Test,
+			) error {
+				<-releaseA
+
+				return nil
+			},
+		},
+		{
+			ID: "b", Title: "b", Description: "b", Account: "temp4",
+			Timeout: 5 * time.Second,
+			Scenario: func(context.Context, *Manager, *Test) error {
+				return nil
+			},
+		},
+	}
+	manager := testManager(t, defs)
+	require.NoError(t, manager.StartAll(ModeSequential))
+
+	waitStatus(t, manager, "a", StatusRunning)
+	// The second test must not start while the first one runs.
+	time.Sleep(200 * time.Millisecond)
+	require.Equal(t, StatusIdle, manager.Tests()[1].Status)
+
+	close(releaseA)
+	waitStatus(t, manager, "a", StatusPassed)
+	waitStatus(t, manager, "b", StatusPassed)
+}
+
 // waitStatus polls the test view until the wanted status lands.
 func waitStatus(
 	t *testing.T, manager *Manager, id string, status string,
