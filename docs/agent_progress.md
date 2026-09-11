@@ -1483,3 +1483,68 @@ name the variant number that best fits the real bot UI.
   flips a loud test, not a silent byte drift). AGENTS.md documents
   the probe contract. Verified: go build/vet, go test ./... (16
   packages), golangci-lint 0 issues.
+
+## Active task: the shop planner buys the top affordable item of a slot, not an intermediate step
+
+Started: 2026-09-11. Branch: `feature/acceptance`. Commits as melg8,
+pushed as they land. Stack deployment started as the mandatory first
+step (tools/swarm_fast_deploy.sh).
+
+### Goal
+
+The user reported the purchase queue behaving wrong on the live swarm:
+a bot wears a weapon worth 14k adena and carries enough adena (the
+carried adena plus the weapon sale proceeds) to buy the ~60k Gladius.
+When the trip unequips and sells the 14k weapon, the bot either buys
+nothing or buys the ~1k Short Sword. The demanded rule: when the money
+covers the more expensive variant, that variant is bought - the planner
+must not buy an intermediate step of the same slot ladder.
+
+### Root cause analysis
+
+`gear.PlanPurchases` ranks every pick by the score gain PER ADENA
+(`bestPurchase`: `value = gain / price`). While the old weapon is worn,
+the cheaper ladder steps have a negative gain (they are no upgrade) and
+are correctly skipped, so the trip plans the Gladius with the SellFirst
+credit and sells the 14k weapon first. The re-plan after the sale
+(`hunt.planShoppingStops`) runs against the fresh adena and the EMPTY
+weapon slot: now every weapon candidate has the full score gain and the
+cheap Short Sword wins the value-per-adena ranking by an order of
+magnitude - the one-purchase-per-slot guard then blocks the Gladius for
+the trip. The bot bought the intermediate sword instead of the
+affordable top tier. The same ranking also leaves the slot unpurchased
+when a previous intermediate already sits in the inventory (simulated
+as a free upgrade) and the remaining adena misses the top weapon.
+
+### Fix
+
+The same-slot top-tier guard in `bestPurchase`: among the viable
+(affordable, positive gain, slot free) candidates, a candidate is
+dropped when another viable candidate with a strictly higher score gain
+writes into an overlapping set of paperdoll slots. The value-per-adena
+ranking then decides only between the per-slot winners - the empty slot
+fillers of other slots keep their documented priority, while a slot
+ladder contributes only its best affordable step. The gain (the net
+paperdoll delta including the family clears) is the dominance measure,
+so the two-hand vs one-hand-plus-shield tradeoffs keep their correct
+semantics.
+
+### Acceptance criteria
+
+- The user scenario in a unit test: a worn weapon (sickle, 18500
+  reference) plus adena that together with the sale credit covers the
+  Gladius plans the Gladius (SellFirst the sickle), never the Short
+  Sword.
+- The post-sale re-plan state (empty weapon slot, fresh adena) plans
+  the top affordable weapon directly.
+- The bare rich character buys the best shop weapon (the Long Sword),
+  not the value-per-adena Short Sword.
+- The existing documented behaviors keep their tests green: the cheap
+  fillers first, one purchase per slot per trip, no duplicate
+  necklaces, the sell credit accounting.
+- go build, go vet, go test ./..., golangci-lint run all green; the
+  live stack E2E stays healthy.
+
+### Status
+
+- In progress: the planner fix, the tests and the docs round.
