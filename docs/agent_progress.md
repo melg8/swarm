@@ -19,6 +19,7 @@ every push.
 
 ### Goal
 
+<<<<<<< HEAD
 The user report (2026-09-11, Russian): the bots are stuck and not
 learning. The state dump (build 36bfe99) shows the character test1
 (level 13, 25023 SP) at the elven village teacher plaza
@@ -65,6 +66,87 @@ fired, and the deterministic re-path planned the identical route.
 - The real pack probe: the dry search from the dump stuck spot to
   Herbiel now plans a 9 waypoint route of length 3258 (was 3451) that
   avoids the plaza detour that triggered the stuck loop.
+
+## Active task: the bare-handed bot - the weapon run owns the town trips
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (2026-09-11, Russian): the bot never may fight with
+bare hands - buying a weapon is the highest priority whenever no
+weapon exists; plus the reason why it sold its weapon without buying
+the replacement right away had to be found.
+
+The state dump (build 36bfe99, bot test2, level 11, 14814 adena)
+shows the character punching Kaboo Orc Grunts for 2 damage with an
+empty right hand while its plan says "the shop strategy plans
+purchases worth 883 adena" (the Short Sword, the first weapon
+milestone from an empty hand). The trip carrying that buy aborted on
+the teacher walk: "town walk stuck, re-pathing (1..3 of 3)" ->
+"town trip ended: aborted, walk stuck" - the weapon buy stop was
+appended BEHIND the teach stop and never ran.
+
+### Root cause
+
+The sell-first replacement flow banks the worn weapon's
+referencePrice/2 credit before the buy lands (stepReplacementSales),
+and the buy stop of the weapon was the LAST leg of the trip: the sell
+stop went to the NEAREST merchant (junk sells anywhere), the learning
+stops rode behind it (the books, the teacher), and planShoppingStops
+appended the buy groups by walking distance at the shop. Any failure
+between the sale and the buy - the village stuck walks the dump
+shows, an attacker interrupt (resetTownTrip drops the stops), a
+merchant that never showed up, an exhausted buy retry budget - left
+the character bare-fisted with the adena in the wallet. The next
+trips re-planned the Short Sword but repeated the same stop order,
+so the teacher leg abort kept eating the weapon buy. Nothing tied
+the weapon sale to the weapon purchase, and nothing in the hunt loop
+treated "no weapon" as the emergency it is.
+
+### Fix
+
+- gear.HasWeapon: the profile weapon probe over the whole inventory
+  (equipped or bagged, the profile scoring decides what counts - a
+  bow is no weapon for the melee fighter).
+- The weapon leads every trip that buys one: the sell stop routes to
+  the weapon purchase's merchant (the junk sells at any merchant, so
+  the sell-first of the replaced weapon and the buy share ONE stop -
+  the replacement lands immediately after the sale).
+- The weapon run: a character with NO weapon and an affordable
+  weapon in the plan runs the weapon errand alone - no teach stops,
+  no books, a short retry cooldown (weaponRunCooldown 45s instead of
+  the 5 minute tripCooldown) so an aborted run retries instead of
+  punching mobs for five minutes.
+- The bare-handed engage gate: a weaponless character with an
+  affordable weapon never picks a fresh target (the weapon run owns
+  the next ticks; the aggro self defense answer stays armed), and the
+  zone entry engage of the return leg skips the same way.
+
+### Acceptance criteria
+
+- A weaponless bot with enough adena starts a town trip whose first
+  (and only planned) stop is the weapon merchant, even with queued
+  lessons waiting at the teacher.
+- The weaponless engage gate holds fresh picks while the weapon run
+  is pending; an attacker on the character still gets fought.
+- A weapon upgrade trip routes its sell stop to the weapon merchant,
+  so the displaced weapon sells and the replacement buys at one npc.
+- An aborted weapon run retries after 45 seconds, not after 5
+  minutes.
+
+### Status: in progress (2026-09-11)
+
+- The environment deployed (STACK_READY, ports 2106/7777/3306, 75
+  tables), the shopping/town/learning/equip code surveyed, the dump
+  slot mask confusion resolved against the Mobius BodyPart enum
+  (0x40 is head, 0x08 is neck - the dump table mislabeled them).
+- Rebased onto the concurrent reverse wall round (c50e995): the two
+  rounds compose - the wall check removes the planner side of the
+  stuck walks my dump shows, the weapon run owns the trip priority
+  side of the same story.
 
 ## Active task: the delevel water loop - the walk the planner planned as a swim
 
