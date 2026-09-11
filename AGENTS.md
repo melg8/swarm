@@ -96,6 +96,20 @@ bash tools/install_dev_tools.sh check  # preflight: exit 0 if all present
 bash tools/install_dev_tools.sh        # install missing dev tools (~10 s)
 ```
 
+**Run the deploy (and every other long script) in the FOREGROUND of
+the shell call, with a call timeout of at least 10 minutes.** Never
+start it in the background - `&`, `nohup ... &`, `setsid`, `screen`,
+`tmux`, the "run in background" option of the agent tooling. A
+background process does not survive the return of the tool call that
+started it in the sandboxed agent shells: the deploy dies mid-run,
+the next call finds a half-installed stack, and the session pays the
+same "the deploy process died, restarting in the foreground with a
+long timeout" rediscovery round every agent before it already paid.
+The scripts are idempotent, so a dead run is cheap to repeat - but
+the foreground start with the long timeout is the only correct first
+attempt. The full rule lives in `docs/deployment.md` ("Foreground
+execution is mandatory").
+
 The deploy is successful only when the last lines printed contain
 `STACK_READY: login :2106, game :7777, db :3306` (printed by
 `tools/mobius_start.sh` invoked at the end of `swarm_fast_deploy.sh`,

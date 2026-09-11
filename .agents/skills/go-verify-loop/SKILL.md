@@ -22,6 +22,12 @@ gofmt -l cmd internal     # empty output = formatted
 golangci-lint run         # the strict gate; 0 issues required
 ```
 
+Run the loop in the foreground of the tool call with a call timeout
+of at least 10 minutes - the full suite alone can cost ~123 s on a
+cold cache, and a background process does not survive the return of
+the call that started it (docs/deployment.md, "Foreground
+execution is mandatory").
+
 `task check:all` runs lint + test; the individual tasks are `task test`,
 `task lint`, `task test:race`. The Windows dev host has `task` 3.53.1
 and golangci-lint v2.13.2 installed; `-race` needs cgo with gcc, which
@@ -77,15 +83,15 @@ flagged too); declare plain zero vars and use them:
 
 ```go
 var (
-	emptyItem  state.InventoryItem
-	emptyStats npcdata.GearStats
+        emptyItem  state.InventoryItem
+        emptyStats npcdata.GearStats
 )
 
 var clearedScoredItem = ScoredItem{
-	Item:  emptyItem,
-	Stats: emptyStats,
-	Score: 0,
-	Slot:  slotInvalid,
+        Item:  emptyItem,
+        Stats: emptyStats,
+        Score: 0,
+        Slot:  slotInvalid,
 }
 ```
 

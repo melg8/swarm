@@ -23,6 +23,16 @@ bash tools/swarm_fast_deploy.sh   # idempotent, ~90 s from a blank sandbox
 ss -ltn | grep -E ':(2106|7777|3306) '
 ```
 
+Run the deploy in the FOREGROUND of the tool call with a call
+timeout of at least 10 minutes. A background process (`&`, `nohup
+... &`, `setsid`, `screen`, `tmux`, the agent tooling's "run in
+background" mode) does not survive the return of the call that
+started it - a background deploy dies mid-run and the next call
+starts with a half-installed stack. The scripts are idempotent, so
+a re-run is safe, but the foreground start with the long timeout is
+the only correct first attempt (docs/deployment.md, "Foreground
+execution is mandatory").
+
 Deploy is successful only when the script printed
 `STACK_READY: login :2106, game :7777, db :3306`, all three ports
 listen and the schema has 75 tables. Deeper check: `task` equivalent of

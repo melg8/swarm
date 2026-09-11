@@ -11,6 +11,56 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the foreground execution rule in the agent docs (2026-09-11)
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user reported that agent sessions keep starting the deploy (and
+other long scripts) in the background, lose the process when the
+tool call returns, and pay the same rediscovery round every time
+("the deploy process died (the background process did not survive
+the call completion), restarting in the foreground with a long
+timeout - the script is idempotent"). The agent documentation must
+require the foreground start EXPLICITLY, in the places every session
+reads before running the long commands, so the knowledge stops
+living in the session transcripts only.
+
+### Acceptance criteria
+
+- AGENTS.md states the foreground rule inside the mandatory first
+  step section (the place a session reads right before deploying).
+- `docs/deployment.md` carries the full rule as its own section:
+  what happens to background processes when a tool call returns,
+  which commands must run in the foreground, the timeout budget and
+  the idempotent re-run path for a call that died anyway.
+- The `mobius-stack` and `go-verify-loop` skills repeat the rule
+  where their long commands live (the deploy and the verify loop).
+- The environment is deployed per the docs first (fast deploy +
+  dev tools), so the docs change happens on a verified stack.
+
+### Progress (2026-09-11)
+
+- Environment deployed per AGENTS.md before touching the docs:
+  `tools/swarm_fast_deploy.sh` ran in the foreground with a 10
+  minute call timeout - `STACK_READY`, 75 tables, login 2106 /
+  game 7777 / db 3306 listening; `tools/install_dev_tools.sh` green
+  (task, golangci-lint, gci, gofumpt); `go build ./...` green.
+- Commit "docs: the foreground execution rule for the agent shells":
+  the rule landed in AGENTS.md (the mandatory first step section),
+  the "Foreground execution is mandatory (the background deploy
+  trap)" section in `docs/deployment.md` (with the pointer from the
+  mandatory first step, the four bullet rules and the cross link to
+  the sandbox signal pitfall), the same rule condensed in the
+  `mobius-stack` and `go-verify-loop` skills, and the restricted
+  sandbox shells operational note now references the section.
+- Status: done (2026-09-11). A pure documentation change - no code
+  touched, `go build ./...` is the only gate it needs and it passed
+  before the edits.
+
 ## Active task: the frozen trip plan - the shop manager stops re-planning (2026-09-11)
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.

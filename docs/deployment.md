@@ -16,6 +16,11 @@ Any task that needs the live environment starts here:
 bash tools/swarm_fast_deploy.sh
 ```
 
+Run it in the FOREGROUND of the tool call with a call timeout of at
+least 10 minutes (the "Foreground execution is mandatory" section
+below holds the full rule) - a background deploy does not survive
+the return of the call that started it.
+
 The script is idempotent (finished steps are detected and skipped,
 re-running is always safe), needs no root and brings the whole stack
 up from a blank z.ai-style sandbox (Debian 13, no javac/go/MariaDB
@@ -233,10 +238,58 @@ debugging connectivity issues:
 - **Restricted sandbox shells may kill background processes when the
   invoking shell exits.** In such environments start the stack and run
   the bot in a single invocation - `tools/mobius_e2e.sh` is written
-  exactly for that and is the reliable way to test.
+  exactly for that and is the reliable way to test. This is the same
+  trap the "Foreground execution is mandatory" section codifies: the
+  first attempt of every long script is a foreground call with a
+  long timeout; backgrounding is never the plan.
 - Account auto registration is already enabled by the shipped login
   config (`AutoCreateAccounts = True`), so the bot simply logs in with
   `test1`/`test` and the account is created on first use.
+
+## Foreground execution is mandatory (the background deploy trap)
+
+A tool call of an AI coding agent does not keep its processes alive
+past the call's return: the sandboxed agent shells reap every
+background process (`&`, `nohup ... &`, `setsid`, `screen`, `tmux`,
+the "run in background" option of the agent tooling) when the
+invocation completes. A deploy started that way dies mid-run -
+usually during the javac compile or the SQL import - and the next
+call finds a half-installed stack. Sessions keep paying the same
+rediscovery round ("the deploy process died, restarting in the
+foreground with a long timeout - the script is idempotent"); the
+rule below makes the knowledge explicit so no session pays it again.
+
+- **The first attempt is always the foreground attempt.** Run
+  `tools/swarm_fast_deploy.sh`, `tools/install_dev_tools.sh`,
+  `tools/mobius_bootstrap.sh`, `tools/mobius_e2e.sh`, the full
+  `go test ./...` and the node web harnesses in the foreground of
+  the tool call, with a call timeout of at least 10 minutes (600 s).
+  The timing budget of AGENTS.md tells what a step can cost: deploy
+  ~99 s, e2e ~47 s, the full test suite ~123 s - 10 minutes covers
+  them all with room to spare.
+- **The script call itself never goes to the background, even when
+  the script starts daemons.** `tools/mobius_start.sh` daemonizes
+  the JVMs with `nohup` and returns only after the ports listen and
+  the game server registered with the login server - that is the
+  exact shape a long command must have: the call stays foreground
+  until the readiness line prints (`STACK_READY`), and only the
+  daemons the script manages internally run detached.
+- **If the sandbox reaps even those daemons** when the shell exits,
+  do not fight it: keep each logical run in one invocation
+  (`tools/mobius_e2e.sh` starts the stack, runs the bot and tears
+  it down in a single foreground call - that is its purpose).
+  Whether the daemons survive between calls is a property of the
+  host, not of the scripts; the e2e path works in both worlds.
+- **A call that died mid-run is re-run, not repaired.** All the
+  `tools/` scripts are idempotent (marker files, port checks and
+  the `~/opt` installs are detected and skipped), so the recovery
+  from a half-deploy is the same command, foreground, longer
+  timeout - never manual surgery on the half-installed tree.
+
+The related signal problem of background jobs (SIGINT/SIGQUIT set
+to SIG_IGN, which Go cannot catch) lives in the "Sandbox signal
+pitfall" section below; both reduce to the same habit: the
+foreground is the only place a long command is safe.
 
 ## Sandbox signal pitfall
 
