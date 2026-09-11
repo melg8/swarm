@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/melg8/swarm/internal/swarm/acceptance"
 	"github.com/melg8/swarm/internal/swarm/connection"
 	"github.com/melg8/swarm/internal/swarm/hunt"
 	"github.com/melg8/swarm/internal/swarm/pathfind"
@@ -451,8 +452,6 @@ func main() {
 		proxyServer = startProxy(cfg)
 	}
 
-	web := startWebInterface(cfg, registry, nil, proxyServer)
-
 	// The geodata engine serves the town trips of the hunt and the
 	// long manual walks of the web UI (the server side pathfinder
 	// refuses far targets), so it loads in every mode.
@@ -471,6 +470,9 @@ func main() {
 		log.Println("No geodata files found in " + stats.Dir +
 			", the bot hunts without town trips")
 	}
+
+	web := startWebInterface(cfg, registry, nil, proxyServer)
+	attachAcceptance(web, registry, cfg, engine, proxyServer)
 
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
@@ -510,8 +512,6 @@ func runFleet(cfg config) {
 		proxyServer = startProxy(cfg)
 	}
 
-	web := startWebInterface(cfg, registry, nil, proxyServer)
-
 	// The geodata engine is shared by all bots: the town trips and the
 	// manual long walks of every session read through the same LRU
 	// cache of parsed regions.
@@ -530,6 +530,9 @@ func runFleet(cfg config) {
 		log.Println("No geodata files found in " + stats.Dir +
 			", the bot hunts without town trips")
 	}
+
+	web := startWebInterface(cfg, registry, nil, proxyServer)
+	attachAcceptance(web, registry, cfg, engine, proxyServer)
 
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
@@ -811,6 +814,30 @@ func startWebInterface(
 	}()
 
 	return server
+}
+
+// attachAcceptance wires the acceptance test manager into the web
+// interface: the temp test bots (temp1..temp3) register in the shared
+// bot registry, so they appear in the sidebar bot list and stay
+// connectable through the client proxy exactly like the fleet bots.
+func attachAcceptance(
+	web *webserver.Server, registry *state.Registry, cfg config,
+	engine *pathfind.Engine, proxyServer *proxy.Server,
+) {
+	if web == nil {
+		return
+	}
+	manager := acceptance.NewManager(acceptance.ManagerDeps{
+		Registry: registry,
+		Login:    cfg.loginAddress,
+		Engine:   engine,
+		Proxy:    proxyServer,
+		Logger:   log.Default(),
+		DBConfig: acceptance.DefaultDBConfig(),
+	}, acceptance.Definitions())
+	web.SetAcceptance(manager)
+	log.Printf("Acceptance tests ready: %d scenarios on the accounts %s",
+		len(acceptance.Definitions()), acceptance.AccountList())
 }
 
 // shutdownWebInterface gracefully stops the web server.
