@@ -105,3 +105,32 @@ func TestBuildStateDumpEventWindow(t *testing.T) {
 	require.NotContains(t, report, "event 0 ",
 		"the first events rolled out of the ring")
 }
+
+// TestDumpSlotNames pins the body part mask labels of the equipment
+// lines against the Mobius BodyPart enum: the jewel and armor masks
+// (0x40 head, 0x08 neck, 0x800 legs, 0x1000 feet) once printed as
+// shifted slot names (a Cloth Cap read as lfinger, a Necklace of Magic
+// as lear ear) and made a healthy paperdoll look corrupted in the
+// field reports.
+func TestDumpSlotNames(t *testing.T) {
+	require.Equal(t, "underwear", dumpSlotName(0x01))
+	require.Equal(t, "rear ear", dumpSlotName(0x02))
+	require.Equal(t, "lear ear", dumpSlotName(0x04))
+	require.Equal(t, "earring", dumpSlotName(0x06))
+	require.Equal(t, "necklace", dumpSlotName(0x08))
+	require.Equal(t, "rfinger", dumpSlotName(0x10))
+	require.Equal(t, "lfinger", dumpSlotName(0x20))
+	require.Equal(t, "ring", dumpSlotName(0x30))
+	require.Equal(t, "head", dumpSlotName(0x40))
+	require.Equal(t, "rhand", dumpSlotName(0x80))
+	require.Equal(t, "lhand", dumpSlotName(0x100))
+	require.Equal(t, "gloves", dumpSlotName(0x200))
+	require.Equal(t, "chest", dumpSlotName(0x400))
+	require.Equal(t, "legs", dumpSlotName(0x800))
+	require.Equal(t, "feet", dumpSlotName(0x1000))
+	require.Equal(t, "back", dumpSlotName(0x2000))
+	require.Equal(t, "lrhand", dumpSlotName(0x4000))
+	require.Equal(t, "full armor", dumpSlotName(0x8000))
+	require.Equal(t, "hair", dumpSlotName(0x10000))
+	require.Equal(t, "part 0x20000", dumpSlotName(0x20000))
+}

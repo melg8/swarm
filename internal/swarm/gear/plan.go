@@ -47,6 +47,29 @@ func (c *nextPlanCandidate) better(action EquipAction) {
 	}
 }
 
+// HasWeapon reports whether the character wears or carries any weapon
+// the profile can fight with: every inventory item (equipped or
+// bagged) whose gear stats place it in the weapon family with a
+// positive profile score counts - a bow is no weapon for the melee
+// fighter, a sword is none for the mystic, the profile decides. The
+// weapon run trigger of the hunt loop reads it: a character that
+// answers false while its plan offers an affordable weapon shops for
+// the weapon before anything else (see hunt/shopping.go).
+func HasWeapon(profile Profile, equipment Equipment) bool {
+	for _, item := range equipment.Items {
+		stats, ok := npcdata.ItemGearStats(item.ItemID)
+		if !ok {
+			continue
+		}
+		if CategoryOf(stats) == CategoryWeapon &&
+			scoreStats(profile, stats) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
 // NextUpgrade plans the next equip action that strictly improves the
 // paperdoll under the profile: an empty slot filled with the best
 // scoring fitting item, a slot swapped for a strictly better item or

@@ -298,10 +298,21 @@ func (l *Loop) tripActive() bool {
 	}
 }
 
-// tripCooldownOver reports whether a new town trip may start.
+// tripCooldownOver reports whether a new town trip may start. A
+// bare-handed character with an affordable weapon retries on the
+// short weapon run cooldown: punching mobs through the five minute
+// cooldown of an ordinary trip is the exact outcome the weapon run
+// exists to prevent.
 func (l *Loop) tripCooldownOver() bool {
-	return l.tripEndedAt.IsZero() ||
-		time.Since(l.tripEndedAt) >= tripCooldown
+	if l.tripEndedAt.IsZero() {
+		return true
+	}
+	cooldown := tripCooldown
+	if l.weaponlessRunWanted() {
+		cooldown = weaponRunCooldown
+	}
+
+	return time.Since(l.tripEndedAt) >= cooldown
 }
 
 // inventoryFull reports whether the inventory passed a trip trigger
@@ -335,8 +346,12 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	}
 	shopping := l.shoppingTripEnabled() && l.shoppingWanted()
 	learning := l.learnTripWanted()
+	// The weapon run outranks every other trip reason: a character
+	// without any weapon shops for one at once, whatever the inventory
+	// and the lesson queue say.
+	weaponRun := l.weaponlessRunWanted()
 	if l.navigator == nil || !l.tripCooldownOver() ||
-		(!l.inventoryFull() && !shopping && !learning) {
+		(!l.inventoryFull() && !shopping && !learning && !weaponRun) {
 		return
 	}
 	// The walk needs a standing character: a resting one stands up
@@ -351,6 +366,17 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	merchant, ok := l.nearestMerchant(selfX, selfY)
 	if !ok {
 		return
+	}
+	// The weapon leads the trip that buys it: the sell stop routes to
+	// the weapon purchase's merchant, so the sell-first of the replaced
+	// weapon and the buy share ONE stop (the junk sells at any
+	// merchant) and the replacement lands right after the sale instead
+	// of a village walk later - every abort in between used to leave
+	// the character bare-handed. A bare-handed character runs the
+	// weapon errand alone: the lessons and the books wait for the next
+	// trip, nothing outranks the weapon.
+	if weaponMerchant, ok := l.weaponStopMerchant(); ok {
+		merchant = weaponMerchant
 	}
 	// The walk back target: the farm spot when the trip starts inside
 	// the hunting zone, the zone center otherwise (a village respawn,
@@ -372,10 +398,13 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	l.buyRetries = 0
 	l.resetReplacementSales()
 	l.resetLearnState()
-	if learning {
+	if learning && !weaponRun {
 		// The learning stops ride behind the sell stop: the books
 		// after the junk sold (the fresh adena funds them), the
 		// teacher behind them, the gear shopping behind the teacher.
+		// The weapon run carries none of them: a bare-handed
+		// character walks for the weapon and back, the lessons ride
+		// the next trip (their queue keeps waiting).
 		l.planLearnStops()
 	}
 	l.phase = phaseTownWalk
@@ -389,7 +418,12 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 				affordablePrefix(l.shoppingPlanCache)), 10) +
 			" adena"
 	}
-	if learning {
+	if weaponRun {
+		// The bare-handed errand names itself: the 2 damage punches of
+		// the dump report read at a glance in the log tail.
+		reason = "no weapon in hand, the weapon run comes first"
+	}
+	if learning && !weaponRun {
 		// The learning contributes its lesson budget to the reason:
 		// a learning-only trip names it, a combined one appends it.
 		lessons := l.learnableLessons()
@@ -1270,6 +1304,13 @@ func (l *Loop) sellJunk() {
 func (l *Loop) engagesOnZoneEntry() bool {
 	zone := l.zone()
 	if zone == nil || !l.inZoneSelf() {
+		return false
+	}
+	// A bare-handed character with an affordable weapon keeps walking
+	// home: the zone entry fight would farm with the fists, and the
+	// weapon run owns the next ticks anyway (the trip end arms the
+	// short weapon run cooldown).
+	if l.weaponlessRunWanted() {
 		return false
 	}
 	now := time.Now()

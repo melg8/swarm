@@ -155,22 +155,36 @@ func writeDumpZone(b *strings.Builder, snap state.Snapshot) {
 }
 
 // dumpSlotNames maps the item body part mask to the paperdoll slot
-// name; masks outside the table fall back to the hex form.
+// name; masks outside the table fall back to the hex form. The masks
+// mirror the Mobius BodyPart enum (entity/item/enums/BodyPart.java):
+// 0x02 the right ear, 0x04 the left ear, 0x08 the neck, 0x10 the
+// right finger, 0x20 the left finger, 0x40 the head, 0x800 the legs,
+// 0x1000 the feet, 0x2000 the back, 0x4000 the two hand weapon and
+// 0x8000 the one-piece armor; the pair families carry the OR of their
+// two slots (0x6 the earrings, 0x30 the rings). The old table shifted
+// the jewel and armor labels (a Cloth Cap printed as lfinger, a
+// Necklace of Magic as lear ear), which read like a corrupted
+// paperdoll in the field reports while the equipment was fine.
 var dumpSlotNames = map[int32]string{
 	0x01:    "underwear",
-	0x04:    "rear ear",
-	0x08:    "lear ear",
-	0x10:    "necklace",
-	0x20:    "rfinger",
-	0x40:    "lfinger",
+	0x02:    "rear ear",
+	0x04:    "lear ear",
+	0x06:    "earring",
+	0x08:    "necklace",
+	0x10:    "rfinger",
+	0x20:    "lfinger",
+	0x30:    "ring",
+	0x40:    "head",
 	0x80:    "rhand",
 	0x100:   "lhand",
 	0x200:   "gloves",
 	0x400:   "chest",
-	0x4000:  "legs",
-	0x8000:  "feet",
-	0x40000: "lrhand",
-	0x80000: "hair",
+	0x800:   "legs",
+	0x1000:  "feet",
+	0x2000:  "back",
+	0x4000:  "lrhand",
+	0x8000:  "full armor",
+	0x10000: "hair",
 }
 
 // dumpSlotName renders the paperdoll slot of the item body part mask.

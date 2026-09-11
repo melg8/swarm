@@ -370,6 +370,10 @@ type Loop struct {
 	// logNoPickableTargets): zero means the next empty pick logs
 	// at once, a successful pick re-arms it.
 	noPickLogAt time.Time
+	// weaponWaitLogAt paces the bare-handed hold log of the engage
+	// gate (see logWeaponWait): the hold spans the weapon run
+	// cooldown window, one line per period keeps the log readable.
+	weaponWaitLogAt time.Time
 	// avoidScratch is the reused threat buffer of the aggro-aware
 	// walk steering (see loop_avoid.go): the scan refills it in
 	// place, so the per leg danger pass costs no allocation.
@@ -614,6 +618,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		buffAt:            time.Time{},
 		skillReuse:        make(map[int32]time.Time),
 		profilePicked:     false,
+		weaponWaitLogAt:   time.Time{},
 		shoppingViewCache: state.ShoppingPlanView{
 			Entries: nil,
 			Adena:   0,
@@ -1265,6 +1270,20 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 			// fires on this very tick, the chase stops where
 			// it stands.
 		} else {
+			if l.weaponlessRunWanted() {
+				// Bare-handed with an affordable weapon
+				// in the plan: no fresh targets - the
+				// fists land 2 damage while the plan
+				// offers a sword, and the weapon run
+				// (the town trip trigger of this tick)
+				// owns the next moves. The attacker
+				// answer above stays armed: a mob
+				// already on the character is fought
+				// whatever the weapon state is.
+				l.logWeaponWait(now)
+
+				return
+			}
 			pick, ok := l.tracker.NearestAttackablePreferredWindowed(
 				attackNearestRange, l.zone(), l.activeSkips(now),
 				l.minTargetLevel(), l.maxTargetLevel(), true,

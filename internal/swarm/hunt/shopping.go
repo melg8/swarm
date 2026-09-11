@@ -56,6 +56,14 @@ const (
 	// justifies a shopping trip on its own (a trip without it would
 	// walk to town for a handful of adena).
 	shoppingTripMinValue = 100
+	// weaponRunCooldown shortens the trip cooldown for the weapon
+	// runs: a bare-handed character with an affordable weapon
+	// retries the errand within a minute instead of punching mobs
+	// through the five minute cooldown of an ordinary trip. The
+	// failed run itself burns tens of seconds (the stuck re-paths,
+	// the walk back), so the short window still breaks any tight
+	// retry loop.
+	weaponRunCooldown = 45 * time.Second
 	// townTaxRate is the buy tax markup of the elven village
 	// merchants (baseTax 15 percent, no castle owns their tax on a
 	// fresh server). A future region config carries its own rate.
@@ -812,6 +820,68 @@ func (l *Loop) advanceTripStop() {
 // catalogs).
 func (l *Loop) shoppingTripEnabled() bool {
 	return l.equip != nil && len(townShopCatalog.Shops) > 0
+}
+
+// emptyPurchase is the not-found sentinel of the weapon purchase
+// probe (a plain zero var: nested empty literals trip exhaustruct).
+var emptyPurchase gear.Purchase
+
+// affordableWeaponPurchase returns the first affordable weapon
+// purchase of the cached shopping plan (the affordable prefix ends at
+// the first wanted tail entry). The weapon purchase is the highest
+// priority of the shop strategy: the trip machinery routes its sell
+// stop to the weapon's merchant so the sell-first of the replaced
+// weapon and the buy share one stop, and a bare-handed character runs
+// the weapon errand alone (see weaponlessRunWanted).
+func (l *Loop) affordableWeaponPurchase() (gear.Purchase, bool) {
+	if !l.shoppingTripEnabled() {
+		return emptyPurchase, false
+	}
+	l.refreshShoppingCache()
+	for _, purchase := range l.shoppingPlanCache {
+		if !purchase.Affordable {
+			break
+		}
+		stats, ok := npcdata.ItemGearStats(purchase.ItemID)
+		if !ok || gear.CategoryOf(stats) != gear.CategoryWeapon {
+			continue
+		}
+
+		return purchase, true
+	}
+
+	return emptyPurchase, false
+}
+
+// weaponStopMerchant resolves the town merchant that sells the
+// affordable weapon purchase of the plan.
+func (l *Loop) weaponStopMerchant() (townNpc, bool) {
+	purchase, ok := l.affordableWeaponPurchase()
+	if !ok {
+		return zeroTownNpc, false
+	}
+
+	return merchantByTemplate(purchase.MerchantTemplateID)
+}
+
+// weaponlessRunWanted reports whether the character fights bare-handed
+// while its plan offers an affordable weapon: the weapon purchase
+// outranks everything the loop could do instead - the fresh target
+// picks hold (no farming with the fists for 2 damage), the town trip
+// runs the weapon errand without the teach stops, and an aborted run
+// retries on the short weapon run cooldown. A character that cannot
+// afford any weapon keeps farming: the wallet grows until the plan
+// offers one, there is nothing better to do.
+func (l *Loop) weaponlessRunWanted() bool {
+	if l.equip == nil {
+		return false
+	}
+	if gear.HasWeapon(l.equip.profile, l.equipment()) {
+		return false
+	}
+	_, ok := l.affordableWeaponPurchase()
+
+	return ok
 }
 
 // stopBuysPending reports whether the current stop still wants buys:

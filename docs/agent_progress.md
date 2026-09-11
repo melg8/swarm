@@ -147,6 +147,36 @@ treated "no weapon" as the emergency it is.
   stuck walks my dump shows, the weapon run owns the trip priority
   side of the same story.
 
+- Commit "hunt: the weapon run leads the town trips": (1)
+  gear.HasWeapon (plan.go) probes the whole inventory for a profile
+  usable weapon; (2) hunt/shopping.go grows the weapon probe
+  (affordableWeaponPurchase, weaponStopMerchant,
+  weaponlessRunWanted) and the weaponRunCooldown 45s; (3)
+  maybeStartTownTrip routes the sell stop to the weapon purchase's
+  merchant (the sell-first of the replaced weapon and the buy share
+  one stop), a weapon run starts without the teach stops whatever the
+  inventory and lesson queue say; (4) the bare-handed engage gate
+  holds the fresh picks (the attacker self defense answer stays) and
+  engagesOnZoneEntry skips the same way; (5) tripCooldownOver shortens
+  to weaponRunCooldown while weaponless. Tests:
+  gear/gear_test.go TestHasWeapon, hunt/weapon_run_test.go (the
+  weapon stop routing, the learning skip, the held fresh picks with
+  the armed attacker answer, the pick that proceeds when no weapon is
+  affordable, the short cooldown, the upgrade stop routing, the zone
+  entry hold).
+- Commit "webserver: the dump slot names match the Mobius masks": the
+  dumpSlotNames table of dump.go mirrored the Mobius BodyPart enum
+  (verified against entity/item/enums/BodyPart.java) - the old table
+  mislabeled 0x04/0x08/0x10/0x20/0x40/0x4000/0x8000 and missed the
+  pair masks and legs/feet/back, so a healthy paperdoll read as
+  corrupted (Cloth Cap [lfinger], Necklace of Magic [lear ear],
+  Pants [part 0x800]). Test: webserver/dump_test.go
+  TestDumpSlotNames.
+- Verify loop: go build, go vet, the full go test suite (18 packages
+  green), -race green on the hunt package, gofmt clean, gofumpt
+  clean, golangci-lint zero new findings in the touched files (the
+  pre-existing branch findings stay untouched).
+
 ## Active task: the delevel water loop - the walk the planner planned as a swim
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.

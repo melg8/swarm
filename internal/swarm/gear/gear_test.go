@@ -352,3 +352,36 @@ func TestScoreSkipsNonGearItems(t *testing.T) {
 	require.Zero(t, Score(profile, item(1, 57)))
 	require.Zero(t, gearPoints(profile, item(1, 57)))
 }
+
+func TestHasWeapon(t *testing.T) {
+	profile := MeleeFighter{}
+	// The equipped short sword counts.
+	items := []state.InventoryItem{item(100, shortSwordID)}
+	equipment := equipmentWith(items, map[Slot]int32{SlotRHand: 100})
+	require.True(t, HasWeapon(profile, equipment),
+		"an equipped weapon answers true")
+
+	// A bagged weapon counts the same: the weapon run trigger must not
+	// arm while a spare weapon waits for its equip request.
+	items = []state.InventoryItem{item(100, shortSwordID)}
+	equipment = equipmentWith(items, nil)
+	require.True(t, HasWeapon(profile, equipment),
+		"a bagged weapon answers true")
+
+	// A bow is no weapon for the melee fighter.
+	items = []state.InventoryItem{item(100, shortBowID)}
+	equipment = equipmentWith(items, map[Slot]int32{SlotRHand: 100})
+	require.False(t, HasWeapon(profile, equipment),
+		"a bow is no melee weapon")
+
+	// An empty inventory answers false.
+	equipment = equipmentWith(nil, nil)
+	require.False(t, HasWeapon(profile, equipment),
+		"no weapon in the inventory answers false")
+
+	// The starter dagger counts: a fresh character is not weaponless.
+	items = []state.InventoryItem{item(100, 10)}
+	equipment = equipmentWith(items, map[Slot]int32{SlotRHand: 100})
+	require.True(t, HasWeapon(profile, equipment),
+		"the starter dagger is a weapon")
+}

@@ -122,6 +122,21 @@ func (l *Loop) logNoPickableTargets(now time.Time) {
 	l.logger.Printf("%s", strings.TrimSuffix(line.String(), ";"))
 }
 
+// logWeaponWait logs the bare-handed hold of the engage gate: the
+// character owns no weapon while its plan offers an affordable one,
+// so the fresh picks hold until the weapon run trip buys it. One line
+// per noPickLogPeriod while the hold lasts; a landed weapon ends the
+// hold and the log with it.
+func (l *Loop) logWeaponWait(now time.Time) {
+	if !l.weaponWaitLogAt.IsZero() &&
+		now.Sub(l.weaponWaitLogAt) < noPickLogPeriod {
+		return
+	}
+	l.weaponWaitLogAt = now
+	l.logger.Printf("Hunt: no weapon in hand, holding the target " +
+		"picks until the weapon run buys one")
+}
+
 // patrolToCenter walks a targetless hunter toward the zone center:
 // the pack moved on or the social fence keeps the camps out of
 // reach, and standing still waits for luck. One paced leg at a
