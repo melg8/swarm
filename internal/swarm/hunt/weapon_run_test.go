@@ -5,6 +5,8 @@
 package hunt
 
 import (
+	"bytes"
+	"log"
 	"testing"
 	"time"
 
@@ -226,4 +228,56 @@ func TestEngagesOnZoneEntryHoldsWhenWeaponless(t *testing.T) {
 	require.False(t, loop.engagesOnZoneEntry(),
 		"the zone entry engage holds while weaponless")
 	require.Empty(t, game.forces)
+}
+
+// TestWeaponlessHoldBlocksTheZoneReturn pins the leash order of the
+// bare-handed character: outside the hunting ground the return walk
+// never starts while the weapon run is pending. The walk home through
+// the aggressive packs unarmed never arrives - the panic logout saves
+// the character on the ground it flees, the relogin handoff resumes
+// that ground and the packs pile on again (the 2026-09-11 farm round:
+// the reset bot walked from the village to the Spore Fungus SW ground
+// bare handed and livelocked in the logout cycle). The trip machinery
+// owns the walk instead: the weapon run shops first and its return
+// leg walks home armed.
+func TestWeaponlessHoldBlocksTheZoneReturn(t *testing.T) {
+	loop, game, bot, _ := newTripLoop()
+	logBuf := &bytes.Buffer{}
+	loop.SetLogger(log.New(logBuf, "", 0))
+	// The trip cooldown holds the weapon run on the first tick: the
+	// leash branch of the engage owns it and must NOT walk home.
+	loop.tripEndedAt = time.Now()
+	bot.ApplyUserInfo(weaponRunUserInfo(11))
+	bot.ApplyItemList([]state.InventoryItem{
+		{ObjectID: 999, ItemID: 57, Count: 14814, Type2: 4, Change: 1},
+	})
+	// The hunting zone sits far from the character: the leash sees the
+	// character outside the square (the village respawn case).
+	loop.SetHuntingZone(40000, 40000, 1000)
+
+	loop.tick()
+
+	require.Equal(t, phaseEngage, loop.phase,
+		"the return walk never starts bare-handed")
+	require.Empty(t, game.walks,
+		"no walk toward the zone started")
+	require.True(t, loop.zoneReturn,
+		"the hold marks the pending return")
+	require.Contains(t, logBuf.String(),
+		"the weapon run outranks the walk home")
+
+	// The second tick after the weapon run cooldown: the trip
+	// machinery runs the weapon errand instead of the walk home.
+	loop.tripEndedAt = time.Now().Add(-weaponRunCooldown - time.Second)
+	logBuf.Reset()
+
+	loop.tick()
+
+	require.Equal(t, phaseTownWalk, loop.phase,
+		"the weapon run replaces the walk home")
+	require.NotEmpty(t, loop.tripStops)
+	require.Equal(t, int32(7147), loop.tripStops[0].merchant.TemplateID,
+		"the errand walks to the weapon merchant")
+	require.Contains(t, logBuf.String(),
+		"no weapon in hand, the weapon run comes first")
 }

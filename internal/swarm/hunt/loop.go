@@ -1088,6 +1088,31 @@ func (l *Loop) engage() {
 			return
 		}
 		if !l.adoptOutZoneFight(now) {
+			if l.weaponlessRunWanted() {
+				// The bare-handed errand outranks the walk
+				// home: the return walk through the
+				// aggressive packs never arrives unarmed -
+				// the panic logout saves the character on
+				// the ground it flees, the relogin handoff
+				// resumes that ground and the packs pile on
+				// again (the 2026-09-11 farm round: the
+				// reset bot walked from the village to the
+				// Spore Fungus SW ground bare handed and
+				// livelocked in the logout cycle). The trip
+				// machinery starts the weapon run on the
+				// next tick and its return leg walks home
+				// armed; the wallet that cannot afford any
+				// weapon keeps the ordinary return (the
+				// punches are all it has).
+				if !l.zoneReturn {
+					l.zoneReturn = true
+					l.logger.Printf("Hunt: no weapon in " +
+						"hand, the weapon run outranks " +
+						"the walk home")
+				}
+
+				return
+			}
 			l.returnToZone()
 
 			return
