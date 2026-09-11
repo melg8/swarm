@@ -301,3 +301,18 @@ cd "${SWARM}"
 bash tools/mobius_start.sh
 
 step "ГОТОВО. Бот: ${LOGS_DIR}/swarm_bot (или tools/mobius_e2e.sh 45)"
+
+# ---------------------------------------------------------------------------
+# Post-deploy dev-tool preflight: the Go toolchain is up, but the
+# workflow also expects task, golangci-lint, gci and gofumpt. The
+# fast deploy does not install them (they belong to the developer
+# side, not the server stack); the dedicated installer does. This is
+# a check, not an install - it prints a clear next step when a tool
+# is missing instead of paying the install cost on every deploy.
+if [ -x "${SWARM}/tools/install_dev_tools.sh" ]; then
+    echo
+    echo ">>> dev tools preflight (run tools/install_dev_tools.sh to fix):"
+    PATH="${GOROOT_DIR}/bin:${HOME}/go/bin:${PATH}" \
+        bash "${SWARM}/tools/install_dev_tools.sh" check \
+        2>&1 | sed 's/^/    /' || true
+fi
