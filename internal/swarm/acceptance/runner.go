@@ -172,6 +172,24 @@ func (m *Manager) runSession(
 	if err != nil {
 		return fmt.Errorf("game authentication: %w", err)
 	}
+
+	// The temp character must exist before the selection: a fresh
+	// database starts every scenario with an empty account, so the
+	// session creates the missing elven fighter exactly like runBot
+	// does (the same creation values ensureCharacter uses).
+	charList, err = game.EnsureCharacter(connection.CharacterParams{
+		Name:      char,
+		Race:      elfRaceID,
+		Female:    male,
+		ClassID:   elfFighterID,
+		HairStyle: defaultHair,
+		HairColor: defaultHair,
+		Face:      defaultFace,
+	}, charList)
+	if err != nil {
+		return fmt.Errorf("prepare character: %w", err)
+	}
+
 	slot, charInfo, found := charList.FindCharacterByName(char)
 	if !found {
 		return fmt.Errorf("character %s not found", char)
