@@ -42,6 +42,12 @@ const logRingLimit = 40
 // the combat stance delay, the new run proceeds alone after the cap.
 const restartWait = 90 * time.Second
 
+// parallelStartStagger spaces the simultaneous launch of the parallel
+// run all: the login server flood protector drops the connections
+// that arrive too close together, so the scenarios log in one after
+// another while their runs still overlap.
+const parallelStartStagger = 2 * time.Second
+
 // checkLogLimit bounds how many checks one scenario may publish.
 const checkLogLimit = 12
 
@@ -375,11 +381,24 @@ func (m *Manager) StartAll(mode string) error {
 		return fmt.Errorf("unknown run mode %q", mode)
 	}
 	if mode == ModeParallel {
-		for _, test := range m.tests {
-			if err := m.Start(test.def.ID); err != nil {
-				return err
+		go func() {
+			for i, test := range m.tests {
+				if i > 0 {
+					// The Mobius login flood protector silently
+					// drops the connections of one address that
+					// arrive within the 350ms window (and the
+					// bursts past 15 quick connects): the stagger
+					// keeps the simultaneous launch of the
+					// scenarios off the burst path - the runs
+					// still overlap, the temp bots just log in
+					// one after another.
+					time.Sleep(parallelStartStagger)
+				}
+				if err := m.Start(test.def.ID); err != nil {
+					m.logger.Printf("Acceptance: %v", err)
+				}
 			}
-		}
+		}()
 
 		return nil
 	}
