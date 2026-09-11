@@ -102,6 +102,16 @@ const (
 	// arrived: the list lands within a second of the enter world, and
 	// a trip started ahead of it drops the learning stops silently.
 	skillListWaitLimit = 10 * time.Second
+	// clickShortenFloor bounds the halving of a walk click the
+	// server validation refuses: below it the refusal is local (the
+	// character stands boxed) and the follower hops or re-paths
+	// instead of crawling micro legs.
+	clickShortenFloor = 100.0
+	// hopCoincideDist is the distance under which a walked-past
+	// waypoint counts as stood on: the escape hop of a refused
+	// click targets the nearest plan bend between it and the
+	// waypoint arrival radius.
+	hopCoincideDist = 15.0
 )
 
 // townNpc is a town npc the trip machinery navigates to: a shop
@@ -179,6 +189,13 @@ type Navigator interface {
 	// the water has no walkable connection to, so the only sensible
 	// walk is the one back to the shore.
 	FindWaterEscape(start pathfind.Vec3) (*pathfind.Result, error)
+	// ValidateClick mirrors the server-side validation of a
+	// mouse-mode move request: it answers the destination the
+	// server would actually walk to and whether the click runs at
+	// all. A refused click (the geodata correction collapses the
+	// target onto the walker) never moves the character - the
+	// follower reacts to it instead of sending it.
+	ValidateClick(from, to pathfind.Vec3) (pathfind.Vec3, bool)
 }
 
 // engineNavigator adapts a geodata engine to the Navigator interface,
@@ -250,6 +267,13 @@ func (e engineNavigator) FindWaterEscape(
 	start pathfind.Vec3,
 ) (*pathfind.Result, error) {
 	return e.engine.FindWaterEscape(start)
+}
+
+// ValidateClick mirrors the server move validation with the engine.
+func (e engineNavigator) ValidateClick(
+	from, to pathfind.Vec3,
+) (pathfind.Vec3, bool) {
+	return e.engine.ValidateClick(from, to)
 }
 
 // nearestMerchant returns the town merchant closest to the point.
@@ -764,11 +788,11 @@ func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
 // followWaypoints is the shared waypoint follower core of the town
 // legs and the water escapes: the waypoint arrival (tight for the
 // intermediate turns, wide for the final goal), the passed waypoint
-// skipping, the stuck tracking, the leg splitting and the click
-// pacing. The waterGuard switch tells whether the click lines must
-// verify dry before they are sent (the town legs: the character is
-// ashore and must stay so) or not (the water escape: its legs
-// intentionally cross the water back to the shore).
+// skipping, the stuck tracking and the click pacing. The waterGuard
+// switch tells whether the click lines must verify dry before they
+// are sent (the town legs: the character is ashore and must stay so)
+// or not (the water escape: its legs intentionally cross the water
+// back to the shore).
 func (l *Loop) followWaypoints(
 	selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
 ) bool {
@@ -782,6 +806,21 @@ func (l *Loop) followWaypoints(
 	if !l.moveAt.IsZero() && now.Sub(l.moveAt) < walkRequestPeriod {
 		return false
 	}
+	l.clickWaypoint(selfX, selfY, selfZ, now, waterGuard)
+
+	return false
+}
+
+// clickWaypoint aims the current waypoint, bends the click around the
+// idle aggressive camps, guards the line against water and the server
+// refusal and sends it. The leg splitting caps the click at the
+// server move request limit; the water guard and the server click
+// validation run after the steering so the line they verify is the
+// one actually being sent. Without a navigator both guards stay off
+// (the walk was planned elsewhere, the follower only walks it).
+func (l *Loop) clickWaypoint(
+	selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
+) {
 	wp := l.waypoints[l.wpIndex]
 	dx := wp.X - float64(selfX)
 	dy := wp.Y - float64(selfY)
@@ -805,16 +844,142 @@ func (l *Loop) followWaypoints(
 		int32(l.legDest.X), int32(l.legDest.Y), now); dodged {
 		moveX, moveY = float64(ax), float64(ay)
 	}
-	// The water guard runs after the steering so the line it verifies
-	// is the one actually being sent; without a navigator it stays
-	// off (the walk was planned elsewhere, the follower only walks it).
 	if waterGuard && l.navigator != nil && l.clickWouldEnterWater(
 		selfX, selfY, selfZ, moveX, moveY, moveZ) {
-		return false
+		return
+	}
+	// The server click validation runs last: the server refuses
+	// whole lines its Bresenham raster walks into walled corners -
+	// a refused click never moves the character.
+	if l.navigator != nil && !l.clickServerValidated(
+		selfX, selfY, selfZ, &moveX, &moveY, &moveZ, now) {
+		return
 	}
 	l.moveAt = now
 	if err := l.game.WalkTo(int32(moveX), int32(moveY), int32(moveZ)); err != nil {
 		l.logger.Printf("Hunt: town walk request failed: %v", err)
+	}
+}
+
+// clickServerValidated gates a walk click through the server
+// validation port (Navigator.ValidateClick): a click the server would
+// cancel never moves the character, so sending it just grinds
+// ActionFailed answers until the stuck timeout fires - the town walk
+// stuck of 2026-09-10 (the bot clicked the second waypoint 58 units
+// over the village plaza corner, the geodata correction collapsed the
+// target onto the walker and the character froze through all three
+// re-paths). A refused click shortens the leg first (the Bresenham
+// prefix of a split leg is not a prefix of the full raster, a shorter
+// line often validates), then hops to the nearest swallowed plan bend
+// (the escape step out of a trap cell), and finally falls back to the
+// re-path of the stuck path. It reports whether the click target in
+// the move pointers may be sent.
+func (l *Loop) clickServerValidated(
+	selfX, selfY, selfZ int32,
+	moveX, moveY, moveZ *float64, now time.Time,
+) bool {
+	from := pathfind.Vec3{
+		X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+	}
+	if _, ok := l.navigator.ValidateClick(from,
+		pathfind.Vec3{X: *moveX, Y: *moveY, Z: *moveZ}); ok {
+		return true
+	}
+	if l.shortenClickLeg(selfX, selfY, selfZ, moveX, moveY, moveZ, from) {
+		return true
+	}
+	if l.clickEscapeHop(selfX, selfY, selfZ, moveX, moveY, moveZ) {
+		return true
+	}
+	// No local escape works: re-path from the current position like
+	// the stuck path does, bounded by the same budget.
+	l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+	l.rePaths++
+	if l.rePaths > maxRePaths {
+		l.abortTownTrip("the server refuses every walk click")
+
+		return false
+	}
+	l.logger.Printf("Hunt: the server would refuse the walk click to "+
+		"%d %d, re-pathing (%d of %d)",
+		int32(*moveX), int32(*moveY), l.rePaths, maxRePaths)
+	if !l.startWalkLeg(l.legDest) {
+		l.abortTownTrip("re-path failed")
+	}
+
+	return false
+}
+
+// shortenClickLeg halves a refused click leg toward its target until a
+// prefix validates: the split legs of a long waypoint line rasterize
+// differently than the planned leg (the Bresenham accumulator starts
+// from the endpoint deltas), so the far half of a line can fail where
+// a shorter prefix passes. It reports whether the move pointers carry
+// a validated shorter target.
+func (l *Loop) shortenClickLeg(
+	selfX, selfY, selfZ int32,
+	moveX, moveY, moveZ *float64, from pathfind.Vec3,
+) bool {
+	dx := *moveX - float64(selfX)
+	dy := *moveY - float64(selfY)
+	dz := *moveZ - float64(selfZ)
+	full := math.Hypot(dx, dy)
+	for leg := full / 2; leg >= clickShortenFloor; leg /= 2 {
+		frac := leg / full
+		shortX := float64(selfX) + dx*frac
+		shortY := float64(selfY) + dy*frac
+		shortZ := float64(selfZ) + dz*frac
+		if _, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
+			X: shortX, Y: shortY, Z: shortZ,
+		}); ok {
+			*moveX, *moveY, *moveZ = shortX, shortY, shortZ
+
+			return true
+		}
+	}
+
+	return false
+}
+
+// clickEscapeHop walks the nearest plan bend the arrival slack
+// swallowed: the geodata holds trap cells (entered legally through an
+// open wall, their own walls box the walker in - the village terrace
+// rows), and the re-path plans the escape step over them; but the bend
+// sits inside the waypoint arrival radius, the cursor skips it and the
+// far clicks keep leaving the boxed cell. The hop clicks the bend
+// directly so the character stands on it and the following clicks
+// validate from there. It reports whether the move pointers carry a
+// validated hop target.
+func (l *Loop) clickEscapeHop(
+	selfX, selfY, selfZ int32,
+	moveX, moveY, moveZ *float64,
+) bool {
+	from := pathfind.Vec3{
+		X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+	}
+	for j := l.wpIndex - 1; j >= 0; j-- {
+		wp := l.waypoints[j]
+		dist := waypointDistance(wp, selfX, selfY, selfZ)
+		if dist > waypointPassDist {
+			// Deeper waypoints stand farther back along the
+			// route: walking to them retraces the route
+			// instead of escaping the spot.
+			break
+		}
+		if dist <= hopCoincideDist {
+			// Stood on it: no hop needed.
+			continue
+		}
+		if _, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
+			X: wp.X, Y: wp.Y, Z: wp.Z,
+		}); ok {
+			*moveX, *moveY, *moveZ = wp.X, wp.Y, wp.Z
+			l.logger.Printf("Hunt: walk click refused, hopping "+
+				"back to the plan bend at %d %d",
+				int32(wp.X), int32(wp.Y))
+
+			return true
+		}
 	}
 
 	return false

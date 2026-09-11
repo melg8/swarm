@@ -43,6 +43,18 @@ type fakeNavigator struct {
 	// tests arm it to refuse the clicks, every other walk stays dry
 	// by default (the zero value answers a dry line).
 	wetLine bool
+	// refuseClicks makes the server click validation port refuse
+	// every line: the follower reaction tests (the shorten, the hop
+	// and the re-path) arm it.
+	refuseClicks bool
+	// validateHook overrides the ValidateClick answers line by
+	// line (the shortening and hop targeting tests answer by
+	// geometry).
+	validateHook func(from, to pathfind.Vec3) (pathfind.Vec3, bool)
+	// validatedClicks records the lines the follower asked the server
+	// validation port about (the shorten loop and the hop targeting
+	// checks pin their geometry here).
+	validatedClicks []pathfind.Vec3
 	// escapeRoute overrides the waypoints of the water escape search.
 	escapeRoute []pathfind.Vec3
 	// escapeErr makes the water escape search fail hard.
@@ -183,6 +195,24 @@ func (f *fakeNavigator) WaterCrossed(_, _ pathfind.Vec3) (bool, error) {
 	}
 
 	return f.wetLine, nil
+}
+
+// ValidateClick answers the configured server click validation: the
+// default accepts every line (the port is a pure mirror, the fake
+// trusts the plan), the validateHook overrides the answers for the
+// follower reaction tests and refuseClicks arms the blanket refusal.
+func (f *fakeNavigator) ValidateClick(
+	from, to pathfind.Vec3,
+) (pathfind.Vec3, bool) {
+	f.validatedClicks = append(f.validatedClicks, to)
+	if f.validateHook != nil {
+		return f.validateHook(from, to)
+	}
+	if f.refuseClicks {
+		return from, false
+	}
+
+	return to, true
 }
 
 // FindWaterEscape answers the configured shore escape.
