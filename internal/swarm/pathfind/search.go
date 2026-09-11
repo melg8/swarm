@@ -553,8 +553,9 @@ func (s *search) obstacleMultiplier(ring []*node) float32 {
 }
 
 // canStep mirrors the walkable surface rule of one cell step: the
-// walls of the source cell must be open for the step direction and the
-// height difference must stay within the passable limit in BOTH
+// walls of the source cell must be open for the step direction, the
+// walls of the target cell must be open for the reverse direction and
+// the height difference must stay within the passable limit in BOTH
 // directions (the Mobius HEIGHT_INCREASE_LIMIT of 40 gates the climb;
 // the drop uses the same bound). The Mobius movement validation
 // accepts any downward step, but a planned walk must stay on the
@@ -577,8 +578,19 @@ func (s *search) canStep(from, to *node) bool {
 		s.maxPassableHeight
 }
 
-// wallsOpen reports whether the walls of the source node allow the
-// step to the adjacent node.
+// wallsOpen reports whether the walls of both the source and the
+// target node allow the step between them. The source cell's wall in
+// the step direction must be open (the character can leave the cell)
+// AND the target cell's wall in the reverse direction must be open
+// (the character can enter the cell). The reverse check mirrors the
+// Mobius MoveToLocation handler: isCompletelyBlocked rejects any
+// target cell whose walls are all closed, and the movement validation
+// checks the target cell's wall in the approach direction. Without
+// the reverse check the search planned steps onto cells the server
+// refused to enter - the character stood still, the stuck timer fired
+// and the deterministic re-path planned the identical route (the
+// 2026-09-11 town walk stuck loop of the elven village teacher plaza
+// trips).
 func (s *search) wallsOpen(from, to *node) bool {
 	if from.coords.Y > to.coords.Y && !from.layer.IsNorthOpen() {
 		return false
@@ -590,6 +602,24 @@ func (s *search) wallsOpen(from, to *node) bool {
 		return false
 	}
 	if from.coords.X > to.coords.X && !from.layer.IsWestOpen() {
+		return false
+	}
+	// The target cell's wall in the reverse direction must also be
+	// open: a step onto a cell whose reverse wall is closed is a step
+	// the server refuses (the isCompletelyBlocked check of
+	// MoveToLocation rejects any target whose walls are all closed,
+	// and a target whose reverse wall alone is closed blocks the
+	// movement validation the same way).
+	if from.coords.Y > to.coords.Y && !to.layer.IsSouthOpen() {
+		return false
+	}
+	if from.coords.Y < to.coords.Y && !to.layer.IsNorthOpen() {
+		return false
+	}
+	if from.coords.X < to.coords.X && !to.layer.IsWestOpen() {
+		return false
+	}
+	if from.coords.X > to.coords.X && !to.layer.IsEastOpen() {
 		return false
 	}
 

@@ -11,6 +11,61 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the town walk stuck loop - the reverse wall check and the waypoint skip
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (2026-09-11, Russian): the bots are stuck and not
+learning. The state dump (build 36bfe99) shows the character test1
+(level 13, 25023 SP) at the elven village teacher plaza
+(44440 52552 -2832), cycling "town walk stuck, re-pathing (1 of 3)"
+-> "town trip ended: aborted, walk stuck" and restarting. The learning
+trip planned 25 lessons worth 6570 SP at the teacher Cobendell, walked
+to the trader Herbiel first and stuck on the first leg. The user also
+asked to verify which NPCs are the skill teachers and to check the
+pathfinding.
+
+### Root cause
+
+The pathfinder's `wallsOpen` checked only the SOURCE cell's wall in
+the step direction. The Mobius `MoveToLocation` handler checks the
+TARGET cell too (`isCompletelyBlocked` rejects any target whose walls
+are all closed, the movement validation checks the reverse wall). A
+path that stepped onto a cell whose reverse wall was closed was a path
+the server refused to walk - the character stood still, the stuck timer
+fired, and the deterministic re-path planned the identical route.
+
+### Fix
+
+- pathfind: `wallsOpen` now checks the TARGET cell's reverse wall too.
+  `Layer.IsCompletelyBlocked` documents the server's check.
+- hunt: `walkStuck` first SKIPS the current waypoint before re-planning
+  the whole leg. The skip breaks the deterministic re-path loop: the
+  next waypoint may be reachable through a different cell.
+- The skill teacher data was verified against the Mobius C1
+  SkillLearn.xml: both Ellenia and Cobendell teach the elven fighter,
+  the bot's nearest teacher selection is correct.
+
+### Status: done (2026-09-11)
+
+- Commit "pathfind: the reverse wall check and the waypoint skip":
+  (1) pathfind/search.go `wallsOpen` checks the target cell's reverse
+  wall; (2) pathfind/layer.go `IsCompletelyBlocked` helper; (3)
+  hunt/town.go `walkStuck` skips the current waypoint before re-planning
+  the leg; (4) tests: pathfind/reverse_wall_test.go, hunt/
+  walk_stuck_skip_test.go, hunt/skill_teacher_test.go; (5) docs:
+  development_log.md Round 49, agent_progress.md this entry.
+- Verify loop: go build, go vet, the full go test suite (16 packages
+  green), gofmt clean, golangci-lint zero new findings in the touched
+  files.
+- The real pack probe: the dry search from the dump stuck spot to
+  Herbiel now plans a 9 waypoint route of length 3258 (was 3451) that
+  avoids the plaza detour that triggered the stuck loop.
+
 ## Active task: the delevel water loop - the walk the planner planned as a swim
 
 Started: 2026-09-10. Branch: `feature/proxy-server`. Commits as melg8.

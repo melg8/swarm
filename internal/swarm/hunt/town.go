@@ -896,8 +896,18 @@ func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
 // walkStuck tracks the movement progress of the walker and re-paths
 // around the obstacle once the character stands still for too long.
 // A stuck water escape re-plans the escape itself - the town leg is
-// meaningless until the character is back ashore. It reports whether
-// the trip had to abort.
+// meaningless until the character is back ashore. A stuck town leg
+// first tries to SKIP the current waypoint: the waypoint itself may
+// sit on a cell the server refuses to enter (a completely blocked
+// cell the isCompletelyBlocked check of MoveToLocation rejects, a
+// layer mismatch the movement validation bounces), while the next
+// waypoint on the planned route may be reachable through a different
+// cell. The skip breaks the deterministic re-path loop where the A*
+// returns the identical route from the identical start and the walker
+// burns its whole re-path budget on the same refused click. When no
+// more waypoints remain to skip, the leg re-plans from the current
+// position to the destination. It reports whether the trip had to
+// abort.
 func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
 	if l.stuckAt.IsZero() {
 		l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
@@ -933,6 +943,23 @@ func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
 
 		return false
 	}
+	// First try to skip the current waypoint: the waypoint cell may
+	// be unreachable (the server refuses the move) while the next
+	// waypoint on the route is reachable. The skip advances the
+	// follower cursor, clears the move pacer so the next tick sends a
+	// fresh click at the new target and resets the stuck timer so the
+	// new waypoint gets its own stuck window.
+	if l.wpIndex+1 < len(l.waypoints) {
+		l.wpIndex++
+		l.moveAt = time.Time{}
+		l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+		l.logger.Printf("Hunt: town walk stuck, skipping waypoint "+
+			"(%d of %d)", l.rePaths, maxRePaths)
+
+		return false
+	}
+	// No more waypoints to skip: re-plan the whole leg from the
+	// current position to the destination.
 	l.logger.Printf("Hunt: town walk stuck, re-pathing (%d of %d)",
 		l.rePaths, maxRePaths)
 	if !l.startWalkLeg(l.legDest) {

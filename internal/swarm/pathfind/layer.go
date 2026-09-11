@@ -41,6 +41,12 @@ func (l Layer) IsEastOpen() bool { return l.NSWE&nsweEast != 0 }
 // IsCompletelyOpen reports whether every wall of the cell is open.
 func (l Layer) IsCompletelyOpen() bool { return l.NSWE == nsweAll }
 
+// IsCompletelyBlocked reports whether every wall of the cell is closed.
+// The Mobius MoveToLocation handler rejects any move whose target cell
+// is completely blocked (isCompletelyBlocked of GeoEngine), so the
+// pathfinder must never plan a step onto such a cell.
+func (l Layer) IsCompletelyBlocked() bool { return l.NSWE == 0 }
+
 // layerPool interns layers so identical (height, walls) pairs are stored
 // once per engine and cells reference them by a small id. Real regions
 // contain only a few thousand distinct layers, so this cuts the memory

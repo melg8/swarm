@@ -2949,3 +2949,86 @@ lands in abortDelevel with its cooldown.
   the bay through the village deck (15831 units against the swim's
   11837 - the shore detour the "re-pathing around the shore" always
   claimed to do).
+
+## Round 49: the town walk stuck loop - the reverse wall check and the waypoint skip (2026-09-11)
+
+### The report
+
+The bot hung cycling "town walk stuck, re-pathing (1 of 3)" -> "(2 of
+3)" -> "(3 of 3)" -> "town trip ended: aborted, walk stuck" and
+restarting, never reaching the trader or the teacher. The state dump
+(build 36bfe99, branch feature/proxy-server): the character test1
+(level 13, 25023 SP) stood at the elven village teacher plaza
+(44440 52552 -2832), the hunting zone 42278 56761 behind it. The
+learning trip planned 25 lessons worth 6570 SP at the teacher
+Cobendell, walked to the trader Herbiel first (the sell stop) and
+stuck on the very first leg - the character never moved, the 15 s
+stuck timer fired, the re-path planned the identical route (the A* is
+deterministic, the start and the destination were the same) and the
+walker burned its whole 3 re-path budget on the same refused click.
+
+### The root cause
+
+The pathfinder's `wallsOpen` checked only the SOURCE cell's wall in
+the step direction. The Mobius `MoveToLocation` handler checks the
+TARGET cell too: `isCompletelyBlocked` rejects any target whose walls
+are all closed, and the movement validation checks the target cell's
+wall in the approach direction. A path that stepped onto a cell whose
+reverse wall was closed was a path the server refused to walk - the
+character stood still, the stuck timer fired, and the deterministic
+re-path planned the identical route from the identical start. The
+reverse wall check was missing from the port of the L2jGeodataPathFinder.
+
+### The fix
+
+- pathfind: `wallsOpen` now checks the TARGET cell's wall in the
+  reverse direction too - a step onto a cell whose reverse wall is
+  closed is rejected. The `Layer.IsCompletelyBlocked` helper (NSWE ==
+  0) documents the server's `isCompletelyBlocked` check the pathfinder
+  must never violate.
+- hunt: `walkStuck` first tries to SKIP the current waypoint before
+  re-planning the whole leg. The current waypoint may sit on a cell
+  the server refuses to enter (a completely blocked cell, a layer
+  mismatch), while the next waypoint on the planned route may be
+  reachable through a different cell. The skip breaks the deterministic
+  re-path loop: the follower cursor advances, the move pacer clears and
+  the next tick sends a fresh click at the new target. When no more
+  waypoints remain to skip, the leg re-plans from the current position
+  as before. The water escape branch is unchanged (a stuck escape
+  re-plans the escape itself).
+- The skill teacher data was verified against the Mobius C1
+  SkillLearn.xml: both Ellenia (30155/7155) and Cobendell (30156/7156)
+  teach the elven fighter classes 18-24, Greenis (30157/7157) and
+  Esrandell (30158/7158) teach the elven mystic classes 25-30. The
+  bot's nearest teacher selection (Cobendell for a character at the
+  teacher plaza) is correct - the dump's "walking to the teacher
+  Cobendell" is the right teacher, the trip just never reached it.
+
+### Tests
+
+- pathfind/reverse_wall_test.go: the reverse wall check rejects a
+  target whose reverse wall is closed, accepts one whose reverse wall
+  is open, rejects a completely blocked target; the Layer helper
+  IsCompletelyBlocked; the dry path from the dump stuck spot to
+  Herbiel and to Cobendell both found and dry.
+- hunt/walk_stuck_skip_test.go: the first stuck skips the current
+  waypoint and sends a fresh walk at the new target; the re-path
+  fallback fires after all waypoints are skipped; the trip aborts
+  after the re-path budget; the water escape branch is unchanged.
+- hunt/skill_teacher_test.go: the elven fighter has Ellenia and
+  Cobendell, the elven mystic has Greenis and Esrandell, the nearest
+  teacher picks the closest, the town merchants are never teachers.
+
+### Verification
+
+- go build, go vet, go test ./internal/swarm/... (16 packages green);
+  gofmt clean; golangci-lint: zero new findings in the touched files
+  (the pre-existing branch findings in the spot/zones/delevel code
+  stay untouched).
+- The real pack probe: the dry search from the dump stuck spot
+  (44440 52552 -2832) to Herbiel (42766 50037 -2984) now plans a
+  9 waypoint route of length 3258 (was 3451 before the reverse wall
+  fix) that stays on the z -2832 deck and descends directly, avoiding
+  the plaza detour at z -2792 that the old route climbed and dropped
+  back from - the detour that triggered the stuck loop.
+
