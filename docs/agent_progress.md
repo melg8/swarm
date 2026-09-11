@@ -1581,3 +1581,84 @@ semantics.
   all met; the reported purchase queue bug (a 14k weapon replaced
   through a 1k intermediate or an empty handed return) is fixed by the
   top-tier slot guard.
+
+## Active task: the dump state diagnostics for stuck bot reports
+
+Started: 2026-09-11. Branch: `feature/acceptance`. Commits as melg8,
+pushed as they land. Stack deployed and verified as the mandatory
+first step (tools/swarm_fast_deploy.sh: STACK_READY, ports
+2106/7777/3306, 75 tables).
+
+### Goal
+
+The user asked for an analysis of what the state dump (the JSON
+snapshot of `GET /api/bots/{id}/state` and the SSE stream) carries
+today, what is missing, what is redundant, and an improvement so the
+dump works as a live server report when bots get stuck or behave
+inadequately.
+
+### Gap analysis of the current dump
+
+The snapshot carries: id, status, phase, a 39 field character view,
+the full inventory, every world object (31 fields each), the last 100
+events, the last 64 chat lines, the manual/town walk plan, the 2
+second combat animation window, the hunting zones, packets, version,
+serverTimeMs, startedAt, updatedAt.
+
+Missing for a stuck bot report:
+
+1. No liveness ages or rates: the packet counter is cumulative with
+   no rate, updatedAt carries no age, the phase has no age - a bot
+   stuck in townWalk for 15 minutes is indistinguishable from one
+   that just switched.
+2. No reconnect visibility: the login cooldown the emergency logout
+   arms is tracked but never published, so an offline bot carries no
+   reason.
+3. No hunt loop internals: the loop state (current target, engagement
+   age, the engage skip list, the re-path count, the stuck watchdog,
+   the flee episode, the trip age, the buy retries) never reaches the
+   tracker, and every loop decision is printed to the console logger
+   only - the dump has no WHY.
+4. Coarse combat view: inCombat is one boolean; the auto attack flag,
+   the fighting target, the combat activity age and the hit age are
+   missing, so a stale-flag fight is indistinguishable from a live
+   one.
+5. Walk freshness: the moving flag has no fresh window companion (a
+   lost stop packet leaves it set forever).
+6. No object summary: the known list health (npc/player/item/dead
+   counts) requires scanning the whole array by hand.
+
+Redundant for a report (kept anyway): the combat animation beats, the
+per-object vitals and the per-item icon/name fields are UI payload of
+the same endpoint - the diagnostics section adds the report layer
+without growing the per-object cost.
+
+### Fix plan
+
+1. state: a `diagnostics` section at the end of the snapshot - phase
+   age, update age, the 10 second packet rate, the login cooldown,
+   the combat nuance (autoAttacking, fightingTargetId, combat
+   activity age, hit age, under attack, attacker count), the walk
+   freshness, the object counts, and the hunt subview (target,
+   engagement age, skipped targets, no-target age, re-paths, stuck
+   age, waypoints left, trip age, flee age, buy retries, last action
+   and its age, loop tick age).
+2. hunt: the loop publishes its internals every tick and routes its
+   decision log lines into the tracker event log, so the dump events
+   array carries the decision history and the last action.
+3. webserver: the footer and the activity banner surface the key ages
+   so a stuck bot is visible in the live UI too.
+
+### Acceptance criteria
+
+- The reflection golden suite and the live encode parity tests stay
+  green with the new section (byte identical paths).
+- Unit tests for every diagnostics field family (phase age, packet
+  rate window, cooldown, combat nuance, walk freshness, counts, hunt
+  publication, note action).
+- go build, go vet, go test ./..., golangci-lint run green; the live
+  stack e2e prints E2E_OK with the diagnostics flowing.
+
+### Status
+
+- In progress: the state diagnostics section first.
