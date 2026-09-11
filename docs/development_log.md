@@ -3600,3 +3600,97 @@ within the server interaction distance (npcInteractionDist = 250 in
   recovery walker (hunt/loop_los.go) still use the old approach gate
   for their npc interactions; the same npcInteractionDist early
   return would harden them if they approach town npcs.
+
+## Round 55: the zone return stuck - the town trip blocks out, the non-dry fallback routes home (2026-09-11)
+
+Scope: the 2026-09-11 06:00 user follow-up dump. The bot test3
+(build c1faefb, phase engage) stood at 43000 50184 -2992 (near
+Herbiel, outside the zone) for 3 minutes. Events: "no dry path to
+38553 50080, the walk would swim" repeated, then a learning trip
+started and also failed with "no dry path to 42766 50037" (Herbiel
+is only 276 units away). The bot never moved.
+
+### Problem statement
+
+Two bugs composed:
+
+1. The town trip started while the bot was outside the zone.
+   `handleTownTrip` runs before `engage()` in the tick, so
+   `maybeStartTownTrip` fired and started a learning trip (2090 SP
+   worth of lessons) before the zone return had a chance. The
+   learning trip's `startWalkLeg(Herbiel)` failed ("no dry path"),
+   the trip aborted and armed the 5 minute cooldown. The zone return
+   then tried and also failed. The bot was stuck at the village.
+
+2. The zone return had no non-dry fallback. `returnToZone` called
+   `startWalkLeg` (dry search only). When the dry search failed, it
+   fell back to `walkZoneLeg` (direct walks toward the zone center).
+   The direct line from 43000 50184 to 38553 50080 crosses water
+   (the probe showed water at 741..1928 units along the line) and
+   walls, so the server refused the walks and the bot stood still.
+
+A geodata probe (scripts/probe_zone_return, since deleted) confirmed
+that `FindPathApproachDry` from 43000 50184 -2992 to both Herbiel
+(276 units) and the zone center (4447 units) SUCCEEDS in the offline
+probe against the project geodata pack. The runtime failure reason
+is unresolved (possibly a different geodata directory at runtime, or
+a race condition), but the non-dry fallback gives the bot a route
+regardless.
+
+### Fix
+
+1. **The town trip is blocked while the bot is outside the zone.**
+   `maybeStartTownTrip` checks `l.zone() != nil && !l.inZoneSelf()`
+   and returns early (the zone return owns the walk). The weapon run
+   is the sole exception: a bare-handed character shops for a weapon
+   at once, even outside the zone (punching mobs through the walk
+   home is worse than a late return).
+
+2. **The zone return tries the non-dry search as a fallback.** The
+   new `startZoneReturnLeg` method runs the dry search first, and
+   when it fails, runs the non-dry search (`FindPathApproach`,
+   water allowed with a cost penalty). The click guard of the town
+   walk follower refuses water legs and re-paths around the shore,
+   so a non-dry plan with water legs is still safe to walk - the bot
+   follows the dry parts and re-plans at the waterline. If both
+   searches fail, the fallback to `walkZoneLeg` (direct walks) stays.
+
+   The refactoring splits `startWalkLeg` into:
+   - `startWalkLeg(dest)` - the dry-only search (the town trips,
+     unchanged behavior).
+   - `startZoneReturnLeg(dest)` - the dry + non-dry fallback (the
+     zone return).
+   - `startWalkLegSearch(dest, nonDry)` - the shared core.
+
+### Verification
+
+- go build/vet, gofmt clean, go test ./... (19 packages green);
+  golangci-lint: zero new findings in the touched files.
+- The zone return tests pin both fixes:
+  - `TestTownTripBlockedOutsideTheZone`: a bot outside the zone with
+    a learning budget does NOT start a town trip (the zone return
+    is armed instead).
+  - `TestTownTripStartsInsideTheZone`: a bot inside the zone starts
+    the town trip normally.
+  - `TestTownTripWeaponRunStartsOutsideTheZone`: the weapon run
+    exception - a bare-handed character starts the weapon trip even
+    outside the zone.
+  - `TestZoneReturnNonDryFallback`: when the dry search fails, the
+    non-dry search runs and the zone return walks.
+  - `TestZoneReturnDryFailureFallsBackToWalkZoneLeg`: when both
+    searches fail, the direct walk fallback fires.
+  - `TestStartZoneReturnLegTriesDryThenNonDry`: the search order is
+    dry first, non-dry second.
+- The existing town trip tests stay green: the dry search behavior
+  for the town trips is unchanged.
+
+### Follow ups
+
+- The runtime dry search failure reason is unresolved. The offline
+  probe against the project geodata succeeds; the bot's runtime
+  geodata might differ (a different `detectGeodataDir` candidate, a
+  different geodata pack). The non-dry fallback masks the issue but
+  does not root-cause it.
+- The `walkZoneLeg` direct walk fallback still sends unvalidated
+  clicks (no `ValidateClick` gate). The same gate the town walk
+  follower uses would harden it.

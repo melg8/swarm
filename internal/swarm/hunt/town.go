@@ -393,6 +393,14 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 		time.Since(l.tracker.SessionStartedAt()) < skillListWaitLimit {
 		return
 	}
+	// A bot outside the hunting zone returns first: the zone return
+	// owns the walk until the bot is back in the zone. A town trip
+	// started outside the zone (a village respawn after an emergency
+	// logout) would try to walk to the village shops - where the bot
+	// already stands - and then fail to return to the zone, leaving
+	// the bot stuck at the village (the 2026-09-11 06:00 dump: test3
+	// at 43000 50184, the learning trip started before the zone
+	// return, both failed with "no dry path", the bot never moved).
 	shopping := l.shoppingTripEnabled() && l.shoppingWanted()
 	learning := l.learnTripWanted()
 	// The weapon run outranks every other trip reason: a character
@@ -401,6 +409,17 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	weaponRun := l.weaponlessRunWanted()
 	if l.navigator == nil || !l.tripCooldownOver() ||
 		(!l.inventoryFull() && !shopping && !learning && !weaponRun) {
+		return
+	}
+	// A bot outside the hunting zone returns first: the zone return
+	// owns the walk until the bot is back in the zone. The weapon run
+	// is the sole exception - a bare-handed character shops for a
+	// weapon at once, even outside the zone (punching mobs through the
+	// walk home is worse than a late return). The 2026-09-11 06:00
+	// dump showed a learning trip starting at the village (outside the
+	// zone) before the zone return, both searches failed with "no dry
+	// path", and the bot never moved.
+	if !weaponRun && l.zone() != nil && !l.inZoneSelf() {
 		return
 	}
 	// The walk needs a standing character: a resting one stands up
@@ -649,6 +668,38 @@ func (l *Loop) interruptTripForAttacker(now time.Time) bool {
 // walk plan view - the dump shows the whole walk from it. It reports
 // whether the leg was planned.
 func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
+	return l.startWalkLegSearch(dest, false)
+}
+
+// startZoneReturnLeg plans the zone return walk with a non-dry
+// fallback: the dry search (water walled off) runs first, and when it
+// fails the non-dry search (water allowed, with a cost penalty) runs
+// as a fallback. The zone return must bring the bot home even when
+// the dry search fails for unknown reasons (the 2026-09-11 06:00
+// dump: the dry search reported "no dry path" from 43000 50184 to
+// both the zone center and Herbiel 276 units away, while the offline
+// probe against the same geodata found both paths - the runtime
+// difference is unresolved, but the non-dry fallback gives the bot a
+// route). The click guard of the town walk follower refuses water
+// legs and re-paths around the shore, so a non-dry plan with water
+// legs is still safe to walk - the bot follows the dry parts and
+// re-plans at the waterline. It reports whether the leg was planned.
+func (l *Loop) startZoneReturnLeg(dest pathfind.Vec3) bool {
+	if l.startWalkLegSearch(dest, false) {
+		return true
+	}
+	l.logger.Printf("Hunt: no dry zone return path to %d %d, "+
+		"trying the non-dry search", int(dest.X), int(dest.Y))
+
+	return l.startWalkLegSearch(dest, true)
+}
+
+// startWalkLegSearch plans the walk to the destination through either
+// the dry or the non-dry approach search and arms the waypoint
+// follower. The dry switch walls the water off (the town trips refuse
+// a planned swim); the non-dry switch allows water crossings (the
+// zone return fallback). It reports whether the leg was planned.
+func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
 	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
 	if !ok {
 		return false
@@ -658,16 +709,28 @@ func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
 		Y: float64(selfY),
 		Z: float64(selfZ),
 	}
-	result, err := l.navigator.FindPathApproachDry(
-		from, dest, tripApproachRadius)
+	var result *pathfind.Result
+	var err error
+	if nonDry {
+		result, err = l.navigator.FindPathApproach(
+			from, dest, tripApproachRadius)
+	} else {
+		result, err = l.navigator.FindPathApproachDry(
+			from, dest, tripApproachRadius)
+	}
 	if err != nil {
 		l.logger.Printf("Hunt: town trip path search failed: %v", err)
 
 		return false
 	}
 	if result == nil || !result.Found || len(result.Waypoints) == 0 {
-		l.logger.Printf("Hunt: no dry path to %d %d, the walk would "+
-			"swim", int(dest.X), int(dest.Y))
+		if !nonDry {
+			l.logger.Printf("Hunt: no dry path to %d %d, the walk would "+
+				"swim", int(dest.X), int(dest.Y))
+		} else {
+			l.logger.Printf("Hunt: no path to %d %d at all",
+				int(dest.X), int(dest.Y))
+		}
 
 		return false
 	}
