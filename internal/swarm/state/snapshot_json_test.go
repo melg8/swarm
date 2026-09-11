@@ -178,6 +178,42 @@ func goldenSnapshot() Snapshot {
 		ServerTimeMs: 1725800496999,
 		StartedAt:    moment,
 		UpdatedAt:    moment,
+		Diagnostics: Diagnostics{
+			PhaseForMs:        456000,
+			UpdatedAgoMs:      12000,
+			PacketsPerSecond:  8.5,
+			LoginCooldownMs:   90000,
+			AutoAttacking:     true,
+			FightingTargetID:  1000000,
+			CombatActiveAgoMs: 1500,
+			LastHitAgoMs:      800,
+			UnderAttack:       true,
+			AttackerCount:     2,
+			WalkFresh:         false,
+			MoveAgoMs:         7000,
+			Objects: ObjectCounts{
+				NPCs:    40,
+				Players: 3,
+				Items:   7,
+				Dead:    2,
+			},
+			Hunt: HuntDiagnostics{
+				TargetID:       1001277,
+				TargetForMs:    25000,
+				SkippedTargets: 3,
+				NoTargetForMs:  0,
+				RePaths:        1,
+				StuckForMs:     4000,
+				WaypointsLeft:  12,
+				TripForMs:      300000,
+				FleeForMs:      0,
+				BuyRetries:     1,
+				LastAction: "Hunt: target 1001277 does " +
+					"not engage, switching",
+				LastActionAgoMs: 3000,
+				TickAgoMs:       0,
+			},
+		},
 	}
 }
 

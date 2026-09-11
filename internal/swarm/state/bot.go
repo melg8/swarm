@@ -335,9 +335,14 @@ type Bot struct {
 	// selling, deleveling). Empty until the loop publishes its
 	// first phase; the manual only sessions stay empty (the loop
 	// never sets it) and the UI falls back to the status text.
-	phase  string
-	selfID int32
-	char   CharacterState
+	phase string
+	// phaseAt records when the phase last changed: the
+	// diagnostics report the age of the current phase (a bot
+	// stuck in one phase for minutes is the top stuck
+	// signature).
+	phaseAt time.Time
+	selfID  int32
+	char    CharacterState
 	// world is the dense object storage (see objectStore): the
 	// packet apply paths mutate the records in place and the
 	// scans walk the memory sequentially.
@@ -352,15 +357,29 @@ type Bot struct {
 	// log is the rolling packet event log, chat the chat window
 	// ring, combat the web view animation feed (one component
 	// value each, see their types for the layout contracts).
-	log          eventLog
-	chat         chatLog
-	combat       combatFeed
-	zone         *Zone
-	zoneViews    []ZoneView
-	packets      int64
-	version      uint64
-	started      time.Time
-	updated      time.Time
+	log       eventLog
+	chat      chatLog
+	combat    combatFeed
+	zone      *Zone
+	zoneViews []ZoneView
+	packets   int64
+	version   uint64
+	started   time.Time
+	updated   time.Time
+	// hunt, huntPublishedAt: the internals the hunt loop
+	// publishes every tick (SetHuntDiagnostics) with their
+	// publication stamp - the encoders derive the loop
+	// heartbeat age from it.
+	hunt            HuntDiagnostics
+	huntPublishedAt time.Time
+	// huntLastAction, huntLastActionAt: the last decision line
+	// of the loop (NoteAction), the same text the event log
+	// carries.
+	huntLastAction   string
+	huntLastActionAt time.Time
+	// packetWindow feeds the packet rate of the diagnostics
+	// view (see packetRateWindow).
+	packetWindow packetRateWindow
 	commandQueue chan Command
 	// The published manual walk plan of the web UI (see
 	// SetWalkPlan): the remaining waypoints of a double click
@@ -380,6 +399,7 @@ func NewBot(id string) *Bot {
 		id:                 id,
 		status:             StatusConnecting,
 		phase:              "",
+		phaseAt:            time.Time{},
 		loginCooldownUntil: time.Time{},
 		selfID:             0,
 		char:               newCharacterState(),
@@ -396,9 +416,17 @@ func NewBot(id string) *Bot {
 		version:            0,
 		started:            time.Now(),
 		updated:            time.Time{},
-		commandQueue:       make(chan Command, commandQueueCapacity),
-		walkPath:           nil,
-		walkPathAt:         time.Time{},
+		//nolint:exhaustruct // the zero view is the fresh state
+		hunt:             HuntDiagnostics{},
+		huntPublishedAt:  time.Time{},
+		huntLastAction:   "",
+		huntLastActionAt: time.Time{},
+		packetWindow: packetRateWindow{
+			second: 0, filled: 0, counts: [packetRateSeconds]int32{},
+		},
+		commandQueue: make(chan Command, commandQueueCapacity),
+		walkPath:     nil,
+		walkPathAt:   time.Time{},
 	}
 }
 
@@ -663,6 +691,7 @@ func (b *Bot) SetPhase(phase string) {
 		return
 	}
 	b.phase = phase
+	b.phaseAt = time.Now()
 	b.touch()
 }
 
@@ -750,6 +779,14 @@ func (b *Bot) ResetSession() {
 	b.walkPath = nil
 	b.walkPathAt = time.Time{}
 	b.phase = ""
+	b.phaseAt = time.Time{}
+	// The hunt internals of the dead session carry no meaning
+	// for the next one: the loop republishes them after its
+	// first tick.
+	b.hunt = HuntDiagnostics{} //nolint:exhaustruct // the zero view resets
+	b.huntPublishedAt = time.Time{}
+	b.huntLastAction = ""
+	b.huntLastActionAt = time.Time{}
 	b.status = StatusConnecting
 	b.touch()
 }
@@ -1378,6 +1415,7 @@ func (b *Bot) CountPacket() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.packets++
+	b.packetWindow.note(time.Now().Unix())
 }
 
 // RecordEvent appends a message to the rolling event log.
@@ -1594,6 +1632,12 @@ type Snapshot struct {
 	ServerTimeMs int64             `json:"serverTimeMs"`
 	StartedAt    time.Time         `json:"startedAt"`
 	UpdatedAt    time.Time         `json:"updatedAt"`
+	// Diagnostics is the health view of the live state: the
+	// liveness ages and rates, the combat nuance, the known
+	// list summary and the hunt loop internals (see
+	// Diagnostics). The section rides the end of the snapshot,
+	// after the world data it summarizes.
+	Diagnostics Diagnostics `json:"diagnostics"`
 }
 
 // ZoneView is one hunting zone of the map view: the registry entry
@@ -1681,15 +1725,18 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 		ServerTimeMs: now.UnixMilli(),
 		StartedAt:    b.started,
 		UpdatedAt:    b.updated,
+		Diagnostics:  Diagnostics{}, //nolint:exhaustruct // filled below
 	}
 	if b.walkPath != nil && time.Since(b.walkPathAt) <= walkPlanTTL {
 		snap.WalkPath = make([]WalkPoint, len(b.walkPath))
 		copy(snap.WalkPath, b.walkPath)
 	}
 	nowNano := now.UnixNano()
+	var counts worldCounts
 	for i := range b.world.hot {
 		snap.Objects = append(snap.Objects,
 			b.objectSnapshotLocked(i, nowNano))
+		counts.note(&b.world.hot[i], b.selfID)
 	}
 	snap.CombatEvents = b.combat.appendView(snap.CombatEvents, now)
 	snap.Events = b.log.appendNewest(snap.Events, snapshotEvents)
@@ -1698,6 +1745,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
 	snap.HuntingZones = make([]ZoneView, len(b.zoneViews))
 	copy(snap.HuntingZones, b.zoneViews)
 	b.fillInventorySnapshot(&snap)
+	snap.Diagnostics = b.diagnosticsLocked(now, counts)
 
 	return snap
 }

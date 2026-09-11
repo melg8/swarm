@@ -41,6 +41,7 @@ func (b *Bot) appendSnapshotJSONLocked(dst []byte, now time.Time) []byte {
 	}
 
 	adena, inventorySlots := b.inventoryTotalsLocked()
+	var counts worldCounts
 	dst = append(dst, `{"id":`...)
 	dst = appendJSONString(dst, b.id)
 	dst = append(dst, `,"status":`...)
@@ -53,7 +54,7 @@ func (b *Bot) appendSnapshotJSONLocked(dst []byte, now time.Time) []byte {
 	dst = append(dst, `,"inventory":[`...)
 	dst = b.appendLiveInventoryJSON(dst)
 	dst = append(dst, `],"objects":[`...)
-	dst = b.appendLiveObjectsJSON(dst, now)
+	dst = b.appendLiveObjectsJSON(dst, now, &counts)
 	dst = append(dst, `],"events":[`...)
 	dst = b.appendLiveEventsJSON(dst)
 	dst = append(dst, `],"chat":[`...)
@@ -76,6 +77,8 @@ func (b *Bot) appendSnapshotJSONLocked(dst []byte, now time.Time) []byte {
 	dst = appendJSONTime(dst, b.started)
 	dst = append(dst, `,"updatedAt":`...)
 	dst = appendJSONTime(dst, b.updated)
+	dst = append(dst, `,"diagnostics":`...)
+	dst = appendDiagnosticsJSON(dst, b.diagnosticsLocked(now, counts))
 
 	return append(dst, '}')
 }
@@ -107,14 +110,19 @@ func (b *Bot) appendLiveInventoryJSON(dst []byte) []byte {
 }
 
 // appendLiveObjectsJSON writes the world object array opened by the
-// caller. The caller must hold a lock.
-func (b *Bot) appendLiveObjectsJSON(dst []byte, now time.Time) []byte {
+// caller and folds the records into the counts tally of the
+// diagnostics view (one walk, no second pass over the hot records).
+// The caller must hold a lock.
+func (b *Bot) appendLiveObjectsJSON(
+	dst []byte, now time.Time, counts *worldCounts,
+) []byte {
 	nowNano := now.UnixNano()
 	for i := range b.world.hot {
 		if i > 0 {
 			dst = append(dst, ',')
 		}
 		dst = appendObjectJSON(dst, b.objectSnapshotLocked(i, nowNano))
+		counts.note(&b.world.hot[i], b.selfID)
 	}
 
 	return dst
@@ -326,6 +334,7 @@ func (b *Bot) snapshotJSONSizeLocked() int {
 		len(b.char.Name)
 	size += 448 * len(b.inventory.items)
 	size += 384 * len(b.world.hot)
+	size += 704 + len(b.huntLastAction)
 	count := min(b.log.length, snapshotEvents)
 	size += 96 * count
 	size += 96 * b.chat.length
