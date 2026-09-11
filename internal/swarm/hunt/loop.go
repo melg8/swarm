@@ -429,6 +429,11 @@ type Loop struct {
 	// server-side, so the engage holds its re-requests until the step
 	// finished.
 	combatAvoidUntil time.Time
+	// zoneLegLogAt paces the walled direct leg diagnostic of the
+	// zone return escalation (see guardZoneLegClick): the refusal
+	// repeats every second while the character stands in the
+	// pocket, the log names the wall once per period.
+	zoneLegLogAt time.Time
 	// fleeAt paces the escape walk requests: the escape must not
 	// wait out the attack request pacing of the engage (the last
 	// forced attack fired moments before the threshold crossed).
@@ -660,6 +665,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		skillReuse:        make(map[int32]time.Time),
 		profilePicked:     false,
 		weaponWaitLogAt:   time.Time{},
+		zoneLegLogAt:      time.Time{},
 		shoppingViewCache: state.ShoppingPlanView{
 			Entries: nil,
 			Adena:   0,

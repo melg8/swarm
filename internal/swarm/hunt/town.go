@@ -2048,9 +2048,19 @@ func (l *Loop) engagesOnZoneEntry() bool {
 	return true
 }
 
-// startReturnLeg plans the walk back to the farm spot.
+// startReturnLeg plans the walk back to the farm spot. The leg is a
+// fresh logical unit of the trip machinery (the sell stop handed the
+// walk over after the shopping, the deleveling aborted into it), so
+// the frozen re-path cell of whatever walk came before dies here: the
+// return leg must not inherit the frozen budget of the guard walk or
+// the sell approach, or its own first refused click ends it instantly
+// - the delevel abort and the return leg of the 2026-09-12 01:50 dump
+// died back to back from the same cell in one second, leaving the
+// character to the direct zone legs and the permanent freeze.
 func (l *Loop) startReturnLeg() {
 	l.phase = phaseTownReturn
+	l.repathX, l.repathY = 0, 0
+	l.frozenRepaths = 0
 	destX, destY, destZ := l.farmX, l.farmY, l.farmZ
 	if zone := l.zone(); zone != nil &&
 		(!zone.Contains(destX, destY) || (destX == 0 && destY == 0)) {

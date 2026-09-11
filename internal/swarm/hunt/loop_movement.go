@@ -349,7 +349,10 @@ func (l *Loop) zoneReturnDestination(
 // aggro-aware steering bends the leg around the idle aggressive camps
 // sitting on its line (see loop_avoid.go) - the mobs at the zone
 // center itself stay exempt: the ground the return deliberately
-// enters carries its own prey.
+// enters carries its own prey. The click guard runs before the
+// request: a leg the server would cancel never moves the character,
+// so a refused leg re-arms the pathfound return instead of grinding
+// refused clicks forever (see guardZoneLegClick).
 func (l *Loop) walkZoneLeg(
 	zone *state.Zone, selfX int32, selfY int32, selfZ int32,
 ) {
@@ -366,7 +369,54 @@ func (l *Loop) walkZoneLeg(
 		time.Now()); dodged {
 		moveX, moveY = ax, ay
 	}
+	if !l.guardZoneLegClick(selfX, selfY, selfZ, moveX, moveY) {
+		return
+	}
 	if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
 		l.logf("Hunt: walk back failed: %v", err)
 	}
+}
+
+// guardZoneLegClick validates one direct zone leg through the server
+// click port (Navigator.ValidateClick) and reports whether the request
+// may be sent. A click the server would cancel never moves the
+// character - the geodata correction collapses its target onto the
+// walker cell (the village walls, the deck edges), the answer is a
+// silent ActionFailed and the character freezes - so the escalation
+// to the direct legs must not send it: the refusal re-arms the
+// pathfound zone return instead (zoneFails back under the escalation
+// budget, the next returnToZone plans a fresh geodata route whose
+// first click the offline probe validates before it leaves) and the
+// paced log line explains the standing hunter in the state dump (the
+// 2026-09-12 01:50 report: the post-abort escalation clicked the same
+// collapsed southwest leg of the elven village street for over an
+// hour without a single event or a single cell of movement). Without
+// a navigator there is nothing to validate with: the legacy behavior
+// stands and the click goes out as it always did.
+func (l *Loop) guardZoneLegClick(
+	selfX int32, selfY int32, selfZ int32, moveX int32, moveY int32,
+) bool {
+	if l.navigator == nil {
+		return true
+	}
+	from := pathfind.Vec3{
+		X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+	}
+	to := pathfind.Vec3{
+		X: float64(moveX), Y: float64(moveY), Z: float64(selfZ),
+	}
+	if _, ok := l.navigator.ValidateClick(from, to); ok {
+		return true
+	}
+	if l.zoneFails >= zoneReturnFailBudget {
+		l.zoneFails = 0
+	}
+	now := time.Now()
+	if now.Sub(l.zoneLegLogAt) >= noPickLogPeriod {
+		l.zoneLegLogAt = now
+		l.logf("Hunt: the direct zone leg to %d %d is walled, "+
+			"re-arming the pathfound return", moveX, moveY)
+	}
+
+	return false
 }

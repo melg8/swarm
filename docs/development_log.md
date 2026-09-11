@@ -3944,3 +3944,88 @@ five minutes of the reported hang.
   test2 database row, the bot walked the plan to the zone with every
   click ACCEPTED on the MOVEDBG diagnostics build (both PathFinding
   modes), and `tools/mobius_e2e.sh` stays E2E_OK on the fixed build.
+
+## Round 58: the engage freeze - the inherited frozen re-path and the unguarded direct zone legs (2026-09-12)
+
+The user report (the 01:50 state dump, build 2149ad1, bot test1,
+phase engage, uptime 10h32m): the character stood at (43048 50312
+-2992, the elven village main street next to Herbiel) with the
+hunting zone 7900 units away (the Kaboo Orc Fighter SW spot leash at
+35214 51358, half 1448), the walk plan empty and the last 1h15m of
+the event log holding nothing but the server pings - no hunt decision,
+no movement, a single frozen position.
+
+### Root cause (probed against the real geodata pack)
+
+The event trail: a level 14 character started a deleveling at the
+town guards, three guard deaths respawned it in the village, the
+guard walk's first click failed the offline validation from the
+respawn cell ("the server would refuse the walk click"), the round 57
+frozen re-path rule aborted the deleveling, and the machinery started
+the return leg to the farm spot. Two defects then chained into the
+permanent freeze:
+
+1. The return leg INHERITED the frozen re-path cell of the guard
+   walk: `startDelevelReturnLeg` resets the trip timeout and the
+   re-path budget but not `repathX/repathY/frozenRepaths` (only
+   `endTownTrip` clears them, and the delevel abort path bypasses
+   it), so the return leg's own first refused click read as the
+   second frozen re-path from the same cell and `abortFrozenTrip`
+   ended it within one second ("town trip ended: aborted, the server
+   refuses the walk click from this cell") - the delevel walk and
+   the return leg died back to back.
+2. The `abortFrozenTrip` escalation armed `zoneFails` to the budget
+   and the engage phase fell back to the direct zone legs
+   (`walkZoneLeg`). The direct leg aims 1000 units toward the zone
+   center - from the dump cell that line runs straight into the
+   walled southern side of the street: the server click validation
+   collapses it onto the walker, the move is silently canceled
+   (ActionFailed, no movement, no feedback) and `walkZoneLeg` sent
+   the same refused click once per second forever, without
+   validation, without a stuck detection and without a single log
+   line. The offline probe against the real geodata confirmed both
+   halves: the direct leg click (43048 50312 -2992) -> (42056 50444
+   -2992) is refused wholesale (the destination collapses onto the
+   walker, 0 of 1000 units) while the geodata route out of the same
+   cell exists and every click of it validates.
+
+### Fix
+
+1. `hunt/town.go` (`startReturnLeg`): the return leg is a fresh
+   logical unit of the trip machinery - the frozen re-path cell of
+   the guard walk (or the sell approach) dies at its start. The
+   delevel abort path keeps its fast escalation for a genuinely
+   frozen cell, but the handover never condemns the next leg.
+2. `hunt/loop_movement.go` (`guardZoneLegClick`): every direct zone
+   leg is validated through the server click port before it leaves.
+   A refused leg is never sent; the refusal re-arms the pathfound
+   zone return (`zoneFails` back under the budget, the next
+   `returnToZone` plans a fresh geodata route whose first click the
+   offline probe has already validated) and the paced log line
+   ("the direct zone leg ... is walled, re-arming the pathfound
+   return") explains the standing hunter in the dump. Without a
+   navigator the legacy behavior stands.
+
+### Verification
+
+- go build/vet, gofmt clean, golangci-lint --new zero findings, the
+  full go test suite green.
+- The exact dump state against the real geodata pack (the dump cell,
+  the dump zone, the post-abort escalation state, the faithful click
+  server): the zone return walks out of the walled street pocket and
+  arrives inside the zone with every sent click validated - the
+  inversion of the dump signature (TestReproRound58VillageStuckCell
+  WalksToZone).
+- The guard pins: a refused direct leg is never sent and re-arms the
+  pathfound return, a validated leg goes out and keeps the
+  escalation state
+  (TestReproRound58ZoneLegGuardRefusalReArmsPathfoundReturn).
+- The frozen reset pins: the return leg starts with a clean frozen
+  budget and survives its first refused click with an ordinary
+  re-path, both directly and through the full delevel abort path
+  (TestReproRound58ReturnLegResetsFrozenRepath,
+  TestReproRound58DelevelAbortKeepsFrozenBudgetClean).
+- The round 56/57 contracts stay green: the short click extension,
+  the frozen re-path escalation of the total-freeze server and the
+  follower reaction tests all pass unchanged (the reset moved to the
+  leg boundary, the in-plan frozen detection is untouched).
