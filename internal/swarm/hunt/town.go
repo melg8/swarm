@@ -75,6 +75,16 @@ const (
 	// merchantApproachDist is the distance the seller stands from the
 	// merchant: below the 250 units interaction distance of the server.
 	merchantApproachDist = 200.0
+	// npcInteractionDist is the server INTERACTION_DISTANCE of 250:
+	// the talk click (ClickObject) and the transactions succeed within
+	// this 3D distance of the npc. The approach walk aims the offset
+	// ring at 150 units 2D, and a small z gap (the trainer hall floor
+	// is 40 units above the approach deck) keeps dist3D above the
+	// approach gate (200) but well within this interaction gate - the
+	// talk click must fire from the offset ring, not wait for the
+	// approach gate that the z gap keeps unreachable (the 2026-09-11
+	// 05:45 dump looped forever on the offset ring).
+	npcInteractionDist = 250.0
 	// tripApproachRadius is the geodata search radius the trip walks
 	// end within: a merchant cell without a modeled floor layer (the
 	// elven village shops) or behind a counter stays reachable, the
@@ -1421,6 +1431,11 @@ func (l *Loop) handleMerchant(now time.Time, templates []int32) bool {
 // Bresenham line that can "step over" onto a roof layer when the
 // click targets an interior cell (the 2026-09-11 roof teleport
 // report), so the offset keeps the click line on the surrounding deck.
+//
+// The merchant select fires as soon as the bot is within the server
+// interaction distance (npcInteractionDist = 250 in 3D), even when
+// the z gap keeps the dist3D above the approach gate (200) - see
+// approachTeacher for the same fix and the 2026-09-11 05:45 dump.
 func (l *Loop) approachMerchant(now time.Time) bool {
 	x, y, z, ok := l.tracker.ObjectPosition(l.merchantID)
 	if !ok {
@@ -1432,6 +1447,15 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 	dist2D := math.Hypot(float64(x-selfX), float64(y-selfY))
 	dz := float64(z - selfZ)
 	dist3D := math.Sqrt(dist2D*dist2D + dz*dz)
+	// The merchant select fires within the server interaction distance
+	// (250 in 3D) even when the approach gate (200) is not met: the
+	// offset ring lands the bot at ~150 units 2D from the npc, and a
+	// small z gap keeps dist3D above 200 but within 250. Without this
+	// early return the bot looped on the offset ring forever (the
+	// 2026-09-11 05:45 dump).
+	if dist3D <= npcInteractionDist {
+		return l.selectMerchant(now)
+	}
 	if dist3D > merchantApproachDist {
 		ax, ay, az := npcApproachPoint(x, y, z, selfX, selfY)
 		approachDist2D := math.Hypot(
@@ -1468,13 +1492,26 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 		}
 
 		// Far away on the same level: a plain approach walk to the
-		// offset point, not the merchant's exact cell.
+		// offset point, not the merchant's exact cell. The dist3D <=
+		// npcInteractionDist early return above takes over once the bot
+		// arrives at the offset ring (the talk click lands from the ring
+		// even with a small z gap).
 		if approachDist2D > hopCoincideDist {
 			l.walkToward(ax, ay, az, now)
 		}
 
 		return false
 	}
+	// dist3D in (merchantApproachDist, npcInteractionDist]: the bot is
+	// on the offset ring, the merchant select proceeds.
+	return l.selectMerchant(now)
+}
+
+// selectMerchant re-requests the merchant selection once per select
+// period until the tracker confirms it, then reports ready. The
+// transactions need the merchant as the selected target
+// (RequestBuyItem checks it server side).
+func (l *Loop) selectMerchant(now time.Time) bool {
 	if l.tracker.SelfTargetID() != l.merchantID {
 		// The transactions need the merchant as the selected target
 		// (RequestBuyItem checks it server side): re-request the

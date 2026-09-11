@@ -390,6 +390,16 @@ func (l *Loop) handleTeacher(now time.Time) bool {
 // resolved the target onto the roof). The offset keeps the click
 // line on the surrounding deck, within the interaction distance but
 // outside the walled interior.
+//
+// The talk click fires as soon as the bot is within the server
+// interaction distance (npcInteractionDist = 250 in 3D), even when
+// the z gap keeps the dist3D above the approach gate (200). The
+// 2026-09-11 05:45 dump showed test1 stuck at 44616 52536 -2832
+// (dist 244 from Cobendell at z -2792, dz 40): the far-walk branch
+// clicked the offset point, the bot walked there, but the z gap
+// kept dist3D above 200 forever and the talk click never fired. The
+// 250 gate matches the server rule and lets the talk click land from
+// the offset ring.
 func (l *Loop) approachTeacher(now time.Time) bool {
 	x, y, z, ok := l.tracker.ObjectPosition(l.teacherID)
 	if !ok {
@@ -402,6 +412,19 @@ func (l *Loop) approachTeacher(now time.Time) bool {
 		float64(x-selfX), float64(y-selfY))
 	dz := float64(z - selfZ)
 	dist3D := math.Sqrt(dist2D*dist2D + dz*dz)
+	// The talk click fires within the server interaction distance
+	// (250 in 3D) even when the approach gate (200) is not met: the
+	// offset ring lands the bot at ~150 units 2D from the npc, and a
+	// small z gap (the trainer hall floor is 40 units above the
+	// approach deck) keeps dist3D at ~155 - well within the server
+	// 250 gate, but above the 200 approach gate. The 2026-09-11 05:45
+	// dump looped forever because the talk click waited for dist3D <=
+	// 200 while the bot stood on the offset ring at dist3D 244.
+	if dist3D <= npcInteractionDist {
+		l.clickTeacher(now)
+
+		return true
+	}
 	if dist3D > merchantApproachDist {
 		ax, ay, az := npcApproachPoint(x, y, z, selfX, selfY)
 		approachDist2D := math.Hypot(
@@ -434,23 +457,35 @@ func (l *Loop) approachTeacher(now time.Time) bool {
 
 			return true
 		}
+		// The far walk: the bot is beyond the 2D approach gate. Click
+		// the offset point until the bot arrives at the offset ring,
+		// then the dist3D <= npcInteractionDist early return above
+		// takes over (the talk click lands from the ring even with a
+		// small z gap). Without that early return the bot looped on
+		// the offset ring forever (the 2026-09-11 05:45 dump).
 		if approachDist2D > hopCoincideDist {
 			l.walkToward(ax, ay, az, now)
 		}
 
 		return false
 	}
-	// The talk click: paced once per select period, the selection
-	// itself is idempotent (a re-click re-selects and refreshes the
-	// last folk memory).
+	// dist3D in (merchantApproachDist, npcInteractionDist]: the bot is
+	// on the offset ring, the talk click lands.
+	l.clickTeacher(now)
+
+	return true
+}
+
+// clickTeacher sends the paced talk click that selects the teacher and
+// refreshes the server's last-folk memory (the RequestAcquireSkill
+// lesson requests resolve their trainer through it).
+func (l *Loop) clickTeacher(now time.Time) {
 	if now.Sub(l.teacherPick) >= selectPeriod {
 		l.teacherPick = now
 		if err := l.game.ClickObject(l.teacherID); err != nil {
 			l.logger.Printf("Hunt: learn: teacher click failed: %v", err)
 		}
 	}
-
-	return true
 }
 
 // tickTeacherLessons learns the queued lessons one request at a

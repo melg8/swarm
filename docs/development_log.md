@@ -3506,3 +3506,97 @@ interior.
   the bot 350 units from the npc, which triggers the far walk case.
   A tighter approach radius for the teach stop would reduce the gap,
   but the offset fix already keeps the far walk safe.
+
+## Round 54: the offset ring stuck - the talk click fires within the server interaction distance (2026-09-11)
+
+Scope: the 2026-09-11 05:45 user follow-up dump. The roof teleport
+fix of round 53 (the npc approach offset point) closed the roof
+teleport, but the bot then stuck on the offset ring: the talk click
+waited for dist3D <= 200 (the approach gate) while the bot stood at
+dist3D 244 (within the server 250 interaction gate but above the 200
+approach gate, because of the z gap between the approach deck and the
+trainer hall floor).
+
+### Problem statement
+
+The dump (build 86b4c86, bot test1, phase townSell) showed the
+character at 44616 52536 -2832 (dist 244 from Cobendell at 44823
+52414 -2792, dz 40), target=self, stuck for 31 seconds after "learn:
+teacher Cobendell found, walking to it". The bot sold junk at Herbiel,
+advanced to the Cobendell teach stop, walked to the offset ring and
+then looped: approachTeacher clicked the offset point, the bot walked
+there, but the z gap kept dist3D above 200 forever, the talk click
+never fired, the bot never selected Cobendell, the lessons never
+landed.
+
+### Root cause analysis
+
+A geodata probe reproduced the scenario against the real 21_19.l2j
+region:
+
+- FindPathApproachDry from 44616 52536 -2832 to Cobendell with radius
+  200 returns 2 waypoints: wp0=self, wp1=44680 52536 (64 units from
+  the bot, 188 from Cobendell). The bot is already within
+  waypointArriveDist (150) of wp1, so walkTownWaypoints returns true
+  at once -> enterSellPhase -> teachStop -> handleTeacher finds
+  Cobendell -> approachTeacher fires.
+- approachTeacher: dist3D=244 > merchantApproachDist (200),
+  dist2D=240 > 200, so the "far walk" branch fires. It clicks the
+  offset point (44694 52490, 91 units from the bot). The bot walks
+  there, but that is NOT closer to Cobendell in 3D - dz=40 keeps
+  dist3D above 200. The next tick recomputes the offset from the new
+  position, the bot circles on the offset ring forever.
+
+The approach gate (200) was a planning heuristic (where to aim the
+walk), but the talk click gate must match the server
+INTERACTION_DISTANCE (250) - the server accepts the ClickObject
+action and the transactions within 250 in 3D, regardless of the
+approach gate. The 40 unit z gap (the trainer hall floor at -2792
+vs the approach deck at -2832) is a single geodata step - walkable
+in principle, but the pathfinder's approach radius (200) stops the
+walk short of it. The talk click must fire from the offset ring.
+
+### Fix
+
+The talk click (and the merchant select) fire as soon as the bot is
+within the server interaction distance (npcInteractionDist = 250 in
+3D), even when the z gap keeps dist3D above the approach gate (200).
+
+- `hunt/town.go`: `npcInteractionDist = 250.0` mirrors the server
+  INTERACTION_DISTANCE. `approachMerchant` checks it first: if
+  dist3D <= 250, the merchant select proceeds (the new
+  `selectMerchant` helper). The far walk only fires when dist3D >
+  250.
+- `hunt/learning.go`: `approachTeacher` checks `npcInteractionDist`
+  first: if dist3D <= 250, the talk click fires (the new
+  `clickTeacher` helper). The far walk only fires when dist3D > 250.
+- The deck hop case (dist2D <= 200, dist3D > 200) is unchanged: the
+  offset collapses onto the bot's own cell, the deck window bounds
+  the wait. The new early return takes over before the deck hop
+  branch when dist3D <= 250, so the deck hop now only fires when the
+  z gap is large enough to push dist3D above 250 (a real deck
+  mismatch the server routing must handle).
+
+### Verification
+
+- go build/vet, gofmt clean, go test ./... (19 packages green);
+  golangci-lint: zero new findings in the touched files.
+- The offset ring tests pin the fix: the bot at the exact dump
+  position (44616 52536 -2832, dist3D 244) clicks the teacher
+  directly - no ground walk, the talk click fires
+  (`TestApproachTeacherTalkClickFiresFromTheOffsetRing`). The deck
+  hop case with dist3D in (200, 250] also clicks the teacher
+  (`TestApproachTeacherDeckHopClicksFromTheOffsetRing`).
+- The existing offset tests stay green: the far walk still clicks
+  the offset point when dist3D > 250, the deck hop skip gate still
+  fires when the offset collapses onto the bot.
+
+### Follow ups
+
+- The deck hop window (30 s) now only fires when dist3D > 250 - a
+  real deck mismatch. The trainer hall floor (dz 40) no longer
+  triggers it; the talk click lands at once.
+- The manual long walk follower (hunt/user.go) and the blind engage
+  recovery walker (hunt/loop_los.go) still use the old approach gate
+  for their npc interactions; the same npcInteractionDist early
+  return would harden them if they approach town npcs.

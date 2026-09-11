@@ -90,6 +90,87 @@ webui adjustments:
   and a real bot snapshot to confirm the new magenta path color
   reads over the actual elven map imagery.
 
+## Active task: the offset ring stuck - the talk click fires within the server interaction distance
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The 2026-09-11 05:45 user follow-up dump: after the roof teleport fix
+of round 53, the bot still stuck. The dump (build 86b4c86, bot test1,
+phase townSell) showed the character at 44616 52536 -2832 (dist 244
+from Cobendell at 44823 52414 -2792, dz 40), target=self, stuck for
+31 seconds after "learn: teacher Cobendell found, walking to it".
+
+### Root cause (probed against the real geodata pack)
+
+The roof teleport fix (the npc approach offset point) closed the roof
+teleport, but the talk click then waited for dist3D <= 200 (the
+approach gate) while the bot stood at dist3D 244 (within the server
+250 interaction gate but above the 200 approach gate, because of the
+z gap between the approach deck at -2832 and the trainer hall floor
+at -2792). The bot looped on the offset ring forever.
+
+The approach gate (200) was a planning heuristic (where to aim the
+walk), but the talk click gate must match the server
+INTERACTION_DISTANCE (250) - the server accepts the ClickObject
+action and the transactions within 250 in 3D, regardless of the
+approach gate.
+
+### Fix
+
+The talk click (and the merchant select) fire as soon as the bot is
+within the server interaction distance (npcInteractionDist = 250 in
+3D), even when the z gap keeps dist3D above the approach gate (200).
+
+- `hunt/town.go`: `npcInteractionDist = 250.0` mirrors the server
+  INTERACTION_DISTANCE. `approachMerchant` checks it first; the new
+  `selectMerchant` helper handles the paced selection. The far walk
+  only fires when dist3D > 250.
+- `hunt/learning.go`: `approachTeacher` checks `npcInteractionDist`
+  first; the new `clickTeacher` helper handles the paced talk click.
+  The far walk only fires when dist3D > 250.
+- The deck hop case (dist2D <= 200, dist3D > 200) is unchanged: the
+  offset collapses, the deck window bounds the wait. The new early
+  return takes over before the deck hop branch when dist3D <= 250.
+
+### Acceptance criteria
+
+- A bot at the dump position (dist3D 244 from the teacher) clicks the
+  teacher directly - no ground walk, the talk click fires.
+- A bot in the deck hop case with dist3D in (200, 250] also clicks
+  the teacher (the deck hop window no longer fires for a small z gap).
+- The existing offset tests stay green: the far walk still clicks the
+  offset point when dist3D > 250.
+
+### Progress (2026-09-11)
+
+- The geodata probe reproduced the dump scenario: FindPathApproachDry
+  from 44616 52536 -2832 to Cobendell with radius 200 returns 2
+  waypoints, the bot is already within waypointArriveDist of the
+  last, walkTownWaypoints returns true at once, approachTeacher fires
+  with dist3D 244.
+- Commit "hunt: the talk click fires within the server interaction
+  distance": (1) `npcInteractionDist = 250.0` (town.go); (2)
+  `approachMerchant` early return + `selectMerchant` helper
+  (town.go); (3) `approachTeacher` early return + `clickTeacher`
+  helper (learning.go); (4) tests: `npc_approach_test.go` updated
+  (the deck hop test now pins the talk click, the new dump scenario
+  test pins the exact position); (5) docs: development_log.md
+  Round 54, agent_progress.md this entry.
+- Verify loop: go build, go vet, the full go test suite (19 packages
+  green), gofmt clean, golangci-lint zero new findings.
+
+### Status: done (2026-09-11)
+
+- The fix pushed: the npcInteractionDist early return, the
+  selectMerchant / clickTeacher helpers, the tests, the docs.
+- The user-side check: watch a bot at the dump position click the
+  teacher directly (no "town walk stuck", no 30 s freeze), the
+  lessons land.
+
 ## Active task: the roof teleport - the npc approach clicks the offset, not the exact cell
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.

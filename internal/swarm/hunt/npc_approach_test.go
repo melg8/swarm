@@ -174,14 +174,15 @@ func TestApproachMerchantClicksTheOffsetNotTheExactCell(t *testing.T) {
 		"the approach click targets the npc approach point")
 }
 
-// TestApproachTeacherDeckHopSkipsTheClickWhenTooClose pins the deck
-// hop safety: a bot within the 2D interaction distance but on a
-// different z (the deck hop case) does NOT click the teacher's exact
-// cell - the offset collapses onto the bot's own cell and the caller
-// skips the click. The 2026-09-11 roof teleport happened in exactly
-// this case: the deck hop code clicked the teacher's exact spawn and
-// the server stepped over onto the roof.
-func TestApproachTeacherDeckHopSkipsTheClickWhenTooClose(t *testing.T) {
+// TestApproachTeacherDeckHopClicksFromTheOffsetRing pins the 2026-09-11
+// 05:45 dump fix: a bot within the 2D approach distance but on a
+// different z (the deck hop case) clicks the teacher directly through
+// the talk click (ClickObject) - the server INTERACTION_DISTANCE of
+// 250 in 3D is met even with the z gap. The earlier roof teleport fix
+// (the offset approach point) keeps the ground click safe; this fix
+// keeps the talk click firing from the offset ring instead of looping
+// forever waiting for dist3D <= 200.
+func TestApproachTeacherDeckHopClicksFromTheOffsetRing(t *testing.T) {
 	loop, game, bot := newLearnLoop(500)
 	loop.phase = phaseTownSell
 	loop.tripStart = time.Now()
@@ -200,19 +201,68 @@ func TestApproachTeacherDeckHopSkipsTheClickWhenTooClose(t *testing.T) {
 	loop.teacherID = teacherID
 	// The bot stands 100 units north of Cobendell (within the 200 unit
 	// 2D approach distance) but 200 units above it (the deck hop case:
-	// the z mismatch pushes the 3D distance over the approach gate).
+	// the z mismatch pushes the 3D distance to ~224, above the 200
+	// approach gate but within the 250 interaction gate).
 	moveSelfTo(bot, 44823, 52314, -2592)
 
 	game.walks = nil
+	game.clicks = nil
 	loop.tick()
 
-	// The deck hop case: the bot is within 2D range but the z is off.
-	// The offset collapses onto the bot's own cell, the hopCoincideDist
-	// gate skips the click. No walk is sent - the deck window bounds
-	// the wait before the teacher is given up.
+	// The deck hop case with dist3D in (200, 250]: the talk click
+	// fires (ClickObject on the teacher), no ground walk is sent.
 	require.Empty(t, game.walks,
-		"the deck hop case must not click the teacher's exact cell "+
-			"(the roof teleport root cause)")
+		"the deck hop case must not send a ground walk (the offset "+
+			"collapses onto the bot's own cell)")
+	require.Contains(t, game.clicks, teacherID,
+		"the talk click fires from the offset ring - the server "+
+			"INTERACTION_DISTANCE of 250 is met even with the z gap")
 	require.NotEqual(t, int32(-1), loop.teacherID,
-		"the teacher is not given up yet (the deck window is open)")
+		"the teacher is not given up (the talk click landed)")
+}
+
+// TestApproachTeacherTalkClickFiresFromTheOffsetRing pins the exact
+// dump scenario: the bot at 44616 52536 -2832 (dist 244 from Cobendell
+// at z -2792, dz 40) clicks the teacher directly - dist3D 244 is above
+// the 200 approach gate but within the 250 interaction gate. Without
+// the fix the bot looped forever on the offset ring.
+func TestApproachTeacherTalkClickFiresFromTheOffsetRing(t *testing.T) {
+	loop, game, bot := newLearnLoop(500)
+	loop.phase = phaseTownSell
+	loop.tripStart = time.Now()
+	loop.tripStops = []tripStop{{
+		merchant: townNpc{
+			TemplateID: 7156, Name: "Cobendell",
+			X: 44823, Y: 52414, Z: -2792,
+		},
+		teach: true,
+	}}
+	const teacherID = int32(77)
+	bot.ApplyNpcInfo(state.NpcInfo{
+		ObjectID: teacherID, TemplateID: 7156 + 1000000,
+		X: 44823, Y: 52414, Z: -2792, Name: "Cobendell",
+	})
+	loop.teacherID = teacherID
+	loop.teacherPick = time.Now().Add(-2 * selectPeriod)
+	// The exact dump position: dist2D 240, dz 40, dist3D 244.
+	// dist3D 244 is in (200, 250]: the talk click fires at once,
+	// no ground walk. Without the fix the bot looped forever on the
+	// offset ring because the talk click waited for dist3D <= 200.
+	moveSelfTo(bot, 44616, 52536, -2832)
+
+	game.walks = nil
+	game.clicks = nil
+	loop.tick()
+
+	// The talk click fires from the dump position (dist3D 244 is
+	// within the 250 interaction gate). No ground walk is sent.
+	require.Empty(t, game.walks,
+		"no ground walk - dist3D 244 is within the 250 interaction "+
+			"gate, the talk click fires directly")
+	require.Contains(t, game.clicks, teacherID,
+		"the talk click fires from the dump position - the server "+
+			"INTERACTION_DISTANCE of 250 is met even with the z gap "+
+			"(the 2026-09-11 05:45 dump fix)")
+	require.NotEqual(t, int32(-1), loop.teacherID,
+		"the teacher is not given up (the talk click landed)")
 }
