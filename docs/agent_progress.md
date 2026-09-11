@@ -1277,3 +1277,44 @@ live stack; go build/vet/test/lint stay green.
   issues, all five node web harnesses PASS.
 - Next: none - the round is complete; the scenarios await the user's
   press of the TESTS panel buttons.
+
+### Progress (2026-09-11, round 3: the weaponless livelock and the stagger)
+
+- The farm scenario of the 07:17 process restart livelocked: the
+  reset bot landed at the village spawn correctly, but the engage
+  leash started the walk home to the picked Spore Fungus SW ground
+  BARE HANDED - the hunt loop defers the weapon run until the trip
+  machinery owns a tick, and the zone return occupies it. The Kaboo
+  Orc packs piled on the unarmed walker, every emergency logout
+  saved the character on the ground it fled, the relogin handoff
+  resumed that ground and the weapon run from the zone never
+  survived the road out: an unarmed logout cycle until the timeout.
+- Commit "hunt: the weapon run outranks the zone return walk": the
+  leash branch of the engage skips the return walk while
+  weaponlessRunWanted holds (a one-time log line marks the hold,
+  the zoneReturn flag reuses the ordinary back-home bookkeeping);
+  the trip machinery starts the weapon errand on the next tick and
+  its return leg walks home armed. A wallet that cannot afford any
+  weapon keeps the ordinary return (the punches are all it has).
+  TestWeaponlessHoldBlocksTheZoneReturn pins the hold, the one-time
+  log and the weapon errand takeover.
+- Live verification (process rebuilt at 07:37): the farm run logs
+  the hold at 07:37:47, the weapon run starts at the village at
+  once (no unarmed zone walk), the gear set lands (5 armor slots,
+  5 jewels, weapon), the books buy, the lessons learn (5 skills,
+  Attack Aura and Defence Aura included), the bot farms the Spore
+  Fungus SW ground under both auras and kills there; the shop
+  strategy's mid run upgrade round (the sold chest/head/feet
+  rebought at Ariel) re-equips and the scenario PASSED at 08:01:27
+  with every condition holding at once, the bot left the world
+  gracefully.
+- Commit "acceptance: the parallel launch staggers the logins": the
+  simultaneous launch of the parallel run all raced the Mobius
+  login flood protector (the 350ms window drops the connections of
+  one address); the launch now spaces the scenarios two seconds
+  apart. Observed live: the starts at 08:04:15.161, 08:04:17.161,
+  08:04:19.161, all three temp bots entered the world, bot-lifetime
+  and proxy-relay PASSED in the same window, the farm leg re-ran
+  the full round.
+- go build/vet/test green, golangci-lint run --new: 0 issues.
+- Next: the parallel run's farm leg finish, then the push.
