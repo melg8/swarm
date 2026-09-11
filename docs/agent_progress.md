@@ -11,6 +11,70 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the round 53 town walk stuck - the shared re-path budget and the slow skip recovery (2026-09-11)
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (2026-09-11, Russian): the bot is stuck again after the
+round 52 fix. The state dump (build f1c3136, bot test2, level 11,
+phase townReturn, dumped 2026-09-11T05:06:14+03:00) shows the character
+frozen at (46008, 51992, -2792) - the elven village teacher plaza -
+cycling "town walk stuck, skipping waypoint (1 of 3)" -> "the server
+would refuse the walk click to 45304 52152, re-pathing (2 of 3)" ->
+"town walk stuck, skipping waypoint (3 of 3)" -> "town trip ended:
+aborted, the server refuses every walk click" TWICE within 90 seconds.
+The user asked to clarify why the bot is stuck, check the pathfinding,
+write tests and ensure it is fixed.
+
+### Root cause analysis
+
+The round 52 click validation port (Engine.ValidateClick) correctly
+mirrors the Mobius GeoEngine.getValidLocation: the offline reproduction
+test TestReproRound53ZoneReturnWalksThePlan walks the exact dump
+position to the hunting zone in 13 validated clicks with zero refused
+clicks and zero re-paths. The pathfinder's plan is sound and every
+click the follower sends would survive the server validation.
+
+The freeze is NOT in the click validation. It is in the RECOVERY
+BUDGET. The dump's event sequence shows the bot alternating between
+walkStuck (skip waypoint, increment rePaths) and clickServerValidated
+(re-path, increment rePaths). Both shared the same maxRePaths=3 budget.
+The sequence consumed the budget in 2 cycles (40 seconds) and aborted.
+
+Two compounding design flaws:
+
+1. The waypoint skip (a cursor advance, no navigator call) consumed the
+   same budget as the full leg re-plan (startWalkLeg, an A* search).
+   The skip is cheap and should be retried freely; the re-plan is
+   expensive and should be bounded.
+2. The stuck timeout was 15 seconds for EVERY stuck. Once the walker
+   knew the server refused its clicks, waiting 15 seconds for every
+   subsequent waypoint just burned the trip's time budget.
+
+### Fix
+
+1. walkStuck: the waypoint skip no longer consumes the re-path budget.
+   Only the full leg re-plan (startWalkLeg) and the water escape
+   re-plan consume it.
+2. walkStuck: after the first skip, the stuck timeout drops from 15s
+   (stuckTimeout) to 4s (stuckFastTimeout). The stuckFast flag arms on
+   the first skip and clears on startWalkLeg and the other full
+   resets.
+3. walkStuck split into walkStuck + stuckWaterEscape + stuckTownWalk to
+   stay under the funlen limit.
+
+### Status: done (2026-09-11)
+
+- Commit "hunt: the round 53 stuck budget - the skip does not consume
+  the re-path budget, the fast timeout cuts the recovery window".
+- Verify loop: go build, go vet, the full go test suite (18 packages
+  green), gofmt clean, golangci-lint zero new findings in the touched
+  files.
+
 ## Active task: the webui polish pass - proxy accent, full bot name, instant skills, bright path
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.

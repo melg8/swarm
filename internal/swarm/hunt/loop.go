@@ -300,29 +300,35 @@ type Loop struct {
 	// loot, town trip and delevel logic. A manual only session (started
 	// without -hunt) keeps it off, the loop then drains the manual web
 	// commands and otherwise stays idle.
-	autonomous        bool
-	target            int32
-	lastHit           time.Time
-	lootID            int32
-	lootAt            time.Time
-	lootMoveAt        time.Time
-	skipped           map[int32]time.Time
-	restActionAt      time.Time
-	restActionSit     bool
-	restartAt         time.Time
-	zoneCX            int32
-	zoneCY            int32
-	zoneHalf          int32
-	navigator         Navigator
-	waypoints         []pathfind.Vec3
-	wpIndex           int
-	legDest           pathfind.Vec3
-	legStart          pathfind.Vec3
-	waterEscape       bool
-	moveAt            time.Time
-	stuckAt           time.Time
-	stuckX            int32
-	stuckY            int32
+	autonomous    bool
+	target        int32
+	lastHit       time.Time
+	lootID        int32
+	lootAt        time.Time
+	lootMoveAt    time.Time
+	skipped       map[int32]time.Time
+	restActionAt  time.Time
+	restActionSit bool
+	restartAt     time.Time
+	zoneCX        int32
+	zoneCY        int32
+	zoneHalf      int32
+	navigator     Navigator
+	waypoints     []pathfind.Vec3
+	wpIndex       int
+	legDest       pathfind.Vec3
+	legStart      pathfind.Vec3
+	waterEscape   bool
+	moveAt        time.Time
+	stuckAt       time.Time
+	stuckX        int32
+	stuckY        int32
+	// stuckFast arms after the first stuck skip of a trip: subsequent
+	// stuck detections use the shorter stuckFastTimeout so the walker
+	// cycles through the remaining waypoints quickly instead of waiting
+	// the full stuckTimeout for each one. resetTownTrip and
+	// startWalkLeg clear it.
+	stuckFast         bool
 	rePaths           int
 	farmX             int32
 	farmY             int32
@@ -584,6 +590,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		stuckAt:           time.Time{},
 		stuckX:            0,
 		stuckY:            0,
+		stuckFast:         false,
 		rePaths:           0,
 		farmX:             0,
 		farmY:             0,

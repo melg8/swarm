@@ -3694,3 +3694,60 @@ regardless.
 - The `walkZoneLeg` direct walk fallback still sends unvalidated
   clicks (no `ValidateClick` gate). The same gate the town walk
   follower uses would harden it.
+
+## Round 53: the town walk stuck budget - the shared re-path budget and the slow skip recovery (2026-09-11)
+
+Composition with round 52 (the click validation port): round 52 made
+the pathfinder's plan sound - every click the follower sends would
+survive the server validation. Round 53 closes the recovery half: the
+budget that bounds the recovery ate itself on the dump scenario, even
+though the plan itself was correct.
+
+Scope: the 2026-09-11T05:06:14+03:00 state dump report - the bot test2
+(level 11, phase townReturn) stood frozen at (46008, 51992, -2792) -
+the elven village teacher plaza - cycling "town walk stuck, skipping
+waypoint (1 of 3)" -> "the server would refuse the walk click to 45304
+52152, re-pathing (2 of 3)" -> "town walk stuck, skipping waypoint (3
+of 3)" -> "town trip ended: aborted, the server refuses every walk
+click" TWICE within 90 seconds. The build f1c3136 (the round 52 fix)
+reproduced the freeze on a new spot.
+
+### Root cause
+
+The pathfinder's plan was SOUND. The offline reproduction
+(TestReproRound53ZoneReturnWalksThePlan) walks the exact dump position
+to the hunting zone in 13 validated clicks with zero refused clicks and
+zero re-paths. The round 52 click validation port correctly mirrors the
+Mobius GeoEngine.getValidLocation (verified against the actual Mobius
+Java source).
+
+The freeze was in the RECOVERY BUDGET. Two compounding design flaws:
+
+1. The waypoint skip (a cursor advance, no navigator call) consumed the
+   same maxRePaths=3 budget as the full leg re-plan (startWalkLeg, an
+   A* search). The dump alternated between walkStuck (skip, rePaths++)
+   and clickServerValidated (re-path, rePaths++), consuming the budget
+   in 2 cycles (40 seconds) and aborting.
+
+2. The stuck timeout was 15 seconds for EVERY stuck. Once the walker
+   knew the server refused its clicks, waiting 15 seconds for every
+   subsequent waypoint just burned the trip's time budget.
+
+### Fix
+
+1. `hunt/town.go`: the waypoint skip of `walkStuck` no longer consumes
+   the re-path budget. Only the full leg re-plan and the water escape
+   re-plan consume it.
+2. `hunt/town.go`: the `stuckFastTimeout` (4 seconds) arms after the
+   first skip. The first stuck keeps the full 15s window; subsequent
+   stucks fire on the shorter window.
+3. `hunt/loop.go`: the `stuckFast` field added to the Loop struct.
+4. `walkStuck` split into `walkStuck` + `stuckWaterEscape` +
+   `stuckTownWalk` to stay under the funlen limit.
+
+### Verification
+
+- go build/vet, gofmt clean, go test ./... (18 packages green).
+- The exact round 53 dump walk replays with zero refused clicks and
+  zero re-paths (TestReproRound53ZoneReturnWalksThePlan). The skip-no-
+  budget and fast-timeout behavior pinned by the walk_stuck_skip tests.

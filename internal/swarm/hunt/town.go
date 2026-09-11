@@ -70,7 +70,19 @@ const (
 	// stuckTimeout is how long the character may stand still on a leg
 	// before the walker re-paths around the obstacle.
 	stuckTimeout = 15 * time.Second
+	// stuckFastTimeout is the shorter timeout that applies after the
+	// first stuck skip of a trip: once the walker knows the server
+	// refuses its clicks on this leg, waiting the full 15 seconds for
+	// every subsequent waypoint just burns the trip's time budget. The
+	// shorter window keeps the recovery responsive while still letting
+	// a slow server position broadcast land before the next skip.
+	stuckFastTimeout = 4 * time.Second
 	// maxRePaths bounds the re-paths of one trip before it aborts.
+	// The budget bounds only the full leg re-plan (startWalkLeg) - the
+	// waypoint skip of walkStuck does NOT consume it. This lets the
+	// walker cycle through several waypoints looking for one the server
+	// accepts without exhausting the budget, while still bounding the
+	// expensive re-plan operations.
 	maxRePaths = 3
 	// merchantApproachDist is the distance the seller stands from the
 	// merchant: below the 250 units interaction distance of the server.
@@ -741,6 +753,7 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
 	l.waterEscape = false
 	l.moveAt = time.Time{}
 	l.stuckAt = time.Time{}
+	l.stuckFast = false
 
 	return true
 }
@@ -855,6 +868,7 @@ func (l *Loop) walkTownWaypoints() bool {
 			l.waterEscape = false
 			l.rePaths = 0
 			l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
+			l.stuckFast = false
 			l.logger.Printf("Hunt: back on the shore at %d %d %d, "+
 				"re-planning the walk", selfX, selfY, selfZ)
 			if !l.startWalkLeg(l.legDest) {
@@ -1131,6 +1145,7 @@ func (l *Loop) clickWouldEnterWater(
 		return false
 	}
 	l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
+	l.stuckFast = false
 	l.rePaths++
 	if l.rePaths > maxRePaths {
 		l.abortTownTrip("the walk would cross water")
@@ -1209,6 +1224,7 @@ func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
 	l.waterEscape = true
 	l.moveAt = time.Time{}
 	l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
+	l.stuckFast = false
 	last := result.Waypoints[len(result.Waypoints)-1]
 	l.logger.Printf("Hunt: character stands in the water at %d %d %d, "+
 		"escaping to the shore at %d %d %d",
@@ -1257,19 +1273,14 @@ func (l *Loop) legAdvanceClear(
 
 // walkStuck tracks the movement progress of the walker and re-paths
 // around the obstacle once the character stands still for too long.
-// A stuck water escape re-plans the escape itself - the town leg is
-// meaningless until the character is back ashore. A stuck town leg
-// first tries to SKIP the current waypoint: the waypoint itself may
-// sit on a cell the server refuses to enter (a completely blocked
-// cell the isCompletelyBlocked check of MoveToLocation rejects, a
-// layer mismatch the movement validation bounces), while the next
-// waypoint on the planned route may be reachable through a different
-// cell. The skip breaks the deterministic re-path loop where the A*
-// returns the identical route from the identical start and the walker
-// burns its whole re-path budget on the same refused click. When no
-// more waypoints remain to skip, the leg re-plans from the current
-// position to the destination. It reports whether the trip had to
-// abort.
+// The first stuck of a trip waits the full stuckTimeout (a slow server
+// position broadcast must not trip a false stuck); subsequent stucks
+// within the same trip wait the shorter stuckFastTimeout - once the
+// walker knows the server refuses its clicks on this leg, waiting the
+// full window for every waypoint just burns the trip's time budget.
+// The skip of a waypoint does NOT consume the re-path budget: only the
+// full leg re-plan (startWalkLeg) does. It reports whether the trip had
+// to abort.
 func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
 	if l.stuckAt.IsZero() {
 		l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
@@ -1281,47 +1292,68 @@ func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
 
 		return false
 	}
-	if now.Sub(l.stuckAt) < stuckTimeout {
+	timeout := stuckTimeout
+	if l.stuckFast {
+		timeout = stuckFastTimeout
+	}
+	if now.Sub(l.stuckAt) < timeout {
 		return false
 	}
 	l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+	if l.waterEscape {
+		return l.stuckWaterEscape(now, selfX, selfY)
+	}
+
+	return l.stuckTownWalk(now, selfX, selfY)
+}
+
+// stuckWaterEscape re-plans the water escape itself when the character
+// stands still mid-escape. The town leg is meaningless until the
+// character is back ashore. Consumes the re-path budget.
+func (l *Loop) stuckWaterEscape(now time.Time, selfX int32, selfY int32) bool {
 	l.rePaths++
 	if l.rePaths > maxRePaths {
 		l.abortTownTrip("walk stuck")
 
 		return true
 	}
-	if l.waterEscape {
-		// The escape itself stands still: re-plan it from the current
-		// position (the swim may need a different shore click than the
-		// first plan offered).
-		l.logger.Printf("Hunt: water escape stuck, re-planning "+
-			"(%d of %d)", l.rePaths, maxRePaths)
-		if !l.planWaterEscape(selfX, selfY, l.selfZForEscape()) {
-			l.abortTownTrip("water escape re-plan failed")
+	l.logger.Printf("Hunt: water escape stuck, re-planning "+
+		"(%d of %d)", l.rePaths, maxRePaths)
+	if !l.planWaterEscape(selfX, selfY, l.selfZForEscape()) {
+		l.abortTownTrip("water escape re-plan failed")
 
-			return true
-		}
-
-		return false
+		return true
 	}
-	// First try to skip the current waypoint: the waypoint cell may
-	// be unreachable (the server refuses the move) while the next
-	// waypoint on the route is reachable. The skip advances the
-	// follower cursor, clears the move pacer so the next tick sends a
-	// fresh click at the new target and resets the stuck timer so the
-	// new waypoint gets its own stuck window.
+
+	return false
+}
+
+// stuckTownWalk drives the town leg stuck recovery: first try to SKIP
+// the current waypoint (the next one may be reachable through a cell
+// the server accepts), and when no more waypoints remain to skip,
+// re-plan the whole leg from the current position. The skip does NOT
+// consume the re-path budget - it advances the cursor without
+// re-planning, so the walker can skip several waypoints in a row while
+// looking for one the server accepts. The fast timeout flag arms
+// after the first skip so subsequent stuck detections fire on the
+// shorter window.
+func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 	if l.wpIndex+1 < len(l.waypoints) {
 		l.wpIndex++
 		l.moveAt = time.Time{}
 		l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+		l.stuckFast = true
 		l.logger.Printf("Hunt: town walk stuck, skipping waypoint "+
-			"(%d of %d)", l.rePaths, maxRePaths)
+			"(cursor %d of %d)", l.wpIndex, len(l.waypoints))
 
 		return false
 	}
-	// No more waypoints to skip: re-plan the whole leg from the
-	// current position to the destination.
+	l.rePaths++
+	if l.rePaths > maxRePaths {
+		l.abortTownTrip("walk stuck")
+
+		return true
+	}
 	l.logger.Printf("Hunt: town walk stuck, re-pathing (%d of %d)",
 		l.rePaths, maxRePaths)
 	if !l.startWalkLeg(l.legDest) {
