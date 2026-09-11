@@ -1075,3 +1075,46 @@ live stack; go build/vet/test/lint stay green.
   in both launch modes.
 - Next: the live stack verification (run the scenarios through the
   web API against the deployed Mobius C1), then the docs.
+
+### Progress (2026-09-11, round 2: the live verification)
+
+- Live stack: swarm_fast_deploy.sh (SWARM_BRANCH=feature/proxy-server)
+  brought the stack up; the Mobius clone needed the sanctioned API
+  archive channel (the git protocol hung, then 403 - retried until it
+  went through); STACK_READY, 75 tables.
+- Commit "acceptance: the session creates the missing temp
+  character": the lifetime and relay scenarios failed on a fresh
+  database ("the bot never entered the world within 90s") because
+  runSession selected a character that did not exist; the session now
+  creates the missing elven fighter exactly like runBot does.
+- Commit "acceptance: the supervised session, the inclusive wire
+  framing and the database selection": three live findings fixed.
+  (1) The relay fake client read and wrote the 2 byte size header as
+  payload-exclusive while the proxy speaks the Mobius inclusive
+  framing - the init read deadlocked ("read init: i/o timeout");
+  both directions aligned with the proxy/connection convention plus
+  relay_wire_test.go regression tests. (2) The db wire client never
+  selected the schema ("1046 No database selected") - the handshake
+  response now carries CLIENT_CONNECT_WITH_DB and the database name.
+  (3) The farm scenario hung after the hunt loop's emergency logout
+  because the acceptance runner had no session supervisor -
+  runSessionSupervised mirrors runBotForever (login cooldown honored,
+  backoff, stable session reset) and farmTimeout rose 15m -> 30m (the
+  aggressive Kaboo Orc road mobs interrupt the town trips, the sell
+  old weapon -> buy new cycle leaves the bot weaponless mid trip).
+- Commit "acceptance: the sequential run all regression test":
+  TestStartAllSequential pins the one after another order (b stays
+  idle until a passed).
+- Live verification through the web API: bot-lifetime PASSED (entered
+  the world, 30s online window, graceful stop), proxy-relay PASSED
+  (emulated login, char list, world replay, movement echo, net pings),
+  farm-readiness PASSED end to end (level 15 temp1 with 20k SP and
+  100k adena at the creation point bought the gear set and the
+  spellbooks, learned the affordable lessons, reached the Spore Fungus
+  SW zone, ran the auras and killed a mob there in the right clothes).
+  The parallel run all starts all three at once (observed live), the
+  sequential order is pinned by the unit test.
+- go build/vet/test green (19 packages), golangci-lint run --new: 0
+  issues, all five node web harnesses PASS.
+- Next: none - the round is complete; the scenarios await the user's
+  press of the TESTS panel buttons.
