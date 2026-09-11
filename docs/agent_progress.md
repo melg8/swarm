@@ -11,6 +11,79 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the frozen trip plan - the shop manager stops re-planning (2026-09-11)
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user reported racing purchases on the 36954cf build (the
+2026-09-11 10:30 test1 dump, level 14, adena 1800): the shopping trip
+ended holding TWO pairs of gloves - the new Leather Gloves worn, the
+old Gloves left in the bag - and required the manager to know exactly
+what and how much ONE trip buys and to wait for the bot's execution
+in place, instead of recalculating the plan at every step.
+
+### Root cause
+
+The trip planned TWICE against two different states. The sell first
+step (`replacementTargets`) ran the plan computed at the trip start
+(71420 adena, everything worn: Brandish 62214 with the Short Sword's
+sell credit plus Low Boots 7785 with the Apprentice's Shoes credit -
+exactly the dump's "worth 69999") and sold the displaced sword and
+shoes. The stop planning (`planShoppingStops`) then computed a FRESH
+plan against the freed slots and the fresh adena (71807): the armor
+floor pulled the cheapest Apprentice's Shoes (8 adena) into the
+emptied feet slot - blocking the planned Low Boots upgrade, the sold
+piece bought right back - and the defense phase planned the Leather
+Gloves (7785) whose displaced Gloves were never queued for the sale
+(the replacement phase had already run), so the buy swapped the old
+gloves into the bag. The dump's numbers match the reconstruction to
+the adena: 71420 + 387 of the sales - 70007 of the actual buys
+(Apprentice's Shoes 8 + Leather Gloves 7785 + Brandish 62214) = the
+1800 the dump ends with. The same drift class produced the earlier
+sold-weapon re-buy round (build f3b868e).
+
+### Design
+
+- `Loop.tripPlan` freezes `shoppingPlan()` ONCE in
+  `maybeStartTownTrip`, before the weapon merchant routing; the trip
+  trigger reason names the frozen plan's worth.
+- `replacementTargets` and `planShoppingStops` read the frozen plan;
+  no `shoppingPlan()` call happens after the trip starts.
+  `weaponStopMerchant` routes by the frozen plan too.
+- The buy execution keeps its arrival confirmations (the manager
+  waits for every request's inventory answer) and gains one last
+  responsible moment guard: `dropOwnedPurchases` removes the stop
+  purchases whose item id the inventory already carries before any
+  request goes out (a mid trip drop the auto equipment wore, a manual
+  user purchase - a second copy is never part of the plan).
+- The trip end (and the death reset) clears the frozen plan; the
+  next trip freezes a fresh one against the gear the purchases
+  reached.
+- `enterSellPhase` logs the stop honestly: the buy stops of the plan
+  no longer claim "selling the junk" on every arrival.
+
+### Acceptance criteria
+
+- `TestTripPlanFreezesPurchasesAgainstResale` replays the dump: the
+  frozen plan is [Brandish + Low Boots] worth 69999, the replacements
+  are [sword, shoes], the distributed stops carry exactly the frozen
+  plan (no shoes re-buy, no purchase without its queued sale) and the
+  merged stop buys the Brandish from Unoren.
+- `TestStopShoppingSkipsOwnedItems` pins the owned purchase filter.
+- The widget queue tests and the trip flow tests stay green;
+  go build ./..., go vet ./..., the full go test suite, gofmt -l and
+  golangci-lint (the hunt package) stay clean.
+
+### Status: in progress (2026-09-11)
+
+- Next: the frozen plan implementation (the field, the freeze, the
+  frozen reads, the owned purchase filter, the honest stop logs),
+  the dump replay regression test, the docs.
+
 ## Active task: the port of the shop planner top-tier guard from feature/acceptance (2026-09-11)
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
