@@ -181,6 +181,22 @@ body {
   padding: 10px 12px 6px;
 }
 
+/* The sidebar splits the bots into two groups: the long-running fleet
+   bots and the acceptance test temp bots. Each group carries a small
+   sub-title under the BOTS header; the empty group hides so the
+   visible bots stay compact. */
+.bot-group { display: flex; flex-direction: column; }
+.bot-group.hidden { display: none; }
+
+.bot-group-title {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 6px 12px 3px;
+  opacity: 0.85;
+}
+
 .bot-list { list-style: none; overflow-y: auto; flex: 1; }
 
 /* The hunting zone panel: a floating collapsible list on the map

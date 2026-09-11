@@ -171,63 +171,115 @@ function proxyTargetId() {
 }
 
 function renderBotList() {
-  const list = document.getElementById("bot-list");
-  list.innerHTML = "";
+  // The sidebar splits the bots into two groups: the long-running
+  // fleet bots (the 24/7 sessions) and the acceptance test bots (the
+  // temp accounts of the scenarios). A bot without an explicit kind
+  // (the default of an untagged bot) reads as long-running - the
+  // acceptance manager tags its temp bots with kind="acceptance".
+  const longList = document.getElementById("bot-list-long");
+  const accList = document.getElementById("bot-list-acc");
+  const longGroup = document.getElementById("bot-group-long");
+  const accGroup = document.getElementById("bot-group-acc");
+  if (!longList || !accList) { return; }
+  longList.innerHTML = "";
+  accList.innerHTML = "";
+
+  const longBots = [];
+  const accBots = [];
   for (const bot of App.bots) {
-    const item = document.createElement("li");
-    const isProxy = App.proxy && App.proxy.enabled &&
-      bot.id === proxyTargetId();
-    item.className = "bot-item" +
-      (bot.id === App.activeBotId ? " active" : "") +
-      (isProxy ? " is-proxy" : "");
-    item.dataset.id = bot.id;
-
-    const row = document.createElement("div");
-    row.className = "bot-row";
-    const dot = document.createElement("span");
-    dot.className = "dot " + bot.status;
-    const name = document.createElement("span");
-    name.className = "bot-name";
-    name.textContent = bot.name || bot.id;
-    row.append(dot, name);
-    if (bot.inCombat) {
-      row.append(makeChip("bot-chip chip-combat", "combat"));
+    if (bot.kind === "acceptance") {
+      accBots.push(bot);
+    } else {
+      longBots.push(bot);
     }
-    if (bot.sitting) {
-      row.append(makeChip("bot-chip chip-rest", "rest"));
-    }
-    // The proxy target bot now carries the `is-proxy` class on the
-    // bot-item instead of a "proxy" text chip: the four corner accents
-    // (drawn with CSS pseudo-elements) frame the whole plaque, so the
-    // proxy bot reads at a glance without taking space on the row.
-    const level = document.createElement("span");
-    level.className = "bot-level";
-    level.textContent = bot.level > 0 ? "lv " + bot.level : bot.status;
-    row.append(level);
-    item.append(row);
-
-    // The activity banner of the sidebar row: a compact one line
-    // summary of the bot phase so the overview shows at a glance
-    // what every session is doing (hunting, walking to town,
-    // selling, deleveling). Hidden when no phase is published
-    // (the manual only sessions and the pre-world sessions).
-    const activity = botActivityLabel(bot);
-    if (activity) {
-      const act = document.createElement("div");
-      act.className = "bot-activity kind-" + activity.kind;
-      act.textContent = activity.text;
-      item.append(act);
-    }
-
-    // The mini HP/MP/XP bars share the HUD palette: one look at the
-    // sidebar shows what every session is doing.
-    if (bot.status === "online") {
-      item.append(buildMiniBars(bot));
-    }
-
-    item.addEventListener("click", () => selectBot(bot.id));
-    list.append(item);
   }
+
+  for (const bot of longBots) {
+    longList.append(buildBotItem(bot));
+  }
+  for (const bot of accBots) {
+    accList.append(buildBotItem(bot));
+  }
+
+  // The acceptance group stays hidden while there are no acceptance
+  // bots registered (the older processes without the kind tag and the
+  // pathfind test mode never populate it).
+  if (accGroup) {
+    if (accBots.length > 0) {
+      accGroup.classList.remove("hidden");
+    } else {
+      accGroup.classList.add("hidden");
+    }
+  }
+  // The long-running group hides when only acceptance bots exist
+  // (the headless acceptance run path launches no fleet bot).
+  if (longGroup) {
+    if (longBots.length > 0) {
+      longGroup.classList.remove("hidden");
+    } else {
+      longGroup.classList.add("hidden");
+    }
+  }
+}
+
+// buildBotItem renders one bot plaque: the row (status dot, name,
+// combat/rest chips, level), the activity banner and the mini HP/MP/XP
+// bars. The click selects the bot the map observes.
+function buildBotItem(bot) {
+  const item = document.createElement("li");
+  const isProxy = App.proxy && App.proxy.enabled &&
+    bot.id === proxyTargetId();
+  item.className = "bot-item" +
+    (bot.id === App.activeBotId ? " active" : "") +
+    (isProxy ? " is-proxy" : "");
+  item.dataset.id = bot.id;
+
+  const row = document.createElement("div");
+  row.className = "bot-row";
+  const dot = document.createElement("span");
+  dot.className = "dot " + bot.status;
+  const name = document.createElement("span");
+  name.className = "bot-name";
+  name.textContent = bot.name || bot.id;
+  row.append(dot, name);
+  if (bot.inCombat) {
+    row.append(makeChip("bot-chip chip-combat", "combat"));
+  }
+  if (bot.sitting) {
+    row.append(makeChip("bot-chip chip-rest", "rest"));
+  }
+  // The proxy target bot now carries the `is-proxy` class on the
+  // bot-item instead of a "proxy" text chip: the four corner accents
+  // (drawn with CSS pseudo-elements) frame the whole plaque, so the
+  // proxy bot reads at a glance without taking space on the row.
+  const level = document.createElement("span");
+  level.className = "bot-level";
+  level.textContent = bot.level > 0 ? "lv " + bot.level : bot.status;
+  row.append(level);
+  item.append(row);
+
+  // The activity banner of the sidebar row: a compact one line
+  // summary of the bot phase so the overview shows at a glance
+  // what every session is doing (hunting, walking to town,
+  // selling, deleveling). Hidden when no phase is published
+  // (the manual only sessions and the pre-world sessions).
+  const activity = botActivityLabel(bot);
+  if (activity) {
+    const act = document.createElement("div");
+    act.className = "bot-activity kind-" + activity.kind;
+    act.textContent = activity.text;
+    item.append(act);
+  }
+
+  // The mini HP/MP/XP bars share the HUD palette: one look at the
+  // sidebar shows what every session is doing.
+  if (bot.status === "online") {
+    item.append(buildMiniBars(bot));
+  }
+
+  item.addEventListener("click", () => selectBot(bot.id));
+
+  return item;
 }
 
 // botActivityLabel mirrors phaseLabel for the compact BotInfo payload
