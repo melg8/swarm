@@ -262,6 +262,9 @@ func writeDumpObjects(b *strings.Builder, snap state.Snapshot) {
 			o.ObjectID, o.Kind, name, o.Level, o.CurHP, o.MaxHP,
 			o.X, o.Y, o.Z, math.Hypot(dx, dy))
 		var flags []string
+		if o.Attackable {
+			flags = append(flags, "attackable")
+		}
 		if o.Dead {
 			flags = append(flags, "dead")
 		}
