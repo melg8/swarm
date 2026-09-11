@@ -1526,3 +1526,29 @@ without growing the per-object cost.
 ### Status
 
 - In progress: the state diagnostics section first.
+- 2026-09-11: the state diagnostics section. A new
+  state/diagnostics.go defines the Diagnostics view (phaseForMs,
+  updatedAgoMs, packetsPerSecond over a 10 second window,
+  loginCooldownMs, autoAttacking, fightingTargetId,
+  combatActiveAgoMs, lastHitAgoMs, underAttack, attackerCount,
+  walkFresh, moveAgoMs, the ObjectCounts summary, the
+  HuntDiagnostics subview) and its support state: the phaseAt stamp
+  of SetPhase, the packet rate window fed by CountPacket, the hunt
+  publication (SetHuntDiagnostics, no version bump - the values ride
+  the packet driven snapshots) and NoteAction (the event log entry
+  plus the last action of the hunt view). The ages floor to whole
+  seconds through state.AgeMs so both encode paths stay byte
+  identical without a now race. The snapshot struct gains the
+  trailing diagnostics field; the reflection golden fixture covers
+  every new branch; the live encoder walks the object array once and
+  folds the hot records into the worldCounts tally (npcs, players,
+  items, dead, attackers) reused by the diagnostics. Tests:
+  diagnostics_test.go pins the rate window, the phase age, the
+  update fallback, the cooldown, the walk freshness stall signature,
+  the combat nuance, the object counts with the attacker tally, the
+  hunt publication with the last action and the reset. go build, go
+  vet, go test ./... green; golangci-lint 0 issues in state (the 10
+  remaining findings of the full run reproduce on the untouched
+  HEAD with the local golangci-lint 2.6.2 - linter version drift,
+  not this change). Next: the hunt loop publication and the log
+  routing.

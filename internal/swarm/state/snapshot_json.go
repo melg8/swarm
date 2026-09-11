@@ -63,6 +63,7 @@ func snapshotJSONSize(s Snapshot) int {
 	}
 	size += 160 * len(s.CombatEvents)
 	size += 160 * len(s.HuntingZones)
+	size += 704 + len(s.Diagnostics.Hunt.LastAction)
 	for i := range s.Events {
 		size += len(s.Events[i].Message)
 	}
@@ -74,7 +75,10 @@ func snapshotJSONSize(s Snapshot) int {
 }
 
 // appendSnapshotJSON writes the snapshot object in the field order of
-// the struct declaration.
+// the struct declaration. Splitting the linear field walk only
+// obscures the wire format (see appendCharacterJSON).
+//
+//nolint:funlen // linear field order
 func appendSnapshotJSON(dst []byte, s Snapshot) []byte {
 	dst = append(dst, `{"id":`...)
 	dst = appendJSONString(dst, s.ID)
@@ -119,6 +123,8 @@ func appendSnapshotJSON(dst []byte, s Snapshot) []byte {
 	dst = appendJSONTime(dst, s.StartedAt)
 	dst = append(dst, `,"updatedAt":`...)
 	dst = appendJSONTime(dst, s.UpdatedAt)
+	dst = append(dst, `,"diagnostics":`...)
+	dst = appendDiagnosticsJSON(dst, s.Diagnostics)
 	dst = append(dst, '}')
 
 	return dst
@@ -858,6 +864,94 @@ func appendZoneViewJSON(dst []byte, zone ZoneView) []byte {
 	dst = strconv.AppendInt(dst, int64(zone.KillX), 10)
 	dst = append(dst, `,"killY":`...)
 	dst = strconv.AppendInt(dst, int64(zone.KillY), 10)
+
+	return append(dst, '}')
+}
+
+// appendDiagnosticsJSON writes the health view object of the
+// snapshot: the liveness ages and rates, the combat nuance, the
+// known list summary and the hunt internals. The field order
+// mirrors the struct declaration like the reflection encoder.
+//
+
+func appendDiagnosticsJSON(dst []byte, d Diagnostics) []byte {
+	dst = append(dst, `{"phaseForMs":`...)
+	dst = strconv.AppendInt(dst, d.PhaseForMs, 10)
+	dst = append(dst, `,"updatedAgoMs":`...)
+	dst = strconv.AppendInt(dst, d.UpdatedAgoMs, 10)
+	dst = append(dst, `,"packetsPerSecond":`...)
+	dst = appendJSONFloat(dst, d.PacketsPerSecond)
+	dst = append(dst, `,"loginCooldownMs":`...)
+	dst = strconv.AppendInt(dst, d.LoginCooldownMs, 10)
+	dst = append(dst, `,"autoAttacking":`...)
+	dst = strconv.AppendBool(dst, d.AutoAttacking)
+	dst = append(dst, `,"fightingTargetId":`...)
+	dst = strconv.AppendInt(dst, int64(d.FightingTargetID), 10)
+	dst = append(dst, `,"combatActiveAgoMs":`...)
+	dst = strconv.AppendInt(dst, d.CombatActiveAgoMs, 10)
+	dst = append(dst, `,"lastHitAgoMs":`...)
+	dst = strconv.AppendInt(dst, d.LastHitAgoMs, 10)
+	dst = append(dst, `,"underAttack":`...)
+	dst = strconv.AppendBool(dst, d.UnderAttack)
+	dst = append(dst, `,"attackerCount":`...)
+	dst = strconv.AppendInt(dst, int64(d.AttackerCount), 10)
+	dst = append(dst, `,"walkFresh":`...)
+	dst = strconv.AppendBool(dst, d.WalkFresh)
+	dst = append(dst, `,"moveAgoMs":`...)
+	dst = strconv.AppendInt(dst, d.MoveAgoMs, 10)
+	dst = append(dst, `,"objects":`...)
+	dst = appendObjectCountsJSON(dst, d.Objects)
+	dst = append(dst, `,"hunt":`...)
+	dst = appendHuntDiagnosticsJSON(dst, d.Hunt)
+
+	return append(dst, '}')
+}
+
+// appendObjectCountsJSON writes the known list summary object.
+func appendObjectCountsJSON(dst []byte, c ObjectCounts) []byte {
+	dst = append(dst, `{"npcs":`...)
+	dst = strconv.AppendInt(dst, int64(c.NPCs), 10)
+	dst = append(dst, `,"players":`...)
+	dst = strconv.AppendInt(dst, int64(c.Players), 10)
+	dst = append(dst, `,"items":`...)
+	dst = strconv.AppendInt(dst, int64(c.Items), 10)
+	dst = append(dst, `,"dead":`...)
+	dst = strconv.AppendInt(dst, int64(c.Dead), 10)
+
+	return append(dst, '}')
+}
+
+// appendHuntDiagnosticsJSON writes the hunt internals object. The
+// field order mirrors the struct declaration.
+//
+
+func appendHuntDiagnosticsJSON(dst []byte, h HuntDiagnostics) []byte {
+	dst = append(dst, `{"targetId":`...)
+	dst = strconv.AppendInt(dst, int64(h.TargetID), 10)
+	dst = append(dst, `,"targetForMs":`...)
+	dst = strconv.AppendInt(dst, h.TargetForMs, 10)
+	dst = append(dst, `,"skippedTargets":`...)
+	dst = strconv.AppendInt(dst, int64(h.SkippedTargets), 10)
+	dst = append(dst, `,"noTargetForMs":`...)
+	dst = strconv.AppendInt(dst, h.NoTargetForMs, 10)
+	dst = append(dst, `,"rePaths":`...)
+	dst = strconv.AppendInt(dst, int64(h.RePaths), 10)
+	dst = append(dst, `,"stuckForMs":`...)
+	dst = strconv.AppendInt(dst, h.StuckForMs, 10)
+	dst = append(dst, `,"waypointsLeft":`...)
+	dst = strconv.AppendInt(dst, int64(h.WaypointsLeft), 10)
+	dst = append(dst, `,"tripForMs":`...)
+	dst = strconv.AppendInt(dst, h.TripForMs, 10)
+	dst = append(dst, `,"fleeForMs":`...)
+	dst = strconv.AppendInt(dst, h.FleeForMs, 10)
+	dst = append(dst, `,"buyRetries":`...)
+	dst = strconv.AppendInt(dst, int64(h.BuyRetries), 10)
+	dst = append(dst, `,"lastAction":`...)
+	dst = appendJSONString(dst, h.LastAction)
+	dst = append(dst, `,"lastActionAgoMs":`...)
+	dst = strconv.AppendInt(dst, h.LastActionAgoMs, 10)
+	dst = append(dst, `,"tickAgoMs":`...)
+	dst = strconv.AppendInt(dst, h.TickAgoMs, 10)
 
 	return append(dst, '}')
 }
