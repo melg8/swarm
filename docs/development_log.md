@@ -3850,3 +3850,97 @@ Two follower defects composed:
   no refused click; the raw surgical clicks of the aisle legs
   (44728 51992 -> 44728 52200 -> 45160 52120 -> 45725 52105) all
   walked on the live server.
+
+## Round 57: the pathfind freeze - the un-rescuable short click and the identical re-plan (2026-09-11)
+
+The user report (the 11:34 state dump, build d0cd543, bot test2,
+phase townReturn): after a relogin the character stood at
+(44296 51480 -2848, the village south terrace) with an 11 waypoint
+plan to the Kaboo Orc Grunt S zone whose FIRST waypoint sat 22 units
+out (44280 51464 -2832, up the 16 unit terrace step), and the
+character never moved a single cell: "town walk stuck, re-pathing"
+fired three times, the trip aborted, the zone return restarted the
+identical cycle, and the dump caught the second trip mid-cycle - two
+complete trip cycles with no movement and no "the server would
+refuse" line (the local click validation kept blessing every click).
+
+### Root cause (probed live with the MOVEDBG diagnostics build)
+
+The plan itself is valid - every leg validates against the server
+click port, and the local Mobius stack (both PathFinding=0 and =2,
+the byte-identical 21_19 geodata region injected) walks the exact
+dump scenario in one go: every click ACCEPTED, the zone reached in
+about 50 seconds. The freeze lives in the interaction of the SHORT
+first click with the server's own move machinery:
+`Creature.moveToLocation` hands a geodata-collapsed click over to
+the server side pathfinder only when `(originalDistance - distance)
+> 30` - a collapsed click whose ORIGINAL line was under ~31 units is
+silently canceled (ActionFailed, no movement, no feedback the
+offline validation could see). The dump's 22 unit first waypoint
+click was exactly that: collapsed by the user's server (whatever its
+runtime state held against that line), un-rescuable by construction,
+and re-clicked forever.
+
+The bot's recovery then compounded the freeze: the re-path re-plans
+from the standing position, so it reproduced the identical route
+(the deterministic A*) with the identical un-rescuable first click -
+three re-paths per trip, the abort, the zone return restart, the
+same cycle again. Only after three full trip cycles
+(zoneReturnFailBudget) would the direct server routed legs (whose
+long clicks ARE rescue eligible) finally move the character - about
+five minutes of the reported hang.
+
+### Fix
+
+1. `hunt/town.go`: `minWalkClick` (50) - the armed short click
+   extension. After the first stuck that finds no clear successor
+   (the pinned cursor - the proof the plain clicks do not move the
+   character), the follower's clicks re-aim at the forward route
+   samples (`extendShortClickCandidates`: the march along the plan
+   polyline, one cell stride, skipping the samples under the floor
+   or behind the character) - every armed click then clears the 30
+   unit rescue threshold, so a server side collapse hands it to the
+   server pathfinder instead of canceling it. The water guard and
+   the click validation port gate every sample; a walled sample only
+   skips forward (the next route cell carries the click). A waypoint
+   behind the character with no validating forward sample holds the
+   click (the backward click walked the character off the ground the
+   extension just walked - the reproduction ping ponged on exactly
+   that).
+2. `hunt/town.go`: `frozenRepathLimit` - the identical re-plan rule.
+   A re-path that started from the same cell as the previous one
+   without a single cell of movement in between proves the fresh
+   plan cannot move the character either; the trip aborts at once
+   and the zone return escalates straight to the direct server
+   routed legs (`abortFrozenTrip` sets `zoneFails` to the budget)
+   instead of burning two more full trip cycles. The shop trips keep
+   their cooldown recovery.
+
+### Verification
+
+- go build/vet, gofmt clean, golangci-lint zero findings, the full
+  go test suite green (19 packages).
+- The exact dump scenario under the freeze server model (a sim that
+  cancels the sub-31-unit clicks the way the user's server did and
+  walks or pathfinder-rescues the longer ones): the walk arrives at
+  the zone within ONE recovery re-path, every armed click at least
+  the floor length (TestReproRound57ShortClickFreezeWalksThePlan).
+- The zone return sweep from eight village positions (the dump
+  terrace cell, the round 56 aisle/pocket/terrace/plaza approaches,
+  the shop deck, the southwest shore path) all arrive under the same
+  freeze model within two re-paths
+  (TestRound57ZoneReturnFromEveryVillageStart).
+- The total-freeze escalation: a server that moves nothing aborts
+  the trip after one no-movement re-path (two stuck windows instead
+  of the dump's four per trip times the restart cycle) and the zone
+  return escalates to the direct legs at once
+  (TestReproRound57FrozenServerEscalatesFast).
+- The extension gating pins: the march skips the backward and
+  under-floor samples, the unarmed follower keeps the plain short
+  waypoint clicks (the round 56 teacher ramp design), the armed
+  follower extends them, the armed backward aim with no validating
+  sample holds the click (click_floor_test.go).
+- The live stack validation: the dump position injected into the
+  test2 database row, the bot walked the plan to the zone with every
+  click ACCEPTED on the MOVEDBG diagnostics build (both PathFinding
+  modes), and `tools/mobius_e2e.sh` stays E2E_OK on the fixed build.

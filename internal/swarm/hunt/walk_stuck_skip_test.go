@@ -126,11 +126,12 @@ func TestWalkStuckRepathsAfterAllWaypointsSkipped(t *testing.T) {
 		"the re-plan must call the navigator")
 }
 
-// TestWalkStuckAbortsAfterMaxRePaths verifies the abort: after
-// maxRePaths+1 stuck re-paths the trip aborts with the walk stuck
-// reason. The skip does NOT consume the budget, so with a two-waypoint
-// route (no intermediate waypoint to skip), each stuck re-plans the
-// leg, and after maxRePaths re-paths the trip aborts.
+// TestWalkStuckAbortsAfterMaxRePaths verifies the abort: with a
+// two-waypoint route (no intermediate waypoint to skip), each stuck
+// re-plans the leg - and a re-path that produced no movement aborts
+// the next same-cell stuck instead of re-planning the identical route
+// (the frozen re-path rule). The maxRePaths budget still bounds the
+// walks whose re-paths DO move the character between them.
 func TestWalkStuckAbortsAfterMaxRePaths(t *testing.T) {
 	loop, _, bot, nav := newTripLoop()
 	nav.found = true
@@ -142,17 +143,62 @@ func TestWalkStuckAbortsAfterMaxRePaths(t *testing.T) {
 	loop.tick()
 	require.Equal(t, phaseTownWalk, loop.phase)
 
-	// Burn through the re-path budget: each stuck re-plans the leg
-	// (with only 2 waypoints, the skip never fires), and after
-	// maxRePaths attempts the trip aborts.
-	for range maxRePaths {
-		require.Equal(t, phaseTownWalk, loop.phase,
-			"the trip must stay in the walk phase until the budget is exhausted")
-		armStuck(loop, bot)
-		loop.tick()
-	}
-	// After maxRePaths, one more stuck aborts the trip.
+	// The first stuck re-plans the leg (the character stands still,
+	// the route has no waypoint to skip onto).
 	armStuck(loop, bot)
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase,
+		"the first re-path keeps the trip walking")
+	require.Equal(t, 1, loop.rePaths)
+	require.Positive(t, nav.calls,
+		"the re-plan must call the navigator")
+	require.True(t, loop.extendArmed,
+		"the pinned stuck arms the short click extension")
+
+	// The second stuck from the same cell (no movement since the
+	// re-path) aborts the trip: the identical re-plan cannot move the
+	// character either.
+	armStuck(loop, bot)
+	loop.tick()
+	require.NotEqual(t, phaseTownWalk, loop.phase,
+		"the frozen re-path aborts the trip")
+}
+
+// TestWalkStuckBudgetBoundsMovingRepaths pins the maxRePaths budget
+// itself: when each re-path plans from a DIFFERENT cell (the character
+// moved between the stucks), the re-paths keep running until the
+// budget is exhausted - the frozen rule never fires.
+func TestWalkStuckBudgetBoundsMovingRepaths(t *testing.T) {
+	loop, _, bot, nav := newTripLoop()
+	nav.found = true
+	nav.route = []pathfind.Vec3{
+		{X: 45000, Y: 50000, Z: -3500},
+		{X: 44800, Y: 50200, Z: -3500},
+	}
+	// Block every sight line: no waypoint ahead is ever clear, so the
+	// stuck always reaches the re-path branch (no skip).
+	nav.sightFunc = func(_, _ pathfind.Vec3) (bool, error) {
+		return false, nil
+	}
+	fillInventory(bot)
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+
+	for i := 0; i < maxRePaths; i++ {
+		// The character moved between the stucks: the next re-path
+		// plans from a different cell, the frozen rule never fires.
+		x := int32(45000 - i*200)
+		moveSelfTo(bot, x, 50000, -3500)
+		loop.stuckX, loop.stuckY = x, 50000
+		loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
+		loop.tick()
+		require.Equal(t, phaseTownWalk, loop.phase,
+			"the moving re-paths keep the trip walking")
+	}
+	// The budget exhausted: one more moving stuck aborts the trip.
+	moveSelfTo(bot, 44000, 50000, -3500)
+	loop.stuckX, loop.stuckY = 44000, 50000
+	loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
 	loop.tick()
 	require.NotEqual(t, phaseTownWalk, loop.phase,
 		"the trip must abort after the re-path budget is exhausted")

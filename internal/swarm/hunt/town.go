@@ -84,6 +84,42 @@ const (
 	// accepts without exhausting the budget, while still bounding the
 	// expensive re-plan operations.
 	maxRePaths = 3
+	// minWalkClick is the floor length of the ground clicks the
+	// waypoint follower sends. The server's own move validation can
+	// collapse a click onto the walker (the GeoEngine.getValidLocation
+	// correction), and Creature.moveToLocation only hands such a
+	// collapsed click over to the server side pathfinder when the
+	// ORIGINAL line was longer than 30 units: the pathfinding branch
+	// gates on (originalDistance - distance) > 30, so a shorter
+	// collapse is silently canceled with ActionFailed and the
+	// character never moves - the click stays eligible for the
+	// rescue only above the floor (the 2026-09-11 11:34 village
+	// return dump: the first plan waypoint sat 22 units out, every
+	// re-click of it froze through two whole trip cycles). The floor
+	// matches waypointPassDist: an intermediate waypoint under it
+	// counts as arrived, the follower only CLICKS one when the
+	// cursor is pinned on it (no clear successor line), and the
+	// pinned click then extends past it along the plan polyline.
+	minWalkClick = 50.0
+	// frozenRepathLimit bounds the consecutive stuck re-paths that
+	// start from the same cell without a single cell of movement in
+	// between: the re-path re-plans from the standing position, so
+	// a re-path that itself produced no movement proves the fresh
+	// plan cannot move the character either (the refusal the
+	// offline validation cannot see). The next identical re-path
+	// would burn a full stuck window on the same freeze - the trip
+	// aborts and hands the recovery to its callers instead (the
+	// zone return escalates to the direct server routed legs at
+	// once, the shop trip arms its cooldown).
+	frozenRepathLimit = 1
+	// extendMarchStep is the stride of the forward route march of
+	// extendShortClickCandidates: one geodata cell.
+	extendMarchStep = 16.0
+	// extendCandidateMax bounds the forward route samples the
+	// short click extension tries: the first samples past the
+	// floor, each one march step further along the route - enough
+	// to step past a single route cell that walls the chord.
+	extendCandidateMax = 5
 	// merchantApproachDist is the distance the seller stands from the
 	// merchant: below the 250 units interaction distance of the server.
 	merchantApproachDist = 200.0
@@ -964,10 +1000,12 @@ func (l *Loop) followWaypoints(
 // clickWaypoint aims the current waypoint, bends the click around the
 // idle aggressive camps, guards the line against water and the server
 // refusal and sends it. The leg splitting caps the click at the
-// server move request limit; the water guard and the server click
-// validation run after the steering so the line they verify is the
-// one actually being sent. Without a navigator both guards stay off
-// (the walk was planned elsewhere, the follower only walks it).
+// server move request limit; the short click extension re-aims the
+// clicks under the server rescue floor at the plan polyline (see
+// minWalkClick); the water guard and the server click validation run
+// after the steering so the line they verify is the one actually
+// being sent. Without a navigator both guards stay off (the walk was
+// planned elsewhere, the follower only walks it).
 func (l *Loop) clickWaypoint(
 	selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
 ) {
@@ -981,6 +1019,34 @@ func (l *Loop) clickWaypoint(
 		moveX = float64(selfX) + dx*frac
 		moveY = float64(selfY) + dy*frac
 		moveZ = float64(selfZ) + (wp.Z-float64(selfZ))*frac
+	}
+	if l.extendArmed {
+		// The recovery of a stuck leg (extendArmed): the stuck
+		// proved the plain clicks of this leg do not move the
+		// character (a server side refusal the offline click
+		// validation cannot see), so the primary target under
+		// the server rescue floor or behind the character on
+		// the route gives way to the forward route samples.
+		behind := waypointBehindRoute(
+			l.waypoints, l.wpIndex, selfX, selfY)
+		if behind || dist < minWalkClick {
+			extX, extY, extZ, ok := l.extendShortClick(
+				selfX, selfY, selfZ, waterGuard,
+				moveX, moveY, moveZ)
+			if ok {
+				moveX, moveY, moveZ = extX, extY, extZ
+			} else if behind {
+				// No forward sample validates and the
+				// waypoint is behind: clicking it walks
+				// the character backward into the pocket
+				// the route samples just escaped. Hold
+				// the click - the stuck window re-plans
+				// from the standing cell, and the
+				// planner knows the wall the server-side
+				// routing has to route around.
+				return
+			}
+		}
 	}
 	// The aggro-aware steering: the camps of idle aggressive mobs
 	// sitting on the leg bend it sideways (see loop_avoid.go). Every
@@ -1009,6 +1075,130 @@ func (l *Loop) clickWaypoint(
 	if err := l.game.WalkTo(int32(moveX), int32(moveY), int32(moveZ)); err != nil {
 		l.logf("Hunt: town walk request failed: %v", err)
 	}
+}
+
+// waypointBehindRoute reports whether the waypoint at the index sits
+// behind the character relative to the route segment leaving it: the
+// cursor can stay pinned on a waypoint the character already moved
+// past (the successor line is not clear yet), and clicking it walks
+// the character BACK off the ground the forward route samples just
+// walked - the extension takes over such clicks. A waypoint ahead or
+// beside the character (the normal pull back onto the route, the
+// round 56 gated waypoint design) never triggers it.
+func waypointBehindRoute(
+	waypoints []pathfind.Vec3, index int, selfX, selfY int32,
+) bool {
+	if index+1 >= len(waypoints) {
+		return false
+	}
+	wp := waypoints[index]
+	next := waypoints[index+1]
+	fdx := next.X - wp.X
+	fdy := next.Y - wp.Y
+	if math.Hypot(fdx, fdy) < 1 {
+		return false
+	}
+
+	return (wp.X-float64(selfX))*fdx+(wp.Y-float64(selfY))*fdy < 0
+}
+
+// extendShortClick re-aims a click whose primary target sits under the
+// server rescue floor (minWalkClick) at the forward route samples past
+// the floor: the click line still starts at the standing cell, but its
+// target walks along the planned route far enough that a server side
+// collapse hands the click to the server pathfinder instead of
+// silently canceling it (see the minWalkClick contract). The candidates
+// try in forward order and the first the local rules bless wins - the
+// water crossing check of the guard (the town legs must stay dry) and
+// the server click validation port both run on the chord, and a route
+// cell that walls one chord (the 2026-09-11 11:34 reproduction: the
+// terrace hillside step refused every chord crossing it) only skips
+// that sample, the next one further along the route still carries the
+// click. No candidate passing keeps the plain waypoint click - the
+// refusal machinery of clickServerValidated answers it exactly like
+// today.
+func (l *Loop) extendShortClick(
+	selfX, selfY, selfZ int32, waterGuard bool,
+	primX, primY, primZ float64,
+) (float64, float64, float64, bool) {
+	if l.navigator == nil {
+		return primX, primY, primZ, true
+	}
+	from := pathfind.Vec3{
+		X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+	}
+	candidates, count := extendShortClickCandidates(
+		selfX, selfY, l.waypoints, l.wpIndex)
+	for c := 0; c < count; c++ {
+		sample := candidates[c]
+		if waterGuard {
+			if crossed, err := l.navigator.WaterCrossed(
+				from, sample); err == nil && crossed {
+				continue
+			}
+		}
+		if _, ok := l.navigator.ValidateClick(from, sample); !ok {
+			continue
+		}
+
+		return sample.X, sample.Y, sample.Z, true
+	}
+
+	return primX, primY, primZ, false
+}
+
+// extendShortClickCandidates marches the forward route of the plan
+// starting at the aimed waypoint and collects the first route samples
+// whose straight line distance from the standing position reaches the
+// floor: the click chords to them clear the server rescue threshold
+// while their targets stay on the planned route. The march only looks
+// FORWARD - the aimed waypoint itself may sit behind the character (a
+// pinned cursor beside the route), and the backward polyline samples
+// produced chords the server refused from the cells past the first
+// step (the 2026-09-11 11:34 reproduction: the second extension
+// clicked a 24 unit chord into the terrace wall and the escape hop
+// walked the character back, a ping pong through the whole stuck
+// cycle). A route whose whole forward stretch stays under the floor
+// collects nothing - the arrival case keeps its plain waypoint click.
+func extendShortClickCandidates(
+	selfX, selfY int32,
+	waypoints []pathfind.Vec3, index int,
+) ([extendCandidateMax]pathfind.Vec3, int) {
+	var out [extendCandidateMax]pathfind.Vec3
+	count := 0
+	px, py := float64(selfX), float64(selfY)
+	for i := index; i+1 < len(waypoints) && count < extendCandidateMax; i++ {
+		from, to := waypoints[i], waypoints[i+1]
+		fdx, fdy := to.X-from.X, to.Y-from.Y
+		seg := math.Hypot(fdx, fdy)
+		if seg < 1 {
+			continue
+		}
+		steps := int(seg/extendMarchStep) + 1
+		for s := 1; s <= steps && count < extendCandidateMax; s++ {
+			frac := float64(s) / float64(steps)
+			qx := from.X + fdx*frac
+			qy := from.Y + fdy*frac
+			relX, relY := qx-px, qy-py
+			if math.Hypot(relX, relY) < minWalkClick ||
+				relX*fdx+relY*fdy <= 0 {
+				// Under the rescue floor or backward along the
+				// route: a sample behind the character pulls the
+				// walk back off the ground the extension just
+				// walked (the 2026-09-11 11:34 reproduction
+				// ping ponged on exactly the samples near the
+				// pinned waypoint the character already passed).
+				continue
+			}
+			out[count] = pathfind.Vec3{
+				X: qx, Y: qy,
+				Z: from.Z + (to.Z-from.Z)*frac,
+			}
+			count++
+		}
+	}
+
+	return out, count
 }
 
 // clickServerValidated gates a walk click through the server
@@ -1042,7 +1232,16 @@ func (l *Loop) clickServerValidated(
 		return true
 	}
 	// No local escape works: re-path from the current position like
-	// the stuck path does, bounded by the same budget.
+	// the stuck path does, bounded by the same budget. A re-path
+	// from the cell the previous one already planned from (and
+	// moved nothing on) proves the fresh plan cannot move the
+	// character either: the trip aborts for its callers' recovery.
+	if l.noteRepathCell(selfX, selfY) {
+		l.abortFrozenTrip(
+			"the server refuses the walk click from this cell")
+
+		return false
+	}
 	l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
 	l.rePaths++
 	if l.rePaths > maxRePaths {
@@ -1382,6 +1581,20 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 
 		return false
 	}
+	if l.noteRepathCell(selfX, selfY) {
+		// The previous re-path started from this very cell and
+		// its fresh plan moved the character nowhere: the next
+		// re-path would plan the identical route into the same
+		// refusal (see frozenRepathLimit). The trip ends and
+		// the recovery hands over to its callers.
+		l.abortFrozenTrip("walk stuck, no movement since the re-path")
+
+		return true
+	}
+	// The stuck found no clear successor (the pinned cursor): the
+	// plain waypoint clicks of this leg do not move the character
+	// - arm the short click extension for the recovery clicks.
+	l.extendArmed = true
 	l.rePaths++
 	if l.rePaths > maxRePaths {
 		l.abortTownTrip("walk stuck")
@@ -1397,6 +1610,43 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 	}
 
 	return false
+}
+
+// noteRepathCell records the cell a stuck re-path plans from and
+// reports whether the previous re-path of this trip started from the
+// same cell without a single cell of movement in between: the
+// deterministic planner re-plans the identical route from the same
+// standing position, so the freeze the previous plan could not move
+// through is exactly the freeze the next one re-clicks into (the
+// 2026-09-11 11:34 dump: three identical re-paths per trip, two trip
+// cycles, the character never moved a cell). Any movement between the
+// re-paths clears the counter - a different plan shape then has a
+// different first leg to try.
+func (l *Loop) noteRepathCell(selfX int32, selfY int32) bool {
+	frozen := selfX == l.repathX && selfY == l.repathY
+	if frozen {
+		l.frozenRepaths++
+	} else {
+		l.frozenRepaths = 0
+	}
+	l.repathX, l.repathY = selfX, selfY
+
+	return l.frozenRepaths >= frozenRepathLimit
+}
+
+// abortFrozenTrip ends a trip whose re-path produced no movement and
+// escalates the recovery of the zone return at once: the pathfound
+// legs cannot move this character, so the next returnToZone goes
+// straight to the direct server routed legs (walkZoneLeg) instead of
+// burning two more full trip cycles of frozen re-paths first. The
+// shopping trips keep their cooldown recovery: the hunt continues and
+// the next trip retries from a fresh state.
+func (l *Loop) abortFrozenTrip(reason string) {
+	wasReturn := l.phase == phaseTownReturn
+	l.abortTownTrip(reason)
+	if wasReturn {
+		l.zoneFails = zoneReturnFailBudget
+	}
 }
 
 // nextClearWaypoint scans the plan ahead for the first waypoint the
@@ -1849,6 +2099,9 @@ func (l *Loop) endTownTrip(reason string) {
 	l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.waterEscape = false
+	l.extendArmed = false
+	l.repathX, l.repathY = 0, 0
+	l.frozenRepaths = 0
 	l.tripPlan = nil
 	l.tripStops = nil
 	l.buysPlanned = false
@@ -1895,6 +2148,9 @@ func (l *Loop) resetTownTrip() {
 	l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.waterEscape = false
+	l.extendArmed = false
+	l.repathX, l.repathY = 0, 0
+	l.frozenRepaths = 0
 	l.tripPlan = nil
 	l.tripStops = nil
 	l.buysPlanned = false

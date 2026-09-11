@@ -444,7 +444,26 @@ The short form:
   wholesale), and the re-planned leg advances its cursor past the
   fresh plan's wp 0 (the standing cell itself) before the click fires
   - a click at the character's own position is a guaranteed server
-  refusal that would burn the re-path budget on nothing. A trip timeout (20 min) and a trigger cooldown
+  refusal that would burn the re-path budget on nothing. A re-path
+  that starts from the same cell the previous one planned from,
+  without a single cell of movement in between, aborts the trip at
+  once instead of re-planning the identical route: the deterministic
+  planner reproduces the same first click the server already refused
+  twice (the 2026-09-11 11:34 village return dump froze through two
+  whole trip cycles this way), and the zone return escalates straight
+  to the direct server routed legs (a frozen return sets the zone
+  fail budget) while the shop trips keep their cooldown recovery.
+  After the first stuck with no clear successor the short click
+  extension arms: the clicks whose target sits under the server
+  rescue floor (50 units - the server's own move validation only
+  hands a collapsed click to its pathfinder when the original line
+  was longer than 30 units, so a shorter collapse is silently
+  canceled with ActionFailed and never moves the character) or
+  behind the character on the route re-aim at the forward route
+  samples past the floor (the march along the plan polyline skips
+  the under-floor and backward samples, the water guard and the
+  click validation port gate every sample, and a walled sample only
+  skips forward to the next route cell). A trip timeout (20 min) and a trigger cooldown
   (5 min after every trip end) bound the whole feature, and a death -
   mid trip or not - clears the cooldown: the village restart lands next
   to the shops and a full inventory sells right after the revival

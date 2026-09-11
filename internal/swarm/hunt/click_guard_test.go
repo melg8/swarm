@@ -123,31 +123,38 @@ func TestFollowerRefusedClickHopsToTheSwallowedBend(t *testing.T) {
 
 // TestFollowerRefusedClickRepathsAndAborts pins the terminal reaction:
 // nothing validates (the trap has no local escape), the follower
-// re-paths within the budget and aborts the trip after the budget is
-// exhausted.
+// re-paths once - and the second refusal from the same cell aborts the
+// trip without re-planning the identical route (the frozen re-path
+// rule: a re-path that produced no movement proves the fresh plan
+// cannot move the character either).
 func TestFollowerRefusedClickRepathsAndAborts(t *testing.T) {
 	loop, game, nav := newClickGuardLoop(
 		func(from, _ pathfind.Vec3) (pathfind.Vec3, bool) {
 			return from, false
 		})
 	loop.phase = phaseTownWalk
-	for range maxRePaths + 1 {
-		follow(loop)
-		// The re-path refreshed the plan from the fake navigator:
-		// restore the test route so every pass aims the same refused
-		// goal.
-		loop.waypoints = []pathfind.Vec3{
-			{X: 1000, Y: 1000, Z: 0},
-			{X: 1020, Y: 1000, Z: 0},
-			{X: 1600, Y: 1000, Z: 0},
-		}
-		loop.wpIndex = 0
-		loop.moveAt = time.Time{}
+	// The first refusal re-paths within the budget.
+	follow(loop)
+	require.Equal(t, 1, nav.calls,
+		"the first refusal re-paths once")
+	require.Equal(t, 1, loop.rePaths)
+	// The re-path refreshed the plan from the fake navigator:
+	// restore the test route so the next pass aims the same refused
+	// goal from the same cell.
+	loop.waypoints = []pathfind.Vec3{
+		{X: 1000, Y: 1000, Z: 0},
+		{X: 1020, Y: 1000, Z: 0},
+		{X: 1600, Y: 1000, Z: 0},
 	}
+	loop.wpIndex = 0
+	loop.moveAt = time.Time{}
+	// The second refusal from the same cell aborts the trip instead of
+	// re-planning the identical route.
+	follow(loop)
+	require.Equal(t, 1, nav.calls,
+		"the frozen re-path aborts instead of re-planning")
+	require.Equal(t, phaseEngage, loop.phase,
+		"the frozen abort ends the trip back into the hunt")
 	require.Empty(t, game.walks,
 		"a refused click is never sent")
-	require.Equal(t, maxRePaths, nav.calls,
-		"the refusal re-paths stay bounded by the budget")
-	require.Equal(t, phaseEngage, loop.phase,
-		"the exhausted budget aborts the trip back into the hunt")
 }

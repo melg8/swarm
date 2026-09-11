@@ -79,6 +79,75 @@ Three user requests in one session:
 - Status: done (2026-09-11). `go build ./...`, the affected
   packages tests and `golangci-lint run --new` are green.
 
+## Active task: the round 57 pathfind freeze - the un-rescuable short click and the identical re-plan (2026-09-11)
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (2026-09-11, Russian, the 11:34 state dump, build
+d0cd543, bot test2, phase townReturn): the character stood at
+(44296 51480 -2848) with the 11 waypoint plan to the hunting zone and
+never moved a cell - "town walk stuck, re-pathing" burned the budget
+twice (two whole trip cycles) with no refusal log. Find the source,
+test it, fix it.
+
+### Root cause (live probed)
+
+The plan is valid and the local stack walks the exact dump scenario in
+one go (MOVEDBG diagnostics build, both PathFinding modes, the
+byte-identical geodata). The freeze is the interaction of the SHORT
+first click (22 units to the terrace step waypoint) with the server's
+own move machinery: Creature.moveToLocation hands a collapsed click
+to the server pathfinder only when (originalDistance - distance) > 30
+- a collapsed click under ~31 units is silently canceled (ActionFailed,
+no movement, invisible to the offline validation). The user's server
+collapsed that click; the bot kept re-clicking it, and every re-path
+re-planned the identical route with the identical un-rescuable first
+click.
+
+### Fix
+
+1. minWalkClick (50) - the armed short click extension: after the
+   first stuck with no clear successor, the follower's short or
+   backward clicks re-aim at the forward route samples past the rescue
+   threshold (the march skips under-floor and backward samples, the
+   water and validation port gate every sample, a walled sample skips
+   forward).
+2. frozenRepathLimit (1) - the identical re-plan rule: a re-path from
+   the same cell that produced no movement aborts the trip at once
+   and the zone return escalates straight to the direct server routed
+   legs.
+
+### Acceptance criteria
+
+- The exact dump scenario under the freeze server model (the short
+  clicks canceled, the long clicks walked or rescued) arrives at the
+  zone within one recovery re-path, every armed click at least the
+  floor length.
+- The zone return sweep from eight village positions arrives under
+  the same model.
+- The total-freeze server aborts after one no-movement re-path and
+  escalates the zone return to the direct legs.
+- The teacher ramp design (the round 56 short waypoint clicks) stays
+  untouched before any stuck.
+- go build/vet/test/lint green; the live stack validates the dump
+  walk and mobius_e2e stays E2E_OK.
+
+### Status: done (2026-09-11)
+
+- Commit "hunt: the round 57 pathfind freeze - the un-rescuable short
+  click extends, the identical re-plan aborts".
+- Tests: hunt/round57_repro_test.go (the dump freeze walk, the eight
+  start sweep, the total-freeze escalation), hunt/click_floor_test.go
+  (the march, the behind geometry, the armed/unarmed/hold gating), the
+  click guard and walk stuck budget tests updated to the frozen re-path
+  contract.
+- Docs: development_log.md Round 57, agent_progress.md this entry,
+  hunting.md the follower paragraph.
+
 ## Active task: the dump state diagnostics for stuck bot reports
 
 Started: 2026-09-11. Branch: `feature/acceptance`. Commits as melg8,

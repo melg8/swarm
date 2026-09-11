@@ -339,8 +339,23 @@ type Loop struct {
 	// cycles through the remaining waypoints quickly instead of waiting
 	// the full stuckTimeout for each one. resetTownTrip and
 	// startWalkLeg clear it.
-	stuckFast         bool
-	rePaths           int
+	stuckFast bool
+	rePaths   int
+	// extendArmed arms the short click extension of the town walk
+	// follower: it flips on the first stuck that finds no clear
+	// successor waypoint (the pinned cursor - the plain clicks of
+	// the leg proved they do not move the character) and clears at
+	// the trip boundaries. While armed, the clicks whose primary
+	// target sits under the server rescue floor (minWalkClick) or
+	// behind the character on the route re-aim at the forward
+	// route samples (the 2026-09-11 11:34 village return dump: the
+	// 22 unit first waypoint click froze the character through two
+	// whole trip cycles - a collapsed click under the findPath
+	// rescue threshold is silently canceled by the server).
+	extendArmed       bool
+	repathX           int32
+	repathY           int32
+	frozenRepaths     int
 	farmX             int32
 	farmY             int32
 	farmZ             int32
@@ -606,6 +621,10 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		stuckY:            0,
 		stuckFast:         false,
 		rePaths:           0,
+		extendArmed:       false,
+		repathX:           0,
+		repathY:           0,
+		frozenRepaths:     0,
 		farmX:             0,
 		farmY:             0,
 		farmZ:             0,
