@@ -666,7 +666,9 @@ func (l *Loop) stopMerchantTemplates() []int32 {
 // trip may advance.
 // Pre-split debt of the buy confirmation gate (extract the gate into
 // its own step when the stop pipeline is refactored).
-func (l *Loop) tickStopShopping(now time.Time) bool { //nolint:cyclop,funlen
+//
+//nolint:cyclop,funlen,gocognit // the stop shopping decision tree
+func (l *Loop) tickStopShopping(now time.Time) bool {
 	if len(l.tripStops) == 0 {
 		return true
 	}

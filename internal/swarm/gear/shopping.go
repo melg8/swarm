@@ -227,7 +227,7 @@ func PlanPurchaseQueue(
 // The budget gate, the pick loop and the wishlist tail are one
 // decision tree; splitting them hurts the read flow.
 //
-//nolint:cyclop,funlen // the budget gate, the pick loop and the wishlist tail
+//nolint:cyclop,funlen,gocognit // one decision tree (refactor candidate)
 func planPurchases(
 	profile Profile, equipment Equipment, catalog Catalog, adena int64,
 	level int32, tail int,

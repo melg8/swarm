@@ -627,7 +627,9 @@ func (l *Loop) geodataWalkPlan() *state.WalkPlan {
 // that never starts times out and the autonomous hunting resumes.
 // Pre-consolidation phase debt; the hunt loop cleanup is planned
 // (docs/quality_review_and_agent_prompts.md P07).
-func (l *Loop) tickUserAttack(now time.Time) { //nolint:cyclop,funlen
+//
+//nolint:cyclop,funlen,gocognit // the user attack decision tree
+func (l *Loop) tickUserAttack(now time.Time) {
 	if l.userTarget == 0 {
 		l.resumeAuto()
 

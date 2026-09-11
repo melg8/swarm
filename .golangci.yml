@@ -26,6 +26,7 @@ linters:
     - forbidigo     # Forbids identifiers
     - funlen        # Function length
     - goconst       # Repeated strings that could be replaced by a constant
+    - gocognit      # Cognitive complexity (the human-readability twin of cyclop)
     - gocritic      # Extensive code analysis
     - godot         # Comments end in a period
     - gosec         # Security problems
@@ -33,6 +34,7 @@ linters:
     - intrange      # for i := 0; i < n; i++ -> for i := range n
     - ireturn       # Interfaces as return types
     - lll           # Line length
+    - maintidx      # Maintainability index (Halstead + cyclomatic + loc)
     - makezero      # Slice declarations with non-zero initial length
     - misspell      # Commonly misspelled words in comments
     - nakedret      # Naked returns in long functions
@@ -80,8 +82,25 @@ linters:
       # the genuinely long bodies visible.
       lines: 65
       statements: 45
+    gocognit:
+      # The cognitive complexity twin of cyclop: cyclop counts branches,
+      # gocognit counts nesting and human-readable cognitive load. 30 (the
+      # default) flags nothing; 25 surfaces the six hunt-loop decision
+      # functions that read as one decision tree each (engage, the tick
+      # phase handlers, the delevel guard). The flagged functions carry
+      # a //nolint:gocognit directive with a refactor note until they
+      # split.
+      min-complexity: 25
     goconst:
       min-len: 3
+    maintidx:
+      # The maintainability index (Halstead volume + cyclomatic + loc,
+      # scaled 0-100, higher is better). 20 (the default) surfaces the
+      # engage function of the hunt loop (MI 11) and the proxy E2E test
+      # (MI 19); both are the refactor candidates the gocognit finding
+      # already names. The flagged functions carry a //nolint:maintidx
+      # directive with a refactor note.
+      under: 20
     gosec:
       # G115 (integer overflow conversions) is the bread and butter of a
       # binary protocol parser: every wire field read is a bounded value
@@ -141,7 +160,9 @@ linters:
           - exhaustruct_v5
           - funlen
           - goconst
+          - gocognit
           - lll
+          - maintidx
           - noctx
           - prealloc
     paths:

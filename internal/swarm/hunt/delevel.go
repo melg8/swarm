@@ -287,7 +287,9 @@ func (l *Loop) nearestDelevelGuard() (townNpc, bool) {
 // provocation.
 // Pre-consolidation phase debt; the hunt loop cleanup is planned
 // (docs/quality_review_and_agent_prompts.md P07).
-func (l *Loop) fightDelevelGuard(now time.Time) { //nolint:cyclop,funlen
+//
+//nolint:cyclop,funlen,gocognit // the delevel guard decision tree
+func (l *Loop) fightDelevelGuard(now time.Time) {
 	if l.delevelGuard == 0 || !l.tracker.ObjectAlive(l.delevelGuard) {
 		guard, ok := l.tracker.NearestNpcByTemplates(
 			delevelGuardTemplates(), merchantFindRadius)

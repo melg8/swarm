@@ -1060,7 +1060,12 @@ func (l *Loop) recoverFromDeath() {
 // blows, and the target search never initiates on mobs above the
 // character level slack or on social pulls whose clan mates stand
 // within the help range.
-func (l *Loop) engage() { //nolint:cyclop,funlen
+// The engage decision tree: the target search, the attack start,
+// the loot, the rest and the safety gates form one state machine.
+// Refactor candidate: split into the phase handlers.
+//
+//nolint:cyclop,funlen,gocognit,maintidx
+func (l *Loop) engage() {
 	// The hunting zone leash: new fights start inside the square only,
 	// and a character outside of it (a village respawn, the walk home
 	// after a finished fight) walks back instead of hunting. Two

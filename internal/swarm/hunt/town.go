@@ -1400,7 +1400,9 @@ func (l *Loop) enterSellPhase() {
 // the sale later). The fresh adena of the sales re-plans the
 // purchases, every buy stop completes when its purchases were
 // requested, and the return leg starts when no stop is left.
-func (l *Loop) tickTownSell() { //nolint:cyclop // legs of one trip
+//
+//nolint:cyclop,gocognit // the town sell trip legs
+func (l *Loop) tickTownSell() {
 	now := time.Now()
 	if l.teachStop() {
 		// The teacher stop: approach the class master, click it and
