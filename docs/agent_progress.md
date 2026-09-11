@@ -11,6 +11,72 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the port of the shop planner top-tier guard from feature/acceptance (2026-09-11)
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user asked to port the purchase queue fix from
+`feature/acceptance` (commits 9306eee..dd9433f) to this branch: the
+bot that sold its replaced weapon re-planned against the fresh adena
+and the empty weapon slot and bought the same 1k Short Sword back
+(the reported dump, build f3b868e, 09:05-09:06) instead of the top
+affordable tier of the weapon ladder. The acceptance fix commits do
+not cherry-pick: this branch rewrote the planner into the phased
+strategy (the armor floor, the weapon milestone, the jewel floor,
+the defense upgrades, the widget purchase queue), so the guard is
+re-implemented inside its `bestPurchase` walk.
+
+### Root cause on this branch
+
+The weapon phase of `shopStrategy.classify` aims at
+`view.target = bestWeaponValue` - the best `gain / price` among ALL
+strict weapon upgrades, affordable or not. Over an EMPTY weapon slot
+the 883 adena Short Sword owns that target (3.43 vs 0.30 of the
+Knife): after the sell-first sale the re-plan bought the sold sword
+right back. Over a WORN weapon the same ranking aims at cheap rungs
+while the wallet already covers the 60k tier.
+
+### Port design
+
+- `bestPurchase` walks three passes: the viability pass collects the
+  candidates that pass the planned / gain / slot / affordability
+  gates and applies the top-tier guard (the `ladderTop` map records
+  the best viable gain per paperdoll slot in the score descending
+  scan order; a candidate aspired above the record on an overlapping
+  slot is dropped - the same semantics the acceptance fix pinned);
+  the view pass computes the weapon target from the SURVIVORS only;
+  the classification pass runs the unchanged `classify` matrix and
+  `phaseBeats` over the survivors.
+- The guard persists across the pick rounds of one plan: the eroding
+  budget of the later rounds must not crowd the top tier out and
+  push a cheaper rung in - the slot stays unpurchased and waits for
+  the next trip.
+- The floor offers bypass the guard: the armor and jewel floors
+  deliberately buy the cheapest offers of the empty families (the
+  opening outfit rule of the strategy, see `classify`), the guard
+  governs the upgrade phases only.
+- The tail and wishlist modes of the widget purchase queue run
+  without the guard (`ladderTop` is dropped at the mode flips): the
+  unbounded budget would collapse the wanted ladder to its top tier
+  and the widget would hide the milestones the bot saves for.
+
+### Acceptance criteria
+
+- The three regression scenarios of the acceptance fix pass here:
+  the post-sale empty slot plans the top affordable tier, the
+  replaced weapon plans the top tier with the SellFirst sale, and
+  the intermediate never slides in behind the eroding budget.
+- `TestPlanPurchaseQueueMatchesPlainPlan` stays green (the
+  affordable prefix stays byte identical to the plain plan).
+- The journey rules of `TestShoppingStrategyJourneyComparison` stay
+  green; the IS table of `docs/shopping_strategy.md` is regenerated.
+- `go build ./...`, `go vet ./...`, the gear tests,
+  `golangci-lint run` and `gofmt -l` are clean.
+
 ## Active task: the round 56 building stuck - the skip gate and the re-planned self-click (2026-09-11)
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
