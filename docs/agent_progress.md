@@ -1707,3 +1707,22 @@ without growing the per-object cost.
   go test ./... green; golangci-lint clean in hunt and state (the
   remaining gosec G602 findings in zones_test.go reproduce on the
   untouched HEAD). Next: the web UI surfaces.
+- 2026-09-11: the web UI surfaces. The footer gains two cells -
+  phase with its age and the live packet rate - and the existing
+  cells grow the diagnostic detail: the object count splits into the
+  npc/loot/dead summary and the updated cell shows the age of the
+  last state change (the world liveness) instead of a wall clock
+  stamp. The activity banner detail reads the hunt subview: the
+  fighting target with its engagement age, the no-target patience
+  with the skip count, the waypoints left and the trip age of the
+  town walks, the buy retries of the sell stop, the login cooldown
+  of an offline session. The log tab colors the new hunt decision
+  lines (the Hunt: prefix) with the accent color so the decision
+  history reads out of the noise. The special modes (pathfind, fight
+  galleries) hide the new footer cells through the same CSS rules
+  as the existing ones. The state endpoint test pins the diagnostics
+  section presence and the object tally agreement. The HUD harness
+  (tools/repro_hud.js) passes: the label fallbacks work for
+  snapshots without diagnostics. go build, go vet, go test ./... (15
+  packages) green. Next: the AGENTS.md documentation and the live
+  stack verification.
