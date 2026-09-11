@@ -1572,3 +1572,12 @@ semantics.
   shopping_strategy.md Rule 1 and the AGENTS.md shop strategy
   paragraph describe the top-tier guard. Pending: the live stack E2E
   and the push to feature/acceptance.
+- 2026-09-11: task wrap up. The live stack verification passed:
+  tools/mobius_e2e.sh 45 printed E2E_OK (the bot entered the world,
+  hunted, shut down gracefully on SIGINT). Everything pushed to
+  feature/acceptance as melg8 (the branch did not exist remotely - it
+  was created from main bfccb4e): the task context entry, the planner
+  fix commit, the docs commit and this wrap up. Acceptance criteria
+  all met; the reported purchase queue bug (a 14k weapon replaced
+  through a 1k intermediate or an empty handed return) is fixed by the
+  top-tier slot guard.
