@@ -11,6 +11,30 @@ This file holds the RULES and the load-bearing FACTS only; the
 implementation-level detail of every subsystem lives in `docs/` (see
 the documentation map below) and is read on demand, not upfront.
 
+## Tech stack at a glance (read this first)
+
+- **Language**: Go 1.24 (deployed by `tools/swarm_fast_deploy.sh`).
+  `go.mod` pins `go 1.23.2`; the toolchain auto-downloads 1.24 on
+  first `go build`. There is **no Rust, no Node, no C** in the bot
+  itself. Node is only used by the four `tools/repro_*.js` web UI
+  harnesses (plain JS, no npm).
+- **Module path**: `github.com/melg8/swarm`.
+- **Linter gate**: golangci-lint v2.13.2, strict (55 linters, see
+  `.golangci.yml`). Pinned versions of `task`, `gci`, `gofumpt` are
+  installed by `tools/install_dev_tools.sh`.
+- **Server**: a locally hosted
+  [L2J Mobius](https://gitlab.com/MobiusDevelopment/L2J_Mobius/)
+  emulator, module `L2J_Mobius_C1_HarbingersOfWar` (Chronicle 1).
+  Java 25 (server build), MariaDB 11.8 (server database).
+- **Concurrency target**: 9 minimum, 36 optimistic, 100 stretch goal.
+  Every design decision must hold at 100 concurrent bots (see the
+  Performance section below).
+
+Do **not** install Rust, Cargo, Node bundlers, webpack or any C/C++
+toolchain. The only Go toolchain is the one the fast deploy puts at
+`/home/z/opt/go-root/usr/lib/go-1.24/bin/go`; add it to PATH or invoke
+through `task` (the fast deploy wrapper).
+
 ## What this project is
 
 swarm is an out-of-game (OOG) multi-instance proxy botting tool written
@@ -55,26 +79,40 @@ one of them is the reference for its subsystem:
 
 Any task in this repository - a bug fix, a feature, a refactor, a test
 run or an investigation - starts by deploying the repository
-dependencies with `tools/swarm_fast_deploy.sh` and verifying that it
-brought the environment up successfully. Do not begin the actual work
-on an undeployed or broken stack: nearly every task needs the live
-login server (2106), game server (7777) and MariaDB (3306) to
-reproduce, test and validate behavior. (A pure documentation change
-that touches no code needs only `go build ./...` and the lint gate.)
+dependencies with `tools/swarm_fast_deploy.sh` and installing the
+Go developer tools with `tools/install_dev_tools.sh`. The fast deploy
+brings up the Go toolchain, the Mobius C1 stack (login 2106, game
+7777, MariaDB 3306) and builds the bot; the dev-tools script fills the
+gap the fast deploy leaves open (`task`, `golangci-lint`, `gci`,
+`gofumpt`). Do not begin the actual work on an undeployed or broken
+stack: nearly every task needs the live login server (2106), game
+server (7777) and MariaDB (3306) to reproduce, test and validate
+behavior. (A pure documentation change that touches no code needs
+only `go build ./...` and the lint gate.)
 
 ```bash
-bash tools/swarm_fast_deploy.sh
+bash tools/swarm_fast_deploy.sh        # ~90 s on a blank sandbox
+bash tools/install_dev_tools.sh check  # preflight: exit 0 if all present
+bash tools/install_dev_tools.sh        # install missing dev tools (~10 s)
 ```
 
-The deploy is successful only when the script printed
-`STACK_READY: login :2106, game :7777, db :3306`, the three ports
-listen (`ss -ltn | grep -E ':(2106|7777|3306) '`) and the schema count
-is 75. The deeper end-to-end check is `tools/mobius_e2e.sh 45` (must
-print `E2E_OK`). The script is idempotent and needs no root; the full
+The deploy is successful only when the last lines printed contain
+`STACK_READY: login :2106, game :7777, db :3306` (printed by
+`tools/mobius_start.sh` invoked at the end of `swarm_fast_deploy.sh`,
+not by the deploy script itself), the three ports listen
+(`ss -ltn | grep -E ':(2106|7777|3306) '`) and the schema count is 75.
+The deeper end-to-end check is `tools/mobius_e2e.sh 45` (must print
+`E2E_OK`). The script is idempotent and needs no root; the full
 procedure, all checks with commands and the failure handling live in
 `docs/deployment.md` (which also covers the script inventory, the
 Windows host deployment and the stack tunables). If any check fails,
 stop and fix the deployment first.
+
+The full deploy + dev-tools + lint + test + e2e cycle on a fresh sandbox
+is ~5.5 minutes total (measured): deploy ~99 s, dev tools ~10 s,
+`go build` ~1 s, `golangci-lint run --new` ~2 s, `go test ./...` ~123 s
+(pathfind dominates at ~99 s), `mobius_e2e.sh 45` ~47 s. Use these
+numbers to budget a verification loop.
 
 ## Work protocol: atomic commits and progress tracking in the repo
 
@@ -106,20 +144,35 @@ stop and fix the deployment first.
 
 Operational playbooks live in `.agents/skills/` and are discovered by
 the agent tooling automatically; read the matching one before working
-in its area: `go-verify-loop` (the verification loop and the
-lint/nolint etiquette), `webui-harness` (web UI changes and the repro
-harnesses), `packet-recipe` (adding or debugging a protocol packet),
-`mobius-stack` (the live server stack and its pitfalls). AGENTS.md
-stays the source of truth for rules and facts; the skills are the
-step-by-step procedures.
+in its area. Each skill is a short (60-100 line) step-by-step
+procedure; AGENTS.md stays the source of truth for rules and facts.
 
-On top of the four project playbooks the repository vendors the
+The four project playbooks (hand-maintained, never touched by the
+upstream sync):
+
+| Skill | Use when |
+| --- | --- |
+| `go-verify-loop` | Any Go change needs the build/vet/test/fmt/lint loop; the lint etiquette of `//nolint`. |
+| `mobius-stack` | Bringing the stack up, debugging login/game/MariaDB issues, E2E runs. |
+| `packet-recipe` | Adding or changing a protocol packet (any opcode work). |
+| `webui-harness` | Any web UI change (HTML/CSS/JS, snapshot fields, harness failures). |
+| `performance` | Touching a hot path, SoA layout, allocations, benchmarks, fleet E2E. |
+| `dump-state-repro` | A bot behaves badly on a long-lived server; reproducing the exact world state for a fix. |
+| `e2e-repro` | Setting up a reproducible scenario (character, position, target) for an E2E test. |
+
+Load the matching skill before opening code in its area; the skill
+points at the right files, the right tests, the right order of checks.
+Skip loading when the task is unrelated (a typo fix does not need the
+packet-recipe skill).
+
+On top of the project playbooks the repository vendors the
 `samber/cc-skills-golang` collection (46 `golang-*` skills, MIT, e.g.
 `golang-testing`, `golang-concurrency`, `golang-error-handling`,
-`golang-lint`, `golang-troubleshooting`) as the general Go knowledge
-base - load the matching one for generic Go questions. The vendored
-copy travels with the repository (a fresh environment gets it through
-`git clone` alone, no network access needed). Management:
+`golang-lint`, `golang-performance`, `golang-troubleshooting`) as the
+general Go knowledge base - load the matching one for generic Go
+questions. The vendored copy travels with the repository (a fresh
+environment gets it through `git clone` alone, no network access
+needed). Management:
 
 ```bash
 tools/install_agent_skills.sh           # (re)install the pinned commit
@@ -264,17 +317,28 @@ The bot less launch modes (`-pathfind-test`, `-test-fight-ui`,
 `-test-fight-ui-v1`) are described in docs/webui.md and
 docs/pathfinding.md.
 
-Tests and linters (run both before considering work done):
+Tests and linters (run both before considering work done). The single
+fastest verification of changed code is `task lint:new` (2 s on a
+warm cache); it runs only the linters against the lines you touched.
+The full `task lint` (39 s) is the CI gate and runs against the whole
+tree - use it before a push, not on every save:
 
 ```bash
-task check:all            # lint + test
-task lint                 # golangci-lint run
-task lint:new             # golangci-lint run --new (changed code only)
+task check:all            # lint + test (the CI gate, ~160 s with the stack up)
+task lint                 # golangci-lint run (full, ~39 s, all code)
+task lint:new             # golangci-lint run --new (~2 s, changed code only)
 task lint:fix             # golangci-lint run --fix
-task test:cover           # go test ./... --cover --count=1
+task test:cover           # go test ./... --cover --count=1 (~123 s)
 task fmt                  # go fmt ./...
 task tidy                 # go mod tidy
 ```
+
+The branch carries a small set of accepted pre-existing lint findings
+(testifylint float-compare, revive redefines-builtin-id in test
+files, a couple of unused symbols). They are tracked, not yours to
+fix in an unrelated change. Use `task lint:new` for the changed-code
+verdict; if `--new` is clean, your change is lint-clean regardless of
+the full-tree count.
 
 Benchmarks exist for hot paths (crypt, packet parsing, hex view). Use
 them when touching performance sensitive code:
@@ -303,6 +367,88 @@ tools/mobius_e2e.sh 45
 The full deployment workflow (fast deploy for the z.ai sandbox,
 bootstrap for a clean host, the script inventory) lives in
 `docs/deployment.md`.
+
+## Architecture rules (non-negotiable)
+
+The project lives or dies by its layer boundaries. A bot that grew
+into a god object (the historical `state.Bot` of 2392 lines) is the
+failure mode every refactor must move away from, not toward.
+
+- **Single source of truth**: `internal/swarm/state` is the only shared
+  mutable state. The packet parsers (`internal/swarm/packets/*`) stay
+  pure - they fill caller-provided structs, never touch the tracker.
+  The connection layer (`internal/swarm/connection`) calls the public
+  `state.Bot` Apply API, never the struct fields directly. The web
+  layer (`internal/swarm/webserver`) reads snapshots, never talks to
+  the connection.
+- **No god objects, no blob of mud.** A package that grows past
+  ~1500 lines of non-test Go is a refactor candidate. The first move
+  is always to split by responsibility (the `state` package already
+  split `objectStore`, `eventLog`, `chatLog`, `combatFeed` out of the
+  bot; new sub-systems follow the same path). A function that grows
+  past `funlen` (65 lines / 45 statements) or `cyclop` (15) is split,
+  not suppressed with `//nolint`.
+- **Testable by construction.** Every new code path arrives with a
+  unit test next to it (`*_test.go` in the same package) and, when it
+  touches a hot path, a benchmark (`*_bench_test.go` with
+  `-benchmem`). A change without a test is not done. Tests use the
+  fake-server pattern (`connection/game_test.go`) for protocol flows,
+  never a live server unless the suite is explicitly opt-in (the
+  `fleete2e` suite gates on `SWARM_FLEET_E2E=1`).
+- **Skills are part of the workflow.** Before working in an area, load
+  the matching playbook in `.agents/skills/` (`go-verify-loop`,
+  `mobius-stack`, `packet-recipe`, `webui-harness`, plus the new
+  `performance`, `dump-state-repro`, `e2e-repro` playbooks). The
+  skills are the step-by-step procedures; AGENTS.md stays the source of
+  truth for rules and facts. See the "Agent skills" section below.
+
+## Performance and data-oriented design (the 100-bot constraint)
+
+The stretch goal is 100 concurrent bots on one process against a live
+Mobius server. The fleet benchmark (`internal/swarm/fleete2e`)
+verifies that goal end-to-end. Every code change in the hot path
+(state apply, packet parse, snapshot encode, hunt tick) must keep that
+goal reachable.
+
+- **SoA over AoS in the hot path.** The world object store is already
+  split into hot and cold arrays (`state/objects_store.go`):
+  `objectHot` (the fields the hunt tick and the scans read every frame:
+  position, speed, target, dead, in-combat) streams compactly, while
+  `objectCold` (display fields: name, title, template id, max HP/MP)
+  sits behind it. New fields land in the half their reader visits. A
+  new field read every tick that lands in `cold` defeats the split.
+- **Zero allocation is the default for steady state.** The snapshot
+  encoder (`state/snapshot_live.go::AppendSnapshotJSON`) walks the
+  live state under the read lock and allocates nothing per event: the
+  payload buffer is reusable, the view structs stay on the stack, and
+  the size estimate pre-sizes the one allocation the encode pays. The
+  comment on `AppendSnapshotJSON` records the 26 KB of garbage per
+  event the old snapshot-copy path used to pay on a 100-npc bot.
+  Match that bar when adding a new encode path.
+- **Benchmarks are a gate, not a vanity.** Every `*_bench_test.go`
+  reports `-benchmem`; a change to a hot path compares allocations
+  before/after and does not merge if they grew without a written
+  reason. The `prealloc` and `perfsprint` linters enforce the easy
+  wins; `gocritic` catches the rest. A regression of more than 10% on
+  a fleet benchmark (`fleete2e`) blocks the change until explained.
+- **Cache-friendly access.** Iterations over the world store walk the
+  hot array by index (`for i := range b.world.hot`) so the CPU
+  prefetcher sees a contiguous block. Random access by object id is
+  the index lookup (a `map[int32]int32`), never a linear scan. A new
+  scan that breaks the dense invariant (a sparse array, a pointer
+  indirection per slot) is a performance bug.
+- **Hotpaths to look for.** The packet apply path (every received
+  packet mutates the tracker), the snapshot encode (the SSE stream
+  fires it on every version change), the hunt tick (target search,
+  loot scan, movement), and the pathfinder (99 s of the test suite is
+  here). A change to any of these ships with a benchmark delta.
+- **What is NOT a hotpath.** The web UI handlers (one per SSE client,
+  human-paced), the bot startup (one per session), the gear planner
+  (one per shopping trip). Optimize the first three before touching
+  these. Do not micro-optimize code that runs once per minute.
+
+When in doubt, measure: `go test -bench=. -benchmem -count=5` on the
+affected package, then `fleete2e` for the fleet-wide view.
 
 ## Architecture in one paragraph
 
@@ -378,11 +524,23 @@ Enforced by `.golangci-lint` config (strict, most linters enabled):
   `init_bench_v2_test.go` pattern).
 - Protocol flows are covered by in-process fake servers (see
   `connection/game_test.go` for the scripted game session test).
+- The live fleet E2E (`internal/swarm/fleete2e`) gates on
+  `SWARM_FLEET_E2E=1` so the regular test suite never pays its 10-
+  minute 100-session setup. Run it only when changing a hot path that
+  the fleet benchmark covers.
 - Benchmarks report allocations (`-benchmem`) because a core
   requirement is memory-friendly parsing for hundreds of concurrent
   connections. When changing packet code, compare allocations
-  before/after.
+  before/after. The `prealloc` and `perfsprint` linters enforce the
+  easy wins.
 - Use `testify` (`require`/`assert`) with `testifylint`-clean style.
+- Tests are deterministic: time windows use injected clocks (see
+  `go-verify-loop` skill). A flaky test that depends on real wall
+  clock timing is a bug in the test, not a tolerance to widen.
+- Dump state for reproduction: a bot that misbehaves on a long-lived
+  server carries a compact world snapshot (the `dump-state-repro`
+  skill). Use it to reproduce the exact world state in a unit test
+  instead of replaying the live session by hand.
 
 ## Protocol notes (Mobius C1)
 
