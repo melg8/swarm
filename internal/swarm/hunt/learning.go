@@ -380,6 +380,16 @@ func (l *Loop) handleTeacher(now time.Time) bool {
 // teacher standing on another deck of the geodata is walked to by
 // server routing (the ground clicks route through the server
 // pathfinder that knows the ramps), bounded by the deck window.
+//
+// The approach walk clicks the ground at the npc approach point, not
+// at the teacher's exact cell: the server's getValidLocation walks a
+// Bresenham line that can "step over" onto a roof layer when the
+// click targets an interior cell (the 2026-09-11 roof teleport
+// report: the bot clicked Cobendell's spawn point inside the trainer
+// hall, the line crossed the south wall and the height-step fallback
+// resolved the target onto the roof). The offset keeps the click
+// line on the surrounding deck, within the interaction distance but
+// outside the walled interior.
 func (l *Loop) approachTeacher(now time.Time) bool {
 	x, y, z, ok := l.tracker.ObjectPosition(l.teacherID)
 	if !ok {
@@ -393,11 +403,18 @@ func (l *Loop) approachTeacher(now time.Time) bool {
 	dz := float64(z - selfZ)
 	dist3D := math.Sqrt(dist2D*dist2D + dz*dz)
 	if dist3D > merchantApproachDist {
+		ax, ay, az := npcApproachPoint(x, y, z, selfX, selfY)
+		approachDist2D := math.Hypot(
+			float64(ax-selfX), float64(ay-selfY))
 		if dist2D <= merchantApproachDist {
 			// The geodata pack misses the trainer platform ramps: the
-			// 2D distance is met, the z is not. Click the exact teacher
-			// position until the retry window closes - the server
-			// routing knows the ramp.
+			// 2D distance is met, the z is not. The approach point
+			// collapses onto the bot's own cell - the click is a no-op
+			// the server collapses, the deck window bounds the wait
+			// before the teacher is given up. Clicking the teacher's
+			// exact cell here teleported the bot onto the roof (the
+			// 2026-09-11 report), so the offset keeps the click safe
+			// even when it cannot help.
 			if l.teacherDeckUntil.IsZero() {
 				l.teacherDeckUntil = now.Add(merchantDeckWindow)
 				l.logger.Printf("Hunt: learn: the teacher stands on "+
@@ -405,7 +422,9 @@ func (l *Loop) approachTeacher(now time.Time) bool {
 					"routing", selfZ, z)
 			}
 			if now.Before(l.teacherDeckUntil) {
-				l.walkToward(x, y, z, now)
+				if approachDist2D > hopCoincideDist {
+					l.walkToward(ax, ay, az, now)
+				}
 
 				return false
 			}
@@ -415,7 +434,9 @@ func (l *Loop) approachTeacher(now time.Time) bool {
 
 			return true
 		}
-		l.walkToward(x, y, z, now)
+		if approachDist2D > hopCoincideDist {
+			l.walkToward(ax, ay, az, now)
+		}
 
 		return false
 	}

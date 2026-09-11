@@ -90,6 +90,101 @@ webui adjustments:
   and a real bot snapshot to confirm the new magenta path color
   reads over the actual elven map imagery.
 
+## Active task: the roof teleport - the npc approach clicks the offset, not the exact cell
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (2026-09-11, Russian): the bots run somewhere behind
+the building trying to talk to the village teachers (Cobendell et
+al.), and when the character approaches the npc the server teleports
+it onto the roof of the building instead of letting it enter inside.
+The user asked to study where Cobendell and the similar npcs stand
+and to make the bot approach them at a short distance, not talk
+through the wall.
+
+### Root cause (probed against the real geodata pack)
+
+The Cobendell cell (44823 52414) carries two layers: the ground
+floor at z -2792 (where the npc stands) and the roof at z -2448. The
+server's `getValidLocation` (ported as `Engine.ValidateClick` in
+round 52) walks a Bresenham cell line from the click origin to the
+click target. When the click targets Cobendell's exact cell from the
+south or west, the line crosses the building wall, the height-step
+fallback resolves the target onto the roof layer, and the bot ends up
+on the roof. The probe measured it: clicking on Cobendell from deg
+30 (south-east) redirects to z -2576, from deg 180 (west) to z -2456
+- all roof heights.
+
+The bot's `approachTeacher` and `approachMerchant` clicked the npc's
+EXACT spawn cell when the bot was far (dist3D > 200). The pathfinder
+had already planned a route to within 200 units of the npc, but the
+final approach leg clicked the exact cell - and the server
+teleported the bot onto the roof.
+
+### Fix
+
+The approach walk clicks the npc approach point, not the npc's exact
+cell. The approach point is `npcApproachOffset` (150) units from the
+npc toward the bot, so the Bresenham click line stays outside the
+building walls and the server validates it on the ground floor. The
+150 unit offset keeps the bot within the 250 unit server interaction
+distance (the talk click that follows works) but outside the walled
+interior.
+
+- `hunt/town.go`: `npcApproachOffset = 150.0` and `npcApproachPoint`
+  compute the offset target. `approachMerchant` uses it for both the
+  far walk and the deck hop case. The deck hop case skips the click
+  when the offset collapses onto the bot's own cell (the
+  `hopCoincideDist` gate).
+- `hunt/learning.go`: `approachTeacher` uses the same offset for both
+  the far walk and the deck hop case, with the same skip gate.
+
+### Acceptance criteria
+
+- A bot far from a town npc clicks the offset point (150 units from
+  the npc toward the bot), never the npc's exact spawn cell.
+- A bot in the deck hop case (2D close, z far) does NOT click the
+  npc's exact cell - the offset collapses and the skip gate fires.
+- The existing town trip, learning and merchant tests stay green.
+
+### Progress (2026-09-11)
+
+- The environment deployed (the Go toolchain installed at
+  /home/z/my-project/goroot, the geodata pack at data/geodata with
+  165 regions).
+- The geodata probe (scripts/probe_cobendell, since deleted) measured
+  the roof teleport mechanism: the Cobendell cell has the ground
+  floor at z -2792 and the roof at z -2448; clicking on the exact
+  cell from the south/west redirects to the roof (z -2456..-2576);
+  the pathfinder reaches the npc from the north and east; the offset
+  click (150 units toward the bot) validates on the ground floor.
+- Commit "hunt: the npc approach clicks the offset, not the exact
+  cell": (1) `npcApproachOffset` and `npcApproachPoint` (town.go);
+  (2) `approachMerchant` uses the offset for both the far walk and
+  the deck hop case (town.go); (3) `approachTeacher` uses the same
+  offset (learning.go); (4) tests: `npc_approach_test.go` (the
+  offset geometry, the collapse onto the bot, the teacher click, the
+  merchant click, the deck hop skip); (5) docs: development_log.md
+  Round 53, agent_progress.md this entry.
+- Verify loop: go build, go vet, the full go test suite (19 packages
+  green), gofmt clean, golangci-lint zero new findings in the touched
+  files.
+
+### Status: done (2026-09-11)
+
+- The fix pushed: the offset approach point, the deck hop skip gate,
+  the tests, the docs (Round 53).
+- The user-side check stays the project workflow: watch a bot
+  approach a village teacher (Cobendell, Ellenia) and click the
+  offset point (the log line "the teacher stands on another deck"
+  stays for the deck hop case, but the click no longer targets the
+  exact cell), then click the teacher object within the interaction
+  distance - no roof teleport, the lessons land.
+
 ## Active task: the town walk stuck loop - the reverse wall check and the waypoint skip
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.

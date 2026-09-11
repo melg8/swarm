@@ -3399,3 +3399,110 @@ MOVEDBG patch is logging only):
 - The server MOVEDBG logging patch stays in the local Mobius checkout
   only (never committed to the swarm repository - the server
   integrity rules).
+
+## Round 53: the roof teleport - the npc approach clicks the offset, not the exact cell (2026-09-11)
+
+Scope: the 2026-09-11 user report (Russian) - the bots run somewhere
+behind the building trying to talk to the village teachers (Cobendell
+et al.), and when the character approaches the npc the server
+teleports it onto the roof of the building instead of letting it
+enter inside. The user asked to study where Cobendell and the similar
+npcs stand and to make the bot approach them at a short distance, not
+talk through the wall.
+
+### Problem statement
+
+The state dump (build bb12d42, bot test3, phase idle) showed the
+character at 44831 52389 -2796 (26 units from Cobendell at 44823
+52414 -2792) with Cobendell selected as the target. The user's manual
+test confirmed the roof teleport: clicking on Cobendell from certain
+directions lands the character on the roof (z -2456..-2576) instead
+of the ground floor (z -2792).
+
+### Root cause analysis
+
+A geodata probe (scripts/probe_cobendell, run against the real
+21_19.l2j region) confirmed the mechanism:
+
+- The Cobendell cell (44823 52414) carries two layers: the ground
+  floor at z -2792 (where the npc stands) and the roof at z -2448
+  (the building's roof layer). The cell south and west of Cobendell
+  has only the water/abyss layer at z -3872..-3904 (the lake below
+  the floating island).
+- The server's `GeoEngine.getValidLocation` (ported as
+  `Engine.ValidateClick` in round 52) walks a Bresenham cell line
+  from the click origin to the click target. When the click targets
+  Cobendell's exact cell from the south or west, the line crosses
+  the building wall, the height-step fallback
+  (`neighbourLayerNear`, the `clickLayerTolerance` of 16) resolves
+  the target onto the roof layer, and the bot ends up on the roof.
+  The probe measured it directly: clicking on Cobendell from
+  deg 30 (south-east) redirects to z -2576, from deg 150
+  (south-south-west) to z -2568, from deg 180 (west) to z -2456 -
+  all roof heights, not the ground floor.
+- The bot's `approachTeacher` and `approachMerchant` (hunt/learning.go,
+  hunt/town.go) clicked the npc's EXACT spawn cell when the bot was
+  far (dist3D > 200): `l.walkToward(x, y, z, now)` sent the npc's
+  coordinates directly. The pathfinder had already planned a route
+  to within 200 units of the npc, but the final approach leg clicked
+  the exact cell - and the server teleported the bot onto the roof.
+
+The "deck hop" code (dist2D <= 200, dist3D > 200, the z mismatch
+case) had the same problem: it clicked the npc's exact cell to let
+the server routing walk the bot up a ramp, but the click line crossed
+the wall and the height-step fallback put the bot on the roof.
+
+### Fix
+
+The approach walk clicks the npc approach point, not the npc's exact
+cell. The approach point is `npcApproachOffset` (150) units from the
+npc toward the bot, so the Bresenham click line stays outside the
+building walls and the server validates it on the ground floor. The
+150 unit offset keeps the bot within the 250 unit server interaction
+distance (the talk click that follows works) but outside the walled
+interior.
+
+- `hunt/town.go`: `npcApproachOffset = 150.0` and `npcApproachPoint`
+  compute the offset target. `approachMerchant` uses it for both the
+  far walk and the deck hop case. The deck hop case skips the click
+  when the offset collapses onto the bot's own cell (the
+  `hopCoincideDist` gate) - the deck window bounds the wait before
+  the merchant is given up.
+- `hunt/learning.go`: `approachTeacher` uses the same offset for both
+  the far walk and the deck hop case, with the same skip gate.
+
+### Verification
+
+- go build/vet, gofmt clean, go test ./... (19 packages green);
+  golangci-lint: zero new findings in the touched files.
+- The offset computation tests pin the geometry: the target lies on
+  the line from the npc to the bot at the configured distance, never
+  past the bot, and collapses onto the bot's own cell when the bot is
+  already within the offset (`TestNpcApproachPointOffsetsTowardTheBot`,
+  `TestNpcApproachPointCollapsesOntoTheBotWhenClose`).
+- The approach tests pin the fix: a bot 500 units from Cobendell
+  clicks the offset point (44823 52264 -2792), never the exact cell
+  (44823 52414 -2792) - the roof teleport root cause
+  (`TestApproachTeacherClicksTheOffsetNotTheExactCell`). The same for
+  the merchant approach (`TestApproachMerchantClicksTheOffsetNotTheExactCell`).
+- The deck hop test pins the safety: a bot within the 2D interaction
+  distance but on a different z does NOT click the teacher's exact
+  cell - the offset collapses and the `hopCoincideDist` gate skips
+  the click (`TestApproachTeacherDeckHopSkipsTheClickWhenTooClose`).
+- The probe (deleted after the analysis, the findings live in the
+  tests) confirmed the safe approach directions: north and east of
+  Cobendell validate fine (the click lands on the ground floor),
+  south and west redirect to the roof or water. The offset keeps the
+  click on the safe side regardless of the bot's approach direction.
+
+### Follow ups
+
+- The manual long walk follower (hunt/user.go) and the blind engage
+  recovery walker (hunt/loop_los.go) still send unvalidated clicks
+  to npc positions; the same offset rule would harden them if they
+  approach town npcs.
+- The pathfinder's approach radius (`tripApproachRadius = 200`) and
+  the waypoint arrival slack (`waypointArriveDist = 150`) can leave
+  the bot 350 units from the npc, which triggers the far walk case.
+  A tighter approach radius for the teach stop would reduce the gap,
+  but the offset fix already keeps the far walk safe.

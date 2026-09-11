@@ -112,6 +112,21 @@ const (
 	// click targets the nearest plan bend between it and the
 	// waypoint arrival radius.
 	hopCoincideDist = 15.0
+	// npcApproachOffset is the 2D distance the bot stops short of
+	// a town npc when the approach walk clicks the ground: the
+	// click targets a point this many units from the npc toward
+	// the bot, keeping the click line outside the building walls.
+	// The server's getValidLocation walks a Bresenham line that
+	// can "step over" onto the roof layer when the click targets
+	// the npc's exact cell inside a building (the 2026-09-11 roof
+	// teleport report: the bot clicked Cobendell's spawn point,
+	// the line crossed the south wall and the height-step
+	// fallback resolved the target onto the roof at z -2456
+	// instead of the ground floor at z -2792). The offset keeps
+	// the click target on the surrounding deck, within the 250
+	// unit server interaction distance but outside the walled
+	// interior.
+	npcApproachOffset = 150.0
 )
 
 // townNpc is a town npc the trip machinery navigates to: a shop
@@ -479,6 +494,33 @@ func townNpcPosition(npc townNpc) pathfind.Vec3 {
 		Y: float64(npc.Y),
 		Z: float64(npc.Z),
 	}
+}
+
+// npcApproachPoint computes the ground click target for a town npc
+// approach: a point npcApproachOffset units from the npc toward the
+// bot, so the Bresenham click line the server validates stays outside
+// the building walls. The z is the npc's z: the server resolves the
+// target cell layer from it, picking the ground floor the npc stands
+// on. When the bot already stands within the offset distance, the
+// bot's own x and y are returned (the click collapses to a no-op the
+// caller skips in favor of the talk click).
+func npcApproachPoint(
+	npcX, npcY, npcZ, selfX, selfY int32,
+) (int32, int32, int32) {
+	dx := float64(selfX - npcX)
+	dy := float64(selfY - npcY)
+	dist := math.Hypot(dx, dy)
+	if dist < 1 {
+		return npcX, npcY, npcZ
+	}
+	frac := npcApproachOffset / dist
+	if frac >= 1 {
+		return selfX, selfY, npcZ
+	}
+	ax := float64(npcX) + dx*frac
+	ay := float64(npcY) + dy*frac
+
+	return int32(math.Round(ax)), int32(math.Round(ay)), npcZ
 }
 
 // rememberFarmSpot stores the walk home target of a trip: the position
@@ -1373,6 +1415,12 @@ func (l *Loop) handleMerchant(now time.Time, templates []int32) bool {
 // geodata (the disconnected village decks) is skipped: the 3D
 // interaction distance of the server can never be met and the sale
 // does not need the merchant.
+//
+// The approach walk clicks the ground at the npc approach point, not
+// at the merchant's exact cell: the server's getValidLocation walks a
+// Bresenham line that can "step over" onto a roof layer when the
+// click targets an interior cell (the 2026-09-11 roof teleport
+// report), so the offset keeps the click line on the surrounding deck.
 func (l *Loop) approachMerchant(now time.Time) bool {
 	x, y, z, ok := l.tracker.ObjectPosition(l.merchantID)
 	if !ok {
@@ -1385,13 +1433,19 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 	dz := float64(z - selfZ)
 	dist3D := math.Sqrt(dist2D*dist2D + dz*dz)
 	if dist3D > merchantApproachDist {
+		ax, ay, az := npcApproachPoint(x, y, z, selfX, selfY)
+		approachDist2D := math.Hypot(
+			float64(ax-selfX), float64(ay-selfY))
 		if dist2D <= merchantApproachDist {
 			// The geodata pack misses some village ramps: the character
 			// stands under the merchant deck (the 2D distance is met,
-			// the z is not). Ground clicks route through the server
-			// pathfinder, which knows the ramps - click the exact
-			// merchant position until the z matches or the retry window
-			// closes.
+			// the z is not). The approach point collapses onto the
+			// bot's own cell - the click is a no-op the server
+			// collapses, the deck window bounds the wait before the
+			// merchant is given up. Clicking the merchant's exact cell
+			// here teleported the bot onto the roof (the 2026-09-11
+			// report), so the offset keeps the click safe even when it
+			// cannot help.
 			if l.merchantDeckUntil.IsZero() {
 				l.merchantDeckUntil = now.Add(merchantDeckWindow)
 				l.logger.Printf("Hunt: %s stands on another deck (z %d vs "+
@@ -1399,7 +1453,9 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 					l.tracker.ObjectName(l.merchantID), selfZ, z)
 			}
 			if now.Before(l.merchantDeckUntil) {
-				l.walkToward(x, y, z, now)
+				if approachDist2D > hopCoincideDist {
+					l.walkToward(ax, ay, az, now)
+				}
 
 				return false
 			}
@@ -1411,8 +1467,11 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 			return true
 		}
 
-		// Far away on the same level: a plain approach walk.
-		l.walkToward(x, y, z, now)
+		// Far away on the same level: a plain approach walk to the
+		// offset point, not the merchant's exact cell.
+		if approachDist2D > hopCoincideDist {
+			l.walkToward(ax, ay, az, now)
+		}
 
 		return false
 	}
