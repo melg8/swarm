@@ -217,9 +217,15 @@ func (l *Loop) learnTripWanted() bool {
 // planLearnStops appends the learning stops of the running trip: the
 // spellbook purchases of the learnable lessons from the town merchant
 // that sells them and the teacher stop of the class master. The stops
-// run after the junk selling of the first stop - the fresh adena of
-// the sales funds the books.
+// close the trip BEHIND the gear stops (the sell phase calls this
+// after planShoppingStops): the books merge into the gear stop of
+// their merchant when they match (the jewel trader Creamees sells both
+// the basic jewels and the spellbooks - one visit buys them all), the
+// teacher walk follows, so one town visit buys the weapon, the armor,
+// the jewels, the books and teaches the lessons. The fresh adena of
+// the junk sales funds the books.
 func (l *Loop) planLearnStops() {
+	l.refreshLearnPlan()
 	lessons := l.walkLearnPrefix(false)
 	if len(lessons) == 0 {
 		return
@@ -235,14 +241,23 @@ func (l *Loop) planLearnStops() {
 	if len(books) > 0 {
 		merchant, found := merchantByTemplate(books[0].MerchantTemplateID)
 		if found {
-			l.tripStops = append(l.tripStops, tripStop{
-				merchant: merchant,
-				buys:     books,
-				sell:     false,
-				teach:    false,
-			})
-			l.logger.Printf("Hunt: learn: buying %d spellbooks from %s",
-				len(books), merchant.Name)
+			if stop := l.merchantStop(merchant.TemplateID); stop != nil {
+				// The gear stop of the book merchant absorbs the books:
+				// the jewels and the spellbooks of the same trader leave
+				// in one visit.
+				stop.buys = append(stop.buys, books...)
+				l.logger.Printf("Hunt: learn: buying %d spellbooks from %s"+
+					" with the gear stop", len(books), merchant.Name)
+			} else {
+				l.tripStops = append(l.tripStops, tripStop{
+					merchant: merchant,
+					buys:     books,
+					sell:     false,
+					teach:    false,
+				})
+				l.logger.Printf("Hunt: learn: buying %d spellbooks from %s",
+					len(books), merchant.Name)
+			}
 		} else {
 			l.logger.Printf("Hunt: learn: no known merchant for the %d"+
 				" spellbooks, learning without them", len(books))
@@ -257,6 +272,19 @@ func (l *Loop) planLearnStops() {
 	l.logger.Printf("Hunt: learn: walking to the teacher %s for %d"+
 		" lessons worth %d sp", teacher.Name, len(lessons),
 		spTotal(lessons))
+}
+
+// merchantStop resolves the trip stop of the merchant when the trip
+// carries one, so a later stop planning merges its buys into it
+// instead of walking to the same npc twice.
+func (l *Loop) merchantStop(templateID int32) *tripStop {
+	for index := range l.tripStops {
+		if l.tripStops[index].merchant.TemplateID == templateID {
+			return &l.tripStops[index]
+		}
+	}
+
+	return nil
 }
 
 // spTotal sums the SP cost of the lessons.

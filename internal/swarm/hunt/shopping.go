@@ -128,20 +128,40 @@ func (l *Loop) shoppingPlan() []gear.Purchase {
 // shoppingQueue computes the fresh purchase queue against the current
 // gear state: the affordable plan of the next trip plus the wanted
 // tail with the cumulative missing adena (see
-// gear.PlanPurchaseQueue). The character level drives the jewel
-// upgrade gate of the strategy (the cheapest set serves until level
-// 15, the upgrades open past it); the armor floor and the weapon
-// milestone order the opening game (the jewels wait for the filled
-// armor slots and the worn weapon).
+// gear.PlanPurchaseQueue). The wallet the queue plans against holds
+// the spellbook reserve of the pending lessons: the trip buys the
+// books BEFORE the gear stops, so the gear plan must leave their
+// adena unspent (a plan that eats the book money would starve the
+// lessons and the next trip would walk for them - the one town visit
+// rule of the acceptance round).
 func (l *Loop) shoppingQueue() []gear.Purchase {
 	if l.equip == nil {
 		return nil
 	}
 	stats := l.tracker.InventoryStats()
+	adena := int64(stats.Adena) - l.pendingBookBudget()
+	if adena < 0 {
+		adena = 0
+	}
 
 	return gear.PlanPurchaseQueue(
-		l.equip.profile, l.equipment(), townShopCatalog,
-		int64(stats.Adena), l.tracker.SelfLevel())
+		l.equip.profile, l.equipment(), townShopCatalog, adena)
+}
+
+// pendingBookBudget prices the spellbooks the learning queue demands
+// and the inventory does not carry yet: exactly the books the book
+// stop of the next trip buys (see bookPurchases), at the town tax
+// price. The reserve drops to zero when no lesson waits.
+func (l *Loop) pendingBookBudget() int64 {
+	l.refreshLearnPlan()
+	books := bookPurchases(l.walkLearnPrefix(false),
+		l.tracker.InventoryHasItem)
+	total := int64(0)
+	for _, book := range books {
+		total += book.Price
+	}
+
+	return total
 }
 
 // refreshShoppingCache recomputes the cached purchase queue when the
@@ -159,9 +179,14 @@ func (l *Loop) refreshShoppingCache() {
 		now.Sub(l.shoppingPlanAt) < shoppingPlanPeriod {
 		return
 	}
+	stats := l.tracker.InventoryStats()
+	adena := int64(stats.Adena) - l.pendingBookBudget()
+	if adena < 0 {
+		adena = 0
+	}
 	l.shoppingPlanCache = l.shoppingQueue()
 	l.shoppingPlanAt = now
-	l.shoppingPlanAdena = int64(l.tracker.InventoryStats().Adena)
+	l.shoppingPlanAdena = adena
 	l.shoppingViewCache = shoppingQueueView(
 		l.shoppingPlanCache, l.shoppingPlanAdena)
 	// The fresh plan re-feeds the weapon priority of the learning
@@ -784,18 +809,29 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 }
 
 // dropOwnedPurchases filters the stop purchases whose item id the
-// inventory already carries (the same signal the arrival confirmation
-// reads): the frozen trip plan executes verbatim, but a second copy
-// of an item the bot holds is never part of it.
+// inventory already carries beyond the family copy count (the same
+// signal the arrival confirmation reads): the frozen trip plan
+// executes verbatim, but a surplus copy of an item the bot holds is
+// never part of it. A pair family (the rings, the earrings) carries
+// two copies - one worn plus one planned fills both slots - while a
+// single slot family blocks its second copy (the second pair of
+// gloves of the report).
 func (l *Loop) dropOwnedPurchases(purchases []gear.Purchase) []gear.Purchase {
 	items := l.tracker.InventoryItems()
-	carried := make(map[int32]bool, len(items))
+	carried := make(map[int32]int, len(items))
 	for _, item := range items {
-		carried[item.ItemID] = true
+		carried[item.ItemID]++
 	}
+	planned := make(map[int32]int, len(purchases))
 	kept := purchases[:0]
 	for _, purchase := range purchases {
-		if carried[purchase.ItemID] {
+		stats, hasStats := npcdata.ItemGearStats(purchase.ItemID)
+		copies := 1
+		if hasStats {
+			copies = int(gear.FamilyCopiesOf(stats))
+		}
+		planned[purchase.ItemID]++
+		if carried[purchase.ItemID]+planned[purchase.ItemID] > copies {
 			l.logger.Printf("Hunt: shop: %s already in the inventory, "+
 				"skipping the purchase", npcdata.ItemName(purchase.ItemID))
 

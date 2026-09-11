@@ -70,11 +70,16 @@ func TestWeaponlessRunStartsTheWeaponStop(t *testing.T) {
 		"the walk aims along the leg to the weapon merchant")
 }
 
-// TestWeaponlessRunSkipsLearning pins the priority: queued lessons
-// never ride the weapon run - a bare-handed character walks for the
-// weapon and back, the lessons keep waiting for the next trip.
-func TestWeaponlessRunSkipsLearning(t *testing.T) {
-	loop, _, bot, _ := newTripLoop()
+// TestWeaponlessRunCarriesLearning pins the one town visit rule: the
+// weapon run rides the learning stops too - a bare-handed character
+// buys the weapon FIRST (the sell stop routes to the weapon merchant
+// and the milestone buys there), then the gear, the books and the
+// teacher follow in the same visit. The bare-handed abort risk the
+// old skip guarded against cannot fire anymore: the weapon stop runs
+// before every learn stop, so a stuck teacher leg never strands the
+// character unarmed.
+func TestWeaponlessRunCarriesLearning(t *testing.T) {
+	loop, game, bot, _ := newTripLoop()
 	// The learning budget of the learn tests (500 sp of queued level 5
 	// strikes) PLUS no weapon: the weapon run must win the trip.
 	bot.ApplyUserInfo(state.UserInfo{
@@ -95,9 +100,33 @@ func TestWeaponlessRunSkipsLearning(t *testing.T) {
 	loop.tick()
 
 	require.Equal(t, phaseTownWalk, loop.phase)
-	require.Len(t, loop.tripStops, 1,
-		"the weapon run carries no teach stop")
-	require.False(t, loop.tripStops[0].teach)
+	require.Equal(t, int32(7147), loop.tripStops[0].merchant.TemplateID,
+		"the weapon run still starts at the weapon merchant")
+	// The walk arrives at the sell stop: the stop planning distributes
+	// the frozen gear plan and the learning joins behind it.
+	arriveAtStop(t, loop, bot)
+	loop.tick()
+	require.NotEmpty(t, loop.tripStops,
+		"the trip plans its stops at the sell phase")
+	teach := false
+	books := false
+	for _, stop := range loop.tripStops[1:] {
+		if stop.teach {
+			teach = true
+		}
+		for _, purchase := range stop.buys {
+			if purchase.Reason == bookReason {
+				books = true
+			}
+		}
+	}
+	require.True(t, teach,
+		"the weapon run carries the teach stop behind the gear stops")
+	require.True(t, books || loop.pendingBookBudget() == 0,
+		"the weapon run carries the spellbook purchases (none demanded"+
+			" when the queue needs no books)")
+	require.NotEmpty(t, game.walks,
+		"the walk to the weapon merchant started")
 }
 
 // TestWeaponlessRunHoldsFreshPicks pins the bare-handed engage gate:

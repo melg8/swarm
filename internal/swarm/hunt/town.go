@@ -524,15 +524,14 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	l.buyRetries = 0
 	l.resetReplacementSales()
 	l.resetLearnState()
-	if learning && !weaponRun {
-		// The learning stops ride behind the sell stop: the books
-		// after the junk sold (the fresh adena funds them), the
-		// teacher behind them, the gear shopping behind the teacher.
-		// The weapon run carries none of them: a bare-handed
-		// character walks for the weapon and back, the lessons ride
-		// the next trip (their queue keeps waiting).
-		l.planLearnStops()
-	}
+	// The learning stops no longer ride the trip start: they plan
+	// AFTER the gear stops at the sell stop (see tickTownSell), so
+	// one town visit buys the weapon, the armor, the jewels, the
+	// books and teaches the lessons - the user rule of the one
+	// town visit. The weapon stop still runs FIRST (the sell stop
+	// routes to the weapon merchant), so a stuck teacher leg can
+	// no longer strand a bare-handed character: the weapon is
+	// bought and worn before the teacher leg ever runs.
 	l.phase = phaseTownWalk
 	stats := l.tracker.InventoryStats()
 	reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
@@ -548,7 +547,7 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 		// the dump report read at a glance in the log tail.
 		reason = "no weapon in hand, the weapon run comes first"
 	}
-	if learning && !weaponRun {
+	if learning {
 		// The learning contributes its lesson budget to the reason:
 		// a learning-only trip names it, a combined one appends it.
 		lessons := l.learnableLessons()
@@ -1759,6 +1758,17 @@ func (l *Loop) tickTownSell() {
 				"%.0f%% weight), distributing the trip plan",
 				stats.Slots, stats.WeightPercent)
 			l.planShoppingStops()
+			// The learning stops close the trip: the books and
+			// the teacher ride BEHIND the gear stops, so one
+			// town visit buys the weapon, the armor, the jewels,
+			// the books and teaches the lessons (the user rule
+			// of the one town visit - the books stop merges with
+			// the gear stop of its merchant when they match, see
+			// planLearnStops). The weapon stop already ran (the
+			// sell stop routes to the weapon merchant), so an
+			// abort on the teacher leg never strands a
+			// bare-handed character.
+			l.planLearnStops()
 		}
 	}
 	if l.stopBuysPending() {

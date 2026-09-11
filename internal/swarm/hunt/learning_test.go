@@ -58,17 +58,22 @@ func arriveAtStop(t *testing.T, loop *Loop, bot *state.Bot) {
 
 // TestLearnTripTriggersOnTheSkillBudget pins the learning trigger:
 // enough SP worth of unlocked lessons arms the town trip exactly like
-// the full inventory does, and the reason names the lessons.
+// the full inventory does, and the reason names the lessons. The learn
+// stops plan at the sell stop (one town visit: the gear stops, the
+// books, the teacher), so the assertions walk the trip into its first
+// stop first.
 func TestLearnTripTriggersOnTheSkillBudget(t *testing.T) {
-	loop, _, _ := newLearnLoop(500)
+	loop, _, bot := newLearnLoop(500)
 
 	require.False(t, loop.tripActive())
 	loop.tick()
 
 	require.Equal(t, phaseTownWalk, loop.phase,
 		"the learning budget starts the town trip")
-	require.Greater(t, len(loop.tripStops), 1,
-		"the trip carries the teach stop behind the sell stop")
+	arriveAtStop(t, loop, bot)
+	loop.tick()
+	require.True(t, loop.teachStop(),
+		"the teach stop follows the sell stop of the trip")
 	require.True(t, loop.tripStops[len(loop.tripStops)-1].teach,
 		"the last learning stop is the teacher")
 }
@@ -216,7 +221,13 @@ func TestLearnTripBuysTheSpellbooks(t *testing.T) {
 
 	loop.tick()
 	require.True(t, loop.tripActive())
-	var bookStop, teachStop int
+	// The learn stops plan at the sell stop: walk the trip into its
+	// first stop, the arrival tick plans the book stop (merged into
+	// the sell stop when the book merchant matches it) and the
+	// teacher behind it.
+	arriveAtStop(t, loop, bot)
+	loop.tick()
+	bookStop, teachStop := -1, -1
 	for i, stop := range loop.tripStops {
 		if stop.teach {
 			teachStop = i
@@ -227,8 +238,8 @@ func TestLearnTripBuysTheSpellbooks(t *testing.T) {
 			bookStop = i
 		}
 	}
-	require.NotZero(t, bookStop, "the trip plans a book stop")
-	require.NotZero(t, teachStop, "the trip plans a teach stop")
+	require.NotEqual(t, -1, bookStop, "the trip plans a book stop")
+	require.NotEqual(t, -1, teachStop, "the trip plans a teach stop")
 	require.Less(t, bookStop, teachStop,
 		"the books are bought before the teaching")
 	// The spellbooks of the queued lessons: the Attack Aura book 1095
@@ -319,8 +330,8 @@ func TestTripWaitsForTheSkillList(t *testing.T) {
 	loop.tick()
 	require.True(t, loop.tripActive(),
 		"the trip starts once the skill list arrived")
-	require.Greater(t, len(loop.tripStops), 1,
-		"the learning stops ride the trip")
+	require.True(t, loop.learnTripWanted(),
+		"the fresh skill queue arms the learning")
 }
 
 // TestTripWaitsForTheSkillListAfterAReconnect pins the reconnect half
@@ -362,6 +373,6 @@ func TestTripWaitsForTheSkillListAfterAReconnect(t *testing.T) {
 	loop.lastHit = time.Now().Add(-time.Minute)
 	loop.tick()
 	require.True(t, loop.tripActive())
-	require.Greater(t, len(loop.tripStops), 1,
-		"the learning stops ride the reconnected trip")
+	require.True(t, loop.learnTripWanted(),
+		"the fresh skill queue arms the reconnected learning")
 }

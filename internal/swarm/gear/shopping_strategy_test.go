@@ -40,9 +40,8 @@ var journeyIncome = map[int]int64{
 	18: 122_000, 19: 151_000, 20: 185_000,
 }
 
-// journeyTopLevel bounds the simulated journey: level 15 is the
-// jewel gate of the strategy, the levels past it must show the
-// jewel upgrades joining the defense phase.
+// journeyTopLevel bounds the simulated journey through the top of
+// the elven lands income table.
 const journeyTopLevel = 20
 
 // legacyBestPurchase picks the affordable candidate with the highest
@@ -142,10 +141,9 @@ type journeyRecord struct {
 }
 
 // journeyPlanner abstracts the strategy under test: the legacy copy
-// and the phased PlanPurchases share the signature modulo the level.
+// and the phased PlanPurchases share the signature.
 type journeyPlanner func(
 	profile Profile, equipment Equipment, catalog Catalog, adena int64,
-	level int32,
 ) []Purchase
 
 // runJourney walks the levels 1..journeyTopLevel: every level adds
@@ -171,8 +169,7 @@ func runJourney(
 			legacy = legacyPlanPurchases(
 				profile, equipment, elvenCatalog(), wallet)
 		} else {
-			legacy = planner(profile, equipment, elvenCatalog(),
-				wallet, int32(level))
+			legacy = planner(profile, equipment, elvenCatalog(), wallet)
 		}
 		if len(legacy) > 0 {
 			trips = append(trips, journeyRecord{
@@ -309,32 +306,36 @@ func (e *Equipment) setItemEquipped(objectID int32, equipped bool) {
 
 // TestShoppingStrategyJourneyComparison walks the level journey
 // through both planners and pins the ordering rules of the phased
-// strategy: the armor floor opens the journey, the weapon milestone
-// follows, no jewel runs before the first weapon, the defense stays
-// inside the weapon budget and no jewel upgrade runs below level 15.
+// strategy: the weapon milestone leads every trip that affords one,
+// the pdef maximizing armor set follows, no jewel runs before the
+// first weapon and the jewels stay on the basic floor set through the
+// whole journey (the starting locations barely attack with magic).
 func TestShoppingStrategyJourneyComparison(t *testing.T) {
 	wasTrips := runLegacyJourney(t)
 	isTrips := runJourney(t, PlanPurchases)
 
 	printJourney(t, "WAS (greedy value per adena)", wasTrips)
-	printJourney(t, "IS (phased: armor floor, weapon, jewel floor, defense)",
-		isTrips)
+	printJourney(t, "IS (weapon milestone, pdef-maximizing armor set, "+
+		"basic jewels)", isTrips)
 
-	// Rule 1: the opening trips buy the cheap armor floor only - the
-	// empty armor slots fill with the cheapest shop pieces ahead of
-	// every weapon and jewel.
-	first := isTrips[0]
-	require.NotEmpty(t, first.is)
-	for _, purchase := range first.is {
-		require.Equal(t, CategoryArmor,
-			CategoryOf(candidateStats(t, purchase.ItemID)),
-			"the opening trip buys the cheap armor floor only")
+	// Rule 1: the weapon milestone leads every trip that affords one -
+	// the first purchase of such a trip is the weapon, the armor set
+	// and the jewels follow behind it. The trips below every weapon
+	// tier spend the wallet on the pdef maximizing armor set alone.
+	for _, trip := range isTrips {
+		weapons := weaponPurchases(trip.is)
+		if len(weapons) == 0 {
+			continue
+		}
+		first := trip.is[0]
+		require.Equal(t, CategoryWeapon,
+			CategoryOf(candidateStats(t, first.ItemID)),
+			"level %d: the weapon milestone leads the trip", trip.level)
 	}
 
 	// Rule 2: the first weapon purchase comes before any jewel
-	// purchase of the whole journey - the jewelry waits for the
-	// filled armor slots and the worn weapon (the user rule of the
-	// opening game).
+	// purchase of the whole journey - the jewelry waits for the worn
+	// weapon (the user rule of the opening game).
 	weaponFirst := firstWeaponIndex(t, isTrips)
 	require.Positive(t, weaponFirst,
 		"the journey must buy a weapon")
@@ -345,14 +346,12 @@ func TestShoppingStrategyJourneyComparison(t *testing.T) {
 			"no jewel runs before the first weapon")
 	}
 
-	// Rule 3: no jewel upgrade below the jewel gate - the only
-	// jewels of the levels 1..14 are the floor items themselves.
+	// Rule 3: the jewels stay basic through the whole journey - the
+	// starting locations barely attack with magic, the floor items are
+	// the only jewel purchases any level plans.
 	floorIDs := cheapestJewelIDs(catalogCandidates(
 		MeleeFighter{}, elvenCatalog()))
 	for _, trip := range isTrips {
-		if trip.level >= jewelUpgradeLevel {
-			continue
-		}
 		for _, purchase := range trip.is {
 			if CategoryOf(candidateStats(t, purchase.ItemID)) !=
 				CategoryJewel {
@@ -364,25 +363,37 @@ func TestShoppingStrategyJourneyComparison(t *testing.T) {
 		}
 	}
 
-	// Rule 4: past the gate the jewel upgrades join the defense
-	// phase - the cheapest jewel upgrade beats nothing until the
-	// armor is done, but by the top of the journey the jewel
-	// upgrades must have started.
-	upgradeSeen := false
-	for _, trip := range isTrips {
-		if trip.level < jewelUpgradeLevel {
-			continue
-		}
-		for _, purchase := range trip.is {
-			if CategoryOf(candidateStats(t, purchase.ItemID)) ==
-				CategoryJewel && !floorIDs[purchase.ItemID] {
-				upgradeSeen = true
-			}
+	// Rule 4: the acceptance wallet of the farm readiness round - a
+	// bare level 15 character with 100,000 adena buys the weapon
+	// milestone (the brandish), the pdef maximizing armor set (the
+	// summed armor pdef reaches past the cheap floor by a wide margin -
+	// the aggressive adena utilization) and the basic jewel set (both
+	// halves of the pairs included) in ONE plan.
+	profile := MeleeFighter{}
+	equipment := equipmentWith(nil, nil)
+	plan := PlanPurchases(profile, equipment, elvenCatalog(), 100_000)
+	require.NotEmpty(t, plan)
+	weapons := weaponPurchases(plan)
+	require.Len(t, weapons, 1, "one weapon milestone")
+	require.Equal(t, int32(1333), weapons[0].ItemID,
+		"the brandish is the top affordable tier of 100k adena")
+	var armorPdef int32
+	jewels := 0
+	for _, purchase := range plan {
+		stats := candidateStats(t, purchase.ItemID)
+		switch CategoryOf(stats) {
+		case CategoryArmor:
+			armorPdef += stats.PDef
+		case CategoryJewel:
+			jewels++
+		case CategoryShield, CategoryWeapon, CategoryUnusable:
 		}
 	}
-	require.True(t, upgradeSeen,
-		"the jewel upgrades must open past level %d",
-		jewelUpgradeLevel)
+	require.GreaterOrEqual(t, armorPdef, int32(120),
+		"the armor set maximizes the pdef of the leftover budget")
+	require.Equal(t, 5, jewels,
+		"the basic jewel set fills every slot, the pair halves included")
+	require.LessOrEqual(t, AdenaSpent(plan), int64(100_000))
 
 	// Rule 5: the legacy strategy bought the cheap fillers in a greedy
 	// value per adena soup with no phases (the apprentice's shoes at
@@ -397,16 +408,13 @@ func TestShoppingStrategyJourneyComparison(t *testing.T) {
 		"the greedy journey opens with the apprentice's shoes")
 }
 
-// runLegacyJourney walks the journey through the legacy planner
-// (no level argument).
+// runLegacyJourney walks the journey through the legacy planner.
 func runLegacyJourney(t *testing.T) []journeyRecord {
 	t.Helper()
 	legacy := func(
 		profile Profile, equipment Equipment, catalog Catalog,
-		adena int64, level int32,
+		adena int64,
 	) []Purchase {
-		_ = level
-
 		return legacyPlanPurchases(profile, equipment, catalog, adena)
 	}
 

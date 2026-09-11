@@ -279,7 +279,8 @@ func TestShopCatalogCoversTownMerchants(t *testing.T) {
 func TestPlanShoppingStopsMergesCurrentMerchant(t *testing.T) {
 	loop, game, bot, _ := newTripLoop()
 	// The character stands at Ariel with enough adena for the
-	// armor floor fillers of the strategy opening.
+	// pdef maximizing armor set of the strategy opening (the shoes
+	// plus the shirt: 44 pdef for 177 adena).
 	ariel := townMerchants[1]
 	moveSelfTo(bot, ariel.X, ariel.Y, ariel.Z)
 	bot.ApplyItemList([]state.InventoryItem{
@@ -293,8 +294,8 @@ func TestPlanShoppingStopsMergesCurrentMerchant(t *testing.T) {
 	loop.planShoppingStops()
 	require.True(t, loop.buysPlanned)
 	require.Len(t, loop.tripStops, 1,
-		"the armor floor needs no second merchant")
-	require.Len(t, loop.tripStops[0].buys, 3,
+		"the armor set needs no second merchant")
+	require.Len(t, loop.tripStops[0].buys, 2,
 		"the armor purchases merge into the current stop")
 	for _, purchase := range loop.tripStops[0].buys {
 		require.Equal(t, int32(7148), purchase.MerchantTemplateID)

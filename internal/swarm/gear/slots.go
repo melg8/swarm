@@ -56,8 +56,8 @@ const (
 // slotNames carries the log names of the slots.
 var slotNames = [slotCount]string{
 	"underwear", "right ear", "left ear", partNeck, "right finger",
-	"left finger", "head", "right hand", "left hand", "gloves",
-	partChest, partLegs, "feet", "back",
+	"left finger", partHead, "right hand", "left hand", partGloves,
+	partChest, partLegs, partFeet, partBack,
 }
 
 // String renders the slot for logs.
@@ -86,6 +86,10 @@ const (
 	partOnepiece = "onepiece"
 	partEars     = "rear;lear"
 	partFingers  = "rfinger;lfinger"
+	partHead     = "head"
+	partGloves   = "gloves"
+	partFeet     = "feet"
+	partBack     = "back"
 )
 
 // paperdollIndexSlots maps the UserInfo paperdoll block index (the
@@ -133,10 +137,10 @@ var bodyPartSlots = map[string][]Slot{
 	partChest:    {SlotChest},
 	partLegs:     {SlotLegs},
 	partOnepiece: {SlotChest},
-	"head":       {SlotHead},
-	"gloves":     {SlotGloves},
-	"feet":       {SlotFeet},
-	"back":       {SlotBack},
+	partHead:     {SlotHead},
+	partGloves:   {SlotGloves},
+	partFeet:     {SlotFeet},
+	partBack:     {SlotBack},
 	"underwear":  {SlotUnderwear},
 	partNeck:     {SlotNeck},
 	partEars:     {SlotREar, SlotLEar},
