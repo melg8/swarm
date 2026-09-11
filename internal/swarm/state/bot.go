@@ -363,7 +363,7 @@ type Bot struct {
 	// its temp bots with KindAcceptance so the web UI can split
 	// them out of the fleet bot list. Set once at construction;
 	// the sidebar reads it through Info().
-	kind    string
+	kind string
 	// phaseAt records when the phase last changed: the
 	// diagnostics report the age of the current phase (a bot
 	// stuck in one phase for minutes is the top stuck

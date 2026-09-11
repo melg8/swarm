@@ -59,6 +59,198 @@ Three user requests in one session:
   entry tags the fleet bots. Added `TestBotKind` next to the change.
 - Status: in progress - the sidebar UI split is the next commit.
 
+## Active task: the dump state diagnostics for stuck bot reports
+
+Started: 2026-09-11. Branch: `feature/acceptance`. Commits as melg8,
+pushed as they land. Stack deployed and verified as the mandatory
+first step (tools/swarm_fast_deploy.sh: STACK_READY, ports
+2106/7777/3306, 75 tables).
+
+### Goal
+
+The user asked for an analysis of what the state dump (the JSON
+snapshot of `GET /api/bots/{id}/state` and the SSE stream) carries
+today, what is missing, what is redundant, and an improvement so the
+dump works as a live server report when bots get stuck or behave
+inadequately.
+
+### Gap analysis of the current dump
+
+The snapshot carries: id, status, phase, a 39 field character view,
+the full inventory, every world object (31 fields each), the last 100
+events, the last 64 chat lines, the manual/town walk plan, the 2
+second combat animation window, the hunting zones, packets, version,
+serverTimeMs, startedAt, updatedAt.
+
+Missing for a stuck bot report:
+
+1. No liveness ages or rates: the packet counter is cumulative with
+   no rate, updatedAt carries no age, the phase has no age - a bot
+   stuck in townWalk for 15 minutes is indistinguishable from one
+   that just switched.
+2. No reconnect visibility: the login cooldown the emergency logout
+   arms is tracked but never published, so an offline bot carries no
+   reason.
+3. No hunt loop internals: the loop state (current target, engagement
+   age, the engage skip list, the re-path count, the stuck watchdog,
+   the flee episode, the trip age, the buy retries) never reaches the
+   tracker, and every loop decision is printed to the console logger
+   only - the dump has no WHY.
+4. Coarse combat view: inCombat is one boolean; the auto attack flag,
+   the fighting target, the combat activity age and the hit age are
+   missing, so a stale-flag fight is indistinguishable from a live
+   one.
+5. Walk freshness: the moving flag has no fresh window companion (a
+   lost stop packet leaves it set forever).
+6. No object summary: the known list health (npc/player/item/dead
+   counts) requires scanning the whole array by hand.
+
+Redundant for a report (kept anyway): the combat animation beats, the
+per-object vitals and the per-item icon/name fields are UI payload of
+the same endpoint - the diagnostics section adds the report layer
+without growing the per-object cost.
+
+### Fix plan
+
+1. state: a `diagnostics` section at the end of the snapshot - phase
+   age, update age, the 10 second packet rate, the login cooldown,
+   the combat nuance (autoAttacking, fightingTargetId, combat
+   activity age, hit age, under attack, attacker count), the walk
+   freshness, the object counts, and the hunt subview (target,
+   engagement age, skipped targets, no-target age, re-paths, stuck
+   age, waypoints left, trip age, flee age, buy retries, last action
+   and its age, loop tick age).
+2. hunt: the loop publishes its internals every tick and routes its
+   decision log lines into the tracker event log, so the dump events
+   array carries the decision history and the last action.
+3. webserver: the footer and the activity banner surface the key ages
+   so a stuck bot is visible in the live UI too.
+
+### Acceptance criteria
+
+- The reflection golden suite and the live encode parity tests stay
+  green with the new section (byte identical paths).
+- Unit tests for every diagnostics field family (phase age, packet
+  rate window, cooldown, combat nuance, walk freshness, counts, hunt
+  publication, note action).
+- go build, go vet, go test ./..., golangci-lint run green; the live
+  stack e2e prints E2E_OK with the diagnostics flowing.
+
+### Status: done (2026-09-11)
+
+- In progress: the state diagnostics section first.
+- 2026-09-11: the state diagnostics section. A new
+  state/diagnostics.go defines the Diagnostics view (phaseForMs,
+  updatedAgoMs, packetsPerSecond over a 10 second window,
+  loginCooldownMs, autoAttacking, fightingTargetId,
+  combatActiveAgoMs, lastHitAgoMs, underAttack, attackerCount,
+  walkFresh, moveAgoMs, the ObjectCounts summary, the
+  HuntDiagnostics subview) and its support state: the phaseAt stamp
+  of SetPhase, the packet rate window fed by CountPacket, the hunt
+  publication (SetHuntDiagnostics, no version bump - the values ride
+  the packet driven snapshots) and NoteAction (the event log entry
+  plus the last action of the hunt view). The ages floor to whole
+  seconds through state.AgeMs so both encode paths stay byte
+  identical without a now race. The snapshot struct gains the
+  trailing diagnostics field; the reflection golden fixture covers
+  every new branch; the live encoder walks the object array once and
+  folds the hot records into the worldCounts tally (npcs, players,
+  items, dead, attackers) reused by the diagnostics. Tests:
+  diagnostics_test.go pins the rate window, the phase age, the
+  update fallback, the cooldown, the walk freshness stall signature,
+  the combat nuance, the object counts with the attacker tally, the
+  hunt publication with the last action and the reset. go build, go
+  vet, go test ./... green; golangci-lint 0 issues in state (the 10
+  remaining findings of the full run reproduce on the untouched
+  HEAD with the local golangci-lint 2.6.2 - linter version drift,
+  not this change). Next: the hunt loop publication and the log
+  routing.
+- 2026-09-11: the hunt loop publication. A new
+  internal/swarm/hunt/loop_diagnostics.go adds Loop.diagnostics (the
+  internals report: the target, the engagement age, the active skip
+  count of both skip maps, the no-target patience age, the re-path
+  count, the stuck watchdog age, the waypoints left of the manual or
+  geodata plan, the trip and flee episode ages, the buy retries)
+  published through the extended tick defer together with the phase.
+  The 118 loop decision log lines now route through Loop.logf: the
+  message still prints on the console logger and additionally lands
+  in the tracker event log (Bot.NoteAction), so the dump events
+  array carries the decision history of the session - the WHY a
+  stuck bot report needs. Tests: the per tick publication (target,
+  ages, heartbeat, phase age), the stale server side selection skip
+  flow (the skip count and the "does not engage" line in the event
+  log and the last action), the death decision routing, the age
+  references and the per phase waypoint counting. go build, go vet,
+  go test ./... green; golangci-lint clean in hunt and state (the
+  remaining gosec G602 findings in zones_test.go reproduce on the
+  untouched HEAD). Next: the web UI surfaces.
+- 2026-09-11: the web UI surfaces. The footer gains two cells -
+  phase with its age and the live packet rate - and the existing
+  cells grow the diagnostic detail: the object count splits into the
+  npc/loot/dead summary and the updated cell shows the age of the
+  last state change (the world liveness) instead of a wall clock
+  stamp. The activity banner detail reads the hunt subview: the
+  fighting target with its engagement age, the no-target patience
+  with the skip count, the waypoints left and the trip age of the
+  town walks, the buy retries of the sell stop, the login cooldown
+  of an offline session. The log tab colors the new hunt decision
+  lines (the Hunt: prefix) with the accent color so the decision
+  history reads out of the noise. The special modes (pathfind, fight
+  galleries) hide the new footer cells through the same CSS rules
+  as the existing ones. The state endpoint test pins the diagnostics
+  section presence and the object tally agreement. The HUD harness
+  (tools/repro_hud.js) passes: the label fallbacks work for
+  snapshots without diagnostics. go build, go vet, go test ./... (15
+  packages) green. Next: the AGENTS.md documentation and the live
+  stack verification.
+- 2026-09-11: the phase gating and the documentation. The live run
+  showed the residual stuckAt/tripStart stamps leaking misleading
+  ages into the engage phase report (a stuckForMs of 28 s while
+  hunting): Loop.diagnostics now carries the stuck watchdog age and
+  the trip clock only in the walking phases (Loop.walkPhase for the
+  stuck age, tripActive plus the delevel guard walk for the trip
+  age), the hunt phases report zero. The AGENTS.md web interface
+  section documents the diagnostics contract: the field families,
+  the hunt publication, the NoteAction decision routing, the
+  seconds flooring of the ages and the zero-never semantics.
+- 2026-09-11: task wrap up. The live verification on the deployed
+  stack: the bot hunted, looted and equipped gear while the dump
+  showed the full report - phase for 11 s, the packet rate 6.3/s,
+  the fighting target with its engagement age, under attack with
+  the attacker count, the known list summary (32 npcs, 1 loot, 0
+  dead), the hunt heartbeat fresh, the last action ("equipping
+  Cloth Shoes into the empty feet slot") and the decision history
+  riding the events array (the target died/loot/equip lines between
+  the packet events). tools/mobius_e2e.sh 45 printed E2E_OK. All
+  acceptance criteria met: the golden reflection and live parity
+  suites stay green with the new section, every diagnostics field
+  family has its unit tests, the build, vet, the full test suite
+  (15 packages) and the lint of the touched packages are clean, and
+  the live report answers the stuck bot questions (is the socket
+  alive, is the loop ticking, how long in this phase, what did it
+  decide last) straight from GET /api/bots/{id}/state.
+
+- 2026-09-11: the port to feature/proxy-server. The 7 diagnostics
+  commits rebased onto the evolved proxy line (the shop planner
+  commits of the acceptance branch did not travel: their content
+  lives here as the top-tier guard port plus the frozen trip plan
+  round). The rebase merged both sides honestly: the proxy hunt
+  loop evolution (the road fight budget, the weapon run, the blind
+  engage recovery, the trip stops, the non-dry zone return, the
+  spot kill marks, sessionAt) stays; the logf routing now also
+  carries the new proxy decision lines (the HP/mana sit split, the
+  frozen trip plan messages, the manual target death with the blind
+  recovery clear); the diagnostics documentation section moved into
+  docs/webui.md (AGENTS.md was split into the docs/ modules here).
+  The lint run matches the pre-port proxy baseline exactly (4
+  findings, all in files this port does not touch); the full
+  19-package suite, vet and gofmt are green; the live stack run
+  shows the diagnostics flowing - the decision history rode the
+  events array, the hunt heartbeat, packet rate and phase gates
+  answered green, the bot exited gracefully. The branch line above
+  records where the work started; the port is the delivery into
+  the proxy line.
+
 ## Active task: the foreground execution rule in the agent docs (2026-09-11)
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
@@ -1446,173 +1638,3 @@ live stack; go build/vet/test/lint stay green.
 - go build/vet/test green, golangci-lint run --new: 0 issues; all
   four commits rebased over the shop freeze round and pushed.
 - Next: none - the round is complete.
-## Active task: the dump state diagnostics for stuck bot reports
-
-Started: 2026-09-11. Branch: `feature/acceptance`. Commits as melg8,
-pushed as they land. Stack deployed and verified as the mandatory
-first step (tools/swarm_fast_deploy.sh: STACK_READY, ports
-2106/7777/3306, 75 tables).
-
-### Goal
-
-The user asked for an analysis of what the state dump (the JSON
-snapshot of `GET /api/bots/{id}/state` and the SSE stream) carries
-today, what is missing, what is redundant, and an improvement so the
-dump works as a live server report when bots get stuck or behave
-inadequately.
-
-### Gap analysis of the current dump
-
-The snapshot carries: id, status, phase, a 39 field character view,
-the full inventory, every world object (31 fields each), the last 100
-events, the last 64 chat lines, the manual/town walk plan, the 2
-second combat animation window, the hunting zones, packets, version,
-serverTimeMs, startedAt, updatedAt.
-
-Missing for a stuck bot report:
-
-1. No liveness ages or rates: the packet counter is cumulative with
-   no rate, updatedAt carries no age, the phase has no age - a bot
-   stuck in townWalk for 15 minutes is indistinguishable from one
-   that just switched.
-2. No reconnect visibility: the login cooldown the emergency logout
-   arms is tracked but never published, so an offline bot carries no
-   reason.
-3. No hunt loop internals: the loop state (current target, engagement
-   age, the engage skip list, the re-path count, the stuck watchdog,
-   the flee episode, the trip age, the buy retries) never reaches the
-   tracker, and every loop decision is printed to the console logger
-   only - the dump has no WHY.
-4. Coarse combat view: inCombat is one boolean; the auto attack flag,
-   the fighting target, the combat activity age and the hit age are
-   missing, so a stale-flag fight is indistinguishable from a live
-   one.
-5. Walk freshness: the moving flag has no fresh window companion (a
-   lost stop packet leaves it set forever).
-6. No object summary: the known list health (npc/player/item/dead
-   counts) requires scanning the whole array by hand.
-
-Redundant for a report (kept anyway): the combat animation beats, the
-per-object vitals and the per-item icon/name fields are UI payload of
-the same endpoint - the diagnostics section adds the report layer
-without growing the per-object cost.
-
-### Fix plan
-
-1. state: a `diagnostics` section at the end of the snapshot - phase
-   age, update age, the 10 second packet rate, the login cooldown,
-   the combat nuance (autoAttacking, fightingTargetId, combat
-   activity age, hit age, under attack, attacker count), the walk
-   freshness, the object counts, and the hunt subview (target,
-   engagement age, skipped targets, no-target age, re-paths, stuck
-   age, waypoints left, trip age, flee age, buy retries, last action
-   and its age, loop tick age).
-2. hunt: the loop publishes its internals every tick and routes its
-   decision log lines into the tracker event log, so the dump events
-   array carries the decision history and the last action.
-3. webserver: the footer and the activity banner surface the key ages
-   so a stuck bot is visible in the live UI too.
-
-### Acceptance criteria
-
-- The reflection golden suite and the live encode parity tests stay
-  green with the new section (byte identical paths).
-- Unit tests for every diagnostics field family (phase age, packet
-  rate window, cooldown, combat nuance, walk freshness, counts, hunt
-  publication, note action).
-- go build, go vet, go test ./..., golangci-lint run green; the live
-  stack e2e prints E2E_OK with the diagnostics flowing.
-
-### Status
-
-- In progress: the state diagnostics section first.
-- 2026-09-11: the state diagnostics section. A new
-  state/diagnostics.go defines the Diagnostics view (phaseForMs,
-  updatedAgoMs, packetsPerSecond over a 10 second window,
-  loginCooldownMs, autoAttacking, fightingTargetId,
-  combatActiveAgoMs, lastHitAgoMs, underAttack, attackerCount,
-  walkFresh, moveAgoMs, the ObjectCounts summary, the
-  HuntDiagnostics subview) and its support state: the phaseAt stamp
-  of SetPhase, the packet rate window fed by CountPacket, the hunt
-  publication (SetHuntDiagnostics, no version bump - the values ride
-  the packet driven snapshots) and NoteAction (the event log entry
-  plus the last action of the hunt view). The ages floor to whole
-  seconds through state.AgeMs so both encode paths stay byte
-  identical without a now race. The snapshot struct gains the
-  trailing diagnostics field; the reflection golden fixture covers
-  every new branch; the live encoder walks the object array once and
-  folds the hot records into the worldCounts tally (npcs, players,
-  items, dead, attackers) reused by the diagnostics. Tests:
-  diagnostics_test.go pins the rate window, the phase age, the
-  update fallback, the cooldown, the walk freshness stall signature,
-  the combat nuance, the object counts with the attacker tally, the
-  hunt publication with the last action and the reset. go build, go
-  vet, go test ./... green; golangci-lint 0 issues in state (the 10
-  remaining findings of the full run reproduce on the untouched
-  HEAD with the local golangci-lint 2.6.2 - linter version drift,
-  not this change). Next: the hunt loop publication and the log
-  routing.
-- 2026-09-11: the hunt loop publication. A new
-  internal/swarm/hunt/loop_diagnostics.go adds Loop.diagnostics (the
-  internals report: the target, the engagement age, the active skip
-  count of both skip maps, the no-target patience age, the re-path
-  count, the stuck watchdog age, the waypoints left of the manual or
-  geodata plan, the trip and flee episode ages, the buy retries)
-  published through the extended tick defer together with the phase.
-  The 118 loop decision log lines now route through Loop.logf: the
-  message still prints on the console logger and additionally lands
-  in the tracker event log (Bot.NoteAction), so the dump events
-  array carries the decision history of the session - the WHY a
-  stuck bot report needs. Tests: the per tick publication (target,
-  ages, heartbeat, phase age), the stale server side selection skip
-  flow (the skip count and the "does not engage" line in the event
-  log and the last action), the death decision routing, the age
-  references and the per phase waypoint counting. go build, go vet,
-  go test ./... green; golangci-lint clean in hunt and state (the
-  remaining gosec G602 findings in zones_test.go reproduce on the
-  untouched HEAD). Next: the web UI surfaces.
-- 2026-09-11: the web UI surfaces. The footer gains two cells -
-  phase with its age and the live packet rate - and the existing
-  cells grow the diagnostic detail: the object count splits into the
-  npc/loot/dead summary and the updated cell shows the age of the
-  last state change (the world liveness) instead of a wall clock
-  stamp. The activity banner detail reads the hunt subview: the
-  fighting target with its engagement age, the no-target patience
-  with the skip count, the waypoints left and the trip age of the
-  town walks, the buy retries of the sell stop, the login cooldown
-  of an offline session. The log tab colors the new hunt decision
-  lines (the Hunt: prefix) with the accent color so the decision
-  history reads out of the noise. The special modes (pathfind, fight
-  galleries) hide the new footer cells through the same CSS rules
-  as the existing ones. The state endpoint test pins the diagnostics
-  section presence and the object tally agreement. The HUD harness
-  (tools/repro_hud.js) passes: the label fallbacks work for
-  snapshots without diagnostics. go build, go vet, go test ./... (15
-  packages) green. Next: the AGENTS.md documentation and the live
-  stack verification.
-- 2026-09-11: the phase gating and the documentation. The live run
-  showed the residual stuckAt/tripStart stamps leaking misleading
-  ages into the engage phase report (a stuckForMs of 28 s while
-  hunting): Loop.diagnostics now carries the stuck watchdog age and
-  the trip clock only in the walking phases (Loop.walkPhase for the
-  stuck age, tripActive plus the delevel guard walk for the trip
-  age), the hunt phases report zero. The AGENTS.md web interface
-  section documents the diagnostics contract: the field families,
-  the hunt publication, the NoteAction decision routing, the
-  seconds flooring of the ages and the zero-never semantics.
-- 2026-09-11: task wrap up. The live verification on the deployed
-  stack: the bot hunted, looted and equipped gear while the dump
-  showed the full report - phase for 11 s, the packet rate 6.3/s,
-  the fighting target with its engagement age, under attack with
-  the attacker count, the known list summary (32 npcs, 1 loot, 0
-  dead), the hunt heartbeat fresh, the last action ("equipping
-  Cloth Shoes into the empty feet slot") and the decision history
-  riding the events array (the target died/loot/equip lines between
-  the packet events). tools/mobius_e2e.sh 45 printed E2E_OK. All
-  acceptance criteria met: the golden reflection and live parity
-  suites stay green with the new section, every diagnostics field
-  family has its unit tests, the build, vet, the full test suite
-  (15 packages) and the lint of the touched packages are clean, and
-  the live report answers the stuck bot questions (is the socket
-  alive, is the loop ticking, how long in this phase, what did it
-  decide last) straight from GET /api/bots/{id}/state.
