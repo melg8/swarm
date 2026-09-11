@@ -1084,6 +1084,21 @@ func (gc *GameClient) RequestLogout() error {
 	return nil
 }
 
+// Close drops the game connection without the logout announcement.
+// The character selection stage holds no world session, so a plain
+// socket close is the clean exit of a client that never entered the
+// world (the character creation probe of the acceptance runner); the
+// server frees the account the same way it does for a client closing
+// at the char screen.
+func (gc *GameClient) Close() error {
+	if err := gc.conn.Close(); err != nil {
+		return fmt.Errorf(
+			"failed to close the game connection: %w", err)
+	}
+
+	return nil
+}
+
 // disconnect closes the connection, announcing the logout to the server
 // first when the connection is still usable.
 func (gc *GameClient) disconnect(announce bool) {
