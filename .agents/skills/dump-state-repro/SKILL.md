@@ -90,20 +90,27 @@ story of a stuck session lives minutes back.
 ## Reproducing the dump in a test
 
 The dump is a plain text report, not a JSON of the storage layout. A
-unit test reproduces the behavior in two ways:
+unit test reproduces the behavior in two ways, both shipped in
+`internal/swarm/webserver/dump_parse.go`:
 
-1. **Parse the dump back into view structs** (when the test cares
-   about the visible state): a small parser reads the character, the
-   objects and the walk plan sections into the `state.Snapshot` view
-   types, then the test runs the hunt tick against them. This is the
-   pattern for "the bot should have picked NPC 11085 at distance 73"
-   type assertions.
+1. **Parse the dump back into view structs** (`ParseDump`): a tolerant
+   line-oriented parser reads the character, the objects, the walk
+   plan and the other sections into the `state.Snapshot` view types.
+   Use this when the test asserts on the visible state (the position,
+   the HP, the target id, the walk plan). The parser is the inverse of
+   `BuildStateDump` (dump.go) - the round trip is pinned by
+   `TestParseDumpRoundTrip`.
 
-2. **Rebuild the live state through the Apply API** (when the test
-   cares about the storage invariants): replay the parsed packet
-   fields into a fresh `state.Bot` so the SoA split, the index map and
-   the version counter hold. The `state/*_test.go` helpers already
-   pattern this; the dump narrows which packets to replay.
+2. **Rebuild the live state through the Apply API** (`ApplyDump`):
+   replays the parsed snapshot into a fresh `state.Bot` through the
+   public Apply API (SetCharacter, ApplyUserInfo, ApplyNpcInfo,
+   ApplyStatusUpdate, SetHuntingZone, SetWalkPlan, RecordEvent), so
+   the storage invariants (the SoA split of the world store, the
+   object id index map, the version counter) hold exactly like a live
+   session built them. Use this when the test runs the hunt tick
+   (NearestAttackableConstrained, the target search) against the
+   rebuilt state - the dense hot array and the index map must be real.
+   The storage invariant contract is pinned by `TestApplyDumpEnablesHuntScan`.
 
 ```go
 func TestStuckBotRepro(t *testing.T) {
@@ -111,24 +118,24 @@ func TestStuckBotRepro(t *testing.T) {
     require.NoError(t, err)
 
     // Option A: parse the dump into the view structs.
-    snap := dumpparse.State([]byte(data)) // a small helper
+    snap, err := webserver.ParseDump(string(data))
+    require.NoError(t, err)
     require.Equal(t, "test1", snap.ID)
     require.NotZero(t, snap.Character.TargetID)
 
     // Option B: rebuild the live state through Apply.
     bot := state.NewBot("test1")
-    applyDump(t, bot, data) // a helper that replays the dump fields
-    target, dist := bot.NearestAttackableConstrained(1500, nil, nil, 0, true)
-    require.NotEqual(t, int32(0), target.ObjectID,
-        "expected NPC 11085 at distance %d to be picked", dist)
+    webserver.ApplyDump(bot, snap)
+    target, found := bot.NearestAttackableConstrained(1500, nil, nil, 0, true)
+    require.True(t, found, "the rebuilt bot should find the dumped npc")
 }
 ```
 
-The `applyDump` / `dumpparse.State` helpers do not exist yet in the
-codebase - they are the first thing to add when a dump-driven repro
-lands. Keep them in `internal/swarm/webserver/dump_test.go` or a new
-`internal/swarm/webserver/dump_repro_test.go` so the dump format and
-the parser stay in sync.
+The inventory, the combat events and the chat are view-only
+projections of the live state (they carry presentation fields the
+Apply API does not take), so they stay on the snapshot and do not
+round-trip through the bot. A test that needs them reads them off
+the parsed snapshot directly.
 
 ## What the dump is NOT
 
