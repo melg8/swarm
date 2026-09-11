@@ -37,22 +37,41 @@ source):
 
 ## The strategy
 
-**Rule 1 - value per adena decides every purchase.** The marginal
-value of a purchase is the score gain it brings to the paperdoll
-(the melee fighter scoring: weapon pAtk x attack speed, armor pDef,
-jewel mDef, shield expected block value). The planner picks the
-purchase with the highest `gain / price` first, applies it to a
-virtual paperdoll and repeats. Consequences that match the data:
+**Rule 1 - value per adena decides every purchase, the top tier
+decides every slot.** The marginal value of a purchase is the score
+gain it brings to the paperdoll (the melee fighter scoring: weapon
+pAtk x attack speed, armor pDef, jewel mDef, shield expected block
+value). The planner picks the purchase with the highest `gain / price`
+first, applies it to a virtual paperdoll and repeats. The top-tier
+guard runs before the ranking: within one paperdoll slot the plan
+considers only the best affordable step of the ladder - a strictly
+better affordable candidate on the same slots outdominates every
+cheaper rung whatever its gain per adena, and once the plan has seen
+the top tier the eroding budget of the later picks never pushes an
+intermediate rung in (the slot waits for the next trip instead). The
+trigger case: a bot that sold its replaced 14k weapon re-plans against
+the fresh adena and the empty weapon slot, where the 1k short sword's
+full gain beats the 60k weapon's gain per adena by an order of
+magnitude - the guard makes it buy the 60k weapon directly. The gain
+(the net paperdoll delta with the family clears) is the dominance
+measure, so a two hand weapon only dominates the one hand swords when
+its end state (including the lost shield) is strictly better.
+Consequences that match the data:
 
 - The **empty slot fillers come first**: Apprentice's Shoes are 8
   pDef for 8.05 adena (0.99 pDef per adena) - the single best buy of
   the whole village. Cloth Cap, Short Gloves, Magic Ring follow in
   the 0.18-0.21 range. A fresh character with 100-500 adena fills
-  every slot long before it can afford a real weapon.
-- The **weapon ladder waits for the wallet**: Short Sword (883 with
-  tax) brings 3 pAtk over bare fists - good value once the fillers
-  are done; the Long Sword (156k) only wins when nothing cheaper
-  remains.
+  every slot long before it can afford a real weapon - and every
+  filled slot takes its best affordable piece, not the cheapest one
+  of it (the 9 pDef cloth shoes, not the 8 pDef apprentice's shoes
+  that beat them on value per adena alone).
+- The **weapon ladder waits for the wallet, then takes the top**:
+  Short Sword (883 with tax) brings 3 pAtk over bare fists - the top
+  affordable tier while the wallet is thin; the Gladius class weapons
+  (62k) are bought the moment the adena (the sale proceeds of the
+  replaced weapon included) reaches them, with no 1k sword in
+  between.
 - **Nothing is bought twice** and **nothing the inventory already
   carries is bought** (the free upgrades are simulated first, the
   purchases compare against the paperdoll the auto equipment will
@@ -61,9 +80,10 @@ virtual paperdoll and repeats. Consequences that match the data:
   slots it fills or clears (the family interplay included - a
   two-hander owns both hands, a one-piece owns chest and legs) and the
   later picks skip the candidates that would write into them. The
-  upgrade chains are cut: a rich bot buys ONE weapon (the best value
-  pick), not the knife/short sword/sickle ladder in a single walk, and
-  never two necklaces of which only the better one gets worn. The next
+  upgrade chains are cut: a rich bot buys ONE weapon (the top
+  affordable tier), not the knife/short sword/sickle ladder in a
+  single walk, and never two necklaces of which only the better one
+  gets worn. The next
   trip re-plans against the paperdoll the purchases reached and takes
   the next step - the progression converges over the trips without
   ever paying for a step that ends up in the sale bag instead.

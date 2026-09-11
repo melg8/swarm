@@ -458,7 +458,11 @@ the design goal is per-class and per-region extension):
 - **Shop strategy** (`gear/shopping.go`, `hunt/shopping.go`,
   `docs/shopping_strategy.md`): the greedy value-per-adena planner
   buys the best score gain per adena first (the cheap empty slot
-  fillers beat the weapon upgrades early), never buys what the
+  fillers beat the weapon upgrades early) with the top-tier guard on
+  every slot - the best affordable step of a slot ladder beats its
+  cheaper rungs whatever their value per adena, so the bot that sold
+  its replaced weapon buys the 60k weapon its adena now covers
+  instead of the 1k intermediate sword; it never buys what the
   inventory already carries and respects the adena budget; **one item
   per paperdoll slot per trip** - every purchase marks the slots it
   fills or clears (the family interplay included) and the later picks
