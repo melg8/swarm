@@ -55,8 +55,6 @@ const (
 
 // spotMetric accumulates the session experience of one spot.
 type spotMetric struct {
-	// visits counts the completed hunting stays at the spot.
-	visits int
 	// activeMin is the total hunting time spent at the spot
 	// (minutes, rest included, town trips excluded).
 	activeMin float64
@@ -124,7 +122,9 @@ type spotHub struct {
 
 // globalSpotHub is the process wide spot occupancy registry: all bot
 // sessions of the swarm share it.
-var globalSpotHub = &spotHub{hunters: make(map[string]int)}
+var globalSpotHub = &spotHub{ //nolint:exhaustruct_v5 // mu is zero
+	hunters: make(map[string]int),
+}
 
 // enter claims the spot for a hunter: the occupancy of the spot
 // grows by one. Returns the leave function that releases the claim.
@@ -223,7 +223,9 @@ func (h *spotHunter) spotValue(spot *Spot, metric *spotMetric) float64 {
 // death per hour already costs a third of the score. This replaces
 // the MinGear gate: an undergeared character dies, the deaths heat
 // the spot, the picker moves it away.
-func (h *spotHunter) spotSafety(spot *Spot, metric *spotMetric, now time.Time) float64 {
+func (h *spotHunter) spotSafety(
+	spot *Spot, metric *spotMetric, now time.Time,
+) float64 {
 	var mass float64
 	for index := range spot.Mobs {
 		mass += float64(spot.Mobs[index].Count)

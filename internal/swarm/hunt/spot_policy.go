@@ -126,7 +126,7 @@ type spotHunter struct {
 
 // newSpotHunter creates the spot mode state for a registry.
 func newSpotHunter(spots []Spot, hub *spotHub) *spotHunter {
-	hunter := &spotHunter{
+	hunter := &spotHunter{ //nolint:exhaustruct_v5 // session fields start zero
 		spots:        spots,
 		picked:       -1,
 		hub:          hub,
@@ -557,7 +557,7 @@ func (h *spotHunter) accumulate(l *Loop, now time.Time) {
 // rotation: only a targetless, healthy, in-leash, central engage
 // phase reads the emptiness at all - running fights, resting walks
 // and town trips never rotate.
-func (h *spotHunter) waitOrMove(l *Loop, now time.Time) { //nolint:cyclop,funlen
+func (h *spotHunter) waitOrMove(l *Loop, now time.Time) {
 	if l.phase != phaseEngage || l.target != 0 || l.tripActive() ||
 		l.tracker.SelfUnderAttack() || l.tracker.SelfSitting() ||
 		!l.inZoneSelf() {
@@ -796,6 +796,7 @@ func (h *spotHunter) publishView(l *Loop, now time.Time) {
 			spot.ID, now); ok {
 			next = int32(eta.Seconds())
 		}
+		//nolint:exhaustruct_v5 // Deaths/KillX set below
 		view := state.ZoneView{
 			ID: spot.ID, Name: spot.Name, Region: spot.Region,
 			MinLevel: spot.MinLevel, MaxLevel: spot.MaxLevel,
@@ -830,6 +831,7 @@ func (h *spotHunter) publishView(l *Loop, now time.Time) {
 	marks := make([]state.KillMarkView, 0, len(h.kills))
 	for index := range h.kills {
 		kill := &h.kills[index]
+		//nolint:exhaustruct_v5 // BotID stays 0
 		marks = append(marks, state.KillMarkView{
 			X: kill.x, Y: kill.y, AtMs: kill.at.UnixMilli(),
 		})

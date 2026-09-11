@@ -114,17 +114,17 @@ func TestFindPathFailsOnAFabricatedGoalHeight(t *testing.T) {
 	targetX, targetY := 1000, 1000
 	for dx := -1; dx <= 1; dx++ {
 		for dy := -1; dy <= 1; dy++ {
-			spec.setCell(targetX+dx, targetY+dy, closedWalls(0))
+			spec.setCell(targetX+dx, targetY+dy, closedWalls())
 		}
 	}
 	// A wall ring seals the playground: the reachable world stays
 	// small so the starved search exhausts fast instead of burning
 	// the expansion cap.
 	for x := 950; x <= 1050; x++ {
-		spec.setCell(x, 950, closedWalls(0))
-		spec.setCell(x, 1050, closedWalls(0))
-		spec.setCell(950, x, closedWalls(0))
-		spec.setCell(1050, x, closedWalls(0))
+		spec.setCell(x, 950, closedWalls())
+		spec.setCell(x, 1050, closedWalls())
+		spec.setCell(950, x, closedWalls())
+		spec.setCell(1050, x, closedWalls())
 	}
 	engine := newTestEngine(t, spec)
 	start := worldOf(960, 960, 0)

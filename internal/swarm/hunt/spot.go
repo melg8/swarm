@@ -110,20 +110,6 @@ func spotDistance(spot Spot, x int32, y int32) float64 {
 	return math.Hypot(float64(spot.AnchorX-x), float64(spot.AnchorY-y))
 }
 
-// spotByID resolves a spot of the registry by its id.
-func spotByID(spots []Spot, id string) (Spot, bool) {
-	if id == "" {
-		return Spot{}, false
-	}
-	for index := range spots {
-		if spots[index].ID == id {
-			return spots[index], true
-		}
-	}
-
-	return Spot{}, false
-}
-
 // spotWindowMass returns the expected population of the spot inside
 // the white-green window [max(1, level-5), level]: the mobs a few
 // levels below the character drop full loot without any exp or adena

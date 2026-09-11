@@ -53,8 +53,8 @@ func TestSteerClearDeflectsLegAroundCamp(t *testing.T) {
 	// The deflected endpoint clears the trigger circle: at least the
 	// aggro range (450) plus the clearance margin (150) away from the
 	// camp mob, planar.
-	clear := math.Hypot(float64(toX-45500), float64(toY-50000))
-	require.GreaterOrEqual(t, clear, 600.0)
+	clearance := math.Hypot(float64(toX-45500), float64(toY-50000))
+	require.GreaterOrEqual(t, clearance, 600.0)
 	// The bend leaves the original line: the endpoint moved sideways,
 	// not just shortened along the leg.
 	require.NotEqual(t, 50000, toY)
@@ -173,8 +173,8 @@ func TestTownWalkSteersAroundCamp(t *testing.T) {
 	walk := game.walks[0]
 	require.NotEqual(t, int32(50000), walk[1],
 		"the issued walk bends off the camp line")
-	clear := math.Hypot(float64(walk[0]-45500), float64(walk[1]-50000))
-	require.GreaterOrEqual(t, clear, 600.0)
+	clearance := math.Hypot(float64(walk[0]-45500), float64(walk[1]-50000))
+	require.GreaterOrEqual(t, clearance, 600.0)
 }
 
 // TestZoneLegSteersAroundCamp pins the steering inside the direct
@@ -190,8 +190,8 @@ func TestZoneLegSteersAroundCamp(t *testing.T) {
 	require.Len(t, game.walks, 1)
 	walk := game.walks[0]
 	require.NotEqual(t, int32(50000), walk[1])
-	clear := math.Hypot(float64(walk[0]-45400), float64(walk[1]-50000))
-	require.GreaterOrEqual(t, clear, 600.0)
+	clearance := math.Hypot(float64(walk[0]-45400), float64(walk[1]-50000))
+	require.GreaterOrEqual(t, clearance, 600.0)
 }
 
 // TestSteerRidesTheTangentOfTheCircle pins the tangent construction:

@@ -176,7 +176,7 @@ func TestSpotWindowHelpers(t *testing.T) {
 		},
 	}
 	// The white-green window [L-5, L] for level 10: mid only.
-	require.Equal(t, 5.0, spotWindowMass(spot, 10))
+	require.InDelta(t, 5.0, spotWindowMass(spot, 10), 0.0001)
 	// The wide eligibility window [L-8, L+2]: mid and high.
 	require.True(t, spotEligible(spot, 10))
 	require.False(t, spotEligible(spot, 22))
@@ -271,7 +271,7 @@ func TestSpotKillPredictionOverlay(t *testing.T) {
 	metric := &hunter.metrics[hunter.picked]
 	require.Equal(t, 1, metric.visitKills)
 	require.True(t, metric.killPosKnown)
-	require.Equal(t, float64(46912), metric.killX)
+	require.InDelta(t, float64(46912), metric.killX, 0.5)
 }
 
 func TestSpotWaitsForPredictedRespawn(t *testing.T) {
@@ -292,7 +292,7 @@ func TestSpotWaitsForPredictedRespawn(t *testing.T) {
 	bot.ApplyStatusUpdate(7001, []state.Attribute{
 		{ID: state.AttrCurHP, Value: 0},
 	})
-	for tick := 0; tick < 6; tick++ {
+	for range 6 {
 		loop.tick()
 	}
 	require.Equal(t, "test-home", loop.zonePickedID)
@@ -380,7 +380,7 @@ func TestSpotAccumulateAttributesAdena(t *testing.T) {
 	// The fold closes the visit into the totals.
 	hunter.foldVisit(hunter.picked)
 	require.Equal(t, int64(900), metric.adena)
-	require.Equal(t, 2.0/60.0, metric.activeMin, 0.001)
+	require.InDelta(t, 2.0/60.0, metric.activeMin, 0.0001)
 }
 
 func TestSpotViewCarriesTheEconomy(t *testing.T) {

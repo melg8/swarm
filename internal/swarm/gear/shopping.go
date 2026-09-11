@@ -223,13 +223,18 @@ func PlanPurchaseQueue(
 // guard stands down and the weapon value gate opens (see
 // shopStrategy.wishlist), so the progression the widget shows never
 // collapses into a lone milestone.
+//
+// The budget gate, the pick loop and the wishlist tail are one
+// decision tree; splitting them hurts the read flow.
+//
+//nolint:cyclop,funlen // the budget gate, the pick loop and the wishlist tail
 func planPurchases(
 	profile Profile, equipment Equipment, catalog Catalog, adena int64,
 	level int32, tail int,
 ) []Purchase {
 	virtual := SimulateInventory(profile, equipment)
 	candidates := catalogCandidates(profile, catalog)
-	strategy := &shopStrategy{
+	strategy := &shopStrategy{ //nolint:exhaustruct_v5 // wishlist starts false
 		level:         level,
 		floorIDs:      cachedCheapestJewelIDs(profile, catalog, candidates),
 		armorFloorIDs: cachedCheapestArmorIDs(profile, catalog, candidates),
@@ -348,6 +353,11 @@ type shopStrategy struct {
 // is eligible - the strategy never buys a worse value weapon just
 // because it is cheaper, the wallet saves for the milestone), the
 // defense by the raw gain (the maximum defense per buy).
+//
+// The category switch and the slot guards form one classification
+// matrix; splitting them hides the decision.
+//
+//nolint:cyclop
 func (s *shopStrategy) classify(
 	view walkView, candidate *purchaseCandidate, gain float64,
 ) (int, float64, bool) {

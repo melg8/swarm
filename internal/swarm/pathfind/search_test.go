@@ -22,8 +22,8 @@ func newTestEngine(t *testing.T, spec *regionSpec) *Engine {
 }
 
 // closedWalls is the layer of an impassable cell (every wall closed).
-func closedWalls(height int16) Layer {
-	return Layer{Height: height, NSWE: 0}
+func closedWalls() Layer {
+	return Layer{Height: 0, NSWE: 0}
 }
 
 // wallOnlyLayer keeps only the north and south walls open, closing the
@@ -131,7 +131,7 @@ func TestFindPathEnclosedTarget(t *testing.T) {
 			if dx == 0 && dy == 0 {
 				continue
 			}
-			spec.setCell(targetX+dx, targetY+dy, closedWalls(0))
+			spec.setCell(targetX+dx, targetY+dy, closedWalls())
 		}
 	}
 	engine := newTestEngine(t, spec)
@@ -327,7 +327,7 @@ func TestFindPathApproachRadius(t *testing.T) {
 	targetX, targetY := 1000, 1000
 	for dx := -1; dx <= 1; dx++ {
 		for dy := -1; dy <= 1; dy++ {
-			spec.setCell(targetX+dx, targetY+dy, closedWalls(0))
+			spec.setCell(targetX+dx, targetY+dy, closedWalls())
 		}
 	}
 	engine := newTestEngine(t, spec)

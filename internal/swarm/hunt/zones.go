@@ -743,7 +743,7 @@ func (l *Loop) publishZoneView() {
 	}
 	views := make([]state.ZoneView, 0, len(l.zones))
 	for _, zone := range l.zones {
-		views = append(views, state.ZoneView{
+		views = append(views, state.ZoneView{ //nolint:exhaustruct_v5 // legacy zone
 			ID:       zone.ID,
 			Name:     zone.Name,
 			Region:   zone.Region,

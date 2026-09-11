@@ -363,8 +363,8 @@ func TestSnapshotCarriesClanAndClampedAggro(t *testing.T) {
 	require.Len(t, objects, 1)
 	viewed, ok := objects[0].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, float64(450), viewed["aggroRange"])
-	require.Equal(t, float64(300), viewed["clanHelpRange"])
+	require.InDelta(t, float64(450), viewed["aggroRange"], 0.5)
+	require.InDelta(t, float64(300), viewed["clanHelpRange"], 0.5)
 	// The mask rides the wire as a decimal string: the ALL bit of the
 	// top exceeds the safe integer range of JavaScript.
 	mask, ok := viewed["clanMask"].(string)

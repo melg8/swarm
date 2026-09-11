@@ -445,7 +445,7 @@ type Bot struct {
 
 // NewBot creates a bot tracker for the given session id (account name).
 func NewBot(id string) *Bot {
-	return &Bot{
+	return &Bot{ //nolint:exhaustruct_v5 // killMarks starts nil
 		mu:                 sync.RWMutex{},
 		id:                 id,
 		status:             StatusConnecting,

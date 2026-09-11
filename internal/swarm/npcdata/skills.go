@@ -132,6 +132,7 @@ func ClassCastsMagic(classID int32) bool {
 			continue
 		}
 		cast, castOK := SkillCastOf(lesson.SkillID)
+		//nolint:goconst // ONE is a generated string literal in skill_trees.go
 		if castOK && cast.Magic && cast.Operate == "A1" &&
 			cast.Target == "ONE" {
 			return true

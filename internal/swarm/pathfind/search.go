@@ -607,6 +607,10 @@ func (s *search) canStep(from, to *node) bool {
 // smoothed plan climbed the plaza wall through the corner the terrace
 // deck had walled off, every click came back ActionFailed and the
 // distance collapsed to zero).
+//
+// The 8 directional wall checks mirror the server anti corner cut.
+//
+//nolint:cyclop
 func (s *search) wallsOpen(from, to *node) bool {
 	if from.coords.Y > to.coords.Y && !from.layer.IsNorthOpen() {
 		return false

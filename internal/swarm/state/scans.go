@@ -427,6 +427,8 @@ func (b *Bot) NearestAttackablePreferredWindowed(
 // level window [minLevel, maxLevel] fences the worthless and the
 // deadly mobs out (zero bound = disabled, an unresolved template
 // passes).
+//
+//nolint:cyclop // the zone, level, social and priority filters are one scan
 func (b *Bot) nearestAttackable(
 	maxDistance float64, zone *Zone, skip []int32,
 	minLevel int32, maxLevel int32, avoidSocial bool,

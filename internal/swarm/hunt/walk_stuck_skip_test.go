@@ -119,7 +119,7 @@ func TestWalkStuckRepathsAfterAllWaypointsSkipped(t *testing.T) {
 		"the re-plan must reset the follower cursor")
 	require.False(t, loop.stuckFast,
 		"the re-plan must clear the fast stuck flag")
-	require.Greater(t, nav.calls, 0,
+	require.Positive(t, nav.calls,
 		"the re-plan must call the navigator")
 }
 

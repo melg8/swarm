@@ -807,6 +807,8 @@ func appendZoneViewsJSON(dst []byte, zones []ZoneView) []byte {
 
 // appendZoneViewJSON writes one zone registry entry of the map view.
 // The live state encoder reuses it with the stored view directly.
+//
+//nolint:funlen // wire-format encoder: one statement per field
 func appendZoneViewJSON(dst []byte, zone ZoneView) []byte {
 	dst = append(dst, `{"id":`...)
 	dst = appendJSONString(dst, zone.ID)
