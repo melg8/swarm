@@ -1726,3 +1726,29 @@ without growing the per-object cost.
   snapshots without diagnostics. go build, go vet, go test ./... (15
   packages) green. Next: the AGENTS.md documentation and the live
   stack verification.
+- 2026-09-11: the phase gating and the documentation. The live run
+  showed the residual stuckAt/tripStart stamps leaking misleading
+  ages into the engage phase report (a stuckForMs of 28 s while
+  hunting): Loop.diagnostics now carries the stuck watchdog age and
+  the trip clock only in the walking phases (Loop.walkPhase for the
+  stuck age, tripActive plus the delevel guard walk for the trip
+  age), the hunt phases report zero. The AGENTS.md web interface
+  section documents the diagnostics contract: the field families,
+  the hunt publication, the NoteAction decision routing, the
+  seconds flooring of the ages and the zero-never semantics.
+- 2026-09-11: task wrap up. The live verification on the deployed
+  stack: the bot hunted, looted and equipped gear while the dump
+  showed the full report - phase for 11 s, the packet rate 6.3/s,
+  the fighting target with its engagement age, under attack with
+  the attacker count, the known list summary (32 npcs, 1 loot, 0
+  dead), the hunt heartbeat fresh, the last action ("equipping
+  Cloth Shoes into the empty feet slot") and the decision history
+  riding the events array (the target died/loot/equip lines between
+  the packet events). tools/mobius_e2e.sh 45 printed E2E_OK. All
+  acceptance criteria met: the golden reflection and live parity
+  suites stay green with the new section, every diagnostics field
+  family has its unit tests, the build, vet, the full test suite
+  (15 packages) and the lint of the touched packages are clean, and
+  the live report answers the stuck bot questions (is the socket
+  alive, is the loop ticking, how long in this phase, what did it
+  decide last) straight from GET /api/bots/{id}/state.

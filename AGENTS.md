@@ -931,6 +931,38 @@ the same variables).
   snapshot), `GET /api/bots/{id}/events` (SSE stream that pushes a
   snapshot whenever the bot state version changes), `GET /` and the
   static assets.
+- Dump state diagnostics: the snapshot ends with a `diagnostics`
+  section - the report payload for stuck or misbehaving bots on a
+  live server (`state/diagnostics.go`). The liveness half is computed
+  by the encoders from the live state: `phaseForMs` (the age of the
+  current hunt phase, `SetPhase` stamps it - a phase age of minutes
+  is the top stuck signature), `updatedAgoMs` (the age of the last
+  state change, the session start while nothing changed yet),
+  `packetsPerSecond` (the 10 second window `CountPacket` feeds), the
+  `loginCooldownMs` remainder of an emergency logout, the combat
+  nuance (`autoAttacking`, `fightingTargetId`, `combatActiveAgoMs`,
+  `lastHitAgoMs`, `underAttack`, the `attackerCount` tally of the
+  object walk), the walk freshness (`walkFresh` exposes the stale
+  moving flag of a lost stop packet with its `moveAgoMs`) and the
+  `objects` summary (npc/player/item/dead counts, collected during
+  the object walk without a second pass). The `hunt` subview carries
+  the internals the hunt loop publishes every tick
+  (`Loop.diagnostics` through `SetHuntDiagnostics`: the target and
+  its engagement age, the active skip count of both skip maps, the
+  no-target patience, the re-path count, the stuck watchdog age, the
+  waypoints left, the trip and flee episode ages, the buy retries)
+  plus the tracker owned `lastAction` with its age and the
+  `tickAgoMs` loop heartbeat (a growing value means the loop
+  goroutine stopped ticking while the session stays online). The
+  hunt decision log lines route through `Loop.logf`: they print on
+  the console logger and land in the tracker event log
+  (`Bot.NoteAction`), so the dump `events` array carries the
+  decision history of the session. Age values floor to whole seconds
+  through `state.AgeMs` (0 means the reference never happened, not
+  now); the diagnostics publication never bumps the state version -
+  the values ride the snapshots the packet traffic drives. The web
+  UI footer, the activity banner and the log tab colors read the
+  same section.
 - Snapshot encoding: the state endpoint and the SSE stream serialize
   the bot state through the direct live encoder
   (`state.Bot.AppendSnapshotJSON`, see `state/snapshot_live.go`): it
