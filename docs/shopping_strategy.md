@@ -125,6 +125,29 @@ Supporting rules that survived the rework unchanged:
   trip re-plans against the paperdoll the purchases reached and takes
   the next step - the progression converges over the trips without
   ever paying for a step that ends up in the sale bag instead.
+- **The frozen trip plan** (the 2026-09-11 two pairs of gloves
+  report): the trip plans ONCE at its start
+  (`maybeStartTownTrip` -> `Loop.tripPlan`) and everything after
+  reads that frozen plan - the sell first step banks exactly its
+  SellFirst pieces, the stop planning distributes exactly its
+  purchases, and nothing re-plans in between. The re-planning shop
+  this replaces computed the replacements against the trip start
+  state and the buys against the freed slots and the fresh adena -
+  the two plans drifted and both failure modes fired at once: the
+  re-plan re-bought the Apprentice's Shoes the trip had just sold
+  (the armor floor pulled the cheapest piece into the emptied feet
+  slot, blocking the planned Low Boots upgrade) and it planned the
+  Leather Gloves whose displaced Gloves were never queued for the
+  sale (the replacement phase had already run) - the bot walked home
+  wearing the new gloves with the old pair in the bag. The frozen
+  plan makes the manager know exactly what and how much this trip
+  buys before it walks, and the buy execution waits for every
+  request's inventory confirmation as before. One honest guard
+  remains at the execution point: a purchase whose item id the
+  inventory already carries (a loot drop the auto equipment wore mid
+  trip, a manual user purchase) drops out of the stop before any
+  request goes out (`dropOwnedPurchases`) - a second copy is never
+  part of the plan.
 - **The top-tier slot guard** (the 2026-09-11 sold-weapon round):
   within the upgrade phases the guard records the best viable gain
   per paperdoll slot (the scan runs in the score descending order,
@@ -143,19 +166,20 @@ Supporting rules that survived the rework unchanged:
 
 **Rule 2 - buy at the town trip, sell first - and sell everything.**
 The purchases run inside the town trips the loop already makes: the
-junk selling frees the slots and the adena first, the purchase plan is
-recomputed with the fresh numbers, then the bot walks to every
-merchant of the plan (buy groups order by walking distance; a group of
-the merchant the character already stands at buys without an extra
-walk). A trip is worth it when the plan totals at least 100 adena -
-below that the walking time costs more than the gains. **Every vendor
-visit sells the whole accumulated junk, not only past the 50 percent
-inventory trigger**: the selling ends when nothing sellable is left,
-so a buy trip never leaves the bag half full of sellable drops (the
-bot would farm with them and walk back for the sale later otherwise).
-A trip also never interrupts a running fight: it waits for the kill,
-the loot pickup and the between-fights window, because the drops of
-the kill are the point of the fight.
+trip FREEZES its purchase plan once at the start (see the frozen trip
+plan rule below), the junk selling frees the slots and banks the
+sale credits the plan counted on, then the bot walks to every
+merchant of the frozen plan (buy groups order by walking distance; a
+group of the merchant the character already stands at buys without
+an extra walk). A trip is worth it when the plan totals at least 100
+adena - below that the walking time costs more than the gains.
+**Every vendor visit sells the whole accumulated junk, not only past
+the 50 percent inventory trigger**: the selling ends when nothing
+sellable is left, so a buy trip never leaves the bag half full of
+sellable drops (the bot would farm with them and walk back for the
+sale later otherwise). A trip also never interrupts a running fight:
+it waits for the kill, the loot pickup and the between-fights window,
+because the drops of the kill are the point of the fight.
 
 **Rule 2a - the weapon outranks the trip itself (the 2026-09-11
 bare-handed report).** The weapon purchase is the highest priority of

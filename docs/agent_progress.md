@@ -78,11 +78,47 @@ sold-weapon re-buy round (build f3b868e).
   go build ./..., go vet ./..., the full go test suite, gofmt -l and
   golangci-lint (the hunt package) stay clean.
 
-### Status: in progress (2026-09-11)
+### Progress
 
-- Next: the frozen plan implementation (the field, the freeze, the
-  frozen reads, the owned purchase filter, the honest stop logs),
-  the dump replay regression test, the docs.
+- 2026-09-11, commit "shop: the trip freezes its purchase plan and
+  executes it verbatim": the `Loop.tripPlan` field (frozen once in
+  `maybeStartTownTrip` before the weapon routing), the frozen reads
+  in `replacementTargets` / `planShoppingStops` /
+  `weaponStopMerchant`, the `dropOwnedPurchases` guard of
+  `tickStopShopping`, the honest per-stop log of `enterSellPhase`,
+  the trip reason naming the frozen plan's worth, the trip end and
+  death reset clearing the plan. Tests:
+  `TestTripPlanFreezesPurchasesAgainstResale` replays the dump trip
+  end to end (the frozen plan worth 69999, the sword and the shoes
+  sold in the plan order, the stops carrying exactly the frozen
+  plan, the Brandish bought from Unoren);
+  `TestStopShoppingSkipsOwnedItems` pins the owned purchase filter;
+  `TestPlanShoppingStopsMergesCurrentMerchant` and
+  `TestReplacementSalesSellBeforeBuy` freeze the plan explicitly
+  now. Verified: go build ./..., go vet ./..., the full go test
+  suite green (19 packages), gofmt -l clean, golangci-lint 0 issues
+  on the hunt package.
+
+### Status: done (2026-09-11)
+
+- The shop manager plans once per trip: the plan the trigger armed
+  with is the plan the sell first step banks and the buy stops
+  execute - nothing re-plans in between, every request waits for its
+  inventory confirmation (the manager waits for the bot's
+  implementation on the spot).
+- The two pairs of gloves round cannot recur: the sold piece is
+  never re-bought (the stops carry the frozen plan) and no purchase
+  appears without its queued sale (the SellFirst union of the frozen
+  plan is exactly what the replacement step sells); a second copy of
+  an owned item is filtered out at the execution point.
+- The dump numbers are pinned by the regression test: the frozen
+  plan worth 69999 ([Brandish 62214 + Low Boots 7785], the
+  replacements [sword, shoes]) against the reconstructed 71420
+  adena state.
+- All the checks green: go build ./..., go vet ./..., the full go
+  test suite (19 packages), gofmt -l, golangci-lint (0 issues on the
+  hunt package; the two pre-existing findings of the acceptance
+  package predate this task).
 
 ## Active task: the port of the shop planner top-tier guard from feature/acceptance (2026-09-11)
 
