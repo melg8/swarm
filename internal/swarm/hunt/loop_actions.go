@@ -35,7 +35,7 @@ func (l *Loop) rest() {
 	case hp < sitDownHealthPercent:
 		wantSit = true
 	default:
-		l.logger.Printf("Hunt: resting, HP %.0f%% below %.0f%%",
+		l.logf("Hunt: resting, HP %.0f%% below %.0f%%",
 			hp, reengageHealthPercent)
 
 		return
@@ -53,13 +53,13 @@ func (l *Loop) rest() {
 		}
 	}
 	if wantSit {
-		l.logger.Printf("Hunt: HP %.0f%% below %.0f%%, sitting down to regenerate",
+		l.logf("Hunt: HP %.0f%% below %.0f%%, sitting down to regenerate",
 			hp, sitDownHealthPercent)
 	} else {
-		l.logger.Printf("Hunt: HP %.0f%% recovered, standing up", hp)
+		l.logf("Hunt: HP %.0f%% recovered, standing up", hp)
 	}
 	if err := l.game.ActionSitStand(); err != nil {
-		l.logger.Printf("Hunt: sit/stand action failed: %v", err)
+		l.logf("Hunt: sit/stand action failed: %v", err)
 
 		return
 	}
@@ -92,7 +92,7 @@ func (l *Loop) loot() {
 		// unreachable. Skip it for a while and try the next one.
 		l.skipped[item.ObjectID] = now.Add(pickupRetryDelay)
 		l.lootID = 0
-		l.logger.Printf("Hunt: pickup of %d timed out, skipping", item.ObjectID)
+		l.logf("Hunt: pickup of %d timed out, skipping", item.ObjectID)
 
 		return
 	}
@@ -107,13 +107,13 @@ func (l *Loop) loot() {
 	l.lootMoveAt = now
 	if dist > lootApproachRadius {
 		if err := l.game.WalkTo(item.X, item.Y, item.Z); err != nil {
-			l.logger.Printf("Hunt: walk to loot failed: %v", err)
+			l.logf("Hunt: walk to loot failed: %v", err)
 		}
 
 		return
 	}
 	if err := l.game.PickupItem(item); err != nil {
-		l.logger.Printf("Hunt: pickup failed: %v", err)
+		l.logf("Hunt: pickup failed: %v", err)
 	}
 }
 
@@ -129,12 +129,12 @@ func (l *Loop) cleanupInventory() {
 	if len(junk) == 0 {
 		return
 	}
-	l.logger.Printf("Hunt: inventory at %d slots and %.0f%% weight, "+
+	l.logf("Hunt: inventory at %d slots and %.0f%% weight, "+
 		"destroying %d items", stats.Slots, stats.WeightPercent, len(junk))
 	for _, item := range junk {
 		err := l.game.DestroyItem(item.ObjectID, item.Count)
 		if err != nil {
-			l.logger.Printf("Hunt: destroy failed: %v", err)
+			l.logf("Hunt: destroy failed: %v", err)
 
 			return
 		}

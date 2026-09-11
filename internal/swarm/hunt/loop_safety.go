@@ -19,7 +19,7 @@ import (
 // must not re-select it), the pending engage bookkeeping clears and
 // the shared threat walk runs.
 func (l *Loop) fleeFromTarget(targetID int32, now time.Time) {
-	l.logger.Printf("Hunt: HP %.0f%%, fleeing the fight with %d",
+	l.logf("Hunt: HP %.0f%%, fleeing the fight with %d",
 		l.tracker.SelfHealthPercent(), targetID)
 	l.target = 0
 	l.engageAt = time.Time{}
@@ -51,7 +51,7 @@ func (l *Loop) fleeFromThreat(now time.Time) {
 		// character running forever, the session ends and the
 		// login cooldown resets the aggro while the character
 		// regenerates sitting.
-		l.logger.Printf("Hunt: fleeing for %.0fs without shaking "+
+		l.logf("Hunt: fleeing for %.0fs without shaking "+
 			"the chase, resetting the aggro via logout",
 			now.Sub(l.fleeSince).Seconds())
 		l.emergencyLogout()
@@ -68,7 +68,7 @@ func (l *Loop) fleeFromThreat(now time.Time) {
 		return
 	}
 	if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
-		l.logger.Printf("Hunt: escape walk failed: %v", err)
+		l.logf("Hunt: escape walk failed: %v", err)
 	}
 }
 
@@ -145,16 +145,16 @@ func (l *Loop) emergencyLogout() {
 	if count := l.tracker.SelfAttackerCount(); count >= panicLogoutAttackers {
 		reason = fmt.Sprintf("%d mobs piled on us", count)
 	}
-	l.logger.Printf("Hunt: %s, emergency logout for %s",
+	l.logf("Hunt: %s, emergency logout for %s",
 		reason, panicLogoutPause)
 	if moveX, moveY, moveZ, ok := l.escapeWalkDestination(); ok {
 		if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
-			l.logger.Printf("Hunt: escape walk failed: %v", err)
+			l.logf("Hunt: escape walk failed: %v", err)
 		}
 	}
 	l.tracker.SetLoginCooldown(panicLogoutPause)
 	if err := l.game.RequestLogout(); err != nil {
-		l.logger.Printf("Hunt: logout request failed: %v", err)
+		l.logf("Hunt: logout request failed: %v", err)
 	}
 }
 

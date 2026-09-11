@@ -1688,3 +1688,22 @@ without growing the per-object cost.
   HEAD with the local golangci-lint 2.6.2 - linter version drift,
   not this change). Next: the hunt loop publication and the log
   routing.
+- 2026-09-11: the hunt loop publication. A new
+  internal/swarm/hunt/loop_diagnostics.go adds Loop.diagnostics (the
+  internals report: the target, the engagement age, the active skip
+  count of both skip maps, the no-target patience age, the re-path
+  count, the stuck watchdog age, the waypoints left of the manual or
+  geodata plan, the trip and flee episode ages, the buy retries)
+  published through the extended tick defer together with the phase.
+  The 118 loop decision log lines now route through Loop.logf: the
+  message still prints on the console logger and additionally lands
+  in the tracker event log (Bot.NoteAction), so the dump events
+  array carries the decision history of the session - the WHY a
+  stuck bot report needs. Tests: the per tick publication (target,
+  ages, heartbeat, phase age), the stale server side selection skip
+  flow (the skip count and the "does not engage" line in the event
+  log and the last action), the death decision routing, the age
+  references and the per phase waypoint counting. go build, go vet,
+  go test ./... green; golangci-lint clean in hunt and state (the
+  remaining gosec G602 findings in zones_test.go reproduce on the
+  untouched HEAD). Next: the web UI surfaces.

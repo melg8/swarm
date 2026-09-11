@@ -184,7 +184,7 @@ func (l *Loop) startDelevel() {
 	l.delevelCounted = false
 	l.waypoints = nil
 	l.phase = phaseDelevel
-	l.logger.Printf("Hunt: level %d is too high for level %d mobs, "+
+	l.logf("Hunt: level %d is too high for level %d mobs, "+
 		"deleveling to %d at the town guards", l.tracker.SelfLevel(),
 		median, target)
 }
@@ -244,7 +244,7 @@ func (l *Loop) planDelevelWalk() {
 
 		return
 	}
-	l.logger.Printf("Hunt: walking to the guard " + guard.Name)
+	l.logf("Hunt: walking to the guard " + guard.Name)
 }
 
 // nearestDelevelGuard returns the guard closest to the character,
@@ -306,7 +306,7 @@ func (l *Loop) fightDelevelGuard(now time.Time) { //nolint:cyclop
 		}
 		l.delevelGuard = guard.ObjectID
 		l.delevelFight = now
-		l.logger.Printf("Hunt: provoking the guard " + guard.Name)
+		l.logf("Hunt: provoking the guard " + guard.Name)
 	}
 	x, y, z, ok := l.tracker.ObjectPosition(l.delevelGuard)
 	if !ok {
@@ -341,7 +341,7 @@ func (l *Loop) fightDelevelGuard(now time.Time) { //nolint:cyclop
 		// Mobius isInsidePeaceZone only guards playable versus
 		// playable combat, guards swing at players anywhere.
 		guardName := l.tracker.ObjectName(l.delevelGuard)
-		l.logger.Printf("Hunt: the guard %s does not attack, trying "+
+		l.logf("Hunt: the guard %s does not attack, trying "+
 			"the next one (%d of %d)", guardName, l.rePaths,
 			maxRePaths)
 		l.delevelGuard = 0
@@ -360,7 +360,7 @@ func (l *Loop) fightDelevelGuard(now time.Time) { //nolint:cyclop
 	}
 	l.lastHit = now
 	if err := l.game.AttackTarget(l.delevelGuard); err != nil {
-		l.logger.Printf("Hunt: guard attack failed: %v", err)
+		l.logf("Hunt: guard attack failed: %v", err)
 	}
 }
 
@@ -388,7 +388,7 @@ func (l *Loop) noteDelevelDeath() {
 		return
 	}
 	l.delevelFree++
-	l.logger.Printf("Hunt: delevel death %d removed no experience",
+	l.logf("Hunt: delevel death %d removed no experience",
 		l.delevelFree)
 }
 
@@ -399,7 +399,7 @@ func (l *Loop) finishDelevel() {
 	l.delevelEnd = time.Now()
 	l.delevelTarget = 0
 	l.delevelGuard = 0
-	l.logger.Printf("Hunt: delevel finished at level %d, walking back",
+	l.logf("Hunt: delevel finished at level %d, walking back",
 		l.tracker.SelfLevel())
 	l.startDelevelReturnLeg()
 }
@@ -413,7 +413,7 @@ func (l *Loop) abortDelevel(reason string) {
 	l.delevelEnd = time.Now()
 	l.delevelTarget = 0
 	l.delevelGuard = 0
-	l.logger.Printf("Hunt: delevel aborted: " + reason)
+	l.logf("Hunt: delevel aborted: " + reason)
 	l.startDelevelReturnLeg()
 }
 

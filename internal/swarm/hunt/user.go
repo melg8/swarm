@@ -113,7 +113,7 @@ func (l *Loop) gateInventoryCommand(cmd state.Command) bool {
 		return false
 	}
 	l.userDeferred = append(l.userDeferred, cmd)
-	l.logger.Printf("Hunt: user command %q waits for the item pace",
+	l.logf("Hunt: user command %q waits for the item pace",
 		cmd.Kind)
 
 	return true
@@ -166,7 +166,7 @@ func (l *Loop) applyUserCommand(cmd state.Command) {
 	case state.CommandMove, state.CommandAttack, state.CommandPickup:
 		l.userMovement(cmd)
 	default:
-		l.logger.Printf("Hunt: unknown user command %q", cmd.Kind)
+		l.logf("Hunt: unknown user command %q", cmd.Kind)
 	}
 }
 
@@ -196,10 +196,10 @@ func (l *Loop) userUseItem(cmd state.Command) {
 	if cmd.ObjectID == 0 {
 		return
 	}
-	l.logger.Printf("Hunt: user command: use item %d", cmd.ObjectID)
+	l.logf("Hunt: user command: use item %d", cmd.ObjectID)
 	l.markInventoryAction(cmd.ObjectID)
 	if err := l.game.UseItem(cmd.ObjectID); err != nil {
-		l.logger.Printf("Hunt: use item failed: %v", err)
+		l.logf("Hunt: use item failed: %v", err)
 	}
 }
 
@@ -212,15 +212,15 @@ func (l *Loop) userDrop(cmd state.Command) {
 	}
 	x, y, z, ok := l.tracker.SelfPosition()
 	if !ok {
-		l.logger.Printf("Hunt: user command: drop failed: no self position")
+		l.logf("Hunt: user command: drop failed: no self position")
 
 		return
 	}
-	l.logger.Printf("Hunt: user command: drop %d of item %d",
+	l.logf("Hunt: user command: drop %d of item %d",
 		cmd.Count, cmd.ObjectID)
 	l.markInventoryAction(cmd.ObjectID)
 	if err := l.game.DropItem(cmd.ObjectID, cmd.Count, x, y, z); err != nil {
-		l.logger.Printf("Hunt: drop item failed: %v", err)
+		l.logf("Hunt: drop item failed: %v", err)
 	}
 }
 
@@ -233,11 +233,11 @@ func (l *Loop) userDestroy(cmd state.Command) {
 	if cmd.ObjectID == 0 || cmd.Count < 1 {
 		return
 	}
-	l.logger.Printf("Hunt: user command: destroy %d of item %d",
+	l.logf("Hunt: user command: destroy %d of item %d",
 		cmd.Count, cmd.ObjectID)
 	l.markInventoryAction(cmd.ObjectID)
 	if err := l.game.DestroyItem(cmd.ObjectID, cmd.Count); err != nil {
-		l.logger.Printf("Hunt: destroy item failed: %v", err)
+		l.logf("Hunt: destroy item failed: %v", err)
 	}
 }
 
@@ -248,16 +248,16 @@ func (l *Loop) userDestroy(cmd state.Command) {
 // refuses the command instead.
 func (l *Loop) userMovement(cmd state.Command) {
 	if l.phase == phaseDelevel {
-		l.logger.Printf("Hunt: user command %q ignored while deleveling",
+		l.logf("Hunt: user command %q ignored while deleveling",
 			cmd.Kind)
 
 		return
 	}
 	if l.phase == phaseUser {
-		l.logger.Printf("Hunt: user command: %s replaces the manual %s",
+		l.logf("Hunt: user command: %s replaces the manual %s",
 			cmd.Kind, l.userKind)
 	} else if l.tripActive() {
-		l.logger.Printf("Hunt: user command: %s cancels the town trip",
+		l.logf("Hunt: user command: %s cancels the town trip",
 			cmd.Kind)
 		l.resetTownTrip()
 	}
@@ -283,13 +283,13 @@ func (l *Loop) userMovement(cmd state.Command) {
 	l.engageAt = time.Time{}
 	switch cmd.Kind {
 	case state.CommandMove:
-		l.logger.Printf("Hunt: user command: walking to %d %d %d",
+		l.logf("Hunt: user command: walking to %d %d %d",
 			cmd.X, cmd.Y, cmd.Z)
 	case state.CommandAttack:
-		l.logger.Printf("Hunt: user command: attacking object %d",
+		l.logf("Hunt: user command: attacking object %d",
 			cmd.ObjectID)
 	case state.CommandPickup:
-		l.logger.Printf("Hunt: user command: picking up item %d",
+		l.logf("Hunt: user command: picking up item %d",
 			cmd.ObjectID)
 	}
 }
@@ -345,14 +345,14 @@ func (l *Loop) tickUserMove(now time.Time) {
 	}
 	dist := math.Hypot(float64(l.userX-selfX), float64(l.userY-selfY))
 	if dist <= userArriveRadius {
-		l.logger.Printf("Hunt: manual walk arrived (%d units left)",
+		l.logf("Hunt: manual walk arrived (%d units left)",
 			int(dist))
 		l.resumeAuto()
 
 		return
 	}
 	if now.Sub(l.userStart) > userMoveTimeout {
-		l.logger.Printf("Hunt: manual walk timed out, resuming the hunt")
+		l.logf("Hunt: manual walk timed out, resuming the hunt")
 		l.resumeAuto()
 
 		return
@@ -375,7 +375,7 @@ func (l *Loop) tickUserMove(now time.Time) {
 	l.userRedirect = false
 	l.userMoveAt = now
 	if err := l.game.WalkTo(l.userX, l.userY, l.userZ); err != nil {
-		l.logger.Printf("Hunt: manual walk failed: %v", err)
+		l.logf("Hunt: manual walk failed: %v", err)
 	}
 }
 
@@ -392,12 +392,12 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
 	}
 	result, err := l.navigator.FindPath(from, end)
 	if err != nil {
-		l.logger.Printf("Hunt: manual walk path search failed: %v", err)
+		l.logf("Hunt: manual walk path search failed: %v", err)
 
 		return
 	}
 	if result == nil || !result.Found || len(result.Waypoints) == 0 {
-		l.logger.Printf("Hunt: no geodata path to %d %d, "+
+		l.logf("Hunt: no geodata path to %d %d, "+
 			"walking by server routing", l.userX, l.userY)
 
 		return
@@ -405,7 +405,7 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
 	l.userWaypoints = result.Waypoints
 	l.userWpIndex = 0
 	l.userMoveAt = time.Time{}
-	l.logger.Printf("Hunt: manual walk path planned: %d waypoints, "+
+	l.logf("Hunt: manual walk path planned: %d waypoints, "+
 		"%.0f units (%.2fs search)", len(result.Waypoints),
 		result.Length, result.Duration.Seconds())
 }
@@ -442,13 +442,13 @@ func (l *Loop) followUserWaypoints(
 		l.userMoveAt = time.Time{}
 	}
 	if l.userWpIndex >= len(l.userWaypoints) {
-		l.logger.Printf("Hunt: manual walk arrived (path done)")
+		l.logf("Hunt: manual walk arrived (path done)")
 		l.resumeAuto()
 
 		return
 	}
 	if now.Sub(l.userStart) > userMoveTimeout {
-		l.logger.Printf("Hunt: manual walk timed out, resuming the hunt")
+		l.logf("Hunt: manual walk timed out, resuming the hunt")
 		l.resumeAuto()
 
 		return
@@ -478,7 +478,7 @@ func (l *Loop) followUserWaypoints(
 	l.userMoveAt = now
 	if err := l.game.WalkTo(
 		int32(moveX), int32(moveY), int32(moveZ)); err != nil {
-		l.logger.Printf("Hunt: manual walk failed: %v", err)
+		l.logf("Hunt: manual walk failed: %v", err)
 	}
 }
 
@@ -607,7 +607,7 @@ func (l *Loop) tickUserAttack(now time.Time) { //nolint:cyclop,funlen
 		l.lootID = 0
 		l.userKind = ""
 		l.target = 0
-		l.logger.Printf("Hunt: manual target %d died or vanished",
+		l.logf("Hunt: manual target %d died or vanished",
 			l.userTarget)
 
 		return
@@ -633,7 +633,7 @@ func (l *Loop) tickUserAttack(now time.Time) { //nolint:cyclop,funlen
 		!l.chaseProgress(&l.userLastDist, &l.userDistAt, dist, now) {
 		// The server chase stalled with the target far away: walk
 		// toward the target instead of trusting the stuck chase.
-		l.logger.Printf("Hunt: manual attack chase stalled at %d "+
+		l.logf("Hunt: manual attack chase stalled at %d "+
 			"units, walking to the target", int(dist))
 		fighting = false
 	}
@@ -644,7 +644,7 @@ func (l *Loop) tickUserAttack(now time.Time) { //nolint:cyclop,funlen
 		return
 	}
 	if now.Sub(l.userStart) > userAttackTimeout {
-		l.logger.Printf("Hunt: manual attack never engaged, " +
+		l.logf("Hunt: manual attack never engaged, " +
 			"resuming the hunt")
 		l.resumeAuto()
 
@@ -658,7 +658,7 @@ func (l *Loop) tickUserAttack(now time.Time) { //nolint:cyclop,funlen
 		// The first request selects the target (and starts the
 		// server chase).
 		if err := l.game.AttackTarget(l.userTarget); err != nil {
-			l.logger.Printf("Hunt: manual attack failed: %v", err)
+			l.logf("Hunt: manual attack failed: %v", err)
 		}
 
 		return
@@ -668,14 +668,14 @@ func (l *Loop) tickUserAttack(now time.Time) { //nolint:cyclop,funlen
 		// walk request works where the AI chase stalls.
 		if !l.tracker.SelfWalking() {
 			if err := l.game.WalkTo(x, y, z); err != nil {
-				l.logger.Printf("Hunt: manual attack walk failed: %v", err)
+				l.logf("Hunt: manual attack walk failed: %v", err)
 			}
 		}
 
 		return
 	}
 	if err := l.game.AttackTarget(l.userTarget); err != nil {
-		l.logger.Printf("Hunt: manual attack failed: %v", err)
+		l.logf("Hunt: manual attack failed: %v", err)
 	}
 }
 
@@ -686,14 +686,14 @@ func (l *Loop) tickUserAttack(now time.Time) { //nolint:cyclop,funlen
 func (l *Loop) tickUserPickup(now time.Time) {
 	item, ok := l.tracker.GroundItemByID(l.userTarget)
 	if l.userTarget == 0 || !ok {
-		l.logger.Printf("Hunt: manual pickup of %d finished, "+
+		l.logf("Hunt: manual pickup of %d finished, "+
 			"resuming the hunt", l.userTarget)
 		l.resumeAuto()
 
 		return
 	}
 	if now.Sub(l.userStart) > userPickupTimeout {
-		l.logger.Printf("Hunt: manual pickup timed out, " +
+		l.logf("Hunt: manual pickup timed out, " +
 			"resuming the hunt")
 		l.resumeAuto()
 
@@ -712,13 +712,13 @@ func (l *Loop) tickUserPickup(now time.Time) {
 	dist := math.Hypot(float64(item.X-selfX), float64(item.Y-selfY))
 	if dist > lootApproachRadius {
 		if err := l.game.WalkTo(item.X, item.Y, item.Z); err != nil {
-			l.logger.Printf("Hunt: manual pickup walk failed: %v", err)
+			l.logf("Hunt: manual pickup walk failed: %v", err)
 		}
 
 		return
 	}
 	if err := l.game.PickupItem(item); err != nil {
-		l.logger.Printf("Hunt: manual pickup failed: %v", err)
+		l.logf("Hunt: manual pickup failed: %v", err)
 	}
 }
 

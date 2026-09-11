@@ -110,12 +110,12 @@ func (l *Loop) maybeEquipGear() {
 	}
 	l.markInventoryAction(action.ObjectID)
 	if err := l.game.UseItem(action.ObjectID); err != nil {
-		l.logger.Printf("Hunt: gear equip failed: %v", err)
+		l.logf("Hunt: gear equip failed: %v", err)
 
 		return
 	}
 	manager.lastActionAt = now
-	l.logger.Printf("Hunt: gear: %s", action.Reason)
+	l.logf("Hunt: gear: %s", action.Reason)
 }
 
 // maybeDestroyReplacedStarters destroys the starter kit items a
@@ -158,13 +158,13 @@ func (l *Loop) maybeDestroyReplacedStarters() {
 		l.markInventoryAction(drop.Item.ObjectID)
 		if err := l.game.DestroyItem(drop.Item.ObjectID,
 			drop.Item.Count); err != nil {
-			l.logger.Printf("Hunt: starter destroy failed: %v", err)
+			l.logf("Hunt: starter destroy failed: %v", err)
 			manager.starterRetryAt[drop.Item.ObjectID] = now.Add(starterRetryDelay)
 
 			return
 		}
 		manager.lastActionAt = now
-		l.logger.Printf("Hunt: gear: %s", drop.Reason)
+		l.logf("Hunt: gear: %s", drop.Reason)
 
 		return
 	}

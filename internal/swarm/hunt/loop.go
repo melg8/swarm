@@ -612,8 +612,14 @@ func (l *Loop) tick() { //nolint:cyclop
 	// never churns the event stream. Runs on every return path
 	// through the defer. The closure captures l.phase by reference
 	// so the value at return time is published (a plain defer call
-	// evaluates its arguments at registration time).
-	defer func() { l.tracker.SetPhase(string(l.phase)) }()
+	// evaluates its arguments at registration time). The same defer
+	// publishes the loop internals for the diagnostics section of
+	// the state dump (SetHuntDiagnostics stamps the heartbeat the
+	// encoders age without a version bump).
+	defer func() {
+		l.tracker.SetPhase(string(l.phase))
+		l.tracker.SetHuntDiagnostics(l.diagnostics(time.Now()))
+	}()
 	if l.tracker.SelfDead() {
 		l.recoverFromDeath()
 
@@ -791,9 +797,9 @@ func (l *Loop) recoverFromDeath() {
 		// point of the phase).
 		l.noteZoneDeath()
 	}
-	l.logger.Printf("Hunt: character died, restarting at the nearest village")
+	l.logf("Hunt: character died, restarting at the nearest village")
 	if err := l.game.RestartAtVillage(); err != nil {
-		l.logger.Printf("Hunt: village restart failed: %v", err)
+		l.logf("Hunt: village restart failed: %v", err)
 	}
 }
 
@@ -833,7 +839,7 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 	if l.zoneReturn {
 		l.zoneReturn = false
 		l.zoneFails = 0
-		l.logger.Printf("Hunt: back in the hunting zone, resuming the hunt")
+		l.logf("Hunt: back in the hunting zone, resuming the hunt")
 	}
 	// Prefer the server view of the target while it lives: the
 	// MyTargetSelected answer of the last attack request arrives
@@ -851,7 +857,7 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		l.target = serverTarget
 	}
 	if l.target != 0 && !l.tracker.ObjectAlive(l.target) {
-		l.logger.Printf("Hunt: target %d died, looting", l.target)
+		l.logf("Hunt: target %d died, looting", l.target)
 		l.target = 0
 		l.phase = phaseLoot
 		l.lootID = 0
@@ -867,7 +873,7 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		// selected). Only the selection of a DIFFERENT object id
 		// replaces the stale one, so the target is dropped and
 		// skipped for a while.
-		l.logger.Printf("Hunt: target %d does not engage, "+
+		l.logf("Hunt: target %d does not engage, "+
 			"switching to another", l.target)
 		if l.targetSkip == nil {
 			l.targetSkip = make(map[int32]time.Time)
@@ -961,11 +967,11 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 					!l.tracker.SelfWalking() &&
 					now.Sub(l.lastHit) >= engageRetryPeriod {
 					l.lastHit = now
-					l.logger.Printf("Hunt: chase on %d stalled at "+
+					l.logf("Hunt: chase on %d stalled at "+
 						"%d units, walking to the target",
 						l.target, int(dist))
 					if err := l.game.WalkTo(x, y, z); err != nil {
-						l.logger.Printf("Hunt: chase walk failed: %v",
+						l.logf("Hunt: chase walk failed: %v",
 							err)
 					}
 				}
@@ -978,7 +984,7 @@ func (l *Loop) engage() { //nolint:cyclop,funlen
 		return
 	}
 	if err := l.game.AttackTarget(l.target); err != nil {
-		l.logger.Printf("Hunt: attack failed: %v", err)
+		l.logf("Hunt: attack failed: %v", err)
 
 		return
 	}
