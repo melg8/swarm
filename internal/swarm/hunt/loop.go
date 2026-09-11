@@ -449,10 +449,12 @@ type Loop struct {
 	// equip drives the auto equipment: it equips inventory gear that
 	// beats the paperdoll of the character (see equip.go).
 	equip *equipManager
-	// The town trip shopping state (see shopping.go): the merchant
-	// stops of the running trip, the request pacing of the buys, the
-	// in-flight buy batch awaiting its inventory confirmation and
-	// the cached plan of the shopping trigger.
+	// The town trip shopping state (see shopping.go): the frozen
+	// purchase plan of the running trip, the merchant stops it
+	// distributes into, the request pacing of the buys, the in-flight
+	// buy batch awaiting its inventory confirmation and the cached
+	// plan of the shopping trigger.
+	tripPlan          []gear.Purchase
 	tripStops         []tripStop
 	buysPlanned       bool
 	buyAt             time.Time
@@ -601,6 +603,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		merchantPick:      time.Time{},
 		merchantDeckUntil: time.Time{},
 		sold:              make(map[int32]bool),
+		tripPlan:          nil,
 		tripStops:         nil,
 		buysPlanned:       false,
 		buyAt:             time.Time{},

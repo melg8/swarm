@@ -447,6 +447,16 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	if !ok {
 		return
 	}
+	// The trip plan freezes here, ONCE: the purchases the planner
+	// picked against the current gear and adena are exactly what
+	// this trip sells and buys - the sell first step banks their
+	// SellFirst credits, the stop planning distributes the purchases
+	// and nothing re-plans in between (a re-plan at the shop ran
+	// against the freed slots and the fresh adena and drifted: it
+	// re-bought the piece the trip had just sold and planned
+	// purchases whose displaced pieces were never queued - the
+	// 2026-09-11 two pairs of gloves report).
+	l.tripPlan = l.shoppingPlan()
 	// The weapon leads the trip that buys it: the sell stop routes to
 	// the weapon purchase's merchant, so the sell-first of the replaced
 	// weapon and the buy share ONE stop (the junk sells at any
@@ -494,8 +504,7 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 		"% weight"
 	if !l.inventoryFull() {
 		reason = "the shop strategy plans purchases worth " +
-			strconv.FormatInt(gear.AdenaSpent(
-				affordablePrefix(l.shoppingPlanCache)), 10) +
+			strconv.FormatInt(gear.AdenaSpent(l.tripPlan), 10) +
 			" adena"
 	}
 	if weaponRun {
@@ -516,8 +525,9 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 			reason = lessonReason
 		}
 	}
-	// The trigger plan cache drops: the stop planning recomputes it
-	// with the fresh adena of the sales.
+	// The trigger plan cache drops: the frozen trip plan owns the
+	// trip now, the cache only feeds the widget view between the
+	// recomputes.
 	l.shoppingPlanCache = nil
 	l.shoppingPlanAt = time.Time{}
 	l.shoppingPlanAdena = 0
@@ -1420,7 +1430,8 @@ func (l *Loop) selfZForEscape() int32 {
 }
 
 // enterSellPhase switches into the selling and shopping state at the
-// shop.
+// shop. The log names the stop honestly: the first stop sells the
+// junk, the buy stops of the frozen plan only trade.
 func (l *Loop) enterSellPhase() {
 	l.phase = phaseTownSell
 	l.sellPhaseAt = time.Now()
@@ -1429,7 +1440,18 @@ func (l *Loop) enterSellPhase() {
 	l.merchantID = 0
 	l.merchantPick = time.Time{}
 	l.merchantDeckUntil = time.Time{}
-	l.logger.Printf("Hunt: shop reached, selling the junk")
+	if l.sellableStop() {
+		l.logger.Printf("Hunt: shop reached, selling the junk")
+
+		return
+	}
+	if len(l.tripStops) > 0 {
+		l.logger.Printf("Hunt: shop reached at %s",
+			l.tripStops[0].merchant.Name)
+
+		return
+	}
+	l.logger.Printf("Hunt: shop reached")
 }
 
 // tickTownSell runs the sell stop (the first trip stop) and the buy
@@ -1437,9 +1459,10 @@ func (l *Loop) enterSellPhase() {
 // selling ends when nothing sellable is left, not when the inventory
 // drops below the trip trigger (a bag of 30 percent junk on a buy
 // trip still sells, or the bot would farm with it and walk back for
-// the sale later). The fresh adena of the sales re-plans the
-// purchases, every buy stop completes when its purchases were
-// requested, and the return leg starts when no stop is left.
+// the sale later). The sell first step banks the credits the frozen
+// trip plan counted on, the stop planning distributes its purchases,
+// every buy stop completes when its purchases were requested, and
+// the return leg starts when no stop is left.
 //
 //nolint:cyclop,gocognit // the town sell trip legs
 func (l *Loop) tickTownSell() {
@@ -1483,8 +1506,8 @@ func (l *Loop) tickTownSell() {
 		if !l.buysPlanned {
 			stats := l.tracker.InventoryStats()
 			l.logger.Printf("Hunt: shop: junk sold (%d slots left, "+
-				"%.0f%% weight), planning the purchases", stats.Slots,
-				stats.WeightPercent)
+				"%.0f%% weight), distributing the trip plan",
+				stats.Slots, stats.WeightPercent)
 			l.planShoppingStops()
 		}
 	}
@@ -1813,7 +1836,9 @@ func (l *Loop) clearTalkedTarget() {
 	}
 }
 
-// endTownTrip finishes the trip and arms the trigger cooldown.
+// endTownTrip finishes the trip and arms the trigger cooldown. The
+// frozen trip plan dies with it: the next trip freezes a fresh one
+// against the gear the purchases reached.
 func (l *Loop) endTownTrip(reason string) {
 	l.clearTalkedTarget()
 	l.phase = phaseEngage
@@ -1824,6 +1849,7 @@ func (l *Loop) endTownTrip(reason string) {
 	l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.waterEscape = false
+	l.tripPlan = nil
 	l.tripStops = nil
 	l.buysPlanned = false
 	l.buyRequested = nil
@@ -1869,6 +1895,7 @@ func (l *Loop) resetTownTrip() {
 	l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.waterEscape = false
+	l.tripPlan = nil
 	l.tripStops = nil
 	l.buysPlanned = false
 	l.buyRequested = nil

@@ -17,10 +17,16 @@ import (
 
 // Shopping of the town trips: the gear.PlanPurchases strategy decides
 // what to buy (the greedy value per adena planner against the
-// equipment and the adena), the trip visits the merchants of the plan
-// after selling the junk (the fresh adena of the sales re-plans the
-// purchases at the shop) and buys one buylist per transaction request
-// (buying shares the transaction flood protector with selling).
+// equipment and the adena), the trip FREEZES that plan once at its
+// start and executes it verbatim - the sell first step sells exactly
+// the pieces the frozen plan counted on (its SellFirst lists), the
+// stop planning distributes exactly its purchases, and nothing
+// re-plans in between (a re-plan at the shop runs against the freed
+// slots and the fresh adena and drifted: it re-bought the piece the
+// trip had just sold and planned purchases whose sell first pieces
+// were never queued - the 2026-09-11 two pairs of gloves report).
+// One buylist goes out per transaction request (buying shares the
+// transaction flood protector with selling).
 
 // Timing and threshold constants of the shopping.
 const (
@@ -111,7 +117,10 @@ func shopCatalog(merchants []townNpc) gear.Catalog {
 // shoppingPlan plans the purchases against the current gear state.
 // The gear profile of the loop scores the items; the returned plan
 // holds only the affordable purchases (the wanted tail of the queue
-// is the widget's save up view, the trip never buys it).
+// is the widget's save up view, the trip never buys it). The town
+// trip calls it ONCE at its start and freezes the result as the trip
+// plan (see maybeStartTownTrip): everything the trip sells and buys
+// reads that frozen plan.
 func (l *Loop) shoppingPlan() []gear.Purchase {
 	return affordablePrefix(l.shoppingQueue())
 }
@@ -534,11 +543,14 @@ func (l *Loop) resetReplacementSales() {
 	l.replaceTried = 0
 }
 
-// replacementTargets collects the equipped object ids the planned
-// purchases displace: the plan runs against the current gear state
-// and carries the SellFirst list on every replacing purchase.
+// replacementTargets collects the equipped object ids the FROZEN TRIP
+// PLAN displaces: the plan was computed once at the trip start and
+// carries the SellFirst list on every replacing purchase, so the sell
+// first step banks exactly the credit the buys were planned against
+// - a purchase whose displaced piece was never queued for sale (the
+// drift the shop re-plans used to produce) cannot happen anymore.
 func (l *Loop) replacementTargets() []int32 {
-	purchases := l.shoppingPlan()
+	purchases := l.tripPlan
 	if len(purchases) == 0 {
 		return nil
 	}
@@ -557,17 +569,19 @@ func (l *Loop) replacementTargets() []int32 {
 	return targets
 }
 
-// planShoppingStops plans the buy stops of the running trip with the
-// fresh adena of the completed selling: the purchases group by their
-// merchant, the groups order by the walking distance from the
-// character, and a group of the merchant the character already
-// stands at merges into the current stop.
+// planShoppingStops distributes the FROZEN TRIP PLAN into the buy
+// stops of the running trip: the purchases group by their merchant,
+// the groups order by the walking distance from the character, and a
+// group of the merchant the character already stands at merges into
+// the current stop. No planning happens here - the plan was computed
+// once at the trip start; the selling that ran in between only banks
+// the credits the plan already counted (see replacementTargets).
 func (l *Loop) planShoppingStops() {
 	l.buysPlanned = true
-	purchases := l.shoppingPlan()
+	purchases := l.tripPlan
 	if len(purchases) == 0 {
-		l.logger.Printf("Hunt: shop: nothing worth buying after the " +
-			"sales, heading back")
+		l.logger.Printf("Hunt: shop: the trip plan carries no buys, " +
+			"heading back")
 
 		return
 	}
@@ -676,6 +690,16 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 	if len(stop.buys) == 0 && len(l.buyRequested) == 0 {
 		return true
 	}
+	// The frozen plan's last responsible moment: an item the inventory
+	// already carries must not be bought again (a loot drop the auto
+	// equipment wore mid trip, a manual user purchase). The owned
+	// lines drop out of the stop before any request goes out - the
+	// buy itself would deliver a duplicate the plan never wanted.
+	l.tripStops[0].buys = l.dropOwnedPurchases(l.tripStops[0].buys)
+	stop = l.tripStops[0]
+	if len(stop.buys) == 0 && len(l.buyRequested) == 0 {
+		return true
+	}
 	if !l.handleMerchant(now, l.stopMerchantTemplates()) {
 		return false
 	}
@@ -757,6 +781,30 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 
 	return len(l.tripStops) > 0 && len(l.tripStops[0].buys) == 0 &&
 		len(l.buyRequested) == 0
+}
+
+// dropOwnedPurchases filters the stop purchases whose item id the
+// inventory already carries (the same signal the arrival confirmation
+// reads): the frozen trip plan executes verbatim, but a second copy
+// of an item the bot holds is never part of it.
+func (l *Loop) dropOwnedPurchases(purchases []gear.Purchase) []gear.Purchase {
+	items := l.tracker.InventoryItems()
+	carried := make(map[int32]bool, len(items))
+	for _, item := range items {
+		carried[item.ItemID] = true
+	}
+	kept := purchases[:0]
+	for _, purchase := range purchases {
+		if carried[purchase.ItemID] {
+			l.logger.Printf("Hunt: shop: %s already in the inventory, "+
+				"skipping the purchase", npcdata.ItemName(purchase.ItemID))
+
+			continue
+		}
+		kept = append(kept, purchase)
+	}
+
+	return kept
 }
 
 // buysArrived reports whether every purchase of the batch shows up in
@@ -856,14 +904,19 @@ func (l *Loop) affordableWeaponPurchase() (gear.Purchase, bool) {
 }
 
 // weaponStopMerchant resolves the town merchant that sells the
-// affordable weapon purchase of the plan.
+// weapon purchase of the frozen trip plan (the plan the trip
+// executes - the cached hunt queue already served its trigger).
 func (l *Loop) weaponStopMerchant() (townNpc, bool) {
-	purchase, ok := l.affordableWeaponPurchase()
-	if !ok {
-		return zeroTownNpc, false
+	for _, purchase := range l.tripPlan {
+		stats, ok := npcdata.ItemGearStats(purchase.ItemID)
+		if !ok || gear.CategoryOf(stats) != gear.CategoryWeapon {
+			continue
+		}
+
+		return merchantByTemplate(purchase.MerchantTemplateID)
 	}
 
-	return merchantByTemplate(purchase.MerchantTemplateID)
+	return zeroTownNpc, false
 }
 
 // weaponlessRunWanted reports whether the character fights bare-handed

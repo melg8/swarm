@@ -286,6 +286,9 @@ func TestPlanShoppingStopsMergesCurrentMerchant(t *testing.T) {
 		{ObjectID: 999, ItemID: 57, Count: 200, Type2: 4, Change: 1},
 	})
 	loop.tripStops = []tripStop{{merchant: ariel, sell: true}}
+	// The trip plan freezes at the trip start (maybeStartTownTrip);
+	// the stop planning only distributes it.
+	loop.tripPlan = loop.shoppingPlan()
 
 	loop.planShoppingStops()
 	require.True(t, loop.buysPlanned)
@@ -328,6 +331,10 @@ func TestReplacementSalesSellBeforeBuy(t *testing.T) {
 		MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
 		PaperdollObjectIDs: [state.PaperdollSlots]int32{0, 0, 0, 0, 0, 0, 0, 100},
 	})
+	// The trip plan freezes at the trip start (maybeStartTownTrip):
+	// the weapon purchase of the frozen plan carries the sickle as
+	// its SellFirst piece.
+	loop.tripPlan = loop.shoppingPlan()
 
 	// The sell stop with no junk: the replacement step runs before
 	// the buy planning.
@@ -386,8 +393,9 @@ func TestReplacementSalesSellBeforeBuy(t *testing.T) {
 	require.True(t, loop.buysPlanned,
 		"the purchase planning runs after the replacement sale")
 
-	// The re-plan with the sale proceeds still buys a weapon
-	// upgrade - the freed slot and the fresh adena pay for it.
+	// The frozen plan's purchases still fill the stops after the
+	// sale proceeds landed: the freed slot and the counted credit
+	// pay for the weapon upgrade they were planned against.
 	foundWeapon := false
 	for _, stop := range loop.tripStops {
 		for _, purchase := range stop.buys {
@@ -561,4 +569,197 @@ func TestTripShoppingViewHoldsThePlanDuringWalk(t *testing.T) {
 		"the queue view carries the planned purchases")
 	require.False(t, snap.Shopping.Trip,
 		"the walk view is the hunt queue, not a trip batch")
+}
+
+// test1DumpPaperdoll is the UserInfo paperdoll block of the
+// 2026-09-11 10:30 test1 dump at its trip start: the Short Sword, the
+// Gloves and the Apprentice's Shoes worn among the rest of the outfit
+// (the same object ids the dump carries).
+var test1DumpPaperdoll = [state.PaperdollSlots]int32{
+	0,         // underwear
+	268457163, // right ear: Earring of Strength
+	268457164, // left ear: Earring of Wisdom
+	268450945, // neck: Necklace of Anguish
+	268457165, // right finger: Ring of Anguish
+	268457188, // left finger: Ring of Anguish
+	268451114, // head: Leather Helmet
+	268451661, // right hand: Short Sword
+	0,         // left hand
+	268457274, // gloves: Gloves
+	268451006, // chest: Wooden Breastplate
+	268451057, // legs: Hard Leather Pants
+	268451634, // feet: Apprentice's Shoes
+	0,         // back
+	268451661, // the C1 duplicate of the right hand
+}
+
+// test1DumpInventory is the inventory behind the paperdoll plus the
+// 71420 adena the reconstruction of the dump derives (71420 + 387 of
+// the sale proceeds - 70007 of the buys = the 1800 the dump ends with).
+func test1DumpInventory() []state.InventoryItem {
+	return []state.InventoryItem{
+		{ObjectID: 268451661, ItemID: 1, Count: 1, Type2: 0, Equipped: true, Change: 1},
+		{ObjectID: 268457274, ItemID: 49, Count: 1, Type2: 1, Equipped: true, Change: 1},
+		{ObjectID: 268451634, ItemID: 1121, Count: 1, Type2: 1, Equipped: true, Change: 1},
+		{ObjectID: 268451006, ItemID: 23, Count: 1, Type2: 1, Equipped: true, Change: 1},
+		{ObjectID: 268451057, ItemID: 30, Count: 1, Type2: 1, Equipped: true, Change: 1},
+		{ObjectID: 268451114, ItemID: 44, Count: 1, Type2: 1, Equipped: true, Change: 1},
+		{ObjectID: 268457163, ItemID: 114, Count: 1, Type2: 2, Equipped: true, Change: 1},
+		{ObjectID: 268457164, ItemID: 115, Count: 1, Type2: 2, Equipped: true, Change: 1},
+		{ObjectID: 268457165, ItemID: 876, Count: 1, Type2: 2, Equipped: true, Change: 1},
+		{ObjectID: 268457188, ItemID: 876, Count: 1, Type2: 2, Equipped: true, Change: 1},
+		{ObjectID: 268450945, ItemID: 907, Count: 1, Type2: 2, Equipped: true, Change: 1},
+		{ObjectID: 999, ItemID: 57, Count: 71420, Type2: 4, Change: 1},
+	}
+}
+
+// TestTripPlanFreezesPurchasesAgainstResale replays the 2026-09-11
+// 10:30 test1 trip on the frozen plan machinery: the trip plans
+// [Brandish + Low Boots] once at its start (worth 69999 adena, the
+// dump's own number), sells the displaced Short Sword and Apprentice's
+// Shoes - and the stop planning distributes EXACTLY the frozen plan.
+// The shop re-plan this regression replaces produced a different
+// list against the freed slots and the fresh adena: it re-bought the
+// Apprentice's Shoes the trip had just sold (the armor floor pulled
+// the cheapest piece into the emptied slot) and planned the Leather
+// Gloves whose displaced Gloves were never queued for the sale - the
+// bot walked home holding two pairs of gloves.
+func TestTripPlanFreezesPurchasesAgainstResale(t *testing.T) {
+	loop, game, bot, _ := newTripLoop()
+	bot.ApplyItemList(test1DumpInventory())
+	bot.ApplyUserInfo(state.UserInfo{
+		Name: "test1", Level: 14,
+		X: 45000, Y: 50000, Z: -3500,
+		MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
+		PaperdollObjectIDs: test1DumpPaperdoll,
+	})
+
+	// The trip arms on the shopping trigger and freezes its plan.
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase)
+	require.Len(t, loop.tripPlan, 2, "the frozen plan holds both purchases")
+	require.Equal(t, int64(69999), gear.AdenaSpent(loop.tripPlan),
+		"the frozen plan matches the dump's worth")
+	require.Equal(t, int32(1333), loop.tripPlan[0].ItemID,
+		"the weapon milestone of the frozen plan is the Brandish")
+	require.Equal(t, []int32{268451661}, loop.tripPlan[0].SellFirst)
+	require.Equal(t, int32(38), loop.tripPlan[1].ItemID,
+		"the feet upgrade of the frozen plan is the Low Boots")
+	require.Equal(t, []int32{268451634}, loop.tripPlan[1].SellFirst)
+
+	// The sell stop routes to the weapon merchant of the frozen plan.
+	unoren := townMerchants[0]
+	moveSelfTo(bot, unoren.X, unoren.Y, unoren.Z)
+	loop.tick()
+	require.Equal(t, phaseTownSell, loop.phase)
+
+	// The replacement queue of the frozen plan: the sword and the
+	// shoes - the gloves stay worn (their upgrade is not in the plan).
+	for range 3 {
+		loop.tick()
+		if loop.replacePlanned {
+			break
+		}
+	}
+	require.Equal(t, []int32{268451661, 268451634}, loop.replaceQueue)
+
+	// Both replaced pieces come off (paced) and their unequips confirm:
+	// the server answers with the UserInfo paperdoll block (the slot
+	// empties) plus the inventory update (the equipped flag flips).
+	paperdoll := test1DumpPaperdoll
+	for _, piece := range []struct {
+		objectID int32
+		itemID   int32
+		type2    int16
+		slot     int
+	}{
+		{268451661, 1, 0, state.PaperdollRHand},
+		{268451634, 1121, 1, state.PaperdollFeet},
+	} {
+		loop.replaceUnequipAt = time.Now().Add(-equipActionPeriod - time.Second)
+		loop.tick()
+		paperdoll[piece.slot] = 0
+		bot.ApplyPaperdoll(paperdoll)
+		bot.ApplyInventoryUpdate([]state.InventoryItem{
+			{
+				ObjectID: piece.objectID, ItemID: piece.itemID,
+				Count: 1, Type2: piece.type2, Equipped: false, Change: 2,
+			},
+		})
+	}
+	require.Equal(t, []int32{268451661, 268451634}, game.uses,
+		"both displaced pieces were unequipped in the plan order")
+
+	// The offer batch sells both pieces; the removals settle the step.
+	loop.sellAt = time.Now().Add(-sellPause - time.Second)
+	loop.tick()
+	require.Len(t, game.sells, 1, "both replaced pieces go out as one batch")
+	bot.ApplyInventoryUpdate([]state.InventoryItem{
+		{ObjectID: 268451661, ItemID: 1, Count: 0, Change: 3},
+		{ObjectID: 268451634, ItemID: 1121, Count: 0, Change: 3},
+		{ObjectID: 999, ItemID: 57, Count: 71807, Type2: 4, Change: 2},
+	})
+	loop.tick()
+	require.True(t, loop.buysPlanned,
+		"the frozen plan distributes after the sales settled")
+
+	// THE REGRESSION: the stops carry exactly the frozen plan - the
+	// Brandish at its merchant and the Low Boots at its own - never the
+	// re-bought Apprentice's Shoes and never a purchase whose displaced
+	// piece was not queued for the sale.
+	require.Len(t, loop.tripStops, 2)
+	require.Equal(t, int32(7147), loop.tripStops[0].merchant.TemplateID)
+	require.Len(t, loop.tripStops[0].buys, 1)
+	require.Equal(t, int32(1333), loop.tripStops[0].buys[0].ItemID)
+	require.Equal(t, int32(7148), loop.tripStops[1].merchant.TemplateID)
+	require.Len(t, loop.tripStops[1].buys, 1)
+	require.Equal(t, int32(38), loop.tripStops[1].buys[0].ItemID)
+	for _, stop := range loop.tripStops {
+		for _, purchase := range stop.buys {
+			require.NotEqual(t, int32(1121), purchase.ItemID,
+				"the sold Apprentice's Shoes are never bought back")
+			require.NotEqual(t, int32(50), purchase.ItemID,
+				"no purchase appears without its queued sale")
+		}
+	}
+
+	// The buy of the merged stop executes against the frozen plan: the
+	// manager knows what it buys and waits for the confirmation.
+	settleMerchant(t, loop, game, bot, unoren, 55)
+	loop.buyAt = time.Now().Add(-buyPause - time.Second)
+	loop.sellAt = time.Now().Add(-buyPause - time.Second)
+	loop.merchantPick = time.Now().Add(-2 * time.Second)
+	loop.tick()
+	require.Len(t, game.buys, 1, "the frozen plan's weapon buys")
+	require.Len(t, game.buys[0], 1)
+	require.Equal(t, int32(1333), game.buys[0][0].ItemID)
+	require.Equal(t, int32(3014700), game.buys[0][0].ListID)
+}
+
+// TestStopShoppingSkipsOwnedItems pins the last responsible moment of
+// the frozen plan: an item the inventory already carries (a loot drop
+// the auto equipment wore mid trip, a manual user purchase) drops out
+// of the stop before any request goes out - the buy would deliver a
+// duplicate the plan never wanted (the second pair of gloves).
+func TestStopShoppingSkipsOwnedItems(t *testing.T) {
+	loop, game, bot, _ := newTripLoop()
+	// The bot already holds the Leather Gloves the stop is about to buy.
+	bot.ApplyInventoryUpdate([]state.InventoryItem{
+		{ObjectID: 800, ItemID: 50, Count: 1, Type2: 1, Change: 1},
+	})
+	loop.tripStops = []tripStop{{
+		merchant: townMerchants[1],
+		buys: []gear.Purchase{{
+			ItemID: 50, ListID: 3014800, MerchantTemplateID: 7148,
+			Count: 1, Price: 7785, Reason: "buying Leather Gloves",
+			Affordable: true,
+		}},
+	}}
+	loop.merchantID = -1
+	loop.buyAt = time.Now().Add(-buyPause - time.Second)
+
+	done := loop.tickStopShopping(time.Now())
+	require.True(t, done, "the owned line drops out and the stop completes")
+	require.Empty(t, game.buys, "the owned item is never bought again")
+	require.Empty(t, loop.tripStops[0].buys, "the owned line left the stop")
 }
