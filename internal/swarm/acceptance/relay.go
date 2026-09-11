@@ -607,14 +607,19 @@ func appendUTF16LE(dst []byte, value string) []byte {
 	return append(dst, 0, 0)
 }
 
-// readWirePacket reads one 2 byte framed packet payload.
+// readWirePacket reads one 2 byte framed packet payload: the size
+// header includes itself (the Mobius wire convention, the same
+// framing the proxy and the connection package speak).
 func readWirePacket(conn net.Conn) ([]byte, error) {
 	header := make([]byte, 2)
 	if err := readFull(conn, header); err != nil {
 		return nil, err
 	}
-	length := int(header[0]) | int(header[1])<<8
-	payload := make([]byte, length)
+	size := int(header[0]) | int(header[1])<<8
+	if size < 2 {
+		return nil, errors.New("wire packet size below the header")
+	}
+	payload := make([]byte, size-2)
 	if err := readFull(conn, payload); err != nil {
 		return nil, err
 	}
@@ -622,9 +627,11 @@ func readWirePacket(conn net.Conn) ([]byte, error) {
 	return payload, nil
 }
 
-// writeWirePacket frames and writes one packet payload.
+// writeWirePacket frames and writes one packet payload: the size
+// header includes itself (the Mobius wire convention).
 func writeWirePacket(conn net.Conn, payload []byte) error {
-	header := []byte{byte(len(payload)), byte(len(payload) >> 8)}
+	size := len(payload) + 2
+	header := []byte{byte(size), byte(size >> 8)}
 	if _, err := conn.Write(header); err != nil {
 		return err
 	}

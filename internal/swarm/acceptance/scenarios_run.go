@@ -36,8 +36,8 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
 	defer cancelSession()
 	sessionDone := make(chan error, 1)
 	go func() {
-		sessionDone <- m.runSession(sessionCtx, farmAccount, farmPassword,
-			farmAccount, true, m.proxy, test.appendLog)
+		sessionDone <- m.runSessionSupervised(sessionCtx, farmAccount,
+			farmPassword, farmAccount, true, m.proxy, test.appendLog)
 	}()
 
 	tracker := m.tracker(test)

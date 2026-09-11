@@ -42,8 +42,9 @@ const dbTimeout = 10 * time.Second
 // plugin so the empty password auth of the passwordless root account
 // works.
 const (
-	clientProtocol41 = 0x00000200
-	clientPluginAuth = 0x00080000
+	clientProtocol41    = 0x00000200
+	clientPluginAuth    = 0x00080000
+	clientConnectWithDB = 0x00000008
 )
 
 // maxPacketSize is the client limit announced in the handshake.
@@ -224,7 +225,8 @@ func (db *DB) handshake(config DBConfig) error {
 // handshakeResponse builds the HandshakeResponse41 payload.
 func handshakeResponse(config DBConfig) []byte {
 	payload := make([]byte, 0, 96)
-	payload = appendUint32(payload, clientProtocol41|clientPluginAuth)
+	payload = appendUint32(payload,
+		clientProtocol41|clientPluginAuth|clientConnectWithDB)
 	payload = appendUint32(payload, maxPacketSize)
 	payload = append(payload, 33) // utf8_general_ci
 	payload = append(payload, make([]byte, 23)...)
@@ -232,6 +234,13 @@ func handshakeResponse(config DBConfig) []byte {
 	payload = append(payload, 0)
 	payload = append(payload, byte(len(config.Password)))
 	payload = append(payload, config.Password...)
+	if config.Database != "" {
+		// The default schema of the session: without it every query
+		// answers "1046 No database selected" (the deployed Mobius
+		// database is l2jmobiusc1).
+		payload = append(payload, config.Database...)
+		payload = append(payload, 0)
+	}
 	payload = append(payload, authPluginNative...)
 	payload = append(payload, 0)
 

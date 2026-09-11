@@ -23,10 +23,13 @@ const (
 )
 
 // Scenario timeouts: the farm readiness needs the shopping, the
-// lessons, the walk and the kill (quarter of an hour covers a slow
-// economy), the lifetime and relay scenarios are short hops.
+// lessons, the walk and the kill - the aggressive mobs on the village
+// road interrupt the trips (the emergency logout reconnects and
+// retries), a quarter of an hour measured too tight for the full
+// cycle, half an hour bounds a slow economy with room to spare. The
+// lifetime and relay scenarios are short hops.
 const (
-	farmTimeout = 15 * time.Minute
+	farmTimeout = 30 * time.Minute
 	lifeTimeout = 4 * time.Minute
 )
 

@@ -43,6 +43,15 @@ var sessionDialer = &net.Dialer{Timeout: connectTimeout}
 // account from racing it.
 const ensurePause = 2 * time.Second
 
+// The reconnect backoff of the supervised sessions: the same shape
+// the runBotForever supervisor uses (a lost session reconnects after
+// the login cooldown, a stable session resets the delay).
+const (
+	sessionReconnectMinDelay = 2 * time.Second
+	sessionReconnectMaxDelay = 30 * time.Second
+	sessionStableTime        = time.Minute
+)
+
 // ensureCharacter connects to the login and game server, creates the
 // temp character when it is missing (a level 1 elven fighter with the
 // starter gear, standing at the creation spawn point) and drops the
@@ -218,6 +227,46 @@ func (m *Manager) runSession(
 	go loop.Run(ctx)
 
 	return game.Run(ctx, char)
+}
+
+// runSessionSupervised keeps the temp session alive the way the
+// runBotForever supervisor does: a lost session (the emergency logout
+// of the hunt loop, a server kick, a transport error) reconnects
+// after the tracker login cooldown with a growing backoff, and the
+// run context ends the loop. The return mirrors a single session: nil
+// means the run context ended while the session was healthy.
+func (m *Manager) runSessionSupervised(
+	ctx context.Context, account string, password string, char string,
+	autonomous bool, registrar *proxy.Server, logLine func(string),
+) error {
+	delay := sessionReconnectMinDelay
+	for {
+		started := time.Now()
+		err := m.runSession(ctx, account, password, char, autonomous,
+			registrar, logLine)
+		if ctx.Err() != nil {
+			return nil
+		}
+		if err != nil {
+			logLine("acceptance: session lost, reconnecting: " + err.Error())
+		}
+		tracker := m.registryTracker(account)
+		if cooldown := tracker.LoginCooldownRemaining(); cooldown > delay {
+			logLine("acceptance: the login cooldown holds the reconnect " +
+				"back for " + cooldown.String())
+			delay = cooldown
+		}
+		if time.Since(started) >= sessionStableTime {
+			delay = sessionReconnectMinDelay
+		}
+		logLine("acceptance: reconnecting in " + delay.String())
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(delay):
+		}
+		delay = min(delay*2, sessionReconnectMaxDelay)
+	}
 }
 
 // registryTracker resolves the tracker of a temp account.
