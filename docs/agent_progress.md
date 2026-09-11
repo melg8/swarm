@@ -19,7 +19,6 @@ every push.
 
 ### Goal
 
-<<<<<<< HEAD
 The user report (2026-09-11, Russian): the bots are stuck and not
 learning. The state dump (build 36bfe99) shows the character test1
 (level 13, 25023 SP) at the elven village teacher plaza
