@@ -97,7 +97,12 @@ const shopTaxLimit = 2.0
 // (a cloth cap for a handful of adena) come before the expensive
 // weapon upgrades unless the weapon gain outweighs them, and nothing
 // gets bought that the inventory already carries (the free upgrades
-// are simulated first). Simulated equips keep the plan consistent:
+// are simulated first). The top-tier guard of bestPurchase keeps every
+// slot ladder at its best affordable step: a strictly better affordable
+// candidate on the same paperdoll slots beats the intermediate steps
+// whatever their gain per adena - when the budget (the sale proceeds
+// included) reaches the top weapon, the top weapon is bought, never a
+// cheaper rung below it. Simulated equips keep the plan consistent:
 // after a planned purchase the virtual paperdoll carries the bought
 // item and the next pick compares against it.
 //
@@ -118,9 +123,11 @@ func PlanPurchases(
 	budget := adena
 	planned := make(map[int32]bool)
 	boughtSlots := make(map[Slot]bool)
+	ladderTop := make(map[Slot]float64)
 	for budget > 0 {
 		best, gain, credit, sellFirst := bestPurchase(
-			virtual, candidates, budget, planned, boughtSlots, equipment)
+			virtual, candidates, budget, planned, boughtSlots,
+			equipment, ladderTop)
 		if best == nil || gain <= 0 {
 			break
 		}
@@ -209,6 +216,16 @@ func catalogCandidates(
 	return candidates
 }
 
+// viableCandidate is one candidate that passed the affordability, gain
+// and slot guards of a pick round, with the precomputed data the value
+// ranking needs.
+type viableCandidate struct {
+	candidate *purchaseCandidate
+	gain      float64
+	credit    int64
+	sellFirst []int32
+}
+
 // bestPurchase picks the affordable candidate with the highest score
 // gain per adena; the plain gain breaks ties between equally priced
 // offers. The candidates that would write into a slot this plan
@@ -217,25 +234,85 @@ func catalogCandidates(
 // purchase displaces (the trip sells them before buying, see
 // displacedValue): a replacement is within reach as soon as the
 // adena plus the proceeds cover it, so the character shops for it
-// immediately instead of hoarding the full price first. The winner
-// returns with its credit and the SellFirst object ids.
+// immediately instead of hoarding the full price first.
+//
+// The top-tier guard runs before the value ranking: a viable candidate
+// that another viable candidate outgains on an overlapping set of
+// paperdoll slots is dropped, whatever its gain per adena. Without the
+// guard the cheap ladder steps of a slot win the ranking (the full
+// weapon gain over the 883 adena short sword beats the same slot's
+// 62k gladius gain by an order of magnitude), so after selling the
+// replaced weapon the plan bought the 1k intermediate sword and the
+// one-per-slot guard blocked the affordable top tier for the trip.
+// With the guard a slot ladder contributes only its best viable step
+// and the value ranking decides between the per-slot winners - the
+// cheap fillers of the other slots keep their documented priority.
+//
+// The guard holds across the whole plan, not only one pick round:
+// ladderTop carries the best gain ever seen per slot, and a later
+// round whose budget no longer reaches the top step leaves the slot
+// unpurchased instead of buying the intermediate rung the budget
+// suddenly fits again (the other picks of the plan must not crowd the
+// top tier out and push a cheaper rung in - the bot would spend the
+// sale proceeds of its replaced weapon on a downgrade). The gain (the
+// net paperdoll delta with the family clears) is the dominance
+// measure, so the two hand versus one hand plus shield tradeoffs keep
+// their semantics: the strictly better end state dominates, an equal
+// gain at a lower price does not (the value ranking keeps the cheaper
+// pick). The winner returns with its credit and the SellFirst object
+// ids.
 func bestPurchase(
 	virtual [slotCount]ScoredItem, candidates []purchaseCandidate,
 	budget int64, planned map[int32]bool, boughtSlots map[Slot]bool,
-	equipment Equipment,
+	equipment Equipment, ladderTop map[Slot]float64,
 ) (*purchaseCandidate, float64, int64, []int32) {
-	var best *purchaseCandidate
+	viable := viableCandidates(
+		virtual, candidates, budget, planned, boughtSlots,
+		equipment, ladderTop)
+
+	var best *viableCandidate
 	bestValue := float64(0)
 	bestGain := float64(0)
-	var bestCredit int64
-	var bestSellFirst []int32
+	for index := range viable {
+		item := &viable[index]
+		value := item.gain
+		if item.candidate.price > 0 {
+			value = item.gain / float64(item.candidate.price)
+		}
+		if best == nil || value > bestValue ||
+			(value == bestValue && item.gain > bestGain) {
+			best = item
+			bestValue = value
+			bestGain = item.gain
+		}
+	}
+	if best == nil {
+		return nil, 0, 0, nil
+	}
+
+	return best.candidate, best.gain, best.credit, best.sellFirst
+}
+
+// viableCandidates filters the catalog offers down to the ones this
+// pick round can take: not planned yet, affordable (the sell credit of
+// the displaced pieces included), a strict paperdoll improvement, not
+// writing into a slot the plan already bought for and not aspired
+// above by a better tier of the same slots. Every survivor records its
+// gain on its slots (the ladder top the later rounds hold the plan
+// to); the survivors return with their credits and SellFirst ids.
+func viableCandidates(
+	virtual [slotCount]ScoredItem, candidates []purchaseCandidate,
+	budget int64, planned map[int32]bool, boughtSlots map[Slot]bool,
+	equipment Equipment, ladderTop map[Slot]float64,
+) []viableCandidate {
+	viable := make([]viableCandidate, 0, len(candidates))
 	for index := range candidates {
 		candidate := &candidates[index]
 		if planned[candidate.itemID] {
 			continue
 		}
-		credit, sellFirst := displacedValue(equipment, affectedSlots(
-			virtual, candidate.stats.BodyPart))
+		slots := affectedSlots(virtual, candidate.stats.BodyPart)
+		credit, sellFirst := displacedValue(equipment, slots)
 		if candidate.price > budget+credit {
 			continue
 		}
@@ -246,20 +323,45 @@ func bestPurchase(
 		if slotBlocked(virtual, candidate.stats.BodyPart, boughtSlots) {
 			continue
 		}
-		value := gain
-		if candidate.price > 0 {
-			value = gain / float64(candidate.price)
+		if aspiredAbove(ladderTop, slots, gain) {
+			continue
 		}
-		if value > bestValue || (value == bestValue && gain > bestGain) {
-			best = candidate
-			bestValue = value
-			bestGain = gain
-			bestCredit = credit
-			bestSellFirst = sellFirst
+		for _, slot := range slots {
+			if gain > ladderTop[slot] {
+				ladderTop[slot] = gain
+			}
+		}
+		viable = append(viable, viableCandidate{
+			candidate: candidate,
+			gain:      gain,
+			credit:    credit,
+			sellFirst: sellFirst,
+		})
+	}
+
+	return viable
+}
+
+// aspiredAbove reports whether the slots of the candidate carry the
+// recorded gain of a better tier this plan already considered: the
+// ladder keeps aiming at that top step, so the intermediate rung stays
+// out of the plan even when the eroding budget of the later pick
+// rounds would fit it again. The recording runs in the score
+// descending scan order of the candidates, so within one pick round
+// the scan itself drops every same-slot rung below the best viable
+// tier (a lower score item can never outgain a higher score one on
+// overlapping slots - the shared displacement subtracts the same
+// scores), and the persistence of the map extends the guard over the
+// later rounds. A gain equal to the record is not aspired - the value
+// ranking keeps the cheaper of two equal tiers.
+func aspiredAbove(ladderTop map[Slot]float64, slots []Slot, gain float64) bool {
+	for _, slot := range slots {
+		if ladderTop[slot] > gain {
+			return true
 		}
 	}
 
-	return best, bestGain, bestCredit, bestSellFirst
+	return false
 }
 
 // purchaseGain computes the score gain the stats would bring to the
