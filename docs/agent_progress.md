@@ -910,3 +910,22 @@ live stack; go build/vet/test/lint stay green.
   and the session runner (the same wiring runBot uses).
 - Next: implement the db client, the manager, the runner, the checks,
   the webserver endpoints and the web UI panel.
+
+### Progress (2026-09-11, round 1)
+
+- Commit "connection: plain Close of the char selection connection":
+  the char selection stage probe needs a clean drop (no logout
+  announcement) - GameClient.Close.
+- Commit "acceptance: the test runner, the db injection and the
+  scenarios": internal/swarm/acceptance (db.go + db_test.go with a
+  fake wire server, setup.go with the reset SQL, manager.go,
+  runner.go, monitor.go + monitor_test.go, scenarios.go,
+  scenarios_run.go, relay.go). 19 packages green, 0 lint findings in
+  the touched packages, all six web harnesses PASS.
+- Commit "webui: the acceptance endpoints and the tests panel": the
+  API endpoints, the TESTS sidebar panel, the hover tooltip, the run
+  all buttons (sequential + parallel).
+- Commit "main: the acceptance manager wiring": the manager attaches
+  in both launch modes.
+- Next: the live stack verification (run the scenarios through the
+  web API against the deployed Mobius C1), then the docs.
