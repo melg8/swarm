@@ -49,6 +49,8 @@ const (
 // (ValidateClick port) approved the click from (46008, 51992) to wp 2
 // (46008, 52040, 48 units south), the click was sent, but the
 // character never moved. The dump shows three re-path cycles in 90 s.
+//
+//nolint:dupl // mirrors TestReproVillageZoneReturnWalksThePlan with the round 53 coords
 func TestReproRound53ZoneReturnWalksThePlan(t *testing.T) {
 	engine := reproEngine(t)
 	nav := NewNavigator(engine)

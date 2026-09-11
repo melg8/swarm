@@ -100,6 +100,8 @@ func (s *villageClickServer) consume(game *fakeGame, bot *state.Bot) {
 // The walk must arrive with zero refused clicks and zero stuck
 // re-paths - the exact inversion of the reported failure signature
 // (three re-paths and a character frozen on its own cell).
+//
+//nolint:dupl // mirrors TestReproRound53ZoneReturnWalksThePlan with the village coords
 func TestReproVillageZoneReturnWalksThePlan(t *testing.T) {
 	engine := reproEngine(t)
 	nav := NewNavigator(engine)

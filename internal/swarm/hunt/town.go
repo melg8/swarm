@@ -1310,7 +1310,7 @@ func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
 // stuckWaterEscape re-plans the water escape itself when the character
 // stands still mid-escape. The town leg is meaningless until the
 // character is back ashore. Consumes the re-path budget.
-func (l *Loop) stuckWaterEscape(now time.Time, selfX int32, selfY int32) bool {
+func (l *Loop) stuckWaterEscape(_ time.Time, selfX int32, selfY int32) bool {
 	l.rePaths++
 	if l.rePaths > maxRePaths {
 		l.abortTownTrip("walk stuck")
