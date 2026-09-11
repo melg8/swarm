@@ -321,7 +321,7 @@ func (l *Loop) SetHuntingZoneRegion(region string) {
 	case regionElven, "":
 		l.SetHuntingSpotRegion(regionElven)
 	default:
-		l.logger.Printf("Hunt: no zone registry for region %q, hunting "+
+		l.logf("Hunt: no zone registry for region %q, hunting "+
 			"without zones", region)
 	}
 }
@@ -341,13 +341,13 @@ func (l *Loop) userZoneSelect(index int32) {
 		return
 	}
 	if index < 0 || int(index) >= len(l.zones) {
-		l.logger.Printf("Hunt: zone index %d out of range", index)
+		l.logf("Hunt: zone index %d out of range", index)
 
 		return
 	}
 	zone := l.zones[index]
 	l.zoneOverride = int(index)
-	l.logger.Printf("Hunt: user selected the hunting zone %s", zone.Name)
+	l.logf("Hunt: user selected the hunting zone %s", zone.Name)
 	l.stopForZoneSwitch()
 	l.applyHuntingZone(zone)
 }
@@ -376,7 +376,7 @@ func (l *Loop) stopForZoneSwitch() {
 	if x, y, z, ok := l.tracker.SelfPosition(); ok &&
 		l.tracker.SelfWalking() {
 		if err := l.game.WalkTo(x, y, z); err != nil {
-			l.logger.Printf("Hunt: zone switch stop walk failed: %v", err)
+			l.logf("Hunt: zone switch stop walk failed: %v", err)
 		}
 	}
 }
@@ -413,7 +413,7 @@ func (l *Loop) maybeSwitchZone() {
 			return
 		}
 		l.zoneOverride = -1
-		l.logger.Printf("Hunt: outgrew the manual zone %s, resuming the "+
+		l.logf("Hunt: outgrew the manual zone %s, resuming the "+
 			"automatic picker", zone.Name)
 	}
 	fromX, fromY := l.selfZoneAnchor()
@@ -423,7 +423,7 @@ func (l *Loop) maybeSwitchZone() {
 		return
 	}
 	l.applyHuntingZone(zone)
-	l.logger.Printf("Hunt: level %d with gear %d: hunting %s (levels "+
+	l.logf("Hunt: level %d with gear %d: hunting %s (levels "+
 		"%d-%d)", level, l.gearPoints(), zone.Name, zone.MinLevel,
 		zone.MaxLevel)
 }
@@ -523,12 +523,12 @@ func (l *Loop) maybeRotateEmptyZone(now time.Time) { //nolint:cyclop
 	l.applyHuntingZone(next)
 	l.zoneCheckAt = now
 	if currentOK {
-		l.logger.Printf("Hunt: %s is cleared out, rotating to %s",
+		l.logf("Hunt: %s is cleared out, rotating to %s",
 			current.Name, next.Name)
 
 		return
 	}
-	l.logger.Printf("Hunt: the zone is cleared out, rotating to %s",
+	l.logf("Hunt: the zone is cleared out, rotating to %s",
 		next.Name)
 }
 
@@ -624,7 +624,7 @@ func (l *Loop) noteZoneDeath() {
 	l.zoneDeaths[zone.ID]++
 	deaths := l.zoneDeaths[zone.ID]
 	if deaths < zoneDeathLimit {
-		l.logger.Printf("Hunt: death %d of %d in %s",
+		l.logf("Hunt: death %d of %d in %s",
 			deaths, zoneDeathLimit, zone.Name)
 		l.publishZoneView()
 
@@ -645,7 +645,7 @@ func (l *Loop) noteZoneDeath() {
 	l.zoneCheckAt = time.Time{}
 	l.zoneEmptySince = time.Time{}
 	l.publishZoneView()
-	l.logger.Printf("Hunt: %d deaths in %s, the zone outguns the "+
+	l.logf("Hunt: %d deaths in %s, the zone outguns the "+
 		"character: regressing to an easier band (capped below level "+
 		"%d) until the level grows", deaths, zone.Name, zone.MinLevel)
 }
@@ -683,7 +683,7 @@ func (l *Loop) resetZoneDeathState() {
 	l.zoneDeathCap = -1
 	l.publishZoneView()
 	if !first {
-		l.logger.Printf("Hunt: level %d: the zone death bookkeeping "+
+		l.logf("Hunt: level %d: the zone death bookkeeping "+
 			"resets", level)
 	}
 }

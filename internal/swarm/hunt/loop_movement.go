@@ -76,7 +76,7 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
 		moveY = int32(float64(selfY) + dy*frac)
 	}
 	if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
-		l.logger.Printf("Hunt: far target walk failed: %v", err)
+		l.logf("Hunt: far target walk failed: %v", err)
 	}
 
 	return true
@@ -279,7 +279,7 @@ func (l *Loop) returnToZone() {
 	}
 	if !l.zoneReturn {
 		l.zoneReturn = true
-		l.logger.Printf("Hunt: outside the hunting zone, pathfinding back")
+		l.logf("Hunt: outside the hunting zone, pathfinding back")
 	}
 	if (l.navigator == nil) || l.zoneFails >= zoneReturnFailBudget {
 		l.phase = phaseEngage
@@ -367,6 +367,6 @@ func (l *Loop) walkZoneLeg(
 		moveX, moveY = ax, ay
 	}
 	if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
-		l.logger.Printf("Hunt: walk back failed: %v", err)
+		l.logf("Hunt: walk back failed: %v", err)
 	}
 }

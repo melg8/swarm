@@ -531,7 +531,7 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	l.shoppingPlanCache = nil
 	l.shoppingPlanAt = time.Time{}
 	l.shoppingPlanAdena = 0
-	l.logger.Printf("Hunt: %s, walking to the trader %s", reason,
+	l.logf("Hunt: %s, walking to the trader %s", reason,
 		merchant.Name)
 	if !l.startWalkLeg(townNpcPosition(merchant)) {
 		l.abortTownTrip("no walkable path to the shop")
@@ -604,7 +604,7 @@ func (l *Loop) walkToward(x, y, z int32, now time.Time) {
 	}
 	l.moveAt = now
 	if err := l.game.WalkTo(x, y, z); err != nil {
-		l.logger.Printf("Hunt: walk request failed: %v", err)
+		l.logf("Hunt: walk request failed: %v", err)
 	}
 }
 
@@ -741,16 +741,16 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
 			from, dest, tripApproachRadius)
 	}
 	if err != nil {
-		l.logger.Printf("Hunt: town trip path search failed: %v", err)
+		l.logf("Hunt: town trip path search failed: %v", err)
 
 		return false
 	}
 	if result == nil || !result.Found || len(result.Waypoints) == 0 {
 		if !nonDry {
-			l.logger.Printf("Hunt: no dry path to %d %d, the walk would "+
+			l.logf("Hunt: no dry path to %d %d, the walk would "+
 				"swim", int(dest.X), int(dest.Y))
 		} else {
-			l.logger.Printf("Hunt: no path to %d %d at all",
+			l.logf("Hunt: no path to %d %d at all",
 				int(dest.X), int(dest.Y))
 		}
 
@@ -1007,7 +1007,7 @@ func (l *Loop) clickWaypoint(
 	}
 	l.moveAt = now
 	if err := l.game.WalkTo(int32(moveX), int32(moveY), int32(moveZ)); err != nil {
-		l.logger.Printf("Hunt: town walk request failed: %v", err)
+		l.logf("Hunt: town walk request failed: %v", err)
 	}
 }
 
@@ -1388,7 +1388,7 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 
 		return true
 	}
-	l.logger.Printf("Hunt: town walk stuck, re-pathing (%d of %d)",
+	l.logf("Hunt: town walk stuck, re-pathing (%d of %d)",
 		l.rePaths, maxRePaths)
 	if !l.startWalkLeg(l.legDest) {
 		l.abortTownTrip("re-path failed")
@@ -1441,17 +1441,17 @@ func (l *Loop) enterSellPhase() {
 	l.merchantPick = time.Time{}
 	l.merchantDeckUntil = time.Time{}
 	if l.sellableStop() {
-		l.logger.Printf("Hunt: shop reached, selling the junk")
+		l.logf("Hunt: shop reached, selling the junk")
 
 		return
 	}
 	if len(l.tripStops) > 0 {
-		l.logger.Printf("Hunt: shop reached at %s",
+		l.logf("Hunt: shop reached at %s",
 			l.tripStops[0].merchant.Name)
 
 		return
 	}
-	l.logger.Printf("Hunt: shop reached")
+	l.logf("Hunt: shop reached")
 }
 
 // tickTownSell runs the sell stop (the first trip stop) and the buy
@@ -1505,7 +1505,7 @@ func (l *Loop) tickTownSell() {
 		}
 		if !l.buysPlanned {
 			stats := l.tracker.InventoryStats()
-			l.logger.Printf("Hunt: shop: junk sold (%d slots left, "+
+			l.logf("Hunt: shop: junk sold (%d slots left, "+
 				"%.0f%% weight), distributing the trip plan",
 				stats.Slots, stats.WeightPercent)
 			l.planShoppingStops()
@@ -1558,7 +1558,7 @@ func (l *Loop) handleMerchant(now time.Time, templates []int32) bool {
 		templates, merchantFindRadius)
 	if ok {
 		l.merchantID = merchant.ObjectID
-		l.logger.Printf("Hunt: trading with " + merchant.Name)
+		l.logf("Hunt: trading with " + merchant.Name)
 
 		return false
 	}
@@ -1632,7 +1632,7 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 			// cannot help.
 			if l.merchantDeckUntil.IsZero() {
 				l.merchantDeckUntil = now.Add(merchantDeckWindow)
-				l.logger.Printf("Hunt: %s stands on another deck (z %d vs "+
+				l.logf("Hunt: %s stands on another deck (z %d vs "+
 					"%d), re-walking by server routing",
 					l.tracker.ObjectName(l.merchantID), selfZ, z)
 			}
@@ -1643,7 +1643,7 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 
 				return false
 			}
-			l.logger.Printf("Hunt: %s stays out of reach, the sells work "+
+			l.logf("Hunt: %s stays out of reach, the sells work "+
 				"without it and its buys are skipped",
 				l.tracker.ObjectName(l.merchantID))
 			l.merchantID = -1
@@ -1680,7 +1680,7 @@ func (l *Loop) selectMerchant(now time.Time) bool {
 		if now.Sub(l.merchantPick) >= selectPeriod {
 			l.merchantPick = now
 			if err := l.game.AttackTarget(l.merchantID); err != nil {
-				l.logger.Printf("Hunt: merchant select failed: %v", err)
+				l.logf("Hunt: merchant select failed: %v", err)
 			}
 		}
 
@@ -1753,14 +1753,14 @@ func (l *Loop) sellJunk() {
 		return
 	}
 	if err := l.game.SellItems(batch); err != nil {
-		l.logger.Printf("Hunt: sell request failed: %v", err)
+		l.logf("Hunt: sell request failed: %v", err)
 
 		return
 	}
 	for _, item := range batch {
 		l.sold[item.ObjectID] = true
 	}
-	l.logger.Printf("Hunt: offered %d items for sale", len(batch))
+	l.logf("Hunt: offered %d items for sale", len(batch))
 }
 
 // engagesOnZoneEntry ends the return walk the moment the hunting
@@ -1793,7 +1793,7 @@ func (l *Loop) engagesOnZoneEntry() bool {
 		return false
 	}
 	l.endTownTrip("a target stands inside the zone")
-	l.logger.Printf("Hunt: engaging %s on the zone entry", pick.Name)
+	l.logf("Hunt: engaging %s on the zone entry", pick.Name)
 
 	return true
 }
@@ -1818,7 +1818,7 @@ func (l *Loop) startReturnLeg() {
 
 		return
 	}
-	l.logger.Printf("Hunt: walking back to the farm spot")
+	l.logf("Hunt: walking back to the farm spot")
 }
 
 // clearTalkedTarget drops the npc selection a stop or a whole trip
@@ -1861,7 +1861,7 @@ func (l *Loop) endTownTrip(reason string) {
 	l.resetReplacementSales()
 	l.resetLearnState()
 	l.tripEndedAt = time.Now()
-	l.logger.Printf("Hunt: town trip ended: " + reason)
+	l.logf("Hunt: town trip ended: " + reason)
 }
 
 // abortTownTrip finishes a failed trip with a log line. A deleveling
@@ -1942,7 +1942,7 @@ func (l *Loop) standUpGuarded(now time.Time) bool {
 		return false
 	}
 	if err := l.game.ActionSitStand(); err != nil {
-		l.logger.Printf("Hunt: stand up failed: %v", err)
+		l.logf("Hunt: stand up failed: %v", err)
 
 		return false
 	}

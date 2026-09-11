@@ -855,10 +855,14 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
 	// view of the web UI widget rides the same defer: every tick
 	// republishes the queue (SetShoppingPlan no-ops on an identical
 	// view) so the widget never shows a stale plan whatever phase
-	// the tick ended in.
+	// the tick ended in. The same defer publishes the loop internals
+	// for the diagnostics section of the state dump
+	// (SetHuntDiagnostics stamps the heartbeat the encoders age
+	// without a version bump).
 	defer func() {
 		l.tracker.SetPhase(string(l.phase))
 		l.publishShoppingView()
+		l.tracker.SetHuntDiagnostics(l.diagnostics(time.Now()))
 	}()
 	if l.tracker.SelfDead() {
 		l.recoverFromDeath()
@@ -1055,9 +1059,9 @@ func (l *Loop) recoverFromDeath() {
 		// point of the phase).
 		l.noteZoneDeath()
 	}
-	l.logger.Printf("Hunt: character died, restarting at the nearest village")
+	l.logf("Hunt: character died, restarting at the nearest village")
 	if err := l.game.RestartAtVillage(); err != nil {
-		l.logger.Printf("Hunt: village restart failed: %v", err)
+		l.logf("Hunt: village restart failed: %v", err)
 	}
 }
 
@@ -1135,7 +1139,7 @@ func (l *Loop) engage() {
 		l.zoneReturn = false
 		l.zoneFails = 0
 		l.roadFights = 0
-		l.logger.Printf("Hunt: back in the hunting zone, resuming the hunt")
+		l.logf("Hunt: back in the hunting zone, resuming the hunt")
 	}
 	// The mana rest of the caster runs before the server target
 	// re-adopt: a caster whose mana sits under the re-engage
@@ -1180,7 +1184,7 @@ func (l *Loop) engage() {
 		if l.spot != nil {
 			l.spotNoteKill(l.target, now)
 		}
-		l.logger.Printf("Hunt: target %d died, looting", l.target)
+		l.logf("Hunt: target %d died, looting", l.target)
 		l.target = 0
 		l.clearBlindRecovery()
 		l.phase = phaseLoot
@@ -1207,7 +1211,7 @@ func (l *Loop) engage() {
 		// target is dropped and skipped for a while; the
 		// blind recovery owns the obstructed case with its
 		// own budgets instead.
-		l.logger.Printf("Hunt: target %d does not engage, "+
+		l.logf("Hunt: target %d does not engage, "+
 			"switching to another", l.target)
 		if l.targetSkip == nil {
 			l.targetSkip = make(map[int32]time.Time)
@@ -1398,11 +1402,11 @@ func (l *Loop) engage() {
 					!l.tracker.SelfWalking() &&
 					now.Sub(l.lastHit) >= engageRetryPeriod {
 					l.lastHit = now
-					l.logger.Printf("Hunt: chase on %d stalled at "+
+					l.logf("Hunt: chase on %d stalled at "+
 						"%d units, walking to the target",
 						l.target, int(dist))
 					if err := l.game.WalkTo(x, y, z); err != nil {
-						l.logger.Printf("Hunt: chase walk failed: %v",
+						l.logf("Hunt: chase walk failed: %v",
 							err)
 					}
 				}
@@ -1422,7 +1426,7 @@ func (l *Loop) engage() {
 		return
 	}
 	if err := l.game.AttackTarget(l.target); err != nil {
-		l.logger.Printf("Hunt: attack failed: %v", err)
+		l.logf("Hunt: attack failed: %v", err)
 
 		return
 	}

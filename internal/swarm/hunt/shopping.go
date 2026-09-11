@@ -361,7 +361,7 @@ func (l *Loop) stepReplacementSales(now time.Time) bool {
 		if len(l.replaceQueue) == 0 {
 			return true
 		}
-		l.logger.Printf("Hunt: shop: %d equipped pieces feed the "+
+		l.logf("Hunt: shop: %d equipped pieces feed the "+
 			"replacements, selling them first", len(l.replaceQueue))
 
 		return false
@@ -435,17 +435,17 @@ func (l *Loop) replaceHeadOff(head int32, now time.Time) bool {
 		return false
 	}
 	if l.replaceTried >= 2 {
-		l.logger.Printf("Hunt: shop: item %d does not come off, "+
+		l.logf("Hunt: shop: item %d does not come off, "+
 			"buying without its credit", head)
 
 		return true
 	}
 	l.replaceUnequipAt = now
 	l.replaceTried++
-	l.logger.Printf("Hunt: shop: unequipping the replaced item %d",
+	l.logf("Hunt: shop: unequipping the replaced item %d",
 		head)
 	if err := l.game.UseItem(head); err != nil {
-		l.logger.Printf("Hunt: shop: unequip of %d failed: %v",
+		l.logf("Hunt: shop: unequip of %d failed: %v",
 			head, err)
 
 		return false
@@ -488,7 +488,7 @@ func (l *Loop) replaceOfferDone(now time.Time) bool {
 		return false
 	}
 	if err := l.game.SellItems(batch); err != nil {
-		l.logger.Printf("Hunt: shop: replacement sell failed: %v", err)
+		l.logf("Hunt: shop: replacement sell failed: %v", err)
 
 		return false
 	}
@@ -497,7 +497,7 @@ func (l *Loop) replaceOfferDone(now time.Time) bool {
 	}
 	l.sellAt = now
 	l.replaceSellSent = true
-	l.logger.Printf("Hunt: shop: offered %d replaced pieces for sale",
+	l.logf("Hunt: shop: offered %d replaced pieces for sale",
 		len(batch))
 
 	return true
@@ -580,7 +580,7 @@ func (l *Loop) planShoppingStops() {
 	l.buysPlanned = true
 	purchases := l.tripPlan
 	if len(purchases) == 0 {
-		l.logger.Printf("Hunt: shop: the trip plan carries no buys, " +
+		l.logf("Hunt: shop: the trip plan carries no buys, " +
 			"heading back")
 
 		return
@@ -603,7 +603,7 @@ func (l *Loop) planShoppingStops() {
 	for templateID, buys := range groups {
 		merchant, ok := merchantByTemplate(templateID)
 		if !ok {
-			l.logger.Printf("Hunt: shop: no known merchant for template "+
+			l.logf("Hunt: shop: no known merchant for template "+
 				"%d, skipping %d purchases", templateID, len(buys))
 
 			continue
@@ -624,7 +624,7 @@ func (l *Loop) planShoppingStops() {
 	for _, stop := range stops {
 		total += len(stop.buys)
 	}
-	l.logger.Printf("Hunt: shop: planning to buy %d items from %d "+
+	l.logf("Hunt: shop: planning to buy %d items from %d "+
 		"merchants", total, len(stops))
 	// The first group of the merchant the character stands at (the
 	// sell stop) buys right here.
@@ -708,7 +708,7 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 	if len(l.buyRequested) > 0 {
 		switch {
 		case l.buysArrived(l.buyRequested):
-			l.logger.Printf("Hunt: shop: %d purchases confirmed",
+			l.logf("Hunt: shop: %d purchases confirmed",
 				len(l.buyRequested))
 			l.buyRequested = nil
 			l.buyConfirmAt = time.Time{}
@@ -718,14 +718,14 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 		default:
 			l.buyRetries++
 			if l.buyRetries > stopBuyRetries {
-				l.logger.Printf("Hunt: shop: %d purchases never "+
+				l.logf("Hunt: shop: %d purchases never "+
 					"arrived after %d requests, skipping them",
 					len(l.buyRequested), l.buyRetries)
 				l.buyRequested = nil
 				l.buyConfirmAt = time.Time{}
 				l.buyRetries = 0
 			} else {
-				l.logger.Printf("Hunt: shop: %d purchases did not "+
+				l.logf("Hunt: shop: %d purchases did not "+
 					"arrive, re-requesting (try %d of %d)",
 					len(l.buyRequested), l.buyRetries, stopBuyRetries)
 			}
@@ -765,7 +765,7 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 		l.tripStops[0].buys = remaining
 	}
 	if err := l.game.BuyItems(listID, batch); err != nil {
-		l.logger.Printf("Hunt: shop: buy request failed: %v", err)
+		l.logf("Hunt: shop: buy request failed: %v", err)
 
 		return false
 	}
@@ -776,7 +776,7 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 	for _, purchase := range batch {
 		names = append(names, npcdata.ItemName(purchase.ItemID))
 	}
-	l.logger.Printf("Hunt: shop: buying %d items from %s (list %d): %s",
+	l.logf("Hunt: shop: buying %d items from %s (list %d): %s",
 		len(batch), stop.merchant.Name, listID, strings.Join(names, ", "))
 
 	return len(l.tripStops) > 0 && len(l.tripStops[0].buys) == 0 &&
@@ -857,7 +857,7 @@ func (l *Loop) advanceTripStop() {
 	l.merchantPick = time.Time{}
 	l.merchantDeckUntil = time.Time{}
 	stop := l.tripStops[0]
-	l.logger.Printf("Hunt: shop: walking to %s", stop.merchant.Name)
+	l.logf("Hunt: shop: walking to %s", stop.merchant.Name)
 	if !l.startWalkLeg(townNpcPosition(stop.merchant)) {
 		l.abortTownTrip("no walkable path to the shop of " +
 			stop.merchant.Name)
@@ -954,7 +954,7 @@ func (l *Loop) resetStopBuys(reason string) {
 	if len(l.tripStops) == 0 {
 		return
 	}
-	l.logger.Printf("Hunt: shop: %s, skipping %d purchases", reason,
+	l.logf("Hunt: shop: %s, skipping %d purchases", reason,
 		len(l.tripStops[0].buys))
 	l.tripStops[0].buys = nil
 }
