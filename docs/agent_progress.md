@@ -1318,3 +1318,33 @@ live stack; go build/vet/test/lint stay green.
   the full round.
 - go build/vet/test green, golangci-lint run --new: 0 issues.
 - Next: the parallel run's farm leg finish, then the push.
+
+### Progress (2026-09-11, round 3 addendum: the road budget verified)
+
+- The parallel run all's farm leg timed out ("cancelled: context
+  deadline exceeded") on the road fights: the engage's out of zone
+  adoption answered every attacker the aggressive Kaboo territory
+  fed it, each kill adopted the next (the respawn window is 15-20s)
+  and the leash never resumed the walk home - the log shows the
+  Power Strike casts every fifteen seconds for nine straight
+  minutes.
+- Commit "hunt: the road fight budget lets the walk home resume":
+  adoptOutZoneFight counts the consecutive road fights and stops
+  starting new ones past roadFightBudget (3) - the walk home
+  continues through the blows, the flee flow keeps owning the hurt
+  case, the budget resets on the zone entry. Pinned by
+  TestRoadFightBudgetResumesTheWalkHome.
+- Live verification (rebuilt at 08:46): the farm scenario PASSED at
+  09:01:54 - the full cycle (weapon run at the village, the gear
+  set, the books, the lessons with the mid run gear upgrades, the
+  walk home through the aggressive packs, the auras, the kill) ran
+  in 14m54s against the 30m timeout, every condition held at once
+  and the bot left the world gracefully.
+- The parallel run all verified live: the staggered starts
+  (08:04:15.161 / 08:04:17.161 / 08:04:19.161), all three temp bots
+  entered the world, bot-lifetime and proxy-relay PASSED in the
+  same window, the farm leg's timeout was the road fight finding
+  above (fixed and re-verified standalone).
+- go build/vet/test green, golangci-lint run --new: 0 issues; all
+  four commits rebased over the shop freeze round and pushed.
+- Next: none - the round is complete.
