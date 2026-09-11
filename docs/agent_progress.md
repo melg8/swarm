@@ -438,6 +438,38 @@ carries underneath.
 Verify loop: `repro_gear` and `repro_hud` PASS (they parse
 `style.css`); the change is CSS only.
 
+### Followup: the waypoint labels do not collide with the bot name (2026-09-11)
+
+The user reported the waypoint coordinate labels `(x, y)` drawn on
+the map by `drawWalkPlan` were hard to read AND collided with the
+bot name label drawn at the character position by `drawLabels`
+(especially the first waypoint, which sits right next to the
+character). The user also asked to make the left-panel proxy
+corner brackets brighter and not touch the bot name.
+
+Fix 1 (map / `map.js`): the `drawWalkPlan` label loop now computes
+the character's screen position once and skips the coordinate
+label (but still draws the waypoint dot) for any waypoint within
+`labelSkipPx = 30` pixels of the character - the bot name label
+drawn by `drawLabels` at the character position no longer overlaps
+the coordinate text. The remaining labels alternate above-right and
+below-right offsets (`labelIndex % 2`) so adjacent waypoints do not
+stack on each other either. The font is bumped from 10px to 11px,
+the dark outline from 3px to 3.5px at alpha 0.9, so the text reads
+on both the light map imagery and the dark fill.
+
+Fix 2 (left panel / `style.css`): the `.bot-item.is-proxy::before`
+corner brackets now use a bright gold `#ffb800` (distinct from
+every other UI accent), 3px thick stripes (was 2px) and 16px long
+(was 12px) - clearly visible on both themes. The pseudo-element
+sits at `inset: 2px` instead of `inset: 0`, pulling the brackets
+2px inside the bot-item edges so they never touch the wrapped
+second line of the bot-name even when the item is short (offline
+bot, no activity banner, no mini bars).
+
+Verify loop: `repro_gear`, `repro_hud`, `repro_map_render` PASS;
+`node --check map.js` clean.
+
 ## Active task: the town walk stuck loop - the reverse wall check and the waypoint skip
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.

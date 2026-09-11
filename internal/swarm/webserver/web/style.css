@@ -532,47 +532,50 @@ body.mode-pathfind .buffs-panel { display: none; }
    (top-left, top-right, bottom-left, bottom-right) so the proxy bot
    reads at a glance from anywhere in the list, without taking space
    on the row. All four corners are drawn by a single ::before that
-   fills the bot-item, so they are positioned relative to the SAME
-   box and therefore always form a clean rectangle around the
-   plaque - regardless of how many activity bars or mini bars the
-   row carries. Each corner is two stripes (one horizontal, one
-   vertical) drawn by a linear-gradient, layered as 8 background
-   images on the pseudo-element. */
+   sits inside the bot-item (inset: 2px), so they are positioned
+   relative to the SAME box and therefore always form a clean
+   rectangle around the plaque - regardless of how many activity
+   bars or mini bars the row carries. The inset pulls the brackets
+   2px away from the box edge so they never touch the wrapped
+   second line of the bot-name even when the item is short. The
+   bright gold color (#ffb800) is distinct from every other UI
+   accent, and the 3px thick / 16px long stripes stay clearly
+   visible on both themes. */
 .bot-item.is-proxy {
   position: relative;
 }
 .bot-item.is-proxy::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: 2px;
   pointer-events: none;
   background-image:
     /* top-left horizontal stripe */
-    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(#ffb800, #ffb800),
     /* top-left vertical stripe */
-    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(#ffb800, #ffb800),
     /* top-right horizontal stripe */
-    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(#ffb800, #ffb800),
     /* top-right vertical stripe */
-    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(#ffb800, #ffb800),
     /* bottom-left horizontal stripe */
-    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(#ffb800, #ffb800),
     /* bottom-left vertical stripe */
-    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(#ffb800, #ffb800),
     /* bottom-right horizontal stripe */
-    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(#ffb800, #ffb800),
     /* bottom-right vertical stripe */
-    linear-gradient(var(--accent), var(--accent));
+    linear-gradient(#ffb800, #ffb800);
   background-position:
     top left, top left,
     top right, top right,
     bottom left, bottom left,
     bottom right, bottom right;
   background-size:
-    12px 2px, 2px 12px,
-    12px 2px, 2px 12px,
-    12px 2px, 2px 12px,
-    12px 2px, 2px 12px;
+    16px 3px, 3px 16px,
+    16px 3px, 3px 16px,
+    16px 3px, 3px 16px,
+    16px 3px, 3px 16px;
   background-repeat: no-repeat;
 }
 

@@ -1976,30 +1976,51 @@ const MapView = {
       }
       ctx.stroke();
       // The waypoint dots and the coordinate labels: a filled magenta
-      // disc with a white outline at every waypoint, plus a small
-      // text label "(x, y)" offset above and right of the disc. The
-      // label has a dark stroke and a bright fill so it reads over
+      // disc with a white outline at every waypoint, plus a text
+      // label "(x, y)" near the disc. The label is skipped when the
+      // waypoint lies within the character label exclusion zone
+      // (labelSkipPx) so it never overlaps the bot name drawn by
+      // drawLabels at the character position. The remaining labels
+      // alternate above-right and below-right offsets so adjacent
+      // waypoints do not stack on top of each other either. The text
+      // has a thick dark stroke and a bright fill so it reads over
       // any map background.
+      const c0 = this.lastSnap.character;
+      const rt0 = this.runtime.get("self");
+      const selfScreen = this.worldToScreen(
+        rt0 ? rt0.drawX : (c0 && c0.x) || 0,
+        rt0 ? rt0.drawY : (c0 && c0.y) || 0);
+      const labelSkipPx = 30;
+      const labelSkip2 = labelSkipPx * labelSkipPx;
       ctx.setLineDash([]);
       ctx.lineWidth = 2;
-      ctx.font = "10px Consolas, \"Liberation Mono\", monospace";
+      ctx.font = "11px Consolas, \"Liberation Mono\", monospace";
       ctx.textBaseline = "middle";
       ctx.textAlign = "left";
+      let labelIndex = 0;
       for (const wp of plan) {
         const q = this.worldToScreen(wp.x, wp.y);
+        const dx = q.x - selfScreen.x;
+        const dy = q.y - selfScreen.y;
+        const nearSelf = (dx * dx + dy * dy) <= labelSkip2;
         ctx.beginPath();
         ctx.fillStyle = this.mapColors.userPath;
         ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
         ctx.arc(q.x, q.y, 3.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+        if (nearSelf) { continue; }
         const label = "(" + Math.round(wp.x) + ", " + Math.round(wp.y) + ")";
-        const tx = q.x + 7;
-        const ty = q.y - 9;
+        // Alternate the label position above and below the disc so
+        // neighboring waypoint labels do not stack on each other.
+        const above = (labelIndex % 2) === 0;
+        const tx = q.x + 8;
+        const ty = above ? q.y - 11 : q.y + 11;
+        labelIndex++;
         ctx.save();
         ctx.globalAlpha = 1;
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
         ctx.strokeText(label, tx, ty);
         ctx.fillStyle = this.mapColors.userPath;
         ctx.fillText(label, tx, ty);
