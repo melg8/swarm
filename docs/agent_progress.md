@@ -185,6 +185,29 @@ interior.
   exact cell), then click the teacher object within the interaction
   distance - no roof teleport, the lessons land.
 
+### Followup: the proxy corner brackets (2026-09-11)
+
+The user reported the four corner accents did not form a rectangle
+but sat at scattered positions. Root cause: the original CSS drew
+two corners on `.bot-item::before/::after` (top-left + bottom-right
+of the whole item) and two corners on `.bot-row::before/::after`
+(top-right + bottom-left of just the bot-row, which is only the
+first row of the item). The `.bot-row::after` "bottom-left" corner
+landed at the bottom of the first row instead of the bottom of the
+whole plaque, so the four corners did not align on one box.
+
+Fix: replaced all four rules with a single `.bot-item.is-proxy::before`
+that fills the whole item (`inset: 0`) and draws the four L-corner
+brackets through eight `linear-gradient` stripes, each positioned
+relative to that same box - top-left, top-right, bottom-left,
+bottom-right. Two stripes per corner (a horizontal 12x2 and a
+vertical 2x12), all on the same element, guarantee a clean
+rectangle regardless of how many activity or vital bars the row
+carries underneath.
+
+Verify loop: `repro_gear` and `repro_hud` PASS (they parse
+`style.css`); the change is CSS only.
+
 ## Active task: the town walk stuck loop - the reverse wall check and the waypoint skip
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
