@@ -312,7 +312,7 @@ func bookPurchase(itemID int32) (gear.Purchase, bool) {
 				price := npcdata.ItemPrice(itemID)
 				price += price * 15 / 100
 
-				return gear.Purchase{ //nolint:exhaustruct // gear fields stay zero
+				return gear.Purchase{ //nolint:exhaustruct_v5 // gear fields stay zero
 					ItemID:             itemID,
 					ListID:             listID,
 					MerchantTemplateID: shop.MerchantTemplateID,
@@ -324,7 +324,7 @@ func bookPurchase(itemID int32) (gear.Purchase, bool) {
 		}
 	}
 
-	return gear.Purchase{}, false //nolint:exhaustruct // not-found
+	return gear.Purchase{}, false //nolint:exhaustruct_v5 // not-found
 }
 
 // bookReason marks the spellbook purchases in the trip stop buys.

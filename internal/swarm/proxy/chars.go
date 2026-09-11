@@ -56,7 +56,7 @@ func buildCharacterListFor(session *botSession) ([]byte, error) {
 func characterInfoFor(
 	session *botSession, character state.CharacterSnapshot, account string,
 ) fromgameserver.CharacterInfo {
-	//nolint:exhaustruct // the paperdoll is filled below
+	//nolint:exhaustruct_v5 // the paperdoll is filled below
 	info := fromgameserver.CharacterInfo{
 		Name:        character.Name,
 		ObjectID:    character.ObjectID,

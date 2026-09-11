@@ -490,7 +490,7 @@ func (s *Server) listenFamily(
 	login bool, addrs []string, serve func(net.Listener),
 ) error {
 	for i, addr := range addrs {
-		//nolint:exhaustruct // the zero fields of ListenConfig are the defaults
+		//nolint:exhaustruct_v5 // the zero fields of ListenConfig are the defaults
 		listener, err := (&net.ListenConfig{}).Listen(
 			context.Background(), "tcp", addr)
 		if err != nil {

@@ -19,7 +19,10 @@ linters:
     - dupl          # Tool for code clone detection
     - errorlint     # Error wrapping scheme problems
     - exhaustive    # Exhaustiveness of enum switch statements
-    - exhaustruct   # All struct fields must be initialized (the v5 major rename is a planned follow-up)
+    - exhaustruct_v5 # All struct fields must be initialized (the v5
+                     # major of exhaustruct; the v1 entry is deprecated
+                     # since golangci-lint v2.13.0). The nolint
+                     # directive is //nolint:exhaustruct_v5.
     - forbidigo     # Forbids identifiers
     - funlen        # Function length
     - goconst       # Repeated strings that could be replaced by a constant
@@ -89,11 +92,17 @@ linters:
       # by the remaining gosec checks.
       excludes:
         - G115
-    exhaustruct:
-      # net.Dialer carries deprecated fields: listing them all for the
-      # explicit-initialization convention trips staticcheck SA1019.
-      exclude:
-        - "^net\\.Dialer$"
+    exhaustruct_v5:
+      # The v5 linter matches types by a regexp over the full type
+      # path (package.Type); the v1 'exclude' field is replaced by
+      # 'ignore-patterns' (and 'enforce-patterns' for opt-in mode).
+      # The ignore-patterns list below stays empty: net.Dialer
+      # carries deprecated fields and is the only production case that
+      # needs relief, handled by a local //nolint:exhaustruct_v5
+      # directive with the documented reason (staticcheck SA1019).
+      # Adding a global ignore for it would mask a real miss in any
+      # other package that aliased net.Dialer.
+      ignore-patterns: []
     exhaustive:
       # A switch with a default case explicitly handles the remaining
       # values; demanding every enum member listed there too would only
@@ -129,7 +138,7 @@ linters:
           # production code do not aid the reader. The production rules
           # stay strict.
           - dogsled
-          - exhaustruct
+          - exhaustruct_v5
           - funlen
           - goconst
           - lll

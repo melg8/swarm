@@ -222,7 +222,7 @@ func (b *Bot) InventoryItemState(objectID int32) (InventoryItem, bool) {
 func (b *Bot) InventoryStats() InventoryStats {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	//nolint:exhaustruct // zero value grows inside the loop
+	//nolint:exhaustruct_v5 // zero value grows inside the loop
 	stats := InventoryStats{
 		Slots:    len(b.inventory.items),
 		MaxSlots: inventorySlotLimit,
@@ -453,7 +453,7 @@ func (b *Bot) NearestGroundItemExcluding(
 ) (LootItem, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	//nolint:exhaustruct // zero value grows inside the loop
+	//nolint:exhaustruct_v5 // zero value grows inside the loop
 	best := LootItem{}
 	bestDist := maxDistance
 	found := false

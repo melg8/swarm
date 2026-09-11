@@ -238,7 +238,7 @@ func newServer(address string, logger *log.Logger) *Server {
 		eventsDone:   make(chan struct{}),
 		shutdown:     nil,
 	}
-	//nolint:exhaustruct // the zero defaults of http.Server are intended
+	//nolint:exhaustruct_v5 // the zero defaults of http.Server are intended
 	server.httpServer = &http.Server{
 		Addr:              address,
 		Handler:           mux,

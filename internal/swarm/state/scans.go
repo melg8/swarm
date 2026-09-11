@@ -50,7 +50,7 @@ func (b *Bot) NearestAttacker() (AttackTarget, bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	//nolint:exhaustruct // zero value grows inside the loop
+	//nolint:exhaustruct_v5 // zero value grows inside the loop
 	best := AttackTarget{}
 	bestDist := math.MaxFloat64
 	found := false
@@ -439,7 +439,7 @@ func (b *Bot) nearestAttackable(
 			maxDistance, zone, skip, minLevel, maxLevel, priority)
 	}
 
-	//nolint:exhaustruct // zero value grows inside the loop
+	//nolint:exhaustruct_v5 // zero value grows inside the loop
 	best := AttackTarget{}
 	bestScore := math.MaxFloat64
 	found := false
@@ -497,7 +497,7 @@ func (b *Bot) nearestAttackableSocial(
 	maxDistance float64, zone *Zone, skip []int32,
 	minLevel int32, maxLevel int32, priority map[int32]int32,
 ) (AttackTarget, bool) {
-	//nolint:exhaustruct // zero value grows inside the loop
+	//nolint:exhaustruct_v5 // zero value grows inside the loop
 	best := AttackTarget{}
 	bestScore := math.MaxFloat64
 	found := false
@@ -716,7 +716,7 @@ func (b *Bot) NearestNpcByTemplates(
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	//nolint:exhaustruct // zero value grows inside the loop
+	//nolint:exhaustruct_v5 // zero value grows inside the loop
 	best := AttackTarget{}
 	bestDist := maxDistance
 	found := false

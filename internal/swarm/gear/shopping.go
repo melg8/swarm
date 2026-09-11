@@ -400,7 +400,7 @@ func (s *shopStrategy) classify(
 // purchase: the item id drives the anchor and defense pricing of the
 // later picks, the object id stays zero (nothing equips it yet).
 func boughtEntry(best *purchaseCandidate) ScoredItem {
-	//nolint:exhaustruct // a planned buy has no inventory object yet
+	//nolint:exhaustruct_v5 // a planned buy has no inventory object yet
 	return ScoredItem{
 		Item:  state.InventoryItem{ItemID: best.itemID},
 		Stats: best.stats,

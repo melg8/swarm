@@ -43,7 +43,7 @@ func (s *inventoryStore) lookupLocked(objectID int32) (InventoryItem, bool) {
 		return s.items[slot], true
 	}
 
-	//nolint:exhaustruct // the zero value reports the miss
+	//nolint:exhaustruct_v5 // the zero value reports the miss
 	return InventoryItem{}, false
 }
 
@@ -69,7 +69,7 @@ func (s *inventoryStore) upsertLocked(
 	s.index[item.ObjectID] = int32(len(s.items) - 1)
 	s.orderDirty = true
 
-	//nolint:exhaustruct // the zero value reports the miss
+	//nolint:exhaustruct_v5 // the zero value reports the miss
 	return InventoryItem{}, false
 }
 

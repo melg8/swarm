@@ -58,14 +58,14 @@ func (s *objectStore) upsertLocked(
 	if slot, ok := s.index[objectID]; ok {
 		return &s.hot[slot], &s.cold[slot]
 	}
-	//nolint:exhaustruct // the spawn defaults, the rest starts zero
+	//nolint:exhaustruct_v5 // the spawn defaults, the rest starts zero
 	s.hot = append(s.hot, objectHot{
 		ObjectID:      objectID,
 		Kind:          kind,
 		Running:       true,
 		MoveSpeedMult: 1,
 	})
-	//nolint:exhaustruct // the unit item count, the rest starts zero
+	//nolint:exhaustruct_v5 // the unit item count, the rest starts zero
 	s.cold = append(s.cold, objectCold{Count: 1})
 	slot := int32(len(s.hot) - 1)
 	s.index[objectID] = slot

@@ -220,7 +220,7 @@ type Equipment struct {
 func NewEquipment(
 	items []state.InventoryItem, paperdoll [state.PaperdollSlots]int32,
 ) Equipment {
-	//nolint:exhaustruct // zero slots fill below
+	//nolint:exhaustruct_v5 // zero slots fill below
 	equipment := Equipment{Items: items}
 	for index, objectID := range paperdoll {
 		slot, ok := SlotOfPaperdollIndex(index)

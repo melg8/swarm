@@ -1517,7 +1517,7 @@ func (b *Bot) recordSwingEventsLocked(a Attack, now time.Time) {
 			b.char.LastLandedHitAt = now
 			b.char.LastLandedHitTarget = a.TargetIDs[i]
 		}
-		//nolint:exhaustruct // the ring assigns Seq, a swing carries no amount
+		//nolint:exhaustruct_v5 // the ring assigns Seq, a swing carries no amount
 		b.recordCombatEventLocked(CombatEvent{
 			Kind:       CombatEventAttack,
 			AttackerID: a.AttackerID,

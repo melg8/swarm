@@ -190,6 +190,8 @@ func registerProxyFlags(cfg *config) {
 // connect timeout.
 // Listing the deprecated Dialer fields explicitly would trip
 // staticcheck SA1019, so the struct stays partial.
+//
+//nolint:exhaustruct_v5 // net.Dialer carries deprecated fields (see above)
 var swarmDialer = &net.Dialer{Timeout: connectTimeout}
 
 // connectLoginServer establishes the login server connection.
