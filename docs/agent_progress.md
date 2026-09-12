@@ -2771,3 +2771,29 @@ green, lint clean, the live packet dispatch verified against the real
 server. The full Mirabel -> Gludio -> Dion live drive is the follow-up
 (the hunt-loop gatekeeper trip phase, the T-009 prerequisite): the
 packet chain, the parser and the step are ready to wire.
+
+## Active task: T-010 the band gear catalogs (in-scope done)
+
+Started: 2026-09-12 08:53Z. Branch: `feature/proxy-server`. Commits as
+melg8. Agent label: `soak-z`.
+
+### Goal
+
+The D-grade gear catalog of the Dion merchants for the 20-25 band
+shopping trip.
+
+### Result
+
+- gear.DionCatalog() (gear/dion_catalog.go): Sabrin (7060, weapons),
+  Casey (7061, armor), Sonia (7062, jewels + spellbooks), Lara (7063,
+  grocery) at the 20 percent Dion buy tax, buylists 3006000-3006300.
+  Two unit tests pin the merchant set and the tax shape.
+- The npcdata buylists and D-grade item GearStats were already
+  generated (verified item 256: DUALFIST D-grade).
+- The out-of-scope follow-up (a new task): the hunt multi-town catalog
+  selection and the shopping_strategy.md Dion shop section.
+
+### Status: done (2026-09-12 08:56Z) - in-scope
+
+The gear catalog ships within the T-010 scope (gear/, npcdata/,
+tools/). The hunt wiring is the follow-up.

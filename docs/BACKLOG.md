@@ -286,7 +286,7 @@ resume: -
 
 ### T-010: the band gear catalogs
 
-status: in_progress
+status: done
 milestone: M3
 priority: P3
 deps: T-008
@@ -298,12 +298,15 @@ the band price brackets and the sell-first rules of the shop
 strategy; the shopping strategy doc gains the Dion shop section.
 
 claimed: soak-z 2026-09-12 08:53Z
-resume: claiming; the Dion buylists are already in npcdata
-  (shop_catalogs.go: 7060-7063 → 3006000-3006300, the generator ran).
-  Next: add gear.DionCatalog() (Sabrin 7060, Casey 7061, Sonia 7062,
-  Lara 7063, Dion baseTax 20% = 0.20), verify the D-grade item
-  GearStats, unit-test the catalog, then the hunt multi-town wiring
-  (out of this scope - a follow-up) and the shopping_strategy doc.
+resume: done 2026-09-12 08:56Z (in-scope). gear.DionCatalog() ships
+  (Sabrin 7060, Casey 7061, Sonia 7062, Lara 7063, Dion baseTax 20%
+  = 0.20, buylists 3006000-3006300) with 2 unit tests; the npcdata
+  buylists and the D-grade item GearStats were already generated and
+  verified. The out-of-scope follow-up (a new task): the hunt
+  multi-town catalog selection (hunt/shopping.go switches to the
+  Dion catalog when the bot farms the 20-25 band at Dion) and the
+  shopping_strategy.md Dion shop section. The gate: M1 green before
+  the 20-25 band is reached.
 
 ### T-011: the quest journal parser and tracker section
 

@@ -4849,3 +4849,37 @@ parse npc html", no "unknown packet" - the new 0x1B case consumed
 them). The full Mirabel -> Gludio -> Dion live drive is the follow-up
 (the hunt-loop gatekeeper trip phase, the T-009 prerequisite): the
 packet chain, the parser and the step are ready to wire.
+
+## Round 65: the Dion band gear catalog (T-010, 2026-09-12)
+
+The M3 band survey (T-006) named the Dion merchants the 20-25 band
+shopping trip targets, and the gatekeeper teleport flow (T-008) built
+the packet chain the bot reaches them through. The gear planner had no
+catalog for them - the elven village catalog (the 1-19 band) was the
+only one wired.
+
+The fix is the Dion catalog (T-010, scope: gear/, npcdata/, tools/):
+
+- gear.DionCatalog() (gear/dion_catalog.go): the four Dion merchants
+  the survey names - Sabrin (7060, weapons), Casey (7061, armor), Sonia
+  (7062, jewels + spellbooks) and Lara (7063, grocery) - at the 20
+  percent Dion buy tax (MerchantPriceConfig.xml priceConfig id=8,
+  baseTax=20; the castle tax is 0 on the local test server so the total
+  is the base tax, the same shape the elven 15 percent uses). The
+  buylist ids (3006000-3006300) match the file names of the Mobius
+  buylists; the npcdata generator (tools/generate_shop_catalogs.sh)
+  already loaded them into npcdata.npcBuyLists (shop_catalogs.go:
+  7060-7063).
+- The D-grade item GearStats were already generated (npcdata/item_stats.go
+  covers the D-grade weapons and armor of the buylists; item 256
+  verified: DUALFIST PAtk 29, D-grade soulshots), so the gear planner
+  scores the Dion items with the existing MeleeFighter profile.
+- Two unit tests pin the merchant set, the tax rate, the buylist ids
+  and the tax-shape mirror against the elven catalog.
+
+Verification: go build green, the gear tests green, golangci-lint run
+--new: 0 issues. The out-of-scope follow-up (a new task): the hunt
+multi-town catalog selection (hunt/shopping.go switches to the Dion
+catalog when the bot farms the 20-25 band at Dion) and the
+shopping_strategy.md Dion shop section. The gate: M1 green before the
+20-25 band is reached.
