@@ -2450,3 +2450,41 @@ Dion.
 The packet parsers are the foundation; the connection wiring, the
 hunt-loop gatekeeper step and the live verification remain. A new
 agent reads this entry and the BACKLOG resume to continue.
+
+### Progress (2026-09-12, T-004 round)
+
+- 07:35 UTC: claimed T-004 (the T-001 claim lost the push race to
+  soak-z at 07:27; T-002 was taken by zai-agent at 07:36 - both
+  theirs, T-003 waits on T-002, T-004 is the top claimable task).
+- The Mobius source survey: the quest engine
+  (mechanics/script: Quest, QuestState, State), the dialog entry
+  (Action 0x04 -> NpcClick -> showChatWindow / ON_NPC_FIRST_TALK),
+  the bypass channel (RequestBypassToServer 0x21 -> BypassHandler
+  -> ScriptLink/ChatLink), the html action cache
+  (AbstractHtmlPacket + HtmlUtil: the anti-injection gate, the 250
+  unit origin check, the $-parameter prefix matching), the quest
+  journal packet (QuestList 0x98, the cond/flags encoding), the
+  persistence (character_quests: charId/name/var/value), the kill
+  notification delay (Attackable._onKillDelay = 2500 ms), the
+  dialog gates (weight penalty, 90 percent inventory, 25 quests).
+- The class transfer chain walked end to end from the sources:
+  Q00406 (Sorius Gludio -> skeletons Ruins of Agony -> Kluto Gludin
+  -> Ol Mahum Novice -> the brooch 1204) and Q00407 (Reisa ->
+  Moretti -> Babenco -> Prias -> the recommendation 1217), the
+  class change at Rains 30288 (level 20 + the mark item ->
+  setPlayerClass(19) + broadcastUserInfo), the gatekeeper legs
+  (Mirabel 30146 elven village -> Gludio 9200a, Bella 30256 Gludio
+  -> Gludin 7300a).
+- Live verification (SWARM_TRACE_PACKETS=1, accounts trace1/trace2
+  and the farm-readiness scenario on temp1, all against the
+  deployed stack): the QuestList 0x98 (5 bytes, empty) arrives at
+  world entry unrequested (EnterWorld.java line 303 confirms the
+  push), and the merchant dialogs push NpcHtmlMessage 0x1B (813
+  bytes) about once per second through the whole sell round - the
+  dialog stream the bot currently drops unseen.
+- The deliverable: docs/quest_protocol.md (the engine, the packet
+  layouts with the Java references, the state machine, the event
+  firing rules, the two quest chains, the geography gap, the
+  follow-up task list).
+- Docs-only round: `go build ./...` green, `golangci-lint run --new`
+  clean (no Go file touched).

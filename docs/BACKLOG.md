@@ -141,10 +141,24 @@ Research only: no code changes. List the follow-up code tasks in the
 resume notes.
 
 claimed: agent-quest 2026-09-12 07:35 UTC
-resume: fresh claim; the plan: read the Mobius quest engine sources
-  (the quest state machine, the quest packets, the html dialog flow,
-  the class transfer script of the elven fighter) and write
-  docs/quest_protocol.md in the shape of protocol_description.md.
+resume: docs/quest_protocol.md written (the engine, the dialog
+  packets, the html action cache, the persistence, the two class
+  transfer chains, the gatekeeper geography). The follow-up code
+  tasks it proposes (each its own BACKLOG entry when claimed):
+  1. parse NpcHtmlMessage 0x1B + the html link mirror (state
+     tracker dialog section);
+  2. parse QuestList 0x98 (the quest journal section, arrives free
+     at world entry - live verified);
+  3. send RequestBypassToServer 0x21 with the cache rules (only
+     links of the open page, 250 units of the origin npc) +
+     RequestQuestList 0x63;
+  4. the hunt quest module: the dialog walker, the Q00406/Q00407
+     scripts as data, the gatekeeper legs, the Gludio/Gludin
+     navigation (overlaps the M3 survey);
+  5. the M2 class-transfer acceptance scenario (level 19 injection
+     at Gludio, pass on classId 19/22).
+  Open live checks: the first quest accept burst shape, the
+  completed flags encoding, MoveToPawn ordering at quest talks.
 
 ### T-005: the hypotheses registry convention
 
