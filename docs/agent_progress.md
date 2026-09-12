@@ -2974,3 +2974,36 @@ the last row - the M2 gate stays the SelfClassID flip).
 ### Progress
 
 - 09:52 UTC: claimed.
+
+### Progress (T-009)
+
+- 09:24 UTC: claimed (BACKLOG T-009 in_progress + the entry above).
+- 09:40 UTC: the generator refactor landed and pushed - the elven
+  main became the parameterized generate_registry pipeline
+  (parse_territories with the band window filter, the shared fold/
+  partition/sort/emit, the spec builders), the --dion flag generates
+  zones_dion.go (75 squares over 25 kept territories, 96% spawn mass
+  coverage, the five band windows with the gear gates calibrated
+  against the TotalGearPoints probes of the buyable dress stages:
+  NG 284 / Falchion 292 / Bastard+bone 312 / partial mithril 341 /
+  full D 391). The elven mode verified byte-identical against the
+  committed zones_elven.go. Build, hunt tests, lint --new green.
+- 09:55 UTC: the rebase conflict with T-017 resolved (both rounds
+  added regionDion to zones.go) - one comment now carries both the
+  registry and the catalog-selection aspects; the pending log of the
+  T-017 region case replaced by the DionHuntingZones() install (the
+  seam T-017 explicitly left for the registry landing). The wiring
+  test added (the region install stands the spot mode down and feeds
+  the catalog selection). zones_dion_test.go pins the survey tables:
+  the 13 species at their table levels, the sprout/cruma mob sets,
+  the anchor walking distances, the picker ladder, the death cap.
+  Full hunt suite green (97 s), lint --new 0 issues, pushed.
+- 10:00 UTC: the docs round - the hunting.md "The Dion 20-25 band
+  registry" section, the dev log round 72, the BACKLOG close. Status:
+  done - in-scope. The follow-ups for the next agents: the M1
+  operator soak run (the 8h proof that gates the production band
+  entry), the band acceptance scenario of the survey follow-up 6
+  (a DB-injected level 20 rides the teleport chain and kills its
+  first sprout), the spot-registry migration of the band (the elven
+  precedent - generate_hunt_spots.py - when the hunt loop moves off
+  the square zones).

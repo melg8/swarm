@@ -268,7 +268,7 @@ resume: done 2026-09-12 08:45Z. The full packet chain ships:
 
 ### T-009: the 20-25 zone registry generation
 
-status: in_progress
+status: done
 milestone: M3
 priority: P3
 deps: T-008
@@ -282,10 +282,17 @@ spawn-true squares of the 20-25 band in the shape of zones_elven.go
 the survey doc is the acceptance reference).
 
 claimed: zones-zai 2026-09-12 09:24 UTC
-resume: fresh claim. The gate interpretation follows the T-010
-  precedent (data preparation now, the hunt wiring into the band
-  waits for M1 green). Next: extend the generator with the Dion
-  sources, generate zones_dion.go, pin the survey tables with tests.
+resume: done 10:00 UTC - zones_dion.go ships (75 spawn-true squares
+  over 25 kept territories of the three Dion sources, 96% spawn mass
+  coverage) with the --dion generator mode (the elven mode verified
+  byte-identical), the five band windows at the D-grade dress gates
+  (280/290/310/340/380), the regionDion const + the
+  SetHuntingZoneRegion install closing the T-017 seam, and
+  zones_dion_test.go pinning the survey tables (the species, the mob
+  sets, the anchor distances, the ladder, the death cap) - 6 tests.
+  The production band entry stays gated on M1 green; the consumers:
+  the band acceptance scenario (survey follow-up 6) and the spot
+  migration of the band.
 
 ### T-010: the band gear catalogs
 

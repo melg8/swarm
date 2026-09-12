@@ -5027,3 +5027,67 @@ hunt test suite (97 s) is green (no regression of the M0 round), and
 golangci-lint run --new is clean (0 issues). The Dion zone registry
 (T-009, gated on M1 green) and the multi-town spellbook budget (M2
 follow-up of T-015/T-016) stay out of scope.
+
+## Round 72: the 20-25 band zone registry of the Dion grounds (T-009, 2026-09-12)
+
+The M3 data gap the survey round named: the 20-25 character band had
+its grounds surveyed (docs/band_20_25_survey.md), its gear catalog
+(gear.DionCatalog) and its town merchants wired (T-017), but no
+hunting zone registry - a bot that reached the band had no squares to
+pick, and the region switch of T-017 could only log "the registry is
+pending".
+
+The fix is the generated registry (T-009, scope: the generator, the
+hunt package, docs/):
+
+- The generator (tools/generate_hunt_zones.py): the elven-specific
+  main became a parameterized registry pipeline (parse_territories
+  with the band window filter, the fold, the partition, the sort, the
+  emit - all shared); the `--dion` flag runs the Dion spec (the three
+  spawn sources of the survey, the five band windows, the execution
+  arrival anchor, the regionDion constant, the dionHuntingZones var
+  and the DionHuntingZones accessor, the zones_dion.go output). The
+  elven mode stays byte-identical: regenerated and diffed against the
+  committed zones_elven.go as the regression gate.
+- The registry (hunt/zones_dion.go): 75 spawn-true squares over 25
+  kept territories (dion15_2122_03s folds into dion15_2122_01,
+  dion17_2023_14s into dion17_2023_05 - the same-band sub fold of the
+  elven pipeline), 96 percent spawn mass coverage, 0 territories
+  below 80 percent. Every square carries the full mob list of its
+  territory (the over-25 neighbors included, the engage filters on
+  the level ceiling).
+- The band ladder: five windows continuing the elven ladder
+  (20-21/280, 23-24/290, 24-25/310, 25-26/340, 26-27/380) - the
+  gear gates calibrated against gear.TotalGearPoints probes of the
+  buyable dress stages measured with a temporary gear-package probe
+  run: the NG full dress + bone shield 284, the Falchion + bone +
+  kite + D jewels 292, Bastard + bone + kite 312, the partial mithril
+  step 341, the full D dress 391 (the Dion buylist items, the melee
+  fighter profile). The gates sit at the stage the dress passes them.
+- The seam closure with T-017: the regionDion case of
+  SetHuntingZoneRegion installs DionHuntingZones() (the pending log
+  of the T-017 round became stale the moment the registry landed -
+  the rebase conflict of the two regionDion constants resolved into
+  one comment carrying both the registry and the catalog-selection
+  aspects). A deployment selects the band explicitly; the default
+  elven flow is unchanged, and the production band entry waits for
+  M1 green per the survey protocol (the M3 band acceptance scenario
+  is the consumer).
+
+Verification: zones_dion_test.go pins the survey tables as the
+acceptance reference - the thirteen mob species at their table
+levels, the sprout ground mob sets (only the two sprout species),
+the cruma edge mob sets (exactly the leech/ant/ripper mix, every
+ripper square also carries the leech), the walking distances of the
+survey anchors (the sprout squares within 10k of the execution
+arrival, the cruma squares within 12k of the cruma center, the
+northern wolf squares within 18k of the Dion town square, every
+square within 18.5k of a teleport arrival), the picker ladder (the
+starter fallback at level 20, the NG dress opening the sprouts at
+22, the Falchion dress the wolves at 25, the Bastard dress at 26,
+the partial mithril at 27, the full D dress the cruma grounds at 28,
+the death cap demotion) and the region install (the loop gets the
+registry, the spot mode stands down, the region feeds the catalog
+selection). Build green, the full hunt suite green (97 s),
+golangci-lint run --new clean (0 issues), the elven regeneration
+byte-identical.
