@@ -411,14 +411,8 @@ func TestShoppingStrategyJourneyComparison(t *testing.T) {
 // runLegacyJourney walks the journey through the legacy planner.
 func runLegacyJourney(t *testing.T) []journeyRecord {
 	t.Helper()
-	legacy := func(
-		profile Profile, equipment Equipment, catalog Catalog,
-		adena int64,
-	) []Purchase {
-		return legacyPlanPurchases(profile, equipment, catalog, adena)
-	}
 
-	return runJourney(t, legacy)
+	return runJourney(t, legacyPlanPurchases)
 }
 
 // printJourney prints one journey leg for the comparison log.
