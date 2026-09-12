@@ -19,8 +19,20 @@ Inputs (env-overridable):
              (default: /home/z/my-project/l2j_mobius/...)
   OUT        the generated Go file path
              (default: internal/swarm/hunt/zones_elven.go of this repo)
+  DION_OUT   the generated Go file path of the Dion registry
+             (default: internal/swarm/hunt/zones_dion.go of this repo)
 
 Output: deterministic Go source with the elvenHuntingZones registry.
+
+Dion mode: `generate_hunt_zones.py --dion` generates the 20-25 band
+registry of the Dion grounds (the three spawn sources of the survey:
+ExecutionGrounds, CrumaMarshlands, PlainsOfDion) into zones_dion.go
+in the shape of zones_elven.go - the territory filter keeps the
+spawn grounds with at least one mob of the 20-25 band window (the
+survey territory lists), the five band windows and the gear gates
+continue the elven ladder onto the D-grade dress stages. The hunt
+wiring into the band waits for M1 green (the survey protocol); the
+registry is the data the wiring consumes.
 
 Survey mode: `generate_hunt_zones.py --survey MIN MAX` scans ALL spawn
 territories (not just ElvenStarting.xml) for the mobs of the given
@@ -54,6 +66,10 @@ OUT = os.environ.get(
     "OUT",
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                  "internal/swarm/hunt/zones_elven.go"))
+DION_OUT = os.environ.get(
+    "DION_OUT",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                 "internal/swarm/hunt/zones_dion.go"))
 
 # The ten mob level bands of the elven ladder: (minLevel, maxLevel,
 # minGear). The band of a territory is the lowest band whose window
@@ -77,6 +93,31 @@ BANDS = [
 # The first zone of the sorted registry is the starter fallback of the
 # picker (a fresh character hunts the nearest band 1-3 square).
 VILLAGE_X, VILLAGE_Y = 46112, 41500
+
+# The Dion registry spec: the three spawn sources of the 20-25 band
+# survey (docs/band_20_25_survey.md), the five band windows that
+# continue the elven ladder (the mob tops of the survey grounds run
+# 21..27: the sprout, wolf, sapling+blossom, specter/destroyer and
+# cruma/jaguar steps), the gear gates calibrated against the
+# gear.TotalGearPoints probes of the buyable dress stages (the NG
+# full dress 284, the Falchion dress 292, Bastard+bone 312, the
+# partial mithril step 341, the full D dress 391) and the anchor the
+# starter fallback orders against (the Trisha "Execution Ground"
+# teleport arrival - the entry ground of the band).
+DION_SPAWNS = [
+    "Dion/ExecutionGrounds.xml",
+    "Dion/CrumaMarshlands.xml",
+    "Dion/PlainsOfDion.xml",
+]
+DION_BAND_MIN, DION_BAND_MAX = 20, 25
+DION_BANDS = [
+    (20, 21, 280),
+    (23, 24, 290),
+    (24, 25, 310),
+    (25, 26, 340),
+    (26, 27, 380),
+]
+DION_ANCHOR_X, DION_ANCHOR_Y = 46165, 150008
 
 # Geometry knobs. SINGLE_MAX_R: a polygon whose every node sits within
 # this radius of its centroid becomes one square. CELL mobs target:
@@ -237,17 +278,17 @@ def sample_poly(nodes, step=50):
     return pts
 
 
-def band_of(max_level):
-    for minl, maxl, gear in BANDS:
+def band_of(bands, max_level):
+    for minl, maxl, gear in bands:
         if max_level <= maxl:
             return (minl, maxl, gear)
-    return BANDS[-1]
+    return bands[-1]
 
 
-def compass(x, y):
+def compass(x, y, anchor_x, anchor_y):
     # The L2 world axes: x east, y south. The math angle of the
-    # direction from the village with north up decides the octant.
-    dx, dy = x - VILLAGE_X, y - VILLAGE_Y
+    # direction from the anchor with north up decides the octant.
+    dx, dy = x - anchor_x, y - anchor_y
     if dx == 0 and dy == 0:
         return "C"
     sector = int(round(math.atan2(-dy, dx) / (math.pi / 4)))
@@ -313,6 +354,47 @@ def territory_coverage(nodes, squares, step=50):
 
 def go_str(s):
     return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+
+def parse_territories(paths, stats, bands, band_window=None):
+    """Read the spawn territories of the xml files into the shape the
+    pipeline consumes. band_window (min, max) filters: only the
+    territories holding at least one mob of the window pass (the
+    survey territory lists of a band registry)."""
+    territories = []
+    for path in paths:
+        root = ET.parse(path).getroot()
+        for spawn in root.iter("spawn"):
+            terr = spawn.find("territory")
+            if terr is None:
+                continue
+            nodes = [(int(n.get("x")), int(n.get("y")))
+                     for n in terr.findall("node")]
+            if not nodes:
+                continue
+            mobs = []
+            total = 0
+            for npc in spawn.findall("npc"):
+                tid = int(npc.get("id"))
+                count = int(npc.get("count"))
+                level, name = stats.get(tid, (0, "npc%d" % tid))
+                mobs.append((tid, name, level, count))
+                total += count
+            if not mobs:
+                continue
+            if band_window is not None:
+                in_window = [m for m in mobs
+                             if band_window[0] <= m[2] <= band_window[1]]
+                if not in_window:
+                    continue
+            max_level = max(m[2] for m in mobs)
+            min_level = min(m[2] for m in mobs)
+            territories.append({
+                "zone": spawn.get("zone"), "nodes": nodes, "mobs": mobs,
+                "total": total, "max_level": max_level,
+                "min_level": min_level, "band": band_of(bands, max_level),
+            })
+    return territories
 
 
 def survey_mode(min_level, max_level):
@@ -392,38 +474,19 @@ def survey_mode(min_level, max_level):
                                info["name"], tid))
 
 
-def main():
-    if len(sys.argv) == 4 and sys.argv[1] == "--survey":
-        survey_mode(int(sys.argv[2]), int(sys.argv[3]))
-        return
+def generate_registry(spec):
+    """Run the shared registry pipeline of a spec: parse the spawn
+    territories, fold the same-band sub polygons, partition into
+    squares, sort by band and anchor distance, emit the Go source."""
     stats = load_npc_stats()
-    root = ET.parse(SPAWN_XML).getroot()
-
-    territories = []
-    for spawn in root.iter("spawn"):
-        terr = spawn.find("territory")
-        nodes = [(int(n.get("x")), int(n.get("y")))
-                 for n in terr.findall("node")]
-        mobs = []
-        total = 0
-        for npc in spawn.findall("npc"):
-            tid = int(npc.get("id"))
-            count = int(npc.get("count"))
-            level, name = stats.get(tid, (0, "npc%d" % tid))
-            mobs.append((tid, name, level, count))
-            total += count
-        max_level = max(m[2] for m in mobs)
-        min_level = min(m[2] for m in mobs)
-        territories.append({
-            "zone": spawn.get("zone"), "nodes": nodes, "mobs": mobs,
-            "total": total, "max_level": max_level, "min_level": min_level,
-            "band": band_of(max_level),
-        })
+    paths = [os.path.join(SPAWNS_DIR, rel) for rel in spec["sources"]]
+    territories = parse_territories(
+        paths, stats, spec["bands"], spec["band_window"])
 
     # Skip the sub territories fully covered by a same band parent:
-    # their polygons fold into the parent squares (the mobs spawn inside
-    # the same ground) and duplicating squares at the same spot only
-    # makes the rotation bounce between identical grounds.
+    # their polygons fold into the parent squares (the mobs spawn
+    # inside the same ground) and duplicating squares at the same spot
+    # only makes the rotation bounce between identical grounds.
     kept = []
     for t in territories:
         covered = False
@@ -466,71 +529,61 @@ def main():
             short = t["zone"].split("_", 1)[1]
             if len(squares) > 1:
                 name = "%s %s-%s" % (
-                    dominant[1], compass(cx, cy), labels[(cx, cy)])
-                zid = "elven-%s-%s" % (short, labels[(cx, cy)])
+                    dominant[1],
+                    compass(cx, cy, spec["anchor"][0], spec["anchor"][1]),
+                    labels[(cx, cy)])
+                zid = "%s-%s-%s" % (spec["id_prefix"], short,
+                                    labels[(cx, cy)])
             else:
-                name = "%s %s" % (dominant[1], compass(cx, cy))
-                zid = "elven-%s" % short
+                name = "%s %s" % (
+                    dominant[1],
+                    compass(cx, cy, spec["anchor"][0], spec["anchor"][1]))
+                zid = "%s-%s" % (spec["id_prefix"], short)
             entries.append({
                 "id": zid, "name": name, "band": t["band"],
                 "cx": cx, "cy": cy, "half": half, "mobs": t["mobs"],
                 "frac": frac, "terr": t["zone"],
             })
 
-    # Sort by band, then by distance from the village: the first entry
+    # Sort by band, then by distance from the anchor: the first entry
     # is the starter fallback square of the fresh characters.
     entries.sort(key=lambda e: (
-        BANDS.index(e["band"]),
-        math.hypot(e["cx"] - VILLAGE_X, e["cy"] - VILLAGE_Y)))
+        spec["bands"].index(e["band"]),
+        math.hypot(e["cx"] - spec["anchor"][0],
+                   e["cy"] - spec["anchor"][1])))
 
+    seen_ids = set()
+    for e in entries:
+        if e["id"] in seen_ids:
+            raise SystemExit("duplicate zone id: %s" % e["id"])
+        seen_ids.add(e["id"])
+
+    coverage = 100.0 * covered_mass / total_mass if total_mass else 0.0
+    values = {
+        "n": len(entries), "k": len(kept), "p": coverage,
+    }
     lines = []
     lines.append("// SPDX-FileCopyrightText: 2026 Melg Eight "
                  "<public.melg8@gmail.com>")
     lines.append("//")
     lines.append("// SPDX-License-Identifier: MIT")
     lines.append("")
-    lines.append("// Code generated by tools/generate_hunt_zones.py from "
-                 "the Mobius C1")
-    lines.append("// spawn data (ElvenStarting.xml); DO NOT EDIT by hand - "
-                 "re-run the")
-    lines.append("// generator instead. The registry covers the spawn "
-                 "polygons with one")
-    lines.append("// or several compact squares per territory, every "
-                 "square carrying")
-    lines.append("// the full mob list of its territory (all species "
-                 "farmed, the level")
-    lines.append("// sorted priorities bias the engage toward the exp "
-                 "rich mobs).")
+    for line in spec["generated_header"]:
+        lines.append(line % values)
     lines.append("")
     lines.append("package hunt")
     lines.append("")
-    lines.append("// elvenHuntingZones ladders the elven lands in the ten "
-                 "mob level")
-    lines.append("// bands over %d compact squares generated from the %d "
-                 "kept spawn" % (len(entries), len(kept)))
-    lines.append("// territories of ElvenStarting.xml (the same-band "
-                 "sub territories fold")
-    lines.append("// into their parents). The squares sit on the real "
-                 "spawn ground: the")
-    lines.append("// mobs of a territory spawn at uniformly random points "
-                 "of its polygon")
-    lines.append("// (NpcSpawnTerritory.getRandomPoint) and the wander "
-                 "stays inside the")
-    lines.append("// polygon, so the measured spawn mass coverage of "
-                 "this registry is")
-    lines.append("// %.0f%% (the hand placed squares of the previous "
-                 "registry covered" % (100.0 * covered_mass / total_mass))
-    lines.append("// 18%). The first entry is the starter fallback of "
-                 "the picker (the")
-    lines.append("// village nearest square of the 1-3 band).")
-    lines.append("var elvenHuntingZones = []HuntingZone{")
+    for line in spec["registry_doc"]:
+        lines.append(line % values)
+    lines.append("var %s = []HuntingZone{" % spec["var_name"])
     for e in entries:
         minl, maxl, gear = e["band"]
         lines.append("\t{")
         lines.append("\t\tID: %s, Name: %s," % (go_str(e["id"]),
                                                  go_str(e["name"])))
-        lines.append("\t\tRegion: regionElven, MinLevel: %d, MaxLevel: %d,"
-                     " MinGear: %d," % (minl, maxl, gear))
+        lines.append("\t\tRegion: %s, MinLevel: %d, MaxLevel: %d,"
+                     " MinGear: %d," % (spec["region_const"], minl, maxl,
+                                        gear))
         lines.append("\t\tCX: %d, CY: %d, Half: %d," %
                      (e["cx"], e["cy"], e["half"]))
         lines.append("\t\tMobs: []ZoneMob{")
@@ -547,16 +600,16 @@ def main():
         lines.append("\t},")
     lines.append("}")
     lines.append("")
-    lines.append("// ElvenHuntingZones returns the hunting grounds of the "
-                 "elven lands.")
-    lines.append("func ElvenHuntingZones() []HuntingZone {")
-    lines.append("\tzones := make([]HuntingZone, len(elvenHuntingZones))")
-    lines.append("\tcopy(zones, elvenHuntingZones)")
+    lines.append(spec["accessor_doc"])
+    lines.append("func %s() []HuntingZone {" % spec["func_name"])
+    lines.append("\tzones := make([]HuntingZone, len(%s))"
+                 % spec["var_name"])
+    lines.append("\tcopy(zones, %s)" % spec["var_name"])
     lines.append("")
     lines.append("\treturn zones")
     lines.append("}")
 
-    with open(OUT, "w", encoding="utf-8") as f:
+    with open(spec["out"], "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
 
     # Report.
@@ -566,7 +619,7 @@ def main():
     by_band = {}
     for e in entries:
         by_band.setdefault(e["band"], []).append(e)
-    for band in BANDS:
+    for band in spec["bands"]:
         es = by_band.get(band, [])
         if not es:
             continue
@@ -576,11 +629,131 @@ def main():
                min(halves), max(halves)))
     low = [e for e in entries if e["frac"] < 0.8]
     print("territory spawn mass coverage: %.0f%% (%d territories below "
-          "80%%)" % (100.0 * covered_mass / total_mass, len(low)))
+          "80%%)" % (coverage, len(low)))
     for e in low:
         print("  low coverage %s -> %.0f%% (%s)" %
               (e["terr"], e["frac"] * 100, e["id"]))
-    print("written: %s" % OUT)
+    print("written: %s" % spec["out"])
+
+
+def elven_registry_spec():
+    """The registry spec of the elven lands (the historical default)."""
+    return {
+        "sources": ["ElvenTerritory/ElvenStarting.xml"],
+        "bands": BANDS,
+        "band_window": None,
+        "anchor": (VILLAGE_X, VILLAGE_Y),
+        "region_const": "regionElven",
+        "id_prefix": "elven",
+        "var_name": "elvenHuntingZones",
+        "func_name": "ElvenHuntingZones",
+        "out": OUT,
+        "generated_header": [
+            "// Code generated by tools/generate_hunt_zones.py from "
+            "the Mobius C1",
+            "// spawn data (ElvenStarting.xml); DO NOT EDIT by hand - "
+            "re-run the",
+            "// generator instead. The registry covers the spawn "
+            "polygons with one",
+            "// or several compact squares per territory, every "
+            "square carrying",
+            "// the full mob list of its territory (all species "
+            "farmed, the level",
+            "// sorted priorities bias the engage toward the exp "
+            "rich mobs).",
+        ],
+        "registry_doc": [
+            "// elvenHuntingZones ladders the elven lands in the ten "
+            "mob level",
+            "// bands over %(n)d compact squares generated from the "
+            "%(k)d kept spawn",
+            "// territories of ElvenStarting.xml (the same-band sub "
+            "territories fold",
+            "// into their parents). The squares sit on the real "
+            "spawn ground: the",
+            "// mobs of a territory spawn at uniformly random points "
+            "of its polygon",
+            "// (NpcSpawnTerritory.getRandomPoint) and the wander "
+            "stays inside the",
+            "// polygon, so the measured spawn mass coverage of "
+            "this registry is",
+            "// %(p).0f%% (the hand placed squares of the previous "
+            "registry covered",
+            "// 18%%). The first entry is the starter fallback of "
+            "the picker (the",
+            "// village nearest square of the 1-3 band).",
+        ],
+        "accessor_doc": "// ElvenHuntingZones returns the hunting "
+                        "grounds of the elven lands.",
+    }
+
+
+def dion_registry_spec():
+    """The registry spec of the Dion 20-25 band grounds (T-009)."""
+    return {
+        "sources": DION_SPAWNS,
+        "bands": DION_BANDS,
+        "band_window": (DION_BAND_MIN, DION_BAND_MAX),
+        "anchor": (DION_ANCHOR_X, DION_ANCHOR_Y),
+        "region_const": "regionDion",
+        "id_prefix": "dion",
+        "var_name": "dionHuntingZones",
+        "func_name": "DionHuntingZones",
+        "out": DION_OUT,
+        "generated_header": [
+            "// Code generated by tools/generate_hunt_zones.py from "
+            "the Mobius C1",
+            "// spawn data (the Dion spawn sources of the 20-25 band "
+            "survey -",
+            "// ExecutionGrounds, CrumaMarshlands, PlainsOfDion); DO "
+            "NOT EDIT by",
+            "// hand - re-run the generator instead. The registry "
+            "covers the spawn",
+            "// polygons with one or several compact squares per "
+            "territory, every",
+            "// square carrying the full mob list of its territory "
+            "(all species",
+            "// farmed, the level sorted priorities bias the engage "
+            "toward the exp",
+            "// rich mobs).",
+        ],
+        "registry_doc": [
+            "// dionHuntingZones ladders the Dion grounds of the "
+            "20-25 band in",
+            "// five mob level bands over %(n)d compact squares "
+            "generated from the",
+            "// %(k)d kept spawn territories of the Dion spawn "
+            "sources",
+            "// (ExecutionGrounds, CrumaMarshlands, PlainsOfDion - "
+            "the survey",
+            "// of docs/band_20_25_survey.md; the same-band sub "
+            "territories fold",
+            "// into their parents). The squares sit on the real "
+            "spawn ground: the",
+            "// mobs of a territory spawn at uniformly random points "
+            "of its polygon",
+            "// (NpcSpawnTerritory.getRandomPoint) and the wander "
+            "stays inside the",
+            "// polygon, so the measured spawn mass coverage of "
+            "this registry is",
+            "// %(p).0f%%. The first entry is the starter fallback "
+            "of the picker",
+            "// (the execution ground arrival nearest square of the "
+            "20-21 band).",
+        ],
+        "accessor_doc": "// DionHuntingZones returns the hunting "
+                        "grounds of the Dion 20-25 band.",
+    }
+
+
+def main():
+    if len(sys.argv) == 4 and sys.argv[1] == "--survey":
+        survey_mode(int(sys.argv[2]), int(sys.argv[3]))
+        return
+    if len(sys.argv) == 2 and sys.argv[1] == "--dion":
+        generate_registry(dion_registry_spec())
+        return
+    generate_registry(elven_registry_spec())
 
 
 if __name__ == "__main__":
