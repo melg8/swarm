@@ -30,6 +30,13 @@ const (
 // adenaItemID is the adena item of the C1 item table.
 const adenaItemID = 57
 
+// ResetItem is one injected inventory stack of the start state: the
+// template id and the count of the pile the character wakes up with.
+type ResetItem struct {
+	ItemID int32
+	Count  int32
+}
+
 // adenaObjectIDBase is the object id of the injected adena stack. It
 // stays below the FIRST_OBJECT_ID (268435456) of the server IdManager
 // on purpose: the running server allocates every new world object id
@@ -55,12 +62,17 @@ type characterReset struct {
 	Exp     int64
 	SP      int64
 	Adena   int64
-	X       int32
-	Y       int32
-	Z       int32
-	MaxHP   int32
-	MaxMP   int32
-	MaxCP   int32
+	// Items are the injected inventory stacks (no object ids of their
+	// own: the reset derives stable ones below the server range). The
+	// character equips the wearable pieces through the auto equipment
+	// of the hunt loop - the injection lands everything in the bag.
+	Items []ResetItem
+	X     int32
+	Y     int32
+	Z     int32
+	MaxHP int32
+	MaxMP int32
+	MaxCP int32
 }
 
 // farmReadinessReset returns the level 15 start state of the user
@@ -79,6 +91,81 @@ func farmReadinessReset(account string) characterReset {
 		MaxHP:   level15HP,
 		MaxMP:   level15MP,
 		MaxCP:   level15CP,
+	}
+}
+
+// The dump start state of the zone return scenario (the 2026-09-12
+// 01:50 stuck report, build 2149ad1): the character woke at the elven
+// village main street cell next to Herbiel - the position the frozen
+// return left it standing on for over an hour - as the level 14
+// fighter of the report with the exact inventory the dump carried.
+const (
+	// zoneReturnSpawnX/Y/Z is the reported stuck position (the dump of
+	// 2026-09-12 01:50, the village respawn cell of test1).
+	zoneReturnSpawnX = 43048
+	zoneReturnSpawnY = 50312
+	zoneReturnSpawnZ = -2992
+	// The vitals and the wallet of the dump character.
+	zoneReturnExp   = 192206
+	zoneReturnSP    = 7549
+	zoneReturnAdena = 31857
+	zoneReturnHP    = 339
+	zoneReturnMP    = 137
+	zoneReturnCP    = 105
+)
+
+// zoneReturnItems is the exact item set of the dump: the equipped
+// paperdoll (the Brandish two hander, the wooden armor set, the
+// starter jewels) and the bag of the report (the arrows, the potions,
+// the recipes and the crafting materials). The injection lands every
+// stack in the bag - the auto equipment of the hunt loop dresses the
+// character from it, the wearable pieces are the ones the dump wore.
+var zoneReturnItems = []ResetItem{
+	{ItemID: 1333, Count: 1}, // Brandish (the two hand sword of the dump)
+	{ItemID: 23, Count: 1},   // Wooden Breastplate
+	{ItemID: 31, Count: 1},   // Bone Gaiters
+	{ItemID: 44, Count: 1},   // Leather Helmet
+	{ItemID: 50, Count: 1},   // Leather Gloves
+	{ItemID: 1121, Count: 1}, // Apprentice's Shoes
+	{ItemID: 114, Count: 1},  // Earring of Strength
+	{ItemID: 115, Count: 1},  // Earring of Wisdom
+	{ItemID: 876, Count: 2},  // Ring of Anguish
+	{ItemID: 907, Count: 1},  // Necklace of Anguish
+	{ItemID: 17, Count: 65},  // Wooden Arrow
+	{ItemID: 1060, Count: 3}, // Lesser Healing Potion
+	{ItemID: 1103, Count: 1}, // Cotton Stockings
+	{ItemID: 1795, Count: 8}, // Recipe: Leather Shoes
+	{ItemID: 1798, Count: 2}, // Recipe: Leather Helmet
+	{ItemID: 1831, Count: 4}, // Antidote
+	{ItemID: 1833, Count: 2}, // Bandage
+	{ItemID: 1864, Count: 8}, // Stem
+	{ItemID: 1866, Count: 4}, // Suede
+	{ItemID: 1867, Count: 9}, // Animal Skin
+	{ItemID: 1869, Count: 1}, // Iron Ore
+	{ItemID: 1870, Count: 5}, // Coal
+	{ItemID: 2005, Count: 1}, // Broadsword Blade
+	{ItemID: 2008, Count: 1}, // Cedar Staff Head
+	{ItemID: 2010, Count: 1}, // Brandish Blade
+}
+
+// zoneReturnReset returns the dump start state of the zone return
+// scenario: the reported stuck cell, the reported level and vitals,
+// the reported wallet and the reported item set.
+func zoneReturnReset(account string) characterReset {
+	return characterReset{
+		Account: account,
+		Char:    account,
+		Level:   14,
+		Exp:     zoneReturnExp,
+		SP:      zoneReturnSP,
+		Adena:   zoneReturnAdena,
+		Items:   zoneReturnItems,
+		X:       zoneReturnSpawnX,
+		Y:       zoneReturnSpawnY,
+		Z:       zoneReturnSpawnZ,
+		MaxHP:   zoneReturnHP,
+		MaxMP:   zoneReturnMP,
+		MaxCP:   zoneReturnCP,
 	}
 }
 
@@ -156,6 +243,23 @@ func resetCharacter(db *DB, reset characterReset, log func(string)) error {
 			objectID + ", " + strconv.Itoa(adenaItemID) + ", " + adena +
 			", 'INVENTORY', 0)"); err != nil {
 		return fmt.Errorf("inject adena: %w", err)
+	}
+
+	// The injected inventory stacks: the derived object ids stay
+	// below the FIRST_OBJECT_ID range like the adena stack (the
+	// wipe above keeps the numbering idempotent on a re-run).
+	for i, item := range reset.Items {
+		itemObjectID := strconv.FormatInt(
+			charID+adenaObjectIDBase+int64(i)+1, 10)
+		if _, err := db.Exec(
+			"INSERT INTO items (owner_id, object_id, item_id, count, " +
+				"loc, loc_data) VALUES (" +
+				strconv.FormatInt(charID, 10) + ", " + itemObjectID +
+				", " + strconv.Itoa(int(item.ItemID)) + ", " +
+				strconv.Itoa(int(item.Count)) +
+				", 'INVENTORY', 0)"); err != nil {
+			return fmt.Errorf("inject item %d: %w", item.ItemID, err)
+		}
 	}
 
 	if _, err := db.Exec(

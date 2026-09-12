@@ -66,12 +66,12 @@ func TestDefinitionsAreSane(t *testing.T) {
 }
 
 // TestDefinitionsUseTempAccounts pins the temp account contract: the
-// scenarios own temp1, temp2 and temp3 and never collide with the
-// -bots fleet accounts (test1, test2, ...).
+// scenarios own temp1, temp2, temp3 and temp4 and never collide with
+// the -bots fleet accounts (test1, test2, ...).
 func TestDefinitionsUseTempAccounts(t *testing.T) {
 	for _, def := range Definitions() {
 		switch def.Account {
-		case farmAccount, lifeAccount, relayAccount:
+		case farmAccount, lifeAccount, relayAccount, returnAccount:
 		default:
 			t.Fatalf("scenario %s owns the unexpected account %s",
 				def.ID, def.Account)
@@ -90,6 +90,7 @@ func TestManagerRegistersTrackers(t *testing.T) {
 	require.True(t, ids[farmAccount])
 	require.True(t, ids[lifeAccount])
 	require.True(t, ids[relayAccount])
+	require.True(t, ids[returnAccount])
 }
 
 // TestStartRejectsUnknownIDs pins the api error path.

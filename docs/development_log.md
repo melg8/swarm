@@ -4029,3 +4029,16 @@ permanent freeze:
   the frozen re-path escalation of the total-freeze server and the
   follower reaction tests all pass unchanged (the reset moved to the
   leg boundary, the in-plan frozen detection is untouched).
+- The `zone-return` acceptance scenario (the user runnable mirror of
+  the report): the temp character temp4 starts at the dump cell
+  (43048 50312 -2992) with the exact dump inventory (level 14, exp
+  192206, sp 7549, adena 31857, the 25 stacks of the report - the
+  injection lands everything in the bag and the auto equipment dresses
+  the character from it), and the pass condition is standing inside
+  its selected hunting zone. The live stack run of 2026-09-12
+  (build a4c9e15 + the scenario) passed in 68 s: the gear dressed,
+  the spot anchored (Spore Fungus SW), the village-to-zone route
+  walked clean, a Kaboo Orc Fighter engaged on the zone entry. The
+  scenario pins live in acceptance/zone_return_test.go (the dump
+  reset values, the exact item set, the check list, the condition
+  evaluation and the database item injection).

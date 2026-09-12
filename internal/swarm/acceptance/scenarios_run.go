@@ -81,6 +81,85 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
 	}
 }
 
+// zoneReturnScenario runs the stuck cell round: the temp character
+// wakes at the reported freeze position with the reported item set
+// and must walk to its selected hunting zone on its own - the freeze
+// of the report (the round 58 dump) held a character on that very
+// cell forever, the reproduction and the fix live in the hunt package.
+func zoneReturnScenario(ctx context.Context, m *Manager, t *Test) error {
+	test := t
+	test.setChecks(zoneReturnChecks())
+
+	if err := m.ensureCharacter(returnAccount, returnPassword, returnAccount,
+		test.appendLog); err != nil {
+		return fmt.Errorf("ensure character: %w", err)
+	}
+	time.Sleep(ensurePause)
+	if err := m.injectReset(zoneReturnReset(returnAccount), test); err != nil {
+		return fmt.Errorf("inject start state: %w", err)
+	}
+	time.Sleep(ensurePause)
+
+	sessionCtx, cancelSession := context.WithCancel(ctx)
+	defer cancelSession()
+	sessionDone := make(chan error, 1)
+	go func() {
+		sessionDone <- m.runSessionSupervised(sessionCtx, returnAccount,
+			returnPassword, returnAccount, true, m.proxy, test.appendLog)
+	}()
+
+	tracker := m.tracker(test)
+	if err := waitOnline(ctx, tracker, test); err != nil {
+		cancelSession()
+		<-sessionDone
+
+		return err
+	}
+	test.appendLog("acceptance: the bot is in the world, watching the " +
+		"zone return")
+
+	for {
+		if ctx.Err() != nil {
+			cancelSession()
+			<-sessionDone
+
+			return fmt.Errorf("cancelled: %w", ctx.Err())
+		}
+		evaluateZoneReturnConditions(tracker, test)
+		if allChecksDone(test) {
+			test.appendLog("acceptance: the bot reached its hunting zone, " +
+				"stopping the bot")
+			cancelSession()
+			if err := <-sessionDone; err != nil {
+				return fmt.Errorf("session end: %w", err)
+			}
+			test.appendLog("acceptance: the bot left the world gracefully")
+
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			cancelSession()
+			<-sessionDone
+
+			return fmt.Errorf("cancelled: %w", ctx.Err())
+		case <-time.After(monitorPeriod):
+		}
+	}
+}
+
+// evaluateZoneReturnConditions rewrites the check list of the stuck
+// cell scenario from the live tracker state: the zone check holds
+// once the character stands inside the hunting zone its own spot
+// economy selected.
+func evaluateZoneReturnConditions(tracker *state.Bot, test *Test) {
+	if tracker.Status() != state.StatusOnline {
+		return
+	}
+	_, inside, _ := evaluateZone(tracker)
+	test.updateCheck(checkZone, inside, "the hunt zone")
+}
+
 // evaluateFarmConditions rewrites the farm readiness check list from
 // the live tracker state.
 func evaluateFarmConditions(

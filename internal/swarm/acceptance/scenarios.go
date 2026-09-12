@@ -9,17 +9,19 @@ import (
 	"time"
 )
 
-// The temp accounts of the scenarios: temp1, temp2 and temp3 with the
-// matching passwords and character names. They never collide with the
-// -bots fleet (which derives test1, test2, ... from the base
+// The temp accounts of the scenarios: temp1, temp2, temp3 and temp4
+// with the matching passwords and character names. They never collide
+// with the -bots fleet (which derives test1, test2, ... from the base
 // account).
 const (
-	farmAccount   = "temp1"
-	farmPassword  = "temp1"
-	lifeAccount   = "temp2"
-	lifePassword  = "temp2"
-	relayAccount  = "temp3"
-	relayPassword = "temp3"
+	farmAccount    = "temp1"
+	farmPassword   = "temp1"
+	lifeAccount    = "temp2"
+	lifePassword   = "temp2"
+	relayAccount   = "temp3"
+	relayPassword  = "temp3"
+	returnAccount  = "temp4"
+	returnPassword = "temp4"
 )
 
 // Scenario timeouts: the farm readiness runs the one town visit
@@ -38,6 +40,13 @@ const (
 	farmTimeout = 20 * time.Minute
 	lifeTimeout = 4 * time.Minute
 )
+
+// zoneReturnTimeout bounds the stuck cell scenario: the walk from the
+// village street to the far hunting grounds covers several thousand
+// units of geodata route (the dump zone sat 7900 units away), and a
+// shopping detour or two may ride along - a quarter of an hour keeps
+// the slowest honest run inside the bound.
+const zoneReturnTimeout = 15 * time.Minute
 
 // lifeOnlineTime is how long the lifetime scenario keeps the bot in
 // the world: enough to observe a stable session (the mirrors of
@@ -76,6 +85,27 @@ func Definitions() []TestDef {
 				"under the attack and defence auras and has killed at " +
 				"least one mob there after this run started.",
 			Scenario: farmReadinessScenario,
+		},
+		{
+			ID:      "zone-return",
+			Title:   "zone return · stuck dump cell",
+			Account: returnAccount,
+			Timeout: zoneReturnTimeout,
+			Description: "Start: the elven fighter temp4 wakes at the " +
+				"reported stuck cell of the 2026-09-12 freeze dump " +
+				"(43048 50312 -2992, the elven village street next to " +
+				"Herbiel) as the level 14 character of the report with " +
+				"the exact inventory it carried - the Brandish sword, " +
+				"the wooden armor set, the starter jewels, the arrows, " +
+				"the potions, the recipes and the crafting pile, " +
+				"31,857 adena and 7,549 sp. Flow: the bot dresses " +
+				"itself, picks its hunting zone and walks there " +
+				"through the village streets and the geodata route. " +
+				"Pass: the bot stands inside its selected hunting " +
+				"zone (the freeze of the report left it standing on " +
+				"the village cell forever - the round 58 fix and its " +
+				"reproduction live in hunt/round58_repro_test.go).",
+			Scenario: zoneReturnScenario,
 		},
 		{
 			ID:      "bot-lifetime",

@@ -81,6 +81,21 @@ func lifetimeChecks() []Check {
 	}
 }
 
+// zoneReturnChecks is the check list of the stuck cell scenario: the
+// world entry plus the walk home to the selected hunting zone.
+func zoneReturnChecks() []Check {
+	return []Check{
+		{
+			ID: checkOnline, Label: "entered the world", Done: false,
+			Detail: "",
+		},
+		{
+			ID: checkZone, Label: "walked to the selected hunting zone",
+			Done: false, Detail: "",
+		},
+	}
+}
+
 // relayChecks is the check list of the proxy relay scenario.
 func relayChecks() []Check {
 	return []Check{

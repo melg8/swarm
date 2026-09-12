@@ -11,12 +11,6 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
-## Active task: the round 58 engage freeze - the inherited frozen re-path, the unguarded direct zone legs, the repro tests and the acceptance scenario (2026-09-12)
-
-Started: 2026-09-12. Branch: `feature/proxy-server`. Commits as melg8.
-Other agents may push to the same branch concurrently - rebase before
-every push.
-
 ## Active task: the farm readiness acceptance round - the one town visit and the pdef maximizing armor set (2026-09-11)
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
@@ -24,59 +18,6 @@ Other agents may push to the same branch concurrently - rebase before
 every push.
 
 ### Goal
-
-The user report (the 01:50 state dump, build 2149ad1, bot test1,
-phase engage): the bot stood at (43048 50312 -2992, the elven village
-street) for over an hour with the hunting zone 7900 units away
-(the Kaboo Orc Fighter SW leash), no walk plan, no events. The user
-asked: find why the bot freezes, fix it, add the reproduction tests,
-and add an acceptance test (runnable from the web UI / the
-`-acceptance` CLI) where the bot starts at the same position with the
-same set of items and walks to the selected zone.
-
-### Root cause (probed against the real geodata pack)
-
-A deleveling aborted on a frozen re-path cell; its return leg
-inherited the frozen cell (`startDelevelReturnLeg` never cleared
-`repathX/repathY/frozenRepaths`) and died on its own first refused
-click in one second; `abortFrozenTrip` armed the fail budget and the
-engage fell back to the direct zone legs, whose southwest line the
-server click validation collapses onto the walker (the walled street
-side) - `walkZoneLeg` never validated its clicks, never detected the
-missing movement and never logged, so the bot ground the same refused
-click once per second forever. See `docs/development_log.md` Round 58
-for the full story and the probes.
-
-### Fix (commit 1)
-
-1. `hunt/town.go` (`startReturnLeg`): the return leg starts with a
-   clean frozen re-path budget.
-2. `hunt/loop_movement.go` (`guardZoneLegClick`): every direct zone
-   leg is validated through the server click port; a refused leg is
-   never sent, the refusal re-arms the pathfound zone return and the
-   paced log line names the wall.
-
-### Acceptance criteria
-
-- The exact dump state (the dump cell, the dump zone, the post-abort
-  escalation) walks into the zone against the real geodata pack with
-  zero refused clicks (round58_repro_test.go).
-- The round 56/57 contracts stay green (the in-plan frozen detection
-  is untouched; the reset moved to the leg boundary).
-- A new `zone-return` acceptance scenario: the temp character starts
-  at the dump position with the dump inventory (level 14, the exact
-  bag of the report) and the pass condition is standing inside its
-  selected hunting zone.
-- go build/vet/test/lint green; the live stack validates the walk.
-
-### Status: in progress
-
-- Commit 1 (the hunt fix): the frozen reset, the zone leg guard, the
-  four round 58 repro tests, development_log Round 58, this entry.
-  All tests and `golangci-lint run --new` green.
-- Next: the acceptance scenario (the character reset with the dump
-  inventory, the `zone-return` definition, the monitor checks) and the
-  live stack validation.
 
 test (scenario 1, `farm-readiness`) passes but takes far too long and
 the bot acts suboptimally - it buys only the weapon/armor, walks to
