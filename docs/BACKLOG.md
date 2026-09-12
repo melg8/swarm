@@ -158,7 +158,7 @@ resume: done. The AGENTS.md "Hypotheses and unknowns" section holds
 
 ### T-006: the 20-25 band survey
 
-status: todo
+status: in_progress
 milestone: M3
 priority: P3
 deps: -
@@ -169,6 +169,11 @@ the elven lands, in the shape of the elven zone survey: territories,
 towns, merchants, teachers. Output: a survey document plus the
 follow-up task list (the registry generation itself is a separate
 task once M1 is green).
+
+claimed: band-survey-e3f8 2026-09-12 07:58Z
+resume: claim pushed; next: find the elven zone survey doc for the
+  shape, locate the 20-25 mobs of the Mobius spawn data reachable
+  from the elven lands, run the territory analysis.
 
 ### T-007: the PROGRESS.md page
 
