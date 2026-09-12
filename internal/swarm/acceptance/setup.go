@@ -231,6 +231,52 @@ func gearGapReset(account string) characterReset {
 	}
 }
 
+// The start state of the building entry scenario (the character of
+// the 2026-09-12 03:56 trainer hall freeze dump, standing at its walk
+// plan origin): the level 15 elven fighter wakes at the west aisle
+// entrance of the trainer hall with the wallet and the empty bag the
+// dump character carried when its town visit began - the weapon run
+// trip arms at once (the dump's own first trip: "no weapon in hand,
+// the weapon run comes first, 33 lessons worth 18690 sp wait at the
+// teacher"), buys the gear and the spellbooks across the village
+// merchants and then walks the teacher leg from the last stop into
+// the trainer hall - the exact leg the dump froze on.
+const (
+	// entrySpawnX/Y/Z is the dump walk plan origin: the aisle
+	// entrance of the elven village trainer hall.
+	entrySpawnX = 44744
+	entrySpawnY = 51992
+	entrySpawnZ = -2792
+	// The wallet and the vitals of the dump character at its town
+	// visit start: the shopping budget of the weapon run round.
+	entrySP    = 20000
+	entryAdena = 100000
+	entryHP    = 358
+	entryMP    = 145
+	entryCP    = 178
+)
+
+// buildingEntryReset returns the dump start state of the building
+// entry scenario: the aisle entrance position, the reported level and
+// vitals, the reported wallet and the reported item set.
+func buildingEntryReset(account string) characterReset {
+	return characterReset{
+		Account: account,
+		Char:    account,
+		Level:   15,
+		Exp:     level15Exp,
+		SP:      entrySP,
+		Adena:   entryAdena,
+		Items:   nil,
+		X:       entrySpawnX,
+		Y:       entrySpawnY,
+		Z:       entrySpawnZ,
+		MaxHP:   entryHP,
+		MaxMP:   entryMP,
+		MaxCP:   entryCP,
+	}
+}
+
 // waitCharacterOffline polls the characters row until the server
 // flushed the session state (the online flag drops with the store on
 // logout). The timeout case continues with a warning instead of

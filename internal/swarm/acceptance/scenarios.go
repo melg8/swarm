@@ -9,10 +9,10 @@ import (
 	"time"
 )
 
-// The temp accounts of the scenarios: temp1, temp2, temp3, temp4 and
-// temp5 with the matching passwords and character names. They never
-// collide with the -bots fleet (which derives test1, test2, ... from
-// the base account).
+// The temp accounts of the scenarios: temp1 through temp6 with the
+// matching passwords and character names. They never collide with the
+// -bots fleet (which derives test1, test2, ... from the base
+// account).
 const (
 	farmAccount    = "temp1"
 	farmPassword   = "temp1"
@@ -24,6 +24,8 @@ const (
 	returnPassword = "temp4"
 	gearAccount    = "temp5"
 	gearPassword   = "temp5"
+	entryAccount   = "temp6"
+	entryPassword  = "temp6"
 )
 
 // Scenario timeouts: the farm readiness runs the one town visit
@@ -57,6 +59,14 @@ const zoneReturnTimeout = 15 * time.Minute
 // way they interrupted the trip that caused the report. A quarter of
 // an hour keeps the slowest honest run inside the bound.
 const gearGapTimeout = 15 * time.Minute
+
+// buildingEntryTimeout bounds the trainer hall entry scenario: the
+// weapon run town round - the weapon, the armor, the jewels, the
+// spellbooks and the teacher leg into the hall - measured ~2.2
+// minutes on the live stack run (the dump's own town visit), the
+// bound leaves room for the walk retries and the aggressive road
+// mobs of the village surroundings.
+const buildingEntryTimeout = 9 * time.Minute
 
 // lifeOnlineTime is how long the lifetime scenario keeps the bot in
 // the world: enough to observe a stable session (the mirrors of
@@ -95,6 +105,29 @@ func Definitions() []TestDef {
 				"under the attack and defence auras and has killed at " +
 				"least one mob there after this run started.",
 			Scenario: farmReadinessScenario,
+		},
+		{
+			ID:      "building-entry",
+			Title:   "building entry · the teacher hall walk",
+			Account: entryAccount,
+			Timeout: buildingEntryTimeout,
+			Description: "Start: the elven fighter temp5 wakes at the " +
+				"trainer hall west aisle entrance (44744 51992 -2792, the " +
+				"freeze cell of the 2026-09-12 03:56 dump) as the level 15 " +
+				"character of the report - 20,000 SP, 100,000 adena and an " +
+				"empty inventory, exactly the state the dump's town visit " +
+				"began from. Flow: the weapon run trip arms at once, buys " +
+				"the gear and the spellbooks across the village merchants " +
+				"and then walks the teacher leg from the last stop through " +
+				"the building entrance right up to the class master Ellenia " +
+				"inside the hall, and the lessons begin. Pass: the character " +
+				"stands within the interaction distance of Ellenia and at " +
+				"least one lesson consumed SP (the dump freeze held the " +
+				"character at the entrance forever - the frozen corridor " +
+				"ban, the detour re-plan and the direct server routed walk " +
+				"own the recovery, the reproduction lives in " +
+				"hunt/building_entry_test.go).",
+			Scenario: buildingEntryScenario,
 		},
 		{
 			ID:      "zone-return",

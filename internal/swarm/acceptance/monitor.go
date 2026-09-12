@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/state"
@@ -31,6 +32,60 @@ const (
 	checkBuffs    = "buffs"
 	checkKill     = "kill"
 )
+
+// The building entry condition ids.
+const (
+	checkTeacher = "teacher"
+	checkLesson  = "lesson"
+)
+
+// The teacher hall geometry of the building entry scenario: the class
+// master Ellenia of the elven fighters stands inside the trainer hall
+// (ElvenVillageNPCs.xml), the interaction ring the scenario accepts
+// matches the server INTERACTION_DISTANCE.
+const (
+	elleniaSpawnX = 45725
+	elleniaSpawnY = 52105
+	elleniaSpawnZ = -2792
+	// elleniaInteractionDist is the server interaction distance the
+	// talk click and the lesson requests land within.
+	elleniaInteractionDist = 250.0
+)
+
+// evaluateTeacher reports whether the character stands within the
+// interaction distance of the teacher Ellenia - the walk crossed the
+// building entrance and reached the class master inside the hall.
+func evaluateTeacher(tracker *state.Bot) (detail string, done bool) {
+	x, y, z, ok := tracker.SelfPosition()
+	if !ok {
+		return "no position yet", false
+	}
+	dx := float64(x - elleniaSpawnX)
+	dy := float64(y - elleniaSpawnY)
+	dz := float64(z - elleniaSpawnZ)
+	dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
+	if dist > elleniaInteractionDist {
+		return fmt.Sprintf("%.0f units from Ellenia", dist), false
+	}
+
+	return fmt.Sprintf("at %.0f units from Ellenia", dist), true
+}
+
+// evaluateLesson reports whether the teach stop already taught: the
+// SP of the character dropped below the injected start value (only
+// the lesson requests consume SP). A zero SP means the UserInfo of
+// the world entry has not landed yet - no lesson answer before it.
+func evaluateLesson(tracker *state.Bot) (detail string, done bool) {
+	sp := tracker.SelfSp()
+	if sp <= 0 {
+		return "no skill points observed yet", false
+	}
+	if sp >= entrySP {
+		return fmt.Sprintf("%d sp, no lesson yet", sp), false
+	}
+
+	return fmt.Sprintf("%d sp, the lessons began", sp), true
+}
 
 // farmChecks is the initial check list of the farm readiness
 // scenario: the narrative order of the user story.
@@ -107,6 +162,26 @@ func gearGapChecks() []Check {
 		{
 			ID: "legs", Label: "bought the legs armor back", Done: false,
 			Detail: "",
+		},
+	}
+}
+
+// buildingEntryChecks is the check list of the trainer hall entry
+// scenario: the world entry at the building entrance, the walk right
+// up to the teacher npc inside the hall and the first learned lesson.
+func buildingEntryChecks() []Check {
+	return []Check{
+		{
+			ID: checkOnline, Label: "entered the world at the hall entrance",
+			Done: false, Detail: "",
+		},
+		{
+			ID: checkTeacher, Label: "walked up to the teacher Ellenia",
+			Done: false, Detail: "",
+		},
+		{
+			ID: checkLesson, Label: "learned a lesson at the teacher",
+			Done: false, Detail: "",
 		},
 	}
 }

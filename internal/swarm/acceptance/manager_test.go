@@ -71,7 +71,7 @@ func TestDefinitionsAreSane(t *testing.T) {
 func TestDefinitionsUseTempAccounts(t *testing.T) {
 	for _, def := range Definitions() {
 		switch def.Account {
-		case farmAccount, lifeAccount, relayAccount, returnAccount, gearAccount:
+		case farmAccount, lifeAccount, relayAccount, returnAccount, entryAccount, gearAccount:
 		default:
 			t.Fatalf("scenario %s owns the unexpected account %s",
 				def.ID, def.Account)

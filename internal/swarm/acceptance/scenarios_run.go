@@ -81,6 +81,93 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
 	}
 }
 
+// buildingEntryScenario runs the trainer hall round of the
+// 2026-09-12 03:56 freeze dump: the temp character wakes at the west
+// aisle entrance of the trainer hall with the dump inventory and the
+// learning trip armed - the sell stop walks first (every vendor trip
+// sells the accumulated junk), then the teacher leg must cross the
+// building entrance and reach the class master Ellenia inside the
+// hall, and the lessons begin. The dump freeze held the character at
+// the entrance forever; the frozen corridor ban, the detour re-plan
+// and the direct server routed walk own the recovery, the offline
+// reproduction lives in hunt/building_entry_test.go.
+//
+//nolint:dupl // mirrors zoneReturnScenario with the dump hall state and checks
+func buildingEntryScenario(ctx context.Context, m *Manager, t *Test) error {
+	test := t
+	test.setChecks(buildingEntryChecks())
+
+	if err := m.ensureCharacter(entryAccount, entryPassword, entryAccount,
+		test.appendLog); err != nil {
+		return fmt.Errorf("ensure character: %w", err)
+	}
+	time.Sleep(ensurePause)
+	if err := m.injectReset(buildingEntryReset(entryAccount), test); err != nil {
+		return fmt.Errorf("inject start state: %w", err)
+	}
+	time.Sleep(ensurePause)
+
+	sessionCtx, cancelSession := context.WithCancel(ctx)
+	defer cancelSession()
+	sessionDone := make(chan error, 1)
+	go func() {
+		sessionDone <- m.runSessionSupervised(sessionCtx, entryAccount,
+			entryPassword, entryAccount, true, m.proxy, test.appendLog)
+	}()
+
+	tracker := m.tracker(test)
+	if err := waitOnline(ctx, tracker, test); err != nil {
+		cancelSession()
+		<-sessionDone
+
+		return err
+	}
+	test.appendLog("acceptance: the bot is in the world at the hall " +
+		"entrance, watching the teacher walk")
+
+	for {
+		if ctx.Err() != nil {
+			cancelSession()
+			<-sessionDone
+
+			return fmt.Errorf("cancelled: %w", ctx.Err())
+		}
+		evaluateBuildingEntryConditions(tracker, test)
+		if allChecksDone(test) {
+			test.appendLog("acceptance: the character reached the teacher " +
+				"and the lessons began, stopping the bot")
+			cancelSession()
+			if err := <-sessionDone; err != nil {
+				return fmt.Errorf("session end: %w", err)
+			}
+			test.appendLog("acceptance: the bot left the world gracefully")
+
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			cancelSession()
+			<-sessionDone
+
+			return fmt.Errorf("cancelled: %w", ctx.Err())
+		case <-time.After(monitorPeriod):
+		}
+	}
+}
+
+// evaluateBuildingEntryConditions rewrites the check list of the
+// trainer hall entry scenario from the live tracker state: the walk
+// up to the teacher npc and the first learned lesson.
+func evaluateBuildingEntryConditions(tracker *state.Bot, test *Test) {
+	if tracker.Status() != state.StatusOnline {
+		return
+	}
+	teacherDetail, atTeacher := evaluateTeacher(tracker)
+	test.updateCheck(checkTeacher, atTeacher, teacherDetail)
+	lessonDetail, learned := evaluateLesson(tracker)
+	test.updateCheck(checkLesson, learned, lessonDetail)
+}
+
 // zoneReturnScenario runs the stuck cell round: the temp character
 // wakes at the reported freeze position with the reported item set
 // and must walk to its selected hunting zone on its own - the freeze
