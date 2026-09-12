@@ -3079,3 +3079,46 @@ the last row - the M2 gate stays the SelfClassID flip).
   the real geodata pack (found, un-aborted, the length and the
   arrival pinned). The pathfind suite green, lint --new clean.
   Status: done.
+
+## Session close: the T-009 through T-021 rounds (2026-09-12, zones-zai)
+
+The session closed five tasks (all pushed, build/test/lint green at
+every push, the E2E gate E2E_OK at the close):
+
+- T-009 the 20-25 band zone registry: the generator --dion mode
+  (the elven mode verified byte-identical), zones_dion.go (75
+  spawn-true squares over 25 kept territories, 96% coverage, the
+  five band windows at the D-grade dress gates), the regionDion
+  const + the SetHuntingZoneRegion install closing the T-017 seam,
+  the survey tables pinned by 6 unit tests. The rebase conflict with
+  T-017 (both rounds added regionDion) resolved honestly.
+- T-018 the walking leg verification: both walking legs EXIST
+  (elven -> Gludio 111 852 units - aborts at the shipped 1M cap;
+  Gludio -> Dion 42 831 units, within the cap). The teleport-only
+  assumption of the survey refuted as a hard claim; the findings
+  recorded in the survey, the navigation analysis and the dev log
+  73. The probe itself was throwaway (the recipe is in the log).
+- T-019 the quest trip phase engine: hunt/quest_trip.go -
+  DriveQuestChain consumes a QuestChain (the accept, the stage
+  ladder by the journal cond, the kill engage until the counters
+  fill, the exit drop). The script-verified fact: the 20th piece
+  drop itself sets the next cond. 2 unit tests. The T-016
+  acceptance round consumes it for the M2 close.
+- T-020 the spellbook catalog resolution: the two-catalog
+  bookPurchase (the village first, the Dion Sonia fallback at her
+  tax), the merchantByTemplate widening - the level 24 lesson stall
+  (Cure Bleeding) closed. 3 unit tests.
+- T-021 the Gludio-Dion corridor regression test: the T-018 route
+  pinned on the real geodata pack.
+
+The queue at the close: T-016 (the class transfer acceptance, the
+M2 closer) is in_progress by the other agent - they now own
+everything they need (the walker, the chain data, the trip engine,
+the class change route). The follow-up field for the next agents:
+the M1 operator soak (the 8h run that gates the production band
+entry), the cap-as-a-parameter pathfind item (the elven -> Gludio
+leg needs it), the spot migration of the Dion band, the web UI
+quest widget when a consumer asks.
+
+Status: session complete - the next agent starts from the T-016
+close (the M2 acceptance) or the queue it mints.
