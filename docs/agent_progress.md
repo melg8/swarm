@@ -2421,4 +2421,3 @@ transfer, M3+ injects the band levels).
 ### Progress
 
 - 07:51 UTC: T-003 claimed in docs/BACKLOG.md.
- (docs: close T-007 - the progress page renders the ladder)
