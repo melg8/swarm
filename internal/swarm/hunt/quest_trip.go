@@ -11,6 +11,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/melg8/swarm/internal/swarm/gear"
+	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/state"
 )
 
@@ -45,6 +47,51 @@ const questNpcFindWait = 30 * time.Second
 
 // questWalkTimeout bounds one walk to a station or a kill ground.
 const questWalkTimeout = 5 * time.Minute
+
+// questSegmentLen bounds one planned segment of the route walk: the
+// geodata search of a long leg (Gludio to the Ruins of Agony is
+// 37 500 units) would burn the shipped 1M expansion cap, so the
+// route splits into segments of this length and every segment plans
+// its own path (~200k expansions, far under the cap).
+const questSegmentLen = 8000.0
+
+// questStuckWait is the position silence that marks a stuck segment
+// walk: no cell of movement for this window re-plans the segment.
+// The var (not a const) is a test seam: the route tests shorten it.
+var questStuckWait = 5 * time.Second
+
+// questTransferArriveRadius is the arrival gate of a gatekeeper
+// teleport: the arrival square of the teleporter xml plus the
+// scatter the server drops the character at.
+const questTransferArriveRadius = 2000.0
+
+// questTransferArriveWait bounds the wait for the teleport arrival:
+// the server answers the bypass with the TeleportToLocation burst
+// within a second, the bound covers a slow tick. The var (not a
+// const) is a test seam: the transfer tests shorten it.
+var questTransferArriveWait = 20 * time.Second
+
+// questRestSitHP is the health share the kill stage sits down at:
+// the manual trip has no rest phase of the hunt loop, so the farm
+// loop itself parks the character until the sitting regeneration
+// covers the next fights.
+const questRestSitHP = 40.0
+
+// questRestStandHP is the health share the rest stands up at.
+const questRestStandHP = 85.0
+
+// questRestTimeout bounds one rest: the sitting regeneration of a
+// level 20 fighter covers the window with a wide margin; a timeout
+// stands up and continues anyway (the health floor still guards).
+// The var (not a const) is a test seam: the rest tests shorten it.
+var questRestTimeout = 3 * time.Minute
+
+// questEquipConfirmWait bounds the wait for the inventory mutation
+// after one equip request of EquipBaggedGear.
+const questEquipConfirmWait = 5 * time.Second
+
+// questEquipMaxActions bounds the equip loop of one dress-up call.
+const questEquipMaxActions = 20
 
 // questArriveRadius is the arrival distance of a quest walk: inside
 // the interaction distance (250) the dialog talks work, so the walk
@@ -107,6 +154,9 @@ func (l *Loop) FindQuestNpc(
 func (l *Loop) walkToQuestPoint(
 	x int32, y int32, z int32, timeout time.Duration,
 ) error {
+	if l.navigator != nil {
+		return l.walkQuestRoute(x, y, timeout)
+	}
 	if err := l.game.WalkTo(x, y, z); err != nil {
 		return fmt.Errorf("the walk request failed: %w", err)
 	}
@@ -120,6 +170,170 @@ func (l *Loop) walkToQuestPoint(
 		if time.Now().After(deadline) {
 			return fmt.Errorf(
 				"the walk to (%d, %d) did not arrive", x, y)
+		}
+		time.Sleep(questWalkPoll)
+	}
+}
+
+// walkQuestRoute walks to the destination through planned geodata
+// segments: one long leg (tens of thousands of units) exceeds the
+// shipped expansion cap of one search, so the route splits into
+// questSegmentLen hops along the straight line to the goal and every
+// hop plans its own waypoint path. A hop whose search fails falls
+// back to the raw direct click of the legacy walk (the server stops
+// a walled click, the stuck detector re-plans). The walk stands on
+// itself: it re-plans on a stuck segment until the timeout.
+func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+		if !ok {
+			return errors.New("no self position for the route walk")
+		}
+		if math.Hypot(float64(selfX-x), float64(selfY-y)) <=
+			questArriveRadius {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf(
+				"the route walk to (%d, %d) did not arrive", x, y)
+		}
+		segX, segY := questSegmentTarget(selfX, selfY, x, y)
+		if l.followPlannedSegment(selfX, selfY, selfZ, segX, segY, deadline) {
+			continue
+		}
+		// No geodata path for the segment (or the follower
+		// ran dry): the direct click, the server stops it at
+		// an obstacle and the loop re-plans above.
+		if err := l.game.WalkTo(segX, segY, selfZ); err != nil {
+			return fmt.Errorf("the walk request failed: %w", err)
+		}
+		if !l.awaitSegmentProgress(segX, segY, deadline) {
+			return fmt.Errorf(
+				"the walk to (%d, %d) stalled at (%d, %d)",
+				x, y, selfX, selfY)
+		}
+	}
+}
+
+// questSegmentTarget picks the segment destination: the goal itself
+// inside the last stretch, the point questSegmentLen along the
+// straight line otherwise.
+func questSegmentTarget(selfX, selfY, x, y int32) (int32, int32) {
+	dist := math.Hypot(float64(x-selfX), float64(y-selfY))
+	if dist <= questSegmentLen {
+		return x, y
+	}
+	frac := questSegmentLen / dist
+
+	return int32(float64(selfX) + float64(x-selfX)*frac),
+		int32(float64(selfY) + float64(y-selfY)*frac)
+}
+
+// followPlannedSegment plans the geodata path of one segment and
+// walks its waypoints. It reports whether the plan existed and was
+// followed (the caller falls back to the direct click otherwise).
+func (l *Loop) followPlannedSegment(
+	selfX, selfY, selfZ, segX, segY int32, deadline time.Time,
+) bool {
+	from := pathfind.Vec3{
+		X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+	}
+	dest := pathfind.Vec3{
+		X: float64(segX), Y: float64(segY), Z: float64(selfZ),
+	}
+	result, err := l.navigator.FindPathApproachDryAvoiding(
+		from, dest, questArriveRadius, l.frozenAreas)
+	if err != nil || result == nil || !result.Found ||
+		len(result.Waypoints) == 0 {
+		return false
+	}
+	waypoints := result.Waypoints
+	l.logf("quest: walking a planned segment to (%d, %d) through "+
+		"%d waypoints", segX, segY, len(waypoints))
+	for i := range waypoints {
+		if !l.followWaypoint(waypoints, i, deadline) {
+			return true
+		}
+	}
+
+	return true
+}
+
+// followWaypoint walks toward the waypoint at the index until the
+// tracker counts it reached (the tight pass radius of the town
+// trips) or the walk stalls. False when the waypoint needs a re-plan
+// (the follower returns, the caller plans a fresh segment); true
+// when the waypoint was reached or the segment ran out of budget.
+func (l *Loop) followWaypoint(
+	waypoints []pathfind.Vec3, index int, deadline time.Time,
+) bool {
+	wp := waypoints[index]
+	lastX, lastY := int32(0), int32(0)
+	stuckSince := time.Time{}
+	for {
+		if time.Now().After(deadline) {
+			return true
+		}
+		selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+		if !ok {
+			time.Sleep(questWalkPoll)
+
+			continue
+		}
+		radius := waypointPassDist
+		if index == len(waypoints)-1 {
+			radius = questArriveRadius
+		}
+		if waypointDistance(wp, selfX, selfY, selfZ) <= radius {
+			return true
+		}
+		if lastX == selfX && lastY == selfY {
+			if stuckSince.IsZero() {
+				stuckSince = time.Now()
+			} else if time.Since(stuckSince) >= questStuckWait {
+				return false
+			}
+		} else {
+			lastX, lastY = selfX, selfY
+			stuckSince = time.Time{}
+		}
+		if err := l.game.WalkTo(
+			int32(wp.X), int32(wp.Y), selfZ); err != nil {
+			l.logf("quest: the waypoint walk failed: %v", err)
+
+			return false
+		}
+		time.Sleep(questWalkPoll)
+	}
+}
+
+// awaitSegmentProgress waits until the character moves a meaningful
+// distance from the position the direct click started at (the click
+// took, the walk runs) or the deadline lapses. False marks a stalled
+// click: the character stands where it stood.
+func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
+	startX, startY, _, ok := l.tracker.SelfPosition()
+	if !ok {
+		return false
+	}
+	for {
+		if time.Now().After(deadline) {
+			return false
+		}
+		selfX, selfY, _, ok := l.tracker.SelfPosition()
+		if !ok {
+			time.Sleep(questWalkPoll)
+
+			continue
+		}
+		if math.Hypot(float64(selfX-startX), float64(selfY-startY)) >
+			waypointPassDist {
+			return true
+		}
+		if math.Hypot(float64(selfX-segX), float64(selfY-segY)) <=
+			questArriveRadius {
+			return true
 		}
 		time.Sleep(questWalkPoll)
 	}
@@ -185,12 +399,19 @@ func (l *Loop) DriveQuestChain(
 	}
 }
 
-// driveQuestStage runs one stage of the ladder: the talk half walks
-// to the station and drives the dialog route, the kill half farms
-// the item counters on the ground.
+// driveQuestStage runs one stage of the ladder: the optional
+// gatekeeper leg first (the station sits in another town), then the
+// talk half walks to the station and drives the dialog route, the
+// kill half farms the item counters on the ground.
 func (l *Loop) driveQuestStage(
 	ctx context.Context, chain QuestChain, stage QuestStage,
 ) error {
+	if stage.Transfer != nil {
+		if err := l.driveQuestTransfer(ctx, *stage.Transfer); err != nil {
+			return fmt.Errorf("the transfer to %s: %w",
+				stage.Transfer.DestLabel, err)
+		}
+	}
 	if stage.TalkNpc.TemplateID == 0 {
 		return l.farmQuestStage(ctx, stage)
 	}
@@ -199,6 +420,136 @@ func (l *Loop) driveQuestStage(
 		chain.QuestID, stage.TalkNpc.Name)
 
 	return l.driveQuestTalk(chain, stage.TalkNpc, route)
+}
+
+// driveQuestTransfer rides one gatekeeper hop: the walk to the
+// teleporter, the talk that opens the first page (the html action
+// cache only validates the links of the open page, so the showTeleports
+// bypass needs the talk first), the showTeleports list, the
+// destination button and the arrival wait at the teleport square.
+// Live verified against Bella (Gludio -> Gludin) and Richlin
+// (Gludin -> Gludio) on the deployed stack.
+func (l *Loop) driveQuestTransfer(
+	ctx context.Context, transfer QuestTransfer,
+) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("cancelled: %w", err)
+	}
+	target, err := l.FindQuestNpc(
+		transfer.Gatekeeper, questNpcFindWait)
+	if err != nil {
+		return err
+	}
+	if err := l.walkToQuestPoint(
+		target.X, target.Y, target.Z, questWalkTimeout); err != nil {
+		return fmt.Errorf("the walk to %s: %w",
+			transfer.Gatekeeper.Name, err)
+	}
+	l.logf("quest: talking to the gatekeeper %s (object %d), "+
+		"riding the teleport to %s",
+		transfer.Gatekeeper.Name, target.ObjectID, transfer.DestLabel)
+
+	// The talk opens the first page (the walk-in gate of the
+	// html action cache).
+	if err := l.game.ClickObject(target.ObjectID); err != nil {
+		return fmt.Errorf("the gatekeeper click: %w", err)
+	}
+	if _, html, err := l.awaitTransferPage(
+		target.ObjectID, "", questTransferArriveWait); err != nil {
+		return err
+	} else if FindShowTeleportsButton(ParseGatekeeperHTML(html)) == nil {
+		return fmt.Errorf(
+			"the first page of %s carries no teleport entry",
+			transfer.Gatekeeper.Name)
+	}
+
+	// The showTeleports bypass (the button of the open first
+	// page) opens the list.
+	if err := l.game.SendBypass(fmt.Sprintf(
+		"npc_%d_showTeleports", target.ObjectID)); err != nil {
+		return fmt.Errorf("the showTeleports send: %w", err)
+	}
+	buttons, _, err := l.awaitTransferPage(
+		target.ObjectID, transfer.DestLabel, questTransferArriveWait)
+	if err != nil {
+		return err
+	}
+	teleport := FindTeleportButton(
+		buttons, "NORMAL", transfer.DestLabel)
+	if teleport == nil {
+		return fmt.Errorf(
+			"the teleport list of %s carries no %s button",
+			transfer.Gatekeeper.Name, transfer.DestLabel)
+	}
+	command := fmt.Sprintf("npc_%d_teleport %s %d",
+		target.ObjectID, teleport.ListName, teleport.LocID)
+	l.logf("quest: teleporting to %s", teleport.Label)
+	if err := l.game.SendBypass(command); err != nil {
+		return fmt.Errorf("the teleport send: %w", err)
+	}
+
+	return l.awaitTransferArrival(ctx, transfer)
+}
+
+// awaitTransferPage waits for the dialog of the gatekeeper to carry
+// the wanted button (a teleport button whose label contains
+// destLabel; any page when destLabel is empty - the first page
+// wait). It returns the parsed buttons of the matching page and the
+// raw html.
+func (l *Loop) awaitTransferPage(
+	npcObjID int32, destLabel string, wait time.Duration,
+) ([]BypassButton, string, error) {
+	deadline := time.Now().Add(wait)
+	for {
+		id, html := l.game.LastHTMLDialog()
+		if id == npcObjID && html != "" {
+			buttons := ParseGatekeeperHTML(html)
+			if destLabel == "" {
+				if len(buttons) > 0 {
+					return buttons, html, nil
+				}
+			} else if FindTeleportButton(
+				buttons, "NORMAL", destLabel) != nil {
+				return buttons, html, nil
+			}
+		}
+		if time.Now().After(deadline) {
+			return nil, "", fmt.Errorf(
+				"the gatekeeper dialog with %q never arrived",
+				destLabel)
+		}
+		time.Sleep(gatekeeperPollPeriod)
+	}
+}
+
+// awaitTransferArrival waits until the tracker places the character
+// at the arrival square of the teleport (the TeleportToLocation
+// answer of the server; the connection layer sends the Appearing
+// confirmation).
+func (l *Loop) awaitTransferArrival(
+	ctx context.Context, transfer QuestTransfer,
+) error {
+	deadline := time.Now().Add(questTransferArriveWait)
+	for {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("cancelled: %w", err)
+		}
+		selfX, selfY, _, ok := l.tracker.SelfPosition()
+		if ok && math.Hypot(
+			float64(selfX-transfer.ArriveX),
+			float64(selfY-transfer.ArriveY)) <=
+			questTransferArriveRadius {
+			l.logf("quest: the teleport to %s landed at (%d, %d)",
+				transfer.DestLabel, selfX, selfY)
+
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf(
+				"the teleport to %s never landed", transfer.DestLabel)
+		}
+		time.Sleep(questWalkPoll)
+	}
 }
 
 // driveQuestTalk finds the station npc, walks into the interaction
@@ -228,7 +579,10 @@ func (l *Loop) driveQuestTalk(
 // fill the target. The attacks ride the double click semantics (the
 // repeated request starts the fight); a ground with no living quest
 // mob in the scan radius holds for the respawn instead of walking
-// away (the stage deadline guards a dead ground).
+// away (the stage deadline guards a dead ground). The rest between
+// the fights parks the character sitting until the regeneration
+// covers the next fight (the manual trip has no rest phase of the
+// hunt loop).
 func (l *Loop) farmQuestStage(
 	ctx context.Context, stage QuestStage,
 ) error {
@@ -263,6 +617,9 @@ func (l *Loop) farmQuestStage(
 		if l.tracker.SelfHealthPercent() < questHealthFloor {
 			return errors.New("the health floor breached")
 		}
+		if err := l.restBetweenFights(ctx); err != nil {
+			return err
+		}
 		mob, ok := l.tracker.NearestNpcByTemplates(
 			templates, questKillScanRadius)
 		if !ok {
@@ -274,5 +631,106 @@ func (l *Loop) farmQuestStage(
 			return fmt.Errorf("the attack on %s: %w", mob.Name, err)
 		}
 		time.Sleep(questKillAttackPeriod)
+	}
+}
+
+// restBetweenFights parks a tired character: below the sit threshold
+// the character sits down and waits for the sitting regeneration to
+// reach the stand threshold (the rest timeout stands up anyway - the
+// health floor of the farm loop still guards the retreat). A healthy
+// character returns at once.
+func (l *Loop) restBetweenFights(ctx context.Context) error {
+	if l.tracker.SelfHealthPercent() >= questRestSitHP {
+		return nil
+	}
+	l.logf("quest: resting at %.0f%% health",
+		l.tracker.SelfHealthPercent())
+	if err := l.game.ActionSitStand(); err != nil {
+		return fmt.Errorf("the sit request: %w", err)
+	}
+	deadline := time.Now().Add(questRestTimeout)
+	for {
+		if err := ctx.Err(); err != nil {
+			_ = l.game.ActionSitStand()
+
+			return fmt.Errorf("cancelled: %w", err)
+		}
+		hp := l.tracker.SelfHealthPercent()
+		if hp >= questRestStandHP {
+			break
+		}
+		if time.Now().After(deadline) {
+			l.logf("quest: the rest timed out at %.0f%% health", hp)
+
+			break
+		}
+		time.Sleep(questWalkPoll)
+	}
+	if err := l.game.ActionSitStand(); err != nil {
+		return fmt.Errorf("the stand request: %w", err)
+	}
+	l.logf("quest: the rest ended at %.0f%% health",
+		l.tracker.SelfHealthPercent())
+
+	return nil
+}
+
+// EquipBaggedGear dresses the character from the bag: the blocking
+// variant of the auto equipment for the manual quest trip loop. The
+// loop plans the next paperdoll upgrade (the gear simulation of the
+// MeleeFighter profile), sends the use request and waits for the
+// inventory mutation to confirm; the cycle ends when the paperdoll
+// holds no further upgrade or the action budget lapses. The scenario
+// calls it right after the world entry of an injected character
+// (the reset lands every stack in the bag).
+func (l *Loop) EquipBaggedGear() error {
+	if l.equip == nil || l.game == nil {
+		return errors.New("the equip manager is not wired")
+	}
+	lastObject := int32(0)
+	retries := 0
+	for range questEquipMaxActions {
+		action, ok := gear.NextUpgrade(l.equip.profile, l.equipment())
+		if !ok {
+			return nil
+		}
+		if action.ObjectID == lastObject {
+			retries++
+			if retries > 3 {
+				return fmt.Errorf(
+					"the equip of %s never confirmed", action.Reason)
+			}
+		} else {
+			retries = 0
+			lastObject = action.ObjectID
+		}
+		before := l.tracker.InventoryVersion()
+		if err := l.game.UseItem(action.ObjectID); err != nil {
+			return fmt.Errorf("the equip of %s: %w", action.Reason, err)
+		}
+		if !l.awaitInventoryMutation(before, questEquipConfirmWait) {
+			return fmt.Errorf(
+				"the equip of %s never confirmed", action.Reason)
+		}
+		l.logf("quest: gear: %s", action.Reason)
+	}
+
+	return errors.New("the equip loop reached the action budget")
+}
+
+// awaitInventoryMutation waits until the tracker reports a new
+// inventory version (an InventoryUpdate the use request triggered).
+func (l *Loop) awaitInventoryMutation(
+	before uint64, wait time.Duration,
+) bool {
+	deadline := time.Now().Add(wait)
+	for {
+		if l.tracker.InventoryVersion() != before {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(gatekeeperPollPeriod)
 	}
 }

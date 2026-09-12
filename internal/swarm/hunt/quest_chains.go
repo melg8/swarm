@@ -86,6 +86,34 @@ type QuestStage struct {
 	// Kill is the farming block of the stage (the zero QuestKill
 	// of a pure talk stage).
 	Kill QuestKill
+	// Transfer is the optional gatekeeper leg the stage opens
+	// with: the station sits in another town (Kluto of Gludin
+	// while the character stands in Gludio), so the stage first
+	// walks to the gatekeeper and rides the teleport. Nil when
+	// the station is reachable on foot.
+	Transfer *QuestTransfer
+}
+
+// QuestTransfer is the town hop a quest stage may need before its
+// station becomes reachable: one gatekeeper teleport bought through
+// the bypass flow (the walk to the teleporter, the talk that opens
+// the first page, the showTeleports list, the destination button).
+// The two Gludio hops of the knight chain read from the live stack
+// teleporter xml (Bella of Gludio, Richlin of Gludin - the research
+// draft's "Trisha" stands in Dion, the quest_protocol correction).
+type QuestTransfer struct {
+	// Gatekeeper is the teleporter npc of the town the character
+	// leaves (the walk target of the leg).
+	Gatekeeper QuestNpc
+	// DestLabel selects the teleport list button (a substring of
+	// the button label: "The Village of Gludin",
+	// "The Town of Gludio").
+	DestLabel string
+	// ArriveX/Y/Z is the arrival square of the teleport (the xml
+	// location of the teleporter data - the arrival wait gate).
+	ArriveX int32
+	ArriveY int32
+	ArriveZ int32
 }
 
 // QuestChain is one first profession quest of the elven fighter:
@@ -148,6 +176,7 @@ var (
 // zeroQuestStage is the not-found sentinel of QuestStageByCond.
 var zeroQuestStage = QuestStage{
 	Cond: 0, TalkNpc: zeroQuestNpc, Links: nil, Kill: zeroQuestKill,
+	Transfer: nil,
 }
 
 // questTalkStage builds a talk stage: the cond the stage starts
@@ -156,13 +185,27 @@ var zeroQuestStage = QuestStage{
 func questTalkStage(
 	cond int32, npc QuestNpc, links ...DialogStep,
 ) QuestStage {
-	return QuestStage{Cond: cond, TalkNpc: npc, Links: links, Kill: zeroQuestKill}
+	return QuestStage{
+		Cond: cond, TalkNpc: npc, Links: links, Kill: zeroQuestKill,
+		Transfer: nil,
+	}
 }
 
 // questKillStage builds a farming stage: the cond the stage starts
 // at and the kill economy.
 func questKillStage(cond int32, kill QuestKill) QuestStage {
-	return QuestStage{Cond: cond, TalkNpc: zeroQuestNpc, Links: nil, Kill: kill}
+	return QuestStage{
+		Cond: cond, TalkNpc: zeroQuestNpc, Links: nil, Kill: kill,
+		Transfer: nil,
+	}
+}
+
+// withTransfer returns the stage with the gatekeeper leg attached
+// (the builder of the cross-town talk stages).
+func (s QuestStage) withTransfer(transfer *QuestTransfer) QuestStage {
+	s.Transfer = transfer
+
+	return s
 }
 
 // The class transfer npc stations of the live stack (the Gludio
@@ -201,6 +244,52 @@ func priasNPC() QuestNpc {
 func rainsNPC() QuestNpc {
 	return QuestNpc{
 		TemplateID: 7288, Name: "Rains", X: -13579, Y: 123017, Z: -3103,
+	}
+}
+
+// bellaNPC is the Gludio gatekeeper (GludioNPCs.xml: -12736 122816
+// -3114): the Gludin hop of the knight chain (the teleporter xml
+// 30256.xml, "The Village of Gludin" for 7300 adena).
+func bellaNPC() QuestNpc {
+	return QuestNpc{
+		TemplateID: 7256, Name: "Bella", X: -12736, Y: 122816, Z: -3114,
+	}
+}
+
+// richlinNPC is the Gludin gatekeeper (GludinVillageNPCs.xml:
+// -80752 149776 -3044): the return Gludio hop (the teleporter xml
+// 30320.xml, "The Town of Gludio" for 7300 adena).
+func richlinNPC() QuestNpc {
+	return QuestNpc{
+		TemplateID: 7320, Name: "Richlin",
+		X: -80752, Y: 149776, Z: -3044,
+	}
+}
+
+// TransferGludioToGludin is the outbound town hop of the knight
+// chain: Bella teleports the character from Gludio to the Gludin
+// village square (the arrival square of the teleporter xml).
+func TransferGludioToGludin() *QuestTransfer {
+	return &QuestTransfer{
+		Gatekeeper: bellaNPC(),
+		DestLabel:  "The Village of Gludin",
+		ArriveX:    -80826,
+		ArriveY:    149775,
+		ArriveZ:    -3043,
+	}
+}
+
+// TransferGludinToGludio is the return town hop of the knight
+// chain: Richlin teleports the character from Gludin back to the
+// Gludio town square (the class master Rains and the closing Sorius
+// talk both stand there).
+func TransferGludinToGludio() *QuestTransfer {
+	return &QuestTransfer{
+		Gatekeeper: richlinNPC(),
+		DestLabel:  "The Town of Gludio",
+		ArriveX:    -12694,
+		ArriveY:    122776,
+		ArriveZ:    -3114,
 	}
 }
 
@@ -248,9 +337,12 @@ func ElvenKnightChain() QuestChain {
 			questTalkStage(2, soriusNPC()),
 			// The link's event 30317-02.htm: setCond(4),
 			// the letter taken, Kluto's Memo 1276 given.
+			// Kluto stands in Gludin: the stage opens with
+			// the Bella teleport out of Gludio.
 			questTalkStage(3, klutoNPC(), DialogStep{
 				LinkText: "Ask about the favor",
-			}),
+			}).
+				withTransfer(TransferGludioToGludin()),
 			questKillStage(4, QuestKill{
 				Mobs: []int32{782},
 				// Ol Mahum Novice 17 - the camps north of
@@ -268,8 +360,12 @@ func ElvenKnightChain() QuestChain {
 			questTalkStage(5, klutoNPC()),
 			// The closing talk: page 30327-10, the box and
 			// the memo taken, the brooch 1204 given, 3200
-			// xp + 2280 sp, exitQuest(true, true).
-			questTalkStage(6, soriusNPC()),
+			// xp + 2280 sp, exitQuest(true, true). The
+			// character stands in Gludin after the Kluto
+			// talks: the stage opens with the Richlin
+			// teleport back to Gludio.
+			questTalkStage(6, soriusNPC()).
+				withTransfer(TransferGludinToGludio()),
 		},
 		ProofItem: 1204,
 		RewardXP:  3200,
