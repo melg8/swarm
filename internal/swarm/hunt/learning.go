@@ -47,6 +47,14 @@ const (
 	// teacherWaitTimeout bounds the wait for the teacher NpcInfo
 	// before the stop gives the lessons up.
 	teacherWaitTimeout = 45 * time.Second
+	// teacherApproachWindow bounds the whole close approach of the
+	// teach stop: the ring walk clicks the npc approach point until
+	// the character stands right by the teacher (from the building
+	// entrance through the hall to the training npc), and the window
+	// leaves room for a server routed walk plus a few position
+	// broadcasts before the fallback (the talk from wherever within
+	// the interaction distance, or the skip) answers.
+	teacherApproachWindow = 45 * time.Second
 )
 
 // lessonTarget is one lesson the teacher stop plans to learn: the
@@ -401,13 +409,14 @@ func (l *Loop) handleTeacher(now time.Time) bool {
 	return true
 }
 
-// approachTeacher walks to the teacher, clicks it within the
-// interaction distance and reports when the lesson requests may
-// fire. The distance gate is 3D like the merchant approach (the
-// server INTERACTION_DISTANCE of 250 checks x, y and z together); a
-// teacher standing on another deck of the geodata is walked to by
-// server routing (the ground clicks route through the server
-// pathfinder that knows the ramps), bounded by the deck window.
+// approachTeacher walks the character right up to the teacher npc and
+// reports when the lesson requests may fire. The walk targets the npc
+// approach point - the converging offset ring of npcApproachPoint at
+// npcApproachOffset units from the teacher - and the talk click fires
+// once the character stands on the ring (the 2026-09-12 user rule: the
+// character must walk from the building entrance right up to the
+// training npc, not talk to it through the wall from wherever the
+// geodata leg happened to end).
 //
 // The approach walk clicks the ground at the npc approach point, not
 // at the teacher's exact cell: the server's getValidLocation walks a
@@ -416,18 +425,16 @@ func (l *Loop) handleTeacher(now time.Time) bool {
 // report: the bot clicked Cobendell's spawn point inside the trainer
 // hall, the line crossed the south wall and the height-step fallback
 // resolved the target onto the roof). The offset keeps the click
-// line on the surrounding deck, within the interaction distance but
-// outside the walled interior.
+// line on the walkable approach, within the interaction distance.
 //
-// The talk click fires as soon as the bot is within the server
-// interaction distance (npcInteractionDist = 250 in 3D), even when
-// the z gap keeps the dist3D above the approach gate (200). The
-// 2026-09-11 05:45 dump showed test1 stuck at 44616 52536 -2832
-// (dist 244 from Cobendell at z -2792, dz 40): the far-walk branch
-// clicked the offset point, the bot walked there, but the z gap
-// kept dist3D above 200 forever and the talk click never fired. The
-// 250 gate matches the server rule and lets the talk click land from
-// the offset ring.
+// The teacherWalkUntil window bounds the whole close approach and
+// answers its two dead ends: a ring the server routing refuses to
+// walk (the talk then fires from wherever the character stands, as
+// long as the 3D distance fits the server INTERACTION_DISTANCE of
+// 250 - the 2026-09-11 05:45 dump: the bot stood at dist 244 with a
+// z gap of 40, the talk gate waited for 200 forever), and a teacher
+// on a deck the ring cannot reach (the stop skips, the trip
+// continues).
 func (l *Loop) approachTeacher(now time.Time) bool {
 	x, y, z, ok := l.tracker.ObjectPosition(l.teacherID)
 	if !ok {
@@ -440,68 +447,65 @@ func (l *Loop) approachTeacher(now time.Time) bool {
 		float64(x-selfX), float64(y-selfY))
 	dz := float64(z - selfZ)
 	dist3D := math.Sqrt(dist2D*dist2D + dz*dz)
-	// The talk click fires within the server interaction distance
-	// (250 in 3D) even when the approach gate (200) is not met: the
-	// offset ring lands the bot at ~150 units 2D from the npc, and a
-	// small z gap (the trainer hall floor is 40 units above the
-	// approach deck) keeps dist3D at ~155 - well within the server
-	// 250 gate, but above the 200 approach gate. The 2026-09-11 05:45
-	// dump looped forever because the talk click waited for dist3D <=
-	// 200 while the bot stood on the offset ring at dist3D 244.
-	if dist3D <= npcInteractionDist {
-		l.clickTeacher(now)
-
-		return true
+	// The window arms once per teach stop and bounds the whole close
+	// approach (the ring walk and the deck wait alike).
+	if l.teacherWalkUntil.IsZero() {
+		l.teacherWalkUntil = now.Add(teacherApproachWindow)
 	}
-	if dist3D > merchantApproachDist {
-		ax, ay, az := npcApproachPoint(x, y, z, selfX, selfY)
-		approachDist2D := math.Hypot(
-			float64(ax-selfX), float64(ay-selfY))
-		if dist2D <= merchantApproachDist {
-			// The geodata pack misses the trainer platform ramps: the
-			// 2D distance is met, the z is not. The approach point
-			// collapses onto the bot's own cell - the click is a no-op
-			// the server collapses, the deck window bounds the wait
-			// before the teacher is given up. Clicking the teacher's
-			// exact cell here teleported the bot onto the roof (the
-			// 2026-09-11 report), so the offset keeps the click safe
-			// even when it cannot help.
-			if l.teacherDeckUntil.IsZero() {
-				l.teacherDeckUntil = now.Add(merchantDeckWindow)
-				l.logger.Printf("Hunt: learn: the teacher stands on "+
-					"another deck (z %d vs %d), re-walking by server "+
-					"routing", selfZ, z)
-			}
-			if now.Before(l.teacherDeckUntil) {
-				if approachDist2D > hopCoincideDist {
-					l.walkToward(ax, ay, az, now)
-				}
-
-				return false
-			}
-			l.teacherID = -1
-			l.logger.Printf("Hunt: learn: the teacher stays out of " +
-				"reach, skipping the lessons")
+	// The close ring: the character stands right by the teacher - the
+	// small z gap of the trainer hall floor stays inside the server
+	// interaction gate, so the talk click lands from the ring.
+	if dist2D <= npcApproachOffset+hopCoincideDist {
+		if dist3D <= npcInteractionDist {
+			l.clickTeacher(now)
 
 			return true
 		}
-		// The far walk: the bot is beyond the 2D approach gate. Click
-		// the offset point until the bot arrives at the offset ring,
-		// then the dist3D <= npcInteractionDist early return above
-		// takes over (the talk click lands from the ring even with a
-		// small z gap). Without that early return the bot looped on
-		// the offset ring forever (the 2026-09-11 05:45 dump).
-		if approachDist2D > hopCoincideDist {
-			l.walkToward(ax, ay, az, now)
+		// The teacher stands on another deck and no ring walk closes
+		// the z gap: wait the window out (the offset clicks cannot
+		// help - clicking the teacher's exact cell teleported the bot
+		// onto the roof, the 2026-09-11 report), then the expiry path
+		// below talks from wherever the character stands or skips.
+		if l.teacherDeckUntil.IsZero() {
+			l.teacherDeckUntil = now.Add(merchantDeckWindow)
+			l.logger.Printf("Hunt: learn: the teacher stands on "+
+				"another deck (z %d vs %d), waiting out the approach",
+				z, selfZ)
 		}
 
 		return false
 	}
-	// dist3D in (merchantApproachDist, npcInteractionDist]: the bot is
-	// on the offset ring, the talk click lands.
-	l.clickTeacher(now)
+	if now.After(l.teacherWalkUntil) {
+		// The window burned without reaching the ring: the talk fires
+		// from wherever the character stands when the 3D distance fits
+		// the server interaction gate (the 2026-09-11 05:45 rule: the
+		// z gap kept the character at dist3D 244 forever, the talk gate
+		// must not wait for the ring it cannot close), everything else
+		// skips the lessons - the trip continues either way.
+		if dist3D <= npcInteractionDist {
+			l.clickTeacher(now)
 
-	return true
+			return true
+		}
+		l.teacherID = -1
+		l.logger.Printf("Hunt: learn: the teacher stays out of " +
+			"reach, skipping the lessons")
+
+		return true
+	}
+	// The ring walk: click the npc approach point until the character
+	// stands on the ring right by the teacher. The point converges
+	// with the character (npcApproachPoint offsets toward the walker),
+	// so the chained clicks close the last stretch of the approach -
+	// through the building entrance and up to the training npc.
+	ax, ay, az := npcApproachPoint(x, y, z, selfX, selfY)
+	approachDist2D := math.Hypot(
+		float64(ax-selfX), float64(ay-selfY))
+	if approachDist2D > hopCoincideDist {
+		l.walkToward(ax, ay, az, now)
+	}
+
+	return false
 }
 
 // clickTeacher sends the paced talk click that selects the teacher and
@@ -603,6 +607,7 @@ func (l *Loop) resetLearnState() {
 	l.teacherID = 0
 	l.teacherPick = time.Time{}
 	l.teacherDeckUntil = time.Time{}
+	l.teacherWalkUntil = time.Time{}
 	l.learnRequested = nil
 	l.learnConfirmAt = time.Time{}
 	l.learnRetries = 0

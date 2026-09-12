@@ -221,12 +221,18 @@ func TestApproachTeacherDeckHopClicksFromTheOffsetRing(t *testing.T) {
 		"the teacher is not given up (the talk click landed)")
 }
 
-// TestApproachTeacherTalkClickFiresFromTheOffsetRing pins the exact
-// dump scenario: the bot at 44616 52536 -2832 (dist 244 from Cobendell
-// at z -2792, dz 40) clicks the teacher directly - dist3D 244 is above
-// the 200 approach gate but within the 250 interaction gate. Without
-// the fix the bot looped forever on the offset ring.
-func TestApproachTeacherTalkClickFiresFromTheOffsetRing(t *testing.T) {
+// TestApproachTeacherWalksTheOffsetRingBeforeTalking pins the exact
+// dump scenario under the close approach rule: the bot at 44616 52536
+// -2832 (dist 244 from Cobendell at z -2792, dz 40) first walks the
+// offset ring - the ground click at the npc approach point - instead
+// of talking through the wall from wherever it stands. When the ring
+// walk cannot close (the trainer platform edge of the dump: the server
+// stops the character short), the approach window expires and the talk
+// click fires from the dump position anyway - dist3D 244 is above the
+// 200 approach gate but within the 250 interaction gate (the
+// 2026-09-11 05:45 dump fix: the bot used to loop forever on the
+// offset ring because the talk click waited for dist3D <= 200).
+func TestApproachTeacherWalksTheOffsetRingBeforeTalking(t *testing.T) {
 	loop, game, bot := newLearnLoop(500)
 	loop.phase = phaseTownSell
 	loop.tripStart = time.Now()
@@ -244,25 +250,32 @@ func TestApproachTeacherTalkClickFiresFromTheOffsetRing(t *testing.T) {
 	})
 	loop.teacherID = teacherID
 	loop.teacherPick = time.Now().Add(-2 * selectPeriod)
-	// The exact dump position: dist2D 240, dz 40, dist3D 244.
-	// dist3D 244 is in (200, 250]: the talk click fires at once,
-	// no ground walk. Without the fix the bot looped forever on the
-	// offset ring because the talk click waited for dist3D <= 200.
+	// The exact dump position: dist2D 240, dz 40, dist3D 244 - beyond
+	// the close ring (165): the ring walk clicks the npc approach
+	// point first.
 	moveSelfTo(bot, 44616, 52536, -2832)
 
 	game.walks = nil
 	game.clicks = nil
 	loop.tick()
+	require.NotEmpty(t, game.walks,
+		"the ring walk clicks the npc approach point - the character "+
+			"walks right up to the teacher before the talk")
+	require.Empty(t, game.clicks,
+		"no talk click while the character is beyond the close ring")
 
-	// The talk click fires from the dump position (dist3D 244 is
-	// within the 250 interaction gate). No ground walk is sent.
-	require.Empty(t, game.walks,
-		"no ground walk - dist3D 244 is within the 250 interaction "+
-			"gate, the talk click fires directly")
+	// The ring walk makes no progress (the server stops the character
+	// short of the trainer platform): the window expires and the talk
+	// fires from wherever the character stands - dist3D 244 is within
+	// the 250 interaction gate.
+	loop.teacherWalkUntil = time.Now().Add(-teacherApproachWindow - time.Second)
+	game.walks = nil
+	game.clicks = nil
+	loop.tick()
 	require.Contains(t, game.clicks, teacherID,
-		"the talk click fires from the dump position - the server "+
-			"INTERACTION_DISTANCE of 250 is met even with the z gap "+
-			"(the 2026-09-11 05:45 dump fix)")
+		"the talk click fires from the dump position after the window - "+
+			"the server INTERACTION_DISTANCE of 250 is met even with "+
+			"the z gap (the 2026-09-11 05:45 dump fix)")
 	require.NotEqual(t, int32(-1), loop.teacherID,
 		"the teacher is not given up (the talk click landed)")
 }
