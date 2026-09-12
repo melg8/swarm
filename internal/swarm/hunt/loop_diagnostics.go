@@ -42,6 +42,12 @@ func (l *Loop) diagnostics(now time.Time) state.HuntDiagnostics {
 		TripForMs:      0,
 		FleeForMs:      state.AgeMs(since(now, l.fleeSince)),
 		BuyRetries:     l.buyRetries,
+		// The stagnation stalls read the watch baselines directly: a
+		// zero stamp (offline gap, manual session, fresh session)
+		// reports a zero age, so the dump never shows a stall the
+		// watch itself does not count.
+		XpStallForMs:       state.AgeMs(since(now, l.stagXPAt)),
+		PositionStallForMs: state.AgeMs(since(now, l.stagPosAt)),
 		// The last action and the publication age belong to the
 		// tracker: NoteAction owns the text, the encoders age the
 		// publication stamp of SetHuntDiagnostics.

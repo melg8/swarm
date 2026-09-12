@@ -112,6 +112,17 @@ type HuntDiagnostics struct {
 	FleeForMs int64 `json:"fleeForMs"`
 	// BuyRetries is the retry count of the buy confirmation wait.
 	BuyRetries int `json:"buyRetries"`
+	// XpStallForMs is the time the character experience has been
+	// static (the stagnation watch input): a healthy farm changes it
+	// every few kills, a town trip holds it for minutes; the
+	// stagnation event fires at the window bound (see
+	// hunt.stagnationXPWindow).
+	XpStallForMs int64 `json:"xpStallForMs"`
+	// PositionStallForMs is the time the character has stood on the
+	// same exact cell (the stagnation watch input): the walks and the
+	// death cycles move it constantly; the freeze event fires at the
+	// window bound (see hunt.stagnationPositionWindow).
+	PositionStallForMs int64 `json:"positionStallForMs"`
 	// LastAction is the last decision line of the loop (the same
 	// text the event log carries).
 	LastAction string `json:"lastAction"`

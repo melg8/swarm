@@ -438,6 +438,20 @@ type Loop struct {
 	// gate (see logWeaponWait): the hold spans the weapon run
 	// cooldown window, one line per period keeps the log readable.
 	weaponWaitLogAt time.Time
+	// The stagnation watch state (see stagnation.go): the last
+	// observed experience with the moment it last changed, and
+	// the last observed position with the moment the character
+	// last stood elsewhere. A value that stops moving for its
+	// window logs the livelock line (the web UI event feed and
+	// the bot log both carry it, the state dump diagnostics show
+	// the stall ages).
+	stagXP     int32
+	stagXPAt   time.Time
+	stagPosX   int32
+	stagPosY   int32
+	stagPosZ   int32
+	stagPosSet bool
+	stagPosAt  time.Time
 	// avoidScratch is the reused threat buffer of the aggro-aware
 	// walk steering (see loop_avoid.go): the scan refills it in
 	// place, so the per leg danger pass costs no allocation.
@@ -724,6 +738,13 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		skillReuse:        make(map[int32]time.Time),
 		profilePicked:     false,
 		weaponWaitLogAt:   time.Time{},
+		stagXP:            0,
+		stagXPAt:          time.Time{},
+		stagPosX:          0,
+		stagPosY:          0,
+		stagPosZ:          0,
+		stagPosSet:        false,
+		stagPosAt:         time.Time{},
 		zoneLegLogAt:      time.Time{},
 		shoppingViewCache: state.ShoppingPlanView{
 			Entries: nil,
@@ -945,11 +966,15 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
 	// the tick ended in. The same defer publishes the loop internals
 	// for the diagnostics section of the state dump
 	// (SetHuntDiagnostics stamps the heartbeat the encoders age
-	// without a version bump).
+	// without a version bump). The stagnation watch rides the same
+	// defer so it observes every tick whatever path the state
+	// machine took (see stagnation.go).
 	defer func() {
+		now := time.Now()
 		l.tracker.SetPhase(string(l.phase))
 		l.publishShoppingView()
-		l.tracker.SetHuntDiagnostics(l.diagnostics(time.Now()))
+		l.tracker.SetHuntDiagnostics(l.diagnostics(now))
+		l.observeStagnation(now)
 	}()
 	if l.tracker.SelfDead() {
 		l.recoverFromDeath()

@@ -2148,6 +2148,20 @@ visible without a state dump.
 ### Progress
 
 - 07:36 UTC: T-002 claimed in docs/BACKLOG.md.
+- 07:40 UTC: the stagnation watch landed (hunt/stagnation.go): the
+  named windows stagnationXPWindow (20 min, calibrated over the
+  measured town trip rounds) and stagnationPositionWindow (10 min),
+  the observeStagnation hook on the tick publish defer (every tick
+  path, including the death and logout early returns), one event
+  line per window via logf (console + tracker event feed +
+  NoteAction), the phase word in every line, the offline/manual
+  reset. The state dump diagnostics gained xpStallForMs and
+  positionStallForMs (state.HuntDiagnostics + the snapshot
+  encoder). 8 unit tests (hunt/stagnation_test.go): fire, re-arm,
+  refresh-while-moving, manual/offline quiet, tick-path coverage,
+  event feed surface, diagnostics wiring. go build/vet, the full
+  test suite, gofmt and golangci-lint --new green; the full lint
+  reports only the pre-existing findings of the branch.
 
 ## Active task: T-004 the quest subsystem research
 
