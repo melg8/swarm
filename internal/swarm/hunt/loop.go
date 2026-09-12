@@ -548,6 +548,20 @@ type Loop struct {
 	replaceUnequipAt time.Time
 	replaceWaitAt    time.Time
 	replaceTried     int
+	// tripGearStart snapshots the paperdoll object ids the trip
+	// started with (and their item ids) so the trip exits can arm
+	// the gear debt: a slot the trip left empty whose piece is
+	// gone from the inventory was sold for a replacement that
+	// never landed (see gearDebtCheck, the 2026-09-12 pantsless
+	// dump report).
+	tripGearStart    [state.PaperdollSlots]int32
+	tripGearStartIDs [state.PaperdollSlots]int32
+	// gearDebt holds the paperdoll slot indexes the town trip
+	// machinery stranded (the map value is the item id of the lost
+	// piece for the logs): the debt survives the trip end and runs
+	// the refill trip on the gear run cooldown until the slot is
+	// dressed again (gearGapRunWanted clears the refilled entries).
+	gearDebt map[int]int32
 	// The multi zone hunting state (see zones.go): the registry of the
 	// deployment, the picked and the manually overridden zone. The
 	// spot mode (see spot_policy.go) replaces the registry with the
@@ -681,6 +695,9 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		replaceUnequipAt:  time.Time{},
 		replaceWaitAt:     time.Time{},
 		replaceTried:      0,
+		tripGearStart:     [state.PaperdollSlots]int32{},
+		tripGearStartIDs:  [state.PaperdollSlots]int32{},
+		gearDebt:          make(map[int]int32),
 		tripStart:         time.Time{},
 		tripEndedAt:       time.Time{},
 		zones:             nil,

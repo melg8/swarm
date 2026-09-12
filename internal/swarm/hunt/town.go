@@ -396,16 +396,20 @@ func (l *Loop) tripActive() bool {
 }
 
 // tripCooldownOver reports whether a new town trip may start. A
-// bare-handed character with an affordable weapon retries on the
-// short weapon run cooldown: punching mobs through the five minute
-// cooldown of an ordinary trip is the exact outcome the weapon run
-// exists to prevent.
+// bare-handed character with an affordable weapon and a character
+// with an armed gear debt (a slot the last trip stranded) retries
+// on the short gear run cooldown: punching mobs through the five
+// minute cooldown of an ordinary trip is the exact outcome the
+// weapon run exists to prevent, and farming without the armor the
+// merchant sold is the same wound (the 2026-09-12 04:58 dump: the
+// level 14 fighter farmed the Kaboo woods without its legs armor
+// through the whole cooldown window).
 func (l *Loop) tripCooldownOver() bool {
 	if l.tripEndedAt.IsZero() {
 		return true
 	}
 	cooldown := tripCooldown
-	if l.weaponlessRunWanted() {
+	if l.weaponlessRunWanted() || l.gearDebtRunWanted() {
 		cooldown = weaponRunCooldown
 	}
 
@@ -493,6 +497,10 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	// purchases whose displaced pieces were never queued - the
 	// 2026-09-11 two pairs of gloves report).
 	l.tripPlan = l.shoppingPlan()
+	// The gear the trip starts with is the baseline the trip exits
+	// compare against: a slot the trip empties without landing the
+	// replacement becomes gear debt (see gearDebtCheck).
+	l.snapshotTripGear()
 	// The weapon leads the trip that buys it: the sell stop routes to
 	// the weapon purchase's merchant, so the sell-first of the replaced
 	// weapon and the buy share ONE stop (the junk sells at any
@@ -559,6 +567,11 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 		} else {
 			reason = lessonReason
 		}
+	}
+	if l.gearDebtRunWanted() {
+		// The refill names itself: the stranded slot of the dump
+		// report reads at a glance in the log tail.
+		reason += " (the gear debt refill)"
 	}
 	// The trigger plan cache drops: the frozen trip plan owns the
 	// trip now, the cache only feeds the widget view between the
@@ -2111,6 +2124,11 @@ func (l *Loop) clearTalkedTarget() {
 // against the gear the purchases reached.
 func (l *Loop) endTownTrip(reason string) {
 	l.clearTalkedTarget()
+	// The trip answer for the gear debt: whatever kept the trip
+	// from landing the replacements (a refused buy, an abort, a
+	// session death the relogin resumed), the exits compare the
+	// reached paperdoll against the trip start here.
+	l.gearDebtCheck()
 	l.phase = phaseEngage
 	l.target = 0
 	l.clearBlindRecovery()
@@ -2156,10 +2174,15 @@ func (l *Loop) abortTownTrip(reason string) {
 // restart lands next to the shops, and the cooldown of the trip the
 // death interrupted is cleared as well, so a full inventory sells
 // right after the revival instead of farming with the junk first.
+// The gear debt check runs here too: the interrupt that drops the
+// trip (an attacker mid trip) leaves the sold pieces sold - a slot
+// the sell first step already emptied stays a debt even though the
+// trip never reached its end.
 func (l *Loop) resetTownTrip() {
 	if !l.tripActive() {
 		return
 	}
+	l.gearDebtCheck()
 	l.phase = phaseEngage
 	l.target = 0
 	l.clearBlindRecovery()

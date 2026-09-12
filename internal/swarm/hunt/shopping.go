@@ -7,6 +7,7 @@ package hunt
 import (
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -973,6 +974,121 @@ func (l *Loop) weaponlessRunWanted() bool {
 	_, ok := l.affordableWeaponPurchase()
 
 	return ok
+}
+
+// snapshotTripGear records the paperdoll the trip starts with: the
+// object ids and the item ids of every equipped slot. The trip exits
+// compare this snapshot against the reached paperdoll (gearDebtCheck)
+// so a trip that sells a piece for a replacement it never lands arms
+// the gear debt instead of walking away silently.
+func (l *Loop) snapshotTripGear() {
+	l.tripGearStart = l.tracker.PaperdollSlotObjectIDs()
+	for index, objectID := range l.tripGearStart {
+		if objectID == 0 {
+			l.tripGearStartIDs[index] = 0
+
+			continue
+		}
+		if item, ok := l.tracker.InventoryItemState(objectID); ok {
+			l.tripGearStartIDs[index] = item.ItemID
+		} else {
+			l.tripGearStartIDs[index] = 0
+		}
+	}
+}
+
+// gearDebtCheck arms the gear debt at the trip exits: every paperdoll
+// slot that was occupied at the trip start, sits empty now and whose
+// piece is gone from the inventory (the sell first step banked it for
+// a replacement the trip never landed - a buy the server silently
+// refused three times, a merchant that never showed up, an aborted
+// walk, an attacker interrupt, a session death the relogin resumed
+// into the return leg) becomes a debt entry that runs the refill trip
+// on the gear run cooldown. A piece that still sits in the bag is no
+// debt: the auto equipment re-wears it within seconds. The snapshot
+// dies with the check - the next trip freezes a fresh one.
+func (l *Loop) gearDebtCheck() {
+	current := l.tracker.PaperdollSlotObjectIDs()
+	items := l.tracker.InventoryItems()
+	carried := make(map[int32]bool, len(items))
+	for _, entry := range items {
+		carried[entry.ObjectID] = true
+	}
+	for index, objectID := range l.tripGearStart {
+		if objectID == 0 || current[index] != 0 || carried[objectID] {
+			continue
+		}
+		if _, debt := l.gearDebt[index]; debt {
+			continue
+		}
+		slot, ok := gear.SlotOfPaperdollIndex(index)
+		if !ok {
+			continue
+		}
+		if l.gearDebt == nil {
+			l.gearDebt = make(map[int]int32)
+		}
+		l.gearDebt[index] = l.tripGearStartIDs[index]
+		l.logf("Hunt: shop: the trip left the %s slot empty - the %s it "+
+			"started with is gone (sold for a replacement that never "+
+			"landed); the gear debt runs the refill trip on the gear "+
+			"run cooldown", slot.String(), debtItemName(
+			l.tripGearStartIDs[index]))
+	}
+	l.tripGearStart = [state.PaperdollSlots]int32{}
+	l.tripGearStartIDs = [state.PaperdollSlots]int32{}
+}
+
+// gearDebtRunWanted reports whether an armed gear debt still waits
+// for its refill: a town trip stranded a paperdoll slot (sold the
+// piece for a replacement that never landed) and the hole is not
+// dressed yet. The debt runs the refill trip on the gear run
+// cooldown - the same short window the weapon run uses - until the
+// slot is dressed again; the refilled entries clear here so the
+// priority never outlives its wound. The debt only hurries the
+// cooldown: the trip justification stays with the ordinary triggers
+// (a broke character cannot buy the filler anyway, the wallet farms
+// toward it and the short cadence fires the moment the plan offers
+// the refill).
+func (l *Loop) gearDebtRunWanted() bool {
+	if l.equip == nil {
+		return false
+	}
+	if len(l.gearDebt) == 0 {
+		return false
+	}
+	l.clearRefilledDebt()
+
+	return len(l.gearDebt) > 0
+}
+
+// clearRefilledDebt drops the debt entries whose slot is dressed
+// again: the refill landed (a bought filler the auto equipment wore,
+// a looted piece) and the debt's job is done. Each cleared slot logs
+// one line so the recovery is visible in the event log.
+func (l *Loop) clearRefilledDebt() {
+	current := l.tracker.PaperdollSlotObjectIDs()
+	for index := range l.gearDebt {
+		if current[index] == 0 {
+			continue
+		}
+		delete(l.gearDebt, index)
+		if slot, ok := gear.SlotOfPaperdollIndex(index); ok {
+			l.logf("Hunt: shop: the %s slot is dressed again, the gear "+
+				"debt clears", slot.String())
+		}
+	}
+}
+
+// debtItemName renders the lost piece of a gear debt entry for the
+// logs: the generated dictionary name, or the item id fallback.
+func debtItemName(itemID int32) string {
+	name := npcdata.ItemName(itemID)
+	if name == "" {
+		name = "item #" + strconv.Itoa(int(itemID))
+	}
+
+	return name
 }
 
 // stopBuysPending reports whether the current stop still wants buys:
