@@ -4558,3 +4558,32 @@ loot walk) and zero stagnation lines on the healthy run, with the
 graceful SIGINT shutdown. The positive fire (a real 10/20 min
 freeze) is owned by the M1 soak acceptance runs where the windows
 are the pass criteria.
+
+## Round 65: the PROGRESS.md page - the ladder renders from the roadmap (2026-09-12)
+
+The T-001 soak round delivered the metrics trail and the
+progress_report.sh renderer, but its milestone section was
+hardcoded to a single M1 line - the task T-007 acceptance asks for
+the "milestone ladder green/red by the last acceptance results", and
+the renderer could not build a ladder. The human dashboard also
+existed only as a script, not as a committed page (the task: the
+page is committed after every milestone-relevant run so the page
+history is the project history).
+
+The fix (T-007, scope: tools/ and docs/):
+
+- render_milestone now parses docs/ROADMAP.md (the `## M<N> - title
+  (DONE)` headings) and walks the whole ladder: a DONE heading
+  renders done (M0), the first open milestone is the current one and
+  colors green/red by the last metrics row (PASS/FAIL), the rest
+  render pending. The section header became "Milestone ladder".
+- The first PROGRESS.md page is committed: M0 done, M1 green (the
+  07:45 smoke soak PASS row of runs/metrics.jsonl - the 8 hour
+  acceptance run will overwrite the verdict row when it runs), the
+  ten BACKLOG tasks and the last 20 commits.
+
+Verification: `bash tools/progress_report.sh` re-rendered the page
+and the ladder matches docs/ROADMAP.md (M0-M6, one current, five
+pending); `go build ./...` green and `golangci-lint run --new` 0
+issues (no Go code touched - the renderer is bash + python3);
+no behavior change, no e2e required.

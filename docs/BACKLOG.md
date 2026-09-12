@@ -195,7 +195,7 @@ resume: done. docs/band_20_25_survey.md is the survey (transport,
 
 ### T-007: the PROGRESS.md page
 
-status: in_progress
+status: done
 milestone: M1
 priority: P3
 deps: T-001
@@ -208,10 +208,12 @@ every milestone-relevant run so the page history is the project
 history.
 
 claimed: progress-page-e3f8 2026-09-12 08:41Z
-resume: claim pushed; next: run tools/progress_report.sh, verify the
-  page against the task acceptance (the milestone ladder green/red,
-  the metrics, the tasks, the commits), fix the gaps, commit
-  PROGRESS.md.
+done: 2026-09-12 08:53Z
+resume: done. The renderer builds the full M0-M6 ladder from
+  ROADMAP.md (done / current green-red by the last metrics row /
+  pending); the first PROGRESS.md page is committed. The protocol:
+  re-run tools/progress_report.sh and commit after every
+  milestone-relevant acceptance run.
 
 ### T-008: the gatekeeper teleport flow
 

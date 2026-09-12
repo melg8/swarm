@@ -2362,9 +2362,27 @@ by the tooling of T-001 (tools/progress_report.sh), committed after
 every milestone-relevant run so the page history is the project
 history.
 
+### Result
+
+- tools/progress_report.sh: render_milestone parses docs/ROADMAP.md
+  and walks the whole ladder - the (DONE) headings render done, the
+  first open milestone colors green/red by the last metrics row
+  status, the rest pending; the section header renamed "Milestone
+  ladder".
+- PROGRESS.md: the first committed page (M0 done, M1 green from the
+  07:45 smoke soak PASS, the BACKLOG table, the last 20 commits).
+- docs/development_log.md round 65 (renumbered past the parallel T-002 round 64).
+
+### Verification
+
+The page re-rendered and the ladder cross-checked against
+ROADMAP.md; `go build ./...` green, `golangci-lint run --new` 0
+issues (bash/python tooling + docs only, no Go code touched); no
+behavior change, no e2e required.
+
 ### Status
 
-In progress - the claim commit; the renderer run starts next.
+Done (2026-09-12 08:53Z) - session wrap-up window starts.
 
 ## Active task: T-003 the level milestone scenario
 
@@ -2403,3 +2421,4 @@ transfer, M3+ injects the band levels).
 ### Progress
 
 - 07:51 UTC: T-003 claimed in docs/BACKLOG.md.
+ (docs: close T-007 - the progress page renders the ladder)
