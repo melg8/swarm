@@ -90,6 +90,14 @@ const questRestStandHP = 85.0
 // The var (not a const) is a test seam: the rest tests shorten it.
 var questRestTimeout = 3 * time.Minute
 
+// questPotionItemID is the healing potion of the quest trips (the
+// Lesser Healing Potion of the classic item table).
+const questPotionItemID = 1060
+
+// questPotionHealHP is the health a healing potion restores (the
+// Lesser Healing Potion of the C1 item table).
+const questPotionHealHP = 120
+
 // questEquipConfirmWait bounds the wait for the inventory mutation
 // after one equip request of EquipBaggedGear.
 const questEquipConfirmWait = 5 * time.Second
@@ -666,15 +674,19 @@ func (l *Loop) farmQuestStage(
 		if l.tracker.SelfHealthPercent() < questHealthFloor {
 			return errors.New("the health floor breached")
 		}
-		if err := l.restBetweenFights(ctx); err != nil {
-			return err
-		}
 		mob, ok := l.tracker.NearestNpcByTemplates(
 			templates, questKillScanRadius)
-		if !ok {
-			time.Sleep(questWalkPoll)
-
-			continue
+		if ok {
+			// A quest mob stands in the scan radius: the tired
+			// character drinks a healing potion instead of sitting
+			// down (the Ruins of Agony skeletons are aggressive -
+			// the first live run sat the character down inside the
+			// camp and it died seated).
+			if err := l.drinkHealingPotion(); err != nil {
+				return err
+			}
+		} else if err := l.restBetweenFights(ctx); err != nil {
+			return err
 		}
 		if err := l.game.AttackTarget(mob.ObjectID); err != nil {
 			return fmt.Errorf("the attack on %s: %w", mob.Name, err)
@@ -720,6 +732,31 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
 	}
 	l.logf("quest: the rest ended at %.0f%% health",
 		l.tracker.SelfHealthPercent())
+
+	return nil
+}
+
+// drinkHealingPotion restores the health mid fight: the Lesser
+// Healing Potion of the inventory (when one is left) or the no-op
+// for a healthy character.
+func (l *Loop) drinkHealingPotion() error {
+	if l.tracker.SelfHealthPercent() >= questRestSitHP {
+		return nil
+	}
+	for _, item := range l.tracker.InventoryItems() {
+		if item.ItemID == questPotionItemID && item.Count > 0 &&
+			!item.Equipped {
+			l.logf("quest: drinking a healing potion at %.0f%% health",
+				l.tracker.SelfHealthPercent())
+			before := l.tracker.InventoryVersion()
+			if err := l.game.UseItem(item.ObjectID); err != nil {
+				return fmt.Errorf("the potion use: %w", err)
+			}
+			l.awaitInventoryMutation(before, questEquipConfirmWait)
+
+			return nil
+		}
+	}
 
 	return nil
 }

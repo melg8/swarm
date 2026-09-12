@@ -92,16 +92,16 @@ const questNpcFindWait = 30 * time.Second
 // health against the 17-21 band skeletons; the kit below weighs
 // ~7.9k of the ~13k limit, inside the healthy half).
 var classTransferItems = []ResetItem{
-	{ItemID: 68, Count: 1},   // Falchion
-	{ItemID: 629, Count: 1},  // Kite Shield
-	{ItemID: 29, Count: 1},   // Leather Pants
-	{ItemID: 45, Count: 1},   // Bone Helmet
-	{ItemID: 49, Count: 1},   // Gloves
-	{ItemID: 1123, Count: 1}, // Blue Buckskin Boots
-	{ItemID: 876, Count: 2},  // Ring of Anguish
-	{ItemID: 873, Count: 2},  // Earring of Aid
-	{ItemID: 907, Count: 1},  // Necklace of Anguish
-	{ItemID: 1060, Count: 5}, // Lesser Healing Potion
+	{ItemID: 68, Count: 1},    // Falchion
+	{ItemID: 629, Count: 1},   // Kite Shield
+	{ItemID: 29, Count: 1},    // Leather Pants
+	{ItemID: 45, Count: 1},    // Bone Helmet
+	{ItemID: 49, Count: 1},    // Gloves
+	{ItemID: 1123, Count: 1},  // Blue Buckskin Boots
+	{ItemID: 876, Count: 2},   // Ring of Anguish
+	{ItemID: 873, Count: 2},   // Earring of Aid
+	{ItemID: 907, Count: 1},   // Necklace of Anguish
+	{ItemID: 1060, Count: 20}, // Lesser Healing Potion
 }
 
 // classTransferReset builds the start state of the class transfer
