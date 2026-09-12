@@ -51,6 +51,8 @@ func (gc *GameClient) handleServerPacket(payload []byte) {
 		gc.applySocialAction(payload)
 	case actionFailedID:
 		gc.applyActionFailed(payload)
+	case npcHTMLMessageID:
+		gc.applyNpcHTMLMessage(payload)
 	default:
 		gc.handleWorldPacket(payload)
 	}

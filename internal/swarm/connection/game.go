@@ -65,6 +65,7 @@ const (
 	charInfoID         = 0x03
 	attackID           = 0x06
 	spawnItemID        = 0x15
+	npcHTMLMessageID   = 0x1B
 	dropItemID         = 0x16
 	getItemID          = 0x17
 	statusUpdateID     = 0x1A
@@ -156,9 +157,12 @@ type GameClient struct {
 	skillList      fromgameserver.SkillListPacket
 	questList      fromgameserver.QuestListPacket
 	abnormalStatus fromgameserver.AbnormalStatusUpdatePacket
+	npcHTML        fromgameserver.NpcHTMLMessage
 	invItems       []state.InventoryItem
 	skills         []state.LearnedSkill
 	statusAttrs    [statusAttrsCapacity]state.Attribute
+	htmlMu         sync.Mutex
+	lastHTML       fromgameserver.NpcHTMLMessage
 }
 
 // statusAttrsCapacity bounds the scratch attributes of status updates.
