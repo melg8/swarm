@@ -2365,3 +2365,41 @@ history.
 ### Status
 
 In progress - the claim commit; the renderer run starts next.
+
+## Active task: T-003 the level milestone scenario
+
+Started: 2026-09-12 07:51 UTC. Branch: `feature/proxy-server`.
+Agent: zai-agent. Commits as melg8. Other agents may push to the
+same branch concurrently - rebase before every push (T-002 closed
+at 07:53 UTC by this session, its dep is green).
+
+### Goal
+
+Generalize farm-readiness into the level milestone scenario: a
+scenario that DB-injects a character at an arbitrary level N with
+the zone-appropriate gear and passes when the character reaches
+level N+1 within the time budget. This is the building block every
+later milestone acceptance reuses (M2 injects level 20 for the class
+transfer, M3+ injects the band levels).
+
+### Constraints
+
+- Scope: internal/swarm/acceptance/ (+ docs). No hunt/state changes.
+- The level N must be parameterizable (env) with a sane default;
+  the near-threshold xp keeps the run minutes long, not hours.
+- The injection starts the character inside its level-appropriate
+  hunting ground with the gear the shop strategy would reach (the
+  farm-readiness pattern: the wallet, the empty bag, the bot shops).
+- The pass check watches the level (the UserInfo level of the
+  tracker), the timeout bounds the run.
+
+### Acceptance
+
+- A live run of the scenario at the default level passes against
+  the deployed stack (level N -> N+1 observed).
+- Unit tests for the reset construction and the pass evaluation.
+- golangci-lint run --new clean, the touched package tests green.
+
+### Progress
+
+- 07:51 UTC: T-003 claimed in docs/BACKLOG.md.

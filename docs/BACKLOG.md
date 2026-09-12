@@ -108,7 +108,7 @@ the dev log round 63, the live e2e + autonomous smoke verified.
 
 ### T-003: the level milestone scenario
 
-status: todo
+status: in_progress
 milestone: M1
 priority: P2
 deps: T-002
@@ -118,6 +118,12 @@ Generalize farm-readiness: a scenario that DB-injects a character at
 an arbitrary level with the zone-appropriate gear and passes when the
 character reaches level N+1 within the time budget. This is the
 building block every later milestone acceptance reuses.
+
+claimed: zai-agent 2026-09-12 07:51 UTC
+resume: claimed fresh right after T-002 (mine) closed and unlocked
+the dep; next: study the soak scenario of T-001 and the zone ladder
+per level, then design the injection (level N, near-threshold xp,
+the zone-appropriate start) and the N+1 watch
 
 ### T-004: the quest subsystem research
 
