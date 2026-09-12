@@ -88,6 +88,27 @@ const (
 func Definitions() []TestDef {
 	return []TestDef{
 		{
+			ID:      classTransferScenarioID,
+			Title:   "class transfer · the M2 accept stage",
+			Account: classTransferAccount,
+			Timeout: classTransferTimeout,
+			Description: "Start: the elven fighter temp9 is injected at " +
+				"level 19 (the Q00406 start gate) with the milestone " +
+				"wallet shape, standing on the approach ring of Master " +
+				"Sorius in Gludio (-13440 122493 -3103, 150 units off " +
+				"his trainer hall cell). Flow: the manual session " +
+				"enters the world, finds Sorius through the world " +
+				"store and the dialog walker drives the two-link " +
+				"accept route of the chain data (the quest pages of " +
+				"the CREATED state - the challenge link runs the " +
+				"startQuest event). Pass (the staged gate of the M2 " +
+				"vehicle): the quest journal flips to Q00406 cond 1 " +
+				"within the budget; the kill stages (the quest trip " +
+				"phase) and the Rains class change join in the " +
+				"follow-up rounds, the SelfClassID flip closes M2.",
+			Scenario: classTransferScenario,
+		},
+		{
 			ID:      milestoneScenarioID,
 			Title:   "level milestone · N to N+1",
 			Account: milestoneAccount,

@@ -66,13 +66,14 @@ func TestDefinitionsAreSane(t *testing.T) {
 }
 
 // TestDefinitionsUseTempAccounts pins the temp account contract: the
-// scenarios own temp1 through temp8 and never collide with the
+// scenarios own temp1 through temp9 and never collide with the
 // -bots fleet accounts (test1, test2, ...).
 func TestDefinitionsUseTempAccounts(t *testing.T) {
 	for _, def := range Definitions() {
 		switch def.Account {
 		case farmAccount, lifeAccount, relayAccount, returnAccount,
-			entryAccount, gearAccount, soakAccount, milestoneAccount:
+			entryAccount, gearAccount, soakAccount, milestoneAccount,
+			classTransferAccount:
 		default:
 			t.Fatalf("scenario %s owns the unexpected account %s",
 				def.ID, def.Account)

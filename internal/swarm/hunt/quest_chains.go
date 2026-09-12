@@ -403,6 +403,24 @@ func ElvenScoutClassChange() ClassChange {
 	}
 }
 
+// QuestEntryLinks is the dialog prefix every quest npc conversation
+// of this chain rides through: the first talk click of an npc
+// without an ON_NPC_FIRST_TALK listener opens the npc's STATIC
+// page (the trainer html of data/html/trainer/<npcid>.htm - live
+// verified 2026-09-12: Sorius answers with his trainer page, not
+// the quest page), whose "Quest" link (the bare `bypass Script`
+// command) runs ScriptLink.showQuestWindow: a station of exactly
+// one quest (every station of both chains) resolves the single
+// option straight through Quest.notifyTalk to the quest page of
+// the current cond (the live run of 2026-09-12: the "Quest" click
+// at Sorius answers with 30327-01 directly - the choose window
+// link list only appears for npcs offering several quests).
+func QuestEntryLinks(_ QuestChain) []DialogStep {
+	return []DialogStep{
+		{LinkText: "Quest"},
+	}
+}
+
 // QuestStageByCond returns the stage of the chain at a cond value
 // (the quest journal the tracker reports): the stage the bot acts
 // on next. False when the cond sits outside the ladder (the quest

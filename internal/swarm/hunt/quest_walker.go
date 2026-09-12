@@ -34,6 +34,16 @@ const questDialogPoll = 250 * time.Millisecond
 // var (not a const) is a test seam.
 var dialogClickPause = selectPeriod
 
+// dialogBypassPace is the minimum pause between two bypass sends of
+// one conversation: the server bypass flood protector
+// (FloodProtectorServerBypassInterval = 3 of the deployed
+// FloodProtector.ini) silently drops a bypass that arrives sooner -
+// the live Q00406 accept run of 2026-09-12 lost the second page
+// link to it (the page never answered, the step timed out). The
+// margin above the 3 s interval covers the protector's rounding.
+// The var (not a const) is a test seam.
+var dialogBypassPace = 3200 * time.Millisecond
+
 // DialogStep is one link choice of a dialog route: the walker picks
 // the link whose visible text contains LinkText and sends the
 // bypass command that link carries. The text of the quest and class
@@ -76,6 +86,7 @@ func (l *Loop) DriveDialog(npcObjID int32, steps []DialogStep) error {
 		return fmt.Errorf("dialog: the talk entry failed: %w", err)
 	}
 	lastPage := ""
+	lastBypass := time.Time{}
 	for i := range steps {
 		html, err := l.awaitNewDialogPage(npcObjID, lastPage)
 		if err != nil {
@@ -95,6 +106,14 @@ func (l *Loop) DriveDialog(npcObjID int32, steps []DialogStep) error {
 				"dialog: step %d: the %q link command %q failed the open page validation",
 				i+1, steps[i].LinkText, link.Command)
 		}
+		// The bypass flood protector pace: a bypass riding the
+		// previous one inside the 3 s window is dropped silently.
+		if !lastBypass.IsZero() {
+			if wait := dialogBypassPace - time.Since(lastBypass); wait > 0 {
+				time.Sleep(wait)
+			}
+		}
+		lastBypass = time.Now()
 		l.logf("dialog: step %d sends %q", i+1, link.Command)
 		if err := l.game.SendBypass(link.Command); err != nil {
 			return fmt.Errorf(

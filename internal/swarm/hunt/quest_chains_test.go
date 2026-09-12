@@ -256,3 +256,20 @@ func TestQuestChainAccessorsReturnFreshValues(t *testing.T) {
 	require.Equal(t, int32(35), fresh.Kill.Mobs[0])
 	require.Empty(t, fresh.TalkNpc.Name)
 }
+
+// TestQuestEntryLinksPinTheServerChain pins the quest conversation
+// prefix: the static page Quest link resolves the single quest of
+// the station straight to its current page (the server side chain
+// of the 2026-09-12 live runs: the first talk of Sorius answers
+// with his trainer page, the "Quest" click answers with the quest
+// page 30327-01 directly - no choose window for single quest
+// stations).
+func TestQuestEntryLinksPinTheServerChain(t *testing.T) {
+	for _, chain := range []QuestChain{
+		ElvenKnightChain(), ElvenScoutChain(),
+	} {
+		links := QuestEntryLinks(chain)
+		require.Len(t, links, 1)
+		require.Equal(t, "Quest", links[0].LinkText)
+	}
+}

@@ -108,6 +108,9 @@ func shortenDialogSeams(t *testing.T) {
 		dialogClickPause = dialogPause
 		questDialogWait = dialogWait
 	})
+	dialogPace := dialogBypassPace
+	dialogBypassPace = time.Millisecond
+	t.Cleanup(func() { dialogBypassPace = dialogPace })
 }
 
 func (s *scriptGame) ClickObject(objectID int32) error {
