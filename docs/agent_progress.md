@@ -152,8 +152,28 @@ The demanded behavior:
   pin the new flow (`TestWeaponlessRunCarriesLearning`,
   `TestLearnTripTriggersOnTheSkillBudget`,
   `TestLearnTripBuysTheSpellbooks`).
-- Status: in progress - the docs refresh, the acceptance measurement
-  run and the timeout tightening follow.
+- Commit "docs: the weapon-first shop strategy, the pdef maximizing
+  armor set and the one town visit rule": `docs/shopping_strategy.md`
+  rewritten around the new phases (the acceptance wallet check, the
+  new was/is journey table), `docs/hunting.md` shop strategy section
+  and the weapon run paragraph updated.
+- Commit "gear: the basic jewel floor reserves ahead of the armor
+  set": the first acceptance measurement run (481 s, PASS) showed the
+  armor enumeration eating the wallet down to 53 adena - only 3 of
+  the 5 jewel slots filled and a second village walk would follow for
+  the remaining pair halves. The phase order is now the weapon
+  milestone, the basic jewel floor (the 261 adena outfit covers every
+  slot first), the pdef maximizing armor set and the leftover shield:
+  the second measurement run bought all five jewels with the
+  125 pdef armor set (472 s, PASS).
+- Commit "acceptance: the farm readiness timeout tightened to the
+  measured one town visit round": farmTimeout drops from 30 to
+  20 minutes - the fixed flow measures 472-481 s (the lessons pacing
+  dominates), the bound holds two and a half times that for the live
+  run variance (the mob positions, the walk retries, the road fights).
+- Status: done (2026-09-12). Two full acceptance runs PASS at 481 s
+  and 472 s; `go build ./...`, the full `go test ./...` suite and
+  `golangci-lint run --new` are green.
 
 ## Active task: the sidebar split, the test widget buttons and the CLI acceptance flag (2026-09-11)
 

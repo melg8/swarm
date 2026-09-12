@@ -22,14 +22,20 @@ const (
 	relayPassword = "temp3"
 )
 
-// Scenario timeouts: the farm readiness needs the shopping, the
-// lessons, the walk and the kill - the aggressive mobs on the village
-// road interrupt the trips (the emergency logout reconnects and
-// retries), a quarter of an hour measured too tight for the full
-// cycle, half an hour bounds a slow economy with room to spare. The
-// lifetime and relay scenarios are short hops.
+// Scenario timeouts: the farm readiness runs the one town visit
+// round - the weapon, the pdef maximizing armor set, the basic jewel
+// set, the spellbooks and the lessons all land in a single village
+// walk, then the bot crosses to its farm zone and kills its first
+// mob under the auras. The measured duration of the fixed flow is
+// ~8 minutes (472 s and 481 s on the local stack, the lessons pacing
+// dominates); the bound holds two and a half times that so a live
+// run whose mob positions, walk retries or road fights drift slower
+// still fits - the aggressive mobs on the village road interrupt the
+// trips (the emergency logout reconnects and retries) and the zone
+// kill may wait out a respawn. The lifetime and relay scenarios are
+// short hops.
 const (
-	farmTimeout = 30 * time.Minute
+	farmTimeout = 20 * time.Minute
 	lifeTimeout = 4 * time.Minute
 )
 

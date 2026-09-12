@@ -164,22 +164,24 @@ const enumerateArmorSetCap = 1 << 16
 // milestone first (the top affordable strict upgrade - the best tier
 // the wallet plus the sale credits reach; the top-tier guard drops
 // every cheaper rung of the same slots whatever their value per
-// adena), the pdef maximizing armor set second (one piece per armor
-// family inside the remaining budget: a rich wallet buys the advanced
-// pieces directly, a poor one fills many slots with the cheap offers -
-// the set maximizes the summed pdef either way, the user rule of the
-// armor spending), the basic jewel floor behind a real weapon (the
-// cheapest offer of every empty slot, both halves of every pair - the
-// starting locations barely attack with magic, the mDef upgrades
-// never pay) and the shield with the leftover. Nothing gets bought
-// that the inventory already carries (the free upgrades are simulated
-// first). Simulated equips keep the plan consistent: after a planned
-// purchase the virtual paperdoll carries the bought item and the next
-// pick compares against it. Every slot gets at most ONE purchase per
-// trip: the weapon phase buys one milestone, the set planner picks
-// one piece per armor family and the jewel floor fills each empty
-// slot once - the next trip re-plans against the paperdoll the
-// previous purchases reached.
+// adena), the basic jewel floor second (the cheapest offer of every
+// empty jewel slot, both halves of every pair - the 261 adena outfit
+// covers every slot ahead of the armor maximization: the starting
+// locations barely attack with magic, the mDef upgrades never pay
+// and the slots must not stay empty because the armor set ate the
+// wallet), the pdef maximizing armor set third (one piece per armor
+// family inside the remaining budget: a rich wallet buys the
+// advanced pieces directly, a poor one fills many slots with the
+// cheap offers - the set maximizes the summed pdef either way, the
+// user rule of the armor spending) and the shield with the leftover.
+// Nothing gets bought that the inventory already carries (the free
+// upgrades are simulated first). Simulated equips keep the plan
+// consistent: after a planned purchase the virtual paperdoll carries
+// the bought item and the next pick compares against it. Every slot
+// gets at most ONE purchase per trip: the weapon phase buys one
+// milestone, the jewel floor fills each empty slot once, the set
+// planner picks one piece per armor family - the next trip re-plans
+// against the paperdoll the previous purchases reached.
 func PlanPurchases(
 	profile Profile, equipment Equipment, catalog Catalog, adena int64,
 ) []Purchase {
@@ -271,19 +273,22 @@ func newPlanWalk(
 }
 
 // runPhases walks the phases in the strategy order: the weapon
-// milestone, the pdef maximizing armor set, the basic jewel floor and
-// the shield upgrade. The tail budget may end the walk between the
-// phases (see tailDone).
+// milestone, the basic jewel floor (the cheapest set of every slot,
+// both pair halves - the 261 adena outfit reserves ahead of the armor
+// maximization so every slot carries its basic jewel while the armor
+// set takes the rest), the pdef maximizing armor set and the shield
+// upgrade. The tail budget may end the walk between the phases (see
+// tailDone).
 func (w *planWalk) runPhases() {
 	w.weaponPhase()
 	if w.tailDone() {
 		return
 	}
-	w.armorPhase()
+	w.jewelPhase()
 	if w.tailDone() {
 		return
 	}
-	w.jewelPhase()
+	w.armorPhase()
 	if w.tailDone() {
 		return
 	}

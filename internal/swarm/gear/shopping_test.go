@@ -95,13 +95,13 @@ func TestPlanPurchasesArmorFloorFirst(t *testing.T) {
 		seen[purchase.ItemID] = true
 	}
 
-	// A worn real weapon opens the jewel floor behind the armor: the
+	// A worn real weapon opens the jewel floor right behind it: the
 	// same bare character now wields the short sword, and the plan
-	// fills the empty armor slots first, then the cheapest jewel set
-	// (BOTH halves of the pairs - the basic set covers every slot) and
-	// the leather shield the leftover reaches. The next weapon
-	// milestone (the knife at 14374) stays out of reach of the 1000
-	// adena wallet.
+	// buys the cheapest jewel set first (BOTH halves of the pairs -
+	// the basic set covers every slot ahead of the armor), then the
+	// pdef maximizing armor set of the leftover and the leather shield.
+	// The next weapon milestone (the knife at 14374) stays out of
+	// reach of the 1000 adena wallet.
 	equipped := equipmentWith(
 		[]state.InventoryItem{item(100, 1)},
 		map[Slot]int32{SlotRHand: 100})
