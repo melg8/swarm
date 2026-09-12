@@ -4329,3 +4329,48 @@ The regressions and the acceptance:
   the eleven purchases across Ariel, Unoren and Creamees, the teacher
   leg reached Ellenia inside the hall and the first lesson (Power
   Strike level 1) consumed its SP.
+
+## Round 62: the hypotheses registry - the unverified assumption becomes a tracked artifact (2026-09-12)
+
+The self-organization round (agent_progress 2026-09-12) added the
+boot prompt rule "an unverified assumption goes into the hypotheses
+registry with a verification plan" - but the registry itself did not
+exist: the open server questions of the navigation work (the swim
+semantics, the gatekeeper graph, the boats, the doors) lived as prose
+inside docs/navigation_analysis.md with no ids, no tracking and no
+obligation for relying code to reference them. An agent reading
+AGENTS.md had no way to tell a verified server fact from a hopeful
+guess, and the T-004 quest research round was about to mint a fresh
+set of protocol assumptions with the same problem.
+
+The fix is the convention plus the seed (T-005, scope: AGENTS.md and
+docs/navigation_analysis.md only):
+
+- AGENTS.md carries the "Hypotheses and unknowns" section: every
+  unverified server assumption becomes an H-NNN registry entry
+  BEFORE the relying code is written (a comment on the relying line
+  references the id), every entry names its evidence (the Mobius
+  Java classes to read, the live experiment to run), and running the
+  plan closes the entry - a confirmed fact moves into the matching
+  subsystem doc, a refuted one records what the server actually did.
+- The registry is seeded with the four open navigation unknowns:
+  H-001 the swimming semantics (the 60 s breath of
+  Player.startWaterTask, the WaterTask damage, the swim speed
+  defaults), H-002 the gatekeeper teleport graph (the
+  Teleporter.onBypassFeedback bypass chain, RequestBypassToServer,
+  the teleporter xml shape), H-003 the boats as scheduled edges (the
+  three vehicle scripts, the GetOn/GetOff vehicle packet family),
+  H-004 the doors as passable obstacles (the Door openable
+  families, DoorStatusUpdate). Every class named in a verification
+  plan was located in the local Mobius checkout before the entry
+  was written - the plans reference real files, not guesses.
+- docs/navigation_analysis.md links its open items to the registry
+  ids so the analysis doc and the registry agree both ways.
+
+Verification: docs-only change - `go build ./...` green,
+`golangci-lint run --new` clean (0 issues), the stack was up
+(STACK_READY login :2106 game :7777 db :3306, 75 tables) for the
+source reading; no behavior changed so no e2e run was required. The
+follow-up the convention itself demands: the next pathfind change
+adds the H-001 reference to the waterCostMultiplier comment (outside
+the docs scope of this round, noted in the BACKLOG resume notes).
