@@ -736,6 +736,47 @@ function flashDumpButton(button, kind) {
   setTimeout(() => { button.classList.remove(kind); }, 2500);
 }
 
+// ---- session dump button ----
+
+// initSessionButton wires the HUD session button: it fetches the
+// compact session report of the selected bot (the whole run since the
+// application start: the hourly curves, the kill and death statistics,
+// the money trail, the stalls, the story tail) and copies it to the
+// clipboard - the long-run analysis material an agent reads in one
+// click. The clipboard fallbacks mirror the dump state button.
+function initSessionButton() {
+  const button = document.getElementById("hud-session");
+  if (!button) { return; }
+  button.addEventListener("click", async () => {
+    if (!App.activeBotId) { flashDumpButton(button, "failed"); return; }
+    let text = null;
+    try {
+      const response = await fetch("/api/bots/" + App.activeBotId +
+        "/session-report");
+      if (!response.ok) { throw new Error("report http " + response.status); }
+      text = await response.text();
+    } catch (err) {
+      flashDumpButton(button, "failed");
+      return;
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        flashDumpButton(button, "copied");
+
+        return;
+      } catch (err) { /* fall through to the legacy copy */ }
+    }
+    if (legacyCopyText(text)) {
+      flashDumpButton(button, "copied");
+    } else {
+      window.open("/api/bots/" + App.activeBotId + "/session-report",
+        "_blank");
+      flashDumpButton(button, "failed");
+    }
+  });
+}
+
 // ---- hunting zones panel ----
 
 // The zone panel starts collapsed: the map corner chip carries the

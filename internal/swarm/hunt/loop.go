@@ -16,6 +16,7 @@ import (
 
 	"github.com/melg8/swarm/internal/swarm/gear"
 	"github.com/melg8/swarm/internal/swarm/pathfind"
+	"github.com/melg8/swarm/internal/swarm/session"
 	"github.com/melg8/swarm/internal/swarm/state"
 )
 
@@ -316,14 +317,22 @@ type Loop struct {
 	game    GameAPI
 	tracker *state.Bot
 	logger  *log.Logger
+	journal *session.Journal
 	phase   phase
 	// autonomous enables the hunting phases of the loop: the engage,
 	// loot, town trip and delevel logic. A manual only session (started
 	// without -hunt) keeps it off, the loop then drains the manual web
 	// commands and otherwise stays idle.
-	autonomous    bool
-	target        int32
-	lastHit       time.Time
+	autonomous bool
+	target     int32
+	lastHit    time.Time
+	// fightStartAt and fightStartFor hold the start of the CURRENT
+	// fight: set when the server confirms the running fight of a
+	// new target, keyed by the target id (a stale pair is ignored).
+	// engageAt re-anchors on every live fight activity for the
+	// stuck timeout, so it cannot measure the fight length.
+	fightStartAt  time.Time
+	fightStartFor int32
 	lootID        int32
 	lootAt        time.Time
 	lootMoveAt    time.Time
@@ -677,11 +686,14 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		game:              game,
 		tracker:           tracker,
 		logger:            log.Default(),
+		journal:           nil,
 		autonomous:        true,
 		phase:             phaseEngage,
 		equip:             newEquipManager(gear.MeleeFighter{}),
 		target:            0,
 		lastHit:           time.Time{},
+		fightStartAt:      time.Time{},
+		fightStartFor:     0,
 		lootID:            0,
 		lootAt:            time.Time{},
 		lootMoveAt:        time.Time{},
@@ -691,6 +703,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		restartAt:         time.Time{},
 		zoneCX:            0,
 		zoneCY:            0,
+		zoneRegion:        "",
 		zoneHalf:          0,
 		navigator:         nil,
 		waypoints:         nil,
@@ -865,6 +878,33 @@ func (l *Loop) SetLogger(logger *log.Logger) {
 		return
 	}
 	l.logger = logger
+}
+
+// SetJournal installs the session journal of the loop: the kill,
+// death, trip and zone events of the structured session trail land in
+// it. A nil journal (the default, and the -session-dir "" mode) turns
+// every journal call into a no-op, so the tests and the acceptance
+// scenarios run unchanged.
+func (l *Loop) SetJournal(journal *session.Journal) {
+	l.journal = journal
+}
+
+// journalKill emits the structured kill record: the fight duration
+// and the health the character ended with ride along for the combat
+// efficiency aggregates of the session report.
+func (l *Loop) journalKill(objectID int32, now time.Time) {
+	if l.journal == nil {
+		return
+	}
+	mob := l.tracker.ObjectName(objectID)
+	mobLevel, _ := l.tracker.ObjectLevel(objectID)
+	fight := 0.0
+	if l.fightStartFor == objectID && !l.fightStartAt.IsZero() &&
+		now.After(l.fightStartAt) {
+		fight = now.Sub(l.fightStartAt).Seconds()
+	}
+	l.journal.Kill(l.tracker.ID(), mob, mobLevel, fight,
+		l.tracker.SelfHealthPercent())
 }
 
 // SetGearProfile replaces the gear scoring profile of the auto
@@ -1189,6 +1229,11 @@ func (l *Loop) recoverFromDeath() {
 		l.noteZoneDeath()
 	}
 	l.logf("Hunt: character died, restarting at the nearest village")
+	if l.journal != nil {
+		level := l.tracker.SelfLevel()
+		x, y, _, _ := l.tracker.SelfPosition()
+		l.journal.Death(l.tracker.ID(), level, x, y)
+	}
 	if err := l.game.RestartAtVillage(); err != nil {
 		l.logf("Hunt: village restart failed: %v", err)
 	}
@@ -1313,6 +1358,7 @@ func (l *Loop) engage() {
 		if l.spot != nil {
 			l.spotNoteKill(l.target, now)
 		}
+		l.journalKill(l.target, now)
 		l.logf("Hunt: target %d died, looting", l.target)
 		l.target = 0
 		l.clearBlindRecovery()
@@ -1491,6 +1537,13 @@ func (l *Loop) engage() {
 		}
 	}
 	if l.tracker.SelfFighting(l.target) {
+		// The confirmed running fight stamps its start once: the
+		// kill journal record measures the real fight length
+		// against it (engageAt re-anchors and cannot).
+		if l.fightStartAt.IsZero() || l.fightStartFor != l.target {
+			l.fightStartAt = now
+			l.fightStartFor = l.target
+		}
 		// A running fight ends the flee episode: the character
 		// answered instead of running, the escape budget resets.
 		l.fleeSince = time.Time{}

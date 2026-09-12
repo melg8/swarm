@@ -6,7 +6,10 @@ package hunt
 
 import (
 	"errors"
+	"io"
+	"log"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -189,6 +192,33 @@ func (f *fakeGame) DropItem(
 	f.drops = append(f.drops, [5]int32{objectID, count, x, y, z})
 
 	return nil
+}
+
+// recordingLogger builds the production-shaped logger of the loop:
+// a console copy and the mirror that records the Hunt: decision lines
+// into the tracker event log (the same shape the huntEventLogger of
+// cmd/swarm installs - the event log routing belongs to the wiring,
+// the loop logf only updates the last action view).
+func recordingLogger(bot *state.Bot) *log.Logger {
+	return log.New(io.MultiWriter(io.Discard, eventMirror{bot: bot}), "", 0)
+}
+
+// eventMirror records Hunt: lines into the tracker event log.
+type eventMirror struct {
+	bot *state.Bot
+}
+
+// Write implements io.Writer for the log package.
+func (m eventMirror) Write(p []byte) (int, error) {
+	line := strings.TrimSpace(string(p))
+	if at := strings.Index(line, "Hunt: "); at >= 0 {
+		line = line[at:]
+	}
+	if line != "" {
+		m.bot.RecordEvent(line)
+	}
+
+	return len(p), nil
 }
 
 func newTestBot() *state.Bot {

@@ -6,6 +6,7 @@ package hunt
 
 import (
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/melg8/swarm/internal/swarm/npcdata"
@@ -436,6 +437,10 @@ func (l *Loop) maybeSwitchZone() {
 		return
 	}
 	l.applyHuntingZone(zone)
+	if l.journal != nil {
+		l.journal.Zone(l.tracker.ID(), zone.Name,
+			"the ladder re-pick at level "+strconv.Itoa(int(level)))
+	}
 	l.logf("Hunt: level %d with gear %d: hunting %s (levels "+
 		"%d-%d)", level, l.gearPoints(), zone.Name, zone.MinLevel,
 		zone.MaxLevel)
@@ -535,6 +540,10 @@ func (l *Loop) maybeRotateEmptyZone(now time.Time) { //nolint:cyclop
 	}
 	l.applyHuntingZone(next)
 	l.zoneCheckAt = now
+	if l.journal != nil {
+		l.journal.Zone(l.tracker.ID(), next.Name,
+			"the square cleared out")
+	}
 	if currentOK {
 		l.logf("Hunt: %s is cleared out, rotating to %s",
 			current.Name, next.Name)

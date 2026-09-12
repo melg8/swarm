@@ -47,6 +47,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   initChat();
   initDumpButton();
+  initSessionButton();
   initAcceptance();
   initSidebarTabs();
   StatsTab.init();

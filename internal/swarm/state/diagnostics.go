@@ -229,6 +229,21 @@ func (b *Bot) NoteAction(message string) {
 	b.recordLocked(message)
 }
 
+// NoteLastAction updates the last action view of the hunt diagnostics
+// WITHOUT recording the message into the event log. The hunt loop
+// logger wiring already mirrors every decision line into the log
+// through its own mirror writer (see the huntEventLogger of cmd/swarm
+// and the sessionLogger of the acceptance runner), so the loop logf
+// calls this variant - the old double recording (once through the
+// mirror Write, once through NoteAction) put every Hunt: line twice
+// into the event ring, the session journal and the web UI log tab.
+func (b *Bot) NoteLastAction(message string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.huntLastAction = message
+	b.huntLastActionAt = time.Now()
+}
+
 // worldCounts is the per kind tally of the world object array: the
 // encoders collect it during their object walk (the diagnostics
 // reuse it without a second pass over the hot records).

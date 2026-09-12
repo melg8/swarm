@@ -419,6 +419,10 @@ type Bot struct {
 	// packetWindow feeds the packet rate of the diagnostics
 	// view (see packetRateWindow).
 	packetWindow packetRateWindow
+	// eventSink mirrors every recorded event into the session
+	// journal of cmd/swarm (see SetEventSink): nil unless the
+	// journal wiring installed it.
+	eventSink    EventSink
 	commandQueue chan Command
 	// The published walk plan of the web UI and the state dump
 	// (see SetWalkPlan): the planning origin, the full waypoint
@@ -518,6 +522,7 @@ func NewBot(id string) *Bot {
 		packetWindow: packetRateWindow{
 			second: 0, filled: 0, counts: [packetRateSeconds]int32{},
 		},
+		eventSink:          nil,
 		commandQueue:       make(chan Command, commandQueueCapacity),
 		walkPlan:           nil,
 		walkPlanAt:         time.Time{},
@@ -1888,6 +1893,23 @@ func (b *Bot) RecordEvent(message string) {
 	b.recordLocked(message)
 }
 
+// EventSink receives every recorded event with its timestamp. The
+// session journal installs it to mirror the full event story into its
+// persistent file. The contract is strict: the sink is called while
+// the bot write lock is held, so it must never call back into the
+// tracker and must never block (the journal sink hands the line to a
+// buffered channel and drops on overflow).
+type EventSink func(at time.Time, message string)
+
+// SetEventSink installs (or with nil removes) the event observer. It
+// must be called before the session traffic starts (the wiring in
+// cmd/swarm installs it right after the tracker is created).
+func (b *Bot) SetEventSink(sink EventSink) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.eventSink = sink
+}
+
 // NewestEvents returns up to limit newest events of the rolling log
 // in chronological order. The state dump reads a deeper window than
 // the snapshot carries (the web UI log tail keeps the last entries
@@ -1959,10 +1981,16 @@ func (b *Bot) clearSelfTargetLocked(reason string) {
 	b.recordLocked("target cleared: " + reason)
 }
 
-// recordLocked appends an event to the rolling log (see eventLog).
-// The caller must hold the write lock.
+// recordLocked appends an event to the rolling log (see eventLog)
+// and hands it to the installed event sink. The caller must hold the
+// write lock; the sink contract forbids any re-entry into the tracker
+// (see SetEventSink).
 func (b *Bot) recordLocked(message string) {
-	b.log.record(message, time.Now())
+	at := time.Now()
+	b.log.record(message, at)
+	if b.eventSink != nil {
+		b.eventSink(at, message)
+	}
 }
 
 // recordCombatEventLocked appends one combat animation beat (see

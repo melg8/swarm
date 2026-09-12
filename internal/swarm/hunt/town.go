@@ -615,6 +615,9 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	l.shoppingPlanCache = nil
 	l.shoppingPlanAt = time.Time{}
 	l.shoppingPlanAdena = 0
+	if l.journal != nil {
+		l.journal.TripStart(l.tracker.ID(), reason)
+	}
 	l.logf("Hunt: %s, walking to the trader %s", reason,
 		merchant.Name)
 	l.legRadius = tripApproachRadius
@@ -1780,6 +1783,9 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 	}
 	l.logf("Hunt: town walk stuck, re-pathing (%d of %d)",
 		l.rePaths, maxRePaths)
+	if l.journal != nil {
+		l.journal.Repath(l.tracker.ID(), l.rePaths)
+	}
 	if !l.startWalkLeg(l.legDest) {
 		l.abortTownTrip("re-path failed")
 
@@ -2294,6 +2300,9 @@ func (l *Loop) sellJunk() {
 	for _, item := range batch {
 		l.sold[item.ObjectID] = true
 	}
+	if l.journal != nil {
+		l.journal.Sell(l.tracker.ID(), len(batch))
+	}
 	l.logf("Hunt: offered %d items for sale", len(batch))
 }
 
@@ -2416,6 +2425,10 @@ func (l *Loop) endTownTrip(reason string) {
 	l.resetReplacementSales()
 	l.resetLearnState()
 	l.tripEndedAt = time.Now()
+	if l.journal != nil {
+		l.journal.TripEnd(l.tracker.ID(), reason,
+			time.Since(l.tripStart))
+	}
 	l.logf("Hunt: town trip ended: " + reason)
 }
 

@@ -6,6 +6,7 @@ package hunt
 
 import (
 	"bytes"
+	"io"
 	"log"
 	"strings"
 	"testing"
@@ -37,7 +38,8 @@ func newStagnationLoop(
 ) (*Loop, *bytes.Buffer) {
 	sink := &bytes.Buffer{}
 	loop := NewLoop(game, bot)
-	loop.SetLogger(log.New(sink, "", 0))
+	loop.SetLogger(log.New(
+		io.MultiWriter(sink, eventMirror{bot: bot}), "", 0))
 
 	return loop, sink
 }

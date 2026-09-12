@@ -65,6 +65,7 @@ one of them is the reference for its subsystem:
 | `docs/hunting.md` | The autonomous hunt: hunt loop, combat safety, blind engage recovery, multi-zone hunting, auto equipment, shop strategy execution, town trips, deleveling, live-validated facts |
 | `docs/shopping_strategy.md` | The shop strategy reasoning, prices, purchase phases and the was/is level journey comparison |
 | `docs/webui.md` | The web interface: launch modes, map rendering, movement interpolation, HUD, equipment and shop queue widgets, interactivity, the bot statistics tab, snapshot encoding, the state tracker internals, repro harnesses |
+| `docs/session_journal.md` | The persistent session journal: the JSONL record of the whole run (events, samples, kills, trips, purchases), the session dump report of the web UI, the offline -session-report CLI |
 | `docs/pathfinding.md` | The geodata pathfinder: format, engine, deviations from the original, test UI, benchmarks, geodata visualization |
 | `docs/navigation_analysis.md` | The measured gaps on the road to universal A to B world navigation (continue navigation work from there) |
 | `docs/proxy.md` | The MITM client proxy: running it, the l2.ini recipes, the protocol the client sees, the relogin handoff, debugging proxy.log |

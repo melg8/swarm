@@ -22,6 +22,7 @@ func TestLoopPublishesHuntDiagnostics(t *testing.T) {
 	spawnMob(bot)
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
+	loop.SetLogger(recordingLogger(bot))
 	loop.lastHit = time.Now().Add(-time.Minute)
 
 	// The fresh tracker carries no hunt view: the first tick
@@ -70,6 +71,7 @@ func TestLoopNotesDeathDecision(t *testing.T) {
 	bot := newTestBot()
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
+	loop.SetLogger(recordingLogger(bot))
 
 	bot.ApplyStatusUpdate(100, []state.Attribute{
 		{ID: state.AttrCurHP, Value: 0},
@@ -98,6 +100,7 @@ func TestLoopDiagnosticsAges(t *testing.T) {
 	bot := newTestBot()
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
+	loop.SetLogger(recordingLogger(bot))
 
 	now := time.Now()
 	loop.engageAt = now.Add(-(2*time.Second + 500*time.Millisecond))
@@ -129,6 +132,7 @@ func TestLoopRemainingWaypoints(t *testing.T) {
 	bot := newTestBot()
 	game := &fakeGame{}
 	loop := NewLoop(game, bot)
+	loop.SetLogger(recordingLogger(bot))
 
 	loop.phase = phaseEngage
 	require.Equal(t, 0, loop.remainingWaypoints())

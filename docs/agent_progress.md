@@ -3247,3 +3247,55 @@ queue entry, verified against this journal's T-016 sections):
 Status: the next agent resumes the T-016 hand-off above (the M2
 acceptance); new-work coordination waits for the owner's replacement
 approach.
+
+## Active task: the session journal - the session dump of the long runs (owner-direct)
+
+Started: 2026-09-12 19:00 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. The owner asked (Russian) for a dump-state-like but
+bigger mechanism: a session journal that records everything about the
+bot session from the application start, runs autonomously in logs/,
+gets a web UI button for a clipboard export, and is compact enough for
+an agent session to digest while answering the long-run questions
+(why little money, how many stalls, what fought badly) of the 8-24 hour
+runs on the user machine without bothering the user.
+
+### Result
+
+- internal/swarm/session (new package): the Journal (one append-only
+  JSONL file per process, 64 MB rotation with background gzip, story
+  flood cap 120/min/bot, nil-receiver no-op API), the per-bot
+  in-memory aggregator (hourly buckets, level marks, per-mob fight
+  stats with a duration histogram, trips, buys, stalls, story ring),
+  the compact report renderer (7 sections), the offline journal
+  parser (plain + gz, torn-line tolerant) and the 30 s tracker
+  sampler.
+- state.Bot.SetEventSink: every recorded event mirrors into the
+  journal (non-blocking channel send under the tracker lock).
+- hunt: kill (with the honest fight length from the new
+  fightStartAt/fightStartFor pair - engageAt re-anchors for the stuck
+  timeout and could not measure it), death, trip brackets, buy batches
+  with the cost, sells, zone switches, stalls, re-paths.
+- cmd/swarm: -session-dir (default logs, "" disables), the journal +
+  sampler + sink wiring of the single and fleet modes, the lifecycle
+  marks (entered/lost/reconnect-wait/shutdown), -session-report FILE
+  for the offline post-mortem rendering.
+- webserver: GET /api/bots/{id}/session-report + the Session dump
+  button of the map toolbar (the same clipboard fallbacks as the state
+  dump).
+- The double-record fix: the loop logf recorded every Hunt: line twice
+  (the logger mirror + NoteAction); logf now calls NoteLastAction
+  (last-action view only), the wiring mirror is the single recorder.
+- logs/ gitignored; docs/session_journal.md + the docs map entries.
+
+### Verification
+
+- go build, go vet, golangci-lint run --new: 0 issues.
+- The full suite green; the session package (14 tests), the webserver
+  endpoint tests and the hunt emission tests new.
+- Live: two -hunt runs against the deployed stack (STACK_READY). The
+  journal recorded 170-206 lines per 2.5-3 minute run (story, kills
+  with honest 12.5 s fights, samples, lifecycle); the CLI report
+  rendered the full 7-section page from the file; the duplicate Hunt:
+  lines are gone.
+
+Status: done (2026-09-12).

@@ -19,10 +19,15 @@ import (
 // bot tracker: the message becomes an event log entry of the state
 // dump (the live server report carries the decision history next to
 // the world data) and the last action of the hunt diagnostics view.
+// The event log entry arrives through the logger mirror of the wiring
+// (huntEventLogger of cmd/swarm, sessionLogger of the acceptance
+// runner); the last action update carries no record of its own - the
+// old NoteAction here recorded the same line a second time and every
+// Hunt: decision landed twice in the ring, the journal and the web UI.
 func (l *Loop) logf(format string, args ...any) {
 	message := fmt.Sprintf(format, args...)
 	l.logger.Print(message)
-	l.tracker.NoteAction(message)
+	l.tracker.NoteLastAction(message)
 }
 
 // diagnostics snapshots the loop internals for the diagnostics

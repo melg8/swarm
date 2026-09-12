@@ -852,8 +852,14 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 	l.buyRequested = batch
 	l.buyConfirmAt = now
 	names := make([]string, 0, len(batch))
+	cost := int64(0)
 	for _, purchase := range batch {
 		names = append(names, npcdata.ItemName(purchase.ItemID))
+		cost += purchase.Price
+	}
+	if l.journal != nil {
+		l.journal.Buy(l.tracker.ID(), strings.Join(names, ", "),
+			len(batch), cost)
 	}
 	l.logf("Hunt: shop: buying %d items from %s (list %d): %s",
 		len(batch), stop.merchant.Name, listID, strings.Join(names, ", "))

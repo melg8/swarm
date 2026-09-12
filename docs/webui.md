@@ -301,6 +301,14 @@ grow by the 2 s window, so the payload stays small.
   a live problem report always tells which exact code produced it (see
   `internal/version`): the report plus a `git log` are all it takes to
   line the behavior up with the source.
+- Session dump: the Session dump button of the map toolbar (next to
+  the state dump) copies the compact session report of the whole run
+  (`GET /api/bots/{id}/session-report`, the session journal package)
+  - the hourly state curves, the kill and death statistics, the
+  money trail, the stalls and the story tail. The long-run analysis
+  material of an 8-24 hour session in one click; the offline
+  post-mortem renders the same report through `-session-report
+  <file>` (see [session_journal.md](session_journal.md)).
 - Bot status banner: a compact chip pinned to the top center of the
   map (`#bot-status` in index.html, `renderBotStatus` in app.js) shows
   the current activity of the active bot at a glance - hunting,

@@ -5313,3 +5313,54 @@ queue section), `rg -i 'agent_selforganization|docs/BACKLOG' AGENTS.md
 docs/ROADMAP.md tools/progress_report.sh runs/README.md
 docs/quest_protocol.md docs/band_20_25_survey.md PROGRESS.md` returns
 nothing (the append-only journals excluded on purpose).
+
+## Round 78: the session journal - the long-run evidence trail (2026-09-12)
+
+Problem: the debugging artifacts of a live run all lived in the
+moment: the state dump is a snapshot, the tracker event log is a
+512-entry ring and the soak metrics only land at the acceptance
+boundaries. A user running the bot for 8-24 hours had nothing to hand
+over when the questions are "why did it farm so little money", "how
+many stalls happened", "what made the fights go badly" - the evidence
+rolled out of memory long before the run ended.
+
+Root cause: no persistent recorder existed; every diagnostic surface
+assumed a developer watching it live.
+
+Fix:
+
+- internal/swarm/session: the persistent journal (one JSONL file per
+  process, every bot of a fleet in it, rotated at 64 MB with
+  background gzip), fed by three sources: the mirrored tracker event
+  story (state.Bot.SetEventSink, a non-blocking channel send under the
+  tracker lock), the 30 s character state sampler and the structured
+  hunt emissions (kill with the honest fight length, death, trip
+  brackets, buys with costs, sells, zone switches, stalls, re-paths).
+  The in-memory aggregator (hourly buckets, level marks, per-mob fight
+  statistics with a duration histogram, trips, purchases, stalls,
+  story ring) renders the compact agent-facing report; the offline
+  parser rebuilds the same aggregates from a journal file (plain or
+  gzipped, torn final line tolerant).
+- The export surfaces: the Session dump web UI button (the clipboard
+  copy of GET /api/bots/{id}/session-report) and the -session-report
+  FILE CLI for the post-mortem of an over or crashed run. The measured
+  volume: 60-70 story lines a minute on the elven lands (the world
+  spawn chatter dominates), 6-8 MB raw per 24 h per bot, under 1 MB
+  gzipped; the report stays at tens of kilobytes (the story flood cap
+  120/min/bot and the rotation bound the runaway cases).
+- Two bugs surfaced and closed by the journal work: the loop logf
+  double-recorded every Hunt: decision (the logger mirror Write plus
+  NoteAction both recorded into the ring - logf now updates the last
+  action view through the new state.NoteLastAction, the wiring mirror
+  is the single recorder), and the kill fight length had no honest
+  source (engageAt re-anchors on every live fight activity for the
+  stuck timeout - the new fightStartAt/fightStartFor pair stamps the
+  confirmed fight start, keyed by the target id).
+
+Verification: the environment deployed fresh (STACK_READY); `go build`,
+`go vet`, `golangci-lint run --new` 0 issues; the full suite green
+(the session package 14 tests, the webserver endpoint tests, the hunt
+emission tests); two live -hunt runs wrote the journals (170-206
+lines per 2.5-3 minutes: story, kills with 12.5 s fights, samples,
+lifecycle marks, no duplicates) and the CLI rendered the full
+7-section report from the files.

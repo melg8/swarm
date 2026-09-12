@@ -82,6 +82,9 @@ func (l *Loop) observeStagnationXP(now time.Time) {
 	}
 	l.logf("Hunt: stagnation: no experience change for %s, "+
 		"exp %d held, phase %s", held.Round(time.Minute), xp, l.phase)
+	if l.journal != nil {
+		l.journal.Stall(l.tracker.ID(), "xp", held, 0, 0)
+	}
 	// The window restarts instead of the whole watch: a permanently
 	// stalled loop keeps logging one line per window until the
 	// character progresses again or the session ends.
@@ -108,6 +111,9 @@ func (l *Loop) observeStagnationPosition(now time.Time) {
 	}
 	l.logf("Hunt: stagnation: position held %s at %d %d %d, phase %s",
 		held.Round(time.Minute), x, y, z, l.phase)
+	if l.journal != nil {
+		l.journal.Stall(l.tracker.ID(), "pos", held, x, y)
+	}
 	l.stagPosAt = now
 }
 

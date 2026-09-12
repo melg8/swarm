@@ -33,6 +33,7 @@ the area you are about to touch, not all of them.
 | Document | Area |
 | --- | --- |
 | [webui.md](webui.md) | The web interface: launch modes, map rendering, movement interpolation, HUD, equipment and shop queue widgets, interactivity, snapshot encoding, state tracker internals, repro harnesses |
+| [session_journal.md](session_journal.md) | The persistent session journal and the session dump report: the JSONL record of the whole run, the web UI button, the offline CLI |
 
 ## History and plans
 

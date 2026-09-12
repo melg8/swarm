@@ -27,6 +27,7 @@ import (
 	"github.com/melg8/swarm/internal/swarm/hunt"
 	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/proxy"
+	"github.com/melg8/swarm/internal/swarm/session"
 	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/melg8/swarm/internal/swarm/webserver"
 	"github.com/melg8/swarm/internal/version"
@@ -103,6 +104,13 @@ type config struct {
 	// specific id runs just that one. The exit code reflects the
 	// outcome (0 for a pass, 1 for a fail).
 	acceptanceRun string
+	// sessionDir is the directory of the persistent session journal
+	// ("logs" by default, empty disables the journal entirely).
+	sessionDir string
+	// sessionReport renders the compact session report of a journal
+	// file to stdout and exits (the post-mortem path: the run may be
+	// long over, the journal file carries the story).
+	sessionReport string
 }
 
 func parseFlags() config {
@@ -124,6 +132,8 @@ func parseFlags() config {
 		proxyLog:      "",
 		bots:          1,
 		acceptanceRun: "",
+		sessionDir:    "",
+		sessionReport: "",
 	}
 	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
 		"login server address")
@@ -177,6 +187,17 @@ func parseFlags() config {
 			"sets 480) for the window length. Pass an empty "+
 			"-web to keep the UI off; the result prints to the "+
 			"log. Exit code: 0 for a pass, 1 for a fail.")
+	flag.StringVar(&cfg.sessionDir, "session-dir", "logs",
+		"directory of the persistent session journal (the JSONL "+
+			"record of every event since the application start, "+
+			"rotated and gzipped; the web UI session dump button "+
+			"renders its report). Empty disables the journal")
+	flag.StringVar(&cfg.sessionReport, "session-report", "",
+		"render the compact session report of a journal file to "+
+			"stdout and exit (the post-mortem analysis of a "+
+			"finished or crashed run; plain and gzipped journal "+
+			"segments both parse). With -account set, only that "+
+			"bot renders")
 	flag.Parse()
 
 	return cfg
@@ -249,8 +270,9 @@ func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
 // bound to a derived context so it stops with the session. The optional
 // geodata engine serves the town trips of the hunt loop.
 func runBot( //nolint:funlen // linear session script
-	ctx context.Context, cfg config, tracker *state.Bot, engine *pathfind.Engine,
-	proxyServer *proxy.Server,
+	ctx context.Context, cfg config, tracker *state.Bot,
+	engine *pathfind.Engine, proxyServer *proxy.Server,
+	journal *session.Journal,
 ) error {
 	sessionCtx, cancelSession := context.WithCancel(ctx)
 	defer cancelSession()
@@ -330,6 +352,10 @@ func runBot( //nolint:funlen // linear session script
 		return fmt.Errorf("failed to enter world: %w", err)
 	}
 	log.Println("Character " + cfg.charName + " entered the world")
+	if journal != nil {
+		journal.Connect(cfg.account, "entered",
+			"level "+strconv.Itoa(int(charInfo.Level)))
+	}
 
 	// The loop always runs: with -hunt it hunts autonomously, without
 	// it stays in the manual mode and only executes the commands of the
@@ -341,6 +367,7 @@ func runBot( //nolint:funlen // linear session script
 	// the loop (zone switches, escapes, stuck re-paths) next to the
 	// raw game events - the debugging material of the live sessions.
 	loop.SetLogger(huntEventLogger(tracker))
+	loop.SetJournal(journal)
 	if engine != nil {
 		loop.SetNavigator(hunt.NewNavigator(engine))
 	} else if cfg.hunt {
@@ -365,6 +392,67 @@ func huntEventLogger(tracker *state.Bot) *log.Logger {
 	mirror := huntEventMirror{tracker: tracker}
 
 	return log.New(io.MultiWriter(os.Stdout, mirror), "", log.LstdFlags)
+}
+
+// openSessionJournal opens the persistent session journal when the
+// mode is on (-session-dir defaults to "logs", the empty value
+// disables it). The journal carries the process identity line and
+// logs its path so the user knows what to attach to a report.
+func openSessionJournal(cfg config) *session.Journal {
+	if cfg.sessionDir == "" {
+		return nil
+	}
+	journal, err := session.NewJournal(cfg.sessionDir, log.Default())
+	if err != nil {
+		log.Printf("Session journal unavailable (continuing without): %v",
+			err)
+
+		return nil
+	}
+	journal.Build(version.Identity())
+	log.Printf("Session journal: %s", journal.Path())
+
+	return journal
+}
+
+// wireSessionBot connects one tracker to the journal: the event story
+// mirror (every recorded tracker event lands in the journal file) and
+// the periodic state sampler of the quantitative trail.
+func wireSessionBot(
+	ctx context.Context, journal *session.Journal, tracker *state.Bot,
+) {
+	if journal == nil {
+		return
+	}
+	botID := tracker.ID()
+	tracker.SetEventSink(func(at time.Time, message string) {
+		journal.Story(botID, message, at)
+	})
+	go session.NewSampler(botID, tracker, journal).Run(ctx)
+}
+
+// runSessionReportCLI renders the session report of a journal file to
+// stdout: the post-mortem path of a finished or crashed run. With
+// -account set, only that bot renders; otherwise every bot of the
+// file renders in first-seen order.
+func runSessionReportCLI(cfg config) {
+	parsed, err := session.ParseJournalFile(cfg.sessionReport)
+	if err != nil {
+		log.Fatalf("Session report: %v", err)
+	}
+	bots := parsed.Order
+	if cfg.account != "" {
+		bots = []string{cfg.account}
+	}
+	for _, bot := range bots {
+		report, err := parsed.Report(bot)
+		if err != nil {
+			log.Fatalf("Session report: %v", err)
+		}
+		if _, err := os.Stdout.WriteString(report); err != nil {
+			log.Fatalf("Session report write: %v", err)
+		}
+	}
 }
 
 // huntEventMirror writes hunt log lines into the bot event log.
@@ -395,17 +483,20 @@ func (m huntEventMirror) Write(p []byte) (int, error) {
 // its own. The geodata engine survives the reconnects.
 func runBotForever(
 	ctx context.Context, cfg config, tracker *state.Bot, engine *pathfind.Engine,
-	proxyServer *proxy.Server,
+	proxyServer *proxy.Server, journal *session.Journal,
 ) {
 	delay := reconnectMinDelay
 	for {
 		started := time.Now()
-		err := runBot(ctx, cfg, tracker, engine, proxyServer)
+		err := runBot(ctx, cfg, tracker, engine, proxyServer, journal)
 		if ctx.Err() != nil {
 			return
 		}
 		if err != nil {
 			log.Println("Bot failed: " + err.Error())
+			if journal != nil {
+				journal.Lost(cfg.account, err.Error())
+			}
 		}
 		// An emergency logout of the hunt loop armed a login
 		// cooldown: honor it on top of the reconnect backoff so the
@@ -421,6 +512,10 @@ func runBotForever(
 			delay = reconnectMinDelay
 		}
 		log.Printf("Reconnecting in %s", delay)
+		if journal != nil {
+			journal.Connect(cfg.account, "reconnect-wait",
+				delay.String())
+		}
 		select {
 		case <-ctx.Done():
 			return
@@ -433,6 +528,12 @@ func runBotForever(
 func main() {
 	cfg := parseFlags()
 	log.SetOutput(os.Stdout)
+
+	if cfg.sessionReport != "" {
+		runSessionReportCLI(cfg)
+
+		return
+	}
 
 	if cfg.testFightUI {
 		runTestFightUI(cfg)
@@ -474,6 +575,11 @@ func main() {
 	tracker.SetKind(state.KindLongRunning)
 	registry.Add(tracker)
 
+	journal := openSessionJournal(cfg)
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+	wireSessionBot(ctx, journal, tracker)
+
 	var proxyServer *proxy.Server
 	if cfg.proxy {
 		proxyServer = startProxy(cfg)
@@ -500,14 +606,18 @@ func main() {
 
 	web := startWebInterface(cfg, registry, nil, proxyServer)
 	attachAcceptance(web, registry, cfg, engine, proxyServer)
+	if web != nil && journal != nil {
+		web.SetSessionJournal(journal)
+	}
 
-	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
-
-	runBotForever(ctx, cfg, tracker, engine, proxyServer)
+	runBotForever(ctx, cfg, tracker, engine, proxyServer, journal)
 	stop()
 	shutdownWebInterface(web)
 	shutdownProxy(proxyServer)
+	if journal != nil {
+		journal.Shutdown("process finished")
+		journal.Close()
+	}
 	log.Println("Bot finished")
 }
 
@@ -565,6 +675,11 @@ func runFleet(cfg config) {
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
 
+	journal := openSessionJournal(cfg)
+	for _, tracker := range trackers {
+		wireSessionBot(ctx, journal, tracker)
+	}
+
 	// Launch every bot supervisor in its own goroutine. A per-bot
 	// config carries the derived account and char name; the rest of
 	// the flags (login, hunt, geodata, proxy) stay shared.
@@ -576,13 +691,17 @@ func runFleet(cfg config) {
 		wg.Add(1)
 		go func(c config, t *state.Bot) {
 			defer wg.Done()
-			runBotForever(ctx, c, t, engine, proxyServer)
+			runBotForever(ctx, c, t, engine, proxyServer, journal)
 		}(botCfg, tracker)
 	}
 	wg.Wait()
 	stop()
 	shutdownWebInterface(web)
 	shutdownProxy(proxyServer)
+	if journal != nil {
+		journal.Shutdown("fleet finished")
+		journal.Close()
+	}
 	log.Println("Fleet finished")
 }
 

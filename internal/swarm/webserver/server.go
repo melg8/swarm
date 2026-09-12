@@ -22,6 +22,7 @@ import (
 
 	"github.com/melg8/swarm/internal/swarm/acceptance"
 	"github.com/melg8/swarm/internal/swarm/pathfind"
+	"github.com/melg8/swarm/internal/swarm/session"
 	"github.com/melg8/swarm/internal/swarm/state"
 )
 
@@ -111,6 +112,7 @@ type Server struct {
 	iconsDir     atomic.Value // string, the icon pack directory or ""
 	proxy        ProxyController
 	acceptance   *acceptance.Manager
+	journal      *session.Journal
 	logger       *log.Logger
 	httpServer   *http.Server
 	eventsDone   chan struct{}
@@ -247,6 +249,7 @@ func newServer(address string, logger *log.Logger) *Server {
 		iconsDir:     atomic.Value{},
 		proxy:        nil,
 		acceptance:   nil,
+		journal:      nil,
 		logger:       logger,
 		httpServer:   nil,
 		eventsDone:   make(chan struct{}),

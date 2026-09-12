@@ -28,3 +28,7 @@ go.work.sum
 .task
 # Local staging of the downloaded geodata pack (not part of the repo)
 .tmp-geodata/
+
+# The persistent session journals of the bot runs (the session dump
+# artifacts, see docs/session_journal.md)
+logs/
