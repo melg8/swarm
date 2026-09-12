@@ -74,6 +74,16 @@ type GameAPI interface {
 	// character that left mid combat fifteen seconds after the
 	// combat ends).
 	RequestLogout() error
+	// SendBypass sends a RequestBypassToServer command to the server
+	// (the gatekeeper teleport flow, the H-002 verification). The
+	// command is the raw bypass string (the client strips the
+	// "bypass -h " prefix the html button carries).
+	SendBypass(command string) error
+	// LastHTMLDialog returns the npc object id and the html body of
+	// the last NpcHTMLMessage the server sent (the gatekeeper dialog
+	// the bot reads the bypass buttons from). A zero npcObjID means
+	// no dialog arrived yet.
+	LastHTMLDialog() (npcObjID int32, html string)
 }
 
 // Timing and threshold constants of the hunt loop.

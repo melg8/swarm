@@ -37,6 +37,8 @@ func (b *benchGame) AcquireSkill(_, _ int32) error      { return nil }
 func (b *benchGame) UseMagicSkill(_ int32) error        { return nil }
 func (b *benchGame) DropItem(_, _, _, _, _ int32) error { return nil }
 func (b *benchGame) RequestLogout() error               { return nil }
+func (b *benchGame) SendBypass(_ string) error          { return nil }
+func (b *benchGame) LastHTMLDialog() (int32, string)    { return 0, "" }
 
 // benchWorldBot builds a bot with npcCount living attackable mobs
 // around the character and two skipped targets, the steady engage

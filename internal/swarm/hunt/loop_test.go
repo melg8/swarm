@@ -35,6 +35,9 @@ type fakeGame struct {
 	casts     []int32
 	noTargets bool
 	logouts   int
+	bypasses  []string
+	htmlNPC   int32
+	htmlBody  string
 	lastError error
 }
 
@@ -126,6 +129,19 @@ func (f *fakeGame) RequestLogout() error {
 	f.logouts++
 
 	return nil
+}
+
+func (f *fakeGame) SendBypass(command string) error {
+	if f.lastError != nil {
+		return f.lastError
+	}
+	f.bypasses = append(f.bypasses, command)
+
+	return nil
+}
+
+func (f *fakeGame) LastHTMLDialog() (int32, string) {
+	return f.htmlNPC, f.htmlBody
 }
 
 func (f *fakeGame) ClickObject(objectID int32) error {

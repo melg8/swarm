@@ -45,6 +45,15 @@ func (gc *GameClient) LastHTMLMessage() fromgameserver.NpcHTMLMessage {
 	return gc.lastHTML
 }
 
+// LastHTMLDialog returns the npc object id and the html body of the
+// last NpcHTMLMessage, matching the hunt.GameAPI interface. A zero
+// npcObjID means no dialog arrived yet.
+func (gc *GameClient) LastHTMLDialog() (npcObjID int32, html string) {
+	msg := gc.LastHTMLMessage()
+
+	return msg.NpcObjID, msg.HTML
+}
+
 // SendBypass sends a RequestBypassToServer command to the server
 // (the gatekeeper teleport flow, the H-002 verification). The command
 // is the raw bypass string the NpcHtmlMessage button carried, WITHOUT
