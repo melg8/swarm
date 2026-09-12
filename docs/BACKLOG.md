@@ -294,3 +294,24 @@ strategy; the shopping strategy doc gains the Dion shop section.
 
 claimed: -
 resume: -
+
+### T-011: the quest journal parser and tracker section
+
+status: in_progress
+milestone: M2
+priority: P2
+deps: T-004
+scope: internal/swarm/packets/from_game_server/, internal/swarm/state/, internal/swarm/connection/
+
+Follow-up 2 of docs/quest_protocol.md: parse the QuestList packet
+(0x98 - the quest journal: active quest ids with their cond, the
+quest item stacks) and land it in the state tracker (a quest
+journal section with quest-cond and quest-item accessors for the
+hunt loop and the sell filter). The packet arrives free at world
+entry (live verified, EnterWorld.java:303 pushes it). The web UI
+quest widget is a later round of its own.
+
+claimed: agent-quest 2026-09-12 08:05 UTC
+resume: fresh claim; the wire layout and the Java reference
+  (QuestList.java) live in docs/quest_protocol.md; the live 5 byte
+  empty form is the golden parser test input.

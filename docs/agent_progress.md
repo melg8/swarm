@@ -2492,3 +2492,35 @@ agent reads this entry and the BACKLOG resume to continue.
   delivered, the follow-up code tasks listed in the BACKLOG resume
   notes, the development_log round 66 entry written. The T-008
   packet foundation of soak-z covers follow-up items 1 and 3.
+
+## Active task: T-011 the quest journal parser and tracker section
+
+Started: 2026-09-12 08:05 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. Agent label: agent-quest.
+
+### Goal
+
+BACKLOG T-011 (milestone M2, follow-up 2 of the quest research):
+parse the QuestList packet (0x98) and land the quest journal in
+the state tracker. T-009/T-010 (the remaining todo tasks) both
+depend on T-008 (in progress), so this is the top claimable work.
+
+### Plan
+
+1. packets/from_game_server/quest_list.go: the parser
+   ([opcode 0x98][questCount: 2]{[questId: 4][state: 4]}
+   [itemCount: 2]{[objectId: 4][itemId: 4][count: 4]
+   [bodyPart: 4]}) with the caps (quests 64, items 256) and the
+   golden tests incl. the live 5 byte empty form.
+2. state/quests.go: the journal (map questId -> cond) + the quest
+   item stacks (map itemId -> count, the quest-item id set feeds
+   the sell filter later); accessors QuestCond/QuestCount/
+   QuestItemCount; replaced whole like the skill list (the server
+   always sends the full journal).
+3. connection: the 0x98 dispatcher case + applyQuestList wiring
+   (same shape as applySkillList).
+
+### Progress
+
+- 08:05 UTC: claimed T-011 (a new BACKLOG entry from the T-004
+  follow-up list; T-009/T-010 wait on T-008).
