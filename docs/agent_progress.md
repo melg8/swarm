@@ -3122,3 +3122,55 @@ quest widget when a consumer asks.
 
 Status: session complete - the next agent starts from the T-016
 close (the M2 acceptance) or the queue it mints.
+
+## Session close: the self-organization system retirement (2026-09-12, owner-direct)
+
+The owner reviewed the claim/lease self-organization loop and judged
+it unsuccessful: the queue approach is retired, a replacement
+coordination approach will be designed separately. This round removes
+the system from the repository.
+
+Removed and cleaned:
+
+- docs/agent_selforganization.md deleted (the design document of the
+  loop: the language argument, the verification pyramid narrative,
+  the claim/lease protocol, the boot prompt).
+- docs/BACKLOG.md deleted (the task queue). All 21 tasks it tracked
+  are done except T-016 (in_progress, M2); its hand-off plan is
+  preserved below so the in-flight work survives the deletion.
+- AGENTS.md: the work protocol no longer points at the queue; the
+  goal ladder (docs/ROADMAP.md) stays the definition of progress.
+- docs/ROADMAP.md: the intro and the milestone-discipline rule no
+  longer reference the removed document or the queue.
+- tools/progress_report.sh: the BACKLOG section is gone from the
+  page; the milestone ladder, the metrics trail and the commit feed
+  remain. PROGRESS.md regenerated.
+- runs/README.md, docs/quest_protocol.md, docs/band_20_25_survey.md:
+  the dangling references rephrased.
+- The historical entries of this journal and of
+  docs/development_log.md keep their original wording (append-only
+  history); the retirement is this entry and the dev log round 77.
+
+The preserved hand-off of T-016 (the M2 closer, from the deleted
+queue entry, verified against this journal's T-016 sections):
+
+- Done so far: the ACCEPT stage PASSED live 2026-09-12 10:30 UTC
+  (acceptance/class_transfer.go: temp9, the level 19 injection at the
+  Sorius approach ring -13440 122493 -3103, the manual session seam,
+  the composed accept route, the journal flip gate); the metrics trail
+  holds the FAIL discovery row and the PASS row; the quest trip phase
+  engine (hunt/quest_trip.go, DriveQuestChain of the T-019 round) is
+  in.
+- Remaining: (1) extend acceptance/class_transfer.go to the full run
+  (the quest trip phase under the session, the Rains class change
+  leg, pass when SelfClassID == 19 plus the character selection packet
+  agreement after a relogin); (2) live-verify with
+  `-acceptance class-transfer` (CLOSES M2).
+- Two live-pinned server facts to respect: the bypass flood protector
+  drops unpaced sends (dialogBypassPace handles it inside one
+  conversation - a second DriveDialog call must not ride the tail of
+  the first) and every quest npc talk starts from the STATIC page.
+
+Status: the next agent resumes the T-016 hand-off above (the M2
+acceptance); new-work coordination waits for the owner's replacement
+approach.

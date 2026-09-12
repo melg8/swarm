@@ -23,8 +23,7 @@ server broadcasts (the fix and the source evidence live in
 `docs/development_log.md`). The rows stay as written: the trail is
 append-only history.
 
-Fields (the M1 acceptance contract, see `docs/BACKLOG.md` T-001 and
-`docs/ROADMAP.md` M1):
+Fields (the M1 acceptance contract, see `docs/ROADMAP.md` M1):
 
 | Field | Type | Meaning |
 | --- | --- | --- |

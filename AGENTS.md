@@ -250,14 +250,16 @@ numbers to budget a verification loop.
   contains an unfinished task entry, resume that task (verify the
   described state against the code, then continue from the recorded
   "next" step) before taking a new one.
-- **When `docs/agent_progress.md` has no unfinished task, take work from
-  the queue.** The goal ladder lives in `docs/ROADMAP.md` (milestones
-  with binary live-acceptance criteria; the progress of the project is
-  the highest green milestone) and the task queue with the claim/lease
-  protocol lives in `docs/BACKLOG.md` (claim a task by pushing a status
-  commit, lease 4 hours, resume from the notes). Every task must
-  advance a milestone - do not invent disconnected work. The reasoning
-  behind the whole loop lives in `docs/agent_selforganization.md`.
+- **The claim/lease task queue is retired (2026-09-12).** The queue and
+  its design document were removed by the owner decision - the approach
+  underperformed; a replacement coordination approach is pending and
+  will be defined by the owner in this file. Until it lands, do not take
+  new work from any queue: resume the unfinished entries of
+  `docs/agent_progress.md` only. The goal ladder still lives in
+  `docs/ROADMAP.md` (milestones with binary live-acceptance criteria;
+  the progress of the project is the highest green milestone) and every
+  change must still advance a milestone - do not invent disconnected
+  work.
 
 ## Agent skills
 

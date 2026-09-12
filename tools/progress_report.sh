@@ -4,13 +4,13 @@
 # SPDX-License-Identifier: MIT
 #
 # progress_report.sh renders PROGRESS.md from three live sources:
-#   1. the tail of runs/metrics.jsonl (the soak metrics trail)
-#   2. the task statuses of docs/BACKLOG.md (todo / in_progress / done)
+#   1. the milestone ladder of docs/ROADMAP.md (done / green / red / pending)
+#   2. the tail of runs/metrics.jsonl (the soak metrics trail)
 #   3. the last 20 commits of git log --oneline
 #
 # The output is the one-page human dashboard of the project: the
-# milestone ladder green/red by the last metrics run, the active
-# BACKLOG tasks and the recent commits. Run it after every
+# milestone ladder green/red by the last metrics run, the recent
+# soak metrics and the recent commits. Run it after every
 # milestone-relevant acceptance run; the page history is the project
 # history.
 #
@@ -23,7 +23,6 @@ set -euo pipefail
 REPO_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 OUT="${1:-${REPO_DIR}/PROGRESS.md}"
 METRICS="${REPO_DIR}/runs/metrics.jsonl"
-BACKLOG="${REPO_DIR}/docs/BACKLOG.md"
 ROADMAP="${REPO_DIR}/docs/ROADMAP.md"
 
 # render_metrics turns the tail of the JSONL trail into a markdown
@@ -68,26 +67,6 @@ for raw in sys.stdin:
         row.get("status", ""),
     ))
 '
-}
-
-# render_backlog extracts the task headers and their status lines.
-render_backlog() {
-        if [ ! -f "${BACKLOG}" ]; then
-                echo "_docs/BACKLOG.md not found._"
-                return
-        fi
-        echo "| Task | Status | Milestone | Priority |"
-        echo "| --- | --- | --- | --- |"
-        awk '
-                /^### T-[0-9]+:/ { id = $2; gsub(/:$/, "", id) }
-                /^status: / { status = $2 }
-                /^milestone: / { ms = $2 }
-                /^priority: / {
-                        prio = $2
-                        if (id != "")
-                                printf "| %s | %s | %s | %s |\n", id, status, ms, prio
-                }
-        ' "${BACKLOG}"
 }
 
 # render_commits shows the last 20 commits.
@@ -167,10 +146,6 @@ if not steps:
         echo "## Soak metrics (last 10 runs)"
         echo
         render_metrics
-        echo
-        echo "## BACKLOG"
-        echo
-        render_backlog
         echo
         echo "## Recent commits"
         echo

@@ -20,7 +20,7 @@ The shape follows the elven zone survey (the territory/mob/transport
 knowledge behind `zones_elven.go` and the hunting.md sections): the
 territories with their real spawn polygons, the towns, the merchants,
 the teachers, the follow-up tasks. The registry generation itself is
-a separate task and waits for M1 green (the backlog protocol).
+a separate task and waits for M1 green.
 
 ## The transport reality (the ladder leaves the elven lands)
 
@@ -170,7 +170,7 @@ sells all three. The lesson trips of the 24th level must route the
 book buy through a Dion stop (or carry the book ahead from an
 earlier trip).
 
-## Follow-up tasks (the list the backlog grows from)
+## Follow-up tasks
 
 1. **The gatekeeper teleport flow** (M3, the H-002 verification
    first): read `Teleporter.onBypassFeedback`,

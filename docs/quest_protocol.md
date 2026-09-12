@@ -6,7 +6,7 @@ SPDX-License-Identifier: MIT
 
 # The quest subsystem protocol (Mobius C1)
 
-> Research document of BACKLOG T-004 (M2, the first profession). Every
+> Research document of the M2 milestone (the first profession). Every
 > statement below is read from the Mobius C1 sources
 > (`L2J_Mobius_C1_HarbingersOfWar`, game protocol version 419) and,
 > where marked **[live]**, observed against the deployed local stack

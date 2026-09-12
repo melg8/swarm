@@ -8,17 +8,15 @@ SPDX-License-Identifier: MIT
 
 The goal ladder of the project: a single bot character levels from 1
 to 60 with zero human intervention, verified by live acceptance runs.
-The full reasoning (verification pyramid, self-organization protocol,
-boot prompt) lives in `docs/agent_selforganization.md`; this file is
-the operational ladder every task must reference.
+This file is the operational ladder every unit of work must reference.
 
 Rules:
 
 - A milestone is closed ONLY by a live acceptance run against the
   deployed local Mobius stack, never by "the code is written".
 - The progress of the project equals the highest green milestone.
-- Every BACKLOG task references the milestone it advances. If a task
-  advances none, it does not belong in the backlog.
+- Every unit of work references the milestone it advances; work that
+  advances none is disconnected work.
 - Party play, raids and sieges are the NEXT ladder (see
   `docs/project_description.md`); they are deliberately out of scope
   here: the solo ladder builds the quest, zone and skill

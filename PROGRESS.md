@@ -1,6 +1,6 @@
 # PROGRESS
 
-Generated: 2026-09-12 10:08:49Z
+Generated: 2026-09-12 17:46:54Z
 
 ## Milestone ladder
 
@@ -25,34 +25,14 @@ Generated: 2026-09-12 10:08:49Z
 | 2026-09-12T09:37:30Z | class-transfer | 6s | 19 | 19 | 0 | 0 | 100000 | 0 | FAIL |
 | 2026-09-12T09:40:26Z | class-transfer | 7s | 19 | 19 | 0 | 0 | 100000 | 0 | PASS |
 
-## BACKLOG
-
-| Task | Status | Milestone | Priority |
-| --- | --- | --- | --- |
-| T-001 | done | M1 | P1 |
-| T-002 | done | M1 | P1 |
-| T-003 | done | M1 | P2 |
-| T-004 | done | M2 | P2 |
-| T-005 | done | M1 | P3 |
-| T-006 | done | M3 | P3 |
-| T-007 | done | M1 | P3 |
-| T-008 | done | M3 | P2 |
-| T-009 | done | M3 | P3 |
-| T-010 | done | M3 | P3 |
-| T-011 | done | M2 | P2 |
-| T-012 | done | M2 | P2 |
-| T-013 | done | M2 | P2 |
-| T-014 | done | M2 | P2 |
-| T-015 | done | M2 | P2 |
-| T-016 | in_progress | M2 | P2 |
-| T-017 | done | M3 | P3 |
-| T-018 | done | M3 | P3 |
-| T-019 | done | M2 | P2 |
-| T-020 | done | M3 | P3 |
-
 ## Recent commits
 
 ```
+65f003d docs: the session close notes of the T-009..T-021 rounds
+1767cbc docs: close T-021 - the corridor regression test lands
+e1531aa pathfind: the gludio-dion corridor regression test (T-021)
+d71955c backlog: register + claim T-021 the corridor regression test
+514b70a progress: the dashboard refresh + the journal timestamp corrections
 1e262da docs: close T-020 - the spellbook routing lands
 3cd8812 hunt: the spellbook resolution falls back to the dion catalog (T-020)
 e9b9640 backlog: register + claim T-020 the spellbook catalog resolution
@@ -68,9 +48,4 @@ d5ec49b acceptance: the class transfer scenario - the M2 accept stage (T-016)
 9adb904 docs: close T-009 - the dion band zone registry ships
 7ac28d9 hunt: the 20-25 band zone registry of the dion grounds (T-009)
 1b0c23c backlog: claim T-016 the class transfer acceptance scenario (in_progress)
-e20f490 backlog: claim T-016 the class transfer acceptance scenario
-3904b9f docs: close T-017 the multi-town gear catalog selection (done)
-7b9f920 hunt: the multi-town gear catalog selection (T-017)
-3be542f backlog: claim T-009 the 20-25 zone registry generation
-5f50f65 docs: close T-015 - the quest chains are data
 ```

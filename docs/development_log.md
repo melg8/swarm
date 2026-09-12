@@ -5281,3 +5281,35 @@ measured run: found, 10.6 s, green. The elven -> Gludio leg (1.25M
 nodes, 25 percent above the shipped cap) stays the documentation
 fact - the cap-as-a-parameter roadmap item owns it. The pathfind
 town route suite green (75 s), lint --new clean.
+
+## Round 77: the self-organization system retirement (2026-09-12)
+
+Problem: the owner judged the claim/lease self-organization loop
+unsuccessful - the task queue as the coordination mechanism
+underperformed in practice - and asked for its full removal; a
+replacement approach will be designed separately.
+
+Root cause: a coordination-process decision by the owner, not a code
+defect. The queue protocol (claim by commit, 4h lease, resume notes)
+was the mechanism the agents were told to organize around; it is
+retired as a whole and no replacement is invented in this round.
+
+Fix (docs only):
+
+- docs/agent_selforganization.md and docs/BACKLOG.md deleted.
+- AGENTS.md, docs/ROADMAP.md, tools/progress_report.sh, runs/README.md,
+  docs/quest_protocol.md, docs/band_20_25_survey.md cleaned of the
+  live references; the PROGRESS.md page regenerated without the queue
+  section (the milestone ladder, the metrics trail and the commit
+  feed remain).
+- The in-flight T-016 hand-off plan (the M2 acceptance) preserved in
+  docs/agent_progress.md; the historical journal entries stay
+  append-only.
+
+Verification: docs-only round - no Go files touched, `bash -n
+tools/progress_report.sh` clean, `bash tools/progress_report.sh`
+regenerated the page (the ladder M0-M6 matches docs/ROADMAP.md, no
+queue section), `rg -i 'agent_selforganization|docs/BACKLOG' AGENTS.md
+docs/ROADMAP.md tools/progress_report.sh runs/README.md
+docs/quest_protocol.md docs/band_20_25_survey.md PROGRESS.md` returns
+nothing (the append-only journals excluded on purpose).
