@@ -79,7 +79,7 @@ resume: claim just pushed; next: design the soak scenario, the
 
 ### T-002: the stagnation watch
 
-status: todo
+status: in_progress
 milestone: M1
 priority: P1
 deps: -
@@ -91,6 +91,11 @@ named and unit tested). The events surface in the web UI event feed
 and in the bot log with the current phase, so a silent livelock
 becomes a loud line. Cover with unit tests (the clock seam of the
 loop tests) and a live note in the dev log.
+
+claimed: zai-agent 2026-09-12 07:36 UTC
+resume: claimed fresh, no code yet - the acceptance claim of T-001
+was lost to soak-z fairly (their push landed first), taking T-002;
+the hunt loop structure study is next
 
 ### T-003: the level milestone scenario
 

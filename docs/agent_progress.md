@@ -2105,3 +2105,46 @@ later replace it with the tracker event source.
   active task entry started. Environment already deployed
   (STACK_READY, 75 tables, dev tools installed). Reading the
   acceptance package shape next.
+
+## Active task: T-002 the stagnation watch
+
+Started: 2026-09-12 07:36 UTC. Branch: `feature/proxy-server`.
+Agent: zai-agent. Commits as melg8. Other agents may push to the
+same branch concurrently - rebase before every push (the T-001
+claim of this session lost to soak-z at 07:27Z, the queue rule
+picked the next todo task).
+
+### Goal
+
+The M1 soak proof requires that a silent livelock becomes a loud
+line: the hunt loop logs explicit events when the character gains
+no XP for M minutes or holds the same position for K minutes. The
+events surface in the web UI event feed (tracker event log) and in
+the bot log with the current phase, so a freeze like the round 58
+stuck cell (a character standing on one cell for over an hour) is
+visible without a state dump.
+
+### Constraints
+
+- Scope: internal/swarm/hunt/, internal/swarm/state/, docs/ only.
+  The acceptance package belongs to soak-z (T-001, in flight).
+- Both thresholds are named constants, unit tested through the
+  clock seam of the loop tests; no real wall clock timing in tests.
+- The watch never blocks the hunt loop: it observes the tracker
+  state the loop already reads and logs.
+- The event lines carry the phase (tracker.Phase style) so the log
+  explains what the loop was doing while frozen.
+
+### Acceptance
+
+- Unit tests: xp stagnation fires once per window and re-arms, the
+  position freeze fires on a held cell, both stay silent while the
+  values move, offline sessions pause the timers.
+- go build, gofmt, the hunt and state package tests, golangci-lint
+  run --new all green.
+- A live note in docs/development_log.md (the round entry) - a full
+  live acceptance belongs to T-001/T-003 scenarios.
+
+### Progress
+
+- 07:36 UTC: T-002 claimed in docs/BACKLOG.md.
