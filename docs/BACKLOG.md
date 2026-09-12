@@ -586,7 +586,7 @@ the band wiring gated on M1 green).
 
 ### T-021: the Gludio-Dion walking corridor regression test
 
-status: in_progress
+status: done
 milestone: M3
 priority: P3
 deps: T-018
@@ -602,8 +602,10 @@ leg (1.25M nodes, above the shipped cap) stays a documentation
 fact: the cap-as-a-parameter roadmap item owns it.
 
 claimed: zones-zai 2026-09-12 10:10 UTC
-resume: fresh claim. Next: the test next to TestFindPathToShopDeck,
-  run, push, close.
+resume: done 10:14 UTC - TestFindPathGludioToDionCorridor pins the
+  T-018 route on the real pack (found, un-aborted at the shipped
+  cap, the span and the arrival asserted). The elven -> Gludio leg
+  stays documented above the cap until the roadmap cap item lands.
 
 claimed: zones-zai 2026-09-12 10:03 UTC
 resume: done 10:07 UTC - the bookPurchase two-catalog fallback (the

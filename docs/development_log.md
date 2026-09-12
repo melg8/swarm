@@ -5264,3 +5264,20 @@ golangci-lint run --new clean (0 issues). The production walk legs
 (the village -> Dion book trip of a band character) ride the band
 wiring gated on M1 green; the M2/M3 acceptance drives the stops
 directly.
+
+## Round 76: the Gludio-Dion corridor regression test (T-021, 2026-09-12)
+
+The T-018 finding existed only as documentation: the walking
+corridor Gludio -> Dion (42 831 units, within the shipped expansion
+cap) had no committed guard - a geodata refresh or a search
+regression could break the band trip connectivity silently.
+
+The regression pin (internal/swarm/pathfind/town_route_test.go):
+TestFindPathGludioToDionCorridor runs the real-pack town route
+(the townTestEngine harness of the shop deck tests) - the route must
+be found, un-aborted (the corridor sits within the shipped 1M cap),
+longer than the two-town span and ending at the Dion square. The
+measured run: found, 10.6 s, green. The elven -> Gludio leg (1.25M
+nodes, 25 percent above the shipped cap) stays the documentation
+fact - the cap-as-a-parameter roadmap item owns it. The pathfind
+town route suite green (75 s), lint --new clean.

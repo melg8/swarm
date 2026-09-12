@@ -3070,3 +3070,12 @@ the last row - the M2 gate stays the SelfClassID flip).
   merchantByTemplate widening to the Dion stations + 3 unit tests.
   Full hunt suite green (98 s), lint --new clean. Status: done -
   in-scope. The production walk legs are the band wiring (M1 gate).
+
+### Progress (T-021)
+
+- 10:10 UTC: registered + claimed (the committed guard of the
+  T-018 finding).
+- 10:14 UTC: landed and pushed - the corridor regression test on
+  the real geodata pack (found, un-aborted, the length and the
+  arrival pinned). The pathfind suite green, lint --new clean.
+  Status: done.
