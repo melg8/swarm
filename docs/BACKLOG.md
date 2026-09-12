@@ -368,3 +368,33 @@ resume: done 08:27 UTC - state/dialog.go with the page store, the
   Player.validateHtmlAction (exact or the trimmed '$' prefix).
   The 0x1B dispatcher case that feeds ApplyDialog stays with
   T-008 (connection/ is their scope).
+
+### T-014: the quest dialog walker engine
+
+status: in_progress
+milestone: M2
+priority: P2
+deps: T-011, T-012, T-013
+scope: internal/swarm/hunt/ (new files only), docs/
+
+Follow-up 4's engine half of docs/quest_protocol.md: the generic
+dialog walker the quest brain runs on - the two-click talk entry
+(the NpcClick semantics: the first Action click selects the npc,
+the second opens the html page; every click refreshes the
+last-folk memory), the bounded wait for a NEW page from the npc
+(content change detection - the connection layer stores only the
+last html, and the quest pages all arrive from the same npc), the
+hunt-side feed of the tracker dialog section (ApplyDialog from
+ParseHTMLLinks - the wiring T-013 left to the consumer) and the
+link-by-text bypass walk (IsDialogCommand validation before every
+SendBypass, per-page bounded waits). Unit tests pin the walker on
+the real Q00406/ElfHumanFighterChange1 page goldens through the
+fakeGame stub; a live round trip against a village npc of the
+deployed stack (click -> html -> link -> bypass -> next html)
+closes the round.
+
+claimed: quest-walker-e3f8 2026-09-12 08:45 UTC
+resume: fresh claim - the walker composes the landed seams
+  (GameAPI.SendBypass/LastHTMLDialog, state ApplyDialog/
+  IsDialogCommand, ParseHTMLLinks); no loop.go wiring (the quest
+  phase integration is the M2 acceptance round's work).

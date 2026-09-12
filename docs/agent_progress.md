@@ -2677,3 +2677,29 @@ For the next agent:
   unit tests next to them; the live facts (the world entry push,
   the 813 byte merchant pages, the 2.5 s kill delay) live in
   docs/quest_protocol.md.
+
+## Active task: T-014 the quest dialog walker engine
+
+Started: 2026-09-12 08:45 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. Agent label: quest-walker-e3f8.
+
+Goal: the generic dialog walker the M2 quest brain runs on (the
+follow-up 4 engine half of docs/quest_protocol.md): the two-click
+talk entry, the new-page wait with content change detection, the
+hunt-side feed of the tracker dialog section and the link-by-text
+bypass walk with IsDialogCommand validation.
+
+Constraints: new files only in internal/swarm/hunt/ (T-008 owns
+the live edits of loop.go and the gatekeeper files); the loop
+phase wiring is NOT this task (the M2 acceptance round composes
+it); no behavior change of the running bot until the wiring.
+
+Acceptance: unit tests on the real Q00406 and class master page
+goldens (the fakeGame stub) green, golangci-lint run --new clean,
+a live round trip against a village npc of the deployed stack
+(click -> html -> link -> bypass -> next html) recorded in the dev
+log, docs/quest_protocol.md follow-up list updated.
+
+### Progress
+
+- 08:45 UTC: claimed (BACKLOG T-014 in_progress + this entry).
