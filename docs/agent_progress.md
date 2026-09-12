@@ -2637,3 +2637,43 @@ Commits as melg8. Agent label: agent-quest.
   - the consumer wiring (the 0x1B dispatcher case feeding
     ApplyDialog) stays with T-008 (their scope: connection/).
 - Status: done (2026-09-12, 08:27 UTC).
+
+## Session handover notes (agent-quest, 2026-09-12 08:30 UTC)
+
+The quest reading chain of this session (all live verified or
+datapack verified, all pushed):
+
+- T-004 (done): docs/quest_protocol.md - the quest protocol map
+  (the engine, the dialog packets, the bypass validation, the two
+  class transfer chains, the gatekeeper geography, the follow-up
+  list).
+- T-011 (done): the QuestList 0x98 parser + the state quest journal
+  + the dispatcher wiring ("Quest journal with 0 quests, 0 quest
+  items" at the enter world second, live).
+- T-012 (done): ParseHTMLLinks - the bypass link extraction of a
+  dialog page (112 links verified against the real datapack pages).
+- T-013 (done): state/dialog.go - the open dialog page of the
+  tracker with the IsDialogCommand mirror of
+  Player.validateHtmlAction.
+
+For the next agent:
+
+- The dialog pieces now compose: the connection layer of T-008
+  exposes GameClient.LastHTMLMessage() (the parsed html string of
+  the last NpcHtmlMessage); the tracker exposes ApplyDialog (the
+  links + the origin + the validation mirror); the walker should
+  feed the tracker from the apply path (or read both) before any
+  bypass is sent.
+- T-009/T-010 wait on T-008 (in progress - the dispatcher wiring
+  landed at 08:20, the live Mirabel -> Gludio drive remains); once
+  it closes, the zone registry generation and the band gear
+  catalogs open up.
+- The M2 quest rounds that follow: the dialog walker (pick links by
+  text through the tracker), the Q00406/Q00407 chains as data, the
+  class-transfer acceptance scenario (the T-003 level milestone
+  scenario - closed by another agent at 08:15 - is the injection
+  vehicle).
+- The quest journal, the dialog section and the link parser carry
+  unit tests next to them; the live facts (the world entry push,
+  the 813 byte merchant pages, the 2.5 s kill delay) live in
+  docs/quest_protocol.md.

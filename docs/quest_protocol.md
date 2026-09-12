@@ -469,8 +469,13 @@ decomposes into:
    visible texts, the server side scan mirrored) landed as
    `html_links.go` (T-012, verified against every real page of the
    Q00406 script, the class master pages and the teleporter page -
-   112 links). The remaining half is the state tracker "open
-   dialog" section (the current page, its links, its origin npc).
+   112 links), and the state tracker "open dialog" section landed
+   as `state/dialog.go` (T-013: the page store with the origin npc
+   and the links, the IsDialogCommand mirror of the server
+   validation). The connection half of T-008 stores the last html
+   as `GameClient.LastHTMLMessage()` - the integration (feeding
+   ApplyDialog from the 0x1B apply path, or the walker reading
+   both) is the next quest round's first move.
 2. **Parse the quest journal** (from_game_server): `QuestList`
    (0x98) - the active quest ids with their cond, the quest item
    list; the tracker quest section; arrives free at world entry
