@@ -5091,3 +5091,51 @@ registry, the spot mode stands down, the region feeds the catalog
 selection). Build green, the full hunt suite green (97 s),
 golangci-lint run --new clean (0 issues), the elven regeneration
 byte-identical.
+
+## Round 72: the class transfer accept stage - the M2 vehicle drives its first leg live (T-016, 2026-09-12)
+
+Problem: the M2 acceptance needs its vehicle - a scenario that
+injects the level 19 elven fighter at Gludio and drives the quest
+chain - but the acceptance package had no quest scenario and no
+way to drive the dialog walker from a scenario (the sessions of
+the manager encapsulate the game client, the scenarios only
+observe the tracker).
+
+Root cause: the quest pieces (the walker of T-014, the chain data
+of T-015) landed without their acceptance composition; the T-003
+injection machinery and the session patterns existed but never
+carried a dialog walk.
+
+Fix (T-016, the staged build): acceptance/class_transfer.go - the
+class-transfer scenario (temp9, the level 19 injection with the
+milestone wallet shape standing on Sorius's approach ring at
+Gludio, 150 units off his trainer hall cell), the manual session
+seam (startClassTransferSession exposes the game client for the
+walker drive - no hunt autonomy, the elven zone machinery would
+drag the character home), the Sorius find through the world store,
+the composed accept route (QuestEntryLinks + the chain accept) and
+the journal flip gate (awaitQuestCond on the tracker QuestCond).
+The staged pass line: Q00406 cond 1 within the budget.
+
+Verification: live run PASSED (the 3-link accept walk, the journal
+"0 quests -> 1 quests" flip at the accept bypass, 7 s); the hunt
+and acceptance package tests green, golangci-lint --new clean,
+tools/mobius_e2e.sh 45 prints E2E_OK; the metrics trail carries
+the FAIL discovery row and the PASS row.
+
+Two server facts the live iterations pinned (the first run FAILED
+twice before passing - the honest record):
+- The first talk of a quest npc without an ON_NPC_FIRST_TALK
+  listener opens the npc's STATIC page (Sorius: his trainer html
+  with the Learn skills and Quest links), NOT the quest page; the
+  quest page of the current cond rides the bare `bypass Script`
+  command - ScriptLink.showQuestWindow resolves the single quest
+  of the station straight through Quest.notifyTalk (the choose
+  window link list only appears for npcs offering several quests).
+  The chain data gained QuestEntryLinks (the one-link prefix).
+- The bypass flood protector (FloodProtectorServerBypassInterval
+  = 3 of the deployed FloodProtector.ini) silently drops a bypass
+  riding the previous one - the second page link of the accept
+  walk vanished until the walker learned to pace its sends
+  (dialogBypassPace, 3.2 s). The player action protector runs at
+  1 s (the talk clicks were always fine).

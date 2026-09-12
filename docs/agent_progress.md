@@ -3007,3 +3007,29 @@ the last row - the M2 gate stays the SelfClassID flip).
   first sprout), the spot-registry migration of the band (the elven
   precedent - generate_hunt_spots.py - when the hunt loop moves off
   the square zones).
+
+### Progress (T-016)
+
+- 09:52 UTC: claimed (the staged build: the accept leg first).
+- 10:30 UTC: the accept stage landed and PASSED live:
+  - acceptance/class_transfer.go: the scenario (temp9, the level 19
+    injection at Sorius's approach ring, the manual session seam
+    exposing the game client, the Sorius find, the composed accept
+    route, the journal flip gate, the metrics rows);
+  - the registrations (the Definitions entry, the temp9 account of
+    the manager test);
+  - hunt/quest_chains.go: QuestEntryLinks (the live-corrected
+    entry prefix - the static page Quest link resolves the single
+    quest straight to its page);
+  - hunt/quest_walker.go: dialogBypassPace (the 3 s bypass flood
+    protector of the deployed stack - the second live discovery);
+  - live: acceptance PASS ("Quest journal with 1 quests" at the
+    accept bypass), e2e E2E_OK, the metrics trail has the FAIL
+    discovery row and the PASS row.
+- Status: in_progress - the accept stage done, the remaining legs:
+  the kill stages (the quest trip phase of the hunt loop: the
+  combat at the Ruins of Agony/Ol Mahum camps on the chain kill
+  data, the stage loop through QuestStageByCond), the Kluto leg,
+  the Rains class change and the SelfClassID + relogin gate. The
+  gatekeeper hops (T-008 closed) join when the scenario moves its
+  start to the elven village.
