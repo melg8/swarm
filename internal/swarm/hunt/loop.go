@@ -944,7 +944,13 @@ func (l *Loop) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			started := time.Now()
 			l.tick()
+			// The tick duration feeds the statistics view
+			// of the web UI: the loop cadence health of a
+			// loaded process (NoteHuntTick averages and
+			// bounds the window max, see state metrics).
+			l.tracker.NoteHuntTick(time.Since(started))
 		}
 	}
 }

@@ -479,6 +479,11 @@ type Bot struct {
 	// honors after an emergency logout. The tracker outlives the
 	// sessions, so the cooldown spans them (see SetLoginCooldown).
 	loginCooldownUntil time.Time
+	// metrics holds the lifetime statistics counters of the tracker
+	// (see metrics.go): the kills, deaths, sessions, swings and
+	// damage of the whole deployment history of the bot, surviving
+	// the session resets like every other lifetime field.
+	metrics botMetrics
 }
 
 // NewBot creates a bot tracker for the given session id (account name).
@@ -531,6 +536,7 @@ func NewBot(id string) *Bot {
 		bookKeepLevel:      0,
 		buffs:              nil,
 		buffsAt:            time.Time{},
+		metrics:            newBotMetrics(),
 	}
 }
 
@@ -1146,6 +1152,7 @@ func (b *Bot) ResetSession() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.drainCommands()
+	b.metrics.sessions++
 	b.sessionAt = time.Now()
 	b.selfID = 0
 	b.char = newCharacterState()
@@ -1569,6 +1576,7 @@ func (b *Bot) ApplyAttack(a Attack) {
 		b.touch()
 	}
 	b.recordSwingEventsLocked(a, now)
+	b.noteSwingsLocked(a)
 	for i := range a.TargetCount {
 		if a.TargetIDs[i] == b.selfID {
 			b.char.X = a.TargetX
@@ -1781,9 +1789,17 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
 	defer b.mu.Unlock()
 	now := time.Now()
 	if objectID == b.charObjectID() {
+		wasDead := b.char.MaxHP > 0 && b.char.CurHP <= 0
 		b.recordCharDamageLocked(attrs, now)
 		for _, attr := range attrs {
 			b.applyCharAttr(attr)
+		}
+		if !wasDead && b.char.MaxHP > 0 && b.char.CurHP <= 0 {
+			// The alive to dead transition of the played
+			// character: exactly one death per demise, the
+			// village restart that follows revives without
+			// counting (see metrics.go).
+			b.noteDeathLocked(now)
 		}
 		b.touch()
 
@@ -1793,6 +1809,7 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
 	if obj == nil {
 		return
 	}
+	wasDead := obj.Dead
 	b.recordObjectDamageLocked(obj, cold, objectID, attrs, now)
 	for _, attr := range attrs {
 		switch attr.ID {
@@ -1807,7 +1824,10 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
 			cold.MaxMP = float64(attr.Value)
 		}
 	}
-	cold.UpdatedAt = time.Now().UnixNano()
+	cold.UpdatedAt = now.UnixNano()
+	if obj.Dead && !wasDead {
+		b.noteKillLocked(objectID, now)
+	}
 	if obj.Dead && b.char.TargetID == objectID {
 		// A killed target is no target anymore: the server keeps
 		// the corpse selected, the tracker drops it so the HUD

@@ -101,6 +101,8 @@ func (b *Bot) recordCharDamageLocked(attrs []Attribute, now time.Time) {
 		if attr.ID != AttrCurHP || float64(attr.Value) >= b.char.CurHP {
 			continue
 		}
+		amount := b.char.CurHP - float64(attr.Value)
+		b.noteDamageTakenLocked(amount)
 		b.recordCombatEventLocked(CombatEvent{
 			Kind:       CombatEventDamage,
 			TargetID:   b.selfID,
