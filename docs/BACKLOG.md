@@ -57,7 +57,7 @@ resume: <where the previous agent stopped, what is next>
 
 ### T-001: the soak metrics trail
 
-status: in_progress
+status: done
 milestone: M1
 priority: P1
 deps: -
@@ -72,10 +72,16 @@ stagnation watch of T-008 in the pass criteria. Ship a tiny
 tail, the BACKLOG statuses and `git log --oneline -20`.
 
 claimed: soak-z 2026-09-12 07:27Z
-resume: claim just pushed; next: design the soak scenario, the
-  metrics writer, the stagnation guard and the progress report, then
-  implement in the acceptance package, wire the CLI flag and verify
-  with a smoke run.
+resume: done 2026-09-12 07:45Z. The soak scenario (temp7, the
+  supervised hunt loop, SWARM_SOAK_MINUTES env, default 10), the
+  stagnation guard (no XP for 10m / no move for 5m, an
+  acceptance-package tracker read with the now seam), the
+  runs/metrics.jsonl writer (O_APPEND, one JSON line, the local C1
+  XP table for the hourly rate) and tools/progress_report.sh ship
+  together. Unit tests green, lint:new clean, the live 2m smoke run
+  PASSED (temp7 1->2, 9984 XP/h, 0 deaths, 0 stuck, 28 adena). The
+  8h M1 proof is the follow-up: SWARM_SOAK_MINUTES=480 then commit
+  the PASS row + PROGRESS.md to close M1.
 
 ### T-002: the stagnation watch
 

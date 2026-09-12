@@ -1,6 +1,6 @@
 # PROGRESS
 
-Generated: 2026-09-12 07:45:39Z
+Generated: 2026-09-12 07:47:18Z
 
 ## Milestone
 
@@ -16,7 +16,7 @@ Generated: 2026-09-12 07:45:39Z
 
 | Task | Status | Milestone | Priority |
 | --- | --- | --- | --- |
-| T-001 | in_progress | M1 | P1 |
+| T-001 | done | M1 | P1 |
 | T-002 | in_progress | M1 | P1 |
 | T-003 | todo | M1 | P2 |
 | T-004 | in_progress | M2 | P2 |
@@ -27,6 +27,8 @@ Generated: 2026-09-12 07:45:39Z
 ## Recent commits
 
 ```
+e1db40e tools: the progress report renderer and the runs directory
+8f816b6 hunt: the stagnation watch logs the xp and position livelocks
 8dddd90 acceptance: the soak scenario, the metrics trail and the stagnation guard
 88a07bd backlog: the T-006 status claim (the previous commit missed the file)
 e62205f backlog: claim T-006 the 20-25 band survey
@@ -45,6 +47,4 @@ fc06bc2 hunt: the delevel trigger requires the static spot median agreement
 598d136 hunt: the teach legs walk the close ring right up to the training npc
 cbb065b hunt: the frozen town leg escalation ladder - the corridor ban and the direct server routed walk
 74f3eac pathfind: the avoid areas of the approach search - the frozen corridor ban
-c0df26b docs: the round 60 gear debt
-9f225b2 acceptance: the gear gap scenario replays the pantsless dump and buys the legs armor back
 ```

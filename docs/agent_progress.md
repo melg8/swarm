@@ -2105,6 +2105,38 @@ later replace it with the tracker event source.
   active task entry started. Environment already deployed
   (STACK_READY, 75 tables, dev tools installed). Reading the
   acceptance package shape next.
+- 2026-09-12 07:34Z: the soak scenario, the stagnation guard, the
+  metrics writer and the death/stuck helpers land in
+  internal/swarm/acceptance/ (soak.go, soak_guard.go,
+  soak_metrics.go, soak_helpers.go); the scenario is registered in
+  scenarios.go (the temp7 account, the duration-aware timeout), the
+  CLI flag help updated. Unit tests (soak_test.go) cover the guard
+  fires (no XP, no move), the healthy never-fire, the startup grace,
+  the metrics JSON, the append atomicity, the XP math, the death
+  edge tracker, the duration env, the cumulative XP table.
+  `golangci-lint run --new` clean (0 issues) after the funlen split,
+  the exhaustruct full literals, the goconst constants and the
+  nlreturn blank lines.
+- 2026-09-12 07:43Z: tools/progress_report.sh renders PROGRESS.md
+  from the metrics tail, the BACKLOG statuses and the last 20
+  commits; runs/README documents the JSONL schema.
+- 2026-09-12 07:45Z: live smoke run PASSED. SWARM_SOAK_MINUTES=2
+  against the deployed stack: temp7 farmed level 1 to 2 in 120 s
+  (9984 XP/h, 0 deaths, 0 stuck events, 28 adena), the bot left the
+  world gracefully, runs/metrics.jsonl received the PASS row. The
+  8-hour M1 proof is a follow-up operator run (the machinery is
+  duration-agnostic).
+
+### Status: done (2026-09-12)
+
+T-001 complete: the soak scenario, the runs/metrics.jsonl trail, the
+stagnation guard and the progress report ship together. The unit
+tests are green, lint:new is clean, the live smoke run produced a
+PASS metrics row. The 8-hour M1 acceptance run is the next step
+(SWARM_SOAK_MINUTES=480), owned by whoever triggers the milestone
+closure. The stagnation guard is an acceptance-package read today;
+T-002 (the stagnation watch) can later move the events into the hunt
+loop and the soak scenario can consume them.
 
 ## Active task: T-002 the stagnation watch
 

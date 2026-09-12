@@ -4374,3 +4374,70 @@ source reading; no behavior changed so no e2e run was required. The
 follow-up the convention itself demands: the next pathfind change
 adds the H-001 reference to the waterCostMultiplier comment (outside
 the docs scope of this round, noted in the BACKLOG resume notes).
+
+## Round 63: the soak metrics trail - the M1 acceptance vehicle (2026-09-12)
+
+The self-organization round named the M1 acceptance ("a fresh account
+runs -hunt for 8 hours, runs/metrics.jsonl receives one row per run,
+the stagnation watch fails the livelock") but the vehicle did not
+exist: no scenario drove a long supervised farm run, no metrics
+trail recorded the outcome, and a silent livelock (no XP, no move)
+had no acceptance-level gate. The soak scenario, the metrics writer
+and the stagnation guard close that gap (T-001, scope:
+internal/swarm/acceptance/, cmd/swarm/, tools/, docs/).
+
+- The `soak` acceptance scenario (internal/swarm/acceptance/soak.go):
+  a fresh level 1 elven fighter temp7 enters the world under the
+  supervised hunt loop (the same runSessionSupervised the 24/7 fleet
+  supervisor uses, so a lost session reconnects with the growing
+  backoff) and farms the elven lands for SWARM_SOAK_MINUTES (default
+  the 10 minute smoke; the real M1 proof sets 480). The check list
+  (entered the world, stayed online the window, never stagnated, shut
+  down gracefully) drives the pass verdict; the scenario splits into
+  soakSetup (the ensure, the session launch, the world wait, the
+  start-state capture), soakMonitor (the guard + check loop) and
+  soakAwaitOutcome (the session teardown + the metrics write) so the
+  funlen gate holds.
+- The stagnation guard (soak_guard.go): a tracker-public-API read of
+  the cumulative experience (level plus the within-level exp, through
+  a local copy of the C1 experience table) and the floored position.
+  The guard fires when the experience holds for M minutes
+  (stagnationNoXpMinutes = 10) or the position holds for K minutes
+  (stagnationNoMoveMinutes = 5), after a 90 s startup grace (the
+  world entry settles before the thresholds count). The now seam
+  (a func() time.Time) lets the unit tests drive the clock; the
+  production path uses time.Now. The guard is single-goroutine (the
+  soak monitor owns it), so it never races the tracker lock. The
+  scope stays inside the acceptance package on purpose: T-002 (the
+  stagnation watch) will later surface the same events from the hunt
+  loop and the soak scenario can consume them.
+- The metrics trail (soak_metrics.go): one JSON line per run, the
+  fields the M1 contract names (date, scenario, durationSec,
+  startLevel, endLevel, xpPerHour, deaths, adena, stuckEvents,
+  status, failReason). The writer opens runs/metrics.jsonl with
+  O_APPEND and writes one marshalled row, so parallel runs never
+  interleave. The XP rate is the cumulative-experience delta over the
+  duration hours; the cumulative XP uses a local copy of the C1
+  experience table (byte identical with
+  internal/swarm/state/experience.go) so the acceptance package never
+  crosses into state (T-002 and T-003 territory). The deaths are the
+  alive->dead rising edges the deathEdgeTracker counts off
+  SelfDead(); the stuck events are the hunt loop re-path count delta
+  (each re-path is a stuck-and-replanned leg, read off the snapshot
+  diagnostics).
+- The progress report (tools/progress_report.sh): renders PROGRESS.md
+  from the metrics tail, the BACKLOG task statuses and the last 20
+  commits. The M1 milestone line colors green on the last soak PASS,
+  red on FAIL, pending otherwise. runs/README documents the schema.
+
+Verification: the unit tests cover the guard (the no-XP fire, the
+no-move fire, the healthy never-fire, the startup-grace hold), the
+metrics writer (the atomic single-line append, the JSON field
+names), the XP math, the death edge tracker, the duration env and
+the cumulative XP table - `go test ./internal/swarm/acceptance/`
+green, `golangci-lint run --new` clean (0 issues). The live smoke run
+(SWARM_SOAK_MINUTES=2 against the deployed stack) PASSED: temp7
+farmed level 1 to 2 in 120 s (9984 XP/h, 0 deaths, 0 stuck events, 28
+adena), the bot left the world gracefully, and runs/metrics.jsonl
+received the PASS row. The 8-hour M1 proof is a follow-up operator
+run (the machinery is duration-agnostic).
