@@ -315,7 +315,54 @@ to the merchant and selects it like the official client.
 
 The `TransactionFloodProtector` paces the requests (10 s by default).
 
+### RequestBypassToServer (0x21)
+
+Routes a html dialog bypass command to the server (the gatekeeper
+teleport flow, the H-002 verification). The client sends the bypass
+string the NpcHtmlMessage button carried; the server runs the
+matching `BypassHandler` or, for `npc_<objId>_<action>` commands, the
+npc `onBypassFeedback`. The bot shapes the gatekeeper flow uses:
+
+- `npc_<objId>_Chat` opens the next html page of the teleporter.
+- `npc_<objId>_teleport <list> <index>` pays the fee and teleports to
+  the destination of the teleporter list (the `Teleporter.
+  onBypassFeedback` "teleport" branch).
+
+Reference: [RequestBypassToServer.java](https://gitlab.com/MobiusDevelopment/L2J_Mobius/-/blob/master/L2J_Mobius_C1_HarbingersOfWar/java/org/l2jmobius/gameserver/network/clientpackets/RequestBypassToServer.java)
+(readImpl reads the single string; the `npc_` branch calls
+`object.asNpc().onBypassFeedback`).
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x21 |
+| 1 | str | Command (null-terminated UTF-16LE) |
+
+The server validates the bypass origin (the player must be within
+`Npc.INTERACTION_DISTANCE` of the npc the html came from) and paces
+the requests with the `canUseServerBypass` flood protector.
+
 ## Game server -> client packets
+
+### NpcHtmlMessage (0x1B)
+
+The server html dialog a gatekeeper (or any npc) sends in response to
+a talk or a bypass. The bot reads the html body to find the bypass
+buttons of the teleport list (the `npc_<objId>_teleport <list>
+<index>` links), then answers with `RequestBypassToServer` carrying
+the chosen command.
+
+Reference: [NpcHtmlMessage.java](https://gitlab.com/MobiusDevelopment/L2J_Mobius/-/blob/master/L2J_Mobius_C1_HarbingersOfWar/java/org/l2jmobius/gameserver/network/serverpackets/NpcHtmlMessage.java)
+(writeImpl writes the npc object id, the html string, the item id).
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x1B |
+| 1 | 4 | Npc object id |
+| 5 | str | Html body (null-terminated UTF-16LE) |
+| tail | 4 | Item id (0 for the npc html scope, non-zero for the item html scope) |
+
+The item id selects the `HtmlActionScope` (npc html vs npc item html)
+the bypass validation tracks; a gatekeeper dialog always carries 0.
 
 ### ChangeWaitType (0x3F)
 
