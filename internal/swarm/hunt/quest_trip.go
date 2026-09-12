@@ -94,10 +94,6 @@ var questRestTimeout = 3 * time.Minute
 // Lesser Healing Potion of the classic item table).
 const questPotionItemID = 1060
 
-// questPotionHealHP is the health a healing potion restores (the
-// Lesser Healing Potion of the C1 item table).
-const questPotionHealHP = 120
-
 // questEquipConfirmWait bounds the wait for the inventory mutation
 // after one equip request of EquipBaggedGear.
 const questEquipConfirmWait = 5 * time.Second
@@ -205,6 +201,13 @@ func (l *Loop) walkToQuestPoint(
 func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
+		// The aggressive transit mobs grind the walking character
+		// down: keep the health buffer full on the way.
+		if l.tracker.SelfHealthPercent() < questWalkPotionHP {
+			if err := l.drinkHealingPotionAt(questWalkPotionHP); err != nil {
+				return err
+			}
+		}
 		selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
 		if !ok {
 			return errors.New("no self position for the route walk")
@@ -736,11 +739,26 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
 	return nil
 }
 
+// questWalkPotionHP is the health share the route walk drinks at:
+// the aggressive mobs along the approach legs (the Ruins of Agony
+// clans assist each other) grind a passing character down, so the
+// walk keeps the health buffer full instead of arriving half dead
+// (the first live runs reached the kill ground at 26 percent and
+// died in seconds).
+const questWalkPotionHP = 60.0
+
 // drinkHealingPotion restores the health mid fight: the Lesser
 // Healing Potion of the inventory (when one is left) or the no-op
 // for a healthy character.
 func (l *Loop) drinkHealingPotion() error {
-	if l.tracker.SelfHealthPercent() >= questRestSitHP {
+	return l.drinkHealingPotionAt(questRestSitHP)
+}
+
+// drinkHealingPotionAt drinks the first healing potion of the bag
+// when the health sits below the threshold (a no-op above it or
+// with the bag empty of potions).
+func (l *Loop) drinkHealingPotionAt(threshold float64) error {
+	if l.tracker.SelfHealthPercent() >= threshold {
 		return nil
 	}
 	for _, item := range l.tracker.InventoryItems() {

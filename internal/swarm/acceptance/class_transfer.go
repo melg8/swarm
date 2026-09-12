@@ -101,7 +101,7 @@ var classTransferItems = []ResetItem{
 	{ItemID: 876, Count: 2},   // Ring of Anguish
 	{ItemID: 873, Count: 2},   // Earring of Aid
 	{ItemID: 907, Count: 1},   // Necklace of Anguish
-	{ItemID: 1060, Count: 20}, // Lesser Healing Potion
+	{ItemID: 1060, Count: 30}, // Lesser Healing Potion
 }
 
 // classTransferReset builds the start state of the class transfer
