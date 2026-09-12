@@ -9,6 +9,7 @@ import (
 
 	fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
 	togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
+	"github.com/melg8/swarm/internal/swarm/state"
 )
 
 // applyNpcHTMLMessage parses the server html dialog packet and stores
@@ -31,7 +32,35 @@ func (gc *GameClient) applyNpcHTMLMessage(payload []byte) {
 		gc.tracker.RecordEvent(fmt.Sprintf(
 			"npc html from %d: %d bytes",
 			gc.npcHTML.NpcObjID, len(gc.npcHTML.HTML)))
+		gc.tracker.ApplyDialog(state.DialogPageView{
+			NpcObjID: gc.npcHTML.NpcObjID,
+			ItemID:   gc.npcHTML.ItemID,
+			Links:    gc.dialogLinks(),
+		})
 	}
+}
+
+// dialogLinks extracts the bypass links of the current html through
+// the shared ParseHTMLLinks parser (T-012) and maps them to the
+// state.DialogLinkView the open dialog section of the tracker (T-013)
+// stores. The gatekeeper step reads the raw html through LastHTMLDialog
+// for the teleport-specific classification (the list name and the
+// destination index); the tracker path serves the web UI and the M2
+// quest dialog walker.
+func (gc *GameClient) dialogLinks() []state.DialogLinkView {
+	parsed := fromgameserver.ParseHTMLLinks(gc.npcHTML.HTML)
+	if len(parsed) == 0 {
+		return nil
+	}
+	links := make([]state.DialogLinkView, 0, len(parsed))
+	for i := range parsed {
+		links = append(links, state.DialogLinkView{
+			Command: parsed[i].Command,
+			Text:    parsed[i].Text,
+		})
+	}
+
+	return links
 }
 
 // LastHTMLMessage returns a copy of the last NpcHTMLMessage the
