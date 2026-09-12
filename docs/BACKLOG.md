@@ -474,29 +474,33 @@ selection packet agreement after a relogin. The gatekeeper legs
 the task that CLOSES M2 (the live acceptance run).
 
 claimed: soak-z 2026-09-12 09:28Z
-resume: claimed (session partial - design only, no code yet). The
-  deps are all done: T-015 ships hunt/quest_chains.go
-  (ElvenKnightChain() + ElvenKnightClassChange() + QuestStageByCond,
-  the npc/kill/stage data pinned to the Java quest scripts), T-003
-  ships acceptance/level_milestone.go (the DB-inject level N +
-  runSessionSupervised + the level-N+1 watch, temp8) and T-008
-  ships the gatekeeper packet chain (Mirabel -> Gludio hop). Next
-  agent: (1) add a hunt-loop quest trip phase (hunt/quest_trip.go,
-  new file) that consumes a QuestChain: walk to the quest npc,
-  ClickObject, drive the dialog walker (the T-014 walker) through
-  the stages by cond, walk to the kill grounds, engage the quest
-  mobs until the item counters fill, return to the npc for the next
-  stage, until the chain cond reaches the class change; (2) add the
-  acceptance scenario acceptance/class_transfer.go (temp9, DB-inject
-  level 19 ELVEN_FIGHTER at Gludio 15671 142994 -2706, run the quest
-  trip phase under runSessionSupervised, pass when SelfClassID ==
-  19 + the char selection packet after relogin); (3) register the
-  scenario in scenarios.go; (4) live-verify with
-  -acceptance class-transfer (CLOSES M2). Scope note: the quest trip
-  phase is the bulk (a new hunt/quest_trip.go wiring the T-014
-  walker + the T-015 data + the engage loop); estimate ~1.5h, too
-  big for the 13 min left of this session. Claimed to hand off the
-  plan, not to block the next agent.
+resume: TWO claims raced (quest-scenario-e3f8 09:52 landed first,
+  the hand-off plan of the second agent is merged below). The
+  ACCEPT stage of quest-scenario-e3f8 PASSED live (2026-09-12
+  10:30 UTC): acceptance/class_transfer.go (temp9, the level 19
+  injection at Sorius's approach ring -13440 122493 -3103, the
+  manual session seam exposing the game client, the composed
+  accept route, the journal flip gate), QuestEntryLinks (the
+  static page entry prefix) and the walker bypass pacing (the 3 s
+  flood protector) are in; the metrics trail has the FAIL
+  discovery row and the PASS row. Next agent (the hand-off plan,
+  updated): (1) the quest trip phase (hunt/quest_trip.go, a new
+  file) that consumes a QuestChain: walk to the quest npc,
+  ClickObject, drive the dialog walker (the T-014 walker, the
+  QuestEntryLinks prefix + the stage links through
+  QuestStageByCond) through the stages by cond, walk to the kill
+  grounds, engage the quest mobs until the item counters fill,
+  return to the npc for the next stage, until the chain cond
+  reaches the class change; (2) extend acceptance/class_transfer.go
+  with the full run (the quest trip phase under the session, the
+  Rains class change leg, pass when SelfClassID == 19 + the char
+  selection packet after a relogin); (3) live-verify with
+  -acceptance class-transfer (CLOSES M2). Two live-pinned server
+  facts the next agent must respect: the bypass flood protector
+  drops unpaced sends (dialogBypassPace handles it inside one
+  conversation - a second DriveDialog call must not ride the tail
+  of the first) and every quest npc talk starts from the STATIC
+  page.
 
 ### T-017: the multi-town gear catalog selection
 
