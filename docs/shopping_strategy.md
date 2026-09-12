@@ -336,6 +336,49 @@ wallet turns into combat stats in ONE plan, where the old planner
 bought the 88 pDef cheap floor and burned 17k adena on the Cat's Eye
 and Ring of Wisdom mDef upgrades.
 
+## The Dion shop section (the 20-25 band)
+
+The M3 band survey (`docs/band_20_25_survey.md`) names the Town of
+Dion the service town of the 20-25 grounds: the bot reaches it through
+the gatekeeper network (Mirabel -> Gludio -> Dion, the T-008 packet
+chain) and shops the D-grade gear the band needs there. The shopping
+strategy reuses the same planner; the only difference is the catalog
+the town trip consults.
+
+- The Dion merchants (`internal/swarm/hunt/town.go::dionMerchants`):
+  Sabrin (7060, weapons), Casey (7061, armor), Sonia (7062, jewels +
+  spellbooks) and Lara (7063, grocery), at the spawn positions of
+  `spawns/Dion/DionNPCs.xml`. The buylist ids (3006000-3006300) are
+  the file names of `dist/game/data/buylists/`; the npcdata generator
+  loaded them into `npcdata.npcBuyLists` (the same map the elven
+  catalog reads).
+- The Dion tax (`internal/swarm/hunt/shopping.go::dionTownTaxRate`):
+  20 percent (the `MerchantPriceConfig.xml` priceConfig id=8 baseTax=20;
+  the castle tax is 0 on the local test server so the total is the
+  base tax). The buy price formula is the same shape as the elven
+  village: `price = baseItemPrice * (1 + taxRate)`, so the D-grade
+  items cost 20 percent over the reference price (vs 15 percent in
+  the elven village).
+- The catalog selection (`internal/swarm/hunt/shopping.go::
+  shopCatalogForRegion`): the hunt loop picks the Dion catalog when
+  the active zone region is Dion (`Loop.SetHuntingZoneRegion("dion")`
+  sets `Loop.zoneRegion`); the elven village catalog stays the
+  default for the 1-19 band (the M0 acceptance still passes). The
+  `gear.DionCatalog` of T-010 is the gear-package view of the same
+  merchants; the hunt package builds its catalog from the npcdata
+  buylists the same way the elven catalog does.
+- The spellbook budget: the elven village teachers (the M0 round) buy
+  their spellbooks at the elven merchants (`internal/swarm/hunt/
+  learning.go::bookPurchase` reads the elven catalog); the Dion
+  teachers (the M2 class transfer round) buy theirs at Sonia (the
+  3006201 mystic spellbook list). The multi-town book purchase is the
+  M2 follow-up (the T-015 quest data and the T-016 acceptance scenario
+  own it).
+
+The sell-first rule, the one town visit, the wallet reservation for
+the spellbooks and the auto equipment all carry over unchanged: the
+strategy is catalog-agnostic, the Dion round only swaps the catalog.
+
 ## Where each piece lives
 
 - `tools/generate_item_stats.sh` - the prices, weights and combat

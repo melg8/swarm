@@ -471,7 +471,7 @@ resume: -
 
 ### T-017: the multi-town gear catalog selection
 
-status: in_progress
+status: done
 milestone: M3
 priority: P3
 deps: T-010
@@ -491,7 +491,11 @@ the Dion shop section. The elven village behavior stays unchanged
 (the M0 acceptance still passes).
 
 claimed: soak-z 2026-09-12 09:17Z
-resume: claim pushed; next: add the Dion merchants to town.go, add
-  a per-town catalog builder keyed by the hunt zone region, keep the
-  elven catalog as the default, unit-test the selection, document
-  the Dion shop in shopping_strategy.md.
+resume: done 2026-09-12 09:40Z. dionMerchants (town.go), dionShopCatalog
+  + shopCatalogForRegion + dionTownTaxRate (shopping.go), regionDion +
+  zoneRegion field + SetHuntingZoneRegion Dion case (zones.go/loop.go),
+  5 unit tests (elven default, Dion selection, tax rates, merchant set,
+  live buylist ids), the shopping_strategy.md Dion shop section. Full
+  hunt suite (97 s) green, golangci-lint --new: 0 issues. The Dion zone
+  registry (T-009, gated on M1 green) and the multi-town spellbook
+  budget (M2 follow-up of T-015/T-016) stay out of scope.

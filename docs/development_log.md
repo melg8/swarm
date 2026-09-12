@@ -4985,3 +4985,45 @@ the research doc claimed - the Mobius npc stats (20053
 name="Ol Mahum Patrol", level 21) and the spawn file comments
 agree; the Bugbear is npc 20133 (display 133) and no quest of this
 chain kills it. docs/quest_protocol.md corrected accordingly.
+
+## Round 66: the multi-town gear catalog selection (T-017, 2026-09-12)
+
+The T-010 follow-up the previous session left: the gear package had
+the Dion catalog (gear.DionCatalog), but the hunt shopping loop still
+consulted the single elven village townShopCatalog, so a bot that
+farmed the 20-25 band at Dion would shop the elven village merchants
+(the wrong town, the wrong tax, the wrong buylists).
+
+The fix is the per-region catalog selection (T-017, scope: hunt/,
+docs/):
+
+- The Dion merchants (hunt/town.go::dionMerchants): Sabrin (7060,
+  weapons), Casey (7061, armor), Sonia (7062, jewels + spellbooks)
+  and Lara (7063, grocery), at the spawn positions of
+  spawns/Dion/DionNPCs.xml. The buylist ids (3006000-3006300) are the
+  file names of the Mobius buylists; the npcdata generator already
+  loaded them.
+- The Dion catalog (hunt/shopping.go::dionShopCatalog): built at the
+  20 percent Dion buy tax (MerchantPriceConfig.xml priceConfig id=8
+  baseTax=20; the castle tax is 0 on the local test server). The tax
+  differs from the elven 15 percent, so the Dion catalog has its own
+  builder.
+- The selector (hunt/shopping.go::shopCatalogForRegion): the hunt
+  loop picks the Dion catalog when the active zone region is Dion;
+  the elven village catalog stays the default. shoppingQueue and
+  shoppingTripEnabled switch to it through Loop.zoneRegion (a new
+  field the SetHuntingZoneRegion call records). The elven village
+  behavior stays unchanged (the M0 acceptance still passes).
+- The region key (hunt/zones.go::regionDion): the Dion case of
+  SetHuntingZoneRegion logs the pending state (the zone registry is
+  T-009, gated on M1 green) and lets the gear catalog selection fire.
+- The docs (docs/shopping_strategy.md): the Dion shop section names
+  the merchants, the tax, the catalog selection and the sell-first
+  rule carry-over.
+
+Verification: 5 unit tests pin the elven default, the Dion selection,
+the tax rates, the merchant set and the live buylist ids. The full
+hunt test suite (97 s) is green (no regression of the M0 round), and
+golangci-lint run --new is clean (0 issues). The Dion zone registry
+(T-009, gated on M1 green) and the multi-town spellbook budget (M2
+follow-up of T-015/T-016) stay out of scope.

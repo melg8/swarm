@@ -2912,3 +2912,45 @@ round entry.
 ### Progress
 
 - 09:24 UTC: claimed (BACKLOG T-009 in_progress + this entry).
+
+## Active task: T-017 the multi-town gear catalog selection
+
+Started: 2026-09-12 09:17Z. Branch: `feature/proxy-server`. Commits as
+melg8. Agent label: `soak-z`.
+
+### Goal
+
+The T-010 follow-up: the hunt shopping loop selects the gear catalog
+of the town it farms near (elven village default, Dion for the 20-25
+band).
+
+### Result
+
+- dionMerchants (hunt/town.go): Sabrin, Casey, Sonia, Lara at their
+  survey positions.
+- dionShopCatalog + dionTownTaxRate + shopCatalogForRegion
+  (hunt/shopping.go): the Dion catalog at the 20 percent Dion tax; the
+  selector returns it for regionDion, the elven catalog otherwise.
+- regionDion + Loop.zoneRegion + the SetHuntingZoneRegion Dion case
+  (hunt/zones.go, hunt/loop.go): the region is recorded on the Loop;
+  the Dion case logs the pending zone registry (T-009, gated on M1
+  green) and lets the gear catalog selection fire.
+- shoppingQueue and shoppingTripEnabled switch to
+  shopCatalogForRegion(l.zoneRegion); the elven behavior is unchanged.
+- 5 unit tests pin the elven default, the Dion selection, the tax
+  rates, the merchant set and the live buylist ids.
+- docs/shopping_strategy.md: the Dion shop section.
+
+### Verification
+
+go build green, the full hunt test suite (97 s) green (no M0
+regression), golangci-lint run --new: 0 issues. Live verification
+deferred: the Dion zone registry (T-009, gated on M1 green) is not
+wired, so the bot never enters the Dion region in a live run yet;
+the selection is unit-tested against the real npcdata buylists.
+
+### Status: done (2026-09-12 09:40Z)
+
+T-017 complete: the multi-town catalog selection ships. The Dion zone
+registry (T-009) and the multi-town spellbook budget (M2 follow-up of
+T-015/T-016) stay out of scope.
