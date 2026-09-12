@@ -5233,3 +5233,34 @@ guard (a journal cond outside the ladder returns the error naming
 it). Build green, the full hunt suite green (99 s), golangci-lint
 run --new clean (0 issues). The live verification rides the T-016
 acceptance round that consumes the engine (the M2 closer).
+
+## Round 75: the spellbook catalog resolution across towns (T-020, 2026-09-12)
+
+The lesson stall the survey follow-up 5 named: the level 24 lessons
+of the first profession demand the Cure Bleeding spellbook (1379)
+the elven village does not sell (the village book list carries only
+Charm 1513 and Poison Recovery 1377), so the lesson trips of a
+character past level 23 could never buy the book - the lesson
+waited forever ("no known merchant for the spellbooks, learning
+without them").
+
+The fix (the data plumbing of the band lesson economy):
+
+- bookPurchase (hunt/learning.go) walks the two town catalogs: the
+  elven village first (the near stop of the 1-19 band), the Dion
+  catalog as the fallback - Sonia (7062, buylist 3006201) sells all
+  three books of the first profession band. The price carries the
+  selling town's tax (the shopTaxPercent read of the catalog rate,
+  the integer math of the original 15/100 form kept for both towns).
+- merchantByTemplate (hunt/shopping.go) covers the Dion merchants:
+  the trip stop planning finds the Sonia station at her survey
+  position when the book routes through Dion.
+
+Verification: 3 unit tests pin the routing - the village books stay
+local at the 15 percent tax, the Cure Bleeding book falls back to
+the Sonia stop at the 20 percent Dion tax, the merchant lookup
+covers the Dion stations. The full hunt suite green (98 s),
+golangci-lint run --new clean (0 issues). The production walk legs
+(the village -> Dion book trip of a band character) ride the band
+wiring gated on M1 green; the M2/M3 acceptance drives the stops
+directly.

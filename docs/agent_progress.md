@@ -3060,3 +3060,13 @@ the last row - the M2 gate stays the SelfClassID flip).
   T-016 acceptance round (the consumer); the resume note records the
   hand-off: DriveQuestChain(ctx, ElvenKnightChain()) on the manual
   session loop, the Rains class change leg after it.
+
+### Progress (T-020)
+
+- 10:18 UTC: registered + claimed (the survey follow-up 5 - the
+  level 24 lesson stall).
+- 10:25 UTC: landed and pushed - the two-catalog bookPurchase (the
+  village first, the Dion Sonia fallback at her own tax) + the
+  merchantByTemplate widening to the Dion stations + 3 unit tests.
+  Full hunt suite green (98 s), lint --new clean. Status: done -
+  in-scope. The production walk legs are the band wiring (M1 gate).

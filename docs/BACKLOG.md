@@ -566,7 +566,7 @@ first) and every quest npc talk starting from the STATIC page.
 
 ### T-020: the spellbook catalog resolution across towns
 
-status: in_progress
+status: done
 milestone: M3
 priority: P3
 deps: T-017
@@ -585,8 +585,12 @@ lesson economy (the survey protocol: the production walk legs ride
 the band wiring gated on M1 green).
 
 claimed: zones-zai 2026-09-12 10:18 UTC
-resume: fresh claim. Next: the two-catalog bookPurchase, the
-  merchant lookup widening, the unit tests, push.
+resume: done 10:25 UTC - the bookPurchase two-catalog fallback (the
+  village first, the Dion Sonia stop at the 20 percent Dion tax),
+  the merchantByTemplate widening to the Dion stations, 3 unit tests
+  pinning the routing. The level 24 lesson stall closed: the Cure
+  Bleeding book resolves through Sonia. The production walk legs
+  ride the band wiring (M1 gate).
 
 claimed: zones-zai 2026-09-12 10:13 UTC
 resume: done 10:05 UTC - hunt/quest_trip.go + 2 unit tests ship:
