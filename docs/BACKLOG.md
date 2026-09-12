@@ -164,7 +164,7 @@ resume: done. The AGENTS.md "Hypotheses and unknowns" section holds
 
 ### T-006: the 20-25 band survey
 
-status: in_progress
+status: done
 milestone: M3
 priority: P3
 deps: -
@@ -177,9 +177,12 @@ follow-up task list (the registry generation itself is a separate
 task once M1 is green).
 
 claimed: band-survey-e3f8 2026-09-12 07:58Z
-resume: claim pushed; next: find the elven zone survey doc for the
-  shape, locate the 20-25 mobs of the Mobius spawn data reachable
-  from the elven lands, run the territory analysis.
+done: 2026-09-12 08:29Z
+resume: done. docs/band_20_25_survey.md is the survey (transport,
+  grounds, merchants, teachers, follow-ups); generate_hunt_zones.py
+  grew the --survey mode (registry mode byte identical); the
+  follow-ups T-008/T-009/T-010 are in the queue; the aggression
+  default correction landed in navigation_analysis.md.
 
 ### T-007: the PROGRESS.md page
 

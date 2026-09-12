@@ -2301,6 +2301,33 @@ elven zone survey - territories, towns, merchants, teachers. Output: a
 survey document plus the follow-up task list (the registry generation
 itself is a separate task once M1 is green).
 
+### Result
+
+- tools/generate_hunt_zones.py: the --survey MIN MAX mode (the
+  grounds, the mob stats with the effective aggression, the teleport
+  anchors on the Mirabel/Bella/Trisha route chain); the default
+  registry mode verified byte identical.
+- docs/band_20_25_survey.md: the transport chain (13 600 one way to
+  the Execution Ground), the four ground families with per-mob
+  hp/exp/aggro, the Dion merchant buylists, the elven village
+  teacher economy (25 200 round trip), the Cure Bleeding spellbook
+  gap, six follow-up items.
+- The backlog gained T-008 (the gatekeeper teleport flow, P2),
+  T-009 (the band registry, gated on M1 green) and T-010 (the band
+  gear catalogs).
+- docs/navigation_analysis.md: the "mobs never attack on sight"
+  claim refuted and corrected (NpcTemplate default isAggressive
+  TRUE; the explicit false list is the passive one).
+- docs/development_log.md round 63.
+
+### Verification
+
+The survey data comes from the live Mobius checkout (spawn xml,
+npc stats, teleporter data) cross-checked with NpcTemplate.java and
+the skill trees; `go build ./...` green, `golangci-lint run --new`
+0 issues; docs + tooling only - no behavior change, no e2e run
+required.
+
 ### Status
 
-In progress - the claim commit; the survey starts next.
+Done (2026-09-12 08:29Z) - taking the next eligible BACKLOG task.
