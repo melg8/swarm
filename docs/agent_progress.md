@@ -2055,3 +2055,53 @@ started; no Go files were touched by this task (the diff is markdown
 only).
 
 ### Status: done (2026-09-12)
+
+## Active task: T-001 the soak metrics trail
+
+Started: 2026-09-12 07:27Z. Branch: `feature/proxy-server`. Commits as
+melg8. Agent label: `soak-z`. Other agents may push to the same branch
+concurrently - rebase before every push.
+
+### Goal
+
+Add the `soak` acceptance scenario, the `runs/metrics.jsonl` trail and
+the `tools/progress_report.sh` renderer. The soak scenario is the M1
+acceptance vehicle: a fresh account runs `-hunt` for N minutes (the
+real M1 run is 8h, the dev smoke is ~10m) under supervision, and one
+JSON line per run lands in `runs/metrics.jsonl` with date, scenario,
+duration, start/end level, XP per hour, deaths, adena, stuck events
+and PASS/FAIL. The pass criteria include the stagnation guard (no XP
+gain for M minutes, no position change for K minutes fails the run);
+the guard is an acceptance-package read of the tracker public API
+within T-001 scope, so T-002 (the hunt-loop stagnation watch) can
+later replace it with the tracker event source.
+
+### Constraints
+
+- Scope: `internal/swarm/acceptance/`, `cmd/swarm/`, `tools/`, `docs/`
+  only. Do NOT touch `internal/swarm/hunt/` or `internal/swarm/state/`
+  (that is T-002 and T-003 territory).
+- The duration is configurable (env `SWARM_SOAK_MINUTES`, default a
+  smoke value); the real 8h run is a follow-up operator action, not a
+  2h-session deliverable.
+- The metrics writer appends exactly one JSON line per run, atomically
+  (open with O_APPEND, one Write call), so parallel runs never
+  interleave.
+- Lint clean (`golangci-lint run --new`), the touched package tests
+  green, the smoke run produces one metrics line against the live
+  stack.
+
+### Acceptance
+
+- `-acceptance soak` runs the scenario, prints PASS/FAIL and appends a
+  line to `runs/metrics.jsonl`.
+- `tools/progress_report.sh` writes `PROGRESS.md` from the metrics
+  tail, the BACKLOG statuses and `git log --oneline -20`.
+- Unit tests cover the stagnation guard and the metrics serialization.
+
+### Progress
+
+- 2026-09-12 07:27Z: T-001 claimed (BACKLOG status in_progress), the
+  active task entry started. Environment already deployed
+  (STACK_READY, 75 tables, dev tools installed). Reading the
+  acceptance package shape next.

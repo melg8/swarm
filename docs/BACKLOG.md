@@ -57,7 +57,7 @@ resume: <where the previous agent stopped, what is next>
 
 ### T-001: the soak metrics trail
 
-status: todo
+status: in_progress
 milestone: M1
 priority: P1
 deps: -
@@ -70,6 +70,12 @@ XP per hour, deaths, adena, stuck events, PASS/FAIL). Include the
 stagnation watch of T-008 in the pass criteria. Ship a tiny
 `tools/progress_report.sh` that renders PROGRESS.md from the metrics
 tail, the BACKLOG statuses and `git log --oneline -20`.
+
+claimed: soak-z 2026-09-12 07:27Z
+resume: claim just pushed; next: design the soak scenario, the
+  metrics writer, the stagnation guard and the progress report, then
+  implement in the acceptance package, wire the CLI flag and verify
+  with a smoke run.
 
 ### T-002: the stagnation watch
 
