@@ -464,17 +464,20 @@ decomposes into:
 
 1. **Parse the dialog stream** (from_game_server):
    `NpcHtmlMessage` (0x1B) - the npc object id, the html string,
-   the itemId; a tiny html link parser extracts the
-   `action="bypass ..."` commands and their link texts; the state
-   tracker gains the "open dialog" section (the current page, its
-   links, its origin npc). Unit tests with captured pages; a
-   benchmark on the 813 byte merchant page (one page per second
-   per town trip - not a hot path, but the parser should not
-   allocate per link).
+   the itemId (the packet parser landed with T-008); the link
+   extraction `ParseHTMLLinks` (the bypass commands with their
+   visible texts, the server side scan mirrored) landed as
+   `html_links.go` (T-012, verified against every real page of the
+   Q00406 script, the class master pages and the teleporter page -
+   112 links). The remaining half is the state tracker "open
+   dialog" section (the current page, its links, its origin npc).
 2. **Parse the quest journal** (from_game_server): `QuestList`
    (0x98) - the active quest ids with their cond, the quest item
    list; the tracker quest section; arrives free at world entry
-   (**[live]** verified).
+   (**[live]** verified). DONE as T-011: the parser
+   (`quest_list.go`), the tracker journal (`state/quests.go`) and
+   the dispatcher wiring, live verified ("Quest journal with 0
+   quests, 0 quest items" at the enter world second).
 3. **Send the dialog commands** (to_game_server):
    `RequestBypassToServer` (0x21) - plus the client side mirror of
    the html action cache (send only the links of the currently open

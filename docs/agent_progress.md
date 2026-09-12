@@ -2574,3 +2574,36 @@ depend on T-008 (in progress), so this is the top claimable work.
     bot printed "Quest journal with 0 quests, 0 quest items" at
     the enter world second - the 0x98 push now lands in the
     tracker instead of dropping on the floor.
+
+## Active task: T-012 the html dialog link parser
+
+Started: 2026-09-12 08:15 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. Agent label: agent-quest. Taken after T-011
+closed (T-009/T-010 still wait on T-008).
+
+### Progress
+
+- 08:15-08:25 UTC: implemented and verified:
+  - packets/from_game_server/html_links.go: ParseHTMLLinks
+    extracts the bypass links of a server dialog page (the command
+    per <a action="bypass ..."> with the -h prefix stripped and
+    trimmed, plus the visible link text), mirroring
+    HtmlUtil.buildHtmlBypassCache (the case-insensitive "=\"bypass "
+    match on the lowercased html, the original casing preserved,
+    the unterminated attribute ends the scan, the 128 link cap);
+  - 8 unit tests: the real Sorius quest page, the Rains class
+    master page (the -h strip, the multi-link order), the
+    case-insensitive attribute, the $ parameter marker, the command
+    trim, the non-bypass actions, the empty/broken pages, the cap;
+  - verification against the real datapack: the parser walked every
+    page of the Q00406 script, the ElfHumanFighterChange1 master
+    pages and the Mirabel teleporter page - 112 links, commands and
+    texts exact (the %objectId% of the file form stays as the raw
+    token - the server replaces it at send time, the packet form
+    arrives resolved);
+  - go build ./... green, the package tests green,
+    golangci-lint run --new: 0 issues (the HtmlLink -> HTMLLink
+    naming and the TrimPrefix staticcheck findings fixed);
+  - docs/quest_protocol.md: the follow-up list marks the link
+    parser landed (and the T-011 journal parser landed).
+- Status: done (2026-09-12, 08:25 UTC).

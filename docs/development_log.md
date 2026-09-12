@@ -4735,3 +4735,34 @@ and the leveling kills), the env-parameterized run (level 2 -> 3)
 PASSED in 2m30s with the corrected metrics row (2111 xp/h against
 the real 88 xp gain - no phantom span), both rows in
 runs/metrics.jsonl.
+
+
+## Round 68: the dialog links leave the html - the walker gets its eyes (2026-09-12)
+
+Problem: the dialog pages the server streams (one NpcHtmlMessage
+per second during a merchant round, the quest and class transfer
+pages of M2) carry the actions as raw html anchors; without the
+link extraction the dialog walker (T-008's teleport buttons, the
+M2 quest pages) would have to regex the html inline - duplicated,
+untested parsing in every consumer.
+
+Root cause: the research round defined the follow-up but only the
+packet parser (the raw html string) had landed (T-008).
+
+Fix (T-012): packets/from_game_server/html_links.go -
+ParseHTMLLinks mirrors the server side scan of
+HtmlUtil.buildHtmlBypassCache (the case-insensitive "=\"bypass "
+attribute match, the command to the closing quote, the "-h "
+prefix strip, the trim) and adds the link text the walker matches
+pages by; the unterminated attribute ends the scan, a 128 link cap
+bounds the pathological page.
+
+Verification: 8 unit tests on the real page forms (the Sorius
+quest page, the Rains class master page with the class change
+command, the $ parameter, the case-insensitive attribute); a
+datapack cross-check - the parser walked every Q00406 script page,
+every ElfHumanFighterChange1 master page and the Mirabel teleporter
+page (112 links, commands and texts exact; the %objectId% token of
+the file form is the raw placeholder, the packet form arrives
+resolved). go build ./... green, the package tests green,
+golangci-lint run --new: 0 issues.

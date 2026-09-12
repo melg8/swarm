@@ -323,7 +323,7 @@ resume: done 08:15 UTC - the parser, the state journal and the
 
 ### T-012: the html dialog link parser
 
-status: in_progress
+status: done
 milestone: M2
 priority: P2
 deps: T-004
