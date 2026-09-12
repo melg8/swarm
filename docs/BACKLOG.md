@@ -417,7 +417,7 @@ resume: done 09:10 UTC - hunt/quest_walker.go (DriveDialog: the
 
 ### T-015: the class transfer quest chains as data
 
-status: in_progress
+status: done
 milestone: M2
 priority: P2
 deps: T-014
@@ -439,7 +439,11 @@ sources (the npc ids, the item ids, the kill ids read from the
 Java); the hunt consumer is T-016.
 
 claimed: quest-data-e3f8 2026-09-12 09:12 UTC
-resume: fresh claim.
+resume: done 09:40 UTC - hunt/quest_chains.go + the pin tests
+  (every display id through npcdata, the ladders, the kill economy,
+  the routes, no shared state). The round's correction: the Q00407
+  cond 2 mob is the Ol Mahum Patrol 20053, not the Bugbear (npc
+  20133); quest_protocol.md fixed. T-016 is claimable now.
 
 ### T-016: the class transfer acceptance scenario
 

@@ -4944,3 +4944,44 @@ verified in the Java). The position injection between
 EnsureCharacter and EnterWorld (the mariadb CLI channel) moves the
 character cleanly - the game server loads the row at the world
 entry.
+
+## Round 71: the quest chains become data - the brain gets its map (T-015, 2026-09-12)
+
+Problem: the quest brain (T-014's walker) had legs but no map - the
+class transfer chains lived only as prose tables in the research
+doc (docs/quest_protocol.md), and the M2 acceptance scenario plus
+the future quest trip phase need the executable form: which npc at
+which cond, which links to click, which mobs to farm until which
+item count.
+
+Root cause: the research round (T-004) was documentation-only by
+design; the data task was queued as its follow-up.
+
+Fix (T-015): hunt/quest_chains.go - ElvenKnightChain (Q00406, the
+cond 1..6 ladder: the six Ruins of Agony skeleton species with the
+70 percent topaz hunt to 20, the Sorius letter talk, Kluto's favor
+link, the 50 percent emerald hunt of the Ol Mahum Novices, the
+closing brooch talk) and ElvenScoutChain (Q00407, the cond 1..8
+ladder: Moretti's two-link briefing, the torn letter hunt of the
+Ol Mahum Patrols (the sequential four-piece drops), the Prias
+rescue legs, the 60 percent sentry key, the recommendation close),
+plus the two class change routes at Rains (the -h Script
+ElfHumanFighterChange1 19/22 legs with the proof items). Every
+npc station carries the npcdata display id and the live spawn
+position; every kill stage carries the mob display set, the item
+ids, the drop chance, the piece target and the spawn hull ground.
+
+Verification: 6 unit tests (the stations resolve through
+npcdata.NPCName, the kill mobs resolve to the script's species,
+the quest items resolve through the item names, the cond ladders
+run 1..6/1..8 with every stage exactly one action, the kill
+economy and the route texts pin, the accessors share no state).
+go build ./... green, the hunt package tests green,
+golangci-lint run --new: 0 issues.
+
+The research correction of the round: the Q00407 cond 2 kill mob
+is the Ol Mahum Patrol (npc 20053, display 53), NOT the Bugbear
+the research doc claimed - the Mobius npc stats (20053
+name="Ol Mahum Patrol", level 21) and the spawn file comments
+agree; the Bugbear is npc 20133 (display 133) and no quest of this
+chain kills it. docs/quest_protocol.md corrected accordingly.

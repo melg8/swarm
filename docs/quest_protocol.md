@@ -396,7 +396,10 @@ Q00407_PathOfTheElvenScout/Q00407_PathOfTheElvenScout.java`. Start:
 Master Reisa (30328, Gludio -13693, 122583, -3103). The chain runs
 through Guard Moretti (30337, Gludio), Guard Babenco (30334,
 Gludio) and Trainee Prias (30426, at -9076, 72969, -3448 south of
-the Neutral Zone); the kills are the bugbear 20053 (Gludio area)
+the Neutral Zone); the kills are the Ol Mahum Patrol 20053 (the abandoned camp between Gludio and Gludin, spawns
+Others/18_22.xml - the CORRECTED fact: the npc stats name 20053 "Ol Mahum Patrol", the
+research draft's "bugbear" was the name error; the Bugbear is npc 20133 and no quest of
+this chain kills it)
 and the Ol Mahum Sentry 27031 spawns around Prias (-8700, 72362;
 `Others/19_20.xml`). The proof item: Reisa's Recommendation (1217).
 
@@ -493,11 +496,14 @@ decomposes into:
    content-change page wait, the tracker feed, the link-by-text
    bypass walk with the IsDialogCommand validation; live verified
    against Ellenia: the "Quest" link round trip to the no-quest
-   answer page). The remaining halves: the two class transfer
-   scripts as data (the npc chain, the item counts, the kill
-   counters read from the inventory updates), the gatekeeper leg
-   (a town trip whose walk is a teleport buy), and the
-   Gludio/Gludin navigation data (the M3 zone survey feeds it).
+   answer page) and the two class transfer CHAINS AS DATA landed
+   as T-015 (hunt/quest_chains.go - the stations, the cond
+   ladders, the kill economy, the proof items, the class change
+   routes, every id pinned through npcdata). The remaining
+   halves: the quest trip phase (the hunt loop wiring that drives
+   the walker on the chain data), the gatekeeper leg (a town trip
+   whose walk is a teleport buy - T-008), and the Gludio/Gludin
+   navigation data (the M3 zone survey feeds it).
 5. **The M2 acceptance scenario** (acceptance): the class-transfer
    scenario - a DB-injected level 19 ELVEN_FIGHTER (the level
    milestone scenario of T-003 generalizes the injection) starts

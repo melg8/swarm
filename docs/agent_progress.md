@@ -2850,3 +2850,20 @@ clean, the quest_protocol.md table cross-checked against the data
 ### Progress
 
 - 09:12 UTC: claimed.
+
+### Progress (T-015, continued)
+
+- 09:30 UTC (the restarted session, the shell outage of 09:25
+  recovered): the data round landed and pushed - hunt/quest_chains.go
+  (the two chains, the two class changes, the stage constructors,
+  QuestStageByCond) + hunt/quest_chains_test.go (6 pin tests: the
+  npcdata cross-checks, the ladders, the kill economy, the routes,
+  the no-shared-state contract).
+- The research correction verified against the Mobius sources: the
+  Q00407 cond 2 mob is the Ol Mahum Patrol 20053 (display 53), not
+  the Bugbear (npc 20133); quest_protocol.md corrected, the dev log
+  round 71 records it.
+- Status: done (2026-09-12, 09:40 UTC) - the data, the pins, the
+  docs. T-016 (the class transfer acceptance scenario) opens up:
+  its deps (T-003 level milestone + T-014 walker + T-015 data) are
+  all done; the gatekeeper legs join when T-008 closes.
