@@ -2240,3 +2240,21 @@ clean (0 issues); the stack was up for the source reading
 ### Status
 
 Done (2026-09-12 07:55Z) - taking the next eligible BACKLOG task.
+
+## Active task: T-006 the 20-25 band survey
+
+Started: 2026-09-12 07:58Z. Branch: `feature/proxy-server`. Commits as
+melg8.
+
+### Goal
+
+Claimed from docs/BACKLOG.md (T-006, milestone M3, priority P3, scope:
+docs/, tools/generate_hunt_zones.py): survey the Mobius spawn data for
+the 20-25 mob band reachable from the elven lands, in the shape of the
+elven zone survey - territories, towns, merchants, teachers. Output: a
+survey document plus the follow-up task list (the registry generation
+itself is a separate task once M1 is green).
+
+### Status
+
+In progress - the claim commit; the survey starts next.
