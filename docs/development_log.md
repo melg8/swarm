@@ -4492,3 +4492,69 @@ generator regression is byte identical output;
 tooling only, no bot behavior changed, no e2e required. The
 per-mob aggression readings were double-checked against
 NpcTemplate.java and the npc xml directly.
+
+## Round 64: the hunt loop stagnation watch - a silent livelock becomes a loud line (2026-09-12)
+
+The M1 milestone (ROADMAP: the soak proof, level 1 to 20 unattended)
+demands that no livelock survives silently: "the stagnation watch
+(no XP gain for M minutes, no position change for K minutes) logs
+explicit events and fails the scenario when it fires". The freeze
+history of the project proves the need - the round 58 stuck cell
+held a character on one village cell for over an hour (the dump was
+the only signal), the round 60 pantsless bot farmed half dressed for
+an hour, and every one of those reports arrived through a manual
+state dump instead of a live log line. The hunt loop had watchdogs
+for the narrow cases (the engage stuck timeout, the walk stuck
+re-path) but no global progress watch: a character that stopped
+farming without tripping any single-phase watchdog looked exactly
+like a healthy one in the bot log.
+
+The fix is the watch itself (T-002, hunt/stagnation.go):
+
+- Two named windows calibrated against the measured honest flows:
+  stagnationXPWindow (20 min - the longest legit experience stall is
+  the full town trip round, measured 2.2 min for the weapon run and
+  14m54s for the whole farm readiness round) and
+  stagnationPositionWindow (10 min - walks, fights and death cycles
+  all move the character; the freeze dumps stood on one cell for an
+  hour).
+- The observation hooks the tick publish defer in Loop.tick, so it
+  runs on every tick whatever early return the state machine took
+  (the death recovery, the emergency logout, the phase dispatches).
+- One event line per window (the timer re-arms after firing, a
+  permanently frozen character logs its stall every window instead
+  of every 250 ms tick), the line carries the loop phase and the
+  held value ("Hunt: stagnation: no experience change for 21m0s,
+  exp 1000 held, phase engage" / "Hunt: stagnation: position held
+  11m0s at 43048 50312 -2992, phase townWalk"), and it routes
+  through Loop.logf: the console log, the tracker event log and the
+  web UI log tab all carry it.
+- The watch stays quiet and resets outside the autonomous online
+  session: a manual only session may stand still legitimately, an
+  offline gap (the supervisor relogin) re-arms the windows fresh -
+  neither fires an event nor inherits a stale baseline.
+- The state dump diagnostics gained the stall ages (xpStallForMs,
+  positionStallForMs in state.HuntDiagnostics + the snapshot
+  encoder): a freeze report now shows how long the experience and
+  the cell have been static at a glance, next to the phase age the
+  dump already carried.
+
+Verification: 9 unit tests (hunt/stagnation_test.go) through the
+seeded-baseline clock seam of the loop tests - the fire, the re-arm
+(the immediate repeat stays quiet), the refresh while farming and
+while moving, the manual/offline quiet with the reset, the tick path
+coverage through the early returns (the dead character tick still
+publishes), the event feed surface (the tracker event log carries
+the line) and the diagnostics wiring (the stalls report and reset).
+go build, go vet, the full test suite, gofmt and
+golangci-lint run --new (0 issues) green; the full golangci-lint
+reports only the pre-existing findings of the branch. Live: the
+tools/mobius_e2e.sh 45 run printed E2E_OK (the manual session
+regression), and a 60 s autonomous -hunt smoke run against the live
+stack killed a mob with the watch armed - the live snapshot
+diagnostics carried the new fields tracking the real progress
+(xpStallForMs following the kill, positionStallForMs following the
+loot walk) and zero stagnation lines on the healthy run, with the
+graceful SIGINT shutdown. The positive fire (a real 10/20 min
+freeze) is owned by the M1 soak acceptance runs where the windows
+are the pass criteria.

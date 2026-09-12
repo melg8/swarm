@@ -96,6 +96,28 @@ would have paid for.
   under attack) and the tracker clearing by
   internal/swarm/state/tracking_test.go.
 
+- **Stagnation watch (hunt/stagnation.go)**: the M1 soak proof
+  requires a silent livelock to become a loud line, so the tick
+  publish defer observes two progress values every tick - the
+  character experience and the exact standing cell. No experience
+  change for `stagnationXPWindow` (20 min, calibrated over the
+  measured town trip rounds: the weapon run round takes 2.2 min, the
+  full farm readiness round 14m54s) or the same position held for
+  `stagnationPositionWindow` (10 min) logs one explicit event per
+  window (`Hunt: stagnation: no experience change ...` / `Hunt:
+  stagnation: position held ... at X Y Z`), carrying the loop phase so
+  the log explains what the state machine was doing while frozen. The
+  lines route through `Loop.logf` (console, tracker event log, the
+  web UI log tab) and the stall ages ride the state dump diagnostics
+  (`xpStallForMs`, `positionStallForMs`). The windows re-arm after
+  each event (a frozen character logs its stall every window, not
+  every tick) and reset on the offline gaps, the manual only
+  sessions and the missing position (a relogin is not a livelock).
+  The unit tests live in hunt/stagnation_test.go (the seeded
+  baselines of the loop tests are the clock seam: fire, re-arm,
+  refresh-while-farming, manual/offline quiet, the tick path
+  coverage, the event feed surface, the diagnostics wiring).
+
 ## Combat safety (hunt/loop.go + the constrained target search of state)
 
 - The engage never initiates on mobs above the character level + 2 or

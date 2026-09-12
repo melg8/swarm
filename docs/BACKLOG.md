@@ -85,7 +85,7 @@ resume: done 2026-09-12 07:45Z. The soak scenario (temp7, the
 
 ### T-002: the stagnation watch
 
-status: in_progress
+status: done
 milestone: M1
 priority: P1
 deps: -
@@ -99,9 +99,12 @@ becomes a loud line. Cover with unit tests (the clock seam of the
 loop tests) and a live note in the dev log.
 
 claimed: zai-agent 2026-09-12 07:36 UTC
-resume: claimed fresh, no code yet - the acceptance claim of T-001
-was lost to soak-z fairly (their push landed first), taking T-002;
-the hunt loop structure study is next
+done 2026-09-12 07:53 UTC by zai-agent: the watch lives in
+hunt/stagnation.go (20 min xp / 10 min position windows, one line
+per window through logf, the tick defer coverage, the manual/offline
+reset), the dump diagnostics carry xpStallForMs and
+positionStallForMs, 9 unit tests, the docs in hunting.md/webui.md,
+the dev log round 63, the live e2e + autonomous smoke verified.
 
 ### T-003: the level milestone scenario
 

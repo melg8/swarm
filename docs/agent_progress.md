@@ -2194,6 +2194,21 @@ visible without a state dump.
   event feed surface, diagnostics wiring. go build/vet, the full
   test suite, gofmt and golangci-lint --new green; the full lint
   reports only the pre-existing findings of the branch.
+- 07:52 UTC: docs closed out - hunting.md gained the stagnation
+  watch bullet (the windows, the event shape, the routing, the
+  reset semantics), webui.md documents the two new stall fields of
+  the hunt diagnostics subview, development_log.md carries the
+  round 64 entry (problem -> cause -> fix -> verification - renumbered over
+  the two parallel round 63 entries of the branch).
+- Live verification: tools/mobius_e2e.sh 45 printed E2E_OK (the
+  manual session regression with the watch compiled in); a 60 s
+  autonomous -hunt smoke against the live stack killed a mob with
+  the watch armed, the live snapshot showed xpStallForMs and
+  positionStallForMs tracking the real progress (the kill, the loot
+  walk) and the log stayed free of stagnation lines; the SIGINT
+  shutdown was graceful.
+- 07:53 UTC: status done - the task is complete, the queue rule
+  hands the round to the next claimable BACKLOG task.
 
 ## Active task: T-004 the quest subsystem research
 

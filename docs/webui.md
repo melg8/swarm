@@ -607,7 +607,10 @@ changes the direction immediately.
   (`Loop.diagnostics` through `SetHuntDiagnostics`: the target and
   its engagement age, the active skip count of both skip maps, the
   no-target patience, the re-path count, the stuck watchdog age, the
-  waypoints left, the trip and flee episode ages, the buy retries)
+  waypoints left, the trip and flee episode ages, the buy retries,
+  the stagnation stall ages `xpStallForMs` and `positionStallForMs`
+  - the time the experience and the exact standing cell have been
+  static, the livelock watch inputs of hunt/stagnation.go)
   plus the tracker owned `lastAction` with its age and the
   `tickAgoMs` loop heartbeat (a growing value means the loop
   goroutine stopped ticking while the session stays online). The
