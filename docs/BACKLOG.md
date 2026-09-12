@@ -343,3 +343,26 @@ offered).
 claimed: agent-quest 2026-09-12 08:15 UTC
 resume: fresh claim; the real quest/master/trainer pages of the
   research round are the golden test inputs.
+
+### T-013: the open dialog section of the tracker
+
+status: in_progress
+milestone: M2
+priority: P2
+deps: T-011, T-012
+scope: internal/swarm/state/
+
+Follow-up 1's remainder of docs/quest_protocol.md: the state
+tracker gains the "open dialog" section - the current dialog page
+(the npc origin, the links with their texts) fed from the
+NpcHTMLMessage parse of the connection layer, replaced on every
+page arrival (the NPC_HTML scope semantics) and cleared with the
+session. The accessors serve the dialog walker of the M2 round;
+IsDialogCommand mirrors the server side validateHtmlAction rules
+(exact match or the $ parameter prefix) so the bypass sender only
+fires commands the open page actually offered.
+
+claimed: agent-quest 2026-09-12 08:18 UTC
+resume: fresh claim; the T-012 link parser feeds the links, the
+  T-011 journal pattern (replace whole, reset with the session)
+  is the shape.
