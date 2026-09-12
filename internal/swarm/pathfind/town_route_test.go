@@ -126,3 +126,34 @@ func TestFindPathToShopPlainWaterArrival(t *testing.T) {
 	require.Less(t, end.Z, -3800.0,
 		"the plain search ends on the water deck below the shop")
 }
+
+// TestFindPathGludioToDionCorridor pins the T-018 finding: the
+// Gludio -> Dion walking corridor of the 20-25 band survey exists
+// on the real geodata pack within the shipped expansion cap (the
+// measured route: 42 831 units, 25 waypoints, 0.94M nodes, ~9 s).
+// A geodata refresh or a search regression that breaks the mainland
+// connectivity of the band trips fails here instead of surfacing as
+// a walk that never arrives. The elven -> Gludio leg (1.25M nodes,
+// 25 percent above the shipped cap) stays the documentation fact of
+// docs/navigation_analysis.md - the cap-as-a-parameter roadmap item
+// owns it.
+func TestFindPathGludioToDionCorridor(t *testing.T) {
+	engine := townTestEngine(t)
+
+	gludio := Vec3{X: -12694, Y: 122776, Z: -3114}
+	dion := Vec3{X: 15671, Y: 142994, Z: -2704}
+	result, err := engine.FindPathApproach(
+		gludio, dion, 150, DefaultMaxPassableHeight)
+	require.NoError(t, err)
+	require.True(t, result.Found,
+		"the Gludio -> Dion corridor must stay connected")
+	require.False(t, result.Aborted,
+		"the corridor sits within the shipped expansion cap")
+	require.Greater(t, result.Length, 35000.0,
+		"the corridor route spans the two towns")
+	require.NotEmpty(t, result.Waypoints)
+	end := result.Waypoints[len(result.Waypoints)-1]
+	require.LessOrEqual(t,
+		math.Hypot(float64(end.X-dion.X), float64(end.Y-dion.Y)),
+		300.0, "the route ends at the Dion town square")
+}
