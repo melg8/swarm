@@ -2524,3 +2524,30 @@ depend on T-008 (in progress), so this is the top claimable work.
 
 - 08:05 UTC: claimed T-011 (a new BACKLOG entry from the T-004
   follow-up list; T-009/T-010 wait on T-008).
+
+- 08:07-08:12 UTC: implemented and verified:
+  - packets/from_game_server/quest_list.go: the QuestList parser
+    (readQuestEntries + readQuestItemEntries split for the cyclop
+    bound), the caps (quests 64 - the server refuses more than 25
+    started quests; items 256) and the reusable buffers;
+  - state/quests.go: the journal (quest id -> cond/flags map, the
+    quest item id -> count map), ApplyQuestList replaces whole
+    (the server always sends the full journal), the accessors
+    (QuestCond, QuestCount, QuestIDs sorted, IsQuestItem,
+    QuestItemCount) and the ResetSession clear (the journal is
+    session state the server repushes at world entry);
+  - connection: the 0x98 dispatcher case, applyQuestList and the
+    two convert helpers (the parse buffer is reused, the state
+    view must not alias it);
+  - tests: 7 parser tests (the live 5 byte empty form golden, the
+    populated class transfer journal, buffer reuse, bad id,
+    truncated quest/item entries, the count caps) + 4 state tests
+    (the journal pins, the whole-list replacement, the sorted ids,
+    the session reset clear);
+  - go build ./... green, the three package test runs green,
+    golangci-lint run --new: 0 issues (the cyclop and lll findings
+    of the first draft fixed by the split and the reflow);
+  - live verification against the deployed stack: the fresh trace3
+    bot printed "Quest journal with 0 quests, 0 quest items" at
+    the enter world second - the 0x98 push now lands in the
+    tracker instead of dropping on the floor.

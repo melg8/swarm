@@ -4631,3 +4631,44 @@ client request (EnterWorld.java:303), and the merchant sell round
 streams NpcHtmlMessage 0x1B (813 bytes, about one per second) that
 the bot currently drops. `go build ./...` green,
 `golangci-lint run --new` 0 issues (no Go file touched).
+
+## Round 67: the quest journal lands in the tracker - the 0x98 push stops dropping (2026-09-12)
+
+Problem: the server pushes the quest journal (QuestList 0x98) at
+world entry and after every quest state change, but the bot's
+dispatcher had no case for the opcode - the packet fell into the
+unknown-packet log line and the quest state of the character was
+invisible to every layer (the M2 quest brain has nothing to read).
+
+Root cause: the quest protocol was researched only minutes before
+(the round 66 research); no code existed for any quest packet.
+
+Fix (T-011):
+
+- packets/from_game_server/quest_list.go: the parser (the quest
+  count + [questId][state] entries, the item count + the
+  [objectId][itemId][count][bodyPart] stacks), the count caps
+  (64 quests - the engine itself refuses more than 25 started, 256
+  items) and the reusable entry buffers (the ParseXxx packet struct
+  is a field of the game client, so the buffers reset, not grow).
+- state/quests.go: the journal maps (quest id -> the cond or
+  completion flags int, quest item id -> count) with the
+  whole-list replacement semantics (the server always resends the
+  full journal, the same contract as the skill list), the accessors
+  for the hunt loop (QuestCond, QuestCount, QuestIDs) and the
+  quest-item answers for the future sell filter (IsQuestItem,
+  QuestItemCount); ResetSession clears both maps - the journal is
+  session state the server repushes at world entry.
+- connection: the 0x98 dispatcher case, applyQuestList and the
+  convert helpers that copy the parsed entries into the state view
+  without aliasing the reused parse buffer.
+
+Verification: 7 parser unit tests (the golden empty form is the
+live 5 byte packet of the round 66 trace, the populated form is the
+two class transfer quests with the topaz/emerald stacks) and 4
+state unit tests (the journal pins, the replacement, the sorted
+accessor, the session reset); go build ./... green, the three
+touched packages' tests green, golangci-lint run --new: 0 issues;
+live against the deployed stack - the fresh trace3 bot logs "Quest
+journal with 0 quests, 0 quest items" at the enter world second,
+proving the 0x98 push now parses and lands.

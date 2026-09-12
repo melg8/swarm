@@ -433,6 +433,14 @@ type Bot struct {
 	// published. shoppingAt bounds its freshness (shoppingPlanTTL).
 	shopping   *ShoppingPlanView
 	shoppingAt time.Time
+	// quests holds the quest journal of the QuestList packets
+	// (quest id -> the state int of the cond or completion flags);
+	// questItems holds the quest item stacks the packet repeats
+	// (item id -> count, the quest-item id set the sell filter
+	// needs). The server sends the whole journal on every change, so
+	// both maps are replaced, not merged (see quests.go).
+	quests     map[int32]int32
+	questItems map[int32]int32
 	// skills holds the learned skill list of the server packet
 	// (id -> level + passive). skillsRevision counts the SetSkills
 	// calls and the weapon priority changes; skillQueue caches the
@@ -507,6 +515,8 @@ func NewBot(id string) *Bot {
 		shoppingAt:         time.Time{},
 		skills:             nil,
 		skillsRevision:     0,
+		quests:             nil,
+		questItems:         nil,
 		skillQueue:         nil,
 		skillQueueClass:    0,
 		skillQueueRevision: 0,
@@ -1139,6 +1149,8 @@ func (b *Bot) ResetSession() {
 	b.inventoryVersion++
 	b.skills = nil
 	b.skillsRevision++
+	b.quests = nil
+	b.questItems = nil
 	b.skillQueue = nil
 	b.skillQueueClass = 0
 	b.skillQueueRevision = 0

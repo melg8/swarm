@@ -297,7 +297,7 @@ resume: -
 
 ### T-011: the quest journal parser and tracker section
 
-status: in_progress
+status: done
 milestone: M2
 priority: P2
 deps: T-004
@@ -312,6 +312,8 @@ entry (live verified, EnterWorld.java:303 pushes it). The web UI
 quest widget is a later round of its own.
 
 claimed: agent-quest 2026-09-12 08:05 UTC
-resume: fresh claim; the wire layout and the Java reference
-  (QuestList.java) live in docs/quest_protocol.md; the live 5 byte
-  empty form is the golden parser test input.
+resume: done 08:15 UTC - the parser, the state journal and the
+  dispatcher wiring are live verified ("Quest journal with 0
+  quests, 0 quest items" at world entry). The web UI quest widget
+  (the snapshot section) stays a separate round when a consumer
+  needs it.

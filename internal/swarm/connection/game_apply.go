@@ -540,6 +540,63 @@ func (gc *GameClient) applySkillList(payload []byte) {
 	gc.logger.Printf("Skill list with %d skills", len(skills))
 }
 
+// applyQuestList parses the quest journal packet (opcode 0x98) and
+// lands the whole journal in the tracker. The server pushes it at
+// world entry (EnterWorld.java:303, live verified - see
+// docs/quest_protocol.md) and after every quest state change, so the
+// replacement semantics of ApplyQuestList keep the tracker exact.
+func (gc *GameClient) applyQuestList(payload []byte) {
+	if err := fromgameserver.ParseQuestListPacket(
+		&gc.questList, payload); err != nil {
+		gc.logger.Printf("Failed to parse quest list: %v", err)
+
+		return
+	}
+	if gc.tracker == nil {
+		return
+	}
+	gc.tracker.ApplyQuestList(
+		convertQuestEntries(gc.questList.Quests),
+		convertQuestItems(gc.questList.Items))
+	gc.logger.Printf("Quest journal with %d quests, %d quest items",
+		len(gc.questList.Quests), len(gc.questList.Items))
+}
+
+// convertQuestEntries copies the parsed quest entries into the state
+// view: the parse buffer is reused by the next packet, so the values
+// must not alias it.
+func convertQuestEntries(
+	source []fromgameserver.QuestListEntry,
+) []state.QuestEntryView {
+	entries := make([]state.QuestEntryView, 0, len(source))
+	for _, quest := range source {
+		entries = append(entries, state.QuestEntryView{
+			QuestID: quest.QuestID,
+			State:   quest.State,
+		})
+	}
+
+	return entries
+}
+
+// convertQuestItems copies the parsed quest item stacks into the
+// state view (the object id is inventory detail the tracker owns
+// through the ordinary item packets; the journal names the quest
+// bound items).
+func convertQuestItems(
+	source []fromgameserver.QuestItemEntry,
+) []state.QuestItemView {
+	items := make([]state.QuestItemView, 0, len(source))
+	for _, item := range source {
+		items = append(items, state.QuestItemView{
+			ItemID: item.ItemID,
+			Count:  item.Count,
+		})
+	}
+
+	return items
+}
+
 // convertSkills copies the parsed entries into state entries through
 // a fresh slice: the state layer stores its own map, but the parse
 // buffer is reused by the next packet, so the values must not alias
