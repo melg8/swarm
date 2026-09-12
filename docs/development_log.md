@@ -4248,3 +4248,84 @@ one-item-per-slot-per-trip invariants keep their semantics.
   Creamees sold the spellbook, Ariel bought "Leather Pants, Wooden
   Breastplate" (list 3014800) and the auto equipment equipped
   "Leather Pants (27) into the empty legs slot" - PASS.
+=======
+## Round 61: the trainer hall entry - the frozen corridor ban, the close teacher ring and the delevel median agreement (2026-09-12)
+
+The user reproduced the 2026-09-12 03:56 hang locally (build 6a2ac91,
+bot temp1, phase townWalk): the learn leg to the teacher Ellenia froze
+at the trainer hall west aisle entrance (44728 51992 -2792) - the
+geodata plan entered the building through the aisle column (44728
+51992 -> 44728 52040 -> 45160 52120), the 48 unit click into the
+aisile moved the character nowhere while the ported click validation
+accepted it in full, and the deterministic re-path reproduced the
+identical route until the budget aborted the trip. The user rule that
+came with the report: the character must walk from the building
+entrance right up to the training npc, not talk to it through the
+wall from wherever the leg happened to end.
+
+The live probe against the sandbox stack (the aisle cell, the exact
+dump clicks) walked the whole route clean - the sandbox server runs
+without geodata regions and accepts every click - which localized the
+freeze to a server whose geodata disagrees with the pack at the aisle
+cells. The fix therefore had to make the recovery work on any server
+configuration, not just the sandbox.
+
+Root causes found and fixed:
+
+- The frozen re-path had no escalation for town walk legs: the
+  identical deterministic route was re-planned forever. The escalation
+  ladder now climbs one rung per frozen abort of the same leg: (1) the
+  aimed waypoint's cells join the session's avoid areas (a new
+  FindPathApproachDryAvoiding search with banned patches - the A*, the
+  direct line shortcut and the smoothing all refuse the banned ground)
+  and the leg re-plans the detour around the corridor (the trainer
+  hall route goes north over the terrace and east past the hall); (2)
+  the follower drops the plan and clicks the stop target directly by
+  the server's own routing (the npc approach point of the stop, the
+  water guard and the aggro steering stay on), bounded by a 45 s
+  window; (3) the plain trip abort with its cooldown. The zone return
+  keeps its existing escalation (the direct zone legs).
+- waypointBehindRoute misjudged V-shaped detour routes: a far waypoint
+  the route doubles back from (the north climb of the hall detour)
+  projected "behind" the character although it sat 900+ units ahead,
+  and the short click extension then re-aimed the perfectly good
+  climb click at far route samples whose straight lines cross the
+  terrace walls - the freeze the walled aisle reproduction exposed.
+  Only a waypoint the character stands near counts as behind now.
+- The teach stop ended its walk on the wide 200 unit approach ring and
+  talked through the wall from there. The teach legs now search their
+  route within the close ring (npcApproachOffset, 150) with the wide
+  ring as the fallback, the tight legs complete their route end with
+  the pass radius instead of the wide trip slack, and the teacher
+  approach walks the npc approach point ring before the talk (the
+  approach window bounds the walk - a ring the server routing refuses
+  still talks from within the interaction distance, the 05:45 rule).
+- The delevel trigger fired on the flickering live zone median: the
+  building entry acceptance anchored Kaboo Orc Fighter SW (static
+  median 9, gap 6 - safe) and de-leveled a healthy level 15 anyway
+  when the respawn window left only the level 7 species alive. The
+  trigger now requires the static median of the anchored spot to agree
+  with the live one, and the spot picker skips grounds whose static
+  median sits at the delevel gap (the spot window admits level-8
+  grounds the deleveling immediately answers with guard deaths).
+
+The regressions and the acceptance:
+
+- The offline reproduction (hunt/building_entry_test.go) models the
+  freeze server with the walled aisle patches on the repro server sim:
+  the agreeing server walks the aisle plan clean and talks at 149
+  units; the walled server freezes exactly like the dump, climbs the
+  ladder (the ban, the detour), and talks within the interaction
+  distance. The pathfind ban tests pin the detour shape, the empty
+  ban equivalence and the sealed goal refusal.
+- The `building-entry` acceptance scenario (the user runnable mirror
+  of the report): the temp character temp5 wakes at the dump aisle
+  entrance with the dump's town visit start state (level 15, 20,000
+  SP, 100,000 adena, the empty inventory - the dump's own weapon run
+  trip arms at once, its exact first log line reproduces), buys the
+  gear and the spellbooks across the village merchants and walks the
+  teacher leg through the building entrance right up to Ellenia. The
+  live stack run of 2026-09-12 passed in 2 m 10 s: the weapon run,
+  the eleven purchases across Ariel, Unoren and Creamees, the teacher
+  leg reached Ellenia inside the hall and the first lesson (Power
+  Strike level 1) consumed its SP.

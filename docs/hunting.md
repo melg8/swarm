@@ -522,7 +522,29 @@ The short form:
   twice (the 2026-09-11 11:34 village return dump froze through two
   whole trip cycles this way), and the zone return escalates straight
   to the direct server routed legs (a frozen return sets the zone
-  fail budget) while the shop trips keep their cooldown recovery.
+  fail budget). The town walk legs climb their own escalation ladder
+  instead of dying on the first freeze (the 2026-09-12 03:56 trainer
+  hall dump: the learn leg froze at the aisle entrance through every
+  re-path of two whole trips - the server walled the corridor the
+  pack modeled as open): the frozen abort first bans the aimed
+  waypoint's cells as the session's avoid areas and re-plans the
+  detour around them (the pathfind search takes the banned patches -
+  a step onto banned ground costs impassable, and neither the direct
+  line shortcut nor the smoothing may collapse a leg across them, so
+  the trainer hall route goes north over the terrace and east past
+  the hall), then - if the detour freezes as well - the follower
+  drops the plan and clicks the stop target directly by the server's
+  own routing (the npc approach point of the stop, the water guard
+  and the aggro steering stay on), bounded by a 45 s window; only a
+  direct walk that also makes no progress ends the trip with its
+  cooldown. The ban list survives for the session (bounded to 8
+  areas) so the later trips route around the frozen corridor too.
+  The `waypointBehindRoute` gate only counts a waypoint the character
+  stands near: the V-shaped detour routes (the hall recovery climbs
+  far north before doubling back south east) carry waypoints hundreds
+  of units ahead whose position projects beyond the doubling segment,
+  and the projection test alone re-aimed their climb clicks at far
+  route samples whose straight lines cross the terrace walls.
   After the first stuck with no clear successor the short click
   extension arms: the clicks whose target sits under the server
   rescue floor (50 units - the server's own move validation only
@@ -592,20 +614,37 @@ The short form:
   the current waypoint and the destination - for exactly this class of
   debugging (see docs/webui.md).
 - Path layer selection: the trip legs navigate with
-  pathfind.Engine.FindPathApproachDry and the trip approach radius (200
-  units, under the interaction distance): the walk ends on the deck
-  ring around the merchant, which handles the C1 shop interiors (the
-  geodata holds no floor layer at the real merchant z - only a raised
-  surface and the water below) and the counters the same way, while the
-  water deck below the shop never satisfies the radius (the z difference
-  counts in the 3D distance). The water is a wall for the search, so
-  the walks cross the village ramps instead of swimming the lake under
-  the floating island (the 2026-09-09 fix; regression tests
-  `TestFindPathToShopDeck`, the synthetic water tests of
+  pathfind.Engine.FindPathApproachDry (through the Navigator's
+  FindPathApproachDryAvoiding - the dry search with the session's
+  frozen corridor bans) and the leg approach radius: the merchant
+  stops and the returns use the wide trip ring (200 units, under the
+  interaction distance): the walk ends on the deck ring around the
+  merchant, which handles the C1 shop interiors (the geodata holds no
+  floor layer at the real merchant z - only a raised surface and the
+  water below) and the counters the same way, while the water deck
+  below the shop never satisfies the radius (the z difference counts
+  in the 3D distance). The teacher stops search the close ring
+  instead (npcApproachOffset, 150 units) with the wide ring as the
+  fallback: the character walks right up to the training npc - the
+  geodata search is the one that knows the walkable ring cells (the
+  trainer hall interior carries its floor along the hall rows, the
+  straight line offset ring lands on the roof-only bands between
+  them), and the tight legs complete their route end with the pass
+  radius instead of the wide trip slack. The water is a wall for the
+  search, so the walks cross the village ramps instead of swimming
+  the lake under the floating island (the 2026-09-09 fix; regression
+  tests `TestFindPathToShopDeck`, the synthetic water tests of
   `search_test.go` and the dry search tests of `dry_search_test.go`).
   approachMerchant also
   gives up targeting when the merchant stands more than the interaction
-  distance above or below the character.
+  distance above or below the character. The teacher approach
+  (approachTeacher) walks the npc approach point ring before the talk
+  click fires (the 2026-09-12 user rule: the character walks from the
+  building entrance right up to the training npc), and the approach
+  window bounds the walk: a ring the server routing refuses to close
+  still talks from wherever the character stands when the 3D distance
+  fits the interaction gate (the 2026-09-11 05:45 z gap rule), a
+  teacher on a deck the ring cannot reach skips the stop.
 - The npc talk selection clears when the conversation ends: the
   merchant select and the teacher talk click leave the villager
   selected server side (the server never clears a selection, only the
@@ -714,7 +753,16 @@ death continuation, target exit, fight timeout, free death abort).
 Delevel trigger caveat: `MedianZoneMobLevel` sees only the known
 objects around the char; at the village (8000+ units from the fields)
 the median is 0 and the delevel does not re-trigger - by design the
-trigger fires only from the farm zone.
+trigger fires only from the farm zone. The live median flickers with
+the respawn windows (a ground whose designed mix sits close to the
+character level shows a transient median a full trigger lower while
+its higher species are down), so the trigger also requires the static
+median of the anchored spot to agree with the live one (the 2026-09-12
+building entry acceptance round de-leveled a healthy level 15 on the
+Kaboo Orc Fighter SW respawn window whose static median is 9), and the
+spot picker itself skips eligible grounds whose static median sits at
+the delevel gap - the spot window (level-8) admits grounds the
+deleveling would immediately answer with guard deaths.
 
 ## Live validated facts (2026-09-07 round, do not re-derive)
 

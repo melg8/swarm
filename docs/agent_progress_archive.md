@@ -4967,3 +4967,108 @@ for the full story and the probes.
   anchored the Spore Fungus SW spot, walked the village-to-zone route
   in ~70 s and engaged a Kaboo Orc Fighter on the zone entry -
   `Acceptance: PASS` in 68 s; `tools/mobius_e2e.sh 45` E2E_OK.
+
+## Active task: the farm readiness acceptance round - the one town visit and the pdef maximizing armor set (2026-09-11)
+
+Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+test (scenario 1, `farm-readiness`) passes but takes far too long and
+the bot acts suboptimally - it buys only the weapon/armor, walks to
+the farm spot, farms, and walks back for the books and the lessons.
+The demanded behavior:
+
+1. The bot buys the weapon, the armor, the spellbooks AND learns the
+   skills in ONE town visit, before it ever leaves for the farm spot.
+2. The bot spends its adena aggressively: the advanced armor pieces
+   inside the leftover budget of the weapon milestone, maximizing the
+   summed pdef of the whole set (the cheap multi slot fillers when
+   they maximize pdef, the single expensive piece when that wins).
+3. The jewels stay on the basic floor set in every slot (both halves
+   of the pairs): the starting locations barely attack with magic,
+   the mDef upgrades never pay.
+4. Root cause found and fixed: the old planner's armor floor bought
+   the cheapest piece of every empty armor family and the
+   one-per-slot guard then blocked the advanced upgrades for the rest
+   of the trip (the bot left town in the 8-88 pdef floor set with
+   ~20k adena unspent and walked back for the upgrades next trip);
+   the weapon budget rule capped the defense at the weapon reference
+   price; the jewel upgrades at level 15 burned 17k adena on mDef.
+5. Measure the post-fix acceptance duration and tighten the farm
+   scenario timeout to the measurement plus margin (the live mob
+   positions vary run to run).
+
+### Acceptance criteria
+
+- `gear.PlanPurchases` plans: the weapon milestone first, then the
+  pdef maximizing armor set (an exhaustive enumeration over the per
+  family efficient frontiers inside the remaining budget, one piece
+  per armor family per trip), the basic jewel floor (both pair
+  halves) behind a real weapon, the shield with the leftover.
+- No jewel upgrades ever, no weapon-budget cap on the armor.
+- The weapon run (a bare-handed character) carries the learning stops
+  too: the books and the teacher join the gear stops in the same
+  visit, the weapon stop runs first so an abort never strands the bot
+  unarmed. The learn stops plan at the sell stop behind the gear
+  stops, the book stop merges into the gear stop of its merchant.
+- The trip's gear plan reserves the spellbook budget
+  (`Loop.pendingBookBudget`) so the books always stay affordable.
+- `dropOwnedPurchases` counts family copies (the pair families carry
+  two) so the second ring/earring half buys instead of dropping.
+- Every change ships with its unit test; the lint gate stays clean on
+  the new lines.
+
+### Progress (2026-09-11)
+
+- Environment deployed per AGENTS.md before touching the code:
+  `tools/swarm_fast_deploy.sh` in the foreground with a 10 minute
+  timeout - `STACK_READY`, login 2106 / game 7777 / db 3306
+  listening; `tools/install_dev_tools.sh` green (task, golangci-lint,
+  gci, gofumpt); `go build ./...` green.
+- Commit "gear: the pdef maximizing armor set replaces the floor and
+  the defense phases": the planner phases are now the weapon
+  milestone, the armor set enumeration (`planWalk.armorPhase`,
+  `familyFrontier` with the sell-credit net costs, the dominance
+  pruning and `enumerateArmorSet`), the basic jewel floor (both pair
+  halves, `familyCopies`) and the leftover shield. The jewel
+  upgrades, the weapon budget rule (`defenseFits`, `defenseValue`),
+  the armor floor caches and the wishlist extension are gone; the
+  level parameter left the public API. The 100k adena level 15 plan
+  now buys the Brandish plus a 127 pdef armor set plus the five basic
+  jewels (99.9 percent of the wallet) where the old plan bought the
+  88 pdef floor and 17k adena of jewel upgrades.
+- Commit "hunt: the weapon run carries the learning stops - one town
+  visit buys the weapon, the armor, the books and teaches": the learn
+  stops plan at the sell stop behind the gear stops (the book stop
+  merges into the gear stop of its merchant - Creamees sells both the
+  basic jewels and the spellbooks), `Loop.pendingBookBudget` reserves
+  the spellbook adena out of the gear planning wallet and
+  `dropOwnedPurchases` counts the family copies. The updated tests
+  pin the new flow (`TestWeaponlessRunCarriesLearning`,
+  `TestLearnTripTriggersOnTheSkillBudget`,
+  `TestLearnTripBuysTheSpellbooks`).
+- Commit "docs: the weapon-first shop strategy, the pdef maximizing
+  armor set and the one town visit rule": `docs/shopping_strategy.md`
+  rewritten around the new phases (the acceptance wallet check, the
+  new was/is journey table), `docs/hunting.md` shop strategy section
+  and the weapon run paragraph updated.
+- Commit "gear: the basic jewel floor reserves ahead of the armor
+  set": the first acceptance measurement run (481 s, PASS) showed the
+  armor enumeration eating the wallet down to 53 adena - only 3 of
+  the 5 jewel slots filled and a second village walk would follow for
+  the remaining pair halves. The phase order is now the weapon
+  milestone, the basic jewel floor (the 261 adena outfit covers every
+  slot first), the pdef maximizing armor set and the leftover shield:
+  the second measurement run bought all five jewels with the
+  125 pdef armor set (472 s, PASS).
+- Commit "acceptance: the farm readiness timeout tightened to the
+  measured one town visit round": farmTimeout drops from 30 to
+  20 minutes - the fixed flow measures 472-481 s (the lessons pacing
+  dominates), the bound holds two and a half times that for the live
+  run variance (the mob positions, the walk retries, the road fights).
+- Status: done (2026-09-12). Two full acceptance runs PASS at 481 s
+  and 472 s; `go build ./...`, the full `go test ./...` suite and
+  `golangci-lint run --new` are green.

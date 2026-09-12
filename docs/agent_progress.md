@@ -160,110 +160,85 @@ recovery built for exactly this refusal never armed. See
   decides whether level A clears the line or level B switches the
   target - both are pinned and bounded).
 
-## Active task: the farm readiness acceptance round - the one town visit and the pdef maximizing armor set (2026-09-11)
+## Active task: the trainer hall building entry - the frozen corridor ban and the close teacher ring (2026-09-12)
 
-Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.
+Started: 2026-09-12. Branch: `feature/proxy-server`. Commits as melg8.
 Other agents may push to the same branch concurrently - rebase before
 every push.
 
 ### Goal
 
-test (scenario 1, `farm-readiness`) passes but takes far too long and
-the bot acts suboptimally - it buys only the weapon/armor, walks to
-the farm spot, farms, and walks back for the books and the lessons.
-The demanded behavior:
+The user reproduced the 2026-09-12 03:56 hang locally (build 6a2ac91,
+bot temp1, phase townWalk, the state dump of the report): the
+character could not enter the trainer hall building - the learn leg to
+the teacher Ellenia froze at the west aisle entrance (44728 51992
+-2792) through every re-path of its trip. The demands:
 
-1. The bot buys the weapon, the armor, the spellbooks AND learns the
-   skills in ONE town visit, before it ever leaves for the farm spot.
-2. The bot spends its adena aggressively: the advanced armor pieces
-   inside the leftover budget of the weapon milestone, maximizing the
-   summed pdef of the whole set (the cheap multi slot fillers when
-   they maximize pdef, the single expensive piece when that wins).
-3. The jewels stay on the basic floor set in every slot (both halves
-   of the pairs): the starting locations barely attack with magic,
-   the mDef upgrades never pay.
-4. Root cause found and fixed: the old planner's armor floor bought
-   the cheapest piece of every empty armor family and the
-   one-per-slot guard then blocked the advanced upgrades for the rest
-   of the trip (the bot left town in the 8-88 pdef floor set with
-   ~20k adena unspent and walked back for the upgrades next trip);
-   the weapon budget rule capped the defense at the weapon reference
-   price; the jewel upgrades at level 15 burned 17k adena on mDef.
-5. Measure the post-fix acceptance duration and tighten the farm
-   scenario timeout to the measurement plus margin (the live mob
-   positions vary run to run).
+1. A dedicated test for entering the building (the entrance -> the
+   npc walk).
+2. The character must walk from the building entrance right up to the
+   training npc ("вплотную к npc для обучения") - not talk to it
+   through the wall from wherever the geodata leg happened to end.
+3. Fix the situation in general: the freeze must recover on any
+   server configuration, whatever geodata disagreement causes it.
 
 ### Acceptance criteria
 
-- `gear.PlanPurchases` plans: the weapon milestone first, then the
-  pdef maximizing armor set (an exhaustive enumeration over the per
-  family efficient frontiers inside the remaining budget, one piece
-  per armor family per trip), the basic jewel floor (both pair
-  halves) behind a real weapon, the shield with the leftover.
-- No jewel upgrades ever, no weapon-budget cap on the armor.
-- The weapon run (a bare-handed character) carries the learning stops
-  too: the books and the teacher join the gear stops in the same
-  visit, the weapon stop runs first so an abort never strands the bot
-  unarmed. The learn stops plan at the sell stop behind the gear
-  stops, the book stop merges into the gear stop of its merchant.
-- The trip's gear plan reserves the spellbook budget
-  (`Loop.pendingBookBudget`) so the books always stay affordable.
-- `dropOwnedPurchases` counts family copies (the pair families carry
-  two) so the second ring/earring half buys instead of dropping.
-- Every change ships with its unit test; the lint gate stays clean on
-  the new lines.
+- An offline reproduction with the exact dump positions against the
+  real geodata pack models the freeze (a server that walls the aisle
+  corridor the pack models as open) and passes with the recovery.
+- A live acceptance scenario (`building-entry`) runs the whole dump
+  town visit from the aisle entrance: the weapon run, the purchases,
+  the teacher leg through the building entrance, the first lesson.
+- The full verify loop green: build, vet, the full test suite, gofmt,
+  `golangci-lint run --new` clean (the full count stays at the
+  pre-existing baseline).
 
-### Progress (2026-09-11)
+### Progress (2026-09-12)
 
-- Environment deployed per AGENTS.md before touching the code:
-  `tools/swarm_fast_deploy.sh` in the foreground with a 10 minute
-  timeout - `STACK_READY`, login 2106 / game 7777 / db 3306
-  listening; `tools/install_dev_tools.sh` green (task, golangci-lint,
-  gci, gofumpt); `go build ./...` green.
-- Commit "gear: the pdef maximizing armor set replaces the floor and
-  the defense phases": the planner phases are now the weapon
-  milestone, the armor set enumeration (`planWalk.armorPhase`,
-  `familyFrontier` with the sell-credit net costs, the dominance
-  pruning and `enumerateArmorSet`), the basic jewel floor (both pair
-  halves, `familyCopies`) and the leftover shield. The jewel
-  upgrades, the weapon budget rule (`defenseFits`, `defenseValue`),
-  the armor floor caches and the wishlist extension are gone; the
-  level parameter left the public API. The 100k adena level 15 plan
-  now buys the Brandish plus a 127 pdef armor set plus the five basic
-  jewels (99.9 percent of the wallet) where the old plan bought the
-  88 pdef floor and 17k adena of jewel upgrades.
-- Commit "hunt: the weapon run carries the learning stops - one town
-  visit buys the weapon, the armor, the books and teaches": the learn
-  stops plan at the sell stop behind the gear stops (the book stop
-  merges into the gear stop of its merchant - Creamees sells both the
-  basic jewels and the spellbooks), `Loop.pendingBookBudget` reserves
-  the spellbook adena out of the gear planning wallet and
-  `dropOwnedPurchases` counts the family copies. The updated tests
-  pin the new flow (`TestWeaponlessRunCarriesLearning`,
-  `TestLearnTripTriggersOnTheSkillBudget`,
-  `TestLearnTripBuysTheSpellbooks`).
-- Commit "docs: the weapon-first shop strategy, the pdef maximizing
-  armor set and the one town visit rule": `docs/shopping_strategy.md`
-  rewritten around the new phases (the acceptance wallet check, the
-  new was/is journey table), `docs/hunting.md` shop strategy section
-  and the weapon run paragraph updated.
-- Commit "gear: the basic jewel floor reserves ahead of the armor
-  set": the first acceptance measurement run (481 s, PASS) showed the
-  armor enumeration eating the wallet down to 53 adena - only 3 of
-  the 5 jewel slots filled and a second village walk would follow for
-  the remaining pair halves. The phase order is now the weapon
-  milestone, the basic jewel floor (the 261 adena outfit covers every
-  slot first), the pdef maximizing armor set and the leftover shield:
-  the second measurement run bought all five jewels with the
-  125 pdef armor set (472 s, PASS).
-- Commit "acceptance: the farm readiness timeout tightened to the
-  measured one town visit round": farmTimeout drops from 30 to
-  20 minutes - the fixed flow measures 472-481 s (the lessons pacing
-  dominates), the bound holds two and a half times that for the live
-  run variance (the mob positions, the walk retries, the road fights).
-- Status: done (2026-09-12). Two full acceptance runs PASS at 481 s
-  and 472 s; `go build ./...`, the full `go test ./...` suite and
-  `golangci-lint run --new` are green.
+- The live probe against the sandbox stack walked the dump clicks
+  clean (the sandbox server runs without geodata regions and accepts
+  every click), localizing the freeze to a server whose geodata
+  disagrees with the pack at the aisle cells - the fix had to make
+  the recovery work on any server configuration.
+- Commit "pathfind: the avoid areas of the approach search": a new
+  `FindPathApproachDryAvoiding` search takes banned world patches -
+  the A*, the direct line shortcut and the smoothing all refuse the
+  banned ground, so a route around the corridor exists whenever one
+  exists at all.
+- Commit "hunt: the frozen leg escalation ladder": the frozen abort
+  of a town walk leg climbs rungs - the corridor ban re-plan first
+  (the session keeps the ban), the direct server routed walk second
+  (the stop's npc approach point, bounded by a 45 s window), the
+  plain trip abort last. The zone return keeps its own escalation.
+  The `waypointBehindRoute` far-waypoint sabotage fixed (the V-shaped
+  detour routes misjudged their far waypoints as behind).
+- Commit "hunt: the teach legs walk the close ring up to the npc":
+  the teacher stops search their route within npcApproachOffset with
+  the wide ring fallback, the tight legs complete their route end
+  with the pass radius, and the teacher approach walks the npc
+  approach point ring before the talk (the approach window owns the
+  dead ends).
+- Commit "hunt: the delevel trigger requires the static spot median
+  agreement": the live zone median flickers with the respawn windows
+  and de-leveled a healthy level 15 on the building entry round; the
+  trigger now requires the anchored spot's static median to agree and
+  the spot picker skips grounds whose static median sits at the gap.
+- Commit "acceptance: the building entry scenario": the temp5
+  character wakes at the dump aisle entrance with the dump's town
+  visit start state (level 15, 20k SP, 100k adena, the empty
+  inventory - the dump's own weapon run arms at once, its exact
+  first log line reproduces) and must reach Ellenia inside the hall
+  with a lesson consumed. The live stack run passed in 2 m 10 s:
+  the weapon run, the eleven purchases across Ariel, Unoren and
+  Creamees, the teacher leg reached Ellenia inside the hall, Power
+  Strike level 1 learned.
+- Status: done (2026-09-12). The offline reproduction
+  (hunt/building_entry_test.go) passes on both the agreeing server
+  (the aisle plan walks clean, the talk at 149 units) and the walled
+  model (the ladder rescues the leg, the talk within the interaction
+  distance); the pathfind ban tests pin the detour shape; the full
+  verify loop is green.
 
 ## Active task: the sidebar split, the test widget buttons and the CLI acceptance flag (2026-09-11)
 
