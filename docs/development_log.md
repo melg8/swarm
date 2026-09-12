@@ -4441,3 +4441,54 @@ farmed level 1 to 2 in 120 s (9984 XP/h, 0 deaths, 0 stuck events, 28
 adena), the bot left the world gracefully, and runs/metrics.jsonl
 received the PASS row. The 8-hour M1 proof is a follow-up operator
 run (the machinery is duration-agnostic).
+
+## Round 63: the 20-25 band survey - the ladder beyond the elven lands and the aggression default correction (2026-09-12)
+
+The M3 preparation needed the ground truth of the first band beyond
+the elven ladder: which 20-25 grounds exist, how a character reaches
+them from the elven lands and what services them. The elven survey
+knowledge lived scattered across hunting.md and the generated
+registry, and nothing mapped the next band - the ROADMAP M3 entry
+("zone registries for the 20+ grounds reachable from the elven
+lands") had no data to build on.
+
+The survey (T-006, scope: docs/ and tools/generate_hunt_zones.py):
+
+- tools/generate_hunt_zones.py grew the `--survey MIN MAX` mode: it
+  scans every spawn territory of the data pack for the band mobs,
+  joins the npc stats (level, hp, exp, the ai block) and prints the
+  grounds with the walking distance from the teleport network
+  arrival points. The default registry mode is untouched (verified:
+  the regenerated zones_elven.go is byte identical).
+- docs/band_20_25_survey.md: the transport reality (no 20-25 mobs in
+  the elven lands at all - the band lives 84k+ units out and rides
+  the Mirabel -> Bella -> Trisha gatekeeper chain, 13 600 one way),
+  the four ground families (the Execution Grounds mandragora ladder
+  20-25 with a passive start, the magic-fighting mist leeches of the
+  Cruma edge, the mixed plains grounds, the wasteland watchers), the
+  Dion merchant counters (Sabrin/Casey/Sonia/Lara with their
+  buylists), the teacher economy (the elven village masters stay the
+  teachers - a 25 200 adena lesson round trip) and the spellbook gap
+  (Cure Bleeding is not sold in the elven village; Dion's Sonia has
+  it).
+- The follow-up list became the backlog tasks T-008 (the gatekeeper
+  teleport flow), T-009 (the band zone registry) and T-010 (the band
+  gear catalogs); the rest (the walk leg verification, the book
+  routing, the band acceptance scenario) is documented in the survey.
+- The survey also refuted a "verified" claim of
+  docs/navigation_analysis.md: the C1 monsters do NOT "never attack
+  on sight" - NpcTemplate fills isAggressive TRUE when the xml
+  omits the attribute, so the mandragoras and dire wolves of the
+  band (and the Kaboo Orc Fighter of the elven lands, as AGENTS.md
+  already recorded live) attack on sight; only the explicit
+  isAggressive="false" mobs (the leeches, the gazers) ignore a
+  passing walker. The danger model section now carries the corrected
+  reading with the Java line reference.
+
+Verification: the survey numbers come from the live Mobius checkout
+the stack runs (the spawn files, npc stats, teleporter xml); the
+generator regression is byte identical output;
+`go build ./...` green, `golangci-lint run --new` 0 issues; docs +
+tooling only, no bot behavior changed, no e2e required. The
+per-mob aggression readings were double-checked against
+NpcTemplate.java and the npc xml directly.
