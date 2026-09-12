@@ -523,6 +523,30 @@ loop picks by the active zone region. The shopping_strategy.md gains
 the Dion shop section. The elven village behavior stays unchanged
 (the M0 acceptance still passes).
 
+### T-018: the walking leg verification of the elven lands to Dion
+
+status: in_progress
+milestone: M3
+priority: P3
+deps: -
+scope: docs/, internal/swarm/pathfind/ (throwaway probe, no committed
+  code changes)
+
+Survey follow-up 4 of docs/band_20_25_survey.md: run the geodata
+pathfinder Elven Village -> Gludio -> Dion (the Neutral Zone
+corridor) with the raised expansion cap and region cache of the
+navigation analysis (40M nodes, 16 regions) and record whether a
+walk route exists at all - the teleport-only assumption of the band
+survey stands on it. Verification only: the probe runs as a
+throwaway test (not committed), the findings land in the survey doc
+and the navigation analysis (a confirmed gap backs the meta
+transport plan; a found route becomes the cheap lesson leg of the
+band economy).
+
+claimed: zones-zai 2026-09-12 09:45 UTC
+resume: fresh claim. Next: the temporary cap patch, the route probe
+  test, the recorded findings, the revert.
+
 claimed: soak-z 2026-09-12 09:17Z
 resume: done 2026-09-12 09:40Z. dionMerchants (town.go), dionShopCatalog
   + shopCatalogForRegion + dionTownTaxRate (shopping.go), regionDion +
