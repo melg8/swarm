@@ -450,7 +450,7 @@ resume: done 09:40 UTC - hunt/quest_chains.go + the pin tests
 
 ### T-016: the class transfer acceptance scenario
 
-status: todo
+status: in_progress
 milestone: M2
 priority: P2
 deps: T-015
@@ -466,8 +466,30 @@ selection packet agreement after a relogin. The gatekeeper legs
 (the elven village -> Gludio hop) join once T-008 closes. This is
 the task that CLOSES M2 (the live acceptance run).
 
-claimed: -
-resume: -
+claimed: soak-z 2026-09-12 09:28Z
+resume: claimed (session partial - design only, no code yet). The
+  deps are all done: T-015 ships hunt/quest_chains.go
+  (ElvenKnightChain() + ElvenKnightClassChange() + QuestStageByCond,
+  the npc/kill/stage data pinned to the Java quest scripts), T-003
+  ships acceptance/level_milestone.go (the DB-inject level N +
+  runSessionSupervised + the level-N+1 watch, temp8) and T-008
+  ships the gatekeeper packet chain (Mirabel -> Gludio hop). Next
+  agent: (1) add a hunt-loop quest trip phase (hunt/quest_trip.go,
+  new file) that consumes a QuestChain: walk to the quest npc,
+  ClickObject, drive the dialog walker (the T-014 walker) through
+  the stages by cond, walk to the kill grounds, engage the quest
+  mobs until the item counters fill, return to the npc for the next
+  stage, until the chain cond reaches the class change; (2) add the
+  acceptance scenario acceptance/class_transfer.go (temp9, DB-inject
+  level 19 ELVEN_FIGHTER at Gludio 15671 142994 -2706, run the quest
+  trip phase under runSessionSupervised, pass when SelfClassID ==
+  19 + the char selection packet after relogin); (3) register the
+  scenario in scenarios.go; (4) live-verify with
+  -acceptance class-transfer (CLOSES M2). Scope note: the quest trip
+  phase is the bulk (a new hunt/quest_trip.go wiring the T-014
+  walker + the T-015 data + the engage loop); estimate ~1.5h, too
+  big for the 13 min left of this session. Claimed to hand off the
+  plan, not to block the next agent.
 
 ### T-017: the multi-town gear catalog selection
 
