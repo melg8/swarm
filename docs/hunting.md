@@ -449,6 +449,30 @@ The short form:
   equipment runs during the trips so the purchases are worn at the shop
   already. The catalogs are generated from the Mobius buylists
   (`tools/generate_shop_catalogs.sh`, keyed by packet template id).
+- **The gear debt** (the 2026-09-12 04:58 pantsless dump): the
+  sell-first step is one-way - a sale that lands while its
+  replacement buy fails (a silently refused request, a merchant
+  no-show, a walk abort, a session death the relogin resumed into
+  the return leg) strands the slot, and every trip exit used to end
+  the trip as a success. Now the trip start snapshots the worn
+  slots (`Loop.snapshotTripGear`) and every exit (`endTownTrip`,
+  the interrupt `resetTownTrip`) compares the reached paperdoll
+  against it (`Loop.gearDebtCheck`): a slot that was occupied, sits
+  empty and whose piece is gone becomes gear debt - the map entry
+  carries the lost item id, the arming logs the wound ("the trip
+  left the legs slot empty - the Leather Pants it started with is
+  gone") and the debt shortens the trip cooldown to the gear run
+  window (`gearDebtRunWanted`, the 45 s window of the weapon run)
+  until the refill dresses the slot (a log line clears the entry).
+  The debt never justifies a trip on its own - the ordinary
+  triggers fire the refill the moment the plan affords it, on the
+  short cadence. The state dump names the holes the equipment
+  section used to hide: the "empty slots:" line below the worn
+  pieces (the report's bot farmed the Kaboo woods without its legs
+  armor and the dump printed nothing about it). Pinned by
+  hunt/round60_repro_test.go and the live "gear-gap" acceptance
+  scenario (acceptance/gearGapReset: the exact dump character must
+  buy its legs armor back).
 - The path plan comes from the pathfind engine through the
   hunt.Navigator interface (set in main.go with hunt.NewNavigator from
   the auto detected geodata directory; without geodata the bot hunts

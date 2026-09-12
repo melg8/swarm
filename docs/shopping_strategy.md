@@ -189,6 +189,30 @@ can never eat the book money - the books always stay affordable in
 the same visit, and the acceptance round finishes its shopping,
 its book buying and its lessons in ONE walk through the village.
 
+**Rule 2c - the gear debt (the 2026-09-12 pantsless report).** No
+town trip may leave a paperdoll slot worse than it found it: the
+trip start snapshots the worn slots (`Loop.snapshotTripGear`) and
+every trip exit - the normal end, the aborts, the attacker
+interrupt, the relogin-resumed return leg - compares the reached
+paperdoll against the snapshot (`Loop.gearDebtCheck`). A slot that
+was occupied, sits empty now and whose piece is gone from the
+inventory was sold for a replacement that never landed (a silently
+refused buy, a merchant that never showed up, a walk abort, a
+session death mid trip): it becomes GEAR DEBT. The debt logs the
+loss ("the trip left the legs slot empty - the Leather Pants it
+started with is gone"), shortens the trip cooldown to the gear run
+window (the 45 s `weaponRunCooldown` - farming without the armor
+the merchant sold is the same wound the weapon run answers for
+bare hands) and clears with a log line the moment the slot is
+dressed again. The debt never justifies a trip on its own: a broke
+wallet cannot buy the filler, the ordinary triggers (the affordable
+plan of the refill) fire the trip on the short cadence the moment
+the wallet affords it. The state dump answers for the holes the
+equipment section used to hide: the "empty slots:" line under the
+worn pieces names every unfilled family (the report's bot carried
+an invisible wound - the dump printed only the occupied slots, so
+a character farming without its legs armor read as a fine outfit).
+
 **Rule 3 - the gear feeds the zone ladder.** The hunting zones gate
 on gear points (`gear.TotalGearPoints`: the weapon damage per hit
 plus the defenses, in character-stat-sheet units). The intended
@@ -338,6 +362,13 @@ and Ring of Wisdom mDef upgrades.
   multi-stop buy execution, the transaction pacing and the widget
   view publish (`publishShoppingView`: the queue while hunting, the
   remaining trip buys while a town trip runs).
+- `internal/swarm/hunt/round60_repro_test.go` - the gear debt
+  reproduction of the 2026-09-12 pantsless dump: the full stranding
+  flow (the sell first sale, the lost buys, the debt arming), the
+  refill trip, the debt lifecycle and the fresh loop self heal.
+- `internal/swarm/gear/round60_repro_test.go` - the dump wallet
+  pins: the affordable prefix plans the Leather Pants filler for
+  the empty legs slot.
 - `internal/swarm/hunt/learning.go` - the learn stop planning (the
   books merge into the gear stop of their merchant, the teacher
   closes the trip) and the lesson execution.

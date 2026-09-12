@@ -11,6 +11,39 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the round 60 gear debt - the pantsless town trip of the 2026-09-12 04:58 dump (2026-09-12)
+
+Started: 2026-09-12. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user reported (state dump, build 4deb888, bot test2, phase
+engage, uptime 1m44s) that the level 14 elven fighter returned from
+its town trip WITHOUT the legs armor: every other slot filled, the
+bag holding nothing but the 13162 adena, "town trip ended: back at
+the farm spot" ten seconds before the dump. Find out why the bot
+stayed without its pants and fix the market handling so similar
+problems can never arise again.
+
+### Acceptance criteria
+
+- The root cause is named and documented (development_log round 60).
+- A town trip can never strand a paperdoll slot silently: every trip
+  exit detects a slot it left worse than it found it and arms gear
+  debt with a log line.
+- The armed debt shortens the trip cooldown to the gear run window
+  and the refill trip dresses the slot; the debt clears on the
+  refill.
+- The state dump shows the empty paperdoll families (the report's
+  hole was invisible - only occupied slots printed).
+- Reproductions pin the machinery at the unit level and the exact
+  dump state is injected into a live acceptance scenario ("gear
+  gap") that must buy the legs armor back.
+- go build, the full test suite and `golangci-lint run --new` green;
+  the live scenario PASSes against the deployed stack.
+
 ## Active task: the sidebar LIVE/TESTS tab switch (2026-09-12)
 
 Started: 2026-09-12. Branch: `feature/proxy-server`. Commits as melg8.
@@ -1948,3 +1981,57 @@ live stack; go build/vet/test/lint stay green.
 - go build/vet/test green, golangci-lint run --new: 0 issues; all
   four commits rebased over the shop freeze round and pushed.
 - Next: none - the round is complete.
+
+### Progress (2026-09-12, round 60: the pantsless return)
+
+- Environment deployed fresh (swarm_fast_deploy.sh: STACK_READY, 75
+  tables) and the dev tools installed; the branch checked out at
+  4deb888.
+- Root cause analysis: the sell-first step of the town trips banks
+  the credit of displaced equipped pieces before the replacement
+  buy; every exit between the two (a silently refused buy after the
+  3 retries, a merchant no-show, an attacker interrupt that drops
+  the whole trip, a walk abort, a session death the relogin resumed
+  into the return leg) ends the trip without the replacement and
+  nothing detects the regression - the five minute cooldown armed
+  and the bot farmed on half dressed. The dump's own session
+  started at the village (the previous session died mid trip) and
+  the return leg finished as a success ten seconds before the dump.
+- Commit "hunt: the gear debt - the town trip answers for the slot
+  it stranded": the trip start snapshots the paperdoll
+  (snapshotTripGear), every exit (endTownTrip, the interrupt
+  resetTownTrip) arms gear debt for a slot that was occupied, sits
+  empty and whose piece is gone (gearDebtCheck, a log line names
+  the slot and the lost piece), the debt shortens the trip cooldown
+  to the gear run window (gearDebtRunWanted) and clears with a log
+  line when the slot is dressed again (clearRefilledDebt). The trip
+  start reason appends "(the gear debt refill)".
+- Commit "webui: the state dump names the empty paperdoll slots":
+  the equipment section lists the unfilled families below the worn
+  pieces ("empty slots: ..."), so the next pantsless report shows
+  the hole at a glance (the two hand weapon and the one-piece
+  blockers stay unlisted).
+- Reproductions: gear/round60_repro_test.go (the planner plans the
+  Leather Pants filler for the empty legs of the dump wallet) and
+  hunt/round60_repro_test.go (the full stranding flow arms the debt
+  with the short cooldown, the debt runs the refill trip, the debt
+  lifecycle clears on the refill, the interrupt exit arms it, a
+  fresh loop self-heals the dump state).
+- Commit "acceptance: the gear gap scenario replays the pantsless
+  dump and buys the legs armor back": the temp5 account wakes as
+  the exact dump character (the 11 piece paperdoll minus the legs,
+  13162 adena, the reported farm spot) and the run passes when the
+  legs slot is dressed again. The zone-return and gear-gap
+  scenarios share the new runSupervisedScenario skeleton (the dupl
+  finding of the round).
+- go build, gofmt, the full test suite (19 packages) and
+  `golangci-lint run --new` (0 issues) green.
+- Live verification: `-acceptance gear-gap` against the deployed
+  stack PASSED - the plan triggered the trip, the sell-first sold
+  the displaced Leather Shirt, Ariel bought "Leather Pants, Wooden
+  Breastplate" and the auto equipment equipped "Leather Pants (27)
+  into the empty legs slot".
+- Docs: development_log round 60, shopping_strategy Rule 2c (the
+  gear debt), the hunting.md town trip section, the AGENTS.md
+  documentation map unchanged (the shopping doc entry covers it).
+- Status: done (2026-09-12).

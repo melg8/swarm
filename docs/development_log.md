@@ -4131,3 +4131,120 @@ casting Power Strike at it every 15 s, forever.
   reads as a running fight), the stale refusal scoping, the stuck
   timeout through the stale attack stance, the timeout hold during
   the recovery walk.
+
+## Round 60: the pantsless return - the town trip that sold the legs armor and never bought it back (2026-09-12)
+
+The user report (the 04:58 state dump, build 4deb888, bot test2,
+phase engage, uptime 1m44s): the level 14 elven fighter returned
+from its town trip WITHOUT the legs armor - the equipment held 11
+pieces (Sickle, Buckler, Leather Shirt, Wooden Helmet, Gloves,
+Leather Shoes, the basic jewel set), every slot filled except the
+legs, the bag held nothing but the 13162 adena, and the event log
+closed with "Hunt: town trip ended: back at the farm spot" ten
+seconds before the dump. The session had started at the village
+(the previous session died mid trip; the loop state survives the
+relogin, so the return leg resumed and finished as a success). The
+state dump itself could not even show the wound: the equipment
+section prints only the occupied slots, so the missing legs line
+was invisible.
+
+### Root cause (the sell first step is one-way)
+
+The town trip machinery banks the sell credit of displaced
+equipped pieces BEFORE the replacement buy runs (the planner
+counts the credit toward the budget so a character shops for a
+replacement as soon as the adena plus the proceeds cover it). Every
+exit path between the sale and the buy strands the slot silently:
+
+1. The buy requests the server silently refuses (the transaction
+   flood window, a lost adena update, a selection reset) never
+   deliver the items; the stop re-requests the batch three times
+   and then SKIPS it ("purchases never arrived, skipping them") -
+   the purchase dies with the sold piece already gone.
+2. A merchant that never showed up (or stands on another deck)
+   resets the stop buys the same way.
+3. An attacker interrupt mid trip drops the whole trip
+   (resetTownTrip) - the sold pieces stay sold.
+4. A walk abort, the trip timeout, a session death (the exact dump
+   path: the relogin landed in the return leg) - the trip ends as
+   a success without the replacement.
+
+`endTownTrip` cleared the trip state happily and armed the five
+minute ordinary trip cooldown; nothing compared the paperdoll the
+trip started with against the paperdoll it reached, so the bot
+farmed the Kaboo woods half dressed with no diagnostics line and
+no priority. The weapon had its dedicated weaponless run (the
+short 45 s cooldown and the trip justification of Rule 2a); the
+armor slots had nothing.
+
+The planner itself was never broken: against the exact dump state
+(legs empty, 13162 adena) it plans the Leather Pants filler
+(1747 adena with tax) plus the Wooden Breastplate - the recovery
+path existed, it just was neither prioritized nor visible.
+
+### Fix (the gear debt - the trip answers for what it stranded)
+
+1. `hunt/town.go` (`snapshotTripGear`, called from
+   `maybeStartTownTrip`): the trip start snapshots the paperdoll
+   object ids and item ids it begins with.
+2. `hunt/shopping.go` (`gearDebtCheck`, called from every trip
+   exit - `endTownTrip` and the interrupt/death `resetTownTrip`):
+   every slot that was occupied at the start, sits empty now and
+   whose piece is gone from the inventory becomes gear debt - the
+   map entry carries the lost item id. A piece that still sits in
+   the bag is no debt (the auto equipment re-wears it). The arming
+   logs the wound for the state dump reports: "the trip left the
+   legs slot empty - the Leather Pants it started with is gone
+   (sold for a replacement that never landed)".
+3. `hunt/shopping.go` (`gearDebtRunWanted`): the armed debt
+   shortens the trip cooldown to the gear run window (the 45 s
+   weapon run cooldown - farming without the armor the merchant
+   sold is the same wound the weapon run answers for bare hands).
+   The debt does NOT justify a trip by itself: a broke character
+   cannot buy the filler anyway, the ordinary triggers fire the
+   moment the plan affords it - on the short cadence. The refilled
+   entries clear with a log line ("the legs slot is dressed again,
+   the gear debt clears"), so the priority never outlives its
+   wound.
+4. `webserver/dump.go` (`dumpEmptySlots`): the state dump
+   equipment section lists the EMPTY paperdoll families below the
+   worn pieces ("empty slots: legs, ..."), so the next pantsless
+   report shows the hole at a glance instead of hiding it.
+5. The trip start reason appends "(the gear debt refill)" while a
+   debt is armed, so the refill trip names itself in the log tail.
+
+The trip justification and the shopping planner are unchanged: the
+debt only hurries the cooldown, the frozen trip plan and the
+one-item-per-slot-per-trip invariants keep their semantics.
+
+### Verification
+
+- go build, gofmt clean, golangci-lint --new zero findings, the
+  full go test suite green (19 packages).
+- The exact dump state replays and pins the machinery
+  (hunt/round60_repro_test.go): the full stranding flow (the sell
+  first sale lands, the buy requests never arrive, the retry
+  budget skips them, the return leg ends the trip) arms the debt
+  with the log line and the short cooldown
+  (TestRound60DebtArmsOnStrandedReplacement); the debt runs the
+  refill trip whose plan carries the Leather Pants
+  (TestRound60DebtRunsTheRefillTrip); the refill clears the debt
+  (TestRound60DebtClearsOnRefill); the interrupt exit
+  (resetTownTrip) arms the debt of the already sold piece
+  (TestRound60ResetTownTripArmsDebt); a fresh loop with no trip
+  history refills the dump state through the ordinary trigger
+  alone (TestRound60FreshLoopRefillsTheDumpState).
+- The planner side of the dump state is pinned in
+  gear/round60_repro_test.go: the affordable prefix plans the
+  Leather Pants for the empty legs slot of the 13162 adena wallet
+  and the slot model of the dump reconstruction is correct.
+- Live verification against the deployed Mobius stack (the new
+  "gear-gap" acceptance scenario, acceptance gearGapReset): the
+  temp5 character wakes at the reported farm spot (38344 46248
+  -3592) as the exact dump character - the 11 piece paperdoll
+  minus the legs, the 13162 adena, nothing in the bag - and the
+  run must dress the legs slot again. Observed: the plan triggered
+  the town trip, the sell first sold the displaced Leather Shirt,
+  Creamees sold the spellbook, Ariel bought "Leather Pants, Wooden
+  Breastplate" (list 3014800) and the auto equipment equipped
+  "Leather Pants (27) into the empty legs slot" - PASS.
