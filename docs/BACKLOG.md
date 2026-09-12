@@ -346,7 +346,7 @@ resume: fresh claim; the real quest/master/trainer pages of the
 
 ### T-013: the open dialog section of the tracker
 
-status: in_progress
+status: done
 milestone: M2
 priority: P2
 deps: T-011, T-012
@@ -363,6 +363,8 @@ IsDialogCommand mirrors the server side validateHtmlAction rules
 fires commands the open page actually offered.
 
 claimed: agent-quest 2026-09-12 08:18 UTC
-resume: fresh claim; the T-012 link parser feeds the links, the
-  T-011 journal pattern (replace whole, reset with the session)
-  is the shape.
+resume: done 08:27 UTC - state/dialog.go with the page store, the
+  accessors and the IsDialogCommand mirror of
+  Player.validateHtmlAction (exact or the trimmed '$' prefix).
+  The 0x1B dispatcher case that feeds ApplyDialog stays with
+  T-008 (connection/ is their scope).

@@ -2607,3 +2607,33 @@ closed (T-009/T-010 still wait on T-008).
   - docs/quest_protocol.md: the follow-up list marks the link
     parser landed (and the T-011 journal parser landed).
 - Status: done (2026-09-12, 08:25 UTC).
+
+## Active task: T-013 the open dialog section of the tracker
+
+Started: 2026-09-12 08:18 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. Agent label: agent-quest.
+
+### Progress
+
+- 08:18-08:27 UTC: implemented and verified:
+  - state/dialog.go: the open dialog page of the NPC_HTML scope
+    (the npc origin, the item id, the links) - ApplyDialog replaces
+    the page whole (one page per scope, the same semantics as the
+    server cache), the accessors (DialogLinks defensive copy,
+    DialogOrigin) and IsDialogCommand mirroring
+    Player.validateHtmlAction (the exact match or the trimmed
+    prefix of the '$' variable parameter link); ClearDialog and the
+    ResetSession clear (the relogin starts with no dialog);
+  - 7 unit tests: the Sorius quest page pins, the page replacement
+    (the old links stop validating), the '$' parameter prefix rule
+    (the prefix must match, the suffix commands pass, the near miss
+    fails), the defensive copy (no aliasing of the applied page or
+    the returned slice), the session reset and the explicit clear;
+  - go build ./... green, the state and packet package tests green,
+    golangci-lint run --new: 0 issues (the '$' prefix fix mirrors
+    the Java exactly - the marker is stripped and the remainder
+    trimmed before the prefix match; the exhaustruct findings
+    resolved with the repo's zero-view nolint pattern);
+  - the consumer wiring (the 0x1B dispatcher case feeding
+    ApplyDialog) stays with T-008 (their scope: connection/).
+- Status: done (2026-09-12, 08:27 UTC).

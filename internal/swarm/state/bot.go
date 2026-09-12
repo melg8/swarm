@@ -433,6 +433,11 @@ type Bot struct {
 	// published. shoppingAt bounds its freshness (shoppingPlanTTL).
 	shopping   *ShoppingPlanView
 	shoppingAt time.Time
+	// dialog holds the open dialog page (the NPC_HTML scope mirror
+	// of docs/quest_protocol.md): one page, replaced on every
+	// NpcHtmlMessage arrival, cleared with the session (see
+	// dialog.go).
+	dialog openDialog
 	// quests holds the quest journal of the QuestList packets
 	// (quest id -> the state int of the cond or completion flags);
 	// questItems holds the quest item stacks the packet repeats
@@ -1151,6 +1156,7 @@ func (b *Bot) ResetSession() {
 	b.skillsRevision++
 	b.quests = nil
 	b.questItems = nil
+	b.dialog = openDialog{} //nolint:exhaustruct_v5 // the zero page clears
 	b.skillQueue = nil
 	b.skillQueueClass = 0
 	b.skillQueueRevision = 0

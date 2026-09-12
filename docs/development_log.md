@@ -4766,3 +4766,32 @@ page (112 links, commands and texts exact; the %objectId% token of
 the file form is the raw placeholder, the packet form arrives
 resolved). go build ./... green, the package tests green,
 golangci-lint run --new: 0 issues.
+
+## Round 69: the open dialog lands in the tracker - the bypass cache mirror exists client side (2026-09-12)
+
+Problem: the dialog pages stream in (one per second during a
+merchant round) but nothing stores "the page that is currently
+open" - and the bypass sender must never fire a command the open
+page did not offer (the server's html action cache drops unmatched
+commands silently, the anti-injection gate of the quest research).
+
+Root cause: the parse chain (the packet, the links) had just landed
+(T-008 partial, T-012) but the tracker half of the NPC_HTML scope
+mirror did not exist.
+
+Fix (T-013): state/dialog.go - the open dialog page (the npc
+origin the 250 unit interaction check rides on, the links with
+their texts), replaced whole on every page arrival (the server
+cache clears and re-caches per scope on every NpcHtmlMessage),
+cleared with the session; IsDialogCommand mirrors the exact match
+of Player.validateHtmlAction plus the variable parameter rule (the
+'$' marker stripped, the remainder trimmed, the prefix matched -
+the Java compares substring(0, len-1).trim(), the first draft
+forgot the marker strip and the test caught it).
+
+Verification: 7 unit tests (the real quest page form, the page
+replacement, the parameter prefix rule with its near-miss, the
+defensive copy against aliasing, the session reset, the explicit
+clear); go build ./... green, the state and packets package tests
+green, golangci-lint run --new: 0 issues. The 0x1B dispatcher
+wiring that feeds ApplyDialog stays in T-008's scope (connection/).
