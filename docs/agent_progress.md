@@ -2421,3 +2421,32 @@ transfer, M3+ injects the band levels).
 ### Progress
 
 - 07:51 UTC: T-003 claimed in docs/BACKLOG.md.
+
+## Active task: T-008 the gatekeeper teleport flow
+
+Started: 2026-09-12 07:55Z. Branch: `feature/proxy-server`. Commits
+as melg8. Agent label: `soak-z`.
+
+### Goal
+
+The M3 gatekeeper dialog + teleport travel (the H-002 verification):
+implement the packet chain the bot needs to drive Mirabel -> Gludio ->
+Dion.
+
+### Progress (session partial)
+
+- 2026-09-12 07:55Z: the packet-protocol foundation landed.
+  to_game_server/request_bypass_to_server.go (opcode 0x21, the bypass
+  command string) and from_game_server/npc_html_message.go (opcode
+  0x1B, npcObjId + html + itemId) with 3 unit tests each. Build, the
+  two packet-package tests and golangci-lint --new are green.
+- The hunt-loop integration (the 0x1B dispatcher case, the talk +
+  html parse + RequestBypassToServer teleport + the arrival
+  Appearing) and the live Mirabel -> Gludio -> Dion drive are the
+  next agent's work (see the BACKLOG resume notes).
+
+### Status: in_progress (2026-09-12) - handed off
+
+The packet parsers are the foundation; the connection wiring, the
+hunt-loop gatekeeper step and the live verification remain. A new
+agent reads this entry and the BACKLOG resume to continue.

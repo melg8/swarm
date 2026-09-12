@@ -217,7 +217,7 @@ resume: done. The renderer builds the full M0-M6 ladder from
 
 ### T-008: the gatekeeper teleport flow
 
-status: todo
+status: in_progress
 milestone: M3
 priority: P2
 deps: -
@@ -231,8 +231,21 @@ and implement the packet chain the bot needs (the html bypass
 commands, the fee deduction, the arrival Appearing answer the
 teleport shares with the village revive).
 
-claimed: -
-resume: -
+claimed: soak-z 2026-09-12 07:55Z
+resume: packet-protocol foundation done (session partial). Added
+  internal/swarm/packets/to_game_server/request_bypass_to_server.go
+  (opcode 0x21, the bypass command string, unit-tested against the
+  "npc_30146_Chat" and "npc_30146_teleport 1 0" shapes) and
+  internal/swarm/packets/from_game_server/npc_html_message.go
+  (opcode 0x1B, npcObjId + html + itemId, 3 unit tests). Build, the
+  two packet-package tests and golangci-lint --new are green. Next:
+  wire NpcHTMLMessage into the connection/game.go dispatcher (a new
+  field + the 0x1B case), add a hunt-loop gatekeeper step that talks
+  to the teleporter npc (RequestActionUse / the talk bypass), parses
+  the html for the teleport-list bypass buttons, sends
+  RequestBypassToServer "npc_<id>_teleport <list> <idx>" and answers
+  the arrival TeleportToLocation with Appearing (0x30) - then the
+  live Mirabel -> Gludio -> Dion drive closes H-002.
 
 ### T-009: the 20-25 zone registry generation
 
