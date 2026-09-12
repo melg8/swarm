@@ -62,7 +62,10 @@ the town trips cross the village bridges instead of swimming the lake
 under the floating island (see development_log round 35 and the
 TestFindPathWaterCost regression). The remaining points below stay
 open: the exact swim/run speed ratio (the 3x is a planning
-conservative), the breath limits and the boat edges.
+conservative), the breath limits and the boat edges - all tracked as
+the hypothesis H-001 of the AGENTS.md registry (the verification plan
+names the `Player.checkWaterState`/`WaterTask` chain and the live
+swim experiment).
 
 The plain search otherwise treats water as ordinary ground: the ocean
 floor heights are open walkable cells, so routes happily cross the
@@ -97,7 +100,10 @@ budget, and otherwise route water travel through the boat edges below.
 ## Meta transport (the layer above geodata)
 
 The measured Orc ↔ Elven gap proves that walking alone cannot cover the
-world. The server data for the missing transport modes already exists:
+world. The server data for the missing transport modes already exists (the
+gatekeeper edges are the hypothesis H-002 and the boats the H-003 of
+the AGENTS.md registry, each with its Java reading list and live
+experiment):
 
 - **Gatekeeper teleports**: `data/teleporters/town/*.xml` and
   `data/teleporters/others/` - 25 teleporter NPCs with 352 named
@@ -122,7 +128,9 @@ world. The server data for the missing transport modes already exists:
   closed door is a wall to the search while the server opens it on
   demand. A passable-obstacle layer (doors, paid passages) is needed
   for interior and siege navigation; town to town routes are not
-  affected.
+  affected. Tracked as the hypothesis H-004 of the AGENTS.md
+  registry (the `Door.java` openable families and the live
+  closed-door walk experiment).
 - Mobs and players are not movement obstacles (the server does not
   validate collisions against creatures), so the static path stays
   valid under them.

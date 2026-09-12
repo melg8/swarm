@@ -75,6 +75,103 @@ one of them is the reference for its subsystem:
 | `docs/quality_review_and_agent_prompts.md` | The 2026-09-07 architecture review and its improvement program (a historical snapshot - verify the state of a finding against the code before acting on it) |
 | `docs/webui_modernization_proposal.md` | The pending web UI modernization proposal (awaiting user approval; do not implement before it) |
 
+## Hypotheses and unknowns: the registry
+
+Every server fact in this file and in `docs/` is verified - either
+read from the Mobius C1 Java sources or observed on the live stack.
+Anything about the server that is NOT yet verified is a hypothesis,
+and a hypothesis never lives silently in code comments, in a
+conversation or in a commit message: it lives in the registry below.
+
+- Before code that relies on an unverified server assumption is
+  written, the assumption becomes a registry entry (the next free
+  H-NNN) carrying the assumption, the verification plan and the
+  status; a comment on the relying line references the id.
+- The verification plan names its evidence: the Mobius Java classes
+  to read and, whenever behavior matters, the live experiment (the
+  deployed local stack, `tools/mobius_e2e.sh` or an acceptance
+  scenario in `internal/swarm/acceptance`).
+- Running the plan closes the entry. A confirmed fact moves into the
+  matching subsystem doc (`docs/protocol_description.md`,
+  `docs/hunting.md`, ...) and the entry records `verified <date>,
+  see <doc>`; a refuted assumption records what the server actually
+  did and what changed in the bot as a result.
+- Entries append at the end; ids are never reused or renumbered.
+  The seed entries came from the open items of
+  `docs/navigation_analysis.md` (T-005).
+
+### H-001: the swimming semantics of deep water crossings
+
+- Assumption: a water cell is walkable at the 3x step cost
+  (`waterCostMultiplier`) and a character crossing deep water
+  survives the breath gauge; the sea routes the search returns
+  (Talking Island to Giran on the sea floor) are accepted by the
+  server as-is.
+- Relied on by: the water cost model of the geodata search
+  (`internal/swarm/pathfind`, the -3780 water surface) and the route
+  claims of `docs/navigation_analysis.md`.
+- Verify: read `Player.checkWaterState`/`startWaterTask` (the 60 s
+  breath base scaled by `Stat.BREATH`, gated on `ALLOW_WATER`),
+  `WaterTask` (maxHp/100 damage per second once the gauge empties),
+  `CreatureTemplate` (`baseSwimRunSpd` defaults to the run speed)
+  and the `WaterZone`/`ZoneId.WATER` machinery; then walk a
+  DB-injected character from a shore into deep water on the live
+  stack and record the `SetupGauge` packet, the breath damage
+  message, the observed swim speed and any `ValidateLocation`
+  correction.
+- Status: open.
+
+### H-002: the gatekeeper teleport graph
+
+- Assumption: the teleporter data (`data/teleporters/town/*.xml`
+  and `data/teleporters/others/`, 25 npcs, 352 destinations) parses
+  into navigation teleport edges priced by the fee, and a bot drives
+  a gatekeeper through the html dialog bypass flow.
+- Relied on by: the meta transport plan of
+  `docs/navigation_analysis.md` and the M3 navigation legs.
+- Verify: read `Teleporter.onBypassFeedback` (the `chat`,
+  `show teleports <list>` and `teleport <list> <index>` bypass
+  commands), `RequestBypassToServer` (the client packet routing the
+  commands), `NpcHtmlMessage`, `TeleporterData`/`TeleportHolder`
+  and `TeleportToLocation`; then click a village gatekeeper with a
+  live bot, walk the bypass chain, and confirm the fee deduction
+  and the arrival coordinates against the xml.
+- Status: open.
+
+### H-003: the boats as scheduled transport edges
+
+- Assumption: the three boat routes (BoatTalkingGludin,
+  BoatGiranTalking, BoatGludinRune of
+  `dist/game/data/scripts/vehicles`) are scheduled edges a bot can
+  board through the wharf managers and ride with the vehicle
+  packets.
+- Relied on by: the meta transport plan of
+  `docs/navigation_analysis.md` (the alternative to sea walking).
+- Verify: read `Boat.java`, `BoatManager`, the three scripts and
+  the vehicle packet family (`RequestGetOnVehicle`,
+  `RequestGetOffVehicle`, `MoveToLocationInVehicle` and their
+  server answers); then observe the `VehicleInfo` and
+  `VehicleDeparture` broadcasts at a wharf at the schedule time and
+  ride one leg live, recording the boarding bypass command and the
+  oust position.
+- Status: open.
+
+### H-004: the doors as passable obstacles
+
+- Assumption: a closed door is a wall to the geodata search while
+  the server opens it on demand (click, skill, item, time), so
+  interior routes through closed doors are planned as blocked
+  although they are passable live.
+- Relied on by: the static geodata walls of the search and the
+  dynamic world elements section of
+  `docs/navigation_analysis.md`.
+- Verify: read `Door.java` (`isOpen`, `openMe`, `closeMe`, the
+  isOpenableBy* families) with `DoorInfo`/`DoorStatusUpdate`; then
+  stand a live bot by a default-closed door of `Doors.xml` (41
+  entries), record the initial status broadcast, request the open
+  and walk through, noting whether the server blocks the move.
+- Status: open.
+
 ## Mandatory first step of every task: deploy and verify the environment
 
 Any task in this repository - a bug fix, a feature, a refactor, a test
