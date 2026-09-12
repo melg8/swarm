@@ -336,31 +336,44 @@ func bookPurchases(
 }
 
 // bookPurchase resolves one spellbook purchase through the town shop
-// catalog: the merchant buylist that sells the item and its price
-// (the reference price with the town tax of 15 percent).
+// catalogs: the elven village catalog first (the near stop of the
+// 1-19 band lessons), the Dion catalog as the fallback (Sonia sells
+// every spellbook of the first profession band - the village list
+// carries only Charm and Poison Recovery, so the Cure Bleeding book
+// of the level 24 lessons routes through the Dion stop; the price
+// carries the selling town's tax).
 func bookPurchase(itemID int32) (gear.Purchase, bool) {
-	for _, shop := range townShopCatalog.Shops {
-		for _, listID := range shop.Lists {
-			for _, product := range npcdata.ItemsOfBuyList(listID) {
-				if product != itemID {
-					continue
-				}
-				price := npcdata.ItemPrice(itemID)
-				price += price * 15 / 100
+	for _, catalog := range []gear.Catalog{townShopCatalog, dionShopCatalog} {
+		for _, shop := range catalog.Shops {
+			for _, listID := range shop.Lists {
+				for _, product := range npcdata.ItemsOfBuyList(listID) {
+					if product != itemID {
+						continue
+					}
+					price := npcdata.ItemPrice(itemID)
+					price += price * int64(shopTaxPercent(shop)) / 100
 
-				return gear.Purchase{ //nolint:exhaustruct_v5 // gear fields stay zero
-					ItemID:             itemID,
-					ListID:             listID,
-					MerchantTemplateID: shop.MerchantTemplateID,
-					Count:              1,
-					Price:              price,
-					Reason:             bookReason,
-				}, true
+					return gear.Purchase{ //nolint:exhaustruct_v5 // gear fields stay zero
+						ItemID:             itemID,
+						ListID:             listID,
+						MerchantTemplateID: shop.MerchantTemplateID,
+						Count:              1,
+						Price:              price,
+						Reason:             bookReason,
+					}, true
+				}
 			}
 		}
 	}
 
 	return gear.Purchase{}, false //nolint:exhaustruct_v5 // not-found
+}
+
+// shopTaxPercent reads the buy tax of a catalog shop back as whole
+// percent for the integer price math (the catalog builders carry the
+// exact 15 and 20 percent rates).
+func shopTaxPercent(shop gear.Shop) int32 {
+	return int32(math.Round(float64(shop.TaxRate) * 100))
 }
 
 // bookReason marks the spellbook purchases in the trip stop buys.

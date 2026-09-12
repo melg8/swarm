@@ -724,6 +724,13 @@ func merchantByTemplate(templateID int32) (townNpc, bool) {
 			return merchant, true
 		}
 	}
+	// The Dion merchants serve the band book stops (the spellbook
+	// fallback of the lesson trips - the Sonia book list).
+	for _, merchant := range dionMerchants {
+		if merchant.TemplateID == templateID {
+			return merchant, true
+		}
+	}
 
 	return zeroTownNpc, false
 }
