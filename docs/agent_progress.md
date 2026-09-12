@@ -2148,3 +2148,42 @@ visible without a state dump.
 ### Progress
 
 - 07:36 UTC: T-002 claimed in docs/BACKLOG.md.
+
+## Active task: T-004 the quest subsystem research
+
+Started: 2026-09-12 07:35 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. Agent label: agent-quest.
+
+### Goal
+
+BACKLOG T-004 (milestone M2, P2, deps none): read the Mobius C1 Java
+sources and write `docs/quest_protocol.md` - the quest packet flow
+(the quest list, the NPC html dialog packets, quest state
+transitions, quest item drops), with a link to every relevant Java
+class, in the shape of `docs/protocol_description.md`. Research only:
+no code changes. The follow-up code tasks land in the BACKLOG resume
+notes.
+
+### Context
+
+T-001 (the soak metrics trail) was claimed by soak-z and T-002 (the
+stagnation watch) by zai-agent while my claim commit lost the push
+race - both are theirs now, no fight over tasks. T-003 waits on
+T-002. T-004 is the top claimable task left and it de-risks M2 (the
+first profession: the elven class transfer quest at level 20).
+
+### Acceptance
+
+- `docs/quest_protocol.md` documents: the quest list packet flow, the
+  NPC dialog (html) packet flow, the quest state transitions, the
+  quest item drop mechanics, every layout with the reference Java
+  class, plus the elven fighter class transfer quest chain
+  (ElvenKnight/ElvenScout) walked end to end from the sources.
+- The follow-up code tasks are listed (in the resume notes and/or a
+  proposal section of the doc).
+- No Go code changes (docs-only round: `go build ./...` and the lint
+  gate stay green trivially).
+
+### Progress
+
+- 07:35 UTC: claimed T-004 after losing the T-001 push race.

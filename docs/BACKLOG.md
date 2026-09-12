@@ -112,7 +112,7 @@ building block every later milestone acceptance reuses.
 
 ### T-004: the quest subsystem research
 
-status: todo
+status: in_progress
 milestone: M2
 priority: P2
 deps: -
@@ -124,6 +124,12 @@ quest state transitions, quest item drops), with a link to every
 relevant Java class, in the shape of `docs/protocol_description.md`.
 Research only: no code changes. List the follow-up code tasks in the
 resume notes.
+
+claimed: agent-quest 2026-09-12 07:35 UTC
+resume: fresh claim; the plan: read the Mobius quest engine sources
+  (the quest state machine, the quest packets, the html dialog flow,
+  the class transfer script of the elven fighter) and write
+  docs/quest_protocol.md in the shape of protocol_description.md.
 
 ### T-005: the hypotheses registry convention
 
