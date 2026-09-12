@@ -153,6 +153,14 @@ numbers to budget a verification loop.
   contains an unfinished task entry, resume that task (verify the
   described state against the code, then continue from the recorded
   "next" step) before taking a new one.
+- **When `docs/agent_progress.md` has no unfinished task, take work from
+  the queue.** The goal ladder lives in `docs/ROADMAP.md` (milestones
+  with binary live-acceptance criteria; the progress of the project is
+  the highest green milestone) and the task queue with the claim/lease
+  protocol lives in `docs/BACKLOG.md` (claim a task by pushing a status
+  commit, lease 4 hours, resume from the notes). Every task must
+  advance a milestone - do not invent disconnected work. The reasoning
+  behind the whole loop lives in `docs/agent_selforganization.md`.
 
 ## Agent skills
 

@@ -2010,3 +2010,48 @@ live stack; go build/vet/test/lint stay green.
   gear debt), the hunting.md town trip section, the AGENTS.md
   documentation map unchanged (the shopping doc entry covers it).
 - Status: done (2026-09-12).
+
+## Active task: the self-organization design notes, the roadmap ladder and the backlog queue
+
+Started: 2026-09-12. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The owner asked (2026-09-12, Russian) how to organize the feedback
+loops so the agents can always verify their assumptions about the
+protocol, the server and the character behavior; which implementation
+language to pick; how the agents should self-organize towards the
+solo 1-60 goal from a single boot prompt; and how the human sees the
+real progress. The deliverable is a design document plus the
+operational scaffolding it prescribes.
+
+### Result
+
+- docs/agent_selforganization.md (Russian): the constraints-to-process
+  table, the language argument (Go), the verification pyramid L0-L6
+  with time budgets and the "verify what you touched" rule, the
+  repo-as-external-brain self-organization protocol (claim by commit,
+  4h lease, the stop protocol), the copy-paste boot prompt, the
+  progress visibility plan and the failure playbook.
+- docs/ROADMAP.md: the solo 1-60 milestone ladder M0-M6 with binary
+  acceptance criteria (M0 done; M1 the soak proof; M2 the first
+  profession; M3-M5 the bands; M6 the integral run).
+- docs/BACKLOG.md: the task queue with the claim/lease protocol and
+  the seed tasks T-001..T-007 (the soak metrics, the stagnation watch,
+  the level milestone scenario, the quest research, the hypotheses
+  registry, the band survey, the progress page).
+- AGENTS.md: the work protocol now points at the roadmap and the
+  backlog when agent_progress.md has no unfinished task.
+
+### Verification
+
+Docs-only round: the environment was deployed fresh
+(swarm_fast_deploy.sh: STACK_READY, the schema loaded, the ports
+listening), `tools/mobius_e2e.sh 45` printed E2E_OK and the full suite
+`go test ./... -count=1` was green (19 packages) before the doc work
+started; no Go files were touched by this task (the diff is markdown
+only).
+
+### Status: done (2026-09-12)
