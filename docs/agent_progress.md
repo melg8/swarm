@@ -2867,3 +2867,48 @@ clean, the quest_protocol.md table cross-checked against the data
   docs. T-016 (the class transfer acceptance scenario) opens up:
   its deps (T-003 level milestone + T-014 walker + T-015 data) are
   all done; the gatekeeper legs join when T-008 closes.
+
+## Active task: T-009 the 20-25 zone registry generation
+
+Started: 2026-09-12 09:24 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. Agent label: `zones-zai`. Taken as the top todo of
+the queue (T-008 done unblocks it; T-015 closed while this session
+deployed, T-017 is in_progress by soak-z in the same hunt/ package -
+no file overlap: this task touches the generator, a new generated
+zones_dion.go, the zones.go region constant and new test files).
+
+### Goal
+
+The M3 zone registry of the 20-25 band: extend
+tools/generate_hunt_zones.py with the Dion spawn sources of the
+survey (CrumaMarshlands, ExecutionGrounds, PlainsOfDion) and
+generate the spawn-true squares of the band as
+internal/swarm/hunt/zones_dion.go in the shape of zones_elven.go
+(the survey territories are the input polygons; the band tables of
+docs/band_20_25_survey.md are the acceptance reference).
+
+### Constraints
+
+- The gate line of the task (M1 green) follows the T-010 precedent:
+  the data preparation lands now, the hunt wiring into the 20-25
+  band waits for the M1 operator soak.
+- The elven generation mode must stay byte-identical (the committed
+  zones_elven.go is regenerated and diffed as the regression gate).
+- Every mob id, level and count comes from the spawn XMLs (no
+  guessed server facts); the survey tables pin the output.
+- The gear gates of the new bands are calibrated against the
+  gear.TotalGearPoints probes of the buyable dress stages (NG dress
+  284, Falchion dress ~292, Bastard+bone ~312, full D dress ~391).
+
+### Acceptance
+
+go build green, the hunt package tests green, golangci-lint run
+--new clean, the generator elven-mode output byte-identical, the
+zones_dion.go registry pinned by unit tests against the survey
+tables (the mob sets of the grounds, the band ladder, the walking
+distances of the survey), the hunting.md section, the dev log
+round entry.
+
+### Progress
+
+- 09:24 UTC: claimed (BACKLOG T-009 in_progress + this entry).

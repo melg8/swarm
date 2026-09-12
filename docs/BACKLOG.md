@@ -268,7 +268,7 @@ resume: done 2026-09-12 08:45Z. The full packet chain ships:
 
 ### T-009: the 20-25 zone registry generation
 
-status: todo
+status: in_progress
 milestone: M3
 priority: P3
 deps: T-008
@@ -281,8 +281,11 @@ spawn-true squares of the 20-25 band in the shape of zones_elven.go
 (the survey territories are the input polygons; the band table of
 the survey doc is the acceptance reference).
 
-claimed: -
-resume: -
+claimed: zones-zai 2026-09-12 09:24 UTC
+resume: fresh claim. The gate interpretation follows the T-010
+  precedent (data preparation now, the hunt wiring into the band
+  waits for M1 green). Next: extend the generator with the Dion
+  sources, generate zones_dion.go, pin the survey tables with tests.
 
 ### T-010: the band gear catalogs
 
