@@ -219,11 +219,79 @@ func writeDumpInventory(b *strings.Builder, snap state.Snapshot) {
 	for _, line := range equipped {
 		fmt.Fprintln(b, line)
 	}
+	// The paperdoll holes an equipment section hides: the report only
+	// prints the occupied slots, so a character farming without its
+	// legs armor (the 2026-09-12 04:58 pantsless dump) read as a fine
+	// outfit - the missing legs line was invisible. The empty families
+	// now name themselves right below the equipment.
+	if empty := dumpEmptySlots(snap.Inventory); len(empty) > 0 {
+		fmt.Fprintf(b, "empty slots: %s\n", strings.Join(empty, ", "))
+	}
 	fmt.Fprintf(b, "bag (%d):\n", len(bag))
 	for _, line := range bag {
 		fmt.Fprintln(b, line)
 	}
 	fmt.Fprintln(b)
+}
+
+// dumpEmptySlots lists the paperdoll slot families no equipped item
+// covers: the armor and hand slots, the necklace and the unfilled pair
+// halves (one earring or ring equipped names the other half empty).
+// The two hand weapon blocks the left hand and the one-piece armor the
+// legs, so those stay unlisted while the blocker is worn. The
+// underwear and hair slots stay out: no gear of the catalogs ever
+// fills them and they would read as permanent holes.
+func dumpEmptySlots(items []state.InventoryItemSnapshot) []string {
+	covered := make(map[int32]int, len(items))
+	twoHand, onePiece := false, false
+	for i := range items {
+		item := &items[i]
+		if !item.Equipped {
+			continue
+		}
+		covered[item.BodyPart]++
+		switch item.BodyPart {
+		case 0x4000:
+			twoHand = true
+		case 0x8000:
+			onePiece = true
+		}
+	}
+	families := []struct {
+		mask int32
+		name string
+	}{
+		{0x40, "head"},
+		{0x80, "rhand"},
+		{0x100, "lhand"},
+		{0x200, "gloves"},
+		{0x400, "chest"},
+		{0x800, "legs"},
+		{0x1000, "feet"},
+		{0x2000, "back"},
+		{0x08, "necklace"},
+	}
+	empty := make([]string, 0, len(families)+2)
+	for _, family := range families {
+		if covered[family.mask] > 0 {
+			continue
+		}
+		if twoHand && (family.mask == 0x80 || family.mask == 0x100) {
+			continue
+		}
+		if onePiece && (family.mask == 0x400 || family.mask == 0x800) {
+			continue
+		}
+		empty = append(empty, family.name)
+	}
+	if covered[0x6] == 1 {
+		empty = append(empty, "earring half")
+	}
+	if covered[0x30] == 1 {
+		empty = append(empty, "ring half")
+	}
+
+	return empty
 }
 
 // enchSuffix renders the enchant level of a dump item line.

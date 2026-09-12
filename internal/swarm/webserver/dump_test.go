@@ -134,3 +134,55 @@ func TestDumpSlotNames(t *testing.T) {
 	require.Equal(t, "hair", dumpSlotName(0x10000))
 	require.Equal(t, "part 0x20000", dumpSlotName(0x20000))
 }
+
+// TestDumpEmptySlots pins the paperdoll hole line of the dump: the
+// equipment section only printed the occupied slots, so a character
+// farming without its legs armor (the 2026-09-12 04:58 pantsless
+// report) read as a fine outfit - the empty families now name
+// themselves below the worn pieces. The two hand weapon blocks the
+// left hand and the one-piece armor the legs, and a half-filled
+// pair names its empty half.
+func TestDumpEmptySlots(t *testing.T) {
+	bot := state.NewBot("acc1")
+	bot.SetCharacter("test2", 100, 18, 38344, 46248, -3592, 339, 137)
+	// The dump character of the report: every slot filled except the
+	// legs, one earring worn (the other half empty).
+	bot.ApplyItemList([]state.InventoryItem{
+		{ObjectID: 1, ItemID: 20, Count: 1, Equipped: true, BodyPart: 0x100},
+		{ObjectID: 2, ItemID: 22, Count: 1, Equipped: true, BodyPart: 0x400},
+		{ObjectID: 3, ItemID: 43, Count: 1, Equipped: true, BodyPart: 0x40},
+		{ObjectID: 4, ItemID: 49, Count: 1, Equipped: true, BodyPart: 0x200},
+		{ObjectID: 5, ItemID: 37, Count: 1, Equipped: true, BodyPart: 0x1000},
+		{ObjectID: 6, ItemID: 112, Count: 1, Equipped: true, BodyPart: 0x6},
+		{ObjectID: 7, ItemID: 153, Count: 1, Equipped: true, BodyPart: 0x80},
+	})
+
+	report := BuildStateDump(bot)
+
+	require.Contains(t, report, "empty slots: legs, back, necklace, earring half",
+		"the dump names the missing legs armor of the report")
+	require.NotContains(t, report, "empty slots: rhand",
+		"the worn pieces never name their own slots empty")
+}
+
+// TestDumpEmptySlotsBlockers pins the family blockers: a two hand
+// weapon fills the right hand and blocks the left hand, a one-piece
+// armor fills the chest and blocks the legs - neither names the
+// blocked slot a hole.
+func TestDumpEmptySlotsBlockers(t *testing.T) {
+	bot := state.NewBot("acc1")
+	bot.SetCharacter("test2", 100, 18, 38344, 46248, -3592, 339, 137)
+	bot.ApplyItemList([]state.InventoryItem{
+		{ObjectID: 1, ItemID: 1333, Count: 1, Equipped: true, BodyPart: 0x4000},
+	})
+
+	report := BuildStateDump(bot)
+
+	require.Contains(t, report,
+		"empty slots: head, gloves, chest, legs, feet, back, necklace",
+		"the two hand weapon blocks the hands out of the hole list")
+	require.NotContains(t, report, "empty slots: lhand",
+		"the blocked left hand never names a hole")
+	require.NotContains(t, report, "empty slots: rhand",
+		"the filled right hand never names a hole")
+}
