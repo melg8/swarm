@@ -561,6 +561,16 @@ func (b *Bot) SkillsListed() bool {
 	return b.skills != nil
 }
 
+// StartedAt returns the moment the tracker was created (the uptime
+// anchor that survives the reconnects): the statistics view derives
+// the long run rates of the bot from it.
+func (b *Bot) StartedAt() time.Time {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.started
+}
+
 // SessionStartedAt returns the moment of the current login (the
 // uptime anchor Started survives the reconnects): the bounded waits
 // of the hunt loop - the skill list gate of the first town trip -

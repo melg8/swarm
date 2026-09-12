@@ -115,6 +115,9 @@ type Server struct {
 	httpServer   *http.Server
 	eventsDone   chan struct{}
 	shutdown     func()
+	// stats is the bot statistics collector (nil in the bot less
+	// modes): the sampler goroutine of the statistics endpoints.
+	stats *statsCollector
 }
 
 // ProxyController drives the client proxy from the web UI: which bot a
@@ -151,6 +154,14 @@ func NewServer(
 	mux.HandleFunc("GET /api/bots/{id}/events", server.handleBotEvents)
 	mux.HandleFunc("POST /api/bots/{id}/commands", server.handleBotCommand)
 	mux.HandleFunc("GET /api/config", server.handleBotConfig)
+	mux.HandleFunc("GET /api/stats", server.handleStats)
+	mux.HandleFunc("GET /api/stats/{id}", server.handleBotStats)
+
+	// The statistics sampler starts with the server: the history of
+	// the statistics tab collects from the first minute of the
+	// process, not from the first visit of the tab.
+	server.stats = newStatsCollector(registry, logger)
+	go server.stats.run()
 
 	return server
 }
@@ -240,6 +251,7 @@ func newServer(address string, logger *log.Logger) *Server {
 		httpServer:   nil,
 		eventsDone:   make(chan struct{}),
 		shutdown:     nil,
+		stats:        nil,
 	}
 	//nolint:exhaustruct_v5 // the zero defaults of http.Server are intended
 	server.httpServer = &http.Server{
@@ -288,6 +300,9 @@ func (s *Server) ListenAndServe() error {
 // cancelled first so the shutdown does not wait for them.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.shutdown()
+	if s.stats != nil {
+		s.stats.stop()
+	}
 
 	return s.httpServer.Shutdown(ctx)
 }

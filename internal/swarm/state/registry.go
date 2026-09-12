@@ -88,6 +88,18 @@ func (r *Registry) List() []BotInfo {
 	return infos
 }
 
+// Bots returns the tracker pointers of the registry in registration
+// order. The statistics sampler of the web layer walks it at a human
+// paced cadence; the copy keeps the walk outside the registry lock.
+func (r *Registry) Bots() []*Bot {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	bots := make([]*Bot, len(r.bots))
+	copy(bots, r.bots)
+
+	return bots
+}
+
 // FleetKillMarks aggregates the recent kill marks of every bot of the
 // registry, oldest first: the web map draws them as the fleet wide
 // crosses of the deployment, so every kill of every bot stays visible
