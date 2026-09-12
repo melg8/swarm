@@ -286,7 +286,7 @@ resume: -
 
 ### T-010: the band gear catalogs
 
-status: todo
+status: in_progress
 milestone: M3
 priority: P3
 deps: T-008
@@ -297,8 +297,13 @@ Wire the D-grade weapon/armor/jewel catalogs of the Dion merchants
 the band price brackets and the sell-first rules of the shop
 strategy; the shopping strategy doc gains the Dion shop section.
 
-claimed: -
-resume: -
+claimed: soak-z 2026-09-12 08:53Z
+resume: claiming; the Dion buylists are already in npcdata
+  (shop_catalogs.go: 7060-7063 → 3006000-3006300, the generator ran).
+  Next: add gear.DionCatalog() (Sabrin 7060, Casey 7061, Sonia 7062,
+  Lara 7063, Dion baseTax 20% = 0.20), verify the D-grade item
+  GearStats, unit-test the catalog, then the hunt multi-town wiring
+  (out of this scope - a follow-up) and the shopping_strategy doc.
 
 ### T-011: the quest journal parser and tracker section
 
