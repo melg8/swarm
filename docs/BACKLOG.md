@@ -133,7 +133,7 @@ resume: fresh claim; the plan: read the Mobius quest engine sources
 
 ### T-005: the hypotheses registry convention
 
-status: todo
+status: in_progress
 milestone: M1
 priority: P3
 deps: -
@@ -145,6 +145,11 @@ a registry section with a verification plan, and code relying on it
 must reference it. Seed the registry with the open items of
 `docs/navigation_analysis.md` (swimming semantics, doors, the
 gatekeeper graph) so the pattern starts populated.
+
+claimed: hypotheses-e3f8 2026-09-12 07:38Z
+resume: claim pushed; next: read docs/navigation_analysis.md open
+  items, design the registry section shape, add the AGENTS.md
+  convention and seed the registry.
 
 ### T-006: the 20-25 band survey
 

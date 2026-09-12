@@ -2187,3 +2187,32 @@ first profession: the elven class transfer quest at level 20).
 ### Progress
 
 - 07:35 UTC: claimed T-004 after losing the T-001 push race.
+
+## Active task: T-005 the hypotheses registry convention
+
+Started: 2026-09-12 07:38Z. Branch: `feature/proxy-server`. Commits as
+melg8. Other agents may push to the same branch concurrently - rebase
+before every push.
+
+### Goal
+
+Claimed from docs/BACKLOG.md (T-005, milestone M1, priority P3,
+scope: AGENTS.md, docs/navigation_analysis.md): add the
+"Hypotheses / Unknowns" convention to the AGENTS.md documentation
+rules - every unverified server assumption must live in a registry
+section with a verification plan, and code relying on it must
+reference it. Seed the registry with the open items of
+docs/navigation_analysis.md (swimming semantics, doors, the gatekeeper
+graph) so the pattern starts populated.
+
+### Session history
+
+- T-002 and T-004 were claimed by parallel agents seconds before my
+  claim pushes landed (fetch+rebase showed their commits first) - the
+  protocol says do not fight over tasks, both were conceded.
+- T-001 claimed by soak-z 07:27Z, T-002 by zai-agent 07:36Z, T-004 by
+  agent-quest 07:35Z.
+
+### Status
+
+In progress - the claim commit; reading navigation_analysis.md next.
