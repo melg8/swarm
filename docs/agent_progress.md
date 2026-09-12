@@ -2331,3 +2331,22 @@ required.
 ### Status
 
 Done (2026-09-12 08:29Z) - taking the next eligible BACKLOG task.
+
+## Active task: T-007 the PROGRESS.md page
+
+Started: 2026-09-12 08:41Z. Branch: `feature/proxy-server`. Commits
+as melg8.
+
+### Goal
+
+Claimed from docs/BACKLOG.md (T-007, milestone M1, priority P3, deps
+T-001 done, scope: tools/, docs/): the one-page human dashboard -
+milestone ladder green/red by the last acceptance results, the last
+soak metrics, the active BACKLOG tasks, the last commits. Generated
+by the tooling of T-001 (tools/progress_report.sh), committed after
+every milestone-relevant run so the page history is the project
+history.
+
+### Status
+
+In progress - the claim commit; the renderer run starts next.
