@@ -167,12 +167,14 @@ func parseFlags() config {
 			"test1, test2, test3 on the fly.")
 	flag.StringVar(&cfg.acceptanceRun, "acceptance", "",
 		"run an acceptance scenario headless instead of the bot: "+
-			"the value is a scenario id (farm-readiness, "+
+			"the value is a scenario id (soak, farm-readiness, "+
 			"bot-lifetime, proxy-relay) or 'all' to run every "+
 			"scenario in definition order, or 'list' to print "+
 			"the available ids and exit. No fleet bot supervisor "+
 			"runs; the acceptance manager launches the temp bot "+
-			"of the scenario, runs it and exits. Pass an empty "+
+			"of the scenario, runs it and exits. The soak scenario "+
+			"reads SWARM_SOAK_MINUTES (default 10, the M1 proof "+
+			"sets 480) for the window length. Pass an empty "+
 			"-web to keep the UI off; the result prints to the "+
 			"log. Exit code: 0 for a pass, 1 for a fail.")
 	flag.Parse()

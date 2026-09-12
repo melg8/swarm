@@ -88,6 +88,27 @@ const (
 func Definitions() []TestDef {
 	return []TestDef{
 		{
+			ID:      soakScenarioID,
+			Title:   "soak · the M1 metrics trail",
+			Account: soakAccount,
+			Timeout: soakTimeout(),
+			Description: "Start: a fresh level 1 elven fighter temp7 " +
+				"enters the world (no database injection, the login " +
+				"auto-creates the account). Flow: the supervised hunt " +
+				"loop farms the elven lands for the configured window " +
+				"(SWARM_SOAK_MINUTES, default the 10 minute smoke; the " +
+				"real M1 run sets 480 for the 8 hour proof), the " +
+				"stagnation guard watches for no XP gain for M minutes " +
+				"and no position change for K minutes, the lost " +
+				"sessions reconnect the way the 24/7 supervisor does. " +
+				"Pass: the bot stayed online the whole window, the " +
+				"stagnation guard never fired and the session ended " +
+				"gracefully; one JSON line lands in runs/metrics.jsonl " +
+				"either way (date, scenario, duration, start/end level, " +
+				"XP per hour, deaths, adena, stuck events, PASS/FAIL).",
+			Scenario: soakScenario,
+		},
+		{
 			ID:      "farm-readiness",
 			Title:   "farm readiness · level 15",
 			Account: farmAccount,
