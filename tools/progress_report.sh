@@ -96,32 +96,63 @@ render_commits() {
                 echo "_git log unavailable_"
 }
 
-# render_milestone reads the last metrics status per scenario and
-# colors the M1 milestone: PASS green, FAIL red, none pending.
+# render_milestone builds the full milestone ladder from
+# docs/ROADMAP.md: a heading `## M<N> - <title> (DONE)` marks a closed
+# milestone (green), the first open milestone is the current one and
+# colors green/red by the last metrics row status (PASS/FAIL), the
+# rest stay pending. python3 keeps the heading parse and the ladder
+# walk in one place.
 render_milestone() {
-        local last
-        if [ -f "${METRICS}" ]; then
-                last=$(tail -n 1 "${METRICS}" 2>/dev/null || true)
-        else
-                last=""
-        fi
-        if [ -z "${last}" ]; then
-                echo "**M1 (soak proof):** pending (no metrics yet)"
-                return
-        fi
-        local status
-        status=$(printf '%s' "${last}" | python3 -c '
-import json, sys
-try:
-    print(json.loads(sys.stdin.read()).get("status", "pending"))
-except Exception:
-    print("pending")
-' 2>/dev/null || echo "pending")
-        case "${status}" in
-                PASS) echo "**M1 (soak proof):** green (last soak PASS)" ;;
-                FAIL) echo "**M1 (soak proof):** red (last soak FAIL)" ;;
-                *)    echo "**M1 (soak proof):** pending (last soak ${status})" ;;
-        esac
+        python3 -c '
+import json, os, re, sys
+
+repo = sys.argv[1]
+roadmap = os.path.join(repo, "docs", "ROADMAP.md")
+metrics = os.path.join(repo, "runs", "metrics.jsonl")
+
+last_status = ""
+if os.path.isfile(metrics):
+    with open(metrics, encoding="utf-8") as handle:
+        lines = [l for l in handle.read().splitlines() if l.strip()]
+    if lines:
+        try:
+            row = json.loads(lines[-1])
+            last_status = row.get("status", "")
+        except json.JSONDecodeError:
+            pass
+
+steps = []
+if os.path.isfile(roadmap):
+    with open(roadmap, encoding="utf-8") as handle:
+        for line in handle:
+            m = re.match(r"^## (M[0-9]+) - (.+?)(?:\s+\(DONE\))?\s*$", line)
+            if not m:
+                continue
+            title = m.group(2).strip()
+            done = line.rstrip().endswith("(DONE)")
+            steps.append((m.group(1), title, done))
+
+current = True
+for mid, title, done in steps:
+    head = "**%s (%s):**" % (mid, title)
+    if done:
+        print("%s done" % head)
+        continue
+    if current:
+        current = False
+        if last_status == "PASS":
+            print("%s green (last run PASS)" % head)
+        elif last_status == "FAIL":
+            print("%s red (last run FAIL)" % head)
+        elif last_status:
+            print("%s pending (last run %s)" % (head, last_status))
+        else:
+            print("%s pending (no metrics yet)" % head)
+        continue
+    print("%s pending" % head)
+if not steps:
+    print("_docs/ROADMAP.md milestones not found._")
+' "${REPO_DIR}"
 }
 
 {
@@ -129,7 +160,7 @@ except Exception:
         echo
         echo "Generated: $(date -u +'%Y-%m-%d %H:%M:%SZ')"
         echo
-        echo "## Milestone"
+        echo "## Milestone ladder"
         echo
         render_milestone
         echo
