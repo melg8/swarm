@@ -127,7 +127,7 @@ the zone-appropriate start) and the N+1 watch
 
 ### T-004: the quest subsystem research
 
-status: in_progress
+status: done
 milestone: M2
 priority: P2
 deps: -

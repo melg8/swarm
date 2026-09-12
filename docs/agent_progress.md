@@ -2488,3 +2488,7 @@ agent reads this entry and the BACKLOG resume to continue.
   follow-up task list).
 - Docs-only round: `go build ./...` green, `golangci-lint run --new`
   clean (no Go file touched).
+- Status: done (2026-09-12, 08:15 UTC) - docs/quest_protocol.md
+  delivered, the follow-up code tasks listed in the BACKLOG resume
+  notes, the development_log round 66 entry written. The T-008
+  packet foundation of soak-z covers follow-up items 1 and 3.

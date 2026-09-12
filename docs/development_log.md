@@ -4587,3 +4587,47 @@ and the ladder matches docs/ROADMAP.md (M0-M6, one current, five
 pending); `go build ./...` green and `golangci-lint run --new` 0
 issues (no Go code touched - the renderer is bash + python3);
 no behavior change, no e2e required.
+
+## Round 66: the quest subsystem research - the M2 protocol map before the code (2026-09-12)
+
+Problem: the M2 milestone (the first profession, the class transfer
+at level 20) needs the quest machinery - NPC dialogs, bypass
+commands, quest state, quest items - and none of it was documented
+or understood: the bot drops every dialog packet it receives
+(0x1B) and never sent a single bypass (0x21). Starting the quest
+code from guesses would burn the next sessions on protocol
+rediscovery (the exact failure mode the verification pyramid of
+docs/agent_selforganization.md exists to prevent).
+
+Root cause: pure knowledge gap - the quest engine, its packets and
+the two elven class transfer quests had never been read against the
+Mobius C1 sources.
+
+Fix (T-004, docs only):
+
+- docs/quest_protocol.md: the quest engine (Quest/QuestState/State,
+  the CREATED/STARTED/COMPLETED machine, the character_quests
+  persistence), the dialog flow with the packet layouts (Action
+  0x04, RequestBypassToServer 0x21 with the command grammar,
+  NpcHtmlMessage 0x1B, QuestList 0x98, PlaySound 0xB1, MoveToPawn
+  0x75), the html action cache (the anti-injection gate: only the
+  links of the currently open page validate, 250 units of the
+  origin npc, the $-parameter prefix), the quest events (the 2.5 s
+  ON_ATTACKABLE_KILL delay, the dialog gates), the Q00406/Q00407
+  chains walked end to end with the npc positions, the class
+  change script at Rains 30288 and the gatekeeper geography
+  (Mirabel -> Gludio 9200a, Bella -> Gludin 7300a).
+- The follow-up code tasks are listed in the BACKLOG resume notes
+  (the dialog stream parser, the quest journal parser, the bypass
+  sender with the cache mirror, the hunt quest module, the M2
+  acceptance scenario); the T-008 packet work of soak-z already
+  covers the first two items.
+
+Verification: the sources were read in the local Mobius checkout
+(every class named in the document was opened); two live facts were
+traced against the deployed stack (SWARM_TRACE_PACKETS=1): the
+QuestList 0x98 (5 bytes, empty) pushes at world entry without any
+client request (EnterWorld.java:303), and the merchant sell round
+streams NpcHtmlMessage 0x1B (813 bytes, about one per second) that
+the bot currently drops. `go build ./...` green,
+`golangci-lint run --new` 0 issues (no Go file touched).
