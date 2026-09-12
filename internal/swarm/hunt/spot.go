@@ -6,6 +6,7 @@ package hunt
 
 import (
 	"math"
+	"slices"
 
 	"github.com/melg8/swarm/internal/swarm/npcdata"
 	"github.com/melg8/swarm/internal/swarm/state"
@@ -151,6 +152,63 @@ func spotEligible(spot Spot, level int32) bool {
 	}
 
 	return false
+}
+
+// spotMedianLevel returns the count weighted median mob level of the
+// spot: the delevel trigger measures the character level against
+// exactly this gap (MedianZoneMobLevel observes the live spawns of
+// the anchored square, the static median is what the picker can
+// judge BEFORE committing the character to the ground).
+func spotMedianLevel(spot Spot) int32 {
+	type census struct {
+		level int32
+		mass  int32
+	}
+	censusRows := make([]census, 0, len(spot.Mobs))
+	total := int32(0)
+	for index := range spot.Mobs {
+		if spot.Mobs[index].Count <= 0 {
+			continue
+		}
+		censusRows = append(censusRows, census{
+			level: spot.Mobs[index].Level,
+			mass:  spot.Mobs[index].Count,
+		})
+		total += spot.Mobs[index].Count
+	}
+	if total <= 0 {
+		return 0
+	}
+	slices.SortFunc(censusRows, func(a, b census) int {
+		return int(a.level - b.level)
+	})
+	seen := int32(0)
+	for _, row := range censusRows {
+		seen += row.mass
+		if seen*2 > total {
+			return row.level
+		}
+	}
+
+	return censusRows[len(censusRows)-1].level
+}
+
+// spotDelevelSafe reports whether anchoring the spot at the given
+// level keeps the character under the delevel trigger: the spot
+// window (level-8) admits grounds whose median sits 7+ levels below
+// the character, and the deleveling answers such an anchor with the
+// guard deaths - the picker must not commit the character to ground
+// it immediately delevels it for (the 2026-09-12 building entry
+// acceptance round anchored Kaboo Orc Fighter SW at level 15 and the
+// delevel ate the whole scenario). A spot without a computable median
+// keeps the plain window judgement.
+func spotDelevelSafe(spot Spot, level int32) bool {
+	median := spotMedianLevel(spot)
+	if median <= 0 {
+		return true
+	}
+
+	return level-median < delevelTriggerDiff
 }
 
 // spotLevelDistance returns the smallest mob level distance between

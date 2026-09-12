@@ -376,6 +376,13 @@ func (h *spotHunter) pickBest(exclude int, now time.Time) (int, float64) {
 		if !spotEligible(h.spots[index], h.level) {
 			continue
 		}
+		if !spotDelevelSafe(h.spots[index], h.level) {
+			// The window admits the ground but the deleveling does
+			// not: anchoring it costs the guard deaths right after
+			// the walk (the picker never commits the character to
+			// ground it immediately delevels it for).
+			continue
+		}
 		if score := h.spotScore(index, now); score > bestScore {
 			best, bestScore = index, score
 		}

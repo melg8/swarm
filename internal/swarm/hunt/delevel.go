@@ -143,7 +143,14 @@ func (l *Loop) delevelCooldownOver() bool {
 
 // delevelWanted reports whether the character outleveled the hunting
 // ground: the median level of the living attackable npcs inside the
-// zone trails the character level by the trigger difference.
+// zone trails the character level by the trigger difference. The
+// static median of the anchored spot must agree: the live median
+// flickers with the respawn windows (a ground whose designed mix sits
+// close to the character level shows a transient median a full
+// trigger lower while its higher species are down - the guard deaths
+// must not answer that; the 2026-09-12 building entry acceptance
+// round de-leveled a healthy level 15 on the Kaboo Orc Fighter SW
+// respawn window whose static median is 9).
 func (l *Loop) delevelWanted() bool {
 	if l.navigator == nil || !l.delevelCooldownOver() {
 		return false
@@ -156,9 +163,26 @@ func (l *Loop) delevelWanted() bool {
 	if median <= 0 {
 		return false
 	}
+	if level-median < delevelTriggerDiff {
+		return false
+	}
+	if static := l.anchoredSpotMedian(); static > 0 &&
+		level-static < delevelTriggerDiff {
+		return false
+	}
 
-	return (level-median >= delevelTriggerDiff) &&
-		(level >= delevelMinLevel)
+	return level >= delevelMinLevel
+}
+
+// anchoredSpotMedian returns the count weighted median mob level of
+// the currently anchored spot (0 when none is picked): the designed
+// mob mix of the ground, the stable counterpart of the live median.
+func (l *Loop) anchoredSpotMedian() int32 {
+	if l.spot == nil || l.spot.picked < 0 || l.spot.picked >= len(l.spot.spots) {
+		return 0
+	}
+
+	return spotMedianLevel(l.spot.spots[l.spot.picked])
 }
 
 // startDelevel begins the deleveling: the target level is computed from
