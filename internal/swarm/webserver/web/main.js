@@ -48,6 +48,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   initChat();
   initDumpButton();
   initAcceptance();
+  initSidebarTabs();
   MapView.init();
   refreshBots();
   refreshAcceptance();

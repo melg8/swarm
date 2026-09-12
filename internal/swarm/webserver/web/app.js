@@ -192,15 +192,17 @@ function proxyTargetId() {
 }
 
 function renderBotList() {
-  // The sidebar splits the bots into two groups: the long-running
-  // fleet bots (the 24/7 sessions) and the acceptance test bots (the
-  // temp accounts of the scenarios). A bot without an explicit kind
-  // (the default of an untagged bot) reads as long-running - the
-  // acceptance manager tags its temp bots with kind="acceptance".
+  // The sidebar shows two views through a tab switch: LIVE for the
+  // long-running fleet bots, TESTS for the acceptance test bots and
+  // their scenarios. A bot without an explicit kind (the default of
+  // an untagged bot) reads as long-running - the acceptance manager
+  // tags its temp bots with kind="acceptance".
   const longList = document.getElementById("bot-list-long");
   const accList = document.getElementById("bot-list-acc");
-  const longGroup = document.getElementById("bot-group-long");
   const accGroup = document.getElementById("bot-group-acc");
+  const longEmpty = document.getElementById("bot-list-long-empty");
+  const testsEmpty = document.getElementById("tests-view-empty");
+  const accPanel = document.getElementById("acceptance-panel");
   if (!longList || !accList) { return; }
   longList.innerHTML = "";
   accList.innerHTML = "";
@@ -222,25 +224,71 @@ function renderBotList() {
     accList.append(buildBotItem(bot));
   }
 
-  // The acceptance group stays hidden while there are no acceptance
-  // bots registered (the older processes without the kind tag and the
-  // pathfind test mode never populate it).
+  // The acceptance bots group inside the TESTS view hides while there
+  // are no acceptance bots registered (the older processes without
+  // the kind tag and the pathfind test mode never populate it).
   if (accGroup) {
-    if (accBots.length > 0) {
-      accGroup.classList.remove("hidden");
-    } else {
-      accGroup.classList.add("hidden");
-    }
+    accGroup.classList.toggle("hidden", accBots.length === 0);
   }
-  // The long-running group hides when only acceptance bots exist
-  // (the headless acceptance run path launches no fleet bot).
-  if (longGroup) {
-    if (longBots.length > 0) {
-      longGroup.classList.remove("hidden");
-    } else {
-      longGroup.classList.add("hidden");
-    }
+  // The empty hint of the LIVE view shows when no long-running bot is
+  // registered (the headless acceptance CLI mode launches none).
+  if (longEmpty) {
+    longEmpty.classList.toggle("hidden", longBots.length > 0);
   }
+  // The empty hint of the TESTS view shows when there are no
+  // acceptance bots AND no scenarios panel (the pathfind and fight
+  // modes have neither).
+  if (testsEmpty) {
+    const hasScenarios = accPanel && !accPanel.classList.contains("hidden");
+    testsEmpty.classList.toggle("hidden",
+      accBots.length > 0 || hasScenarios);
+  }
+}
+
+// sidebarTabKey is the localStorage key of the active sidebar tab.
+const sidebarTabKey = "swarm.sidebarTab";
+
+// activeSidebarTab returns the stored tab name ("live" or "tests"),
+// defaulting to "live" when nothing is stored or the value is unknown.
+function activeSidebarTab() {
+  const saved = window.localStorage.getItem(sidebarTabKey);
+  if (saved === "live" || saved === "tests") { return saved; }
+  return "live";
+}
+
+// selectSidebarTab flips the sidebar view: "live" shows the
+// long-running bot list, "tests" shows the acceptance bots and the
+// scenarios panel. The tab strip updates the aria-selected and the
+// active class so the underline lands on the picked tab.
+function selectSidebarTab(name) {
+  const live = document.getElementById("view-live");
+  const tests = document.getElementById("view-tests");
+  const tabLive = document.getElementById("tab-live");
+  const tabTests = document.getElementById("tab-tests");
+  if (!live || !tests || !tabLive || !tabTests) { return; }
+  const isLive = name === "live";
+  live.classList.toggle("hidden", !isLive);
+  live.classList.toggle("active", isLive);
+  tests.classList.toggle("hidden", isLive);
+  tests.classList.toggle("active", !isLive);
+  tabLive.classList.toggle("active", isLive);
+  tabLive.setAttribute("aria-selected", isLive ? "true" : "false");
+  tabTests.classList.toggle("active", !isLive);
+  tabTests.setAttribute("aria-selected", isLive ? "false" : "true");
+  window.localStorage.setItem(sidebarTabKey, name);
+}
+
+// initSidebarTabs binds the tab buttons and restores the saved view.
+function initSidebarTabs() {
+  const tabLive = document.getElementById("tab-live");
+  const tabTests = document.getElementById("tab-tests");
+  if (tabLive) {
+    tabLive.addEventListener("click", () => selectSidebarTab("live"));
+  }
+  if (tabTests) {
+    tabTests.addEventListener("click", () => selectSidebarTab("tests"));
+  }
+  selectSidebarTab(activeSidebarTab());
 }
 
 // buildBotItem renders one bot plaque: the row (status dot, name,

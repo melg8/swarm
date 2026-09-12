@@ -11,6 +11,47 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the sidebar LIVE/TESTS tab switch (2026-09-12)
+
+Started: 2026-09-12. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user wants to switch between the live bots and the acceptance
+bots/scenarios instead of seeing both stacked in the same vertical
+sidebar. The previous split (two groups under the BOTS header) was a
+first iteration; the user asked for an explicit view switch.
+
+### Acceptance criteria
+
+- The sidebar carries a LIVE/TESTS tab strip at the top.
+- LIVE shows only the long-running fleet bots; TESTS shows the
+  acceptance bots and the scenarios panel.
+- The active tab persists in localStorage (like the theme toggle).
+- The pathfind and the fight modes keep hiding the whole bot section
+  (they have no bots and no scenarios).
+- An empty hint shows when the active view has nothing to render.
+
+### Progress (2026-09-12)
+
+- Environment redeployed (`tools/swarm_fast_deploy.sh`,
+  `tools/install_dev_tools.sh`) - the session sandbox had been
+  reset, Go 1.24.4 back; `go build ./...` green.
+- Commit "webui: switch sidebar between LIVE and TESTS views through
+  a tab strip": the bot-section now opens with a tab strip, the two
+  views are `#view-live` (just the long-running bot list) and
+  `#view-tests` (the acceptance bots group + the scenarios panel).
+  Added `selectSidebarTab` / `initSidebarTabs` in app.js, the
+  choice persists through `swarm.sidebarTab` in localStorage. The
+  pathfind and fight modes hide `#view-tests` alongside the bot
+  section. Empty hints show when the active view has nothing.
+- Status: done (2026-09-12). `go build ./...`, the HTML structure
+  (145 div opens / 145 div closes), `node -c app.js` and
+  `golangci-lint run --new` green; the pathfind test UI smoke
+  served the new tab strip on `http://127.0.0.1:8081/`.
+
 ## Active task: the round 59 phantom chase livelock - the "Cannot see target" standoff that never armed the blind recovery (2026-09-12)
 
 Started: 2026-09-12. Branch: `feature/proxy-server`. Commits as melg8.

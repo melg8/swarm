@@ -181,10 +181,56 @@ body {
   padding: 10px 12px 6px;
 }
 
-/* The sidebar splits the bots into two groups: the long-running fleet
-   bots and the acceptance test temp bots. Each group carries a small
-   sub-title under the BOTS header; the empty group hides so the
-   visible bots stay compact. */
+/* The sidebar shows two views through a tab switch: LIVE for the
+   long-running fleet bots, TESTS for the acceptance test bots and
+   their scenarios. The tab strip sits at the top of the bot section
+   so the user never scrolls past the group they are not watching; a
+   click flips the visible view, the choice persists in localStorage
+   like the theme toggle. */
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-panel);
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 8px 10px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.1s ease, border-color 0.1s ease;
+}
+
+.sidebar-tab:hover { color: var(--text); }
+
+.sidebar-tab.active {
+  color: var(--text-bright);
+  border-bottom-color: var(--accent);
+}
+
+.sidebar-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.sidebar-view.hidden { display: none; }
+
+.sidebar-view-empty {
+  padding: 16px 14px;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.sidebar-view-empty.hidden { display: none; }
+
+/* The acceptance bots group inside the TESTS view keeps its sub-title
+   so the user reads the temp bots separate from the scenarios list
+   below. */
 .bot-group { display: flex; flex-direction: column; }
 .bot-group.hidden { display: none; }
 
@@ -1121,6 +1167,7 @@ body.mode-pathfind #pf-panel { display: block; }
 
 body.mode-pathfind #bot-section,
 body.mode-pathfind #acceptance-panel,
+body.mode-pathfind #view-tests,
 body.mode-pathfind .sidebar-foot,
 body.mode-pathfind .hud-stack,
 body.mode-pathfind .chat-box,
@@ -2219,6 +2266,7 @@ body.mode-fight #tab-map,
 body.mode-fight .map-toolbar,
 body.mode-fight #bot-section,
 body.mode-fight #acceptance-panel,
+body.mode-fight #view-tests,
 body.mode-fight .sidebar-foot,
 body.mode-fight .hud-stack,
 body.mode-fight .chat-box,

@@ -36,31 +36,46 @@ SPDX-License-Identifier: MIT
   <div class="app-body">
     <aside class="sidebar">
       <div id="bot-section">
-        <div class="sidebar-title">BOTS</div>
-        <div id="bot-group-long" class="bot-group">
-          <div class="bot-group-title">long-running</div>
-          <ul id="bot-list-long" class="bot-list"></ul>
+        <div class="sidebar-tabs" role="tablist"
+          aria-label="sidebar view switch">
+          <button id="tab-live" class="sidebar-tab active" type="button"
+            role="tab" aria-selected="true"
+            title="the long-running fleet bots of the process">LIVE</button>
+          <button id="tab-tests" class="sidebar-tab" type="button"
+            role="tab" aria-selected="false"
+            title="the acceptance test bots and their scenarios">TESTS</button>
         </div>
-        <div id="bot-group-acc" class="bot-group hidden">
-          <div class="bot-group-title">acceptance</div>
-          <ul id="bot-list-acc" class="bot-list"></ul>
-        </div>
-        <ul id="bot-list" class="bot-list bot-list-fallback hidden"></ul>
-      </div>
 
-      <div id="acceptance-panel" class="acceptance-panel hidden">
-        <div class="sidebar-title">TESTS</div>
-        <div class="acc-actions">
-          <button id="acc-run-seq" class="btn acc-runall-btn" type="button"
-            title="run every scenario one after another - a fresh temp bot each, the next starts when the previous finishes">
-            run all &#9654;
-          </button>
-          <button id="acc-run-par" class="btn acc-runall-btn" type="button"
-            title="start every scenario at the same time - each on its own temp account (temp1, temp2, temp3)">
-            run all &#8741;
-          </button>
+        <div id="view-live" class="sidebar-view active">
+          <ul id="bot-list-long" class="bot-list"></ul>
+          <div id="bot-list-long-empty" class="sidebar-view-empty hidden">
+            no live bots registered
+          </div>
         </div>
-        <ul id="acc-list" class="acc-list"></ul>
+
+        <div id="view-tests" class="sidebar-view hidden">
+          <div id="bot-group-acc" class="bot-group hidden">
+            <div class="bot-group-title">acceptance bots</div>
+            <ul id="bot-list-acc" class="bot-list"></ul>
+          </div>
+          <div id="acceptance-panel" class="acceptance-panel hidden">
+            <div class="sidebar-title">SCENARIOS</div>
+            <div class="acc-actions">
+              <button id="acc-run-seq" class="btn acc-runall-btn" type="button"
+                title="run every scenario one after another - a fresh temp bot each, the next starts when the previous finishes">
+                run all &#9654;
+              </button>
+              <button id="acc-run-par" class="btn acc-runall-btn" type="button"
+                title="start every scenario at the same time - each on its own temp account (temp1, temp2, temp3)">
+                run all &#8741;
+              </button>
+            </div>
+            <ul id="acc-list" class="acc-list"></ul>
+          </div>
+          <div id="tests-view-empty" class="sidebar-view-empty hidden">
+            no acceptance tests registered
+          </div>
+        </div>
       </div>
 
       <div id="pf-panel" class="pf-panel">
