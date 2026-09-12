@@ -584,6 +584,27 @@ trip stop planning finds the station. Data plumbing of the band
 lesson economy (the survey protocol: the production walk legs ride
 the band wiring gated on M1 green).
 
+### T-021: the Gludio-Dion walking corridor regression test
+
+status: in_progress
+milestone: M3
+priority: P3
+deps: T-018
+scope: internal/swarm/pathfind/ (test file only), docs/
+
+The committed regression artifact of the T-018 finding: the
+Gludio -> Dion walking corridor route (42 831 units, within the
+shipped expansion cap) pinned as a pathfind town-route test on the
+real geodata pack - a geodata refresh or a search regression that
+breaks the corridor connectivity fails the suite instead of
+surfacing as a band trip that never arrives. The elven -> Gludio
+leg (1.25M nodes, above the shipped cap) stays a documentation
+fact: the cap-as-a-parameter roadmap item owns it.
+
+claimed: zones-zai 2026-09-12 10:10 UTC
+resume: fresh claim. Next: the test next to TestFindPathToShopDeck,
+  run, push, close.
+
 claimed: zones-zai 2026-09-12 10:03 UTC
 resume: done 10:07 UTC - the bookPurchase two-catalog fallback (the
   village first, the Dion Sonia stop at the 20 percent Dion tax),
