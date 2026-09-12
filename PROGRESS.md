@@ -1,6 +1,6 @@
 # PROGRESS
 
-Generated: 2026-09-12 17:46:54Z
+Generated: 2026-09-12 21:43:45Z
 
 ## Milestone ladder
 
@@ -28,6 +28,14 @@ Generated: 2026-09-12 17:46:54Z
 ## Recent commits
 
 ```
+b3cd6bb session: register the fleet report endpoint and flush the first record at once
+c759f9e session: the persistent session journal and the session dump report
+c4eb81d state: split the self half of ApplyStatusUpdate
+57f6e2b docs: the statistics tab documentation and the progress entry
+68c2b39 webui: the bot statistics tab
+d439684 webserver: the statistics collector and the /api/stats endpoints
+508f179 state: the lifetime bot metrics counters for the statistics view
+b9731dc docs: retire the self-organization queue and its design document
 65f003d docs: the session close notes of the T-009..T-021 rounds
 1767cbc docs: close T-021 - the corridor regression test lands
 e1531aa pathfind: the gludio-dion corridor regression test (T-021)
@@ -40,12 +48,4 @@ e9b9640 backlog: register + claim T-020 the spellbook catalog resolution
 c161da2 hunt: the quest trip phase engine consumes a quest chain (T-019)
 d3596b4 backlog: register + claim T-019 the quest trip phase engine
 3cbdeae docs: close T-018 - the walking legs exist, findings recorded
-28c74e6 backlog: register + claim T-018 the walking leg verification
-1a7a5bd backlog: the T-016 resume merge - the accept stage state plus the hand-off plan
-18b9a9a docs: the T-016 round - the accept stage passed live
-d0f8781 metrics: the class transfer accept stage PASS row + the progress page
-d5ec49b acceptance: the class transfer scenario - the M2 accept stage (T-016)
-9adb904 docs: close T-009 - the dion band zone registry ships
-7ac28d9 hunt: the 20-25 band zone registry of the dion grounds (T-009)
-1b0c23c backlog: claim T-016 the class transfer acceptance scenario (in_progress)
 ```
