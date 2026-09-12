@@ -786,6 +786,70 @@ spot picker itself skips eligible grounds whose static median sits at
 the delevel gap - the spot window (level-8) admits grounds the
 deleveling would immediately answer with guard deaths.
 
+## The quest dialog walker (hunt/quest_walker.go)
+
+The dialog engine the M2 quest brain runs on: DriveDialog walks one
+NPC conversation end to end from the two-click talk entry to the
+answer page of the last bypass. The caller (the future quest trip
+phase) keeps the character within the 250 unit interaction distance
+of the npc through the whole conversation - the server gates every
+bypass and every quest event on it (Player.processScriptEvent
+resolves the npc through the last-folk memory and re-checks the
+distance); the walker's entry clicks refresh that memory.
+
+The walk: the paced two-click talk (the first Action click of a new
+target only selects it, the second opens the html - NpcClick.onAction;
+a click on an npc that is already the target interacts right away, so
+the entry is idempotent), the bounded new-page wait (5 s per page,
+polled every 250 ms), the link match by visible text (the
+case-insensitive containment match: a route step names a distinctive
+substring of the link label, "Challenge the test", "Change profession
+to an Elven Knight"), the IsDialogCommand validation of the tracker
+(only commands the open page offered are sent - the server drops the
+rest silently) and the bypass send. Every page the walker sees is
+parsed (ParseHTMLLinks) and applied to the tracker dialog section
+BEFORE any bypass of that page fires, so the validation runs against
+the page the command came from (the hunt-side feed of the state
+dialog section; the connection layer stores the raw html only).
+
+The arrival signal of a new page is the content change: the
+connection layer keeps only the last html, and the pages of one
+conversation all arrive from the same npc, so "the html of npc X
+differs from the last seen" is the only arrival evidence. Every quest
+page transition changes the content (the links of a page carry the
+next page's file name); the one blind spot - the server re-sending a
+byte identical page after a bypass - reads as "no answer yet" and
+lapses into the step timeout, which the caller treats as a failed
+conversation (never a silent success).
+
+The route steps are data: []DialogStep with the link texts in
+conversation order. A step whose page never arrives, whose link text
+the page does not offer, or whose command fails the open page
+validation fails the walk with an error naming the step; the caller
+retries the conversation from the entry (the server state of the
+quest makes the re-entry idempotent - re-talking re-sends the page
+of the current cond).
+
+Live verified (the T-014 round, account dialogw1): the trainer page
+of Ellenia at the elven village (the character injected at her
+approach ring through the DB), the "Quest" link (the bare `bypass
+Script` command the trainer pages carry) walked through to the
+no-quest answer page in 1.7 s - the full click -> html -> link ->
+bypass -> answer chain against the deployed stack. The SkillList
+link of the same page answers with the SkillList packet, NOT an html
+page - the walker routes only fit page-answering links. The opt-in
+live suite (SWARM_LIVE_DIALOG=1, quest_walker_live_test.go) replays
+the round trip; SWARM_LIVE_DIALOG_LINK overrides the route link for
+ad-hoc experiments.
+
+Covered by hunt/quest_walker_test.go (the scripted fakeGame wrapper
+emulates the server html action cache: a bypass the open page never
+offered is never answered) on the real Q00406 and
+ElfHumanFighterChange1 datapack pages: the accept chain, the -h
+prefix strip of the class change link, the stale-npc page guard, the
+missing-link guard, the same-page repeat blind spot, the timeouts
+and the argument guards.
+
 ## Live validated facts (2026-09-07 round, do not re-derive)
 
 The town trips (sell loop) and the deleveling cycle are live verified

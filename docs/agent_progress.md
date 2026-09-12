@@ -2797,3 +2797,30 @@ shopping trip.
 
 The gear catalog ships within the T-010 scope (gear/, npcdata/,
 tools/). The hunt wiring is the follow-up.
+
+### Progress (T-014)
+
+- 08:45 UTC: claimed (BACKLOG T-014 in_progress + the entry above).
+- 08:48 UTC: hunt/quest_walker.go landed and pushed - DriveDialog
+  (the two-click talk entry, the content-change page wait, the
+  hunt-side tracker feed, the link-by-text bypass walk with the
+  IsDialogCommand validation) + 10 unit tests on the real Q00406
+  and ElfHumanFighterChange1 page goldens through the scripted
+  fakeGame wrapper (the html action cache emulation). Build, the
+  hunt tests, golangci-lint --new green.
+- 09:05 UTC: the live verification round landed and pushed -
+  quest_walker_live_test.go (SWARM_LIVE_DIALOG=1, the fleet session
+  recipe + the DB position injection through the mariadb CLI
+  channel): the character injected at Ellenia's approach ring
+  talked to her, the walker matched the "Quest" link (the bare
+  `bypass Script` command of the trainer pages), sent it, the
+  no-quest answer page arrived and landed in the tracker - 1.7 s
+  round trip. The standard mobius_e2e.sh 45 prints E2E_OK. The
+  live facts of the round (the glade pages carry no links, the
+  SkillList link answers with a packet not a page, the trainer
+  page link inventory) live in the dev log round 70.
+- Status: done (2026-09-12, 09:10 UTC) - the engine, the tests, the
+  live round trip, the docs (hunting.md section, quest_protocol.md
+  follow-up list, dev log round 70). Not wired into the tick
+  machine (the quest trip phase is the M2 acceptance round's work,
+  after the Q00406 chain data task).

@@ -4883,3 +4883,64 @@ multi-town catalog selection (hunt/shopping.go switches to the Dion
 catalog when the bot farms the 20-25 band at Dion) and the
 shopping_strategy.md Dion shop section. The gate: M1 green before the
 20-25 band is reached.
+
+## Round 70: the dialog walker walks - the quest brain gets its legs (T-014, 2026-09-12)
+
+Problem: the M2 quest brain needs a dialog engine that drives one
+NPC conversation end to end (the class transfer chain of
+docs/quest_protocol.md is four NPCs, nine pages), but the landed
+pieces (the 0x1B parse of T-008, the link parser of T-012, the
+tracker dialog section of T-013) were three separate seams with no
+driver that composes them - and no code fed ApplyDialog (the
+connection layer stores the raw html only).
+
+Root cause: the composition was scoped as the follow-up 4 engine
+half of the quest research; nobody had claimed it yet.
+
+Fix (T-014): hunt/quest_walker.go - DriveDialog walks one NPC
+conversation: the paced two-click talk entry (NpcClick.onAction:
+the first Action click of a new target only selects, the second
+opens the html - verified in the Java sources; every click
+refreshes the last-folk memory the quest events resolve their npc
+through), the bounded new-page wait with content change detection
+(the connection stores only the last html and the quest pages all
+arrive from the same npc - the identical page re-send is the
+documented blind spot), the hunt-side feed of the tracker dialog
+section (applyDialogPage parses the links and applies the page
+before any bypass fires, so IsDialogCommand validates against the
+page the command came from) and the link-by-text bypass walk (the
+case-insensitive containment match, the validation, the send).
+
+Verification: 10 unit tests through a scripted fakeGame wrapper
+(the html action cache emulation: a bypass the open page never
+offered is never answered) on the real Q00406 and
+ElfHumanFighterChange1 datapack pages - the accept chain, the -h
+strip of the class change link, the stale-npc page guard, the
+missing-link guard, the same-page repeat blind spot, the timeouts
+and the argument guards; the live round trip
+(SWARM_LIVE_DIALOG=1, hunt/quest_walker_live_test.go): the
+character injected at the trainer approach ring of Ellenia talked
+to her, the walker matched the "Quest" link (the bare `bypass
+Script` command her trainer page carries), sent it, and the
+no-quest answer page arrived and landed in the tracker - the full
+click -> html -> link -> bypass -> answer chain against the
+deployed stack in 1.7 s. go build ./... green, the hunt package
+tests green (the live suite skipped by default),
+golangci-lint run --new: 0 issues, tools/mobius_e2e.sh 45 prints
+E2E_OK.
+
+Live facts of the round (the elven spawn glade, account dialogw1):
+the fresh elven fighter spawns at (46048, 41141, -3440) among
+Gremlins, Nerupa (template 7370, 59 units away) and the Newbie
+Helper (7400); both glade guide pages are plain text with NO links
+(Nerupa's 249 byte intro, the helper's 397 byte gremlin tutorial)
+- the nearest link-carrying pages live at the trainer/merchant
+sprawl 6-11k south. The trainer pages (Ellenia 30155, Cobendell
+30156) carry exactly two links: `bypass -h npc_%objectId%_SkillList`
+("Learn skills" - answers with the SkillList packet, NOT an html
+page) and the bare `bypass Script` ("Quest" - ScriptLink answers
+with the quest choose window or the no-quest message, both html;
+verified in the Java). The position injection between
+EnsureCharacter and EnterWorld (the mariadb CLI channel) moves the
+character cleanly - the game server loads the row at the world
+entry.

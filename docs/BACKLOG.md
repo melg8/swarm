@@ -381,7 +381,7 @@ resume: done 08:27 UTC - state/dialog.go with the page store, the
 
 ### T-014: the quest dialog walker engine
 
-status: in_progress
+status: done
 milestone: M2
 priority: P2
 deps: T-011, T-012, T-013
@@ -404,7 +404,60 @@ deployed stack (click -> html -> link -> bypass -> next html)
 closes the round.
 
 claimed: quest-walker-e3f8 2026-09-12 08:45 UTC
-resume: fresh claim - the walker composes the landed seams
-  (GameAPI.SendBypass/LastHTMLDialog, state ApplyDialog/
-  IsDialogCommand, ParseHTMLLinks); no loop.go wiring (the quest
-  phase integration is the M2 acceptance round's work).
+resume: done 09:10 UTC - hunt/quest_walker.go (DriveDialog: the
+  two-click entry, the content-change wait, the tracker feed, the
+  validated bypass walk) + the scripted fakeGame unit tests on the
+  real datapack pages + the live round trip (Ellenia, the "Quest"
+  link, the answer page applied, SWARM_LIVE_DIALOG=1 replays it).
+  The dev log round 70 records the live facts (the glade pages
+  carry no links; SkillList answers with a packet, not a page).
+  Follow-ups for the next agents: T-015 the quest chain data, T-016
+  the class-transfer acceptance scenario, the quest trip phase
+  wiring.
+
+### T-015: the class transfer quest chains as data
+
+status: todo
+milestone: M2
+priority: P2
+deps: T-014
+scope: internal/swarm/hunt/ (new files only), docs/
+
+The data half of the quest brain: the two class transfer chains of
+docs/quest_protocol.md as Go data the quest trip phase consumes -
+the npc chain of Q00406 (Sorius 30327, Kluto 30317) and Q00407
+(Reisa 30328, Moretti 30337, Babenco 30334, Prias 30426), the kill
+grounds (the Ruins of Agony skeleton/spartoi ids, the Ol Mahum
+camps), the item economy (the pieces, the letters, the memo, the
+box, the brooch) with the drop chances and the 20 piece counters,
+the cond progression (1..7) and the dialog route steps (the link
+texts per cond, from the datapack pages - the T-012 goldens and the
+T-014 live dumps pin the forms). The ElfHumanFighterChange1 class
+change chain (Rains 30288, the 30288-11 -> 12 -> -h 19 route)
+rides along. Unit tests pin the data against the quest script
+sources (the npc ids, the item ids, the kill ids read from the
+Java); the hunt consumer is T-016.
+
+claimed: -
+resume: -
+
+### T-016: the class transfer acceptance scenario
+
+status: todo
+milestone: M2
+priority: P2
+deps: T-015
+scope: internal/swarm/acceptance/, docs/
+
+The M2 acceptance vehicle: a scenario that DB-injects a level 19
+ELVEN_FIGHTER at Gludio (the level milestone machinery of T-003
+plus the quest chain data of T-015), drives the quest trip phase
+(the dialog walker through the Sorius chain, the kill grounds, the
+Kluto chain) and the Rains class change, and passes when
+SelfClassID reports 19 (Elven Knight) - plus the character
+selection packet agreement after a relogin. The gatekeeper legs
+(the elven village -> Gludio hop) join once T-008 closes. This is
+the task that CLOSES M2 (the live acceptance run).
+
+claimed: -
+resume: -

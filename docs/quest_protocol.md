@@ -488,11 +488,15 @@ decomposes into:
    the html action cache (send only the links of the currently open
    page, within 250 units of the origin npc). `RequestQuestList`
    (0x63) for journal refreshes after relogins.
-4. **The quest brain** (hunt): a dialog walker (pick the link by
-   text, send its bypass, wait for the next page), the two class
-   transfer scripts as data (the npc chain, the item counts, the
-   kill counters read from the inventory updates), the gatekeeper
-   leg (a town trip whose walk is a teleport buy), and the
+4. **The quest brain** (hunt): the dialog walker ENGINE landed as
+   T-014 (hunt/quest_walker.go - the two-click talk entry, the
+   content-change page wait, the tracker feed, the link-by-text
+   bypass walk with the IsDialogCommand validation; live verified
+   against Ellenia: the "Quest" link round trip to the no-quest
+   answer page). The remaining halves: the two class transfer
+   scripts as data (the npc chain, the item counts, the kill
+   counters read from the inventory updates), the gatekeeper leg
+   (a town trip whose walk is a teleport buy), and the
    Gludio/Gludin navigation data (the M3 zone survey feeds it).
 5. **The M2 acceptance scenario** (acceptance): the class-transfer
    scenario - a DB-injected level 19 ELVEN_FIGHTER (the level
