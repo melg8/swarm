@@ -208,7 +208,7 @@ func (h *healingGame) ActionSitStand() error {
 	if err := h.fakeGame.ActionSitStand(); err != nil {
 		return err
 	}
-	if h.fakeGame.sits == 1 {
+	if h.sits == 1 {
 		// The sit toggle: the regeneration covers the rest.
 		h.bot.ApplyStatusUpdate(100, []state.Attribute{
 			{ID: state.AttrCurHP, Value: 90},

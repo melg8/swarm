@@ -45,8 +45,12 @@ const questNpcScanRadius = 6000.0
 // tracker world before the trip gives up on the station.
 const questNpcFindWait = 30 * time.Second
 
-// questWalkTimeout bounds one walk to a station or a kill ground.
-const questWalkTimeout = 5 * time.Minute
+// questWalkTimeout bounds one walk to a station or a kill ground:
+// the far legs of the class transfer chain (Gludio to the Ruins of
+// Agony, the Ol Mahum camps north of Gludin) run over 30 000 units
+// of planned segments, so the bound holds the whole walk plus the
+// re-plans.
+const questWalkTimeout = 10 * time.Minute
 
 // questSegmentLen bounds one planned segment of the route walk: the
 // geodata search of a long leg (Gludio to the Ruins of Agony is
@@ -145,6 +149,13 @@ func (l *Loop) FindQuestNpc(
 		}
 		time.Sleep(questWalkPoll)
 	}
+}
+
+// WalkQuestStation walks to a quest station (an npc cell or a kill
+// ground reference): the public form of the quest walk the
+// acceptance scenarios drive on a manual loop.
+func (l *Loop) WalkQuestStation(x int32, y int32, z int32) error {
+	return l.walkToQuestPoint(x, y, z, questWalkTimeout)
 }
 
 // walkToQuestPoint walks to a station and waits for the arrival
