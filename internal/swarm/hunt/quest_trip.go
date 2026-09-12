@@ -215,10 +215,24 @@ func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
 		}
 		// No geodata path for the segment (or the follower
 		// ran dry): the direct click, the server stops it at
-		// an obstacle and the loop re-plans above.
-		if err := l.game.WalkTo(segX, segY, selfZ); err != nil {
+		// an obstacle and the loop re-plans above. The click
+		// rides the same flood protector pacing as the planned
+		// waypoints.
+		now := time.Now()
+		if now.Sub(l.questWalkAt) < walkRequestPeriod {
+			time.Sleep(questWalkPoll)
+
+			continue
+		}
+		segZ := selfZ
+		if height, err := l.navigator.ClosestHeight(
+			float64(segX), float64(segY), int16(selfZ)); err == nil {
+			segZ = int32(height)
+		}
+		if err := l.game.WalkTo(segX, segY, segZ); err != nil {
 			return fmt.Errorf("the walk request failed: %w", err)
 		}
+		l.questWalkAt = now
 		if !l.awaitSegmentProgress(segX, segY, deadline) {
 			return fmt.Errorf(
 				"the walk to (%d, %d) stalled at (%d, %d)",
@@ -261,7 +275,8 @@ func (l *Loop) followPlannedSegment(
 	}
 	waypoints := result.Waypoints
 	l.logf("quest: walking a planned segment to (%d, %d) through "+
-		"%d waypoints", segX, segY, len(waypoints))
+		"%d waypoints from (%d, %d)", segX, segY, len(waypoints),
+		selfX, selfY)
 	for i := range waypoints {
 		if !l.followWaypoint(waypoints, i, deadline) {
 			return true
@@ -280,6 +295,7 @@ func (l *Loop) followWaypoint(
 	waypoints []pathfind.Vec3, index int, deadline time.Time,
 ) bool {
 	wp := waypoints[index]
+	sent := false
 	lastX, lastY := int32(0), int32(0)
 	stuckSince := time.Time{}
 	for {
@@ -299,22 +315,44 @@ func (l *Loop) followWaypoint(
 		if waypointDistance(wp, selfX, selfY, selfZ) <= radius {
 			return true
 		}
-		if lastX == selfX && lastY == selfY {
-			if stuckSince.IsZero() {
-				stuckSince = time.Now()
-			} else if time.Since(stuckSince) >= questStuckWait {
-				return false
-			}
-		} else {
+		moving := selfX != lastX || selfY != lastY
+		if moving {
 			lastX, lastY = selfX, selfY
 			stuckSince = time.Time{}
+		} else if stuckSince.IsZero() {
+			stuckSince = time.Now()
+		}
+		if !stuckSince.IsZero() && time.Since(stuckSince) >= questStuckWait {
+			return false
+		}
+		// The pacing: no request while the character walks; a repeat
+		// click only for the standing one, gated by the town walk
+		// period (the Mobius PlayerActionFloodProtector mutes the
+		// click stream above one action per second - the 2026-09-12
+		// run stalled ten minutes on the mute).
+		now := time.Now()
+		if sent && (moving || now.Sub(l.questWalkAt) < walkRequestPeriod) {
+			time.Sleep(questWalkPoll)
+
+			continue
+		}
+		// The click carries the geodata height of the waypoint, not
+		// the stale self height: the server validates the click z
+		// against its own geodata (the same run stalled on the
+		// segment west of Gludio - an 864 unit rise with every click
+		// riding the self z, every request ActionFailed).
+		clickZ := selfZ
+		if wp.Z != 0 {
+			clickZ = int32(wp.Z)
 		}
 		if err := l.game.WalkTo(
-			int32(wp.X), int32(wp.Y), selfZ); err != nil {
+			int32(wp.X), int32(wp.Y), clickZ); err != nil {
 			l.logf("quest: the waypoint walk failed: %v", err)
 
 			return false
 		}
+		sent = true
+		l.questWalkAt = now
 		time.Sleep(questWalkPoll)
 	}
 }

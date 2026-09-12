@@ -350,9 +350,12 @@ type Loop struct {
 	legStart      pathfind.Vec3
 	waterEscape   bool
 	moveAt        time.Time
-	stuckAt       time.Time
-	stuckX        int32
-	stuckY        int32
+	// questWalkAt paces the quest trip walk requests (the flood
+	// protector mute of the 2026-09-12 class transfer run).
+	questWalkAt time.Time
+	stuckAt     time.Time
+	stuckX      int32
+	stuckY      int32
 	// stuckFast arms after the first stuck skip of a trip: subsequent
 	// stuck detections use the shorter stuckFastTimeout so the walker
 	// cycles through the remaining waypoints quickly instead of waiting
