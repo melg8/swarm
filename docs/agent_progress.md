@@ -11,6 +11,57 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the session journal and the session dump report (2026-09-12)
+
+Started: 2026-09-12. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The dump-state snapshot is a moment picture and the tracker event
+ring holds only 512 lines, so long unattended runs (8-24 h) had
+nothing to analyze post-mortem. Build the three-layer session
+evidence trail: the append-only JSONL journal per bot in logs/ (the
+story mirror, the 30 s samples, kill/death/level/trip/buy/sell/zone/
+stall/repath/lifecycle events, 64 MB rotation with gzip), the in-memory
+aggregator (hourly bins, per-mob stats, fight histograms) and the
+compact text report rendered from it, plus the web UI "session dump"
+button that copies the report to the clipboard and the offline
+`-session-report FILE` CLI.
+
+### Acceptance criteria
+
+- The journal writes every session event to logs/session-*.jsonl
+  with rotation and never blocks the tracker (channel sink).
+- GET /api/bots/{id}/session-report serves the report; the button
+  copies it to the clipboard.
+- The CLI renders the same report from a journal file.
+- go build, the full suite and golangci-lint --new green; live runs
+  verify the journal growth and the report content.
+
+### Progress
+
+- Commit c759f9e "session: the persistent session journal and the
+  session dump report" (2026-09-12): internal/swarm/session (events,
+  journal, aggregator, report, reader, sampler), the state event
+  sink mirror, the hunt emission points, the -session-dir and
+  -session-report flags, the web endpoint and the button.
+- Commit b3cd6bb "session: register the fleet report endpoint and
+  flush the first record at once" (2026-09-12, pushed 2026-09-13
+  after the sandbox credential reset): the owner reported the button
+  dead and a 0 KB journal - the fleet mode never called
+  web.SetSessionJournal (the endpoint 404ed) and a hard kill inside
+  the first 2 s flush window left the empty file. The fix registers
+  the endpoint in runFleet, flushes the first record immediately and
+  makes the button failure readable (console.error plus the report
+  endpoint opened in a new tab). Round 79 of development_log.md
+  carries the full root cause.
+- Status: done (2026-09-13). Both symptoms reproduced and fixed
+  live: the fleet endpoint answers 200 for every bot, the journal
+  carries the identity line from the first ~100 ms; build, vet,
+  lint --new (0 issues) and the full suite green.
+
 ## Active task: the bot statistics tab of the web UI (2026-09-13)
 
 Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.
@@ -116,6 +167,18 @@ problems can never arise again.
   gap") that must buy the legs armor back.
 - go build, the full test suite and `golangci-lint run --new` green;
   the live scenario PASSes against the deployed stack.
+
+### Progress (2026-09-12)
+
+- Commits 041d945 "hunt: the gear debt - the town trip answers for
+  the slot it stranded" and c0df26b "docs: the round 60 gear debt":
+  the town trip exit detects a stranded paperdoll slot and arms the
+  gear debt, the armed debt shortens the trip cooldown to the gear
+  run window and the refill trip dresses the slot, the state dump
+  prints the empty paperdoll families.
+- Status: done (2026-09-12). The "gear gap" acceptance scenario
+  PASSed live (the legs armor bought back into the empty slot);
+  development_log Round 60 carries the full root cause and the fix.
 
 ## Active task: the sidebar LIVE/TESTS tab switch (2026-09-12)
 
