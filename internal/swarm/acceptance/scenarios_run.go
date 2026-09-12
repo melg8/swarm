@@ -86,16 +86,24 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
 // and must walk to its selected hunting zone on its own - the freeze
 // of the report (the round 58 dump) held a character on that very
 // cell forever, the reproduction and the fix live in the hunt package.
-func zoneReturnScenario(ctx context.Context, m *Manager, t *Test) error {
+// runSupervisedScenario drives the common skeleton of the supervised
+// temp bot scenarios: ensure the temp character exists, inject the
+// start state, run the supervised hunt session behind it and watch
+// the check list until every condition holds (the context cancel
+// unwinds the session either way). The zone return and the gear gap
+// rounds share it - their stories differ only in the start state and
+// the conditions.
+func runSupervisedScenario(
+	ctx context.Context, m *Manager, t *Test, reset characterReset,
+	evaluate func(*state.Bot, *Test), watchLog, doneLog string,
+) error {
 	test := t
-	test.setChecks(zoneReturnChecks())
-
-	if err := m.ensureCharacter(returnAccount, returnPassword, returnAccount,
+	if err := m.ensureCharacter(reset.Account, reset.Account, reset.Char,
 		test.appendLog); err != nil {
 		return fmt.Errorf("ensure character: %w", err)
 	}
 	time.Sleep(ensurePause)
-	if err := m.injectReset(zoneReturnReset(returnAccount), test); err != nil {
+	if err := m.injectReset(reset, test); err != nil {
 		return fmt.Errorf("inject start state: %w", err)
 	}
 	time.Sleep(ensurePause)
@@ -104,8 +112,8 @@ func zoneReturnScenario(ctx context.Context, m *Manager, t *Test) error {
 	defer cancelSession()
 	sessionDone := make(chan error, 1)
 	go func() {
-		sessionDone <- m.runSessionSupervised(sessionCtx, returnAccount,
-			returnPassword, returnAccount, true, m.proxy, test.appendLog)
+		sessionDone <- m.runSessionSupervised(sessionCtx, reset.Account,
+			reset.Account, reset.Char, true, m.proxy, test.appendLog)
 	}()
 
 	tracker := m.tracker(test)
@@ -115,8 +123,7 @@ func zoneReturnScenario(ctx context.Context, m *Manager, t *Test) error {
 
 		return err
 	}
-	test.appendLog("acceptance: the bot is in the world, watching the " +
-		"zone return")
+	test.appendLog(watchLog)
 
 	for {
 		if ctx.Err() != nil {
@@ -125,10 +132,9 @@ func zoneReturnScenario(ctx context.Context, m *Manager, t *Test) error {
 
 			return fmt.Errorf("cancelled: %w", ctx.Err())
 		}
-		evaluateZoneReturnConditions(tracker, test)
+		evaluate(tracker, test)
 		if allChecksDone(test) {
-			test.appendLog("acceptance: the bot reached its hunting zone, " +
-				"stopping the bot")
+			test.appendLog(doneLog)
 			cancelSession()
 			if err := <-sessionDone; err != nil {
 				return fmt.Errorf("session end: %w", err)
@@ -146,6 +152,35 @@ func zoneReturnScenario(ctx context.Context, m *Manager, t *Test) error {
 		case <-time.After(monitorPeriod):
 		}
 	}
+}
+
+// zoneReturnScenario runs the stuck cell round: the temp character
+// wakes at the reported freeze position with the reported item set
+// and must walk to its selected hunting zone on its own - the freeze
+// of the report (the round 58 dump) held a character on that very
+// cell forever, the reproduction and the fix live in the hunt package.
+func zoneReturnScenario(ctx context.Context, m *Manager, t *Test) error {
+	t.setChecks(zoneReturnChecks())
+
+	return runSupervisedScenario(ctx, m, t, zoneReturnReset(returnAccount),
+		evaluateZoneReturnConditions,
+		"acceptance: the bot is in the world, watching the zone return",
+		"acceptance: the bot reached its hunting zone, stopping the bot")
+}
+
+// gearGapScenario runs the pantsless dump round: the temp character
+// wakes at the reported farm spot of the 2026-09-12 04:58 dump with
+// the reported pantsless paperdoll and wallet, and must buy its legs
+// armor back through the ordinary shop strategy (the report's bot
+// farmed on without it - the gear debt machinery of the round 60 fix
+// and its reproduction live in the hunt package).
+func gearGapScenario(ctx context.Context, m *Manager, t *Test) error {
+	t.setChecks(gearGapChecks())
+
+	return runSupervisedScenario(ctx, m, t, gearGapReset(gearAccount),
+		evaluateGearGapConditions,
+		"acceptance: the bot is in the world, watching the gear gap refill",
+		"acceptance: the legs slot is dressed, stopping the bot")
 }
 
 // evaluateZoneReturnConditions rewrites the check list of the stuck

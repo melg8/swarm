@@ -169,6 +169,68 @@ func zoneReturnReset(account string) characterReset {
 	}
 }
 
+// The dump start state of the gear gap scenario (the 2026-09-12
+// 04:58 pantsless report, build 4deb888): the level 14 fighter test2
+// stood at its Spore Fungus SW farm spot wearing every slot EXCEPT
+// the legs - the town trip had sold the piece for a replacement that
+// never landed - with the 13162 adena of the report and nothing in
+// the bag. The scenario verifies the recovery invariant: the hunt
+// loop detects the hole, shops and dresses it.
+const (
+	// gearGapSpawnX/Y/Z is the reported farm spot position (the dump
+	// of 2026-09-12 04:58, inside the Spore Fungus SW zone).
+	gearGapSpawnX = 38344
+	gearGapSpawnY = 46248
+	gearGapSpawnZ = -3592
+	// The vitals, the wallet and the experience of the dump character.
+	gearGapExp   = 247995
+	gearGapSP    = 2977
+	gearGapAdena = 13162
+	gearGapHP    = 339
+	gearGapMP    = 137
+	gearGapCP    = 105
+)
+
+// gearGapItems is the exact item set of the dump: the equipped
+// paperdoll minus the legs piece the trip stranded (the injection
+// lands every stack in the bag - the auto equipment of the hunt loop
+// dresses the character from it, the wearable pieces are the ones the
+// dump wore).
+var gearGapItems = []ResetItem{
+	{ItemID: 20, Count: 1},  // Buckler
+	{ItemID: 22, Count: 1},  // Leather Shirt
+	{ItemID: 37, Count: 1},  // Leather Shoes
+	{ItemID: 43, Count: 1},  // Wooden Helmet
+	{ItemID: 49, Count: 1},  // Gloves
+	{ItemID: 112, Count: 1}, // Apprentice's Earring
+	{ItemID: 112, Count: 1}, // Apprentice's Earring
+	{ItemID: 116, Count: 1}, // Magic Ring
+	{ItemID: 116, Count: 1}, // Magic Ring
+	{ItemID: 118, Count: 1}, // Necklace of Magic
+	{ItemID: 153, Count: 1}, // Sickle
+}
+
+// gearGapReset returns the dump start state of the gear gap
+// scenario: the reported farm spot, the reported level and vitals,
+// the reported wallet and the reported pantsless item set.
+func gearGapReset(account string) characterReset {
+	return characterReset{
+		Account: account,
+		Char:    account,
+		Level:   14,
+		Exp:     gearGapExp,
+		SP:      gearGapSP,
+		Adena:   gearGapAdena,
+		Items:   gearGapItems,
+		X:       gearGapSpawnX,
+		Y:       gearGapSpawnY,
+		Z:       gearGapSpawnZ,
+		MaxHP:   gearGapHP,
+		MaxMP:   gearGapMP,
+		MaxCP:   gearGapCP,
+	}
+}
+
 // waitCharacterOffline polls the characters row until the server
 // flushed the session state (the online flag drops with the store on
 // logout). The timeout case continues with a warning instead of

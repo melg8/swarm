@@ -96,6 +96,44 @@ func zoneReturnChecks() []Check {
 	}
 }
 
+// gearGapChecks is the check list of the pantsless dump scenario: the
+// world entry plus the dressed legs slot of the gear gap refill.
+func gearGapChecks() []Check {
+	return []Check{
+		{
+			ID: checkOnline, Label: "entered the world", Done: false,
+			Detail: "",
+		},
+		{
+			ID: "legs", Label: "bought the legs armor back", Done: false,
+			Detail: "",
+		},
+	}
+}
+
+// evaluateGearGapConditions rewrites the check list of the pantsless
+// dump scenario from the live tracker state: the legs check holds
+// once the character wears any piece in the paperdoll legs slot the
+// town trip bought back (the auto equipment wears the filler within
+// seconds of its arrival).
+func evaluateGearGapConditions(tracker *state.Bot, test *Test) {
+	if tracker.Status() != state.StatusOnline {
+		return
+	}
+	counts, _ := evaluateEquipment(tracker)
+	test.updateCheck("legs", counts.legs == 1,
+		legsWord(counts.legs))
+}
+
+// legsWord renders the legs slot state of the gear gap detail.
+func legsWord(legs int) string {
+	if legs == 1 {
+		return "the legs slot is dressed"
+	}
+
+	return "the legs slot is still empty"
+}
+
 // relayChecks is the check list of the proxy relay scenario.
 func relayChecks() []Check {
 	return []Check{

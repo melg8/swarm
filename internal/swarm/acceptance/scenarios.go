@@ -9,10 +9,10 @@ import (
 	"time"
 )
 
-// The temp accounts of the scenarios: temp1, temp2, temp3 and temp4
-// with the matching passwords and character names. They never collide
-// with the -bots fleet (which derives test1, test2, ... from the base
-// account).
+// The temp accounts of the scenarios: temp1, temp2, temp3, temp4 and
+// temp5 with the matching passwords and character names. They never
+// collide with the -bots fleet (which derives test1, test2, ... from
+// the base account).
 const (
 	farmAccount    = "temp1"
 	farmPassword   = "temp1"
@@ -22,6 +22,8 @@ const (
 	relayPassword  = "temp3"
 	returnAccount  = "temp4"
 	returnPassword = "temp4"
+	gearAccount    = "temp5"
+	gearPassword   = "temp5"
 )
 
 // Scenario timeouts: the farm readiness runs the one town visit
@@ -47,6 +49,14 @@ const (
 // shopping detour or two may ride along - a quarter of an hour keeps
 // the slowest honest run inside the bound.
 const zoneReturnTimeout = 15 * time.Minute
+
+// gearGapTimeout bounds the pantsless dump scenario: the recovery is
+// one town trip (the walk to the village, the filler buy, the walk
+// back) that a road fight or a relogin may stretch - the aggressive
+// Kaboo packs of the dump surroundings interrupt the walks the same
+// way they interrupted the trip that caused the report. A quarter of
+// an hour keeps the slowest honest run inside the bound.
+const gearGapTimeout = 15 * time.Minute
 
 // lifeOnlineTime is how long the lifetime scenario keeps the bot in
 // the world: enough to observe a stable session (the mirrors of
@@ -106,6 +116,27 @@ func Definitions() []TestDef {
 				"the village cell forever - the round 58 fix and its " +
 				"reproduction live in hunt/round58_repro_test.go).",
 			Scenario: zoneReturnScenario,
+		},
+		{
+			ID:      "gear-gap",
+			Title:   "gear gap refill · pantsless dump",
+			Account: gearAccount,
+			Timeout: gearGapTimeout,
+			Description: "Start: the elven fighter temp5 wakes at the " +
+				"reported farm spot of the 2026-09-12 04:58 pantsless " +
+				"dump (38344 46248 -3592, the Spore Fungus SW ground) " +
+				"as the level 14 character test2 of the report with " +
+				"the exact paperdoll it carried - every slot filled " +
+				"EXCEPT the legs (the town trip had sold the piece " +
+				"for a replacement that never landed) - and the " +
+				"13,162 adena of the report, nothing in the bag. " +
+				"Flow: the bot picks its hunting zone, the shop " +
+				"strategy plans the legs filler against the empty " +
+				"slot and the town trip buys it. Pass: the legs slot " +
+				"of the paperdoll is dressed again (the report's bot " +
+				"farmed on without it - the round 60 gear debt fix " +
+				"and its reproduction live in hunt/round60_repro_test.go).",
+			Scenario: gearGapScenario,
 		},
 		{
 			ID:      "bot-lifetime",
