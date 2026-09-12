@@ -57,6 +57,11 @@ type fakeNavigator struct {
 	validatedClicks []pathfind.Vec3
 	// escapeRoute overrides the waypoints of the water escape search.
 	escapeRoute []pathfind.Vec3
+	// avoidRoute overrides the waypoints of the avoiding approach
+	// search (the frozen leg recovery re-plan); avoiding records
+	// the avoid areas the loop passed.
+	avoidRoute []pathfind.Vec3
+	avoiding   [][]pathfind.AvoidArea
 	// escapeErr makes the water escape search fail hard.
 	escapeErr   bool
 	escapeCalls int
@@ -148,6 +153,33 @@ func (f *fakeNavigator) FindPathApproachDry(
 	}
 
 	return f.result(start, end)
+}
+
+// FindPathApproachDryAvoiding plans the water walled approach search
+// around the avoid areas: the frozen leg recovery tests record the ban
+// the loop passed and answer the configured avoiding route (nil: the
+// plain result - the ban made no difference to the fake planner).
+func (f *fakeNavigator) FindPathApproachDryAvoiding(
+	start, end pathfind.Vec3, _ float64, avoid []pathfind.AvoidArea,
+) (*pathfind.Result, error) {
+	f.avoiding = append(f.avoiding, avoid)
+	if f.avoidRoute != nil {
+		f.calls++
+		f.callsAt = append(f.callsAt, time.Now())
+
+		return &pathfind.Result{
+			Found:     true,
+			Aborted:   false,
+			Waypoints: f.avoidRoute,
+			RawPath:   f.avoidRoute,
+			Duration:  0,
+			Explored:  0,
+			OpenLeft:  0,
+			Length:    0,
+		}, nil
+	}
+
+	return f.FindPathApproachDry(start, end, 0)
 }
 
 // FindPath plans the plain search.
@@ -594,13 +626,23 @@ func TestTripStuckWalkRepaths(t *testing.T) {
 	require.Equal(t, 2, nav.calls, "the stuck walk re-paths")
 	require.Equal(t, phaseTownWalk, loop.phase)
 
-	// Three more stuck re-paths exhaust the budget: the trip aborts.
+	// The stuck cycles from the same cell climb the frozen leg
+	// escalation ladder instead of re-planning the identical route:
+	// the detour re-plan first, the direct server routed walk second.
 	for range maxRePaths {
 		loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
 		loop.tick()
+		require.Equal(t, phaseTownWalk, loop.phase,
+			"the escalation keeps the trip walking")
 	}
+	require.True(t, loop.directLeg,
+		"the ladder armed the direct server routed walk")
+
+	// The direct window burning without progress aborts the trip.
+	loop.directLegUntil = time.Now().Add(-directLegWindow - time.Second)
+	loop.tick()
 	require.Equal(t, phaseEngage, loop.phase,
-		"the trip aborts when the re-paths are spent")
+		"the trip aborts when the direct walk window is spent")
 	require.False(t, loop.tripCooldownOver())
 }
 

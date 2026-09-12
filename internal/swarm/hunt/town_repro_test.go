@@ -113,12 +113,33 @@ func reproEngine(t *testing.T) *pathfind.Engine {
 // deepest z the character ever stood on, so the tests can assert the
 // route never swims.
 type reproServer struct {
-	nav       *pathfind.Engine
+	nav *pathfind.Engine
+	// walled names the world patches the simulated server treats as
+	// unwalkable even though the bot's geodata pack models them as
+	// open: the model of a server whose geodata disagrees with the
+	// pack (the 2026-09-12 trainer hall aisle freeze - the server
+	// walled the aisle column the bot's pack walked straight
+	// through). A step into a walled patch stalls the walk exactly
+	// the way the real getValidLocation collapse freezes the
+	// character.
+	walled    []pathfind.AvoidArea
 	requests  int
 	target    [3]int32
 	minZ      int32
 	stalled   bool
 	stalledAt [3]int32
+}
+
+// walledStep reports whether a world position sits inside one of the
+// simulated server's walled patches.
+func (s *reproServer) walledStep(x, y float64) bool {
+	for _, area := range s.walled {
+		if math.Hypot(area.Center.X-x, area.Center.Y-y) <= area.Radius {
+			return true
+		}
+	}
+
+	return false
 }
 
 // consume takes the newest walk request of the fake game as the
@@ -154,6 +175,13 @@ func (s *reproServer) advance(bot *state.Bot) {
 		step := reproSimStep / dist
 		px := x + dx*step
 		py := y + dy*step
+		if s.walledStep(px, py) {
+			// The simulated server geodata refuses this ground: the
+			// move validation collapses the walk onto the walker.
+			s.stall(x, y, z)
+
+			break
+		}
 		pz, err := s.nav.ClosestHeight(px, py, int16(z))
 		if err != nil {
 			s.stall(x, y, z)

@@ -880,6 +880,11 @@ func (l *Loop) advanceTripStop() {
 	l.buyConfirmAt = time.Time{}
 	l.buyRetries = 0
 	l.resetLearnState()
+	// A fresh stop starts with a fresh escalation ladder: the frozen
+	// aborts of the previous leg spent its rungs, the next leg deserves
+	// its own detour re-plan and direct walk before the trip gives up.
+	l.frozenStage = 0
+	l.directLeg = false
 	// The finished stop talked to its npc: drop the selection the
 	// talk left behind, the next stop selects its own npc and the
 	// trip end walks home with a clean engage.
@@ -895,7 +900,25 @@ func (l *Loop) advanceTripStop() {
 	l.merchantDeckUntil = time.Time{}
 	stop := l.tripStops[0]
 	l.logf("Hunt: shop: walking to %s", stop.merchant.Name)
-	if !l.startWalkLeg(townNpcPosition(stop.merchant)) {
+	if stop.teach {
+		// The teacher stop walks right up to the class master: the
+		// close approach ring of the npc approach offset, planned by
+		// the geodata search - the only authority that knows the
+		// walkable ring cells (the trainer hall interior carries its
+		// floor along the hall rows, the straight line offset ring
+		// lands on the roof-only band between them). The wide trip
+		// ring stays the fallback for a teacher whose tight ring has
+		// no walkable route at all, the approach window owns the last
+		// stretch there.
+		l.legRadius = npcApproachOffset
+		if !l.startWalkLeg(townNpcPosition(stop.merchant)) {
+			l.legRadius = tripApproachRadius
+		}
+	} else {
+		l.legRadius = tripApproachRadius
+	}
+	planFailed := !l.startWalkLeg(townNpcPosition(stop.merchant))
+	if l.phase == phaseTownWalk && planFailed {
 		l.abortTownTrip("no walkable path to the shop of " +
 			stop.merchant.Name)
 	}

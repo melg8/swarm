@@ -156,12 +156,35 @@ func TestWalkStuckAbortsAfterMaxRePaths(t *testing.T) {
 		"the pinned stuck arms the short click extension")
 
 	// The second stuck from the same cell (no movement since the
-	// re-path) aborts the trip: the identical re-plan cannot move the
-	// character either.
+	// re-path) climbs the escalation ladder rung 1: the frozen
+	// corridor joins the session bans and the leg re-plans the detour
+	// around it - the identical frozen route is never re-planned again.
 	armStuck(loop, bot)
 	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase,
+		"the frozen re-path escalates to the detour re-plan, the trip keeps walking")
+	require.Len(t, loop.frozenAreas, 1,
+		"the frozen corridor joins the session avoid areas")
+	require.GreaterOrEqual(t, nav.calls, 2,
+		"the detour re-plan calls the navigator again")
+
+	// The third stuck from the same cell (the detour froze as well)
+	// climbs rung 2: the direct server routed walk - the follower
+	// drops the plan and clicks the stop target directly, bounded by
+	// the window.
+	armStuck(loop, bot)
+	loop.tick()
+	require.Equal(t, phaseTownWalk, loop.phase,
+		"the frozen detour escalates to the direct server routed walk")
+	require.True(t, loop.directLeg,
+		"the direct leg is armed")
+
+	// The direct window burning without progress aborts the trip: the
+	// ladder is exhausted, the cooldown recovery owns the rest.
+	loop.directLegUntil = time.Now().Add(-directLegWindow - time.Second)
+	loop.tick()
 	require.NotEqual(t, phaseTownWalk, loop.phase,
-		"the frozen re-path aborts the trip")
+		"the expired direct walk aborts the trip")
 }
 
 // TestWalkStuckBudgetBoundsMovingRepaths pins the maxRePaths budget
@@ -184,7 +207,7 @@ func TestWalkStuckBudgetBoundsMovingRepaths(t *testing.T) {
 	loop.tick()
 	require.Equal(t, phaseTownWalk, loop.phase)
 
-	for i := 0; i < maxRePaths; i++ {
+	for i := range maxRePaths {
 		// The character moved between the stucks: the next re-path
 		// plans from a different cell, the frozen rule never fires.
 		x := int32(45000 - i*200)

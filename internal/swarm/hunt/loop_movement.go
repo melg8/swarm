@@ -299,6 +299,7 @@ func (l *Loop) returnToZone() {
 	l.tripStart = time.Now()
 	l.rePaths = 0
 	l.phase = phaseTownReturn
+	l.legRadius = tripApproachRadius
 	if !l.startZoneReturnLeg(dest) {
 		// No geodata path: direct legs toward the zone, the server
 		// stops them at obstacles and the next second plans again.

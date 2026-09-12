@@ -439,7 +439,7 @@ func (l *Loop) followUserWaypoints(
 ) {
 	for l.userWpIndex < len(l.userWaypoints) {
 		if waypointArrived(l.userWaypoints, l.userWpIndex,
-			selfX, selfY, selfZ) {
+			selfX, selfY, selfZ, waypointArriveDist) {
 			l.userWpIndex++
 			l.userMoveAt = time.Time{}
 

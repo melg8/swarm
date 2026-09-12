@@ -112,6 +112,21 @@ const (
 	// zone return escalates to the direct server routed legs at
 	// once, the shop trip arms its cooldown).
 	frozenRepathLimit = 1
+	// frozenBanRadius is the radius of the avoid area a frozen leg
+	// bans: three geodata cells around the aimed waypoint close the
+	// corridor the server refused to walk without fencing in the
+	// standing character itself (the start cell of a search may sit
+	// inside its own ban - the search may always leave it).
+	frozenBanRadius = 48.0
+	// frozenBanMax bounds the session ban list: every frozen leg
+	// adds one area, and the list must never grow into a wall the
+	// planner cannot detour around at all.
+	frozenBanMax = 8
+	// directLegWindow bounds the direct server routed walk of a
+	// frozen town leg: the clicks go out at the walk request period
+	// and the window leaves room for a server pathfinder walk plus
+	// a few position broadcasts before the stop gives up.
+	directLegWindow = 45 * time.Second
 	// extendMarchStep is the stride of the forward route march of
 	// extendShortClickCandidates: one geodata cell.
 	extendMarchStep = 16.0
@@ -227,14 +242,17 @@ type Navigator interface {
 	FindPathApproach(start, end pathfind.Vec3, approachRadius float64) (
 		*pathfind.Result, error,
 	)
-	// FindPathApproachDry plans the same walk with the water walled
-	// off: every waypoint of a found route stands above the water
-	// level, a target only swimming reaches answers not found. The
-	// shore walks navigate with it - a planned swim is a plan the
-	// click guard refuses leg by leg.
-	FindPathApproachDry(start, end pathfind.Vec3, approachRadius float64) (
-		*pathfind.Result, error,
-	)
+	// FindPathApproachDryAvoiding plans the water walled walk around
+	// the given avoid areas: every waypoint of a found route stands
+	// above the water level and outside the banned ground, a target
+	// only swimming (or only reachable through the ban) reaches
+	// answers not found. The town legs navigate with it - a planned
+	// swim is a plan the click guard refuses leg by leg, and the
+	// session's frozen corridors must not be re-planned into.
+	FindPathApproachDryAvoiding(
+		start, end pathfind.Vec3, approachRadius float64,
+		avoid []pathfind.AvoidArea,
+	) (*pathfind.Result, error)
 	// FindPath plans a walk to the target cell arriving on whatever
 	// deck of it the walk reaches first.
 	FindPath(start, end pathfind.Vec3) (*pathfind.Result, error)
@@ -293,13 +311,14 @@ func (e engineNavigator) FindPathApproach(
 		start, end, approachRadius, e.engine.MaxPassableHeight())
 }
 
-// FindPathApproachDry searches the water walled path with the engine
-// settings and the approach radius goal.
-func (e engineNavigator) FindPathApproachDry(
+// FindPathApproachDryAvoiding searches the water walled path around the
+// avoid areas with the engine settings and the approach radius goal.
+func (e engineNavigator) FindPathApproachDryAvoiding(
 	start, end pathfind.Vec3, approachRadius float64,
+	avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
-	return e.engine.FindPathApproachDry(
-		start, end, approachRadius, e.engine.MaxPassableHeight())
+	return e.engine.FindPathApproachDryAvoiding(
+		start, end, approachRadius, e.engine.MaxPassableHeight(), avoid)
 }
 
 // FindPath searches the walkable path with the engine settings.
@@ -530,6 +549,8 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	l.buyRequested = nil
 	l.buyConfirmAt = time.Time{}
 	l.buyRetries = 0
+	l.frozenStage = 0
+	l.directLeg = false
 	l.resetReplacementSales()
 	l.resetLearnState()
 	// The learning stops no longer ride the trip start: they plan
@@ -581,6 +602,7 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
 	l.shoppingPlanAdena = 0
 	l.logf("Hunt: %s, walking to the trader %s", reason,
 		merchant.Name)
+	l.legRadius = tripApproachRadius
 	if !l.startWalkLeg(townNpcPosition(merchant)) {
 		l.abortTownTrip("no walkable path to the shop")
 	}
@@ -768,7 +790,11 @@ func (l *Loop) startZoneReturnLeg(dest pathfind.Vec3) bool {
 // the dry or the non-dry approach search and arms the waypoint
 // follower. The dry switch walls the water off (the town trips refuse
 // a planned swim); the non-dry switch allows water crossings (the
-// zone return fallback). It reports whether the leg was planned.
+// zone return fallback). The dry search routes around the frozen
+// areas of the session - ground the live server refused to walk
+// although the geodata pack modeled it as open - so the deterministic
+// planner detours instead of reproducing the frozen corridor. It
+// reports whether the leg was planned.
 func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
 	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
 	if !ok {
@@ -779,14 +805,17 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
 		Y: float64(selfY),
 		Z: float64(selfZ),
 	}
+	radius := l.legRadius
+	if radius <= 0 {
+		radius = tripApproachRadius
+	}
 	var result *pathfind.Result
 	var err error
 	if nonDry {
-		result, err = l.navigator.FindPathApproach(
-			from, dest, tripApproachRadius)
+		result, err = l.navigator.FindPathApproach(from, dest, radius)
 	} else {
-		result, err = l.navigator.FindPathApproachDry(
-			from, dest, tripApproachRadius)
+		result, err = l.navigator.FindPathApproachDryAvoiding(
+			from, dest, radius, l.frozenAreas)
 	}
 	if err != nil {
 		l.logf("Hunt: town trip path search failed: %v", err)
@@ -809,6 +838,7 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
 	l.legDest = dest
 	l.legStart = from
 	l.waterEscape = false
+	l.directLeg = false
 	l.moveAt = time.Time{}
 	l.stuckAt = time.Time{}
 	l.stuckFast = false
@@ -838,19 +868,39 @@ func waypointDistance(
 // the index as reached from the character position: the intermediate
 // waypoints need the tight pass radius (a detour turn or a bridge ramp
 // entry must be walked through - the wide radius let the follower cut
-// the corner into the railing), the final waypoint keeps the wide trip
-// arrival radius (the search goal of the leg, the server may stop the
-// character slightly short of the click).
+// the corner into the railing), the final waypoint keeps the trip
+// arrival radius of the leg (the search goal of the leg, the server
+// may stop the character slightly short of the click). The tight ring
+// legs (the teach stop close approach) pass their own tight final
+// radius: the wide slack would end the walk a whole ring short of the
+// teacher.
 func waypointArrived(
 	waypoints []pathfind.Vec3, index int, selfX, selfY, selfZ int32,
+	finalArrive float64,
 ) bool {
 	radius := waypointPassDist
 	if index == len(waypoints)-1 {
-		radius = waypointArriveDist
+		radius = finalArrive
 	}
 
 	return waypointDistance(waypoints[index], selfX, selfY, selfZ) <=
 		radius
+}
+
+// finalArriveRadius answers the arrival radius of the final waypoint
+// of the current town leg: the wide trip slack for the ordinary legs,
+// the tight pass radius for the close ring legs - a leg that searches
+// its route within npcApproachOffset of the npc must actually reach
+// the route end, the wide slack accepts a stop a full ring short of
+// the teacher and dumps the last stretch onto the straight offset
+// clicks whose lines cross the roof-only interior bands (the trainer
+// hall rows carry the floor, the spaces between them do not).
+func (l *Loop) finalArriveRadius() float64 {
+	if l.legRadius > 0 && l.legRadius < tripApproachRadius {
+		return waypointPassDist
+	}
+
+	return waypointArriveDist
 }
 
 // waypointPassed reports whether the character already moved past the
@@ -914,6 +964,13 @@ func (l *Loop) walkTownWaypoints() bool {
 	if !ok {
 		return false
 	}
+	if l.directLeg {
+		// The frozen leg escalation handed the walk to the
+		// server's own routing: the geodata plan proved unable
+		// to move the character, the plain follower has nothing
+		// left to follow (see walkDirectLeg).
+		return l.walkDirectLeg(time.Now(), selfX, selfY, selfZ)
+	}
 	if l.navigator != nil {
 		if l.navigator.OverWater(
 			float64(selfX), float64(selfY), int16(selfZ)) {
@@ -942,6 +999,84 @@ func (l *Loop) walkTownWaypoints() bool {
 	return l.followWaypoints(selfX, selfY, selfZ, time.Now(), true)
 }
 
+// walkDirectLeg drives the server routed walk of a frozen town leg:
+// the geodata plan could not move the character (the frozen abort
+// escalated here), so the follower drops the plan and clicks the leg
+// target directly - the server's own routing answers (its pathfinder
+// walks the click around the walls its geodata knows, a server
+// without geodata walks the straight line, and the water guard keeps
+// the bot ashore either way). The target of an npc stop is the npc
+// approach point - the converging offset ring of npcApproachPoint -
+// so the character walks right up to the npc instead of clicking its
+// exact spawn cell (the roof step-over hazard of the interior cells).
+// The window bounds the walk: a target the server routing also
+// refuses to move to ends the trip with its cooldown instead of
+// grinding refused clicks forever. It reports whether the leg
+// arrived at its destination.
+func (l *Loop) walkDirectLeg(
+	now time.Time, selfX, selfY, selfZ int32,
+) bool {
+	radius := l.legRadius
+	if radius <= 0 {
+		radius = tripApproachRadius
+	}
+	if waypointDistance(l.legDest, selfX, selfY, selfZ) <= radius {
+		l.directLeg = false
+		l.logf("Hunt: the server routed walk reached %d %d",
+			int32(l.legDest.X), int32(l.legDest.Y))
+
+		return true
+	}
+	if now.After(l.directLegUntil) {
+		l.directLeg = false
+		l.abortTownTrip("the server routed walk made no progress")
+
+		return false
+	}
+	moveX, moveY, moveZ := l.directLegTarget(selfX, selfY)
+	if l.navigator != nil {
+		crossed, err := l.navigator.WaterCrossed(pathfind.Vec3{
+			X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+		}, pathfind.Vec3{
+			X: float64(moveX), Y: float64(moveY), Z: float64(moveZ),
+		})
+		if err == nil && crossed {
+			// The straight line to the target would swim: the
+			// geodata shore route owns that case, and it just
+			// failed - the trip ends with its cooldown.
+			l.directLeg = false
+			l.abortTownTrip("the server routed walk would swim")
+
+			return false
+		}
+	}
+	if ax, ay, dodged := l.steerClearOfAggro(
+		selfX, selfY, selfZ, moveX, moveY, moveZ,
+		int32(l.legDest.X), int32(l.legDest.Y), now); dodged {
+		moveX, moveY = ax, ay
+	}
+	l.walkToward(moveX, moveY, moveZ, now)
+
+	return false
+}
+
+// directLegTarget resolves the click target of the direct server
+// routed walk: the npc approach point when the leg walks to the npc
+// of the current trip stop (the offset ring keeps the click line
+// outside the interior walls and converges with the character), the
+// leg destination itself for every other target (the return leg, the
+// farm spot).
+func (l *Loop) directLegTarget(selfX, selfY int32) (int32, int32, int32) {
+	if len(l.tripStops) > 0 {
+		npc := l.tripStops[0].merchant
+		if townNpcPosition(npc) == l.legDest {
+			return npcApproachPoint(npc.X, npc.Y, npc.Z, selfX, selfY)
+		}
+	}
+
+	return int32(l.legDest.X), int32(l.legDest.Y), int32(l.legDest.Z)
+}
+
 // advanceWaypoints walks the waypoint cursor forward as far as the
 // character's position allows: a waypoint counts as passed when it is
 // reached within its radius or already bypassed along the route AND
@@ -957,7 +1092,8 @@ func (l *Loop) walkTownWaypoints() bool {
 func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
 	for l.wpIndex < len(l.waypoints) {
 		arrived := waypointArrived(
-			l.waypoints, l.wpIndex, selfX, selfY, selfZ)
+			l.waypoints, l.wpIndex, selfX, selfY, selfZ,
+			l.finalArriveRadius())
 		passed := !arrived && l.wpIndex+1 < len(l.waypoints) &&
 			waypointPassed(l.waypoints[l.wpIndex],
 				l.waypoints[l.wpIndex+1], selfX, selfY)
@@ -1094,9 +1230,17 @@ func (l *Loop) clickWaypoint(
 // cursor can stay pinned on a waypoint the character already moved
 // past (the successor line is not clear yet), and clicking it walks
 // the character BACK off the ground the forward route samples just
-// walked - the extension takes over such clicks. A waypoint ahead or
-// beside the character (the normal pull back onto the route, the
-// round 56 gated waypoint design) never triggers it.
+// walked - the extension takes over such clicks. Only a waypoint the
+// character stands NEAR counts: the V-shaped detour routes (the
+// 2026-09-12 trainer hall recovery - the route climbs far north
+// before it doubles back south east) carry waypoints hundreds of
+// units ahead whose position projects beyond the doubling segment,
+// and clicking those far waypoints is the whole point of the climb -
+// the projection test alone re-aimed their clicks at the far route
+// samples whose straight lines cross the terrace walls (the freeze
+// the walled aisle reproduction exposed). A waypoint ahead or beside
+// the character (the normal pull back onto the route, the round 56
+// gated waypoint design) never triggers it.
 func waypointBehindRoute(
 	waypoints []pathfind.Vec3, index int, selfX, selfY int32,
 ) bool {
@@ -1108,6 +1252,12 @@ func waypointBehindRoute(
 	fdx := next.X - wp.X
 	fdy := next.Y - wp.Y
 	if math.Hypot(fdx, fdy) < 1 {
+		return false
+	}
+	if math.Hypot(wp.X-float64(selfX), wp.Y-float64(selfY)) >
+		waypointPassDist {
+		// The waypoint sits far away: the character has not passed
+		// it, whatever the segment direction says.
 		return false
 	}
 
@@ -1647,18 +1797,113 @@ func (l *Loop) noteRepathCell(selfX int32, selfY int32) bool {
 }
 
 // abortFrozenTrip ends a trip whose re-path produced no movement and
-// escalates the recovery of the zone return at once: the pathfound
-// legs cannot move this character, so the next returnToZone goes
-// straight to the direct server routed legs (walkZoneLeg) instead of
-// burning two more full trip cycles of frozen re-paths first. The
-// shopping trips keep their cooldown recovery: the hunt continues and
-// the next trip retries from a fresh state.
+// escalates the recovery of the frozen leg before giving up: the town
+// walk legs try the escalation ladder (the banned detour re-plan, the
+// direct server routed walk - see escalateFrozenLeg), the zone return
+// goes straight to the direct server routed legs (walkZoneLeg) - the
+// pathfound legs cannot move this character, so burning two more full
+// trip cycles of frozen re-paths first helps nobody. The shopping
+// trips keep their cooldown recovery when the ladder is exhausted:
+// the hunt continues and the next trip retries from a fresh state.
 func (l *Loop) abortFrozenTrip(reason string) {
 	wasReturn := l.phase == phaseTownReturn
+	if !wasReturn && l.escalateFrozenLeg() {
+		return
+	}
 	l.abortTownTrip(reason)
 	if wasReturn {
 		l.zoneFails = zoneReturnFailBudget
 	}
+}
+
+// escalateFrozenLeg climbs the recovery ladder of a frozen town walk
+// leg - a leg whose full re-path cycle produced no movement at all,
+// the signature of a server side refusal the offline click validation
+// cannot see (the 2026-09-12 trainer hall aisle dump: the plan
+// entered the building through the west aisle column, the server
+// walled it, and the character stood frozen through every re-path of
+// two whole trips). The rungs, one per frozen abort of the same leg:
+//
+//  1. The banned detour re-plan: the aimed waypoint's cells join the
+//     session's avoid areas and the leg re-plans around them - the
+//     deterministic search produces a different route (around the
+//     building instead of through the walled corridor) instead of
+//     reproducing the identical frozen one.
+//
+//  2. The direct server routed walk: the follower drops the plan and
+//     clicks the stop target directly, handing the routing to the
+//     server itself (its pathfinder walks around the walls its
+//     geodata knows), bounded by a window.
+//
+// Rung 3 does not exist: the window burning without progress falls
+// back to the plain trip abort with its cooldown. The ladder reports
+// whether a rung took over the recovery (the caller skips its abort).
+func (l *Loop) escalateFrozenLeg() bool {
+	if l.phase != phaseTownWalk || l.navigator == nil {
+		return false
+	}
+	if l.frozenStage == 0 {
+		l.frozenStage = 1
+		if l.banFrozenCorridor() {
+			l.logf("Hunt: the walk froze on this corridor, " +
+				"re-planning the detour around it")
+			if l.startWalkLeg(l.legDest) {
+				return true
+			}
+			// No route around the ban: the direct walk is the
+			// only rung left.
+		}
+	}
+	if l.frozenStage == 1 {
+		l.frozenStage = 2
+		l.armDirectLeg("the detour route froze as well")
+
+		return true
+	}
+
+	return false
+}
+
+// banFrozenCorridor adds the aimed waypoint of the frozen leg to the
+// session's avoid areas: every later dry search routes around the
+// patch, so the corridor the server refused to walk stays out of each
+// following plan (the next trip included). It reports whether a fresh
+// area was added - an area that already covers the waypoint (or a
+// full ban list) changes no plan and skips the rung.
+func (l *Loop) banFrozenCorridor() bool {
+	if l.wpIndex >= len(l.waypoints) || len(l.frozenAreas) >= frozenBanMax {
+		return false
+	}
+	wp := l.waypoints[l.wpIndex]
+	for _, area := range l.frozenAreas {
+		if math.Hypot(area.Center.X-wp.X, area.Center.Y-wp.Y) <=
+			area.Radius+frozenBanRadius {
+			return false
+		}
+	}
+	l.frozenAreas = append(l.frozenAreas, pathfind.AvoidArea{
+		Center: wp,
+		Radius: frozenBanRadius,
+	})
+	l.logf("Hunt: banning the frozen corridor at %.0f %.0f for the "+
+		"session", wp.X, wp.Y)
+
+	return true
+}
+
+// armDirectLeg switches the frozen town leg to the direct server
+// routed walk (see walkDirectLeg): the waypoint plan dies, the walk
+// plan view carries the single destination leg and the window starts.
+func (l *Loop) armDirectLeg(reason string) {
+	l.directLeg = true
+	l.directLegUntil = time.Now().Add(directLegWindow)
+	l.waypoints = []pathfind.Vec3{l.legDest}
+	l.wpIndex = 0
+	l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
+	l.stuckFast = false
+	l.moveAt = time.Time{}
+	l.logf("Hunt: %s, walking to %d %d by the server routing",
+		reason, int32(l.legDest.X), int32(l.legDest.Y))
 }
 
 // nextClearWaypoint scans the plan ahead for the first waypoint the
@@ -1702,6 +1947,7 @@ func (l *Loop) enterSellPhase() {
 	l.merchantID = 0
 	l.merchantPick = time.Time{}
 	l.merchantDeckUntil = time.Time{}
+	l.directLeg = false
 	if l.sellableStop() {
 		l.logf("Hunt: shop reached, selling the junk")
 
@@ -2096,6 +2342,7 @@ func (l *Loop) startReturnLeg() {
 		Y: float64(destY),
 		Z: float64(destZ),
 	}
+	l.legRadius = tripApproachRadius
 	if !l.startWalkLeg(dest) {
 		l.abortTownTrip("no walkable path back to the farm spot")
 
@@ -2138,6 +2385,8 @@ func (l *Loop) endTownTrip(reason string) {
 	l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.waterEscape = false
 	l.extendArmed = false
+	l.directLeg = false
+	l.frozenStage = 0
 	l.repathX, l.repathY = 0, 0
 	l.frozenRepaths = 0
 	l.tripPlan = nil
@@ -2192,6 +2441,8 @@ func (l *Loop) resetTownTrip() {
 	l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
 	l.waterEscape = false
 	l.extendArmed = false
+	l.directLeg = false
+	l.frozenStage = 0
 	l.repathX, l.repathY = 0, 0
 	l.frozenRepaths = 0
 	l.tripPlan = nil

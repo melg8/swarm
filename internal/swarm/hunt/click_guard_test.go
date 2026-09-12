@@ -148,13 +148,37 @@ func TestFollowerRefusedClickRepathsAndAborts(t *testing.T) {
 	}
 	loop.wpIndex = 0
 	loop.moveAt = time.Time{}
-	// The second refusal from the same cell aborts the trip instead of
-	// re-planning the identical route.
+	// The second refusal from the same cell climbs the frozen leg
+	// escalation ladder: the frozen corridor joins the session bans
+	// and the detour re-plan runs (never the identical route again).
 	follow(loop)
-	require.Equal(t, 1, nav.calls,
-		"the frozen re-path aborts instead of re-planning")
+	require.Equal(t, 2, nav.calls,
+		"the frozen refusal re-plans the detour around the banned corridor")
+	require.Len(t, loop.frozenAreas, 1,
+		"the aimed waypoint joined the session avoid areas")
+	require.Equal(t, phaseTownWalk, loop.phase,
+		"the escalation keeps the trip walking")
+
+	// The third refusal from the same cell (the detour froze as well)
+	// climbs to the direct server routed walk: the follower drops the
+	// plan and arms the direct leg, bounded by its window.
+	loop.waypoints = []pathfind.Vec3{
+		{X: 1000, Y: 1000, Z: 0},
+		{X: 1020, Y: 1000, Z: 0},
+		{X: 1600, Y: 1000, Z: 0},
+	}
+	loop.wpIndex = 0
+	loop.moveAt = time.Time{}
+	follow(loop)
+	require.True(t, loop.directLeg,
+		"the frozen detour escalates to the direct server routed walk")
+
+	// The direct window burning without the server moving the
+	// character aborts the trip.
+	loop.directLegUntil = time.Now().Add(-directLegWindow - time.Second)
+	follow(loop)
 	require.Equal(t, phaseEngage, loop.phase,
-		"the frozen abort ends the trip back into the hunt")
+		"the expired direct walk ends the trip back into the hunt")
 	require.Empty(t, game.walks,
 		"a refused click is never sent")
 }

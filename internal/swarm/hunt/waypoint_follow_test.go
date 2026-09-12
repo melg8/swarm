@@ -62,14 +62,14 @@ func TestWaypointArrivedRadii(t *testing.T) {
 	}
 	// 60 units from the intermediate waypoint: inside the legacy
 	// 150 radius, outside the tight 50 - not arrived anymore.
-	require.False(t, waypointArrived(waypoints, 0, 60, 0, 0),
+	require.False(t, waypointArrived(waypoints, 0, 60, 0, 0, waypointArriveDist),
 		"an intermediate waypoint must not count as reached at 60 units")
-	require.True(t, waypointArrived(waypoints, 0, 40, 0, 0),
+	require.True(t, waypointArrived(waypoints, 0, 40, 0, 0, waypointArriveDist),
 		"an intermediate waypoint counts as reached at 40 units")
 	// The final waypoint keeps the wide radius.
-	require.True(t, waypointArrived(waypoints, 1, 0, 860, 0),
+	require.True(t, waypointArrived(waypoints, 1, 0, 860, 0, waypointArriveDist),
 		"the final waypoint counts as reached within 150 units")
-	require.False(t, waypointArrived(waypoints, 1, 0, 840, 0),
+	require.False(t, waypointArrived(waypoints, 1, 0, 840, 0, waypointArriveDist),
 		"the final waypoint is not reached beyond 150 units")
 }
 

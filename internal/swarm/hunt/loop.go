@@ -352,10 +352,41 @@ type Loop struct {
 	// 22 unit first waypoint click froze the character through two
 	// whole trip cycles - a collapsed click under the findPath
 	// rescue threshold is silently canceled by the server).
-	extendArmed       bool
-	repathX           int32
-	repathY           int32
-	frozenRepaths     int
+	extendArmed   bool
+	repathX       int32
+	repathY       int32
+	frozenRepaths int
+	// frozenAreas is the session memory of the ground the live
+	// server refused to walk although the geodata pack modeled it
+	// as open: every dry town leg search routes around them (see
+	// banFrozenCorridor). The 2026-09-12 trainer hall aisle dump:
+	// the plan entered the building through the west aisle column,
+	// the server walled it, the deterministic re-plan reproduced
+	// the identical route and the character stood frozen through
+	// the whole re-path budget - the ban turns that freeze into a
+	// detour.
+	frozenAreas []pathfind.AvoidArea
+	// frozenStage counts the escalation rungs of the frozen town
+	// leg (0: none, 1: the banned detour re-plan, 2: the direct
+	// server routed walk): see escalateFrozenLeg. It resets on the
+	// stop boundaries, not on the re-plans of the same leg.
+	frozenStage int
+	// directLeg marks the town leg that walks by the server's own
+	// routing (see armDirectLeg): the geodata plan proved unable to
+	// move the character, so the follower drops it and clicks the
+	// stop target directly - bounded by directLegUntil.
+	directLeg      bool
+	directLegUntil time.Time
+	// legRadius is the approach radius the current town leg searches
+	// its route within: the wide trip ring (tripApproachRadius) for
+	// the merchant stops and the returns, the close ring
+	// (npcApproachOffset) for the teacher stops - the user rule of
+	// the 2026-09-12 report: the character walks right up to the
+	// training npc, and the geodata search is the one that knows the
+	// walkable ring cells (the trainer hall interior is walkable only
+	// along its rows, the straight line offset ring lands on the
+	// roof-only band). The re-paths of the leg inherit it.
+	legRadius         float64
 	farmX             int32
 	farmY             int32
 	farmZ             int32
@@ -510,11 +541,19 @@ type Loop struct {
 	teacherID         int32
 	teacherPick       time.Time
 	teacherDeckUntil  time.Time
-	learnRequested    *lessonTarget
-	learnConfirmAt    time.Time
-	learnRetries      int
-	learnAt           time.Time
-	learnRevision     uint64
+	// teacherWalkUntil bounds the whole close approach of the teach
+	// stop: the ring walk clicks the npc approach point until the
+	// character stands right by the teacher, and the window answers
+	// the two dead ends - the ring the server refuses to walk (the
+	// talk then fires from wherever within the interaction distance)
+	// and the teacher on a deck the ring cannot reach (the stop
+	// skips, the trip continues).
+	teacherWalkUntil time.Time
+	learnRequested   *lessonTarget
+	learnConfirmAt   time.Time
+	learnRetries     int
+	learnAt          time.Time
+	learnRevision    uint64
 	// The combat casting state (see combat_skills.go): the pacing
 	// timestamps of the strike and spell requests and of the self
 	// buff casts, plus the locally tracked reuse windows of the
@@ -641,9 +680,14 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		stuckFast:         false,
 		rePaths:           0,
 		extendArmed:       false,
+		legRadius:         tripApproachRadius,
 		repathX:           0,
 		repathY:           0,
 		frozenRepaths:     0,
+		frozenAreas:       nil,
+		frozenStage:       0,
+		directLeg:         false,
+		directLegUntil:    time.Time{},
 		farmX:             0,
 		farmY:             0,
 		farmZ:             0,
@@ -669,6 +713,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		teacherID:         0,
 		teacherPick:       time.Time{},
 		teacherDeckUntil:  time.Time{},
+		teacherWalkUntil:  time.Time{},
 		learnRequested:    nil,
 		learnConfirmAt:    time.Time{},
 		learnRetries:      0,

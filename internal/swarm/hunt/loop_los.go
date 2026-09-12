@@ -268,7 +268,7 @@ func (l *Loop) walkBlindWaypoints(now time.Time) {
 	}
 	for l.losWpIndex < len(l.losWaypoints) {
 		if waypointArrived(l.losWaypoints, l.losWpIndex,
-			selfX, selfY, selfZ) {
+			selfX, selfY, selfZ, waypointArriveDist) {
 			l.losWpIndex++
 			l.losMoveAt = time.Time{}
 
