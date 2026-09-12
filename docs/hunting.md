@@ -349,14 +349,22 @@ The strategy reasoning, prices and the level journey comparison live
 in `docs/shopping_strategy.md` - read it before touching the planner.
 The short form:
 
-- The greedy value-per-adena planner buys the best score gain per
-  adena first (the cheap empty slot fillers beat the weapon upgrades
-  early), never buys what the inventory already carries and respects
-  the adena budget; **one item per paperdoll slot per trip** - every
-  purchase marks the slots it fills or clears (the family interplay
-  included) and the later picks skip them, so no upgrade chains are
-  bought in a single walk (the next trip re-plans from the reached
-  paperdoll).
+- The phased planner buys in the strategy order: **the weapon
+  milestone first** (the top affordable strict upgrade - the top-tier
+  guard keeps the cheaper rungs of the hand ladder out whatever their
+  value per adena), **the pdef maximizing armor set second** (one
+  piece per armor family per trip, chosen by the exhaustive
+  enumeration of the per family efficient frontiers inside the
+  remaining budget - a rich wallet buys the advanced pieces directly,
+  a poor one fills many slots with the cheap offers, the set
+  maximizes the summed pDef either way), **the basic jewel floor
+  third** (the cheapest offer of every empty slot, both halves of the
+  pairs - the jewels never upgrade: the starting locations barely
+  attack with magic) and **the shield with the leftover**. It never
+  buys what the inventory already carries and it respects the adena
+  budget plus the sell credits of the displaced pieces; **one item
+  per paperdoll slot per trip** - the next trip re-plans from the
+  reached paperdoll.
 - The town trips (internal/swarm/hunt/town.go) trigger when the
   inventory passes 50% of the slots or 50% of the maximum weight. A
   trip start never interrupts a fight: `fightBusy` (a living target, a
@@ -373,10 +381,13 @@ The short form:
   the village for the replacement, and every trip killer in between
   (a stuck teacher leg, an attacker interrupt, a merchant no-show)
   left the character bare-handed. A character with NO weapon at all
-  runs the weapon errand alone (`weaponlessRunWanted`: no profile
+  runs the weapon errand (`weaponlessRunWanted`: no profile
   usable weapon in the inventory and an affordable weapon in the plan
-  - see `gear.HasWeapon`): no teach stops ride the run, the lessons
-  wait for the next trip, and the retry cooldown shortens to 45
+  - see `gear.HasWeapon`): the run carries the learning stops too
+  (the 2026-09-12 one town visit rule - the weapon stop runs FIRST,
+  so a stuck teacher leg can no longer strand a bare-handed
+  character: the weapon is bought and worn before the teacher leg
+  ever runs), the retry cooldown shortens to 45
   seconds (`weaponRunCooldown`) instead of the five minute trip
   cooldown. While the weapon run is pending the engage holds its
   fresh target picks (`logWeaponWait` paces the hold line) and the
@@ -386,6 +397,18 @@ The short form:
   that cannot afford any weapon keeps farming: the gate only holds
   when the plan offers a weapon, so a fresh bot still punches
   keltirs until the wallet crosses the cheapest offer.
+- **One town visit buys everything** (the 2026-09-12 acceptance
+  round): the gear stops distribute first (`planShoppingStops`), the
+  learn stops close the trip behind them (`planLearnStops` at the
+  sell stop) - the book stop merges into the gear stop of its
+  merchant when they match (the jewel trader Creamees sells both the
+  basic jewels and the spellbooks, one visit buys them all) and the
+  teacher walk follows, so a single visit buys the weapon, the armor,
+  the jewels, the books and teaches the lessons. The gear plan
+  reserves the spellbook budget out of its planning wallet
+  (`Loop.pendingBookBudget`: the books of the learnable lessons the
+  inventory does not carry yet, at the town tax price), so the
+  aggressive armor spending can never starve the books.
 - The trip **sells all the accumulated junk first** (the selling ends
   when nothing sellable is left, not at the 50 percent trigger),
   **sells the replaced gear before the buys** (a planned purchase that
