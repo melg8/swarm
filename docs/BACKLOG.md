@@ -543,6 +543,31 @@ and the navigation analysis (a confirmed gap backs the meta
 transport plan; a found route becomes the cheap lesson leg of the
 band economy).
 
+### T-019: the quest trip phase engine
+
+status: in_progress
+milestone: M2
+priority: P2
+deps: T-014, T-015
+scope: internal/swarm/hunt/ (new files only), docs/
+
+The hunt half of the T-016 hand-off plan: hunt/quest_trip.go (a new
+file) consumes a QuestChain imperatively - the accept conversation
+at the start npc, the stage ladder by the journal cond (the talk
+stages through DriveDialog with the QuestEntryLinks prefix and the
+stage links, the kill stages through the ground walk and the quest
+mob engage until the item counters fill) - until the journal drops
+the quest (the exit talk, the proof item lands). The acceptance
+round of T-016 drives it on the manual session loop and adds the
+Rains class change leg. Two live-pinned server facts to respect:
+the bypass flood protector (dialogBypassPace inside one
+conversation; a second DriveDialog never rides the tail of the
+first) and every quest npc talk starting from the STATIC page.
+
+claimed: zones-zai 2026-09-12 10:13 UTC
+resume: fresh claim. Next: quest_trip.go + the scripted unit tests
+  on the fakeGame/scriptGame harness, build/test/lint, push.
+
 claimed: zones-zai 2026-09-12 09:45 UTC
 resume: done 09:50 UTC - both routes found (elven -> Gludio 111 852
   units, 1.25M nodes, aborts at the shipped 1M cap; Gludio -> Dion
