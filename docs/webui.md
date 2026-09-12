@@ -574,6 +574,68 @@ MoveToLocation instead of waiting for the old walk - the server
 replaces the destination of a running walk), so a click somewhere else
 changes the direction immediately.
 
+## The statistics tab
+
+The Stats tab (`web/stats.js`, the collector of
+`webserver/stats.go` and the endpoints of `webserver/stats_api.go`)
+answers the behavior statistics of the bots: how effectively they
+fight, how they behave, how often they die and rejoin the game - the
+fleet wide picture and the per bot picture side by side, with the
+long term history a 24/7 run needs (the rings hold the last day at
+full 15 second resolution, older data ages into coarser steps
+through the half-on-full compaction).
+
+The fleet overview renders:
+
+- the KPI cards: bots online, kills (with the hourly rate), deaths
+  (with the K/D), rejoins, the net experience gained, the average
+  hunt tick, the process memory (heap and sys), the goroutine count
+  (with the GC count and the last pause), the fleet packet rate, the
+  collecting window and the landed swing share (the hit rate);
+- the history charts: online/registered bots, the cumulative kills
+  and deaths, the per minute kill/death rates, the net experience,
+  the average hunt tick time (the loop cadence health of a loaded
+  process), the process memory, the fleet packet rate and the
+  goroutine count;
+- the sortable comparison table of every registry bot (the kills,
+  deaths, K/D, kills per hour, the net experience, the rejoins, the
+  hit rate, the damage taken, the average tick, the uptime); a row
+  click opens the detail view of that bot. The acceptance test bots
+  are listed but stay out of the fleet aggregates.
+
+The per bot detail view adds the counter cards (the level with the
+window gain, kills, deaths, K/D, the net experience, the rejoins and
+sessions, the swing counters with the hit rate, the damage taken,
+the adena wallet, the average and the worst tick, the packet rate,
+the uptime, the ages of the last kill and death), the per bot
+history charts (experience, kills and deaths, health, adena, tick
+time, packet rate), the phase timeline strip, the phase distribution
+(the share of the window spent in every hunt phase) and the event
+timeline (the kills, deaths, rejoins, level changes and the
+online/offline transitions of the collected history).
+
+The counter sources (`state/metrics.go`): a kill counts when the
+object the character actively fights dies (the fighting target of
+the last swings, packet level attribution - a kill stolen between
+two swings counts too, the solo farm case is exact), a death counts
+on the alive to dead HP transition of the character (the village
+restart revives without counting), a session counts every
+`ResetSession` (the first one opens the deployment, every later one
+is a rejoin), the swing counters split the made/landed/taken blows
+of the Attack broadcasts by the miss flag, the damage taken
+accumulates the observed HP drops, and the hunt loop feeds its tick
+duration through `NoteHuntTick` (an EMA plus the worst tick of the
+last minute). The counters survive the session resets: a 24/7
+process reports the whole deployment story.
+
+The window selector (hour, 6 hours, day, everything) refetches both
+views with the matching `?window=` parameter; the endpoints
+downsample the rings to at most 256 points per response. The tab
+polls every 5 seconds while it is visible and stops while another
+tab holds the screen. The charts draw on plain canvases with the
+theme colors of the CSS variables - no framework, no bundler, no
+network dependency; every dynamic text lands through `textContent`.
+
 ## Endpoints
 
 - `GET /api/bots` (list), `GET /api/bots/{id}/state` (full JSON
@@ -585,6 +647,12 @@ changes the direction immediately.
 - `POST /api/bots/{id}/commands` (the command queue).
 - `GET /api/proxy`, `POST /api/proxy/select` (the client proxy
   selection, see docs/proxy.md).
+- `GET /api/stats` (the fleet statistics view: the live counters of
+  every bot, the fleet totals and the downsampled fleet history),
+  `GET /api/stats/{id}` (the per bot view with the phase
+  distribution, the event timeline and the per bot history); both
+  take `?window=<seconds>` (the default day, 0 walks everything
+  collected).
 
 ## Snapshot encoding and the state tracker internals
 
@@ -755,6 +823,11 @@ changes the direction immediately.
   (paperdoll masks, either-or slot resolution, badges, slot counter,
   the keyed rendering, the pinned footer values, the floating placement
   and the manual interactions) and the shop queue widget.
+- `tools/repro_stats.js` for the statistics tab: the fleet overview
+  (activation fetch, KPI cards, chart drawing, the bots table, the
+  bot selector), the bot detail view (KPI cards, events, phase
+  distribution, the timeline strip), the window switch and the
+  polling stop.
 - `tools/repro_fight_ui.js` for the fight FX gallery harness.
 - `tools/repro_bot_switch.js` for the observed bot switch: the map
   resets the previous bot's world (snapshot, runtime objects, social

@@ -11,6 +11,79 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the bot statistics tab of the web UI (2026-09-13)
+
+Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user asked for a dedicated web UI tab that visualizes the
+behavior statistics of the bot fleet: how effectively the bots
+fight, how they behave, how often they die and rejoin the game - the
+overall picture of all bots and the per bot picture, with charts,
+plus the long term observation tools (a day long run must read back
+through the tab) and the technical health metrics (memory, tick
+time) that matter when many bots run at once.
+
+### Acceptance criteria
+
+- A new Stats tab next to Map/Log of the bot control mode.
+- The fleet view: KPI cards, history charts, a sortable comparison
+  table of all bots.
+- The per bot view: counters, per bot history, the phase
+  distribution, the event timeline.
+- The counters are exact and documented (kill attribution, death
+  transitions, rejoins, swings, damage taken, tick duration).
+- The history is bounded (the ring compaction) and the memory stays
+  bounded for a 24/7 process.
+- go build, the full test suite, golangci-lint --new and the web UI
+  harnesses green; a live smoke run against the deployed stack.
+
+### Progress (2026-09-13)
+
+- Environment redeployed (`tools/swarm_fast_deploy.sh`: STACK_READY;
+  `tools/install_dev_tools.sh` complete) - the sandbox was fresh.
+- Commit "state: the lifetime bot metrics counters for the
+  statistics view": state/metrics.go counts the kills (the death of
+  the actively fought object, packet level attribution), the deaths
+  (the alive to dead HP transition, one per demise), the sessions
+  (every ResetSession - the rejoin story), the swing counters
+  (made/landed/taken with the miss flag split) and the cumulative
+  damage taken; NoteHuntTick feeds the hunt loop tick duration (EMA
+  + the worst of the last minute). The hunt loop measures its tick
+  and publishes it. Unit tests: metrics_test.go (10 cases).
+- Commit "webserver: the statistics collector and the /api/stats
+  endpoints": a 15 s sampler walks every registry tracker into
+  bounded rings (2048 samples, the half-on-full compaction keeps the
+  memory bounded whatever the uptime), derives the transition events
+  from the counter deltas and aggregates the fleet ring with the
+  process memory view. GET /api/stats (fleet view) and
+  GET /api/stats/{id} (per bot view) serve the downsampled history
+  (?window= seconds, default day, 0 all). The acceptance bots stay
+  out of the fleet aggregates. Tests: stats_test.go (11 cases).
+- Commit "webui: the bot statistics tab": the Stats tab of
+  index.html (the toolbar with the window selector, the KPI cards,
+  the chart grid, the bots table, the bot detail panel), stats.js
+  (the pure canvas chart engine with the theme colors, the fleet and
+  bot renderers, the 5 s polling that stops while the tab is
+  hidden), the styles, the main.js hook and the preview server stubs.
+  The repro_stats.js harness pins the rendering path (16 checks).
+  The x axis edge labels clamp inside the plot (the vision review
+  found the right-most label clipped).
+- Live verification: 2 bots hunted for ~2 minutes against the
+  deployed stack - /api/stats served 4 kills, 1 rejoin, the 0.09 ms
+  average tick, the 83 percent hit rate; /api/stats/test9 served the
+  kill/level events and the phase distribution. The headless browser
+  walk (preview server) rendered the fleet view, the bot detail
+  view and the dark theme.
+- Docs: the webui.md statistics tab section, the endpoints list and
+  the harness inventory entries.
+- Status: done (2026-09-13). go build, go test (state, hunt,
+  connection, webserver), golangci-lint run --new (0 issues) and all
+  six web UI harnesses green; the live smoke run PASSED.
+
 ## Active task: the round 60 gear debt - the pantsless town trip of the 2026-09-12 04:58 dump (2026-09-12)
 
 Started: 2026-09-12. Branch: `feature/proxy-server`. Commits as melg8.
