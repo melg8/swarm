@@ -461,3 +461,30 @@ the task that CLOSES M2 (the live acceptance run).
 
 claimed: -
 resume: -
+
+### T-017: the multi-town gear catalog selection
+
+status: in_progress
+milestone: M3
+priority: P3
+deps: T-010
+scope: internal/swarm/hunt/, docs/
+
+The T-010 follow-up: the hunt shopping loop selects the gear catalog
+of the town it farms near. The elven village catalog (the 1-19 band,
+townMerchants at the 15 percent elven tax) stays the default; the
+Dion catalog (the 20-25 band, the Dion merchants of the survey at
+the 20 percent Dion tax, gear.DionCatalog of T-010) is selected
+when the hunt zone sits in the Dion territory. The town.go merchant
+list grows with the Dion merchants (Sabrin, Casey, Sonia, Lara at
+their survey positions); the shopping.go catalog builder switches
+from the single townShopCatalog var to a per-town catalog the hunt
+loop picks by the active zone region. The shopping_strategy.md gains
+the Dion shop section. The elven village behavior stays unchanged
+(the M0 acceptance still passes).
+
+claimed: soak-z 2026-09-12 09:17Z
+resume: claim pushed; next: add the Dion merchants to town.go, add
+  a per-town catalog builder keyed by the hunt zone region, keep the
+  elven catalog as the default, unit-test the selection, document
+  the Dion shop in shopping_strategy.md.
