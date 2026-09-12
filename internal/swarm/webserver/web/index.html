@@ -23,6 +23,7 @@ SPDX-License-Identifier: MIT
     <nav class="tabs">
       <button class="tab active" data-tab="map">Map</button>
       <button class="tab" data-tab="log">Log</button>
+      <button class="tab" data-tab="stats">Stats</button>
     </nav>
     <div class="header-right">
       <span id="live-indicator" class="live-dot offline" title="event stream state"></span>
@@ -458,6 +459,169 @@ SPDX-License-Identifier: MIT
         </div>
       </section>
 
+      <section id="tab-stats" class="tab-content">
+        <div class="stats-toolbar">
+          <select id="stats-window" class="stats-select"
+            title="the history window of the charts">
+            <option value="3600">last hour</option>
+            <option value="21600" selected>last 6 hours</option>
+            <option value="86400">last 24 hours</option>
+            <option value="0">everything</option>
+          </select>
+          <span id="stats-collection" class="stats-collection"
+            title="how long the collector has been sampling"></span>
+          <span id="stats-updated" class="stats-updated">connecting…</span>
+        </div>
+
+        <div class="stats-scroll">
+          <div id="stats-fleet" class="stats-fleet">
+            <div class="stats-section-title">FLEET OVERVIEW</div>
+            <div id="stats-kpis" class="stats-kpis"></div>
+            <div class="stats-charts">
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">online bots</span>
+                  <span class="stats-card-sub">registered vs online</span>
+                </div>
+                <canvas id="chart-fleet-online" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">kills &amp; deaths</span>
+                  <span class="stats-card-sub">cumulative</span>
+                </div>
+                <canvas id="chart-fleet-kd" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">kill / death rate</span>
+                  <span class="stats-card-sub">per minute</span>
+                </div>
+                <canvas id="chart-fleet-rate" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">fleet experience</span>
+                  <span class="stats-card-sub">net gained</span>
+                </div>
+                <canvas id="chart-fleet-exp" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">hunt tick time</span>
+                  <span class="stats-card-sub">fleet average, ms</span>
+                </div>
+                <canvas id="chart-fleet-tick" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">process memory</span>
+                  <span class="stats-card-sub">heap and sys, MB</span>
+                </div>
+                <canvas id="chart-fleet-mem" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">packet rate</span>
+                  <span class="stats-card-sub">fleet total, packets/s</span>
+                </div>
+                <canvas id="chart-fleet-traffic" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">goroutines</span>
+                  <span class="stats-card-sub">process threads</span>
+                </div>
+                <canvas id="chart-fleet-goroutines" class="stats-canvas"></canvas>
+              </div>
+            </div>
+            <div class="stats-section-title">BOTS</div>
+            <div class="stats-table-wrap">
+              <table class="stats-table" id="stats-bots-table"></table>
+            </div>
+          </div>
+
+          <div id="stats-bot" class="stats-bot hidden">
+            <div class="stats-bot-head">
+              <select id="stats-bot-select" class="stats-select"
+                title="the bot of the detail view"></select>
+              <span id="stats-bot-name" class="stats-bot-name"></span>
+              <span id="stats-bot-badges" class="stats-bot-badges"></span>
+              <button id="stats-bot-close" class="btn stats-bot-close"
+                type="button" title="close the bot detail view">×</button>
+            </div>
+            <div id="stats-bot-kpis" class="stats-kpis"></div>
+            <div class="stats-charts">
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">experience</span>
+                  <span class="stats-card-sub">net gained</span>
+                </div>
+                <canvas id="chart-bot-exp" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">kills &amp; deaths</span>
+                  <span class="stats-card-sub">cumulative</span>
+                </div>
+                <canvas id="chart-bot-kd" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">health</span>
+                  <span class="stats-card-sub">percent</span>
+                </div>
+                <canvas id="chart-bot-hp" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">adena</span>
+                  <span class="stats-card-sub">inventory</span>
+                </div>
+                <canvas id="chart-bot-adena" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">hunt tick time</span>
+                  <span class="stats-card-sub">average, ms</span>
+                </div>
+                <canvas id="chart-bot-tick" class="stats-canvas"></canvas>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">packet rate</span>
+                  <span class="stats-card-sub">packets/s</span>
+                </div>
+                <canvas id="chart-bot-traffic" class="stats-canvas"></canvas>
+              </div>
+            </div>
+            <div class="stats-card stats-card-wide">
+              <div class="stats-card-head">
+                <span class="stats-card-title">phase timeline</span>
+                <span class="stats-card-sub">hunt phases over the window</span>
+              </div>
+              <canvas id="bot-phase-strip" class="stats-canvas stats-phase-canvas"></canvas>
+            </div>
+            <div class="stats-bot-bottom">
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">phase distribution</span>
+                  <span class="stats-card-sub">time in phase</span>
+                </div>
+                <div id="stats-phase-shares" class="stats-phase-shares"></div>
+              </div>
+              <div class="stats-card">
+                <div class="stats-card-head">
+                  <span class="stats-card-title">events</span>
+                  <span class="stats-card-sub">kills, deaths, rejoins, levels</span>
+                </div>
+                <div id="stats-events" class="stats-events"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="tab-log" class="tab-content">
         <div class="log-toolbar">
           <input id="log-filter" type="text" placeholder="filter events…">
@@ -487,6 +651,7 @@ SPDX-License-Identifier: MIT
 
 <script src="app.js"></script>
 <script src="map.js"></script>
+<script src="stats.js"></script>
 <script src="pathfind.js"></script>
 <script src="fight.js"></script>
 <script src="fighttest.js"></script>

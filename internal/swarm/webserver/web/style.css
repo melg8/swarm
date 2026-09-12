@@ -2959,3 +2959,394 @@ canvas.fxg-cell.picked {
   color: var(--text-dim);
   font-size: 10px;
 }
+
+/* ===== Statistics tab ===== */
+
+/* The toolbar of the statistics tab: the window selector, the
+   collection clock and the update state. */
+.stats-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  min-height: 34px;
+  flex: none;
+}
+
+.stats-select {
+  background: var(--bg-panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 3px 6px;
+}
+
+.stats-collection {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.stats-updated {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* The scrollable body of the tab. */
+.stats-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px 20px;
+}
+
+.stats-fleet, .stats-bot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stats-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin: 4px 0 0 2px;
+}
+
+/* The KPI cards row. */
+.stats-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 8px;
+}
+
+.stats-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  box-shadow: var(--shadow);
+}
+
+.stats-kpi-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.stats-kpi-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-kpi-sub {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.stats-kpi-green .stats-kpi-value { color: var(--green); }
+.stats-kpi-red .stats-kpi-value { color: var(--red); }
+
+/* The charts grid. */
+.stats-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.stats-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px 6px;
+  box-shadow: var(--shadow);
+}
+
+.stats-card-wide {
+  grid-column: 1 / -1;
+}
+
+.stats-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.stats-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.stats-card-sub {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.stats-canvas {
+  width: 100%;
+  height: 130px;
+  display: block;
+}
+
+.stats-phase-canvas {
+  height: 26px;
+}
+
+/* The bots comparison table. */
+.stats-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow);
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.stats-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel-2);
+  color: var(--text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.stats-table th.sorted-asc::after { content: " ↑"; color: var(--accent); }
+.stats-table th.sorted-desc::after { content: " ↓"; color: var(--accent); }
+
+.stats-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.stats-table td.stats-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-table tbody tr {
+  cursor: pointer;
+}
+
+.stats-table tbody tr:hover {
+  background: var(--bg-panel-2);
+}
+
+.stats-table tbody tr.selected {
+  background: var(--bg-panel-2);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.stats-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* The bot detail panel. */
+.stats-bot-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stats-bot-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.stats-bot-badges {
+  display: flex;
+  gap: 6px;
+}
+
+.stats-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel-2);
+  color: var(--text-dim);
+}
+
+.stats-badge-online {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.stats-badge-offline {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.stats-badge-combat {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.stats-bot-close {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  background: var(--bg-panel-2);
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  width: 24px;
+  height: 22px;
+  line-height: 1;
+}
+
+.stats-bot-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* The phase distribution bars. */
+.stats-phase-shares {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 2px 0 4px;
+}
+
+.stats-phase-row {
+  display: grid;
+  grid-template-columns: 86px 1fr 110px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.stats-phase-label {
+  color: var(--text-dim);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-phase-bar {
+  height: 8px;
+  background: var(--bg-panel-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stats-phase-fill {
+  height: 100%;
+  border-radius: 4px;
+  opacity: 0.85;
+}
+
+.stats-phase-fill.phase-green { background: var(--green); }
+.stats-phase-fill.phase-gold { background: var(--gold); }
+.stats-phase-fill.phase-blue { background: var(--blue); }
+.stats-phase-fill.phase-violet { background: var(--violet); }
+.stats-phase-fill.phase-gray { background: var(--gray); }
+.stats-phase-fill.phase-accent { background: var(--accent); }
+
+.stats-phase-value {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The event list. */
+.stats-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 2px 0 4px;
+}
+
+.stats-event {
+  display: grid;
+  grid-template-columns: 44px 70px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.stats-event:hover { background: var(--bg-panel-2); }
+
+.stats-event-time {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-event-chip {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--bg);
+  text-align: center;
+}
+
+.stats-event-green { background: var(--green); }
+.stats-event-red { background: var(--red); }
+.stats-event-violet { background: var(--violet); }
+.stats-event-gold { background: var(--gold); }
+.stats-event-gray { background: var(--gray); }
+
+.stats-event-text {
+  color: var(--text);
+}
+
+.stats-event-ago {
+  color: var(--text-dim);
+}
+
+.stats-empty {
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 8px 2px;
+}
+
+/* The statistics tab hides in the bot less modes like the log tab. */
+body.mode-pathfind .tab[data-tab="stats"],
+body.mode-fight .tab[data-tab="stats"],
+body.mode-test-fight .tab[data-tab="stats"] {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .stats-bot-bottom { grid-template-columns: 1fr; }
+  .stats-kpis { grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); }
+  .stats-charts { grid-template-columns: 1fr; }
+}

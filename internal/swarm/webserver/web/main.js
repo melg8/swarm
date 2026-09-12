@@ -49,6 +49,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   initDumpButton();
   initAcceptance();
   initSidebarTabs();
+  StatsTab.init();
   MapView.init();
   refreshBots();
   refreshAcceptance();
@@ -75,6 +76,10 @@ function initTabs() {
       if (name === "map") {
         MapView.refreshColors();
         MapView.resize();
+      }
+      // The statistics tab polls only while it is visible.
+      if (typeof StatsTab !== "undefined") {
+        StatsTab.setActive(name === "stats");
       }
     });
   }
