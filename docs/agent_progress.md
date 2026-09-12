@@ -11,6 +11,81 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the round 59 phantom chase livelock - the "Cannot see target" standoff that never armed the blind recovery (2026-09-12)
+
+Started: 2026-09-12. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report (the 03:25 state dump, build a4c9e15, bot test1,
+phase engage, uptime 7m13s): the bot stood 80 units from the NPC it
+wanted to attack for over a minute - no movement, no walk plan, no
+target switch - while the server answered every attempt with
+"Cannot see target." every ~3 s and the bot kept casting Power
+Strike at the invisible target every 15 s. The user asked to
+reproduce and fix it from three angles: the pathfinding (the
+reposition walk), the pathfinding activation (why it never turned
+on) and the target abandonment (give the target up after several
+seconds of refusals).
+
+### Root cause
+
+The phantom chase of the refused attack: the server AI of the armed
+ATTACK intention broadcasts the character's own MoveToPawn chase
+steps while every doAttack of the same intention fails the
+canSeeTarget check and answers "Cannot see target." - the chase
+stream kept the tracker's fresh fight view (CombatActiveAt,
+FightingTargetID) alive in a ~3 s cycle (chase -> refusal -> disarm
+-> 3 s staleness -> the 1 s paced re-request re-arms the chase), so
+SelfFighting read true, the fighting branch re-anchored the engage
+clock past every refusal (holding the 12 s stuck timeout away
+forever) and blindEngageBlocked died at its SelfFighting gate: the
+recovery built for exactly this refusal never armed. See
+`docs/development_log.md` Round 59 for the full trace.
+
+### Fix (the refusal-vs-activity ordering rule)
+
+1. `state/bot.go`: `SelfCombatActiveAt` exposes the raw last fight
+   activity timestamp.
+2. `hunt/loop_los.go`: `blindEngageBlocked` detects the block when a
+   fresh refusal of the current attempt is the NEWEST fight activity
+   (the SelfFighting early-out is gone); `fightClearedRefusal`
+   gates the recovery standdown on activity strictly newer than the
+   refusal.
+3. `hunt/loop.go`: the engage clock re-anchor of the fighting branch
+   requires the same progression past the last refusal.
+
+### Acceptance criteria
+
+- The exact dump standoff (the dump positions, the dump zone, the
+  phantom MoveToPawn chase, the fresh refusals) arms the recovery
+  and walks the reposition leg on the arming tick
+  (round59_repro_test.go).
+- The persisting refusal spends the two attempts and ends in the
+  target switch with the skip list holding the obstructed mob out
+  and the next pick taking the spare mob of the dump scene - the
+  80 s livelock is bounded to the recovery budgets.
+- The round 56/57/58 contracts and the whole loop_los_test.go suite
+  stay green (the fresh fight guard: a chase step after the refusal
+  still reads as a running fight).
+- go build/vet/test/lint:new green.
+
+### Status: done
+
+- Commit 1 (the hunt fix + the repro tests + the docs): the ordering
+  rule, the SelfCombatActiveAt accessor, the three round 59 repro
+  tests, the hunting.md blind recovery section update, the
+  development_log Round 59 entry, this entry. All tests and
+  `golangci-lint run --new` green.
+- Live stack validation: the deploy ran green before the work
+  (STACK_READY); the unit repro pins the exact dump behavior. A
+  longer live soak against the running server is the natural next
+  step for a future round (the Mobius geodata of the standoff cell
+  decides whether level A clears the line or level B switches the
+  target - both are pinned and bounded).
+
 ## Active task: the farm readiness acceptance round - the one town visit and the pdef maximizing armor set (2026-09-11)
 
 Started: 2026-09-11. Branch: `feature/proxy-server`. Commits as melg8.

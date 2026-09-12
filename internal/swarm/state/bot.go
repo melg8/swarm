@@ -598,6 +598,23 @@ func (b *Bot) SelfCannotSeeTargetAt() time.Time {
 	return b.char.CannotSeeTargetAt
 }
 
+// SelfCombatActiveAt returns when the last fight activity of the played
+// character landed (a swing attempt or a chase step, zero when none ever
+// did), regardless of freshness. The hunt loop orders it against
+// SelfCannotSeeTargetAt: a refusal that is newer than the activity
+// marks the phantom chase - the server keeps broadcasting the chase
+// steps of an attack it refuses to execute behind an obstacle, so a
+// fresh activity view alone must not read as a running fight (the
+// 2026-09-12 03:25 dump livelock: the character stood 80 units from
+// the target for over a minute, "Cannot see target" every few seconds,
+// no swing ever landing).
+func (b *Bot) SelfCombatActiveAt() time.Time {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	return b.char.CombatActiveAt
+}
+
 // SelfWalking reports whether the character is moving right now: the
 // moving flag is set by the movement broadcasts and the fresh window
 // guards against a lost stop packet (no update for seconds means the

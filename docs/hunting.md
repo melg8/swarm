@@ -184,15 +184,38 @@ SelfCannotSeeTargetAt) and has two levels:
   could not clear the block - the next pick selects a different mob,
   which also replaces the stale server side selection.
 
+The arming of both levels survived the phantom chase of the refused
+attack (the 2026-09-12 03:25 dump): the server AI of an armed ATTACK
+intention keeps broadcasting the character's OWN MoveToPawn chase steps
+(`PlayerAI.thinkAttack` -> `maybeMoveToPawn` -> `startFollow`) while
+every `doAttack` of the same intention fails the `canSeeTarget` check
+and answers "Cannot see target." - the chase stream refreshed the
+tracker's `CombatActiveAt`/`FightingTargetID`, so `SelfFighting` read
+true in a livelock, the fighting branch re-anchored the engage clock
+past every refusal (holding the stuck timeout and the detection window
+away forever) and the detection gate itself refused to arm while the
+fight view looked fresh. The bot stood 80 units from its target for
+minutes with the refusal spam every ~3 s, a Power Strike cast at the
+invisible mob every 15 s, no walk, no switch, no landed blow. The fix
+is an ordering rule: the refusal being the NEWEST fight activity
+(nothing landed or stepped after the server said "cannot see") marks
+the obstructed engage even while the chase view is fresh - only
+activity strictly newer than the refusal (a swing or a chase step that
+landed after it) proves the sight line cleared, both for the detection
+(`blindEngageBlocked`), the standdown of a running recovery
+(`fightClearedRefusal`) and the engage clock re-anchor of the fighting
+branch. Pinned by hunt/round59_repro_test.go against the exact dump
+scene.
+
 The stuck timeout itself now measures the FRESH fight view (the gate is
-!SelfFighting, not !SelfEngaged) and a running fight re-anchors the
-engage clock, so a stale attack stance without refusals still trips it
-after 12 s of no fight packets; while the blind recovery is armed the
-timeout stays held (the recovery manages its own budgets). Covered by
-hunt/loop_los_test.go (reposition walk, arrival re-engage, both switch
-levels, retry budget, stale stance timeout, timeout hold, attempt
-scoping, fresh fight guard) and the state tracker test of the refusal
-recording.
+!SelfFighting, not !SelfEngaged) and a running fight that progressed
+past the last refusal re-anchors the engage clock, so a stale attack
+stance without refusals still trips it after 12 s of no fight packets;
+while the blind recovery is armed the timeout stays held (the recovery
+manages its own budgets). Covered by hunt/loop_los_test.go
+(reposition walk, arrival re-engage, both switch levels, retry budget,
+stale stance timeout, timeout hold, attempt scoping, fresh fight
+guard) and the state tracker test of the refusal recording.
 
 ## Spot-anchored hunting (hunt/spot*.go, hunt/spots_elven.go)
 

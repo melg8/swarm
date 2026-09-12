@@ -4042,3 +4042,92 @@ permanent freeze:
   scenario pins live in acceptance/zone_return_test.go (the dump
   reset values, the exact item set, the check list, the condition
   evaluation and the database item injection).
+
+## Round 59: the phantom chase livelock - the refused attack that kept reading as a running fight (2026-09-12)
+
+The user report (the 03:25 state dump, build a4c9e15, bot test1,
+phase engage, uptime 7m13s): the level 14 character stood at
+(35224 47288 -3656, the Spore Fungus SW spot) with the selected
+target 268439361 (Kaboo Orc Fighter) at 35144 47288 -3656 - 80
+units, the exact melee standoff - with "moving: no", "walk plan:
+none", "in combat: true" and an empty combat feed, while the chat
+window held "Cannot see target." every ~3 s for over a minute and
+the event log showed nothing but a Power Strike cast every 15 s. The
+bot neither moved, nor switched the target, nor landed a blow.
+
+### Root cause (traced through the Mobius AI and the tracker apply path)
+
+The event trail: the previous kill finished at 03:24:12, the picker
+selected the aggressive Kaboo that had stalked the fight, the forced
+attack armed the server side ATTACK intention. From there a server
+cycle ran forever:
+
+1. `PlayerAI.thinkAttack` -> `maybeMoveToPawn` -> `startFollow`:
+   the chase of the armed intention broadcasts the character's OWN
+   MoveToPawn steps, and `applySelfPawnMovementLocked` refreshes
+   `CombatActiveAt`/`FightingTargetID` on every one of them (the
+   steps are zero distance at the standoff - "moving: no" in the
+   dump while the fight view stays fresh).
+2. `Creature.doAttack` fails the `canSeeTarget` geodata check and
+   answers SystemMessage 181; `setIntentionActive` disarms the
+   intention (the chase stops, the view ages out after the 3 s
+   fightingFreshWindow).
+3. The loop's 1 s paced re-request re-arms the ATTACK intention -
+   back to step 1. The observed ~3 s refusal cadence is exactly
+   this cycle (the 3 s view staleness + the 1 s pacing).
+
+While the phantom chase held `SelfFighting` true, the engage branch
+re-anchored `engageAt` on every tick (loop.go, "the fresh fight also
+re-anchors the engage clock"), which held the 12 s engage stuck
+timeout away forever; the `blindEngageBlocked` detection died at its
+`SelfFighting` gate and at `cannotSeeAt.Before(l.engageAt)` (the
+refusals always landed before the newest re-anchor); the blind
+engage recovery - the mechanism built for exactly this refusal -
+never armed. The bot stood 80 units from a mob it could not see,
+casting Power Strike at it every 15 s, forever.
+
+### Fix (the refusal-vs-activity ordering rule)
+
+1. `state/bot.go` (`SelfCombatActiveAt`): the raw timestamp of the
+   last fight activity (a swing attempt or a chase step), so the
+   loop can order it against the last refusal.
+2. `hunt/loop_los.go` (`blindEngageBlocked`): the `SelfFighting`
+   early-out is gone; the block is detected when a fresh refusal of
+   the current attempt is the NEWEST fight activity - nothing
+   landed or stepped after the server said "cannot see". A fresh
+   chase view alone no longer clears the block (the phantom chase
+   of the refused attack produces exactly that view); a chase step
+   or swing strictly newer than the refusal (the mob walked past
+   the obstacle edge, the walk cleared the sight line) still does.
+3. `hunt/loop_los.go` (`fightClearedRefusal`, used by
+   `recoverBlindEngage`): the standdown of a running recovery
+   requires the same progression past the refusal, not merely the
+   fresh chase view - otherwise the recovery would arm and stand
+   down in a loop through the phantom chase.
+4. `hunt/loop.go` (the fighting branch): the engage clock
+   re-anchor requires the same progression, so the phantom chase
+   can no longer slide the clock past every refusal. The plain
+   stuck timeout (the no-refusal stale stance mode) and every other
+   fight behavior are unchanged.
+
+### Verification
+
+- go build/vet, gofmt clean, golangci-lint --new zero findings, the
+  full go test suite green (the pre-existing full-lint findings of
+  the branch are untouched files).
+- The exact dump scene replays and pins the three halves
+  (hunt/round59_repro_test.go): the phantom chase arms the recovery
+  and walks the first reposition leg on the arming tick
+  (TestReproRound59PhantomChaseArmsBlindRecovery); the persisting
+  refusal spends the attempt budget and ends in the target switch
+  with the skip list holding the Kaboo out and the next pick taking
+  the Spore Fungus of the dump object list
+  (TestReproRound59PhantomChaseSwitchesTarget); the phantom chase
+  no longer re-anchors the engage clock while a fight that truly
+  progressed past the refusal still does
+  (TestReproRound59EngageClockHoldsPastRefusal).
+- The round 56/57/58 contracts and the whole loop_los_test.go suite
+  pass unchanged: the fresh fight guard (a chase AFTER the refusal
+  reads as a running fight), the stale refusal scoping, the stuck
+  timeout through the stale attack stance, the timeout hold during
+  the recovery walk.

@@ -58,11 +58,17 @@ const (
 // blindEngageBlocked reports whether the current engage attempt is
 // being refused because the target is not visible: the server answered
 // an attack with "Cannot see target." during this attempt, the answer
-// is fresh, and no swing or chase step of this fight landed in between
-// (a fresh fight means the sight line cleared on its own - a moving
-// character or mob walked past the obstacle edge).
+// is fresh, and nothing of this fight landed in between - no swing and
+// no chase step is newer than the refusal. A fresh activity view alone
+// does not clear the block: the server of a refused attack keeps
+// broadcasting the chase steps of its own re-try (the MoveToPawn
+// stream of the armed attack intention), so the phantom chase reads
+// as a live fight while every swing attempt lands on the refusal - the
+// 2026-09-12 03:25 dump livelock stood exactly there for minutes (a
+// moving character or mob that truly walked past the obstacle edge
+// puts the activity after the refusal and reads as clear).
 func (l *Loop) blindEngageBlocked(now time.Time) bool {
-	if l.target == 0 || l.tracker.SelfFighting(l.target) {
+	if l.target == 0 {
 		return false
 	}
 	if l.engageAt.IsZero() || now.Sub(l.engageAt) < blindEngageDelay {
@@ -74,8 +80,11 @@ func (l *Loop) blindEngageBlocked(now time.Time) bool {
 		// engage started after the obstruction was last reported.
 		return false
 	}
+	if now.Sub(cannotSeeAt) > cannotSeeFreshWindow {
+		return false
+	}
 
-	return now.Sub(cannotSeeAt) <= cannotSeeFreshWindow
+	return !l.tracker.SelfCombatActiveAt().After(cannotSeeAt)
 }
 
 // blindRecoveryArmed reports whether the blind engage recovery owns
@@ -93,10 +102,14 @@ func (l *Loop) blindRecoveryArmed(now time.Time) bool {
 // attack request would set the ATTACK intention again and cancel the
 // walk the recovery just started.
 func (l *Loop) recoverBlindEngage(now time.Time) {
-	if l.tracker.SelfFighting(l.target) {
-		// The fight is running: the walk cleared the sight line (or
-		// the mob walked past the obstacle edge on its own). Stand
-		// down and let the engage own the fight again.
+	if l.fightClearedRefusal() {
+		// The fight progressed past the refusal: a swing or a chase step
+		// landed after the server last said "cannot see" (the walk
+		// cleared the sight line, or the mob walked past the obstacle
+		// edge on its own). Stand down and let the engage own the fight
+		// again. The plain fresh-chase view is not enough here - the
+		// phantom chase of the refused attack keeps it alive behind the
+		// obstacle and would stand the recovery down in a loop.
 		l.clearBlindRecovery()
 
 		return
@@ -116,6 +129,22 @@ func (l *Loop) recoverBlindEngage(now time.Time) {
 		return
 	}
 	l.walkBlindWaypoints(now)
+}
+
+// fightClearedRefusal reports whether the running fight progressed
+// past the last "Cannot see target." refusal: the engagement is fresh
+// AND its last activity (a swing attempt or a chase step) landed after
+// the refusal. The refusal itself is the proof the sight line was
+// closed at that moment, so only newer activity proves it opened
+// again; the fresh chase view alone cannot (the server keeps
+// broadcasting the chase steps of the very attack it refuses).
+func (l *Loop) fightClearedRefusal() bool {
+	if !l.tracker.SelfFighting(l.target) {
+		return false
+	}
+
+	return l.tracker.SelfCombatActiveAt().After(
+		l.tracker.SelfCannotSeeTargetAt())
 }
 
 // startBlindReposition plans the route to a standing point that sees

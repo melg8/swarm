@@ -1393,8 +1393,18 @@ func (l *Loop) engage() {
 		// The fresh fight also re-anchors the engage clock: the
 		// stuck timeout measures from the last real fight
 		// activity, not from the original pick - a slow but
-		// living fight must never trip it.
-		l.engageAt = now
+		// living fight must never trip it. The re-anchor requires
+		// the fight to have progressed past the last "Cannot see
+		// target." refusal: the server keeps broadcasting the chase
+		// steps of an attack it refuses to execute (the phantom
+		// chase), and a clock re-anchored past every refusal holds
+		// both the stuck timeout and the blind recovery away from
+		// the obstructed engage forever (the 2026-09-12 03:25 dump:
+		// 80 units from the target, over a minute of refusals, no
+		// walk, no switch).
+		if l.fightClearedRefusal() {
+			l.engageAt = now
+		}
 		// The impending add: an aggressive neighbor about to
 		// join the fight gets a step of clearance BEFORE its
 		// on-sight trigger fires (see loop_avoid.go) - backing
