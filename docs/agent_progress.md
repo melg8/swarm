@@ -2954,3 +2954,23 @@ the selection is unit-tested against the real npcdata buylists.
 T-017 complete: the multi-town catalog selection ships. The Dion zone
 registry (T-009) and the multi-town spellbook budget (M2 follow-up of
 T-015/T-016) stay out of scope.
+## Active task: T-016 the class transfer acceptance scenario
+
+Started: 2026-09-12 09:52 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. Agent label: quest-scenario-e3f8.
+
+Goal: the M2 acceptance vehicle in internal/swarm/acceptance/: the
+level 19 injection at Gludio, the quest drive on the T-015 chain
+data through the T-014 walker, the class change and the
+SelfClassID gate. Staged: this round builds the accept leg (the
+journal cond flip of Q00406) - the kill stages need the quest trip
+phase (the Gludio band combat wiring), the next round's work.
+
+Constraints: acceptance/ + docs/ scope; the staged PASS line is
+the quest journal cond 1 (the honest partial, the metrics row
+carries the stage); no false M2 closure (the ladder renders by
+the last row - the M2 gate stays the SelfClassID flip).
+
+### Progress
+
+- 09:52 UTC: claimed.
