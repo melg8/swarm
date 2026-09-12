@@ -2728,3 +2728,46 @@ trail; the last minutes added one more M1 evidence row:
 Status: session complete - the next agent starts from the BACKLOG
 queue (T-008 unblocks T-009/T-010) or the M1 operator soak run.
 
+
+## Active task: T-008 the gatekeeper teleport flow (resumed + done)
+
+Started: 2026-09-12 07:55Z (round 63 foundation). Resumed: 2026-09-12
+08:08Z (this session). Branch: `feature/proxy-server`. Commits as
+melg8. Agent label: `soak-z`.
+
+### Goal
+
+The M3 gatekeeper dialog + teleport travel (the H-002 verification):
+implement the packet chain the bot needs to drive Mirabel -> Gludio ->
+Dion.
+
+### Progress
+
+- 07:55Z (round 63): the packet parsers (RequestBypassToServer 0x21 +
+  NpcHTMLMessage 0x1B) with unit tests + protocol_description.md docs.
+- 08:15Z: the connection dispatch (0x1B → applyNpcHTMLMessage →
+  LastHTMLMessage/LastHTMLDialog, SendBypass) with 4 unit tests.
+- 08:23Z: the html bypass parser (hunt/gatekeeper_html.go:
+  ParseGatekeeperHTML, FindTeleportButton, FindShowTeleportsButton) with
+  7 unit tests.
+- 08:30Z: the gatekeeper step (hunt/gatekeeper_step.go:
+  DriveGatekeeperTeleport, bounded 5s dialog wait) + the GameAPI
+  SendBypass/LastHTMLDialog seam + 4 unit tests.
+- 08:40Z: live verified - the building-entry acceptance run with
+  SWARM_TRACE_PACKETS=1 showed the server 0x1B packets (813 bytes)
+  arriving and the dispatch parsing them (no parse failure,
+  building-entry PASSED).
+- 08:45Z: the ApplyDialog bridge - the 0x1B handler now feeds the
+  state tracker's open dialog section through ParseHTMLLinks (T-012),
+  completing the 0x1B wiring the T-013 round named as T-008 scope.
+- go build/vet green, golangci-lint run --new: 0 issues on the touched
+  packages (connection, hunt).
+
+### Status: done (2026-09-12 08:45Z)
+
+T-008 complete: the full packet chain ships (parsers, dispatch, send,
+html parser, gatekeeper step, ApplyDialog bridge, docs). Unit tests
+green, lint clean, the live packet dispatch verified against the real
+server. The full Mirabel -> Gludio -> Dion live drive is the follow-up
+(the hunt-loop gatekeeper trip phase, the T-009 prerequisite): the
+packet chain, the parser and the step are ready to wire.

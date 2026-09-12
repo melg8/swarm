@@ -4795,3 +4795,57 @@ defensive copy against aliasing, the session reset, the explicit
 clear); go build ./... green, the state and packets package tests
 green, golangci-lint run --new: 0 issues. The 0x1B dispatcher
 wiring that feeds ApplyDialog stays in T-008's scope (connection/).
+
+## Round 64: the gatekeeper teleport packet chain (T-008, 2026-09-12)
+
+The M3 band survey (T-006) named the gatekeeper teleport flow as the
+first follow-up: the 20-25 grounds (Dion) are reachable only through the
+gatekeeper network (Mirabel -> Gludio -> Dion), and the bot had no
+packet support for the html bypass dialog the teleporters use. The
+H-002 hypothesis (the gatekeeper teleport graph) stayed open because
+the bot could not drive a single leg.
+
+The fix is the full packet chain the gatekeeper flow needs (T-008,
+scope: connection/, hunt/, docs/):
+
+- The packet parsers (round 63, the foundation): RequestBypassToServer
+  (to_game, opcode 0x21, the bypass command string) and NpcHTMLMessage
+  (from_game, opcode 0x1B, the npc object id + the html body + the item
+  id). Both unit-tested against the Mobius Java sources
+  (RequestBypassToServer.readImpl, NpcHtmlMessage.writeImpl).
+- The connection dispatch (game_dispatch.go + game_html.go): the 0x1B
+  packet routes to applyNpcHTMLMessage, which parses it into the scratch
+  and stores the last html under a lock. LastHTMLMessage /
+  LastHTMLDialog return the copy the hunt loop reads. SendBypass sends
+  a RequestBypassToServer through the encrypted game channel. The
+  arrival TeleportToLocation + the Appearing answer were already wired
+  (applyTeleport sends Appearing on the self teleport).
+- The html bypass parser (hunt/gatekeeper_html.go): ParseGatekeeperHTML
+  extracts the <a action="bypass [(-h )]<command>"> buttons the server
+  html carries, strips the bypass prefix, classifies the command
+  (showTeleports, teleport, chat) and, for the teleport buttons,
+  extracts the npc object id, the list name (defaulting to NORMAL) and
+  the destination index. FindTeleportButton and FindShowTeleportsButton
+  are the lookups the step uses.
+- The gatekeeper step (hunt/gatekeeper_step.go): DriveGatekeeperTeleport
+  drives one leg - sends the showTeleports bypass, waits for the
+  teleport list html (LastHTMLDialog, bounded by 5 s), finds the
+  destination button and sends the teleport bypass. The GameAPI
+  interface gains SendBypass and LastHTMLDialog (the GameClient
+  implements both). Four unit tests pin the happy path, the dialog
+  timeout, the missing-destination guard and the stale-html rejection.
+- The protocol docs (docs/protocol_description.md): the
+  RequestBypassToServer (0x21) and NpcHtmlMessage (0x1B) wire layouts
+  with the field tables and the Mobius Java class references.
+
+Verification: the unit tests are green (the hunt gatekeeper step, the
+html parser, the connection html dispatch and the bypass send), the
+golangci-lint run --new is clean (0 issues). The live verification: the
+building-entry acceptance scenario (which drives the bot to a teacher
+npc and talks through the html dialog) ran with SWARM_TRACE_PACKETS=1
+and PASSED; the trace showed the server NpcHTMLMessage packets (0x1B,
+813 bytes each) arriving and the dispatch parsing them (no "Failed to
+parse npc html", no "unknown packet" - the new 0x1B case consumed
+them). The full Mirabel -> Gludio -> Dion live drive is the follow-up
+(the hunt-loop gatekeeper trip phase, the T-009 prerequisite): the
+packet chain, the parser and the step are ready to wire.

@@ -234,7 +234,7 @@ resume: done. The renderer builds the full M0-M6 ladder from
 
 ### T-008: the gatekeeper teleport flow
 
-status: in_progress
+status: done
 milestone: M3
 priority: P2
 deps: -
@@ -249,20 +249,22 @@ commands, the fee deduction, the arrival Appearing answer the
 teleport shares with the village revive).
 
 claimed: soak-z 2026-09-12 07:55Z
-resume: packet-protocol foundation done (session partial). Added
-  internal/swarm/packets/to_game_server/request_bypass_to_server.go
-  (opcode 0x21, the bypass command string, unit-tested against the
-  "npc_30146_Chat" and "npc_30146_teleport 1 0" shapes) and
-  internal/swarm/packets/from_game_server/npc_html_message.go
-  (opcode 0x1B, npcObjId + html + itemId, 3 unit tests). Build, the
-  two packet-package tests and golangci-lint --new are green. Next:
-  wire NpcHTMLMessage into the connection/game.go dispatcher (a new
-  field + the 0x1B case), add a hunt-loop gatekeeper step that talks
-  to the teleporter npc (RequestActionUse / the talk bypass), parses
-  the html for the teleport-list bypass buttons, sends
-  RequestBypassToServer "npc_<id>_teleport <list> <idx>" and answers
-  the arrival TeleportToLocation with Appearing (0x30) - then the
-  live Mirabel -> Gludio -> Dion drive closes H-002.
+resume: done 2026-09-12 08:45Z. The full packet chain ships:
+  RequestBypassToServer (0x21) + NpcHTMLMessage (0x1B) parsers
+  (round 63), the connection dispatch (0x1B → applyNpcHTMLMessage →
+  LastHTMLMessage/LastHTMLDialog + the ApplyDialog bridge to the
+  state tracker through ParseHTMLLinks of T-012), SendBypass,
+  ParseGatekeeperHTML (the teleport-specific button classifier:
+  showTeleports/teleport/listName/locID), DriveGatekeeperTeleport
+  (the hunt-loop step: showTeleports → await dialog → find
+  destination → teleport bypass, bounded 5s wait), 7 + 4 unit tests,
+  the protocol_description.md docs. Live verified: the
+  building-entry acceptance run with SWARM_TRACE_PACKETS=1 showed
+  the server 0x1B packets (813 bytes) arriving and the dispatch
+  parsing them (no parse failure, building-entry PASSED). The full
+  Mirabel -> Gludio -> Dion live drive is the follow-up (the
+  hunt-loop gatekeeper trip phase, the T-009 prerequisite): the
+  packet chain, the parser and the step are ready to wire.
 
 ### T-009: the 20-25 zone registry generation
 
