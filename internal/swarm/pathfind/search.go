@@ -87,7 +87,21 @@ type search struct {
 	// walker refuses wet legs, so a wet plan burns the re-path
 	// budget on identical refused routes and aborts (the delevel
 	// water loop of the 2026-09-10 state dump).
-	dry             bool
+	dry bool
+	// avoid holds the world patches this search must route around
+	// (the frozen-cell ban of the hunt loop recovery): a step onto a
+	// banned cell costs impassable, so the A* detours around the
+	// patch, and neither the direct line shortcut nor the smoothing
+	// may collapse a leg across it. The ban is the planner's own
+	// memory of ground the live server refused to walk although the
+	// geodata pack modeled it as open (the 2026-09-12 trainer hall
+	// aisle freeze: the plan entered through the west aisle column,
+	// the server walled it, the deterministic re-plan reproduced the
+	// identical route and the character stood frozen through the
+	// whole re-path budget).
+	avoid []AvoidArea
+	// neighborScratch and ringScratch are the reusable neighbor
+	// buffers of the expansion loop.
 	neighborScratch []*node
 	ringScratch     []*node
 	region          *Region
@@ -112,6 +126,7 @@ func newSearch(engine *Engine, maxPassableHeight uint16) *search {
 		targetWorld:       Vec3{X: 0, Y: 0, Z: 0},
 		approachRadius:    0,
 		dry:               false,
+		avoid:             nil,
 		neighborScratch:   nil,
 		ringScratch:       nil,
 		region:            nil,
@@ -324,7 +339,8 @@ func (s *search) astar(from *node) []*node {
 func (s *search) directOrAstar(from, to *node) ([]*node, []*node) {
 	direct := s.straightPath(from, to)
 	if len(direct) > 0 && direct[len(direct)-1].coords == to.coords &&
-		s.directLineDry(direct) && s.serverLegVerified(from, to) {
+		s.directLineDry(direct) && s.serverLegVerified(from, to) &&
+		s.legAllowed(from, to) {
 		return direct, []*node{direct[0], direct[len(direct)-1]}
 	}
 
@@ -511,6 +527,12 @@ func (s *search) reconstruct(target *node) []*node {
 // and the water penalty of the destination.
 func (s *search) costTo(current, next *node, ring []*node) float32 {
 	if !s.canStep(current, next) {
+		return impassableScore
+	}
+	if s.cellAvoided(next.coords) {
+		// The recovery ban: the live server proved this ground
+		// unwalkable for this session, the detour around it is the
+		// only plan worth planning.
 		return impassableScore
 	}
 	cost := commonScore
@@ -832,7 +854,8 @@ func (s *search) smoothPath(path []*node) []*node {
 	result := []*node{path[0]}
 	current := path[0]
 	for i := 1; i < len(path); i++ {
-		if s.lineOfSight(current, path[i]) && s.legDry(current, path[i]) {
+		if s.lineOfSight(current, path[i]) && s.legDry(current, path[i]) &&
+			s.legAllowed(current, path[i]) {
 			continue
 		}
 		current = path[i-1]
@@ -843,6 +866,41 @@ func (s *search) smoothPath(path []*node) []*node {
 	}
 
 	return result
+}
+
+// cellAvoided reports whether the cell falls inside one of the avoid
+// areas of the search: the recovery ban of the hunt loop, expressed in
+// world coordinates the caller derives from its own freeze reports.
+func (s *search) cellAvoided(p Point) bool {
+	if len(s.avoid) == 0 {
+		return false
+	}
+	center := CellToWorldCenter(p)
+	for _, area := range s.avoid {
+		if math.Hypot(center.X-area.Center.X, center.Y-area.Center.Y) <=
+			area.Radius {
+			return true
+		}
+	}
+
+	return false
+}
+
+// legAllowed reports whether the straight leg between two nodes stays
+// outside every avoid area: the direct line shortcut and the smoothing
+// may only collapse legs the ban does not cross, otherwise the shortcut
+// hands the walker back the very corridor the re-plan meant to detour.
+func (s *search) legAllowed(from, to *node) bool {
+	if len(s.avoid) == 0 {
+		return true
+	}
+	for _, step := range s.straightPath(from, to) {
+		if s.cellAvoided(step.coords) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // sign returns the sign of an integer difference.

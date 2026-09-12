@@ -294,6 +294,37 @@ func (e *Engine) FindPathApproachDry(
 	return search.run(start, end, approachRadius)
 }
 
+// AvoidArea names one world patch the recovery searches route around:
+// a circle over the ground the live server refused to walk although
+// the geodata pack modeled it as open. The hunt loop derives the
+// patches from its freeze reports (the aimed waypoint of a leg whose
+// re-path produced no movement at all) and keeps them for the session,
+// so every later plan detours around the frozen corridor instead of
+// re-planning the identical deterministic route into it.
+type AvoidArea struct {
+	Center Vec3
+	Radius float64
+}
+
+// FindPathApproachDryAvoiding is FindPathApproachDry with the avoid
+// areas of the caller: the search treats every cell inside an area as
+// impassable, the direct line shortcut refuses lines crossing one and
+// the smoothing keeps its collapsed legs outside them, so the returned
+// route detours around the banned ground. The start cell itself stays
+// allowed wherever it sits - the walker standing inside a patch must
+// be able to plan its way OUT of it. A route that only exists through
+// the banned ground answers Found=false.
+func (e *Engine) FindPathApproachDryAvoiding(
+	start, end Vec3, approachRadius float64, maxPassableHeight uint16,
+	avoid []AvoidArea,
+) (*Result, error) {
+	search := newSearch(e, maxPassableHeight)
+	search.dry = true
+	search.avoid = avoid
+
+	return search.run(start, end, approachRadius)
+}
+
 // FindWaterEscape plans the way out of the water for a position whose
 // geodata surface lies below the C1 water level: the walk to the
 // nearest shore cell standing above the water surface. The hunt loop

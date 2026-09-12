@@ -143,3 +143,104 @@ func TestElleniaPocketLinesRefuseTheHallClick(t *testing.T) {
 		64.0,
 		"the hall click from the aisle must collapse onto the first step east")
 }
+
+// The frozen corridor ban of the hunt loop recovery (the 2026-09-12
+// trainer hall aisle freeze): the session records the aimed waypoint
+// of a leg whose re-path produced no movement at all, and every later
+// dry search routes around the banned patch - the deterministic
+// planner must never reproduce the identical frozen corridor.
+
+// TestAvoidingSearchDetoursAroundTheFrozenAisle pins the ban itself:
+// the dry approach search from the aisle entrance to Ellenia normally
+// walks the west aisle column (the dump plan); with the aisle column
+// banned, the same search detours around the building - north over
+// the terrace, east past the hall, into the approach ring from the
+// east. The detour stays dry, ends inside the approach ring and every
+// one of its legs survives the server click validation in full (the
+// follower only clicks verified lines).
+func TestAvoidingSearchDetoursAroundTheFrozenAisle(t *testing.T) {
+	engine := townTestEngine(t)
+
+	ban := []AvoidArea{{
+		Center: Vec3{X: 44728, Y: 52040, Z: -2792},
+		Radius: 48.0,
+	}}
+	result, err := engine.FindPathApproachDryAvoiding(
+		elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight, ban)
+	require.NoError(t, err)
+	require.True(t, result.Found,
+		"the banned aisle must leave the around-the-building route")
+
+	// The detour never enters the banned corridor: every waypoint
+	// stays on or outside the ban circle (the start cell of the search
+	// may sit exactly on the boundary - the walker standing inside its
+	// own patch must be able to plan the way out).
+	for i, wp := range result.Waypoints {
+		require.GreaterOrEqual(t, math.Hypot(wp.X-ban[0].Center.X, wp.Y-ban[0].Center.Y),
+			ban[0].Radius,
+			"waypoint %d of the detour must stay outside the banned aisle", i)
+	}
+	// The detour ends inside the approach ring of the teacher.
+	last := result.Waypoints[len(result.Waypoints)-1]
+	require.LessOrEqual(t, dist3D(last, elleniaSpawn), 200.0,
+		"the detour must end inside the Ellenia approach ring")
+	// Every leg of the detour validates in full: the follower clicks
+	// only lines the ported server rules accept completely (the
+	// degenerate zero length legs of the duplicated plan start are
+	// skipped by the follower cursor, they never become clicks).
+	for i := 1; i < len(result.Waypoints); i++ {
+		from := result.Waypoints[i-1]
+		to := result.Waypoints[i]
+		if math.Hypot(to.X-from.X, to.Y-from.Y) < 1 {
+			continue
+		}
+		validated, ok := engine.ValidateClick(from, to)
+		require.True(t, ok,
+			"the detour leg %d must survive the server validation", i)
+		require.InDelta(t, to.X, validated.X, 1.0,
+			"the detour leg %d must validate in full (no partial collapse)", i)
+		require.InDelta(t, to.Y, validated.Y, 1.0,
+			"the detour leg %d must validate in full (no partial collapse)", i)
+	}
+}
+
+// TestAvoidingSearchStillAnswersTheUnbannedRoute pins the empty ban:
+// no avoid areas keep the ordinary dry search untouched (the aisle
+// route of the dump plan stays the answer).
+func TestAvoidingSearchStillAnswersTheUnbannedRoute(t *testing.T) {
+	engine := townTestEngine(t)
+
+	plain, err := engine.FindPathApproachDry(
+		elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight)
+	require.NoError(t, err)
+	require.True(t, plain.Found)
+
+	avoiding, err := engine.FindPathApproachDryAvoiding(
+		elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight, nil)
+	require.NoError(t, err)
+	require.True(t, avoiding.Found)
+	require.Len(t, avoiding.Waypoints, len(plain.Waypoints),
+		"the empty ban must not change the planned route")
+	for i := range plain.Waypoints {
+		require.InDelta(t, plain.Waypoints[i].X, avoiding.Waypoints[i].X, 1.0)
+		require.InDelta(t, plain.Waypoints[i].Y, avoiding.Waypoints[i].Y, 1.0)
+	}
+}
+
+// TestAvoidingSearchRefusesGoalsInsideTheBan pins the boundary: a
+// goal that only exists inside the banned ground answers not found -
+// the caller falls back to its next recovery rung instead of walking
+// a route through the corridor the server refused.
+func TestAvoidingSearchRefusesGoalsInsideTheBan(t *testing.T) {
+	engine := townTestEngine(t)
+
+	ban := []AvoidArea{{
+		Center: Vec3{X: 44728, Y: 52040, Z: -2792},
+		Radius: 400.0,
+	}}
+	result, err := engine.FindPathApproachDryAvoiding(
+		elleniaApproaches[0].pos, elleniaSpawn, 150, DefaultMaxPassableHeight, ban)
+	require.NoError(t, err)
+	require.False(t, result.Found,
+		"a goal sealed inside the ban must answer not found")
+}
