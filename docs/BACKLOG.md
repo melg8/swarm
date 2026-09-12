@@ -317,3 +317,26 @@ resume: done 08:15 UTC - the parser, the state journal and the
   quests, 0 quest items" at world entry). The web UI quest widget
   (the snapshot section) stays a separate round when a consumer
   needs it.
+
+### T-012: the html dialog link parser
+
+status: in_progress
+milestone: M2
+priority: P2
+deps: T-004
+scope: internal/swarm/packets/from_game_server/, docs/
+
+Follow-up 1b of docs/quest_protocol.md: extract the bypass links
+of a server dialog page (the command each <a action="bypass ...">
+carries plus its visible text) as a pure parser next to the
+NpcHTMLMessage packet, mirroring the server side extraction of
+HtmlUtil.buildHtmlBypassCache (the case-insensitive "=\"bypass "
+match, the -h prefix strip, the trim). The dialog walker of T-008
+(the teleport buttons) and the quest dialog walker of the M2 round
+both consume it; the parse result also seeds the client side
+mirror of the html action cache (send only what the open page
+offered).
+
+claimed: agent-quest 2026-09-12 08:15 UTC
+resume: fresh claim; the real quest/master/trainer pages of the
+  research round are the golden test inputs.
