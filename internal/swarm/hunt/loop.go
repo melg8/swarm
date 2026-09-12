@@ -632,6 +632,7 @@ type Loop struct {
 	// leash square of the active spot.
 	zones        []HuntingZone
 	spot         *spotHunter
+	zoneRegion   string
 	zonePickedID string
 	zoneOverride int
 	zoneCheckAt  time.Time

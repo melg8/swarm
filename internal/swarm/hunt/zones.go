@@ -85,6 +85,11 @@ type HuntingZone struct {
 // regionElven is the region key of the elven lands zone registry.
 const regionElven = "elven"
 
+// regionDion is the region key of the Dion band (the 20-25 band of
+// the M3 survey). The hunt loop selects the Dion gear catalog (the
+// gear.DionCatalog of T-010) when the zone region is Dion.
+const regionDion = "dion"
+
 // zoneLevelLead is the level lead the character must hold over the
 // top mob of a band before the picker opens it: the fights stay
 // winnable when the hunted mobs sit 1-2 levels below the character
@@ -317,9 +322,17 @@ func (l *Loop) SetHuntingZones(zones []HuntingZone) {
 // the spot anchored registry of the redesign (the square zones stay
 // available through SetHuntingZones for the legacy setups).
 func (l *Loop) SetHuntingZoneRegion(region string) {
+	l.zoneRegion = region
 	switch region {
 	case regionElven, "":
 		l.SetHuntingSpotRegion(regionElven)
+	case regionDion:
+		// The Dion zone registry is T-009 (gated on M1 green); the
+		// gear catalog of the Dion merchants ships through
+		// shopCatalogForRegion until the registry lands.
+		l.logf("Hunt: the Dion zone registry is pending (T-009), " +
+			"hunting without zones; the Dion gear catalog is " +
+			"selected for the shopping trips")
 	default:
 		l.logf("Hunt: no zone registry for region %q, hunting "+
 			"without zones", region)

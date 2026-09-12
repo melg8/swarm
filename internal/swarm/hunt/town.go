@@ -231,6 +231,21 @@ var townMerchants = []townNpc{
 	{TemplateID: 7150, Name: "Herbiel", X: 42766, Y: 50037, Z: -2984},
 }
 
+// dionMerchants are the shop merchants of the Town of Dion the 20-25
+// band shopping trip targets, from docs/band_20_25_survey.md. The
+// coordinates are the spawn positions of spawns/Dion/DionNPCs.xml;
+// TemplateID is the CT0-to-C4 display id (the npcdata.npcBuyLists map
+// resolves their buylists). The elven village merchants stay the
+// default of the 1-19 band; the hunt loop switches to the Dion
+// merchants when the active zone region is Dion (see
+// shopCatalogForRegion).
+var dionMerchants = []townNpc{
+	{TemplateID: 7060, Name: "Sabrin", X: 17999, Y: 144484, Z: -3048},
+	{TemplateID: 7061, Name: "Casey", X: 17948, Y: 144560, Z: -3048},
+	{TemplateID: 7062, Name: "Sonia", X: 19313, Y: 146229, Z: -3048},
+	{TemplateID: 7063, Name: "Lara", X: 19223, Y: 146228, Z: -3048},
+}
+
 // Navigator plans walkable paths through the world geodata. The
 // pathfind engine is wrapped into one through NewNavigator; tests fake
 // the interface.

@@ -75,6 +75,11 @@ const (
 	// merchants (baseTax 15 percent, no castle owns their tax on a
 	// fresh server). A future region config carries its own rate.
 	townTaxRate = 0.15
+	// dionTownTaxRate is the buy tax markup of the Town of Dion
+	// merchants (MerchantPriceConfig.xml priceConfig id=8 baseTax=20,
+	// no castle owns their tax on the local test server). The 20-25
+	// band shopping trip pays it.
+	dionTownTaxRate = 0.20
 )
 
 // tripStop is one merchant visit of a town trip: the merchant to
@@ -89,11 +94,51 @@ type tripStop struct {
 	teach    bool
 }
 
-// townShopCatalog is the static gear catalog of the town merchants,
-// built once from the generated buylist data: the town trip trigger
-// consults it on every hunt tick, so the per tick catalog build of
-// the shops slice was pure allocation churn.
+// townShopCatalog is the static gear catalog of the elven village town
+// merchants, built once from the generated buylist data: the town
+// trip trigger consults it on every hunt tick, so the per tick catalog
+// build of the shops slice was pure allocation churn.
 var townShopCatalog = shopCatalog(townMerchants)
+
+// dionShopCatalog is the static gear catalog of the Dion town merchants
+// (the 20-25 band), built once like the elven catalog. The hunt loop
+// selects it through shopCatalogForRegion when the active zone region
+// is Dion (see SetHuntingZoneRegion).
+var dionShopCatalog = dionShopCatalogBuild(dionMerchants)
+
+// dionShopCatalogBuild builds the gear catalog of the Dion merchants
+// at the 20 percent Dion buy tax (MerchantPriceConfig.xml priceConfig
+// id=8 baseTax=20). The tax rate differs from the elven 15 percent,
+// so the Dion catalog has its own builder.
+func dionShopCatalogBuild(merchants []townNpc) gear.Catalog {
+	shops := make([]gear.Shop, 0, len(merchants))
+	for _, merchant := range merchants {
+		lists := npcdata.BuyListsOfNPC(merchant.TemplateID)
+		if len(lists) == 0 {
+			continue
+		}
+		shops = append(shops, gear.Shop{
+			MerchantTemplateID: merchant.TemplateID,
+			TaxRate:            dionTownTaxRate,
+			Lists:              lists,
+		})
+	}
+
+	return gear.Catalog{Shops: shops}
+}
+
+// shopCatalogForRegion returns the gear catalog of the town the hunt
+// loop farms near: the elven village catalog (the 1-19 band) is the
+// default; the Dion catalog (the 20-25 band) is selected when the
+// active zone region is Dion. The elven village behavior stays
+// unchanged (the M0 acceptance still passes).
+func shopCatalogForRegion(region string) gear.Catalog {
+	if region == regionDion {
+		return dionShopCatalog
+	}
+
+	return townShopCatalog
+}
 
 // shopCatalog builds the gear catalog of the town merchants from the
 // generated buylist data: every merchant of the trip targets sells
@@ -146,7 +191,8 @@ func (l *Loop) shoppingQueue() []gear.Purchase {
 	}
 
 	return gear.PlanPurchaseQueue(
-		l.equip.profile, l.equipment(), townShopCatalog, adena)
+		l.equip.profile, l.equipment(),
+		shopCatalogForRegion(l.zoneRegion), adena)
 }
 
 // pendingBookBudget prices the spellbooks the learning queue demands
@@ -929,7 +975,8 @@ func (l *Loop) advanceTripStop() {
 // and the known merchants must sell something (the generated
 // catalogs).
 func (l *Loop) shoppingTripEnabled() bool {
-	return l.equip != nil && len(townShopCatalog.Shops) > 0
+	return l.equip != nil &&
+		len(shopCatalogForRegion(l.zoneRegion).Shops) > 0
 }
 
 // emptyPurchase is the not-found sentinel of the weapon purchase
