@@ -282,7 +282,7 @@ spawn-true squares of the 20-25 band in the shape of zones_elven.go
 the survey doc is the acceptance reference).
 
 claimed: zones-zai 2026-09-12 09:24 UTC
-resume: done 10:00 UTC - zones_dion.go ships (75 spawn-true squares
+resume: done 09:35 UTC - zones_dion.go ships (75 spawn-true squares
   over 25 kept territories of the three Dion sources, 96% spawn mass
   coverage) with the --dion generator mode (the elven mode verified
   byte-identical), the five band windows at the D-grade dress gates
@@ -525,7 +525,7 @@ the Dion shop section. The elven village behavior stays unchanged
 
 ### T-018: the walking leg verification of the elven lands to Dion
 
-status: in_progress
+status: done
 milestone: M3
 priority: P3
 deps: -
@@ -544,8 +544,14 @@ transport plan; a found route becomes the cheap lesson leg of the
 band economy).
 
 claimed: zones-zai 2026-09-12 09:45 UTC
-resume: fresh claim. Next: the temporary cap patch, the route probe
-  test, the recorded findings, the revert.
+resume: done 09:50 UTC - both routes found (elven -> Gludio 111 852
+  units, 1.25M nodes, aborts at the shipped 1M cap; Gludio -> Dion
+  42 831 units, within the shipped cap). The teleport-only claim of
+  the survey refuted as a hard statement; the gatekeeper chain stays
+  the practical leg, the walk is the zero-adena fallback. The
+  findings live in band_20_25_survey.md, navigation_analysis.md and
+  the dev log round 73; the probe itself is not committed (the
+  recipe is in the log).
 
 claimed: soak-z 2026-09-12 09:17Z
 resume: done 2026-09-12 09:40Z. dionMerchants (town.go), dionShopCatalog

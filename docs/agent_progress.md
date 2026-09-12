@@ -2998,7 +2998,7 @@ the last row - the M2 gate stays the SelfClassID flip).
   the 13 species at their table levels, the sprout/cruma mob sets,
   the anchor walking distances, the picker ladder, the death cap.
   Full hunt suite green (97 s), lint --new 0 issues, pushed.
-- 10:00 UTC: the docs round - the hunting.md "The Dion 20-25 band
+- 09:35 UTC: the docs round - the hunting.md "The Dion 20-25 band
   registry" section, the dev log round 72, the BACKLOG close. Status:
   done - in-scope. The follow-ups for the next agents: the M1
   operator soak run (the 8h proof that gates the production band
@@ -3033,3 +3033,15 @@ the last row - the M2 gate stays the SelfClassID flip).
   the Rains class change and the SelfClassID + relogin gate. The
   gatekeeper hops (T-008 closed) join when the scenario moves its
   start to the elven village.
+
+### Progress (T-018)
+
+- 09:45 UTC: registered + claimed (BACKLOG T-018, the survey
+  follow-up 4 - the queue was empty, every task done or owned).
+- 09:50 UTC: the probe ran - both walking legs FOUND (elven ->
+  Gludio 111 852 units / 1.25M nodes / 13 s at the raised 40M cap,
+  aborts at the shipped 1M; Gludio -> Dion 42 831 units / 0.94M
+  nodes, within the shipped cap). The temporary patch and the probe
+  test reverted; the findings recorded in the survey doc, the
+  navigation analysis (two new route rows) and the dev log round
+  73. Status: done.

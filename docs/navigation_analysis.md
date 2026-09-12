@@ -17,6 +17,11 @@ Mobius C1 stack and its geodata pack (215 regions in
 
 - Connected geodata over the mainland: a route from Gludin to Aden town
   was found end to end (312 848 world units, 116 smoothed waypoints).
+- The elven lands connect to Gludio and Dion on foot (the T-018
+  verification of the band survey, 2026-09-12): the Neutral Zone
+  corridor routes exist end to end, so the survey band is reachable
+  walking too - the elven -> Gludio leg just exceeds the shipped
+  expansion cap by 25 percent (1.25M nodes).
 - Multi region search, multilayer cells (bridges, decks, interiors),
   line of sight, post smoothing, cell level visualization of the
   geodata on the map (`-pathfind-test`, the `geodata` overlay with the
@@ -33,6 +38,8 @@ cache to 16 (the shipped constants are 1M and 4):
 | Route | Result |
 |---|---|
 | Gludin → Aden town (land, half the world) | found: 312 848 units, 116 waypoints, **25.2M nodes expanded, 106 s** |
+| Elven village → Gludio town (the Neutral Zone corridor, T-018) | found: 111 852 units, 49 waypoints, 1.25M nodes, 13 s - **aborts at the shipped 1M cap** |
+| Gludio town → Dion town (T-018) | found: 42 831 units, 25 waypoints, 0.94M nodes, 9 s - within the shipped cap |
 | Obelisk of Victory (Talking Island) → Giran shop (across the sea) | found: 224 871 units, 87 waypoints, 6.1M nodes, 25 s |
 | Orc village → Elven village | **not found at all, 40M nodes, 3 min aborted** |
 | The same routes with the shipped cap (1M) | all three abort |

@@ -43,10 +43,19 @@ The one-way trip to the Execution Ground costs **13 600 adena**
 (9 200 + 3 400 + 1 000); the return (Dion -> Gludio 3 400, Gludio ->
 Elven Village 9 200) makes a lesson round trip ~25 200 adena - the
 lesson economy of the band must plan the SP buys and the book buys
-into the same trips. The walking alternative (Elven Village -> Dion
-on foot through the Neutral Zone and Gludio) is unverified: the
-geodata pack covers the corridor but no route was run; it stays an
-open item of the follow-up list below.
+into the same trips. The walking alternative is MEASURED (T-018,
+2026-09-12): the geodata pathfinder finds a walk route Elven Village
+-> Gludio town of 111 852 units (49 waypoints, 1.25M node
+expansions, 13 s with the raised 40M cap) and Gludio -> Dion of
+42 831 units (25 waypoints, 0.94M nodes - within the shipped 1M
+cap), so the corridor through the Neutral Zone exists end to end on
+foot. The economics keep the gatekeeper chain the practical leg
+(~154 700 units of pure running, over 14 minutes at the run speed,
+against the instant 13 600 adena hop); the walk is the zero-adena
+fallback of a broke character and the emergency return. The shipped
+expansion cap (1M) aborts the elven -> Gludio leg - the cap must
+become a search parameter (the navigation analysis roadmap item 1)
+before the walk leg is usable in the bot.
 
 ## The grounds
 
@@ -180,11 +189,13 @@ earlier trip).
    catalogs of the Dion merchants (buylists 3006000-3006300) wired
    into the gear planner with the band price brackets and the
    sell-first rules of the shop strategy.
-4. **The walking leg verification** (M3): run the geodata pathfinder
-   Elven Village -> Gludio -> Dion (the Neutral Zone corridor) with
-   the raised expansion cap of the navigation analysis and record
-   whether a walk route exists at all - the teleport-only assumption
-   of this survey stands on it.
+4. **The walking leg verification** (M3, done as T-018, 2026-09-12):
+   both routes found - Elven Village -> Gludio 111 852 units
+   (aborts at the shipped 1M cap, 1.25M nodes at the raised cap) and
+   Gludio -> Dion 42 831 units (within the shipped cap). The
+   teleport-only assumption is refuted as a hard claim; the
+   gatekeeper chain stays the practical leg, the walk is the
+   zero-adena fallback.
 5. **The lesson trip book routing** (M2/M3): the town trip planner
    learns the Dion book stop for the books the village does not sell
    (Cure Bleeding) - the shopping strategy owns the routing.

@@ -5139,3 +5139,51 @@ twice before passing - the honest record):
   walk vanished until the walker learned to pace its sends
   (dialogBypassPace, 3.2 s). The player action protector runs at
   1 s (the talk clicks were always fine).
+
+## Round 73: the walking leg verification of the elven lands to Dion (T-018, 2026-09-12)
+
+The open item the band survey stood on: the 20-25 band was reachable
+only through the gatekeeper chain (13 600 adena one way) because the
+walking alternative was never measured - the survey recorded it as
+"unverified: the geodata pack covers the corridor but no route was
+run".
+
+The verification ran as a throwaway probe (not committed, the
+T-018 scope: a temporary patch of MaxSearchExpansions to 40M, a
+temporary probe test in the pathfind package reusing the
+townTestEngine harness, the region cache raised to 16 - the exact
+recipe of the navigation analysis scale measurements):
+
+- Elven Village (Mirabel 46926 51511) -> Gludio town (-12694
+  122776): **found** - 111 852 units, 49 waypoints, 1 253 518 node
+  expansions, 13.0 s. At the SHIPPED 1M cap the same search aborts
+  (explored exactly 1 000 000) - the leg exceeds the shipped budget
+  by 25 percent.
+- Gludio town -> Dion town (15671 142994): **found** - 42 831
+  units, 25 waypoints, 939 096 expansions, 8.9 s, within the shipped
+  cap.
+- Both searches used FindPathApproach (radius 150, the town trip
+  form) over the in-repository geodata pack; the engine.go patch and
+  the probe test were reverted after the run (the committed tree
+  carries only the findings).
+
+The consequences recorded in the docs:
+
+- The teleport-only assumption of the survey is refuted as a hard
+  claim (docs/band_20_25_survey.md): the corridor through the
+  Neutral Zone exists on foot end to end. The gatekeeper chain
+  stays the practical leg (~154 700 units of running, over 14
+  minutes, against the instant 13 600 adena hop); the walk is the
+  zero-adena fallback of a broke character and the emergency
+  return.
+- The navigation analysis gains the two route rows
+  (docs/navigation_analysis.md): the "cap as a parameter" roadmap
+  item now has its concrete number - the elven -> Gludio leg needs
+  the cap raised above 1.25M before the bot can use it.
+
+Verification: the probe run itself (both legs found, the shipped-cap
+abort reproduced for leg 1), the revert verified by git status
+clean, the findings cross-recorded in the survey, the navigation
+analysis, this log and the agent progress notes. No committed code
+changed - go build and the pathfind package tests stay green by
+construction (the tree is byte-identical to the T-009 close).
