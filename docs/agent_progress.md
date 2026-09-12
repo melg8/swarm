@@ -2824,3 +2824,29 @@ tools/). The hunt wiring is the follow-up.
   follow-up list, dev log round 70). Not wired into the tick
   machine (the quest trip phase is the M2 acceptance round's work,
   after the Q00406 chain data task).
+
+## Active task: T-015 the class transfer quest chains as data
+
+Started: 2026-09-12 09:12 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. Agent label: quest-data-e3f8. Taken after T-014
+closed (the walker engine the data feeds).
+
+Goal: the Q00406/Q00407/ElfHumanFighterChange1 chains as Go data
+(new files in internal/swarm/hunt/): the npc chain, the cond
+progression, the kill grounds (mob ids, item ids, drop chances,
+the 20 piece counters), the dialog route steps (the link texts per
+stage) and the class change requirements.
+
+Constraints: new files only (T-008 still owns the live edits of
+loop.go and the gatekeeper files); every id, chance and counter
+cross-checked against the quest script Java sources and the
+datapack pages (rule 5 - no guessed server facts); unit tests pin
+the data.
+
+Acceptance: the data file + tests green, golangci-lint --new
+clean, the quest_protocol.md table cross-checked against the data
+(the doc is the research, the data is the executable form).
+
+### Progress
+
+- 09:12 UTC: claimed.

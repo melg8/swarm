@@ -417,7 +417,7 @@ resume: done 09:10 UTC - hunt/quest_walker.go (DriveDialog: the
 
 ### T-015: the class transfer quest chains as data
 
-status: todo
+status: in_progress
 milestone: M2
 priority: P2
 deps: T-014
@@ -438,8 +438,8 @@ rides along. Unit tests pin the data against the quest script
 sources (the npc ids, the item ids, the kill ids read from the
 Java); the hunt consumer is T-016.
 
-claimed: -
-resume: -
+claimed: quest-data-e3f8 2026-09-12 09:12 UTC
+resume: fresh claim.
 
 ### T-016: the class transfer acceptance scenario
 
