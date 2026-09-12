@@ -5412,3 +5412,76 @@ the build line first, and the single mode still renders. `go build`,
 below the ticker period; the report render test window widened to 10 s
 after a starvation flake on the 2-core sandbox with the L2J stack
 running).
+## Round 80: the stuck bot - the session silence watchdog and the stagnation recovery (2026-09-12)
+
+Problem: the owner reported (Russian) a bot standing in the world
+doing nothing ("бот застрял и ничего не делает") with a dump attached
+that did not survive the session handover. The reproduction audit of
+this round walked every known stuck class against the deployed stack
+(the hunt flow, the emergency logout cycle, the kill -9 mid-farm
+recovery, the game server restart recovery, the 5 bot fleet) - all
+green - and then examined the two architectural gaps the audit could
+not close:
+
+1. The game session read loop has NO receive deadline: the pings keep
+   "succeeding" into the OS socket buffer of a dead connection (the
+   host slept, the network black-holed, the server JVM froze), so the
+   read side blocks forever while the bot stands online doing
+   nothing. Nothing in the loop can notice - the tracker state stays
+   exactly as the last packet left it.
+2. The stagnation watch (round 64) DETECTS the livelock (no XP for
+   20 min, position held 10 min) but only logs: every livelock class
+   this project has met was cured by a relogin, yet the watch left
+   the actual cure to the human reading the log.
+
+Root causes: a missing read-side liveness bound in the session loop
+and a detector without a recovery path.
+
+Fix:
+
+- internal/swarm/connection: the session silence watchdog. The
+  server answers every RequestNetPing unconditionally
+  (RequestNetPing.runImpl), so a healthy connection delivers at
+  least one packet per ping period even in an empty world at night.
+  The runLoop now arms a gameSilenceTimeout (3 min, ~7 unanswered
+  pings) timer that every received packet re-arms; a session that
+  stays silent past it unwinds with "game session silent for 3m0s,
+  closing the connection (the server stopped answering while the
+  socket stayed writable)" and the supervisor reconnects with the
+  usual backoff. The var (not a const) is a test seam.
+- internal/swarm/hunt: the stagnation recovery escalation. The
+  position stall (10 min on the exact same cell) first clears the
+  frozen loop state in place (the soft reset: the target drops onto
+  the skip list, the pending loot, the blind recovery, the panic and
+  flee episodes and a trip caught mid freeze all restart from the
+  live world state, a sitting character stands up, the zone return
+  budget re-arms) - the next tick re-runs its phase from scratch. A
+  stall that survives it (the second window) or a full experience
+  window without progress (20 min - the stronger signal, a pacing
+  loop can move the cell without farming) rebuilds the session
+  through the emergency logout (the hard reset): the relogin
+  constructs a fresh loop, resets the server side session state and
+  clears every per-session structure a livelock can hide in. The
+  emergencyLogout split into emergencyLogoutWithReason so the
+  stagnation path logs its honest reason instead of the HP panic
+  wording. The hard reset is paced by stagnationHardCooldown
+  (15 min) so a loop that keeps livelocking retries one rebuild per
+  window instead of thrashing reconnects; the delevel phase is
+  exempt (its own timeout and death cycle own it); the fire counters
+  reset on movement and experience changes so a self-recovered loop
+  never inherits the escalation.
+
+Verification: the full suite green (the stagnation recovery suite
+now 14 tests: the soft reset state clearing, the hard rebuild with
+the honest reason line, the cooldown hold, the movement reset, the
+delevel exemption; the connection suite gained the wedged-server
+case and the quiet-traffic-stays-alive case), `go build`, `go vet`,
+`golangci-lint run --new` 0 issues. Live against the deployed stack:
+a 5 min hunt run and a 4 min 5 bot fleet run with zero false
+positive watchdog events, and the wedged server E2E - SIGSTOP on the
+game server JVM mid farm (the sockets stay open, the ping writes
+keep succeeding, no packet arrives) - fired the watchdog at exactly
+3 min, unwound the session, and after SIGCONT the bot relogged and
+resumed farming within 30 s. The old behavior on the same scenario:
+the bot blocks on the read forever - precisely the reported "stuck
+and does nothing".

@@ -33,6 +33,20 @@ const (
 	bufferInitialSize = 4096
 )
 
+// gameSilenceTimeout bounds the absolute packet silence of a live
+// game session. The server answers every RequestNetPing with a
+// NetPing broadcast (RequestNetPing.runImpl sends it unconditionally,
+// ~gamePingPeriod apart), so a healthy connection never goes quiet
+// for minutes even in an empty world at night. A socket that
+// delivers nothing while the ping writes keep "succeeding" is a
+// half-open connection (the host slept, the network black-holed, the
+// server JVM froze): the write side sinks the pings into the OS
+// buffer for a long time, the read side blocks forever and the bot
+// stands in the world doing nothing - exactly the frozen session the
+// 24/7 runs must not tolerate. The var (not a const) is a test seam:
+// the unit tests shorten it to keep the silence case under a second.
+var gameSilenceTimeout = 3 * time.Minute
+
 // Character selection constants. The server drops a CharacterSelect
 // silently when it races the creation flow: the updated char list is
 // written before the server side char selection cache is updated, so a
@@ -1042,13 +1056,20 @@ func (gc *GameClient) run(ctx context.Context, characterName string) error {
 	return err
 }
 
-// runLoop is the main receive loop of the in game session.
+// runLoop is the main receive loop of the in game session. The
+// silence watchdog bounds the packet gaps: every received packet
+// re-arms the timer, and a session that stays silent past
+// gameSilenceTimeout unwinds with an error so the supervisor
+// reconnects instead of blocking on a dead socket forever (see
+// gameSilenceTimeout).
 func (gc *GameClient) runLoop(
 	ctx context.Context,
 	packets <-chan gamePacket,
 	pingTicker *time.Ticker,
 	characterName string,
 ) error {
+	silence := time.NewTimer(gameSilenceTimeout)
+	defer silence.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -1059,6 +1080,10 @@ func (gc *GameClient) runLoop(
 			if err := gc.sendPacket(&togameserver.RequestNetPing{}); err != nil {
 				return fmt.Errorf("failed to send net ping: %w", err)
 			}
+		case <-silence.C:
+			return fmt.Errorf("game session silent for %s, closing the "+
+				"connection (the server stopped answering while the "+
+				"socket stayed writable)", gameSilenceTimeout)
 		case msg, ok := <-packets:
 			if !ok {
 				return nil
@@ -1068,6 +1093,7 @@ func (gc *GameClient) runLoop(
 			}
 			gc.handleServerPacket(msg.payload)
 			bufferPool.Put(msg.buf)
+			silence.Reset(gameSilenceTimeout)
 		}
 	}
 }

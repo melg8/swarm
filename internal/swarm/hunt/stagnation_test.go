@@ -234,3 +234,138 @@ func TestStagnationStallsSurfaceInDiagnostics(t *testing.T) {
 	require.Zero(t, report.XpStallForMs)
 	require.Zero(t, report.PositionStallForMs)
 }
+
+// TestStagnationXPStallRebuildsSession: a full experience window
+// without progress drives the hard recovery - the emergency logout
+// with the honest stagnation reason, the login cooldown that paces
+// the supervisor reconnect and the quiet logoutDone tick gate.
+func TestStagnationXPStallRebuildsSession(t *testing.T) {
+	bot := stagnationBot()
+	game := &fakeGame{}
+	loop, sink := newStagnationLoop(bot, game)
+	armStagnationXP(loop, bot)
+
+	loop.observeStagnation(time.Now())
+	require.Equal(t, 1, game.logouts, "the xp stall rebuilds the session")
+	require.True(t, loop.logoutDone)
+	require.Positive(t, bot.LoginCooldownRemaining())
+	require.Contains(t, sink.String(), "rebuilding the session")
+	require.Contains(t, sink.String(), "no experience change for 21m0s")
+}
+
+// TestStagnationHardCooldownHoldsSecondRebuild: a stall that fires
+// again inside the cooldown window stays at one logout (the rebuild
+// either fixed the loop or the next window retries), while a stall
+// past the cooldown rebuilds again.
+func TestStagnationHardCooldownHoldsSecondRebuild(t *testing.T) {
+	bot := stagnationBot()
+	game := &fakeGame{}
+	loop, _ := newStagnationLoop(bot, game)
+	now := time.Now()
+	armStagnationXP(loop, bot)
+
+	loop.observeStagnation(now)
+	require.Equal(t, 1, game.logouts)
+
+	// A logout request that failed to unwind the session (the socket
+	// stayed open): the next fire lands inside the cooldown window and
+	// must not thrash a second reconnect into the dying session. The
+	// logoutDone gate already holds a healthy unwind; this models the
+	// failed-request path where it does not.
+	loop.logoutDone = false
+	armStagnationXP(loop, bot)
+	loop.observeStagnation(now.Add(time.Minute))
+	require.Equal(t, 1, game.logouts, "the cooldown holds the rebuild")
+
+	// Past the cooldown the rebuild retries.
+	loop.logoutDone = false
+	armStagnationXP(loop, bot)
+	loop.observeStagnation(now.Add(stagnationHardCooldown + time.Minute))
+	require.Equal(t, 2, game.logouts, "the rebuild retries past the cooldown")
+}
+
+// TestStagnationPositionFirstFireSoftResets: the first position
+// stall clears the frozen loop state in place - the engage target
+// drops onto the skip list, a trip caught mid freeze restarts from
+// the engage phase, the blind recovery and the panic state clear -
+// and the session stays (no logout fires).
+func TestStagnationPositionFirstFireSoftResets(t *testing.T) {
+	bot := stagnationBot()
+	game := &fakeGame{}
+	loop, sink := newStagnationLoop(bot, game)
+	loop.target = 1234
+	loop.phase = phaseTownWalk
+	armStagnationPosition(loop, bot)
+
+	loop.observeStagnation(time.Now())
+	require.Zero(t, game.logouts, "the soft reset keeps the session")
+	require.Zero(t, loop.target, "the frozen target drops")
+	require.True(t, loop.targetSkipped(1234, time.Now()),
+		"the dropped target stays skipped for the re-pick")
+	require.Equal(t, phaseEngage, loop.phase, "the trip restarts from engage")
+	require.Contains(t, sink.String(), "clearing the loop state")
+}
+
+// TestStagnationPositionSecondFireRebuildsSession: a freeze that
+// survives the soft reset climbs to the session rebuild.
+func TestStagnationPositionSecondFireRebuildsSession(t *testing.T) {
+	bot := stagnationBot()
+	game := &fakeGame{}
+	loop, _ := newStagnationLoop(bot, game)
+	armStagnationPosition(loop, bot)
+
+	// First fire: the soft reset.
+	loop.observeStagnation(time.Now())
+	require.Zero(t, game.logouts)
+
+	// Second fire without any movement between: the hard reset.
+	armStagnationPosition(loop, bot)
+	loop.observeStagnation(time.Now())
+	require.Equal(t, 1, game.logouts, "the surviving freeze rebuilds")
+	require.True(t, loop.logoutDone)
+}
+
+// TestStagnationMovementResetsEscalation: a character that moves
+// after the soft reset clears the fire counter, so the next freeze
+// starts from the soft recovery again instead of jumping straight
+// to the rebuild.
+func TestStagnationMovementResetsEscalation(t *testing.T) {
+	bot := stagnationBot()
+	game := &fakeGame{}
+	loop, _ := newStagnationLoop(bot, game)
+	armStagnationPosition(loop, bot)
+
+	loop.observeStagnation(time.Now())
+	require.Zero(t, game.logouts)
+	require.Equal(t, 1, loop.stagPosFires)
+
+	// The soft reset worked: the character moved again.
+	bot.ApplyMovement(state.Movement{
+		ObjectID: 100, X: 45100, Y: 50100, Z: -3500,
+		DestX: 45100, DestY: 50100, DestZ: -3500,
+	})
+	loop.observeStagnation(time.Now())
+	require.Zero(t, loop.stagPosFires, "the movement resets the escalation")
+
+	// The next freeze starts over at the soft reset.
+	armStagnationPosition(loop, bot)
+	loop.observeStagnation(time.Now())
+	require.Zero(t, game.logouts)
+}
+
+// TestStagnationDelevelExemptFromRecovery: the deleveling owns its
+// lifecycle (its own timeout, its deaths refresh the experience),
+// so neither the soft reset nor the session rebuild fires for it.
+func TestStagnationDelevelExemptFromRecovery(t *testing.T) {
+	bot := stagnationBot()
+	game := &fakeGame{}
+	loop, sink := newStagnationLoop(bot, game)
+	loop.phase = phaseDelevel
+	armStagnationXP(loop, bot)
+	armStagnationPosition(loop, bot)
+
+	loop.observeStagnation(time.Now())
+	require.Zero(t, game.logouts, "the delevel phase rebuilds nothing")
+	require.Contains(t, sink.String(),
+		"the delevel phase owns its own recovery")
+}

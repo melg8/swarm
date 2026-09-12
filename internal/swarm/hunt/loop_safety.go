@@ -244,15 +244,25 @@ func (l *Loop) panicAnchorDistance() float64 {
 // holds an offline character in the world (fifteen seconds), then
 // the session logs out and the supervisor reconnects after the
 // armed login cooldown - the aggro resets on the disappearance,
-// the mobs left behind walk home, and the character regenerates
-// sitting.
+// the mobs walk home, and the character regenerates sitting.
 func (l *Loop) emergencyLogout() {
-	l.logoutDone = true
 	reason := fmt.Sprintf("HP %.0f%% under attack",
 		l.tracker.SelfHealthPercent())
 	if count := l.tracker.SelfAttackerCount(); count >= panicLogoutAttackers {
 		reason = fmt.Sprintf("%d mobs piled on us", count)
 	}
+	l.emergencyLogoutWithReason(reason)
+}
+
+// emergencyLogoutWithReason is the shared body of the emergency
+// logout: the reason line names what drove the session out, the
+// escape leg keeps the character moving through the logout combat
+// window and the login cooldown paces the supervisor reconnect.
+// The stagnation recovery calls it with its own honest reason (a
+// livelocked loop is as good a reason to rebuild the session as a
+// death risk - see stagnation.go).
+func (l *Loop) emergencyLogoutWithReason(reason string) {
+	l.logoutDone = true
 	l.logf("Hunt: %s, emergency logout for %s",
 		reason, panicLogoutPause)
 	if moveX, moveY, moveZ, ok := l.escapeWalkDestination(); ok {

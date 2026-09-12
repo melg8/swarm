@@ -463,14 +463,22 @@ type Loop struct {
 	// last stood elsewhere. A value that stops moving for its
 	// window logs the livelock line (the web UI event feed and
 	// the bot log both carry it, the state dump diagnostics show
-	// the stall ages).
-	stagXP     int32
-	stagXPAt   time.Time
-	stagPosX   int32
-	stagPosY   int32
-	stagPosZ   int32
-	stagPosSet bool
-	stagPosAt  time.Time
+	// the stall ages) and drives the recovery escalation: the
+	// fire counters climb while a window keeps re-firing and a
+	// movement or an experience change resets them, the soft
+	// reset clears the frozen loop state on the first position
+	// fire and the hard reset rebuilds the session through the
+	// emergency logout once the soft reset proved not enough.
+	stagXP       int32
+	stagXPAt     time.Time
+	stagPosX     int32
+	stagPosY     int32
+	stagPosZ     int32
+	stagPosSet   bool
+	stagPosAt    time.Time
+	stagPosFires int
+	stagXPFires  int
+	stagHardAt   time.Time
 	// avoidScratch is the reused threat buffer of the aggro-aware
 	// walk steering (see loop_avoid.go): the scan refills it in
 	// place, so the per leg danger pass costs no allocation.
@@ -769,6 +777,9 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
 		stagPosZ:          0,
 		stagPosSet:        false,
 		stagPosAt:         time.Time{},
+		stagPosFires:      0,
+		stagXPFires:       0,
+		stagHardAt:        time.Time{},
 		zoneLegLogAt:      time.Time{},
 		shoppingViewCache: state.ShoppingPlanView{
 			Entries: nil,

@@ -686,7 +686,12 @@ network dependency; every dynamic text lands through `textContent`.
   waypoints left, the trip and flee episode ages, the buy retries,
   the stagnation stall ages `xpStallForMs` and `positionStallForMs`
   - the time the experience and the exact standing cell have been
-  static, the livelock watch inputs of hunt/stagnation.go)
+  static, the livelock watch inputs of hunt/stagnation.go - whose
+  recovery escalation also drives the unsticking: the first
+  position stall clears the frozen loop state in place, a
+  surviving stall or the experience window rebuilds the session
+  through the emergency logout, so the dump `events` carries the
+  recovery lines next to the stall)
   plus the tracker owned `lastAction` with its age and the
   `tickAgoMs` loop heartbeat (a growing value means the loop
   goroutine stopped ticking while the session stays online). The

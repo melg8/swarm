@@ -3399,5 +3399,57 @@ nothing (no clipboard content) and logs/ holds one session file of
   shutdown record.
 - go build, go vet, golangci-lint run --new: 0 issues; the full
   suite green.
+## Active task: the stuck bot - silence watchdog + stagnation recovery (owner-direct)
+
+Started: 2026-09-12 20:37 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. The owner reported (Russian) a bot stuck doing
+nothing with an attached dump (the file did not survive the session
+handover - the upload directory was empty on arrival), asked to find
+the cause and fix it.
+
+### Investigation
+
+- Environment deployed fresh (STACK_READY, 75 tables) per the
+  mandatory first step; the branch pulled (in sync at c759f9e).
+- Reproduction sweep, all green: 13+ min single hunt (kills, rest
+  cycles, town trip, gear buys, lessons), 9 min five bot fleet
+  (emergency logout cycles, relogins), kill -9 mid farm (relogin
+  resumes), game server restart mid farm (backoff + relogin).
+- Audit of every wait path: engage (stuck timeout, blind recovery,
+  chase progress), flee/panic (budgets + logout), town trips
+  (20 min timeout, re-path budget), lessons (windows + retries),
+  delevel (60 min bound), spot economy (emptiness switches),
+  supervisor (backoff + cooldown honoring).
+- Two architectural gaps found: the game session read loop has no
+  receive deadline (a half-open/wedged connection blocks forever -
+  pings keep "succeeding" into the OS buffer while no packet ever
+  arrives), and the stagnation watch only logs (round 64), never
+  recovers.
+
+### Result
+
+- connection: the session silence watchdog - gameSilenceTimeout
+  (3 min, test seam var) re-armed by every received packet; a silent
+  session unwinds with an honest error and the supervisor
+  reconnects.
+- hunt: the stagnation recovery escalation - the first position
+  stall soft-resets the loop state in place (target + skip, loot,
+  blind recovery, panic/flee, trip restart, stand up, return
+  re-arm), the surviving stall or the XP window (20 min) rebuilds
+  the session through emergencyLogoutWithReason ("stagnation ...,
+  rebuilding the session"); paced by stagnationHardCooldown (15
+  min); the delevel phase exempt; fire counters reset on progress.
+- emergencyLogout split into emergencyLogoutWithReason for the
+  honest reason line.
+
+### Verification
+
+- go build, go vet, golangci-lint run --new: 0 issues.
+- Full suite green (stagnation 14 tests, connection wedged-server +
+  quiet-traffic tests new).
+- Live: 5 min hunt + 4 min fleet with zero false positives; the
+  wedged-server E2E (SIGSTOP the game JVM mid farm) fired the
+  watchdog at exactly 3 min, unwound, and relogged + resumed
+  farming after SIGCONT (dev log round 80).
 
 Status: done (2026-09-12).

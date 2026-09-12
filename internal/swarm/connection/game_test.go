@@ -477,3 +477,158 @@ func TestGameClientTracksWorldState(t *testing.T) {
 	require.NotEmpty(t, snapshot.Events)
 	require.GreaterOrEqual(t, snapshot.Packets, int64(6))
 }
+
+// TestGameClientSessionSilenceWatchdog pins the half-open connection
+// class: a server that stops sending packets while the socket stays
+// writable (the host slept, the network black-holed, the server JVM
+// froze) must end the session through the silence watchdog instead
+// of blocking the read loop forever - the pings keep "succeeding"
+// into the OS buffer, so only the receive side can notice. The
+// shortened gameSilenceTimeout keeps the case under a second.
+func TestGameClientSessionSilenceWatchdog(t *testing.T) {
+	productionSilence := gameSilenceTimeout
+	gameSilenceTimeout = 150 * time.Millisecond
+	t.Cleanup(func() { gameSilenceTimeout = productionSilence })
+
+	server := startFakeGameServer(t)
+	server.flow = func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt) {
+		s.characterFlow(conn, cipher)
+
+		var selected []byte
+		selected = append(selected, 0x21)
+		selected = append(selected, utf16Bytes("test1")...)
+		selected = binary.LittleEndian.AppendUint32(selected, 100)
+		selected = append(selected, utf16Bytes("")...)
+		selected = binary.LittleEndian.AppendUint32(selected, 42)
+		for range 5 {
+			selected = binary.LittleEndian.AppendUint32(selected, 0)
+		}
+		selected = binary.LittleEndian.AppendUint32(selected, 1) // active
+		selected = binary.LittleEndian.AppendUint32(selected, 45000)
+		selected = binary.LittleEndian.AppendUint32(selected, 50000)
+		selected = binary.LittleEndian.AppendUint32(selected, 0xFFFFF268)
+		selected = binary.LittleEndian.AppendUint64(selected, 50) // cur hp
+		selected = binary.LittleEndian.AppendUint64(selected, 30) // cur mp
+		s.writeEncrypted(conn, cipher, selected)
+
+		payload := s.readEncrypted(conn, cipher)
+		require.Equal(s.t, byte(0x03), payload[0])
+
+		// The wedged server: the socket stays open and writable, no
+		// packet ever arrives again.
+		time.Sleep(2 * time.Second)
+	}
+
+	conn, err := net.Dial("tcp", server.Addr())
+	require.NoError(t, err)
+
+	client, err := NewGameClient(conn)
+	require.NoError(t, err)
+
+	charList, err := client.Authenticate(GameSessionParams{
+		Account:    "test1",
+		LoginOkID1: 1,
+		LoginOkID2: 2,
+		PlayOkID1:  3,
+		PlayOkID2:  4,
+	})
+	require.NoError(t, err)
+
+	updated, err := client.EnsureCharacter(CharacterParams{
+		Name:      "test1",
+		Race:      1,
+		Female:    0,
+		ClassID:   18,
+		HairStyle: 0,
+		HairColor: 0,
+		Face:      0,
+	}, charList)
+	require.NoError(t, err)
+	slot, _, found := updated.FindCharacterByName("test1")
+	require.True(t, found)
+	require.NoError(t, client.EnterWorld(int32(slot)))
+
+	err = client.Run(context.Background(), "test1")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "game session silent")
+}
+
+// TestGameClientSessionSilenceWatchdogKeepsQuietTrafficAlive: the
+// watchdog re-arms on every received packet, so a healthy session
+// whose only traffic is the ping answers runs past many silence
+// windows without unwinding.
+func TestGameClientSessionSilenceWatchdogKeepsQuietTrafficAlive(t *testing.T) {
+	productionSilence := gameSilenceTimeout
+	gameSilenceTimeout = 150 * time.Millisecond
+	t.Cleanup(func() { gameSilenceTimeout = productionSilence })
+
+	server := startFakeGameServer(t)
+	server.flow = func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt) {
+		s.characterFlow(conn, cipher)
+
+		var selected []byte
+		selected = append(selected, 0x21)
+		selected = append(selected, utf16Bytes("test1")...)
+		selected = binary.LittleEndian.AppendUint32(selected, 100)
+		selected = append(selected, utf16Bytes("")...)
+		selected = binary.LittleEndian.AppendUint32(selected, 42)
+		for range 5 {
+			selected = binary.LittleEndian.AppendUint32(selected, 0)
+		}
+		selected = binary.LittleEndian.AppendUint32(selected, 1) // active
+		selected = binary.LittleEndian.AppendUint32(selected, 45000)
+		selected = binary.LittleEndian.AppendUint32(selected, 50000)
+		selected = binary.LittleEndian.AppendUint32(selected, 0xFFFFF268)
+		selected = binary.LittleEndian.AppendUint64(selected, 50) // cur hp
+		selected = binary.LittleEndian.AppendUint64(selected, 30) // cur mp
+		s.writeEncrypted(conn, cipher, selected)
+
+		payload := s.readEncrypted(conn, cipher)
+		require.Equal(s.t, byte(0x03), payload[0])
+
+		// A resting world: the server answers nothing but the pings,
+		// one answer per 100 ms (the client never sends anything else
+		// inside the short window - its own ping ticker is 25 s).
+		deadline := time.Now().Add(700 * time.Millisecond)
+		for time.Now().Before(deadline) {
+			s.writeEncrypted(conn, cipher,
+				append([]byte{0xEC}, 0x0A, 0x00, 0x00, 0x00))
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	conn, err := net.Dial("tcp", server.Addr())
+	require.NoError(t, err)
+
+	client, err := NewGameClient(conn)
+	require.NoError(t, err)
+
+	charList, err := client.Authenticate(GameSessionParams{
+		Account:    "test1",
+		LoginOkID1: 1,
+		LoginOkID2: 2,
+		PlayOkID1:  3,
+		PlayOkID2:  4,
+	})
+	require.NoError(t, err)
+
+	updated, err := client.EnsureCharacter(CharacterParams{
+		Name:      "test1",
+		Race:      1,
+		Female:    0,
+		ClassID:   18,
+		HairStyle: 0,
+		HairColor: 0,
+		Face:      0,
+	}, charList)
+	require.NoError(t, err)
+	slot, _, found := updated.FindCharacterByName("test1")
+	require.True(t, found)
+	require.NoError(t, client.EnterWorld(int32(slot)))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
+	defer cancel()
+
+	err = client.Run(ctx, "test1")
+	require.NoError(t, err, "the ping traffic keeps the session alive")
+}
