@@ -3299,3 +3299,42 @@ runs on the user machine without bothering the user.
   lines are gone.
 
 Status: done (2026-09-12).
+
+## Active task: the session dump fleet gap fix (owner-direct)
+
+Started: 2026-09-12 20:45 UTC. Branch: `feature/proxy-server`.
+The owner reported (Russian): clicking the session dump button does
+nothing (no clipboard content) and logs/ holds one session file of
+0 KB.
+
+### Result
+
+- Root cause of the dead button: the fleet mode never called
+  web.SetSessionJournal - the single mode did, the fleet mode only
+  opened the journal, so GET /api/bots/{id}/session-report did not
+  exist (404) and the button died in its silent catch. runFleet now
+  opens the journal before the web interface and registers it exactly
+  like the single mode (verified live: both fleet bots answer 200
+  with the full report).
+- Root cause of the 0 KB file class: the first record (the build
+  identity line) sat in the 64 KB bufio buffer until the first 2 s
+  ticker, so a process hard-killed inside that window left an empty
+  file. The flusher now flushes the first record at once (verified
+  live: the file is non-empty at ~100 ms with the build line first;
+  pinned by TestJournalFirstRecordFlush below the ticker period).
+- The button failures are visible now: console.error plus the report
+  endpoint opened in a new tab with the server answer, instead of a
+  red flash nobody registers as feedback.
+- Test hardening: TestSessionReportRenders window 5 s -> 10 s after a
+  starvation flake on the 2-core sandbox with the L2J stack running.
+
+### Verification
+
+- Reproduced both symptoms before the fix (fleet button 404, single
+  mode worked); after the fix the fleet repro answers HTTP 200 per
+  bot, the journal grows in both modes, graceful shutdown writes the
+  shutdown record.
+- go build, go vet, golangci-lint run --new: 0 issues; the full
+  suite green.
+
+Status: done (2026-09-12).

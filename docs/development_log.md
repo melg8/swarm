@@ -5364,3 +5364,51 @@ emission tests); two live -hunt runs wrote the journals (170-206
 lines per 2.5-3 minutes: story, kills with 12.5 s fights, samples,
 lifecycle marks, no duplicates) and the CLI rendered the full
 7-section report from the files.
+
+## Round 79: the session dump fleet gap and the zero byte journal (2026-09-12)
+
+Symptoms (owner report from the Windows host): clicking the session
+dump button did nothing - no clipboard content - and logs/ held one
+session file of 0 KB.
+
+Root causes:
+
+- The fleet mode never registered the session report endpoint: the
+  single mode called web.SetSessionJournal(journal) after
+  startWebInterface, the fleet mode opened the journal but skipped the
+  call entirely, so GET /api/bots/{id}/session-report answered 404
+  (the route did not exist) and the button died in its silent catch -
+  a red 2.5 s flash nobody registers as feedback.
+- A 0 KB journal file means the process died inside the first flush
+  period: the first record (the build identity line) sat in the 64 KB
+  bufio buffer and the ticker fires at 2 s, so a hard kill (a closed
+  console window, a task manager shot) inside that window left an
+  empty file that says nothing about the build that wrote it.
+- The button failure paths were invisible by design: an HTTP error
+  only flashed, with no console trace and no readable reason.
+
+Fix:
+
+- cmd/swarm: runFleet now opens the journal before the web interface
+  and calls web.SetSessionJournal(journal) exactly like the single
+  mode, so both modes expose the report endpoint.
+- session: the flusher flushes the very first record at once instead
+  of waiting for the first period tick - every journal file that
+  exists on disk carries its build identity line from the first
+  milliseconds, and an empty file can only mean a run that never got
+  past NewJournal.
+- web UI: the session dump button reports failures - console.error
+  plus the report endpoint opened in a new tab, so the server answer
+  (a 404 route, a 503 disabled journal, a 404 unknown bot) is
+  readable instead of a silent flash.
+
+Verification: reproduced both symptoms locally (the fleet button got
+404 with a growing journal, the single mode worked end to end); after
+the fix the fleet repro answers HTTP 200 with the full report for
+every bot of the fleet, the journal file is non-empty at ~100 ms with
+the build line first, and the single mode still renders. `go build`,
+`go vet`, `golangci-lint run --new` 0 issues; the full suite green
+(the new TestJournalFirstRecordFlush pins the immediate first flush
+below the ticker period; the report render test window widened to 10 s
+after a starvation flake on the 2-core sandbox with the L2J stack
+running).

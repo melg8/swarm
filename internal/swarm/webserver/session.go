@@ -20,8 +20,11 @@ import (
 // developer agent in one click, no file digging on the user side.
 
 // SetSessionJournal attaches the session journal and registers the
-// report endpoint. Call it before ListenAndServe; without a journal
-// the endpoint answers 503 (the -session-dir "" mode).
+// report endpoint. The single and the fleet modes of cmd/swarm both
+// call it right after startWebInterface (the ServeMux registration is
+// mutex guarded, so a request racing the call sees at worst a 404 in
+// the first microseconds); without a journal the endpoint answers 503
+// (the -session-dir "" mode).
 func (s *Server) SetSessionJournal(journal *session.Journal) {
 	s.journal = journal
 	mux := s.httpServer.Handler.(*http.ServeMux)

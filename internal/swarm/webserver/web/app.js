@@ -743,19 +743,26 @@ function flashDumpButton(button, kind) {
 // application start: the hourly curves, the kill and death statistics,
 // the money trail, the stalls, the story tail) and copies it to the
 // clipboard - the long-run analysis material an agent reads in one
-// click. The clipboard fallbacks mirror the dump state button.
+// click. The clipboard fallbacks mirror the dump state button, and an
+// HTTP failure never stays silent: the report endpoint opens in a new
+// tab so the server error (a missing journal, an unknown bot) is
+// readable instead of a red flash nobody notices.
 function initSessionButton() {
   const button = document.getElementById("hud-session");
   if (!button) { return; }
   button.addEventListener("click", async () => {
     if (!App.activeBotId) { flashDumpButton(button, "failed"); return; }
+    const url = "/api/bots/" + App.activeBotId + "/session-report";
     let text = null;
     try {
-      const response = await fetch("/api/bots/" + App.activeBotId +
-        "/session-report");
-      if (!response.ok) { throw new Error("report http " + response.status); }
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error("report http " + response.status);
+      }
       text = await response.text();
     } catch (err) {
+      console.error("session dump failed:", err);
+      window.open(url, "_blank");
       flashDumpButton(button, "failed");
       return;
     }
@@ -770,8 +777,7 @@ function initSessionButton() {
     if (legacyCopyText(text)) {
       flashDumpButton(button, "copied");
     } else {
-      window.open("/api/bots/" + App.activeBotId + "/session-report",
-        "_blank");
+      window.open(url, "_blank");
       flashDumpButton(button, "failed");
     }
   });

@@ -67,12 +67,21 @@ mutes past 120 story lines per bot per minute (the muted count rides
 the report), and the 64 MB rotation bounds the disk usage of the worst
 runaway.
 
+The flush discipline: the writer goroutine flushes the buffered
+records every 2 s, and the very first record of the file lands on disk
+at once - a run hard-killed inside the first period still leaves its
+build identity line, so a journal file that exists is never a zero
+byte mystery (an empty file can only come from a process that died
+before NewJournal finished).
+
 ## Reading it back
 
 - **The web UI button** "session dump" (next to "dump state" on the
   map toolbar) fetches `GET /api/bots/{id}/session-report` and copies
   the plain text report to the clipboard - one click hands the whole
-  run to the agent.
+  run to the agent. A failure never stays silent: the report endpoint
+  opens in a new tab with the server answer (a disabled journal, an
+  unknown bot), so a broken dump is readable, not just a red flash.
 - **The offline CLI** `swarm -session-report <file>` renders the same
   report from any journal file (plain or gzipped, a torn final line of
   a crashed run is skipped): the post-mortem path for a run that is

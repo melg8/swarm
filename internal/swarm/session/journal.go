@@ -47,28 +47,31 @@ var (
 // and the tracker locks must not wait on disk), the aggregator rides
 // the same goroutine so the report always sees the flushed truth, and
 // the file rotates at rotateBytes with the rotated copy gzipped in the
-// background.
+// background. The first record flushes to disk at once (a run killed
+// before the first flush period still leaves the build identity line
+// behind instead of a zero byte mystery file).
 //
 // A nil *Journal is valid: every method is a no-op on it, so the hunt
 // loop, the supervisor and the web handlers call it unconditionally
 // (the -session-dir "" mode turns the journal off everywhere at once).
 type Journal struct {
-	dir     string
-	path    string
-	logger  *log.Logger
-	queue   chan record
-	closed  atomic.Bool
-	done    chan struct{}
-	wg      sync.WaitGroup
-	mu      sync.RWMutex
-	aggs    map[string]*botAgg
-	file    *os.File
-	writer  *bufio.Writer
-	counter *countingWriter
-	enc     *json.Encoder
-	seq     int
-	written int64
-	dropped atomic.Uint64
+	dir         string
+	path        string
+	logger      *log.Logger
+	queue       chan record
+	closed      atomic.Bool
+	done        chan struct{}
+	wg          sync.WaitGroup
+	mu          sync.RWMutex
+	aggs        map[string]*botAgg
+	file        *os.File
+	writer      *bufio.Writer
+	counter     *countingWriter
+	enc         *json.Encoder
+	seq         int
+	written     int64
+	dropped     atomic.Uint64
+	firstRecord bool
 }
 
 // NewJournal opens the journal file in dir (created when missing) and
@@ -83,21 +86,22 @@ func NewJournal(dir string, logger *log.Logger) (*Journal, error) {
 		return nil, err //nolint:wrapcheck // os error already carries the path
 	}
 	j := &Journal{ //nolint:exhaustruct_v5 // closed is a working zero
-		dir:     dir,
-		path:    path,
-		logger:  logger,
-		queue:   make(chan record, eventQueueDepth),
-		done:    make(chan struct{}),
-		wg:      sync.WaitGroup{},
-		mu:      sync.RWMutex{},
-		aggs:    make(map[string]*botAgg),
-		file:    nil,
-		writer:  nil,
-		counter: &countingWriter{inner: nil, written: 0},
-		enc:     nil,
-		seq:     0,
-		written: 0,
-		dropped: atomic.Uint64{},
+		dir:         dir,
+		path:        path,
+		logger:      logger,
+		queue:       make(chan record, eventQueueDepth),
+		done:        make(chan struct{}),
+		wg:          sync.WaitGroup{},
+		mu:          sync.RWMutex{},
+		aggs:        make(map[string]*botAgg),
+		file:        nil,
+		writer:      nil,
+		counter:     &countingWriter{inner: nil, written: 0},
+		enc:         nil,
+		seq:         0,
+		written:     0,
+		dropped:     atomic.Uint64{},
+		firstRecord: true,
 	}
 	j.install(file)
 	j.wg.Add(1)
@@ -176,7 +180,10 @@ func (j *Journal) send(r record) {
 
 // flusher is the single writer goroutine: it drains the queue into
 // the buffered file, flushes on the period ticker and exits when the
-// journal closes and the queue drains.
+// journal closes and the queue drains. The very first record lands on
+// disk immediately: a process killed inside the first flush period
+// still leaves its build identity line, so an empty journal file is
+// never a mystery again (only a run that never got past NewJournal).
 func (j *Journal) flusher() {
 	defer j.wg.Done()
 	ticker := time.NewTicker(flushPeriod)
@@ -185,6 +192,10 @@ func (j *Journal) flusher() {
 		select {
 		case r := <-j.queue:
 			j.write(r)
+			if j.firstRecord {
+				j.firstRecord = false
+				j.flushFile()
+			}
 		case <-ticker.C:
 			j.flushFile()
 		case <-j.done:

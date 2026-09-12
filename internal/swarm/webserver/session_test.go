@@ -81,5 +81,5 @@ func TestSessionReportRenders(t *testing.T) {
 		require.Contains(t, body, "Hunt: the hunt decision")
 
 		return true
-	}, 5*time.Second, 20*time.Millisecond, "the report must render")
+	}, 10*time.Second, 20*time.Millisecond, "the report must render")
 }

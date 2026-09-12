@@ -178,6 +178,32 @@ func TestJournalReportLive(t *testing.T) {
 	require.ErrorIs(t, err, errUnknownBot)
 }
 
+// TestJournalFirstRecordFlush pins the immediate first flush: the very
+// first record (the build identity line) reaches the disk at once, so
+// a run killed inside the first flush period still leaves a readable
+// self-describing file instead of a zero byte mystery. The deadline
+// sits just below the flush period on purpose: the ticker never fires
+// early, so a write observed before it can only come from the first
+// record flush.
+func TestJournalFirstRecordFlush(t *testing.T) {
+	dir := t.TempDir()
+	journal, err := NewJournal(dir, nil)
+	require.NoError(t, err)
+	defer journal.Close()
+	journal.Build("main:abc123")
+
+	deadline := time.Now().Add(1900 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		info, err := os.Stat(journal.Path())
+		if err == nil && info.Size() > 0 {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("the first record stayed buffered: the file is still empty " +
+		"before the flush period could have fired")
+}
+
 // TestJournalUniqueNames verifies two processes (or a restart) never
 // clobber each other: the file name carries the process id.
 func TestJournalUniqueNames(t *testing.T) {

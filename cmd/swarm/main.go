@@ -645,6 +645,12 @@ func runFleet(cfg config) {
 	}
 	log.Printf("Fleet accounts: %s", fleetAccountList(cfg.account, cfg.bots))
 
+	// The journal opens before the web interface so the session
+	// report endpoint registers with it (the fleet mode once missed
+	// the wiring: the button answered 404 while the journal itself
+	// kept collecting - the two symptoms of a fleet dump look broken).
+	journal := openSessionJournal(cfg)
+
 	var proxyServer *proxy.Server
 	if cfg.proxy {
 		proxyServer = startProxy(cfg)
@@ -671,11 +677,13 @@ func runFleet(cfg config) {
 
 	web := startWebInterface(cfg, registry, nil, proxyServer)
 	attachAcceptance(web, registry, cfg, engine, proxyServer)
+	if web != nil && journal != nil {
+		web.SetSessionJournal(journal)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(),
 		syscall.SIGINT, syscall.SIGTERM)
 
-	journal := openSessionJournal(cfg)
 	for _, tracker := range trackers {
 		wireSessionBot(ctx, journal, tracker)
 	}
