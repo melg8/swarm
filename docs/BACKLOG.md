@@ -564,6 +564,30 @@ the bypass flood protector (dialogBypassPace inside one
 conversation; a second DriveDialog never rides the tail of the
 first) and every quest npc talk starting from the STATIC page.
 
+### T-020: the spellbook catalog resolution across towns
+
+status: in_progress
+milestone: M3
+priority: P3
+deps: T-017
+scope: internal/swarm/hunt/ (learning.go, shopping.go, new tests),
+  docs/
+
+Survey follow-up 5: the level 24 lessons of the first profession
+demand the Cure Bleeding spellbook (1379) the elven village does
+not sell (the village list carries only Charm and Poison Recovery);
+Dion's Sonia sells all three. The book resolution of the lesson
+trips (bookPurchase) falls back to the Dion catalog when the active
+town's lists do not carry the book, the price carries the selling
+town's tax, and merchantByTemplate covers the Dion merchants so the
+trip stop planning finds the station. Data plumbing of the band
+lesson economy (the survey protocol: the production walk legs ride
+the band wiring gated on M1 green).
+
+claimed: zones-zai 2026-09-12 10:18 UTC
+resume: fresh claim. Next: the two-catalog bookPurchase, the
+  merchant lookup widening, the unit tests, push.
+
 claimed: zones-zai 2026-09-12 10:13 UTC
 resume: done 10:05 UTC - hunt/quest_trip.go + 2 unit tests ship:
   DriveQuestChain consumes a QuestChain (the accept route, the stage
