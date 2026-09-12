@@ -2213,6 +2213,30 @@ graph) so the pattern starts populated.
 - T-001 claimed by soak-z 07:27Z, T-002 by zai-agent 07:36Z, T-004 by
   agent-quest 07:35Z.
 
+### Result
+
+- AGENTS.md: the "Hypotheses and unknowns" registry convention - an
+  unverified server assumption becomes an H-NNN entry before the
+  relying code is written, the entry names its evidence (Mobius Java
+  classes + live experiment), running the plan closes it (a
+  confirmed fact moves into the subsystem doc, a refuted one records
+  the server's actual behavior), entries append, ids never reuse.
+- The seed entries H-001 (swimming semantics), H-002 (the gatekeeper
+  teleport graph), H-003 (the boats), H-004 (the doors) - every
+  named Java class was located in the local Mobius checkout before
+  writing the plan (Stat.BREATH at mechanics/stats/Stat.java:117,
+  Teleporter.onBypassFeedback, WaterTask, Door openable families,
+  the vehicle packet set).
+- docs/navigation_analysis.md links its water, meta transport and
+  door open items to the registry ids.
+- docs/development_log.md round 62 entry.
+
+### Verification
+
+Docs-only round: `go build ./...` green, `golangci-lint run --new`
+clean (0 issues); the stack was up for the source reading
+(STACK_READY, 75 tables); no behavior change, no e2e required.
+
 ### Status
 
-In progress - the claim commit; reading navigation_analysis.md next.
+Done (2026-09-12 07:55Z) - taking the next eligible BACKLOG task.

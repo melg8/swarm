@@ -133,7 +133,7 @@ resume: fresh claim; the plan: read the Mobius quest engine sources
 
 ### T-005: the hypotheses registry convention
 
-status: in_progress
+status: done
 milestone: M1
 priority: P3
 deps: -
@@ -147,9 +147,14 @@ must reference it. Seed the registry with the open items of
 gatekeeper graph) so the pattern starts populated.
 
 claimed: hypotheses-e3f8 2026-09-12 07:38Z
-resume: claim pushed; next: read docs/navigation_analysis.md open
-  items, design the registry section shape, add the AGENTS.md
-  convention and seed the registry.
+done: 2026-09-12 07:55Z
+resume: done. The AGENTS.md "Hypotheses and unknowns" section holds
+  the convention and the seed entries H-001..H-004 (swimming,
+  gatekeepers, boats, doors); navigation_analysis.md links its open
+  items to the ids. Follow-up (next pathfind-touching task): the
+  waterCostMultiplier comment gains its H-001 reference; every new
+  unverified server assumption now mints an H-NNN entry before the
+  relying code lands.
 
 ### T-006: the 20-25 band survey
 
