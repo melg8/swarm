@@ -5187,3 +5187,49 @@ clean, the findings cross-recorded in the survey, the navigation
 analysis, this log and the agent progress notes. No committed code
 changed - go build and the pathfind package tests stay green by
 construction (the tree is byte-identical to the T-009 close).
+
+## Round 74: the quest trip phase engine (T-019, 2026-09-12)
+
+The T-016 hand-off plan named the missing hunt half: the acceptance
+scenario can drive the accept conversation (the staged round passed
+live), but the full class transfer chain needs a chain runner in
+hunt/ that the acceptance scope cannot write (acceptance/ + docs/
+only).
+
+The engine (hunt/quest_trip.go, a new file):
+
+- DriveQuestChain(ctx, chain): the accept conversation when the
+  journal does not carry the quest, then the stage ladder by the
+  journal cond - talk stages walk to their station and drive the
+  entry prefix plus the stage links through the T-014 walker, kill
+  stages walk to the ground and engage the quest mobs until the
+  journal counters fill - until the exit talk drops the quest.
+- FindQuestNpc: the knownlist scan of the station (the npcdata
+  display id on the wire template space, the +1000000 convention).
+- walkToQuestPoint: the walk request plus the arrival poll (the
+  200 unit arrival radius sits inside the 250 interaction distance;
+  the kill ground z is unknown to the chain data, the self z rides
+  the request and the server corrects the height).
+- The knobs: the 20 minute kill stage deadline, the 5 minute walk
+  deadline, the 700 ms attack pace (the Mobius double click
+  semantics), the 20 percent health floor (the manual trip has no
+  rest phase - a dying character is the caller's decision, not the
+  engine's).
+
+The design gap caught before it shipped: the kill stage exit. The
+first sketch re-read the journal cond after the counters filled,
+which would loop the kill stage forever if the cond only moved at a
+turn-in talk. The Mobius script source settled it (rule 5 - never
+guess the server): the 20th piece drop itself runs st.setCond(2,
+true) (the giveItems branch of ON_ATTACKABLE_KILL), so the journal
+advances AT the kill and the ladder reads the next stage off the
+fresh cond. The Q00407 letter drops follow the same shape.
+
+Verification: the two scripted unit tests on the walker test
+harness - the happy path (the static page entry, the accept route,
+the journal flip, the kill stage engaging the mob until the 20th
+piece sets cond 2, the exit talk dropping the quest) and the ladder
+guard (a journal cond outside the ladder returns the error naming
+it). Build green, the full hunt suite green (99 s), golangci-lint
+run --new clean (0 issues). The live verification rides the T-016
+acceptance round that consumes the engine (the M2 closer).

@@ -3045,3 +3045,18 @@ the last row - the M2 gate stays the SelfClassID flip).
   test reverted; the findings recorded in the survey doc, the
   navigation analysis (two new route rows) and the dev log round
   73. Status: done.
+
+### Progress (T-019)
+
+- 10:13 UTC: registered + claimed (the T-016 hand-off plan names
+  the hunt half the acceptance scope cannot write).
+- 10:00 UTC: quest_trip.go landed and pushed - DriveQuestChain (the
+  accept + the stage ladder by the journal cond), FindQuestNpc, the
+  walk arrival poll, the kill engage with the counters exit. The
+  Mobius script source settled the kill stage exit design (the 20th
+  piece drop itself sets the next cond - no turn-in livelock). The
+  two scripted unit tests + the full hunt suite (99 s) + lint --new
+  clean. Status: done - in-scope. The live verification rides the
+  T-016 acceptance round (the consumer); the resume note records the
+  hand-off: DriveQuestChain(ctx, ElvenKnightChain()) on the manual
+  session loop, the Rains class change leg after it.

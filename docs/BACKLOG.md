@@ -545,7 +545,7 @@ band economy).
 
 ### T-019: the quest trip phase engine
 
-status: in_progress
+status: done
 milestone: M2
 priority: P2
 deps: T-014, T-015
@@ -565,8 +565,16 @@ conversation; a second DriveDialog never rides the tail of the
 first) and every quest npc talk starting from the STATIC page.
 
 claimed: zones-zai 2026-09-12 10:13 UTC
-resume: fresh claim. Next: quest_trip.go + the scripted unit tests
-  on the fakeGame/scriptGame harness, build/test/lint, push.
+resume: done 10:05 UTC - hunt/quest_trip.go + 2 unit tests ship:
+  DriveQuestChain consumes a QuestChain (the accept route, the stage
+  ladder by the journal cond, the kill engage until the counters
+  fill, the exit drop), FindQuestNpc, the walk arrival poll, the
+  stage deadlines and the health floor. The script-verified fact the
+  engine rides: the 20th piece drop itself sets the next cond (the
+  giveItems setCond branch). The T-016 acceptance round consumes it:
+  DriveQuestChain(ctx, ElvenKnightChain()) on the manual session
+  loop, then the Rains class change leg (the ClassChange route of
+  quest_chains.go through DriveDialog), pass on SelfClassID 19.
 
 claimed: zones-zai 2026-09-12 09:45 UTC
 resume: done 09:50 UTC - both routes found (elven -> Gludio 111 852

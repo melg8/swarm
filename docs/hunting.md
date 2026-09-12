@@ -904,6 +904,38 @@ prefix strip of the class change link, the stale-npc page guard, the
 missing-link guard, the same-page repeat blind spot, the timeouts
 and the argument guards.
 
+## The quest trip engine (hunt/quest_trip.go)
+
+The imperative chain runner the class transfer acceptance drives on
+a manual loop (SetAutonomy(false), the loop never ticks - the trip
+owns every move): `DriveQuestChain(ctx, chain)` consumes a
+QuestChain of hunt/quest_chains.go end to end. The accept
+conversation runs when the journal does not carry the quest (the
+QuestEntryLinks static page prefix plus the chain Accept links
+through DriveDialog), then the stage ladder walks by the journal
+cond the tracker reports: a talk stage walks to its station
+(FindQuestNpc, the knownlist scan of the display id on the wire
+space) and drives the entry prefix plus the stage links, a kill
+stage walks to the ground and engages the quest mobs until the
+journal counters fill. The run ends when the exit talk drops the
+quest from the journal (the proof item survives in the inventory,
+the class change leg of the caller consumes it).
+
+The script facts the engine rides (Q00406 read from the Mobius
+source, no guessing): the 20th piece drop itself sets the next cond
+(the giveItems setCond branch - the journal advances AT the kill,
+the QuestList push follows), so the kill stage exits on the
+counters and the ladder reads the next stage off the fresh cond. A
+journal cond outside the ladder, a stage deadline (20 min per kill
+stage, 5 min per walk) or a health floor breach (20 percent - the
+manual trip has no rest phase, a dying character is the caller's
+decision) returns an error naming the stage. The kill engage paces
+the attack requests at 700 ms (the Mobius double click semantics:
+the repeated request starts the fight), a ground with no living
+quest mob in the 1600 scan radius holds for the respawn instead of
+walking away. The class change leg (the Rains route) and the level
+19 DB injection stay with the acceptance scenario of T-016.
+
 ## Live validated facts (2026-09-07 round, do not re-derive)
 
 The town trips (sell loop) and the deleveling cycle are live verified
