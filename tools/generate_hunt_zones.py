@@ -21,11 +21,23 @@ Inputs (env-overridable):
              (default: internal/swarm/hunt/zones_elven.go of this repo)
 
 Output: deterministic Go source with the elvenHuntingZones registry.
+
+Survey mode: `generate_hunt_zones.py --survey MIN MAX` scans ALL spawn
+territories (not just ElvenStarting.xml) for the mobs of the given
+level band, joins the mob stats (hp, exp, the AI block - NpcTemplate
+fills isAggressive TRUE when the xml omits it, so the survey reports
+the effective aggression) and prints the grounds with their walking
+distance from the teleport network arrival points, plus the anchors
+themselves. The registry generation for such a band stays a separate
+task (M1 first); the survey is the data the band survey document and
+the follow-up tasks build on.
 """
 
 import glob
 import math
 import os
+import re
+import sys
 import xml.etree.ElementTree as ET
 
 MOBIUS_C1 = os.environ.get(
@@ -34,7 +46,10 @@ MOBIUS_C1 = os.environ.get(
 )
 SPAWN_XML = os.path.join(
     MOBIUS_C1, "dist/game/data/spawns/ElvenTerritory/ElvenStarting.xml")
+SPAWNS_DIR = os.path.join(MOBIUS_C1, "dist/game/data/spawns")
 NPC_STATS_DIR = os.path.join(MOBIUS_C1, "dist/game/data/stats/npcs")
+TELEPORTER_DIR = os.path.join(
+    MOBIUS_C1, "dist/game/data/teleporters/town")
 OUT = os.environ.get(
     "OUT",
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -89,6 +104,87 @@ def load_npc_stats():
             stats[int(npc.get("id"))] = (
                 int(npc.get("level", "0")), npc.get("name", "?"))
     return stats
+
+
+# The survey needs more of every mob than the registry: the vitals and
+# the AI block of the npc xml (NpcTemplate fills isAggressive TRUE when
+# the attribute is omitted - see the survey docstring).
+def load_npc_survey_stats():
+    stats = {}
+    for path in glob.glob(NPC_STATS_DIR + "/*.xml"):
+        try:
+            root = ET.parse(path).getroot()
+        except ET.ParseError:
+            continue
+        for npc in root.iter("npc"):
+            ai = npc.find("ai")
+            acquire = npc.find("acquire")
+            vitals = npc.find(".//vitals")
+            exp = int(float(acquire.get("exp", "0"))) \
+                if acquire is not None else 0
+            hp = int(float(vitals.get("hp", "0"))) if vitals is not None \
+                else 0
+            if ai is None:
+                aggressive = True
+                aggro_range = 0
+                clan_help = 0
+            else:
+                aggressive = ai.get("isAggressive", "true") != "false"
+                aggro_range = int(ai.get("aggroRange", "0"))
+                clan_help = int(ai.get("clanHelpRange", "0"))
+            stats[int(npc.get("id"))] = {
+                "level": int(npc.get("level", "0")),
+                "name": npc.get("name", "?"),
+                "type": npc.get("type", "?"),
+                "exp": exp, "hp": hp, "aggressive": aggressive,
+                "aggro_range": aggro_range, "clan_help": clan_help,
+            }
+    return stats
+
+
+# The teleport network of the survey: the arrival points the band
+# grounds measure their walking distance against. The elven village
+# gatekeeper chain (Mirabel -> Bella -> Trisha) plus the local
+# destinations of the Dion gatekeeper (the service town of the 20-25
+# band grounds).
+# The teleport chain preference of the survey anchors: the elven
+# village route (Mirabel the elven village, Bella the Gludio hub,
+# Trisha the Dion service town). A destination name offered by many
+# gatekeepers resolves to the hop of this chain so the printed fee is
+# the one the route from the elven lands pays.
+ROUTE_GATEKEEPERS = ("Mirabel", "Bella", "Trisha")
+
+
+def load_teleport_arrivals():
+    arrivals = {}
+    pattern = re.compile(
+        r'<location name="([^"]+)" x="(-?\d+)" y="(-?\d+)" '
+        r'z="(-?\d+)" feeCount="(\d+)"')
+    for path in sorted(glob.glob(TELEPORTER_DIR + "/*.xml")):
+        content = open(path, encoding="utf-8").read()
+        npc_id = re.search(r'<npc id="(\d+)">\s*<!-- ([A-Za-z]+) -->',
+                           content)
+        if npc_id is None:
+            continue
+        for match in pattern.finditer(content):
+            name, x, y, z, fee = match.groups()
+            if int(fee) > 30000:  # the noble/arena entries skip
+                continue
+            arrivals.setdefault(name, []).append((
+                npc_id.group(2), int(x), int(y), int(fee)))
+    return arrivals
+
+
+def route_arrival(arrivals, name):
+    """The arrival entry of the name on the elven route chain."""
+    entries = arrivals.get(name)
+    if not entries:
+        return None
+    for gatekeeper in ROUTE_GATEKEEPERS:
+        for entry in entries:
+            if entry[0] == gatekeeper:
+                return entry
+    return entries[0]
 
 
 def shoelace(nodes):
@@ -219,7 +315,87 @@ def go_str(s):
     return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
 
 
+def survey_mode(min_level, max_level):
+    """Print the band survey: the grounds, the mobs, the transport."""
+    stats = load_npc_survey_stats()
+    ground_names = {
+        "The Town of Dion": "dion_town",
+        "Execution Ground": "execution_ground",
+        "The Center of the Cruma Marshlands": "cruma_center",
+        "Cruma Marshlands": "cruma_edge",
+        "Plains of Dion": "plains_south",
+        "The Town of Gludio": "gludio_town",
+    }
+    anchors = {}
+    for name, short in ground_names.items():
+        entry = route_arrival(load_teleport_arrivals(), name)
+        if entry is None:
+            continue
+        gatekeeper, x, y, fee = entry
+        anchors[short] = (name, gatekeeper, x, y, fee)
+
+    rows = []
+    for path in glob.glob(SPAWNS_DIR + "/**/*.xml", recursive=True):
+        rel = os.path.relpath(path, SPAWNS_DIR)
+        try:
+            root = ET.parse(path).getroot()
+        except ET.ParseError:
+            continue
+        for spawn in root.iter("spawn"):
+            terr = spawn.find("territory")
+            if terr is None:
+                continue
+            nodes = [(int(n.get("x")), int(n.get("y")))
+                     for n in terr.findall("node")]
+            if not nodes:
+                continue
+            mobs, band_mass, total = [], 0, 0
+            for npc in spawn.findall("npc"):
+                tid = int(npc.get("id"))
+                count = int(npc.get("count"))
+                info = stats.get(tid)
+                if info is None:
+                    continue
+                mobs.append((tid, count, info))
+                total += count
+                if min_level <= info["level"] <= max_level:
+                    band_mass += count
+            if band_mass == 0 or not mobs:
+                continue
+            cx = sum(p[0] for p in nodes) / len(nodes)
+            cy = sum(p[1] for p in nodes) / len(nodes)
+            near, dist = None, None
+            for short, (_, _, ax, ay, _) in anchors.items():
+                d = math.hypot(cx - ax, cy - ay)
+                if dist is None or d < dist:
+                    near, dist = short, d
+            rows.append((rel, spawn.get("zone") or "?", cx, cy, near,
+                         dist, band_mass, total, mobs))
+
+    rows.sort(key=lambda r: (r[4] if r[4] else "zzz", r[5] or 0))
+    print("band %d-%d survey: %d territories" % (min_level, max_level,
+                                                 len(rows)))
+    print("anchors: " + "; ".join(
+        "%s (%s, %d %d, fee %d)" % (k, v[1], v[2], v[3], v[4])
+        for k, v in sorted(anchors.items())))
+    print()
+    for rel, zone, cx, cy, near, dist, band_mass, total, mobs in rows:
+        print("%-42s %-24s (%7.0f,%7.0f) walk=%s %.0f band %d/%d" %
+              (rel, zone, cx, cy, near, dist or 0, band_mass, total))
+        for tid, count, info in sorted(mobs, key=lambda m: -m[2]["level"]):
+            flag = "*" if min_level <= info["level"] <= max_level else " "
+            aggro = ("aggro %d" % info["aggro_range"]) if info[
+                "aggressive"] else "passive"
+            print("  %s lvl %2d x%-3d hp %5d exp %4d %-10s clan %d "
+                  "%s [%d]" % (flag, info["level"], count, info["hp"],
+                               info["exp"], aggro, info["clan_help"],
+                               info["name"], tid))
+
+
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == "--survey":
+        survey_mode(int(sys.argv[2]), int(sys.argv[3]))
+        return
     stats = load_npc_stats()
     root = ET.parse(SPAWN_XML).getroot()
 

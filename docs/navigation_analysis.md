@@ -138,12 +138,21 @@ experiment):
 ## Danger model (mob spawns)
 
 `data/spawns/` holds 103 xml files with 8 761 spawn points grouped by
-territory. The peculiarity of this C1 data pack: `stats/npcs` contains
-**zero** monsters with `isAggressive="true"` - verified against the
-server source (`AttackableAI.isAggressiveTowards` returns
-`me.isAggressive() && canSeeTarget`), so mobs here never attack on
-sight; they only fight back when attacked. Walking past spawns is
-therefore safe on this server unless the bot starts a fight itself.
+territory. The danger reading of this C1 data pack (corrected
+2026-09-12, the 20-25 band survey): the `stats/npcs` xml files carry
+no explicit `isAggressive="true"` on the monsters, but the Mobius
+`NpcTemplate` fills the attribute TRUE when the xml omits it
+(`_isAggressive = set.getBoolean("isAggressive", true)`) and
+`AttackableAI.isAggressiveTowards` returns
+`me.isAggressive() && canSeeTarget` within the aggro range - so the
+monsters that omit the attribute (the Kaboo Orc Fighter of the elven
+lands, the mandragoras and dire wolves of the 20-25 band) DO attack
+on sight. Walking past spawns is NOT safe; only the mobs whose xml
+says `isAggressive="false"` (the mist leeches, the monster eye
+gazers) ignore a passing walker. The earlier "never attack on
+sight" note of this section was wrong (it counted the xml attribute
+and missed the template default - see the survey of the 20-25 band
+for the per-mob readings).
 
 For a universal navigator the danger layer is still required in
 general: mob levels (already generated into `internal/swarm/npcdata`
