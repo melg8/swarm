@@ -2998,7 +2998,7 @@ the last row - the M2 gate stays the SelfClassID flip).
   the 13 species at their table levels, the sprout/cruma mob sets,
   the anchor walking distances, the picker ladder, the death cap.
   Full hunt suite green (97 s), lint --new 0 issues, pushed.
-- 09:35 UTC: the docs round - the hunting.md "The Dion 20-25 band
+- 09:33 UTC: the docs round - the hunting.md "The Dion 20-25 band
   registry" section, the dev log round 72, the BACKLOG close. Status:
   done - in-scope. The follow-ups for the next agents: the M1
   operator soak run (the 8h proof that gates the production band
@@ -3038,7 +3038,7 @@ the last row - the M2 gate stays the SelfClassID flip).
 
 - 09:45 UTC: registered + claimed (BACKLOG T-018, the survey
   follow-up 4 - the queue was empty, every task done or owned).
-- 09:50 UTC: the probe ran - both walking legs FOUND (elven ->
+- 09:43 UTC: the probe ran - both walking legs FOUND (elven ->
   Gludio 111 852 units / 1.25M nodes / 13 s at the raised 40M cap,
   aborts at the shipped 1M; Gludio -> Dion 42 831 units / 0.94M
   nodes, within the shipped cap). The temporary patch and the probe
@@ -3048,9 +3048,9 @@ the last row - the M2 gate stays the SelfClassID flip).
 
 ### Progress (T-019)
 
-- 10:13 UTC: registered + claimed (the T-016 hand-off plan names
+- 09:52 UTC: registered + claimed (the T-016 hand-off plan names
   the hunt half the acceptance scope cannot write).
-- 10:00 UTC: quest_trip.go landed and pushed - DriveQuestChain (the
+- 10:03 UTC: quest_trip.go landed and pushed - DriveQuestChain (the
   accept + the stage ladder by the journal cond), FindQuestNpc, the
   walk arrival poll, the kill engage with the counters exit. The
   Mobius script source settled the kill stage exit design (the 20th
@@ -3063,9 +3063,9 @@ the last row - the M2 gate stays the SelfClassID flip).
 
 ### Progress (T-020)
 
-- 10:18 UTC: registered + claimed (the survey follow-up 5 - the
+- 10:03 UTC: registered + claimed (the survey follow-up 5 - the
   level 24 lesson stall).
-- 10:25 UTC: landed and pushed - the two-catalog bookPurchase (the
+- 10:07 UTC: landed and pushed - the two-catalog bookPurchase (the
   village first, the Dion Sonia fallback at her own tax) + the
   merchantByTemplate widening to the Dion stations + 3 unit tests.
   Full hunt suite green (98 s), lint --new clean. Status: done -

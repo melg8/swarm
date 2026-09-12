@@ -282,7 +282,7 @@ spawn-true squares of the 20-25 band in the shape of zones_elven.go
 the survey doc is the acceptance reference).
 
 claimed: zones-zai 2026-09-12 09:24 UTC
-resume: done 09:35 UTC - zones_dion.go ships (75 spawn-true squares
+resume: done 09:33 UTC - zones_dion.go ships (75 spawn-true squares
   over 25 kept territories of the three Dion sources, 96% spawn mass
   coverage) with the --dion generator mode (the elven mode verified
   byte-identical), the five band windows at the D-grade dress gates
@@ -584,16 +584,16 @@ trip stop planning finds the station. Data plumbing of the band
 lesson economy (the survey protocol: the production walk legs ride
 the band wiring gated on M1 green).
 
-claimed: zones-zai 2026-09-12 10:18 UTC
-resume: done 10:25 UTC - the bookPurchase two-catalog fallback (the
+claimed: zones-zai 2026-09-12 10:03 UTC
+resume: done 10:07 UTC - the bookPurchase two-catalog fallback (the
   village first, the Dion Sonia stop at the 20 percent Dion tax),
   the merchantByTemplate widening to the Dion stations, 3 unit tests
   pinning the routing. The level 24 lesson stall closed: the Cure
   Bleeding book resolves through Sonia. The production walk legs
   ride the band wiring (M1 gate).
 
-claimed: zones-zai 2026-09-12 10:13 UTC
-resume: done 10:05 UTC - hunt/quest_trip.go + 2 unit tests ship:
+claimed: zones-zai 2026-09-12 09:52 UTC
+resume: done 10:03 UTC - hunt/quest_trip.go + 2 unit tests ship:
   DriveQuestChain consumes a QuestChain (the accept route, the stage
   ladder by the journal cond, the kill engage until the counters
   fill, the exit drop), FindQuestNpc, the walk arrival poll, the
@@ -605,7 +605,7 @@ resume: done 10:05 UTC - hunt/quest_trip.go + 2 unit tests ship:
   quest_chains.go through DriveDialog), pass on SelfClassID 19.
 
 claimed: zones-zai 2026-09-12 09:45 UTC
-resume: done 09:50 UTC - both routes found (elven -> Gludio 111 852
+resume: done 09:43 UTC - both routes found (elven -> Gludio 111 852
   units, 1.25M nodes, aborts at the shipped 1M cap; Gludio -> Dion
   42 831 units, within the shipped cap). The teleport-only claim of
   the survey refuted as a hard statement; the gatekeeper chain stays

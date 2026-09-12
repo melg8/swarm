@@ -1,6 +1,6 @@
 # PROGRESS
 
-Generated: 2026-09-12 09:43:31Z
+Generated: 2026-09-12 10:08:49Z
 
 ## Milestone ladder
 
@@ -46,10 +46,24 @@ Generated: 2026-09-12 09:43:31Z
 | T-015 | done | M2 | P2 |
 | T-016 | in_progress | M2 | P2 |
 | T-017 | done | M3 | P3 |
+| T-018 | done | M3 | P3 |
+| T-019 | done | M2 | P2 |
+| T-020 | done | M3 | P3 |
 
 ## Recent commits
 
 ```
+1e262da docs: close T-020 - the spellbook routing lands
+3cd8812 hunt: the spellbook resolution falls back to the dion catalog (T-020)
+e9b9640 backlog: register + claim T-020 the spellbook catalog resolution
+2a66adb docs: close T-019 - the quest trip engine ships
+c161da2 hunt: the quest trip phase engine consumes a quest chain (T-019)
+d3596b4 backlog: register + claim T-019 the quest trip phase engine
+3cbdeae docs: close T-018 - the walking legs exist, findings recorded
+28c74e6 backlog: register + claim T-018 the walking leg verification
+1a7a5bd backlog: the T-016 resume merge - the accept stage state plus the hand-off plan
+18b9a9a docs: the T-016 round - the accept stage passed live
+d0f8781 metrics: the class transfer accept stage PASS row + the progress page
 d5ec49b acceptance: the class transfer scenario - the M2 accept stage (T-016)
 9adb904 docs: close T-009 - the dion band zone registry ships
 7ac28d9 hunt: the 20-25 band zone registry of the dion grounds (T-009)
@@ -59,15 +73,4 @@ e20f490 backlog: claim T-016 the class transfer acceptance scenario
 7b9f920 hunt: the multi-town gear catalog selection (T-017)
 3be542f backlog: claim T-009 the 20-25 zone registry generation
 5f50f65 docs: close T-015 - the quest chains are data
-8c220d5 hunt: the class transfer quest chains as data (T-015)
-dcde986 backlog: register + claim T-017 the multi-town gear catalog selection
-d223a83 backlog: claim T-015 the class transfer quest chains as data
-ade0f14 docs: close T-014 - the dialog walker walks, live verified
-c130e1c hunt: the live dialog walker verification (T-014)
-60688fc docs: close T-010 the band gear catalogs (in-scope done)
-e0bfafe gear: the Dion band catalog (T-010)
-f46cd06 backlog: claim T-010 the band gear catalogs (in_progress)
-db65d4b hunt: the quest dialog walker engine (T-014)
-9fb2ce2 docs: close T-008 the gatekeeper teleport flow (done)
-f95355a connection: feed the open dialog tracker from the npc html dispatch
 ```
