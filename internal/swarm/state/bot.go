@@ -1799,19 +1799,7 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
 	defer b.mu.Unlock()
 	now := time.Now()
 	if objectID == b.charObjectID() {
-		wasDead := b.char.MaxHP > 0 && b.char.CurHP <= 0
-		b.recordCharDamageLocked(attrs, now)
-		for _, attr := range attrs {
-			b.applyCharAttr(attr)
-		}
-		if !wasDead && b.char.MaxHP > 0 && b.char.CurHP <= 0 {
-			// The alive to dead transition of the played
-			// character: exactly one death per demise, the
-			// village restart that follows revives without
-			// counting (see metrics.go).
-			b.noteDeathLocked(now)
-		}
-		b.touch()
+		b.applySelfStatusLocked(attrs, now)
 
 		return
 	}
@@ -1865,6 +1853,24 @@ func (b *Bot) applyCharAttr(attr Attribute) {
 	case AttrMaxLoad:
 		b.char.MaxLoad = attr.Value
 	}
+}
+
+// applySelfStatusLocked applies the vitals attributes of the played
+// character: the damage bookkeeping first (it reads the previous HP),
+// then the values, and the alive to dead transition counts one death
+// (exactly one per demise - the village restart that follows revives
+// without counting, see metrics.go). The caller must hold the write
+// lock.
+func (b *Bot) applySelfStatusLocked(attrs []Attribute, now time.Time) {
+	wasDead := b.char.MaxHP > 0 && b.char.CurHP <= 0
+	b.recordCharDamageLocked(attrs, now)
+	for _, attr := range attrs {
+		b.applyCharAttr(attr)
+	}
+	if !wasDead && b.char.MaxHP > 0 && b.char.CurHP <= 0 {
+		b.noteDeathLocked(now)
+	}
+	b.touch()
 }
 
 // CountPacket accounts one received packet.
