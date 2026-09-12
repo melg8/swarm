@@ -221,11 +221,14 @@ func TestXpPerHour(t *testing.T) {
 // values: level 1 is zero, level 2 is 68, the cumulative adds the
 // within-level exp, and a sub-level-1 character returns the raw exp.
 func TestCumulativeSoakXP(t *testing.T) {
+	// The exp the tracker carries is the cumulative total (the
+	// UserInfo packet broadcasts player.getExp()), so the cumulative
+	// view is the exp itself whatever the level is.
 	require.Equal(t, int64(0), cumulativeSoakXP(1, 0))
-	require.Equal(t, int64(68), cumulativeSoakXP(2, 0))
-	require.Equal(t, int64(168), cumulativeSoakXP(2, 100))
+	require.Equal(t, int64(0), cumulativeSoakXP(2, 0))
+	require.Equal(t, int64(100), cumulativeSoakXP(2, 100))
 	require.Equal(t, int64(50), cumulativeSoakXP(0, 50))
-	require.Equal(t, int64(363), cumulativeSoakXP(3, 0))
+	require.Equal(t, int64(363), cumulativeSoakXP(3, 363))
 }
 
 // TestDeathEdgeTrackerCountsRisingEdges pins the death count: two

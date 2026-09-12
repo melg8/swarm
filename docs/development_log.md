@@ -4672,3 +4672,66 @@ touched packages' tests green, golangci-lint run --new: 0 issues;
 live against the deployed stack - the fresh trace3 bot logs "Quest
 journal with 0 quests, 0 quest items" at the enter world second,
 proving the 0x98 push now parses and lands.
+## Round 66: the level milestone scenario - the building block of the milestone acceptances (2026-09-12)
+
+Every milestone acceptance from M2 on needs the same vehicle: a
+character injected at an arbitrary level with the zone-appropriate
+start that must reach the next level within a budget. The farm
+readiness scenario hard-coded level 15 and its own kill condition;
+nothing generalized, and the near-threshold trick (start the
+character one short stretch of kills below the level-up) did not
+exist - so a level milestone acceptance would either burn tens of
+kills per run or need its own reset plumbing.
+
+The fix is the scenario (T-003, scope: internal/swarm/acceptance/):
+
+- The `level-milestone` scenario: the temp8 character injected at
+  level N (the SWARM_LEVEL_MILESTONE_LEVEL env knob, default 10,
+  valid 1..20) with the near-threshold experience (one twentieth of
+  the level span below the N+1 threshold), the template vitals of
+  the level, the farm readiness wallet (100k adena, 20k sp, the
+  empty bag - the shopping strategy dresses the character for its
+  band) and the creation spawn point (the zone ladder walks it out).
+  The pass line is the observed level N+1: the UserInfo broadcast of
+  the Mobius level-up (Player.levelUp -> broadcastUserInfo) refreshes
+  the tracker level the monitor reads.
+- The elven fighter vitals table (levels 1..20, floored hp/mp/cp)
+  read from the Mobius player template
+  dist/game/data/stats/players/templates/StartingClass/ElvenFighter.xml
+  (lvlUpgainData): the injected database row agrees with the values
+  the server would have leveled the character along (the level 15
+  row matches the farm readiness constants 280/111/112).
+- The run appends one metrics row to runs/metrics.jsonl on every
+  outcome (the PASS row, the session teardown fail, the setup fail),
+  reusing the T-001 trail shape so the level milestone runs and the
+  soak runs accumulate in one place.
+
+The round also fixed a live-found bug of the young metrics trail:
+the level 10 live run reported xpPerHour 187169 for a real 1266 xp
+gain. The cumulative XP helper of the acceptance package added the
+level start threshold on top of the exp value
+(table[level-1] + exp), but the Mobius exp is the running TOTAL
+(PlayableStat.addExp does setExp(getExp()+value) and derives the
+level by walking the experience table, UserInfo broadcasts
+(int) player.getExp() - both read in the local Java checkout), so
+the helper double counted the whole start-level span. The fix
+returns the exp as the cumulative value; the historical rows stay
+as written (the trail is append-only, the note lives in
+runs/README.md).
+
+Verification: 7 unit tests (acceptance/level_milestone_test.go) -
+the reset construction (the near-threshold exp strictly inside the
+last twentieth of the span, the vitals, the wallet, the spawn), the
+tail scaling for every injectable level, the env knob matrix (16, 1,
+20, the out-of-range and malformed fallbacks), the check evaluation
+(distance detail, the reached flip), the check list, the vitals
+table against the template constants and the definition
+registration; the manager temp account contract extended to temp8.
+go build, go vet, the full acceptance suite, gofumpt and
+golangci-lint run --new (0 issues) green. Live against the deployed
+stack: the default run (level 10 -> 11) PASSED in 7m46s (466 s, 0
+deaths, 0 stuck events, the full weapon run round, the band walk
+and the leveling kills), the env-parameterized run (level 2 -> 3)
+PASSED in 2m30s with the corrected metrics row (2111 xp/h against
+the real 88 xp gain - no phantom span), both rows in
+runs/metrics.jsonl.

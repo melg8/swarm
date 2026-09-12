@@ -1,1 +1,3 @@
 {"date":"2026-09-12T07:45:28Z","scenario":"soak","durationSec":120,"startLevel":1,"endLevel":2,"xpPerHour":9984.446871805401,"deaths":0,"adena":28,"stuckEvents":0,"status":"PASS"}
+{"date":"2026-09-12T08:08:18Z","scenario":"level-milestone","durationSec":466,"startLevel":10,"endLevel":11,"xpPerHour":187169.52672003623,"deaths":0,"adena":4977,"stuckEvents":0,"status":"PASS"}
+{"date":"2026-09-12T08:13:36Z","scenario":"level-milestone","durationSec":150,"startLevel":2,"endLevel":3,"xpPerHour":2111.311403681994,"deaths":0,"adena":94,"stuckEvents":0,"status":"PASS"}

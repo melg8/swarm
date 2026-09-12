@@ -158,18 +158,29 @@ var soakExperienceTable = [...]int64{
 // soakMaxLevel is the highest level the local table knows about.
 const soakMaxLevel = 81
 
-// cumulativeSoakXP returns the total experience a character at the
-// given level with the given within-level exp has accumulated. A
-// level above the table clamps to the last entry, a level below 1
-// returns the raw exp. The function mirrors the state.ExpPercent
-// computation without crossing the package boundary.
+// cumulativeSoakXP returns the total experience a character has
+// accumulated. The tracker exp is already the cumulative total: the
+// Mobius PlayerStat keeps one running number (PlayableStat.addExp
+// does setExp(getExp()+value) and derives the level by walking the
+// experience table upward, see
+// java/org/l2jmobius/gameserver/entity/actor/stat/PlayableStat.java)
+// and the UserInfo packet broadcasts that same total
+// (UserInfo.writeImpl writes (int) player.getExp()). The level
+// argument stays in the signature for the clamp documentation and
+// the callers that read the level alongside; a level below 1 keeps
+// the raw exp (a tracker that has not seen a UserInfo yet).
+//
+// The original implementation added the level start threshold on
+// top (table[level-1] + exp), double counting the total and
+// inflating every xpPerHour row of the trail by the span of the
+// start level; the level milestone run of 2026-09-12 exposed it (a
+// real 1266 xp delta reported as 24238). The historical rows of
+// runs/metrics.jsonl written before the fix keep their inflated
+// values - the trail is append-only.
 func cumulativeSoakXP(level int32, exp int32) int64 {
 	if level < 1 {
 		return int64(exp)
 	}
-	if int(level) > soakMaxLevel {
-		return soakExperienceTable[soakMaxLevel-1] + int64(exp)
-	}
 
-	return soakExperienceTable[level-1] + int64(exp)
+	return int64(exp)
 }

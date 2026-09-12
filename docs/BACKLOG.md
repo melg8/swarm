@@ -108,7 +108,7 @@ the dev log round 63, the live e2e + autonomous smoke verified.
 
 ### T-003: the level milestone scenario
 
-status: in_progress
+status: done
 milestone: M1
 priority: P2
 deps: T-002
@@ -120,10 +120,13 @@ character reaches level N+1 within the time budget. This is the
 building block every later milestone acceptance reuses.
 
 claimed: zai-agent 2026-09-12 07:51 UTC
-resume: claimed fresh right after T-002 (mine) closed and unlocked
-the dep; next: study the soak scenario of T-001 and the zone ladder
-per level, then design the injection (level N, near-threshold xp,
-the zone-appropriate start) and the N+1 watch
+done 2026-09-12 08:15 UTC by zai-agent: the level-milestone scenario
+(SWARM_LEVEL_MILESTONE_LEVEL 1..20, default 10, the near-threshold
+exp, the template vitals, the metrics rows) live-verified twice (10
+-> 11 in 7m46s, 2 -> 3 in 2m30s); the round also fixed the
+xpPerHour double count of the T-001 cumulative helper (the Mobius
+exp is the running total - the Java evidence in the dev log round
+65 entry).
 
 ### T-004: the quest subsystem research
 

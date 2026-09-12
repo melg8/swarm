@@ -88,6 +88,27 @@ const (
 func Definitions() []TestDef {
 	return []TestDef{
 		{
+			ID:      milestoneScenarioID,
+			Title:   "level milestone · N to N+1",
+			Account: milestoneAccount,
+			Timeout: milestoneTimeout,
+			Description: "Start: the elven fighter temp8 is injected at " +
+				"level N (SWARM_LEVEL_MILESTONE_LEVEL, default 10) " +
+				"with the near-threshold experience (one twentieth of " +
+				"the level span below the N+1 threshold), the template " +
+				"vitals of the level, 20,000 SP, 100,000 adena and an " +
+				"empty bag, standing at the creation spawn point of the " +
+				"elven village. Flow: the bot runs the weapon run town " +
+				"round (the gear, the spellbooks, the lessons), walks " +
+				"to its band hunting ground through the zone ladder " +
+				"and farms the last kills to the level-up. Pass: the " +
+				"observed level reaches N+1 within the time budget " +
+				"(the UserInfo the server broadcasts on the level-up " +
+				"refreshes the tracker); the metrics trail in " +
+				"runs/metrics.jsonl receives one row either way.",
+			Scenario: levelMilestoneScenario,
+		},
+		{
 			ID:      soakScenarioID,
 			Title:   "soak · the M1 metrics trail",
 			Account: soakAccount,

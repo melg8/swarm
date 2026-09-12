@@ -2421,6 +2421,29 @@ transfer, M3+ injects the band levels).
 ### Progress
 
 - 07:51 UTC: T-003 claimed in docs/BACKLOG.md.
+- 08:00 UTC: the level-milestone scenario landed
+  (acceptance/level_milestone.go): the level N injection (the
+  SWARM_LEVEL_MILESTONE_LEVEL env, default 10, 1..20) with the
+  near-threshold exp (span/20 below the N+1 threshold), the
+  elven fighter vitals table from the Mobius template XML, the
+  farm readiness wallet and spawn; the pass watch on the tracker
+  level; the metrics row on every outcome; the Definitions
+  registration with the temp8 account (the manager account
+  contract test extended).
+- 08:08 UTC: live PASS - the default level 10 -> 11 run finished
+  in 7m46s (0 deaths, 0 stuck, the row in runs/metrics.jsonl).
+- 08:10 UTC: the live row exposed the xpPerHour double count of
+  the T-001 cumulative helper (187169 for a real 1266 xp): the
+  Mobius exp is the running total (PlayableStat.addExp +
+  UserInfo.writeImpl read in the Java checkout), the helper added
+  the level start threshold on top. Fixed (cumulativeSoakXP now
+  returns the exp itself), the soak unit tests updated, the note
+  in runs/README.md; the historical rows stay as written.
+- 08:13 UTC: the second live PASS - the env run level 2 -> 3 in
+  2m30s with the corrected metrics row (2111 xp/h for the real
+  88 xp gain). The dev log carries the round 66 entry (renumbered
+  past the parallel PROGRESS.md page round 65).
+- 08:15 UTC: status done.
 
 ## Active task: T-008 the gatekeeper teleport flow
 
