@@ -305,11 +305,13 @@ function check(results, name, ok, detail) {
     results.push({ name, ok, detail });
 }
 
-// Scenario 1: the Voronoi hunt cell layer. The snapshot carries the
+// Scenario 1: the hexagon hunt cell layer. The snapshot carries the
 // mesh version and the live record of the held cell; the layer
-// fetches the static mesh once, strokes the partition edges (no
-// fills, no shading of the inactive cells) and highlights exactly
-// ONE element: the cell the bot holds, with its live label.
+// fetches the static mesh once and draws EXACTLY TWO hexagons: the
+// one the bot fights in (the fill, the bright stroke, the live
+// label) and the one under the map cursor (the hover hit test of
+// the mesh). Every other hexagon of the partition stays invisible -
+// no edges, no fills, no labels.
 const CELL_MESH = {
     version: "test-cells-1",
     cells: [
@@ -339,8 +341,34 @@ function cellSnapshot(cellID, state) {
     return snap;
 }
 
+// cellEdgeStrokes counts the strokes that trace an edge of the
+// given cell polygon (a segment between two adjacent vertices of
+// its world outline, within the tolerance).
+function cellEdgeStrokes(record, cell) {
+    const verts = cell.verts;
+    let count = 0;
+    for (const stroke of record.strokes) {
+        for (const seg of stroke.segments) {
+            for (let i = 0; i + 1 < verts.length; i += 2) {
+                const a = worldToScreen(verts[i], verts[i + 1]);
+                const b = worldToScreen(
+                    verts[(i + 2) % verts.length],
+                    verts[(i + 3) % verts.length]);
+                if (Math.hypot(seg[0] - a.x, seg[1] - a.y) < 3
+                    && Math.hypot(seg[2] - b.x, seg[3] - b.y) < 3) {
+                    count++;
+
+                    break;
+                }
+            }
+        }
+    }
+
+    return count;
+}
+
 async function runScenarioHuntCells(mapFile) {
-    const { MapView, record, sandbox } = loadMapJs(mapFile);
+    const { MapView, record, fireCanvas, sandbox } = loadMapJs(mapFile);
     MapView.init();
     // The mesh fetch resolves through the stub of the sandbox: the
     // json() answer carries the cell payload of the scenario.
@@ -369,18 +397,13 @@ async function runScenarioHuntCells(mapFile) {
     record.strokes.length = 0;
     record.texts.length = 0;
     MapView.draw();
-    // The partition edges: the strokes of the cell polygons (the
-    // flat vertex lists draw as closed paths).
-    const edgeStroke = record.strokes.find(
-        (s) => s.segments.length >= 3
-            && s.segments.some((seg) =>
-                Math.hypot(seg[0] - worldToScreen(44500, 49500).x,
-                    seg[1] - worldToScreen(44500, 49500).y) < 3));
-    check(results, "the mesh edges stroke the partition outlines",
-        !!edgeStroke, "no cell edge stroke found");
 
-    // The active cell: the ONLY highlighted element - its label
-    // carries the name, the state and the live economy.
+    // The active cell: the ONLY hexagon that draws by itself - its
+    // outline strokes and its label carry the name, the state and
+    // the live economy.
+    const activeEdges = cellEdgeStrokes(record, CELL_MESH.cells[0]);
+    check(results, "the held hexagon draws its outline",
+        activeEdges >= 3, "no Home Cell outline stroke found");
     const label = record.texts.find(
         (t) => t.text.startsWith("Home Cell")
             && t.text.indexOf("hunting") >= 0
@@ -390,11 +413,56 @@ async function runScenarioHuntCells(mapFile) {
         !!label, "no live Home Cell label, texts: "
         + record.texts.map((t) => t.text).join(" | "));
 
-    // The inactive neighbor stays outline only: no fill, no label.
+    // The inactive neighbor stays INVISIBLE: no outline stroke of
+    // its polygon, no label - the partition itself never draws.
+    const neighborEdges = cellEdgeStrokes(record, CELL_MESH.cells[1]);
+    check(results, "the inactive hexagons draw nothing",
+        neighborEdges === 0,
+        "the Neighbor Cell outline drew " + neighborEdges + " edges");
     const neighborLabel = record.texts.filter(
         (t) => t.text.startsWith("Neighbor Cell")).length;
-    check(results, "the inactive cells stay outline only",
+    check(results, "the inactive cells stay labelless",
         neighborLabel === 0, "Neighbor Cell labeled without a hover");
+
+    // The hexagon under the cursor draws: the hover hit test
+    // resolves the mesh cell at the pointer, its outline and its
+    // name label light up next to the active one.
+    const overNeighbor = worldToScreen(46500, 51500);
+    fireCanvas("mousemove", {
+        clientX: overNeighbor.x, clientY: overNeighbor.y
+    });
+    record.strokes.length = 0;
+    record.texts.length = 0;
+    MapView.draw();
+    check(results, "the hover resolves the hexagon under the cursor",
+        MapView.hoverZone && MapView.hoverZone.kind === "cell"
+            && MapView.hoverZone.id === "c2",
+        "hoverZone is "
+            + JSON.stringify(MapView.hoverZone && MapView.hoverZone.id));
+    const hoverEdges = cellEdgeStrokes(record, CELL_MESH.cells[1]);
+    check(results, "the hovered hexagon draws its outline",
+        hoverEdges >= 3, "no Neighbor Cell outline on the hover");
+    const hoverLabel = record.texts.filter(
+        (t) => t.text.startsWith("Neighbor Cell")).length;
+    check(results, "the hovered hexagon carries its name label",
+        hoverLabel > 0, "no Neighbor Cell label on the hover");
+    const activeKept = record.texts.filter(
+        (t) => t.text.startsWith("Home Cell")).length;
+    check(results, "the active hexagon keeps drawing under the hover",
+        activeKept > 0, "the Home Cell label vanished on the hover");
+
+    // The pointer leaves the mesh: the hovered hexagon disappears,
+    // the active one stays.
+    fireCanvas("mousemove", { clientX: 10, clientY: 10 });
+    record.strokes.length = 0;
+    record.texts.length = 0;
+    MapView.draw();
+    const leftEdges = cellEdgeStrokes(record, CELL_MESH.cells[1]);
+    const keptLabel = record.texts.filter(
+        (t) => t.text.startsWith("Home Cell")).length;
+    check(results, "leaving the mesh hides the hovered hexagon",
+        leftEdges === 0 && keptLabel > 0,
+        "neighbor edges " + leftEdges + ", home label " + keptLabel);
 
     // The moving state: the label flips when the bot walks to the
     // cell (the map answers which zone the bot is heading to).

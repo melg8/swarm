@@ -175,25 +175,17 @@ const MapView = {
   // drifting adena rate does not drop the hunt cache.
   huntKey: "",
 
-  // huntMesh caches the static Voronoi hunt mesh of the cell mode
-  // (the /api/hunt-mesh payload: the version plus the convex cell
-  // polygons). The mesh is the same for the whole deployment, the
-  // fetch happens once per version and the per second snapshot only
-  // carries the version marker and the live record of the held
-  // cell. huntMeshFetching guards the in-flight request.
+  // huntMesh caches the static hexagon hunt mesh of the cell mode
+  // (the /api/hunt-mesh payload: the version plus the uniform
+  // hexagon polygons). The mesh is the same for the whole deployment,
+  // the fetch happens once per version and the per second snapshot
+  // only carries the version marker and the live record of the held
+  // cell. huntMeshFetching guards the in-flight request. The mesh
+  // serves the hover hit tests and the active hex lookup - the map
+  // DRAWS only the hex the fight runs in and the one under the
+  // cursor, never the partition.
   huntMesh: null,
   huntMeshFetching: false,
-
-  // cellBg caches the edge raster of the mesh the same way huntBg
-  // holds the spot circles: the partition edges never change at
-  // runtime, so the cache key is only the mesh version, the zoom and
-  // the canvas geometry. The ACTIVE cell highlight paints fresh per
-  // frame on top (one polygon plus its label).
-  cellBg: {
-    canvas: null, ctx: null, key: "",
-    cx: 0, cy: 0, worldLeft: 0, worldTop: 0,
-    cssW: 0, cssH: 0, dpr: 1, marginX: 0, marginY: 0
-  },
 
   // tileLoads counts the tile arrivals of both pyramids (the map
   // imagery, the geodata view, the loads and the misses). The cache
@@ -1776,16 +1768,19 @@ const MapView = {
     return true;
   },
 
-  // ---- the voronoi cell layer ----
+  // ---- the hexagon hunt layer ----
   //
-  // The cell mode draws the partition itself: the static mesh edges
-  // (one thin stroke per boundary, no fills, no shading - the render
-  // load of a 1k+ cell registry stays a single cached raster) and
-  // exactly ONE highlighted element: the cell the bot holds or walks
-  // to (the fill, the bright stroke and the live label). The mesh
-  // payload arrives once per registry version through
-  // /api/hunt-mesh; the live record of the held cell rides the
-  // snapshot.
+  // The cell mode draws EXACTLY TWO hexagons of the whole partition:
+  // the one the bot fights in (the active cell of the live record -
+  // the fill, the bright stroke, the live label) and the one under
+  // the map cursor (the hover hit test of the mesh - the outline,
+  // the light fill and the name label). Every other hexagon of the
+  // registry stays INVISIBLE: a 1k+ cell partition stroked as a
+  // whole would drown the map, and the partition carries no
+  // information the operator needs while the fights run. The mesh
+  // payload still arrives once per registry version through
+  // /api/hunt-mesh (the hover hit test needs every polygon); the
+  // live record of the held cell rides the snapshot.
 
   // syncHuntMesh fetches the mesh when the snapshot carries a
   // version the cache does not hold. The fetch is async and
@@ -1810,7 +1805,6 @@ const MapView = {
       })
       .then((mesh) => {
         this.huntMesh = mesh;
-        this.cellBg.key = "";
         this.huntMeshFetching = false;
         this.redraw();
       })
@@ -1837,8 +1831,11 @@ const MapView = {
     return index;
   },
 
-  // drawHuntCells paints the partition: the cached edge raster plus
-  // the fresh highlight of the active cell and the hover labels.
+  // drawHuntCells paints the hunt layer of the cell mode: the active
+  // hexagon (the one the bot holds or fights in) and the hovered
+  // hexagon (the one under the cursor) - nothing else of the
+  // partition draws, the render load is two polygons and their
+  // labels.
   drawHuntCells(ctx, rect, snap) {
     const mesh = this.huntMesh;
     if (!mesh || mesh.version !== snap.huntMesh) {
@@ -1846,8 +1843,8 @@ const MapView = {
 
       return;
     }
-    this.blitCellMeshLayer(ctx, rect, mesh);
-    this.drawActiveCell(ctx, rect, snap);
+    this.drawActiveCell(ctx, snap);
+    this.drawHoveredCell(ctx);
   },
 
   // cellPath appends one cell polygon to the ctx path (the flat
@@ -1863,125 +1860,13 @@ const MapView = {
     ctx.closePath();
   },
 
-  // cellBBoxVisible reports whether the polygon bounding box of the
-  // cell intersects the view (the edge raster skips the offscreen
-  // cells).
-  cellBBoxVisible(cell, vw, vh) {
-    const verts = cell.verts;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity,
-      maxY = -Infinity;
-    for (let i = 0; i + 1 < verts.length; i += 2) {
-      const p = this.worldToScreen(verts[i], verts[i + 1]);
-      if (p.x < minX) { minX = p.x; }
-      if (p.y < minY) { minY = p.y; }
-      if (p.x > maxX) { maxX = p.x; }
-      if (p.y > maxY) { maxY = p.y; }
-    }
-
-    return maxX >= 0 && maxY >= 0 && minX <= vw && minY <= vh;
-  },
-
-  // drawCellMeshRaster strokes every cell edge of the mesh into the
-  // given context: one path, one stroke, no fills, no dashes - the
-  // outline of the whole partition costs a single stroke call.
-  drawCellMeshRaster(ctx, vw, vh, mesh) {
-    ctx.save();
-    ctx.globalAlpha = 0.55;
-    ctx.strokeStyle = zoneFutureColor;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (const cell of mesh.cells) {
-      if (!this.cellBBoxVisible(cell, vw, vh)) { continue; }
-      this.cellPath(ctx, cell);
-    }
-    ctx.stroke();
-    ctx.restore();
-  },
-
-  // blitCellMeshLayer composites the cached edge raster onto the
-  // frame: the cache rasterizes once per (mesh version, zoom, canvas
-  // geometry) and pans inside its slack box; a camera pan alone
-  // never re-strokes the mesh. Environments without an offscreen
-  // canvas (the Node harnesses) paint the raster directly.
-  blitCellMeshLayer(ctx, rect, mesh) {
-    const cb = this.cellBg;
-    if (!cb.canvas) {
-      cb.canvas = this.createBgCanvas();
-      if (!cb.canvas) {
-        this.drawCellMeshRaster(ctx, rect.width, rect.height, mesh);
-
-        return;
-      }
-      cb.ctx = cb.canvas.getContext("2d");
-    }
-    const dpr = this.viewDpr || 1;
-    const key = [mesh.version, this.scale, this.colorsRev,
-      Math.round(rect.width), Math.round(rect.height), dpr].join("|");
-    const drifted = Math.abs(this.camX - cb.cx) > cb.marginX
-      || Math.abs(this.camY - cb.cy) > cb.marginY;
-    if (cb.key !== key || drifted) {
-      this.renderCellMeshLayer(rect, dpr, key, mesh);
-    }
-    const cssW = cb.cssW, cssH = cb.cssH;
-    const left = this.camX - rect.width / 2 / this.scale;
-    const top = this.camY - rect.height / 2 / this.scale;
-    const dx = Math.round((cb.worldLeft - left) * this.scale * dpr) / dpr;
-    const dy = Math.round((cb.worldTop - top) * this.scale * dpr) / dpr;
-    ctx.drawImage(cb.canvas, 0, 0, cb.canvas.width, cb.canvas.height,
-      dx, dy, cssW, cssH);
-  },
-
-  // renderCellMeshLayer rasterizes the mesh edges into the cache
-  // with the cache geometry swapped in (the same swap dance the
-  // background and the hunt caches run).
-  renderCellMeshLayer(rect, dpr, key, mesh) {
-    const cb = this.cellBg;
-    const cssW = Math.max(1,
-      Math.round(rect.width * (1 + 2 * bgMarginOfView)));
-    const cssH = Math.max(1,
-      Math.round(rect.height * (1 + 2 * bgMarginOfView)));
-    let cd = Math.min(dpr, 2);
-    const fit = Math.sqrt(huntDevicePixels / (cssW * cssH));
-    if (cd > fit) { cd = Math.max(1, fit); }
-    const devW = Math.max(1, Math.round(cssW * cd));
-    const devH = Math.max(1, Math.round(cssH * cd));
-    if (cb.canvas.width !== devW) { cb.canvas.width = devW; }
-    if (cb.canvas.height !== devH) { cb.canvas.height = devH; }
-    const ctx = cb.ctx;
-    ctx.setTransform(cd, 0, 0, cd, 0, 0);
-    ctx.clearRect(0, 0, cssW, cssH);
-    const keepView = this.view;
-    const keepX = this.camX;
-    const keepY = this.camY;
-    this.view = { width: cssW, height: cssH,
-      left: keepView.left, top: keepView.top };
-    this.camX = cb.cx = keepX;
-    this.camY = cb.cy = keepY;
-    try {
-      this.drawCellMeshRaster(ctx, cssW, cssH, mesh);
-    } finally {
-      this.view = keepView;
-      this.camX = keepX;
-      this.camY = keepY;
-    }
-    cb.cssW = cssW;
-    cb.cssH = cssH;
-    cb.dpr = cd;
-    cb.worldLeft = cb.cx - cssW / 2 / this.scale;
-    cb.worldTop = cb.cy - cssH / 2 / this.scale;
-    cb.marginX = Math.max(1, rect.width * bgMarginOfView - 64)
-      / this.scale;
-    cb.marginY = Math.max(1, rect.height * bgMarginOfView - 64)
-      / this.scale;
-    cb.key = key;
-  },
-
-  // drawActiveCell highlights the ONE cell the bot holds or walks
-  // to: the light fill, the bright stroke and the minimal label
-  // (the name, the band, the respawn clock and the income of the
-  // live record). The hovered cell of the pointer draws its name
-  // label too - the rest of the map stays outline only.
-  drawActiveCell(ctx, rect, snap) {
+  // drawActiveCell highlights the ONE hexagon the bot fights in (or
+  // walks to): the light fill, the bright stroke, the focus dot and
+  // the minimal label (the name, the state, the band, the respawn
+  // clock and the income of the live record). No other hexagon of
+  // the partition draws except the one under the cursor (see
+  // drawHoveredCell).
+  drawActiveCell(ctx, snap) {
     const live = snap.huntCell;
     if (!live || !live.id) { return; }
     const index = this.cellMeshIndex();
@@ -2007,21 +1892,42 @@ const MapView = {
     ctx.fill();
     this.drawCellLabel(ctx, live, focus, true);
     ctx.restore();
-    // The hovered cell label (never the active one twice).
-    if (this.hoverZone && this.hoverZone.kind === "cell"
-        && this.hoverZone.id !== live.id) {
-      const hovered = index.get(this.hoverZone.id);
-      if (hovered) {
-        ctx.save();
-        const p = this.worldToScreen(hovered.focusX, hovered.focusY);
-        this.drawCellLabel(ctx, {
-          id: hovered.id, name: hovered.name,
-          state: "hover", minLevel: hovered.minLevel,
-          maxLevel: hovered.maxLevel, spawnMass: hovered.mass
-        }, p, false);
-        ctx.restore();
-      }
-    }
+  },
+
+  // drawHoveredCell draws the hexagon under the map cursor: the
+  // outline, the light fill and the name label with the band and the
+  // mass of the mesh record (no live economy - the hovered hexagon
+  // is a query, not the hunt). Never draws the active hexagon a
+  // second time.
+  drawHoveredCell(ctx) {
+    if (!this.hoverZone || this.hoverZone.kind !== "cell") { return; }
+    const live = this.lastSnap ? this.lastSnap.huntCell : null;
+    if (live && this.hoverZone.id === live.id) { return; }
+    const index = this.cellMeshIndex();
+    if (!index) { return; }
+    const hovered = index.get(this.hoverZone.id);
+    if (!hovered) { return; }
+    ctx.save();
+    ctx.globalAlpha = 0.10;
+    ctx.fillStyle = zoneFutureColor;
+    ctx.beginPath();
+    this.cellPath(ctx, hovered);
+    ctx.fill();
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = zoneFutureColor;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    this.cellPath(ctx, hovered);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const focus = this.worldToScreen(hovered.focusX, hovered.focusY);
+    this.drawCellLabel(ctx, {
+      id: hovered.id, name: hovered.name,
+      state: "hover", minLevel: hovered.minLevel,
+      maxLevel: hovered.maxLevel, spawnMass: hovered.mass
+    }, focus, false);
+    ctx.restore();
   },
 
   // drawCellLabel writes the label block of a cell near the anchor:
