@@ -449,7 +449,7 @@ func (b *Bot) NearestGroundItem(maxDistance float64) (LootItem, bool) {
 // in the future and the points outside the zone (nil zone or nil skip
 // map mean no limit).
 func (b *Bot) NearestGroundItemExcluding(
-    maxDistance float64, skipped map[int32]time.Time, zone *Zone,
+    maxDistance float64, skipped map[int32]time.Time, zone ZoneArea,
 ) (LootItem, bool) {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -468,7 +468,7 @@ func (b *Bot) NearestGroundItemExcluding(
         if until, ok := skipped[obj.ObjectID]; ok && until.After(now) {
             continue
         }
-        if !zone.Contains(obj.X, obj.Y) {
+        if zone != nil && !zone.Contains(obj.X, obj.Y) {
             continue
         }
         dist := math.Hypot(float64(obj.X)-selfX, float64(obj.Y)-selfY)

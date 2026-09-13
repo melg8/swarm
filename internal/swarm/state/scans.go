@@ -42,6 +42,31 @@ func (z *Zone) Contains(x int32, y int32) bool {
         y >= z.CY-z.Half && y <= z.CY+z.Half
 }
 
+// ZoneArea is the geometric leash contract of the hunt: the target
+// searches, the loot scans and the emptiness readings ask it whether
+// a world point belongs to the hunted ground. The square *Zone of
+// the legacy zone mode satisfies it directly; the convex *CellZone
+// of the Voronoi cell partition implements it with the half-plane
+// containment test. A nil area (or a nil square) means "no limit"
+// at the scan sites that treat the leash as a filter, the same
+// semantics the nil *Zone carried before the interface.
+type ZoneArea interface {
+    Contains(x int32, y int32) bool
+}
+
+// areaNil reports whether a ZoneArea argument carries no leash at
+// all: a nil interface or a nil square pointer. The distinction
+// matters because the legacy callers hand a nil *Zone into the
+// interface (a typed nil), which is NOT a nil interface.
+func areaNil(zone ZoneArea) bool {
+    if zone == nil {
+        return true
+    }
+    square, ok := zone.(*Zone)
+
+    return ok && square == nil
+}
+
 // NearestAttacker returns the closest living attackable npc that
 // currently targets the character: the mob whose blows land, the
 // chase of the flee flow. The projected position of every attacker
@@ -89,7 +114,7 @@ func (b *Bot) NearestAttacker() (AttackTarget, bool) {
 // from its last packet start position and a stale "nearest" choice
 // would send the character to a mob that is no longer the closest one.
 func (b *Bot) NearestAttackable(
-    maxDistance float64, zone *Zone,
+    maxDistance float64, zone ZoneArea,
 ) (AttackTarget, bool) {
     return b.NearestAttackableExcept(maxDistance, zone, nil)
 }
@@ -103,7 +128,7 @@ func (b *Bot) NearestAttackable(
 // skip list is a dense id slice the caller rebuilds into a reused
 // buffer - no per call map allocation on the tick path.
 func (b *Bot) NearestAttackableExcept(
-    maxDistance float64, zone *Zone, skip []int32,
+    maxDistance float64, zone ZoneArea, skip []int32,
 ) (AttackTarget, bool) {
     return b.nearestAttackable(maxDistance, zone, skip, 0, 0, false, nil)
 }
@@ -115,7 +140,7 @@ func (b *Bot) NearestAttackableExcept(
 // search of the engage fences the socially packed camps out, while
 // this check answers the plain question of whether the square still
 // holds anything to kill at all. A nil zone never holds mobs.
-func (b *Bot) ZoneHasAttackable(zone *Zone) bool {
+func (b *Bot) ZoneHasAttackable(zone ZoneArea) bool {
     return b.ZoneHasAttackableBelow(zone, 0)
 }
 
@@ -126,8 +151,8 @@ func (b *Bot) ZoneHasAttackable(zone *Zone) bool {
 // the ceiling is as good as empty for the rotation; level 0 disables
 // the filter like everywhere in the target search, an unresolved
 // template counts as passable). A nil zone never holds mobs.
-func (b *Bot) ZoneHasAttackableBelow(zone *Zone, maxLevel int32) bool {
-    if zone == nil {
+func (b *Bot) ZoneHasAttackableBelow(zone ZoneArea, maxLevel int32) bool {
+    if areaNil(zone) {
         return false
     }
     b.mu.RLock()
@@ -162,7 +187,7 @@ func (b *Bot) ZoneHasAttackableBelow(zone *Zone, maxLevel int32) bool {
 // center - stalls the whole session. A nil zone never holds pickable
 // targets.
 func (b *Bot) ZoneHasPickable(
-    zone *Zone, maxLevel int32, skip []int32,
+    zone ZoneArea, maxLevel int32, skip []int32,
 ) bool {
     return b.ZoneHasPickableWindowed(zone, 0, maxLevel, skip)
 }
@@ -175,7 +200,7 @@ func (b *Bot) ZoneHasPickable(
 // survivors. Zero disables the floor (an unresolved template passes
 // both bounds, matching the ceiling semantics).
 func (b *Bot) ZoneHasPickableWindowed(
-    zone *Zone, minLevel int32, maxLevel int32, skip []int32,
+    zone ZoneArea, minLevel int32, maxLevel int32, skip []int32,
 ) bool {
     _, ok := b.nearestAttackable(
         math.MaxFloat64, zone, skip, minLevel, maxLevel, true, nil)
@@ -268,7 +293,7 @@ type BlockedTarget struct {
 // the diagnostic logs a handful of the nearest mobs, not the whole
 // knownlist.
 func (b *Bot) NearestBlockedTargets(
-    zone *Zone, maxLevel int32, skip []int32, limit int,
+    zone ZoneArea, maxLevel int32, skip []int32, limit int,
 ) []BlockedTarget {
     return b.NearestBlockedTargetsWindowed(zone, 0, maxLevel, skip, limit)
 }
@@ -277,7 +302,7 @@ func (b *Bot) NearestBlockedTargets(
 // level window floor of the spot hunting: a mob below the floor shows
 // its reason like the ones above the ceiling.
 func (b *Bot) NearestBlockedTargetsWindowed(
-    zone *Zone, minLevel int32, maxLevel int32, skip []int32, limit int,
+    zone ZoneArea, minLevel int32, maxLevel int32, skip []int32, limit int,
 ) []BlockedTarget {
     if limit <= 0 {
         return nil
@@ -340,7 +365,7 @@ func (b *Bot) NearestBlockedTargetsWindowed(
 // names the reasons print; the caller must hold the read lock.
 func blockedReason(
     scans []npcScan, cand *npcScan, cold []objectCold,
-    zone *Zone, minLevel int32, maxLevel int32, skip []int32,
+    zone ZoneArea, minLevel int32, maxLevel int32, skip []int32,
 ) string {
     if skipContains(skip, cand.objectID) {
         return "skipped by the engage"
@@ -353,7 +378,8 @@ func blockedReason(
         return fmt.Sprintf("level %d above the ceiling %d",
             cand.level, maxLevel)
     }
-    if !zone.Contains(int32(math.Round(cand.x)), int32(math.Round(cand.y))) {
+    if zone != nil && !zone.Contains(int32(math.Round(cand.x)),
+        int32(math.Round(cand.y))) {
         return "outside the hunting zone"
     }
     if helper := socialHelperRecord(scans, cand); helper != nil {
@@ -383,7 +409,7 @@ const targetPriorityBias = 200.0
 // unknown level means the bot never resolved the template and should
 // not be fenced by it.
 func (b *Bot) NearestAttackableConstrained(
-    maxDistance float64, zone *Zone, skip []int32,
+    maxDistance float64, zone ZoneArea, skip []int32,
     maxLevel int32, avoidSocial bool,
 ) (AttackTarget, bool) {
     return b.nearestAttackable(
@@ -397,7 +423,7 @@ func (b *Bot) NearestAttackableConstrained(
 // exp rich mobs when several candidates sit at a comparable range. A
 // nil (or empty) priority map keeps the plain nearest-first pick.
 func (b *Bot) NearestAttackablePreferred(
-    maxDistance float64, zone *Zone, skip []int32,
+    maxDistance float64, zone ZoneArea, skip []int32,
     maxLevel int32, avoidSocial bool, priority map[int32]int32,
 ) (AttackTarget, bool) {
     return b.nearestAttackable(
@@ -411,7 +437,7 @@ func (b *Bot) NearestAttackablePreferred(
 // unresolved template (level 0) passes both bounds like everywhere in
 // the target search.
 func (b *Bot) NearestAttackablePreferredWindowed(
-    maxDistance float64, zone *Zone, skip []int32,
+    maxDistance float64, zone ZoneArea, skip []int32,
     minLevel int32, maxLevel int32, avoidSocial bool,
     priority map[int32]int32,
 ) (AttackTarget, bool) {
@@ -430,7 +456,7 @@ func (b *Bot) NearestAttackablePreferredWindowed(
 //
 //nolint:cyclop // the zone, level, social and priority filters are one scan
 func (b *Bot) nearestAttackable(
-    maxDistance float64, zone *Zone, skip []int32,
+    maxDistance float64, zone ZoneArea, skip []int32,
     minLevel int32, maxLevel int32, avoidSocial bool,
     priority map[int32]int32,
 ) (AttackTarget, bool) {
@@ -463,7 +489,7 @@ func (b *Bot) nearestAttackable(
             continue
         }
         x, y := projectedPosition(obj, nowNano)
-        if !zone.Contains(
+        if zone != nil && !zone.Contains(
             int32(math.Round(x)), int32(math.Round(y))) {
             continue
         }
@@ -496,7 +522,7 @@ func (b *Bot) nearestAttackable(
 // implementation rescanned the whole world storage per candidate. The
 // caller must hold the read lock.
 func (b *Bot) nearestAttackableSocial(
-    maxDistance float64, zone *Zone, skip []int32,
+    maxDistance float64, zone ZoneArea, skip []int32,
     minLevel int32, maxLevel int32, priority map[int32]int32,
 ) (AttackTarget, bool) {
     //nolint:exhaustruct_v5 // zero value grows inside the loop
@@ -531,7 +557,7 @@ func (b *Bot) nearestAttackableSocial(
         if minLevel > 0 && cand.level < minLevel && cand.level > 0 {
             continue
         }
-        if !zone.Contains(
+        if zone != nil && !zone.Contains(
             int32(math.Round(cand.x)), int32(math.Round(cand.y))) {
             continue
         }
@@ -768,10 +794,10 @@ func templateWanted(templateID int32, templates []int32) bool {
 // delevel policy compares the character level against it to detect a
 // hunting ground whose monsters are too low for the character. Nil zones
 // mean no limit and return zero.
-func (b *Bot) MedianZoneMobLevel(zone *Zone) int32 {
+func (b *Bot) MedianZoneMobLevel(zone ZoneArea) int32 {
     b.mu.RLock()
     defer b.mu.RUnlock()
-    if zone == nil {
+    if areaNil(zone) {
         return 0
     }
     levels := make([]int32, 0, len(b.world.hot))
