@@ -73,6 +73,66 @@ const MapView = {
   // the bot walks there.
   userMark: null,
 
+  // ---- the per batch viewport and camera cache ----
+  //
+  // The map used to read getBoundingClientRect (and the follow
+  // checkbox) inside every worldToScreen call: a zoomed out frame
+  // fires it hundreds of times (tiles, kill marks, every object twice)
+  // and each read between the DOM writes of the tooltip and the status
+  // chips forces a synchronous layout - the drag and far zoom lag was
+  // a layout thrash, not a draw cost. The geometry is now read once
+  // per frame batch into these fields (syncView) and the transform is
+  // pure math.
+  view: { width: 800, height: 600, left: 0, top: 0 },
+  followOn: false,
+  camX: 0,
+  camY: 0,
+
+  // sortedObjects: the stable draw order of the snapshot objects
+  // (dead first, then north to south, then object id), sorted once per
+  // snapshot instead of once per frame.
+  sortedObjects: [],
+
+  // objectsText: the object count line of the map footer, derived
+  // from the snapshot alone - it cannot change between snapshots, so
+  // updateMapInfo re-writes the chip only when it actually differs.
+  objectsText: "",
+
+  // chipTexts: the last written text of the footer chips, so the
+  // per frame info update writes the DOM only on a real change.
+  chipTexts: {},
+
+  // labelWidths: the measured pixel width of every label text. The
+  // declutter pass called measureText per label per frame; the names
+  // repeat across frames, so the width is measured once per text.
+  labelWidths: new Map(),
+
+  // The resolved fonts of the map text (getComputedStyle per draw
+  // was a forced style resolve every frame): the zone and unit label
+  // font and the sans stack of the damage numbers.
+  labelFont: "600 10.5px sans-serif",
+  sansStack: "sans-serif",
+
+  // projectionCache: the per object cursor of the server movement
+  // replay (see projectTickwise) - the tick recurrence is memoized at
+  // the last whole tick so a long walk costs O(ticks since the last
+  // frame), not O(ticks since the move started) on every frame.
+  projectionCache: new Map(),
+
+  // ---- the fps meter ----
+  //
+  // Counts every painted frame (the rAF animation loop and the event
+  // driven repaints alike - a drag that repaints on every mousemove is
+  // a real frame budget user) and the wall time each paint took. The
+  // chip in the map corner shows the last half second window; every
+  // five seconds the same numbers go to the console so a lag report
+  // carries the measurements. The fields are mutated in place - the
+  // meter must never allocate in the paint path.
+  fps: {
+    paints: 0, drawMs: 0, worstMs: 0, windowStart: 0,
+    lastChip: "", lastChipAt: 0, lastLogAt: 0, chip: null
+  },
+
   // The live combat animation layer: the server observed swings and
   // damage landings replayed as short canvas effects (see
   // spawnCombatAnim). lastCombatSeq dedupes the events across the
@@ -136,6 +196,14 @@ const MapView = {
         this.draw();
       });
     }
+    // The idle marker of the fps chip: when nothing painted for a
+    // while the chip must say so instead of freezing the last reading
+    // (a stopped render loop is a fact worth seeing). The interval
+    // only exists where timers exist - the Node harnesses run the
+    // meter fine without it.
+    if (typeof setInterval === "function") {
+      setInterval(() => this.markFpsIdle(), 1200);
+    }
   },
 
   // Canvas colors: the UI chrome (grid, text) follows the active theme
@@ -154,6 +222,12 @@ const MapView = {
       border: read("--border"),
       zone: read("--text-dim")
     };
+    // The map text fonts resolve once here: the label draw and the
+    // zone names used to run getComputedStyle per draw (per damage
+    // number even), which forced a style resolve every frame.
+    this.sansStack = read("--sans") || "sans-serif";
+    this.labelFont = "600 10.5px " + this.sansStack;
+    this.labelWidths.clear();
     this.mapColors = {
       self: "#1a73e8",
       player: "#9334e6",
@@ -208,9 +282,21 @@ const MapView = {
     for (const id of this.runtime.keys()) {
       if (!alive.has(id)) { this.runtime.delete(id); }
     }
+    for (const id of this.projectionCache.keys()) {
+      if (!alive.has(id)) { this.projectionCache.delete(id); }
+    }
     this.ingestCombatEvents(snapshot);
     this.lastSnap = snapshot;
     this.rebuildSocialMasks(snapshot);
+    // The stable draw order and the footer object counts derive from
+    // the snapshot alone: computing them here keeps every frame of the
+    // render loop free of the per frame sort and the per frame count
+    // walk (the sort ran on every draw before - a slice plus an
+    // n log n compare on every animation frame).
+    this.sortedObjects = (snapshot.objects || []).slice()
+      .sort((a, b) => ((a.dead ? 0 : 1) - (b.dead ? 0 : 1))
+        || (a.y - b.y) || (a.objectId - b.objectId));
+    this.objectsText = this.buildObjectsText(snapshot);
     this.kickAnimation();
     this.draw();
   },
@@ -224,6 +310,9 @@ const MapView = {
     this.lastSnap = null;
     this.runtime.clear();
     this.socialMasks.clear();
+    this.projectionCache.clear();
+    this.sortedObjects = [];
+    this.objectsText = "";
     this.combatAnims = [];
     this.lastCombatSeq = 0;
     this.userMark = null;
@@ -258,9 +347,9 @@ const MapView = {
 
   onWheel(event) {
     event.preventDefault();
-    const rect = this.canvas.getBoundingClientRect();
+    this.syncView();
     const cursor = {
-      x: event.clientX - rect.left, y: event.clientY - rect.top
+      x: event.clientX - this.view.left, y: event.clientY - this.view.top
     };
     // Anchor the zoom at the cursor: the world point under it must
     // stay under it (like the google maps wheel zoom). While follow is
@@ -277,18 +366,36 @@ const MapView = {
     }
   },
 
-  // screenToWorld inverts the world to screen transform for a viewport
-  // relative point.
+  // screenToWorld inverts the world to screen transform for a
+  // viewport relative point. Pure math on the synced view cache -
+  // the callers are input handlers that run syncView on entry.
   screenToWorld(sx, sy) {
-    const rect = this.canvas.getBoundingClientRect();
-
     return {
-      x: this.centerX() + (sx - rect.width / 2) / this.scale,
-      y: this.centerY() + (sy - rect.height / 2) / this.scale
+      x: this.camX + (sx - this.view.width / 2) / this.scale,
+      y: this.camY + (sy - this.view.height / 2) / this.scale
     };
   },
 
+  // syncView reads the viewport geometry and the camera state once
+  // per frame batch. draw() calls it at the top; the input handlers
+  // that need world coordinates before a draw (hover, wheel, clicks,
+  // drags) call it on entry. Between two syncView calls the transform
+  // math is pure - no layout reads, no style resolves.
+  syncView() {
+    const rect = this.canvas.getBoundingClientRect();
+    this.view.width = rect.width;
+    this.view.height = rect.height;
+    this.view.left = rect.left;
+    this.view.top = rect.top;
+    this.followOn = !this.pathfindEnabled() && !this.zoneFocus
+      && document.getElementById("follow").checked;
+    const pos = this.followOn ? this.charPos() : this.panAnchor;
+    this.camX = pos.x;
+    this.camY = pos.y;
+  },
+
   onDragStart(event) {
+    this.syncView();
     if (this.pathfindEnabled()) {
       if (this.pathfind.placeMode) {
         this.setPathfindMarker(this.pathfind.placeMode,
@@ -453,7 +560,7 @@ const MapView = {
       // A view seen for the first time mid move starts at the projected
       // position (anchored at the packet time), so a mob that walked
       // into the known list does not pop up at its segment start.
-      const p = this.projectTickwise(view, nowMs);
+      const p = this.projectTickwise(view, key, nowMs);
       rt = {
         drawX: p.x, drawY: p.y, drawHeading: view.heading || 0,
         settled: true, lastV: 0
@@ -463,7 +570,7 @@ const MapView = {
     if (view.speed > 0) {
       rt.lastV = view.speed;
     }
-    const target = this.projectTickwise(view, nowMs);
+    const target = this.projectTickwise(view, key, nowMs);
     const dx = target.x - rt.drawX;
     const dy = target.y - rt.drawY;
     const dist = Math.hypot(dx, dy);
@@ -504,7 +611,18 @@ const MapView = {
   // positions around the current tick are interpolated linearly, which
   // renders the same average motion as one straight constant speed move
   // - exactly what the official client animation does with the ticks.
-  projectTickwise(view, nowMs) {
+  //
+  // The replay is memoized per object (projectionCache): the cursor
+  // of the last whole tick is kept, so a frame only advances the ticks
+  // that passed since the previous frame. Without the memo a long walk
+  // replayed its whole tick history on every animation frame - a two
+  // minute town trip ran a 1200 iteration loop sixty times per second,
+  // and the loop never shrank back after the arrival snap. The cache
+  // key is the move signature; a new packet (a re-issued move, a
+  // speed change) resets the cursor and replays from the packet
+  // anchor - the arithmetic sequence is identical either way, so the
+  // result is bit for bit what the from scratch replay produced.
+  projectTickwise(view, key, nowMs) {
     if (!view.moving || !(view.speed > 0)) {
       return { x: view.x, y: view.y };
     }
@@ -514,29 +632,61 @@ const MapView = {
     }
     const collision = view.collisionRadius > 0
       ? view.collisionRadius : defaultCollisionRadius;
-    const step = view.speed / 10;
     const tickFloat = Math.max(0, nowMs - (view.moveAtMs || 0)) / 100;
     const whole = Math.floor(tickFloat);
     const frac = tickFloat - whole;
-    let x = view.x;
-    let y = view.y;
-    for (let k = 0; k <= whole; k++) {
-      const remainingX = view.destX - x;
-      const remainingY = view.destY - y;
+    const moveAtMs = view.moveAtMs || 0;
+    let memo = this.projectionCache.get(key);
+    if (!memo || memo.x0 !== view.x || memo.y0 !== view.y
+      || memo.dx !== view.destX || memo.dy !== view.destY
+      || memo.speed !== view.speed || memo.coll !== collision
+      || memo.atMs !== moveAtMs) {
+      memo = {
+        x0: view.x, y0: view.y, dx: view.destX, dy: view.destY,
+        speed: view.speed, coll: collision, atMs: moveAtMs,
+        x: view.x, y: view.y, tick: 0
+      };
+      this.projectionCache.set(key, memo);
+    }
+    const step = view.speed / 10;
+    while (memo.tick < whole) {
+      const remainingX = view.destX - memo.x;
+      const remainingY = view.destY - memo.y;
       const remaining = Math.hypot(remainingX, remainingY);
       const delta = Math.max(0.00001, remaining - collision);
       const advance = step / delta;
-      const nextX = advance >= 1 ? view.destX : x + remainingX * advance;
-      const nextY = advance >= 1 ? view.destY : y + remainingY * advance;
-      if (k === whole) {
-        // The window between tick k and tick k+1: interpolate.
-        return { x: x + (nextX - x) * frac, y: y + (nextY - y) * frac };
-      }
-      x = nextX;
-      y = nextY;
-    }
+      if (advance >= 1) {
+        // The arrival snap: every later tick computes the same
+        // destination, so the cursor jumps straight to the present.
+        memo.x = view.destX;
+        memo.y = view.destY;
+        memo.tick = whole;
 
-    return { x, y };
+        break;
+      }
+      memo.x += remainingX * advance;
+      memo.y += remainingY * advance;
+      memo.tick += 1;
+    }
+    if (memo.tick > whole) {
+      // The clock estimate moved backwards (a fresher snapshot with
+      // an earlier sample): hold the last position until time passes
+      // the cursor again instead of rewinding the walk.
+      return { x: memo.x, y: memo.y };
+    }
+    // The window between the whole tick and the next one: interpolate.
+    const remainingX = view.destX - memo.x;
+    const remainingY = view.destY - memo.y;
+    const remaining = Math.hypot(remainingX, remainingY);
+    const delta = Math.max(0.00001, remaining - collision);
+    const advance = step / delta;
+    const nextX = advance >= 1 ? view.destX : memo.x + remainingX * advance;
+    const nextY = advance >= 1 ? view.destY : memo.y + remainingY * advance;
+
+    return {
+      x: memo.x + (nextX - memo.x) * frac,
+      y: memo.y + (nextY - memo.y) * frac
+    };
   },
 
   // ---- world map background ----
@@ -574,7 +724,11 @@ const MapView = {
     const byMin = Math.floor(worldTop / tile) + this.mapTileZeroY;
     const byMax = Math.floor(worldBottom / tile) + this.mapTileZeroY;
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+    // "low" (bilinear) instead of "high": the high quality filter of
+    // the zoomed out frames downscaled a dozen 512px tiles per paint
+    // and is visually indistinguishable on terrain imagery - the far
+    // zoom tile pass was one of the biggest frame costs.
+    ctx.imageSmoothingQuality = "low";
     for (let bx = bxMin; bx <= bxMax; bx++) {
       for (let by = byMin; by <= byMax; by++) {
         // The full resolution tiles ship only for the detail window:
@@ -620,7 +774,7 @@ const MapView = {
     const byMin = Math.floor(worldTop / tile) + this.mapTileZeroY;
     const byMax = Math.floor(worldBottom / tile) + this.mapTileZeroY;
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+    ctx.imageSmoothingQuality = "low";
     for (let bx = bxMin; bx <= bxMax; bx++) {
       for (let by = byMin; by <= byMax; by++) {
         const entry = this.geoTileAncestor(level, bx, by);
@@ -774,18 +928,15 @@ const MapView = {
 
   // eventWorld converts a mouse event to world coordinates.
   eventWorld(event) {
-    const rect = this.canvas.getBoundingClientRect();
-
     return this.screenToWorld(
-      event.clientX - rect.left, event.clientY - rect.top);
+      event.clientX - this.view.left, event.clientY - this.view.top);
   },
 
   // pathfindMarkerAt hit tests the draggable markers in screen space.
   pathfindMarkerAt(clientX, clientY) {
     if (!this.pathfindEnabled()) { return null; }
-    const rect = this.canvas.getBoundingClientRect();
-    const mx = clientX - rect.left;
-    const my = clientY - rect.top;
+    const mx = clientX - this.view.left;
+    const my = clientY - this.view.top;
     for (const key of ["end", "start"]) {
       const marker = this.pathfind[key];
       const p = this.worldToScreen(marker.x, marker.y);
@@ -877,10 +1028,23 @@ const MapView = {
 
   // ---- drawing ----
 
+  // draw paints one frame: syncs the view cache once, paints every
+  // layer and feeds the fps meter (the paint wall time is the number
+  // the chip and the console log carry). Every repaint - the rAF
+  // animation loop, a drag mousemove, a zoom wheel tick, a landed
+  // tile - goes through here, so the meter sees the real frame
+  // budget the user feels.
   draw() {
     const ctx = this.ctx;
     if (!ctx || !this.colors) { return; }
-    const rect = this.canvas.getBoundingClientRect();
+    const paintStart = performance.now();
+    this.syncView();
+    this.paint(ctx);
+    this.notePaint(paintStart);
+  },
+
+  paint(ctx) {
+    const rect = this.view;
     ctx.clearRect(0, 0, rect.width, rect.height);
     const pathfind = this.pathfindEnabled();
     if (!this.lastSnap && !pathfind) { return; }
@@ -912,6 +1076,96 @@ const MapView = {
       this.drawLabels(ctx);
     }
     this.updateMapInfo();
+  },
+
+  // ---- the fps meter ----
+
+  // notePaint closes one measurement: the paint wall time joins the
+  // current window and, every fpsWindowMs, the window becomes the
+  // chip reading (and every fpsLogMs a console line - the log line
+  // is what a lag report pastes).
+  notePaint(started) {
+    const now = performance.now();
+    const f = this.fps;
+    f.paints += 1;
+    const took = now - started;
+    f.drawMs += took;
+    if (took > f.worstMs) { f.worstMs = took; }
+    f.lastChipAt = now;
+    if (f.windowStart === 0) {
+      f.windowStart = now;
+
+      return;
+    }
+    const elapsed = now - f.windowStart;
+    if (elapsed < fpsWindowMs) { return; }
+    const fps = Math.round(f.paints * 1000 / elapsed);
+    const avgMs = f.drawMs / Math.max(1, f.paints);
+    this.renderFpsChip(fps, avgMs, f.worstMs);
+    if (now - f.lastLogAt >= fpsLogMs) {
+      f.lastLogAt = now;
+      this.logFps(fps, avgMs, f.worstMs);
+    }
+    f.paints = 0;
+    f.drawMs = 0;
+    f.worstMs = 0;
+    f.windowStart = now;
+  },
+
+  // renderFpsChip updates the on-screen counter: the last window
+  // reading with the draw cost, colored by health. The write only
+  // happens when the text changed - a steady 60 fps window must not
+  // dirty the DOM at all.
+  renderFpsChip(fps, avgMs, worstMs) {
+    let text = fps + " fps · draw " + avgMs.toFixed(1) + " ms";
+    if (worstMs > Math.max(fpsWorstShowMs, 3 * Math.max(avgMs, 0.1))) {
+      text += " · worst " + worstMs.toFixed(1) + " ms";
+    }
+    if (text === this.fps.lastChip) { return; }
+    this.fps.lastChip = text;
+    const chip = this.fpsChip();
+    if (!chip) { return; }
+    // textContent and inline style only: the stub DOM of the Node
+    // harnesses has no dataset/classList.add, and both are enough for
+    // the chip.
+    chip.textContent = text;
+    chip.style.color = fps >= fpsGoodThreshold
+      ? fpsGoodColor : fps >= fpsOkThreshold ? fpsOkColor : fpsBadColor;
+  },
+
+  // markFpsIdle flags the chip when nothing painted for a while - a
+  // stopped render loop (no movers, no effects) is the normal idle
+  // state and must not read as the last window forever.
+  markFpsIdle() {
+    const f = this.fps;
+    if (f.windowStart === 0) { return; }
+    if (performance.now() - f.lastChipAt < 1500) { return; }
+    if (f.lastChip === "idle") { return; }
+    f.lastChip = "idle";
+    const chip = this.fpsChip();
+    if (chip) {
+      chip.textContent = "idle";
+      chip.style.color = "";
+    }
+  },
+
+  // logFps prints the window to the console so the browser devtools
+  // log of a lag report carries the numbers (the Node harnesses run
+  // without a console - the typeof guard keeps them quiet).
+  logFps(fps, avgMs, worstMs) {
+    if (typeof console === "undefined" || !console.log) { return; }
+    console.log("map fps: " + fps + " fps · draw avg "
+      + avgMs.toFixed(1) + " ms · worst " + worstMs.toFixed(1) + " ms");
+  },
+
+  // fpsChip resolves the counter element once: it lives in the map
+  // corner (index.html #map-fps).
+  fpsChip() {
+    if (!this.fps.chip && typeof document !== "undefined") {
+      this.fps.chip = document.getElementById("map-fps");
+    }
+
+    return this.fps.chip;
   },
 
   // computeUnitScale maps the zoom into a marker size factor: the
@@ -988,8 +1242,7 @@ const MapView = {
       return snap.huntingZone || null;
     }
     const world = this.screenToWorld(
-      clientX - this.canvas.getBoundingClientRect().left,
-      clientY - this.canvas.getBoundingClientRect().top);
+      clientX - this.view.left, clientY - this.view.top);
     let best = null;
     let bestArea = Infinity;
     for (const zone of zones) {
@@ -1025,8 +1278,8 @@ const MapView = {
     const center = this.worldToScreen(zone.cx, zone.cy);
     const radius = zone.radius * this.scale;
     if (center.x + radius < 0 || center.y + radius < 0
-      || center.x - radius > this.canvas.clientWidth
-      || center.y - radius > this.canvas.clientHeight) {
+      || center.x - radius > this.view.width
+      || center.y - radius > this.view.height) {
       return;
     }
     // The name (with its economy suffixes) only reads while the
@@ -1094,8 +1347,7 @@ const MapView = {
       ctx.stroke();
     }
     if (drawLabel) {
-      ctx.font = "600 10.5px " + (getComputedStyle(document.documentElement)
-        .getPropertyValue("--sans").trim() || "sans-serif");
+      ctx.font = this.labelFont;
       ctx.lineWidth = 3;
       ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
       ctx.strokeText(label, center.x + 8, center.y - 8);
@@ -1118,7 +1370,7 @@ const MapView = {
     const highlighted = this.zoneHighlighted(zone);
     const p1 = this.worldToScreen(zone.cx - zone.half, zone.cy - zone.half);
     const size = zone.half * 2 * this.scale;
-    if (p1.x > this.canvas.clientWidth || p1.y > this.canvas.clientHeight
+    if (p1.x > this.view.width || p1.y > this.view.height
       || p1.x + size < 0 || p1.y + size < 0) {
       return;
     }
@@ -1163,8 +1415,7 @@ const MapView = {
     ctx.stroke();
     ctx.setLineDash([]);
     if (drawLabel) {
-      ctx.font = "600 10.5px " + (getComputedStyle(document.documentElement)
-        .getPropertyValue("--sans").trim() || "sans-serif");
+      ctx.font = this.labelFont;
       ctx.lineWidth = 3;
       ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
       ctx.strokeText(label, p1.x + 6, p1.y + 14);
@@ -1235,9 +1486,15 @@ const MapView = {
       const mask = this.socialMasks.get(obj.objectId);
       if (!mask || !(obj.clanHelpRange > 0)) { continue; }
       const rt = this.runtime.get(obj.objectId);
+      const x = rt ? rt.drawX : obj.x;
+      const y = rt ? rt.drawY : obj.y;
+      // The screen position is computed once per unit: the pair loop
+      // below used to transform the same position again for every
+      // candidate pair - a dense pack multiplied the transform cost
+      // by its square.
+      const p = this.worldToScreen(x, y);
       units.push({
-        x: rt ? rt.drawX : obj.x,
-        y: rt ? rt.drawY : obj.y,
+        x: x, y: y, sx: p.x, sy: p.y,
         low: mask.low, all: mask.all,
         range: obj.clanHelpRange
       });
@@ -1261,11 +1518,11 @@ const MapView = {
         const dy = b.y - a.y;
         const dist = Math.hypot(dx, dy);
         if (dist > warn) { continue; }
-        const pa = this.worldToScreen(a.x, a.y);
-        const pb = this.worldToScreen(b.x, b.y);
-        if ((pa.x < -40 && pb.x < -40) || (pa.y < -40 && pb.y < -40)
-          || (pa.x > rect.width + 40 && pb.x > rect.width + 40)
-          || (pa.y > rect.height + 40 && pb.y > rect.height + 40)) {
+        const pa = a;
+        const pb = b;
+        if ((pa.sx < -40 && pb.sx < -40) || (pa.sy < -40 && pb.sy < -40)
+          || (pa.sx > rect.width + 40 && pb.sx > rect.width + 40)
+          || (pa.sy > rect.height + 40 && pb.sy > rect.height + 40)) {
           continue;
         }
         if (dist <= range) {
@@ -1282,8 +1539,8 @@ const MapView = {
           ctx.strokeStyle = socialWarnColor;
         }
         ctx.beginPath();
-        ctx.moveTo(pa.x, pa.y);
-        ctx.lineTo(pb.x, pb.y);
+        ctx.moveTo(pa.sx, pa.sy);
+        ctx.lineTo(pb.sx, pb.sy);
         ctx.stroke();
       }
     }
@@ -1306,11 +1563,10 @@ const MapView = {
       };
     }
     this.zoneFocus = zone;
-    const rect = this.canvas.getBoundingClientRect();
     const span = zone.kind === "spot"
       ? Math.max(zone.radius || 0, zone.half || 0) * 2
       : zone.half * 2;
-    const fit = Math.min(rect.width, rect.height) * 0.55
+    const fit = Math.min(this.view.width, this.view.height) * 0.55
       / Math.max(span, 1);
     this.scale = Math.max(0.008, Math.min(1.5, fit));
     this.panAnchor = { x: zone.cx, y: zone.cy };
@@ -1412,6 +1668,13 @@ const MapView = {
   drawAggroRanges(ctx, rect) {
     if (!document.getElementById("show-aggro").checked) { return; }
     if (!this.lastSnap || !this.lastSnap.objects) { return; }
+    // The shared style of every circle is set once: the per mob
+    // save/restore pairs (a full state vector round trip each) used
+    // to cost more than the arcs themselves on a packed field.
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
     for (const obj of this.lastSnap.objects) {
       if (obj.kind !== "npc" || !obj.aggressive || obj.dead) { continue; }
       if (!obj.aggroRange || obj.aggroRange <= 0) { continue; }
@@ -1424,17 +1687,14 @@ const MapView = {
         || c.y + radius < 0 || c.y - radius > rect.height) {
         continue;
       }
-      ctx.save();
       ctx.strokeStyle = obj.inCombat
         ? this.mapColors.combat : this.mapColors.aggressive;
-      ctx.globalAlpha = 0.35;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 6]);
       ctx.beginPath();
       ctx.arc(c.x, c.y, radius, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.restore();
     }
+    ctx.setLineDash([]);
+    ctx.restore();
   },
 
   drawObjects(ctx, rect) {
@@ -1444,10 +1704,14 @@ const MapView = {
     // The snapshot objects come out of a go map in random order: the
     // draw order must be stable or overlapping units swap their z
     // position on every snapshot and flicker (dead units always render
-    // below the living ones, then north to south).
-    const objects = (this.lastSnap.objects || []).slice()
-      .sort((a, b) => ((a.dead ? 0 : 1) - (b.dead ? 0 : 1))
-        || (a.y - b.y) || (a.objectId - b.objectId));
+    // below the living ones, then north to south). The order depends
+    // on the snapshot alone, so update() sorts it once per snapshot
+    // (this used to re-sort a copy on every animation frame).
+    const objects = this.sortedObjects;
+    const nowMs = performance.now();
+    // The destination dash lines share their style: set it once for
+    // the whole pass instead of a save/restore round trip per unit.
+    let destStyled = false;
     for (const obj of objects) {
       const rt = this.runtime.get(obj.objectId) || {
         drawX: obj.x, drawY: obj.y, drawHeading: obj.heading
@@ -1459,17 +1723,19 @@ const MapView = {
       }
       const threat = threatOf(obj);
       if (showDest && obj.moving) {
-        const d = this.worldToScreen(obj.destX, obj.destY);
-        ctx.save();
-        ctx.strokeStyle = this.colors.textDim;
+        if (!destStyled) {
+          ctx.save();
+          ctx.strokeStyle = this.colors.textDim;
+          ctx.setLineDash([4, 3]);
+          ctx.lineWidth = 1;
+          destStyled = true;
+        }
         ctx.globalAlpha = obj.dead ? 0.15 : 0.35;
-        ctx.setLineDash([4, 3]);
-        ctx.lineWidth = 1;
+        const d = this.worldToScreen(obj.destX, obj.destY);
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(d.x, d.y);
         ctx.stroke();
-        ctx.restore();
       }
       let labelRadius = 4;
       if (obj.kind === "item") {
@@ -1481,7 +1747,7 @@ const MapView = {
             dead: obj.dead,
             combat: threat === "combat",
             attackingMe: this.isAttackingMe(obj),
-            pulse: performance.now(),
+            pulse: nowMs,
             scale: this.unitScale
           });
         this.drawSocialMarker(ctx, p.x, p.y, labelRadius,
@@ -1510,6 +1776,11 @@ const MapView = {
         });
       }
     }
+    if (destStyled) {
+      ctx.globalAlpha = 1;
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
   },
 
   // labelPriority ranks the labels for the declutter pass: the own
@@ -1528,16 +1799,18 @@ const MapView = {
 
   // drawLabels runs the declutter pass and paints the surviving names
   // with a dark halo, which keeps them readable over the light map
-  // imagery and over both theme fills alike.
+  // imagery and over both theme fills alike. The font is the cached
+  // labelFont (a getComputedStyle ran per draw before) and the text
+  // widths come from the labelWidths cache - measureText used to run
+  // per label per frame.
   drawLabels(ctx) {
-    ctx.font = "600 10.5px " + getComputedStyle(document.documentElement)
-      .getPropertyValue("--sans").trim() || "sans-serif";
+    ctx.font = this.labelFont;
     ctx.textAlign = "center";
     const taken = [];
     const candidates = this.labelCandidates.slice()
       .sort((a, b) => a.priority - b.priority);
     for (const cand of candidates) {
-      const width = ctx.measureText(cand.text).width + 6;
+      const width = this.labelWidth(ctx, cand.text);
       const rect = {
         left: cand.x - width / 2, right: cand.x + width / 2,
         top: cand.y - 12, bottom: cand.y + 2
@@ -1554,6 +1827,23 @@ const MapView = {
       ctx.fillText(cand.text, cand.x, cand.y);
     }
     ctx.textAlign = "left";
+  },
+
+  // labelWidth measures a label text once: the names repeat across
+  // frames and snapshots, so the width joins the cache (bounded - a
+  // long live session sees many mob names but the cache clears with
+  // the theme, and the cap drops a pathological set).
+  labelWidth(ctx, text) {
+    let width = this.labelWidths.get(text);
+    if (width === undefined) {
+      if (this.labelWidths.size > 4000) {
+        this.labelWidths.clear();
+      }
+      width = ctx.measureText(text).width + 6;
+      this.labelWidths.set(text, width);
+    }
+
+    return width;
   },
 
   isAttackingMe(obj) {
@@ -1769,25 +2059,44 @@ const MapView = {
   },
 
   updateMapInfo() {
-    const rect = this.canvas.getBoundingClientRect();
-    const across = Math.round(rect.width / this.scale);
-    document.getElementById("map-scale").textContent =
-      "≈ " + across.toLocaleString("en-US") + " units across";
+    // The chips only re-write when the text actually changed: the
+    // scale string holds still through a drag (it changes with the
+    // zoom and the window size only) and the objects string is
+    // derived per snapshot, so a pan or a render loop frame dirties
+    // no layout at all.
+    const across = Math.round(this.view.width / this.scale);
+    this.setChipText("map-scale",
+      "≈ " + across.toLocaleString("en-US") + " units across");
     if (!this.lastSnap) {
-      document.getElementById("map-objects").textContent = "pathfind test";
+      this.setChipText("map-objects", "pathfind test");
 
       return;
     }
-    const objects = this.lastSnap.objects || [];
+    this.setChipText("map-objects", this.objectsText);
+  },
+
+  // buildObjectsText derives the footer object counts of the map
+  // from one snapshot: the counts cannot change between snapshots, so
+  // the string is computed once per update instead of walked per
+  // frame.
+  buildObjectsText(snapshot) {
     const counts = { passive: 0, aggressive: 0, combat: 0, player: 0, item: 0 };
-    for (const obj of objects) {
+    for (const obj of snapshot.objects || []) {
       const threat = threatOf(obj);
       if (counts[threat] !== undefined) { counts[threat]++; }
     }
-    document.getElementById("map-objects").textContent =
-      counts.passive + " passive · " + counts.aggressive + " aggro · "
+
+    return counts.passive + " passive · " + counts.aggressive + " aggro · "
       + counts.combat + " fighting · " + counts.player + " players · "
       + counts.item + " items";
+  },
+
+  // setChipText writes a footer chip only on change.
+  setChipText(id, text) {
+    if (this.chipTexts[id] === text) { return; }
+    this.chipTexts[id] = text;
+    const el = document.getElementById(id);
+    if (el) { el.textContent = text; }
   },
 
   // updatePathfindCursor keeps the mouse cursor meaningful over the
@@ -1812,11 +2121,15 @@ const MapView = {
 
       return;
     }
+    // A grabbed map never re-queries what sits under the cursor: the
+    // drag itself repaints every mousemove and the hit test on top of
+    // it doubled the per event work while the pointer moved.
+    if (this.drag) { return; }
+    this.syncView();
     const best = this.objectAt(event.clientX, event.clientY);
     const zone = this.zoneAt(event.clientX, event.clientY);
-    const rect = this.canvas.getBoundingClientRect();
-    const mx = event.clientX - rect.left;
-    const my = event.clientY - rect.top;
+    const mx = event.clientX - this.view.left;
+    const my = event.clientY - this.view.top;
     if (best !== this.hover || zone !== this.hoverZone) {
       this.hover = best;
       this.hoverZone = zone;
@@ -1835,9 +2148,8 @@ const MapView = {
   // tooltip pick radius.
   objectAt(clientX, clientY) {
     if (!this.lastSnap) { return null; }
-    const rect = this.canvas.getBoundingClientRect();
-    const mx = clientX - rect.left;
-    const my = clientY - rect.top;
+    const mx = clientX - this.view.left;
+    const my = clientY - this.view.top;
     let best = null;
     let bestDist = 14;
     for (const obj of this.lastSnap.objects || []) {
@@ -1862,6 +2174,7 @@ const MapView = {
   onDoubleClick(event) {
     if (this.pathfindEnabled()) { return; }
     if (!this.lastSnap) { return; }
+    this.syncView();
     const obj = this.objectAt(event.clientX, event.clientY);
     const world = this.eventWorld(event);
     const z = this.lastSnap.character ? this.lastSnap.character.z : 0;
@@ -2320,9 +2633,7 @@ const MapView = {
     // halo the map labels use.
     ctx.translate(x, y);
     ctx.scale(scale, scale);
-    ctx.font = "700 " + size.toFixed(1) + "px " +
-      (getComputedStyle(document.documentElement)
-        .getPropertyValue("--sans").trim() || "sans-serif");
+    ctx.font = "700 " + size.toFixed(1) + "px " + this.sansStack;
     ctx.textAlign = "center";
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(15, 18, 22, 0.75)";
@@ -2351,25 +2662,24 @@ const MapView = {
 
   // ---- transforms ----
 
-  // World to screen transform. Follow mode centers on the character,
-  // free mode stays pinned to the pan anchor.
+  // World to screen transform: pure math over the synced view cache
+  // (one geometry read per frame batch, see syncView - this function
+  // fires hundreds of times per frame and used to force a layout on
+  // every call). Follow mode centers on the character, free mode
+  // stays pinned to the pan anchor.
   worldToScreen(wx, wy) {
-    const rect = this.canvas.getBoundingClientRect();
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
-
     return {
-      x: cx + (wx - this.centerX()) * this.scale,
-      y: cy + (wy - this.centerY()) * this.scale
+      x: this.view.width / 2 + (wx - this.camX) * this.scale,
+      y: this.view.height / 2 + (wy - this.camY) * this.scale
     };
   },
 
   centerX() {
-    return this.followEnabled() ? this.charPos().x : this.panAnchor.x;
+    return this.camX;
   },
 
   centerY() {
-    return this.followEnabled() ? this.charPos().y : this.panAnchor.y;
+    return this.camY;
   },
 
   charPos() {
@@ -2419,6 +2729,25 @@ const chaseFactor = 1.35;
 // chaseFloor is the minimum catch up speed in world units per second so
 // near destination residuals settle quickly for slow units too.
 const chaseFloor = 60;
+
+// The fps meter windows: the chip refreshes every half second, the
+// console log line lands every five seconds (a lag report pastes the
+// log; the chip is for watching while it happens).
+const fpsWindowMs = 500;
+const fpsLogMs = 5000;
+
+// The fps health thresholds of the chip coloring: 45 and up reads
+// good, 28 and up reads degraded, below that the counter reads red.
+// The colors follow the fixed diagnostic palette (they must read over
+// the light map imagery in both themes, like the map markers).
+const fpsGoodThreshold = 45;
+const fpsOkThreshold = 28;
+const fpsGoodColor = "#188038";
+const fpsOkColor = "#9a6700";
+const fpsBadColor = "#d93025";
+// fpsWorstShowMs is the paint time a single worst frame must exceed
+// before the chip shows it next to the average.
+const fpsWorstShowMs = 8;
 
 // socialWindowMs is how long the social animation marker stays visible
 // (the tracker side window in state/chat.go).

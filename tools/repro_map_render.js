@@ -790,6 +790,56 @@ function runScenarioMapDrag(mapFile) {
     return results;
 }
 
+// runScenarioFpsMeter covers the on-screen fps counter: the meter is
+// wired into the paint path (every draw feeds it), the chip renders
+// the window reading with the health color, a spike shows its worst
+// frame, and a steady reading rewrites nothing (a frozen clock keeps
+// the windows from closing in this harness, so the chip is driven
+// through its render entry point directly).
+function runScenarioFpsMeter(mapFile) {
+    const { MapView, elements } = loadMapJs(mapFile);
+    MapView.init();
+    MapView.update(buildSnapshot(0, false));
+
+    const results = [];
+    const paintsBefore = MapView.fps.paints;
+    MapView.draw();
+    MapView.draw();
+    check(results, "every paint feeds the fps meter",
+        MapView.fps.paints === paintsBefore + 2,
+        "paints went from " + paintsBefore + " to "
+        + MapView.fps.paints);
+
+    MapView.renderFpsChip(60, 2.1, 3.0);
+    const chip = elements.get("map-fps");
+    check(results, "the chip reads the window fps and draw cost",
+        chip.textContent === "60 fps · draw 2.1 ms",
+        "chip says " + JSON.stringify(chip.textContent));
+    check(results, "a healthy window colors the chip green",
+        chip.style.color === "#188038",
+        "color is " + JSON.stringify(chip.style.color));
+
+    MapView.renderFpsChip(20, 9.4, 40.2);
+    check(results, "a starved window colors the chip red and shows the worst frame",
+        chip.textContent === "20 fps · draw 9.4 ms · worst 40.2 ms"
+        && chip.style.color === "#d93025",
+        "chip says " + JSON.stringify(chip.textContent)
+        + " color " + JSON.stringify(chip.style.color));
+
+    MapView.renderFpsChip(35, 4.0, 5.0);
+    check(results, "a degraded window colors the chip amber",
+        chip.style.color === "#9a6700",
+        "color is " + JSON.stringify(chip.style.color));
+
+    chip.textContent = "sentinel";
+    MapView.renderFpsChip(35, 4.0, 5.0);
+    check(results, "a steady reading rewrites nothing",
+        chip.textContent === "sentinel",
+        "chip says " + JSON.stringify(chip.textContent));
+
+    return results;
+}
+
 function main() {
     const args = process.argv.slice(2);
     const verbose = args.includes("--verbose");
@@ -809,7 +859,8 @@ function main() {
         ["stable draw order", runScenarioStableOrder(mapFile)],
         ["resting marker", runScenarioRestMarker(mapFile)],
         ["hunting zone", runScenarioHuntingZone(mapFile)],
-        ["hunt zones view", runScenarioHuntZonesView(mapFile)]
+        ["hunt zones view", runScenarioHuntZonesView(mapFile)],
+        ["fps meter", runScenarioFpsMeter(mapFile)]
     ];
     let failed = 0;
     for (const [name, results] of scenarios) {

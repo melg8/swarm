@@ -247,6 +247,67 @@ but no heading: the attacker faces its target, so the map computes the
 heading from the attacker -> first hit target vector (the server sets
 exactly this heading in `Creature.doAttack` before broadcasting).
 
+The tick replay is memoized per object (`projectionCache` of map.js):
+the cursor of the last whole tick is kept, so a frame only advances
+the ticks that passed since the previous frame. Without the memo a
+long walk replayed its whole tick history on every animation frame -
+a two minute town trip ran a 1200 iteration loop sixty times per
+second, and the loop never shrank back after the arrival snap. A move
+signature change (a re-issued move packet, a speed change) resets the
+cursor and replays from the packet anchor; the arithmetic sequence is
+identical either way, so the drawn position is bit for bit the same
+as the from scratch replay (the movement harness pins this).
+
+## Render performance and the fps meter (map.js)
+
+The map renders through one `draw()` pipeline (the rAF animation loop,
+every drag mousemove, every zoom wheel tick, every landed tile and
+every SSE snapshot repaint). The pipeline is tuned so a zoomed out,
+actively dragged map stays at the display refresh rate:
+
+- **One geometry read per frame batch** (`syncView`): the viewport rect
+  and the camera (the follow flag, the character or pan anchor) are
+  read once at the top of every draw and input handler batch, and
+  `worldToScreen`/`screenToWorld` are pure math. The transform used to
+  call `getBoundingClientRect` (plus the follow checkbox through
+  `centerX`/`centerY`) on every invocation - hundreds of forced layout
+  flushes per zoomed out frame between the DOM writes of the tooltip
+  and the status chips, which was the drag lag.
+- **Fonts and text metrics are cached**: the label font resolves once
+  per theme (`labelFont`, `sansStack` of `refreshColors`), and the
+  label declutter pass measures every unique text once
+  (`labelWidths`). Both used to run `getComputedStyle` and
+  `measureText` per draw (per damage number even).
+- **Per snapshot derived data is computed once**: the stable draw
+  order (`sortedObjects`) and the footer object count line
+  (`objectsText`) are built in `update()`; the footer chips re-write
+  their DOM nodes only when the text actually changed
+  (`setChipText`), so a pan or an animation frame dirties no layout.
+- **The social links precompute their screen positions** once per
+  unit (the pair loop transformed the same position per candidate
+  pair), and the aggro circles set their shared style once for the
+  whole pass instead of a save/restore round trip per mob.
+- **The map tiles draw with `imageSmoothingQuality = "low"`**: the
+  default `"high"` filter of the zoomed out frames downscaled a
+dozen 512px tiles per paint and is visually indistinguishable on
+  terrain imagery.
+- **A grabbed map skips hover hit testing**: the drag itself repaints
+  on every mousemove; re-querying what sits under the cursor on top
+  of it doubled the per event work.
+
+The **fps meter** makes the frame budget visible: the chip pinned to
+the top right of the map shows the render rate of the last half
+second window with the average paint cost (`58 fps · draw 2.1 ms`, the
+worst frame joins when it spiked - `worst 40.2 ms`), colored green at
+45 fps and up, amber at 28 and up, red below. Every paint counts -
+the rAF loop and the event driven repaints alike - and when nothing
+has painted for a while the chip reads `idle` (the render loop stops
+when nothing can move; a stopped loop is a fact worth seeing, not a
+frozen reading). Every five seconds the same numbers land in the
+browser console (`map fps: 58 fps · draw avg 2.1 ms · worst 3.4 ms`),
+so a lag report pastes the measurements next to the build identity of
+the state dump.
+
 ## Combat animation layer (map.js + state combatEvents)
 
 The map plays the combat the tracker observes: every `Attack`
@@ -865,8 +926,9 @@ no bundler, no network dependency; every dynamic text lands through
   and `--replay file [--frames]` replays it at 60 fps, printing the
   drawn position of every moving unit per frame and failing on spikes.
 - `tools/repro_map_render.js` (`task repro:map`) for the target links,
-  unit markers and the static free camera (recording canvas in a Node
-  vm sandbox).
+  unit markers, the static free camera, the grab semantics of map
+  panning and the fps meter chip (recording canvas in a Node vm
+  sandbox).
 - `tools/repro_hud.js` (`task repro:hud`) for the HUD and target panel
   rendering (stub DOM).
 - `tools/repro_gear.js` (`task repro:gear`) for the equipment widget
