@@ -96,11 +96,11 @@ Use this structure for exported functions and complex internal functions. Omit s
 //
 // Example:
 //
-//	result, err := pkg.FuncName(arg1, arg2)
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//	fmt.Println(result)
+//    result, err := pkg.FuncName(arg1, arg2)
+//    if err != nil {
+//        log.Fatal(err)
+//    }
+//    fmt.Println(result)
 func FuncName(paramName Type, anotherParam Type) (ResultType, error) {
 ```
 
@@ -201,9 +201,9 @@ Indent code examples by one tab in doc comments. godoc renders these as formatte
 //
 // Example:
 //
-//	names := []string{"alice", "bob"}
-//	upper := Transform(names, strings.ToUpper)
-//	// upper: ["ALICE", "BOB"]
+//    names := []string{"alice", "bob"}
+//    upper := Transform(names, strings.ToUpper)
+//    // upper: ["ALICE", "BOB"]
 func Transform[T any, U any](slice []T, fn func(T) U) []U {
 ```
 
@@ -218,8 +218,8 @@ Add a `Play:` line linking to a runnable Go Playground example of a public libra
 //
 // Example:
 //
-//	  doubled := Map([]int{1, 2, 3}, func(x int) int { return x * 2 })
-//	  // doubled: [2, 4, 6]
+//      doubled := Map([]int{1, 2, 3}, func(x int) int { return x * 2 })
+//      // doubled: [2, 4, 6]
 func Map[T any, U any](s []T, fn func(T) U) []U {
 ```
 
@@ -290,7 +290,7 @@ import (
 //
 // Architecture:
 //
-//	            Schedule(task)
+//                Schedule(task)
 //                  |
 //                  v
 //            [Min-Heap Queue]

@@ -5,10 +5,10 @@
 package acceptance
 
 import (
-	"fmt"
-	"time"
+    "fmt"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // The stagnation thresholds of the soak scenario: the guard fails the
@@ -21,9 +21,9 @@ import (
 // tighter because a healthy bot walks between kills and a stuck cell
 // freezes the coordinates first.
 const (
-	stagnationNoXpMinutes   = 10
-	stagnationNoMoveMinutes = 5
-	stagnationStartupGrace  = 90 * time.Second
+    stagnationNoXpMinutes   = 10
+    stagnationNoMoveMinutes = 5
+    stagnationStartupGrace  = 90 * time.Second
 )
 
 // stagnationGuard watches the tracker for the two soak livelock
@@ -36,43 +36,43 @@ const (
 // path uses time.Now. The guard is single-goroutine: the soak monitor
 // loop owns it and calls update on every tick.
 type stagnationGuard struct {
-	now         func() time.Time
-	bootTime    time.Time
-	lastXp      int64
-	lastXpAt    time.Time
-	lastPos     posKey
-	lastPosAt   time.Time
-	xpSeen      bool
-	posSeen     bool
-	firedReason string
+    now         func() time.Time
+    bootTime    time.Time
+    lastXp      int64
+    lastXpAt    time.Time
+    lastPos     posKey
+    lastPosAt   time.Time
+    xpSeen      bool
+    posSeen     bool
+    firedReason string
 }
 
 // posKey is the position snapshot the guard compares: a coordinate
 // triple floored to the meter so the natural sub-unit jitter of the
 // server movement broadcasts does not reset the timer.
 type posKey struct {
-	x int32
-	y int32
-	z int32
+    x int32
+    y int32
+    z int32
 }
 
 // newStagnationGuard arms the guard with the given clock. The first
 // update after the startup grace seeds the last-seen timestamps; the
 // thresholds only start counting after the first real observation.
 func newStagnationGuard(now func() time.Time) *stagnationGuard {
-	boot := now()
+    boot := now()
 
-	return &stagnationGuard{
-		now:         now,
-		bootTime:    boot,
-		lastXp:      0,
-		lastXpAt:    boot,
-		lastPos:     posKey{x: 0, y: 0, z: 0},
-		lastPosAt:   boot,
-		xpSeen:      false,
-		posSeen:     false,
-		firedReason: "",
-	}
+    return &stagnationGuard{
+        now:         now,
+        bootTime:    boot,
+        lastXp:      0,
+        lastXpAt:    boot,
+        lastPos:     posKey{x: 0, y: 0, z: 0},
+        lastPosAt:   boot,
+        xpSeen:      false,
+        posSeen:     false,
+        firedReason: "",
+    }
 }
 
 // update reads the tracker and advances the guard. A change of the
@@ -84,56 +84,56 @@ func newStagnationGuard(now func() time.Time) *stagnationGuard {
 // experience check still runs - a long offline stretch with no XP is
 // a reconnect livelock.
 func (g *stagnationGuard) update(tracker *state.Bot) {
-	now := g.now()
-	xp := cumulativeSoakXP(tracker.SelfLevel(), tracker.SelfExp())
-	if g.xpSeen && xp != g.lastXp {
-		g.lastXpAt = now
-	}
-	g.lastXp = xp
-	g.xpSeen = true
+    now := g.now()
+    xp := cumulativeSoakXP(tracker.SelfLevel(), tracker.SelfExp())
+    if g.xpSeen && xp != g.lastXp {
+        g.lastXpAt = now
+    }
+    g.lastXp = xp
+    g.xpSeen = true
 
-	if x, y, z, ok := tracker.SelfPosition(); ok {
-		key := posKey{x: x, y: y, z: z}
-		if g.posSeen && key != g.lastPos {
-			g.lastPosAt = now
-		}
-		g.lastPos = key
-		g.posSeen = true
-	}
+    if x, y, z, ok := tracker.SelfPosition(); ok {
+        key := posKey{x: x, y: y, z: z}
+        if g.posSeen && key != g.lastPos {
+            g.lastPosAt = now
+        }
+        g.lastPos = key
+        g.posSeen = true
+    }
 
-	if now.Sub(g.bootTime) < stagnationStartupGrace {
-		return
-	}
-	if g.firedReason != "" {
-		return
-	}
-	noXpFor := now.Sub(g.lastXpAt)
-	if noXpFor >= stagnationNoXpMinutes*time.Minute {
-		g.firedReason = fmt.Sprintf(
-			"no experience gain for %s (threshold %dm)",
-			noXpFor.Round(time.Second),
-			stagnationNoXpMinutes)
+    if now.Sub(g.bootTime) < stagnationStartupGrace {
+        return
+    }
+    if g.firedReason != "" {
+        return
+    }
+    noXpFor := now.Sub(g.lastXpAt)
+    if noXpFor >= stagnationNoXpMinutes*time.Minute {
+        g.firedReason = fmt.Sprintf(
+            "no experience gain for %s (threshold %dm)",
+            noXpFor.Round(time.Second),
+            stagnationNoXpMinutes)
 
-		return
-	}
-	if g.posSeen {
-		noMoveFor := now.Sub(g.lastPosAt)
-		if noMoveFor >= stagnationNoMoveMinutes*time.Minute {
-			g.firedReason = fmt.Sprintf(
-				"no position change for %s (threshold %dm)",
-				noMoveFor.Round(time.Second),
-				stagnationNoMoveMinutes)
-		}
-	}
+        return
+    }
+    if g.posSeen {
+        noMoveFor := now.Sub(g.lastPosAt)
+        if noMoveFor >= stagnationNoMoveMinutes*time.Minute {
+            g.firedReason = fmt.Sprintf(
+                "no position change for %s (threshold %dm)",
+                noMoveFor.Round(time.Second),
+                stagnationNoMoveMinutes)
+        }
+    }
 }
 
 // fired reports whether the guard tripped.
 func (g *stagnationGuard) fired() bool {
-	return g.firedReason != ""
+    return g.firedReason != ""
 }
 
 // reason returns the recorded trip reason (empty when the guard
 // never fired).
 func (g *stagnationGuard) reason() string {
-	return g.firedReason
+    return g.firedReason
 }

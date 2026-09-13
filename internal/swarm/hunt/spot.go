@@ -5,11 +5,11 @@
 package hunt
 
 import (
-	"math"
-	"slices"
+    "math"
+    "slices"
 
-	"github.com/melg8/swarm/internal/swarm/npcdata"
-	"github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // Spot-anchored hunting: the spawn ground of a region as visibility
@@ -32,55 +32,55 @@ import (
 // covers) and the respawn window of the species from the spawn data
 // (the live measured elven window as the default).
 type SpotMob struct {
-	// TemplateID is the npc template id of the spawn data (the
-	// Mobius CT0 xml id, see npcdata.NPCWireTemplateID).
-	TemplateID int32
-	// Name is the display name of the mob.
-	Name string
-	// Level is the mob level of the npc stats.
-	Level int32
-	// Count is the expected spawned population of the species
-	// inside the spot ground.
-	Count int32
-	// RespawnMin and RespawnMax bound the respawn delay of the
-	// species in seconds (the server schedules death + rnd of the
-	// window).
-	RespawnMin int32
-	RespawnMax int32
+    // TemplateID is the npc template id of the spawn data (the
+    // Mobius CT0 xml id, see npcdata.NPCWireTemplateID).
+    TemplateID int32
+    // Name is the display name of the mob.
+    Name string
+    // Level is the mob level of the npc stats.
+    Level int32
+    // Count is the expected spawned population of the species
+    // inside the spot ground.
+    Count int32
+    // RespawnMin and RespawnMax bound the respawn delay of the
+    // species in seconds (the server schedules death + rnd of the
+    // window).
+    RespawnMin int32
+    RespawnMax int32
 }
 
 // Spot is one hunting ground of the spot registry: an anchor on the
 // spawn mass with a visibility bounded radius.
 type Spot struct {
-	// ID is the stable identifier of the spot (region prefixed).
-	ID string
-	// Name is the display name of the map view.
-	Name string
-	// Region groups the spots of one territory (elven, orc, ...).
-	Region string
-	// MinLevel and MaxLevel are the mob level band of the spot
-	// ground (the picker scores the window mass, not the band -
-	// the band only feeds the map label and the diagnostics).
-	MinLevel int32
-	MaxLevel int32
-	// AnchorX and AnchorY are the density centroid of the spawn
-	// mass cluster: the leash square centers here.
-	AnchorX int32
-	AnchorY int32
-	// Radius is the spot circle: the spawn mass of the cluster
-	// stays within it, clamped to the guaranteed visible circle
-	// (2048).
-	Radius int32
-	// RespawnMin and RespawnMax are the dominant respawn window
-	// of the ground in seconds (the count weighted midpoint of
-	// the species windows).
-	RespawnMin int32
-	RespawnMax int32
-	// Mass is the expected total population of the ground (the
-	// count sum of the mob list).
-	Mass float64
-	// Mobs lists every species of the ground the spot covers.
-	Mobs []SpotMob
+    // ID is the stable identifier of the spot (region prefixed).
+    ID string
+    // Name is the display name of the map view.
+    Name string
+    // Region groups the spots of one territory (elven, orc, ...).
+    Region string
+    // MinLevel and MaxLevel are the mob level band of the spot
+    // ground (the picker scores the window mass, not the band -
+    // the band only feeds the map label and the diagnostics).
+    MinLevel int32
+    MaxLevel int32
+    // AnchorX and AnchorY are the density centroid of the spawn
+    // mass cluster: the leash square centers here.
+    AnchorX int32
+    AnchorY int32
+    // Radius is the spot circle: the spawn mass of the cluster
+    // stays within it, clamped to the guaranteed visible circle
+    // (2048).
+    Radius int32
+    // RespawnMin and RespawnMax are the dominant respawn window
+    // of the ground in seconds (the count weighted midpoint of
+    // the species windows).
+    RespawnMin int32
+    RespawnMax int32
+    // Mass is the expected total population of the ground (the
+    // count sum of the mob list).
+    Mass float64
+    // Mobs lists every species of the ground the spot covers.
+    Mobs []SpotMob
 }
 
 // leashHalf returns the engage square half of the spot: the square
@@ -90,25 +90,25 @@ type Spot struct {
 // spawn mass beyond it belongs to the neighboring spots and the
 // wait-or-move economy handles the walk between the anchors.
 func (s Spot) leashHalf() int32 {
-	half := int32(math.Round(float64(s.Radius) / math.Sqrt2))
-	if half < 1 {
-		half = 1
-	}
+    half := int32(math.Round(float64(s.Radius) / math.Sqrt2))
+    if half < 1 {
+        half = 1
+    }
 
-	return half
+    return half
 }
 
 // zoneSquare returns the leash square of the spot in the tracker zone
 // form (the engage leash, the far target search bounds and the
 // emptiness reading all use it).
 func (s Spot) zoneSquare() *state.Zone {
-	return &state.Zone{CX: s.AnchorX, CY: s.AnchorY, Half: s.leashHalf()}
+    return &state.Zone{CX: s.AnchorX, CY: s.AnchorY, Half: s.leashHalf()}
 }
 
 // spotDistance measures the anchor distance between a spot and a
 // world position.
 func spotDistance(spot Spot, x int32, y int32) float64 {
-	return math.Hypot(float64(spot.AnchorX-x), float64(spot.AnchorY-y))
+    return math.Hypot(float64(spot.AnchorX-x), float64(spot.AnchorY-y))
 }
 
 // spotWindowMass returns the expected population of the spot inside
@@ -117,19 +117,19 @@ func spotDistance(spot Spot, x int32, y int32) float64 {
 // penalty and die in a few swings - the gold optimum the picker
 // scores.
 func spotWindowMass(spot Spot, level int32) float64 {
-	low := level - 5
-	if low < 1 {
-		low = 1
-	}
-	mass := 0.0
-	for index := range spot.Mobs {
-		mob := &spot.Mobs[index]
-		if mob.Level >= low && mob.Level <= level {
-			mass += float64(mob.Count)
-		}
-	}
+    low := level - 5
+    if low < 1 {
+        low = 1
+    }
+    mass := 0.0
+    for index := range spot.Mobs {
+        mob := &spot.Mobs[index]
+        if mob.Level >= low && mob.Level <= level {
+            mass += float64(mob.Count)
+        }
+    }
 
-	return mass
+    return mass
 }
 
 // spotEligible reports whether the character can productively hunt
@@ -139,19 +139,19 @@ func spotWindowMass(spot Spot, level int32) float64 {
 // outside the window wastes the character's time - too low pays no
 // adena, too high kills it.
 func spotEligible(spot Spot, level int32) bool {
-	low := level - 8
-	if low < 1 {
-		low = 1
-	}
-	high := level + spotMaxLevelSlack
-	for index := range spot.Mobs {
-		mob := &spot.Mobs[index]
-		if mob.Level >= low && mob.Level <= high {
-			return true
-		}
-	}
+    low := level - 8
+    if low < 1 {
+        low = 1
+    }
+    high := level + spotMaxLevelSlack
+    for index := range spot.Mobs {
+        mob := &spot.Mobs[index]
+        if mob.Level >= low && mob.Level <= high {
+            return true
+        }
+    }
 
-	return false
+    return false
 }
 
 // spotMedianLevel returns the count weighted median mob level of the
@@ -160,37 +160,37 @@ func spotEligible(spot Spot, level int32) bool {
 // the anchored square, the static median is what the picker can
 // judge BEFORE committing the character to the ground).
 func spotMedianLevel(spot Spot) int32 {
-	type census struct {
-		level int32
-		mass  int32
-	}
-	censusRows := make([]census, 0, len(spot.Mobs))
-	total := int32(0)
-	for index := range spot.Mobs {
-		if spot.Mobs[index].Count <= 0 {
-			continue
-		}
-		censusRows = append(censusRows, census{
-			level: spot.Mobs[index].Level,
-			mass:  spot.Mobs[index].Count,
-		})
-		total += spot.Mobs[index].Count
-	}
-	if total <= 0 {
-		return 0
-	}
-	slices.SortFunc(censusRows, func(a, b census) int {
-		return int(a.level - b.level)
-	})
-	seen := int32(0)
-	for _, row := range censusRows {
-		seen += row.mass
-		if seen*2 > total {
-			return row.level
-		}
-	}
+    type census struct {
+        level int32
+        mass  int32
+    }
+    censusRows := make([]census, 0, len(spot.Mobs))
+    total := int32(0)
+    for index := range spot.Mobs {
+        if spot.Mobs[index].Count <= 0 {
+            continue
+        }
+        censusRows = append(censusRows, census{
+            level: spot.Mobs[index].Level,
+            mass:  spot.Mobs[index].Count,
+        })
+        total += spot.Mobs[index].Count
+    }
+    if total <= 0 {
+        return 0
+    }
+    slices.SortFunc(censusRows, func(a, b census) int {
+        return int(a.level - b.level)
+    })
+    seen := int32(0)
+    for _, row := range censusRows {
+        seen += row.mass
+        if seen*2 > total {
+            return row.level
+        }
+    }
 
-	return censusRows[len(censusRows)-1].level
+    return censusRows[len(censusRows)-1].level
 }
 
 // spotDelevelSafe reports whether anchoring the spot at the given
@@ -203,12 +203,12 @@ func spotMedianLevel(spot Spot) int32 {
 // delevel ate the whole scenario). A spot without a computable median
 // keeps the plain window judgement.
 func spotDelevelSafe(spot Spot, level int32) bool {
-	median := spotMedianLevel(spot)
-	if median <= 0 {
-		return true
-	}
+    median := spotMedianLevel(spot)
+    if median <= 0 {
+        return true
+    }
 
-	return level-median < delevelTriggerDiff
+    return level-median < delevelTriggerDiff
 }
 
 // spotLevelDistance returns the smallest mob level distance between
@@ -217,18 +217,18 @@ func spotDelevelSafe(spot Spot, level int32) bool {
 // below every window still hunts the closest ground instead of
 // standing idle).
 func spotLevelDistance(spot Spot, level int32) int32 {
-	best := int32(1 << 30)
-	for index := range spot.Mobs {
-		gap := spot.Mobs[index].Level - level
-		if gap < 0 {
-			gap = -gap
-		}
-		if gap < best {
-			best = gap
-		}
-	}
+    best := int32(1 << 30)
+    for index := range spot.Mobs {
+        gap := spot.Mobs[index].Level - level
+        if gap < 0 {
+            gap = -gap
+        }
+        if gap < best {
+            best = gap
+        }
+    }
 
-	return best
+    return best
 }
 
 // spotAggroMass returns the expected aggressive population of the
@@ -236,15 +236,15 @@ func spotLevelDistance(spot Spot, level int32) int32 {
 // aggressive-heavy ground attacks on sight, the measured death rate
 // dominates it once the experience accumulates).
 func spotAggroMass(spot Spot) float64 {
-	mass := 0.0
-	for index := range spot.Mobs {
-		mob := &spot.Mobs[index]
-		if npcdata.NPCIsAggressive(mob.TemplateID) {
-			mass += float64(mob.Count)
-		}
-	}
+    mass := 0.0
+    for index := range spot.Mobs {
+        mob := &spot.Mobs[index]
+        if npcdata.NPCIsAggressive(mob.TemplateID) {
+            mass += float64(mob.Count)
+        }
+    }
 
-	return mass
+    return mass
 }
 
 // spotMobPriorities builds the window biased engage priority map of a
@@ -256,42 +256,42 @@ func spotAggroMass(spot Spot) float64 {
 // packets identify the same npc by the display id plus offset), so
 // the bias actually matches the scan template ids.
 func spotMobPriorities(spot Spot, level int32) map[int32]int32 {
-	var priorities map[int32]int32
-	for index := range spot.Mobs {
-		mob := &spot.Mobs[index]
-		var priority int32
-		switch {
-		case mob.Level >= level-4 && mob.Level <= level-1:
-			priority = 3
-		case mob.Level >= level-5 && mob.Level <= level:
-			priority = 2
-		case mob.Level >= level-8 && mob.Level <= level+spotMaxLevelSlack:
-			priority = 1
-		}
-		if priority <= 0 {
-			continue
-		}
-		if priorities == nil {
-			priorities = make(map[int32]int32, len(spot.Mobs))
-		}
-		priorities[npcdata.NPCWireTemplateID(mob.TemplateID)] = priority
-	}
+    var priorities map[int32]int32
+    for index := range spot.Mobs {
+        mob := &spot.Mobs[index]
+        var priority int32
+        switch {
+        case mob.Level >= level-4 && mob.Level <= level-1:
+            priority = 3
+        case mob.Level >= level-5 && mob.Level <= level:
+            priority = 2
+        case mob.Level >= level-8 && mob.Level <= level+spotMaxLevelSlack:
+            priority = 1
+        }
+        if priority <= 0 {
+            continue
+        }
+        if priorities == nil {
+            priorities = make(map[int32]int32, len(spot.Mobs))
+        }
+        priorities[npcdata.NPCWireTemplateID(mob.TemplateID)] = priority
+    }
 
-	return priorities
+    return priorities
 }
 
 // spotMobRespawn resolves the respawn window of the spot species a
 // kill record belongs to (the wire template id of the NpcInfo packet
 // keyed back onto the spawn data id of the mob list).
 func spotMobRespawn(spots []Spot, wireTemplateID int32) (int32, int32, bool) {
-	for index := range spots {
-		for mobIndex := range spots[index].Mobs {
-			mob := &spots[index].Mobs[mobIndex]
-			if npcdata.NPCWireTemplateID(mob.TemplateID) == wireTemplateID {
-				return mob.RespawnMin, mob.RespawnMax, true
-			}
-		}
-	}
+    for index := range spots {
+        for mobIndex := range spots[index].Mobs {
+            mob := &spots[index].Mobs[mobIndex]
+            if npcdata.NPCWireTemplateID(mob.TemplateID) == wireTemplateID {
+                return mob.RespawnMin, mob.RespawnMax, true
+            }
+        }
+    }
 
-	return 0, 0, false
+    return 0, 0, false
 }

@@ -10,13 +10,13 @@ package hunt
 // explains a standing hunter in the log.
 
 import (
-	"fmt"
-	"math"
-	"strings"
-	"time"
+    "fmt"
+    "math"
+    "strings"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/pathfind"
-	"github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/pathfind"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // walkToFarTarget walks a targetless hunter toward the nearest
@@ -31,55 +31,55 @@ import (
 // the tick was handled (a far target exists); without one the
 // caller falls back to the center patrol.
 func (l *Loop) walkToFarTarget(now time.Time) bool {
-	if l.noTargetSince.IsZero() {
-		l.noTargetSince = now
+    if l.noTargetSince.IsZero() {
+        l.noTargetSince = now
 
-		return false
-	}
-	if now.Sub(l.noTargetSince) < noTargetPatience {
-		return false
-	}
-	if now.Sub(l.lastHit) < selectPeriod {
-		return true
-	}
-	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
-	if !ok {
-		return false
-	}
-	pick, found := l.tracker.NearestAttackablePreferredWindowed(
-		farTargetRange, l.zone(), l.activeSkips(now),
-		l.minTargetLevel(), l.maxTargetLevel(), true,
-		l.zoneMobPriority)
-	if !found {
-		// The far search scans the whole square: nothing in the zone
-		// is pickable at any distance. Explain the standing hunter in
-		// the log - the mobs the character sees, their positions and
-		// why the target search rejects them - instead of letting a
-		// fenced social pack look like a broken bot.
-		l.logNoPickableTargets(now)
+        return false
+    }
+    if now.Sub(l.noTargetSince) < noTargetPatience {
+        return false
+    }
+    if now.Sub(l.lastHit) < selectPeriod {
+        return true
+    }
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
+    }
+    pick, found := l.tracker.NearestAttackablePreferredWindowed(
+        farTargetRange, l.zone(), l.activeSkips(now),
+        l.minTargetLevel(), l.maxTargetLevel(), true,
+        l.zoneMobPriority)
+    if !found {
+        // The far search scans the whole square: nothing in the zone
+        // is pickable at any distance. Explain the standing hunter in
+        // the log - the mobs the character sees, their positions and
+        // why the target search rejects them - instead of letting a
+        // fenced social pack look like a broken bot.
+        l.logNoPickableTargets(now)
 
-		return false
-	}
-	dist := math.Hypot(float64(pick.X-selfX), float64(pick.Y-selfY))
-	if dist <= attackNearestRange {
-		// Inside the engage radius already: the per second pick takes
-		// it from here.
-		return false
-	}
-	l.lastHit = now
-	moveX, moveY := pick.X, pick.Y
-	dx := float64(pick.X - selfX)
-	dy := float64(pick.Y - selfY)
-	if dist > returnWalkLeg {
-		frac := returnWalkLeg / dist
-		moveX = int32(float64(selfX) + dx*frac)
-		moveY = int32(float64(selfY) + dy*frac)
-	}
-	if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
-		l.logf("Hunt: far target walk failed: %v", err)
-	}
+        return false
+    }
+    dist := math.Hypot(float64(pick.X-selfX), float64(pick.Y-selfY))
+    if dist <= attackNearestRange {
+        // Inside the engage radius already: the per second pick takes
+        // it from here.
+        return false
+    }
+    l.lastHit = now
+    moveX, moveY := pick.X, pick.Y
+    dx := float64(pick.X - selfX)
+    dy := float64(pick.Y - selfY)
+    if dist > returnWalkLeg {
+        frac := returnWalkLeg / dist
+        moveX = int32(float64(selfX) + dx*frac)
+        moveY = int32(float64(selfY) + dy*frac)
+    }
+    if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
+        l.logf("Hunt: far target walk failed: %v", err)
+    }
 
-	return true
+    return true
 }
 
 // logNoPickableTargets logs the targetless diagnostic: the nearest
@@ -92,34 +92,34 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
 // keeps it to one line per noPickLogPeriod while the state lasts; a
 // successful pick or a flee re-arms it.
 func (l *Loop) logNoPickableTargets(now time.Time) {
-	if !l.noPickLogAt.IsZero() && now.Sub(l.noPickLogAt) < noPickLogPeriod {
-		return
-	}
-	l.noPickLogAt = now
-	blocked := l.tracker.NearestBlockedTargetsWindowed(
-		l.zone(), l.minTargetLevel(), l.maxTargetLevel(),
-		l.activeSkips(now), noPickLogLimit)
-	if len(blocked) == 0 {
-		l.logger.Printf("Hunt: no pickable target in the zone, " +
-			"no attackable npc in sight")
+    if !l.noPickLogAt.IsZero() && now.Sub(l.noPickLogAt) < noPickLogPeriod {
+        return
+    }
+    l.noPickLogAt = now
+    blocked := l.tracker.NearestBlockedTargetsWindowed(
+        l.zone(), l.minTargetLevel(), l.maxTargetLevel(),
+        l.activeSkips(now), noPickLogLimit)
+    if len(blocked) == 0 {
+        l.logger.Printf("Hunt: no pickable target in the zone, " +
+            "no attackable npc in sight")
 
-		return
-	}
-	selfX, selfY, _, selfOK := l.tracker.SelfPosition()
-	var line strings.Builder
-	line.WriteString("Hunt: no pickable target in the zone:")
-	for i := range blocked {
-		entry := &blocked[i]
-		fmt.Fprintf(&line, " %s (%d) at %d %d %d",
-			entry.Name, entry.ObjectID, entry.X, entry.Y, entry.Z)
-		if selfOK {
-			dist := math.Hypot(
-				float64(entry.X-selfX), float64(entry.Y-selfY))
-			fmt.Fprintf(&line, ", %.0f units", dist)
-		}
-		fmt.Fprintf(&line, " - %s;", entry.Reason)
-	}
-	l.logger.Printf("%s", strings.TrimSuffix(line.String(), ";"))
+        return
+    }
+    selfX, selfY, _, selfOK := l.tracker.SelfPosition()
+    var line strings.Builder
+    line.WriteString("Hunt: no pickable target in the zone:")
+    for i := range blocked {
+        entry := &blocked[i]
+        fmt.Fprintf(&line, " %s (%d) at %d %d %d",
+            entry.Name, entry.ObjectID, entry.X, entry.Y, entry.Z)
+        if selfOK {
+            dist := math.Hypot(
+                float64(entry.X-selfX), float64(entry.Y-selfY))
+            fmt.Fprintf(&line, ", %.0f units", dist)
+        }
+        fmt.Fprintf(&line, " - %s;", entry.Reason)
+    }
+    l.logger.Printf("%s", strings.TrimSuffix(line.String(), ";"))
 }
 
 // logWeaponWait logs the bare-handed hold of the engage gate: the
@@ -128,13 +128,13 @@ func (l *Loop) logNoPickableTargets(now time.Time) {
 // per noPickLogPeriod while the hold lasts; a landed weapon ends the
 // hold and the log with it.
 func (l *Loop) logWeaponWait(now time.Time) {
-	if !l.weaponWaitLogAt.IsZero() &&
-		now.Sub(l.weaponWaitLogAt) < noPickLogPeriod {
-		return
-	}
-	l.weaponWaitLogAt = now
-	l.logger.Printf("Hunt: no weapon in hand, holding the target " +
-		"picks until the weapon run buys one")
+    if !l.weaponWaitLogAt.IsZero() &&
+        now.Sub(l.weaponWaitLogAt) < noPickLogPeriod {
+        return
+    }
+    l.weaponWaitLogAt = now
+    l.logger.Printf("Hunt: no weapon in hand, holding the target " +
+        "picks until the weapon run buys one")
 }
 
 // patrolToCenter walks a targetless hunter toward the zone center:
@@ -145,31 +145,31 @@ func (l *Loop) logWeaponWait(now time.Time) {
 // something valid enters the radius instead of marching to the
 // center first.
 func (l *Loop) patrolToCenter(now time.Time) {
-	zone := l.zone()
-	if zone == nil {
-		return
-	}
-	if l.noTargetSince.IsZero() {
-		l.noTargetSince = now
+    zone := l.zone()
+    if zone == nil {
+        return
+    }
+    if l.noTargetSince.IsZero() {
+        l.noTargetSince = now
 
-		return
-	}
-	if now.Sub(l.noTargetSince) < noTargetPatience {
-		return
-	}
-	if now.Sub(l.lastHit) < selectPeriod {
-		return
-	}
-	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
-	if !ok {
-		return
-	}
-	dist := math.Hypot(float64(zone.CX-selfX), float64(zone.CY-selfY))
-	if dist < patrolCenterMinDist {
-		return
-	}
-	l.lastHit = now
-	l.walkZoneLeg(zone, selfX, selfY, selfZ)
+        return
+    }
+    if now.Sub(l.noTargetSince) < noTargetPatience {
+        return
+    }
+    if now.Sub(l.lastHit) < selectPeriod {
+        return
+    }
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return
+    }
+    dist := math.Hypot(float64(zone.CX-selfX), float64(zone.CY-selfY))
+    if dist < patrolCenterMinDist {
+        return
+    }
+    l.lastHit = now
+    l.walkZoneLeg(zone, selfX, selfY, selfZ)
 }
 
 // adoptOutZoneFight keeps the fight that crossed the hunting zone
@@ -184,57 +184,57 @@ func (l *Loop) patrolToCenter(now time.Time) {
 // the engage logic outside the zone); without one the leash walks
 // the character home.
 func (l *Loop) adoptOutZoneFight(now time.Time) bool {
-	if l.target != 0 && l.tracker.ObjectAlive(l.target) {
-		return true
-	}
-	// The road budget: the aggressive territory on the walk home
-	// feeds a fresh attacker every respawn window - adopting each
-	// one holds the character on the road forever (the 2026-09-11
-	// 08:04 parallel round: the farm leg timed out on the road
-	// fights, the walk home never resumed). Past the budget no new
-	// fight starts: the walk home continues through the blows, the
-	// flee flow above owns the hurt case and the mobs leash back
-	// once the character leaves the aggro radius. The budget resets
-	// on the zone entry.
-	if l.roadFights >= roadFightBudget {
-		return false
-	}
-	serverTarget := l.tracker.SelfTargetID()
-	if serverTarget != 0 && l.tracker.ObjectAlive(serverTarget) &&
-		!l.targetSkipped(serverTarget, now) {
-		l.target = serverTarget
-		l.engageAt = now
-		l.clearBlindRecovery()
-		l.roadFights++
+    if l.target != 0 && l.tracker.ObjectAlive(l.target) {
+        return true
+    }
+    // The road budget: the aggressive territory on the walk home
+    // feeds a fresh attacker every respawn window - adopting each
+    // one holds the character on the road forever (the 2026-09-11
+    // 08:04 parallel round: the farm leg timed out on the road
+    // fights, the walk home never resumed). Past the budget no new
+    // fight starts: the walk home continues through the blows, the
+    // flee flow above owns the hurt case and the mobs leash back
+    // once the character leaves the aggro radius. The budget resets
+    // on the zone entry.
+    if l.roadFights >= roadFightBudget {
+        return false
+    }
+    serverTarget := l.tracker.SelfTargetID()
+    if serverTarget != 0 && l.tracker.ObjectAlive(serverTarget) &&
+        !l.targetSkipped(serverTarget, now) {
+        l.target = serverTarget
+        l.engageAt = now
+        l.clearBlindRecovery()
+        l.roadFights++
 
-		return true
-	}
-	if l.tracker.SelfUnderAttack() {
-		if pick, ok := l.tracker.NearestAttacker(); ok &&
-			!l.targetSkipped(pick.ObjectID, now) {
-			if !l.attackerEngageable(pick.ObjectID) {
-				// The chase is too strong to answer with a fight (the
-				// attacker sits above the level ceiling, the character
-				// is hurt): the defensive escape - the standard run
-				// that logs out when the chase never shakes - beats
-				// both walking home through the blows and pressing a
-				// losing fight.
-				l.fleeFromThreat(now)
+        return true
+    }
+    if l.tracker.SelfUnderAttack() {
+        if pick, ok := l.tracker.NearestAttacker(); ok &&
+            !l.targetSkipped(pick.ObjectID, now) {
+            if !l.attackerEngageable(pick.ObjectID) {
+                // The chase is too strong to answer with a fight (the
+                // attacker sits above the level ceiling, the character
+                // is hurt): the defensive escape - the standard run
+                // that logs out when the chase never shakes - beats
+                // both walking home through the blows and pressing a
+                // losing fight.
+                l.fleeFromThreat(now)
 
-				return true
-			}
-			l.logger.Printf("Hunt: %s (%d) keeps attacking outside "+
-				"the zone, finishing it", pick.Name, pick.ObjectID)
-			l.target = pick.ObjectID
-			l.engageAt = now
-			l.clearBlindRecovery()
-			l.roadFights++
+                return true
+            }
+            l.logger.Printf("Hunt: %s (%d) keeps attacking outside "+
+                "the zone, finishing it", pick.Name, pick.ObjectID)
+            l.target = pick.ObjectID
+            l.engageAt = now
+            l.clearBlindRecovery()
+            l.roadFights++
 
-			return true
-		}
-	}
+            return true
+        }
+    }
 
-	return false
+    return false
 }
 
 // returnToZone walks the character back into the hunting square over the
@@ -252,62 +252,62 @@ func (l *Loop) adoptOutZoneFight(now time.Time) bool {
 // resting character first waits out the sit transition, stands up and
 // only then plans the walk.
 func (l *Loop) returnToZone() {
-	now := time.Now()
-	if !l.standUpGuarded(now) {
-		return
-	}
-	if now.Sub(l.lastHit) < selectPeriod {
-		return
-	}
-	l.lastHit = now
-	zone := l.zone()
-	if zone == nil {
-		return
-	}
-	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
-	if !ok {
-		return
-	}
-	l.target = 0
-	l.clearBlindRecovery()
-	l.lootID = 0
-	if l.zoneReturn && l.phase == phaseEngage {
-		// The previous pathfound return leg ended without reaching
-		// the zone (a stuck walk aborts the leg): count the failure
-		// and stop planning past the budget.
-		l.zoneFails++
-	}
-	if !l.zoneReturn {
-		l.zoneReturn = true
-		l.logf("Hunt: outside the hunting zone, pathfinding back")
-	}
-	if (l.navigator == nil) || l.zoneFails >= zoneReturnFailBudget {
-		l.phase = phaseEngage
-		l.walkZoneLeg(zone, selfX, selfY, selfZ)
+    now := time.Now()
+    if !l.standUpGuarded(now) {
+        return
+    }
+    if now.Sub(l.lastHit) < selectPeriod {
+        return
+    }
+    l.lastHit = now
+    zone := l.zone()
+    if zone == nil {
+        return
+    }
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return
+    }
+    l.target = 0
+    l.clearBlindRecovery()
+    l.lootID = 0
+    if l.zoneReturn && l.phase == phaseEngage {
+        // The previous pathfound return leg ended without reaching
+        // the zone (a stuck walk aborts the leg): count the failure
+        // and stop planning past the budget.
+        l.zoneFails++
+    }
+    if !l.zoneReturn {
+        l.zoneReturn = true
+        l.logf("Hunt: outside the hunting zone, pathfinding back")
+    }
+    if (l.navigator == nil) || l.zoneFails >= zoneReturnFailBudget {
+        l.phase = phaseEngage
+        l.walkZoneLeg(zone, selfX, selfY, selfZ)
 
-		return
-	}
-	dest := l.zoneReturnDestination(zone, selfZ)
-	farmKnown := l.farmX != 0 || l.farmY != 0
-	if farmKnown && zone.Contains(l.farmX, l.farmY) {
-		dest = pathfind.Vec3{
-			X: float64(l.farmX),
-			Y: float64(l.farmY),
-			Z: float64(l.farmZ),
-		}
-	}
-	l.tripStart = time.Now()
-	l.rePaths = 0
-	l.phase = phaseTownReturn
-	l.legRadius = tripApproachRadius
-	if !l.startZoneReturnLeg(dest) {
-		// No geodata path: direct legs toward the zone, the server
-		// stops them at obstacles and the next second plans again.
-		l.phase = phaseEngage
-		l.walkZoneLeg(zone, selfX, selfY, selfZ)
+        return
+    }
+    dest := l.zoneReturnDestination(zone, selfZ)
+    farmKnown := l.farmX != 0 || l.farmY != 0
+    if farmKnown && zone.Contains(l.farmX, l.farmY) {
+        dest = pathfind.Vec3{
+            X: float64(l.farmX),
+            Y: float64(l.farmY),
+            Z: float64(l.farmZ),
+        }
+    }
+    l.tripStart = time.Now()
+    l.rePaths = 0
+    l.phase = phaseTownReturn
+    l.legRadius = tripApproachRadius
+    if !l.startZoneReturnLeg(dest) {
+        // No geodata path: direct legs toward the zone, the server
+        // stops them at obstacles and the next second plans again.
+        l.phase = phaseEngage
+        l.walkZoneLeg(zone, selfX, selfY, selfZ)
 
-		return
-	}
+        return
+    }
 }
 
 // zoneReturnDestination builds the search goal of the zone return for
@@ -324,23 +324,23 @@ func (l *Loop) returnToZone() {
 // failure keeps the self height - the same-deck case it answers
 // correctly.
 func (l *Loop) zoneReturnDestination(
-	zone *state.Zone, selfZ int32,
+    zone *state.Zone, selfZ int32,
 ) pathfind.Vec3 {
-	dest := pathfind.Vec3{
-		X: float64(zone.CX),
-		Y: float64(zone.CY),
-		Z: float64(selfZ),
-	}
-	height, err := l.navigator.ClosestHeight(
-		float64(zone.CX), float64(zone.CY), int16(selfZ))
-	if err != nil {
-		l.logger.Printf("Hunt: zone deck height lookup failed: %v", err)
+    dest := pathfind.Vec3{
+        X: float64(zone.CX),
+        Y: float64(zone.CY),
+        Z: float64(selfZ),
+    }
+    height, err := l.navigator.ClosestHeight(
+        float64(zone.CX), float64(zone.CY), int16(selfZ))
+    if err != nil {
+        l.logger.Printf("Hunt: zone deck height lookup failed: %v", err)
 
-		return dest
-	}
-	dest.Z = float64(height)
+        return dest
+    }
+    dest.Z = float64(height)
 
-	return dest
+    return dest
 }
 
 // walkZoneLeg walks one direct short leg toward the zone center: the
@@ -355,27 +355,27 @@ func (l *Loop) zoneReturnDestination(
 // so a refused leg re-arms the pathfound return instead of grinding
 // refused clicks forever (see guardZoneLegClick).
 func (l *Loop) walkZoneLeg(
-	zone *state.Zone, selfX int32, selfY int32, selfZ int32,
+    zone *state.Zone, selfX int32, selfY int32, selfZ int32,
 ) {
-	moveX, moveY := zone.CX, zone.CY
-	dx := float64(zone.CX - selfX)
-	dy := float64(zone.CY - selfY)
-	if dist := math.Hypot(dx, dy); dist > returnWalkLeg {
-		frac := returnWalkLeg / dist
-		moveX = int32(float64(selfX) + dx*frac)
-		moveY = int32(float64(selfY) + dy*frac)
-	}
-	if ax, ay, dodged := l.steerClearOfAggro(
-		selfX, selfY, selfZ, moveX, moveY, selfZ, zone.CX, zone.CY,
-		time.Now()); dodged {
-		moveX, moveY = ax, ay
-	}
-	if !l.guardZoneLegClick(selfX, selfY, selfZ, moveX, moveY) {
-		return
-	}
-	if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
-		l.logf("Hunt: walk back failed: %v", err)
-	}
+    moveX, moveY := zone.CX, zone.CY
+    dx := float64(zone.CX - selfX)
+    dy := float64(zone.CY - selfY)
+    if dist := math.Hypot(dx, dy); dist > returnWalkLeg {
+        frac := returnWalkLeg / dist
+        moveX = int32(float64(selfX) + dx*frac)
+        moveY = int32(float64(selfY) + dy*frac)
+    }
+    if ax, ay, dodged := l.steerClearOfAggro(
+        selfX, selfY, selfZ, moveX, moveY, selfZ, zone.CX, zone.CY,
+        time.Now()); dodged {
+        moveX, moveY = ax, ay
+    }
+    if !l.guardZoneLegClick(selfX, selfY, selfZ, moveX, moveY) {
+        return
+    }
+    if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
+        l.logf("Hunt: walk back failed: %v", err)
+    }
 }
 
 // guardZoneLegClick validates one direct zone leg through the server
@@ -395,29 +395,29 @@ func (l *Loop) walkZoneLeg(
 // a navigator there is nothing to validate with: the legacy behavior
 // stands and the click goes out as it always did.
 func (l *Loop) guardZoneLegClick(
-	selfX int32, selfY int32, selfZ int32, moveX int32, moveY int32,
+    selfX int32, selfY int32, selfZ int32, moveX int32, moveY int32,
 ) bool {
-	if l.navigator == nil {
-		return true
-	}
-	from := pathfind.Vec3{
-		X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-	}
-	to := pathfind.Vec3{
-		X: float64(moveX), Y: float64(moveY), Z: float64(selfZ),
-	}
-	if _, ok := l.navigator.ValidateClick(from, to); ok {
-		return true
-	}
-	if l.zoneFails >= zoneReturnFailBudget {
-		l.zoneFails = 0
-	}
-	now := time.Now()
-	if now.Sub(l.zoneLegLogAt) >= noPickLogPeriod {
-		l.zoneLegLogAt = now
-		l.logf("Hunt: the direct zone leg to %d %d is walled, "+
-			"re-arming the pathfound return", moveX, moveY)
-	}
+    if l.navigator == nil {
+        return true
+    }
+    from := pathfind.Vec3{
+        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+    }
+    to := pathfind.Vec3{
+        X: float64(moveX), Y: float64(moveY), Z: float64(selfZ),
+    }
+    if _, ok := l.navigator.ValidateClick(from, to); ok {
+        return true
+    }
+    if l.zoneFails >= zoneReturnFailBudget {
+        l.zoneFails = 0
+    }
+    now := time.Now()
+    if now.Sub(l.zoneLegLogAt) >= noPickLogPeriod {
+        l.zoneLegLogAt = now
+        l.logf("Hunt: the direct zone leg to %d %d is walled, "+
+            "re-arming the pathfound return", moveX, moveY)
+    }
 
-	return false
+    return false
 }

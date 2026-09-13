@@ -5,8 +5,8 @@
 package state
 
 import (
-	"strconv"
-	"testing"
+    "strconv"
+    "testing"
 )
 
 // benchBotCount is the stretch goal of the project: up to 100
@@ -24,96 +24,96 @@ const benchFleetNpcCount = 20
 // loaded with a small live world (the realistic multi bot shape:
 // every session tracks its own surroundings, not one huge map).
 func benchRegistry() *Registry {
-	registry := NewRegistry()
-	for i := range benchBotCount {
-		bot := NewBot("bot" + strconv.Itoa(i))
-		bot.SetCharacter("char"+strconv.Itoa(i),
-			int32(268473919+i), 18,
-			benchSelfX, benchSelfY, benchSelfZ, 100, 50)
-		bot.SetOnline("char" + strconv.Itoa(i))
-		bot.SetPhase("engage")
-		for j := range benchFleetNpcCount {
-			bot.ApplyNpcInfo(benchNpcInfo(
-				int32(1_000_000+j*10), benchGoblinTemplate,
-				benchSelfX+int32((j*97)%2200-1100),
-				benchSelfY+int32((j*131)%2200-1100)))
-		}
-		registry.Add(bot)
-	}
+    registry := NewRegistry()
+    for i := range benchBotCount {
+        bot := NewBot("bot" + strconv.Itoa(i))
+        bot.SetCharacter("char"+strconv.Itoa(i),
+            int32(268473919+i), 18,
+            benchSelfX, benchSelfY, benchSelfZ, 100, 50)
+        bot.SetOnline("char" + strconv.Itoa(i))
+        bot.SetPhase("engage")
+        for j := range benchFleetNpcCount {
+            bot.ApplyNpcInfo(benchNpcInfo(
+                int32(1_000_000+j*10), benchGoblinTemplate,
+                benchSelfX+int32((j*97)%2200-1100),
+                benchSelfY+int32((j*131)%2200-1100)))
+        }
+        registry.Add(bot)
+    }
 
-	return registry
+    return registry
 }
 
 // BenchmarkRegistryList100 measures the whole registry list build
 // (the /api/bots payload source) with 100 sessions: the per bot
 // Info() walk under the registry read lock.
 func BenchmarkRegistryList100(b *testing.B) {
-	registry := benchRegistry()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		infos := registry.List()
-		if len(infos) != benchBotCount {
-			b.Fatalf("list length: %d", len(infos))
-		}
-	}
+    registry := benchRegistry()
+    b.ReportAllocs()
+    b.ResetTimer()
+    for range b.N {
+        infos := registry.List()
+        if len(infos) != benchBotCount {
+            b.Fatalf("list length: %d", len(infos))
+        }
+    }
 }
 
 // BenchmarkRegistryList100Parallel measures the concurrent list
 // polls of the web view: every browser page and the sidebar
 // refresh hit the registry at their own cadence.
 func BenchmarkRegistryList100Parallel(b *testing.B) {
-	registry := benchRegistry()
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			if infos := registry.List(); len(infos) != benchBotCount {
-				b.Fatalf("list length: %d", len(infos))
-			}
-		}
-	})
+    registry := benchRegistry()
+    b.ReportAllocs()
+    b.ResetTimer()
+    b.RunParallel(func(pb *testing.PB) {
+        for pb.Next() {
+            if infos := registry.List(); len(infos) != benchBotCount {
+                b.Fatalf("list length: %d", len(infos))
+            }
+        }
+    })
 }
 
 // BenchmarkRegistryGet measures the single bot lookup of the SSE
 // and state endpoints (100 bots online, the map is full).
 func BenchmarkRegistryGet(b *testing.B) {
-	registry := benchRegistry()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		if _, ok := registry.Get("bot42"); !ok {
-			b.Fatal("bot missing")
-		}
-	}
+    registry := benchRegistry()
+    b.ReportAllocs()
+    b.ResetTimer()
+    for range b.N {
+        if _, ok := registry.Get("bot42"); !ok {
+            b.Fatal("bot missing")
+        }
+    }
 }
 
 // BenchmarkBotInfo measures the per bot compact info build: the
 // web list calls this once per session per poll, so it multiplies
 // by the bot count and the poll rate.
 func BenchmarkBotInfo(b *testing.B) {
-	bot := benchWorld(20)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		info := bot.Info()
-		if info.ID != "bench" {
-			b.Fatal("wrong bot")
-		}
-	}
+    bot := benchWorld(20)
+    b.ReportAllocs()
+    b.ResetTimer()
+    for range b.N {
+        info := bot.Info()
+        if info.ID != "bench" {
+            b.Fatal("wrong bot")
+        }
+    }
 }
 
 // BenchmarkNewBot measures the tracker construction cost: the
 // supervisor restarts sessions (runBotForever) and the fleet of
 // 100 pays this per session start.
 func BenchmarkNewBot(b *testing.B) {
-	b.ReportAllocs()
-	for range b.N {
-		bot := NewBot("bench")
-		if bot.Status() != StatusConnecting {
-			b.Fatal("wrong status")
-		}
-	}
+    b.ReportAllocs()
+    for range b.N {
+        bot := NewBot("bench")
+        if bot.Status() != StatusConnecting {
+            b.Fatal("wrong status")
+        }
+    }
 }
 
 // BenchmarkRecordEvent measures the rolling event log write: the
@@ -121,12 +121,12 @@ func BenchmarkNewBot(b *testing.B) {
 // of every session, so the per event cost multiplies by the fleet
 // size.
 func BenchmarkRecordEvent(b *testing.B) {
-	bot := NewBot("bench")
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := range b.N {
-		bot.RecordEvent("event " + strconv.Itoa(i%64))
-	}
+    bot := NewBot("bench")
+    b.ReportAllocs()
+    b.ResetTimer()
+    for i := range b.N {
+        bot.RecordEvent("event " + strconv.Itoa(i%64))
+    }
 }
 
 // BenchmarkSnapshotContended measures the snapshot build while the
@@ -135,99 +135,99 @@ func BenchmarkRecordEvent(b *testing.B) {
 // them. One writer goroutine applies movements at full speed while
 // the benchmark goroutine builds snapshots.
 func BenchmarkSnapshotContended(b *testing.B) {
-	bot := benchWorld(200)
-	stop := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-stop:
-				return
-			default:
-				bot.ApplyMovement(benchMovement(1_000_000))
-			}
-		}
-	}()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		snap := bot.Snapshot()
-		if len(snap.Objects) == 0 {
-			b.Fatal("empty snapshot")
-		}
-	}
-	close(stop)
+    bot := benchWorld(200)
+    stop := make(chan struct{})
+    go func() {
+        for {
+            select {
+            case <-stop:
+                return
+            default:
+                bot.ApplyMovement(benchMovement(1_000_000))
+            }
+        }
+    }()
+    b.ReportAllocs()
+    b.ResetTimer()
+    for range b.N {
+        snap := bot.Snapshot()
+        if len(snap.Objects) == 0 {
+            b.Fatal("empty snapshot")
+        }
+    }
+    close(stop)
 }
 
 // benchMovement builds a movement packet payload for the object at
 // the given id slot of the bench world.
 func benchMovement(objectID int32) Movement {
-	return Movement{
-		ObjectID: objectID,
-		X:        benchSelfX + 100,
-		Y:        benchSelfY + 100,
-		Z:        benchSelfZ,
-		DestX:    benchSelfX + 500,
-		DestY:    benchSelfY + 500,
-		DestZ:    benchSelfZ,
-	}
+    return Movement{
+        ObjectID: objectID,
+        X:        benchSelfX + 100,
+        Y:        benchSelfY + 100,
+        Z:        benchSelfZ,
+        DestX:    benchSelfX + 500,
+        DestY:    benchSelfY + 500,
+        DestZ:    benchSelfZ,
+    }
 }
 
 // BenchmarkVersionPoll measures the SSE poll tick cost: every
 // streamEvents connection checks the version every 300 ms, so 100
 // bots watched by the web view pay this 333 times per second.
 func BenchmarkVersionPoll(b *testing.B) {
-	bot := benchWorld(20)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		if bot.Version() == 0 {
-			b.Fatal("zero version")
-		}
-	}
+    bot := benchWorld(20)
+    b.ReportAllocs()
+    b.ResetTimer()
+    for range b.N {
+        if bot.Version() == 0 {
+            b.Fatal("zero version")
+        }
+    }
 }
 
 // BenchmarkHundredBotsSnapshot rounds the scale measurement: the
 // aggregate cost of snapshotting every bot of the fleet once (the
 // worst case of a web view polling all streams at once).
 func BenchmarkHundredBotsSnapshot(b *testing.B) {
-	registry := benchRegistry()
-	bots := make([]*Bot, 0, benchBotCount)
-	for i := range benchBotCount {
-		bot, _ := registry.Get("bot" + strconv.Itoa(i))
-		bots = append(bots, bot)
-	}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		for _, bot := range bots {
-			if snap := bot.Snapshot(); len(snap.Objects) == 0 {
-				b.Fatal("empty snapshot")
-			}
-		}
-	}
+    registry := benchRegistry()
+    bots := make([]*Bot, 0, benchBotCount)
+    for i := range benchBotCount {
+        bot, _ := registry.Get("bot" + strconv.Itoa(i))
+        bots = append(bots, bot)
+    }
+    b.ReportAllocs()
+    b.ResetTimer()
+    for range b.N {
+        for _, bot := range bots {
+            if snap := bot.Snapshot(); len(snap.Objects) == 0 {
+                b.Fatal("empty snapshot")
+            }
+        }
+    }
 }
 
 // BenchmarkHundredBotsTickTraffic measures the aggregate apply
 // load of the fleet: every session receives its packets while all
 // trackers live in one process (the channel receive fan in shape).
 func BenchmarkHundredBotsTickTraffic(b *testing.B) {
-	registry := benchRegistry()
-	bots := make([]*Bot, 0, benchBotCount)
-	for i := range benchBotCount {
-		bot, _ := registry.Get("bot" + strconv.Itoa(i))
-		bots = append(bots, bot)
-	}
-	movements := make([]Movement, len(bots))
-	for i := range movements {
-		movements[i] = benchMovement(int32(1_000_000 + i*10))
-	}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		for i, bot := range bots {
-			bot.ApplyMovement(movements[i])
-		}
-	}
+    registry := benchRegistry()
+    bots := make([]*Bot, 0, benchBotCount)
+    for i := range benchBotCount {
+        bot, _ := registry.Get("bot" + strconv.Itoa(i))
+        bots = append(bots, bot)
+    }
+    movements := make([]Movement, len(bots))
+    for i := range movements {
+        movements[i] = benchMovement(int32(1_000_000 + i*10))
+    }
+    b.ReportAllocs()
+    b.ResetTimer()
+    for range b.N {
+        for i, bot := range bots {
+            bot.ApplyMovement(movements[i])
+        }
+    }
 }
 
 // benchScanFleet builds the cache pressure shape of the fleet: a
@@ -236,22 +236,22 @@ func BenchmarkHundredBotsTickTraffic(b *testing.B) {
 // the SoA split, 4.8 MB before it) exceeds the per core caches - the
 // memory layout, not the arithmetic, decides the throughput there.
 func benchScanFleet() []*Bot {
-	bots := make([]*Bot, 0, benchBotCount)
-	for i := range benchBotCount {
-		bot := NewBot("scan" + strconv.Itoa(i))
-		bot.SetCharacter("char"+strconv.Itoa(i),
-			int32(268473919+i), 18,
-			benchSelfX, benchSelfY, benchSelfZ, 100, 50)
-		for j := range 200 {
-			bot.ApplyNpcInfo(benchNpcInfo(
-				int32(1_000_000+j*10), benchGoblinTemplate,
-				benchSelfX+int32((j*97)%2200-1100),
-				benchSelfY+int32((j*131)%2200-1100)))
-		}
-		bots = append(bots, bot)
-	}
+    bots := make([]*Bot, 0, benchBotCount)
+    for i := range benchBotCount {
+        bot := NewBot("scan" + strconv.Itoa(i))
+        bot.SetCharacter("char"+strconv.Itoa(i),
+            int32(268473919+i), 18,
+            benchSelfX, benchSelfY, benchSelfZ, 100, 50)
+        for j := range 200 {
+            bot.ApplyNpcInfo(benchNpcInfo(
+                int32(1_000_000+j*10), benchGoblinTemplate,
+                benchSelfX+int32((j*97)%2200-1100),
+                benchSelfY+int32((j*131)%2200-1100)))
+        }
+        bots = append(bots, bot)
+    }
 
-	return bots
+    return bots
 }
 
 // BenchmarkFleetScanPressure measures the target search across the
@@ -260,14 +260,14 @@ func benchScanFleet() []*Bot {
 // bench that pays (and shows) the hot/cold record split - the single
 // world benches fit any cache and measure the compute only.
 func BenchmarkFleetScanPressure(b *testing.B) {
-	bots := benchScanFleet()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		for _, bot := range bots {
-			bot.NearestAttackableConstrained(1500, nil, nil, 0, true)
-		}
-	}
+    bots := benchScanFleet()
+    b.ReportAllocs()
+    b.ResetTimer()
+    for range b.N {
+        for _, bot := range bots {
+            bot.NearestAttackableConstrained(1500, nil, nil, 0, true)
+        }
+    }
 }
 
 // BenchmarkFleetLiveEncodePressure measures the snapshot encode sweep
@@ -276,13 +276,13 @@ func BenchmarkFleetScanPressure(b *testing.B) {
 // iteration while the aggregate working set stays far above the
 // caches.
 func BenchmarkFleetLiveEncodePressure(b *testing.B) {
-	bots := benchScanFleet()
-	payload := make([]byte, 0, 128<<10)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		for _, bot := range bots {
-			payload = bot.AppendSnapshotJSON(payload[:0])
-		}
-	}
+    bots := benchScanFleet()
+    payload := make([]byte, 0, 128<<10)
+    b.ReportAllocs()
+    b.ResetTimer()
+    for range b.N {
+        for _, bot := range bots {
+            payload = bot.AppendSnapshotJSON(payload[:0])
+        }
+    }
 }

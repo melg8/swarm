@@ -5,12 +5,12 @@
 package hunt
 
 import (
-        "testing"
-        "time"
+    "testing"
+    "time"
 
-        "github.com/melg8/swarm/internal/swarm/pathfind"
-        "github.com/melg8/swarm/internal/swarm/state"
-        "github.com/stretchr/testify/require"
+    "github.com/melg8/swarm/internal/swarm/pathfind"
+    "github.com/melg8/swarm/internal/swarm/state"
+    "github.com/stretchr/testify/require"
 )
 
 // The town walk stuck loop of the 2026-09-11 state dump: the bot
@@ -31,15 +31,15 @@ import (
 // character's current position so the position-change check does not
 // reset the timer.
 func armStuck(loop *Loop, bot *state.Bot) {
-        selfX, selfY, _, ok := bot.SelfPosition()
-        if !ok {
-                return
-        }
-        loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
-        loop.stuckX = selfX
-        loop.stuckY = selfY
-        loop.stuckWP = loop.wpIndex
-        loop.stuckBest = loop.stuckWaypointDistance(selfX, selfY)
+    selfX, selfY, _, ok := bot.SelfPosition()
+    if !ok {
+        return
+    }
+    loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
+    loop.stuckX = selfX
+    loop.stuckY = selfY
+    loop.stuckWP = loop.wpIndex
+    loop.stuckBest = loop.stuckWaypointDistance(selfX, selfY)
 }
 
 // TestWalkStuckSkipsCurrentWaypoint verifies the skip: a planned route
@@ -50,37 +50,37 @@ func armStuck(loop *Loop, bot *state.Bot) {
 // NOT consume the re-path budget (rePaths stays zero): the budget bounds
 // the expensive full leg re-plan, not the cursor advance.
 func TestWalkStuckSkipsCurrentWaypoint(t *testing.T) {
-        loop, game, bot, nav := newTripLoop()
-        nav.found = true
-        nav.route = []pathfind.Vec3{
-                {X: 45000, Y: 50000, Z: -3500},
-                {X: 44800, Y: 50200, Z: -3500},
-                {X: 44600, Y: 50400, Z: -3500},
-        }
-        fillInventory(bot)
-        loop.tick()
-        require.Equal(t, phaseTownWalk, loop.phase)
-        require.Len(t, loop.waypoints, 3)
-        // The first waypoint (the start) is already reached: the follower
-        // cursor sits on the mid waypoint.
-        require.Equal(t, 1, loop.wpIndex)
-        require.Len(t, game.walks, 1)
+    loop, game, bot, nav := newTripLoop()
+    nav.found = true
+    nav.route = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3500},
+        {X: 44800, Y: 50200, Z: -3500},
+        {X: 44600, Y: 50400, Z: -3500},
+    }
+    fillInventory(bot)
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase)
+    require.Len(t, loop.waypoints, 3)
+    // The first waypoint (the start) is already reached: the follower
+    // cursor sits on the mid waypoint.
+    require.Equal(t, 1, loop.wpIndex)
+    require.Len(t, game.walks, 1)
 
-        // Arm the stuck timer past the timeout and tick: the skip fires.
-        armStuck(loop, bot)
-        loop.tick()
-        require.Zero(t, loop.rePaths,
-                "the skip must NOT increment the re-path counter (the budget bounds full re-plans)")
-        require.Equal(t, 2, loop.wpIndex,
-                "the first stuck must skip to the next waypoint")
-        require.True(t, loop.stuckFast,
-                "the first skip must arm the fast stuck timeout for subsequent stucks")
-        // The skip sends a fresh walk click at the new waypoint target.
-        require.Len(t, game.walks, 2,
-                "the skip must send a fresh walk at the new waypoint")
-        lastWalk := game.walks[len(game.walks)-1]
-        require.Equal(t, int32(44600), lastWalk[0],
-                "the fresh walk must target the skipped-to waypoint")
+    // Arm the stuck timer past the timeout and tick: the skip fires.
+    armStuck(loop, bot)
+    loop.tick()
+    require.Zero(t, loop.rePaths,
+        "the skip must NOT increment the re-path counter (the budget bounds full re-plans)")
+    require.Equal(t, 2, loop.wpIndex,
+        "the first stuck must skip to the next waypoint")
+    require.True(t, loop.stuckFast,
+        "the first skip must arm the fast stuck timeout for subsequent stucks")
+    // The skip sends a fresh walk click at the new waypoint target.
+    require.Len(t, game.walks, 2,
+        "the skip must send a fresh walk at the new waypoint")
+    lastWalk := game.walks[len(game.walks)-1]
+    require.Equal(t, int32(44600), lastWalk[0],
+        "the fresh walk must target the skipped-to waypoint")
 }
 
 // TestWalkStuckRepathsAfterAllWaypointsSkipped verifies the re-path
@@ -89,43 +89,43 @@ func TestWalkStuckSkipsCurrentWaypoint(t *testing.T) {
 // re-plans the whole leg from the current position to the destination.
 // The re-plan (not the skip) consumes the re-path budget.
 func TestWalkStuckRepathsAfterAllWaypointsSkipped(t *testing.T) {
-        loop, _, bot, nav := newTripLoop()
-        nav.found = true
-        nav.route = []pathfind.Vec3{
-                {X: 45000, Y: 50000, Z: -3500},
-                {X: 44800, Y: 50200, Z: -3500},
-                {X: 44600, Y: 50400, Z: -3500},
-        }
-        fillInventory(bot)
-        loop.tick()
-        require.Equal(t, phaseTownWalk, loop.phase)
-        require.Equal(t, 1, loop.wpIndex)
+    loop, _, bot, nav := newTripLoop()
+    nav.found = true
+    nav.route = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3500},
+        {X: 44800, Y: 50200, Z: -3500},
+        {X: 44600, Y: 50400, Z: -3500},
+    }
+    fillInventory(bot)
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase)
+    require.Equal(t, 1, loop.wpIndex)
 
-        // First stuck: skip from mid (wp1) to end (wp2). No re-path budget
-        // consumed (the skip is a cursor advance).
-        armStuck(loop, bot)
-        loop.tick()
-        require.Zero(t, loop.rePaths,
-                "the skip must NOT consume the re-path budget")
-        require.Equal(t, 2, loop.wpIndex)
+    // First stuck: skip from mid (wp1) to end (wp2). No re-path budget
+    // consumed (the skip is a cursor advance).
+    armStuck(loop, bot)
+    loop.tick()
+    require.Zero(t, loop.rePaths,
+        "the skip must NOT consume the re-path budget")
+    require.Equal(t, 2, loop.wpIndex)
 
-        // Second stuck: the last waypoint is the final one (no more to
-        // skip), so the leg re-plans from the current position. The re-plan
-        // consumes the re-path budget. The follower cursor resets and
-        // immediately advances past the fresh plan's wp 0 (the standing
-        // cell itself - a click at it is the self-click the server always
-        // refuses) onto the first real waypoint.
-        armStuck(loop, bot)
-        nav.calls = 0
-        loop.tick()
-        require.Equal(t, 1, loop.rePaths,
-                "the re-plan must consume the re-path budget")
-        require.Equal(t, 1, loop.wpIndex,
-                "the re-planned cursor must advance past the standing wp 0 onto the first real waypoint")
-        require.False(t, loop.stuckFast,
-                "the re-plan must clear the fast stuck flag")
-        require.Positive(t, nav.calls,
-                "the re-plan must call the navigator")
+    // Second stuck: the last waypoint is the final one (no more to
+    // skip), so the leg re-plans from the current position. The re-plan
+    // consumes the re-path budget. The follower cursor resets and
+    // immediately advances past the fresh plan's wp 0 (the standing
+    // cell itself - a click at it is the self-click the server always
+    // refuses) onto the first real waypoint.
+    armStuck(loop, bot)
+    nav.calls = 0
+    loop.tick()
+    require.Equal(t, 1, loop.rePaths,
+        "the re-plan must consume the re-path budget")
+    require.Equal(t, 1, loop.wpIndex,
+        "the re-planned cursor must advance past the standing wp 0 onto the first real waypoint")
+    require.False(t, loop.stuckFast,
+        "the re-plan must clear the fast stuck flag")
+    require.Positive(t, nav.calls,
+        "the re-plan must call the navigator")
 }
 
 // TestWalkStuckAbortsAfterMaxRePaths verifies the abort: with a
@@ -135,58 +135,58 @@ func TestWalkStuckRepathsAfterAllWaypointsSkipped(t *testing.T) {
 // (the frozen re-path rule). The maxRePaths budget still bounds the
 // walks whose re-paths DO move the character between them.
 func TestWalkStuckAbortsAfterMaxRePaths(t *testing.T) {
-        loop, _, bot, nav := newTripLoop()
-        nav.found = true
-        nav.route = []pathfind.Vec3{
-                {X: 45000, Y: 50000, Z: -3500},
-                {X: 44800, Y: 50200, Z: -3500},
-        }
-        fillInventory(bot)
-        loop.tick()
-        require.Equal(t, phaseTownWalk, loop.phase)
+    loop, _, bot, nav := newTripLoop()
+    nav.found = true
+    nav.route = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3500},
+        {X: 44800, Y: 50200, Z: -3500},
+    }
+    fillInventory(bot)
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase)
 
-        // The first stuck re-plans the leg (the character stands still,
-        // the route has no waypoint to skip onto).
-        armStuck(loop, bot)
-        loop.tick()
-        require.Equal(t, phaseTownWalk, loop.phase,
-                "the first re-path keeps the trip walking")
-        require.Equal(t, 1, loop.rePaths)
-        require.Positive(t, nav.calls,
-                "the re-plan must call the navigator")
-        require.True(t, loop.extendArmed,
-                "the pinned stuck arms the short click extension")
+    // The first stuck re-plans the leg (the character stands still,
+    // the route has no waypoint to skip onto).
+    armStuck(loop, bot)
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase,
+        "the first re-path keeps the trip walking")
+    require.Equal(t, 1, loop.rePaths)
+    require.Positive(t, nav.calls,
+        "the re-plan must call the navigator")
+    require.True(t, loop.extendArmed,
+        "the pinned stuck arms the short click extension")
 
-        // The second stuck from the same cell (no movement since the
-        // re-path) climbs the escalation ladder rung 1: the frozen
-        // corridor joins the session bans and the leg re-plans the detour
-        // around it - the identical frozen route is never re-planned again.
-        armStuck(loop, bot)
-        loop.tick()
-        require.Equal(t, phaseTownWalk, loop.phase,
-                "the frozen re-path escalates to the detour re-plan, the trip keeps walking")
-        require.Len(t, loop.frozenAreas, 1,
-                "the frozen corridor joins the session avoid areas")
-        require.GreaterOrEqual(t, nav.calls, 2,
-                "the detour re-plan calls the navigator again")
+    // The second stuck from the same cell (no movement since the
+    // re-path) climbs the escalation ladder rung 1: the frozen
+    // corridor joins the session bans and the leg re-plans the detour
+    // around it - the identical frozen route is never re-planned again.
+    armStuck(loop, bot)
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase,
+        "the frozen re-path escalates to the detour re-plan, the trip keeps walking")
+    require.Len(t, loop.frozenAreas, 1,
+        "the frozen corridor joins the session avoid areas")
+    require.GreaterOrEqual(t, nav.calls, 2,
+        "the detour re-plan calls the navigator again")
 
-        // The third stuck from the same cell (the detour froze as well)
-        // climbs rung 2: the direct server routed walk - the follower
-        // drops the plan and clicks the stop target directly, bounded by
-        // the window.
-        armStuck(loop, bot)
-        loop.tick()
-        require.Equal(t, phaseTownWalk, loop.phase,
-                "the frozen detour escalates to the direct server routed walk")
-        require.True(t, loop.directLeg,
-                "the direct leg is armed")
+    // The third stuck from the same cell (the detour froze as well)
+    // climbs rung 2: the direct server routed walk - the follower
+    // drops the plan and clicks the stop target directly, bounded by
+    // the window.
+    armStuck(loop, bot)
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase,
+        "the frozen detour escalates to the direct server routed walk")
+    require.True(t, loop.directLeg,
+        "the direct leg is armed")
 
-        // The direct window burning without progress aborts the trip: the
-        // ladder is exhausted, the cooldown recovery owns the rest.
-        loop.directLegUntil = time.Now().Add(-directLegWindow - time.Second)
-        loop.tick()
-        require.NotEqual(t, phaseTownWalk, loop.phase,
-                "the expired direct walk aborts the trip")
+    // The direct window burning without progress aborts the trip: the
+    // ladder is exhausted, the cooldown recovery owns the rest.
+    loop.directLegUntil = time.Now().Add(-directLegWindow - time.Second)
+    loop.tick()
+    require.NotEqual(t, phaseTownWalk, loop.phase,
+        "the expired direct walk aborts the trip")
 }
 
 // TestWalkStuckBudgetBoundsMovingRepaths pins the maxRePaths budget
@@ -194,39 +194,39 @@ func TestWalkStuckAbortsAfterMaxRePaths(t *testing.T) {
 // moved between the stucks), the re-paths keep running until the
 // budget is exhausted - the frozen rule never fires.
 func TestWalkStuckBudgetBoundsMovingRepaths(t *testing.T) {
-        loop, _, bot, nav := newTripLoop()
-        nav.found = true
-        nav.route = []pathfind.Vec3{
-                {X: 45000, Y: 50000, Z: -3500},
-                {X: 44800, Y: 50200, Z: -3500},
-        }
-        // Block every sight line: no waypoint ahead is ever clear, so the
-        // stuck always reaches the re-path branch (no skip).
-        nav.sightFunc = func(_, _ pathfind.Vec3) (bool, error) {
-                return false, nil
-        }
-        fillInventory(bot)
-        loop.tick()
-        require.Equal(t, phaseTownWalk, loop.phase)
+    loop, _, bot, nav := newTripLoop()
+    nav.found = true
+    nav.route = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3500},
+        {X: 44800, Y: 50200, Z: -3500},
+    }
+    // Block every sight line: no waypoint ahead is ever clear, so the
+    // stuck always reaches the re-path branch (no skip).
+    nav.sightFunc = func(_, _ pathfind.Vec3) (bool, error) {
+        return false, nil
+    }
+    fillInventory(bot)
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase)
 
-        for i := range maxRePaths {
-                // The character moved between the stucks: the next re-path
-                // plans from a different cell, the frozen rule never fires.
-                x := int32(45000 - i*200)
-                moveSelfTo(bot, x, 50000, -3500)
-                loop.stuckX, loop.stuckY = x, 50000
-                loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
-                loop.tick()
-                require.Equal(t, phaseTownWalk, loop.phase,
-                        "the moving re-paths keep the trip walking")
-        }
-        // The budget exhausted: one more moving stuck aborts the trip.
-        moveSelfTo(bot, 44000, 50000, -3500)
-        loop.stuckX, loop.stuckY = 44000, 50000
+    for i := range maxRePaths {
+        // The character moved between the stucks: the next re-path
+        // plans from a different cell, the frozen rule never fires.
+        x := int32(45000 - i*200)
+        moveSelfTo(bot, x, 50000, -3500)
+        loop.stuckX, loop.stuckY = x, 50000
         loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
         loop.tick()
-        require.NotEqual(t, phaseTownWalk, loop.phase,
-                "the trip must abort after the re-path budget is exhausted")
+        require.Equal(t, phaseTownWalk, loop.phase,
+            "the moving re-paths keep the trip walking")
+    }
+    // The budget exhausted: one more moving stuck aborts the trip.
+    moveSelfTo(bot, 44000, 50000, -3500)
+    loop.stuckX, loop.stuckY = 44000, 50000
+    loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
+    loop.tick()
+    require.NotEqual(t, phaseTownWalk, loop.phase,
+        "the trip must abort after the re-path budget is exhausted")
 }
 
 // TestWalkStuckFastTimeoutArmsAfterSkip pins the fast timeout: after the
@@ -235,62 +235,62 @@ func TestWalkStuckBudgetBoundsMovingRepaths(t *testing.T) {
 // dump showed the bot waiting 15 s per waypoint while the server refused
 // every click - the fast timeout cuts that to 4 s after the first stuck.
 func TestWalkStuckFastTimeoutArmsAfterSkip(t *testing.T) {
-        loop, _, bot, nav := newTripLoop()
-        nav.found = true
-        nav.route = []pathfind.Vec3{
-                {X: 45000, Y: 50000, Z: -3500},
-                {X: 44800, Y: 50200, Z: -3500},
-                {X: 44600, Y: 50400, Z: -3500},
-                {X: 44400, Y: 50600, Z: -3500},
-        }
-        fillInventory(bot)
-        loop.tick()
-        require.Equal(t, phaseTownWalk, loop.phase)
-        require.Equal(t, 1, loop.wpIndex)
+    loop, _, bot, nav := newTripLoop()
+    nav.found = true
+    nav.route = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3500},
+        {X: 44800, Y: 50200, Z: -3500},
+        {X: 44600, Y: 50400, Z: -3500},
+        {X: 44400, Y: 50600, Z: -3500},
+    }
+    fillInventory(bot)
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase)
+    require.Equal(t, 1, loop.wpIndex)
 
-        // First stuck: skip from wp1 to wp2. Arms the fast timeout.
-        armStuck(loop, bot)
-        loop.tick()
-        require.True(t, loop.stuckFast, "the fast timeout must arm after the first skip")
+    // First stuck: skip from wp1 to wp2. Arms the fast timeout.
+    armStuck(loop, bot)
+    loop.tick()
+    require.True(t, loop.stuckFast, "the fast timeout must arm after the first skip")
 
-        // A stuck that is past the fast timeout but NOT past the full
-        // timeout must still fire the skip.
-        selfX, selfY, _, _ := bot.SelfPosition()
-        loop.stuckAt = time.Now().Add(-stuckFastTimeout - time.Second)
-        loop.stuckX = selfX
-        loop.stuckY = selfY
-        loop.tick()
-        require.Equal(t, 3, loop.wpIndex,
-                "the fast timeout must fire the second skip before the full timeout")
+    // A stuck that is past the fast timeout but NOT past the full
+    // timeout must still fire the skip.
+    selfX, selfY, _, _ := bot.SelfPosition()
+    loop.stuckAt = time.Now().Add(-stuckFastTimeout - time.Second)
+    loop.stuckX = selfX
+    loop.stuckY = selfY
+    loop.tick()
+    require.Equal(t, 3, loop.wpIndex,
+        "the fast timeout must fire the second skip before the full timeout")
 }
 
 // TestWalkStuckDoesNotSkipWaterEscape verifies the water escape branch
 // is unchanged: a stuck water escape re-plans the escape itself, not
 // the town leg. The skip logic only applies to the normal town walk.
 func TestWalkStuckDoesNotSkipWaterEscape(t *testing.T) {
-        loop, _, bot, nav := newTripLoop()
-        nav.found = true
-        nav.overWater = true
-        nav.route = []pathfind.Vec3{
-                {X: 45000, Y: 50000, Z: -3700},
-                {X: 44800, Y: 50200, Z: -3700},
-        }
-        nav.escapeRoute = []pathfind.Vec3{
-                {X: 45000, Y: 50000, Z: -3700},
-                {X: 45200, Y: 49800, Z: -3500},
-        }
-        fillInventory(bot)
-        moveSelfTo(bot, 45000, 50000, -3700)
-        loop.tick()
-        require.True(t, loop.waterEscape,
-                "the character over water must enter the water escape")
+    loop, _, bot, nav := newTripLoop()
+    nav.found = true
+    nav.overWater = true
+    nav.route = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3700},
+        {X: 44800, Y: 50200, Z: -3700},
+    }
+    nav.escapeRoute = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3700},
+        {X: 45200, Y: 49800, Z: -3500},
+    }
+    fillInventory(bot)
+    moveSelfTo(bot, 45000, 50000, -3700)
+    loop.tick()
+    require.True(t, loop.waterEscape,
+        "the character over water must enter the water escape")
 
-        // Stuck water escape: re-plan the escape, not skip a waypoint.
-        armStuck(loop, bot)
-        loop.tick()
-        require.True(t, loop.waterEscape,
-                "the water escape must stay active through the re-plan")
-        require.Equal(t, 1, loop.rePaths)
+    // Stuck water escape: re-plan the escape, not skip a waypoint.
+    armStuck(loop, bot)
+    loop.tick()
+    require.True(t, loop.waterEscape,
+        "the water escape must stay active through the re-plan")
+    require.Equal(t, 1, loop.rePaths)
 }
 
 // TestWalkStuckSkipNeedsAClearLine pins the skip gate of the 06:19
@@ -301,35 +301,35 @@ func TestWalkStuckDoesNotSkipWaterEscape(t *testing.T) {
 // character creeps cell by cell into a trap pocket) and the leg
 // re-plans instead, consuming the re-path budget.
 func TestWalkStuckSkipNeedsAClearLine(t *testing.T) {
-        loop, _, bot, nav := newTripLoop()
-        nav.found = true
-        nav.route = []pathfind.Vec3{
-                {X: 45000, Y: 50000, Z: -3500},
-                {X: 44800, Y: 50200, Z: -3500},
-                {X: 44600, Y: 50400, Z: -3500},
-        }
-        nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-                // The cursor advance onto wp1 stays clear, every successor
-                // line ahead of wp1 is blocked.
-                return int32(to.X) == 44800, nil
-        }
-        fillInventory(bot)
-        loop.tick()
-        require.Equal(t, phaseTownWalk, loop.phase)
-        require.Equal(t, 1, loop.wpIndex)
+    loop, _, bot, nav := newTripLoop()
+    nav.found = true
+    nav.route = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3500},
+        {X: 44800, Y: 50200, Z: -3500},
+        {X: 44600, Y: 50400, Z: -3500},
+    }
+    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
+        // The cursor advance onto wp1 stays clear, every successor
+        // line ahead of wp1 is blocked.
+        return int32(to.X) == 44800, nil
+    }
+    fillInventory(bot)
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase)
+    require.Equal(t, 1, loop.wpIndex)
 
-        // The stuck fires with every successor line blocked: the skip must
-        // refuse to arm the blocked waypoint and re-plan the leg instead.
-        // The re-planned cursor advances past the standing wp 0 onto the
-        // first real waypoint in the same tick (no self-click).
-        armStuck(loop, bot)
-        loop.tick()
-        require.Equal(t, 1, loop.rePaths,
-                "the blocked successor lines must force the re-path")
-        require.Equal(t, 1, loop.wpIndex,
-                "the re-planned cursor must advance onto the first real waypoint")
-        require.False(t, loop.stuckFast,
-                "the re-plan must clear the fast stuck flag")
+    // The stuck fires with every successor line blocked: the skip must
+    // refuse to arm the blocked waypoint and re-plan the leg instead.
+    // The re-planned cursor advances past the standing wp 0 onto the
+    // first real waypoint in the same tick (no self-click).
+    armStuck(loop, bot)
+    loop.tick()
+    require.Equal(t, 1, loop.rePaths,
+        "the blocked successor lines must force the re-path")
+    require.Equal(t, 1, loop.wpIndex,
+        "the re-planned cursor must advance onto the first real waypoint")
+    require.False(t, loop.stuckFast,
+        "the re-plan must clear the fast stuck flag")
 }
 
 // TestWalkStuckSkipJumpsToTheFirstClearWaypoint pins the forward scan
@@ -337,30 +337,30 @@ func TestWalkStuckSkipNeedsAClearLine(t *testing.T) {
 // walkable line, not the immediate next one - the blocked successors
 // in between would arm collapsed clicks just the same.
 func TestWalkStuckSkipJumpsToTheFirstClearWaypoint(t *testing.T) {
-        loop, _, bot, nav := newTripLoop()
-        nav.found = true
-        nav.route = []pathfind.Vec3{
-                {X: 45000, Y: 50000, Z: -3500},
-                {X: 44800, Y: 50200, Z: -3500},
-                {X: 44600, Y: 50400, Z: -3500},
-                {X: 44400, Y: 50600, Z: -3500},
-        }
-        // The cursor line to wp1 is clear, the line to wp2 is blocked, the
-        // line to wp3 is clear again.
-        nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-                return int32(to.X) != 44600, nil
-        }
-        fillInventory(bot)
-        loop.tick()
-        require.Equal(t, phaseTownWalk, loop.phase)
-        require.Equal(t, 1, loop.wpIndex)
+    loop, _, bot, nav := newTripLoop()
+    nav.found = true
+    nav.route = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3500},
+        {X: 44800, Y: 50200, Z: -3500},
+        {X: 44600, Y: 50400, Z: -3500},
+        {X: 44400, Y: 50600, Z: -3500},
+    }
+    // The cursor line to wp1 is clear, the line to wp2 is blocked, the
+    // line to wp3 is clear again.
+    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
+        return int32(to.X) != 44600, nil
+    }
+    fillInventory(bot)
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase)
+    require.Equal(t, 1, loop.wpIndex)
 
-        armStuck(loop, bot)
-        loop.tick()
-        require.Zero(t, loop.rePaths,
-                "the skip onto the clear waypoint must not consume the budget")
-        require.Equal(t, 3, loop.wpIndex,
-                "the skip must jump over the blocked wp2 onto the clear wp3")
-        require.True(t, loop.stuckFast,
-                "the skip must arm the fast stuck timeout")
+    armStuck(loop, bot)
+    loop.tick()
+    require.Zero(t, loop.rePaths,
+        "the skip onto the clear waypoint must not consume the budget")
+    require.Equal(t, 3, loop.wpIndex,
+        "the skip must jump over the blocked wp2 onto the clear wp3")
+    require.True(t, loop.stuckFast,
+        "the skip must arm the fast stuck timeout")
 }

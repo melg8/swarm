@@ -5,9 +5,9 @@
 package togameserver
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const requestBuyItemPacketID = 0x1F
@@ -18,8 +18,8 @@ const requestBuyItemPacketID = 0x1F
 // reference price when the list entry carries none) with the town
 // tax.
 type BuyItemEntry struct {
-	ItemID int32
-	Count  int32
+    ItemID int32
+    Count  int32
 }
 
 // RequestBuyItemPacket buys items from a shop buylist. The server
@@ -37,37 +37,37 @@ type BuyItemEntry struct {
 // request is refused (PlayerConfig.MAX_ITEM_IN_PACKET guards the
 // executor).
 type RequestBuyItemPacket struct {
-	ListID int32
-	Items  []BuyItemEntry
+    ListID int32
+    Items  []BuyItemEntry
 }
 
 // NewRequestBuyItemPacket creates a buy request for the buylist.
 func NewRequestBuyItemPacket() *RequestBuyItemPacket {
-	return &RequestBuyItemPacket{
-		ListID: 0,
-		Items:  nil,
-	}
+    return &RequestBuyItemPacket{
+        ListID: 0,
+        Items:  nil,
+    }
 }
 
 // ToBytes serializes the packet.
 func (p *RequestBuyItemPacket) ToBytes(writer *packet.Writer) error {
-	if err := writer.WriteInt8(requestBuyItemPacketID); err != nil {
-		return fmt.Errorf("failed to write buy item id: %w", err)
-	}
-	if err := writer.WriteInt32(p.ListID); err != nil {
-		return fmt.Errorf("failed to write buy list id: %w", err)
-	}
-	if err := writer.WriteInt32(int32(len(p.Items))); err != nil {
-		return fmt.Errorf("failed to write buy item count: %w", err)
-	}
-	for _, item := range p.Items {
-		if err := writer.WriteInt32(item.ItemID); err != nil {
-			return fmt.Errorf("failed to write buy item id: %w", err)
-		}
-		if err := writer.WriteInt32(item.Count); err != nil {
-			return fmt.Errorf("failed to write buy item stack: %w", err)
-		}
-	}
+    if err := writer.WriteInt8(requestBuyItemPacketID); err != nil {
+        return fmt.Errorf("failed to write buy item id: %w", err)
+    }
+    if err := writer.WriteInt32(p.ListID); err != nil {
+        return fmt.Errorf("failed to write buy list id: %w", err)
+    }
+    if err := writer.WriteInt32(int32(len(p.Items))); err != nil {
+        return fmt.Errorf("failed to write buy item count: %w", err)
+    }
+    for _, item := range p.Items {
+        if err := writer.WriteInt32(item.ItemID); err != nil {
+            return fmt.Errorf("failed to write buy item id: %w", err)
+        }
+        if err := writer.WriteInt32(item.Count); err != nil {
+            return fmt.Errorf("failed to write buy item stack: %w", err)
+        }
+    }
 
-	return nil
+    return nil
 }

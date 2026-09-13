@@ -5,11 +5,11 @@
 package proxy
 
 import (
-	"fmt"
-	"sync"
-	"time"
+    "fmt"
+    "sync"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // The bot relogin handoff: a client sitting in the world must survive the
@@ -39,8 +39,8 @@ import (
 // Server packet opcodes the handoff synthesizes or suppresses (the C1
 // values of the Mobius ServerPackets enum).
 const (
-	handoffOpLeaveWorld      = 0x96
-	handoffOpRestartResponse = 0x74
+    handoffOpLeaveWorld      = 0x96
+    handoffOpRestartResponse = 0x74
 )
 
 // Client game packet opcode of the logout request.
@@ -50,8 +50,8 @@ const clientOpLogout = 0x09
 // and the server packet opcode of its answer (NetPing) - the C1 values
 // of the Mobius ClientPackets/ServerPackets enums.
 const (
-	clientOpNetPing = 0xA8
-	serverOpNetPing = 0xEC
+    clientOpNetPing = 0xA8
+    serverOpNetPing = 0xEC
 )
 
 // isNetPingAnswerPayload reports whether the payload is the NetPing
@@ -65,7 +65,7 @@ const (
 // recorded and relayed again, and the loop accelerates to tens of
 // thousands of packets per second on the attached bot).
 func isNetPingAnswerPayload(payload []byte) bool {
-	return len(payload) > 0 && payload[0] == serverOpNetPing
+    return len(payload) > 0 && payload[0] == serverOpNetPing
 }
 
 // clientHoldTimeout bounds how long a held client waits for its bot to
@@ -89,10 +89,10 @@ var holdKnobsMu sync.Mutex
 
 // holdTimings snapshots the hold tunables under the knob mutex.
 func holdTimings() (timeout time.Duration, poll time.Duration) {
-	holdKnobsMu.Lock()
-	defer holdKnobsMu.Unlock()
+    holdKnobsMu.Lock()
+    defer holdKnobsMu.Unlock()
 
-	return clientHoldTimeout, holdPollPeriod
+    return clientHoldTimeout, holdPollPeriod
 }
 
 // botSwitchAutoSelectDelay is how long the restart dance waits before
@@ -107,10 +107,10 @@ var botSwitchAutoSelectDelay = 1500 * time.Millisecond
 // same guard pattern as holdTimings: the tests rewrite the delay while a
 // relay of a previous connection may still be arming a timer).
 func switchTimings() time.Duration {
-	holdKnobsMu.Lock()
-	defer holdKnobsMu.Unlock()
+    holdKnobsMu.Lock()
+    defer holdKnobsMu.Unlock()
 
-	return botSwitchAutoSelectDelay
+    return botSwitchAutoSelectDelay
 }
 
 // holdForRelogin parks the relay of a client whose bot session ended:
@@ -120,39 +120,39 @@ func switchTimings() time.Duration {
 // replacement session, or nil when the client went away or the hold
 // timed out (the connection is already closed then).
 func (gc *gameConn) holdForRelogin(old *botSession) *botSession {
-	timeout, poll := holdTimings()
-	gc.setHolding(true)
-	defer gc.setHolding(false)
+    timeout, poll := holdTimings()
+    gc.setHolding(true)
+    defer gc.setHolding(false)
 
-	gc.server.logger.Printf(
-		"game#%d: the bot session %q ended, holding the client for its relogin "+
-			"(up to %s)",
-		gc.id, old.id, timeout)
+    gc.server.logger.Printf(
+        "game#%d: the bot session %q ended, holding the client for its relogin "+
+            "(up to %s)",
+        gc.id, old.id, timeout)
 
-	deadline := time.Now().Add(timeout)
-	for {
-		if next := gc.server.sessionByID(old.id); next != nil &&
-			next != old && next.recorder != old.recorder &&
-			switchReady(next) {
-			gc.server.logger.Printf(
-				"game#%d: bot %q is back online, restarting the held client onto it",
-				gc.id, next.id)
+    deadline := time.Now().Add(timeout)
+    for {
+        if next := gc.server.sessionByID(old.id); next != nil &&
+            next != old && next.recorder != old.recorder &&
+            switchReady(next) {
+            gc.server.logger.Printf(
+                "game#%d: bot %q is back online, restarting the held client onto it",
+                gc.id, next.id)
 
-			return next
-		}
-		select {
-		case <-gc.done:
-			return nil
-		case <-time.After(poll):
-		}
-		if time.Now().After(deadline) {
-			gc.shutdown(fmt.Sprintf(
-				"the bot %q did not return within %s, releasing the held client",
-				old.id, timeout))
+            return next
+        }
+        select {
+        case <-gc.done:
+            return nil
+        case <-time.After(poll):
+        }
+        if time.Now().After(deadline) {
+            gc.shutdown(fmt.Sprintf(
+                "the bot %q did not return within %s, releasing the held client",
+                old.id, timeout))
 
-			return nil
-		}
-	}
+            return nil
+        }
+    }
 }
 
 // switchReady reports whether a bot session can take a client through
@@ -160,15 +160,15 @@ func (gc *gameConn) holdForRelogin(old *botSession) *botSession {
 // char selected answer of its login is recorded (the dance serves it to
 // the client as the double click answer, so it must exist).
 func switchReady(session *botSession) bool {
-	return session.tracker.Status() == state.StatusOnline &&
-		session.recorder.FirstPacketSeq(charSelectedOpcode) != 0
+    return session.tracker.Status() == state.StatusOnline &&
+        session.recorder.FirstPacketSeq(charSelectedOpcode) != 0
 }
 
 // buildLeaveWorldPacket builds the C1 LeaveWorld packet: the bare opcode
 // 0x96, no body (see LeaveWorld.writeImpl - STATIC_PACKET). The client
 // that processes it returns to the login screen on its own.
 func buildLeaveWorldPacket() []byte {
-	return []byte{handoffOpLeaveWorld}
+    return []byte{handoffOpLeaveWorld}
 }
 
 // buildRestartResponsePacket builds the C1 RestartResponse packet the
@@ -180,11 +180,11 @@ func buildLeaveWorldPacket() []byte {
 // designed to make, and the carrier of every character switch the proxy
 // performs.
 func buildRestartResponsePacket() []byte {
-	return []byte{handoffOpRestartResponse, 0x01, 0x00, 0x00, 0x00}
+    return []byte{handoffOpRestartResponse, 0x01, 0x00, 0x00, 0x00}
 }
 
 // isLeaveWorldPayload reports whether the payload is the LeaveWorld
 // packet the server sends when the bot session is leaving.
 func isLeaveWorldPayload(payload []byte) bool {
-	return len(payload) > 0 && payload[0] == handoffOpLeaveWorld
+    return len(payload) > 0 && payload[0] == handoffOpLeaveWorld
 }

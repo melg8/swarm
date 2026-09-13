@@ -22,5160 +22,5160 @@ package hunt
 // spots. The first entry is the starter fallback of the
 // spot picker (the village nearest spot of the lowest band).
 var elvenHuntingSpots = []Spot{
-	{
-		ID: "elven-spot-01", Name: "Red Keltir E-f6",
-		Region: regionElven, MinLevel: 1, MaxLevel: 2,
-		AnchorX: 50781, AnchorY: 42201, Radius: 1475,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20530, Name: "Young Red Keltir",
-				Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-02", Name: "Red Keltir SE-a1",
-		Region: regionElven, MinLevel: 1, MaxLevel: 3,
-		AnchorX: 47421, AnchorY: 43003, Radius: 2012,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 3, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20530, Name: "Young Red Keltir",
-				Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-03", Name: "Elder Red Keltir SW-f22",
-		Region: regionElven, MinLevel: 1, MaxLevel: 3,
-		AnchorX: 45030, AnchorY: 43273, Radius: 2018,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20530, Name: "Young Red Keltir",
-				Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-04", Name: "Elder Red Keltir W-d4",
-		Region: regionElven, MinLevel: 1, MaxLevel: 3,
-		AnchorX: 43455, AnchorY: 42367, Radius: 2038,
-		RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 4, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20530, Name: "Young Red Keltir",
-				Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-05", Name: "Red Keltir E-d12",
-		Region: regionElven, MinLevel: 1, MaxLevel: 3,
-		AnchorX: 49049, AnchorY: 42262, Radius: 2000,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 3, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20530, Name: "Young Red Keltir",
-				Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-06", Name: "Elder Red Keltir SW-h8",
-		Region: regionElven, MinLevel: 1, MaxLevel: 3,
-		AnchorX: 43592, AnchorY: 43944, Radius: 1776,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20530, Name: "Young Red Keltir",
-				Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-07", Name: "Elder Red Keltir W-d12",
-		Region: regionElven, MinLevel: 1, MaxLevel: 3,
-		AnchorX: 41263, AnchorY: 41520, Radius: 2046,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 3, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20530, Name: "Young Red Keltir",
-				Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-08", Name: "Elder Red Keltir W-a1",
-		Region: regionElven, MinLevel: 1, MaxLevel: 3,
-		AnchorX: 41091, AnchorY: 39701, Radius: 1775,
-		RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 4, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20530, Name: "Young Red Keltir",
-				Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-09", Name: "Red Keltir E-c11",
-		Region: regionElven, MinLevel: 1, MaxLevel: 3,
-		AnchorX: 53557, AnchorY: 40933, Radius: 1930,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20530, Name: "Young Red Keltir",
-				Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-10", Name: "Elder Red Keltir W-c11",
-		Region: regionElven, MinLevel: 1, MaxLevel: 4,
-		AnchorX: 41123, AnchorY: 42822, Radius: 1848,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20530, Name: "Young Red Keltir",
-				Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-11", Name: "Elder Red Keltir NW-b2",
-		Region: regionElven, MinLevel: 1, MaxLevel: 4,
-		AnchorX: 40985, AnchorY: 37444, Radius: 1837,
-		RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20530, Name: "Young Red Keltir",
-				Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-12", Name: "Red Keltir E-g15",
-		Region: regionElven, MinLevel: 2, MaxLevel: 2,
-		AnchorX: 50750, AnchorY: 40942, Radius: 1417,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-13", Name: "Red Keltir E-a17",
-		Region: regionElven, MinLevel: 2, MaxLevel: 2,
-		AnchorX: 51062, AnchorY: 40065, Radius: 1558,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-14", Name: "Red Keltir E-f14",
-		Region: regionElven, MinLevel: 2, MaxLevel: 2,
-		AnchorX: 52400, AnchorY: 41337, Radius: 757,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-15", Name: "Elder Red Keltir NW-g7",
-		Region: regionElven, MinLevel: 2, MaxLevel: 3,
-		AnchorX: 43480, AnchorY: 38265, Radius: 1674,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-16", Name: "Elder Red Keltir N-e5",
-		Region: regionElven, MinLevel: 2, MaxLevel: 3,
-		AnchorX: 46769, AnchorY: 37144, Radius: 1731,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-17", Name: "Elder Red Keltir NE-h16",
-		Region: regionElven, MinLevel: 2, MaxLevel: 3,
-		AnchorX: 48312, AnchorY: 37507, Radius: 1334,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-18", Name: "Elder Red Keltir N-f6",
-		Region: regionElven, MinLevel: 2, MaxLevel: 3,
-		AnchorX: 44872, AnchorY: 37065, Radius: 1981,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-19", Name: "Elder Red Keltir NE-g23",
-		Region: regionElven, MinLevel: 2, MaxLevel: 3,
-		AnchorX: 50444, AnchorY: 39056, Radius: 1590,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-20", Name: "Elder Red Keltir NE-h24",
-		Region: regionElven, MinLevel: 2, MaxLevel: 3,
-		AnchorX: 50146, AnchorY: 38018, Radius: 1649,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-21", Name: "Elder Red Keltir NW-b18",
-		Region: regionElven, MinLevel: 2, MaxLevel: 3,
-		AnchorX: 43151, AnchorY: 36680, Radius: 1397,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-22", Name: "Elder Red Keltir NE-a9",
-		Region: regionElven, MinLevel: 2, MaxLevel: 4,
-		AnchorX: 49756, AnchorY: 36629, Radius: 1793,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20534, Name: "Red Keltir",
-				Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-23", Name: "Elder Red Keltir N-b26",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 48168, AnchorY: 35692, Radius: 1307,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-24", Name: "Elder Red Keltir N-a17",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 46502, AnchorY: 34997, Radius: 1772,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-25", Name: "Elder Red Keltir W-e13",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 39312, AnchorY: 41838, Radius: 1723,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-26", Name: "Elder Red Keltir N-b10",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 44764, AnchorY: 34566, Radius: 1553,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-27", Name: "Elder Red Keltir W-f14",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 38908, AnchorY: 39573, Radius: 1390,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-28", Name: "Elder Red Keltir NW-c19",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 43122, AnchorY: 34516, Radius: 1493,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-29", Name: "Elder Red Keltir W-c27",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 38429, AnchorY: 41903, Radius: 1297,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-30", Name: "Elder Red Keltir NW-g15",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 39001, AnchorY: 37796, Radius: 1431,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-31", Name: "Elder Red Keltir W-d28",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 37966, AnchorY: 40985, Radius: 1728,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-32", Name: "Elder Red Keltir NW-c3",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 41059, AnchorY: 34877, Radius: 1925,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 3, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-33", Name: "Elder Red Keltir NW-a25",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 39359, AnchorY: 36271, Radius: 683,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-34", Name: "Elder Red Keltir W-d20",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 37536, AnchorY: 39613, Radius: 1249,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-35", Name: "Elder Red Keltir NW-e21",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 37556, AnchorY: 37773, Radius: 1557,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-36", Name: "Elder Red Keltir NW-e29",
-		Region: regionElven, MinLevel: 3, MaxLevel: 4,
-		AnchorX: 37912, AnchorY: 36253, Radius: 1482,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20537, Name: "Elder Red Keltir",
-				Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-37", Name: "Elder Red Keltir NW-f30",
-		Region: regionElven, MinLevel: 4, MaxLevel: 4,
-		AnchorX: 39457, AnchorY: 34809, Radius: 1732,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-38", Name: "Elder Red Keltir NW-g31",
-		Region: regionElven, MinLevel: 4, MaxLevel: 4,
-		AnchorX: 38371, AnchorY: 35216, Radius: 1622,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-39", Name: "Red Keltir SE-c3",
-		Region: regionElven, MinLevel: 4, MaxLevel: 5,
-		AnchorX: 50738, AnchorY: 44622, Radius: 2000,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-40", Name: "Red Keltir SE-b2",
-		Region: regionElven, MinLevel: 4, MaxLevel: 5,
-		AnchorX: 50697, AnchorY: 46899, Radius: 1976,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 3, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-41", Name: "Red Keltir E-e5",
-		Region: regionElven, MinLevel: 4, MaxLevel: 5,
-		AnchorX: 54279, AnchorY: 43222, Radius: 1909,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-42", Name: "Red Keltir SE-h8",
-		Region: regionElven, MinLevel: 4, MaxLevel: 5,
-		AnchorX: 52767, AnchorY: 46884, Radius: 1635,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-43", Name: "Kaboo Orc Grunt SW-h16",
-		Region: regionElven, MinLevel: 4, MaxLevel: 5,
-		AnchorX: 40217, AnchorY: 53051, Radius: 1962,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-44", Name: "Kaboo Orc Grunt SW-a17",
-		Region: regionElven, MinLevel: 4, MaxLevel: 5,
-		AnchorX: 38632, AnchorY: 52980, Radius: 1963,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-45", Name: "Gray Wolf S-a1",
-		Region: regionElven, MinLevel: 4, MaxLevel: 5,
-		AnchorX: 48635, AnchorY: 55373, Radius: 1775,
-		RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 3, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 3, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-46", Name: "Kaboo Orc Grunt SW-d12",
-		Region: regionElven, MinLevel: 4, MaxLevel: 5,
-		AnchorX: 39308, AnchorY: 54905, Radius: 1980,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 3, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-47", Name: "Gray Wolf S-b2",
-		Region: regionElven, MinLevel: 4, MaxLevel: 5,
-		AnchorX: 48920, AnchorY: 57327, Radius: 1727,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-48", Name: "Goblin Raider SE-b2",
-		Region: regionElven, MinLevel: 4, MaxLevel: 5,
-		AnchorX: 53741, AnchorY: 57508, Radius: 1872,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-49", Name: "Red Keltir SE-a9",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 52936, AnchorY: 45053, Radius: 1629,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-50", Name: "Red Keltir SE-g7",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 54508, AnchorY: 45168, Radius: 1578,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-51", Name: "Red Keltir SE-d4",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 54818, AnchorY: 47151, Radius: 1683,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-52", Name: "Goblin Raider SE-a1",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 51475, AnchorY: 54173, Radius: 1738,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-53", Name: "Goblin Raider SE-g7",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 52917, AnchorY: 54365, Radius: 2010,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-54", Name: "Goblin Raider SE-e5",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 54086, AnchorY: 54540, Radius: 1714,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-55", Name: "Goblin Raider SE-c3",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 53812, AnchorY: 55932, Radius: 1573,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-56", Name: "Goblin Raider S-d4",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 52133, AnchorY: 56765, Radius: 2027,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-57", Name: "Gray Wolf S-d4",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 50023, AnchorY: 58406, Radius: 1915,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-58", Name: "Gray Wolf S-b2",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 51790, AnchorY: 59085, Radius: 1789,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-59", Name: "Gray Wolf S-c3",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 49988, AnchorY: 60283, Radius: 1510,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-60", Name: "Gray Wolf S-a1",
-		Region: regionElven, MinLevel: 4, MaxLevel: 6,
-		AnchorX: 51887, AnchorY: 60440, Radius: 1959,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-61", Name: "Kaboo Orc Grunt S-c11",
-		Region: regionElven, MinLevel: 4, MaxLevel: 8,
-		AnchorX: 41731, AnchorY: 55420, Radius: 1669,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-62", Name: "Kaboo Orc Grunt SW-a9",
-		Region: regionElven, MinLevel: 4, MaxLevel: 8,
-		AnchorX: 39660, AnchorY: 56145, Radius: 2046,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20525, Name: "Gray Wolf",
-				Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-63", Name: "Red Keltir SE-e13",
-		Region: regionElven, MinLevel: 5, MaxLevel: 5,
-		AnchorX: 49029, AnchorY: 44035, Radius: 2044,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-64", Name: "Red Keltir SE-b18",
-		Region: regionElven, MinLevel: 5, MaxLevel: 5,
-		AnchorX: 49064, AnchorY: 45240, Radius: 1607,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-65", Name: "Goblin Raider S-f6",
-		Region: regionElven, MinLevel: 5, MaxLevel: 6,
-		AnchorX: 52003, AnchorY: 55795, Radius: 2024,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-66", Name: "Kaboo Orc SE-e5",
-		Region: regionElven, MinLevel: 5, MaxLevel: 7,
-		AnchorX: 51077, AnchorY: 49598, Radius: 1881,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-67", Name: "Kaboo Orc SE-a1",
-		Region: regionElven, MinLevel: 5, MaxLevel: 7,
-		AnchorX: 53139, AnchorY: 49473, Radius: 2012,
-		RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-68", Name: "Kaboo Orc SE-c3",
-		Region: regionElven, MinLevel: 5, MaxLevel: 7,
-		AnchorX: 51202, AnchorY: 51828, Radius: 1414,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-69", Name: "Kaboo Orc SE-d4",
-		Region: regionElven, MinLevel: 5, MaxLevel: 7,
-		AnchorX: 55106, AnchorY: 49510, Radius: 1954,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-70", Name: "Kaboo Orc SE-b2",
-		Region: regionElven, MinLevel: 5, MaxLevel: 7,
-		AnchorX: 54682, AnchorY: 51774, Radius: 1541,
-		RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20325, Name: "Goblin Raider",
-				Level: 5, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-71", Name: "Kaboo Orc SE-h8",
-		Region: regionElven, MinLevel: 6, MaxLevel: 6,
-		AnchorX: 52992, AnchorY: 51344, Radius: 1228,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-72", Name: "Kaboo Orc SE-g7",
-		Region: regionElven, MinLevel: 6, MaxLevel: 6,
-		AnchorX: 53037, AnchorY: 52459, Radius: 1325,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-73", Name: "Kaboo Orc SE-f6",
-		Region: regionElven, MinLevel: 6, MaxLevel: 6,
-		AnchorX: 54740, AnchorY: 53459, Radius: 1331,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20468, Name: "Kaboo Orc",
-				Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-74", Name: "Kaboo Orc Grunt SW-d20",
-		Region: regionElven, MinLevel: 7, MaxLevel: 7,
-		AnchorX: 39930, AnchorY: 50524, Radius: 1759,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-75", Name: "Kaboo Orc Grunt SW-f6",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 38437, AnchorY: 48836, Radius: 1896,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-76", Name: "Kaboo Orc Grunt SW-a1",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 38385, AnchorY: 50814, Radius: 2004,
-		RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 3, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-77", Name: "Kaboo Orc Grunt S-g15",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 43760, AnchorY: 54649, Radius: 1980,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-78", Name: "Kaboo Orc Grunt S-f14",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 44850, AnchorY: 55739, Radius: 1344,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-79", Name: "Kaboo Orc Grunt S-b10",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 42927, AnchorY: 56397, Radius: 1930,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-80", Name: "Kaboo Orc Grunt S-b2",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 45477, AnchorY: 57681, Radius: 1755,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-81", Name: "Kaboo Orc Grunt S-c3",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 43880, AnchorY: 57714, Radius: 2000,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-82", Name: "Kaboo Orc Grunt S-d4",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 40816, AnchorY: 57442, Radius: 2022,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-83", Name: "Kaboo Orc Grunt S-e13",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 42457, AnchorY: 58504, Radius: 1065,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-84", Name: "Green Dryad S-e5",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 45927, AnchorY: 59449, Radius: 1662,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-85", Name: "Green Dryad S-d12",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 43926, AnchorY: 59872, Radius: 1366,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-86", Name: "Green Dryad S-d4",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 45675, AnchorY: 60834, Radius: 1772,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-87", Name: "Green Dryad S-a1",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 43722, AnchorY: 61528, Radius: 1986,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-88", Name: "Green Dryad S-h8",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 41798, AnchorY: 61724, Radius: 1672,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-89", Name: "Green Dryad S-b2",
-		Region: regionElven, MinLevel: 7, MaxLevel: 8,
-		AnchorX: 45357, AnchorY: 62201, Radius: 2041,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-90", Name: "Spore Fungus SW-e5",
-		Region: regionElven, MinLevel: 7, MaxLevel: 9,
-		AnchorX: 35760, AnchorY: 54706, Radius: 1417,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-91", Name: "Spore Fungus SW-c3",
-		Region: regionElven, MinLevel: 7, MaxLevel: 9,
-		AnchorX: 33995, AnchorY: 54151, Radius: 1670,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-92", Name: "Spore Fungus SW-d4",
-		Region: regionElven, MinLevel: 7, MaxLevel: 9,
-		AnchorX: 35887, AnchorY: 56195, Radius: 1167,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-93", Name: "Green Dryad S-e13",
-		Region: regionElven, MinLevel: 7, MaxLevel: 9,
-		AnchorX: 41878, AnchorY: 60352, Radius: 1785,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-94", Name: "Green Dryad S-g7",
-		Region: regionElven, MinLevel: 7, MaxLevel: 9,
-		AnchorX: 41727, AnchorY: 63189, Radius: 1732,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-95", Name: "Green Dryad S-c3",
-		Region: regionElven, MinLevel: 7, MaxLevel: 9,
-		AnchorX: 43616, AnchorY: 64099, Radius: 1650,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-96", Name: "Kaboo Orc Grunt SW-g7",
-		Region: regionElven, MinLevel: 7, MaxLevel: 10,
-		AnchorX: 36073, AnchorY: 50080, Radius: 1855,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-97", Name: "Kaboo Orc Grunt SW-e5",
-		Region: regionElven, MinLevel: 7, MaxLevel: 10,
-		AnchorX: 36761, AnchorY: 52267, Radius: 1681,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-98", Name: "Kaboo Orc Grunt SW-h8",
-		Region: regionElven, MinLevel: 7, MaxLevel: 10,
-		AnchorX: 34087, AnchorY: 50292, Radius: 1563,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-99", Name: "Kaboo Orc Grunt SW-b18",
-		Region: regionElven, MinLevel: 7, MaxLevel: 10,
-		AnchorX: 35237, AnchorY: 52026, Radius: 1293,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-100", Name: "Kaboo Orc Grunt SW-c19",
-		Region: regionElven, MinLevel: 7, MaxLevel: 10,
-		AnchorX: 33847, AnchorY: 51819, Radius: 1175,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-101", Name: "Spore Fungus SW-b2",
-		Region: regionElven, MinLevel: 7, MaxLevel: 10,
-		AnchorX: 37242, AnchorY: 55522, Radius: 2028,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-102", Name: "Spore Fungus SW-a1",
-		Region: regionElven, MinLevel: 7, MaxLevel: 10,
-		AnchorX: 34040, AnchorY: 55928, Radius: 1607,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20470, Name: "Kaboo Orc Grunt",
-				Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-103", Name: "Spore Fungus SW-b2",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 38983, AnchorY: 45227, Radius: 1837,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-104", Name: "Spore Fungus SW-a1",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 38552, AnchorY: 47040, Radius: 1872,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-105", Name: "Spore Fungus W-e5",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 37120, AnchorY: 45033, Radius: 1715,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-106", Name: "Spore Fungus SW-d4",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 36139, AnchorY: 46628, Radius: 1846,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-107", Name: "Spore Fungus SW-c3",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 35353, AnchorY: 47906, Radius: 1824,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-108", Name: "Spore Fungus W-g7",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 34015, AnchorY: 45929, Radius: 1715,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-109", Name: "Spore Fungus SW-f6",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 33756, AnchorY: 48181, Radius: 1978,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-110", Name: "Spore Fungus SW-b2",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 38471, AnchorY: 58143, Radius: 1857,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-111", Name: "Spore Fungus SW-c3",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 36468, AnchorY: 58207, Radius: 1970,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-112", Name: "Spore Fungus SW-a1",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 38432, AnchorY: 59977, Radius: 1912,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-113", Name: "Green Dryad S-c11",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 39827, AnchorY: 61516, Radius: 1952,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-114", Name: "Green Dryad S-f14",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 38034, AnchorY: 61894, Radius: 1960,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-115", Name: "Spore Fungus W-a1",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 23703, AnchorY: 36674, Radius: 1622,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-116", Name: "Green Dryad S-a9",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 39864, AnchorY: 63978, Radius: 1813,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-117", Name: "Green Dryad S-f6",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 41703, AnchorY: 64611, Radius: 1766,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-118", Name: "Green Dryad S-b10",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 38521, AnchorY: 63915, Radius: 1879,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20336, Name: "Green Dryad",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-119", Name: "Spore Fungus SW-a1",
-		Region: regionElven, MinLevel: 8, MaxLevel: 10,
-		AnchorX: 34147, AnchorY: 64070, Radius: 1755,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20469, Name: "Kaboo Orc Archer",
-				Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-120", Name: "Spore Fungus SW-h8",
-		Region: regionElven, MinLevel: 9, MaxLevel: 9,
-		AnchorX: 36688, AnchorY: 48008, Radius: 1318,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-121", Name: "Spore Fungus W-f6",
-		Region: regionElven, MinLevel: 9, MaxLevel: 9,
-		AnchorX: 31069, AnchorY: 47030, Radius: 1536,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-122", Name: "Spore Fungus SW-h8",
-		Region: regionElven, MinLevel: 9, MaxLevel: 9,
-		AnchorX: 33385, AnchorY: 58409, Radius: 1698,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-123", Name: "Spore Fungus SW-g7",
-		Region: regionElven, MinLevel: 9, MaxLevel: 9,
-		AnchorX: 33536, AnchorY: 60540, Radius: 990,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-124", Name: "Spore Fungus W-a9",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 35588, AnchorY: 45283, Radius: 1345,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-125", Name: "Spore Fungus W-a1",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 27731, AnchorY: 39474, Radius: 1841,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-126", Name: "Spore Fungus SW-e5",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 34497, AnchorY: 57699, Radius: 1936,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-127", Name: "Spore Fungus W-f6",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 26553, AnchorY: 36719, Radius: 1769,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-128", Name: "Spore Fungus W-c3",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 25139, AnchorY: 43019, Radius: 1834,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-129", Name: "Spore Fungus SW-d4",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 36447, AnchorY: 60502, Radius: 1797,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-130", Name: "Spore Fungus W-a9",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 25208, AnchorY: 36601, Radius: 1450,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-131", Name: "Spore Fungus W-e5",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 24774, AnchorY: 38270, Radius: 1440,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-132", Name: "Spore Fungus SW-d4",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 34336, AnchorY: 60057, Radius: 2031,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-133", Name: "Spore Fungus W-d4",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 23367, AnchorY: 38341, Radius: 1396,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-134", Name: "Spore Fungus SW-c3",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 35653, AnchorY: 62035, Radius: 1978,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-135", Name: "Spore Fungus SW-f6",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 33781, AnchorY: 61995, Radius: 1195,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-136", Name: "Spore Fungus S-b2",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 37212, AnchorY: 64166, Radius: 1875,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-137", Name: "Spore Fungus SW-e5",
-		Region: regionElven, MinLevel: 9, MaxLevel: 10,
-		AnchorX: 35973, AnchorY: 64065, Radius: 1732,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-138", Name: "Spore Fungus W-e5",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 32147, AnchorY: 46630, Radius: 1875,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-139", Name: "Spore Fungus SW-c3",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 31850, AnchorY: 48317, Radius: 914,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-140", Name: "Spore Fungus SW-a1",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 31877, AnchorY: 50275, Radius: 2021,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-141", Name: "Spore Fungus SW-d4",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 30437, AnchorY: 48364, Radius: 1269,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-142", Name: "Spore Fungus SW-b2",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 30366, AnchorY: 49962, Radius: 1739,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-143", Name: "Kaboo Orc Fighter Leader SW-e5",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 31480, AnchorY: 55293, Radius: 1584,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-144", Name: "Spore Fungus W-e5",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 26072, AnchorY: 39803, Radius: 1764,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-145", Name: "Kaboo Orc Fighter Leader SW-c3",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 31409, AnchorY: 56770, Radius: 1846,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-146", Name: "Spore Fungus W-g7",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 23749, AnchorY: 40661, Radius: 1710,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-147", Name: "Spore Fungus W-f6",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 23381, AnchorY: 42440, Radius: 1929,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-148", Name: "Kaboo Orc Fighter Lieutenant SW-e5",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 31854, AnchorY: 60107, Radius: 1503,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-149", Name: "Kaboo Orc Fighter Lieutenant SW-f6",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 30222, AnchorY: 60378, Radius: 1660,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-150", Name: "Kaboo Orc Fighter Lieutenant SW-a1",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 31751, AnchorY: 62022, Radius: 1621,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-151", Name: "Kaboo Orc Fighter Lieutenant SW-b2",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 30373, AnchorY: 62077, Radius: 1693,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-152", Name: "Kaboo Orc Fighter Lieutenant SW-c3",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 31887, AnchorY: 64251, Radius: 1390,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-153", Name: "Kaboo Orc Fighter Lieutenant SW-d4",
-		Region: regionElven, MinLevel: 9, MaxLevel: 11,
-		AnchorX: 30520, AnchorY: 64182, Radius: 1423,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-154", Name: "Spore Fungus W-d4",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12,
-		AnchorX: 25204, AnchorY: 41612, Radius: 1454,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-155", Name: "Spore Fungus W-b2",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12,
-		AnchorX: 24803, AnchorY: 40503, Radius: 1848,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-156", Name: "Spore Fungus W-b2",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12,
-		AnchorX: 21623, AnchorY: 40107, Radius: 1464,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-157", Name: "Spore Fungus W-g7",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12,
-		AnchorX: 21557, AnchorY: 41782, Radius: 1280,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-158", Name: "Spore Fungus W-c3",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12,
-		AnchorX: 21078, AnchorY: 39070, Radius: 1932,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-159", Name: "Spore Fungus W-h8",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12,
-		AnchorX: 20035, AnchorY: 41084, Radius: 1499,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-160", Name: "Spore Fungus W-b10",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12,
-		AnchorX: 18370, AnchorY: 40941, Radius: 1479,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-161", Name: "Kaboo Orc Fighter Lieutenant SW-b2",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12,
-		AnchorX: 27531, AnchorY: 62507, Radius: 2035,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-162", Name: "Kaboo Orc Fighter Lieutenant SW-d4",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12,
-		AnchorX: 25851, AnchorY: 62610, Radius: 1809,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-163", Name: "Kaboo Orc Fighter Lieutenant SW-a1",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12,
-		AnchorX: 27719, AnchorY: 64352, Radius: 1885,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-164", Name: "Kaboo Orc Fighter Lieutenant SW-c3",
-		Region: regionElven, MinLevel: 9, MaxLevel: 12,
-		AnchorX: 25919, AnchorY: 64173, Radius: 1543,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-165", Name: "Kaboo Orc Fighter Leader W-f6",
-		Region: regionElven, MinLevel: 9, MaxLevel: 13,
-		AnchorX: 20543, AnchorY: 43232, Radius: 1715,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-166", Name: "Kaboo Orc Fighter Leader W-b10",
-		Region: regionElven, MinLevel: 9, MaxLevel: 13,
-		AnchorX: 18598, AnchorY: 42598, Radius: 1683,
-		RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-167", Name: "Kaboo Orc Fighter Leader W-a9",
-		Region: regionElven, MinLevel: 9, MaxLevel: 13,
-		AnchorX: 18634, AnchorY: 44078, Radius: 1508,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20509, Name: "Spore Fungus",
-				Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-168", Name: "Kaboo Orc Fighter Leader SW-b10",
-		Region: regionElven, MinLevel: 10, MaxLevel: 11,
-		AnchorX: 31357, AnchorY: 53406, Radius: 1881,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-169", Name: "Kaboo Orc Fighter Leader SW-b2",
-		Region: regionElven, MinLevel: 10, MaxLevel: 11,
-		AnchorX: 31220, AnchorY: 58391, Radius: 1749,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-170", Name: "Kaboo Orc Fighter Leader SW-c11",
-		Region: regionElven, MinLevel: 10, MaxLevel: 12,
-		AnchorX: 29280, AnchorY: 53398, Radius: 1870,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-171", Name: "Kaboo Orc Fighter Leader SW-f6",
-		Region: regionElven, MinLevel: 10, MaxLevel: 12,
-		AnchorX: 29103, AnchorY: 55099, Radius: 1597,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-172", Name: "Kaboo Orc Fighter Leader SW-a9",
-		Region: regionElven, MinLevel: 10, MaxLevel: 13,
-		AnchorX: 28943, AnchorY: 57140, Radius: 1642,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-173", Name: "Kaboo Orc Fighter Leader SW-d4",
-		Region: regionElven, MinLevel: 10, MaxLevel: 13,
-		AnchorX: 28914, AnchorY: 58952, Radius: 1861,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-174", Name: "Kaboo Orc Fighter Leader SW-a1",
-		Region: regionElven, MinLevel: 10, MaxLevel: 13,
-		AnchorX: 27209, AnchorY: 57164, Radius: 1946,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20471, Name: "Kaboo Orc Fighter",
-				Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-175", Name: "Kaboo Orc Fighter Leader SW-d12",
-		Region: regionElven, MinLevel: 11, MaxLevel: 12,
-		AnchorX: 27399, AnchorY: 54795, Radius: 2035,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-176", Name: "Kaboo Orc Fighter Lieutenant SW-b2",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 28301, AnchorY: 49969, Radius: 1911,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-177", Name: "Kaboo Orc Fighter Lieutenant SW-d4",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 26282, AnchorY: 49748, Radius: 1838,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-178", Name: "Kaboo Orc Fighter Lieutenant SW-a1",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 26464, AnchorY: 51967, Radius: 1902,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-179", Name: "Kaboo Orc Fighter Leader W-d12",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 23879, AnchorY: 46126, Radius: 1689,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-180", Name: "Kaboo Orc Fighter Lieutenant W-e5",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 24846, AnchorY: 49699, Radius: 1950,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-181", Name: "Kaboo Orc Fighter Leader W-a1",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 23148, AnchorY: 48002, Radius: 2014,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-182", Name: "Kaboo Orc Fighter Leader W-c11",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 22548, AnchorY: 46206, Radius: 1802,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-183", Name: "Kaboo Orc Fighter Lieutenant W-f6",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 23445, AnchorY: 49794, Radius: 1904,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-184", Name: "Kaboo Orc Fighter Lieutenant SW-c3",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 24430, AnchorY: 52509, Radius: 1847,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-185", Name: "Kaboo Orc Fighter Leader W-e5",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 20653, AnchorY: 45145, Radius: 1560,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-186", Name: "Kaboo Orc Fighter Leader W-d4",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 20943, AnchorY: 46925, Radius: 1877,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-187", Name: "Kaboo Orc Fighter Leader W-c3",
-		Region: regionElven, MinLevel: 11, MaxLevel: 13,
-		AnchorX: 20876, AnchorY: 48597, Radius: 1782,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
-				Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-188", Name: "Kaboo Orc Fighter Lieutenant SW-h8",
-		Region: regionElven, MinLevel: 12, MaxLevel: 12,
-		AnchorX: 24968, AnchorY: 51214, Radius: 673,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-189", Name: "Kaboo Orc Fighter Leader SW-f14",
-		Region: regionElven, MinLevel: 12, MaxLevel: 12,
-		AnchorX: 26830, AnchorY: 60600, Radius: 1592,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-190", Name: "Kaboo Orc Fighter Leader SW-a17",
-		Region: regionElven, MinLevel: 12, MaxLevel: 12,
-		AnchorX: 23347, AnchorY: 56583, Radius: 1605,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-191", Name: "Kaboo Orc Fighter Leader SW-d4",
-		Region: regionElven, MinLevel: 12, MaxLevel: 12,
-		AnchorX: 20696, AnchorY: 53440, Radius: 1759,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-192", Name: "Kaboo Orc Fighter Leader W-a17",
-		Region: regionElven, MinLevel: 12, MaxLevel: 12,
-		AnchorX: 17037, AnchorY: 42738, Radius: 1881,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-193", Name: "Kaboo Orc Fighter Leader SW-e5",
-		Region: regionElven, MinLevel: 12, MaxLevel: 12,
-		AnchorX: 19352, AnchorY: 53247, Radius: 1591,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-194", Name: "Kaboo Orc Fighter Leader SW-h16",
-		Region: regionElven, MinLevel: 12, MaxLevel: 12,
-		AnchorX: 23523, AnchorY: 60173, Radius: 2007,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-195", Name: "Kaboo Orc Fighter Leader W-b18",
-		Region: regionElven, MinLevel: 12, MaxLevel: 12,
-		AnchorX: 15615, AnchorY: 43045, Radius: 1220,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-196", Name: "Kaboo Orc Fighter Leader W-h8",
-		Region: regionElven, MinLevel: 12, MaxLevel: 12,
-		AnchorX: 15866, AnchorY: 53836, Radius: 1301,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-197", Name: "Kaboo Orc Fighter Leader SW-h8",
-		Region: regionElven, MinLevel: 12, MaxLevel: 13,
-		AnchorX: 24943, AnchorY: 58997, Radius: 1532,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-198", Name: "Kaboo Orc Fighter Leader W-g7",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 18431, AnchorY: 45934, Radius: 1676,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-199", Name: "Kaboo Orc Fighter Leader W-b2",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 18523, AnchorY: 47673, Radius: 1882,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-200", Name: "Kaboo Orc Fighter Leader SW-g7",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 25048, AnchorY: 60612, Radius: 1929,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-201", Name: "Kaboo Orc Fighter Leader W-g7",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 18786, AnchorY: 49553, Radius: 1609,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-202", Name: "Kaboo Orc Fighter Leader SW-e13",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 22905, AnchorY: 58332, Radius: 1908,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-203", Name: "Kaboo Orc Fighter Leader W-f6",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 18739, AnchorY: 51246, Radius: 1568,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-204", Name: "Kaboo Orc Fighter Leader W-e13",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 16873, AnchorY: 45024, Radius: 1793,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-205", Name: "Kaboo Orc Fighter Leader W-b10",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 17268, AnchorY: 49287, Radius: 1786,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-206", Name: "Kaboo Orc Fighter Leader W-h8",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 16656, AnchorY: 46906, Radius: 1969,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-207", Name: "Kaboo Orc Fighter Leader W-a9",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 17297, AnchorY: 51370, Radius: 1293,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-208", Name: "Kaboo Orc Fighter Leader W-b2",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 17601, AnchorY: 53283, Radius: 1721,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-209", Name: "Kaboo Orc Fighter Leader W-f14",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 15461, AnchorY: 45034, Radius: 1807,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-210", Name: "Kaboo Orc Fighter Leader W-d12",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 16039, AnchorY: 49112, Radius: 1901,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-211", Name: "Kaboo Orc Fighter Leader W-a1",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 13620, AnchorY: 48595, Radius: 1976,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-212", Name: "Kaboo Orc Fighter Leader W-b2",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 12338, AnchorY: 46715, Radius: 1858,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-213", Name: "Kaboo Orc Fighter Leader W-c3",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 14033, AnchorY: 53407, Radius: 1913,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-214", Name: "Kaboo Orc Fighter Leader W-c3",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 12400, AnchorY: 48138, Radius: 1898,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-215", Name: "Kaboo Orc Fighter Leader W-d4",
-		Region: regionElven, MinLevel: 12, MaxLevel: 14,
-		AnchorX: 10937, AnchorY: 46374, Radius: 1581,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-216", Name: "Kaboo Orc Fighter Leader W-a1",
-		Region: regionElven, MinLevel: 12, MaxLevel: 15,
-		AnchorX: 15930, AnchorY: 52176, Radius: 1420,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
-				Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-217", Name: "Dryad Elder W-b2",
-		Region: regionElven, MinLevel: 13, MaxLevel: 15,
-		AnchorX: 10412, AnchorY: 49917, Radius: 1831,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-218", Name: "Dryad Elder W-c3",
-		Region: regionElven, MinLevel: 13, MaxLevel: 15,
-		AnchorX: 9038, AnchorY: 49980, Radius: 1742,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20013, Name: "Dryad",
-				Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-219", Name: "Dryad Elder W-f6",
-		Region: regionElven, MinLevel: 14, MaxLevel: 14,
-		AnchorX: 8452, AnchorY: 52292, Radius: 1691,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-220", Name: "Dryad Elder W-c11",
-		Region: regionElven, MinLevel: 14, MaxLevel: 14,
-		AnchorX: 6184, AnchorY: 50801, Radius: 1953,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-221", Name: "Dryad Elder W-h8",
-		Region: regionElven, MinLevel: 14, MaxLevel: 14,
-		AnchorX: 5949, AnchorY: 53348, Radius: 1827,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-222", Name: "Dryad Elder W-b10",
-		Region: regionElven, MinLevel: 14, MaxLevel: 14,
-		AnchorX: 4698, AnchorY: 53102, Radius: 1632,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-223", Name: "Dryad Elder W-g7",
-		Region: regionElven, MinLevel: 14, MaxLevel: 15,
-		AnchorX: 10523, AnchorY: 47976, Radius: 1759,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-224", Name: "Dryad Elder W-a9",
-		Region: regionElven, MinLevel: 14, MaxLevel: 15,
-		AnchorX: 9161, AnchorY: 48148, Radius: 1822,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-225", Name: "Dryad Elder W-e5",
-		Region: regionElven, MinLevel: 14, MaxLevel: 15,
-		AnchorX: 9852, AnchorY: 51948, Radius: 1584,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-226", Name: "Dryad Elder W-d4",
-		Region: regionElven, MinLevel: 14, MaxLevel: 15,
-		AnchorX: 7090, AnchorY: 51810, Radius: 1745,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-227", Name: "Dryad Elder SW-b2",
-		Region: regionElven, MinLevel: 14, MaxLevel: 16,
-		AnchorX: 12865, AnchorY: 55857, Radius: 1543,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-228", Name: "Dryad Elder W-e5",
-		Region: regionElven, MinLevel: 14, MaxLevel: 16,
-		AnchorX: 11696, AnchorY: 54631, Radius: 2018,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-229", Name: "Dryad Elder SW-b2",
-		Region: regionElven, MinLevel: 14, MaxLevel: 16,
-		AnchorX: 12808, AnchorY: 59317, Radius: 1561,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-230", Name: "Dryad Elder SW-f6",
-		Region: regionElven, MinLevel: 14, MaxLevel: 16,
-		AnchorX: 11537, AnchorY: 56873, Radius: 1973,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-231", Name: "Dryad Elder W-a1",
-		Region: regionElven, MinLevel: 14, MaxLevel: 16,
-		AnchorX: 10492, AnchorY: 54844, Radius: 1957,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-232", Name: "Dryad Elder SW-a1",
-		Region: regionElven, MinLevel: 14, MaxLevel: 16,
-		AnchorX: 12454, AnchorY: 60639, Radius: 1604,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-233", Name: "Dryad Elder SW-d4",
-		Region: regionElven, MinLevel: 14, MaxLevel: 16,
-		AnchorX: 9860, AnchorY: 56741, Radius: 1629,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-234", Name: "Dryad Elder SW-c3",
-		Region: regionElven, MinLevel: 14, MaxLevel: 16,
-		AnchorX: 9834, AnchorY: 58248, Radius: 1773,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-235", Name: "Dryad Elder W-a1",
-		Region: regionElven, MinLevel: 14, MaxLevel: 16,
-		AnchorX: 7131, AnchorY: 53070, Radius: 2039,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20019, Name: "Dryad Elder",
-				Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-236", Name: "Crimson Spider SW-c3",
-		Region: regionElven, MinLevel: 15, MaxLevel: 15,
-		AnchorX: 18807, AnchorY: 56488, Radius: 1382,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-237", Name: "Crimson Spider SW-a1",
-		Region: regionElven, MinLevel: 15, MaxLevel: 15,
-		AnchorX: 18790, AnchorY: 57785, Radius: 1406,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-238", Name: "Crimson Spider SW-d4",
-		Region: regionElven, MinLevel: 15, MaxLevel: 15,
-		AnchorX: 17181, AnchorY: 56553, Radius: 1133,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-239", Name: "Crimson Spider SW-b2",
-		Region: regionElven, MinLevel: 15, MaxLevel: 15,
-		AnchorX: 17202, AnchorY: 57903, Radius: 1236,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20460, Name: "Crimson Spider",
-				Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-240", Name: "Pincer Spider SW-d12",
-		Region: regionElven, MinLevel: 16, MaxLevel: 16,
-		AnchorX: 8652, AnchorY: 59268, Radius: 1522,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-241", Name: "Pincer Spider SW-c11",
-		Region: regionElven, MinLevel: 16, MaxLevel: 16,
-		AnchorX: 8638, AnchorY: 60910, Radius: 1926,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-242", Name: "Pincer Spider SW-f14",
-		Region: regionElven, MinLevel: 16, MaxLevel: 16,
-		AnchorX: 6915, AnchorY: 58388, Radius: 1393,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-243", Name: "Pincer Spider SW-e13",
-		Region: regionElven, MinLevel: 16, MaxLevel: 16,
-		AnchorX: 6861, AnchorY: 59528, Radius: 1469,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-244", Name: "Pincer Spider SW-g15",
-		Region: regionElven, MinLevel: 16, MaxLevel: 16,
-		AnchorX: 5382, AnchorY: 58484, Radius: 1508,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-245", Name: "Pincer Spider SW-d20",
-		Region: regionElven, MinLevel: 16, MaxLevel: 18,
-		AnchorX: 11702, AnchorY: 61786, Radius: 1706,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-246", Name: "Pincer Spider SW-b10",
-		Region: regionElven, MinLevel: 16, MaxLevel: 18,
-		AnchorX: 11121, AnchorY: 62938, Radius: 1803,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-247", Name: "Pincer Spider SW-b2",
-		Region: regionElven, MinLevel: 16, MaxLevel: 18,
-		AnchorX: 9017, AnchorY: 63504, Radius: 1878,
-		RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 3, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-248", Name: "Pincer Spider SW-a9",
-		Region: regionElven, MinLevel: 16, MaxLevel: 18,
-		AnchorX: 9672, AnchorY: 65272, Radius: 2042,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-249", Name: "Pincer Spider SW-d4",
-		Region: regionElven, MinLevel: 16, MaxLevel: 18,
-		AnchorX: 6874, AnchorY: 61005, Radius: 1814,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-250", Name: "Pincer Spider SW-a1",
-		Region: regionElven, MinLevel: 16, MaxLevel: 18,
-		AnchorX: 5306, AnchorY: 60353, Radius: 2012,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-251", Name: "Pincer Spider SW-c3",
-		Region: regionElven, MinLevel: 16, MaxLevel: 18,
-		AnchorX: 7478, AnchorY: 66194, Radius: 1926,
-		RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-252", Name: "Lirein W-a1",
-		Region: regionElven, MinLevel: 16, MaxLevel: 18,
-		AnchorX: 2658, AnchorY: 56395, Radius: 1881,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-253", Name: "Lirein SW-a1",
-		Region: regionElven, MinLevel: 16, MaxLevel: 18,
-		AnchorX: 7415, AnchorY: 70777, Radius: 1557,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-254", Name: "Pincer Spider SW-h8",
-		Region: regionElven, MinLevel: 16, MaxLevel: 18,
-		AnchorX: 4913, AnchorY: 74675, Radius: 1294,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-255", Name: "Pincer Spider SW-b2",
-		Region: regionElven, MinLevel: 16, MaxLevel: 18,
-		AnchorX: 3550, AnchorY: 73319, Radius: 1735,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-256", Name: "Pincer Spider SW-f6",
-		Region: regionElven, MinLevel: 16, MaxLevel: 19,
-		AnchorX: 4774, AnchorY: 75678, Radius: 1960,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20308, Name: "Hook Spider",
-				Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-257", Name: "Pincer Spider SW-b18",
-		Region: regionElven, MinLevel: 17, MaxLevel: 17,
-		AnchorX: 3480, AnchorY: 59665, Radius: 1540,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-258", Name: "Pincer Spider SW-h16",
-		Region: regionElven, MinLevel: 17, MaxLevel: 17,
-		AnchorX: 3357, AnchorY: 61184, Radius: 1141,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-259", Name: "Pincer Spider SW-e21",
-		Region: regionElven, MinLevel: 17, MaxLevel: 17,
-		AnchorX: 4280, AnchorY: 64733, Radius: 1827,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-260", Name: "Pincer Spider W-c19",
-		Region: regionElven, MinLevel: 17, MaxLevel: 17,
-		AnchorX: 1723, AnchorY: 59625, Radius: 1523,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-261", Name: "Pincer Spider SW-a17",
-		Region: regionElven, MinLevel: 17, MaxLevel: 17,
-		AnchorX: 1862, AnchorY: 61179, Radius: 1270,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-262", Name: "Pincer Spider SW-e5",
-		Region: regionElven, MinLevel: 17, MaxLevel: 17,
-		AnchorX: 2630, AnchorY: 66415, Radius: 833,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-263", Name: "Lirein W-d4",
-		Region: regionElven, MinLevel: 17, MaxLevel: 18,
-		AnchorX: 4087, AnchorY: 56214, Radius: 1400,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-264", Name: "Pincer Spider SW-g7",
-		Region: regionElven, MinLevel: 17, MaxLevel: 18,
-		AnchorX: 5217, AnchorY: 62996, Radius: 1674,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-265", Name: "Lirein SW-b2",
-		Region: regionElven, MinLevel: 17, MaxLevel: 18,
-		AnchorX: 5978, AnchorY: 70314, Radius: 1089,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-266", Name: "Lirein SW-c3",
-		Region: regionElven, MinLevel: 17, MaxLevel: 18,
-		AnchorX: 6434, AnchorY: 72645, Radius: 1853,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-267", Name: "Pincer Spider SW-h8",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 3763, AnchorY: 63014, Radius: 1830,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-268", Name: "Pincer Spider SW-f6",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 2264, AnchorY: 62517, Radius: 2019,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-269", Name: "Pincer Spider SW-a1",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 4021, AnchorY: 66625, Radius: 1803,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-270", Name: "Pincer Spider SW-e5",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 2002, AnchorY: 64231, Radius: 1773,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-271", Name: "Pincer Spider SW-d4",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 2554, AnchorY: 67686, Radius: 1208,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-272", Name: "Pincer Spider SW-c3",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 1152, AnchorY: 66598, Radius: 1199,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-273", Name: "Pincer Spider SW-d4",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 3351, AnchorY: 71198, Radius: 1813,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-274", Name: "Pincer Spider SW-b2",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 1061, AnchorY: 68275, Radius: 1823,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-275", Name: "Pincer Spider SW-e5",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 1765, AnchorY: 72260, Radius: 1761,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-276", Name: "Pincer Spider SW-c3",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 1620, AnchorY: 73488, Radius: 1884,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-277", Name: "Pincer Spider SW-a1",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 4806, AnchorY: 77660, Radius: 1748,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-278", Name: "Pincer Spider SW-a1",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 4589, AnchorY: 79871, Radius: 1860,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-279", Name: "Pincer Spider SW-f6",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 5500, AnchorY: 81732, Radius: 1295,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-280", Name: "Pincer Spider SW-d4",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 5792, AnchorY: 83038, Radius: 1426,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-281", Name: "Pincer Spider SW-b2",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 4266, AnchorY: 82299, Radius: 1894,
-		RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-282", Name: "Pincer Spider SW-c3",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 5893, AnchorY: 84290, Radius: 1645,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-283", Name: "Pincer Spider SW-e5",
-		Region: regionElven, MinLevel: 17, MaxLevel: 19,
-		AnchorX: 4533, AnchorY: 84440, Radius: 1957,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20466, Name: "Pincer Spider",
-				Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-284", Name: "Lirein W-e5",
-		Region: regionElven, MinLevel: 18, MaxLevel: 18,
-		AnchorX: 5361, AnchorY: 55330, Radius: 1875,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-285", Name: "Lirein W-b2",
-		Region: regionElven, MinLevel: 18, MaxLevel: 18,
-		AnchorX: 5180, AnchorY: 57049, Radius: 1848,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-286", Name: "Lirein W-f6",
-		Region: regionElven, MinLevel: 18, MaxLevel: 18,
-		AnchorX: 3099, AnchorY: 54396, Radius: 1822,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-287", Name: "Lirein W-c3",
-		Region: regionElven, MinLevel: 18, MaxLevel: 18,
-		AnchorX: 2423, AnchorY: 58334, Radius: 1730,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-288", Name: "Lirein SW-d4",
-		Region: regionElven, MinLevel: 18, MaxLevel: 18,
-		AnchorX: 5916, AnchorY: 71715, Radius: 918,
-		RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-289", Name: "Lirein Elder SW-c3",
-		Region: regionElven, MinLevel: 18, MaxLevel: 19,
-		AnchorX: 2520, AnchorY: 76129, Radius: 1317,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-290", Name: "Lirein Elder SW-d4",
-		Region: regionElven, MinLevel: 18, MaxLevel: 19,
-		AnchorX: 1079, AnchorY: 76328, Radius: 1137,
-		RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-291", Name: "Lirein Elder SW-b2",
-		Region: regionElven, MinLevel: 18, MaxLevel: 19,
-		AnchorX: 1626, AnchorY: 77529, Radius: 1830,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
-	{
-		ID: "elven-spot-292", Name: "Lirein Elder SW-a1",
-		Region: regionElven, MinLevel: 18, MaxLevel: 19,
-		AnchorX: 1932, AnchorY: 78621, Radius: 2042,
-		RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
-		Mobs: []SpotMob{
-			{
-				TemplateID: 20044, Name: "Lirein Elder",
-				Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
-			},
-			{
-				TemplateID: 20036, Name: "Lirein",
-				Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
-			},
-		},
-	},
+    {
+        ID: "elven-spot-01", Name: "Red Keltir E-f6",
+        Region: regionElven, MinLevel: 1, MaxLevel: 2,
+        AnchorX: 50781, AnchorY: 42201, Radius: 1475,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20530, Name: "Young Red Keltir",
+                Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-02", Name: "Red Keltir SE-a1",
+        Region: regionElven, MinLevel: 1, MaxLevel: 3,
+        AnchorX: 47421, AnchorY: 43003, Radius: 2012,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 3, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20530, Name: "Young Red Keltir",
+                Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-03", Name: "Elder Red Keltir SW-f22",
+        Region: regionElven, MinLevel: 1, MaxLevel: 3,
+        AnchorX: 45030, AnchorY: 43273, Radius: 2018,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20530, Name: "Young Red Keltir",
+                Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-04", Name: "Elder Red Keltir W-d4",
+        Region: regionElven, MinLevel: 1, MaxLevel: 3,
+        AnchorX: 43455, AnchorY: 42367, Radius: 2038,
+        RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 4, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20530, Name: "Young Red Keltir",
+                Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-05", Name: "Red Keltir E-d12",
+        Region: regionElven, MinLevel: 1, MaxLevel: 3,
+        AnchorX: 49049, AnchorY: 42262, Radius: 2000,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 3, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20530, Name: "Young Red Keltir",
+                Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-06", Name: "Elder Red Keltir SW-h8",
+        Region: regionElven, MinLevel: 1, MaxLevel: 3,
+        AnchorX: 43592, AnchorY: 43944, Radius: 1776,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20530, Name: "Young Red Keltir",
+                Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-07", Name: "Elder Red Keltir W-d12",
+        Region: regionElven, MinLevel: 1, MaxLevel: 3,
+        AnchorX: 41263, AnchorY: 41520, Radius: 2046,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 3, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20530, Name: "Young Red Keltir",
+                Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-08", Name: "Elder Red Keltir W-a1",
+        Region: regionElven, MinLevel: 1, MaxLevel: 3,
+        AnchorX: 41091, AnchorY: 39701, Radius: 1775,
+        RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 4, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20530, Name: "Young Red Keltir",
+                Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-09", Name: "Red Keltir E-c11",
+        Region: regionElven, MinLevel: 1, MaxLevel: 3,
+        AnchorX: 53557, AnchorY: 40933, Radius: 1930,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20530, Name: "Young Red Keltir",
+                Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-10", Name: "Elder Red Keltir W-c11",
+        Region: regionElven, MinLevel: 1, MaxLevel: 4,
+        AnchorX: 41123, AnchorY: 42822, Radius: 1848,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20530, Name: "Young Red Keltir",
+                Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-11", Name: "Elder Red Keltir NW-b2",
+        Region: regionElven, MinLevel: 1, MaxLevel: 4,
+        AnchorX: 40985, AnchorY: 37444, Radius: 1837,
+        RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20530, Name: "Young Red Keltir",
+                Level: 1, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-12", Name: "Red Keltir E-g15",
+        Region: regionElven, MinLevel: 2, MaxLevel: 2,
+        AnchorX: 50750, AnchorY: 40942, Radius: 1417,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-13", Name: "Red Keltir E-a17",
+        Region: regionElven, MinLevel: 2, MaxLevel: 2,
+        AnchorX: 51062, AnchorY: 40065, Radius: 1558,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-14", Name: "Red Keltir E-f14",
+        Region: regionElven, MinLevel: 2, MaxLevel: 2,
+        AnchorX: 52400, AnchorY: 41337, Radius: 757,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-15", Name: "Elder Red Keltir NW-g7",
+        Region: regionElven, MinLevel: 2, MaxLevel: 3,
+        AnchorX: 43480, AnchorY: 38265, Radius: 1674,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-16", Name: "Elder Red Keltir N-e5",
+        Region: regionElven, MinLevel: 2, MaxLevel: 3,
+        AnchorX: 46769, AnchorY: 37144, Radius: 1731,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-17", Name: "Elder Red Keltir NE-h16",
+        Region: regionElven, MinLevel: 2, MaxLevel: 3,
+        AnchorX: 48312, AnchorY: 37507, Radius: 1334,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-18", Name: "Elder Red Keltir N-f6",
+        Region: regionElven, MinLevel: 2, MaxLevel: 3,
+        AnchorX: 44872, AnchorY: 37065, Radius: 1981,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-19", Name: "Elder Red Keltir NE-g23",
+        Region: regionElven, MinLevel: 2, MaxLevel: 3,
+        AnchorX: 50444, AnchorY: 39056, Radius: 1590,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-20", Name: "Elder Red Keltir NE-h24",
+        Region: regionElven, MinLevel: 2, MaxLevel: 3,
+        AnchorX: 50146, AnchorY: 38018, Radius: 1649,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-21", Name: "Elder Red Keltir NW-b18",
+        Region: regionElven, MinLevel: 2, MaxLevel: 3,
+        AnchorX: 43151, AnchorY: 36680, Radius: 1397,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-22", Name: "Elder Red Keltir NE-a9",
+        Region: regionElven, MinLevel: 2, MaxLevel: 4,
+        AnchorX: 49756, AnchorY: 36629, Radius: 1793,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20534, Name: "Red Keltir",
+                Level: 2, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-23", Name: "Elder Red Keltir N-b26",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 48168, AnchorY: 35692, Radius: 1307,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-24", Name: "Elder Red Keltir N-a17",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 46502, AnchorY: 34997, Radius: 1772,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-25", Name: "Elder Red Keltir W-e13",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 39312, AnchorY: 41838, Radius: 1723,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-26", Name: "Elder Red Keltir N-b10",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 44764, AnchorY: 34566, Radius: 1553,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-27", Name: "Elder Red Keltir W-f14",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 38908, AnchorY: 39573, Radius: 1390,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-28", Name: "Elder Red Keltir NW-c19",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 43122, AnchorY: 34516, Radius: 1493,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-29", Name: "Elder Red Keltir W-c27",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 38429, AnchorY: 41903, Radius: 1297,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-30", Name: "Elder Red Keltir NW-g15",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 39001, AnchorY: 37796, Radius: 1431,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-31", Name: "Elder Red Keltir W-d28",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 37966, AnchorY: 40985, Radius: 1728,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-32", Name: "Elder Red Keltir NW-c3",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 41059, AnchorY: 34877, Radius: 1925,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 3, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-33", Name: "Elder Red Keltir NW-a25",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 39359, AnchorY: 36271, Radius: 683,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-34", Name: "Elder Red Keltir W-d20",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 37536, AnchorY: 39613, Radius: 1249,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-35", Name: "Elder Red Keltir NW-e21",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 37556, AnchorY: 37773, Radius: 1557,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-36", Name: "Elder Red Keltir NW-e29",
+        Region: regionElven, MinLevel: 3, MaxLevel: 4,
+        AnchorX: 37912, AnchorY: 36253, Radius: 1482,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20537, Name: "Elder Red Keltir",
+                Level: 3, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-37", Name: "Elder Red Keltir NW-f30",
+        Region: regionElven, MinLevel: 4, MaxLevel: 4,
+        AnchorX: 39457, AnchorY: 34809, Radius: 1732,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-38", Name: "Elder Red Keltir NW-g31",
+        Region: regionElven, MinLevel: 4, MaxLevel: 4,
+        AnchorX: 38371, AnchorY: 35216, Radius: 1622,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-39", Name: "Red Keltir SE-c3",
+        Region: regionElven, MinLevel: 4, MaxLevel: 5,
+        AnchorX: 50738, AnchorY: 44622, Radius: 2000,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-40", Name: "Red Keltir SE-b2",
+        Region: regionElven, MinLevel: 4, MaxLevel: 5,
+        AnchorX: 50697, AnchorY: 46899, Radius: 1976,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 3, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-41", Name: "Red Keltir E-e5",
+        Region: regionElven, MinLevel: 4, MaxLevel: 5,
+        AnchorX: 54279, AnchorY: 43222, Radius: 1909,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-42", Name: "Red Keltir SE-h8",
+        Region: regionElven, MinLevel: 4, MaxLevel: 5,
+        AnchorX: 52767, AnchorY: 46884, Radius: 1635,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-43", Name: "Kaboo Orc Grunt SW-h16",
+        Region: regionElven, MinLevel: 4, MaxLevel: 5,
+        AnchorX: 40217, AnchorY: 53051, Radius: 1962,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-44", Name: "Kaboo Orc Grunt SW-a17",
+        Region: regionElven, MinLevel: 4, MaxLevel: 5,
+        AnchorX: 38632, AnchorY: 52980, Radius: 1963,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-45", Name: "Gray Wolf S-a1",
+        Region: regionElven, MinLevel: 4, MaxLevel: 5,
+        AnchorX: 48635, AnchorY: 55373, Radius: 1775,
+        RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 3, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 3, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-46", Name: "Kaboo Orc Grunt SW-d12",
+        Region: regionElven, MinLevel: 4, MaxLevel: 5,
+        AnchorX: 39308, AnchorY: 54905, Radius: 1980,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 3, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-47", Name: "Gray Wolf S-b2",
+        Region: regionElven, MinLevel: 4, MaxLevel: 5,
+        AnchorX: 48920, AnchorY: 57327, Radius: 1727,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-48", Name: "Goblin Raider SE-b2",
+        Region: regionElven, MinLevel: 4, MaxLevel: 5,
+        AnchorX: 53741, AnchorY: 57508, Radius: 1872,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-49", Name: "Red Keltir SE-a9",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 52936, AnchorY: 45053, Radius: 1629,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-50", Name: "Red Keltir SE-g7",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 54508, AnchorY: 45168, Radius: 1578,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-51", Name: "Red Keltir SE-d4",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 54818, AnchorY: 47151, Radius: 1683,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-52", Name: "Goblin Raider SE-a1",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 51475, AnchorY: 54173, Radius: 1738,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-53", Name: "Goblin Raider SE-g7",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 52917, AnchorY: 54365, Radius: 2010,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-54", Name: "Goblin Raider SE-e5",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 54086, AnchorY: 54540, Radius: 1714,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-55", Name: "Goblin Raider SE-c3",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 53812, AnchorY: 55932, Radius: 1573,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-56", Name: "Goblin Raider S-d4",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 52133, AnchorY: 56765, Radius: 2027,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-57", Name: "Gray Wolf S-d4",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 50023, AnchorY: 58406, Radius: 1915,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-58", Name: "Gray Wolf S-b2",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 51790, AnchorY: 59085, Radius: 1789,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-59", Name: "Gray Wolf S-c3",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 49988, AnchorY: 60283, Radius: 1510,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-60", Name: "Gray Wolf S-a1",
+        Region: regionElven, MinLevel: 4, MaxLevel: 6,
+        AnchorX: 51887, AnchorY: 60440, Radius: 1959,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-61", Name: "Kaboo Orc Grunt S-c11",
+        Region: regionElven, MinLevel: 4, MaxLevel: 8,
+        AnchorX: 41731, AnchorY: 55420, Radius: 1669,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-62", Name: "Kaboo Orc Grunt SW-a9",
+        Region: regionElven, MinLevel: 4, MaxLevel: 8,
+        AnchorX: 39660, AnchorY: 56145, Radius: 2046,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20525, Name: "Gray Wolf",
+                Level: 4, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-63", Name: "Red Keltir SE-e13",
+        Region: regionElven, MinLevel: 5, MaxLevel: 5,
+        AnchorX: 49029, AnchorY: 44035, Radius: 2044,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-64", Name: "Red Keltir SE-b18",
+        Region: regionElven, MinLevel: 5, MaxLevel: 5,
+        AnchorX: 49064, AnchorY: 45240, Radius: 1607,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-65", Name: "Goblin Raider S-f6",
+        Region: regionElven, MinLevel: 5, MaxLevel: 6,
+        AnchorX: 52003, AnchorY: 55795, Radius: 2024,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-66", Name: "Kaboo Orc SE-e5",
+        Region: regionElven, MinLevel: 5, MaxLevel: 7,
+        AnchorX: 51077, AnchorY: 49598, Radius: 1881,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-67", Name: "Kaboo Orc SE-a1",
+        Region: regionElven, MinLevel: 5, MaxLevel: 7,
+        AnchorX: 53139, AnchorY: 49473, Radius: 2012,
+        RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-68", Name: "Kaboo Orc SE-c3",
+        Region: regionElven, MinLevel: 5, MaxLevel: 7,
+        AnchorX: 51202, AnchorY: 51828, Radius: 1414,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-69", Name: "Kaboo Orc SE-d4",
+        Region: regionElven, MinLevel: 5, MaxLevel: 7,
+        AnchorX: 55106, AnchorY: 49510, Radius: 1954,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-70", Name: "Kaboo Orc SE-b2",
+        Region: regionElven, MinLevel: 5, MaxLevel: 7,
+        AnchorX: 54682, AnchorY: 51774, Radius: 1541,
+        RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20325, Name: "Goblin Raider",
+                Level: 5, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-71", Name: "Kaboo Orc SE-h8",
+        Region: regionElven, MinLevel: 6, MaxLevel: 6,
+        AnchorX: 52992, AnchorY: 51344, Radius: 1228,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-72", Name: "Kaboo Orc SE-g7",
+        Region: regionElven, MinLevel: 6, MaxLevel: 6,
+        AnchorX: 53037, AnchorY: 52459, Radius: 1325,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-73", Name: "Kaboo Orc SE-f6",
+        Region: regionElven, MinLevel: 6, MaxLevel: 6,
+        AnchorX: 54740, AnchorY: 53459, Radius: 1331,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20468, Name: "Kaboo Orc",
+                Level: 6, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-74", Name: "Kaboo Orc Grunt SW-d20",
+        Region: regionElven, MinLevel: 7, MaxLevel: 7,
+        AnchorX: 39930, AnchorY: 50524, Radius: 1759,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-75", Name: "Kaboo Orc Grunt SW-f6",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 38437, AnchorY: 48836, Radius: 1896,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-76", Name: "Kaboo Orc Grunt SW-a1",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 38385, AnchorY: 50814, Radius: 2004,
+        RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 3, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-77", Name: "Kaboo Orc Grunt S-g15",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 43760, AnchorY: 54649, Radius: 1980,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-78", Name: "Kaboo Orc Grunt S-f14",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 44850, AnchorY: 55739, Radius: 1344,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-79", Name: "Kaboo Orc Grunt S-b10",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 42927, AnchorY: 56397, Radius: 1930,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-80", Name: "Kaboo Orc Grunt S-b2",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 45477, AnchorY: 57681, Radius: 1755,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-81", Name: "Kaboo Orc Grunt S-c3",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 43880, AnchorY: 57714, Radius: 2000,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-82", Name: "Kaboo Orc Grunt S-d4",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 40816, AnchorY: 57442, Radius: 2022,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-83", Name: "Kaboo Orc Grunt S-e13",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 42457, AnchorY: 58504, Radius: 1065,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-84", Name: "Green Dryad S-e5",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 45927, AnchorY: 59449, Radius: 1662,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-85", Name: "Green Dryad S-d12",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 43926, AnchorY: 59872, Radius: 1366,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-86", Name: "Green Dryad S-d4",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 45675, AnchorY: 60834, Radius: 1772,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-87", Name: "Green Dryad S-a1",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 43722, AnchorY: 61528, Radius: 1986,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-88", Name: "Green Dryad S-h8",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 41798, AnchorY: 61724, Radius: 1672,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-89", Name: "Green Dryad S-b2",
+        Region: regionElven, MinLevel: 7, MaxLevel: 8,
+        AnchorX: 45357, AnchorY: 62201, Radius: 2041,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-90", Name: "Spore Fungus SW-e5",
+        Region: regionElven, MinLevel: 7, MaxLevel: 9,
+        AnchorX: 35760, AnchorY: 54706, Radius: 1417,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-91", Name: "Spore Fungus SW-c3",
+        Region: regionElven, MinLevel: 7, MaxLevel: 9,
+        AnchorX: 33995, AnchorY: 54151, Radius: 1670,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-92", Name: "Spore Fungus SW-d4",
+        Region: regionElven, MinLevel: 7, MaxLevel: 9,
+        AnchorX: 35887, AnchorY: 56195, Radius: 1167,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-93", Name: "Green Dryad S-e13",
+        Region: regionElven, MinLevel: 7, MaxLevel: 9,
+        AnchorX: 41878, AnchorY: 60352, Radius: 1785,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-94", Name: "Green Dryad S-g7",
+        Region: regionElven, MinLevel: 7, MaxLevel: 9,
+        AnchorX: 41727, AnchorY: 63189, Radius: 1732,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-95", Name: "Green Dryad S-c3",
+        Region: regionElven, MinLevel: 7, MaxLevel: 9,
+        AnchorX: 43616, AnchorY: 64099, Radius: 1650,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-96", Name: "Kaboo Orc Grunt SW-g7",
+        Region: regionElven, MinLevel: 7, MaxLevel: 10,
+        AnchorX: 36073, AnchorY: 50080, Radius: 1855,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-97", Name: "Kaboo Orc Grunt SW-e5",
+        Region: regionElven, MinLevel: 7, MaxLevel: 10,
+        AnchorX: 36761, AnchorY: 52267, Radius: 1681,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-98", Name: "Kaboo Orc Grunt SW-h8",
+        Region: regionElven, MinLevel: 7, MaxLevel: 10,
+        AnchorX: 34087, AnchorY: 50292, Radius: 1563,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-99", Name: "Kaboo Orc Grunt SW-b18",
+        Region: regionElven, MinLevel: 7, MaxLevel: 10,
+        AnchorX: 35237, AnchorY: 52026, Radius: 1293,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-100", Name: "Kaboo Orc Grunt SW-c19",
+        Region: regionElven, MinLevel: 7, MaxLevel: 10,
+        AnchorX: 33847, AnchorY: 51819, Radius: 1175,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-101", Name: "Spore Fungus SW-b2",
+        Region: regionElven, MinLevel: 7, MaxLevel: 10,
+        AnchorX: 37242, AnchorY: 55522, Radius: 2028,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-102", Name: "Spore Fungus SW-a1",
+        Region: regionElven, MinLevel: 7, MaxLevel: 10,
+        AnchorX: 34040, AnchorY: 55928, Radius: 1607,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20470, Name: "Kaboo Orc Grunt",
+                Level: 7, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-103", Name: "Spore Fungus SW-b2",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 38983, AnchorY: 45227, Radius: 1837,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-104", Name: "Spore Fungus SW-a1",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 38552, AnchorY: 47040, Radius: 1872,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-105", Name: "Spore Fungus W-e5",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 37120, AnchorY: 45033, Radius: 1715,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-106", Name: "Spore Fungus SW-d4",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 36139, AnchorY: 46628, Radius: 1846,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-107", Name: "Spore Fungus SW-c3",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 35353, AnchorY: 47906, Radius: 1824,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-108", Name: "Spore Fungus W-g7",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 34015, AnchorY: 45929, Radius: 1715,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-109", Name: "Spore Fungus SW-f6",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 33756, AnchorY: 48181, Radius: 1978,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-110", Name: "Spore Fungus SW-b2",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 38471, AnchorY: 58143, Radius: 1857,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-111", Name: "Spore Fungus SW-c3",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 36468, AnchorY: 58207, Radius: 1970,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-112", Name: "Spore Fungus SW-a1",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 38432, AnchorY: 59977, Radius: 1912,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-113", Name: "Green Dryad S-c11",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 39827, AnchorY: 61516, Radius: 1952,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-114", Name: "Green Dryad S-f14",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 38034, AnchorY: 61894, Radius: 1960,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-115", Name: "Spore Fungus W-a1",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 23703, AnchorY: 36674, Radius: 1622,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-116", Name: "Green Dryad S-a9",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 39864, AnchorY: 63978, Radius: 1813,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-117", Name: "Green Dryad S-f6",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 41703, AnchorY: 64611, Radius: 1766,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-118", Name: "Green Dryad S-b10",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 38521, AnchorY: 63915, Radius: 1879,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20336, Name: "Green Dryad",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-119", Name: "Spore Fungus SW-a1",
+        Region: regionElven, MinLevel: 8, MaxLevel: 10,
+        AnchorX: 34147, AnchorY: 64070, Radius: 1755,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20469, Name: "Kaboo Orc Archer",
+                Level: 8, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-120", Name: "Spore Fungus SW-h8",
+        Region: regionElven, MinLevel: 9, MaxLevel: 9,
+        AnchorX: 36688, AnchorY: 48008, Radius: 1318,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-121", Name: "Spore Fungus W-f6",
+        Region: regionElven, MinLevel: 9, MaxLevel: 9,
+        AnchorX: 31069, AnchorY: 47030, Radius: 1536,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-122", Name: "Spore Fungus SW-h8",
+        Region: regionElven, MinLevel: 9, MaxLevel: 9,
+        AnchorX: 33385, AnchorY: 58409, Radius: 1698,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-123", Name: "Spore Fungus SW-g7",
+        Region: regionElven, MinLevel: 9, MaxLevel: 9,
+        AnchorX: 33536, AnchorY: 60540, Radius: 990,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-124", Name: "Spore Fungus W-a9",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 35588, AnchorY: 45283, Radius: 1345,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-125", Name: "Spore Fungus W-a1",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 27731, AnchorY: 39474, Radius: 1841,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-126", Name: "Spore Fungus SW-e5",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 34497, AnchorY: 57699, Radius: 1936,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-127", Name: "Spore Fungus W-f6",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 26553, AnchorY: 36719, Radius: 1769,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-128", Name: "Spore Fungus W-c3",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 25139, AnchorY: 43019, Radius: 1834,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-129", Name: "Spore Fungus SW-d4",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 36447, AnchorY: 60502, Radius: 1797,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-130", Name: "Spore Fungus W-a9",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 25208, AnchorY: 36601, Radius: 1450,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-131", Name: "Spore Fungus W-e5",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 24774, AnchorY: 38270, Radius: 1440,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-132", Name: "Spore Fungus SW-d4",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 34336, AnchorY: 60057, Radius: 2031,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-133", Name: "Spore Fungus W-d4",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 23367, AnchorY: 38341, Radius: 1396,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-134", Name: "Spore Fungus SW-c3",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 35653, AnchorY: 62035, Radius: 1978,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-135", Name: "Spore Fungus SW-f6",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 33781, AnchorY: 61995, Radius: 1195,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-136", Name: "Spore Fungus S-b2",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 37212, AnchorY: 64166, Radius: 1875,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-137", Name: "Spore Fungus SW-e5",
+        Region: regionElven, MinLevel: 9, MaxLevel: 10,
+        AnchorX: 35973, AnchorY: 64065, Radius: 1732,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-138", Name: "Spore Fungus W-e5",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 32147, AnchorY: 46630, Radius: 1875,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-139", Name: "Spore Fungus SW-c3",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 31850, AnchorY: 48317, Radius: 914,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-140", Name: "Spore Fungus SW-a1",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 31877, AnchorY: 50275, Radius: 2021,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-141", Name: "Spore Fungus SW-d4",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 30437, AnchorY: 48364, Radius: 1269,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-142", Name: "Spore Fungus SW-b2",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 30366, AnchorY: 49962, Radius: 1739,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-143", Name: "Kaboo Orc Fighter Leader SW-e5",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 31480, AnchorY: 55293, Radius: 1584,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-144", Name: "Spore Fungus W-e5",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 26072, AnchorY: 39803, Radius: 1764,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-145", Name: "Kaboo Orc Fighter Leader SW-c3",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 31409, AnchorY: 56770, Radius: 1846,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-146", Name: "Spore Fungus W-g7",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 23749, AnchorY: 40661, Radius: 1710,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-147", Name: "Spore Fungus W-f6",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 23381, AnchorY: 42440, Radius: 1929,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-148", Name: "Kaboo Orc Fighter Lieutenant SW-e5",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 31854, AnchorY: 60107, Radius: 1503,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-149", Name: "Kaboo Orc Fighter Lieutenant SW-f6",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 30222, AnchorY: 60378, Radius: 1660,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-150", Name: "Kaboo Orc Fighter Lieutenant SW-a1",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 31751, AnchorY: 62022, Radius: 1621,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-151", Name: "Kaboo Orc Fighter Lieutenant SW-b2",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 30373, AnchorY: 62077, Radius: 1693,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-152", Name: "Kaboo Orc Fighter Lieutenant SW-c3",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 31887, AnchorY: 64251, Radius: 1390,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-153", Name: "Kaboo Orc Fighter Lieutenant SW-d4",
+        Region: regionElven, MinLevel: 9, MaxLevel: 11,
+        AnchorX: 30520, AnchorY: 64182, Radius: 1423,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-154", Name: "Spore Fungus W-d4",
+        Region: regionElven, MinLevel: 9, MaxLevel: 12,
+        AnchorX: 25204, AnchorY: 41612, Radius: 1454,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-155", Name: "Spore Fungus W-b2",
+        Region: regionElven, MinLevel: 9, MaxLevel: 12,
+        AnchorX: 24803, AnchorY: 40503, Radius: 1848,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-156", Name: "Spore Fungus W-b2",
+        Region: regionElven, MinLevel: 9, MaxLevel: 12,
+        AnchorX: 21623, AnchorY: 40107, Radius: 1464,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-157", Name: "Spore Fungus W-g7",
+        Region: regionElven, MinLevel: 9, MaxLevel: 12,
+        AnchorX: 21557, AnchorY: 41782, Radius: 1280,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-158", Name: "Spore Fungus W-c3",
+        Region: regionElven, MinLevel: 9, MaxLevel: 12,
+        AnchorX: 21078, AnchorY: 39070, Radius: 1932,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-159", Name: "Spore Fungus W-h8",
+        Region: regionElven, MinLevel: 9, MaxLevel: 12,
+        AnchorX: 20035, AnchorY: 41084, Radius: 1499,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-160", Name: "Spore Fungus W-b10",
+        Region: regionElven, MinLevel: 9, MaxLevel: 12,
+        AnchorX: 18370, AnchorY: 40941, Radius: 1479,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-161", Name: "Kaboo Orc Fighter Lieutenant SW-b2",
+        Region: regionElven, MinLevel: 9, MaxLevel: 12,
+        AnchorX: 27531, AnchorY: 62507, Radius: 2035,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-162", Name: "Kaboo Orc Fighter Lieutenant SW-d4",
+        Region: regionElven, MinLevel: 9, MaxLevel: 12,
+        AnchorX: 25851, AnchorY: 62610, Radius: 1809,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-163", Name: "Kaboo Orc Fighter Lieutenant SW-a1",
+        Region: regionElven, MinLevel: 9, MaxLevel: 12,
+        AnchorX: 27719, AnchorY: 64352, Radius: 1885,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-164", Name: "Kaboo Orc Fighter Lieutenant SW-c3",
+        Region: regionElven, MinLevel: 9, MaxLevel: 12,
+        AnchorX: 25919, AnchorY: 64173, Radius: 1543,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-165", Name: "Kaboo Orc Fighter Leader W-f6",
+        Region: regionElven, MinLevel: 9, MaxLevel: 13,
+        AnchorX: 20543, AnchorY: 43232, Radius: 1715,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-166", Name: "Kaboo Orc Fighter Leader W-b10",
+        Region: regionElven, MinLevel: 9, MaxLevel: 13,
+        AnchorX: 18598, AnchorY: 42598, Radius: 1683,
+        RespawnMin: 15, RespawnMax: 20, Mass: 5.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-167", Name: "Kaboo Orc Fighter Leader W-a9",
+        Region: regionElven, MinLevel: 9, MaxLevel: 13,
+        AnchorX: 18634, AnchorY: 44078, Radius: 1508,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20509, Name: "Spore Fungus",
+                Level: 9, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-168", Name: "Kaboo Orc Fighter Leader SW-b10",
+        Region: regionElven, MinLevel: 10, MaxLevel: 11,
+        AnchorX: 31357, AnchorY: 53406, Radius: 1881,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-169", Name: "Kaboo Orc Fighter Leader SW-b2",
+        Region: regionElven, MinLevel: 10, MaxLevel: 11,
+        AnchorX: 31220, AnchorY: 58391, Radius: 1749,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-170", Name: "Kaboo Orc Fighter Leader SW-c11",
+        Region: regionElven, MinLevel: 10, MaxLevel: 12,
+        AnchorX: 29280, AnchorY: 53398, Radius: 1870,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-171", Name: "Kaboo Orc Fighter Leader SW-f6",
+        Region: regionElven, MinLevel: 10, MaxLevel: 12,
+        AnchorX: 29103, AnchorY: 55099, Radius: 1597,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-172", Name: "Kaboo Orc Fighter Leader SW-a9",
+        Region: regionElven, MinLevel: 10, MaxLevel: 13,
+        AnchorX: 28943, AnchorY: 57140, Radius: 1642,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-173", Name: "Kaboo Orc Fighter Leader SW-d4",
+        Region: regionElven, MinLevel: 10, MaxLevel: 13,
+        AnchorX: 28914, AnchorY: 58952, Radius: 1861,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-174", Name: "Kaboo Orc Fighter Leader SW-a1",
+        Region: regionElven, MinLevel: 10, MaxLevel: 13,
+        AnchorX: 27209, AnchorY: 57164, Radius: 1946,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20471, Name: "Kaboo Orc Fighter",
+                Level: 10, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-175", Name: "Kaboo Orc Fighter Leader SW-d12",
+        Region: regionElven, MinLevel: 11, MaxLevel: 12,
+        AnchorX: 27399, AnchorY: 54795, Radius: 2035,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-176", Name: "Kaboo Orc Fighter Lieutenant SW-b2",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 28301, AnchorY: 49969, Radius: 1911,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-177", Name: "Kaboo Orc Fighter Lieutenant SW-d4",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 26282, AnchorY: 49748, Radius: 1838,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-178", Name: "Kaboo Orc Fighter Lieutenant SW-a1",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 26464, AnchorY: 51967, Radius: 1902,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-179", Name: "Kaboo Orc Fighter Leader W-d12",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 23879, AnchorY: 46126, Radius: 1689,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-180", Name: "Kaboo Orc Fighter Lieutenant W-e5",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 24846, AnchorY: 49699, Radius: 1950,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-181", Name: "Kaboo Orc Fighter Leader W-a1",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 23148, AnchorY: 48002, Radius: 2014,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-182", Name: "Kaboo Orc Fighter Leader W-c11",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 22548, AnchorY: 46206, Radius: 1802,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-183", Name: "Kaboo Orc Fighter Lieutenant W-f6",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 23445, AnchorY: 49794, Radius: 1904,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-184", Name: "Kaboo Orc Fighter Lieutenant SW-c3",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 24430, AnchorY: 52509, Radius: 1847,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-185", Name: "Kaboo Orc Fighter Leader W-e5",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 20653, AnchorY: 45145, Radius: 1560,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-186", Name: "Kaboo Orc Fighter Leader W-d4",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 20943, AnchorY: 46925, Radius: 1877,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-187", Name: "Kaboo Orc Fighter Leader W-c3",
+        Region: regionElven, MinLevel: 11, MaxLevel: 13,
+        AnchorX: 20876, AnchorY: 48597, Radius: 1782,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20473, Name: "Kaboo Orc Fighter Lieutenant",
+                Level: 11, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-188", Name: "Kaboo Orc Fighter Lieutenant SW-h8",
+        Region: regionElven, MinLevel: 12, MaxLevel: 12,
+        AnchorX: 24968, AnchorY: 51214, Radius: 673,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-189", Name: "Kaboo Orc Fighter Leader SW-f14",
+        Region: regionElven, MinLevel: 12, MaxLevel: 12,
+        AnchorX: 26830, AnchorY: 60600, Radius: 1592,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-190", Name: "Kaboo Orc Fighter Leader SW-a17",
+        Region: regionElven, MinLevel: 12, MaxLevel: 12,
+        AnchorX: 23347, AnchorY: 56583, Radius: 1605,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-191", Name: "Kaboo Orc Fighter Leader SW-d4",
+        Region: regionElven, MinLevel: 12, MaxLevel: 12,
+        AnchorX: 20696, AnchorY: 53440, Radius: 1759,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-192", Name: "Kaboo Orc Fighter Leader W-a17",
+        Region: regionElven, MinLevel: 12, MaxLevel: 12,
+        AnchorX: 17037, AnchorY: 42738, Radius: 1881,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-193", Name: "Kaboo Orc Fighter Leader SW-e5",
+        Region: regionElven, MinLevel: 12, MaxLevel: 12,
+        AnchorX: 19352, AnchorY: 53247, Radius: 1591,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-194", Name: "Kaboo Orc Fighter Leader SW-h16",
+        Region: regionElven, MinLevel: 12, MaxLevel: 12,
+        AnchorX: 23523, AnchorY: 60173, Radius: 2007,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-195", Name: "Kaboo Orc Fighter Leader W-b18",
+        Region: regionElven, MinLevel: 12, MaxLevel: 12,
+        AnchorX: 15615, AnchorY: 43045, Radius: 1220,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-196", Name: "Kaboo Orc Fighter Leader W-h8",
+        Region: regionElven, MinLevel: 12, MaxLevel: 12,
+        AnchorX: 15866, AnchorY: 53836, Radius: 1301,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-197", Name: "Kaboo Orc Fighter Leader SW-h8",
+        Region: regionElven, MinLevel: 12, MaxLevel: 13,
+        AnchorX: 24943, AnchorY: 58997, Radius: 1532,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-198", Name: "Kaboo Orc Fighter Leader W-g7",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 18431, AnchorY: 45934, Radius: 1676,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-199", Name: "Kaboo Orc Fighter Leader W-b2",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 18523, AnchorY: 47673, Radius: 1882,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-200", Name: "Kaboo Orc Fighter Leader SW-g7",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 25048, AnchorY: 60612, Radius: 1929,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-201", Name: "Kaboo Orc Fighter Leader W-g7",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 18786, AnchorY: 49553, Radius: 1609,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-202", Name: "Kaboo Orc Fighter Leader SW-e13",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 22905, AnchorY: 58332, Radius: 1908,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-203", Name: "Kaboo Orc Fighter Leader W-f6",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 18739, AnchorY: 51246, Radius: 1568,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-204", Name: "Kaboo Orc Fighter Leader W-e13",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 16873, AnchorY: 45024, Radius: 1793,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-205", Name: "Kaboo Orc Fighter Leader W-b10",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 17268, AnchorY: 49287, Radius: 1786,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-206", Name: "Kaboo Orc Fighter Leader W-h8",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 16656, AnchorY: 46906, Radius: 1969,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-207", Name: "Kaboo Orc Fighter Leader W-a9",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 17297, AnchorY: 51370, Radius: 1293,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-208", Name: "Kaboo Orc Fighter Leader W-b2",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 17601, AnchorY: 53283, Radius: 1721,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-209", Name: "Kaboo Orc Fighter Leader W-f14",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 15461, AnchorY: 45034, Radius: 1807,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-210", Name: "Kaboo Orc Fighter Leader W-d12",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 16039, AnchorY: 49112, Radius: 1901,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-211", Name: "Kaboo Orc Fighter Leader W-a1",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 13620, AnchorY: 48595, Radius: 1976,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-212", Name: "Kaboo Orc Fighter Leader W-b2",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 12338, AnchorY: 46715, Radius: 1858,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-213", Name: "Kaboo Orc Fighter Leader W-c3",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 14033, AnchorY: 53407, Radius: 1913,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-214", Name: "Kaboo Orc Fighter Leader W-c3",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 12400, AnchorY: 48138, Radius: 1898,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-215", Name: "Kaboo Orc Fighter Leader W-d4",
+        Region: regionElven, MinLevel: 12, MaxLevel: 14,
+        AnchorX: 10937, AnchorY: 46374, Radius: 1581,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-216", Name: "Kaboo Orc Fighter Leader W-a1",
+        Region: regionElven, MinLevel: 12, MaxLevel: 15,
+        AnchorX: 15930, AnchorY: 52176, Radius: 1420,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20472, Name: "Kaboo Orc Fighter Leader",
+                Level: 12, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-217", Name: "Dryad Elder W-b2",
+        Region: regionElven, MinLevel: 13, MaxLevel: 15,
+        AnchorX: 10412, AnchorY: 49917, Radius: 1831,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-218", Name: "Dryad Elder W-c3",
+        Region: regionElven, MinLevel: 13, MaxLevel: 15,
+        AnchorX: 9038, AnchorY: 49980, Radius: 1742,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20013, Name: "Dryad",
+                Level: 13, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-219", Name: "Dryad Elder W-f6",
+        Region: regionElven, MinLevel: 14, MaxLevel: 14,
+        AnchorX: 8452, AnchorY: 52292, Radius: 1691,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-220", Name: "Dryad Elder W-c11",
+        Region: regionElven, MinLevel: 14, MaxLevel: 14,
+        AnchorX: 6184, AnchorY: 50801, Radius: 1953,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-221", Name: "Dryad Elder W-h8",
+        Region: regionElven, MinLevel: 14, MaxLevel: 14,
+        AnchorX: 5949, AnchorY: 53348, Radius: 1827,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-222", Name: "Dryad Elder W-b10",
+        Region: regionElven, MinLevel: 14, MaxLevel: 14,
+        AnchorX: 4698, AnchorY: 53102, Radius: 1632,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-223", Name: "Dryad Elder W-g7",
+        Region: regionElven, MinLevel: 14, MaxLevel: 15,
+        AnchorX: 10523, AnchorY: 47976, Radius: 1759,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-224", Name: "Dryad Elder W-a9",
+        Region: regionElven, MinLevel: 14, MaxLevel: 15,
+        AnchorX: 9161, AnchorY: 48148, Radius: 1822,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-225", Name: "Dryad Elder W-e5",
+        Region: regionElven, MinLevel: 14, MaxLevel: 15,
+        AnchorX: 9852, AnchorY: 51948, Radius: 1584,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-226", Name: "Dryad Elder W-d4",
+        Region: regionElven, MinLevel: 14, MaxLevel: 15,
+        AnchorX: 7090, AnchorY: 51810, Radius: 1745,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-227", Name: "Dryad Elder SW-b2",
+        Region: regionElven, MinLevel: 14, MaxLevel: 16,
+        AnchorX: 12865, AnchorY: 55857, Radius: 1543,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-228", Name: "Dryad Elder W-e5",
+        Region: regionElven, MinLevel: 14, MaxLevel: 16,
+        AnchorX: 11696, AnchorY: 54631, Radius: 2018,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-229", Name: "Dryad Elder SW-b2",
+        Region: regionElven, MinLevel: 14, MaxLevel: 16,
+        AnchorX: 12808, AnchorY: 59317, Radius: 1561,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-230", Name: "Dryad Elder SW-f6",
+        Region: regionElven, MinLevel: 14, MaxLevel: 16,
+        AnchorX: 11537, AnchorY: 56873, Radius: 1973,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-231", Name: "Dryad Elder W-a1",
+        Region: regionElven, MinLevel: 14, MaxLevel: 16,
+        AnchorX: 10492, AnchorY: 54844, Radius: 1957,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-232", Name: "Dryad Elder SW-a1",
+        Region: regionElven, MinLevel: 14, MaxLevel: 16,
+        AnchorX: 12454, AnchorY: 60639, Radius: 1604,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-233", Name: "Dryad Elder SW-d4",
+        Region: regionElven, MinLevel: 14, MaxLevel: 16,
+        AnchorX: 9860, AnchorY: 56741, Radius: 1629,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-234", Name: "Dryad Elder SW-c3",
+        Region: regionElven, MinLevel: 14, MaxLevel: 16,
+        AnchorX: 9834, AnchorY: 58248, Radius: 1773,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-235", Name: "Dryad Elder W-a1",
+        Region: regionElven, MinLevel: 14, MaxLevel: 16,
+        AnchorX: 7131, AnchorY: 53070, Radius: 2039,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20019, Name: "Dryad Elder",
+                Level: 14, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-236", Name: "Crimson Spider SW-c3",
+        Region: regionElven, MinLevel: 15, MaxLevel: 15,
+        AnchorX: 18807, AnchorY: 56488, Radius: 1382,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-237", Name: "Crimson Spider SW-a1",
+        Region: regionElven, MinLevel: 15, MaxLevel: 15,
+        AnchorX: 18790, AnchorY: 57785, Radius: 1406,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-238", Name: "Crimson Spider SW-d4",
+        Region: regionElven, MinLevel: 15, MaxLevel: 15,
+        AnchorX: 17181, AnchorY: 56553, Radius: 1133,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-239", Name: "Crimson Spider SW-b2",
+        Region: regionElven, MinLevel: 15, MaxLevel: 15,
+        AnchorX: 17202, AnchorY: 57903, Radius: 1236,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20460, Name: "Crimson Spider",
+                Level: 15, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-240", Name: "Pincer Spider SW-d12",
+        Region: regionElven, MinLevel: 16, MaxLevel: 16,
+        AnchorX: 8652, AnchorY: 59268, Radius: 1522,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-241", Name: "Pincer Spider SW-c11",
+        Region: regionElven, MinLevel: 16, MaxLevel: 16,
+        AnchorX: 8638, AnchorY: 60910, Radius: 1926,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-242", Name: "Pincer Spider SW-f14",
+        Region: regionElven, MinLevel: 16, MaxLevel: 16,
+        AnchorX: 6915, AnchorY: 58388, Radius: 1393,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-243", Name: "Pincer Spider SW-e13",
+        Region: regionElven, MinLevel: 16, MaxLevel: 16,
+        AnchorX: 6861, AnchorY: 59528, Radius: 1469,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-244", Name: "Pincer Spider SW-g15",
+        Region: regionElven, MinLevel: 16, MaxLevel: 16,
+        AnchorX: 5382, AnchorY: 58484, Radius: 1508,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-245", Name: "Pincer Spider SW-d20",
+        Region: regionElven, MinLevel: 16, MaxLevel: 18,
+        AnchorX: 11702, AnchorY: 61786, Radius: 1706,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-246", Name: "Pincer Spider SW-b10",
+        Region: regionElven, MinLevel: 16, MaxLevel: 18,
+        AnchorX: 11121, AnchorY: 62938, Radius: 1803,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-247", Name: "Pincer Spider SW-b2",
+        Region: regionElven, MinLevel: 16, MaxLevel: 18,
+        AnchorX: 9017, AnchorY: 63504, Radius: 1878,
+        RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 3, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-248", Name: "Pincer Spider SW-a9",
+        Region: regionElven, MinLevel: 16, MaxLevel: 18,
+        AnchorX: 9672, AnchorY: 65272, Radius: 2042,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-249", Name: "Pincer Spider SW-d4",
+        Region: regionElven, MinLevel: 16, MaxLevel: 18,
+        AnchorX: 6874, AnchorY: 61005, Radius: 1814,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-250", Name: "Pincer Spider SW-a1",
+        Region: regionElven, MinLevel: 16, MaxLevel: 18,
+        AnchorX: 5306, AnchorY: 60353, Radius: 2012,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-251", Name: "Pincer Spider SW-c3",
+        Region: regionElven, MinLevel: 16, MaxLevel: 18,
+        AnchorX: 7478, AnchorY: 66194, Radius: 1926,
+        RespawnMin: 15, RespawnMax: 20, Mass: 6.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-252", Name: "Lirein W-a1",
+        Region: regionElven, MinLevel: 16, MaxLevel: 18,
+        AnchorX: 2658, AnchorY: 56395, Radius: 1881,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-253", Name: "Lirein SW-a1",
+        Region: regionElven, MinLevel: 16, MaxLevel: 18,
+        AnchorX: 7415, AnchorY: 70777, Radius: 1557,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-254", Name: "Pincer Spider SW-h8",
+        Region: regionElven, MinLevel: 16, MaxLevel: 18,
+        AnchorX: 4913, AnchorY: 74675, Radius: 1294,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-255", Name: "Pincer Spider SW-b2",
+        Region: regionElven, MinLevel: 16, MaxLevel: 18,
+        AnchorX: 3550, AnchorY: 73319, Radius: 1735,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-256", Name: "Pincer Spider SW-f6",
+        Region: regionElven, MinLevel: 16, MaxLevel: 19,
+        AnchorX: 4774, AnchorY: 75678, Radius: 1960,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20308, Name: "Hook Spider",
+                Level: 16, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-257", Name: "Pincer Spider SW-b18",
+        Region: regionElven, MinLevel: 17, MaxLevel: 17,
+        AnchorX: 3480, AnchorY: 59665, Radius: 1540,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-258", Name: "Pincer Spider SW-h16",
+        Region: regionElven, MinLevel: 17, MaxLevel: 17,
+        AnchorX: 3357, AnchorY: 61184, Radius: 1141,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-259", Name: "Pincer Spider SW-e21",
+        Region: regionElven, MinLevel: 17, MaxLevel: 17,
+        AnchorX: 4280, AnchorY: 64733, Radius: 1827,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-260", Name: "Pincer Spider W-c19",
+        Region: regionElven, MinLevel: 17, MaxLevel: 17,
+        AnchorX: 1723, AnchorY: 59625, Radius: 1523,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-261", Name: "Pincer Spider SW-a17",
+        Region: regionElven, MinLevel: 17, MaxLevel: 17,
+        AnchorX: 1862, AnchorY: 61179, Radius: 1270,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-262", Name: "Pincer Spider SW-e5",
+        Region: regionElven, MinLevel: 17, MaxLevel: 17,
+        AnchorX: 2630, AnchorY: 66415, Radius: 833,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-263", Name: "Lirein W-d4",
+        Region: regionElven, MinLevel: 17, MaxLevel: 18,
+        AnchorX: 4087, AnchorY: 56214, Radius: 1400,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-264", Name: "Pincer Spider SW-g7",
+        Region: regionElven, MinLevel: 17, MaxLevel: 18,
+        AnchorX: 5217, AnchorY: 62996, Radius: 1674,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-265", Name: "Lirein SW-b2",
+        Region: regionElven, MinLevel: 17, MaxLevel: 18,
+        AnchorX: 5978, AnchorY: 70314, Radius: 1089,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-266", Name: "Lirein SW-c3",
+        Region: regionElven, MinLevel: 17, MaxLevel: 18,
+        AnchorX: 6434, AnchorY: 72645, Radius: 1853,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-267", Name: "Pincer Spider SW-h8",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 3763, AnchorY: 63014, Radius: 1830,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-268", Name: "Pincer Spider SW-f6",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 2264, AnchorY: 62517, Radius: 2019,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-269", Name: "Pincer Spider SW-a1",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 4021, AnchorY: 66625, Radius: 1803,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-270", Name: "Pincer Spider SW-e5",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 2002, AnchorY: 64231, Radius: 1773,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-271", Name: "Pincer Spider SW-d4",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 2554, AnchorY: 67686, Radius: 1208,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-272", Name: "Pincer Spider SW-c3",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 1152, AnchorY: 66598, Radius: 1199,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-273", Name: "Pincer Spider SW-d4",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 3351, AnchorY: 71198, Radius: 1813,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-274", Name: "Pincer Spider SW-b2",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 1061, AnchorY: 68275, Radius: 1823,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-275", Name: "Pincer Spider SW-e5",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 1765, AnchorY: 72260, Radius: 1761,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-276", Name: "Pincer Spider SW-c3",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 1620, AnchorY: 73488, Radius: 1884,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-277", Name: "Pincer Spider SW-a1",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 4806, AnchorY: 77660, Radius: 1748,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-278", Name: "Pincer Spider SW-a1",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 4589, AnchorY: 79871, Radius: 1860,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-279", Name: "Pincer Spider SW-f6",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 5500, AnchorY: 81732, Radius: 1295,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-280", Name: "Pincer Spider SW-d4",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 5792, AnchorY: 83038, Radius: 1426,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-281", Name: "Pincer Spider SW-b2",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 4266, AnchorY: 82299, Radius: 1894,
+        RespawnMin: 15, RespawnMax: 20, Mass: 4.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-282", Name: "Pincer Spider SW-c3",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 5893, AnchorY: 84290, Radius: 1645,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-283", Name: "Pincer Spider SW-e5",
+        Region: regionElven, MinLevel: 17, MaxLevel: 19,
+        AnchorX: 4533, AnchorY: 84440, Radius: 1957,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20466, Name: "Pincer Spider",
+                Level: 17, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-284", Name: "Lirein W-e5",
+        Region: regionElven, MinLevel: 18, MaxLevel: 18,
+        AnchorX: 5361, AnchorY: 55330, Radius: 1875,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-285", Name: "Lirein W-b2",
+        Region: regionElven, MinLevel: 18, MaxLevel: 18,
+        AnchorX: 5180, AnchorY: 57049, Radius: 1848,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-286", Name: "Lirein W-f6",
+        Region: regionElven, MinLevel: 18, MaxLevel: 18,
+        AnchorX: 3099, AnchorY: 54396, Radius: 1822,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-287", Name: "Lirein W-c3",
+        Region: regionElven, MinLevel: 18, MaxLevel: 18,
+        AnchorX: 2423, AnchorY: 58334, Radius: 1730,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-288", Name: "Lirein SW-d4",
+        Region: regionElven, MinLevel: 18, MaxLevel: 18,
+        AnchorX: 5916, AnchorY: 71715, Radius: 918,
+        RespawnMin: 15, RespawnMax: 20, Mass: 1.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-289", Name: "Lirein Elder SW-c3",
+        Region: regionElven, MinLevel: 18, MaxLevel: 19,
+        AnchorX: 2520, AnchorY: 76129, Radius: 1317,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-290", Name: "Lirein Elder SW-d4",
+        Region: regionElven, MinLevel: 18, MaxLevel: 19,
+        AnchorX: 1079, AnchorY: 76328, Radius: 1137,
+        RespawnMin: 15, RespawnMax: 20, Mass: 2.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-291", Name: "Lirein Elder SW-b2",
+        Region: regionElven, MinLevel: 18, MaxLevel: 19,
+        AnchorX: 1626, AnchorY: 77529, Radius: 1830,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
+    {
+        ID: "elven-spot-292", Name: "Lirein Elder SW-a1",
+        Region: regionElven, MinLevel: 18, MaxLevel: 19,
+        AnchorX: 1932, AnchorY: 78621, Radius: 2042,
+        RespawnMin: 15, RespawnMax: 20, Mass: 3.0,
+        Mobs: []SpotMob{
+            {
+                TemplateID: 20044, Name: "Lirein Elder",
+                Level: 19, Count: 2, RespawnMin: 15, RespawnMax: 20,
+            },
+            {
+                TemplateID: 20036, Name: "Lirein",
+                Level: 18, Count: 1, RespawnMin: 15, RespawnMax: 20,
+            },
+        },
+    },
 }
 
 // ElvenHuntingSpots returns the hunting spots of the elven lands.
 func ElvenHuntingSpots() []Spot {
-	spots := make([]Spot, len(elvenHuntingSpots))
-	copy(spots, elvenHuntingSpots)
+    spots := make([]Spot, len(elvenHuntingSpots))
+    copy(spots, elvenHuntingSpots)
 
-	return spots
+    return spots
 }

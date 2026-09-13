@@ -5,7 +5,7 @@
 package acceptance
 
 import (
-	"github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // deathEdgeTracker counts the character deaths over the soak window by
@@ -17,39 +17,39 @@ import (
 // single-goroutine read of the public tracker API, so it stays inside
 // the T-001 acceptance scope.
 type deathEdgeTracker struct {
-	previous bool
-	seen     bool
-	count    int
+    previous bool
+    seen     bool
+    count    int
 }
 
 // newDeathEdgeTracker arms the tracker. The first update seeds the
 // previous flag without counting a death.
 func newDeathEdgeTracker() *deathEdgeTracker {
-	return &deathEdgeTracker{
-		previous: false,
-		seen:     false,
-		count:    0,
-	}
+    return &deathEdgeTracker{
+        previous: false,
+        seen:     false,
+        count:    0,
+    }
 }
 
 // update reads the tracker and advances the count on a rising edge.
 func (d *deathEdgeTracker) update(tracker *state.Bot) {
-	current := tracker.SelfDead()
-	if !d.seen {
-		d.seen = true
-		d.previous = current
+    current := tracker.SelfDead()
+    if !d.seen {
+        d.seen = true
+        d.previous = current
 
-		return
-	}
-	if current && !d.previous {
-		d.count++
-	}
-	d.previous = current
+        return
+    }
+    if current && !d.previous {
+        d.count++
+    }
+    d.previous = current
 }
 
 // deaths returns the counted death transitions.
 func (d *deathEdgeTracker) deaths() int {
-	return d.count
+    return d.count
 }
 
 // soakRePaths reads the hunt loop re-path count from the tracker
@@ -58,7 +58,7 @@ func (d *deathEdgeTracker) deaths() int {
 // reports. The snapshot is a read under the tracker lock; a nil
 // engine or a not-yet-ticking loop reports zero.
 func soakRePaths(tracker *state.Bot) int {
-	return tracker.Snapshot().Diagnostics.Hunt.RePaths
+    return tracker.Snapshot().Diagnostics.Hunt.RePaths
 }
 
 // soakAdena reads the current adena count of the character from the
@@ -66,5 +66,5 @@ func soakRePaths(tracker *state.Bot) int {
 // and the loot pickups maintain; zero before the first inventory
 // update (a fresh level 1 character starts with no adena).
 func soakAdena(tracker *state.Bot) int32 {
-	return tracker.Snapshot().Character.Adena
+    return tracker.Snapshot().Character.Adena
 }

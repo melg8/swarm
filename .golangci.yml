@@ -172,10 +172,15 @@ linters:
       - examples$
 
 formatters:
+  # Spaces only (see AGENTS.md): the stock gofmt, gofumpt and
+  # goimports all re-tab the tree, so the formatter of record is the
+  # repository tool cmd/gofmt-spaces (`task fmt`, gated by
+  # `task fmt:check`). Only the import grouping stays with gci.
   enable:
+    - gci
+  disable:
     - gofmt
     - gofumpt
-    - gci
     - goimports
   exclusions:
     generated: lax

@@ -5,9 +5,9 @@
 package fromgameserver
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const questListPacketID byte = 0x98
@@ -29,8 +29,8 @@ const questItemCountCap = 256
 // a started quest, or the completion flags mask when the quest has
 // completed paths (see docs/quest_protocol.md).
 type QuestListEntry struct {
-	QuestID int32
-	State   int32
+    QuestID int32
+    State   int32
 }
 
 // QuestItemEntry is one quest item stack the packet repeats: the
@@ -38,10 +38,10 @@ type QuestListEntry struct {
 // ordinary inventory packets first; this section names which
 // inventory items are quest bound - the sell filter fact).
 type QuestItemEntry struct {
-	ObjectID int32
-	ItemID   int32
-	Count    int32
-	BodyPart int32
+    ObjectID int32
+    ItemID   int32
+    Count    int32
+    BodyPart int32
 }
 
 // QuestListPacket is the quest journal snapshot the server pushes at
@@ -53,97 +53,97 @@ type QuestItemEntry struct {
 // [bodyPart: 4]. The empty live form is 5 bytes: one opcode, two
 // zero counts.
 type QuestListPacket struct {
-	Quests []QuestListEntry
-	Items  []QuestItemEntry
+    Quests []QuestListEntry
+    Items  []QuestItemEntry
 }
 
 // NewQuestListPacket creates a packet ready for parsing with
 // reusable entry buffers.
 func NewQuestListPacket() *QuestListPacket {
-	return &QuestListPacket{
-		Quests: make([]QuestListEntry, 0, 4),
-		Items:  make([]QuestItemEntry, 0, 4),
-	}
+    return &QuestListPacket{
+        Quests: make([]QuestListEntry, 0, 4),
+        Items:  make([]QuestItemEntry, 0, 4),
+    }
 }
 
 // ParseQuestListPacket reads the packet from payload bytes.
 func ParseQuestListPacket(p *QuestListPacket, data []byte) error {
-	reader := packet.NewReader(data)
+    reader := packet.NewReader(data)
 
-	if err := expectPacketID(reader, questListPacketID); err != nil {
-		return err
-	}
-	if err := readQuestEntries(reader, p); err != nil {
-		return err
-	}
+    if err := expectPacketID(reader, questListPacketID); err != nil {
+        return err
+    }
+    if err := readQuestEntries(reader, p); err != nil {
+        return err
+    }
 
-	return readQuestItemEntries(reader, p)
+    return readQuestItemEntries(reader, p)
 }
 
 // readQuestEntries reads the quest count and the quest entries of
 // the journal into the reusable buffer.
 func readQuestEntries(reader *packet.Reader, p *QuestListPacket) error {
-	questCount, err := reader.ReadInt16()
-	if err != nil {
-		return fmt.Errorf("failed to read quest count: %w", err)
-	}
-	if questCount < 0 || int(questCount) > questCountCap {
-		return fmt.Errorf("implausible quest count %d", questCount)
-	}
-	p.Quests = p.Quests[:0]
-	for range questCount {
-		questID, err := reader.ReadInt32()
-		if err != nil {
-			return fmt.Errorf("failed to read quest id: %w", err)
-		}
-		state, err := reader.ReadInt32()
-		if err != nil {
-			return fmt.Errorf("failed to read quest state: %w", err)
-		}
-		p.Quests = append(p.Quests, QuestListEntry{
-			QuestID: questID,
-			State:   state,
-		})
-	}
+    questCount, err := reader.ReadInt16()
+    if err != nil {
+        return fmt.Errorf("failed to read quest count: %w", err)
+    }
+    if questCount < 0 || int(questCount) > questCountCap {
+        return fmt.Errorf("implausible quest count %d", questCount)
+    }
+    p.Quests = p.Quests[:0]
+    for range questCount {
+        questID, err := reader.ReadInt32()
+        if err != nil {
+            return fmt.Errorf("failed to read quest id: %w", err)
+        }
+        state, err := reader.ReadInt32()
+        if err != nil {
+            return fmt.Errorf("failed to read quest state: %w", err)
+        }
+        p.Quests = append(p.Quests, QuestListEntry{
+            QuestID: questID,
+            State:   state,
+        })
+    }
 
-	return nil
+    return nil
 }
 
 // readQuestItemEntries reads the quest item count and the item
 // stacks of the journal into the reusable buffer.
 func readQuestItemEntries(reader *packet.Reader, p *QuestListPacket) error {
-	itemCount, err := reader.ReadInt16()
-	if err != nil {
-		return fmt.Errorf("failed to read quest item count: %w", err)
-	}
-	if itemCount < 0 || int(itemCount) > questItemCountCap {
-		return fmt.Errorf("implausible quest item count %d", itemCount)
-	}
-	p.Items = p.Items[:0]
-	for range itemCount {
-		objectID, err := reader.ReadInt32()
-		if err != nil {
-			return fmt.Errorf("failed to read quest item object id: %w", err)
-		}
-		itemID, err := reader.ReadInt32()
-		if err != nil {
-			return fmt.Errorf("failed to read quest item id: %w", err)
-		}
-		count, err := reader.ReadInt32()
-		if err != nil {
-			return fmt.Errorf("failed to read quest item count: %w", err)
-		}
-		bodyPart, err := reader.ReadInt32()
-		if err != nil {
-			return fmt.Errorf("failed to read quest item body part: %w", err)
-		}
-		p.Items = append(p.Items, QuestItemEntry{
-			ObjectID: objectID,
-			ItemID:   itemID,
-			Count:    count,
-			BodyPart: bodyPart,
-		})
-	}
+    itemCount, err := reader.ReadInt16()
+    if err != nil {
+        return fmt.Errorf("failed to read quest item count: %w", err)
+    }
+    if itemCount < 0 || int(itemCount) > questItemCountCap {
+        return fmt.Errorf("implausible quest item count %d", itemCount)
+    }
+    p.Items = p.Items[:0]
+    for range itemCount {
+        objectID, err := reader.ReadInt32()
+        if err != nil {
+            return fmt.Errorf("failed to read quest item object id: %w", err)
+        }
+        itemID, err := reader.ReadInt32()
+        if err != nil {
+            return fmt.Errorf("failed to read quest item id: %w", err)
+        }
+        count, err := reader.ReadInt32()
+        if err != nil {
+            return fmt.Errorf("failed to read quest item count: %w", err)
+        }
+        bodyPart, err := reader.ReadInt32()
+        if err != nil {
+            return fmt.Errorf("failed to read quest item body part: %w", err)
+        }
+        p.Items = append(p.Items, QuestItemEntry{
+            ObjectID: objectID,
+            ItemID:   itemID,
+            Count:    count,
+            BodyPart: bodyPart,
+        })
+    }
 
-	return nil
+    return nil
 }

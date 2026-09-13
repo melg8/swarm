@@ -5,9 +5,9 @@
 package togameserver
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const changeMoveTypePacketID = 0x1C
@@ -23,23 +23,23 @@ const changeMoveTypePacketID = 0x1C
 // Wire format (see ChangeMoveType2.readImpl): [opcode 0x1C]
 // [typeRun: 4] (1 runs, 0 walks).
 type ChangeMoveTypePacket struct {
-	TypeRun int32
+    TypeRun int32
 }
 
 // NewChangeMoveTypePacket creates a zero valued (walk) move type
 // request.
 func NewChangeMoveTypePacket() *ChangeMoveTypePacket {
-	return &ChangeMoveTypePacket{TypeRun: 0}
+    return &ChangeMoveTypePacket{TypeRun: 0}
 }
 
 // ToBytes serializes the packet.
 func (p *ChangeMoveTypePacket) ToBytes(writer *packet.Writer) error {
-	if err := writer.WriteInt8(changeMoveTypePacketID); err != nil {
-		return fmt.Errorf("failed to write change move type id: %w", err)
-	}
-	if err := writer.WriteInt32(p.TypeRun); err != nil {
-		return fmt.Errorf("failed to write change move type flag: %w", err)
-	}
+    if err := writer.WriteInt8(changeMoveTypePacketID); err != nil {
+        return fmt.Errorf("failed to write change move type id: %w", err)
+    }
+    if err := writer.WriteInt32(p.TypeRun); err != nil {
+        return fmt.Errorf("failed to write change move type flag: %w", err)
+    }
 
-	return nil
+    return nil
 }

@@ -5,35 +5,35 @@
 package helpers
 
 import (
-	"testing"
+    "testing"
 )
 
 func dataForBenchmark() []byte {
-	data := make([]byte, 1024)
-	for i := range data {
-		data[i] = byte(i % 256)
-	}
+    data := make([]byte, 1024)
+    for i := range data {
+        data[i] = byte(i % 256)
+    }
 
-	return data
+    return data
 }
 
 func BenchmarkPlusPlus(b *testing.B) {
-	for range b.N {
-		value := 2 + 2
-		if value != 4 {
-			b.Fatal("value is not 4")
-		}
-	}
+    for range b.N {
+        value := 2 + 2
+        if value != 4 {
+            b.Fatal("value is not 4")
+        }
+    }
 }
 
 func BenchmarkHexASCIIViewFrom(b *testing.B) {
-	data := dataForBenchmark()
-	b.ResetTimer()
+    data := dataForBenchmark()
+    b.ResetTimer()
 
-	for range b.N {
-		result := HexASCIIViewFrom(data)
-		if result == "" {
-			b.Fatal("result is empty")
-		}
-	}
+    for range b.N {
+        result := HexASCIIViewFrom(data)
+        if result == "" {
+            b.Fatal("result is empty")
+        }
+    }
 }

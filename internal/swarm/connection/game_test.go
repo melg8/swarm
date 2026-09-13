@@ -5,477 +5,477 @@
 package connection
 
 import (
-	"context"
-	"encoding/binary"
-	"io"
-	"net"
-	"testing"
-	"time"
+    "context"
+    "encoding/binary"
+    "io"
+    "net"
+    "testing"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/crypt"
-	"github.com/melg8/swarm/internal/swarm/state"
-	"github.com/stretchr/testify/require"
+    "github.com/melg8/swarm/internal/swarm/crypt"
+    "github.com/melg8/swarm/internal/swarm/state"
+    "github.com/stretchr/testify/require"
 )
 
 // fakeGameServer implements the server side of the game protocol handshake
 // and character flow.
 type fakeGameServer struct {
-	listener net.Listener
-	t        *testing.T
-	// flow replaces the default character and world flows when set:
-	// it runs right after the handshake for specialized sessions.
-	flow func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt)
+    listener net.Listener
+    t        *testing.T
+    // flow replaces the default character and world flows when set:
+    // it runs right after the handshake for specialized sessions.
+    flow func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt)
 }
 
 // startFakeGameServer starts a scripted game server on a random port.
 func startFakeGameServer(t *testing.T) *fakeGameServer {
-	t.Helper()
+    t.Helper()
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
+    listener, err := net.Listen("tcp", "127.0.0.1:0")
+    require.NoError(t, err)
 
-	server := &fakeGameServer{listener: listener, t: t}
-	go server.serve()
+    server := &fakeGameServer{listener: listener, t: t}
+    go server.serve()
 
-	return server
+    return server
 }
 
 // Addr returns the address of the fake server.
 func (s *fakeGameServer) Addr() string {
-	return s.listener.Addr().String()
+    return s.listener.Addr().String()
 }
 
 // serve runs a single scripted session.
 func (s *fakeGameServer) serve() {
-	conn, err := s.listener.Accept()
-	if err != nil {
-		return
-	}
-	defer conn.Close()
+    conn, err := s.listener.Accept()
+    if err != nil {
+        return
+    }
+    defer conn.Close()
 
-	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+    _ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
-	serverCrypt := s.handshake(conn)
-	if s.flow != nil {
-		s.flow(s, conn, serverCrypt)
+    serverCrypt := s.handshake(conn)
+    if s.flow != nil {
+        s.flow(s, conn, serverCrypt)
 
-		return
-	}
-	s.characterFlow(conn, serverCrypt)
-	s.worldFlow(conn, serverCrypt)
+        return
+    }
+    s.characterFlow(conn, serverCrypt)
+    s.worldFlow(conn, serverCrypt)
 }
 
 // handshake expects the protocol version and returns the session cipher.
 func (s *fakeGameServer) handshake(conn net.Conn) *crypt.GameCrypt {
-	payload := s.readPacket(conn)
-	require.Equal(s.t, byte(0x00), payload[0])
-	version := binary.LittleEndian.Uint32(payload[1:5])
-	require.Equal(s.t, uint32(419), version)
+    payload := s.readPacket(conn)
+    require.Equal(s.t, byte(0x00), payload[0])
+    version := binary.LittleEndian.Uint32(payload[1:5])
+    require.Equal(s.t, uint32(419), version)
 
-	// Reply with an unencrypted key packet.
-	var keyPacket []byte
-	keyPacket = append(keyPacket, 0x00, 0x01)
-	gameKey := crypt.DefaultGameCryptKey()
-	keyPacket = append(keyPacket, gameKey[:]...)
-	keyPacket = binary.LittleEndian.AppendUint32(keyPacket, 2)
-	keyPacket = binary.LittleEndian.AppendUint32(keyPacket, 1)
-	s.writePacket(conn, keyPacket)
+    // Reply with an unencrypted key packet.
+    var keyPacket []byte
+    keyPacket = append(keyPacket, 0x00, 0x01)
+    gameKey := crypt.DefaultGameCryptKey()
+    keyPacket = append(keyPacket, gameKey[:]...)
+    keyPacket = binary.LittleEndian.AppendUint32(keyPacket, 2)
+    keyPacket = binary.LittleEndian.AppendUint32(keyPacket, 1)
+    s.writePacket(conn, keyPacket)
 
-	// The rest of the session is encrypted with the default key.
-	serverCrypt := crypt.NewGameCrypt(gameKey)
-	serverCrypt.Enable()
+    // The rest of the session is encrypted with the default key.
+    serverCrypt := crypt.NewGameCrypt(gameKey)
+    serverCrypt.Enable()
 
-	return serverCrypt
+    return serverCrypt
 }
 
 // characterFlow exchanges the auth login, creation and selection packets.
 func (s *fakeGameServer) characterFlow(conn net.Conn, cipher *crypt.GameCrypt) {
-	payload := s.readEncrypted(conn, cipher)
-	require.Equal(s.t, byte(0x08), payload[0])
-	login := readUtf16String(payload[1:])
-	require.Equal(s.t, "test1", login)
+    payload := s.readEncrypted(conn, cipher)
+    require.Equal(s.t, byte(0x08), payload[0])
+    login := readUtf16String(payload[1:])
+    require.Equal(s.t, "test1", login)
 
-	var charList []byte
-	charList = append(charList, 0x1F)
-	charList = binary.LittleEndian.AppendUint32(charList, 0)
-	s.writeEncrypted(conn, cipher, charList)
+    var charList []byte
+    charList = append(charList, 0x1F)
+    charList = binary.LittleEndian.AppendUint32(charList, 0)
+    s.writeEncrypted(conn, cipher, charList)
 
-	payload = s.readEncrypted(conn, cipher)
-	require.Equal(s.t, byte(0x0B), payload[0])
-	name := readUtf16String(payload[1:])
-	require.Equal(s.t, "test1", name)
-	race := binary.LittleEndian.Uint32(payload[1+len("test1")*2+2:])
-	require.Equal(s.t, uint32(1), race, "elf race id")
+    payload = s.readEncrypted(conn, cipher)
+    require.Equal(s.t, byte(0x0B), payload[0])
+    name := readUtf16String(payload[1:])
+    require.Equal(s.t, "test1", name)
+    race := binary.LittleEndian.Uint32(payload[1+len("test1")*2+2:])
+    require.Equal(s.t, uint32(1), race, "elf race id")
 
-	s.writeEncrypted(conn, cipher,
-		append([]byte{0x25}, 0x01, 0x00, 0x00, 0x00))
+    s.writeEncrypted(conn, cipher,
+        append([]byte{0x25}, 0x01, 0x00, 0x00, 0x00))
 
-	var updated []byte
-	updated = append(updated, 0x1F)
-	updated = binary.LittleEndian.AppendUint32(updated, 1)
-	updated = append(updated, buildCharacterEntry()...)
-	s.writeEncrypted(conn, cipher, updated)
+    var updated []byte
+    updated = append(updated, 0x1F)
+    updated = binary.LittleEndian.AppendUint32(updated, 1)
+    updated = append(updated, buildCharacterEntry()...)
+    s.writeEncrypted(conn, cipher, updated)
 
-	payload = s.readEncrypted(conn, cipher)
-	require.Equal(s.t, byte(0x0D), payload[0])
-	slot := binary.LittleEndian.Uint32(payload[1:])
-	require.Equal(s.t, uint32(0), slot)
+    payload = s.readEncrypted(conn, cipher)
+    require.Equal(s.t, byte(0x0D), payload[0])
+    slot := binary.LittleEndian.Uint32(payload[1:])
+    require.Equal(s.t, uint32(0), slot)
 }
 
 // worldFlow exchanges the enter world and shutdown packets.
 func (s *fakeGameServer) worldFlow(conn net.Conn, cipher *crypt.GameCrypt) {
-	var selected []byte
-	selected = append(selected, 0x21)
-	selected = append(selected, utf16Bytes("test1")...)
-	selected = binary.LittleEndian.AppendUint32(selected, 100)
-	selected = append(selected, utf16Bytes("")...)
-	selected = binary.LittleEndian.AppendUint32(selected, 42)
-	for range 5 {
-		selected = binary.LittleEndian.AppendUint32(selected, 0)
-	}
-	selected = binary.LittleEndian.AppendUint32(selected, 1) // active
-	selected = binary.LittleEndian.AppendUint32(selected, 45000)
-	selected = binary.LittleEndian.AppendUint32(selected, 50000)
-	selected = append(selected, 0x68, 0xF2, 0xFF, 0xFF)       // z = -3500
-	selected = binary.LittleEndian.AppendUint64(selected, 50) // cur hp
-	selected = binary.LittleEndian.AppendUint64(selected, 30) // cur mp
-	s.writeEncrypted(conn, cipher, selected)
+    var selected []byte
+    selected = append(selected, 0x21)
+    selected = append(selected, utf16Bytes("test1")...)
+    selected = binary.LittleEndian.AppendUint32(selected, 100)
+    selected = append(selected, utf16Bytes("")...)
+    selected = binary.LittleEndian.AppendUint32(selected, 42)
+    for range 5 {
+        selected = binary.LittleEndian.AppendUint32(selected, 0)
+    }
+    selected = binary.LittleEndian.AppendUint32(selected, 1) // active
+    selected = binary.LittleEndian.AppendUint32(selected, 45000)
+    selected = binary.LittleEndian.AppendUint32(selected, 50000)
+    selected = append(selected, 0x68, 0xF2, 0xFF, 0xFF)       // z = -3500
+    selected = binary.LittleEndian.AppendUint64(selected, 50) // cur hp
+    selected = binary.LittleEndian.AppendUint64(selected, 30) // cur mp
+    s.writeEncrypted(conn, cipher, selected)
 
-	payload := s.readEncrypted(conn, cipher)
-	require.Equal(s.t, byte(0x03), payload[0])
+    payload := s.readEncrypted(conn, cipher)
+    require.Equal(s.t, byte(0x03), payload[0])
 
-	s.writeEncrypted(conn, cipher,
-		append([]byte{0xEC}, 0x0A, 0x00, 0x00, 0x00))
+    s.writeEncrypted(conn, cipher,
+        append([]byte{0xEC}, 0x0A, 0x00, 0x00, 0x00))
 
-	// World observation packets exercise the tracker of the client.
-	s.writeEncrypted(conn, cipher, buildNpcInfo(1, "Keltir", 45100, 50100, 8192))
-	s.writeEncrypted(conn, cipher, buildNpcInfo(2, "Gremlin", 44900, 49900, 4096))
-	s.writeEncrypted(conn, cipher, buildValidateLocation(100, 45050, 50050, 16384))
-	s.writeEncrypted(conn, cipher, buildMoveToPacket(1, 45300, 50300))
-	s.writeEncrypted(conn, cipher, buildDeleteObject(2))
+    // World observation packets exercise the tracker of the client.
+    s.writeEncrypted(conn, cipher, buildNpcInfo(1, "Keltir", 45100, 50100, 8192))
+    s.writeEncrypted(conn, cipher, buildNpcInfo(2, "Gremlin", 44900, 49900, 4096))
+    s.writeEncrypted(conn, cipher, buildValidateLocation(100, 45050, 50050, 16384))
+    s.writeEncrypted(conn, cipher, buildMoveToPacket(1, 45300, 50300))
+    s.writeEncrypted(conn, cipher, buildDeleteObject(2))
 
-	// Expect the logout packet when the client stops.
-	for {
-		payload, err := s.readEncryptedResult(conn, cipher)
-		if err != nil {
-			return
-		}
-		if len(payload) > 0 && payload[0] == 0x09 {
-			return
-		}
-	}
+    // Expect the logout packet when the client stops.
+    for {
+        payload, err := s.readEncryptedResult(conn, cipher)
+        if err != nil {
+            return
+        }
+        if len(payload) > 0 && payload[0] == 0x09 {
+            return
+        }
+    }
 }
 
 // readPacket reads one unencrypted framed packet.
 func (s *fakeGameServer) readPacket(conn net.Conn) []byte {
-	var header [2]byte
-	_, err := io.ReadFull(conn, header[:])
-	require.NoError(s.t, err)
+    var header [2]byte
+    _, err := io.ReadFull(conn, header[:])
+    require.NoError(s.t, err)
 
-	size := int(binary.LittleEndian.Uint16(header[:]))
-	payload := make([]byte, size-2)
-	_, err = io.ReadFull(conn, payload)
-	require.NoError(s.t, err)
+    size := int(binary.LittleEndian.Uint16(header[:]))
+    payload := make([]byte, size-2)
+    _, err = io.ReadFull(conn, payload)
+    require.NoError(s.t, err)
 
-	return payload
+    return payload
 }
 
 // readEncrypted reads and decrypts one framed packet.
 func (s *fakeGameServer) readEncrypted(
-	conn net.Conn, cipher *crypt.GameCrypt,
+    conn net.Conn, cipher *crypt.GameCrypt,
 ) []byte {
-	payload, err := s.readEncryptedResult(conn, cipher)
-	require.NoError(s.t, err)
+    payload, err := s.readEncryptedResult(conn, cipher)
+    require.NoError(s.t, err)
 
-	return payload
+    return payload
 }
 
 // readEncryptedResult reads and decrypts one framed packet with an error.
 func (s *fakeGameServer) readEncryptedResult(
-	conn net.Conn, cipher *crypt.GameCrypt,
+    conn net.Conn, cipher *crypt.GameCrypt,
 ) ([]byte, error) {
-	var header [2]byte
-	if _, err := io.ReadFull(conn, header[:]); err != nil {
-		return nil, err
-	}
+    var header [2]byte
+    if _, err := io.ReadFull(conn, header[:]); err != nil {
+        return nil, err
+    }
 
-	size := int(binary.LittleEndian.Uint16(header[:]))
-	if size < 2 {
-		return nil, nil
-	}
-	payload := make([]byte, size-2)
-	if _, err := io.ReadFull(conn, payload); err != nil {
-		return nil, err
-	}
-	cipher.Decrypt(payload)
+    size := int(binary.LittleEndian.Uint16(header[:]))
+    if size < 2 {
+        return nil, nil
+    }
+    payload := make([]byte, size-2)
+    if _, err := io.ReadFull(conn, payload); err != nil {
+        return nil, err
+    }
+    cipher.Decrypt(payload)
 
-	return payload, nil
+    return payload, nil
 }
 
 // writePacket writes one unencrypted framed packet.
 func (s *fakeGameServer) writePacket(conn net.Conn, payload []byte) {
-	s.writeFrame(conn, payload)
+    s.writeFrame(conn, payload)
 }
 
 // writeEncrypted encrypts and writes one framed packet.
 func (s *fakeGameServer) writeEncrypted(
-	conn net.Conn, cipher *crypt.GameCrypt, payload []byte,
+    conn net.Conn, cipher *crypt.GameCrypt, payload []byte,
 ) {
-	// The first server packet after the key packet is already encrypted.
-	cipher.Encrypt(payload)
-	s.writeFrame(conn, payload)
+    // The first server packet after the key packet is already encrypted.
+    cipher.Encrypt(payload)
+    s.writeFrame(conn, payload)
 }
 
 // writeFrame prepends the size header and writes the payload.
 func (s *fakeGameServer) writeFrame(conn net.Conn, payload []byte) {
-	frame := make([]byte, 0, len(payload)+2)
-	var header [2]byte
-	binary.LittleEndian.PutUint16(header[:], uint16(len(payload)+2))
-	frame = append(frame, header[:]...)
-	frame = append(frame, payload...)
-	_, err := conn.Write(frame)
-	require.NoError(s.t, err)
+    frame := make([]byte, 0, len(payload)+2)
+    var header [2]byte
+    binary.LittleEndian.PutUint16(header[:], uint16(len(payload)+2))
+    frame = append(frame, header[:]...)
+    frame = append(frame, payload...)
+    _, err := conn.Write(frame)
+    require.NoError(s.t, err)
 }
 
 // utf16Bytes encodes a string as null terminated utf16le.
 func utf16Bytes(value string) []byte {
-	result := make([]byte, 0, len(value)*2+2)
-	for _, r := range value {
-		result = append(result, byte(r), byte(r>>8))
-	}
-	result = append(result, 0, 0)
+    result := make([]byte, 0, len(value)*2+2)
+    for _, r := range value {
+        result = append(result, byte(r), byte(r>>8))
+    }
+    result = append(result, 0, 0)
 
-	return result
+    return result
 }
 
 // readUtf16String decodes a null terminated utf16le string.
 func readUtf16String(data []byte) string {
-	result := make([]byte, 0, len(data))
-	for i := 0; i+1 < len(data); i += 2 {
-		if data[i] == 0 && data[i+1] == 0 {
-			break
-		}
-		result = append(result, data[i])
-	}
+    result := make([]byte, 0, len(data))
+    for i := 0; i+1 < len(data); i += 2 {
+        if data[i] == 0 && data[i+1] == 0 {
+            break
+        }
+        result = append(result, data[i])
+    }
 
-	return string(result)
+    return string(result)
 }
 
 // buildCharacterEntry builds a binary char list entry for the bot character.
 func buildCharacterEntry() []byte {
-	data := utf16Bytes("test1")
-	data = binary.LittleEndian.AppendUint32(data, 100)
-	data = append(data, utf16Bytes("test1")...)
-	data = binary.LittleEndian.AppendUint32(data, 0) // session id
-	data = binary.LittleEndian.AppendUint32(data, 0) // clan
-	data = binary.LittleEndian.AppendUint32(data, 0) // builder
-	data = binary.LittleEndian.AppendUint32(data, 0) // sex
-	data = binary.LittleEndian.AppendUint32(data, 1) // race
-	data = binary.LittleEndian.AppendUint32(data, 18)
-	data = binary.LittleEndian.AppendUint32(data, 1) // gs name
-	data = binary.LittleEndian.AppendUint32(data, 100)
-	data = binary.LittleEndian.AppendUint32(data, 200)
-	data = binary.LittleEndian.AppendUint32(data, 300)
-	data = binary.LittleEndian.AppendUint64(data, 50) // cur hp
-	data = binary.LittleEndian.AppendUint64(data, 30) // cur mp
-	data = binary.LittleEndian.AppendUint32(data, 0)  // sp
-	data = binary.LittleEndian.AppendUint32(data, 0)  // exp
-	data = binary.LittleEndian.AppendUint32(data, 1)  // level
-	for range 40 {
-		data = binary.LittleEndian.AppendUint32(data, 0)
-	}
-	data = binary.LittleEndian.AppendUint32(data, 2)  // hair style
-	data = binary.LittleEndian.AppendUint32(data, 1)  // hair color
-	data = binary.LittleEndian.AppendUint32(data, 0)  // face
-	data = binary.LittleEndian.AppendUint64(data, 50) // max hp
-	data = binary.LittleEndian.AppendUint64(data, 30) // max mp
-	data = binary.LittleEndian.AppendUint32(data, 0)  // delete timer
+    data := utf16Bytes("test1")
+    data = binary.LittleEndian.AppendUint32(data, 100)
+    data = append(data, utf16Bytes("test1")...)
+    data = binary.LittleEndian.AppendUint32(data, 0) // session id
+    data = binary.LittleEndian.AppendUint32(data, 0) // clan
+    data = binary.LittleEndian.AppendUint32(data, 0) // builder
+    data = binary.LittleEndian.AppendUint32(data, 0) // sex
+    data = binary.LittleEndian.AppendUint32(data, 1) // race
+    data = binary.LittleEndian.AppendUint32(data, 18)
+    data = binary.LittleEndian.AppendUint32(data, 1) // gs name
+    data = binary.LittleEndian.AppendUint32(data, 100)
+    data = binary.LittleEndian.AppendUint32(data, 200)
+    data = binary.LittleEndian.AppendUint32(data, 300)
+    data = binary.LittleEndian.AppendUint64(data, 50) // cur hp
+    data = binary.LittleEndian.AppendUint64(data, 30) // cur mp
+    data = binary.LittleEndian.AppendUint32(data, 0)  // sp
+    data = binary.LittleEndian.AppendUint32(data, 0)  // exp
+    data = binary.LittleEndian.AppendUint32(data, 1)  // level
+    for range 40 {
+        data = binary.LittleEndian.AppendUint32(data, 0)
+    }
+    data = binary.LittleEndian.AppendUint32(data, 2)  // hair style
+    data = binary.LittleEndian.AppendUint32(data, 1)  // hair color
+    data = binary.LittleEndian.AppendUint32(data, 0)  // face
+    data = binary.LittleEndian.AppendUint64(data, 50) // max hp
+    data = binary.LittleEndian.AppendUint64(data, 30) // max mp
+    data = binary.LittleEndian.AppendUint32(data, 0)  // delete timer
 
-	return data
+    return data
 }
 
 func TestGameClientFullFlow(t *testing.T) {
-	server := startFakeGameServer(t)
+    server := startFakeGameServer(t)
 
-	conn, err := net.Dial("tcp", server.Addr())
-	require.NoError(t, err)
+    conn, err := net.Dial("tcp", server.Addr())
+    require.NoError(t, err)
 
-	client, err := NewGameClient(conn)
-	require.NoError(t, err)
-	require.NotNil(t, client.crypt)
+    client, err := NewGameClient(conn)
+    require.NoError(t, err)
+    require.NotNil(t, client.crypt)
 
-	charList, err := client.Authenticate(GameSessionParams{
-		Account:    "test1",
-		LoginOkID1: 1,
-		LoginOkID2: 2,
-		PlayOkID1:  3,
-		PlayOkID2:  4,
-	})
-	require.NoError(t, err)
-	require.Empty(t, charList.Characters)
+    charList, err := client.Authenticate(GameSessionParams{
+        Account:    "test1",
+        LoginOkID1: 1,
+        LoginOkID2: 2,
+        PlayOkID1:  3,
+        PlayOkID2:  4,
+    })
+    require.NoError(t, err)
+    require.Empty(t, charList.Characters)
 
-	updated, err := client.EnsureCharacter(CharacterParams{
-		Name:      "test1",
-		Race:      1,
-		Female:    0,
-		ClassID:   18,
-		HairStyle: 0,
-		HairColor: 0,
-		Face:      0,
-	}, charList)
-	require.NoError(t, err)
+    updated, err := client.EnsureCharacter(CharacterParams{
+        Name:      "test1",
+        Race:      1,
+        Female:    0,
+        ClassID:   18,
+        HairStyle: 0,
+        HairColor: 0,
+        Face:      0,
+    }, charList)
+    require.NoError(t, err)
 
-	slot, info, found := updated.FindCharacterByName("test1")
-	require.True(t, found)
-	require.Equal(t, int32(18), info.BaseClassID)
+    slot, info, found := updated.FindCharacterByName("test1")
+    require.True(t, found)
+    require.Equal(t, int32(18), info.BaseClassID)
 
-	require.NoError(t, client.EnterWorld(int32(slot)))
+    require.NoError(t, client.EnterWorld(int32(slot)))
 
-	// The client must stay in the world until the context is done.
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
+    // The client must stay in the world until the context is done.
+    ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+    defer cancel()
 
-	err = client.Run(ctx, "test1")
-	require.NoError(t, err)
-	require.GreaterOrEqual(t, client.PacketCount(), 1)
+    err = client.Run(ctx, "test1")
+    require.NoError(t, err)
+    require.GreaterOrEqual(t, client.PacketCount(), 1)
 }
 
 // buildNpcInfo builds a minimal NpcInfo packet for tracker tests.
 func buildNpcInfo(
-	objectID int32, name string, x int32, y int32, heading int32,
+    objectID int32, name string, x int32, y int32, heading int32,
 ) []byte {
-	data := []byte{0x22}
-	data = appendInt32(data, objectID)
-	data = appendInt32(data, 1001277)
-	data = appendInt32(data, 1)
-	data = appendInt32(data, x)
-	data = appendInt32(data, y)
-	data = appendInt32(data, 62172) // z
-	data = appendInt32(data, heading)
-	data = append(data, make([]byte, 88)...)
-	data = append(data, 1, 1, 0, 0, 0)
-	data = append(data, utf16Bytes(name)...)
-	data = append(data, utf16Bytes("")...)
+    data := []byte{0x22}
+    data = appendInt32(data, objectID)
+    data = appendInt32(data, 1001277)
+    data = appendInt32(data, 1)
+    data = appendInt32(data, x)
+    data = appendInt32(data, y)
+    data = appendInt32(data, 62172) // z
+    data = appendInt32(data, heading)
+    data = append(data, make([]byte, 88)...)
+    data = append(data, 1, 1, 0, 0, 0)
+    data = append(data, utf16Bytes(name)...)
+    data = append(data, utf16Bytes("")...)
 
-	return data
+    return data
 }
 
 // buildValidateLocation builds a ValidateLocation packet.
 func buildValidateLocation(
-	objectID int32, x int32, y int32, heading int32,
+    objectID int32, x int32, y int32, heading int32,
 ) []byte {
-	data := []byte{0x76}
-	data = appendInt32(data, objectID)
-	data = appendInt32(data, x)
-	data = appendInt32(data, y)
-	data = appendInt32(data, 62172) // z
-	data = appendInt32(data, heading)
+    data := []byte{0x76}
+    data = appendInt32(data, objectID)
+    data = appendInt32(data, x)
+    data = appendInt32(data, y)
+    data = appendInt32(data, 62172) // z
+    data = appendInt32(data, heading)
 
-	return data
+    return data
 }
 
 // appendInt32 appends a little endian int32 value to the packet.
 func appendInt32(dst []byte, value int32) []byte {
-	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], uint32(value))
+    var buf [4]byte
+    binary.LittleEndian.PutUint32(buf[:], uint32(value))
 
-	return append(dst, buf[:]...)
+    return append(dst, buf[:]...)
 }
 
 // buildMoveToPacket builds a MoveToLocation packet.
 func buildMoveToPacket(objectID int32, destX int32, destY int32) []byte {
-	data := []byte{0x01}
-	data = appendInt32(data, objectID)
-	data = appendInt32(data, destX)
-	data = appendInt32(data, destY)
-	data = appendInt32(data, 0)
-	data = appendInt32(data, destX-100)
-	data = appendInt32(data, destY-100)
-	data = appendInt32(data, 0)
+    data := []byte{0x01}
+    data = appendInt32(data, objectID)
+    data = appendInt32(data, destX)
+    data = appendInt32(data, destY)
+    data = appendInt32(data, 0)
+    data = appendInt32(data, destX-100)
+    data = appendInt32(data, destY-100)
+    data = appendInt32(data, 0)
 
-	return data
+    return data
 }
 
 // buildDeleteObject builds a DeleteObject packet.
 func buildDeleteObject(objectID int32) []byte {
-	data := []byte{0x1E}
-	data = appendInt32(data, objectID)
+    data := []byte{0x1E}
+    data = appendInt32(data, objectID)
 
-	return data
+    return data
 }
 
 // findTrackedObject returns the tracked object with the given id.
 func findTrackedObject(
-	snap state.Snapshot, objectID int32,
+    snap state.Snapshot, objectID int32,
 ) *state.ObjectSnapshot {
-	for i := range snap.Objects {
-		if snap.Objects[i].ObjectID == objectID {
-			return &snap.Objects[i]
-		}
-	}
+    for i := range snap.Objects {
+        if snap.Objects[i].ObjectID == objectID {
+            return &snap.Objects[i]
+        }
+    }
 
-	return nil
+    return nil
 }
 
 func TestGameClientTracksWorldState(t *testing.T) {
-	server := startFakeGameServer(t)
+    server := startFakeGameServer(t)
 
-	conn, err := net.Dial("tcp", server.Addr())
-	require.NoError(t, err)
+    conn, err := net.Dial("tcp", server.Addr())
+    require.NoError(t, err)
 
-	client, err := NewGameClient(conn)
-	require.NoError(t, err)
+    client, err := NewGameClient(conn)
+    require.NoError(t, err)
 
-	tracker := state.NewBot("test1")
-	client.SetTracker(tracker)
+    tracker := state.NewBot("test1")
+    client.SetTracker(tracker)
 
-	charList, err := client.Authenticate(GameSessionParams{
-		Account:    "test1",
-		LoginOkID1: 1,
-		LoginOkID2: 2,
-		PlayOkID1:  3,
-		PlayOkID2:  4,
-	})
-	require.NoError(t, err)
+    charList, err := client.Authenticate(GameSessionParams{
+        Account:    "test1",
+        LoginOkID1: 1,
+        LoginOkID2: 2,
+        PlayOkID1:  3,
+        PlayOkID2:  4,
+    })
+    require.NoError(t, err)
 
-	updated, err := client.EnsureCharacter(CharacterParams{
-		Name:      "test1",
-		Race:      1,
-		Female:    0,
-		ClassID:   18,
-		HairStyle: 0,
-		HairColor: 0,
-		Face:      0,
-	}, charList)
-	require.NoError(t, err)
+    updated, err := client.EnsureCharacter(CharacterParams{
+        Name:      "test1",
+        Race:      1,
+        Female:    0,
+        ClassID:   18,
+        HairStyle: 0,
+        HairColor: 0,
+        Face:      0,
+    }, charList)
+    require.NoError(t, err)
 
-	slot, _, found := updated.FindCharacterByName("test1")
-	require.True(t, found)
-	require.NoError(t, client.EnterWorld(int32(slot)))
+    slot, _, found := updated.FindCharacterByName("test1")
+    require.True(t, found)
+    require.NoError(t, client.EnterWorld(int32(slot)))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-	require.NoError(t, client.Run(ctx, "test1"))
+    ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+    defer cancel()
+    require.NoError(t, client.Run(ctx, "test1"))
 
-	snapshot := tracker.Snapshot()
-	require.Equal(t, state.StatusOffline, snapshot.Status)
-	require.Equal(t, "test1", snapshot.Character.Name)
-	require.Equal(t, int32(45050), snapshot.Character.X)
-	require.Equal(t, int32(16384), snapshot.Character.Heading)
+    snapshot := tracker.Snapshot()
+    require.Equal(t, state.StatusOffline, snapshot.Status)
+    require.Equal(t, "test1", snapshot.Character.Name)
+    require.Equal(t, int32(45050), snapshot.Character.X)
+    require.Equal(t, int32(16384), snapshot.Character.Heading)
 
-	// The gremlin was deleted, the keltir remains and moves.
-	require.Len(t, snapshot.Objects, 1)
-	keltir := findTrackedObject(snapshot, 1)
-	require.NotNil(t, keltir)
-	require.Equal(t, state.KindNPC, keltir.Kind)
-	require.True(t, keltir.Attackable)
-	require.True(t, keltir.Moving)
-	require.Equal(t, int32(45300), keltir.DestX)
-	require.Equal(t, int32(45200), keltir.X)
+    // The gremlin was deleted, the keltir remains and moves.
+    require.Len(t, snapshot.Objects, 1)
+    keltir := findTrackedObject(snapshot, 1)
+    require.NotNil(t, keltir)
+    require.Equal(t, state.KindNPC, keltir.Kind)
+    require.True(t, keltir.Attackable)
+    require.True(t, keltir.Moving)
+    require.Equal(t, int32(45300), keltir.DestX)
+    require.Equal(t, int32(45200), keltir.X)
 
-	// Events were recorded for the world observations.
-	require.NotEmpty(t, snapshot.Events)
-	require.GreaterOrEqual(t, snapshot.Packets, int64(6))
+    // Events were recorded for the world observations.
+    require.NotEmpty(t, snapshot.Events)
+    require.GreaterOrEqual(t, snapshot.Packets, int64(6))
 }
 
 // TestGameClientSessionSilenceWatchdog pins the half-open connection
@@ -486,71 +486,71 @@ func TestGameClientTracksWorldState(t *testing.T) {
 // into the OS buffer, so only the receive side can notice. The
 // shortened gameSilenceTimeout keeps the case under a second.
 func TestGameClientSessionSilenceWatchdog(t *testing.T) {
-	productionSilence := gameSilenceTimeout
-	gameSilenceTimeout = 150 * time.Millisecond
-	t.Cleanup(func() { gameSilenceTimeout = productionSilence })
+    productionSilence := gameSilenceTimeout
+    gameSilenceTimeout = 150 * time.Millisecond
+    t.Cleanup(func() { gameSilenceTimeout = productionSilence })
 
-	server := startFakeGameServer(t)
-	server.flow = func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt) {
-		s.characterFlow(conn, cipher)
+    server := startFakeGameServer(t)
+    server.flow = func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt) {
+        s.characterFlow(conn, cipher)
 
-		var selected []byte
-		selected = append(selected, 0x21)
-		selected = append(selected, utf16Bytes("test1")...)
-		selected = binary.LittleEndian.AppendUint32(selected, 100)
-		selected = append(selected, utf16Bytes("")...)
-		selected = binary.LittleEndian.AppendUint32(selected, 42)
-		for range 5 {
-			selected = binary.LittleEndian.AppendUint32(selected, 0)
-		}
-		selected = binary.LittleEndian.AppendUint32(selected, 1) // active
-		selected = binary.LittleEndian.AppendUint32(selected, 45000)
-		selected = binary.LittleEndian.AppendUint32(selected, 50000)
-		selected = binary.LittleEndian.AppendUint32(selected, 0xFFFFF268)
-		selected = binary.LittleEndian.AppendUint64(selected, 50) // cur hp
-		selected = binary.LittleEndian.AppendUint64(selected, 30) // cur mp
-		s.writeEncrypted(conn, cipher, selected)
+        var selected []byte
+        selected = append(selected, 0x21)
+        selected = append(selected, utf16Bytes("test1")...)
+        selected = binary.LittleEndian.AppendUint32(selected, 100)
+        selected = append(selected, utf16Bytes("")...)
+        selected = binary.LittleEndian.AppendUint32(selected, 42)
+        for range 5 {
+            selected = binary.LittleEndian.AppendUint32(selected, 0)
+        }
+        selected = binary.LittleEndian.AppendUint32(selected, 1) // active
+        selected = binary.LittleEndian.AppendUint32(selected, 45000)
+        selected = binary.LittleEndian.AppendUint32(selected, 50000)
+        selected = binary.LittleEndian.AppendUint32(selected, 0xFFFFF268)
+        selected = binary.LittleEndian.AppendUint64(selected, 50) // cur hp
+        selected = binary.LittleEndian.AppendUint64(selected, 30) // cur mp
+        s.writeEncrypted(conn, cipher, selected)
 
-		payload := s.readEncrypted(conn, cipher)
-		require.Equal(s.t, byte(0x03), payload[0])
+        payload := s.readEncrypted(conn, cipher)
+        require.Equal(s.t, byte(0x03), payload[0])
 
-		// The wedged server: the socket stays open and writable, no
-		// packet ever arrives again.
-		time.Sleep(2 * time.Second)
-	}
+        // The wedged server: the socket stays open and writable, no
+        // packet ever arrives again.
+        time.Sleep(2 * time.Second)
+    }
 
-	conn, err := net.Dial("tcp", server.Addr())
-	require.NoError(t, err)
+    conn, err := net.Dial("tcp", server.Addr())
+    require.NoError(t, err)
 
-	client, err := NewGameClient(conn)
-	require.NoError(t, err)
+    client, err := NewGameClient(conn)
+    require.NoError(t, err)
 
-	charList, err := client.Authenticate(GameSessionParams{
-		Account:    "test1",
-		LoginOkID1: 1,
-		LoginOkID2: 2,
-		PlayOkID1:  3,
-		PlayOkID2:  4,
-	})
-	require.NoError(t, err)
+    charList, err := client.Authenticate(GameSessionParams{
+        Account:    "test1",
+        LoginOkID1: 1,
+        LoginOkID2: 2,
+        PlayOkID1:  3,
+        PlayOkID2:  4,
+    })
+    require.NoError(t, err)
 
-	updated, err := client.EnsureCharacter(CharacterParams{
-		Name:      "test1",
-		Race:      1,
-		Female:    0,
-		ClassID:   18,
-		HairStyle: 0,
-		HairColor: 0,
-		Face:      0,
-	}, charList)
-	require.NoError(t, err)
-	slot, _, found := updated.FindCharacterByName("test1")
-	require.True(t, found)
-	require.NoError(t, client.EnterWorld(int32(slot)))
+    updated, err := client.EnsureCharacter(CharacterParams{
+        Name:      "test1",
+        Race:      1,
+        Female:    0,
+        ClassID:   18,
+        HairStyle: 0,
+        HairColor: 0,
+        Face:      0,
+    }, charList)
+    require.NoError(t, err)
+    slot, _, found := updated.FindCharacterByName("test1")
+    require.True(t, found)
+    require.NoError(t, client.EnterWorld(int32(slot)))
 
-	err = client.Run(context.Background(), "test1")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "game session silent")
+    err = client.Run(context.Background(), "test1")
+    require.Error(t, err)
+    require.Contains(t, err.Error(), "game session silent")
 }
 
 // TestGameClientSessionSilenceWatchdogKeepsQuietTrafficAlive: the
@@ -558,77 +558,77 @@ func TestGameClientSessionSilenceWatchdog(t *testing.T) {
 // whose only traffic is the ping answers runs past many silence
 // windows without unwinding.
 func TestGameClientSessionSilenceWatchdogKeepsQuietTrafficAlive(t *testing.T) {
-	productionSilence := gameSilenceTimeout
-	gameSilenceTimeout = 150 * time.Millisecond
-	t.Cleanup(func() { gameSilenceTimeout = productionSilence })
+    productionSilence := gameSilenceTimeout
+    gameSilenceTimeout = 150 * time.Millisecond
+    t.Cleanup(func() { gameSilenceTimeout = productionSilence })
 
-	server := startFakeGameServer(t)
-	server.flow = func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt) {
-		s.characterFlow(conn, cipher)
+    server := startFakeGameServer(t)
+    server.flow = func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt) {
+        s.characterFlow(conn, cipher)
 
-		var selected []byte
-		selected = append(selected, 0x21)
-		selected = append(selected, utf16Bytes("test1")...)
-		selected = binary.LittleEndian.AppendUint32(selected, 100)
-		selected = append(selected, utf16Bytes("")...)
-		selected = binary.LittleEndian.AppendUint32(selected, 42)
-		for range 5 {
-			selected = binary.LittleEndian.AppendUint32(selected, 0)
-		}
-		selected = binary.LittleEndian.AppendUint32(selected, 1) // active
-		selected = binary.LittleEndian.AppendUint32(selected, 45000)
-		selected = binary.LittleEndian.AppendUint32(selected, 50000)
-		selected = binary.LittleEndian.AppendUint32(selected, 0xFFFFF268)
-		selected = binary.LittleEndian.AppendUint64(selected, 50) // cur hp
-		selected = binary.LittleEndian.AppendUint64(selected, 30) // cur mp
-		s.writeEncrypted(conn, cipher, selected)
+        var selected []byte
+        selected = append(selected, 0x21)
+        selected = append(selected, utf16Bytes("test1")...)
+        selected = binary.LittleEndian.AppendUint32(selected, 100)
+        selected = append(selected, utf16Bytes("")...)
+        selected = binary.LittleEndian.AppendUint32(selected, 42)
+        for range 5 {
+            selected = binary.LittleEndian.AppendUint32(selected, 0)
+        }
+        selected = binary.LittleEndian.AppendUint32(selected, 1) // active
+        selected = binary.LittleEndian.AppendUint32(selected, 45000)
+        selected = binary.LittleEndian.AppendUint32(selected, 50000)
+        selected = binary.LittleEndian.AppendUint32(selected, 0xFFFFF268)
+        selected = binary.LittleEndian.AppendUint64(selected, 50) // cur hp
+        selected = binary.LittleEndian.AppendUint64(selected, 30) // cur mp
+        s.writeEncrypted(conn, cipher, selected)
 
-		payload := s.readEncrypted(conn, cipher)
-		require.Equal(s.t, byte(0x03), payload[0])
+        payload := s.readEncrypted(conn, cipher)
+        require.Equal(s.t, byte(0x03), payload[0])
 
-		// A resting world: the server answers nothing but the pings,
-		// one answer per 100 ms (the client never sends anything else
-		// inside the short window - its own ping ticker is 25 s).
-		deadline := time.Now().Add(700 * time.Millisecond)
-		for time.Now().Before(deadline) {
-			s.writeEncrypted(conn, cipher,
-				append([]byte{0xEC}, 0x0A, 0x00, 0x00, 0x00))
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
+        // A resting world: the server answers nothing but the pings,
+        // one answer per 100 ms (the client never sends anything else
+        // inside the short window - its own ping ticker is 25 s).
+        deadline := time.Now().Add(700 * time.Millisecond)
+        for time.Now().Before(deadline) {
+            s.writeEncrypted(conn, cipher,
+                append([]byte{0xEC}, 0x0A, 0x00, 0x00, 0x00))
+            time.Sleep(100 * time.Millisecond)
+        }
+    }
 
-	conn, err := net.Dial("tcp", server.Addr())
-	require.NoError(t, err)
+    conn, err := net.Dial("tcp", server.Addr())
+    require.NoError(t, err)
 
-	client, err := NewGameClient(conn)
-	require.NoError(t, err)
+    client, err := NewGameClient(conn)
+    require.NoError(t, err)
 
-	charList, err := client.Authenticate(GameSessionParams{
-		Account:    "test1",
-		LoginOkID1: 1,
-		LoginOkID2: 2,
-		PlayOkID1:  3,
-		PlayOkID2:  4,
-	})
-	require.NoError(t, err)
+    charList, err := client.Authenticate(GameSessionParams{
+        Account:    "test1",
+        LoginOkID1: 1,
+        LoginOkID2: 2,
+        PlayOkID1:  3,
+        PlayOkID2:  4,
+    })
+    require.NoError(t, err)
 
-	updated, err := client.EnsureCharacter(CharacterParams{
-		Name:      "test1",
-		Race:      1,
-		Female:    0,
-		ClassID:   18,
-		HairStyle: 0,
-		HairColor: 0,
-		Face:      0,
-	}, charList)
-	require.NoError(t, err)
-	slot, _, found := updated.FindCharacterByName("test1")
-	require.True(t, found)
-	require.NoError(t, client.EnterWorld(int32(slot)))
+    updated, err := client.EnsureCharacter(CharacterParams{
+        Name:      "test1",
+        Race:      1,
+        Female:    0,
+        ClassID:   18,
+        HairStyle: 0,
+        HairColor: 0,
+        Face:      0,
+    }, charList)
+    require.NoError(t, err)
+    slot, _, found := updated.FindCharacterByName("test1")
+    require.True(t, found)
+    require.NoError(t, client.EnterWorld(int32(slot)))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
-	defer cancel()
+    ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
+    defer cancel()
 
-	err = client.Run(ctx, "test1")
-	require.NoError(t, err, "the ping traffic keeps the session alive")
+    err = client.Run(ctx, "test1")
+    require.NoError(t, err, "the ping traffic keeps the session alive")
 }

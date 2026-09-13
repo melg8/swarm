@@ -5,25 +5,25 @@
 package pathfind
 
 import (
-	"sync"
+    "sync"
 )
 
 // NSWE wall flags of a cell layer, following the Mobius Cell.java bit
 // layout: east bit 0, west bit 1, south bit 2, north bit 3. A set bit
 // means the direction is open (walkable).
 const (
-	nsweEast  uint8 = 1 << 0
-	nsweWest  uint8 = 1 << 1
-	nsweSouth uint8 = 1 << 2
-	nsweNorth uint8 = 1 << 3
-	nsweAll   uint8 = nsweEast | nsweWest | nsweSouth | nsweNorth
+    nsweEast  uint8 = 1 << 0
+    nsweWest  uint8 = 1 << 1
+    nsweSouth uint8 = 1 << 2
+    nsweNorth uint8 = 1 << 3
+    nsweAll   uint8 = nsweEast | nsweWest | nsweSouth | nsweNorth
 )
 
 // Layer is one walkable level of a geodata cell: the surface height in
 // world units and the open wall directions.
 type Layer struct {
-	Height int16
-	NSWE   uint8
+    Height int16
+    NSWE   uint8
 }
 
 // IsNorthOpen reports whether the cell can be left to the north.
@@ -56,45 +56,45 @@ func (l Layer) IsCompletelyBlocked() bool { return l.NSWE == 0 }
 // already loaded regions read through get without it, so the pool
 // guards itself.
 type layerPool struct {
-	mu     sync.RWMutex
-	ids    map[layerKey]uint16
-	layers []Layer
+    mu     sync.RWMutex
+    ids    map[layerKey]uint16
+    layers []Layer
 }
 
 // layerKey is the deduplication key of a layer.
 type layerKey struct {
-	height int16
-	nswe   uint8
+    height int16
+    nswe   uint8
 }
 
 // newLayerPool creates an empty layer pool.
 func newLayerPool() *layerPool {
-	return &layerPool{
-		mu:     sync.RWMutex{},
-		ids:    make(map[layerKey]uint16),
-		layers: make([]Layer, 0, 4096),
-	}
+    return &layerPool{
+        mu:     sync.RWMutex{},
+        ids:    make(map[layerKey]uint16),
+        layers: make([]Layer, 0, 4096),
+    }
 }
 
 // intern returns the pool id of the layer, adding it on first use.
 func (p *layerPool) intern(layer Layer) uint16 {
-	key := layerKey{height: layer.Height, nswe: layer.NSWE}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if id, ok := p.ids[key]; ok {
-		return id
-	}
-	id := uint16(len(p.layers))
-	p.layers = append(p.layers, layer)
-	p.ids[key] = id
+    key := layerKey{height: layer.Height, nswe: layer.NSWE}
+    p.mu.Lock()
+    defer p.mu.Unlock()
+    if id, ok := p.ids[key]; ok {
+        return id
+    }
+    id := uint16(len(p.layers))
+    p.layers = append(p.layers, layer)
+    p.ids[key] = id
 
-	return id
+    return id
 }
 
 // get returns the layer of a pool id.
 func (p *layerPool) get(id uint16) Layer {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+    p.mu.RLock()
+    defer p.mu.RUnlock()
 
-	return p.layers[id]
+    return p.layers[id]
 }

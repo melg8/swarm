@@ -5,19 +5,22 @@
 #!/usr/bin/env bash
 #
 # Installs the Go developer tools the swarm workflow expects: go-task
-# (Taskfile.yml runner), golangci-lint v2 (the strict gate), gci
-# (import grouping) and gofumpt (stricter gofmt). The fast deploy
-# (tools/swarm_fast_deploy.sh) installs the Go toolchain itself; this
-# script fills the developer-side gap so a fresh agent can run
-# `task check:all`, `task lint`, `task fmt` and `task lint:new` without
-# guessing which binaries are missing.
+# (Taskfile.yml runner), golangci-lint v2 (the strict gate) and gci
+# (import grouping), then builds the repository formatter
+# gofmt-spaces from cmd/gofmt-spaces (the spaces-only gofmt the
+# repository style mandates, see AGENTS.md - the stock gofumpt
+# would re-tab the tree and is no longer part of the toolchain).
+# The fast deploy (tools/swarm_fast_deploy.sh) installs the Go
+# toolchain itself; this script fills the developer-side gap so a
+# fresh agent can run `task check:all`, `task lint`, `task fmt` and
+# `task lint:new` without guessing which binaries are missing.
 #
 # Idempotent: every tool is skipped when its binary already exists.
 # The install path is $GOPATH/bin (default ~/go/bin); add it to PATH
 # or invoke through the `task` wrapper the deploy script sets up.
 #
 # Usage:
-#   tools/install_dev_tools.sh           install all four tools
+#   tools/install_dev_tools.sh           install the tools
 #   tools/install_dev_tools.sh check     verify presence, exit 1 if any
 #                                        missing (use in CI / preflight)
 #
@@ -26,7 +29,7 @@
 #               then /home/z/opt/go-root/usr/lib/go-1.24/bin/go)
 #   GOPATH      Go workspace (default: ~/go)
 #   TOOLS       space-separated tool list override (default:
-#               "task golangci-lint gci gofumpt")
+#               "task golangci-lint gci gofmt-spaces")
 
 set -euo pipefail
 
@@ -46,18 +49,20 @@ if [ -z "$GO_BIN" ]; then
 fi
 
 GOPATH_VAL="${GOPATH:-$HOME/go}"
-TOOLS_LIST="${TOOLS:-task golangci-lint gci gofumpt}"
+TOOLS_LIST="${TOOLS:-task golangci-lint gci gofmt-spaces}"
 BIN_DIR="$GOPATH_VAL/bin"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "$BIN_DIR"
 
 # Pinned versions: pin major versions so an upstream gofumpt that
 # demands Go 1.26 cannot quietly switch the toolchain. Bump them
 # deliberately and update the comment in AGENTS.md Tech stack together.
+# gofmt-spaces carries no pin: it is built from this repository
+# (cmd/gofmt-spaces) and travels with the committed source.
 declare -A PIN=(
     [task]="github.com/go-task/task/v3/cmd/task@v3.53.1"
     [golangci-lint]="github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2"
     [gci]="github.com/daixiang0/gci@v0.13.5"
-    [gofumpt]="mvdan.cc/gofumpt@v0.8.0"
 )
 
 check_tool() {
@@ -91,6 +96,13 @@ for name in $TOOLS_LIST; do
     if check_tool "$name"; then
         echo "skip: $name already installed"
         skipped=$((skipped + 1))
+        continue
+    fi
+    if [ "$name" = "gofmt-spaces" ]; then
+        echo "install: gofmt-spaces (built from ./cmd/gofmt-spaces)"
+        GOFLAGS="-trimpath" "$GO_BIN" build -o "$BIN_DIR/gofmt-spaces" \
+            "$REPO_ROOT/cmd/gofmt-spaces"
+        installed=$((installed + 1))
         continue
     fi
     pkg="${PIN[$name]:-}"

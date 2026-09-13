@@ -2,11 +2,11 @@
 package main
 
 import (
-	"os"
+    "os"
 )
 
 func main() {
-	if err := Execute(); err != nil {
-		os.Exit(1)
-	}
+    if err := Execute(); err != nil {
+        os.Exit(1)
+    }
 }

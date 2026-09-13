@@ -5,9 +5,9 @@
 package hunt
 
 import (
-	"testing"
+    "testing"
 
-	"github.com/stretchr/testify/require"
+    "github.com/stretchr/testify/require"
 )
 
 // The delevel water loop regression of 2026-09-10: the state dump
@@ -27,25 +27,25 @@ import (
 // walk home starts) instead of only the town trip, and the following
 // ticks never restart the deleveling while the cooldown holds.
 func TestDelevelWaterAbortArmsCooldown(t *testing.T) {
-	loop, _, _, nav := newDelevelLoop(11)
-	spawnZoneMobs(loop.tracker)
-	nav.overWater = true // no escapeRoute: the shore search fails
+    loop, _, _, nav := newDelevelLoop(11)
+    spawnZoneMobs(loop.tracker)
+    nav.overWater = true // no escapeRoute: the shore search fails
 
-	loop.tick()
-	require.NotEqual(t, phaseDelevel, loop.phase,
-		"the water abort must end the deleveling, not only the trip")
-	require.False(t, loop.delevelEnd.IsZero(),
-		"the abort arms the delevel cooldown")
-	require.False(t, loop.delevelCooldownOver(),
-		"the cooldown blocks the immediate restart")
+    loop.tick()
+    require.NotEqual(t, phaseDelevel, loop.phase,
+        "the water abort must end the deleveling, not only the trip")
+    require.False(t, loop.delevelEnd.IsZero(),
+        "the abort arms the delevel cooldown")
+    require.False(t, loop.delevelCooldownOver(),
+        "the cooldown blocks the immediate restart")
 
-	// The cooldown holds: no tick restarts the deleveling while it
-	// runs (the old loop re-entered the delevel phase every 1.3 s).
-	for range 8 {
-		loop.tick()
-		require.NotEqual(t, phaseDelevel, loop.phase,
-			"the deleveling must stay down while the cooldown runs")
-	}
+    // The cooldown holds: no tick restarts the deleveling while it
+    // runs (the old loop re-entered the delevel phase every 1.3 s).
+    for range 8 {
+        loop.tick()
+        require.NotEqual(t, phaseDelevel, loop.phase,
+            "the deleveling must stay down while the cooldown runs")
+    }
 }
 
 // TestDelevelWetBudgetAbortsIntoCooldown pins the composition with
@@ -58,46 +58,46 @@ func TestDelevelWaterAbortArmsCooldown(t *testing.T) {
 // abort with the armed cooldown beats both the swim and the old
 // refuse-and-restart cycle.
 func TestDelevelWetBudgetAbortsIntoCooldown(t *testing.T) {
-	loop, game, _, nav := newDelevelLoop(11)
-	spawnZoneMobs(loop.tracker)
-	nav.wetLine = true
+    loop, game, _, nav := newDelevelLoop(11)
+    spawnZoneMobs(loop.tracker)
+    nav.wetLine = true
 
-	// The trigger tick burns the first re-path, three more exhaust
-	// the budget of 3 and abort the deleveling.
-	for range 4 {
-		loop.tick()
-	}
-	require.NotEqual(t, phaseDelevel, loop.phase,
-		"the exhausted wet budget aborts the deleveling")
-	require.False(t, loop.delevelCooldownOver(),
-		"the abort arms the delevel cooldown")
-	require.Empty(t, game.walks,
-		"no wet click line ever reached the server")
+    // The trigger tick burns the first re-path, three more exhaust
+    // the budget of 3 and abort the deleveling.
+    for range 4 {
+        loop.tick()
+    }
+    require.NotEqual(t, phaseDelevel, loop.phase,
+        "the exhausted wet budget aborts the deleveling")
+    require.False(t, loop.delevelCooldownOver(),
+        "the abort arms the delevel cooldown")
+    require.Empty(t, game.walks,
+        "no wet click line ever reached the server")
 
-	// The cooldown holds: no tick restarts the deleveling while it
-	// runs (the old loop re-entered the delevel phase every 1.3 s).
-	for range 8 {
-		loop.tick()
-		require.NotEqual(t, phaseDelevel, loop.phase,
-			"the deleveling must stay down while the cooldown runs")
-	}
+    // The cooldown holds: no tick restarts the deleveling while it
+    // runs (the old loop re-entered the delevel phase every 1.3 s).
+    for range 8 {
+        loop.tick()
+        require.NotEqual(t, phaseDelevel, loop.phase,
+            "the deleveling must stay down while the cooldown runs")
+    }
 }
 
 // TestDelevelWetClicksNeverWalk pins the walk side of the same scene:
 // while the delevel walk fights the wet lines, not a single move
 // request goes to the server - the refused clicks re-path instead.
 func TestDelevelWetClicksNeverWalk(t *testing.T) {
-	loop, game, _, nav := newDelevelLoop(11)
-	spawnZoneMobs(loop.tracker)
-	nav.wetLine = true
+    loop, game, _, nav := newDelevelLoop(11)
+    spawnZoneMobs(loop.tracker)
+    nav.wetLine = true
 
-	for range 3 {
-		loop.tick()
-	}
-	require.Empty(t, game.walks,
-		"the wet click lines must never reach the server")
-	require.Equal(t, 3, loop.rePaths,
-		"every refused click counts against the re-path budget")
+    for range 3 {
+        loop.tick()
+    }
+    require.Empty(t, game.walks,
+        "the wet click lines must never reach the server")
+    require.Equal(t, 3, loop.rePaths,
+        "every refused click counts against the re-path budget")
 }
 
 // TestDelevelDryMissAborts pins the planner side of the same scene: a
@@ -105,17 +105,17 @@ func TestDelevelWetClicksNeverWalk(t *testing.T) {
 // planning tick - the cooldown arms and the walk home starts, the
 // loop never enters the refuse-and-restart cycle.
 func TestDelevelDryMissAborts(t *testing.T) {
-	loop, game, _, nav := newDelevelLoop(11)
-	spawnZoneMobs(loop.tracker)
-	nav.dryMiss = true
+    loop, game, _, nav := newDelevelLoop(11)
+    spawnZoneMobs(loop.tracker)
+    nav.dryMiss = true
 
-	loop.tick()
-	require.NotEqual(t, phaseDelevel, loop.phase,
-		"the deleveling aborts without a dry path to the guard")
-	require.False(t, loop.delevelEnd.IsZero(),
-		"the abort arms the delevel cooldown")
-	require.False(t, loop.delevelCooldownOver(),
-		"the cooldown blocks the immediate restart")
-	require.Empty(t, game.walks,
-		"no walk goes out without a dry plan")
+    loop.tick()
+    require.NotEqual(t, phaseDelevel, loop.phase,
+        "the deleveling aborts without a dry path to the guard")
+    require.False(t, loop.delevelEnd.IsZero(),
+        "the abort arms the delevel cooldown")
+    require.False(t, loop.delevelCooldownOver(),
+        "the cooldown blocks the immediate restart")
+    require.Empty(t, game.walks,
+        "no walk goes out without a dry plan")
 }

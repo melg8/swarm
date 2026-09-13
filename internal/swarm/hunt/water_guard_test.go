@@ -5,12 +5,12 @@
 package hunt
 
 import (
-	"testing"
-	"time"
+    "testing"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/pathfind"
-	"github.com/melg8/swarm/internal/swarm/state"
-	"github.com/stretchr/testify/require"
+    "github.com/melg8/swarm/internal/swarm/pathfind"
+    "github.com/melg8/swarm/internal/swarm/state"
+    "github.com/stretchr/testify/require"
 )
 
 // The water regression of 2026-09-10 (see pathfind/water_escape_test.go
@@ -28,35 +28,35 @@ import (
 // without the water guard and never towards the original village
 // waypoint while it stands in the water.
 func TestTripWaterEscapePlansShoreWalk(t *testing.T) {
-	loop, game, bot, nav := newTripLoop()
-	fillInventory(bot)
-	nav.overWater = true
-	nav.escapeRoute = []pathfind.Vec3{
-		{X: 45000, Y: 50000, Z: -3850},
-		{X: 45600, Y: 50400, Z: -3770},
-	}
-	// The character floats over the lake bed (the first escape
-	// waypoint is its own standing cell, like the real BFS plans).
-	moveSelfTo(bot, 45000, 50000, -3800)
+    loop, game, bot, nav := newTripLoop()
+    fillInventory(bot)
+    nav.overWater = true
+    nav.escapeRoute = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3850},
+        {X: 45600, Y: 50400, Z: -3770},
+    }
+    // The character floats over the lake bed (the first escape
+    // waypoint is its own standing cell, like the real BFS plans).
+    moveSelfTo(bot, 45000, 50000, -3800)
 
-	loop.tick()
-	require.Equal(t, phaseTownWalk, loop.phase,
-		"the trip keeps walking while the escape runs")
-	require.True(t, loop.waterEscape,
-		"the water escape must be armed")
-	require.Equal(t, nav.escapeRoute, loop.waypoints,
-		"the escape waypoints must replace the trip leg")
-	require.Zero(t, loop.wpIndex)
-	require.Empty(t, game.walks,
-		"the planning tick sends no walk yet")
-	require.Equal(t, 1, nav.escapeCalls)
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase,
+        "the trip keeps walking while the escape runs")
+    require.True(t, loop.waterEscape,
+        "the water escape must be armed")
+    require.Equal(t, nav.escapeRoute, loop.waypoints,
+        "the escape waypoints must replace the trip leg")
+    require.Zero(t, loop.wpIndex)
+    require.Empty(t, game.walks,
+        "the planning tick sends no walk yet")
+    require.Equal(t, 1, nav.escapeCalls)
 
-	// The next tick walks the escape: the click aims at the shore
-	// waypoint even though the original village waypoint is closer -
-	// the unclimbable cliff waypoint must not win the skip logic.
-	loop.tick()
-	require.Equal(t, [][3]int32{{45600, 50400, -3770}}, game.walks,
-		"the escape walk must aim at the shore waypoint")
+    // The next tick walks the escape: the click aims at the shore
+    // waypoint even though the original village waypoint is closer -
+    // the unclimbable cliff waypoint must not win the skip logic.
+    loop.tick()
+    require.Equal(t, [][3]int32{{45600, 50400, -3770}}, game.walks,
+        "the escape walk must aim at the shore waypoint")
 }
 
 // TestTripWaterEscapeReplansLegOnShore pins the recovery exit: once
@@ -64,80 +64,80 @@ func TestTripWaterEscapePlansShoreWalk(t *testing.T) {
 // interrupted trip leg re-plans from the shore with a fresh re-path
 // budget.
 func TestTripWaterEscapeReplansLegOnShore(t *testing.T) {
-	loop, game, bot, nav := newTripLoop()
-	fillInventory(bot)
-	nav.overWater = true
-	nav.escapeRoute = []pathfind.Vec3{
-		{X: 45000, Y: 50000, Z: -3850},
-		{X: 45600, Y: 50400, Z: -3770},
-	}
+    loop, game, bot, nav := newTripLoop()
+    fillInventory(bot)
+    nav.overWater = true
+    nav.escapeRoute = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3850},
+        {X: 45600, Y: 50400, Z: -3770},
+    }
 
-	loop.tick()
-	require.True(t, loop.waterEscape)
-	// The character walks out of the water.
-	nav.overWater = false
-	moveSelfTo(bot, 45600, 50400, -3770)
-	loop.tick()
-	require.False(t, loop.waterEscape,
-		"the escape must drop on the dry shore")
-	require.Zero(t, loop.rePaths,
-		"the recovery leaves a fresh re-path budget")
-	require.NotNil(t, loop.waypoints)
-	require.NotEqual(t, nav.escapeRoute, loop.waypoints,
-		"the trip leg must re-plan to the trader")
-	legDest := state.WalkPoint{
-		X: herbielPos[0], Y: herbielPos[1], Z: herbielPos[2],
-	}
-	snap := bot.Snapshot()
-	require.NotNil(t, snap.WalkDest)
-	require.Equal(t, legDest, *snap.WalkDest,
-		"the re-planned leg still aims at the trader")
-	require.Empty(t, game.walks,
-		"the shore tick plans the new leg without walking yet")
+    loop.tick()
+    require.True(t, loop.waterEscape)
+    // The character walks out of the water.
+    nav.overWater = false
+    moveSelfTo(bot, 45600, 50400, -3770)
+    loop.tick()
+    require.False(t, loop.waterEscape,
+        "the escape must drop on the dry shore")
+    require.Zero(t, loop.rePaths,
+        "the recovery leaves a fresh re-path budget")
+    require.NotNil(t, loop.waypoints)
+    require.NotEqual(t, nav.escapeRoute, loop.waypoints,
+        "the trip leg must re-plan to the trader")
+    legDest := state.WalkPoint{
+        X: herbielPos[0], Y: herbielPos[1], Z: herbielPos[2],
+    }
+    snap := bot.Snapshot()
+    require.NotNil(t, snap.WalkDest)
+    require.Equal(t, legDest, *snap.WalkDest,
+        "the re-planned leg still aims at the trader")
+    require.Empty(t, game.walks,
+        "the shore tick plans the new leg without walking yet")
 }
 
 // TestTripWaterEscapeWithoutShoreAborts pins the failure path: a
 // character standing in water without any walkable shore aborts the
 // trip instead of clicking into the cliff forever.
 func TestTripWaterEscapeWithoutShoreAborts(t *testing.T) {
-	loop, _, bot, nav := newTripLoop()
-	fillInventory(bot)
-	nav.overWater = true
+    loop, _, bot, nav := newTripLoop()
+    fillInventory(bot)
+    nav.overWater = true
 
-	loop.tick()
-	require.NotEqual(t, phaseTownWalk, loop.phase,
-		"the trip must abort without a shore path")
-	require.Equal(t, phaseEngage, loop.phase)
-	require.False(t, loop.tripCooldownOver(),
-		"the abort arms the trip cooldown")
+    loop.tick()
+    require.NotEqual(t, phaseTownWalk, loop.phase,
+        "the trip must abort without a shore path")
+    require.Equal(t, phaseEngage, loop.phase)
+    require.False(t, loop.tripCooldownOver(),
+        "the abort arms the trip cooldown")
 }
 
 // TestTripWaterEscapeStuckReplans pins the stuck handling of the
 // escape: a swimming character that stands still re-plans the escape
 // itself, not the town leg.
 func TestTripWaterEscapeStuckReplans(t *testing.T) {
-	loop, _, bot, nav := newTripLoop()
-	fillInventory(bot)
-	nav.overWater = true
-	nav.escapeRoute = []pathfind.Vec3{
-		{X: 45000, Y: 50000, Z: -3850},
-		{X: 45600, Y: 50400, Z: -3770},
-	}
+    loop, _, bot, nav := newTripLoop()
+    fillInventory(bot)
+    nav.overWater = true
+    nav.escapeRoute = []pathfind.Vec3{
+        {X: 45000, Y: 50000, Z: -3850},
+        {X: 45600, Y: 50400, Z: -3770},
+    }
 
-	loop.tick()
-	require.True(t, loop.waterEscape)
-	legSearches := len(nav.approachEnds)
-	// The character stands still in the water past the stuck window.
-	for range 20 {
-		loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
-		loop.tick()
-	}
-	require.GreaterOrEqual(t, nav.escapeCalls, 2,
-		"the stuck escape must re-plan the escape itself")
-	require.Len(t, nav.approachEnds, legSearches,
-		"the stuck escape must never re-plan the town leg")
-	require.Equal(t, phaseEngage, loop.phase,
-		"the escape exhausts its budget and aborts the trip")
+    loop.tick()
+    require.True(t, loop.waterEscape)
+    legSearches := len(nav.approachEnds)
+    // The character stands still in the water past the stuck window.
+    for range 20 {
+        loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
+        loop.tick()
+    }
+    require.GreaterOrEqual(t, nav.escapeCalls, 2,
+        "the stuck escape must re-plan the escape itself")
+    require.Len(t, nav.approachEnds, legSearches,
+        "the stuck escape must never re-plan the town leg")
+    require.Equal(t, phaseEngage, loop.phase,
+        "the escape exhausts its budget and aborts the trip")
 }
 
 // TestTripWetClickRepatsAroundShore pins the click water guard: a dry
@@ -151,25 +151,25 @@ func TestTripWaterEscapeStuckReplans(t *testing.T) {
 // of the old DryLine answer, which read those ramps as water and
 // aborted every trip that carried them.
 func TestTripWetClickRepatsAroundShore(t *testing.T) {
-	loop, game, bot, nav := newTripLoop()
-	fillInventory(bot)
-	nav.wetLine = true
+    loop, game, bot, nav := newTripLoop()
+    fillInventory(bot)
+    nav.wetLine = true
 
-	loop.tick()
-	require.Empty(t, game.walks,
-		"the wet click must never be sent to the server")
-	require.Equal(t, 1, loop.rePaths,
-		"the refused click counts as a re-path")
-	require.Len(t, nav.approachEnds, 2,
-		"the trip planned its leg and re-planned around the shore")
+    loop.tick()
+    require.Empty(t, game.walks,
+        "the wet click must never be sent to the server")
+    require.Equal(t, 1, loop.rePaths,
+        "the refused click counts as a re-path")
+    require.Len(t, nav.approachEnds, 2,
+        "the trip planned its leg and re-planned around the shore")
 
-	// The second wet click re-paths again, the third and fourth
-	// exhaust the budget and abort the trip (the walk cannot cross
-	// the water and no shore route exists).
-	loop.tick()
-	loop.tick()
-	loop.tick()
-	require.Empty(t, game.walks)
-	require.Equal(t, phaseEngage, loop.phase,
-		"the trip must abort when every dry re-path crosses water")
+    // The second wet click re-paths again, the third and fourth
+    // exhaust the budget and abort the trip (the walk cannot cross
+    // the water and no shore route exists).
+    loop.tick()
+    loop.tick()
+    loop.tick()
+    require.Empty(t, game.walks)
+    require.Equal(t, phaseEngage, loop.phase,
+        "the trip must abort when every dry re-path crosses water")
 }

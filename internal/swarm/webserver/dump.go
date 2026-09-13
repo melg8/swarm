@@ -15,15 +15,15 @@ package webserver
 // material attached instead of a screenshot.
 
 import (
-	"fmt"
-	"math"
-	"net/http"
-	"sort"
-	"strings"
-	"time"
+    "fmt"
+    "math"
+    "net/http"
+    "sort"
+    "strings"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/state"
-	"github.com/melg8/swarm/internal/version"
+    "github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/version"
 )
 
 // dumpEventLimit bounds the event window of the dump: the snapshot
@@ -36,15 +36,15 @@ const dumpChatLimit = 40
 
 // handleBotDump serves the state dump of one bot as plain text.
 func (s *Server) handleBotDump(w http.ResponseWriter, r *http.Request) {
-	bot, ok := s.lookupBot(w, r)
-	if !ok {
-		return
-	}
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	report := BuildStateDump(bot)
-	if _, err := w.Write([]byte(report)); err != nil {
-		s.logger.Printf("Error writing dump response: %v", err)
-	}
+    bot, ok := s.lookupBot(w, r)
+    if !ok {
+        return
+    }
+    w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+    report := BuildStateDump(bot)
+    if _, err := w.Write([]byte(report)); err != nil {
+        s.logger.Printf("Error writing dump response: %v", err)
+    }
 }
 
 // BuildStateDump assembles the plain text debug report of the bot.
@@ -53,22 +53,22 @@ func (s *Server) handleBotDump(w http.ResponseWriter, r *http.Request) {
 // then what surrounds it, then the inventory, then the movement plan
 // and at the end the long event log.
 func BuildStateDump(bot *state.Bot) string {
-	snap := bot.Snapshot()
-	events := bot.NewestEvents(dumpEventLimit)
-	b := &strings.Builder{}
+    snap := bot.Snapshot()
+    events := bot.NewestEvents(dumpEventLimit)
+    b := &strings.Builder{}
 
-	writeDumpHeader(b, snap)
-	writeDumpCharacter(b, snap)
-	writeDumpAttackers(b, snap)
-	writeDumpZone(b, snap)
-	writeDumpInventory(b, snap)
-	writeDumpObjects(b, snap)
-	writeDumpWalkPlan(b, snap)
-	writeDumpCombat(b, snap)
-	writeDumpChat(b, snap)
-	writeDumpEvents(b, events)
+    writeDumpHeader(b, snap)
+    writeDumpCharacter(b, snap)
+    writeDumpAttackers(b, snap)
+    writeDumpZone(b, snap)
+    writeDumpInventory(b, snap)
+    writeDumpObjects(b, snap)
+    writeDumpWalkPlan(b, snap)
+    writeDumpCombat(b, snap)
+    writeDumpChat(b, snap)
+    writeDumpEvents(b, events)
 
-	return b.String()
+    return b.String()
 }
 
 // writeDumpHeader writes the report title, the build identity and
@@ -76,82 +76,82 @@ func BuildStateDump(bot *state.Bot) string {
 // report came from - a live problem report never leaves room for
 // guessing which commit produced it.
 func writeDumpHeader(b *strings.Builder, snap state.Snapshot) {
-	fmt.Fprintf(b, "swarm state dump\n")
-	fmt.Fprintf(b, "build: %s\n", version.Identity())
-	fmt.Fprintf(b, "bot: %s (status %s, phase %s)\n",
-		snap.ID, snap.Status, snap.Phase)
-	fmt.Fprintf(b, "dumped: %s\n", time.Now().Format(time.RFC3339))
-	fmt.Fprintf(b, "session: started %s, uptime %s\n",
-		snap.StartedAt.Format(time.RFC3339),
-		time.Since(snap.StartedAt).Round(time.Second))
-	fmt.Fprintf(b, "packets: %d, state version %d\n\n",
-		snap.Packets, snap.Version)
+    fmt.Fprintf(b, "swarm state dump\n")
+    fmt.Fprintf(b, "build: %s\n", version.Identity())
+    fmt.Fprintf(b, "bot: %s (status %s, phase %s)\n",
+        snap.ID, snap.Status, snap.Phase)
+    fmt.Fprintf(b, "dumped: %s\n", time.Now().Format(time.RFC3339))
+    fmt.Fprintf(b, "session: started %s, uptime %s\n",
+        snap.StartedAt.Format(time.RFC3339),
+        time.Since(snap.StartedAt).Round(time.Second))
+    fmt.Fprintf(b, "packets: %d, state version %d\n\n",
+        snap.Packets, snap.Version)
 }
 
 // writeDumpCharacter writes the full character sheet of the dump.
 func writeDumpCharacter(b *strings.Builder, snap state.Snapshot) {
-	c := snap.Character
-	fmt.Fprintf(b, "character:\n")
-	fmt.Fprintf(b, "  name: %s (object %d)\n", c.Name, c.ObjectID)
-	fmt.Fprintf(b, "  class: %d, race: %d, level %d, exp %d (%.2f%%), sp %d\n",
-		c.ClassID, c.Race, c.Level, c.Exp, c.ExpPercent, c.Sp)
-	fmt.Fprintf(b, "  position: x %d, y %d, z %d, heading %d\n",
-		c.X, c.Y, c.Z, c.Heading)
-	fmt.Fprintf(b,
-		"  vitals: HP %.0f/%.0f, MP %.0f/%.0f, sitting %v, in combat %v\n",
-		c.CurHP, c.MaxHP, c.CurMP, c.MaxMP, c.Sitting, c.InCombat)
-	if c.Moving {
-		fmt.Fprintf(b, "  moving: yes -> x %d, y %d, z %d, speed %.0f\n",
-			c.DestX, c.DestY, c.DestZ, c.Speed)
-	} else {
-		fmt.Fprintf(b, "  moving: no (speed %.0f)\n", c.Speed)
-	}
-	if c.TargetID != 0 {
-		fmt.Fprintf(b, "  target: %d\n", c.TargetID)
-	}
-	fmt.Fprintf(b, "  stats: STR %d DEX %d CON %d INT %d WIT %d MEN %d\n",
-		c.STR, c.DEX, c.CON, c.INT, c.WIT, c.MEN)
-	fmt.Fprintf(b, "  load: %d/%d, slots %d/%d, adena %d\n",
-		c.CurrentLoad, c.MaxLoad, c.InventorySlots, c.InventoryMax,
-		c.Adena)
-	fmt.Fprintln(b)
+    c := snap.Character
+    fmt.Fprintf(b, "character:\n")
+    fmt.Fprintf(b, "  name: %s (object %d)\n", c.Name, c.ObjectID)
+    fmt.Fprintf(b, "  class: %d, race: %d, level %d, exp %d (%.2f%%), sp %d\n",
+        c.ClassID, c.Race, c.Level, c.Exp, c.ExpPercent, c.Sp)
+    fmt.Fprintf(b, "  position: x %d, y %d, z %d, heading %d\n",
+        c.X, c.Y, c.Z, c.Heading)
+    fmt.Fprintf(b,
+        "  vitals: HP %.0f/%.0f, MP %.0f/%.0f, sitting %v, in combat %v\n",
+        c.CurHP, c.MaxHP, c.CurMP, c.MaxMP, c.Sitting, c.InCombat)
+    if c.Moving {
+        fmt.Fprintf(b, "  moving: yes -> x %d, y %d, z %d, speed %.0f\n",
+            c.DestX, c.DestY, c.DestZ, c.Speed)
+    } else {
+        fmt.Fprintf(b, "  moving: no (speed %.0f)\n", c.Speed)
+    }
+    if c.TargetID != 0 {
+        fmt.Fprintf(b, "  target: %d\n", c.TargetID)
+    }
+    fmt.Fprintf(b, "  stats: STR %d DEX %d CON %d INT %d WIT %d MEN %d\n",
+        c.STR, c.DEX, c.CON, c.INT, c.WIT, c.MEN)
+    fmt.Fprintf(b, "  load: %d/%d, slots %d/%d, adena %d\n",
+        c.CurrentLoad, c.MaxLoad, c.InventorySlots, c.InventoryMax,
+        c.Adena)
+    fmt.Fprintln(b)
 }
 
 // writeDumpAttackers lists the living attackable npcs that hold the
 // character as their target - the aggro load of the moment.
 func writeDumpAttackers(b *strings.Builder, snap state.Snapshot) {
-	lines := make([]string, 0, len(snap.Objects))
-	for i := range snap.Objects {
-		o := &snap.Objects[i]
-		if o.Kind != state.KindNPC || !o.Attackable || o.Dead ||
-			o.TargetID != snap.Character.ObjectID {
-			continue
-		}
-		lines = append(lines, fmt.Sprintf(
-			"  %d %s (level %d, hp %.0f/%.0f) at %d %d %d",
-			o.ObjectID, o.Name, o.Level, o.CurHP, o.MaxHP,
-			o.X, o.Y, o.Z))
-	}
-	fmt.Fprintf(b, "attackers (%d):\n", len(lines))
-	for _, line := range lines {
-		fmt.Fprintln(b, line)
-	}
-	fmt.Fprintln(b)
+    lines := make([]string, 0, len(snap.Objects))
+    for i := range snap.Objects {
+        o := &snap.Objects[i]
+        if o.Kind != state.KindNPC || !o.Attackable || o.Dead ||
+            o.TargetID != snap.Character.ObjectID {
+            continue
+        }
+        lines = append(lines, fmt.Sprintf(
+            "  %d %s (level %d, hp %.0f/%.0f) at %d %d %d",
+            o.ObjectID, o.Name, o.Level, o.CurHP, o.MaxHP,
+            o.X, o.Y, o.Z))
+    }
+    fmt.Fprintf(b, "attackers (%d):\n", len(lines))
+    for _, line := range lines {
+        fmt.Fprintln(b, line)
+    }
+    fmt.Fprintln(b)
 }
 
 // writeDumpZone writes the hunting zone of the session.
 func writeDumpZone(b *strings.Builder, snap state.Snapshot) {
-	if snap.HuntingZone == nil {
-		fmt.Fprintf(b, "hunting zone: none\n\n")
+    if snap.HuntingZone == nil {
+        fmt.Fprintf(b, "hunting zone: none\n\n")
 
-		return
-	}
-	z := snap.HuntingZone
-	fmt.Fprintf(b, "hunting zone: center %d %d, half %d (square %dx%d)\n",
-		z.CX, z.CY, z.Half, z.Half*2, z.Half*2)
-	c := snap.Character
-	inside := z.Contains(c.X, c.Y)
-	fmt.Fprintf(b, "  character inside: %v\n\n", inside)
+        return
+    }
+    z := snap.HuntingZone
+    fmt.Fprintf(b, "hunting zone: center %d %d, half %d (square %dx%d)\n",
+        z.CX, z.CY, z.Half, z.Half*2, z.Half*2)
+    c := snap.Character
+    inside := z.Contains(c.X, c.Y)
+    fmt.Fprintf(b, "  character inside: %v\n\n", inside)
 }
 
 // dumpSlotNames maps the item body part mask to the paperdoll slot
@@ -166,72 +166,72 @@ func writeDumpZone(b *strings.Builder, snap state.Snapshot) {
 // Necklace of Magic as lear ear), which read like a corrupted
 // paperdoll in the field reports while the equipment was fine.
 var dumpSlotNames = map[int32]string{
-	0x01:    "underwear",
-	0x02:    "rear ear",
-	0x04:    "lear ear",
-	0x06:    "earring",
-	0x08:    "necklace",
-	0x10:    "rfinger",
-	0x20:    "lfinger",
-	0x30:    "ring",
-	0x40:    "head",
-	0x80:    "rhand",
-	0x100:   "lhand",
-	0x200:   "gloves",
-	0x400:   "chest",
-	0x800:   "legs",
-	0x1000:  "feet",
-	0x2000:  "back",
-	0x4000:  "lrhand",
-	0x8000:  "full armor",
-	0x10000: "hair",
+    0x01:    "underwear",
+    0x02:    "rear ear",
+    0x04:    "lear ear",
+    0x06:    "earring",
+    0x08:    "necklace",
+    0x10:    "rfinger",
+    0x20:    "lfinger",
+    0x30:    "ring",
+    0x40:    "head",
+    0x80:    "rhand",
+    0x100:   "lhand",
+    0x200:   "gloves",
+    0x400:   "chest",
+    0x800:   "legs",
+    0x1000:  "feet",
+    0x2000:  "back",
+    0x4000:  "lrhand",
+    0x8000:  "full armor",
+    0x10000: "hair",
 }
 
 // dumpSlotName renders the paperdoll slot of the item body part mask.
 func dumpSlotName(bodyPart int32) string {
-	if name, ok := dumpSlotNames[bodyPart]; ok {
-		return name
-	}
+    if name, ok := dumpSlotNames[bodyPart]; ok {
+        return name
+    }
 
-	return fmt.Sprintf("part 0x%x", bodyPart)
+    return fmt.Sprintf("part 0x%x", bodyPart)
 }
 
 // writeDumpInventory writes the equipment and the bag of the dump.
 func writeDumpInventory(b *strings.Builder, snap state.Snapshot) {
-	var equipped, bag []string
-	for i := range snap.Inventory {
-		item := &snap.Inventory[i]
-		name := item.Name
-		if name == "" {
-			name = fmt.Sprintf("item %d", item.ItemID)
-		}
-		line := fmt.Sprintf("  object %d: %s (item %d) x%d%s",
-			item.ObjectID, name, item.ItemID, item.Count,
-			enchSuffix(item.Enchant))
-		if item.Equipped {
-			equipped = append(equipped,
-				line+" ["+dumpSlotName(item.BodyPart)+"]")
-		} else {
-			bag = append(bag, line)
-		}
-	}
-	fmt.Fprintf(b, "equipment (%d):\n", len(equipped))
-	for _, line := range equipped {
-		fmt.Fprintln(b, line)
-	}
-	// The paperdoll holes an equipment section hides: the report only
-	// prints the occupied slots, so a character farming without its
-	// legs armor (the 2026-09-12 04:58 pantsless dump) read as a fine
-	// outfit - the missing legs line was invisible. The empty families
-	// now name themselves right below the equipment.
-	if empty := dumpEmptySlots(snap.Inventory); len(empty) > 0 {
-		fmt.Fprintf(b, "empty slots: %s\n", strings.Join(empty, ", "))
-	}
-	fmt.Fprintf(b, "bag (%d):\n", len(bag))
-	for _, line := range bag {
-		fmt.Fprintln(b, line)
-	}
-	fmt.Fprintln(b)
+    var equipped, bag []string
+    for i := range snap.Inventory {
+        item := &snap.Inventory[i]
+        name := item.Name
+        if name == "" {
+            name = fmt.Sprintf("item %d", item.ItemID)
+        }
+        line := fmt.Sprintf("  object %d: %s (item %d) x%d%s",
+            item.ObjectID, name, item.ItemID, item.Count,
+            enchSuffix(item.Enchant))
+        if item.Equipped {
+            equipped = append(equipped,
+                line+" ["+dumpSlotName(item.BodyPart)+"]")
+        } else {
+            bag = append(bag, line)
+        }
+    }
+    fmt.Fprintf(b, "equipment (%d):\n", len(equipped))
+    for _, line := range equipped {
+        fmt.Fprintln(b, line)
+    }
+    // The paperdoll holes an equipment section hides: the report only
+    // prints the occupied slots, so a character farming without its
+    // legs armor (the 2026-09-12 04:58 pantsless dump) read as a fine
+    // outfit - the missing legs line was invisible. The empty families
+    // now name themselves right below the equipment.
+    if empty := dumpEmptySlots(snap.Inventory); len(empty) > 0 {
+        fmt.Fprintf(b, "empty slots: %s\n", strings.Join(empty, ", "))
+    }
+    fmt.Fprintf(b, "bag (%d):\n", len(bag))
+    for _, line := range bag {
+        fmt.Fprintln(b, line)
+    }
+    fmt.Fprintln(b)
 }
 
 // dumpEmptySlots lists the paperdoll slot families no equipped item
@@ -242,126 +242,126 @@ func writeDumpInventory(b *strings.Builder, snap state.Snapshot) {
 // underwear and hair slots stay out: no gear of the catalogs ever
 // fills them and they would read as permanent holes.
 func dumpEmptySlots(items []state.InventoryItemSnapshot) []string {
-	covered := make(map[int32]int, len(items))
-	twoHand, onePiece := false, false
-	for i := range items {
-		item := &items[i]
-		if !item.Equipped {
-			continue
-		}
-		covered[item.BodyPart]++
-		switch item.BodyPart {
-		case 0x4000:
-			twoHand = true
-		case 0x8000:
-			onePiece = true
-		}
-	}
-	families := []struct {
-		mask int32
-		name string
-	}{
-		{0x40, "head"},
-		{0x80, "rhand"},
-		{0x100, "lhand"},
-		{0x200, "gloves"},
-		{0x400, "chest"},
-		{0x800, "legs"},
-		{0x1000, "feet"},
-		{0x2000, "back"},
-		{0x08, "necklace"},
-	}
-	empty := make([]string, 0, len(families)+2)
-	for _, family := range families {
-		if covered[family.mask] > 0 {
-			continue
-		}
-		if twoHand && (family.mask == 0x80 || family.mask == 0x100) {
-			continue
-		}
-		if onePiece && (family.mask == 0x400 || family.mask == 0x800) {
-			continue
-		}
-		empty = append(empty, family.name)
-	}
-	if covered[0x6] == 1 {
-		empty = append(empty, "earring half")
-	}
-	if covered[0x30] == 1 {
-		empty = append(empty, "ring half")
-	}
+    covered := make(map[int32]int, len(items))
+    twoHand, onePiece := false, false
+    for i := range items {
+        item := &items[i]
+        if !item.Equipped {
+            continue
+        }
+        covered[item.BodyPart]++
+        switch item.BodyPart {
+        case 0x4000:
+            twoHand = true
+        case 0x8000:
+            onePiece = true
+        }
+    }
+    families := []struct {
+        mask int32
+        name string
+    }{
+        {0x40, "head"},
+        {0x80, "rhand"},
+        {0x100, "lhand"},
+        {0x200, "gloves"},
+        {0x400, "chest"},
+        {0x800, "legs"},
+        {0x1000, "feet"},
+        {0x2000, "back"},
+        {0x08, "necklace"},
+    }
+    empty := make([]string, 0, len(families)+2)
+    for _, family := range families {
+        if covered[family.mask] > 0 {
+            continue
+        }
+        if twoHand && (family.mask == 0x80 || family.mask == 0x100) {
+            continue
+        }
+        if onePiece && (family.mask == 0x400 || family.mask == 0x800) {
+            continue
+        }
+        empty = append(empty, family.name)
+    }
+    if covered[0x6] == 1 {
+        empty = append(empty, "earring half")
+    }
+    if covered[0x30] == 1 {
+        empty = append(empty, "ring half")
+    }
 
-	return empty
+    return empty
 }
 
 // enchSuffix renders the enchant level of a dump item line.
 func enchSuffix(enchant int16) string {
-	if enchant <= 0 {
-		return ""
-	}
+    if enchant <= 0 {
+        return ""
+    }
 
-	return fmt.Sprintf(" +%d", enchant)
+    return fmt.Sprintf(" +%d", enchant)
 }
 
 // writeDumpObjects writes the known world objects sorted by their
 // distance to the character - the closest first, the combat state and
 // the targets included (a mob holding the character is the aggro).
 func writeDumpObjects(b *strings.Builder, snap state.Snapshot) {
-	c := snap.Character
-	type ranked struct {
-		line  string
-		distX float64
-		distY float64
-	}
-	ranked2 := make([]ranked, 0, len(snap.Objects))
-	for i := range snap.Objects {
-		o := &snap.Objects[i]
-		dx := float64(o.X - c.X)
-		dy := float64(o.Y - c.Y)
-		name := o.Name
-		if o.Title != "" {
-			name += " [" + o.Title + "]"
-		}
-		if name == "" {
-			name = fmt.Sprintf("%s %d", o.Kind, o.ObjectID)
-		}
-		line := fmt.Sprintf(
-			"  %d %-7s %s (level %d, hp %.0f/%.0f) at %d %d %d, dist %.0f",
-			o.ObjectID, o.Kind, name, o.Level, o.CurHP, o.MaxHP,
-			o.X, o.Y, o.Z, math.Hypot(dx, dy))
-		var flags []string
-		if o.Attackable {
-			flags = append(flags, "attackable")
-		}
-		if o.Dead {
-			flags = append(flags, "dead")
-		}
-		if o.InCombat {
-			flags = append(flags, "combat")
-		}
-		if o.Moving {
-			flags = append(flags, "moving")
-		}
-		if o.TargetID != 0 {
-			flags = append(flags, fmt.Sprintf("target %d", o.TargetID))
-		}
-		if o.Aggressive {
-			flags = append(flags, "aggressive")
-		}
-		if len(flags) > 0 {
-			line += ", " + strings.Join(flags, ", ")
-		}
-		ranked2 = append(ranked2, ranked{line: line, distX: dx, distY: dy})
-	}
-	sort.SliceStable(ranked2, func(i, j int) bool {
-		return math.Hypot(ranked2[i].distX, ranked2[i].distY) <
-			math.Hypot(ranked2[j].distX, ranked2[j].distY)
-	})
-	fmt.Fprintf(b, "objects (%d):\n", len(ranked2))
-	for _, entry := range ranked2 {
-		fmt.Fprintln(b, entry.line)
-	}
-	fmt.Fprintln(b)
+    c := snap.Character
+    type ranked struct {
+        line  string
+        distX float64
+        distY float64
+    }
+    ranked2 := make([]ranked, 0, len(snap.Objects))
+    for i := range snap.Objects {
+        o := &snap.Objects[i]
+        dx := float64(o.X - c.X)
+        dy := float64(o.Y - c.Y)
+        name := o.Name
+        if o.Title != "" {
+            name += " [" + o.Title + "]"
+        }
+        if name == "" {
+            name = fmt.Sprintf("%s %d", o.Kind, o.ObjectID)
+        }
+        line := fmt.Sprintf(
+            "  %d %-7s %s (level %d, hp %.0f/%.0f) at %d %d %d, dist %.0f",
+            o.ObjectID, o.Kind, name, o.Level, o.CurHP, o.MaxHP,
+            o.X, o.Y, o.Z, math.Hypot(dx, dy))
+        var flags []string
+        if o.Attackable {
+            flags = append(flags, "attackable")
+        }
+        if o.Dead {
+            flags = append(flags, "dead")
+        }
+        if o.InCombat {
+            flags = append(flags, "combat")
+        }
+        if o.Moving {
+            flags = append(flags, "moving")
+        }
+        if o.TargetID != 0 {
+            flags = append(flags, fmt.Sprintf("target %d", o.TargetID))
+        }
+        if o.Aggressive {
+            flags = append(flags, "aggressive")
+        }
+        if len(flags) > 0 {
+            line += ", " + strings.Join(flags, ", ")
+        }
+        ranked2 = append(ranked2, ranked{line: line, distX: dx, distY: dy})
+    }
+    sort.SliceStable(ranked2, func(i, j int) bool {
+        return math.Hypot(ranked2[i].distX, ranked2[i].distY) <
+            math.Hypot(ranked2[j].distX, ranked2[j].distY)
+    })
+    fmt.Fprintf(b, "objects (%d):\n", len(ranked2))
+    for _, entry := range ranked2 {
+        fmt.Fprintln(b, entry.line)
+    }
+    fmt.Fprintln(b)
 }
 
 // writeDumpWalkPlan writes the active walk plan of the hunt loop: the
@@ -370,76 +370,76 @@ func writeDumpObjects(b *strings.Builder, snap state.Snapshot) {
 // waypoint marked and the waypoint the follower currently aims at
 // emphasized - a stuck or drifting walk reads at a glance.
 func writeDumpWalkPlan(b *strings.Builder, snap state.Snapshot) {
-	if snap.WalkPath == nil {
-		fmt.Fprintf(b, "walk plan: none\n\n")
+    if snap.WalkPath == nil {
+        fmt.Fprintf(b, "walk plan: none\n\n")
 
-		return
-	}
-	target := snap.WalkIndex
-	if target < 0 || target >= len(snap.WalkPath) {
-		target = len(snap.WalkPath) - 1
-	}
-	fmt.Fprintf(b, "walk plan (%d waypoints, aiming at wp %d):\n",
-		len(snap.WalkPath), target)
-	if snap.WalkOrigin != nil {
-		fmt.Fprintf(b, "  from %d %d %d\n",
-			snap.WalkOrigin.X, snap.WalkOrigin.Y, snap.WalkOrigin.Z)
-	}
-	for i := range snap.WalkPath {
-		wp := &snap.WalkPath[i]
-		switch {
-		case i == target:
-			fmt.Fprintf(b, "  wp %d: %d %d %d  <-- TARGET\n",
-				i, wp.X, wp.Y, wp.Z)
-		case i < target:
-			fmt.Fprintf(b, "  wp %d: %d %d %d (passed)\n",
-				i, wp.X, wp.Y, wp.Z)
-		default:
-			fmt.Fprintf(b, "  wp %d: %d %d %d\n", i, wp.X, wp.Y, wp.Z)
-		}
-	}
-	if snap.WalkDest != nil {
-		fmt.Fprintf(b, "  dest %d %d %d\n",
-			snap.WalkDest.X, snap.WalkDest.Y, snap.WalkDest.Z)
-	}
-	fmt.Fprintln(b)
+        return
+    }
+    target := snap.WalkIndex
+    if target < 0 || target >= len(snap.WalkPath) {
+        target = len(snap.WalkPath) - 1
+    }
+    fmt.Fprintf(b, "walk plan (%d waypoints, aiming at wp %d):\n",
+        len(snap.WalkPath), target)
+    if snap.WalkOrigin != nil {
+        fmt.Fprintf(b, "  from %d %d %d\n",
+            snap.WalkOrigin.X, snap.WalkOrigin.Y, snap.WalkOrigin.Z)
+    }
+    for i := range snap.WalkPath {
+        wp := &snap.WalkPath[i]
+        switch {
+        case i == target:
+            fmt.Fprintf(b, "  wp %d: %d %d %d  <-- TARGET\n",
+                i, wp.X, wp.Y, wp.Z)
+        case i < target:
+            fmt.Fprintf(b, "  wp %d: %d %d %d (passed)\n",
+                i, wp.X, wp.Y, wp.Z)
+        default:
+            fmt.Fprintf(b, "  wp %d: %d %d %d\n", i, wp.X, wp.Y, wp.Z)
+        }
+    }
+    if snap.WalkDest != nil {
+        fmt.Fprintf(b, "  dest %d %d %d\n",
+            snap.WalkDest.X, snap.WalkDest.Y, snap.WalkDest.Z)
+    }
+    fmt.Fprintln(b)
 }
 
 // writeDumpCombat writes the recent combat beats.
 func writeDumpCombat(b *strings.Builder, snap state.Snapshot) {
-	fmt.Fprintf(b, "recent combat (%d):\n", len(snap.CombatEvents))
-	for i := range snap.CombatEvents {
-		e := &snap.CombatEvents[i]
-		fmt.Fprintf(b, "  %s: attacker %d -> target %d, %.0f damage\n",
-			e.Kind, e.AttackerID, e.TargetID, e.Amount)
-	}
-	fmt.Fprintln(b)
+    fmt.Fprintf(b, "recent combat (%d):\n", len(snap.CombatEvents))
+    for i := range snap.CombatEvents {
+        e := &snap.CombatEvents[i]
+        fmt.Fprintf(b, "  %s: attacker %d -> target %d, %.0f damage\n",
+            e.Kind, e.AttackerID, e.TargetID, e.Amount)
+    }
+    fmt.Fprintln(b)
 }
 
 // writeDumpChat writes the recent chat lines.
 func writeDumpChat(b *strings.Builder, snap state.Snapshot) {
-	start := 0
-	if len(snap.Chat) > dumpChatLimit {
-		start = len(snap.Chat) - dumpChatLimit
-	}
-	chat := snap.Chat[start:]
-	fmt.Fprintf(b, "chat (%d):\n", len(chat))
-	for i := range chat {
-		line := &chat[i]
-		fmt.Fprintf(b, "  %s %s: %s\n",
-			line.Time.Format("15:04:05"), line.Kind, line.Text)
-	}
-	fmt.Fprintln(b)
+    start := 0
+    if len(snap.Chat) > dumpChatLimit {
+        start = len(snap.Chat) - dumpChatLimit
+    }
+    chat := snap.Chat[start:]
+    fmt.Fprintf(b, "chat (%d):\n", len(chat))
+    for i := range chat {
+        line := &chat[i]
+        fmt.Fprintf(b, "  %s %s: %s\n",
+            line.Time.Format("15:04:05"), line.Kind, line.Text)
+    }
+    fmt.Fprintln(b)
 }
 
 // writeDumpEvents writes the deep event window - the game events, the
 // web commands and the mirrored hunt loop decisions in chronological
 // order.
 func writeDumpEvents(b *strings.Builder, events []state.Event) {
-	fmt.Fprintf(b, "events (%d):\n", len(events))
-	for i := range events {
-		e := &events[i]
-		fmt.Fprintf(b, "  %s %s\n",
-			e.Time.Format("15:04:05"), e.Message)
-	}
+    fmt.Fprintf(b, "events (%d):\n", len(events))
+    for i := range events {
+        e := &events[i]
+        fmt.Fprintf(b, "  %s %s\n",
+            e.Time.Format("15:04:05"), e.Message)
+    }
 }

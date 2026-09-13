@@ -5,10 +5,10 @@
 package state
 
 import (
-	"fmt"
-	"sort"
+    "fmt"
+    "sort"
 
-	"github.com/melg8/swarm/internal/swarm/npcdata"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
 // skillQueueCap bounds the learning queue of the snapshot: the C1
@@ -20,15 +20,15 @@ const skillQueueCap = 256
 // LearnedSkill is one entry of the server skill list packet: the
 // learned level of the skill and the passive flag the server sent.
 type LearnedSkill struct {
-	SkillID int32
-	Level   int32
-	Passive bool
+    SkillID int32
+    Level   int32
+    Passive bool
 }
 
 // learnedSkill is the stored form of one learned skill.
 type learnedSkill struct {
-	level   int32
-	passive bool
+    level   int32
+    passive bool
 }
 
 // SkillSnapshot is one learned skill of the snapshot: the level the
@@ -37,12 +37,12 @@ type learnedSkill struct {
 // learned level). The web UI renders the learned list in active /
 // passive tabs.
 type SkillSnapshot struct {
-	SkillID int32  `json:"skillId"`
-	Level   int32  `json:"level"`
-	Passive bool   `json:"passive"`
-	Name    string `json:"name"`
-	Icon    string `json:"icon"`
-	Desc    string `json:"desc"`
+    SkillID int32  `json:"skillId"`
+    Level   int32  `json:"level"`
+    Passive bool   `json:"passive"`
+    Name    string `json:"name"`
+    Icon    string `json:"icon"`
+    Desc    string `json:"desc"`
 }
 
 // SkillPlanEntry is one queued lesson of the learning plan: the next
@@ -53,18 +53,18 @@ type SkillSnapshot struct {
 // text of the level being learned and the affordability against the
 // SP the plan was computed with.
 type SkillPlanEntry struct {
-	SkillID    int32  `json:"skillId"`
-	Name       string `json:"name"`
-	Icon       string `json:"icon"`
-	Desc       string `json:"desc"`
-	Level      int32  `json:"level"`
-	Passive    bool   `json:"passive"`
-	SpCost     int32  `json:"spCost"`
-	ReqLevel   int32  `json:"reqLevel"`
-	BookItemID int32  `json:"bookItemId"`
-	BookName   string `json:"bookName"`
-	Category   int    `json:"category"`
-	Affordable bool   `json:"affordable"`
+    SkillID    int32  `json:"skillId"`
+    Name       string `json:"name"`
+    Icon       string `json:"icon"`
+    Desc       string `json:"desc"`
+    Level      int32  `json:"level"`
+    Passive    bool   `json:"passive"`
+    SpCost     int32  `json:"spCost"`
+    ReqLevel   int32  `json:"reqLevel"`
+    BookItemID int32  `json:"bookItemId"`
+    BookName   string `json:"bookName"`
+    Category   int    `json:"category"`
+    Affordable bool   `json:"affordable"`
 }
 
 // SkillPlanView is the published learning queue of the web UI: the
@@ -77,10 +77,10 @@ type SkillPlanEntry struct {
 // copy, the live encode) computes it against the SP it read under the
 // same lock.
 type SkillPlanView struct {
-	Sp      int64            `json:"sp"`
-	Total   int64            `json:"total"`
-	Missing int64            `json:"missing"`
-	Entries []SkillPlanEntry `json:"entries"`
+    Sp      int64            `json:"sp"`
+    Total   int64            `json:"total"`
+    Missing int64            `json:"missing"`
+    Entries []SkillPlanEntry `json:"entries"`
 }
 
 // SetSkills applies the full skill list of the server packet: the
@@ -90,33 +90,33 @@ type SkillPlanView struct {
 // queue rebuilds lazily on the next snapshot (the learned set
 // changed).
 func (b *Bot) SetSkills(skills []LearnedSkill) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	entries := make(map[int32]learnedSkill, len(skills))
-	for _, skill := range skills {
-		entries[skill.SkillID] = learnedSkill{
-			level:   skill.Level,
-			passive: skill.Passive,
-		}
-	}
-	b.skills = entries
-	b.skillsRevision++
-	b.touch()
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    entries := make(map[int32]learnedSkill, len(skills))
+    for _, skill := range skills {
+        entries[skill.SkillID] = learnedSkill{
+            level:   skill.Level,
+            passive: skill.Passive,
+        }
+    }
+    b.skills = entries
+    b.skillsRevision++
+    b.touch()
 }
 
 // skillTotalsLocked walks the stored queue and returns the SP total
 // of the whole queue and the SP still missing for it against the
 // given wallet. The caller must hold a lock.
 func skillTotals(entries []SkillPlanEntry, sp int64) (total, missing int64) {
-	for i := range entries {
-		total += int64(entries[i].SpCost)
-	}
-	missing = total - sp
-	if missing < 0 {
-		missing = 0
-	}
+    for i := range entries {
+        total += int64(entries[i].SpCost)
+    }
+    missing = total - sp
+    if missing < 0 {
+        missing = 0
+    }
 
-	return total, missing
+    return total, missing
 }
 
 // ensureSkillQueueLocked rebuilds the stored learning queue when the
@@ -129,17 +129,17 @@ func skillTotals(entries []SkillPlanEntry, sp int64) (total, missing int64) {
 // every view against the SP it reads under the same lock. The caller
 // must hold a lock.
 func (b *Bot) ensureSkillQueueLocked() {
-	if b.skillQueueClass == b.char.ClassID &&
-		b.skillQueueRevision == b.skillsRevision {
-		return
-	}
-	b.skillQueue = nil
-	if b.skills != nil {
-		b.skillQueue = buildSkillQueue(
-			b.char.ClassID, b.skills, b.skillWeapons)
-	}
-	b.skillQueueClass = b.char.ClassID
-	b.skillQueueRevision = b.skillsRevision
+    if b.skillQueueClass == b.char.ClassID &&
+        b.skillQueueRevision == b.skillsRevision {
+        return
+    }
+    b.skillQueue = nil
+    if b.skills != nil {
+        b.skillQueue = buildSkillQueue(
+            b.char.ClassID, b.skills, b.skillWeapons)
+    }
+    b.skillQueueClass = b.char.ClassID
+    b.skillQueueRevision = b.skillsRevision
 }
 
 // skillPlanViewLocked builds the learning queue view of the snapshot:
@@ -148,24 +148,24 @@ func (b *Bot) ensureSkillQueueLocked() {
 // SP. The copy keeps the view safe against the next queue rebuild.
 // The caller must hold a lock.
 func (b *Bot) skillPlanViewLocked() *SkillPlanView {
-	b.ensureSkillQueueLocked()
-	if len(b.skillQueue) == 0 {
-		return nil
-	}
-	sp := int64(b.char.Sp)
-	entries := make([]SkillPlanEntry, len(b.skillQueue))
-	copy(entries, b.skillQueue)
-	for i := range entries {
-		entries[i].Affordable = sp >= int64(entries[i].SpCost)
-	}
-	total, missing := skillTotals(entries, sp)
+    b.ensureSkillQueueLocked()
+    if len(b.skillQueue) == 0 {
+        return nil
+    }
+    sp := int64(b.char.Sp)
+    entries := make([]SkillPlanEntry, len(b.skillQueue))
+    copy(entries, b.skillQueue)
+    for i := range entries {
+        entries[i].Affordable = sp >= int64(entries[i].SpCost)
+    }
+    total, missing := skillTotals(entries, sp)
 
-	return &SkillPlanView{
-		Sp:      sp,
-		Total:   total,
-		Missing: missing,
-		Entries: entries,
-	}
+    return &SkillPlanView{
+        Sp:      sp,
+        Total:   total,
+        Missing: missing,
+        Entries: entries,
+    }
 }
 
 // demandedBooksLocked collects the spellbook item ids the character
@@ -180,26 +180,26 @@ func (b *Bot) skillPlanViewLocked() *SkillPlanView {
 // learn (the views rebuild it), which only keeps a consumed book one
 // cache cycle longer, never drops one. The caller must hold a lock.
 func (b *Bot) demandedBooksLocked() map[int32]bool {
-	if b.bookKeep != nil && b.bookKeepRevision == b.skillsRevision &&
-		b.bookKeepLevel == b.char.Level {
-		return b.bookKeep
-	}
-	var books map[int32]bool
-	for i := range b.skillQueue {
-		entry := &b.skillQueue[i]
-		if entry.BookItemID == 0 || entry.ReqLevel > b.char.Level {
-			continue
-		}
-		if books == nil {
-			books = make(map[int32]bool, 4)
-		}
-		books[entry.BookItemID] = true
-	}
-	b.bookKeep = books
-	b.bookKeepRevision = b.skillsRevision
-	b.bookKeepLevel = b.char.Level
+    if b.bookKeep != nil && b.bookKeepRevision == b.skillsRevision &&
+        b.bookKeepLevel == b.char.Level {
+        return b.bookKeep
+    }
+    var books map[int32]bool
+    for i := range b.skillQueue {
+        entry := &b.skillQueue[i]
+        if entry.BookItemID == 0 || entry.ReqLevel > b.char.Level {
+            continue
+        }
+        if books == nil {
+            books = make(map[int32]bool, 4)
+        }
+        books[entry.BookItemID] = true
+    }
+    b.bookKeep = books
+    b.bookKeepRevision = b.skillsRevision
+    b.bookKeepLevel = b.char.Level
 
-	return books
+    return books
 }
 
 // buildSkillQueue computes the ordered learning queue of a class: the
@@ -213,55 +213,55 @@ func (b *Bot) demandedBooksLocked() map[int32]bool {
 // slice is the stored queue; the affordability flag is filled by the
 // views, never here.
 func buildSkillQueue(
-	classID int32, learned map[int32]learnedSkill, weapons []string,
+    classID int32, learned map[int32]learnedSkill, weapons []string,
 ) []SkillPlanEntry {
-	tree, ok := npcdata.SkillTree(classID)
-	if !ok {
-		return nil
-	}
-	queue := make([]SkillPlanEntry, 0, min(len(tree), skillQueueCap))
-	for _, lesson := range tree {
-		if lesson.AutoGet || len(queue) >= skillQueueCap {
-			continue
-		}
-		known := learned[lesson.SkillID].level
-		if known >= lesson.Level {
-			continue
-		}
-		entry := SkillPlanEntry{
-			SkillID: lesson.SkillID,
-			Name:    "",
-			Icon:    "",
-			Desc: npcdata.SkillDescription(lesson.SkillID,
-				lesson.Level),
-			Level:      lesson.Level,
-			Passive:    false,
-			SpCost:     lesson.SpCost,
-			ReqLevel:   lesson.GetLevel,
-			BookItemID: lesson.BookItem,
-			BookName:   npcdata.ItemName(lesson.BookItem),
-			Category:   npcdata.SkillCategoryOther,
-			Affordable: false,
-		}
-		if info, hasInfo := npcdata.SkillInfoOf(lesson.SkillID); hasInfo {
-			entry.Name = info.Name
-			entry.Icon = info.Icon
-			entry.Passive = info.Passive
-			entry.Category = info.Category
-		} else {
-			entry.Name = fmt.Sprintf("skill #%d", lesson.SkillID)
-		}
-		queue = append(queue, entry)
-	}
-	// The tree is sorted by (getLevel, skillId, level); the queue
-	// resorts by the warrior priority groups. The sort is stable so
-	// the tree order survives inside a group.
-	sort.SliceStable(queue, func(i, j int) bool {
-		return skillPlanPriority(queue[i], weapons) <
-			skillPlanPriority(queue[j], weapons)
-	})
+    tree, ok := npcdata.SkillTree(classID)
+    if !ok {
+        return nil
+    }
+    queue := make([]SkillPlanEntry, 0, min(len(tree), skillQueueCap))
+    for _, lesson := range tree {
+        if lesson.AutoGet || len(queue) >= skillQueueCap {
+            continue
+        }
+        known := learned[lesson.SkillID].level
+        if known >= lesson.Level {
+            continue
+        }
+        entry := SkillPlanEntry{
+            SkillID: lesson.SkillID,
+            Name:    "",
+            Icon:    "",
+            Desc: npcdata.SkillDescription(lesson.SkillID,
+                lesson.Level),
+            Level:      lesson.Level,
+            Passive:    false,
+            SpCost:     lesson.SpCost,
+            ReqLevel:   lesson.GetLevel,
+            BookItemID: lesson.BookItem,
+            BookName:   npcdata.ItemName(lesson.BookItem),
+            Category:   npcdata.SkillCategoryOther,
+            Affordable: false,
+        }
+        if info, hasInfo := npcdata.SkillInfoOf(lesson.SkillID); hasInfo {
+            entry.Name = info.Name
+            entry.Icon = info.Icon
+            entry.Passive = info.Passive
+            entry.Category = info.Category
+        } else {
+            entry.Name = fmt.Sprintf("skill #%d", lesson.SkillID)
+        }
+        queue = append(queue, entry)
+    }
+    // The tree is sorted by (getLevel, skillId, level); the queue
+    // resorts by the warrior priority groups. The sort is stable so
+    // the tree order survives inside a group.
+    sort.SliceStable(queue, func(i, j int) bool {
+        return skillPlanPriority(queue[i], weapons) <
+            skillPlanPriority(queue[j], weapons)
+    })
 
-	return queue
+    return queue
 }
 
 // skillPlanPriority maps one queued lesson onto the warrior priority
@@ -270,58 +270,58 @@ func buildSkillQueue(
 // 1 the attack power skills of other weapons, 2 the defense skills,
 // 3 the rest.
 func skillPlanPriority(entry SkillPlanEntry, weapons []string) int {
-	if entry.Category == npcdata.SkillCategoryAttack {
-		if len(weapons) == 0 {
-			return 0
-		}
-		cast, ok := npcdata.SkillCastOf(entry.SkillID)
-		if ok {
-			for _, weapon := range weapons {
-				if cast.UsableWithWeapon(weapon) {
-					return 0
-				}
-			}
-		}
+    if entry.Category == npcdata.SkillCategoryAttack {
+        if len(weapons) == 0 {
+            return 0
+        }
+        cast, ok := npcdata.SkillCastOf(entry.SkillID)
+        if ok {
+            for _, weapon := range weapons {
+                if cast.UsableWithWeapon(weapon) {
+                    return 0
+                }
+            }
+        }
 
-		return 1
-	}
-	if entry.Category == npcdata.SkillCategoryDefense {
-		return 2
-	}
+        return 1
+    }
+    if entry.Category == npcdata.SkillCategoryDefense {
+        return 2
+    }
 
-	return 3
+    return 3
 }
 
 // skillSnapshotsLocked builds the learned skill list of the snapshot
 // sorted by skill id (the web UI splits the list into the active and
 // passive tabs and sorts each by id). The caller must hold a lock.
 func (b *Bot) skillSnapshotsLocked() []SkillSnapshot {
-	if len(b.skills) == 0 {
-		return nil
-	}
-	snapshots := make([]SkillSnapshot, 0, len(b.skills))
-	for id, skill := range b.skills {
-		snapshot := SkillSnapshot{
-			SkillID: id,
-			Level:   skill.level,
-			Passive: skill.passive,
-			Name:    fmt.Sprintf("skill #%d", id),
-			Icon:    "",
-			Desc:    "",
-		}
-		if info, ok := npcdata.SkillInfoOf(id); ok {
-			snapshot.Name = info.Name
-			snapshot.Icon = info.Icon
-			snapshot.Passive = info.Passive
-		}
-		if desc := npcdata.SkillDescription(id, skill.level); desc != "" {
-			snapshot.Desc = desc
-		}
-		snapshots = append(snapshots, snapshot)
-	}
-	sort.Slice(snapshots, func(i, j int) bool {
-		return snapshots[i].SkillID < snapshots[j].SkillID
-	})
+    if len(b.skills) == 0 {
+        return nil
+    }
+    snapshots := make([]SkillSnapshot, 0, len(b.skills))
+    for id, skill := range b.skills {
+        snapshot := SkillSnapshot{
+            SkillID: id,
+            Level:   skill.level,
+            Passive: skill.passive,
+            Name:    fmt.Sprintf("skill #%d", id),
+            Icon:    "",
+            Desc:    "",
+        }
+        if info, ok := npcdata.SkillInfoOf(id); ok {
+            snapshot.Name = info.Name
+            snapshot.Icon = info.Icon
+            snapshot.Passive = info.Passive
+        }
+        if desc := npcdata.SkillDescription(id, skill.level); desc != "" {
+            snapshot.Desc = desc
+        }
+        snapshots = append(snapshots, snapshot)
+    }
+    sort.Slice(snapshots, func(i, j int) bool {
+        return snapshots[i].SkillID < snapshots[j].SkillID
+    })
 
-	return snapshots
+    return snapshots
 }

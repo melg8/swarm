@@ -5,15 +5,15 @@
 package hunt
 
 import (
-	"math"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
+    "math"
+    "sort"
+    "strconv"
+    "strings"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/gear"
-	"github.com/melg8/swarm/internal/swarm/npcdata"
-	"github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/gear"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // Shopping of the town trips: the gear.PlanPurchases strategy decides
@@ -31,55 +31,55 @@ import (
 
 // Timing and threshold constants of the shopping.
 const (
-	// buyPause paces the buy requests after the transaction flood
-	// protector of the server (the transaction window is 10 game
-	// ticks = 1 second wide, shared with the sell batches; the pause
-	// keeps the proven generous margin - a refused transaction does
-	// not extend the window and the punishment config may kick
-	// repeat offenders).
-	buyPause = 11 * time.Second
-	// buyConfirmWait bounds the wait for the inventory update that
-	// confirms a buy request landed: the server answers a refused
-	// transaction SILENTLY (the flood refusal is a chat message, the
-	// range refusal a bare ActionFailed - neither references the
-	// request), so the loop watches the inventory for the bought
-	// item ids instead and re-requests the batch when they never
-	// show up.
-	buyConfirmWait = 15 * time.Second
-	// stopBuyRetries bounds the re-requests of a lost buy batch
-	// before the trip gives the purchases up.
-	stopBuyRetries = 3
-	// replaceSellTimeout bounds the wait for the inventory update
-	// that confirms the replacement sales: the junk flow batches the
-	// pieces at its own pace, and a piece the server refuses to sell
-	// never vanishes - the trip proceeds without its credit after the
-	// wait instead of stalling.
-	replaceSellTimeout = 60 * time.Second
-	// shoppingPlanPeriod bounds the shopping trigger re-plans: the
-	// adena and the inventory change with every loot, the plan for
-	// the trip trigger is cached for this period.
-	shoppingPlanPeriod = 5 * time.Second
-	// shoppingTripMinValue is the minimum total price of a plan that
-	// justifies a shopping trip on its own (a trip without it would
-	// walk to town for a handful of adena).
-	shoppingTripMinValue = 100
-	// weaponRunCooldown shortens the trip cooldown for the weapon
-	// runs: a bare-handed character with an affordable weapon
-	// retries the errand within a minute instead of punching mobs
-	// through the five minute cooldown of an ordinary trip. The
-	// failed run itself burns tens of seconds (the stuck re-paths,
-	// the walk back), so the short window still breaks any tight
-	// retry loop.
-	weaponRunCooldown = 45 * time.Second
-	// townTaxRate is the buy tax markup of the elven village
-	// merchants (baseTax 15 percent, no castle owns their tax on a
-	// fresh server). A future region config carries its own rate.
-	townTaxRate = 0.15
-	// dionTownTaxRate is the buy tax markup of the Town of Dion
-	// merchants (MerchantPriceConfig.xml priceConfig id=8 baseTax=20,
-	// no castle owns their tax on the local test server). The 20-25
-	// band shopping trip pays it.
-	dionTownTaxRate = 0.20
+    // buyPause paces the buy requests after the transaction flood
+    // protector of the server (the transaction window is 10 game
+    // ticks = 1 second wide, shared with the sell batches; the pause
+    // keeps the proven generous margin - a refused transaction does
+    // not extend the window and the punishment config may kick
+    // repeat offenders).
+    buyPause = 11 * time.Second
+    // buyConfirmWait bounds the wait for the inventory update that
+    // confirms a buy request landed: the server answers a refused
+    // transaction SILENTLY (the flood refusal is a chat message, the
+    // range refusal a bare ActionFailed - neither references the
+    // request), so the loop watches the inventory for the bought
+    // item ids instead and re-requests the batch when they never
+    // show up.
+    buyConfirmWait = 15 * time.Second
+    // stopBuyRetries bounds the re-requests of a lost buy batch
+    // before the trip gives the purchases up.
+    stopBuyRetries = 3
+    // replaceSellTimeout bounds the wait for the inventory update
+    // that confirms the replacement sales: the junk flow batches the
+    // pieces at its own pace, and a piece the server refuses to sell
+    // never vanishes - the trip proceeds without its credit after the
+    // wait instead of stalling.
+    replaceSellTimeout = 60 * time.Second
+    // shoppingPlanPeriod bounds the shopping trigger re-plans: the
+    // adena and the inventory change with every loot, the plan for
+    // the trip trigger is cached for this period.
+    shoppingPlanPeriod = 5 * time.Second
+    // shoppingTripMinValue is the minimum total price of a plan that
+    // justifies a shopping trip on its own (a trip without it would
+    // walk to town for a handful of adena).
+    shoppingTripMinValue = 100
+    // weaponRunCooldown shortens the trip cooldown for the weapon
+    // runs: a bare-handed character with an affordable weapon
+    // retries the errand within a minute instead of punching mobs
+    // through the five minute cooldown of an ordinary trip. The
+    // failed run itself burns tens of seconds (the stuck re-paths,
+    // the walk back), so the short window still breaks any tight
+    // retry loop.
+    weaponRunCooldown = 45 * time.Second
+    // townTaxRate is the buy tax markup of the elven village
+    // merchants (baseTax 15 percent, no castle owns their tax on a
+    // fresh server). A future region config carries its own rate.
+    townTaxRate = 0.15
+    // dionTownTaxRate is the buy tax markup of the Town of Dion
+    // merchants (MerchantPriceConfig.xml priceConfig id=8 baseTax=20,
+    // no castle owns their tax on the local test server). The 20-25
+    // band shopping trip pays it.
+    dionTownTaxRate = 0.20
 )
 
 // tripStop is one merchant visit of a town trip: the merchant to
@@ -88,10 +88,10 @@ const (
 // the skill teacher stop that learns the queued lessons (see
 // learning.go).
 type tripStop struct {
-	merchant townNpc
-	buys     []gear.Purchase
-	sell     bool
-	teach    bool
+    merchant townNpc
+    buys     []gear.Purchase
+    sell     bool
+    teach    bool
 }
 
 // townShopCatalog is the static gear catalog of the elven village town
@@ -111,20 +111,20 @@ var dionShopCatalog = dionShopCatalogBuild(dionMerchants)
 // id=8 baseTax=20). The tax rate differs from the elven 15 percent,
 // so the Dion catalog has its own builder.
 func dionShopCatalogBuild(merchants []townNpc) gear.Catalog {
-	shops := make([]gear.Shop, 0, len(merchants))
-	for _, merchant := range merchants {
-		lists := npcdata.BuyListsOfNPC(merchant.TemplateID)
-		if len(lists) == 0 {
-			continue
-		}
-		shops = append(shops, gear.Shop{
-			MerchantTemplateID: merchant.TemplateID,
-			TaxRate:            dionTownTaxRate,
-			Lists:              lists,
-		})
-	}
+    shops := make([]gear.Shop, 0, len(merchants))
+    for _, merchant := range merchants {
+        lists := npcdata.BuyListsOfNPC(merchant.TemplateID)
+        if len(lists) == 0 {
+            continue
+        }
+        shops = append(shops, gear.Shop{
+            MerchantTemplateID: merchant.TemplateID,
+            TaxRate:            dionTownTaxRate,
+            Lists:              lists,
+        })
+    }
 
-	return gear.Catalog{Shops: shops}
+    return gear.Catalog{Shops: shops}
 }
 
 // shopCatalogForRegion returns the gear catalog of the town the hunt
@@ -133,31 +133,31 @@ func dionShopCatalogBuild(merchants []townNpc) gear.Catalog {
 // active zone region is Dion. The elven village behavior stays
 // unchanged (the M0 acceptance still passes).
 func shopCatalogForRegion(region string) gear.Catalog {
-	if region == regionDion {
-		return dionShopCatalog
-	}
+    if region == regionDion {
+        return dionShopCatalog
+    }
 
-	return townShopCatalog
+    return townShopCatalog
 }
 
 // shopCatalog builds the gear catalog of the town merchants from the
 // generated buylist data: every merchant of the trip targets sells
 // its buylists at the town tax rate.
 func shopCatalog(merchants []townNpc) gear.Catalog {
-	shops := make([]gear.Shop, 0, len(merchants))
-	for _, merchant := range merchants {
-		lists := npcdata.BuyListsOfNPC(merchant.TemplateID)
-		if len(lists) == 0 {
-			continue
-		}
-		shops = append(shops, gear.Shop{
-			MerchantTemplateID: merchant.TemplateID,
-			TaxRate:            townTaxRate,
-			Lists:              lists,
-		})
-	}
+    shops := make([]gear.Shop, 0, len(merchants))
+    for _, merchant := range merchants {
+        lists := npcdata.BuyListsOfNPC(merchant.TemplateID)
+        if len(lists) == 0 {
+            continue
+        }
+        shops = append(shops, gear.Shop{
+            MerchantTemplateID: merchant.TemplateID,
+            TaxRate:            townTaxRate,
+            Lists:              lists,
+        })
+    }
 
-	return gear.Catalog{Shops: shops}
+    return gear.Catalog{Shops: shops}
 }
 
 // shoppingPlan plans the purchases against the current gear state.
@@ -168,7 +168,7 @@ func shopCatalog(merchants []townNpc) gear.Catalog {
 // plan (see maybeStartTownTrip): everything the trip sells and buys
 // reads that frozen plan.
 func (l *Loop) shoppingPlan() []gear.Purchase {
-	return affordablePrefix(l.shoppingQueue())
+    return affordablePrefix(l.shoppingQueue())
 }
 
 // shoppingQueue computes the fresh purchase queue against the current
@@ -181,18 +181,18 @@ func (l *Loop) shoppingPlan() []gear.Purchase {
 // lessons and the next trip would walk for them - the one town visit
 // rule of the acceptance round).
 func (l *Loop) shoppingQueue() []gear.Purchase {
-	if l.equip == nil {
-		return nil
-	}
-	stats := l.tracker.InventoryStats()
-	adena := int64(stats.Adena) - l.pendingBookBudget()
-	if adena < 0 {
-		adena = 0
-	}
+    if l.equip == nil {
+        return nil
+    }
+    stats := l.tracker.InventoryStats()
+    adena := int64(stats.Adena) - l.pendingBookBudget()
+    if adena < 0 {
+        adena = 0
+    }
 
-	return gear.PlanPurchaseQueue(
-		l.equip.profile, l.equipment(),
-		shopCatalogForRegion(l.zoneRegion), adena)
+    return gear.PlanPurchaseQueue(
+        l.equip.profile, l.equipment(),
+        shopCatalogForRegion(l.zoneRegion), adena)
 }
 
 // pendingBookBudget prices the spellbooks the learning queue demands
@@ -200,15 +200,15 @@ func (l *Loop) shoppingQueue() []gear.Purchase {
 // stop of the next trip buys (see bookPurchases), at the town tax
 // price. The reserve drops to zero when no lesson waits.
 func (l *Loop) pendingBookBudget() int64 {
-	l.refreshLearnPlan()
-	books := bookPurchases(l.walkLearnPrefix(false),
-		l.tracker.InventoryHasItem)
-	total := int64(0)
-	for _, book := range books {
-		total += book.Price
-	}
+    l.refreshLearnPlan()
+    books := bookPurchases(l.walkLearnPrefix(false),
+        l.tracker.InventoryHasItem)
+    total := int64(0)
+    for _, book := range books {
+        total += book.Price
+    }
 
-	return total
+    return total
 }
 
 // refreshShoppingCache recomputes the cached purchase queue when the
@@ -221,25 +221,25 @@ func (l *Loop) pendingBookBudget() int64 {
 // tick publish does not rebuild it (the rebuild was the dominant
 // allocation source of the 100 bot fleet under live profiling).
 func (l *Loop) refreshShoppingCache() {
-	now := time.Now()
-	if !l.shoppingPlanAt.IsZero() &&
-		now.Sub(l.shoppingPlanAt) < shoppingPlanPeriod {
-		return
-	}
-	stats := l.tracker.InventoryStats()
-	adena := int64(stats.Adena) - l.pendingBookBudget()
-	if adena < 0 {
-		adena = 0
-	}
-	l.shoppingPlanCache = l.shoppingQueue()
-	l.shoppingPlanAt = now
-	l.shoppingPlanAdena = adena
-	l.shoppingViewCache = shoppingQueueView(
-		l.shoppingPlanCache, l.shoppingPlanAdena)
-	// The fresh plan re-feeds the weapon priority of the learning
-	// queue: the planned next weapon purchase swaps the preferred
-	// weapon family of the lesson order (see combat_skills.go).
-	l.publishSkillWeaponPriority()
+    now := time.Now()
+    if !l.shoppingPlanAt.IsZero() &&
+        now.Sub(l.shoppingPlanAt) < shoppingPlanPeriod {
+        return
+    }
+    stats := l.tracker.InventoryStats()
+    adena := int64(stats.Adena) - l.pendingBookBudget()
+    if adena < 0 {
+        adena = 0
+    }
+    l.shoppingPlanCache = l.shoppingQueue()
+    l.shoppingPlanAt = now
+    l.shoppingPlanAdena = adena
+    l.shoppingViewCache = shoppingQueueView(
+        l.shoppingPlanCache, l.shoppingPlanAdena)
+    // The fresh plan re-feeds the weapon priority of the learning
+    // queue: the planned next weapon purchase swaps the preferred
+    // weapon family of the lesson order (see combat_skills.go).
+    l.publishSkillWeaponPriority()
 }
 
 // shoppingWanted reports whether the shop strategy justifies a town
@@ -250,34 +250,34 @@ func (l *Loop) refreshShoppingCache() {
 // was allocating a []Purchase on every bot every 200ms (4.5 MB over
 // a 3 minute fleet run) just to sum prices and throw the slice away.
 func (l *Loop) shoppingWanted() bool {
-	l.refreshShoppingCache()
-	if len(l.shoppingPlanCache) == 0 {
-		return false
-	}
-	var total int64
-	for _, purchase := range l.shoppingPlanCache {
-		if !purchase.Affordable {
-			break
-		}
-		total += purchase.Price
-	}
+    l.refreshShoppingCache()
+    if len(l.shoppingPlanCache) == 0 {
+        return false
+    }
+    var total int64
+    for _, purchase := range l.shoppingPlanCache {
+        if !purchase.Affordable {
+            break
+        }
+        total += purchase.Price
+    }
 
-	return total >= shoppingTripMinValue
+    return total >= shoppingTripMinValue
 }
 
 // affordablePrefix filters the affordable buys of a purchase queue:
 // the trip executes only them, the wanted tail is the widget's save
 // up view.
 func affordablePrefix(queue []gear.Purchase) []gear.Purchase {
-	buys := make([]gear.Purchase, 0, len(queue))
-	for _, purchase := range queue {
-		if !purchase.Affordable {
-			break
-		}
-		buys = append(buys, purchase)
-	}
+    buys := make([]gear.Purchase, 0, len(queue))
+    for _, purchase := range queue {
+        if !purchase.Affordable {
+            break
+        }
+        buys = append(buys, purchase)
+    }
 
-	return buys
+    return buys
 }
 
 // publishShoppingView refreshes the shopping queue of the web UI
@@ -295,46 +295,46 @@ func affordablePrefix(queue []gear.Purchase) []gear.Purchase {
 // built view is reused from the cache between recomputes so the per
 // tick publish pays no allocation.
 func (l *Loop) publishShoppingView() {
-	if !l.autonomous || !l.shoppingTripEnabled() {
-		l.tracker.ClearShoppingPlan()
+    if !l.autonomous || !l.shoppingTripEnabled() {
+        l.tracker.ClearShoppingPlan()
 
-		return
-	}
-	if l.tripActive() {
-		view := l.tripShoppingView()
-		if len(view.Entries) > 0 {
-			l.tracker.SetShoppingPlan(view)
+        return
+    }
+    if l.tripActive() {
+        view := l.tripShoppingView()
+        if len(view.Entries) > 0 {
+            l.tracker.SetShoppingPlan(view)
 
-			return
-		}
-		// No trip buys in flight yet (the walk to the shop, the sell
-		// phase before the stop planning): the triggering plan stays.
-	}
-	l.refreshShoppingCache()
-	l.tracker.SetShoppingPlan(l.shoppingViewCache)
+            return
+        }
+        // No trip buys in flight yet (the walk to the shop, the sell
+        // phase before the stop planning): the triggering plan stays.
+    }
+    l.refreshShoppingCache()
+    l.tracker.SetShoppingPlan(l.shoppingViewCache)
 }
 
 // shoppingQueueView builds the widget view of a purchase queue: the
 // entries in the walked order (the affordable plan first, the wanted
 // tail behind) with the planning adena and the affordable total.
 func shoppingQueueView(
-	queue []gear.Purchase, adena int64,
+    queue []gear.Purchase, adena int64,
 ) state.ShoppingPlanView {
-	var total int64
-	entries := make([]state.ShoppingEntryView, 0, len(queue))
-	for _, purchase := range queue {
-		if purchase.Affordable {
-			total += purchase.Price
-		}
-		entries = append(entries, shoppingEntryView(purchase, false))
-	}
+    var total int64
+    entries := make([]state.ShoppingEntryView, 0, len(queue))
+    for _, purchase := range queue {
+        if purchase.Affordable {
+            total += purchase.Price
+        }
+        entries = append(entries, shoppingEntryView(purchase, false))
+    }
 
-	return state.ShoppingPlanView{
-		Entries: entries,
-		Adena:   adena,
-		Total:   total,
-		Trip:    false,
-	}
+    return state.ShoppingPlanView{
+        Entries: entries,
+        Adena:   adena,
+        Total:   total,
+        Trip:    false,
+    }
 }
 
 // tripShoppingView builds the widget view of a running town trip: the
@@ -342,26 +342,26 @@ func shoppingQueueView(
 // purchases of the current stop and the later stops. The entries are
 // the trip's own plan, the affordable fields of the walker hold.
 func (l *Loop) tripShoppingView() state.ShoppingPlanView {
-	var total int64
-	entries := make([]state.ShoppingEntryView, 0, 16)
-	for _, purchase := range l.buyRequested {
-		total += purchase.Price
-		entries = append(entries, shoppingEntryView(purchase, true))
-	}
-	for _, stop := range l.tripStops {
-		for _, purchase := range stop.buys {
-			total += purchase.Price
-			entries = append(entries, shoppingEntryView(
-				purchase, false))
-		}
-	}
+    var total int64
+    entries := make([]state.ShoppingEntryView, 0, 16)
+    for _, purchase := range l.buyRequested {
+        total += purchase.Price
+        entries = append(entries, shoppingEntryView(purchase, true))
+    }
+    for _, stop := range l.tripStops {
+        for _, purchase := range stop.buys {
+            total += purchase.Price
+            entries = append(entries, shoppingEntryView(
+                purchase, false))
+        }
+    }
 
-	return state.ShoppingPlanView{
-		Entries: entries,
-		Adena:   int64(l.tracker.InventoryStats().Adena),
-		Total:   total,
-		Trip:    true,
-	}
+    return state.ShoppingPlanView{
+        Entries: entries,
+        Adena:   int64(l.tracker.InventoryStats().Adena),
+        Total:   total,
+        Trip:    true,
+    }
 }
 
 // shoppingEntryView converts one planned purchase into the tracker
@@ -370,43 +370,43 @@ func (l *Loop) tripShoppingView() state.ShoppingPlanView {
 // stats) so the web tooltip of the widget reuses the item tooltip
 // shape.
 func shoppingEntryView(
-	purchase gear.Purchase, buying bool,
+    purchase gear.Purchase, buying bool,
 ) state.ShoppingEntryView {
-	stats, hasStats := npcdata.ItemGearStats(purchase.ItemID)
-	itemType := stats.Type
-	if !hasStats {
-		itemType = npcdata.ItemType(purchase.ItemID)
-	}
+    stats, hasStats := npcdata.ItemGearStats(purchase.ItemID)
+    itemType := stats.Type
+    if !hasStats {
+        itemType = npcdata.ItemType(purchase.ItemID)
+    }
 
-	return state.ShoppingEntryView{
-		ItemID:     purchase.ItemID,
-		Name:       npcdata.ItemName(purchase.ItemID),
-		Icon:       npcdata.ItemIcon(purchase.ItemID),
-		MerchantID: purchase.MerchantTemplateID,
-		Merchant: npcdata.NPCName(
-			purchase.MerchantTemplateID + npcDisplayOffset),
-		Type:        itemType,
-		WeaponType:  stats.WeaponType,
-		ArmorType:   stats.ArmorType,
-		BodyPartKey: stats.BodyPart,
-		PAtk:        stats.PAtk,
-		MAtk:        stats.MAtk,
-		PDef:        stats.PDef,
-		MDef:        stats.MDef,
-		SDef:        stats.SDef,
-		RShld:       stats.RShld,
-		PAtkSpd:     stats.PAtkSpd,
-		SoulShots:   stats.SoulShots,
-		SpiritShots: stats.SpiritShots,
-		Weight:      npcdata.ItemWeight(purchase.ItemID),
-		Price:       purchase.Price,
-		SellCredit:  purchase.SellCredit,
-		Missing:     purchase.Missing,
-		Gain:        purchase.Gain,
-		Affordable:  purchase.Affordable,
-		Buying:      buying,
-		Reason:      purchase.Reason,
-	}
+    return state.ShoppingEntryView{
+        ItemID:     purchase.ItemID,
+        Name:       npcdata.ItemName(purchase.ItemID),
+        Icon:       npcdata.ItemIcon(purchase.ItemID),
+        MerchantID: purchase.MerchantTemplateID,
+        Merchant: npcdata.NPCName(
+            purchase.MerchantTemplateID + npcDisplayOffset),
+        Type:        itemType,
+        WeaponType:  stats.WeaponType,
+        ArmorType:   stats.ArmorType,
+        BodyPartKey: stats.BodyPart,
+        PAtk:        stats.PAtk,
+        MAtk:        stats.MAtk,
+        PDef:        stats.PDef,
+        MDef:        stats.MDef,
+        SDef:        stats.SDef,
+        RShld:       stats.RShld,
+        PAtkSpd:     stats.PAtkSpd,
+        SoulShots:   stats.SoulShots,
+        SpiritShots: stats.SpiritShots,
+        Weight:      npcdata.ItemWeight(purchase.ItemID),
+        Price:       purchase.Price,
+        SellCredit:  purchase.SellCredit,
+        Missing:     purchase.Missing,
+        Gain:        purchase.Gain,
+        Affordable:  purchase.Affordable,
+        Buying:      buying,
+        Reason:      purchase.Reason,
+    }
 }
 
 // replacementSellingActive reports whether the sell first step of
@@ -414,7 +414,7 @@ func shoppingEntryView(
 // must not re-equip the pieces the step just unequipped for their
 // sale (the empty slot would pull them right back on).
 func (l *Loop) replacementSellingActive() bool {
-	return len(l.replaceQueue) > 0 || len(l.replaceSelling) > 0
+    return len(l.replaceQueue) > 0 || len(l.replaceSelling) > 0
 }
 
 // stepReplacementSales runs the sell first step of the replacement
@@ -427,25 +427,25 @@ func (l *Loop) replacementSellingActive() bool {
 // the sale batch waiting for its transaction window or its
 // inventory confirmation).
 func (l *Loop) stepReplacementSales(now time.Time) bool {
-	if !l.replacePlanned {
-		l.replacePlanned = true
-		l.replaceQueue = l.replacementTargets()
-		if len(l.replaceQueue) == 0 {
-			return true
-		}
-		l.logf("Hunt: shop: %d equipped pieces feed the "+
-			"replacements, selling them first", len(l.replaceQueue))
+    if !l.replacePlanned {
+        l.replacePlanned = true
+        l.replaceQueue = l.replacementTargets()
+        if len(l.replaceQueue) == 0 {
+            return true
+        }
+        l.logf("Hunt: shop: %d equipped pieces feed the "+
+            "replacements, selling them first", len(l.replaceQueue))
 
-		return false
-	}
-	if !l.replaceUnequipsDone(now) {
-		return false
-	}
-	if !l.replaceOfferDone(now) {
-		return false
-	}
+        return false
+    }
+    if !l.replaceUnequipsDone(now) {
+        return false
+    }
+    if !l.replaceOfferDone(now) {
+        return false
+    }
 
-	return l.replaceSalesSettled(now)
+    return l.replaceSalesSettled(now)
 }
 
 // replaceUnequipsDone drives the unequip phase of the sell first
@@ -456,18 +456,18 @@ func (l *Loop) stepReplacementSales(now time.Time) bool {
 // the offer batch below sells it. Reports false while a unequip is
 // still in flight, true when the queue is drained.
 func (l *Loop) replaceUnequipsDone(now time.Time) bool {
-	for len(l.replaceQueue) > 0 {
-		head := l.replaceQueue[0]
-		if l.replaceHeadSettled(head) {
-			continue
-		}
-		if !l.replaceHeadOff(head, now) {
-			return false
-		}
-		l.dropReplacementHead()
-	}
+    for len(l.replaceQueue) > 0 {
+        head := l.replaceQueue[0]
+        if l.replaceHeadSettled(head) {
+            continue
+        }
+        if !l.replaceHeadOff(head, now) {
+            return false
+        }
+        l.dropReplacementHead()
+    }
 
-	return true
+    return true
 }
 
 // replaceHeadSettled reports whether the queued head needs no
@@ -475,25 +475,25 @@ func (l *Loop) replaceUnequipsDone(now time.Time) bool {
 // the junk flow already, gone from the inventory, or unequipped
 // (the piece joins the sale list for the settle wait).
 func (l *Loop) replaceHeadSettled(head int32) bool {
-	if l.sold[head] {
-		l.dropReplacementHead()
+    if l.sold[head] {
+        l.dropReplacementHead()
 
-		return true
-	}
-	item, ok := l.tracker.InventoryItemState(head)
-	if !ok {
-		l.dropReplacementHead()
+        return true
+    }
+    item, ok := l.tracker.InventoryItemState(head)
+    if !ok {
+        l.dropReplacementHead()
 
-		return true
-	}
-	if item.Equipped {
-		return false
-	}
-	l.replaceQueue = l.replaceQueue[1:]
-	l.replaceSelling = append(l.replaceSelling, item)
-	l.replaceTried = 0
+        return true
+    }
+    if item.Equipped {
+        return false
+    }
+    l.replaceQueue = l.replaceQueue[1:]
+    l.replaceSelling = append(l.replaceSelling, item)
+    l.replaceTried = 0
 
-	return true
+    return true
 }
 
 // replaceHeadOff sends the paced unequip request for the queued
@@ -502,35 +502,35 @@ func (l *Loop) replaceHeadSettled(head int32) bool {
 // (the buy then runs without its credit - the server swap semantics
 // still replace the piece).
 func (l *Loop) replaceHeadOff(head int32, now time.Time) bool {
-	if !l.replaceUnequipAt.IsZero() &&
-		now.Sub(l.replaceUnequipAt) < equipActionPeriod {
-		return false
-	}
-	if l.replaceTried >= 2 {
-		l.logf("Hunt: shop: item %d does not come off, "+
-			"buying without its credit", head)
+    if !l.replaceUnequipAt.IsZero() &&
+        now.Sub(l.replaceUnequipAt) < equipActionPeriod {
+        return false
+    }
+    if l.replaceTried >= 2 {
+        l.logf("Hunt: shop: item %d does not come off, "+
+            "buying without its credit", head)
 
-		return true
-	}
-	l.replaceUnequipAt = now
-	l.replaceTried++
-	l.logf("Hunt: shop: unequipping the replaced item %d",
-		head)
-	if err := l.game.UseItem(head); err != nil {
-		l.logf("Hunt: shop: unequip of %d failed: %v",
-			head, err)
+        return true
+    }
+    l.replaceUnequipAt = now
+    l.replaceTried++
+    l.logf("Hunt: shop: unequipping the replaced item %d",
+        head)
+    if err := l.game.UseItem(head); err != nil {
+        l.logf("Hunt: shop: unequip of %d failed: %v",
+            head, err)
 
-		return false
-	}
+        return false
+    }
 
-	return false
+    return false
 }
 
 // dropReplacementHead drops the head of the replacement queue with
 // its retry budget.
 func (l *Loop) dropReplacementHead() {
-	l.replaceQueue = l.replaceQueue[1:]
-	l.replaceTried = 0
+    l.replaceQueue = l.replaceQueue[1:]
+    l.replaceTried = 0
 }
 
 // replaceOfferDone drives the sale phase: the handed pieces the junk
@@ -540,39 +540,39 @@ func (l *Loop) dropReplacementHead() {
 // the offer phase concluded - the own batch went out or the junk
 // flow owns every piece.
 func (l *Loop) replaceOfferDone(now time.Time) bool {
-	if l.replaceSellSent || len(l.replaceSelling) == 0 {
-		return true
-	}
-	batch := make([]state.InventoryItem, 0, len(l.replaceSelling))
-	for _, item := range l.replaceSelling {
-		if !l.sold[item.ObjectID] {
-			batch = append(batch, item)
-		}
-	}
-	if len(batch) == 0 {
-		// The junk flow already offered every handed piece: the
-		// settle phase waits out their removals.
-		l.replaceSellSent = true
+    if l.replaceSellSent || len(l.replaceSelling) == 0 {
+        return true
+    }
+    batch := make([]state.InventoryItem, 0, len(l.replaceSelling))
+    for _, item := range l.replaceSelling {
+        if !l.sold[item.ObjectID] {
+            batch = append(batch, item)
+        }
+    }
+    if len(batch) == 0 {
+        // The junk flow already offered every handed piece: the
+        // settle phase waits out their removals.
+        l.replaceSellSent = true
 
-		return true
-	}
-	if !l.sellAt.IsZero() && now.Sub(l.sellAt) < sellPause {
-		return false
-	}
-	if err := l.game.SellItems(batch); err != nil {
-		l.logf("Hunt: shop: replacement sell failed: %v", err)
+        return true
+    }
+    if !l.sellAt.IsZero() && now.Sub(l.sellAt) < sellPause {
+        return false
+    }
+    if err := l.game.SellItems(batch); err != nil {
+        l.logf("Hunt: shop: replacement sell failed: %v", err)
 
-		return false
-	}
-	for _, item := range batch {
-		l.sold[item.ObjectID] = true
-	}
-	l.sellAt = now
-	l.replaceSellSent = true
-	l.logf("Hunt: shop: offered %d replaced pieces for sale",
-		len(batch))
+        return false
+    }
+    for _, item := range batch {
+        l.sold[item.ObjectID] = true
+    }
+    l.sellAt = now
+    l.replaceSellSent = true
+    l.logf("Hunt: shop: offered %d replaced pieces for sale",
+        len(batch))
 
-	return true
+    return true
 }
 
 // replaceSalesSettled waits for the inventory update that confirms
@@ -582,22 +582,22 @@ func (l *Loop) replaceOfferDone(now time.Time) bool {
 // arrived). A piece the server refuses to sell never vanishes, so
 // the wait is bounded and the trip proceeds without its credit.
 func (l *Loop) replaceSalesSettled(now time.Time) bool {
-	if len(l.replaceSelling) == 0 {
-		return true
-	}
-	if l.replaceWaitAt.IsZero() {
-		l.replaceWaitAt = now
-	}
-	if now.Sub(l.replaceWaitAt) < replaceSellTimeout {
-		for _, item := range l.replaceSelling {
-			if _, ok := l.tracker.InventoryItemState(item.ObjectID); ok {
-				return false
-			}
-		}
-	}
-	l.replaceSelling = nil
+    if len(l.replaceSelling) == 0 {
+        return true
+    }
+    if l.replaceWaitAt.IsZero() {
+        l.replaceWaitAt = now
+    }
+    if now.Sub(l.replaceWaitAt) < replaceSellTimeout {
+        for _, item := range l.replaceSelling {
+            if _, ok := l.tracker.InventoryItemState(item.ObjectID); ok {
+                return false
+            }
+        }
+    }
+    l.replaceSelling = nil
 
-	return true
+    return true
 }
 
 // resetReplacementSales drops the sell first step state: a fresh
@@ -605,14 +605,14 @@ func (l *Loop) replaceSalesSettled(now time.Time) bool {
 // an aborted trip leaves no half-sold queue behind that the auto
 // equipment would have to steer around.
 func (l *Loop) resetReplacementSales() {
-	l.replacePlanned = false
-	l.replaceDone = false
-	l.replaceQueue = nil
-	l.replaceSelling = nil
-	l.replaceSellSent = false
-	l.replaceUnequipAt = time.Time{}
-	l.replaceWaitAt = time.Time{}
-	l.replaceTried = 0
+    l.replacePlanned = false
+    l.replaceDone = false
+    l.replaceQueue = nil
+    l.replaceSelling = nil
+    l.replaceSellSent = false
+    l.replaceUnequipAt = time.Time{}
+    l.replaceWaitAt = time.Time{}
+    l.replaceTried = 0
 }
 
 // replacementTargets collects the equipped object ids the FROZEN TRIP
@@ -622,23 +622,23 @@ func (l *Loop) resetReplacementSales() {
 // - a purchase whose displaced piece was never queued for sale (the
 // drift the shop re-plans used to produce) cannot happen anymore.
 func (l *Loop) replacementTargets() []int32 {
-	purchases := l.tripPlan
-	if len(purchases) == 0 {
-		return nil
-	}
-	seen := make(map[int32]bool)
-	var targets []int32
-	for _, purchase := range purchases {
-		for _, objectID := range purchase.SellFirst {
-			if objectID == 0 || seen[objectID] {
-				continue
-			}
-			seen[objectID] = true
-			targets = append(targets, objectID)
-		}
-	}
+    purchases := l.tripPlan
+    if len(purchases) == 0 {
+        return nil
+    }
+    seen := make(map[int32]bool)
+    var targets []int32
+    for _, purchase := range purchases {
+        for _, objectID := range purchase.SellFirst {
+            if objectID == 0 || seen[objectID] {
+                continue
+            }
+            seen[objectID] = true
+            targets = append(targets, objectID)
+        }
+    }
 
-	return targets
+    return targets
 }
 
 // planShoppingStops distributes the FROZEN TRIP PLAN into the buy
@@ -649,102 +649,102 @@ func (l *Loop) replacementTargets() []int32 {
 // once at the trip start; the selling that ran in between only banks
 // the credits the plan already counted (see replacementTargets).
 func (l *Loop) planShoppingStops() {
-	l.buysPlanned = true
-	purchases := l.tripPlan
-	if len(purchases) == 0 {
-		l.logf("Hunt: shop: the trip plan carries no buys, " +
-			"heading back")
+    l.buysPlanned = true
+    purchases := l.tripPlan
+    if len(purchases) == 0 {
+        l.logf("Hunt: shop: the trip plan carries no buys, " +
+            "heading back")
 
-		return
-	}
-	selfX, selfY, _, ok := l.tracker.SelfPosition()
-	if !ok {
-		selfX, selfY = 0, 0
-	}
-	// Group the purchases by merchant.
-	groups := make(map[int32][]gear.Purchase)
-	for _, purchase := range purchases {
-		groups[purchase.MerchantTemplateID] = append(
-			groups[purchase.MerchantTemplateID], purchase)
-	}
-	type merchantGroup struct {
-		merchant townNpc
-		buys     []gear.Purchase
-	}
-	stops := make([]merchantGroup, 0, len(groups))
-	for templateID, buys := range groups {
-		merchant, ok := merchantByTemplate(templateID)
-		if !ok {
-			l.logf("Hunt: shop: no known merchant for template "+
-				"%d, skipping %d purchases", templateID, len(buys))
+        return
+    }
+    selfX, selfY, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        selfX, selfY = 0, 0
+    }
+    // Group the purchases by merchant.
+    groups := make(map[int32][]gear.Purchase)
+    for _, purchase := range purchases {
+        groups[purchase.MerchantTemplateID] = append(
+            groups[purchase.MerchantTemplateID], purchase)
+    }
+    type merchantGroup struct {
+        merchant townNpc
+        buys     []gear.Purchase
+    }
+    stops := make([]merchantGroup, 0, len(groups))
+    for templateID, buys := range groups {
+        merchant, ok := merchantByTemplate(templateID)
+        if !ok {
+            l.logf("Hunt: shop: no known merchant for template "+
+                "%d, skipping %d purchases", templateID, len(buys))
 
-			continue
-		}
-		stops = append(stops, merchantGroup{merchant: merchant, buys: buys})
-	}
-	sort.Slice(stops, func(i int, j int) bool {
-		di := math.Hypot(
-			float64(stops[i].merchant.X-selfX),
-			float64(stops[i].merchant.Y-selfY))
-		dj := math.Hypot(
-			float64(stops[j].merchant.X-selfX),
-			float64(stops[j].merchant.Y-selfY))
+            continue
+        }
+        stops = append(stops, merchantGroup{merchant: merchant, buys: buys})
+    }
+    sort.Slice(stops, func(i int, j int) bool {
+        di := math.Hypot(
+            float64(stops[i].merchant.X-selfX),
+            float64(stops[i].merchant.Y-selfY))
+        dj := math.Hypot(
+            float64(stops[j].merchant.X-selfX),
+            float64(stops[j].merchant.Y-selfY))
 
-		return di < dj
-	})
-	total := 0
-	for _, stop := range stops {
-		total += len(stop.buys)
-	}
-	l.logf("Hunt: shop: planning to buy %d items from %d "+
-		"merchants", total, len(stops))
-	// The first group of the merchant the character stands at (the
-	// sell stop) buys right here.
-	if len(stops) > 0 && len(l.tripStops) > 0 &&
-		stops[0].merchant.TemplateID ==
-			l.tripStops[0].merchant.TemplateID {
-		l.tripStops[0].buys = stops[0].buys
-		stops = stops[1:]
-	}
-	for _, stop := range stops {
-		l.tripStops = append(l.tripStops, tripStop{
-			merchant: stop.merchant,
-			buys:     stop.buys,
-			sell:     false,
-			teach:    false,
-		})
-	}
+        return di < dj
+    })
+    total := 0
+    for _, stop := range stops {
+        total += len(stop.buys)
+    }
+    l.logf("Hunt: shop: planning to buy %d items from %d "+
+        "merchants", total, len(stops))
+    // The first group of the merchant the character stands at (the
+    // sell stop) buys right here.
+    if len(stops) > 0 && len(l.tripStops) > 0 &&
+        stops[0].merchant.TemplateID ==
+            l.tripStops[0].merchant.TemplateID {
+        l.tripStops[0].buys = stops[0].buys
+        stops = stops[1:]
+    }
+    for _, stop := range stops {
+        l.tripStops = append(l.tripStops, tripStop{
+            merchant: stop.merchant,
+            buys:     stop.buys,
+            sell:     false,
+            teach:    false,
+        })
+    }
 }
 
 // merchantByTemplate finds the town merchant of the packet template
 // id.
 func merchantByTemplate(templateID int32) (townNpc, bool) {
-	for _, merchant := range townMerchants {
-		if merchant.TemplateID == templateID {
-			return merchant, true
-		}
-	}
-	// The Dion merchants serve the band book stops (the spellbook
-	// fallback of the lesson trips - the Sonia book list).
-	for _, merchant := range dionMerchants {
-		if merchant.TemplateID == templateID {
-			return merchant, true
-		}
-	}
+    for _, merchant := range townMerchants {
+        if merchant.TemplateID == templateID {
+            return merchant, true
+        }
+    }
+    // The Dion merchants serve the band book stops (the spellbook
+    // fallback of the lesson trips - the Sonia book list).
+    for _, merchant := range dionMerchants {
+        if merchant.TemplateID == templateID {
+            return merchant, true
+        }
+    }
 
-	return zeroTownNpc, false
+    return zeroTownNpc, false
 }
 
 // stopMerchantTemplates lists the packet template ids of the current
 // trip stop merchant (offset by the display id base).
 func (l *Loop) stopMerchantTemplates() []int32 {
-	if len(l.tripStops) == 0 {
-		return merchantTemplates()
-	}
+    if len(l.tripStops) == 0 {
+        return merchantTemplates()
+    }
 
-	return []int32{
-		l.tripStops[0].merchant.TemplateID + npcDisplayOffset,
-	}
+    return []int32{
+        l.tripStops[0].merchant.TemplateID + npcDisplayOffset,
+    }
 }
 
 // tickStopShopping buys the purchases of the current stop: the
@@ -762,110 +762,110 @@ func (l *Loop) stopMerchantTemplates() []int32 {
 //
 //nolint:cyclop,funlen,gocognit // the stop shopping decision tree
 func (l *Loop) tickStopShopping(now time.Time) bool {
-	if len(l.tripStops) == 0 {
-		return true
-	}
-	stop := l.tripStops[0]
-	if len(stop.buys) == 0 && len(l.buyRequested) == 0 {
-		return true
-	}
-	// The frozen plan's last responsible moment: an item the inventory
-	// already carries must not be bought again (a loot drop the auto
-	// equipment wore mid trip, a manual user purchase). The owned
-	// lines drop out of the stop before any request goes out - the
-	// buy itself would deliver a duplicate the plan never wanted.
-	l.tripStops[0].buys = l.dropOwnedPurchases(l.tripStops[0].buys)
-	stop = l.tripStops[0]
-	if len(stop.buys) == 0 && len(l.buyRequested) == 0 {
-		return true
-	}
-	if !l.handleMerchant(now, l.stopMerchantTemplates()) {
-		return false
-	}
-	// The confirmation gate of the in-flight batch: the arrived items
-	// complete it, the deadline re-requests it.
-	if len(l.buyRequested) > 0 {
-		switch {
-		case l.buysArrived(l.buyRequested):
-			l.logf("Hunt: shop: %d purchases confirmed",
-				len(l.buyRequested))
-			l.buyRequested = nil
-			l.buyConfirmAt = time.Time{}
-			l.buyRetries = 0
-		case now.Sub(l.buyConfirmAt) < buyConfirmWait:
-			return false
-		default:
-			l.buyRetries++
-			if l.buyRetries > stopBuyRetries {
-				l.logf("Hunt: shop: %d purchases never "+
-					"arrived after %d requests, skipping them",
-					len(l.buyRequested), l.buyRetries)
-				l.buyRequested = nil
-				l.buyConfirmAt = time.Time{}
-				l.buyRetries = 0
-			} else {
-				l.logf("Hunt: shop: %d purchases did not "+
-					"arrive, re-requesting (try %d of %d)",
-					len(l.buyRequested), l.buyRetries, stopBuyRetries)
-			}
-		}
-		if len(l.tripStops) == 0 ||
-			(len(l.tripStops[0].buys) == 0 && len(l.buyRequested) == 0) {
-			return true
-		}
-	}
-	// The buy pacing shares the transaction window with the sells: the
-	// first buy of a stop waits out the last sell batch as well (the
-	// flood window is 1 s wide, the pause keeps the proven margin).
-	last := l.buyAt
-	if l.sellAt.After(last) {
-		last = l.sellAt
-	}
-	if !last.IsZero() && now.Sub(last) < buyPause {
-		return false
-	}
-	// One buylist per request: the purchases of the first list id of
-	// the stop go out together, an in-flight retry re-sends its own
-	// batch.
-	batch := l.buyRequested
-	remaining := make([]gear.Purchase, 0, len(stop.buys))
-	var listID int32
-	if len(batch) > 0 {
-		listID = batch[0].ListID
-	} else {
-		listID = stop.buys[0].ListID
-		for _, purchase := range stop.buys {
-			if purchase.ListID == listID {
-				batch = append(batch, purchase)
-			} else {
-				remaining = append(remaining, purchase)
-			}
-		}
-		l.tripStops[0].buys = remaining
-	}
-	if err := l.game.BuyItems(listID, batch); err != nil {
-		l.logf("Hunt: shop: buy request failed: %v", err)
+    if len(l.tripStops) == 0 {
+        return true
+    }
+    stop := l.tripStops[0]
+    if len(stop.buys) == 0 && len(l.buyRequested) == 0 {
+        return true
+    }
+    // The frozen plan's last responsible moment: an item the inventory
+    // already carries must not be bought again (a loot drop the auto
+    // equipment wore mid trip, a manual user purchase). The owned
+    // lines drop out of the stop before any request goes out - the
+    // buy itself would deliver a duplicate the plan never wanted.
+    l.tripStops[0].buys = l.dropOwnedPurchases(l.tripStops[0].buys)
+    stop = l.tripStops[0]
+    if len(stop.buys) == 0 && len(l.buyRequested) == 0 {
+        return true
+    }
+    if !l.handleMerchant(now, l.stopMerchantTemplates()) {
+        return false
+    }
+    // The confirmation gate of the in-flight batch: the arrived items
+    // complete it, the deadline re-requests it.
+    if len(l.buyRequested) > 0 {
+        switch {
+        case l.buysArrived(l.buyRequested):
+            l.logf("Hunt: shop: %d purchases confirmed",
+                len(l.buyRequested))
+            l.buyRequested = nil
+            l.buyConfirmAt = time.Time{}
+            l.buyRetries = 0
+        case now.Sub(l.buyConfirmAt) < buyConfirmWait:
+            return false
+        default:
+            l.buyRetries++
+            if l.buyRetries > stopBuyRetries {
+                l.logf("Hunt: shop: %d purchases never "+
+                    "arrived after %d requests, skipping them",
+                    len(l.buyRequested), l.buyRetries)
+                l.buyRequested = nil
+                l.buyConfirmAt = time.Time{}
+                l.buyRetries = 0
+            } else {
+                l.logf("Hunt: shop: %d purchases did not "+
+                    "arrive, re-requesting (try %d of %d)",
+                    len(l.buyRequested), l.buyRetries, stopBuyRetries)
+            }
+        }
+        if len(l.tripStops) == 0 ||
+            (len(l.tripStops[0].buys) == 0 && len(l.buyRequested) == 0) {
+            return true
+        }
+    }
+    // The buy pacing shares the transaction window with the sells: the
+    // first buy of a stop waits out the last sell batch as well (the
+    // flood window is 1 s wide, the pause keeps the proven margin).
+    last := l.buyAt
+    if l.sellAt.After(last) {
+        last = l.sellAt
+    }
+    if !last.IsZero() && now.Sub(last) < buyPause {
+        return false
+    }
+    // One buylist per request: the purchases of the first list id of
+    // the stop go out together, an in-flight retry re-sends its own
+    // batch.
+    batch := l.buyRequested
+    remaining := make([]gear.Purchase, 0, len(stop.buys))
+    var listID int32
+    if len(batch) > 0 {
+        listID = batch[0].ListID
+    } else {
+        listID = stop.buys[0].ListID
+        for _, purchase := range stop.buys {
+            if purchase.ListID == listID {
+                batch = append(batch, purchase)
+            } else {
+                remaining = append(remaining, purchase)
+            }
+        }
+        l.tripStops[0].buys = remaining
+    }
+    if err := l.game.BuyItems(listID, batch); err != nil {
+        l.logf("Hunt: shop: buy request failed: %v", err)
 
-		return false
-	}
-	l.buyAt = now
-	l.buyRequested = batch
-	l.buyConfirmAt = now
-	names := make([]string, 0, len(batch))
-	cost := int64(0)
-	for _, purchase := range batch {
-		names = append(names, npcdata.ItemName(purchase.ItemID))
-		cost += purchase.Price
-	}
-	if l.journal != nil {
-		l.journal.Buy(l.tracker.ID(), strings.Join(names, ", "),
-			len(batch), cost)
-	}
-	l.logf("Hunt: shop: buying %d items from %s (list %d): %s",
-		len(batch), stop.merchant.Name, listID, strings.Join(names, ", "))
+        return false
+    }
+    l.buyAt = now
+    l.buyRequested = batch
+    l.buyConfirmAt = now
+    names := make([]string, 0, len(batch))
+    cost := int64(0)
+    for _, purchase := range batch {
+        names = append(names, npcdata.ItemName(purchase.ItemID))
+        cost += purchase.Price
+    }
+    if l.journal != nil {
+        l.journal.Buy(l.tracker.ID(), strings.Join(names, ", "),
+            len(batch), cost)
+    }
+    l.logf("Hunt: shop: buying %d items from %s (list %d): %s",
+        len(batch), stop.merchant.Name, listID, strings.Join(names, ", "))
 
-	return len(l.tripStops) > 0 && len(l.tripStops[0].buys) == 0 &&
-		len(l.buyRequested) == 0
+    return len(l.tripStops) > 0 && len(l.tripStops[0].buys) == 0 &&
+        len(l.buyRequested) == 0
 }
 
 // dropOwnedPurchases filters the stop purchases whose item id the
@@ -877,30 +877,30 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 // single slot family blocks its second copy (the second pair of
 // gloves of the report).
 func (l *Loop) dropOwnedPurchases(purchases []gear.Purchase) []gear.Purchase {
-	items := l.tracker.InventoryItems()
-	carried := make(map[int32]int, len(items))
-	for _, item := range items {
-		carried[item.ItemID]++
-	}
-	planned := make(map[int32]int, len(purchases))
-	kept := purchases[:0]
-	for _, purchase := range purchases {
-		stats, hasStats := npcdata.ItemGearStats(purchase.ItemID)
-		copies := 1
-		if hasStats {
-			copies = int(gear.FamilyCopiesOf(stats))
-		}
-		planned[purchase.ItemID]++
-		if carried[purchase.ItemID]+planned[purchase.ItemID] > copies {
-			l.logger.Printf("Hunt: shop: %s already in the inventory, "+
-				"skipping the purchase", npcdata.ItemName(purchase.ItemID))
+    items := l.tracker.InventoryItems()
+    carried := make(map[int32]int, len(items))
+    for _, item := range items {
+        carried[item.ItemID]++
+    }
+    planned := make(map[int32]int, len(purchases))
+    kept := purchases[:0]
+    for _, purchase := range purchases {
+        stats, hasStats := npcdata.ItemGearStats(purchase.ItemID)
+        copies := 1
+        if hasStats {
+            copies = int(gear.FamilyCopiesOf(stats))
+        }
+        planned[purchase.ItemID]++
+        if carried[purchase.ItemID]+planned[purchase.ItemID] > copies {
+            l.logger.Printf("Hunt: shop: %s already in the inventory, "+
+                "skipping the purchase", npcdata.ItemName(purchase.ItemID))
 
-			continue
-		}
-		kept = append(kept, purchase)
-	}
+            continue
+        }
+        kept = append(kept, purchase)
+    }
 
-	return kept
+    return kept
 }
 
 // buysArrived reports whether every purchase of the batch shows up in
@@ -909,78 +909,78 @@ func (l *Loop) dropOwnedPurchases(purchases []gear.Purchase) []gear.Purchase {
 // the arrival signal; an equipped purchase still counts - the auto
 // equipment wears it within seconds).
 func (l *Loop) buysArrived(batch []gear.Purchase) bool {
-	items := l.tracker.InventoryItems()
-	for _, purchase := range batch {
-		found := false
-		for _, item := range items {
-			if item.ItemID == purchase.ItemID {
-				found = true
+    items := l.tracker.InventoryItems()
+    for _, purchase := range batch {
+        found := false
+        for _, item := range items {
+            if item.ItemID == purchase.ItemID {
+                found = true
 
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
+                break
+            }
+        }
+        if !found {
+            return false
+        }
+    }
 
-	return true
+    return true
 }
 
 // advanceTripStop finishes the current stop and walks to the next
 // one (a buy stop or the return leg when none is left).
 func (l *Loop) advanceTripStop() {
-	if len(l.tripStops) > 0 {
-		l.tripStops = l.tripStops[1:]
-	}
-	// A new stop starts with a fresh retry budget and no in-flight
-	// batch (the previous stop only advances when its batch settled).
-	l.buyRequested = nil
-	l.buyConfirmAt = time.Time{}
-	l.buyRetries = 0
-	l.resetLearnState()
-	// A fresh stop starts with a fresh escalation ladder: the frozen
-	// aborts of the previous leg spent its rungs, the next leg deserves
-	// its own detour re-plan and direct walk before the trip gives up.
-	l.frozenStage = 0
-	l.directLeg = false
-	// The finished stop talked to its npc: drop the selection the
-	// talk left behind, the next stop selects its own npc and the
-	// trip end walks home with a clean engage.
-	l.clearTalkedTarget()
-	if len(l.tripStops) == 0 {
-		l.startReturnLeg()
+    if len(l.tripStops) > 0 {
+        l.tripStops = l.tripStops[1:]
+    }
+    // A new stop starts with a fresh retry budget and no in-flight
+    // batch (the previous stop only advances when its batch settled).
+    l.buyRequested = nil
+    l.buyConfirmAt = time.Time{}
+    l.buyRetries = 0
+    l.resetLearnState()
+    // A fresh stop starts with a fresh escalation ladder: the frozen
+    // aborts of the previous leg spent its rungs, the next leg deserves
+    // its own detour re-plan and direct walk before the trip gives up.
+    l.frozenStage = 0
+    l.directLeg = false
+    // The finished stop talked to its npc: drop the selection the
+    // talk left behind, the next stop selects its own npc and the
+    // trip end walks home with a clean engage.
+    l.clearTalkedTarget()
+    if len(l.tripStops) == 0 {
+        l.startReturnLeg()
 
-		return
-	}
-	l.phase = phaseTownWalk
-	l.merchantID = 0
-	l.merchantPick = time.Time{}
-	l.merchantDeckUntil = time.Time{}
-	stop := l.tripStops[0]
-	l.logf("Hunt: shop: walking to %s", stop.merchant.Name)
-	if stop.teach {
-		// The teacher stop walks right up to the class master: the
-		// close approach ring of the npc approach offset, planned by
-		// the geodata search - the only authority that knows the
-		// walkable ring cells (the trainer hall interior carries its
-		// floor along the hall rows, the straight line offset ring
-		// lands on the roof-only band between them). The wide trip
-		// ring stays the fallback for a teacher whose tight ring has
-		// no walkable route at all, the approach window owns the last
-		// stretch there.
-		l.legRadius = npcApproachOffset
-		if !l.startWalkLeg(townNpcPosition(stop.merchant)) {
-			l.legRadius = tripApproachRadius
-		}
-	} else {
-		l.legRadius = tripApproachRadius
-	}
-	planFailed := !l.startWalkLeg(townNpcPosition(stop.merchant))
-	if l.phase == phaseTownWalk && planFailed {
-		l.abortTownTrip("no walkable path to the shop of " +
-			stop.merchant.Name)
-	}
+        return
+    }
+    l.phase = phaseTownWalk
+    l.merchantID = 0
+    l.merchantPick = time.Time{}
+    l.merchantDeckUntil = time.Time{}
+    stop := l.tripStops[0]
+    l.logf("Hunt: shop: walking to %s", stop.merchant.Name)
+    if stop.teach {
+        // The teacher stop walks right up to the class master: the
+        // close approach ring of the npc approach offset, planned by
+        // the geodata search - the only authority that knows the
+        // walkable ring cells (the trainer hall interior carries its
+        // floor along the hall rows, the straight line offset ring
+        // lands on the roof-only band between them). The wide trip
+        // ring stays the fallback for a teacher whose tight ring has
+        // no walkable route at all, the approach window owns the last
+        // stretch there.
+        l.legRadius = npcApproachOffset
+        if !l.startWalkLeg(townNpcPosition(stop.merchant)) {
+            l.legRadius = tripApproachRadius
+        }
+    } else {
+        l.legRadius = tripApproachRadius
+    }
+    planFailed := !l.startWalkLeg(townNpcPosition(stop.merchant))
+    if l.phase == phaseTownWalk && planFailed {
+        l.abortTownTrip("no walkable path to the shop of " +
+            stop.merchant.Name)
+    }
 }
 
 // shoppingTripEnabled reports whether the shopping trigger may arm:
@@ -988,8 +988,8 @@ func (l *Loop) advanceTripStop() {
 // and the known merchants must sell something (the generated
 // catalogs).
 func (l *Loop) shoppingTripEnabled() bool {
-	return l.equip != nil &&
-		len(shopCatalogForRegion(l.zoneRegion).Shops) > 0
+    return l.equip != nil &&
+        len(shopCatalogForRegion(l.zoneRegion).Shops) > 0
 }
 
 // emptyPurchase is the not-found sentinel of the weapon purchase
@@ -1004,39 +1004,39 @@ var emptyPurchase gear.Purchase
 // weapon and the buy share one stop, and a bare-handed character runs
 // the weapon errand alone (see weaponlessRunWanted).
 func (l *Loop) affordableWeaponPurchase() (gear.Purchase, bool) {
-	if !l.shoppingTripEnabled() {
-		return emptyPurchase, false
-	}
-	l.refreshShoppingCache()
-	for _, purchase := range l.shoppingPlanCache {
-		if !purchase.Affordable {
-			break
-		}
-		stats, ok := npcdata.ItemGearStats(purchase.ItemID)
-		if !ok || gear.CategoryOf(stats) != gear.CategoryWeapon {
-			continue
-		}
+    if !l.shoppingTripEnabled() {
+        return emptyPurchase, false
+    }
+    l.refreshShoppingCache()
+    for _, purchase := range l.shoppingPlanCache {
+        if !purchase.Affordable {
+            break
+        }
+        stats, ok := npcdata.ItemGearStats(purchase.ItemID)
+        if !ok || gear.CategoryOf(stats) != gear.CategoryWeapon {
+            continue
+        }
 
-		return purchase, true
-	}
+        return purchase, true
+    }
 
-	return emptyPurchase, false
+    return emptyPurchase, false
 }
 
 // weaponStopMerchant resolves the town merchant that sells the
 // weapon purchase of the frozen trip plan (the plan the trip
 // executes - the cached hunt queue already served its trigger).
 func (l *Loop) weaponStopMerchant() (townNpc, bool) {
-	for _, purchase := range l.tripPlan {
-		stats, ok := npcdata.ItemGearStats(purchase.ItemID)
-		if !ok || gear.CategoryOf(stats) != gear.CategoryWeapon {
-			continue
-		}
+    for _, purchase := range l.tripPlan {
+        stats, ok := npcdata.ItemGearStats(purchase.ItemID)
+        if !ok || gear.CategoryOf(stats) != gear.CategoryWeapon {
+            continue
+        }
 
-		return merchantByTemplate(purchase.MerchantTemplateID)
-	}
+        return merchantByTemplate(purchase.MerchantTemplateID)
+    }
 
-	return zeroTownNpc, false
+    return zeroTownNpc, false
 }
 
 // weaponlessRunWanted reports whether the character fights bare-handed
@@ -1048,15 +1048,15 @@ func (l *Loop) weaponStopMerchant() (townNpc, bool) {
 // afford any weapon keeps farming: the wallet grows until the plan
 // offers one, there is nothing better to do.
 func (l *Loop) weaponlessRunWanted() bool {
-	if l.equip == nil {
-		return false
-	}
-	if gear.HasWeapon(l.equip.profile, l.equipment()) {
-		return false
-	}
-	_, ok := l.affordableWeaponPurchase()
+    if l.equip == nil {
+        return false
+    }
+    if gear.HasWeapon(l.equip.profile, l.equipment()) {
+        return false
+    }
+    _, ok := l.affordableWeaponPurchase()
 
-	return ok
+    return ok
 }
 
 // snapshotTripGear records the paperdoll the trip starts with: the
@@ -1065,19 +1065,19 @@ func (l *Loop) weaponlessRunWanted() bool {
 // so a trip that sells a piece for a replacement it never lands arms
 // the gear debt instead of walking away silently.
 func (l *Loop) snapshotTripGear() {
-	l.tripGearStart = l.tracker.PaperdollSlotObjectIDs()
-	for index, objectID := range l.tripGearStart {
-		if objectID == 0 {
-			l.tripGearStartIDs[index] = 0
+    l.tripGearStart = l.tracker.PaperdollSlotObjectIDs()
+    for index, objectID := range l.tripGearStart {
+        if objectID == 0 {
+            l.tripGearStartIDs[index] = 0
 
-			continue
-		}
-		if item, ok := l.tracker.InventoryItemState(objectID); ok {
-			l.tripGearStartIDs[index] = item.ItemID
-		} else {
-			l.tripGearStartIDs[index] = 0
-		}
-	}
+            continue
+        }
+        if item, ok := l.tracker.InventoryItemState(objectID); ok {
+            l.tripGearStartIDs[index] = item.ItemID
+        } else {
+            l.tripGearStartIDs[index] = 0
+        }
+    }
 }
 
 // gearDebtCheck arms the gear debt at the trip exits: every paperdoll
@@ -1091,35 +1091,35 @@ func (l *Loop) snapshotTripGear() {
 // debt: the auto equipment re-wears it within seconds. The snapshot
 // dies with the check - the next trip freezes a fresh one.
 func (l *Loop) gearDebtCheck() {
-	current := l.tracker.PaperdollSlotObjectIDs()
-	items := l.tracker.InventoryItems()
-	carried := make(map[int32]bool, len(items))
-	for _, entry := range items {
-		carried[entry.ObjectID] = true
-	}
-	for index, objectID := range l.tripGearStart {
-		if objectID == 0 || current[index] != 0 || carried[objectID] {
-			continue
-		}
-		if _, debt := l.gearDebt[index]; debt {
-			continue
-		}
-		slot, ok := gear.SlotOfPaperdollIndex(index)
-		if !ok {
-			continue
-		}
-		if l.gearDebt == nil {
-			l.gearDebt = make(map[int]int32)
-		}
-		l.gearDebt[index] = l.tripGearStartIDs[index]
-		l.logf("Hunt: shop: the trip left the %s slot empty - the %s it "+
-			"started with is gone (sold for a replacement that never "+
-			"landed); the gear debt runs the refill trip on the gear "+
-			"run cooldown", slot.String(), debtItemName(
-			l.tripGearStartIDs[index]))
-	}
-	l.tripGearStart = [state.PaperdollSlots]int32{}
-	l.tripGearStartIDs = [state.PaperdollSlots]int32{}
+    current := l.tracker.PaperdollSlotObjectIDs()
+    items := l.tracker.InventoryItems()
+    carried := make(map[int32]bool, len(items))
+    for _, entry := range items {
+        carried[entry.ObjectID] = true
+    }
+    for index, objectID := range l.tripGearStart {
+        if objectID == 0 || current[index] != 0 || carried[objectID] {
+            continue
+        }
+        if _, debt := l.gearDebt[index]; debt {
+            continue
+        }
+        slot, ok := gear.SlotOfPaperdollIndex(index)
+        if !ok {
+            continue
+        }
+        if l.gearDebt == nil {
+            l.gearDebt = make(map[int]int32)
+        }
+        l.gearDebt[index] = l.tripGearStartIDs[index]
+        l.logf("Hunt: shop: the trip left the %s slot empty - the %s it "+
+            "started with is gone (sold for a replacement that never "+
+            "landed); the gear debt runs the refill trip on the gear "+
+            "run cooldown", slot.String(), debtItemName(
+            l.tripGearStartIDs[index]))
+    }
+    l.tripGearStart = [state.PaperdollSlots]int32{}
+    l.tripGearStartIDs = [state.PaperdollSlots]int32{}
 }
 
 // gearDebtRunWanted reports whether an armed gear debt still waits
@@ -1134,15 +1134,15 @@ func (l *Loop) gearDebtCheck() {
 // toward it and the short cadence fires the moment the plan offers
 // the refill).
 func (l *Loop) gearDebtRunWanted() bool {
-	if l.equip == nil {
-		return false
-	}
-	if len(l.gearDebt) == 0 {
-		return false
-	}
-	l.clearRefilledDebt()
+    if l.equip == nil {
+        return false
+    }
+    if len(l.gearDebt) == 0 {
+        return false
+    }
+    l.clearRefilledDebt()
 
-	return len(l.gearDebt) > 0
+    return len(l.gearDebt) > 0
 }
 
 // clearRefilledDebt drops the debt entries whose slot is dressed
@@ -1150,51 +1150,51 @@ func (l *Loop) gearDebtRunWanted() bool {
 // a looted piece) and the debt's job is done. Each cleared slot logs
 // one line so the recovery is visible in the event log.
 func (l *Loop) clearRefilledDebt() {
-	current := l.tracker.PaperdollSlotObjectIDs()
-	for index := range l.gearDebt {
-		if current[index] == 0 {
-			continue
-		}
-		delete(l.gearDebt, index)
-		if slot, ok := gear.SlotOfPaperdollIndex(index); ok {
-			l.logf("Hunt: shop: the %s slot is dressed again, the gear "+
-				"debt clears", slot.String())
-		}
-	}
+    current := l.tracker.PaperdollSlotObjectIDs()
+    for index := range l.gearDebt {
+        if current[index] == 0 {
+            continue
+        }
+        delete(l.gearDebt, index)
+        if slot, ok := gear.SlotOfPaperdollIndex(index); ok {
+            l.logf("Hunt: shop: the %s slot is dressed again, the gear "+
+                "debt clears", slot.String())
+        }
+    }
 }
 
 // debtItemName renders the lost piece of a gear debt entry for the
 // logs: the generated dictionary name, or the item id fallback.
 func debtItemName(itemID int32) string {
-	name := npcdata.ItemName(itemID)
-	if name == "" {
-		name = "item #" + strconv.Itoa(int(itemID))
-	}
+    name := npcdata.ItemName(itemID)
+    if name == "" {
+        name = "item #" + strconv.Itoa(int(itemID))
+    }
 
-	return name
+    return name
 }
 
 // stopBuysPending reports whether the current stop still wants buys:
 // unrequested purchases or an in-flight batch awaiting its arrival
 // confirmation.
 func (l *Loop) stopBuysPending() bool {
-	return len(l.tripStops) > 0 &&
-		(len(l.tripStops[0].buys) > 0 || len(l.buyRequested) > 0)
+    return len(l.tripStops) > 0 &&
+        (len(l.tripStops[0].buys) > 0 || len(l.buyRequested) > 0)
 }
 
 // resetStopBuys drops the pending buys of the current stop (a
 // merchant that never showed up: the server refuses buys without the
 // selected merchant target).
 func (l *Loop) resetStopBuys(reason string) {
-	if len(l.tripStops) == 0 {
-		return
-	}
-	l.logf("Hunt: shop: %s, skipping %d purchases", reason,
-		len(l.tripStops[0].buys))
-	l.tripStops[0].buys = nil
+    if len(l.tripStops) == 0 {
+        return
+    }
+    l.logf("Hunt: shop: %s, skipping %d purchases", reason,
+        len(l.tripStops[0].buys))
+    l.tripStops[0].buys = nil
 }
 
 // sellableStop reports whether the current stop sells the junk.
 func (l *Loop) sellableStop() bool {
-	return len(l.tripStops) > 0 && l.tripStops[0].sell
+    return len(l.tripStops) > 0 && l.tripStops[0].sell
 }

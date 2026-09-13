@@ -16,12 +16,12 @@ package proxy
 // сервера в целях отладки"). The current implementation is the
 // transparent passthrough of the MITM mode: packets transit unchanged.
 type Transformer interface {
-	// ServerToClient transforms a server packet on its way to the
-	// connected game client. Returning ok=false drops the packet.
-	ServerToClient(payload []byte) (out []byte, ok bool)
-	// ClientToServer transforms a client packet on its way to the real
-	// game server. Returning ok=false drops the packet.
-	ClientToServer(payload []byte) (out []byte, ok bool)
+    // ServerToClient transforms a server packet on its way to the
+    // connected game client. Returning ok=false drops the packet.
+    ServerToClient(payload []byte) (out []byte, ok bool)
+    // ClientToServer transforms a client packet on its way to the real
+    // game server. Returning ok=false drops the packet.
+    ClientToServer(payload []byte) (out []byte, ok bool)
 }
 
 // PassthroughTransformer is the transparent default: every packet
@@ -30,12 +30,12 @@ type PassthroughTransformer struct{}
 
 // ServerToClient passes the payload through unchanged.
 func (PassthroughTransformer) ServerToClient(payload []byte) ([]byte, bool) {
-	return payload, true
+    return payload, true
 }
 
 // ClientToServer passes the payload through unchanged.
 func (PassthroughTransformer) ClientToServer(payload []byte) ([]byte, bool) {
-	return payload, true
+    return payload, true
 }
 
 // compile time interface check.

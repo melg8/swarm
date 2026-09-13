@@ -5,15 +5,15 @@
 package hunt
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"math"
-	"time"
+    "context"
+    "errors"
+    "fmt"
+    "math"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/gear"
-	"github.com/melg8/swarm/internal/swarm/pathfind"
-	"github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/gear"
+    "github.com/melg8/swarm/internal/swarm/pathfind"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // The quest trip engine: the imperative chain runner the acceptance
@@ -146,30 +146,30 @@ const questHealthFloor = 20.0
 // npcdata display id onto the wire template id (the
 // TemplateID+npcDisplayOffset convention of the chain data).
 func (l *Loop) FindQuestNpc(
-	npc QuestNpc, wait time.Duration,
+    npc QuestNpc, wait time.Duration,
 ) (state.AttackTarget, error) {
-	templates := []int32{npc.TemplateID + npcDisplayOffset}
-	deadline := time.Now().Add(wait)
-	for {
-		found, ok := l.tracker.NearestNpcByTemplates(
-			templates, questNpcScanRadius)
-		if ok {
-			return found, nil
-		}
-		if time.Now().After(deadline) {
-			return state.AttackTarget{}, fmt.Errorf(
-				"the npc %s (template %d) never appeared",
-				npc.Name, npc.TemplateID)
-		}
-		pace(questWalkPoll)
-	}
+    templates := []int32{npc.TemplateID + npcDisplayOffset}
+    deadline := time.Now().Add(wait)
+    for {
+        found, ok := l.tracker.NearestNpcByTemplates(
+            templates, questNpcScanRadius)
+        if ok {
+            return found, nil
+        }
+        if time.Now().After(deadline) {
+            return state.AttackTarget{}, fmt.Errorf(
+                "the npc %s (template %d) never appeared",
+                npc.Name, npc.TemplateID)
+        }
+        pace(questWalkPoll)
+    }
 }
 
 // WalkQuestStation walks to a quest station (an npc cell or a kill
 // ground reference): the public form of the quest walk the
 // acceptance scenarios drive on a manual loop.
 func (l *Loop) WalkQuestStation(x int32, y int32, z int32) error {
-	return l.walkToQuestPoint(x, y, z, questWalkTimeout)
+    return l.walkToQuestPoint(x, y, z, questWalkTimeout)
 }
 
 // walkToQuestPoint walks to a station and waits for the arrival
@@ -177,27 +177,27 @@ func (l *Loop) WalkQuestStation(x int32, y int32, z int32) error {
 // is unknown to the chain data, so the caller passes the current
 // self z there (the server walk corrects the height along the way).
 func (l *Loop) walkToQuestPoint(
-	x int32, y int32, z int32, timeout time.Duration,
+    x int32, y int32, z int32, timeout time.Duration,
 ) error {
-	if l.navigator != nil {
-		return l.walkQuestRoute(x, y, timeout)
-	}
-	if err := l.game.WalkTo(x, y, z); err != nil {
-		return fmt.Errorf("the walk request failed: %w", err)
-	}
-	deadline := time.Now().Add(timeout)
-	for {
-		selfX, selfY, _, ok := l.tracker.SelfPosition()
-		if ok && math.Hypot(
-			float64(selfX-x), float64(selfY-y)) <= questArriveRadius {
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf(
-				"the walk to (%d, %d) did not arrive", x, y)
-		}
-		pace(questWalkPoll)
-	}
+    if l.navigator != nil {
+        return l.walkQuestRoute(x, y, timeout)
+    }
+    if err := l.game.WalkTo(x, y, z); err != nil {
+        return fmt.Errorf("the walk request failed: %w", err)
+    }
+    deadline := time.Now().Add(timeout)
+    for {
+        selfX, selfY, _, ok := l.tracker.SelfPosition()
+        if ok && math.Hypot(
+            float64(selfX-x), float64(selfY-y)) <= questArriveRadius {
+            return nil
+        }
+        if time.Now().After(deadline) {
+            return fmt.Errorf(
+                "the walk to (%d, %d) did not arrive", x, y)
+        }
+        pace(questWalkPoll)
+    }
 }
 
 // fightTransitAttackers clears the mobs that chase the walking
@@ -206,41 +206,41 @@ func (l *Loop) walkToQuestPoint(
 // walk re-plans its segment from the standing cell). A no-op when
 // nothing attacks.
 func (l *Loop) fightTransitAttackers() error {
-	attacker, ok := l.tracker.NearestAttacker()
-	if !ok {
-		return nil
-	}
-	l.logf("quest: the transit fight - %s (object %d) chases",
-		attacker.Name, attacker.ObjectID)
-	deadline := time.Now().Add(questTransitFightTimeout)
-	for {
-		if l.tracker.SelfHealthPercent() <= 0 {
-			return errors.New("the character died in the transit fight")
-		}
-		attacker, ok := l.tracker.NearestAttacker()
-		if !ok {
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf(
-				"the transit fight with %s timed out", attacker.Name)
-		}
-		if err := l.drinkHealingPotion(); err != nil {
-			return err
-		}
-		if err := l.closeAndAttack(
-			attacker.X, attacker.Y, attacker.Z, attacker.ObjectID); err != nil {
-			return err
-		}
-		if time.Since(l.questFightLogAt) >= 3*time.Second {
-			l.questFightLogAt = time.Now()
-			l.logf("quest: the transit fight - %s at %.0f%% hp, "+
-				"the hunter at %.0f%%", attacker.Name,
-				l.tracker.ObjectHealthPercent(attacker.ObjectID),
-				l.tracker.SelfHealthPercent())
-		}
-		pace(questKillAttackPeriod)
-	}
+    attacker, ok := l.tracker.NearestAttacker()
+    if !ok {
+        return nil
+    }
+    l.logf("quest: the transit fight - %s (object %d) chases",
+        attacker.Name, attacker.ObjectID)
+    deadline := time.Now().Add(questTransitFightTimeout)
+    for {
+        if l.tracker.SelfHealthPercent() <= 0 {
+            return errors.New("the character died in the transit fight")
+        }
+        attacker, ok := l.tracker.NearestAttacker()
+        if !ok {
+            return nil
+        }
+        if time.Now().After(deadline) {
+            return fmt.Errorf(
+                "the transit fight with %s timed out", attacker.Name)
+        }
+        if err := l.drinkHealingPotion(); err != nil {
+            return err
+        }
+        if err := l.closeAndAttack(
+            attacker.X, attacker.Y, attacker.Z, attacker.ObjectID); err != nil {
+            return err
+        }
+        if time.Since(l.questFightLogAt) >= 3*time.Second {
+            l.questFightLogAt = time.Now()
+            l.logf("quest: the transit fight - %s at %.0f%% hp, "+
+                "the hunter at %.0f%%", attacker.Name,
+                l.tracker.ObjectHealthPercent(attacker.ObjectID),
+                l.tracker.SelfHealthPercent())
+        }
+        pace(questKillAttackPeriod)
+    }
 }
 
 // closeAndAttack swings at a mob: inside the engage radius the attack
@@ -250,26 +250,26 @@ func (l *Loop) fightTransitAttackers() error {
 // live quest runs attacked from a thousand units away, hit nothing
 // and died standing).
 func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
-	selfX, selfY, _, ok := l.tracker.SelfPosition()
-	if !ok {
-		return errors.New("no self position for the fight")
-	}
-	if math.Hypot(float64(x-selfX), float64(y-selfY)) > userEngageRadius {
-		if time.Since(l.questWalkAt) < walkRequestPeriod {
-			return nil
-		}
-		l.questWalkAt = time.Now()
-		if err := l.game.WalkTo(x, y, z); err != nil {
-			return fmt.Errorf("the approach walk: %w", err)
-		}
+    selfX, selfY, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        return errors.New("no self position for the fight")
+    }
+    if math.Hypot(float64(x-selfX), float64(y-selfY)) > userEngageRadius {
+        if time.Since(l.questWalkAt) < walkRequestPeriod {
+            return nil
+        }
+        l.questWalkAt = time.Now()
+        if err := l.game.WalkTo(x, y, z); err != nil {
+            return fmt.Errorf("the approach walk: %w", err)
+        }
 
-		return nil
-	}
-	if err := l.game.AttackTarget(objectID); err != nil {
-		return fmt.Errorf("the attack on object %d: %w", objectID, err)
-	}
+        return nil
+    }
+    if err := l.game.AttackTarget(objectID); err != nil {
+        return fmt.Errorf("the attack on object %d: %w", objectID, err)
+    }
 
-	return nil
+    return nil
 }
 
 // walkQuestRoute walks to the destination through planned geodata
@@ -281,133 +281,133 @@ func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
 // a walled click, the stuck detector re-plans). The walk stands on
 // itself: it re-plans on a stuck segment until the timeout.
 func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-	for {
-		// A seated character cannot walk: every click of the seated
-		// answers ActionFailed. The stand runs first (a lost toggle
-		// of the previous rest, a server side surprise).
-		if l.tracker.SelfSitting() {
-			l.logf("quest: the walk waits for the stand up")
-			if err := l.ensureStanding(); err != nil {
-				return err
-			}
-		}
-		// The transit defense: an aggressive mob that targets the
-		// character interrupts the walk - the passive transit of the
-		// first live runs dragged a growing chaser tail through the
-		// Ruins of Agony and died at the kill ground door (a stack
-		// of five assisting skeletons hits harder than the potions
-		// heal). The fight clears the chasers, then the walk replans.
-		if err := l.fightTransitAttackers(); err != nil {
-			return err
-		}
-		// The aggressive transit mobs grind the walking character
-		// down: keep the health buffer full on the way.
-		if l.tracker.SelfHealthPercent() < questWalkPotionHP {
-			if err := l.drinkHealingPotionAt(questWalkPotionHP); err != nil {
-				return err
-			}
-		}
-		selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
-		if !ok {
-			return errors.New("no self position for the route walk")
-		}
-		if math.Hypot(float64(selfX-x), float64(selfY-y)) <=
-			questArriveRadius {
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf(
-				"the route walk to (%d, %d) did not arrive", x, y)
-		}
-		segX, segY := questSegmentTarget(selfX, selfY, x, y)
-		if l.followPlannedSegment(selfX, selfY, selfZ, segX, segY, deadline) {
-			continue
-		}
-		// No geodata path for the segment (or the follower
-		// ran dry): the direct click, the server stops it at
-		// an obstacle and the loop re-plans above. The click
-		// rides the same flood protector pacing as the planned
-		// waypoints.
-		now := time.Now()
-		if now.Sub(l.questWalkAt) < walkRequestPeriod {
-			pace(questWalkPoll)
+    deadline := time.Now().Add(timeout)
+    for {
+        // A seated character cannot walk: every click of the seated
+        // answers ActionFailed. The stand runs first (a lost toggle
+        // of the previous rest, a server side surprise).
+        if l.tracker.SelfSitting() {
+            l.logf("quest: the walk waits for the stand up")
+            if err := l.ensureStanding(); err != nil {
+                return err
+            }
+        }
+        // The transit defense: an aggressive mob that targets the
+        // character interrupts the walk - the passive transit of the
+        // first live runs dragged a growing chaser tail through the
+        // Ruins of Agony and died at the kill ground door (a stack
+        // of five assisting skeletons hits harder than the potions
+        // heal). The fight clears the chasers, then the walk replans.
+        if err := l.fightTransitAttackers(); err != nil {
+            return err
+        }
+        // The aggressive transit mobs grind the walking character
+        // down: keep the health buffer full on the way.
+        if l.tracker.SelfHealthPercent() < questWalkPotionHP {
+            if err := l.drinkHealingPotionAt(questWalkPotionHP); err != nil {
+                return err
+            }
+        }
+        selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+        if !ok {
+            return errors.New("no self position for the route walk")
+        }
+        if math.Hypot(float64(selfX-x), float64(selfY-y)) <=
+            questArriveRadius {
+            return nil
+        }
+        if time.Now().After(deadline) {
+            return fmt.Errorf(
+                "the route walk to (%d, %d) did not arrive", x, y)
+        }
+        segX, segY := questSegmentTarget(selfX, selfY, x, y)
+        if l.followPlannedSegment(selfX, selfY, selfZ, segX, segY, deadline) {
+            continue
+        }
+        // No geodata path for the segment (or the follower
+        // ran dry): the direct click, the server stops it at
+        // an obstacle and the loop re-plans above. The click
+        // rides the same flood protector pacing as the planned
+        // waypoints.
+        now := time.Now()
+        if now.Sub(l.questWalkAt) < walkRequestPeriod {
+            pace(questWalkPoll)
 
-			continue
-		}
-		segZ := selfZ
-		if height, err := l.navigator.ClosestHeight(
-			float64(segX), float64(segY), int16(selfZ)); err == nil {
-			segZ = int32(height)
-		}
-		if err := l.game.WalkTo(segX, segY, segZ); err != nil {
-			return fmt.Errorf("the walk request failed: %w", err)
-		}
-		l.questWalkAt = now
-		if !l.awaitSegmentProgress(segX, segY, deadline) {
-			return fmt.Errorf(
-				"the walk to (%d, %d) stalled at (%d, %d)",
-				x, y, selfX, selfY)
-		}
-	}
+            continue
+        }
+        segZ := selfZ
+        if height, err := l.navigator.ClosestHeight(
+            float64(segX), float64(segY), int16(selfZ)); err == nil {
+            segZ = int32(height)
+        }
+        if err := l.game.WalkTo(segX, segY, segZ); err != nil {
+            return fmt.Errorf("the walk request failed: %w", err)
+        }
+        l.questWalkAt = now
+        if !l.awaitSegmentProgress(segX, segY, deadline) {
+            return fmt.Errorf(
+                "the walk to (%d, %d) stalled at (%d, %d)",
+                x, y, selfX, selfY)
+        }
+    }
 }
 
 // questSegmentTarget picks the segment destination: the goal itself
 // inside the last stretch, the point questSegmentLen along the
 // straight line otherwise.
 func questSegmentTarget(selfX, selfY, x, y int32) (int32, int32) {
-	dist := math.Hypot(float64(x-selfX), float64(y-selfY))
-	if dist <= questSegmentLen {
-		return x, y
-	}
-	frac := questSegmentLen / dist
+    dist := math.Hypot(float64(x-selfX), float64(y-selfY))
+    if dist <= questSegmentLen {
+        return x, y
+    }
+    frac := questSegmentLen / dist
 
-	return int32(float64(selfX) + float64(x-selfX)*frac),
-		int32(float64(selfY) + float64(y-selfY)*frac)
+    return int32(float64(selfX) + float64(x-selfX)*frac),
+        int32(float64(selfY) + float64(y-selfY)*frac)
 }
 
 // followPlannedSegment plans the geodata path of one segment and
 // walks its waypoints. It reports whether the plan existed and was
 // followed (the caller falls back to the direct click otherwise).
 func (l *Loop) followPlannedSegment(
-	selfX, selfY, selfZ, segX, segY int32, deadline time.Time,
+    selfX, selfY, selfZ, segX, segY int32, deadline time.Time,
 ) bool {
-	from := pathfind.Vec3{
-		X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-	}
-	dest := pathfind.Vec3{
-		X: float64(segX), Y: float64(segY), Z: float64(selfZ),
-	}
-	result, err := l.navigator.FindPathApproachDryAvoiding(
-		from, dest, questArriveRadius, l.frozenAreas)
-	if err != nil || result == nil || !result.Found ||
-		len(result.Waypoints) == 0 {
-		return false
-	}
-	waypoints := result.Waypoints
-	l.logf("quest: walking a planned segment to (%d, %d) through "+
-		"%d waypoints from (%d, %d)", segX, segY, len(waypoints),
-		selfX, selfY)
-	for i := range waypoints {
-		if !l.followWaypoint(waypoints, i, deadline) {
-			return true
-		}
-	}
-	// The degenerate plan guard: the approach search may answer with
-	// a waypoint inside its own approach radius of the character (a
-	// segment short enough that the arrival check of the follower
-	// closes at once) - the segment then "completes" without moving a
-	// cell and the route loop above would spin the planner in a busy
-	// loop (the 2026-09-13 retreat run burned nineteen thousand
-	// plans a second for four minutes straight). A plan that moved
-	// nothing reports false, the caller falls through to the direct
-	// click.
-	afterX, afterY, _, ok := l.tracker.SelfPosition()
-	if ok && afterX == selfX && afterY == selfY {
-		return false
-	}
+    from := pathfind.Vec3{
+        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+    }
+    dest := pathfind.Vec3{
+        X: float64(segX), Y: float64(segY), Z: float64(selfZ),
+    }
+    result, err := l.navigator.FindPathApproachDryAvoiding(
+        from, dest, questArriveRadius, l.frozenAreas)
+    if err != nil || result == nil || !result.Found ||
+        len(result.Waypoints) == 0 {
+        return false
+    }
+    waypoints := result.Waypoints
+    l.logf("quest: walking a planned segment to (%d, %d) through "+
+        "%d waypoints from (%d, %d)", segX, segY, len(waypoints),
+        selfX, selfY)
+    for i := range waypoints {
+        if !l.followWaypoint(waypoints, i, deadline) {
+            return true
+        }
+    }
+    // The degenerate plan guard: the approach search may answer with
+    // a waypoint inside its own approach radius of the character (a
+    // segment short enough that the arrival check of the follower
+    // closes at once) - the segment then "completes" without moving a
+    // cell and the route loop above would spin the planner in a busy
+    // loop (the 2026-09-13 retreat run burned nineteen thousand
+    // plans a second for four minutes straight). A plan that moved
+    // nothing reports false, the caller falls through to the direct
+    // click.
+    afterX, afterY, _, ok := l.tracker.SelfPosition()
+    if ok && afterX == selfX && afterY == selfY {
+        return false
+    }
 
-	return true
+    return true
 }
 
 // followWaypoint walks toward the waypoint at the index until the
@@ -416,78 +416,78 @@ func (l *Loop) followPlannedSegment(
 // (the follower returns, the caller plans a fresh segment); true
 // when the waypoint was reached or the segment ran out of budget.
 func (l *Loop) followWaypoint(
-	waypoints []pathfind.Vec3, index int, deadline time.Time,
+    waypoints []pathfind.Vec3, index int, deadline time.Time,
 ) bool {
-	wp := waypoints[index]
-	sent := false
-	lastX, lastY := int32(0), int32(0)
-	stuckSince := time.Time{}
-	for {
-		if time.Now().After(deadline) {
-			return true
-		}
-		selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
-		if !ok {
-			pace(questWalkPoll)
+    wp := waypoints[index]
+    sent := false
+    lastX, lastY := int32(0), int32(0)
+    stuckSince := time.Time{}
+    for {
+        if time.Now().After(deadline) {
+            return true
+        }
+        selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+        if !ok {
+            pace(questWalkPoll)
 
-			continue
-		}
-		radius := waypointPassDist
-		if index == len(waypoints)-1 {
-			radius = questArriveRadius
-		}
-		if waypointDistance(wp, selfX, selfY, selfZ) <= radius {
-			return true
-		}
-		moving := selfX != lastX || selfY != lastY
-		if moving {
-			lastX, lastY = selfX, selfY
-			stuckSince = time.Time{}
-		} else if stuckSince.IsZero() {
-			stuckSince = time.Now()
-		}
-		// The potions ride the follower poll: one planned segment
-		// runs over a minute and the chaser damage of that minute
-		// undid the whole buffer of the first live runs (the walk
-		// only drank between the segments, arriving at 39 percent).
-		if err := l.drinkHealingPotionAt(questWalkPotionHP); err != nil {
-			l.logf("quest: the potion drink failed: %v", err)
+            continue
+        }
+        radius := waypointPassDist
+        if index == len(waypoints)-1 {
+            radius = questArriveRadius
+        }
+        if waypointDistance(wp, selfX, selfY, selfZ) <= radius {
+            return true
+        }
+        moving := selfX != lastX || selfY != lastY
+        if moving {
+            lastX, lastY = selfX, selfY
+            stuckSince = time.Time{}
+        } else if stuckSince.IsZero() {
+            stuckSince = time.Now()
+        }
+        // The potions ride the follower poll: one planned segment
+        // runs over a minute and the chaser damage of that minute
+        // undid the whole buffer of the first live runs (the walk
+        // only drank between the segments, arriving at 39 percent).
+        if err := l.drinkHealingPotionAt(questWalkPotionHP); err != nil {
+            l.logf("quest: the potion drink failed: %v", err)
 
-			return false
-		}
-		if !stuckSince.IsZero() && time.Since(stuckSince) >= questStuckWait {
-			return false
-		}
-		// The pacing: no request while the character walks; a repeat
-		// click only for the standing one, gated by the town walk
-		// period (the Mobius PlayerActionFloodProtector mutes the
-		// click stream above one action per second - the 2026-09-12
-		// run stalled ten minutes on the mute).
-		now := time.Now()
-		if sent && (moving || now.Sub(l.questWalkAt) < walkRequestPeriod) {
-			pace(questWalkPoll)
+            return false
+        }
+        if !stuckSince.IsZero() && time.Since(stuckSince) >= questStuckWait {
+            return false
+        }
+        // The pacing: no request while the character walks; a repeat
+        // click only for the standing one, gated by the town walk
+        // period (the Mobius PlayerActionFloodProtector mutes the
+        // click stream above one action per second - the 2026-09-12
+        // run stalled ten minutes on the mute).
+        now := time.Now()
+        if sent && (moving || now.Sub(l.questWalkAt) < walkRequestPeriod) {
+            pace(questWalkPoll)
 
-			continue
-		}
-		// The click carries the geodata height of the waypoint, not
-		// the stale self height: the server validates the click z
-		// against its own geodata (the same run stalled on the
-		// segment west of Gludio - an 864 unit rise with every click
-		// riding the self z, every request ActionFailed).
-		clickZ := selfZ
-		if wp.Z != 0 {
-			clickZ = int32(wp.Z)
-		}
-		if err := l.game.WalkTo(
-			int32(wp.X), int32(wp.Y), clickZ); err != nil {
-			l.logf("quest: the waypoint walk failed: %v", err)
+            continue
+        }
+        // The click carries the geodata height of the waypoint, not
+        // the stale self height: the server validates the click z
+        // against its own geodata (the same run stalled on the
+        // segment west of Gludio - an 864 unit rise with every click
+        // riding the self z, every request ActionFailed).
+        clickZ := selfZ
+        if wp.Z != 0 {
+            clickZ = int32(wp.Z)
+        }
+        if err := l.game.WalkTo(
+            int32(wp.X), int32(wp.Y), clickZ); err != nil {
+            l.logf("quest: the waypoint walk failed: %v", err)
 
-			return false
-		}
-		sent = true
-		l.questWalkAt = now
-		pace(questWalkPoll)
-	}
+            return false
+        }
+        sent = true
+        l.questWalkAt = now
+        pace(questWalkPoll)
+    }
 }
 
 // awaitSegmentProgress waits until the character moves a meaningful
@@ -495,44 +495,44 @@ func (l *Loop) followWaypoint(
 // took, the walk runs) or the deadline lapses. False marks a stalled
 // click: the character stands where it stood.
 func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
-	startX, startY, _, ok := l.tracker.SelfPosition()
-	if !ok {
-		return false
-	}
-	for {
-		if time.Now().After(deadline) {
-			return false
-		}
-		selfX, selfY, _, ok := l.tracker.SelfPosition()
-		if !ok {
-			pace(questWalkPoll)
+    startX, startY, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
+    }
+    for {
+        if time.Now().After(deadline) {
+            return false
+        }
+        selfX, selfY, _, ok := l.tracker.SelfPosition()
+        if !ok {
+            pace(questWalkPoll)
 
-			continue
-		}
-		if math.Hypot(float64(selfX-startX), float64(selfY-startY)) >
-			waypointPassDist {
-			return true
-		}
-		if math.Hypot(float64(selfX-segX), float64(selfY-segY)) <=
-			questArriveRadius {
-			return true
-		}
-		pace(questWalkPoll)
-	}
+            continue
+        }
+        if math.Hypot(float64(selfX-startX), float64(selfY-startY)) >
+            waypointPassDist {
+            return true
+        }
+        if math.Hypot(float64(selfX-segX), float64(selfY-segY)) <=
+            questArriveRadius {
+            return true
+        }
+        pace(questWalkPoll)
+    }
 }
 
 // questItemCount sums the journal counters of the quest item ids of
 // a kill stage.
 func questItemCount(tracker *state.Bot, itemIDs []int32) int32 {
-	total := int32(0)
-	for _, itemID := range itemIDs {
-		count, ok := tracker.QuestItemCount(itemID)
-		if ok {
-			total += count
-		}
-	}
+    total := int32(0)
+    for _, itemID := range itemIDs {
+        count, ok := tracker.QuestItemCount(itemID)
+        if ok {
+            total += count
+        }
+    }
 
-	return total
+    return total
 }
 
 // DriveQuestChain runs one quest chain end to end: the accept
@@ -543,42 +543,42 @@ func questItemCount(tracker *state.Bot, itemIDs []int32) int32 {
 // a stage that misses its deadline or a health floor breach returns
 // an error naming the stage; the journal drop ends the run clean.
 func (l *Loop) DriveQuestChain(
-	ctx context.Context, chain QuestChain,
+    ctx context.Context, chain QuestChain,
 ) error {
-	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("quest %d: %w", chain.QuestID, err)
-	}
-	if _, ok := l.tracker.QuestCond(chain.QuestID); !ok {
-		l.logf("quest %d: driving the accept route at %s",
-			chain.QuestID, chain.Start.Name)
-		route := append(QuestEntryLinks(chain), chain.Accept...)
-		if err := l.driveQuestTalk(chain, chain.Start, route); err != nil {
-			return fmt.Errorf(
-				"quest %d accept: %w", chain.QuestID, err)
-		}
-	}
-	for {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("quest %d: %w", chain.QuestID, err)
-		}
-		cond, ok := l.tracker.QuestCond(chain.QuestID)
-		if !ok {
-			l.logf("quest %d: the journal dropped the quest, "+
-				"the chain is complete", chain.QuestID)
+    if err := ctx.Err(); err != nil {
+        return fmt.Errorf("quest %d: %w", chain.QuestID, err)
+    }
+    if _, ok := l.tracker.QuestCond(chain.QuestID); !ok {
+        l.logf("quest %d: driving the accept route at %s",
+            chain.QuestID, chain.Start.Name)
+        route := append(QuestEntryLinks(chain), chain.Accept...)
+        if err := l.driveQuestTalk(chain, chain.Start, route); err != nil {
+            return fmt.Errorf(
+                "quest %d accept: %w", chain.QuestID, err)
+        }
+    }
+    for {
+        if err := ctx.Err(); err != nil {
+            return fmt.Errorf("quest %d: %w", chain.QuestID, err)
+        }
+        cond, ok := l.tracker.QuestCond(chain.QuestID)
+        if !ok {
+            l.logf("quest %d: the journal dropped the quest, "+
+                "the chain is complete", chain.QuestID)
 
-			return nil
-		}
-		stage, ok := QuestStageByCond(chain, cond)
-		if !ok {
-			return fmt.Errorf(
-				"quest %d: the journal cond %d sits outside "+
-					"the ladder", chain.QuestID, cond)
-		}
-		if err := l.driveQuestStage(ctx, chain, stage); err != nil {
-			return fmt.Errorf("quest %d stage %d: %w",
-				chain.QuestID, stage.Cond, err)
-		}
-	}
+            return nil
+        }
+        stage, ok := QuestStageByCond(chain, cond)
+        if !ok {
+            return fmt.Errorf(
+                "quest %d: the journal cond %d sits outside "+
+                    "the ladder", chain.QuestID, cond)
+        }
+        if err := l.driveQuestStage(ctx, chain, stage); err != nil {
+            return fmt.Errorf("quest %d stage %d: %w",
+                chain.QuestID, stage.Cond, err)
+        }
+    }
 }
 
 // driveQuestStage runs one stage of the ladder: the optional
@@ -586,22 +586,22 @@ func (l *Loop) DriveQuestChain(
 // talk half walks to the station and drives the dialog route, the
 // kill half farms the item counters on the ground.
 func (l *Loop) driveQuestStage(
-	ctx context.Context, chain QuestChain, stage QuestStage,
+    ctx context.Context, chain QuestChain, stage QuestStage,
 ) error {
-	if stage.Transfer != nil {
-		if err := l.driveQuestTransfer(ctx, *stage.Transfer); err != nil {
-			return fmt.Errorf("the transfer to %s: %w",
-				stage.Transfer.DestLabel, err)
-		}
-	}
-	if stage.TalkNpc.TemplateID == 0 {
-		return l.farmQuestStage(ctx, stage)
-	}
-	route := append(QuestEntryLinks(chain), stage.Links...)
-	l.logf("quest %d: the talk stage at %s",
-		chain.QuestID, stage.TalkNpc.Name)
+    if stage.Transfer != nil {
+        if err := l.driveQuestTransfer(ctx, *stage.Transfer); err != nil {
+            return fmt.Errorf("the transfer to %s: %w",
+                stage.Transfer.DestLabel, err)
+        }
+    }
+    if stage.TalkNpc.TemplateID == 0 {
+        return l.farmQuestStage(ctx, stage)
+    }
+    route := append(QuestEntryLinks(chain), stage.Links...)
+    l.logf("quest %d: the talk stage at %s",
+        chain.QuestID, stage.TalkNpc.Name)
 
-	return l.driveQuestTalk(chain, stage.TalkNpc, route)
+    return l.driveQuestTalk(chain, stage.TalkNpc, route)
 }
 
 // driveQuestTransfer rides one gatekeeper hop: the walk to the
@@ -612,65 +612,65 @@ func (l *Loop) driveQuestStage(
 // Live verified against Bella (Gludio -> Gludin) and Richlin
 // (Gludin -> Gludio) on the deployed stack.
 func (l *Loop) driveQuestTransfer(
-	ctx context.Context, transfer QuestTransfer,
+    ctx context.Context, transfer QuestTransfer,
 ) error {
-	if err := ctx.Err(); err != nil {
-		return fmt.Errorf("cancelled: %w", err)
-	}
-	target, err := l.FindQuestNpc(
-		transfer.Gatekeeper, questNpcFindWait)
-	if err != nil {
-		return err
-	}
-	if err := l.walkToQuestPoint(
-		target.X, target.Y, target.Z, questWalkTimeout); err != nil {
-		return fmt.Errorf("the walk to %s: %w",
-			transfer.Gatekeeper.Name, err)
-	}
-	l.logf("quest: talking to the gatekeeper %s (object %d), "+
-		"riding the teleport to %s",
-		transfer.Gatekeeper.Name, target.ObjectID, transfer.DestLabel)
+    if err := ctx.Err(); err != nil {
+        return fmt.Errorf("cancelled: %w", err)
+    }
+    target, err := l.FindQuestNpc(
+        transfer.Gatekeeper, questNpcFindWait)
+    if err != nil {
+        return err
+    }
+    if err := l.walkToQuestPoint(
+        target.X, target.Y, target.Z, questWalkTimeout); err != nil {
+        return fmt.Errorf("the walk to %s: %w",
+            transfer.Gatekeeper.Name, err)
+    }
+    l.logf("quest: talking to the gatekeeper %s (object %d), "+
+        "riding the teleport to %s",
+        transfer.Gatekeeper.Name, target.ObjectID, transfer.DestLabel)
 
-	// The talk opens the first page (the walk-in gate of the
-	// html action cache).
-	if err := l.game.ClickObject(target.ObjectID); err != nil {
-		return fmt.Errorf("the gatekeeper click: %w", err)
-	}
-	if _, html, err := l.awaitTransferPage(
-		target.ObjectID, "", questTransferArriveWait); err != nil {
-		return err
-	} else if FindShowTeleportsButton(ParseGatekeeperHTML(html)) == nil {
-		return fmt.Errorf(
-			"the first page of %s carries no teleport entry",
-			transfer.Gatekeeper.Name)
-	}
+    // The talk opens the first page (the walk-in gate of the
+    // html action cache).
+    if err := l.game.ClickObject(target.ObjectID); err != nil {
+        return fmt.Errorf("the gatekeeper click: %w", err)
+    }
+    if _, html, err := l.awaitTransferPage(
+        target.ObjectID, "", questTransferArriveWait); err != nil {
+        return err
+    } else if FindShowTeleportsButton(ParseGatekeeperHTML(html)) == nil {
+        return fmt.Errorf(
+            "the first page of %s carries no teleport entry",
+            transfer.Gatekeeper.Name)
+    }
 
-	// The showTeleports bypass (the button of the open first
-	// page) opens the list.
-	if err := l.game.SendBypass(fmt.Sprintf(
-		"npc_%d_showTeleports", target.ObjectID)); err != nil {
-		return fmt.Errorf("the showTeleports send: %w", err)
-	}
-	buttons, _, err := l.awaitTransferPage(
-		target.ObjectID, transfer.DestLabel, questTransferArriveWait)
-	if err != nil {
-		return err
-	}
-	teleport := FindTeleportButton(
-		buttons, "NORMAL", transfer.DestLabel)
-	if teleport == nil {
-		return fmt.Errorf(
-			"the teleport list of %s carries no %s button",
-			transfer.Gatekeeper.Name, transfer.DestLabel)
-	}
-	command := fmt.Sprintf("npc_%d_teleport %s %d",
-		target.ObjectID, teleport.ListName, teleport.LocID)
-	l.logf("quest: teleporting to %s", teleport.Label)
-	if err := l.game.SendBypass(command); err != nil {
-		return fmt.Errorf("the teleport send: %w", err)
-	}
+    // The showTeleports bypass (the button of the open first
+    // page) opens the list.
+    if err := l.game.SendBypass(fmt.Sprintf(
+        "npc_%d_showTeleports", target.ObjectID)); err != nil {
+        return fmt.Errorf("the showTeleports send: %w", err)
+    }
+    buttons, _, err := l.awaitTransferPage(
+        target.ObjectID, transfer.DestLabel, questTransferArriveWait)
+    if err != nil {
+        return err
+    }
+    teleport := FindTeleportButton(
+        buttons, "NORMAL", transfer.DestLabel)
+    if teleport == nil {
+        return fmt.Errorf(
+            "the teleport list of %s carries no %s button",
+            transfer.Gatekeeper.Name, transfer.DestLabel)
+    }
+    command := fmt.Sprintf("npc_%d_teleport %s %d",
+        target.ObjectID, teleport.ListName, teleport.LocID)
+    l.logf("quest: teleporting to %s", teleport.Label)
+    if err := l.game.SendBypass(command); err != nil {
+        return fmt.Errorf("the teleport send: %w", err)
+    }
 
-	return l.awaitTransferArrival(ctx, transfer)
+    return l.awaitTransferArrival(ctx, transfer)
 }
 
 // awaitTransferPage waits for the dialog of the gatekeeper to carry
@@ -679,29 +679,29 @@ func (l *Loop) driveQuestTransfer(
 // wait). It returns the parsed buttons of the matching page and the
 // raw html.
 func (l *Loop) awaitTransferPage(
-	npcObjID int32, destLabel string, wait time.Duration,
+    npcObjID int32, destLabel string, wait time.Duration,
 ) ([]BypassButton, string, error) {
-	deadline := time.Now().Add(wait)
-	for {
-		id, html := l.game.LastHTMLDialog()
-		if id == npcObjID && html != "" {
-			buttons := ParseGatekeeperHTML(html)
-			if destLabel == "" {
-				if len(buttons) > 0 {
-					return buttons, html, nil
-				}
-			} else if FindTeleportButton(
-				buttons, "NORMAL", destLabel) != nil {
-				return buttons, html, nil
-			}
-		}
-		if time.Now().After(deadline) {
-			return nil, "", fmt.Errorf(
-				"the gatekeeper dialog with %q never arrived",
-				destLabel)
-		}
-		pace(gatekeeperPollPeriod)
-	}
+    deadline := time.Now().Add(wait)
+    for {
+        id, html := l.game.LastHTMLDialog()
+        if id == npcObjID && html != "" {
+            buttons := ParseGatekeeperHTML(html)
+            if destLabel == "" {
+                if len(buttons) > 0 {
+                    return buttons, html, nil
+                }
+            } else if FindTeleportButton(
+                buttons, "NORMAL", destLabel) != nil {
+                return buttons, html, nil
+            }
+        }
+        if time.Now().After(deadline) {
+            return nil, "", fmt.Errorf(
+                "the gatekeeper dialog with %q never arrived",
+                destLabel)
+        }
+        pace(gatekeeperPollPeriod)
+    }
 }
 
 // awaitTransferArrival waits until the tracker places the character
@@ -709,51 +709,51 @@ func (l *Loop) awaitTransferPage(
 // answer of the server; the connection layer sends the Appearing
 // confirmation).
 func (l *Loop) awaitTransferArrival(
-	ctx context.Context, transfer QuestTransfer,
+    ctx context.Context, transfer QuestTransfer,
 ) error {
-	deadline := time.Now().Add(questTransferArriveWait)
-	for {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("cancelled: %w", err)
-		}
-		selfX, selfY, _, ok := l.tracker.SelfPosition()
-		if ok && math.Hypot(
-			float64(selfX-transfer.ArriveX),
-			float64(selfY-transfer.ArriveY)) <=
-			questTransferArriveRadius {
-			l.logf("quest: the teleport to %s landed at (%d, %d)",
-				transfer.DestLabel, selfX, selfY)
+    deadline := time.Now().Add(questTransferArriveWait)
+    for {
+        if err := ctx.Err(); err != nil {
+            return fmt.Errorf("cancelled: %w", err)
+        }
+        selfX, selfY, _, ok := l.tracker.SelfPosition()
+        if ok && math.Hypot(
+            float64(selfX-transfer.ArriveX),
+            float64(selfY-transfer.ArriveY)) <=
+            questTransferArriveRadius {
+            l.logf("quest: the teleport to %s landed at (%d, %d)",
+                transfer.DestLabel, selfX, selfY)
 
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf(
-				"the teleport to %s never landed", transfer.DestLabel)
-		}
-		pace(questWalkPoll)
-	}
+            return nil
+        }
+        if time.Now().After(deadline) {
+            return fmt.Errorf(
+                "the teleport to %s never landed", transfer.DestLabel)
+        }
+        pace(questWalkPoll)
+    }
 }
 
 // driveQuestTalk finds the station npc, walks into the interaction
 // distance and drives the dialog route through the walker.
 func (l *Loop) driveQuestTalk(
-	chain QuestChain, npc QuestNpc, route []DialogStep,
+    chain QuestChain, npc QuestNpc, route []DialogStep,
 ) error {
-	if len(route) == 0 {
-		return errors.New("the talk route is empty")
-	}
-	target, err := l.FindQuestNpc(npc, questNpcFindWait)
-	if err != nil {
-		return err
-	}
-	if err := l.walkToQuestPoint(
-		target.X, target.Y, target.Z, questWalkTimeout); err != nil {
-		return fmt.Errorf("the walk to %s: %w", npc.Name, err)
-	}
-	l.logf("quest %d: talking to %s (object %d) through %d links",
-		chain.QuestID, npc.Name, target.ObjectID, len(route))
+    if len(route) == 0 {
+        return errors.New("the talk route is empty")
+    }
+    target, err := l.FindQuestNpc(npc, questNpcFindWait)
+    if err != nil {
+        return err
+    }
+    if err := l.walkToQuestPoint(
+        target.X, target.Y, target.Z, questWalkTimeout); err != nil {
+        return fmt.Errorf("the walk to %s: %w", npc.Name, err)
+    }
+    l.logf("quest %d: talking to %s (object %d) through %d links",
+        chain.QuestID, npc.Name, target.ObjectID, len(route))
 
-	return l.DriveDialog(target.ObjectID, route)
+    return l.DriveDialog(target.ObjectID, route)
 }
 
 // questRetreatDistance is how far the retreat walks out of the mob
@@ -766,47 +766,47 @@ const questRetreatDistance = 2600.0
 // from the nearest quest mob; the return ride is the ordinary segment
 // walk of the ground.
 func (l *Loop) retreatAndRest(ctx context.Context, stage QuestStage) error {
-	_, _, selfZ, ok := l.tracker.SelfPosition()
-	if !ok {
-		return errors.New("no self position for the retreat")
-	}
-	selfX, selfY, _, _ := l.tracker.SelfPosition()
-	templates := make([]int32, 0, len(stage.Kill.Mobs))
-	for _, mob := range stage.Kill.Mobs {
-		templates = append(templates, mob+npcDisplayOffset)
-	}
-	awayX, awayY := selfX, selfY
-	if mob, found := l.tracker.NearestNpcByTemplates(
-		templates, questKillScanRadius); found {
-		dx := float64(selfX - mob.X)
-		dy := float64(selfY - mob.Y)
-		if dist := math.Hypot(dx, dy); dist > 1 {
-			awayX = int32(float64(selfX) + dx/dist*questRetreatDistance)
-			awayY = int32(float64(selfY) + dy/dist*questRetreatDistance)
-		}
-	}
-	l.logf("quest: the retreat from the mob crowd to (%d, %d)",
-		awayX, awayY)
-	if err := l.walkToQuestPoint(
-		awayX, awayY, selfZ, questWalkTimeout); err != nil {
-		return fmt.Errorf("the retreat walk: %w", err)
-	}
-	// The retreat point sits outside the aggro radius of the mob it
-	// fled, but a chaser that already locked on walks those 2600
-	// units in twenty seconds and beats the sitting hunter to death
-	// (the 2026-09-13 run: a Tracker Skeleton Leader ground the rest
-	// from 20 to 0 percent for three minutes). Nothing may target the
-	// character when the sit lands.
-	if err := l.fightTransitAttackers(); err != nil {
-		return fmt.Errorf("the retreat fight: %w", err)
-	}
-	if err := l.restBetweenFights(ctx); err != nil {
-		return err
-	}
-	l.logf("quest: the rested hunter returns to the kill ground")
+    _, _, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return errors.New("no self position for the retreat")
+    }
+    selfX, selfY, _, _ := l.tracker.SelfPosition()
+    templates := make([]int32, 0, len(stage.Kill.Mobs))
+    for _, mob := range stage.Kill.Mobs {
+        templates = append(templates, mob+npcDisplayOffset)
+    }
+    awayX, awayY := selfX, selfY
+    if mob, found := l.tracker.NearestNpcByTemplates(
+        templates, questKillScanRadius); found {
+        dx := float64(selfX - mob.X)
+        dy := float64(selfY - mob.Y)
+        if dist := math.Hypot(dx, dy); dist > 1 {
+            awayX = int32(float64(selfX) + dx/dist*questRetreatDistance)
+            awayY = int32(float64(selfY) + dy/dist*questRetreatDistance)
+        }
+    }
+    l.logf("quest: the retreat from the mob crowd to (%d, %d)",
+        awayX, awayY)
+    if err := l.walkToQuestPoint(
+        awayX, awayY, selfZ, questWalkTimeout); err != nil {
+        return fmt.Errorf("the retreat walk: %w", err)
+    }
+    // The retreat point sits outside the aggro radius of the mob it
+    // fled, but a chaser that already locked on walks those 2600
+    // units in twenty seconds and beats the sitting hunter to death
+    // (the 2026-09-13 run: a Tracker Skeleton Leader ground the rest
+    // from 20 to 0 percent for three minutes). Nothing may target the
+    // character when the sit lands.
+    if err := l.fightTransitAttackers(); err != nil {
+        return fmt.Errorf("the retreat fight: %w", err)
+    }
+    if err := l.restBetweenFights(ctx); err != nil {
+        return err
+    }
+    l.logf("quest: the rested hunter returns to the kill ground")
 
-	return l.walkToQuestPoint(
-		stage.Kill.GroundX, stage.Kill.GroundY, selfZ, questWalkTimeout)
+    return l.walkToQuestPoint(
+        stage.Kill.GroundX, stage.Kill.GroundY, selfZ, questWalkTimeout)
 }
 
 // farmQuestStage runs a kill stage: the walk to the kill ground and
@@ -819,74 +819,74 @@ func (l *Loop) retreatAndRest(ctx context.Context, stage QuestStage) error {
 // covers the next fight (the manual trip has no rest phase of the
 // hunt loop).
 func (l *Loop) farmQuestStage(
-	ctx context.Context, stage QuestStage,
+    ctx context.Context, stage QuestStage,
 ) error {
-	kill := stage.Kill
-	_, _, selfZ, ok := l.tracker.SelfPosition()
-	if !ok {
-		return errors.New("no self position for the ground walk")
-	}
-	if err := l.walkToQuestPoint(
-		kill.GroundX, kill.GroundY, selfZ, questWalkTimeout); err != nil {
-		return fmt.Errorf("the walk to the kill ground: %w", err)
-	}
-	templates := make([]int32, 0, len(kill.Mobs))
-	for _, mob := range kill.Mobs {
-		templates = append(templates, mob+npcDisplayOffset)
-	}
-	deadline := time.Now().Add(questKillStageTimeout)
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if total := questItemCount(l.tracker, kill.ItemIDs); total >= kill.Target {
-			l.logf("quest: the kill stage counters filled (%d)", total)
+    kill := stage.Kill
+    _, _, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return errors.New("no self position for the ground walk")
+    }
+    if err := l.walkToQuestPoint(
+        kill.GroundX, kill.GroundY, selfZ, questWalkTimeout); err != nil {
+        return fmt.Errorf("the walk to the kill ground: %w", err)
+    }
+    templates := make([]int32, 0, len(kill.Mobs))
+    for _, mob := range kill.Mobs {
+        templates = append(templates, mob+npcDisplayOffset)
+    }
+    deadline := time.Now().Add(questKillStageTimeout)
+    for {
+        if err := ctx.Err(); err != nil {
+            return err
+        }
+        if total := questItemCount(l.tracker, kill.ItemIDs); total >= kill.Target {
+            l.logf("quest: the kill stage counters filled (%d)", total)
 
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf(
-				"the kill stage timed out at %d of %d items",
-				questItemCount(l.tracker, kill.ItemIDs), kill.Target)
-		}
-		if l.tracker.SelfHealthPercent() < questHealthFloor {
-			return errors.New("the health floor breached")
-		}
-		if l.tracker.SelfHealthPercent() <= 0 {
-			return errors.New("the character died on the kill ground")
-		}
-		// The retreat policy: a tired hunter on the ground walks out
-		// of the mob radius, sits the health back and returns - the
-		// standing fight to the last drop loses to the assisting
-		// clans (the live runs held the ground at 30 percent health
-		// until the floor took them).
-		if l.tracker.SelfHealthPercent() < questRestSitHP {
-			if err := l.retreatAndRest(ctx, stage); err != nil {
-				return err
-			}
+            return nil
+        }
+        if time.Now().After(deadline) {
+            return fmt.Errorf(
+                "the kill stage timed out at %d of %d items",
+                questItemCount(l.tracker, kill.ItemIDs), kill.Target)
+        }
+        if l.tracker.SelfHealthPercent() < questHealthFloor {
+            return errors.New("the health floor breached")
+        }
+        if l.tracker.SelfHealthPercent() <= 0 {
+            return errors.New("the character died on the kill ground")
+        }
+        // The retreat policy: a tired hunter on the ground walks out
+        // of the mob radius, sits the health back and returns - the
+        // standing fight to the last drop loses to the assisting
+        // clans (the live runs held the ground at 30 percent health
+        // until the floor took them).
+        if l.tracker.SelfHealthPercent() < questRestSitHP {
+            if err := l.retreatAndRest(ctx, stage); err != nil {
+                return err
+            }
 
-			continue
-		}
-		mob, ok := l.tracker.NearestNpcByTemplates(
-			templates, questKillScanRadius)
-		if ok {
-			// A quest mob stands in the scan radius: the tired
-			// character drinks a healing potion instead of sitting
-			// down (the Ruins of Agony skeletons are aggressive -
-			// the first live run sat the character down inside the
-			// camp and it died seated).
-			if err := l.drinkHealingPotion(); err != nil {
-				return err
-			}
-		} else if err := l.restBetweenFights(ctx); err != nil {
-			return err
-		}
-		if err := l.closeAndAttack(mob.X, mob.Y, mob.Z,
-			mob.ObjectID); err != nil {
-			return fmt.Errorf("the attack on %s: %w", mob.Name, err)
-		}
-		pace(questKillAttackPeriod)
-	}
+            continue
+        }
+        mob, ok := l.tracker.NearestNpcByTemplates(
+            templates, questKillScanRadius)
+        if ok {
+            // A quest mob stands in the scan radius: the tired
+            // character drinks a healing potion instead of sitting
+            // down (the Ruins of Agony skeletons are aggressive -
+            // the first live run sat the character down inside the
+            // camp and it died seated).
+            if err := l.drinkHealingPotion(); err != nil {
+                return err
+            }
+        } else if err := l.restBetweenFights(ctx); err != nil {
+            return err
+        }
+        if err := l.closeAndAttack(mob.X, mob.Y, mob.Z,
+            mob.ObjectID); err != nil {
+            return fmt.Errorf("the attack on %s: %w", mob.Name, err)
+        }
+        pace(questKillAttackPeriod)
+    }
 }
 
 // ensureStanding stands the character up and waits for the server
@@ -896,23 +896,23 @@ func (l *Loop) farmQuestStage(
 // 2026-09-13 run: the rested hunter returned to the ground and
 // ground the whole walk budget against the seated state).
 func (l *Loop) ensureStanding() error {
-	if !l.tracker.SelfSitting() {
-		return nil
-	}
-	for range 3 {
-		if err := l.game.ActionSitStand(); err != nil {
-			return fmt.Errorf("the stand request: %w", err)
-		}
-		deadline := time.Now().Add(3 * time.Second)
-		for time.Now().Before(deadline) {
-			if !l.tracker.SelfSitting() {
-				return nil
-			}
-			pace(gatekeeperPollPeriod)
-		}
-	}
+    if !l.tracker.SelfSitting() {
+        return nil
+    }
+    for range 3 {
+        if err := l.game.ActionSitStand(); err != nil {
+            return fmt.Errorf("the stand request: %w", err)
+        }
+        deadline := time.Now().Add(3 * time.Second)
+        for time.Now().Before(deadline) {
+            if !l.tracker.SelfSitting() {
+                return nil
+            }
+            pace(gatekeeperPollPeriod)
+        }
+    }
 
-	return errors.New("the character stays seated")
+    return errors.New("the character stays seated")
 }
 
 // restBetweenFights parks a tired character: below the sit threshold
@@ -921,51 +921,51 @@ func (l *Loop) ensureStanding() error {
 // health floor of the farm loop still guards the retreat). A healthy
 // character returns at once.
 func (l *Loop) restBetweenFights(ctx context.Context) error {
-	if l.tracker.SelfHealthPercent() >= questRestSitHP {
-		return nil
-	}
-	l.logf("quest: resting at %.0f%% health",
-		l.tracker.SelfHealthPercent())
-	if err := l.game.ActionSitStand(); err != nil {
-		return fmt.Errorf("the sit request: %w", err)
-	}
-	deadline := time.Now().Add(questRestTimeout)
-	for {
-		if err := ctx.Err(); err != nil {
-			_ = l.game.ActionSitStand()
+    if l.tracker.SelfHealthPercent() >= questRestSitHP {
+        return nil
+    }
+    l.logf("quest: resting at %.0f%% health",
+        l.tracker.SelfHealthPercent())
+    if err := l.game.ActionSitStand(); err != nil {
+        return fmt.Errorf("the sit request: %w", err)
+    }
+    deadline := time.Now().Add(questRestTimeout)
+    for {
+        if err := ctx.Err(); err != nil {
+            _ = l.game.ActionSitStand()
 
-			return fmt.Errorf("cancelled: %w", err)
-		}
-		// A fresh attacker aborts the rest: the sitting regeneration
-		// loses to any chaser still swinging (stand up, the caller's
-		// fight clears it, the next rest tries again).
-		if attacker, ok := l.tracker.NearestAttacker(); ok {
-			l.logf("quest: the rest aborted - %s attacks",
-				attacker.Name)
-			if err := l.ensureStanding(); err != nil {
-				return err
-			}
+            return fmt.Errorf("cancelled: %w", err)
+        }
+        // A fresh attacker aborts the rest: the sitting regeneration
+        // loses to any chaser still swinging (stand up, the caller's
+        // fight clears it, the next rest tries again).
+        if attacker, ok := l.tracker.NearestAttacker(); ok {
+            l.logf("quest: the rest aborted - %s attacks",
+                attacker.Name)
+            if err := l.ensureStanding(); err != nil {
+                return err
+            }
 
-			return nil
-		}
-		hp := l.tracker.SelfHealthPercent()
-		if hp >= questRestStandHP {
-			break
-		}
-		if time.Now().After(deadline) {
-			l.logf("quest: the rest timed out at %.0f%% health", hp)
+            return nil
+        }
+        hp := l.tracker.SelfHealthPercent()
+        if hp >= questRestStandHP {
+            break
+        }
+        if time.Now().After(deadline) {
+            l.logf("quest: the rest timed out at %.0f%% health", hp)
 
-			break
-		}
-		pace(questWalkPoll)
-	}
-	if err := l.ensureStanding(); err != nil {
-		return err
-	}
-	l.logf("quest: the rest ended at %.0f%% health",
-		l.tracker.SelfHealthPercent())
+            break
+        }
+        pace(questWalkPoll)
+    }
+    if err := l.ensureStanding(); err != nil {
+        return err
+    }
+    l.logf("quest: the rest ended at %.0f%% health",
+        l.tracker.SelfHealthPercent())
 
-	return nil
+    return nil
 }
 
 // questWalkPotionHP is the health share the route walk drinks at:
@@ -986,7 +986,7 @@ const questPotionReuse = 10 * time.Second
 // Healing Potion of the inventory (when one is left) or the no-op
 // for a healthy character.
 func (l *Loop) drinkHealingPotion() error {
-	return l.drinkHealingPotionAt(questRestSitHP)
+    return l.drinkHealingPotionAt(questRestSitHP)
 }
 
 // drinkHealingPotionAt drinks the first healing potion of the bag
@@ -994,30 +994,30 @@ func (l *Loop) drinkHealingPotion() error {
 // the previous round has lapsed (a no-op above either gate or with
 // the bag empty of potions).
 func (l *Loop) drinkHealingPotionAt(threshold float64) error {
-	if l.tracker.SelfHealthPercent() >= threshold {
-		return nil
-	}
-	if !l.questPotionAt.IsZero() &&
-		time.Since(l.questPotionAt) < questPotionReuse {
-		return nil
-	}
-	for _, item := range l.tracker.InventoryItems() {
-		if item.ItemID == questPotionItemID && item.Count > 0 &&
-			!item.Equipped {
-			l.logf("quest: drinking a healing potion at %.0f%% health",
-				l.tracker.SelfHealthPercent())
-			before := l.tracker.InventoryVersion()
-			if err := l.game.UseItem(item.ObjectID); err != nil {
-				return fmt.Errorf("the potion use: %w", err)
-			}
-			l.questPotionAt = time.Now()
-			l.awaitInventoryMutation(before, questEquipConfirmWait)
+    if l.tracker.SelfHealthPercent() >= threshold {
+        return nil
+    }
+    if !l.questPotionAt.IsZero() &&
+        time.Since(l.questPotionAt) < questPotionReuse {
+        return nil
+    }
+    for _, item := range l.tracker.InventoryItems() {
+        if item.ItemID == questPotionItemID && item.Count > 0 &&
+            !item.Equipped {
+            l.logf("quest: drinking a healing potion at %.0f%% health",
+                l.tracker.SelfHealthPercent())
+            before := l.tracker.InventoryVersion()
+            if err := l.game.UseItem(item.ObjectID); err != nil {
+                return fmt.Errorf("the potion use: %w", err)
+            }
+            l.questPotionAt = time.Now()
+            l.awaitInventoryMutation(before, questEquipConfirmWait)
 
-			return nil
-		}
-	}
+            return nil
+        }
+    }
 
-	return nil
+    return nil
 }
 
 // EquipBaggedGear dresses the character from the bag: the blocking
@@ -1029,53 +1029,53 @@ func (l *Loop) drinkHealingPotionAt(threshold float64) error {
 // calls it right after the world entry of an injected character
 // (the reset lands every stack in the bag).
 func (l *Loop) EquipBaggedGear() error {
-	if l.equip == nil || l.game == nil {
-		return errors.New("the equip manager is not wired")
-	}
-	lastObject := int32(0)
-	retries := 0
-	for range questEquipMaxActions {
-		action, ok := gear.NextUpgrade(l.equip.profile, l.equipment())
-		if !ok {
-			return nil
-		}
-		if action.ObjectID == lastObject {
-			retries++
-			if retries > 3 {
-				return fmt.Errorf(
-					"the equip of %s never confirmed", action.Reason)
-			}
-		} else {
-			retries = 0
-			lastObject = action.ObjectID
-		}
-		before := l.tracker.InventoryVersion()
-		if err := l.game.UseItem(action.ObjectID); err != nil {
-			return fmt.Errorf("the equip of %s: %w", action.Reason, err)
-		}
-		if !l.awaitInventoryMutation(before, questEquipConfirmWait) {
-			return fmt.Errorf(
-				"the equip of %s never confirmed", action.Reason)
-		}
-		l.logf("quest: gear: %s", action.Reason)
-	}
+    if l.equip == nil || l.game == nil {
+        return errors.New("the equip manager is not wired")
+    }
+    lastObject := int32(0)
+    retries := 0
+    for range questEquipMaxActions {
+        action, ok := gear.NextUpgrade(l.equip.profile, l.equipment())
+        if !ok {
+            return nil
+        }
+        if action.ObjectID == lastObject {
+            retries++
+            if retries > 3 {
+                return fmt.Errorf(
+                    "the equip of %s never confirmed", action.Reason)
+            }
+        } else {
+            retries = 0
+            lastObject = action.ObjectID
+        }
+        before := l.tracker.InventoryVersion()
+        if err := l.game.UseItem(action.ObjectID); err != nil {
+            return fmt.Errorf("the equip of %s: %w", action.Reason, err)
+        }
+        if !l.awaitInventoryMutation(before, questEquipConfirmWait) {
+            return fmt.Errorf(
+                "the equip of %s never confirmed", action.Reason)
+        }
+        l.logf("quest: gear: %s", action.Reason)
+    }
 
-	return errors.New("the equip loop reached the action budget")
+    return errors.New("the equip loop reached the action budget")
 }
 
 // awaitInventoryMutation waits until the tracker reports a new
 // inventory version (an InventoryUpdate the use request triggered).
 func (l *Loop) awaitInventoryMutation(
-	before uint64, wait time.Duration,
+    before uint64, wait time.Duration,
 ) bool {
-	deadline := time.Now().Add(wait)
-	for {
-		if l.tracker.InventoryVersion() != before {
-			return true
-		}
-		if time.Now().After(deadline) {
-			return false
-		}
-		pace(gatekeeperPollPeriod)
-	}
+    deadline := time.Now().Add(wait)
+    for {
+        if l.tracker.InventoryVersion() != before {
+            return true
+        }
+        if time.Now().After(deadline) {
+            return false
+        }
+        pace(gatekeeperPollPeriod)
+    }
 }

@@ -9,9 +9,9 @@ package hunt
 // the emergency logout that ends a lost session.
 
 import (
-        "fmt"
-        "math"
-        "time"
+    "fmt"
+    "math"
+    "time"
 )
 
 // fleeFromTarget drops a fight the character is losing and opens
@@ -19,18 +19,18 @@ import (
 // must not re-select it), the pending engage bookkeeping clears and
 // the shared threat walk runs.
 func (l *Loop) fleeFromTarget(targetID int32, now time.Time) {
-        l.logf("Hunt: HP %.0f%%, fleeing the fight with %d",
-                l.tracker.SelfHealthPercent(), targetID)
-        l.target = 0
-        l.engageAt = time.Time{}
-        l.clearBlindRecovery()
-        l.noTargetSince = time.Time{}
-        l.noPickLogAt = time.Time{}
-        if l.targetSkip == nil {
-                l.targetSkip = make(map[int32]time.Time)
-        }
-        l.targetSkip[targetID] = now.Add(fleeSkipDelay)
-        l.fleeFromThreat(now)
+    l.logf("Hunt: HP %.0f%%, fleeing the fight with %d",
+        l.tracker.SelfHealthPercent(), targetID)
+    l.target = 0
+    l.engageAt = time.Time{}
+    l.clearBlindRecovery()
+    l.noTargetSince = time.Time{}
+    l.noPickLogAt = time.Time{}
+    if l.targetSkip == nil {
+        l.targetSkip = make(map[int32]time.Time)
+    }
+    l.targetSkip[targetID] = now.Add(fleeSkipDelay)
+    l.fleeFromThreat(now)
 }
 
 // fleeFromThreat walks the character away from the nearest living
@@ -41,37 +41,37 @@ func (l *Loop) fleeFromTarget(targetID int32, now time.Time) {
 // the chasers near their spawns). A sitting character stands up
 // first - the server refuses move requests while it sits.
 func (l *Loop) fleeFromThreat(now time.Time) {
-        if !l.fleeAt.IsZero() && now.Sub(l.fleeAt) < selectPeriod {
-                return
-        }
-        l.fleeAt = now
-        if l.fleeSince.IsZero() {
-                l.fleeSince = now
-        }
-        if now.Sub(l.fleeSince) >= fleeLogoutAfter {
-                // The escape never shook the chase: the mobs keep the
-                // character running forever, the session ends and the
-                // login cooldown resets the aggro while the character
-                // regenerates sitting.
-                l.logf("Hunt: fleeing for %.0fs without shaking "+
-                        "the chase, resetting the aggro via logout",
-                        now.Sub(l.fleeSince).Seconds())
-                l.emergencyLogout()
+    if !l.fleeAt.IsZero() && now.Sub(l.fleeAt) < selectPeriod {
+        return
+    }
+    l.fleeAt = now
+    if l.fleeSince.IsZero() {
+        l.fleeSince = now
+    }
+    if now.Sub(l.fleeSince) >= fleeLogoutAfter {
+        // The escape never shook the chase: the mobs keep the
+        // character running forever, the session ends and the
+        // login cooldown resets the aggro while the character
+        // regenerates sitting.
+        l.logf("Hunt: fleeing for %.0fs without shaking "+
+            "the chase, resetting the aggro via logout",
+            now.Sub(l.fleeSince).Seconds())
+        l.emergencyLogout()
 
-                return
-        }
-        if !l.standUpGuarded(now) {
-                return
-        }
-        moveX, moveY, moveZ, ok := l.escapeWalkDestination()
-        if !ok {
-                // The blows landed but no mob stands around anymore:
-                // the under attack window closes on its own in seconds.
-                return
-        }
-        if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
-                l.logf("Hunt: escape walk failed: %v", err)
-        }
+        return
+    }
+    if !l.standUpGuarded(now) {
+        return
+    }
+    moveX, moveY, moveZ, ok := l.escapeWalkDestination()
+    if !ok {
+        // The blows landed but no mob stands around anymore:
+        // the under attack window closes on its own in seconds.
+        return
+    }
+    if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
+        l.logf("Hunt: escape walk failed: %v", err)
+    }
 }
 
 // escapeWalkDestination plans one escape leg away from the nearest
@@ -79,36 +79,36 @@ func (l *Loop) fleeFromThreat(now time.Time) {
 // zone, toward the zone center when it does not (the center
 // direction leashes the chasers near their spawns).
 func (l *Loop) escapeWalkDestination() (int32, int32, int32, bool) {
-        selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
-        if !ok {
-                return 0, 0, 0, false
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return 0, 0, 0, false
+    }
+    threatX, threatY, hasThreat := l.threatPosition()
+    if !hasThreat {
+        return 0, 0, 0, false
+    }
+    dx := float64(selfX - threatX)
+    dy := float64(selfY - threatY)
+    dist := math.Hypot(dx, dy)
+    if dist <= 1 {
+        return 0, 0, 0, false
+    }
+    moveX := int32(float64(selfX) + dx/dist*escapeWalkDistance)
+    moveY := int32(float64(selfY) + dy/dist*escapeWalkDistance)
+    zone := l.zone()
+    if zone != nil && !zone.Contains(moveX, moveY) {
+        // The straight escape leaves the hunting square: run
+        // toward the center instead.
+        dx = float64(zone.CX - selfX)
+        dy = float64(zone.CY - selfY)
+        if centerDist := math.Hypot(dx, dy); centerDist > 1 {
+            frac := math.Min(1, escapeWalkDistance/centerDist)
+            moveX = int32(float64(selfX) + dx*frac)
+            moveY = int32(float64(selfY) + dy*frac)
         }
-        threatX, threatY, hasThreat := l.threatPosition()
-        if !hasThreat {
-                return 0, 0, 0, false
-        }
-        dx := float64(selfX - threatX)
-        dy := float64(selfY - threatY)
-        dist := math.Hypot(dx, dy)
-        if dist <= 1 {
-                return 0, 0, 0, false
-        }
-        moveX := int32(float64(selfX) + dx/dist*escapeWalkDistance)
-        moveY := int32(float64(selfY) + dy/dist*escapeWalkDistance)
-        zone := l.zone()
-        if zone != nil && !zone.Contains(moveX, moveY) {
-                // The straight escape leaves the hunting square: run
-                // toward the center instead.
-                dx = float64(zone.CX - selfX)
-                dy = float64(zone.CY - selfY)
-                if centerDist := math.Hypot(dx, dy); centerDist > 1 {
-                        frac := math.Min(1, escapeWalkDistance/centerDist)
-                        moveX = int32(float64(selfX) + dx*frac)
-                        moveY = int32(float64(selfY) + dy*frac)
-                }
-        }
+    }
 
-        return moveX, moveY, selfZ, true
+    return moveX, moveY, selfZ, true
 }
 
 // threatPosition returns the position of the mob the escape runs
@@ -123,16 +123,16 @@ func (l *Loop) escapeWalkDestination() (int32, int32, int32, bool) {
 // no mob holding the character as its target the escape has nothing
 // to run from and the rest happens where the fight ended.
 func (l *Loop) threatPosition() (int32, int32, bool) {
-        if l.target != 0 && l.tracker.ObjectAlive(l.target) {
-                if x, y, _, ok := l.tracker.ObjectPosition(l.target); ok {
-                        return x, y, true
-                }
+    if l.target != 0 && l.tracker.ObjectAlive(l.target) {
+        if x, y, _, ok := l.tracker.ObjectPosition(l.target); ok {
+            return x, y, true
         }
-        if pick, ok := l.tracker.NearestAttacker(); ok {
-                return pick.X, pick.Y, true
-        }
+    }
+    if pick, ok := l.tracker.NearestAttacker(); ok {
+        return pick.X, pick.Y, true
+    }
 
-        return 0, 0, false
+    return 0, 0, false
 }
 
 // panicPileUpRun answers the social pile up (two or more mobs
@@ -152,88 +152,88 @@ func (l *Loop) threatPosition() (int32, int32, bool) {
 // anymore, nothing attackable stands near): nothing is left to
 // run from, the spot is as safe as the run gets.
 func (l *Loop) panicPileUpRun(now time.Time) {
-        if l.panicAt.IsZero() {
-                x, y, _, ok := l.tracker.SelfPosition()
-                if !ok {
-                        // No known position to measure the run from:
-                        // the instant logout is the only answer left.
-                        l.emergencyLogout()
-
-                        return
-                }
-                l.panicAt = now
-                l.panicX, l.panicY = x, y
-                l.logger.Printf("Hunt: %d mobs piled on us, running %.0f units "+
-                        "from the aggro point before the logout",
-                        l.tracker.SelfAttackerCount(), panicRunDistance)
-                // Drop the fight the pack joined: the dropped target
-                // lands on the long skip list (the run must not
-                // re-engage it), the pending engage bookkeeping
-                // clears - the same handoff fleeFromTarget makes.
-                if l.target != 0 {
-                        if l.targetSkip == nil {
-                                l.targetSkip = make(map[int32]time.Time)
-                        }
-                        l.targetSkip[l.target] = now.Add(fleeSkipDelay)
-                        l.target = 0
-                        l.engageAt = time.Time{}
-                        l.clearBlindRecovery()
-                        l.noTargetSince = time.Time{}
-                }
-        }
-        if dist := l.panicAnchorDistance(); dist >= panicRunDistance {
-                l.logger.Printf("Hunt: %.0f units from the aggro point, "+
-                        "logging out", dist)
-                l.emergencyLogout()
-
-                return
-        }
-        if now.Sub(l.panicAt) >= fleeLogoutAfter {
-                l.logger.Printf("Hunt: the pile up run could not open %.0f units "+
-                        "within %.0fs, logging out anyway",
-                        panicRunDistance, fleeLogoutAfter.Seconds())
-                l.emergencyLogout()
-
-                return
-        }
-        if !l.fleeAt.IsZero() && now.Sub(l.fleeAt) < selectPeriod {
-                return
-        }
-        l.fleeAt = now
-        if l.fleeSince.IsZero() {
-                l.fleeSince = now
-        }
-        if !l.standUpGuarded(now) {
-                return
-        }
-        moveX, moveY, moveZ, ok := l.escapeWalkDestination()
+    if l.panicAt.IsZero() {
+        x, y, _, ok := l.tracker.SelfPosition()
         if !ok {
-                // No mob holds the target anymore and nothing
-                // attackable stands within the escape range: the
-                // pack dissolved, the chase is over wherever the
-                // run got to. Log out now instead of idling out the
-                // budget - the relogin spot is already clear.
-                l.logger.Printf("Hunt: the pile up run shook the chase "+
-                        "at %.0f units, logging out", l.panicAnchorDistance())
-                l.emergencyLogout()
+            // No known position to measure the run from:
+            // the instant logout is the only answer left.
+            l.emergencyLogout()
 
-                return
+            return
         }
-        if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
-                l.logger.Printf("Hunt: pile up escape walk failed: %v", err)
+        l.panicAt = now
+        l.panicX, l.panicY = x, y
+        l.logger.Printf("Hunt: %d mobs piled on us, running %.0f units "+
+            "from the aggro point before the logout",
+            l.tracker.SelfAttackerCount(), panicRunDistance)
+        // Drop the fight the pack joined: the dropped target
+        // lands on the long skip list (the run must not
+        // re-engage it), the pending engage bookkeeping
+        // clears - the same handoff fleeFromTarget makes.
+        if l.target != 0 {
+            if l.targetSkip == nil {
+                l.targetSkip = make(map[int32]time.Time)
+            }
+            l.targetSkip[l.target] = now.Add(fleeSkipDelay)
+            l.target = 0
+            l.engageAt = time.Time{}
+            l.clearBlindRecovery()
+            l.noTargetSince = time.Time{}
         }
+    }
+    if dist := l.panicAnchorDistance(); dist >= panicRunDistance {
+        l.logger.Printf("Hunt: %.0f units from the aggro point, "+
+            "logging out", dist)
+        l.emergencyLogout()
+
+        return
+    }
+    if now.Sub(l.panicAt) >= fleeLogoutAfter {
+        l.logger.Printf("Hunt: the pile up run could not open %.0f units "+
+            "within %.0fs, logging out anyway",
+            panicRunDistance, fleeLogoutAfter.Seconds())
+        l.emergencyLogout()
+
+        return
+    }
+    if !l.fleeAt.IsZero() && now.Sub(l.fleeAt) < selectPeriod {
+        return
+    }
+    l.fleeAt = now
+    if l.fleeSince.IsZero() {
+        l.fleeSince = now
+    }
+    if !l.standUpGuarded(now) {
+        return
+    }
+    moveX, moveY, moveZ, ok := l.escapeWalkDestination()
+    if !ok {
+        // No mob holds the target anymore and nothing
+        // attackable stands within the escape range: the
+        // pack dissolved, the chase is over wherever the
+        // run got to. Log out now instead of idling out the
+        // budget - the relogin spot is already clear.
+        l.logger.Printf("Hunt: the pile up run shook the chase "+
+            "at %.0f units, logging out", l.panicAnchorDistance())
+        l.emergencyLogout()
+
+        return
+    }
+    if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
+        l.logger.Printf("Hunt: pile up escape walk failed: %v", err)
+    }
 }
 
 // panicAnchorDistance measures how far the character stands from
 // the anchored aggro point of the pile up run (the planar distance:
 // the height of the terrain does not make a mob pack closer).
 func (l *Loop) panicAnchorDistance() float64 {
-        x, y, _, ok := l.tracker.SelfPosition()
-        if !ok {
-                return 0
-        }
+    x, y, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        return 0
+    }
 
-        return math.Hypot(float64(x-l.panicX), float64(y-l.panicY))
+    return math.Hypot(float64(x-l.panicX), float64(y-l.panicY))
 }
 
 // emergencyLogout saves a character with no way out: the health
@@ -251,13 +251,13 @@ func (l *Loop) panicAnchorDistance() float64 {
 // (the observed run: 85 emergency logouts on the same spider ground,
 // every session a fresh loop instance with a zeroed regression).
 func (l *Loop) emergencyLogout() {
-        reason := fmt.Sprintf("HP %.0f%% under attack",
-                l.tracker.SelfHealthPercent())
-        if count := l.tracker.SelfAttackerCount(); count >= panicLogoutAttackers {
-                reason = fmt.Sprintf("%d mobs piled on us", count)
-        }
-        l.noteZoneDanger()
-        l.emergencyLogoutWithReason(reason)
+    reason := fmt.Sprintf("HP %.0f%% under attack",
+        l.tracker.SelfHealthPercent())
+    if count := l.tracker.SelfAttackerCount(); count >= panicLogoutAttackers {
+        reason = fmt.Sprintf("%d mobs piled on us", count)
+    }
+    l.noteZoneDanger()
+    l.emergencyLogoutWithReason(reason)
 }
 
 // emergencyLogoutWithReason is the shared body of the emergency
@@ -268,35 +268,35 @@ func (l *Loop) emergencyLogout() {
 // livelocked loop is as good a reason to rebuild the session as a
 // death risk - see stagnation.go).
 func (l *Loop) emergencyLogoutWithReason(reason string) {
-        l.logoutDone = true
-        l.logf("Hunt: %s, emergency logout for %s",
-                reason, panicLogoutPause)
-        // The honest trail: the structured logout event and the tracker
-        // reason replace the "use of closed network connection" line the
-        // supervisor would book for the socket close (see runBotForever).
-        l.tracker.SetEmergencyLogout(reason)
-        if l.journal != nil {
-                l.journal.Logout(l.tracker.ID(), reason, panicLogoutPause)
+    l.logoutDone = true
+    l.logf("Hunt: %s, emergency logout for %s",
+        reason, panicLogoutPause)
+    // The honest trail: the structured logout event and the tracker
+    // reason replace the "use of closed network connection" line the
+    // supervisor would book for the socket close (see runBotForever).
+    l.tracker.SetEmergencyLogout(reason)
+    if l.journal != nil {
+        l.journal.Logout(l.tracker.ID(), reason, panicLogoutPause)
+    }
+    if moveX, moveY, moveZ, ok := l.escapeWalkDestination(); ok {
+        if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
+            l.logf("Hunt: escape walk failed: %v", err)
         }
-        if moveX, moveY, moveZ, ok := l.escapeWalkDestination(); ok {
-                if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
-                        l.logf("Hunt: escape walk failed: %v", err)
-                }
-        }
-        l.tracker.SetLoginCooldown(panicLogoutPause)
-        l.panicAt = time.Time{}
-        if err := l.game.RequestLogout(); err != nil {
-                l.logf("Hunt: logout request failed: %v", err)
-        }
+    }
+    l.tracker.SetLoginCooldown(panicLogoutPause)
+    l.panicAt = time.Time{}
+    if err := l.game.RequestLogout(); err != nil {
+        l.logf("Hunt: logout request failed: %v", err)
+    }
 }
 
 // targetSkipped reports whether the object id is currently held out of
 // the engage target search: a stuck pick keeps its short delay, a
 // fled target its long one (both live in the same expiry map).
 func (l *Loop) targetSkipped(objectID int32, now time.Time) bool {
-        until, ok := l.targetSkip[objectID]
+    until, ok := l.targetSkip[objectID]
 
-        return ok && now.Before(until)
+    return ok && now.Before(until)
 }
 
 // attackerEngageable reports whether the character may answer the
@@ -308,27 +308,27 @@ func (l *Loop) targetSkipped(objectID int32, now time.Time) bool {
 // ceiling never becomes winnable and the defense flow answers
 // instead (the escape walk and, when the chase holds, the logout).
 func (l *Loop) attackerEngageable(objectID int32) bool {
-        if l.tracker.SelfHealthPercent() < reengageHealthPercent {
-                return false
-        }
-        level, ok := l.tracker.ObjectLevel(objectID)
-        if !ok || level <= 0 {
-                return true
-        }
-        maxLevel := l.maxTargetLevel()
+    if l.tracker.SelfHealthPercent() < reengageHealthPercent {
+        return false
+    }
+    level, ok := l.tracker.ObjectLevel(objectID)
+    if !ok || level <= 0 {
+        return true
+    }
+    maxLevel := l.maxTargetLevel()
 
-        return maxLevel <= 0 || level <= maxLevel
+    return maxLevel <= 0 || level <= maxLevel
 }
 
 // activeSkips collects the object ids whose skip expiry has not
 // passed yet into the reused dense scratch list (see skipScratch).
 func (l *Loop) activeSkips(now time.Time) []int32 {
-        l.skipScratch = l.skipScratch[:0]
-        for objectID, until := range l.targetSkip {
-                if now.Before(until) {
-                        l.skipScratch = append(l.skipScratch, objectID)
-                }
+    l.skipScratch = l.skipScratch[:0]
+    for objectID, until := range l.targetSkip {
+        if now.Before(until) {
+            l.skipScratch = append(l.skipScratch, objectID)
         }
+    }
 
-        return l.skipScratch
+    return l.skipScratch
 }

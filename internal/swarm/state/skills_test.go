@@ -5,56 +5,56 @@
 package state
 
 import (
-	"encoding/json"
-	"testing"
+    "encoding/json"
+    "testing"
 
-	"github.com/melg8/swarm/internal/swarm/npcdata"
-	"github.com/stretchr/testify/require"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
+    "github.com/stretchr/testify/require"
 )
 
 // elvenFighterSkills returns a learned set of the elven fighter test
 // bot: the level 3 starter strikes plus the passive masteries.
 func elvenFighterSkills() []LearnedSkill {
-	return []LearnedSkill{
-		{SkillID: 3, Level: 3, Passive: false},
-		{SkillID: 16, Level: 3, Passive: false},
-		{SkillID: 56, Level: 3, Passive: false},
-		{SkillID: 142, Level: 1, Passive: true},
-		{SkillID: 194, Level: 1, Passive: true},
-	}
+    return []LearnedSkill{
+        {SkillID: 3, Level: 3, Passive: false},
+        {SkillID: 16, Level: 3, Passive: false},
+        {SkillID: 56, Level: 3, Passive: false},
+        {SkillID: 142, Level: 1, Passive: true},
+        {SkillID: 194, Level: 1, Passive: true},
+    }
 }
 
 // TestSetSkillsPublishesTheSnapshot pins the apply path: the learned
 // list lands in the snapshot enriched with the display data of the
 // generated dictionary, sorted by skill id.
 func TestSetSkillsPublishesTheSnapshot(t *testing.T) {
-	bot := NewBot("test1")
-	require.Nil(t, bot.Snapshot().Skills,
-		"no skills before the server lists them")
+    bot := NewBot("test1")
+    require.Nil(t, bot.Snapshot().Skills,
+        "no skills before the server lists them")
 
-	bot.SetSkills(elvenFighterSkills())
-	snap := bot.Snapshot()
-	require.NotNil(t, snap.Skills)
-	require.Len(t, snap.Skills, 5)
+    bot.SetSkills(elvenFighterSkills())
+    snap := bot.Snapshot()
+    require.NotNil(t, snap.Skills)
+    require.Len(t, snap.Skills, 5)
 
-	first := snap.Skills[0]
-	require.Equal(t, int32(3), first.SkillID)
-	require.Equal(t, int32(3), first.Level)
-	require.False(t, first.Passive)
-	require.Equal(t, "Power Strike", first.Name)
-	require.Equal(t, "skill0003", first.Icon)
-	require.Equal(t,
-		"Gathers power for a fierce strike. Used when equipped "+
-			"with a sword or blunt type weapon. Over-hit is "+
-			"possible. Power 30.",
-		first.Desc)
+    first := snap.Skills[0]
+    require.Equal(t, int32(3), first.SkillID)
+    require.Equal(t, int32(3), first.Level)
+    require.False(t, first.Passive)
+    require.Equal(t, "Power Strike", first.Name)
+    require.Equal(t, "skill0003", first.Icon)
+    require.Equal(t,
+        "Gathers power for a fierce strike. Used when equipped "+
+            "with a sword or blunt type weapon. Over-hit is "+
+            "possible. Power 30.",
+        first.Desc)
 
-	mastery := snap.Skills[3]
-	require.Equal(t, int32(142), mastery.SkillID)
-	require.True(t, mastery.Passive)
-	require.Equal(t, "Armor Mastery", mastery.Name)
-	require.Equal(t, "skill0142", mastery.Icon)
-	require.Equal(t, "Defense increases.", mastery.Desc)
+    mastery := snap.Skills[3]
+    require.Equal(t, int32(142), mastery.SkillID)
+    require.True(t, mastery.Passive)
+    require.Equal(t, "Armor Mastery", mastery.Name)
+    require.Equal(t, "skill0142", mastery.Icon)
+    require.Equal(t, "Defense increases.", mastery.Desc)
 }
 
 // TestSkillPlanOrdersWarriorPriorities pins the learning order of the
@@ -62,104 +62,104 @@ func TestSetSkillsPublishesTheSnapshot(t *testing.T) {
 // strikes and the weapon mastery), the defense skills second, the
 // rest last; within a category the unlock level orders the lessons.
 func TestSkillPlanOrdersWarriorPriorities(t *testing.T) {
-	bot := NewBot("test1")
-	bot.ApplyUserInfo(UserInfo{
-		Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 100,
-	})
-	bot.SetSkills(elvenFighterSkills())
+    bot := NewBot("test1")
+    bot.ApplyUserInfo(UserInfo{
+        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 100,
+    })
+    bot.SetSkills(elvenFighterSkills())
 
-	plan := bot.Snapshot().SkillPlan
-	require.NotNil(t, plan)
-	require.NotEmpty(t, plan.Entries)
+    plan := bot.Snapshot().SkillPlan
+    require.NotNil(t, plan)
+    require.NotEmpty(t, plan.Entries)
 
-	// The category blocks must be contiguous and ordered attack,
-	// defense, other.
-	lastCategory := -1
-	for _, entry := range plan.Entries {
-		require.LessOrEqual(t, lastCategory, entry.Category,
-			"category blocks must not interleave")
-		lastCategory = entry.Category
-	}
-	require.Equal(t, npcdata.SkillCategoryAttack, plan.Entries[0].Category,
-		"the first lesson must be an attack power skill")
+    // The category blocks must be contiguous and ordered attack,
+    // defense, other.
+    lastCategory := -1
+    for _, entry := range plan.Entries {
+        require.LessOrEqual(t, lastCategory, entry.Category,
+            "category blocks must not interleave")
+        lastCategory = entry.Category
+    }
+    require.Equal(t, npcdata.SkillCategoryAttack, plan.Entries[0].Category,
+        "the first lesson must be an attack power skill")
 
-	// The known Power Strike levels 1-3 never reappear; the next
-	// lesson is level 4 at level 10.
-	var strike *SkillPlanEntry
-	for i := range plan.Entries {
-		if plan.Entries[i].SkillID == 3 {
-			strike = &plan.Entries[i]
+    // The known Power Strike levels 1-3 never reappear; the next
+    // lesson is level 4 at level 10.
+    var strike *SkillPlanEntry
+    for i := range plan.Entries {
+        if plan.Entries[i].SkillID == 3 {
+            strike = &plan.Entries[i]
 
-			break
-		}
-	}
-	require.NotNil(t, strike, "Power Strike 4 must stay queued")
-	require.Equal(t, int32(4), strike.Level)
-	require.Equal(t, int32(310), strike.SpCost)
-	require.Equal(t, int32(10), strike.ReqLevel)
-	require.False(t, strike.Affordable, "100 sp cannot pay 310")
-	require.Equal(t,
-		"Gathers power for a fierce strike. Used when equipped "+
-			"with a sword or blunt type weapon. Over-hit is "+
-			"possible. Power 39.",
-		strike.Desc, "the description must answer with the "+
-			"level being learned")
+            break
+        }
+    }
+    require.NotNil(t, strike, "Power Strike 4 must stay queued")
+    require.Equal(t, int32(4), strike.Level)
+    require.Equal(t, int32(310), strike.SpCost)
+    require.Equal(t, int32(10), strike.ReqLevel)
+    require.False(t, strike.Affordable, "100 sp cannot pay 310")
+    require.Equal(t,
+        "Gathers power for a fierce strike. Used when equipped "+
+            "with a sword or blunt type weapon. Over-hit is "+
+            "possible. Power 39.",
+        strike.Desc, "the description must answer with the "+
+            "level being learned")
 
-	// The auto granted Lucky never enters the queue.
-	for _, entry := range plan.Entries {
-		require.NotEqual(t, int32(194), entry.SkillID)
-	}
+    // The auto granted Lucky never enters the queue.
+    for _, entry := range plan.Entries {
+        require.NotEqual(t, int32(194), entry.SkillID)
+    }
 
-	// The affordability flag follows the SP: with 400 sp the level 10
-	// Power Strike lessons become affordable (the level 15 ones at
-	// 1100 sp stay out of reach).
-	bot.ApplyUserInfo(UserInfo{
-		Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 400,
-	})
-	plan = bot.Snapshot().SkillPlan
-	for _, entry := range plan.Entries {
-		if entry.SkillID == 3 && entry.ReqLevel <= 10 {
-			require.True(t, entry.Affordable)
-		}
-	}
+    // The affordability flag follows the SP: with 400 sp the level 10
+    // Power Strike lessons become affordable (the level 15 ones at
+    // 1100 sp stay out of reach).
+    bot.ApplyUserInfo(UserInfo{
+        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 400,
+    })
+    plan = bot.Snapshot().SkillPlan
+    for _, entry := range plan.Entries {
+        if entry.SkillID == 3 && entry.ReqLevel <= 10 {
+            require.True(t, entry.Affordable)
+        }
+    }
 }
 
 // TestSkillPlanTotals pins the queue economics: the SP wallet, the
 // total cost of the whole queue and the missing SP.
 func TestSkillPlanTotals(t *testing.T) {
-	bot := NewBot("test1")
-	bot.ApplyUserInfo(UserInfo{
-		Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
-	})
-	bot.SetSkills(nil)
+    bot := NewBot("test1")
+    bot.ApplyUserInfo(UserInfo{
+        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
+    })
+    bot.SetSkills(nil)
 
-	plan := bot.Snapshot().SkillPlan
-	require.NotNil(t, plan)
-	require.Equal(t, int64(500), plan.Sp)
+    plan := bot.Snapshot().SkillPlan
+    require.NotNil(t, plan)
+    require.Equal(t, int64(500), plan.Sp)
 
-	var total int64
-	for _, entry := range plan.Entries {
-		total += int64(entry.SpCost)
-	}
-	require.Equal(t, total, plan.Total)
-	require.Equal(t, total-500, plan.Missing)
+    var total int64
+    for _, entry := range plan.Entries {
+        total += int64(entry.SpCost)
+    }
+    require.Equal(t, total, plan.Total)
+    require.Equal(t, total-500, plan.Missing)
 }
 
 // TestSkillPlanClearedBySessionReset pins the reset: a session reset
 // drops the learned list and the queue (the fresh login republishes
 // them).
 func TestSkillPlanClearedBySessionReset(t *testing.T) {
-	bot := NewBot("test1")
-	bot.ApplyUserInfo(UserInfo{
-		Name: "test1", Level: 5, ClassID: 18, Race: 1,
-	})
-	bot.SetSkills(elvenFighterSkills())
-	require.NotNil(t, bot.Snapshot().SkillPlan)
+    bot := NewBot("test1")
+    bot.ApplyUserInfo(UserInfo{
+        Name: "test1", Level: 5, ClassID: 18, Race: 1,
+    })
+    bot.SetSkills(elvenFighterSkills())
+    require.NotNil(t, bot.Snapshot().SkillPlan)
 
-	bot.ResetSession()
-	snap := bot.Snapshot()
-	require.Nil(t, snap.Skills)
-	require.Nil(t, snap.SkillPlan)
+    bot.ResetSession()
+    snap := bot.Snapshot()
+    require.Nil(t, snap.Skills)
+    require.Nil(t, snap.SkillPlan)
 }
 
 // TestSkillPlanUnknownClassStaysNull pins the fallback: a class the
@@ -167,56 +167,56 @@ func TestSkillPlanClearedBySessionReset(t *testing.T) {
 // are not warriors - the dictionary still answers them - but a bogus
 // class id must not crash the snapshot).
 func TestSkillPlanUnknownClassStaysNull(t *testing.T) {
-	bot := NewBot("test1")
-	bot.ApplyUserInfo(UserInfo{
-		Name: "test1", Level: 5, ClassID: 999, Race: 1,
-	})
-	bot.SetSkills(elvenFighterSkills())
+    bot := NewBot("test1")
+    bot.ApplyUserInfo(UserInfo{
+        Name: "test1", Level: 5, ClassID: 999, Race: 1,
+    })
+    bot.SetSkills(elvenFighterSkills())
 
-	require.Nil(t, bot.Snapshot().SkillPlan)
+    require.Nil(t, bot.Snapshot().SkillPlan)
 }
 
 // TestSkillPlanJSONShape pins the JSON contract of the queue and the
 // learned list: the field names the web UI reads.
 func TestSkillPlanJSONShape(t *testing.T) {
-	bot := NewBot("test1")
-	bot.ApplyUserInfo(UserInfo{
-		Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
-	})
-	bot.SetSkills([]LearnedSkill{{SkillID: 142, Level: 1, Passive: true}})
+    bot := NewBot("test1")
+    bot.ApplyUserInfo(UserInfo{
+        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
+    })
+    bot.SetSkills([]LearnedSkill{{SkillID: 142, Level: 1, Passive: true}})
 
-	encoded, err := json.Marshal(bot.Snapshot())
-	require.NoError(t, err)
+    encoded, err := json.Marshal(bot.Snapshot())
+    require.NoError(t, err)
 
-	var raw map[string]any
-	require.NoError(t, json.Unmarshal(encoded, &raw))
-	skills, ok := raw["skills"].([]any)
-	require.True(t, ok)
-	require.Len(t, skills, 1)
-	skill := skills[0].(map[string]any)
-	require.InDelta(t, 142, skill["skillId"], 0.0001)
-	require.InDelta(t, 1, skill["level"], 0.0001)
-	require.Equal(t, true, skill["passive"])
-	require.Equal(t, "Armor Mastery", skill["name"])
-	require.Equal(t, "skill0142", skill["icon"])
-	require.Equal(t, "Defense increases.", skill["desc"])
+    var raw map[string]any
+    require.NoError(t, json.Unmarshal(encoded, &raw))
+    skills, ok := raw["skills"].([]any)
+    require.True(t, ok)
+    require.Len(t, skills, 1)
+    skill := skills[0].(map[string]any)
+    require.InDelta(t, 142, skill["skillId"], 0.0001)
+    require.InDelta(t, 1, skill["level"], 0.0001)
+    require.Equal(t, true, skill["passive"])
+    require.Equal(t, "Armor Mastery", skill["name"])
+    require.Equal(t, "skill0142", skill["icon"])
+    require.Equal(t, "Defense increases.", skill["desc"])
 
-	plan, ok := raw["skillPlan"].(map[string]any)
-	require.True(t, ok)
-	require.InDelta(t, 200, plan["sp"], 0.0001)
-	entries, ok := plan["entries"].([]any)
-	require.True(t, ok)
-	require.NotEmpty(t, entries)
-	first, ok := entries[0].(map[string]any)
-	require.True(t, ok)
-	require.Equal(t, "Power Strike", first["name"])
-	require.InDelta(t, 60, first["spCost"], 0.0001)
-	require.InDelta(t, 5, first["reqLevel"], 0.0001)
-	require.Equal(t, false, first["passive"])
-	require.Equal(t, true, first["affordable"])
-	require.InDelta(t, 0, first["category"], 0.0001)
-	require.Contains(t, first["desc"],
-		"Gathers power for a fierce strike")
+    plan, ok := raw["skillPlan"].(map[string]any)
+    require.True(t, ok)
+    require.InDelta(t, 200, plan["sp"], 0.0001)
+    entries, ok := plan["entries"].([]any)
+    require.True(t, ok)
+    require.NotEmpty(t, entries)
+    first, ok := entries[0].(map[string]any)
+    require.True(t, ok)
+    require.Equal(t, "Power Strike", first["name"])
+    require.InDelta(t, 60, first["spCost"], 0.0001)
+    require.InDelta(t, 5, first["reqLevel"], 0.0001)
+    require.Equal(t, false, first["passive"])
+    require.Equal(t, true, first["affordable"])
+    require.InDelta(t, 0, first["category"], 0.0001)
+    require.Contains(t, first["desc"],
+        "Gathers power for a fierce strike")
 }
 
 // TestSkillPlanCarriesTheBooks pins the book fields of the queued
@@ -224,31 +224,31 @@ func TestSkillPlanJSONShape(t *testing.T) {
 // spellbooks (the item id and the resolved name), the strikes learn
 // without one.
 func TestSkillPlanCarriesTheBooks(t *testing.T) {
-	bot := NewBot("test1")
-	bot.ApplyUserInfo(UserInfo{
-		Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
-	})
-	bot.SetSkills([]LearnedSkill{{SkillID: 142, Level: 1, Passive: true}})
+    bot := NewBot("test1")
+    bot.ApplyUserInfo(UserInfo{
+        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
+    })
+    bot.SetSkills([]LearnedSkill{{SkillID: 142, Level: 1, Passive: true}})
 
-	plan := bot.Snapshot().SkillPlan
-	require.NotNil(t, plan)
+    plan := bot.Snapshot().SkillPlan
+    require.NotNil(t, plan)
 
-	var aura, strike *SkillPlanEntry
-	for i := range plan.Entries {
-		switch plan.Entries[i].SkillID {
-		case 91:
-			aura = &plan.Entries[i]
-		case 3:
-			strike = &plan.Entries[i]
-		}
-	}
-	require.NotNil(t, aura, "Defence Aura must stay queued")
-	require.Equal(t, int32(1294), aura.BookItemID)
-	require.Equal(t, "Spellbook: Advanced Defense Power",
-		aura.BookName)
-	require.NotNil(t, strike, "Power Strike must stay queued")
-	require.Zero(t, strike.BookItemID)
-	require.Empty(t, strike.BookName)
+    var aura, strike *SkillPlanEntry
+    for i := range plan.Entries {
+        switch plan.Entries[i].SkillID {
+        case 91:
+            aura = &plan.Entries[i]
+        case 3:
+            strike = &plan.Entries[i]
+        }
+    }
+    require.NotNil(t, aura, "Defence Aura must stay queued")
+    require.Equal(t, int32(1294), aura.BookItemID)
+    require.Equal(t, "Spellbook: Advanced Defense Power",
+        aura.BookName)
+    require.NotNil(t, strike, "Power Strike must stay queued")
+    require.Zero(t, strike.BookItemID)
+    require.Empty(t, strike.BookName)
 }
 
 // TestSkillPlanWeaponPriority pins the warrior weapon
@@ -257,58 +257,58 @@ func TestSkillPlanCarriesTheBooks(t *testing.T) {
 // purchase plan) sort before the attack lessons of the other
 // weapons; the defense and the rest stay behind.
 func TestSkillPlanWeaponPriority(t *testing.T) {
-	bot := NewBot("test1")
-	bot.ApplyUserInfo(UserInfo{
-		Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
-	})
-	bot.SetSkills([]LearnedSkill{{SkillID: 142, Level: 1, Passive: true}})
+    bot := NewBot("test1")
+    bot.ApplyUserInfo(UserInfo{
+        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
+    })
+    bot.SetSkills([]LearnedSkill{{SkillID: 142, Level: 1, Passive: true}})
 
-	// The boundary helpers: the first and the last queue index of a
-	// skill id.
-	indexOf := func(plan *SkillPlanView, skillID int32) int {
-		for i := range plan.Entries {
-			if plan.Entries[i].SkillID == skillID {
-				return i
-			}
-		}
+    // The boundary helpers: the first and the last queue index of a
+    // skill id.
+    indexOf := func(plan *SkillPlanView, skillID int32) int {
+        for i := range plan.Entries {
+            if plan.Entries[i].SkillID == skillID {
+                return i
+            }
+        }
 
-		return -1
-	}
-	lastIndexOf := func(plan *SkillPlanView, skillID int32) int {
-		for i := len(plan.Entries) - 1; i >= 0; i-- {
-			if plan.Entries[i].SkillID == skillID {
-				return i
-			}
-		}
+        return -1
+    }
+    lastIndexOf := func(plan *SkillPlanView, skillID int32) int {
+        for i := len(plan.Entries) - 1; i >= 0; i-- {
+            if plan.Entries[i].SkillID == skillID {
+                return i
+            }
+        }
 
-		return -1
-	}
+        return -1
+    }
 
-	// A sword in hand: Power Strike (sword/blunt) leads the queue
-	// ahead of the bow and the dagger lessons, Power Shot (bow)
-	// stays behind the sword group with Mortal Blow (dagger).
-	bot.SetSkillWeaponPriority([]string{"SWORD"})
-	plan := bot.Snapshot().SkillPlan
-	require.NotNil(t, plan)
-	require.Equal(t, int32(3), plan.Entries[0].SkillID,
-		"Power Strike leads with a sword")
-	require.Greater(t, indexOf(plan, 56), lastIndexOf(plan, 3),
-		"Power Shot stays behind the sword lessons")
-	require.Greater(t, indexOf(plan, 16), lastIndexOf(plan, 3),
-		"Mortal Blow stays behind the sword lessons")
+    // A sword in hand: Power Strike (sword/blunt) leads the queue
+    // ahead of the bow and the dagger lessons, Power Shot (bow)
+    // stays behind the sword group with Mortal Blow (dagger).
+    bot.SetSkillWeaponPriority([]string{"SWORD"})
+    plan := bot.Snapshot().SkillPlan
+    require.NotNil(t, plan)
+    require.Equal(t, int32(3), plan.Entries[0].SkillID,
+        "Power Strike leads with a sword")
+    require.Greater(t, indexOf(plan, 56), lastIndexOf(plan, 3),
+        "Power Shot stays behind the sword lessons")
+    require.Greater(t, indexOf(plan, 16), lastIndexOf(plan, 3),
+        "Mortal Blow stays behind the sword lessons")
 
-	// A bow as the next weapon: Power Shot joins the sword group,
-	// Mortal Blow stays behind it.
-	bot.SetSkillWeaponPriority([]string{"SWORD", "BOW"})
-	plan = bot.Snapshot().SkillPlan
-	require.NotNil(t, plan)
-	require.Greater(t, indexOf(plan, 16), lastIndexOf(plan, 56),
-		"Mortal Blow stays behind the sword and bow lessons")
+    // A bow as the next weapon: Power Shot joins the sword group,
+    // Mortal Blow stays behind it.
+    bot.SetSkillWeaponPriority([]string{"SWORD", "BOW"})
+    plan = bot.Snapshot().SkillPlan
+    require.NotNil(t, plan)
+    require.Greater(t, indexOf(plan, 16), lastIndexOf(plan, 56),
+        "Mortal Blow stays behind the sword and bow lessons")
 
-	// Without a weapon preference the plain category order returns.
-	bot.SetSkillWeaponPriority(nil)
-	plan = bot.Snapshot().SkillPlan
-	require.NotNil(t, plan)
-	require.Equal(t, npcdata.SkillCategoryAttack,
-		plan.Entries[0].Category)
+    // Without a weapon preference the plain category order returns.
+    bot.SetSkillWeaponPriority(nil)
+    plan = bot.Snapshot().SkillPlan
+    require.NotNil(t, plan)
+    require.Equal(t, npcdata.SkillCategoryAttack,
+        plan.Entries[0].Category)
 }

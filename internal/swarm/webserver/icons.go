@@ -5,11 +5,11 @@
 package webserver
 
 import (
-	"log"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
+    "log"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
 )
 
 // Icon serving of the equipment widget: the item icon pack lives in
@@ -28,38 +28,38 @@ const iconsCacheMaxAge = "public, max-age=86400"
 // launch directories. The candidates are computed per call so tests
 // with a changed working directory see them.
 func iconsDirCandidates() []string {
-	candidates := []string{filepath.Join("data", "icons")}
-	if dir, err := os.Getwd(); err == nil {
-		for walk := dir; ; {
-			parent := filepath.Dir(walk)
-			if parent == walk {
-				break
-			}
-			walk = parent
-			candidates = append(candidates,
-				filepath.Join(walk, "data", "icons"))
-		}
-	}
+    candidates := []string{filepath.Join("data", "icons")}
+    if dir, err := os.Getwd(); err == nil {
+        for walk := dir; ; {
+            parent := filepath.Dir(walk)
+            if parent == walk {
+                break
+            }
+            walk = parent
+            candidates = append(candidates,
+                filepath.Join(walk, "data", "icons"))
+        }
+    }
 
-	return candidates
+    return candidates
 }
 
 // detectIconsDir picks the first icon pack directory that exists and
 // contains PNG files, or an empty string when none does.
 func detectIconsDir() string {
-	for _, candidate := range iconsDirCandidates() {
-		entries, err := os.ReadDir(candidate)
-		if err != nil {
-			continue
-		}
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".png") {
-				return candidate
-			}
-		}
-	}
+    for _, candidate := range iconsDirCandidates() {
+        entries, err := os.ReadDir(candidate)
+        if err != nil {
+            continue
+        }
+        for _, entry := range entries {
+            if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".png") {
+                return candidate
+            }
+        }
+    }
 
-	return ""
+    return ""
 }
 
 // serveIcons answers GET /icons/{name}.png from the icon pack on disk.
@@ -67,61 +67,61 @@ func detectIconsDir() string {
 // fallback glyphs instead. The path is cleaned and must stay inside
 // the pack directory.
 func (s *Server) serveIcons(w http.ResponseWriter, r *http.Request) {
-	dir := s.iconsDir.Load().(string)
-	if dir == "" {
-		http.NotFound(w, r)
+    dir := s.iconsDir.Load().(string)
+    if dir == "" {
+        http.NotFound(w, r)
 
-		return
-	}
+        return
+    }
 
-	name := r.PathValue("name")
-	// The URL carries the .png extension, the pack stores the icon
-	// names without it.
-	name = strings.TrimSuffix(name, ".png")
-	if name == "" || strings.ContainsAny(name, `/\`) {
-		http.NotFound(w, r)
+    name := r.PathValue("name")
+    // The URL carries the .png extension, the pack stores the icon
+    // names without it.
+    name = strings.TrimSuffix(name, ".png")
+    if name == "" || strings.ContainsAny(name, `/\`) {
+        http.NotFound(w, r)
 
-		return
-	}
-	// The file name allows letters, digits, underscores and a hyphen
-	// of the classic client icon naming scheme, nothing else.
-	for _, ch := range name {
-		if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') &&
-			(ch < '0' || ch > '9') && ch != '_' && ch != '-' {
-			http.NotFound(w, r)
+        return
+    }
+    // The file name allows letters, digits, underscores and a hyphen
+    // of the classic client icon naming scheme, nothing else.
+    for _, ch := range name {
+        if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') &&
+            (ch < '0' || ch > '9') && ch != '_' && ch != '-' {
+            http.NotFound(w, r)
 
-			return
-		}
-	}
+            return
+        }
+    }
 
-	// The name is whitelist-validated above and os.Stat guards the
-	// joined path; the taint analysis cannot see the validation.
-	path := filepath.Join(dir, name+".png")
-	info, err := os.Stat(path) //nolint:gosec
-	if err != nil || info.IsDir() {
-		http.NotFound(w, r)
+    // The name is whitelist-validated above and os.Stat guards the
+    // joined path; the taint analysis cannot see the validation.
+    path := filepath.Join(dir, name+".png")
+    info, err := os.Stat(path) //nolint:gosec
+    if err != nil || info.IsDir() {
+        http.NotFound(w, r)
 
-		return
-	}
+        return
+    }
 
-	w.Header().Set("Cache-Control", iconsCacheMaxAge)
-	http.ServeFile(w, r, path) //nolint:gosec
+    w.Header().Set("Cache-Control", iconsCacheMaxAge)
+    http.ServeFile(w, r, path) //nolint:gosec
 }
 
 // initIconsDir resolves the icon pack directory once at server start
 // and remembers it for the handler.
 func (s *Server) initIconsDir(logger *log.Logger) {
-	var dir string
-	if override := os.Getenv("SWARM_ICONS"); override != "" {
-		dir = override
-	} else {
-		dir = detectIconsDir()
-	}
-	if dir == "" {
-		logger.Println("No icon pack found in data/icons, the equipment" +
-			" widget renders fallback glyphs")
-	} else {
-		logger.Printf("Icon pack ready: %s", dir)
-	}
-	s.iconsDir.Store(dir)
+    var dir string
+    if override := os.Getenv("SWARM_ICONS"); override != "" {
+        dir = override
+    } else {
+        dir = detectIconsDir()
+    }
+    if dir == "" {
+        logger.Println("No icon pack found in data/icons, the equipment" +
+            " widget renders fallback glyphs")
+    } else {
+        logger.Printf("Icon pack ready: %s", dir)
+    }
+    s.iconsDir.Store(dir)
 }

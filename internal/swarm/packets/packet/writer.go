@@ -5,63 +5,63 @@
 package packet
 
 import (
-	"bytes"
-	"encoding/binary"
-	"math"
-	"unicode/utf16"
-	"unsafe"
+    "bytes"
+    "encoding/binary"
+    "math"
+    "unicode/utf16"
+    "unsafe"
 )
 
 type Writer struct {
-	*bytes.Buffer
+    *bytes.Buffer
 }
 
 func NewWriter() *Writer {
-	return &Writer{Buffer: bytes.NewBuffer([]byte{})}
+    return &Writer{Buffer: bytes.NewBuffer([]byte{})}
 }
 
 func NewWriterTo(data []byte) *Writer {
-	return &Writer{Buffer: bytes.NewBuffer(data)}
+    return &Writer{Buffer: bytes.NewBuffer(data)}
 }
 
 func (b *Writer) WriteInt64(value int64) error {
-	buf := (*[8]byte)(unsafe.Pointer(&value))
-	_, err := b.Write(buf[:])
+    buf := (*[8]byte)(unsafe.Pointer(&value))
+    _, err := b.Write(buf[:])
 
-	return err
+    return err
 }
 
 func (b *Writer) WriteInt32(value int32) error {
-	buf := (*[4]byte)(unsafe.Pointer(&value))
-	_, err := b.Write(buf[:])
+    buf := (*[4]byte)(unsafe.Pointer(&value))
+    _, err := b.Write(buf[:])
 
-	return err
+    return err
 }
 
 func (b *Writer) WriteInt16(value int16) error {
-	buf := (*[2]byte)(unsafe.Pointer(&value))
-	_, err := b.Write(buf[:])
+    buf := (*[2]byte)(unsafe.Pointer(&value))
+    _, err := b.Write(buf[:])
 
-	return err
+    return err
 }
 
 func (b *Writer) WriteInt8(value int8) error {
-	return b.WriteByte(byte(value))
+    return b.WriteByte(byte(value))
 }
 
 // WriteFloat64 writes a little endian float64 value.
 func (b *Writer) WriteFloat64(value float64) error {
-	var buf [8]byte
-	binary.LittleEndian.PutUint64(buf[:], math.Float64bits(value))
-	_, err := b.Write(buf[:])
+    var buf [8]byte
+    binary.LittleEndian.PutUint64(buf[:], math.Float64bits(value))
+    _, err := b.Write(buf[:])
 
-	return err
+    return err
 }
 
 func (b *Writer) WriteBytes(bytes []byte) error {
-	_, err := b.Write(bytes)
+    _, err := b.Write(bytes)
 
-	return err
+    return err
 }
 
 // WriteStringAsUtf16 writes value as a null terminated UTF-16LE byte
@@ -82,47 +82,47 @@ func (b *Writer) WriteBytes(bytes []byte) error {
 // previous byte(r) truncation that silently corrupted non Latin-1
 // names.
 func (b *Writer) WriteStringAsUtf16(value string) error {
-	// Fast path: ASCII only. Scan once to confirm, then write pairs
-	// directly without allocating a scratch slice. The Grow hint
-	// keeps the buffer from reallocating mid-write on repeated calls.
-	ascii := true
-	for i := range len(value) {
-		if value[i] >= 0x80 {
-			ascii = false
+    // Fast path: ASCII only. Scan once to confirm, then write pairs
+    // directly without allocating a scratch slice. The Grow hint
+    // keeps the buffer from reallocating mid-write on repeated calls.
+    ascii := true
+    for i := range len(value) {
+        if value[i] >= 0x80 {
+            ascii = false
 
-			break
-		}
-	}
+            break
+        }
+    }
 
-	if ascii {
-		// len(value) pairs plus the two byte null terminator.
-		b.Grow(len(value)*2 + 2)
-		var pair [2]byte
-		for i := range len(value) {
-			pair[0] = value[i]
-			pair[1] = 0
-			b.Write(pair[:])
-		}
+    if ascii {
+        // len(value) pairs plus the two byte null terminator.
+        b.Grow(len(value)*2 + 2)
+        var pair [2]byte
+        for i := range len(value) {
+            pair[0] = value[i]
+            pair[1] = 0
+            b.Write(pair[:])
+        }
 
-		// Null terminator.
-		b.Write([]byte{0, 0})
+        // Null terminator.
+        b.Write([]byte{0, 0})
 
-		return nil
-	}
+        return nil
+    }
 
-	// Slow path: non-ASCII. Decode UTF-8 runes, encode to UTF-16
-	// (producing surrogate pairs for supplementary characters), then
-	// write each unit little endian. One allocation for the rune
-	// slice and one for the encoded units - acceptable for the rare
-	// non-ASCII name.
-	runes := []rune(value)
-	encoded := utf16.Encode(runes)
-	var buf [2]byte
-	for _, unit := range encoded {
-		binary.LittleEndian.PutUint16(buf[:], unit)
-		b.Write(buf[:])
-	}
-	b.Write([]byte{0, 0})
+    // Slow path: non-ASCII. Decode UTF-8 runes, encode to UTF-16
+    // (producing surrogate pairs for supplementary characters), then
+    // write each unit little endian. One allocation for the rune
+    // slice and one for the encoded units - acceptable for the rare
+    // non-ASCII name.
+    runes := []rune(value)
+    encoded := utf16.Encode(runes)
+    var buf [2]byte
+    for _, unit := range encoded {
+        binary.LittleEndian.PutUint16(buf[:], unit)
+        b.Write(buf[:])
+    }
+    b.Write([]byte{0, 0})
 
-	return nil
+    return nil
 }

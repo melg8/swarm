@@ -5,13 +5,13 @@
 package acceptance
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"math"
-	"time"
+    "context"
+    "errors"
+    "fmt"
+    "math"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // monitorPeriod paces the condition evaluation of the running
@@ -25,18 +25,18 @@ const onlineWait = 90 * time.Second
 
 // The farm readiness condition ids.
 const (
-	checkOnline   = "online"
-	checkEquipped = "equipped"
-	checkSkills   = "skills"
-	checkZone     = "zone"
-	checkBuffs    = "buffs"
-	checkKill     = "kill"
+    checkOnline   = "online"
+    checkEquipped = "equipped"
+    checkSkills   = "skills"
+    checkZone     = "zone"
+    checkBuffs    = "buffs"
+    checkKill     = "kill"
 )
 
 // The building entry condition ids.
 const (
-	checkTeacher = "teacher"
-	checkLesson  = "lesson"
+    checkTeacher = "teacher"
+    checkLesson  = "lesson"
 )
 
 // The teacher hall geometry of the building entry scenario: the class
@@ -44,31 +44,31 @@ const (
 // (ElvenVillageNPCs.xml), the interaction ring the scenario accepts
 // matches the server INTERACTION_DISTANCE.
 const (
-	elleniaSpawnX = 45725
-	elleniaSpawnY = 52105
-	elleniaSpawnZ = -2792
-	// elleniaInteractionDist is the server interaction distance the
-	// talk click and the lesson requests land within.
-	elleniaInteractionDist = 250.0
+    elleniaSpawnX = 45725
+    elleniaSpawnY = 52105
+    elleniaSpawnZ = -2792
+    // elleniaInteractionDist is the server interaction distance the
+    // talk click and the lesson requests land within.
+    elleniaInteractionDist = 250.0
 )
 
 // evaluateTeacher reports whether the character stands within the
 // interaction distance of the teacher Ellenia - the walk crossed the
 // building entrance and reached the class master inside the hall.
 func evaluateTeacher(tracker *state.Bot) (detail string, done bool) {
-	x, y, z, ok := tracker.SelfPosition()
-	if !ok {
-		return "no position yet", false
-	}
-	dx := float64(x - elleniaSpawnX)
-	dy := float64(y - elleniaSpawnY)
-	dz := float64(z - elleniaSpawnZ)
-	dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
-	if dist > elleniaInteractionDist {
-		return fmt.Sprintf("%.0f units from Ellenia", dist), false
-	}
+    x, y, z, ok := tracker.SelfPosition()
+    if !ok {
+        return "no position yet", false
+    }
+    dx := float64(x - elleniaSpawnX)
+    dy := float64(y - elleniaSpawnY)
+    dz := float64(z - elleniaSpawnZ)
+    dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
+    if dist > elleniaInteractionDist {
+        return fmt.Sprintf("%.0f units from Ellenia", dist), false
+    }
 
-	return fmt.Sprintf("at %.0f units from Ellenia", dist), true
+    return fmt.Sprintf("at %.0f units from Ellenia", dist), true
 }
 
 // evaluateLesson reports whether the teach stop already taught: the
@@ -76,114 +76,114 @@ func evaluateTeacher(tracker *state.Bot) (detail string, done bool) {
 // the lesson requests consume SP). A zero SP means the UserInfo of
 // the world entry has not landed yet - no lesson answer before it.
 func evaluateLesson(tracker *state.Bot) (detail string, done bool) {
-	sp := tracker.SelfSp()
-	if sp <= 0 {
-		return "no skill points observed yet", false
-	}
-	if sp >= entrySP {
-		return fmt.Sprintf("%d sp, no lesson yet", sp), false
-	}
+    sp := tracker.SelfSp()
+    if sp <= 0 {
+        return "no skill points observed yet", false
+    }
+    if sp >= entrySP {
+        return fmt.Sprintf("%d sp, no lesson yet", sp), false
+    }
 
-	return fmt.Sprintf("%d sp, the lessons began", sp), true
+    return fmt.Sprintf("%d sp, the lessons began", sp), true
 }
 
 // farmChecks is the initial check list of the farm readiness
 // scenario: the narrative order of the user story.
 func farmChecks() []Check {
-	return []Check{
-		{
-			ID: checkOnline, Label: "entered the world", Done: false,
-			Detail: "",
-		},
-		{
-			ID: checkEquipped, Label: "wears weapon, armor and jewels",
-			Done: false, Detail: "",
-		},
-		{
-			ID: checkSkills, Label: "learned every affordable lesson",
-			Done: false, Detail: "",
-		},
-		{
-			ID: checkZone, Label: "walked to the farm zone",
-			Done: false, Detail: "",
-		},
-		{
-			ID: checkBuffs, Label: "fights under attack and defence auras",
-			Done: false, Detail: "",
-		},
-		{
-			ID: checkKill, Label: "killed a mob on the farm zone",
-			Done: false, Detail: "",
-		},
-	}
+    return []Check{
+        {
+            ID: checkOnline, Label: "entered the world", Done: false,
+            Detail: "",
+        },
+        {
+            ID: checkEquipped, Label: "wears weapon, armor and jewels",
+            Done: false, Detail: "",
+        },
+        {
+            ID: checkSkills, Label: "learned every affordable lesson",
+            Done: false, Detail: "",
+        },
+        {
+            ID: checkZone, Label: "walked to the farm zone",
+            Done: false, Detail: "",
+        },
+        {
+            ID: checkBuffs, Label: "fights under attack and defence auras",
+            Done: false, Detail: "",
+        },
+        {
+            ID: checkKill, Label: "killed a mob on the farm zone",
+            Done: false, Detail: "",
+        },
+    }
 }
 
 // lifetimeChecks is the check list of the bot lifetime scenario.
 func lifetimeChecks() []Check {
-	return []Check{
-		{
-			ID: checkOnline, Label: "entered the world", Done: false,
-			Detail: "",
-		},
-		{
-			ID: "stable", Label: "stayed online 30 seconds", Done: false,
-			Detail: "",
-		},
-		{
-			ID: "graceful", Label: "shut down gracefully", Done: false,
-			Detail: "",
-		},
-	}
+    return []Check{
+        {
+            ID: checkOnline, Label: "entered the world", Done: false,
+            Detail: "",
+        },
+        {
+            ID: "stable", Label: "stayed online 30 seconds", Done: false,
+            Detail: "",
+        },
+        {
+            ID: "graceful", Label: "shut down gracefully", Done: false,
+            Detail: "",
+        },
+    }
 }
 
 // zoneReturnChecks is the check list of the stuck cell scenario: the
 // world entry plus the walk home to the selected hunting zone.
 func zoneReturnChecks() []Check {
-	return []Check{
-		{
-			ID: checkOnline, Label: "entered the world", Done: false,
-			Detail: "",
-		},
-		{
-			ID: checkZone, Label: "walked to the selected hunting zone",
-			Done: false, Detail: "",
-		},
-	}
+    return []Check{
+        {
+            ID: checkOnline, Label: "entered the world", Done: false,
+            Detail: "",
+        },
+        {
+            ID: checkZone, Label: "walked to the selected hunting zone",
+            Done: false, Detail: "",
+        },
+    }
 }
 
 // gearGapChecks is the check list of the pantsless dump scenario: the
 // world entry plus the dressed legs slot of the gear gap refill.
 func gearGapChecks() []Check {
-	return []Check{
-		{
-			ID: checkOnline, Label: "entered the world", Done: false,
-			Detail: "",
-		},
-		{
-			ID: "legs", Label: "bought the legs armor back", Done: false,
-			Detail: "",
-		},
-	}
+    return []Check{
+        {
+            ID: checkOnline, Label: "entered the world", Done: false,
+            Detail: "",
+        },
+        {
+            ID: "legs", Label: "bought the legs armor back", Done: false,
+            Detail: "",
+        },
+    }
 }
 
 // buildingEntryChecks is the check list of the trainer hall entry
 // scenario: the world entry at the building entrance, the walk right
 // up to the teacher npc inside the hall and the first learned lesson.
 func buildingEntryChecks() []Check {
-	return []Check{
-		{
-			ID: checkOnline, Label: "entered the world at the hall entrance",
-			Done: false, Detail: "",
-		},
-		{
-			ID: checkTeacher, Label: "walked up to the teacher Ellenia",
-			Done: false, Detail: "",
-		},
-		{
-			ID: checkLesson, Label: "learned a lesson at the teacher",
-			Done: false, Detail: "",
-		},
-	}
+    return []Check{
+        {
+            ID: checkOnline, Label: "entered the world at the hall entrance",
+            Done: false, Detail: "",
+        },
+        {
+            ID: checkTeacher, Label: "walked up to the teacher Ellenia",
+            Done: false, Detail: "",
+        },
+        {
+            ID: checkLesson, Label: "learned a lesson at the teacher",
+            Done: false, Detail: "",
+        },
+    }
 }
 
 // evaluateGearGapConditions rewrites the check list of the pantsless
@@ -192,65 +192,65 @@ func buildingEntryChecks() []Check {
 // town trip bought back (the auto equipment wears the filler within
 // seconds of its arrival).
 func evaluateGearGapConditions(tracker *state.Bot, test *Test) {
-	if tracker.Status() != state.StatusOnline {
-		return
-	}
-	counts, _ := evaluateEquipment(tracker)
-	test.updateCheck("legs", counts.legs == 1,
-		legsWord(counts.legs))
+    if tracker.Status() != state.StatusOnline {
+        return
+    }
+    counts, _ := evaluateEquipment(tracker)
+    test.updateCheck("legs", counts.legs == 1,
+        legsWord(counts.legs))
 }
 
 // legsWord renders the legs slot state of the gear gap detail.
 func legsWord(legs int) string {
-	if legs == 1 {
-		return "the legs slot is dressed"
-	}
+    if legs == 1 {
+        return "the legs slot is dressed"
+    }
 
-	return "the legs slot is still empty"
+    return "the legs slot is still empty"
 }
 
 // relayChecks is the check list of the proxy relay scenario.
 func relayChecks() []Check {
-	return []Check{
-		{
-			ID: checkOnline, Label: "bot session entered the world",
-			Done: false, Detail: "",
-		},
-		{
-			ID: "login", Label: "client logged into the emulated login",
-			Done: false, Detail: "",
-		},
-		{
-			ID: "replay", Label: "client entered the world through the replay",
-			Done: false, Detail: "",
-		},
-		{
-			ID: "relay", Label: "client walk echoed through the live relay",
-			Done: false, Detail: "",
-		},
-		{
-			ID: "ping", Label: "net pings answered locally",
-			Done: false, Detail: "",
-		},
-	}
+    return []Check{
+        {
+            ID: checkOnline, Label: "bot session entered the world",
+            Done: false, Detail: "",
+        },
+        {
+            ID: "login", Label: "client logged into the emulated login",
+            Done: false, Detail: "",
+        },
+        {
+            ID: "replay", Label: "client entered the world through the replay",
+            Done: false, Detail: "",
+        },
+        {
+            ID: "relay", Label: "client walk echoed through the live relay",
+            Done: false, Detail: "",
+        },
+        {
+            ID: "ping", Label: "net pings answered locally",
+            Done: false, Detail: "",
+        },
+    }
 }
 
 // equipCounts summarizes the paperdoll of the character.
 type equipCounts struct {
-	weapon int
-	chest  int
-	legs   int
-	head   int
-	gloves int
-	feet   int
-	back   int
-	jewels int
-	shield int
+    weapon int
+    chest  int
+    legs   int
+    head   int
+    gloves int
+    feet   int
+    back   int
+    jewels int
+    shield int
 }
 
 // total sums the filled slots.
 func (c equipCounts) armor() int {
-	return c.chest + c.legs + c.head + c.gloves + c.feet + c.back
+    return c.chest + c.legs + c.head + c.gloves + c.feet + c.back
 }
 
 // evaluateEquipment reads the paperdoll and reports whether the
@@ -259,167 +259,167 @@ func (c equipCounts) armor() int {
 // jewel filled - the outcome the shop strategy of a 100k adena wallet
 // reaches in the elven village shops.
 func evaluateEquipment(tracker *state.Bot) (equipCounts, bool) {
-	doll := tracker.PaperdollSlotObjectIDs()
-	counts := equipCounts{
-		weapon: filled(doll[state.PaperdollRHand]),
-		chest:  filled(doll[state.PaperdollChest]),
-		legs:   filled(doll[state.PaperdollLegs]),
-		head:   filled(doll[state.PaperdollHead]),
-		gloves: filled(doll[state.PaperdollGloves]),
-		feet:   filled(doll[state.PaperdollFeet]),
-		back:   filled(doll[state.PaperdollBack]),
-		shield: filled(doll[state.PaperdollLHand]),
-		jewels: filled(doll[state.PaperdollREar]) +
-			filled(doll[state.PaperdollLEar]) +
-			filled(doll[state.PaperdollNeck]) +
-			filled(doll[state.PaperdollRFinger]) +
-			filled(doll[state.PaperdollLFinger]),
-	}
-	proper := counts.weapon == 1 && counts.chest == 1 &&
-		counts.armor() >= 4 && counts.jewels >= 1
+    doll := tracker.PaperdollSlotObjectIDs()
+    counts := equipCounts{
+        weapon: filled(doll[state.PaperdollRHand]),
+        chest:  filled(doll[state.PaperdollChest]),
+        legs:   filled(doll[state.PaperdollLegs]),
+        head:   filled(doll[state.PaperdollHead]),
+        gloves: filled(doll[state.PaperdollGloves]),
+        feet:   filled(doll[state.PaperdollFeet]),
+        back:   filled(doll[state.PaperdollBack]),
+        shield: filled(doll[state.PaperdollLHand]),
+        jewels: filled(doll[state.PaperdollREar]) +
+            filled(doll[state.PaperdollLEar]) +
+            filled(doll[state.PaperdollNeck]) +
+            filled(doll[state.PaperdollRFinger]) +
+            filled(doll[state.PaperdollLFinger]),
+    }
+    proper := counts.weapon == 1 && counts.chest == 1 &&
+        counts.armor() >= 4 && counts.jewels >= 1
 
-	return counts, proper
+    return counts, proper
 }
 
 // filled reports a filled paperdoll slot.
 func filled(objectID int32) int {
-	if objectID != 0 {
-		return 1
-	}
+    if objectID != 0 {
+        return 1
+    }
 
-	return 0
+    return 0
 }
 
 // evaluateSkills reports whether the character learned its key
 // skills and has no affordable lesson left: the auras of the final
 // state plus the emptied affordable prefix of the class tree.
 func evaluateSkills(tracker *state.Bot) (detail string, done bool) {
-	level := tracker.SelfLevel()
-	plan := tracker.SkillPlan()
-	affordableLeft := false
-	if plan != nil {
-		for i := range plan.Entries {
-			entry := &plan.Entries[i]
-			if entry.ReqLevel <= level &&
-				int64(entry.SpCost) <= plan.Sp {
-				affordableLeft = true
+    level := tracker.SelfLevel()
+    plan := tracker.SkillPlan()
+    affordableLeft := false
+    if plan != nil {
+        for i := range plan.Entries {
+            entry := &plan.Entries[i]
+            if entry.ReqLevel <= level &&
+                int64(entry.SpCost) <= plan.Sp {
+                affordableLeft = true
 
-				break
-			}
-		}
-	}
-	auras := 0
-	for _, skill := range tracker.ActiveSkills() {
-		if skill.SkillID == attackAuraSkillID ||
-			skill.SkillID == defenseAuraSkillID {
-			auras++
-		}
-	}
-	total := len(tracker.ActiveSkills())
-	if auras < 2 {
-		return fmt.Sprintf("%d skills, the auras missing", total), false
-	}
-	if affordableLeft {
-		return fmt.Sprintf("%d skills, affordable lessons left", total),
-			false
-	}
-	if plan == nil {
-		return fmt.Sprintf("%d skills, the queue empty", total), true
-	}
+                break
+            }
+        }
+    }
+    auras := 0
+    for _, skill := range tracker.ActiveSkills() {
+        if skill.SkillID == attackAuraSkillID ||
+            skill.SkillID == defenseAuraSkillID {
+            auras++
+        }
+    }
+    total := len(tracker.ActiveSkills())
+    if auras < 2 {
+        return fmt.Sprintf("%d skills, the auras missing", total), false
+    }
+    if affordableLeft {
+        return fmt.Sprintf("%d skills, affordable lessons left", total),
+            false
+    }
+    if plan == nil {
+        return fmt.Sprintf("%d skills, the queue empty", total), true
+    }
 
-	return fmt.Sprintf("%d skills, %d sp left", total, plan.Sp), true
+    return fmt.Sprintf("%d skills, %d sp left", total, plan.Sp), true
 }
 
 // evaluateZone reports whether the character stands inside its
 // current hunting zone (the spot square the hunt loop leashes itself
 // to) and returns the zone bounds for the kill placement check.
 func evaluateZone(tracker *state.Bot) (detail string, inside bool,
-	zone *state.Zone,
+    zone *state.Zone,
 ) {
-	snapshot := tracker.Snapshot()
-	zone = snapshot.HuntingZone
-	if zone == nil {
-		return "no hunting zone yet", false, nil
-	}
-	x, y, _, ok := tracker.SelfPosition()
-	if !ok {
-		return "no position yet", false, zone
-	}
-	if !insideZone(zone, x, y) {
-		return fmt.Sprintf("at %d %d, the zone is %d %d %+d", x, y,
-			zone.CX, zone.CY, zone.Half), false, zone
-	}
+    snapshot := tracker.Snapshot()
+    zone = snapshot.HuntingZone
+    if zone == nil {
+        return "no hunting zone yet", false, nil
+    }
+    x, y, _, ok := tracker.SelfPosition()
+    if !ok {
+        return "no position yet", false, zone
+    }
+    if !insideZone(zone, x, y) {
+        return fmt.Sprintf("at %d %d, the zone is %d %d %+d", x, y,
+            zone.CX, zone.CY, zone.Half), false, zone
+    }
 
-	return fmt.Sprintf("inside %d %d %+d", zone.CX, zone.CY, zone.Half),
-		true, zone
+    return fmt.Sprintf("inside %d %d %+d", zone.CX, zone.CY, zone.Half),
+        true, zone
 }
 
 // insideZone reports whether the point lies inside the zone square.
 func insideZone(zone *state.Zone, x int32, y int32) bool {
-	return abs32(x-zone.CX) <= zone.Half && abs32(y-zone.CY) <= zone.Half
+    return abs32(x-zone.CX) <= zone.Half && abs32(y-zone.CY) <= zone.Half
 }
 
 // abs32 is the absolute value of an int32.
 func abs32(value int32) int32 {
-	if value < 0 {
-		return -value
-	}
+    if value < 0 {
+        return -value
+    }
 
-	return value
+    return value
 }
 
 // evaluateKill reports whether one kill mark of this run landed
 // inside the hunting zone.
 func evaluateKill(
-	tracker *state.Bot, zone *state.Zone, runStartMs int64,
+    tracker *state.Bot, zone *state.Zone, runStartMs int64,
 ) (detail string, done bool) {
-	marks := tracker.KillMarks()
-	for i := range marks {
-		if marks[i].AtMs < runStartMs {
-			// A kill of a previous run of the same character: the
-			// kill ring survives the session resets.
-			continue
-		}
-		if zone != nil && !insideZone(zone, marks[i].X, marks[i].Y) {
-			continue
-		}
-		at := time.UnixMilli(marks[i].AtMs).Format("15:04:05")
+    marks := tracker.KillMarks()
+    for i := range marks {
+        if marks[i].AtMs < runStartMs {
+            // A kill of a previous run of the same character: the
+            // kill ring survives the session resets.
+            continue
+        }
+        if zone != nil && !insideZone(zone, marks[i].X, marks[i].Y) {
+            continue
+        }
+        at := time.UnixMilli(marks[i].AtMs).Format("15:04:05")
 
-		return "killed at " + itoa(int(marks[i].X)) + "," +
-			itoa(int(marks[i].Y)) + " " + at, true
-	}
+        return "killed at " + itoa(int(marks[i].X)) + "," +
+            itoa(int(marks[i].Y)) + " " + at, true
+    }
 
-	return "no kills yet", false
+    return "no kills yet", false
 }
 
 // waitOnline blocks until the tracker reports the session online (or
 // the context ends): the precondition of every check evaluation.
 func waitOnline(
-	ctx context.Context, tracker *state.Bot, test *Test,
+    ctx context.Context, tracker *state.Bot, test *Test,
 ) error {
-	deadline := time.Now().Add(onlineWait)
-	for {
-		if ctx.Err() != nil {
-			return fmt.Errorf("cancelled while entering the world: %w",
-				ctx.Err())
-		}
-		if tracker.Status() == state.StatusOnline {
-			test.updateCheck(checkOnline, true,
-				"online as "+tracker.Info().Name)
+    deadline := time.Now().Add(onlineWait)
+    for {
+        if ctx.Err() != nil {
+            return fmt.Errorf("cancelled while entering the world: %w",
+                ctx.Err())
+        }
+        if tracker.Status() == state.StatusOnline {
+            test.updateCheck(checkOnline, true,
+                "online as "+tracker.Info().Name)
 
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return errors.New("the bot never entered the world within " +
-				itoa(int(onlineWait/time.Second)) + "s (status " +
-				string(tracker.Status()) + ")")
-		}
-		test.appendLog("acceptance: waiting for the world entry, status " +
-			string(tracker.Status()))
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("cancelled: %w", ctx.Err())
-		case <-time.After(monitorPeriod):
-		}
-	}
+            return nil
+        }
+        if time.Now().After(deadline) {
+            return errors.New("the bot never entered the world within " +
+                itoa(int(onlineWait/time.Second)) + "s (status " +
+                string(tracker.Status()) + ")")
+        }
+        test.appendLog("acceptance: waiting for the world entry, status " +
+            string(tracker.Status()))
+        select {
+        case <-ctx.Done():
+            return fmt.Errorf("cancelled: %w", ctx.Err())
+        case <-time.After(monitorPeriod):
+        }
+    }
 }

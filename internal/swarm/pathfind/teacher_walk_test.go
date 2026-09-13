@@ -5,10 +5,10 @@
 package pathfind
 
 import (
-	"math"
-	"testing"
+    "math"
+    "testing"
 
-	"github.com/stretchr/testify/require"
+    "github.com/stretchr/testify/require"
 )
 
 // The teacher walk regression of 2026-09-11: the state dump showed a
@@ -50,43 +50,43 @@ var teacherPlaza = Vec3{X: 45992, Y: 52040, Z: -2792}
 // finds the walk the dump carried, including the tight ramp steps
 // before the plaza (wp 8..10 sit 16..48 units apart).
 func TestTeacherRouteMatchesTheDumpPlan(t *testing.T) {
-	engine := townTestEngine(t)
+    engine := townTestEngine(t)
 
-	result, err := engine.FindPathApproachDry(
-		teacherShopStart, teacherSpawn, 200, DefaultMaxPassableHeight)
-	require.NoError(t, err)
-	require.True(t, result.Found, "the dry route to the teacher exists")
-	require.GreaterOrEqual(t, len(result.Waypoints), 11,
-		"the route crosses the village, the ramp steps stay")
-	// The dump route: ..., 46200 51640, 46152 51640, 46136 51656,
-	// 45992 52040, 45912 52056 (approach ring of Ellenia).
-	last := result.Waypoints[len(result.Waypoints)-1]
-	require.LessOrEqual(t, dist3D(last, teacherSpawn), 200.0,
-		"the route ends inside the teacher approach ring")
-	// The dump route crossed the trainer ramp (wp 9..10, the tight 16
-	// unit steps at 46152 51640 and 46136 51656); the Round 52 server
-	// click validation found the ramp diagonal flank walled (the
-	// vertical flank cell of the SW step carries nswe 0x9) and the
-	// server PathFinding = 2 deployment refuses that click - the
-	// route now climbs the east approach instead and crosses the
-	// plaza level further west. The pinned points move with it: the
-	// east ascent bend and the plaza corner before the approach ring.
-	for _, want := range []Vec3{
-		{X: 46184, Y: 51528, Z: -2824},
-		{X: 46104, Y: 51528, Z: -2808},
-		teacherPlaza,
-	} {
-		found := false
-		for _, wp := range result.Waypoints {
-			if dist3D(wp, want) < 64 {
-				found = true
+    result, err := engine.FindPathApproachDry(
+        teacherShopStart, teacherSpawn, 200, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.True(t, result.Found, "the dry route to the teacher exists")
+    require.GreaterOrEqual(t, len(result.Waypoints), 11,
+        "the route crosses the village, the ramp steps stay")
+    // The dump route: ..., 46200 51640, 46152 51640, 46136 51656,
+    // 45992 52040, 45912 52056 (approach ring of Ellenia).
+    last := result.Waypoints[len(result.Waypoints)-1]
+    require.LessOrEqual(t, dist3D(last, teacherSpawn), 200.0,
+        "the route ends inside the teacher approach ring")
+    // The dump route crossed the trainer ramp (wp 9..10, the tight 16
+    // unit steps at 46152 51640 and 46136 51656); the Round 52 server
+    // click validation found the ramp diagonal flank walled (the
+    // vertical flank cell of the SW step carries nswe 0x9) and the
+    // server PathFinding = 2 deployment refuses that click - the
+    // route now climbs the east approach instead and crosses the
+    // plaza level further west. The pinned points move with it: the
+    // east ascent bend and the plaza corner before the approach ring.
+    for _, want := range []Vec3{
+        {X: 46184, Y: 51528, Z: -2824},
+        {X: 46104, Y: 51528, Z: -2808},
+        teacherPlaza,
+    } {
+        found := false
+        for _, wp := range result.Waypoints {
+            if dist3D(wp, want) < 64 {
+                found = true
 
-				break
-			}
-		}
-		require.True(t, found, "the route must pass near %.0f %.0f",
-			want.X, want.Y)
-	}
+                break
+            }
+        }
+        require.True(t, found, "the route must pass near %.0f %.0f",
+            want.X, want.Y)
+    }
 }
 
 // TestTeacherCornerWallBlocksTheStraightClick pins the mechanism of
@@ -102,45 +102,45 @@ func TestTeacherRouteMatchesTheDumpPlan(t *testing.T) {
 // the route with intermediate waypoints there instead, so the
 // follower clicks a chain of verified short legs.
 func TestTeacherCornerWallBlocksTheStraightClick(t *testing.T) {
-	engine := townTestEngine(t)
+    engine := townTestEngine(t)
 
-	skip, err := engine.LineOfSight(
-		teacherStuck, teacherPlaza, DefaultMaxPassableHeight)
-	require.NoError(t, err)
-	require.False(t, skip,
-		"the skipped-forward click crosses the plaza railing wall")
+    skip, err := engine.LineOfSight(
+        teacherStuck, teacherPlaza, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.False(t, skip,
+        "the skipped-forward click crosses the plaza railing wall")
 
-	ramp, err := engine.LineOfSight(
-		teacherStuck, teacherRampTop, DefaultMaxPassableHeight)
-	require.NoError(t, err)
-	require.False(t, ramp,
-		"the pocket cell cannot click the ramp top either: its west "+
-			"wall is closed too")
+    ramp, err := engine.LineOfSight(
+        teacherStuck, teacherRampTop, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.False(t, ramp,
+        "the pocket cell cannot click the ramp top either: its west "+
+            "wall is closed too")
 
-	foot, err := engine.LineOfSight(
-		teacherStuck, teacherRampFoot, DefaultMaxPassableHeight)
-	require.NoError(t, err)
-	require.True(t, foot,
-		"the south line to the ramp foot is the pocket's way out")
+    foot, err := engine.LineOfSight(
+        teacherStuck, teacherRampFoot, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.True(t, foot,
+        "the south line to the ramp foot is the pocket's way out")
 
-	climb, err := engine.LineOfSight(
-		teacherRampFoot, teacherRampTop, DefaultMaxPassableHeight)
-	require.NoError(t, err)
-	require.False(t, climb,
-		"the ramp climb diagonal is flank walled: the Round 52 anti "+
-			"corner cut mirrors the server click validation, which "+
-			"refuses the foot->top click on the PathFinding = 2 "+
-			"deployment (the vertical flank cell carries nswe 0x9, its "+
-			"west wall closed) - the planned routes climb the east "+
-			"approach instead")
+    climb, err := engine.LineOfSight(
+        teacherRampFoot, teacherRampTop, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.False(t, climb,
+        "the ramp climb diagonal is flank walled: the Round 52 anti "+
+            "corner cut mirrors the server click validation, which "+
+            "refuses the foot->top click on the PathFinding = 2 "+
+            "deployment (the vertical flank cell carries nswe 0x9, its "+
+            "west wall closed) - the planned routes climb the east "+
+            "approach instead")
 
-	planned, err := engine.LineOfSight(
-		teacherRampTop, teacherPlaza, DefaultMaxPassableHeight)
-	require.NoError(t, err)
-	require.False(t, planned,
-		"the plaza leg stays split into verified steps: the reverse "+
-			"wall rule of the 2026-09-11 Round 49 keeps the straight "+
-			"collapse honest")
+    planned, err := engine.LineOfSight(
+        teacherRampTop, teacherPlaza, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.False(t, planned,
+        "the plaza leg stays split into verified steps: the reverse "+
+            "wall rule of the 2026-09-11 Round 49 keeps the straight "+
+            "collapse honest")
 }
 
 // TestTeacherReplanFromTheStuckCorner pins the recovery: the dry
@@ -149,23 +149,23 @@ func TestTeacherCornerWallBlocksTheStraightClick(t *testing.T) {
 // stuck re-path machinery has a way out when a walk ever lands off
 // the planned line.
 func TestTeacherReplanFromTheStuckCorner(t *testing.T) {
-	engine := townTestEngine(t)
+    engine := townTestEngine(t)
 
-	result, err := engine.FindPathApproachDry(
-		teacherStuck, teacherSpawn, 200, DefaultMaxPassableHeight)
-	require.NoError(t, err)
-	require.True(t, result.Found,
-		"the re-plan from the stuck corner must find the teacher")
-	last := result.Waypoints[len(result.Waypoints)-1]
-	require.LessOrEqual(t, dist3D(last, teacherSpawn), 200.0,
-		"the re-planned route ends inside the approach ring")
+    result, err := engine.FindPathApproachDry(
+        teacherStuck, teacherSpawn, 200, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.True(t, result.Found,
+        "the re-plan from the stuck corner must find the teacher")
+    last := result.Waypoints[len(result.Waypoints)-1]
+    require.LessOrEqual(t, dist3D(last, teacherSpawn), 200.0,
+        "the re-planned route ends inside the approach ring")
 }
 
 // dist3D is the full 3D distance of two world points.
 func dist3D(a, b Vec3) float64 {
-	dx := a.X - b.X
-	dy := a.Y - b.Y
-	dz := a.Z - b.Z
+    dx := a.X - b.X
+    dy := a.Y - b.Y
+    dz := a.Z - b.Z
 
-	return math.Sqrt(dx*dx + dy*dy + dz*dz)
+    return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }

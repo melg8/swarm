@@ -5,10 +5,10 @@
 package pathfind
 
 import (
-	"math"
-	"testing"
+    "math"
+    "testing"
 
-	"github.com/stretchr/testify/require"
+    "github.com/stretchr/testify/require"
 )
 
 // The round 56 acceptance: the bot must reliably reach the teacher
@@ -31,16 +31,16 @@ var elleniaSpawn = Vec3{X: 45725, Y: 52105, Z: -2792}
 // the east plaza the current planner routes through and the two shop
 // quarter spots.
 var elleniaApproaches = []struct {
-	name string
-	pos  Vec3
+    name string
+    pos  Vec3
 }{
-	{"the dump aisle entrance", Vec3{X: 44728, Y: 51992, Z: -2792}},
-	{"the trap pocket", Vec3{X: 44776, Y: 51992, Z: -2808}},
-	{"the north terrace bend", Vec3{X: 44568, Y: 51528, Z: -2808}},
-	{"the south approach", Vec3{X: 44568, Y: 52536, Z: -2832}},
-	{"the east plaza", Vec3{X: 46104, Y: 51528, Z: -2808}},
-	{"the shop deck", Vec3{X: 44872, Y: 47160, Z: -2992}},
-	{"the southwest shore path", Vec3{X: 43752, Y: 48024, Z: -2992}},
+    {"the dump aisle entrance", Vec3{X: 44728, Y: 51992, Z: -2792}},
+    {"the trap pocket", Vec3{X: 44776, Y: 51992, Z: -2808}},
+    {"the north terrace bend", Vec3{X: 44568, Y: 51528, Z: -2808}},
+    {"the south approach", Vec3{X: 44568, Y: 52536, Z: -2832}},
+    {"the east plaza", Vec3{X: 46104, Y: 51528, Z: -2808}},
+    {"the shop deck", Vec3{X: 44872, Y: 47160, Z: -2992}},
+    {"the southwest shore path", Vec3{X: 43752, Y: 48024, Z: -2992}},
 }
 
 // TestElleniaReachableFromEveryVillageApproach walks the dry approach
@@ -52,34 +52,34 @@ var elleniaApproaches = []struct {
 // never arm the collapsed partial click that crept the dump character
 // into the dead-end pocket.
 func TestElleniaReachableFromEveryVillageApproach(t *testing.T) {
-	engine := townTestEngine(t)
+    engine := townTestEngine(t)
 
-	for _, approach := range elleniaApproaches {
-		t.Run(approach.name, func(t *testing.T) {
-			result, err := engine.FindPathApproachDry(
-				approach.pos, elleniaSpawn, 200, DefaultMaxPassableHeight)
-			require.NoError(t, err)
-			require.True(t, result.Found,
-				"the dry route to Ellenia must exist from %s", approach.name)
+    for _, approach := range elleniaApproaches {
+        t.Run(approach.name, func(t *testing.T) {
+            result, err := engine.FindPathApproachDry(
+                approach.pos, elleniaSpawn, 200, DefaultMaxPassableHeight)
+            require.NoError(t, err)
+            require.True(t, result.Found,
+                "the dry route to Ellenia must exist from %s", approach.name)
 
-			last := result.Waypoints[len(result.Waypoints)-1]
-			require.LessOrEqual(t, dist3D(last, elleniaSpawn), 200.0,
-				"the route must end inside the Ellenia approach ring")
+            last := result.Waypoints[len(result.Waypoints)-1]
+            require.LessOrEqual(t, dist3D(last, elleniaSpawn), 200.0,
+                "the route must end inside the Ellenia approach ring")
 
-			for i := 1; i < len(result.Waypoints); i++ {
-				from := result.Waypoints[i-1]
-				to := result.Waypoints[i]
-				validated, ok := engine.ValidateClick(from, to)
-				require.True(t, ok,
-					"the leg %d -> %d must survive the server validation",
-					i-1, i)
-				require.InDelta(t, to.X, validated.X, 1.0,
-					"the leg %d must validate in full (no partial collapse)", i)
-				require.InDelta(t, to.Y, validated.Y, 1.0,
-					"the leg %d must validate in full (no partial collapse)", i)
-			}
-		})
-	}
+            for i := 1; i < len(result.Waypoints); i++ {
+                from := result.Waypoints[i-1]
+                to := result.Waypoints[i]
+                validated, ok := engine.ValidateClick(from, to)
+                require.True(t, ok,
+                    "the leg %d -> %d must survive the server validation",
+                    i-1, i)
+                require.InDelta(t, to.X, validated.X, 1.0,
+                    "the leg %d must validate in full (no partial collapse)", i)
+                require.InDelta(t, to.Y, validated.Y, 1.0,
+                    "the leg %d must validate in full (no partial collapse)", i)
+            }
+        })
+    }
 }
 
 // TestElleniaAisleRouteMatchesTheDumpPlan pins the exact dump walk
@@ -88,31 +88,31 @@ func TestElleniaReachableFromEveryVillageApproach(t *testing.T) {
 // and cross the south hall east - the same plan the 06:19 state dump
 // shows, now verified as fully server-valid.
 func TestElleniaAisleRouteMatchesTheDumpPlan(t *testing.T) {
-	engine := townTestEngine(t)
+    engine := townTestEngine(t)
 
-	result, err := engine.FindPathApproachDry(
-		elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight)
-	require.NoError(t, err)
-	require.True(t, result.Found)
+    result, err := engine.FindPathApproachDry(
+        elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.True(t, result.Found)
 
-	// The dump plan waypoints (44728 51992 -> 44728 52040 ->
-	// 45160 52120 -> 45528 52104): every one must appear in the route.
-	for _, want := range []Vec3{
-		{X: 44728, Y: 52040, Z: -2792},
-		{X: 45160, Y: 52120, Z: -2792},
-		{X: 45528, Y: 52104, Z: -2792},
-	} {
-		found := false
-		for _, wp := range result.Waypoints {
-			if dist3D(wp, want) < 64 {
-				found = true
+    // The dump plan waypoints (44728 51992 -> 44728 52040 ->
+    // 45160 52120 -> 45528 52104): every one must appear in the route.
+    for _, want := range []Vec3{
+        {X: 44728, Y: 52040, Z: -2792},
+        {X: 45160, Y: 52120, Z: -2792},
+        {X: 45528, Y: 52104, Z: -2792},
+    } {
+        found := false
+        for _, wp := range result.Waypoints {
+            if dist3D(wp, want) < 64 {
+                found = true
 
-				break
-			}
-		}
-		require.True(t, found,
-			"the route must pass the dump waypoint %.0f %.0f", want.X, want.Y)
-	}
+                break
+            }
+        }
+        require.True(t, found,
+            "the route must pass the dump waypoint %.0f %.0f", want.X, want.Y)
+    }
 }
 
 // TestElleniaPocketLinesRefuseTheHallClick pins the trap itself: the
@@ -123,25 +123,25 @@ func TestElleniaAisleRouteMatchesTheDumpPlan(t *testing.T) {
 // onto the first step east. These are the two answers the round 56
 // skip gate protects the follower from arming.
 func TestElleniaPocketLinesRefuseTheHallClick(t *testing.T) {
-	engine := townTestEngine(t)
+    engine := townTestEngine(t)
 
-	hall := Vec3{X: 45160, Y: 52120, Z: -2792}
-	pocket := Vec3{X: 44776, Y: 51992, Z: -2808}
-	aisle := Vec3{X: 44728, Y: 51992, Z: -2792}
+    hall := Vec3{X: 45160, Y: 52120, Z: -2792}
+    pocket := Vec3{X: 44776, Y: 51992, Z: -2808}
+    aisle := Vec3{X: 44728, Y: 51992, Z: -2792}
 
-	// From the pocket: the first Bresenham step east hits the closed
-	// east wall, the click collapses onto the walker - a refusal.
-	_, ok := engine.ValidateClick(pocket, hall)
-	require.False(t, ok,
-		"the hall click from the pocket must be refused (the closed east wall)")
+    // From the pocket: the first Bresenham step east hits the closed
+    // east wall, the click collapses onto the walker - a refusal.
+    _, ok := engine.ValidateClick(pocket, hall)
+    require.False(t, ok,
+        "the hall click from the pocket must be refused (the closed east wall)")
 
-	// From the aisle entrance: the click runs but stops at the first
-	// step - the partial that crept the dump character east.
-	validated, ok := engine.ValidateClick(aisle, hall)
-	require.True(t, ok, "the hall click from the aisle runs partially")
-	require.Less(t, math.Hypot(validated.X-aisle.X, validated.Y-aisle.Y),
-		64.0,
-		"the hall click from the aisle must collapse onto the first step east")
+    // From the aisle entrance: the click runs but stops at the first
+    // step - the partial that crept the dump character east.
+    validated, ok := engine.ValidateClick(aisle, hall)
+    require.True(t, ok, "the hall click from the aisle runs partially")
+    require.Less(t, math.Hypot(validated.X-aisle.X, validated.Y-aisle.Y),
+        64.0,
+        "the hall click from the aisle must collapse onto the first step east")
 }
 
 // The frozen corridor ban of the hunt loop recovery (the 2026-09-12
@@ -159,72 +159,72 @@ func TestElleniaPocketLinesRefuseTheHallClick(t *testing.T) {
 // one of its legs survives the server click validation in full (the
 // follower only clicks verified lines).
 func TestAvoidingSearchDetoursAroundTheFrozenAisle(t *testing.T) {
-	engine := townTestEngine(t)
+    engine := townTestEngine(t)
 
-	ban := []AvoidArea{{
-		Center: Vec3{X: 44728, Y: 52040, Z: -2792},
-		Radius: 48.0,
-	}}
-	result, err := engine.FindPathApproachDryAvoiding(
-		elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight, ban)
-	require.NoError(t, err)
-	require.True(t, result.Found,
-		"the banned aisle must leave the around-the-building route")
+    ban := []AvoidArea{{
+        Center: Vec3{X: 44728, Y: 52040, Z: -2792},
+        Radius: 48.0,
+    }}
+    result, err := engine.FindPathApproachDryAvoiding(
+        elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight, ban)
+    require.NoError(t, err)
+    require.True(t, result.Found,
+        "the banned aisle must leave the around-the-building route")
 
-	// The detour never enters the banned corridor: every waypoint
-	// stays on or outside the ban circle (the start cell of the search
-	// may sit exactly on the boundary - the walker standing inside its
-	// own patch must be able to plan the way out).
-	for i, wp := range result.Waypoints {
-		require.GreaterOrEqual(t, math.Hypot(wp.X-ban[0].Center.X, wp.Y-ban[0].Center.Y),
-			ban[0].Radius,
-			"waypoint %d of the detour must stay outside the banned aisle", i)
-	}
-	// The detour ends inside the approach ring of the teacher.
-	last := result.Waypoints[len(result.Waypoints)-1]
-	require.LessOrEqual(t, dist3D(last, elleniaSpawn), 200.0,
-		"the detour must end inside the Ellenia approach ring")
-	// Every leg of the detour validates in full: the follower clicks
-	// only lines the ported server rules accept completely (the
-	// degenerate zero length legs of the duplicated plan start are
-	// skipped by the follower cursor, they never become clicks).
-	for i := 1; i < len(result.Waypoints); i++ {
-		from := result.Waypoints[i-1]
-		to := result.Waypoints[i]
-		if math.Hypot(to.X-from.X, to.Y-from.Y) < 1 {
-			continue
-		}
-		validated, ok := engine.ValidateClick(from, to)
-		require.True(t, ok,
-			"the detour leg %d must survive the server validation", i)
-		require.InDelta(t, to.X, validated.X, 1.0,
-			"the detour leg %d must validate in full (no partial collapse)", i)
-		require.InDelta(t, to.Y, validated.Y, 1.0,
-			"the detour leg %d must validate in full (no partial collapse)", i)
-	}
+    // The detour never enters the banned corridor: every waypoint
+    // stays on or outside the ban circle (the start cell of the search
+    // may sit exactly on the boundary - the walker standing inside its
+    // own patch must be able to plan the way out).
+    for i, wp := range result.Waypoints {
+        require.GreaterOrEqual(t, math.Hypot(wp.X-ban[0].Center.X, wp.Y-ban[0].Center.Y),
+            ban[0].Radius,
+            "waypoint %d of the detour must stay outside the banned aisle", i)
+    }
+    // The detour ends inside the approach ring of the teacher.
+    last := result.Waypoints[len(result.Waypoints)-1]
+    require.LessOrEqual(t, dist3D(last, elleniaSpawn), 200.0,
+        "the detour must end inside the Ellenia approach ring")
+    // Every leg of the detour validates in full: the follower clicks
+    // only lines the ported server rules accept completely (the
+    // degenerate zero length legs of the duplicated plan start are
+    // skipped by the follower cursor, they never become clicks).
+    for i := 1; i < len(result.Waypoints); i++ {
+        from := result.Waypoints[i-1]
+        to := result.Waypoints[i]
+        if math.Hypot(to.X-from.X, to.Y-from.Y) < 1 {
+            continue
+        }
+        validated, ok := engine.ValidateClick(from, to)
+        require.True(t, ok,
+            "the detour leg %d must survive the server validation", i)
+        require.InDelta(t, to.X, validated.X, 1.0,
+            "the detour leg %d must validate in full (no partial collapse)", i)
+        require.InDelta(t, to.Y, validated.Y, 1.0,
+            "the detour leg %d must validate in full (no partial collapse)", i)
+    }
 }
 
 // TestAvoidingSearchStillAnswersTheUnbannedRoute pins the empty ban:
 // no avoid areas keep the ordinary dry search untouched (the aisle
 // route of the dump plan stays the answer).
 func TestAvoidingSearchStillAnswersTheUnbannedRoute(t *testing.T) {
-	engine := townTestEngine(t)
+    engine := townTestEngine(t)
 
-	plain, err := engine.FindPathApproachDry(
-		elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight)
-	require.NoError(t, err)
-	require.True(t, plain.Found)
+    plain, err := engine.FindPathApproachDry(
+        elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.True(t, plain.Found)
 
-	avoiding, err := engine.FindPathApproachDryAvoiding(
-		elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight, nil)
-	require.NoError(t, err)
-	require.True(t, avoiding.Found)
-	require.Len(t, avoiding.Waypoints, len(plain.Waypoints),
-		"the empty ban must not change the planned route")
-	for i := range plain.Waypoints {
-		require.InDelta(t, plain.Waypoints[i].X, avoiding.Waypoints[i].X, 1.0)
-		require.InDelta(t, plain.Waypoints[i].Y, avoiding.Waypoints[i].Y, 1.0)
-	}
+    avoiding, err := engine.FindPathApproachDryAvoiding(
+        elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight, nil)
+    require.NoError(t, err)
+    require.True(t, avoiding.Found)
+    require.Len(t, avoiding.Waypoints, len(plain.Waypoints),
+        "the empty ban must not change the planned route")
+    for i := range plain.Waypoints {
+        require.InDelta(t, plain.Waypoints[i].X, avoiding.Waypoints[i].X, 1.0)
+        require.InDelta(t, plain.Waypoints[i].Y, avoiding.Waypoints[i].Y, 1.0)
+    }
 }
 
 // TestAvoidingSearchRefusesGoalsInsideTheBan pins the boundary: a
@@ -232,15 +232,15 @@ func TestAvoidingSearchStillAnswersTheUnbannedRoute(t *testing.T) {
 // the caller falls back to its next recovery rung instead of walking
 // a route through the corridor the server refused.
 func TestAvoidingSearchRefusesGoalsInsideTheBan(t *testing.T) {
-	engine := townTestEngine(t)
+    engine := townTestEngine(t)
 
-	ban := []AvoidArea{{
-		Center: Vec3{X: 44728, Y: 52040, Z: -2792},
-		Radius: 400.0,
-	}}
-	result, err := engine.FindPathApproachDryAvoiding(
-		elleniaApproaches[0].pos, elleniaSpawn, 150, DefaultMaxPassableHeight, ban)
-	require.NoError(t, err)
-	require.False(t, result.Found,
-		"a goal sealed inside the ban must answer not found")
+    ban := []AvoidArea{{
+        Center: Vec3{X: 44728, Y: 52040, Z: -2792},
+        Radius: 400.0,
+    }}
+    result, err := engine.FindPathApproachDryAvoiding(
+        elleniaApproaches[0].pos, elleniaSpawn, 150, DefaultMaxPassableHeight, ban)
+    require.NoError(t, err)
+    require.False(t, result.Found,
+        "a goal sealed inside the ban must answer not found")
 }

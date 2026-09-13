@@ -18,9 +18,15 @@ Run it from the repository root, in this order:
 go build ./...            # compiles everything including cmd/
 go vet ./...              # cheap static checks
 go test ./... -count=1    # the full suite (~40 s, pathfind dominates)
-gofmt -l cmd internal     # empty output = formatted
+task fmt:check            # spaces-only gate: no tabs, gofmt-spaces clean
 golangci-lint run         # the strict gate; 0 issues required
 ```
+
+The repository whitespace policy is **spaces only, never tabs**
+(four spaces per step). `gofmt-spaces` (`cmd/gofmt-spaces`) is the
+formatter of record - do NOT run the stock `gofmt`, `gofumpt` or
+`goimports`, they re-tab the tree; after `go mod tidy` re-run
+`task fmt` (tidy re-tabs go.mod).
 
 Run the loop in the foreground of the tool call with a call timeout
 of at least 10 minutes - the full suite alone can cost ~123 s on a
@@ -28,11 +34,12 @@ cold cache, and a background process does not survive the return of
 the call that started it (docs/deployment.md, "Foreground
 execution is mandatory").
 
-`task check:all` runs lint + test; the individual tasks are `task test`,
-`task lint`, `task test:race`. The Windows dev host has `task` 3.53.1
-and golangci-lint v2.13.2 installed; `-race` needs cgo with gcc, which
-the Windows host lacks - `task test:race` belongs to environments with
-cgo (the Linux sandbox, CI).
+`task check:all` runs lint + test + fmt:check; the individual tasks are
+`task test`, `task lint`, `task test:race`, `task fmt`. The Windows
+dev host has `task` 3.53.1 and golangci-lint v2.13.2 installed;
+`-race` needs cgo with gcc, which the Windows host lacks -
+`task test:race` belongs to environments with cgo (the Linux sandbox,
+CI).
 
 ## Interpreting failures
 
@@ -83,15 +90,15 @@ flagged too); declare plain zero vars and use them:
 
 ```go
 var (
-        emptyItem  state.InventoryItem
-        emptyStats npcdata.GearStats
+    emptyItem  state.InventoryItem
+    emptyStats npcdata.GearStats
 )
 
 var clearedScoredItem = ScoredItem{
-        Item:  emptyItem,
-        Stats: emptyStats,
-        Score: 0,
-        Slot:  slotInvalid,
+    Item:  emptyItem,
+    Stats: emptyStats,
+    Score: 0,
+    Slot:  slotInvalid,
 }
 ```
 

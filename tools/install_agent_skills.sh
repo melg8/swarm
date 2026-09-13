@@ -19,6 +19,12 @@
 #                                           against the pinned commit,
 #                                           exit 1 on drift
 #
+# The vendored copy is whitespace-normalized to the repository
+# spaces-only policy (tools/normalize_whitespace.sh plus gofmt-spaces
+# over the example sources run after every install), so the drift
+# check compares content ignoring whitespace (diff -w): a re-install
+# that brings tabs back is one `task fmt` away, not a content drift.
+#
 # Environment overrides: SKILLS_REPO, SKILLS_COMMIT, SKILLS_DIR.
 # The project's own playbooks (go-verify-loop, webui-harness,
 # packet-recipe, mobius-stack) are hand-maintained and are never
@@ -41,46 +47,46 @@ git clone --quiet "$REPO_URL" "$tmp/repo"
 
 ref="$PINNED_COMMIT"
 if [ "$MODE" = "latest" ]; then
-	git -C "$tmp/repo" fetch --quiet origin
-	ref="$(git -C "$tmp/repo" rev-parse origin/HEAD)"
+    git -C "$tmp/repo" fetch --quiet origin
+    ref="$(git -C "$tmp/repo" rev-parse origin/HEAD)"
 fi
 git -C "$tmp/repo" checkout --quiet "$ref"
 
 upstream="$tmp/repo/skills"
 if [ ! -d "$upstream" ]; then
-	echo "Error: upstream layout changed, no skills/ directory at $ref"
-	exit 1
+    echo "Error: upstream layout changed, no skills/ directory at $ref"
+    exit 1
 fi
 
 if [ "$MODE" = "check" ]; then
-	drift=0
-	for dir in "$upstream"/golang-*/; do
-		name="$(basename "$dir")"
-		if ! diff -r --brief "$dir" "$SKILLS_DIR/$name" > /dev/null 2>&1; then
-			echo "Drift: $name differs from the pinned commit"
-			drift=1
-		fi
-	done
-	for dir in "$SKILLS_DIR"/golang-*/; do
-		name="$(basename "$dir")"
-		if [ ! -d "$upstream/$name" ]; then
-			echo "Drift: $name is vendored but absent upstream"
-			drift=1
-		fi
-	done
-	if [ "$drift" -eq 0 ]; then
-		echo "Vendored golang skills match $PINNED_COMMIT"
-	fi
+    drift=0
+    for dir in "$upstream"/golang-*/; do
+        name="$(basename "$dir")"
+        if ! diff -r --brief -w "$dir" "$SKILLS_DIR/$name" > /dev/null 2>&1; then
+            echo "Drift: $name differs from the pinned commit"
+            drift=1
+        fi
+    done
+    for dir in "$SKILLS_DIR"/golang-*/; do
+        name="$(basename "$dir")"
+        if [ ! -d "$upstream/$name" ]; then
+            echo "Drift: $name is vendored but absent upstream"
+            drift=1
+        fi
+    done
+    if [ "$drift" -eq 0 ]; then
+        echo "Vendored golang skills match $PINNED_COMMIT"
+    fi
 
-	exit "$drift"
+    exit "$drift"
 fi
 
 installed=0
 for dir in "$upstream"/golang-*/; do
-	name="$(basename "$dir")"
-	rm -rf "$SKILLS_DIR/$name"
-	cp -r "$dir" "$SKILLS_DIR/$name"
-	installed=$((installed + 1))
+    name="$(basename "$dir")"
+    rm -rf "$SKILLS_DIR/$name"
+    cp -r "$dir" "$SKILLS_DIR/$name"
+    installed=$((installed + 1))
 done
 
 # The MIT license of the upstream collection travels with the vendored
@@ -89,3 +95,13 @@ done
 cp "$tmp/repo/LICENSE" "$SKILLS_DIR/golang-cc-skills-LICENSE.md"
 
 echo "Installed $installed golang skills at commit $ref into $SKILLS_DIR"
+
+# Re-apply the repository whitespace policy (spaces only, see
+# AGENTS.md) over the freshly vendored copy: the markdown and the
+# example sources of the upstream arrive tab indented. The normalized
+# tree is what the -w drift check above accepts.
+"$(dirname "$0")/normalize_whitespace.sh" >/dev/null
+if command -v go >/dev/null 2>&1; then
+    go run ./cmd/gofmt-spaces -w .agents/skills >/dev/null
+fi
+echo "Whitespace normalized to spaces (task fmt keeps it that way)"

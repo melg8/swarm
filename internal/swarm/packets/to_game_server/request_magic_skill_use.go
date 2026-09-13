@@ -5,9 +5,9 @@
 package togameserver
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const requestMagicSkillUsePacketID = 0x2F
@@ -24,48 +24,48 @@ const requestMagicSkillUsePacketID = 0x2F
 // Wire format (see RequestMagicSkillUse.readImpl): [opcode 0x2F]
 // [magicId: 4][ctrlPressed: 4][shiftPressed: 1].
 type RequestMagicSkillUsePacket struct {
-	SkillID int32
-	Ctrl    bool
-	Shift   bool
+    SkillID int32
+    Ctrl    bool
+    Shift   bool
 }
 
 // NewRequestMagicSkillUsePacket creates a zero valued cast request.
 func NewRequestMagicSkillUsePacket() *RequestMagicSkillUsePacket {
-	return &RequestMagicSkillUsePacket{
-		SkillID: 0,
-		Ctrl:    false,
-		Shift:   false,
-	}
+    return &RequestMagicSkillUsePacket{
+        SkillID: 0,
+        Ctrl:    false,
+        Shift:   false,
+    }
 }
 
 // ToBytes serializes the packet.
 func (p *RequestMagicSkillUsePacket) ToBytes(
-	writer *packet.Writer,
+    writer *packet.Writer,
 ) error {
-	if err := writer.WriteInt8(requestMagicSkillUsePacketID); err != nil {
-		return fmt.Errorf(
-			"failed to write magic skill use id: %w", err)
-	}
-	if err := writer.WriteInt32(p.SkillID); err != nil {
-		return fmt.Errorf(
-			"failed to write magic skill use id: %w", err)
-	}
-	ctrl := int32(0)
-	if p.Ctrl {
-		ctrl = 1
-	}
-	if err := writer.WriteInt32(ctrl); err != nil {
-		return fmt.Errorf(
-			"failed to write magic skill use ctrl flag: %w", err)
-	}
-	shift := int8(0)
-	if p.Shift {
-		shift = 1
-	}
-	if err := writer.WriteInt8(shift); err != nil {
-		return fmt.Errorf(
-			"failed to write magic skill use shift flag: %w", err)
-	}
+    if err := writer.WriteInt8(requestMagicSkillUsePacketID); err != nil {
+        return fmt.Errorf(
+            "failed to write magic skill use id: %w", err)
+    }
+    if err := writer.WriteInt32(p.SkillID); err != nil {
+        return fmt.Errorf(
+            "failed to write magic skill use id: %w", err)
+    }
+    ctrl := int32(0)
+    if p.Ctrl {
+        ctrl = 1
+    }
+    if err := writer.WriteInt32(ctrl); err != nil {
+        return fmt.Errorf(
+            "failed to write magic skill use ctrl flag: %w", err)
+    }
+    shift := int8(0)
+    if p.Shift {
+        shift = 1
+    }
+    if err := writer.WriteInt8(shift); err != nil {
+        return fmt.Errorf(
+            "failed to write magic skill use shift flag: %w", err)
+    }
 
-	return nil
+    return nil
 }

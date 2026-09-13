@@ -5,16 +5,16 @@
 package webserver
 
 import (
-	"bytes"
-	"image/png"
-	"log"
-	"math"
-	"net/http"
-	"strconv"
-	"strings"
-	"sync"
+    "bytes"
+    "image/png"
+    "log"
+    "math"
+    "net/http"
+    "strconv"
+    "strings"
+    "sync"
 
-	"github.com/melg8/swarm/internal/swarm/pathfind"
+    "github.com/melg8/swarm/internal/swarm/pathfind"
 )
 
 // Geodata tile levels of the visualization pyramid: level 0 renders one
@@ -28,61 +28,61 @@ const geodataTileCacheMax = 24
 
 // geodataTileKey identifies one encoded tile of the visualization.
 type geodataTileKey struct {
-	mode  string
-	level int
-	col   int
-	row   int
+    mode  string
+    level int
+    col   int
+    row   int
 }
 
 // geodataTileCache is a small LRU of encoded PNG tiles.
 type geodataTileCache struct {
-	mu    sync.Mutex
-	tiles map[geodataTileKey][]byte
-	order []geodataTileKey
+    mu    sync.Mutex
+    tiles map[geodataTileKey][]byte
+    order []geodataTileKey
 }
 
 func newGeodataTileCache() *geodataTileCache {
-	return &geodataTileCache{
-		mu:    sync.Mutex{},
-		tiles: make(map[geodataTileKey][]byte),
-		order: make([]geodataTileKey, 0, geodataTileCacheMax),
-	}
+    return &geodataTileCache{
+        mu:    sync.Mutex{},
+        tiles: make(map[geodataTileKey][]byte),
+        order: make([]geodataTileKey, 0, geodataTileCacheMax),
+    }
 }
 
 // get returns the cached tile and moves it to the back of the LRU.
 func (c *geodataTileCache) get(key geodataTileKey) ([]byte, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	tile, ok := c.tiles[key]
-	if !ok {
-		return nil, false
-	}
-	for i, candidate := range c.order {
-		if candidate == key {
-			c.order = append(c.order[:i], c.order[i+1:]...)
-			c.order = append(c.order, key)
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    tile, ok := c.tiles[key]
+    if !ok {
+        return nil, false
+    }
+    for i, candidate := range c.order {
+        if candidate == key {
+            c.order = append(c.order[:i], c.order[i+1:]...)
+            c.order = append(c.order, key)
 
-			break
-		}
-	}
+            break
+        }
+    }
 
-	return tile, true
+    return tile, true
 }
 
 // put stores a tile, evicting the least recently used one on overflow.
 func (c *geodataTileCache) put(key geodataTileKey, tile []byte) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if _, ok := c.tiles[key]; ok {
-		return
-	}
-	c.tiles[key] = tile
-	c.order = append(c.order, key)
-	for len(c.order) > geodataTileCacheMax {
-		oldest := c.order[0]
-		c.order = c.order[1:]
-		delete(c.tiles, oldest)
-	}
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    if _, ok := c.tiles[key]; ok {
+        return
+    }
+    c.tiles[key] = tile
+    c.order = append(c.order, key)
+    for len(c.order) > geodataTileCacheMax {
+        oldest := c.order[0]
+        c.order = c.order[1:]
+        delete(c.tiles, oldest)
+    }
 }
 
 // handleGeodataTile serves one rendered geodata tile as PNG. The tile
@@ -91,100 +91,100 @@ func (c *geodataTileCache) put(key geodataTileKey, tile []byte) {
 // them aggressively. The linear request pipeline is split into the
 // parameter parser and the render-cache tail.
 func (s *Server) handleGeodataTile(w http.ResponseWriter, r *http.Request) {
-	level, size, col, row, mode, ok := parseGeodataTileRequest(w, r)
-	if !ok {
-		// The parser answered the error response itself.
-		return
-	}
+    level, size, col, row, mode, ok := parseGeodataTileRequest(w, r)
+    if !ok {
+        // The parser answered the error response itself.
+        return
+    }
 
-	key := geodataTileKey{mode: mode, level: level, col: col, row: row}
-	if tile, ok := s.geodataTiles.get(key); ok {
-		writeGeodataTile(w, tile)
+    key := geodataTileKey{mode: mode, level: level, col: col, row: row}
+    if tile, ok := s.geodataTiles.get(key); ok {
+        writeGeodataTile(w, tile)
 
-		return
-	}
+        return
+    }
 
-	img, err := s.pathfinder.RenderRegion(pathfind.RegionKey{
-		Col: int16(col),
-		Row: int16(row),
-	}, size, pathfind.RenderMode(mode))
-	if err != nil {
-		s.logger.Printf("Geodata tile %d_%d unavailable: %v", col, row, err)
-		http.Error(w, "geodata region unavailable", http.StatusNotFound)
+    img, err := s.pathfinder.RenderRegion(pathfind.RegionKey{
+        Col: int16(col),
+        Row: int16(row),
+    }, size, pathfind.RenderMode(mode))
+    if err != nil {
+        s.logger.Printf("Geodata tile %d_%d unavailable: %v", col, row, err)
+        http.Error(w, "geodata region unavailable", http.StatusNotFound)
 
-		return
-	}
+        return
+    }
 
-	var encoded bytes.Buffer
-	if err := png.Encode(&encoded, img); err != nil {
-		http.Error(w, "tile encoding failed", http.StatusInternalServerError)
+    var encoded bytes.Buffer
+    if err := png.Encode(&encoded, img); err != nil {
+        http.Error(w, "tile encoding failed", http.StatusInternalServerError)
 
-		return
-	}
-	tile := encoded.Bytes()
-	s.geodataTiles.put(key, tile)
-	writeGeodataTile(w, tile)
+        return
+    }
+    tile := encoded.Bytes()
+    s.geodataTiles.put(key, tile)
+    writeGeodataTile(w, tile)
 }
 
 // parseGeodataTileRequest validates the tile request and returns its
 // parameters (level, tile pixels, region column and row, render mode);
 // ok is false when the error response is already written.
 func parseGeodataTileRequest(
-	w http.ResponseWriter, r *http.Request,
+    w http.ResponseWriter, r *http.Request,
 ) (level, size, col, row int, mode string, ok bool) {
-	level, err := strconv.Atoi(r.PathValue("level"))
-	if err != nil {
-		http.Error(w, "invalid tile level", http.StatusBadRequest)
+    level, err := strconv.Atoi(r.PathValue("level"))
+    if err != nil {
+        http.Error(w, "invalid tile level", http.StatusBadRequest)
 
-		return 0, 0, 0, 0, "", false
-	}
-	size, ok = geodataTilePixels[level]
-	if !ok {
-		http.Error(w, "unknown tile level", http.StatusBadRequest)
+        return 0, 0, 0, 0, "", false
+    }
+    size, ok = geodataTilePixels[level]
+    if !ok {
+        http.Error(w, "unknown tile level", http.StatusBadRequest)
 
-		return 0, 0, 0, 0, "", false
-	}
-	name := r.PathValue("name")
-	if !strings.HasSuffix(name, ".png") {
-		http.Error(w, "tiles are served as .png", http.StatusBadRequest)
+        return 0, 0, 0, 0, "", false
+    }
+    name := r.PathValue("name")
+    if !strings.HasSuffix(name, ".png") {
+        http.Error(w, "tiles are served as .png", http.StatusBadRequest)
 
-		return 0, 0, 0, 0, "", false
-	}
-	colText, rowText, found := strings.Cut(strings.TrimSuffix(name, ".png"), "_")
-	if !found {
-		http.Error(w, "invalid tile name", http.StatusBadRequest)
+        return 0, 0, 0, 0, "", false
+    }
+    colText, rowText, found := strings.Cut(strings.TrimSuffix(name, ".png"), "_")
+    if !found {
+        http.Error(w, "invalid tile name", http.StatusBadRequest)
 
-		return 0, 0, 0, 0, "", false
-	}
-	col, err = strconv.Atoi(colText)
-	if err != nil {
-		http.Error(w, "invalid tile column", http.StatusBadRequest)
+        return 0, 0, 0, 0, "", false
+    }
+    col, err = strconv.Atoi(colText)
+    if err != nil {
+        http.Error(w, "invalid tile column", http.StatusBadRequest)
 
-		return 0, 0, 0, 0, "", false
-	}
-	row, err = strconv.Atoi(rowText)
-	if err != nil {
-		http.Error(w, "invalid tile row", http.StatusBadRequest)
+        return 0, 0, 0, 0, "", false
+    }
+    row, err = strconv.Atoi(rowText)
+    if err != nil {
+        http.Error(w, "invalid tile row", http.StatusBadRequest)
 
-		return 0, 0, 0, 0, "", false
-	}
-	// The region keys are int16 on the wire of the pathfinder API;
-	// reject everything outside before the conversion wraps.
-	if col < 0 || col > math.MaxInt16 || row < 0 || row > math.MaxInt16 {
-		http.Error(w, "tile out of range", http.StatusBadRequest)
+        return 0, 0, 0, 0, "", false
+    }
+    // The region keys are int16 on the wire of the pathfinder API;
+    // reject everything outside before the conversion wraps.
+    if col < 0 || col > math.MaxInt16 || row < 0 || row > math.MaxInt16 {
+        http.Error(w, "tile out of range", http.StatusBadRequest)
 
-		return 0, 0, 0, 0, "", false
-	}
+        return 0, 0, 0, 0, "", false
+    }
 
-	return level, size, col, row,
-		string(pathfind.ParseRenderMode(r.URL.Query().Get("mode"))), true
+    return level, size, col, row,
+        string(pathfind.ParseRenderMode(r.URL.Query().Get("mode"))), true
 }
 
 // writeGeodataTile responds with one PNG tile.
 func writeGeodataTile(w http.ResponseWriter, tile []byte) {
-	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
-	if _, err := w.Write(tile); err != nil {
-		log.Printf("Error writing geodata tile: %v", err)
-	}
+    w.Header().Set("Content-Type", "image/png")
+    w.Header().Set("Cache-Control", "public, max-age=86400")
+    if _, err := w.Write(tile); err != nil {
+        log.Printf("Error writing geodata tile: %v", err)
+    }
 }

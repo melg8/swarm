@@ -5,8 +5,8 @@
 package npcdata
 
 import (
-	"sort"
-	"strings"
+    "sort"
+    "strings"
 )
 
 // clanAllName is the special clan that matches every clan in the
@@ -37,60 +37,60 @@ var npcClanMasks = buildNpcClanMasks()
 // the mask for the social pull check of the target search without
 // any string work.
 func NPCClanMask(templateID int32) uint64 {
-	if templateID <= npcTemplateOffset {
-		return 0
-	}
+    if templateID <= npcTemplateOffset {
+        return 0
+    }
 
-	return npcClanMasks[templateID-npcTemplateOffset]
+    return npcClanMasks[templateID-npcTemplateOffset]
 }
 
 // buildNpcClanSets splits the joined clan strings of the generated
 // dictionary once at package init.
 func buildNpcClanSets() map[int32][]string {
-	sets := make(map[int32][]string, len(npcClans))
-	for id, joined := range npcClans {
-		if joined == "" {
-			continue
-		}
-		sets[id] = strings.Split(joined, " ")
-	}
+    sets := make(map[int32][]string, len(npcClans))
+    for id, joined := range npcClans {
+        if joined == "" {
+            continue
+        }
+        sets[id] = strings.Split(joined, " ")
+    }
 
-	return sets
+    return sets
 }
 
 // buildNpcClanMasks assigns one bit of a uint64 to every clan name of
 // the pack (deterministic: the sorted alphabet) and folds the clan
 // list of every npc into its mask.
 func buildNpcClanMasks() map[int32]uint64 {
-	names := make([]string, 0, 64)
-	seen := make(map[string]struct{}, 64)
-	for _, clans := range npcClanSets {
-		for _, clan := range clans {
-			if _, dup := seen[clan]; dup {
-				continue
-			}
-			seen[clan] = struct{}{}
-			names = append(names, clan)
-		}
-	}
-	sort.Strings(names)
-	bits := make(map[string]uint64, len(names))
-	for i, clan := range names {
-		if clan == clanAllName {
-			bits[clan] = ClanMaskAll
+    names := make([]string, 0, 64)
+    seen := make(map[string]struct{}, 64)
+    for _, clans := range npcClanSets {
+        for _, clan := range clans {
+            if _, dup := seen[clan]; dup {
+                continue
+            }
+            seen[clan] = struct{}{}
+            names = append(names, clan)
+        }
+    }
+    sort.Strings(names)
+    bits := make(map[string]uint64, len(names))
+    for i, clan := range names {
+        if clan == clanAllName {
+            bits[clan] = ClanMaskAll
 
-			continue
-		}
-		bits[clan] = uint64(1) << uint(i)
-	}
-	masks := make(map[int32]uint64, len(npcClanSets))
-	for id, clans := range npcClanSets {
-		var mask uint64
-		for _, clan := range clans {
-			mask |= bits[clan]
-		}
-		masks[id] = mask
-	}
+            continue
+        }
+        bits[clan] = uint64(1) << uint(i)
+    }
+    masks := make(map[int32]uint64, len(npcClanSets))
+    for id, clans := range npcClanSets {
+        var mask uint64
+        for _, clan := range clans {
+            mask |= bits[clan]
+        }
+        masks[id] = mask
+    }
 
-	return masks
+    return masks
 }

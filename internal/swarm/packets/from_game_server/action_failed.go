@@ -5,7 +5,7 @@
 package fromgameserver
 
 import (
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const actionFailedPacketID = 0x35
@@ -20,12 +20,12 @@ type ActionFailedPacket struct{}
 
 // NewActionFailedPacket creates a zero valued packet ready for parsing.
 func NewActionFailedPacket() *ActionFailedPacket {
-	return &ActionFailedPacket{}
+    return &ActionFailedPacket{}
 }
 
 // ParseActionFailedPacket validates the packet id.
 func ParseActionFailedPacket(_ *ActionFailedPacket, data []byte) error {
-	reader := packet.NewReader(data)
+    reader := packet.NewReader(data)
 
-	return expectPacketID(reader, actionFailedPacketID)
+    return expectPacketID(reader, actionFailedPacketID)
 }

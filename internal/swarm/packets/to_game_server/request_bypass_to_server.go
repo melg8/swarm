@@ -5,9 +5,9 @@
 package togameserver
 
 import (
-	"errors"
+    "errors"
 
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const requestBypassToServerPacketID = 0x21
@@ -26,24 +26,24 @@ const requestBypassToServerPacketID = 0x21
 // Reference: org/l2jmobius/gameserver/network/clientpackets/
 // RequestBypassToServer.java (readImpl reads the single string).
 type RequestBypassToServer struct {
-	Command string
+    Command string
 }
 
 // NewRequestBypassToServer builds a zero-valued packet ready to fill.
 func NewRequestBypassToServer() *RequestBypassToServer {
-	return &RequestBypassToServer{Command: ""}
+    return &RequestBypassToServer{Command: ""}
 }
 
 // ToBytes serializes the packet. An empty command is refused: the
 // server logs it and disconnects the client on an empty bypass (see
 // RequestBypassToServer.runImpl), so the bot never sends one.
 func (p *RequestBypassToServer) ToBytes(writer *packet.Writer) error {
-	if p.Command == "" {
-		return errors.New("bypass command is empty")
-	}
-	if err := writer.WriteInt8(requestBypassToServerPacketID); err != nil {
-		return err
-	}
+    if p.Command == "" {
+        return errors.New("bypass command is empty")
+    }
+    if err := writer.WriteInt8(requestBypassToServerPacketID); err != nil {
+        return err
+    }
 
-	return writer.WriteStringAsUtf16(p.Command)
+    return writer.WriteStringAsUtf16(p.Command)
 }

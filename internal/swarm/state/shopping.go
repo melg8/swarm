@@ -16,32 +16,32 @@ import "time"
 // widget reuses the item tooltip shape (the family resolution and the
 // stat lines of the classic client tooltip).
 type ShoppingEntryView struct {
-	ItemID      int32   `json:"itemId"`
-	Name        string  `json:"name"`
-	Icon        string  `json:"icon"`
-	MerchantID  int32   `json:"merchantId"`
-	Merchant    string  `json:"merchant"`
-	Type        string  `json:"type"`
-	WeaponType  string  `json:"weaponType"`
-	ArmorType   string  `json:"armorType"`
-	BodyPartKey string  `json:"bodyPartKey"`
-	PAtk        int32   `json:"pAtk"`
-	MAtk        int32   `json:"mAtk"`
-	PDef        int32   `json:"pDef"`
-	MDef        int32   `json:"mDef"`
-	SDef        int32   `json:"sDef"`
-	RShld       int32   `json:"rShld"`
-	PAtkSpd     int32   `json:"pAtkSpd"`
-	SoulShots   int32   `json:"soulShots"`
-	SpiritShots int32   `json:"spiritShots"`
-	Weight      int32   `json:"weight"`
-	Price       int64   `json:"price"`
-	SellCredit  int64   `json:"sellCredit"`
-	Missing     int64   `json:"missing"`
-	Gain        float64 `json:"gain"`
-	Affordable  bool    `json:"affordable"`
-	Buying      bool    `json:"buying"`
-	Reason      string  `json:"reason"`
+    ItemID      int32   `json:"itemId"`
+    Name        string  `json:"name"`
+    Icon        string  `json:"icon"`
+    MerchantID  int32   `json:"merchantId"`
+    Merchant    string  `json:"merchant"`
+    Type        string  `json:"type"`
+    WeaponType  string  `json:"weaponType"`
+    ArmorType   string  `json:"armorType"`
+    BodyPartKey string  `json:"bodyPartKey"`
+    PAtk        int32   `json:"pAtk"`
+    MAtk        int32   `json:"mAtk"`
+    PDef        int32   `json:"pDef"`
+    MDef        int32   `json:"mDef"`
+    SDef        int32   `json:"sDef"`
+    RShld       int32   `json:"rShld"`
+    PAtkSpd     int32   `json:"pAtkSpd"`
+    SoulShots   int32   `json:"soulShots"`
+    SpiritShots int32   `json:"spiritShots"`
+    Weight      int32   `json:"weight"`
+    Price       int64   `json:"price"`
+    SellCredit  int64   `json:"sellCredit"`
+    Missing     int64   `json:"missing"`
+    Gain        float64 `json:"gain"`
+    Affordable  bool    `json:"affordable"`
+    Buying      bool    `json:"buying"`
+    Reason      string  `json:"reason"`
 }
 
 // ShoppingPlanView is the published shopping queue of the web UI: the
@@ -52,10 +52,10 @@ type ShoppingEntryView struct {
 // running town trip instead of the trigger plan (the in-flight batch
 // entries carry Buying).
 type ShoppingPlanView struct {
-	Entries []ShoppingEntryView `json:"entries"`
-	Adena   int64               `json:"adena"`
-	Total   int64               `json:"total"`
-	Trip    bool                `json:"trip"`
+    Entries []ShoppingEntryView `json:"entries"`
+    Adena   int64               `json:"adena"`
+    Total   int64               `json:"total"`
+    Trip    bool                `json:"trip"`
 }
 
 // shoppingPlanTTL bounds how long a published shopping plan survives
@@ -74,73 +74,73 @@ const shoppingPlanTTL = 10 * time.Second
 // event stream. The entries slice is copied defensively - the caller
 // keeps its own queue state after the publish.
 func (b *Bot) SetShoppingPlan(view ShoppingPlanView) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if len(view.Entries) == 0 {
-		b.clearShoppingPlanLocked()
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    if len(view.Entries) == 0 {
+        b.clearShoppingPlanLocked()
 
-		return
-	}
-	if shoppingPlanEqual(b.shopping, view) {
-		b.shoppingAt = time.Now()
+        return
+    }
+    if shoppingPlanEqual(b.shopping, view) {
+        b.shoppingAt = time.Now()
 
-		return
-	}
-	entries := make([]ShoppingEntryView, len(view.Entries))
-	copy(entries, view.Entries)
-	b.shopping = &ShoppingPlanView{
-		Entries: entries,
-		Adena:   view.Adena,
-		Total:   view.Total,
-		Trip:    view.Trip,
-	}
-	b.shoppingAt = time.Now()
-	b.touch()
+        return
+    }
+    entries := make([]ShoppingEntryView, len(view.Entries))
+    copy(entries, view.Entries)
+    b.shopping = &ShoppingPlanView{
+        Entries: entries,
+        Adena:   view.Adena,
+        Total:   view.Total,
+        Trip:    view.Trip,
+    }
+    b.shoppingAt = time.Now()
+    b.touch()
 }
 
 // ClearShoppingPlan drops the published shopping plan (a no-op when
 // none is published).
 func (b *Bot) ClearShoppingPlan() {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.clearShoppingPlanLocked()
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    b.clearShoppingPlanLocked()
 }
 
 // clearShoppingPlanLocked drops the shopping plan, the caller must
 // hold the state write lock.
 func (b *Bot) clearShoppingPlanLocked() {
-	if b.shopping == nil {
-		return
-	}
-	b.shopping = nil
-	b.shoppingAt = time.Time{}
-	b.touch()
+    if b.shopping == nil {
+        return
+    }
+    b.shopping = nil
+    b.shoppingAt = time.Time{}
+    b.touch()
 }
 
 // shoppingPlanLive reports whether the published shopping plan is
 // fresh enough for the snapshot: nil plans answer false, expired ones
 // too (the hunt loop died or moved on). The caller must hold a lock.
 func (b *Bot) shoppingPlanLive(now time.Time) bool {
-	return b.shopping != nil && now.Sub(b.shoppingAt) <= shoppingPlanTTL
+    return b.shopping != nil && now.Sub(b.shoppingAt) <= shoppingPlanTTL
 }
 
 // shoppingPlanEqual compares a published plan with a fresh view
 // element wise (a nil plan never equals a non empty view).
 func shoppingPlanEqual(
-	published *ShoppingPlanView, view ShoppingPlanView,
+    published *ShoppingPlanView, view ShoppingPlanView,
 ) bool {
-	if published == nil ||
-		len(published.Entries) != len(view.Entries) ||
-		published.Adena != view.Adena ||
-		published.Total != view.Total ||
-		published.Trip != view.Trip {
-		return false
-	}
-	for index := range published.Entries {
-		if published.Entries[index] != view.Entries[index] {
-			return false
-		}
-	}
+    if published == nil ||
+        len(published.Entries) != len(view.Entries) ||
+        published.Adena != view.Adena ||
+        published.Total != view.Total ||
+        published.Trip != view.Trip {
+        return false
+    }
+    for index := range published.Entries {
+        if published.Entries[index] != view.Entries[index] {
+            return false
+        }
+    }
 
-	return true
+    return true
 }

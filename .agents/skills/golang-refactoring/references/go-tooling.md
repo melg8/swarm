@@ -50,8 +50,8 @@ gofmt -d file.go       # show the diff without writing
 package template
 
 import (
-	"errors"
-	"fmt"
+    "errors"
+    "fmt"
 )
 
 func before(s string) error { return fmt.Errorf("%s", s) }

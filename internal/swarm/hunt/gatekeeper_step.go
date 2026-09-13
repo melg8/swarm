@@ -5,9 +5,9 @@
 package hunt
 
 import (
-	"errors"
-	"fmt"
-	"time"
+    "errors"
+    "fmt"
+    "time"
 )
 
 // gatekeeperDialogWait bounds the wait for the server NpcHTMLMessage
@@ -38,36 +38,36 @@ const gatekeeperPollPeriod = 250 * time.Millisecond
 // the standard teleport list; destLabel is a substring of the
 // destination button label (for example "The Town of Gludio").
 func (l *Loop) DriveGatekeeperTeleport(
-	npcObjID int32, listName, destLabel string,
+    npcObjID int32, listName, destLabel string,
 ) error {
-	if err := l.openTeleportDialog(npcObjID); err != nil {
-		return err
-	}
-	html, err := l.awaitDialog(npcObjID)
-	if err != nil {
-		return err
-	}
-	buttons := ParseGatekeeperHTML(html)
-	teleport := FindTeleportButton(buttons, listName, destLabel)
-	if teleport == nil {
-		return fmt.Errorf(
-			"gatekeeper: no teleport button for %q in list %q",
-			destLabel, listName)
-	}
-	command := fmt.Sprintf("npc_%d_teleport %s %d",
-		npcObjID, teleport.ListName, teleport.LocID)
-	l.logf("gatekeeper: teleporting to %s", teleport.Label)
+    if err := l.openTeleportDialog(npcObjID); err != nil {
+        return err
+    }
+    html, err := l.awaitDialog(npcObjID)
+    if err != nil {
+        return err
+    }
+    buttons := ParseGatekeeperHTML(html)
+    teleport := FindTeleportButton(buttons, listName, destLabel)
+    if teleport == nil {
+        return fmt.Errorf(
+            "gatekeeper: no teleport button for %q in list %q",
+            destLabel, listName)
+    }
+    command := fmt.Sprintf("npc_%d_teleport %s %d",
+        npcObjID, teleport.ListName, teleport.LocID)
+    l.logf("gatekeeper: teleporting to %s", teleport.Label)
 
-	return l.game.SendBypass(command)
+    return l.game.SendBypass(command)
 }
 
 // openTeleportDialog sends the showTeleports bypass to the teleporter.
 // The server answers with a NpcHTMLMessage carrying the teleport list
 // (the teleports.htm template with the %locations% replaced).
 func (l *Loop) openTeleportDialog(npcObjID int32) error {
-	command := fmt.Sprintf("npc_%d_showTeleports", npcObjID)
+    command := fmt.Sprintf("npc_%d_showTeleports", npcObjID)
 
-	return l.game.SendBypass(command)
+    return l.game.SendBypass(command)
 }
 
 // awaitDialog waits for the server NpcHTMLMessage reply from the
@@ -76,16 +76,16 @@ func (l *Loop) openTeleportDialog(npcObjID int32) error {
 // the wait lapses. A zero npcObjID on the first read means no dialog
 // arrived yet - the wait continues.
 func (l *Loop) awaitDialog(npcObjID int32) (string, error) {
-	deadline := time.Now().Add(gatekeeperDialogWait)
-	for {
-		id, html := l.game.LastHTMLDialog()
-		if id == npcObjID && html != "" {
-			return html, nil
-		}
-		if time.Now().After(deadline) {
-			return "", errors.New(
-				"gatekeeper: the teleport list dialog never arrived")
-		}
-		pace(gatekeeperPollPeriod)
-	}
+    deadline := time.Now().Add(gatekeeperDialogWait)
+    for {
+        id, html := l.game.LastHTMLDialog()
+        if id == npcObjID && html != "" {
+            return html, nil
+        }
+        if time.Now().After(deadline) {
+            return "", errors.New(
+                "gatekeeper: the teleport list dialog never arrived")
+        }
+        pace(gatekeeperPollPeriod)
+    }
 }

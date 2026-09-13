@@ -10,10 +10,10 @@
 package memwatch
 
 import (
-	"context"
-	"log"
-	"runtime"
-	"time"
+    "context"
+    "log"
+    "runtime"
+    "time"
 )
 
 // DefaultPeriod is the log cadence: one line a minute keeps the
@@ -25,20 +25,20 @@ const DefaultPeriod = time.Minute
 // the ticker owns the rhythm. A nil logger or a non positive period
 // disables the watch.
 func Watch(ctx context.Context, logger *log.Logger, period time.Duration) {
-	if logger == nil || period <= 0 {
-		return
-	}
-	writeLine(logger)
-	ticker := time.NewTicker(period)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			writeLine(logger)
-		}
-	}
+    if logger == nil || period <= 0 {
+        return
+    }
+    writeLine(logger)
+    ticker := time.NewTicker(period)
+    defer ticker.Stop()
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
+            writeLine(logger)
+        }
+    }
 }
 
 // writeLine renders one footprint line: the live heap, the runtime
@@ -47,9 +47,9 @@ func Watch(ctx context.Context, logger *log.Logger, period time.Duration) {
 // keeps the small single bot runs readable while the fleet sizes
 // round fine.
 func writeLine(logger *log.Logger) {
-	var mem runtime.MemStats
-	runtime.ReadMemStats(&mem)
-	logger.Printf("Memory: heap %.1f MB, sys %.1f MB, goroutines %d, gc %d",
-		float64(mem.HeapAlloc)/(1<<20), float64(mem.Sys)/(1<<20),
-		runtime.NumGoroutine(), mem.NumGC)
+    var mem runtime.MemStats
+    runtime.ReadMemStats(&mem)
+    logger.Printf("Memory: heap %.1f MB, sys %.1f MB, goroutines %d, gc %d",
+        float64(mem.HeapAlloc)/(1<<20), float64(mem.Sys)/(1<<20),
+        runtime.NumGoroutine(), mem.NumGC)
 }

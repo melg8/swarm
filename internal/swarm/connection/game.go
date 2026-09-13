@@ -5,32 +5,32 @@
 package connection
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"log"
-	"net"
-	"os"
-	"strconv"
-	"sync"
-	"sync/atomic"
-	"time"
+    "context"
+    "errors"
+    "fmt"
+    "log"
+    "net"
+    "os"
+    "strconv"
+    "sync"
+    "sync/atomic"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/crypt"
-	"github.com/melg8/swarm/internal/swarm/gear"
-	fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
-	togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
-	"github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/crypt"
+    "github.com/melg8/swarm/internal/swarm/gear"
+    fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
+    togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // Protocol constants.
 const (
-	gamePingPeriod    = 25 * time.Second
-	gameWriteTimeout  = 10 * time.Second
-	gameHandshakeWait = 30 * time.Second
-	packetChanSize    = 32
-	bufferInitialSize = 4096
+    gamePingPeriod    = 25 * time.Second
+    gameWriteTimeout  = 10 * time.Second
+    gameHandshakeWait = 30 * time.Second
+    packetChanSize    = 32
+    bufferInitialSize = 4096
 )
 
 // gameSilenceTimeout bounds the absolute packet silence of a live
@@ -56,127 +56,127 @@ var gameSilenceTimeout = 3 * time.Minute
 // allows one select per 3 seconds (30 game ticks of 100 ms), which the
 // 5 second wait between attempts respects.
 const (
-	charSelectWait     = 5 * time.Second
-	charSelectAttempts = 3
-	charCreateOkWait   = 2 * time.Second
+    charSelectWait     = 5 * time.Second
+    charSelectAttempts = 3
+    charCreateOkWait   = 2 * time.Second
 )
 
 // Packet ids used by the game flow state machine.
 const (
-	charSelectInfoID  = 0x1F
-	charCreateOkID    = 0x25
-	charCreateFailID  = 0x26
-	charSelectedID    = 0x21
-	userInfoID        = 0x04
-	leaveWorldID      = 0x96
-	serverCloseID     = 0x36
-	netPingResponseID = 0xEC
+    charSelectInfoID  = 0x1F
+    charCreateOkID    = 0x25
+    charCreateFailID  = 0x26
+    charSelectedID    = 0x21
+    userInfoID        = 0x04
+    leaveWorldID      = 0x96
+    serverCloseID     = 0x36
+    netPingResponseID = 0xEC
 )
 
 // Packet ids of the observed world packets.
 const (
-	moveToLocationID   = 0x01
-	charInfoID         = 0x03
-	attackID           = 0x06
-	spawnItemID        = 0x15
-	npcHTMLMessageID   = 0x1B
-	dropItemID         = 0x16
-	getItemID          = 0x17
-	statusUpdateID     = 0x1A
-	deleteObjectID     = 0x1E
-	npcInfoID          = 0x22
-	itemListID         = 0x27
-	inventoryUpdateID  = 0x37
-	changeMoveTypeID   = 0x3E
-	changeWaitTypeID   = 0x3F
-	targetSelectedID   = 0x39
-	targetUnselectedID = 0x3A
-	autoAttackStartID  = 0x3B
-	autoAttackStopID   = 0x3C
-	teleportID         = 0x38
-	stopMoveID         = 0x59
-	moveToPawnID       = 0x75
-	validateLocationID = 0x76
-	beginRotationID    = 0x77
-	stopRotationID     = 0x78
-	myTargetSelectedID = 0xBF
-	systemMessageID    = 0x7A
-	skillListID        = 0x6D
-	questListID        = 0x98
-	abnormalStatusID   = 0x97
-	socialActionID     = 0x3D
-	actionFailedID     = 0x35
+    moveToLocationID   = 0x01
+    charInfoID         = 0x03
+    attackID           = 0x06
+    spawnItemID        = 0x15
+    npcHTMLMessageID   = 0x1B
+    dropItemID         = 0x16
+    getItemID          = 0x17
+    statusUpdateID     = 0x1A
+    deleteObjectID     = 0x1E
+    npcInfoID          = 0x22
+    itemListID         = 0x27
+    inventoryUpdateID  = 0x37
+    changeMoveTypeID   = 0x3E
+    changeWaitTypeID   = 0x3F
+    targetSelectedID   = 0x39
+    targetUnselectedID = 0x3A
+    autoAttackStartID  = 0x3B
+    autoAttackStopID   = 0x3C
+    teleportID         = 0x38
+    stopMoveID         = 0x59
+    moveToPawnID       = 0x75
+    validateLocationID = 0x76
+    beginRotationID    = 0x77
+    stopRotationID     = 0x78
+    myTargetSelectedID = 0xBF
+    systemMessageID    = 0x7A
+    skillListID        = 0x6D
+    questListID        = 0x98
+    abnormalStatusID   = 0x97
+    socialActionID     = 0x3D
+    actionFailedID     = 0x35
 )
 
 // GameSessionParams carries the login session keys for the game server.
 type GameSessionParams struct {
-	Account    string
-	LoginOkID1 int32
-	LoginOkID2 int32
-	PlayOkID1  int32
-	PlayOkID2  int32
+    Account    string
+    LoginOkID1 int32
+    LoginOkID2 int32
+    PlayOkID1  int32
+    PlayOkID2  int32
 }
 
 // CharacterParams describes the character the bot wants to play.
 type CharacterParams struct {
-	Name      string
-	Race      int32
-	Female    int32
-	ClassID   int32
-	HairStyle int32
-	HairColor int32
-	Face      int32
+    Name      string
+    Race      int32
+    Female    int32
+    ClassID   int32
+    HairStyle int32
+    HairColor int32
+    Face      int32
 }
 
 // GameClient drives a game server session of the Mobius C1 protocol.
 type GameClient struct {
-	conn           net.Conn
-	crypt          *crypt.GameCrypt
-	writeMu        sync.Mutex
-	logger         *log.Logger
-	trace          bool
-	packetCount    atomic.Int64
-	readBuf        []byte
-	tracker        *state.Bot
-	tap            func(payload []byte)
-	rawWriteBuf    []byte
-	npcInfo        fromgameserver.NpcInfoPacket
-	userInfo       fromgameserver.UserInfoPacket
-	charInfo       fromgameserver.CharInfoPacket
-	moveTo         fromgameserver.MoveToLocationPacket
-	moveToPawn     fromgameserver.MoveToPawnPacket
-	stopMove       fromgameserver.StopMovePacket
-	validateLoc    fromgameserver.ValidateLocationPacket
-	deleted        fromgameserver.DeleteObjectPacket
-	dropItem       fromgameserver.DropItemPacket
-	spawnItem      fromgameserver.SpawnItemPacket
-	getItem        fromgameserver.GetItemPacket
-	statusUpd      fromgameserver.StatusUpdatePacket
-	attack         fromgameserver.AttackPacket
-	attackStart    fromgameserver.AutoAttackStartPacket
-	attackStop     fromgameserver.AutoAttackStopPacket
-	beginRotation  fromgameserver.BeginRotationPacket
-	stopRotation   fromgameserver.StopRotationPacket
-	changeMoveType fromgameserver.ChangeMoveTypePacket
-	changeWait     fromgameserver.ChangeWaitTypePacket
-	teleport       fromgameserver.TeleportToLocationPacket
-	myTarget       fromgameserver.MyTargetSelectedPacket
-	targetSelected fromgameserver.TargetSelectedPacket
-	targetDropped  fromgameserver.TargetUnselectedPacket
-	systemMessage  fromgameserver.SystemMessagePacket
-	socialAction   fromgameserver.SocialActionPacket
-	actionFailed   fromgameserver.ActionFailedPacket
-	itemList       fromgameserver.ItemListPacket
-	invUpdate      fromgameserver.InventoryUpdatePacket
-	skillList      fromgameserver.SkillListPacket
-	questList      fromgameserver.QuestListPacket
-	abnormalStatus fromgameserver.AbnormalStatusUpdatePacket
-	npcHTML        fromgameserver.NpcHTMLMessage
-	invItems       []state.InventoryItem
-	skills         []state.LearnedSkill
-	statusAttrs    [statusAttrsCapacity]state.Attribute
-	htmlMu         sync.Mutex
-	lastHTML       fromgameserver.NpcHTMLMessage
+    conn           net.Conn
+    crypt          *crypt.GameCrypt
+    writeMu        sync.Mutex
+    logger         *log.Logger
+    trace          bool
+    packetCount    atomic.Int64
+    readBuf        []byte
+    tracker        *state.Bot
+    tap            func(payload []byte)
+    rawWriteBuf    []byte
+    npcInfo        fromgameserver.NpcInfoPacket
+    userInfo       fromgameserver.UserInfoPacket
+    charInfo       fromgameserver.CharInfoPacket
+    moveTo         fromgameserver.MoveToLocationPacket
+    moveToPawn     fromgameserver.MoveToPawnPacket
+    stopMove       fromgameserver.StopMovePacket
+    validateLoc    fromgameserver.ValidateLocationPacket
+    deleted        fromgameserver.DeleteObjectPacket
+    dropItem       fromgameserver.DropItemPacket
+    spawnItem      fromgameserver.SpawnItemPacket
+    getItem        fromgameserver.GetItemPacket
+    statusUpd      fromgameserver.StatusUpdatePacket
+    attack         fromgameserver.AttackPacket
+    attackStart    fromgameserver.AutoAttackStartPacket
+    attackStop     fromgameserver.AutoAttackStopPacket
+    beginRotation  fromgameserver.BeginRotationPacket
+    stopRotation   fromgameserver.StopRotationPacket
+    changeMoveType fromgameserver.ChangeMoveTypePacket
+    changeWait     fromgameserver.ChangeWaitTypePacket
+    teleport       fromgameserver.TeleportToLocationPacket
+    myTarget       fromgameserver.MyTargetSelectedPacket
+    targetSelected fromgameserver.TargetSelectedPacket
+    targetDropped  fromgameserver.TargetUnselectedPacket
+    systemMessage  fromgameserver.SystemMessagePacket
+    socialAction   fromgameserver.SocialActionPacket
+    actionFailed   fromgameserver.ActionFailedPacket
+    itemList       fromgameserver.ItemListPacket
+    invUpdate      fromgameserver.InventoryUpdatePacket
+    skillList      fromgameserver.SkillListPacket
+    questList      fromgameserver.QuestListPacket
+    abnormalStatus fromgameserver.AbnormalStatusUpdatePacket
+    npcHTML        fromgameserver.NpcHTMLMessage
+    invItems       []state.InventoryItem
+    skills         []state.LearnedSkill
+    statusAttrs    [statusAttrsCapacity]state.Attribute
+    htmlMu         sync.Mutex
+    lastHTML       fromgameserver.NpcHTMLMessage
 }
 
 // statusAttrsCapacity bounds the scratch attributes of status updates.
@@ -189,14 +189,14 @@ const packetTraceEnv = "SWARM_TRACE_PACKETS"
 // gameBuffer is the pooled receive buffer of the read loop. A pointer type
 // keeps sync.Pool arguments pointer-like and allocation free.
 type gameBuffer struct {
-	data []byte
+    data []byte
 }
 
 // bufferPool recycles receive buffers of the read loop.
 var bufferPool = sync.Pool{
-	New: func() any {
-		return &gameBuffer{data: make([]byte, 0, bufferInitialSize)}
-	},
+    New: func() any {
+        return &gameBuffer{data: make([]byte, 0, bufferInitialSize)}
+    },
 }
 
 // NewGameClient wraps a game server connection and performs the protocol
@@ -205,101 +205,101 @@ var bufferPool = sync.Pool{
 // The constructor initializes every reusable packet struct (the
 // exhaustruct convention), which exceeds the line budget.
 func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
-	client := &GameClient{
-		conn:           conn,
-		crypt:          nil,
-		writeMu:        sync.Mutex{},
-		logger:         log.Default(),
-		trace:          os.Getenv(packetTraceEnv) != "",
-		packetCount:    atomic.Int64{},
-		readBuf:        nil,
-		tracker:        nil,
-		tap:            nil,
-		rawWriteBuf:    nil,
-		npcInfo:        *fromgameserver.NewNpcInfoPacket(),
-		userInfo:       *fromgameserver.NewUserInfoPacket(),
-		charInfo:       *fromgameserver.NewCharInfoPacket(),
-		moveTo:         *fromgameserver.NewMoveToLocationPacket(),
-		moveToPawn:     *fromgameserver.NewMoveToPawnPacket(),
-		stopMove:       *fromgameserver.NewStopMovePacket(),
-		validateLoc:    *fromgameserver.NewValidateLocationPacket(),
-		deleted:        *fromgameserver.NewDeleteObjectPacket(),
-		dropItem:       *fromgameserver.NewDropItemPacket(),
-		spawnItem:      *fromgameserver.NewSpawnItemPacket(),
-		getItem:        *fromgameserver.NewGetItemPacket(),
-		statusUpd:      *fromgameserver.NewStatusUpdatePacket(),
-		attack:         *fromgameserver.NewAttackPacket(),
-		attackStart:    *fromgameserver.NewAutoAttackStartPacket(),
-		attackStop:     *fromgameserver.NewAutoAttackStopPacket(),
-		beginRotation:  *fromgameserver.NewBeginRotationPacket(),
-		stopRotation:   *fromgameserver.NewStopRotationPacket(),
-		changeMoveType: *fromgameserver.NewChangeMoveTypePacket(),
-		changeWait:     *fromgameserver.NewChangeWaitTypePacket(),
-		teleport:       *fromgameserver.NewTeleportToLocationPacket(),
-		myTarget:       *fromgameserver.NewMyTargetSelectedPacket(),
-		targetSelected: *fromgameserver.NewTargetSelectedPacket(),
-		targetDropped:  *fromgameserver.NewTargetUnselectedPacket(),
-		systemMessage:  *fromgameserver.NewSystemMessagePacket(),
-		socialAction:   *fromgameserver.NewSocialActionPacket(),
-		actionFailed:   *fromgameserver.NewActionFailedPacket(),
-		itemList:       *fromgameserver.NewItemListPacket(),
-		invUpdate:      *fromgameserver.NewInventoryUpdatePacket(),
-		skillList:      *fromgameserver.NewSkillListPacket(),
-		questList:      *fromgameserver.NewQuestListPacket(),
-		abnormalStatus: *fromgameserver.NewAbnormalStatusUpdatePacket(),
-		invItems:       nil,
-		skills:         nil,
-		statusAttrs:    [statusAttrsCapacity]state.Attribute{},
-	}
+    client := &GameClient{
+        conn:           conn,
+        crypt:          nil,
+        writeMu:        sync.Mutex{},
+        logger:         log.Default(),
+        trace:          os.Getenv(packetTraceEnv) != "",
+        packetCount:    atomic.Int64{},
+        readBuf:        nil,
+        tracker:        nil,
+        tap:            nil,
+        rawWriteBuf:    nil,
+        npcInfo:        *fromgameserver.NewNpcInfoPacket(),
+        userInfo:       *fromgameserver.NewUserInfoPacket(),
+        charInfo:       *fromgameserver.NewCharInfoPacket(),
+        moveTo:         *fromgameserver.NewMoveToLocationPacket(),
+        moveToPawn:     *fromgameserver.NewMoveToPawnPacket(),
+        stopMove:       *fromgameserver.NewStopMovePacket(),
+        validateLoc:    *fromgameserver.NewValidateLocationPacket(),
+        deleted:        *fromgameserver.NewDeleteObjectPacket(),
+        dropItem:       *fromgameserver.NewDropItemPacket(),
+        spawnItem:      *fromgameserver.NewSpawnItemPacket(),
+        getItem:        *fromgameserver.NewGetItemPacket(),
+        statusUpd:      *fromgameserver.NewStatusUpdatePacket(),
+        attack:         *fromgameserver.NewAttackPacket(),
+        attackStart:    *fromgameserver.NewAutoAttackStartPacket(),
+        attackStop:     *fromgameserver.NewAutoAttackStopPacket(),
+        beginRotation:  *fromgameserver.NewBeginRotationPacket(),
+        stopRotation:   *fromgameserver.NewStopRotationPacket(),
+        changeMoveType: *fromgameserver.NewChangeMoveTypePacket(),
+        changeWait:     *fromgameserver.NewChangeWaitTypePacket(),
+        teleport:       *fromgameserver.NewTeleportToLocationPacket(),
+        myTarget:       *fromgameserver.NewMyTargetSelectedPacket(),
+        targetSelected: *fromgameserver.NewTargetSelectedPacket(),
+        targetDropped:  *fromgameserver.NewTargetUnselectedPacket(),
+        systemMessage:  *fromgameserver.NewSystemMessagePacket(),
+        socialAction:   *fromgameserver.NewSocialActionPacket(),
+        actionFailed:   *fromgameserver.NewActionFailedPacket(),
+        itemList:       *fromgameserver.NewItemListPacket(),
+        invUpdate:      *fromgameserver.NewInventoryUpdatePacket(),
+        skillList:      *fromgameserver.NewSkillListPacket(),
+        questList:      *fromgameserver.NewQuestListPacket(),
+        abnormalStatus: *fromgameserver.NewAbnormalStatusUpdatePacket(),
+        invItems:       nil,
+        skills:         nil,
+        statusAttrs:    [statusAttrsCapacity]state.Attribute{},
+    }
 
-	writer := packet.NewWriter()
-	if err := togameserver.NewProtocolVersion().ToBytes(writer); err != nil {
-		return nil, fmt.Errorf("failed to serialize protocol version: %w", err)
-	}
-	if err := writeWirePacket(conn, writer.Bytes()); err != nil {
-		return nil, fmt.Errorf("failed to send protocol version: %w", err)
-	}
-	client.logger.Printf("Sent protocol version %d",
-		togameserver.C1ProtocolVersion)
+    writer := packet.NewWriter()
+    if err := togameserver.NewProtocolVersion().ToBytes(writer); err != nil {
+        return nil, fmt.Errorf("failed to serialize protocol version: %w", err)
+    }
+    if err := writeWirePacket(conn, writer.Bytes()); err != nil {
+        return nil, fmt.Errorf("failed to send protocol version: %w", err)
+    }
+    client.logger.Printf("Sent protocol version %d",
+        togameserver.C1ProtocolVersion)
 
-	if err := conn.SetReadDeadline(time.Now().Add(gameHandshakeWait)); err != nil {
-		return nil, fmt.Errorf("failed to set read deadline: %w", err)
-	}
-	payload, err := readWirePacket(conn, client.readBuf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read key packet: %w", err)
-	}
-	client.readBuf = payload
+    if err := conn.SetReadDeadline(time.Now().Add(gameHandshakeWait)); err != nil {
+        return nil, fmt.Errorf("failed to set read deadline: %w", err)
+    }
+    payload, err := readWirePacket(conn, client.readBuf)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read key packet: %w", err)
+    }
+    client.readBuf = payload
 
-	keyPacket := fromgameserver.NewKeyPacket()
-	if err := fromgameserver.ParseKeyPacket(keyPacket, payload); err != nil {
-		return nil, fmt.Errorf("failed to parse key packet: %w", err)
-	}
-	if !keyPacket.Ok() {
-		return nil, errors.New("game server rejected the protocol version")
-	}
+    keyPacket := fromgameserver.NewKeyPacket()
+    if err := fromgameserver.ParseKeyPacket(keyPacket, payload); err != nil {
+        return nil, fmt.Errorf("failed to parse key packet: %w", err)
+    }
+    if !keyPacket.Ok() {
+        return nil, errors.New("game server rejected the protocol version")
+    }
 
-	client.crypt = crypt.NewGameCrypt(keyPacket.Key)
-	client.crypt.Enable()
-	client.logger.Printf("Game server %d accepted the protocol",
-		keyPacket.ServerID)
+    client.crypt = crypt.NewGameCrypt(keyPacket.Key)
+    client.crypt.Enable()
+    client.logger.Printf("Game server %d accepted the protocol",
+        keyPacket.ServerID)
 
-	if err := conn.SetReadDeadline(time.Time{}); err != nil {
-		return nil, fmt.Errorf("failed to reset read deadline: %w", err)
-	}
+    if err := conn.SetReadDeadline(time.Time{}); err != nil {
+        return nil, fmt.Errorf("failed to reset read deadline: %w", err)
+    }
 
-	return client, nil
+    return client, nil
 }
 
 // SetLogger overrides the default logger of the client.
 func (gc *GameClient) SetLogger(logger *log.Logger) {
-	gc.logger = logger
+    gc.logger = logger
 }
 
 // SetTracker attaches the state tracker that observes the session. The
 // tracker is optional; without it the client only logs packets.
 func (gc *GameClient) SetTracker(tracker *state.Bot) {
-	gc.tracker = tracker
+    gc.tracker = tracker
 }
 
 // SetTap installs a callback that observes every decrypted server packet
@@ -309,7 +309,7 @@ func (gc *GameClient) SetTracker(tracker *state.Bot) {
 // buffer is reused by the next read. The proxy server installs the
 // history recorder here.
 func (gc *GameClient) SetTap(tap func(payload []byte)) {
-	gc.tap = tap
+    gc.tap = tap
 }
 
 // SendRaw sends a raw decrypted client packet payload (opcode and body,
@@ -318,38 +318,38 @@ func (gc *GameClient) SetTap(tap func(payload []byte)) {
 // critical section so hunt loop actions and proxied client packets keep
 // one consistent outbound cipher chain.
 func (gc *GameClient) SendRaw(payload []byte) error {
-	if len(payload) == 0 {
-		return nil
-	}
-	if gc.trace {
-		gc.logger.Printf("Sent raw packet id 0x%02x", payload[0])
-	}
+    if len(payload) == 0 {
+        return nil
+    }
+    if gc.trace {
+        gc.logger.Printf("Sent raw packet id 0x%02x", payload[0])
+    }
 
-	gc.writeMu.Lock()
-	defer gc.writeMu.Unlock()
+    gc.writeMu.Lock()
+    defer gc.writeMu.Unlock()
 
-	// The encryption transforms the buffer in place and the payload
-	// may be backed by a shared proxy buffer, so it is copied into the
-	// reusable outbound scratch first.
-	wire := make([]byte, 0, len(payload))
-	wire = append(wire, payload...)
-	gc.rawWriteBuf = wire
-	gc.crypt.Encrypt(wire)
+    // The encryption transforms the buffer in place and the payload
+    // may be backed by a shared proxy buffer, so it is copied into the
+    // reusable outbound scratch first.
+    wire := make([]byte, 0, len(payload))
+    wire = append(wire, payload...)
+    gc.rawWriteBuf = wire
+    gc.crypt.Encrypt(wire)
 
-	if err := gc.conn.SetWriteDeadline(
-		time.Now().Add(gameWriteTimeout)); err != nil {
-		return fmt.Errorf("failed to set write deadline: %w", err)
-	}
-	if err := writeWirePacket(gc.conn, wire); err != nil {
-		return fmt.Errorf("failed to send raw game packet: %w", err)
-	}
+    if err := gc.conn.SetWriteDeadline(
+        time.Now().Add(gameWriteTimeout)); err != nil {
+        return fmt.Errorf("failed to set write deadline: %w", err)
+    }
+    if err := writeWirePacket(gc.conn, wire); err != nil {
+        return fmt.Errorf("failed to send raw game packet: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // PacketCount returns the number of packets received so far.
 func (gc *GameClient) PacketCount() int {
-	return int(gc.packetCount.Load())
+    return int(gc.packetCount.Load())
 }
 
 // AttackTarget repeats the attack request for a target that is already
@@ -357,60 +357,60 @@ func (gc *GameClient) PacketCount() int {
 // resolves it to onForcedAttack and notifies the player AI with the
 // ATTACK intention, which starts the chase and the auto attack.
 func (gc *GameClient) AttackTarget(objectID int32) error {
-	if objectID == 0 {
-		return nil
-	}
-	x, y, z, ok := gc.tracker.ObjectPosition(objectID)
-	if !ok {
-		return fmt.Errorf("failed to attack target %d: object unknown", objectID)
-	}
-	if err := gc.sendAttackRequest(objectID, x, y, z); err != nil {
-		return fmt.Errorf("failed to attack: %w", err)
-	}
+    if objectID == 0 {
+        return nil
+    }
+    x, y, z, ok := gc.tracker.ObjectPosition(objectID)
+    if !ok {
+        return fmt.Errorf("failed to attack target %d: object unknown", objectID)
+    }
+    if err := gc.sendAttackRequest(objectID, x, y, z); err != nil {
+        return fmt.Errorf("failed to attack: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // sendAttackRequest serializes and sends one AttackRequest packet.
 func (gc *GameClient) sendAttackRequest(
-	targetID int32, x int32, y int32, z int32,
+    targetID int32, x int32, y int32, z int32,
 ) error {
-	request := togameserver.NewAttackRequestPacket()
-	request.TargetID = targetID
-	request.X = x
-	request.Y = y
-	request.Z = z
+    request := togameserver.NewAttackRequestPacket()
+    request.TargetID = targetID
+    request.X = x
+    request.Y = y
+    request.Z = z
 
-	return gc.sendPacket(request)
+    return gc.sendPacket(request)
 }
 
 // PickupItem clicks a ground item: the server walks the character to it
 // and adds it to the inventory (the movement is broadcast as
 // MoveToLocation and the pickup as GetItem with a StopMove to self).
 func (gc *GameClient) PickupItem(item state.LootItem) error {
-	request := togameserver.NewActionRequestPacket()
-	request.ObjectID = item.ObjectID
-	request.X = item.X
-	request.Y = item.Y
-	request.Z = item.Z
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to pick up item: %w", err)
-	}
-	gc.tracker.RecordEvent("picking up " + item.Name)
+    request := togameserver.NewActionRequestPacket()
+    request.ObjectID = item.ObjectID
+    request.X = item.X
+    request.Y = item.Y
+    request.Z = item.Z
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to pick up item: %w", err)
+    }
+    gc.tracker.RecordEvent("picking up " + item.Name)
 
-	return nil
+    return nil
 }
 
 // DestroyItem destroys inventory items to free slots or weight.
 func (gc *GameClient) DestroyItem(objectID int32, count int32) error {
-	request := togameserver.NewRequestDestroyItem()
-	request.ObjectID = objectID
-	request.Count = count
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to destroy item: %w", err)
-	}
+    request := togameserver.NewRequestDestroyItem()
+    request.ObjectID = objectID
+    request.Count = count
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to destroy item: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // UseItem uses an inventory item. Equippable items toggle their
@@ -419,14 +419,14 @@ func (gc *GameClient) DestroyItem(objectID int32, count int32) error {
 // handler. The web UI drives it from the equipment widget: double
 // click and drag-and-drop of the cells.
 func (gc *GameClient) UseItem(objectID int32) error {
-	request := togameserver.NewRequestUseItem()
-	request.ObjectID = objectID
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to use item: %w", err)
-	}
-	gc.tracker.RecordEvent("using item " + strconv.Itoa(int(objectID)))
+    request := togameserver.NewRequestUseItem()
+    request.ObjectID = objectID
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to use item: %w", err)
+    }
+    gc.tracker.RecordEvent("using item " + strconv.Itoa(int(objectID)))
 
-	return nil
+    return nil
 }
 
 // DropItem drops an inventory item on the ground at the given world
@@ -435,21 +435,21 @@ func (gc *GameClient) UseItem(objectID int32) error {
 // character position. Stackable items drop a partial stack through the
 // count, the server splits the stack itself.
 func (gc *GameClient) DropItem(
-	objectID int32, count int32, x int32, y int32, z int32,
+    objectID int32, count int32, x int32, y int32, z int32,
 ) error {
-	request := togameserver.NewRequestDropItem()
-	request.ObjectID = objectID
-	request.Count = count
-	request.X = x
-	request.Y = y
-	request.Z = z
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to drop item: %w", err)
-	}
-	gc.tracker.RecordEvent("dropping " + strconv.Itoa(int(count)) +
-		" of item " + strconv.Itoa(int(objectID)))
+    request := togameserver.NewRequestDropItem()
+    request.ObjectID = objectID
+    request.Count = count
+    request.X = x
+    request.Y = y
+    request.Z = z
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to drop item: %w", err)
+    }
+    gc.tracker.RecordEvent("dropping " + strconv.Itoa(int(count)) +
+        " of item " + strconv.Itoa(int(objectID)))
 
-	return nil
+    return nil
 }
 
 // SellItems sells inventory items to the targeted merchant. The packet
@@ -457,21 +457,21 @@ func (gc *GameClient) DropItem(
 // 0): the server prices every item itself at referencePrice/2, answers
 // with InventoryUpdate removals and adds the adena.
 func (gc *GameClient) SellItems(items []state.InventoryItem) error {
-	request := togameserver.NewRequestSellItemPacket()
-	entries := make([]togameserver.SellItemEntry, 0, len(items))
-	for _, item := range items {
-		entries = append(entries, togameserver.SellItemEntry{
-			ObjectID: item.ObjectID,
-			ItemID:   item.ItemID,
-			Count:    item.Count,
-		})
-	}
-	request.Items = entries
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to sell items: %w", err)
-	}
+    request := togameserver.NewRequestSellItemPacket()
+    entries := make([]togameserver.SellItemEntry, 0, len(items))
+    for _, item := range items {
+        entries = append(entries, togameserver.SellItemEntry{
+            ObjectID: item.ObjectID,
+            ItemID:   item.ItemID,
+            Count:    item.Count,
+        })
+    }
+    request.Items = entries
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to sell items: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // BuyItems buys items from the buylist of the targeted merchant. The
@@ -481,30 +481,30 @@ func (gc *GameClient) SellItems(items []state.InventoryItem) error {
 // Buying shares the transaction flood protector with selling, so the
 // caller paces it like the sell batches.
 func (gc *GameClient) BuyItems(listID int32, items []gear.Purchase) error {
-	request := togameserver.NewRequestBuyItemPacket()
-	request.ListID = listID
-	entries := make([]togameserver.BuyItemEntry, 0, len(items))
-	for _, item := range items {
-		entries = append(entries, togameserver.BuyItemEntry{
-			ItemID: item.ItemID,
-			Count:  item.Count,
-		})
-	}
-	request.Items = entries
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to buy items: %w", err)
-	}
+    request := togameserver.NewRequestBuyItemPacket()
+    request.ListID = listID
+    entries := make([]togameserver.BuyItemEntry, 0, len(items))
+    for _, item := range items {
+        entries = append(entries, togameserver.BuyItemEntry{
+            ItemID: item.ItemID,
+            Count:  item.Count,
+        })
+    }
+    request.Items = entries
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to buy items: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // RequestInventory asks the server for the full inventory list.
 func (gc *GameClient) RequestInventory() error {
-	if err := gc.sendPacket(&togameserver.RequestItemList{}); err != nil {
-		return fmt.Errorf("failed to request item list: %w", err)
-	}
+    if err := gc.sendPacket(&togameserver.RequestItemList{}); err != nil {
+        return fmt.Errorf("failed to request item list: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // ActionSitStand toggles between sitting and standing (RequestActionUse
@@ -512,13 +512,13 @@ func (gc *GameClient) RequestInventory() error {
 // regeneration is faster. The server refuses the transition while
 // moving, casting or attacking, so the caller sends it only while idle.
 func (gc *GameClient) ActionSitStand() error {
-	request := togameserver.NewRequestActionUsePacket()
-	request.ActionID = togameserver.ActionSitStand
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to send action use: %w", err)
-	}
+    request := togameserver.NewRequestActionUsePacket()
+    request.ActionID = togameserver.ActionSitStand
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to send action use: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // ClickObject selects a world object through the plain client click
@@ -528,25 +528,25 @@ func (gc *GameClient) ActionSitStand() error {
 // that. The hunt loop clicks the skill teacher with it before the
 // lesson requests.
 func (gc *GameClient) ClickObject(objectID int32) error {
-	if objectID == 0 {
-		return nil
-	}
-	x, y, z, ok := gc.tracker.ObjectPosition(objectID)
-	if !ok {
-		return fmt.Errorf(
-			"failed to click object %d: object unknown", objectID)
-	}
-	request := togameserver.NewActionRequestPacket()
-	request.ObjectID = objectID
-	request.X = x
-	request.Y = y
-	request.Z = z
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to click object: %w", err)
-	}
-	gc.tracker.RecordEvent("talking to the teacher")
+    if objectID == 0 {
+        return nil
+    }
+    x, y, z, ok := gc.tracker.ObjectPosition(objectID)
+    if !ok {
+        return fmt.Errorf(
+            "failed to click object %d: object unknown", objectID)
+    }
+    request := togameserver.NewActionRequestPacket()
+    request.ObjectID = objectID
+    request.X = x
+    request.Y = y
+    request.Z = z
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to click object: %w", err)
+    }
+    gc.tracker.RecordEvent("talking to the teacher")
 
-	return nil
+    return nil
 }
 
 // ClearTarget drops the selection a conversation with an npc left
@@ -561,25 +561,25 @@ func (gc *GameClient) ClickObject(objectID int32) error {
 // stop finishes talking, so the leftover villager selection never
 // reaches the hunting engage.
 func (gc *GameClient) ClearTarget() error {
-	objectID := gc.tracker.SelfObjectID()
-	if objectID == 0 || gc.tracker.SelfTargetID() == 0 {
-		return nil
-	}
-	x, y, z, ok := gc.tracker.SelfPosition()
-	if !ok {
-		x, y, z = 0, 0, 0
-	}
-	request := togameserver.NewActionRequestPacket()
-	request.ObjectID = objectID
-	request.X = x
-	request.Y = y
-	request.Z = z
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to clear the target: %w", err)
-	}
-	gc.tracker.RecordEvent("clearing the target after the talk")
+    objectID := gc.tracker.SelfObjectID()
+    if objectID == 0 || gc.tracker.SelfTargetID() == 0 {
+        return nil
+    }
+    x, y, z, ok := gc.tracker.SelfPosition()
+    if !ok {
+        x, y, z = 0, 0, 0
+    }
+    request := togameserver.NewActionRequestPacket()
+    request.ObjectID = objectID
+    request.X = x
+    request.Y = y
+    request.Z = z
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to clear the target: %w", err)
+    }
+    gc.tracker.RecordEvent("clearing the target after the talk")
 
-	return nil
+    return nil
 }
 
 // AcquireSkill learns one lesson of the class skill tree at the
@@ -587,16 +587,16 @@ func (gc *GameClient) ClearTarget() error {
 // charges the SP, consumes the required skill book and answers with
 // a fresh SkillList.
 func (gc *GameClient) AcquireSkill(skillID int32, level int32) error {
-	request := togameserver.NewRequestAcquireSkillPacket()
-	request.SkillID = skillID
-	request.Level = level
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to acquire skill: %w", err)
-	}
-	gc.tracker.RecordEvent(fmt.Sprintf(
-		"learning skill %d level %d", skillID, level))
+    request := togameserver.NewRequestAcquireSkillPacket()
+    request.SkillID = skillID
+    request.Level = level
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to acquire skill: %w", err)
+    }
+    gc.tracker.RecordEvent(fmt.Sprintf(
+        "learning skill %d level %d", skillID, level))
 
-	return nil
+    return nil
 }
 
 // UseMagicSkill casts a learned active skill: a strike at the
@@ -604,13 +604,13 @@ func (gc *GameClient) AcquireSkill(skillID int32, level int32) error {
 // cast flow (the range check, the mana cost, the reuse delay) and
 // answers the refusals with ActionFailed.
 func (gc *GameClient) UseMagicSkill(skillID int32) error {
-	request := togameserver.NewRequestMagicSkillUsePacket()
-	request.SkillID = skillID
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to use magic skill: %w", err)
-	}
+    request := togameserver.NewRequestMagicSkillUsePacket()
+    request.SkillID = skillID
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to use magic skill: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // RestartAtVillage revives a dead character at the nearest village
@@ -618,13 +618,13 @@ func (gc *GameClient) UseMagicSkill(skillID int32) error {
 // (RequestRestartPoint 0x6D type 0). The server refuses the request
 // while the character is alive, so the caller sends it only after death.
 func (gc *GameClient) RestartAtVillage() error {
-	request := togameserver.NewRequestRestartPointPacket()
-	request.PointType = togameserver.RestartTypeVillage
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to send restart point: %w", err)
-	}
+    request := togameserver.NewRequestRestartPointPacket()
+    request.PointType = togameserver.RestartTypeVillage
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to send restart point: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // WalkTo makes the character walk to a world point, exactly like a
@@ -633,23 +633,23 @@ func (gc *GameClient) RestartAtVillage() error {
 // the Mobius C1 server has no click handler for ground items, so the
 // character would otherwise never move toward the loot by itself.
 func (gc *GameClient) WalkTo(x int32, y int32, z int32) error {
-	selfX, selfY, selfZ, ok := gc.tracker.SelfPosition()
-	if !ok {
-		return errors.New("failed to walk: own position is unknown")
-	}
-	request := togameserver.NewMoveToLocationRequestPacket()
-	request.TargetX = x
-	request.TargetY = y
-	request.TargetZ = z
-	request.OriginX = selfX
-	request.OriginY = selfY
-	request.OriginZ = selfZ
-	request.Mode = togameserver.MoveModeMouse
-	if err := gc.sendPacket(request); err != nil {
-		return fmt.Errorf("failed to send move to location: %w", err)
-	}
+    selfX, selfY, selfZ, ok := gc.tracker.SelfPosition()
+    if !ok {
+        return errors.New("failed to walk: own position is unknown")
+    }
+    request := togameserver.NewMoveToLocationRequestPacket()
+    request.TargetX = x
+    request.TargetY = y
+    request.TargetZ = z
+    request.OriginX = selfX
+    request.OriginY = selfY
+    request.OriginZ = selfZ
+    request.Mode = togameserver.MoveModeMouse
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to send move to location: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // sendPacket serializes, encrypts and sends a game server packet. The
@@ -658,137 +658,137 @@ func (gc *GameClient) WalkTo(x int32, y int32, z int32) error {
 // match the wire order exactly (the run loop and the client action
 // callers run on different goroutines).
 func (gc *GameClient) sendPacket(data crypt.Serializable) error {
-	writer := packet.NewWriter()
-	if err := data.ToBytes(writer); err != nil {
-		return fmt.Errorf("failed to serialize game packet: %w", err)
-	}
-	if gc.trace {
-		gc.logger.Printf("Sent packet id 0x%02x", writer.Bytes()[0])
-	}
+    writer := packet.NewWriter()
+    if err := data.ToBytes(writer); err != nil {
+        return fmt.Errorf("failed to serialize game packet: %w", err)
+    }
+    if gc.trace {
+        gc.logger.Printf("Sent packet id 0x%02x", writer.Bytes()[0])
+    }
 
-	gc.writeMu.Lock()
-	defer gc.writeMu.Unlock()
-	gc.crypt.Encrypt(writer.Bytes())
+    gc.writeMu.Lock()
+    defer gc.writeMu.Unlock()
+    gc.crypt.Encrypt(writer.Bytes())
 
-	if err := gc.conn.SetWriteDeadline(
-		time.Now().Add(gameWriteTimeout)); err != nil {
-		return fmt.Errorf("failed to set write deadline: %w", err)
-	}
-	if err := writeWirePacket(gc.conn, writer.Bytes()); err != nil {
-		return fmt.Errorf("failed to send game packet: %w", err)
-	}
+    if err := gc.conn.SetWriteDeadline(
+        time.Now().Add(gameWriteTimeout)); err != nil {
+        return fmt.Errorf("failed to set write deadline: %w", err)
+    }
+    if err := writeWirePacket(gc.conn, writer.Bytes()); err != nil {
+        return fmt.Errorf("failed to send game packet: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // readPacket reads and decrypts the next game server packet payload into
 // the client buffer.
 func (gc *GameClient) readPacket(buf []byte) ([]byte, error) {
-	payload, err := readWirePacket(gc.conn, buf)
-	if err != nil {
-		return nil, err
-	}
+    payload, err := readWirePacket(gc.conn, buf)
+    if err != nil {
+        return nil, err
+    }
 
-	gc.crypt.Decrypt(payload)
-	if len(payload) == 0 {
-		return nil, nil
-	}
-	gc.packetCount.Add(1)
-	if gc.tap != nil {
-		gc.tap(payload)
-	}
+    gc.crypt.Decrypt(payload)
+    if len(payload) == 0 {
+        return nil, nil
+    }
+    gc.packetCount.Add(1)
+    if gc.tap != nil {
+        gc.tap(payload)
+    }
 
-	return payload, nil
+    return payload, nil
 }
 
 // Authenticate sends the game AuthLogin packet and waits for the character
 // list of the account.
 func (gc *GameClient) Authenticate(
-	params GameSessionParams,
+    params GameSessionParams,
 ) (*fromgameserver.CharSelectInfoPacket, error) {
-	if err := gc.sendPacket(&togameserver.AuthLogin{
-		Login:      params.Account,
-		PlayOkID1:  params.PlayOkID1,
-		PlayOkID2:  params.PlayOkID2,
-		LoginOkID1: params.LoginOkID1,
-		LoginOkID2: params.LoginOkID2,
-	}); err != nil {
-		return nil, fmt.Errorf("failed to send auth login: %w", err)
-	}
-	gc.logger.Println("Sent game auth login for account " + params.Account)
+    if err := gc.sendPacket(&togameserver.AuthLogin{
+        Login:      params.Account,
+        PlayOkID1:  params.PlayOkID1,
+        PlayOkID2:  params.PlayOkID2,
+        LoginOkID1: params.LoginOkID1,
+        LoginOkID2: params.LoginOkID2,
+    }); err != nil {
+        return nil, fmt.Errorf("failed to send auth login: %w", err)
+    }
+    gc.logger.Println("Sent game auth login for account " + params.Account)
 
-	payload, err := gc.readPacket(gc.readBuf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read character list: %w", err)
-	}
-	gc.readBuf = payload
-	if len(payload) == 0 {
-		return nil, errors.New("empty character list packet")
-	}
-	if payload[0] != charSelectInfoID {
-		return nil, fmt.Errorf(
-			"unexpected packet id 0x%02x while waiting for characters",
-			payload[0])
-	}
+    payload, err := gc.readPacket(gc.readBuf)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read character list: %w", err)
+    }
+    gc.readBuf = payload
+    if len(payload) == 0 {
+        return nil, errors.New("empty character list packet")
+    }
+    if payload[0] != charSelectInfoID {
+        return nil, fmt.Errorf(
+            "unexpected packet id 0x%02x while waiting for characters",
+            payload[0])
+    }
 
-	charList := fromgameserver.NewCharSelectInfoPacket()
-	if err := fromgameserver.ParseCharSelectInfoPacket(
-		charList, payload); err != nil {
-		return nil, fmt.Errorf("failed to parse character list: %w", err)
-	}
-	gc.logger.Printf("Received character list with %d characters",
-		len(charList.Characters))
+    charList := fromgameserver.NewCharSelectInfoPacket()
+    if err := fromgameserver.ParseCharSelectInfoPacket(
+        charList, payload); err != nil {
+        return nil, fmt.Errorf("failed to parse character list: %w", err)
+    }
+    gc.logger.Printf("Received character list with %d characters",
+        len(charList.Characters))
 
-	return charList, nil
+    return charList, nil
 }
 
 // EnsureCharacter returns the character list that contains the character
 // with the requested name, creating the character first when needed.
 func (gc *GameClient) EnsureCharacter(
-	params CharacterParams,
-	charList *fromgameserver.CharSelectInfoPacket,
+    params CharacterParams,
+    charList *fromgameserver.CharSelectInfoPacket,
 ) (*fromgameserver.CharSelectInfoPacket, error) {
-	if _, _, found := charList.FindCharacterByName(params.Name); found {
-		return charList, nil
-	}
+    if _, _, found := charList.FindCharacterByName(params.Name); found {
+        return charList, nil
+    }
 
-	if err := gc.sendPacket(&togameserver.CharacterCreate{
-		Name:      params.Name,
-		Race:      params.Race,
-		Female:    params.Female,
-		ClassID:   params.ClassID,
-		INT:       0,
-		STR:       0,
-		CON:       0,
-		MEN:       0,
-		DEX:       0,
-		WIT:       0,
-		HairStyle: params.HairStyle,
-		HairColor: params.HairColor,
-		Face:      params.Face,
-	}); err != nil {
-		return nil, fmt.Errorf("failed to send character create: %w", err)
-	}
-	gc.logger.Println("Sent character create for " + params.Name)
+    if err := gc.sendPacket(&togameserver.CharacterCreate{
+        Name:      params.Name,
+        Race:      params.Race,
+        Female:    params.Female,
+        ClassID:   params.ClassID,
+        INT:       0,
+        STR:       0,
+        CON:       0,
+        MEN:       0,
+        DEX:       0,
+        WIT:       0,
+        HairStyle: params.HairStyle,
+        HairColor: params.HairColor,
+        Face:      params.Face,
+    }); err != nil {
+        return nil, fmt.Errorf("failed to send character create: %w", err)
+    }
+    gc.logger.Println("Sent character create for " + params.Name)
 
-	// The server answers with the creation result and the updated list.
-	for {
-		done, updated, err := gc.awaitCharacterCreation(params.Name)
-		if err != nil {
-			return nil, err
-		}
-		if done {
-			// The updated list precedes the trailing CharCreateOk on the
-			// wire (the server writes the list from inside the creation
-			// handler and the ok after it returns). Draining the ok with a
-			// bounded wait guarantees the server side char selection cache
-			// is populated before the next packet selection runs, which
-			// closes the silent drop race of a fast client.
-			gc.drainCharCreateOk()
+    // The server answers with the creation result and the updated list.
+    for {
+        done, updated, err := gc.awaitCharacterCreation(params.Name)
+        if err != nil {
+            return nil, err
+        }
+        if done {
+            // The updated list precedes the trailing CharCreateOk on the
+            // wire (the server writes the list from inside the creation
+            // handler and the ok after it returns). Draining the ok with a
+            // bounded wait guarantees the server side char selection cache
+            // is populated before the next packet selection runs, which
+            // closes the silent drop race of a fast client.
+            gc.drainCharCreateOk()
 
-			return updated, nil
-		}
-	}
+            return updated, nil
+        }
+    }
 }
 
 // drainCharCreateOk consumes the CharCreateOk packet that follows the
@@ -796,276 +796,276 @@ func (gc *GameClient) EnsureCharacter(
 // follows (the server writes it last), so a bounded wait drains it; a
 // lost packet only costs the selection retry of EnterWorld.
 func (gc *GameClient) drainCharCreateOk() {
-	deadline := time.Now().Add(charCreateOkWait)
-	if err := gc.conn.SetReadDeadline(deadline); err != nil {
-		gc.logger.Printf("Failed to set the char create ok deadline: %v", err)
+    deadline := time.Now().Add(charCreateOkWait)
+    if err := gc.conn.SetReadDeadline(deadline); err != nil {
+        gc.logger.Printf("Failed to set the char create ok deadline: %v", err)
 
-		return
-	}
+        return
+    }
 
-	for {
-		payload, err := gc.readPacket(gc.readBuf)
-		if err != nil {
-			gc.readBuf = nil
-			if !errors.Is(err, os.ErrDeadlineExceeded) {
-				gc.logger.Printf("Failed to drain the char create ok: %v", err)
+    for {
+        payload, err := gc.readPacket(gc.readBuf)
+        if err != nil {
+            gc.readBuf = nil
+            if !errors.Is(err, os.ErrDeadlineExceeded) {
+                gc.logger.Printf("Failed to drain the char create ok: %v", err)
 
-				return
-			}
-			gc.logger.Println("Char create ok not drained in time, " +
-				"the selection retry will cover it")
+                return
+            }
+            gc.logger.Println("Char create ok not drained in time, " +
+                "the selection retry will cover it")
 
-			return
-		}
-		gc.readBuf = payload
-		if len(payload) == 0 {
-			continue
-		}
-		if payload[0] == charCreateOkID {
-			gc.logger.Println("Character create confirmed")
+            return
+        }
+        gc.readBuf = payload
+        if len(payload) == 0 {
+            continue
+        }
+        if payload[0] == charCreateOkID {
+            gc.logger.Println("Character create confirmed")
 
-			break
-		}
-	}
+            break
+        }
+    }
 
-	if err := gc.conn.SetReadDeadline(time.Time{}); err != nil {
-		gc.logger.Printf("Failed to reset the char create ok deadline: %v", err)
-	}
+    if err := gc.conn.SetReadDeadline(time.Time{}); err != nil {
+        gc.logger.Printf("Failed to reset the char create ok deadline: %v", err)
+    }
 }
 
 // awaitCharacterCreation reads packets until the creation result resolves.
 // The first return value reports completion, the second carries the updated
 // character list when the requested character appeared in it.
 func (gc *GameClient) awaitCharacterCreation(
-	name string,
+    name string,
 ) (bool, *fromgameserver.CharSelectInfoPacket, error) {
-	payload, err := gc.readPacket(gc.readBuf)
-	if err != nil {
-		return false, nil, fmt.Errorf("failed to read creation result: %w", err)
-	}
-	gc.readBuf = payload
-	if len(payload) == 0 {
-		return false, nil, nil
-	}
+    payload, err := gc.readPacket(gc.readBuf)
+    if err != nil {
+        return false, nil, fmt.Errorf("failed to read creation result: %w", err)
+    }
+    gc.readBuf = payload
+    if len(payload) == 0 {
+        return false, nil, nil
+    }
 
-	return gc.handleCharCreatePacket(name, payload)
+    return gc.handleCharCreatePacket(name, payload)
 }
 
 // handleCharCreatePacket dispatches a single packet of the creation flow.
 func (gc *GameClient) handleCharCreatePacket(
-	name string, payload []byte,
+    name string, payload []byte,
 ) (bool, *fromgameserver.CharSelectInfoPacket, error) {
-	switch payload[0] {
-	case charCreateOkID:
-		if err := fromgameserver.ParseCharCreateOkPacket(payload); err != nil {
-			return false, nil, err
-		}
-		gc.logger.Println("Character " + name + " created")
-	case charCreateFailID:
-		return gc.handleCharCreateFail(payload)
-	case charSelectInfoID:
-		return gc.handleUpdatedCharList(name, payload)
-	default:
-		gc.logger.Printf("Ignoring packet id 0x%02x while creating character",
-			payload[0])
-	}
+    switch payload[0] {
+    case charCreateOkID:
+        if err := fromgameserver.ParseCharCreateOkPacket(payload); err != nil {
+            return false, nil, err
+        }
+        gc.logger.Println("Character " + name + " created")
+    case charCreateFailID:
+        return gc.handleCharCreateFail(payload)
+    case charSelectInfoID:
+        return gc.handleUpdatedCharList(name, payload)
+    default:
+        gc.logger.Printf("Ignoring packet id 0x%02x while creating character",
+            payload[0])
+    }
 
-	return false, nil, nil
+    return false, nil, nil
 }
 
 // handleCharCreateFail converts a creation failure packet into an error.
 func (gc *GameClient) handleCharCreateFail(
-	payload []byte,
+    payload []byte,
 ) (bool, *fromgameserver.CharSelectInfoPacket, error) {
-	fail := fromgameserver.NewCharCreateFailPacket()
-	if err := fromgameserver.ParseCharCreateFailPacket(fail, payload); err != nil {
-		return false, nil, err
-	}
+    fail := fromgameserver.NewCharCreateFailPacket()
+    if err := fromgameserver.ParseCharCreateFailPacket(fail, payload); err != nil {
+        return false, nil, err
+    }
 
-	return false, nil, fmt.Errorf(
-		"character creation failed: %s", fail.ReasonText())
+    return false, nil, fmt.Errorf(
+        "character creation failed: %s", fail.ReasonText())
 }
 
 // handleUpdatedCharList checks the updated character list for the name.
 func (gc *GameClient) handleUpdatedCharList(
-	name string, payload []byte,
+    name string, payload []byte,
 ) (bool, *fromgameserver.CharSelectInfoPacket, error) {
-	updated := fromgameserver.NewCharSelectInfoPacket()
-	if err := fromgameserver.ParseCharSelectInfoPacket(
-		updated, payload); err != nil {
-		return false, nil, fmt.Errorf(
-			"failed to parse updated character list: %w", err)
-	}
-	if _, _, found := updated.FindCharacterByName(name); found {
-		return true, updated, nil
-	}
+    updated := fromgameserver.NewCharSelectInfoPacket()
+    if err := fromgameserver.ParseCharSelectInfoPacket(
+        updated, payload); err != nil {
+        return false, nil, fmt.Errorf(
+            "failed to parse updated character list: %w", err)
+    }
+    if _, _, found := updated.FindCharacterByName(name); found {
+        return true, updated, nil
+    }
 
-	return false, nil, errors.New("created character missing in the updated list")
+    return false, nil, errors.New("created character missing in the updated list")
 }
 
 // EnterWorld selects the character slot and requests world entry.
 func (gc *GameClient) EnterWorld(slot int32) error {
-	// The selection is retransmitted when the server drops it
-	// silently (see the charSelectWait constants): the wait is
-	// bounded, the select is resent and only repeated failures give
-	// up (the reconnect supervisor then rebuilds the session).
-	var selected fromgameserver.CharSelectedPacket
-	for attempt := 1; attempt <= charSelectAttempts; attempt++ {
-		if err := gc.sendPacket(
-			&togameserver.CharacterSelect{CharSlot: slot}); err != nil {
-			return fmt.Errorf("failed to send character select: %w", err)
-		}
+    // The selection is retransmitted when the server drops it
+    // silently (see the charSelectWait constants): the wait is
+    // bounded, the select is resent and only repeated failures give
+    // up (the reconnect supervisor then rebuilds the session).
+    var selected fromgameserver.CharSelectedPacket
+    for attempt := 1; attempt <= charSelectAttempts; attempt++ {
+        if err := gc.sendPacket(
+            &togameserver.CharacterSelect{CharSlot: slot}); err != nil {
+            return fmt.Errorf("failed to send character select: %w", err)
+        }
 
-		answered, err := gc.awaitCharSelected(&selected)
-		if err != nil {
-			return err
-		}
-		if answered {
-			break
-		}
-		if attempt == charSelectAttempts {
-			return errors.New("the server did not answer the character " +
-				"selection after " + strconv.Itoa(charSelectAttempts) +
-				" attempts")
-		}
-		gc.logger.Printf("CharSelected did not arrive (attempt %d), "+
-			"reselecting in %s", attempt, charSelectWait)
-	}
-	gc.logger.Println("Selected character " + selected.Name)
+        answered, err := gc.awaitCharSelected(&selected)
+        if err != nil {
+            return err
+        }
+        if answered {
+            break
+        }
+        if attempt == charSelectAttempts {
+            return errors.New("the server did not answer the character " +
+                "selection after " + strconv.Itoa(charSelectAttempts) +
+                " attempts")
+        }
+        gc.logger.Printf("CharSelected did not arrive (attempt %d), "+
+            "reselecting in %s", attempt, charSelectWait)
+    }
+    gc.logger.Println("Selected character " + selected.Name)
 
-	if err := gc.sendPacket(&togameserver.EnterWorld{}); err != nil {
-		return fmt.Errorf("failed to send enter world: %w", err)
-	}
-	gc.logger.Println("Sent enter world request")
+    if err := gc.sendPacket(&togameserver.EnterWorld{}); err != nil {
+        return fmt.Errorf("failed to send enter world: %w", err)
+    }
+    gc.logger.Println("Sent enter world request")
 
-	// The movement toggle of the official client entry: the server
-	// starts every session walking (Creature._isRunning defaults to
-	// false), and a bot that never flips it crosses the world at the
-	// walk speed - every hunt run of the project moved at 97 instead
-	// of ~170 units per second until the 2026-09-12 class transfer
-	// rounds pinned it.
-	run := togameserver.NewChangeMoveTypePacket()
-	run.TypeRun = 1
-	if err := gc.sendPacket(run); err != nil {
-		return fmt.Errorf("failed to send run toggle: %w", err)
-	}
+    // The movement toggle of the official client entry: the server
+    // starts every session walking (Creature._isRunning defaults to
+    // false), and a bot that never flips it crosses the world at the
+    // walk speed - every hunt run of the project moved at 97 instead
+    // of ~170 units per second until the 2026-09-12 class transfer
+    // rounds pinned it.
+    run := togameserver.NewChangeMoveTypePacket()
+    run.TypeRun = 1
+    if err := gc.sendPacket(run); err != nil {
+        return fmt.Errorf("failed to send run toggle: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // awaitCharSelected waits for the CharSelected packet that allows
 // entering the world, bounded by charSelectWait. It reports whether the
 // answer arrived; unrelated packets are ignored like before.
 func (gc *GameClient) awaitCharSelected(
-	selected *fromgameserver.CharSelectedPacket,
+    selected *fromgameserver.CharSelectedPacket,
 ) (bool, error) {
-	if err := gc.conn.SetReadDeadline(time.Now().Add(charSelectWait)); err != nil {
-		return false, fmt.Errorf(
-			"failed to set the char select deadline: %w", err)
-	}
+    if err := gc.conn.SetReadDeadline(time.Now().Add(charSelectWait)); err != nil {
+        return false, fmt.Errorf(
+            "failed to set the char select deadline: %w", err)
+    }
 
-	for {
-		payload, err := gc.readPacket(gc.readBuf)
-		if err != nil {
-			gc.readBuf = nil
-			if errors.Is(err, os.ErrDeadlineExceeded) {
-				return false, nil
-			}
+    for {
+        payload, err := gc.readPacket(gc.readBuf)
+        if err != nil {
+            gc.readBuf = nil
+            if errors.Is(err, os.ErrDeadlineExceeded) {
+                return false, nil
+            }
 
-			return false, fmt.Errorf(
-				"failed to read character selected: %w", err)
-		}
-		gc.readBuf = payload
-		if len(payload) == 0 {
-			continue
-		}
-		if payload[0] == charSelectedID {
-			if err := fromgameserver.ParseCharSelectedPacket(
-				selected, payload); err != nil {
-				return false, fmt.Errorf(
-					"failed to parse char selected: %w", err)
-			}
-			gc.trackerApplySelection(selected)
+            return false, fmt.Errorf(
+                "failed to read character selected: %w", err)
+        }
+        gc.readBuf = payload
+        if len(payload) == 0 {
+            continue
+        }
+        if payload[0] == charSelectedID {
+            if err := fromgameserver.ParseCharSelectedPacket(
+                selected, payload); err != nil {
+                return false, fmt.Errorf(
+                    "failed to parse char selected: %w", err)
+            }
+            gc.trackerApplySelection(selected)
 
-			if resetErr := gc.conn.SetReadDeadline(time.Time{}); resetErr != nil {
-				gc.logger.Printf(
-					"Failed to reset the char select deadline: %v",
-					resetErr)
-			}
+            if resetErr := gc.conn.SetReadDeadline(time.Time{}); resetErr != nil {
+                gc.logger.Printf(
+                    "Failed to reset the char select deadline: %v",
+                    resetErr)
+            }
 
-			return true, nil
-		}
-		gc.logger.Printf("Ignoring packet id 0x%02x while entering world", payload[0])
-	}
+            return true, nil
+        }
+        gc.logger.Printf("Ignoring packet id 0x%02x while entering world", payload[0])
+    }
 }
 
 // trackerApplySelection feeds the selected character state to the tracker.
 func (gc *GameClient) trackerApplySelection(
-	selected *fromgameserver.CharSelectedPacket,
+    selected *fromgameserver.CharSelectedPacket,
 ) {
-	if gc.tracker == nil {
-		return
-	}
-	gc.tracker.SetCharacter(selected.Name, selected.ObjectID, selected.ClassID,
-		selected.X, selected.Y, selected.Z,
-		selected.CurrentHP, selected.CurrentMP)
+    if gc.tracker == nil {
+        return
+    }
+    gc.tracker.SetCharacter(selected.Name, selected.ObjectID, selected.ClassID,
+        selected.X, selected.Y, selected.Z,
+        selected.CurrentHP, selected.CurrentMP)
 }
 
 // gamePacket couples a received payload with its pooled buffer.
 type gamePacket struct {
-	buf     *gameBuffer
-	payload []byte
-	err     error
+    buf     *gameBuffer
+    payload []byte
+    err     error
 }
 
 // Run blocks while the character stays in the world. It reads server
 // packets in a dedicated goroutine and sends periodic net ping requests.
 // On context cancellation it sends the logout packet and closes.
 func (gc *GameClient) Run(ctx context.Context, characterName string) error {
-	if gc.tracker != nil {
-		gc.tracker.SetOnline(characterName)
-	}
+    if gc.tracker != nil {
+        gc.tracker.SetOnline(characterName)
+    }
 
-	err := gc.run(ctx, characterName)
-	if gc.tracker != nil {
-		gc.tracker.SetOffline()
-	}
+    err := gc.run(ctx, characterName)
+    if gc.tracker != nil {
+        gc.tracker.SetOffline()
+    }
 
-	return err
+    return err
 }
 
 // run is the implementation of Run without the tracker bookkeeping.
 func (gc *GameClient) run(ctx context.Context, characterName string) error {
-	packets := make(chan gamePacket, packetChanSize)
-	readerDone := make(chan struct{})
-	go func() {
-		defer close(readerDone)
-		for {
-			buf := bufferPool.Get().(*gameBuffer)
-			payload, err := gc.readPacket(buf.data)
-			if err != nil {
-				bufferPool.Put(buf)
-				packets <- gamePacket{buf: nil, payload: nil, err: err}
+    packets := make(chan gamePacket, packetChanSize)
+    readerDone := make(chan struct{})
+    go func() {
+        defer close(readerDone)
+        for {
+            buf := bufferPool.Get().(*gameBuffer)
+            payload, err := gc.readPacket(buf.data)
+            if err != nil {
+                bufferPool.Put(buf)
+                packets <- gamePacket{buf: nil, payload: nil, err: err}
 
-				return
-			}
-			buf.data = payload
-			packets <- gamePacket{buf: buf, payload: payload, err: nil}
-		}
-	}()
+                return
+            }
+            buf.data = payload
+            packets <- gamePacket{buf: buf, payload: payload, err: nil}
+        }
+    }()
 
-	pingTicker := time.NewTicker(gamePingPeriod)
-	defer pingTicker.Stop()
+    pingTicker := time.NewTicker(gamePingPeriod)
+    defer pingTicker.Stop()
 
-	err := gc.runLoop(ctx, packets, pingTicker, characterName)
-	// The logout is only announced while the connection is still usable:
-	// after a transport error the packet would fail and only spam the log.
-	gc.disconnect(err == nil)
+    err := gc.runLoop(ctx, packets, pingTicker, characterName)
+    // The logout is only announced while the connection is still usable:
+    // after a transport error the packet would fail and only spam the log.
+    gc.disconnect(err == nil)
 
-	// Unblock the reader goroutine and drain pending packets.
-	drainPackets(packets, readerDone)
+    // Unblock the reader goroutine and drain pending packets.
+    drainPackets(packets, readerDone)
 
-	return err
+    return err
 }
 
 // runLoop is the main receive loop of the in game session. The
@@ -1075,39 +1075,39 @@ func (gc *GameClient) run(ctx context.Context, characterName string) error {
 // reconnects instead of blocking on a dead socket forever (see
 // gameSilenceTimeout).
 func (gc *GameClient) runLoop(
-	ctx context.Context,
-	packets <-chan gamePacket,
-	pingTicker *time.Ticker,
-	characterName string,
+    ctx context.Context,
+    packets <-chan gamePacket,
+    pingTicker *time.Ticker,
+    characterName string,
 ) error {
-	silence := time.NewTimer(gameSilenceTimeout)
-	defer silence.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			gc.logger.Println("Leaving the game world with " + characterName)
+    silence := time.NewTimer(gameSilenceTimeout)
+    defer silence.Stop()
+    for {
+        select {
+        case <-ctx.Done():
+            gc.logger.Println("Leaving the game world with " + characterName)
 
-			return nil
-		case <-pingTicker.C:
-			if err := gc.sendPacket(&togameserver.RequestNetPing{}); err != nil {
-				return fmt.Errorf("failed to send net ping: %w", err)
-			}
-		case <-silence.C:
-			return fmt.Errorf("game session silent for %s, closing the "+
-				"connection (the server stopped answering while the "+
-				"socket stayed writable)", gameSilenceTimeout)
-		case msg, ok := <-packets:
-			if !ok {
-				return nil
-			}
-			if msg.err != nil {
-				return fmt.Errorf("game connection lost: %w", msg.err)
-			}
-			gc.handleServerPacket(msg.payload)
-			bufferPool.Put(msg.buf)
-			silence.Reset(gameSilenceTimeout)
-		}
-	}
+            return nil
+        case <-pingTicker.C:
+            if err := gc.sendPacket(&togameserver.RequestNetPing{}); err != nil {
+                return fmt.Errorf("failed to send net ping: %w", err)
+            }
+        case <-silence.C:
+            return fmt.Errorf("game session silent for %s, closing the "+
+                "connection (the server stopped answering while the "+
+                "socket stayed writable)", gameSilenceTimeout)
+        case msg, ok := <-packets:
+            if !ok {
+                return nil
+            }
+            if msg.err != nil {
+                return fmt.Errorf("game connection lost: %w", msg.err)
+            }
+            gc.handleServerPacket(msg.payload)
+            bufferPool.Put(msg.buf)
+            silence.Reset(gameSilenceTimeout)
+        }
+    }
 }
 
 // RequestLogout ends the session from another goroutine (the hunt
@@ -1118,15 +1118,15 @@ func (gc *GameClient) runLoop(
 // read loop of Run notices the closed socket and unwinds the
 // session.
 func (gc *GameClient) RequestLogout() error {
-	if err := gc.sendPacket(&togameserver.Logout{}); err != nil {
-		gc.logger.Printf("Failed to announce the logout: %v", err)
-	}
-	if err := gc.conn.Close(); err != nil {
-		return fmt.Errorf(
-			"failed to close the game connection: %w", err)
-	}
+    if err := gc.sendPacket(&togameserver.Logout{}); err != nil {
+        gc.logger.Printf("Failed to announce the logout: %v", err)
+    }
+    if err := gc.conn.Close(); err != nil {
+        return fmt.Errorf(
+            "failed to close the game connection: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // Close drops the game connection without the logout announcement.
@@ -1136,38 +1136,38 @@ func (gc *GameClient) RequestLogout() error {
 // server frees the account the same way it does for a client closing
 // at the char screen.
 func (gc *GameClient) Close() error {
-	if err := gc.conn.Close(); err != nil {
-		return fmt.Errorf(
-			"failed to close the game connection: %w", err)
-	}
+    if err := gc.conn.Close(); err != nil {
+        return fmt.Errorf(
+            "failed to close the game connection: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // disconnect closes the connection, announcing the logout to the server
 // first when the connection is still usable.
 func (gc *GameClient) disconnect(announce bool) {
-	if announce {
-		if err := gc.sendPacket(&togameserver.Logout{}); err != nil {
-			gc.logger.Printf("Failed to send logout: %v", err)
-		}
-	}
-	_ = gc.conn.Close()
+    if announce {
+        if err := gc.sendPacket(&togameserver.Logout{}); err != nil {
+            gc.logger.Printf("Failed to send logout: %v", err)
+        }
+    }
+    _ = gc.conn.Close()
 }
 
 // drainPackets unblocks the reader goroutine and returns buffers to the pool.
 func drainPackets(packets <-chan gamePacket, readerDone <-chan struct{}) {
-	for {
-		select {
-		case <-readerDone:
-			return
-		case msg, ok := <-packets:
-			if !ok {
-				return
-			}
-			if msg.buf != nil {
-				bufferPool.Put(msg.buf)
-			}
-		}
-	}
+    for {
+        select {
+        case <-readerDone:
+            return
+        case msg, ok := <-packets:
+            if !ok {
+                return
+            }
+            if msg.buf != nil {
+                bufferPool.Put(msg.buf)
+            }
+        }
+    }
 }

@@ -51,8 +51,8 @@ Add a `Play:` line in the doc comment:
 //
 // Example:
 //
-//	doubled := Map([]int{1, 2, 3}, func(x int) int { return x * 2 })
-//	// doubled: [2, 4, 6]
+//    doubled := Map([]int{1, 2, 3}, func(x int) int { return x * 2 })
+//    // doubled: [2, 4, 6]
 func Map[T any, U any](s []T, fn func(T) U) []U {
 ```
 
@@ -120,21 +120,21 @@ Be generous with examples in doc comments. Show common use cases, edge cases, an
 //
 // Example — basic client:
 //
-//	client := NewClient()
+//    client := NewClient()
 //
 // Example — with custom timeout and retries:
 //
-//	client := NewClient(
-//	    WithTimeout(10 * time.Second),
-//	    WithRetries(3),
-//	    WithRetryBackoff(time.Second),
-//	)
+//    client := NewClient(
+//        WithTimeout(10 * time.Second),
+//        WithRetries(3),
+//        WithRetryBackoff(time.Second),
+//    )
 //
 // Example — with authentication:
 //
-//	client := NewClient(
-//	    WithBearerToken(os.Getenv("API_TOKEN")),
-//	)
+//    client := NewClient(
+//        WithBearerToken(os.Getenv("API_TOKEN")),
+//    )
 func NewClient(opts ...Option) *Client {
 ```
 

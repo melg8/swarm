@@ -431,8 +431,11 @@ print('descriptions: %d skills, %d runs, %d chars; tree skills with'
 print('written: %s' % out)
 PYEOF
 
-# The emitted map literals need the tab alignment of the repository
-# style - gofmt fixes the spacing when the toolchain is around.
-if command -v gofmt >/dev/null 2>&1; then
-    gofmt -w "${OUT}"
+# The emitted map literals need the space alignment of the
+# repository style (spaces only, see AGENTS.md) - gofmt-spaces fixes
+# the spacing when the toolchain is around.
+if command -v gofmt-spaces >/dev/null 2>&1; then
+    gofmt-spaces -w "${OUT}"
+elif command -v go >/dev/null 2>&1; then
+    (cd "${SWARM_ROOT}" && go run ./cmd/gofmt-spaces -w "${OUT}")
 fi

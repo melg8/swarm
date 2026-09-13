@@ -5,47 +5,47 @@
 package state
 
 import (
-	"strconv"
-	"time"
+    "strconv"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/npcdata"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
 // Rotation describes a BeginRotation or StopRotation packet.
 type Rotation struct {
-	ObjectID int32
-	Heading  int32
+    ObjectID int32
+    Heading  int32
 }
 
 // MoveType describes a ChangeMoveType packet.
 type MoveType struct {
-	ObjectID int32
-	Running  bool
+    ObjectID int32
+    Running  bool
 }
 
 // Teleport describes a TeleportToLocation packet.
 type Teleport struct {
-	ObjectID int32
-	X        int32
-	Y        int32
-	Z        int32
-	Heading  int32
+    ObjectID int32
+    X        int32
+    Y        int32
+    Z        int32
+    Heading  int32
 }
 
 // ItemPickup describes a GetItem packet.
 type ItemPickup struct {
-	PlayerID int32
-	ObjectID int32
-	X        int32
-	Y        int32
-	Z        int32
+    PlayerID int32
+    ObjectID int32
+    X        int32
+    Y        int32
+    Z        int32
 }
 
 // WaitType describes a ChangeWaitType packet: the server announces the
 // sit/stand transition of a creature with the position it happens at.
 type WaitType struct {
-	ObjectID int32
-	Sitting  bool
+    ObjectID int32
+    Sitting  bool
 }
 
 // ApplyWaitType tracks the sit/stand state of the played character and
@@ -56,27 +56,27 @@ type WaitType struct {
 // foreign ones draw the zZ rest icon of the map for every bot of the
 // fleet, not only the observed one.
 func (b *Bot) ApplyWaitType(w WaitType) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if w.ObjectID != b.selfID {
-		_, cold := b.objectLocked(w.ObjectID)
-		if cold == nil {
-			return
-		}
-		cold.Sitting = w.Sitting
-		cold.UpdatedAt = time.Now().UnixNano()
-		b.touch()
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    if w.ObjectID != b.selfID {
+        _, cold := b.objectLocked(w.ObjectID)
+        if cold == nil {
+            return
+        }
+        cold.Sitting = w.Sitting
+        cold.UpdatedAt = time.Now().UnixNano()
+        b.touch()
 
-		return
-	}
-	b.char.Sitting = w.Sitting
-	b.touch()
-	switch {
-	case w.Sitting:
-		b.recordLocked("sat down to rest")
-	default:
-		b.recordLocked("stood up")
-	}
+        return
+    }
+    b.char.Sitting = w.Sitting
+    b.touch()
+    switch {
+    case w.Sitting:
+        b.recordLocked("sat down to rest")
+    default:
+        b.recordLocked("stood up")
+    }
 }
 
 // ApplyRotationStart turns an object to the heading of the rotation start.
@@ -84,72 +84,72 @@ func (b *Bot) ApplyWaitType(w WaitType) {
 // becomes visible, because CharInfo carries no heading, and on keyboard
 // rotation of a visible player.
 func (b *Bot) ApplyRotationStart(r Rotation) {
-	b.applyRotation(r, false)
+    b.applyRotation(r, false)
 }
 
 // ApplyRotationStop turns an object to the final heading of its rotation.
 func (b *Bot) ApplyRotationStop(r Rotation) {
-	b.applyRotation(r, true)
+    b.applyRotation(r, true)
 }
 
 // applyRotation updates the heading of self or an object.
 func (b *Bot) applyRotation(r Rotation, stop bool) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if r.ObjectID == b.selfID {
-		b.char.Heading = r.Heading
-		if stop {
-			b.clearCharMovement()
-		}
-		b.touch()
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    if r.ObjectID == b.selfID {
+        b.char.Heading = r.Heading
+        if stop {
+            b.clearCharMovement()
+        }
+        b.touch()
 
-		return
-	}
-	obj, cold := b.objectLocked(r.ObjectID)
-	if obj == nil {
-		return
-	}
-	cold.Heading = r.Heading
-	if stop {
-		obj.Moving = false
-		obj.DestX = obj.X
-		obj.DestY = obj.Y
-		obj.DestZ = obj.Z
-	}
-	cold.UpdatedAt = time.Now().UnixNano()
-	b.touch()
+        return
+    }
+    obj, cold := b.objectLocked(r.ObjectID)
+    if obj == nil {
+        return
+    }
+    cold.Heading = r.Heading
+    if stop {
+        obj.Moving = false
+        obj.DestX = obj.X
+        obj.DestY = obj.Y
+        obj.DestZ = obj.Z
+    }
+    cold.UpdatedAt = time.Now().UnixNano()
+    b.touch()
 }
 
 // ApplySelfTarget records the target the server assigned to the played
 // character (MyTargetSelected).
 func (b *Bot) ApplySelfTarget(objectID int32) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.char.TargetID == objectID {
-		return
-	}
-	b.char.TargetID = objectID
-	name := b.objectNameLocked(objectID)
-	if objectID == 0 {
-		b.touch()
-		b.recordLocked("target cleared")
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    if b.char.TargetID == objectID {
+        return
+    }
+    b.char.TargetID = objectID
+    name := b.objectNameLocked(objectID)
+    if objectID == 0 {
+        b.touch()
+        b.recordLocked("target cleared")
 
-		return
-	}
-	b.touch()
-	b.recordLocked("target selected: " + name)
+        return
+    }
+    b.touch()
+    b.recordLocked("target selected: " + name)
 }
 
 // ApplyObjectTarget records the target another visible player selected.
 func (b *Bot) ApplyObjectTarget(objectID int32, targetID int32) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	obj, _ := b.objectLocked(objectID)
-	if obj == nil {
-		return
-	}
-	obj.TargetID = targetID
-	b.touch()
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    obj, _ := b.objectLocked(objectID)
+    if obj == nil {
+        return
+    }
+    obj.TargetID = targetID
+    b.touch()
 }
 
 // ApplyTargetClear drops the target reference of a visible player. The
@@ -158,78 +158,78 @@ func (b *Bot) ApplyObjectTarget(objectID int32, targetID int32) {
 // removed from the world) and notifies everyone including the actor,
 // while never sending MyTargetSelected for the removal.
 func (b *Bot) ApplyTargetClear(objectID int32) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if objectID == b.selfID {
-		b.clearSelfTargetLocked("target unselected")
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    if objectID == b.selfID {
+        b.clearSelfTargetLocked("target unselected")
 
-		return
-	}
-	obj, _ := b.objectLocked(objectID)
-	if obj == nil {
-		return
-	}
-	obj.TargetID = 0
-	b.touch()
+        return
+    }
+    obj, _ := b.objectLocked(objectID)
+    if obj == nil {
+        return
+    }
+    obj.TargetID = 0
+    b.touch()
 }
 
 // ApplyMoveType tracks a creature switching between walking and running.
 func (b *Bot) ApplyMoveType(mt MoveType) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	obj, _ := b.objectLocked(mt.ObjectID)
-	if obj == nil {
-		return
-	}
-	obj.Running = mt.Running
-	b.touch()
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    obj, _ := b.objectLocked(mt.ObjectID)
+    if obj == nil {
+        return
+    }
+    obj.Running = mt.Running
+    b.touch()
 }
 
 // ApplyTeleport snaps an object or the played character to a new place.
 func (b *Bot) ApplyTeleport(t Teleport) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if t.ObjectID == b.selfID {
-		b.char.X = t.X
-		b.char.Y = t.Y
-		b.char.Z = t.Z
-		b.char.Heading = t.Heading
-		b.clearCharMovement()
-		b.touch()
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    if t.ObjectID == b.selfID {
+        b.char.X = t.X
+        b.char.Y = t.Y
+        b.char.Z = t.Z
+        b.char.Heading = t.Heading
+        b.clearCharMovement()
+        b.touch()
 
-		return
-	}
-	obj, cold := b.objectLocked(t.ObjectID)
-	if obj == nil {
-		return
-	}
-	obj.X = t.X
-	obj.Y = t.Y
-	obj.Z = t.Z
-	cold.Heading = t.Heading
-	obj.Moving = false
-	obj.DestX = t.X
-	obj.DestY = t.Y
-	obj.DestZ = t.Z
-	cold.UpdatedAt = time.Now().UnixNano()
-	b.touch()
+        return
+    }
+    obj, cold := b.objectLocked(t.ObjectID)
+    if obj == nil {
+        return
+    }
+    obj.X = t.X
+    obj.Y = t.Y
+    obj.Z = t.Z
+    cold.Heading = t.Heading
+    obj.Moving = false
+    obj.DestX = t.X
+    obj.DestY = t.Y
+    obj.DestZ = t.Z
+    cold.UpdatedAt = time.Now().UnixNano()
+    b.touch()
 }
 
 // ApplySpawnItem upserts a ground item that already existed when it
 // entered the known list of the character, for example after a relogin.
 func (b *Bot) ApplySpawnItem(info ItemInfo) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	obj, cold := b.upsertLocked(info.ObjectID, KindItem)
-	cold.TemplateID = info.TemplateID
-	cold.Name = npcdata.ItemName(info.TemplateID)
-	cold.Count = info.Count
-	obj.X = info.X
-	obj.Y = info.Y
-	obj.Z = info.Z
-	cold.UpdatedAt = time.Now().UnixNano()
-	b.touch()
-	b.recordLocked("item appeared: " + itemName(cold.Name, info.TemplateID))
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    obj, cold := b.upsertLocked(info.ObjectID, KindItem)
+    cold.TemplateID = info.TemplateID
+    cold.Name = npcdata.ItemName(info.TemplateID)
+    cold.Count = info.Count
+    obj.X = info.X
+    obj.Y = info.Y
+    obj.Z = info.Z
+    cold.UpdatedAt = time.Now().UnixNano()
+    b.touch()
+    b.recordLocked("item appeared: " + itemName(cold.Name, info.TemplateID))
 }
 
 // ApplyItemPickup removes a picked up ground item. The GetItem packet
@@ -239,41 +239,41 @@ func (b *Bot) ApplySpawnItem(info ItemInfo) {
 // arrival, so snapping the picker here teleported it across the map on
 // every pickup.
 func (b *Bot) ApplyItemPickup(p ItemPickup) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	obj, cold := b.objectLocked(p.ObjectID)
-	if obj == nil {
-		return
-	}
-	name := itemName(cold.Name, cold.TemplateID)
-	slot := b.world.slotLocked(p.ObjectID)
-	b.removeObjectAtLocked(slot, p.ObjectID)
-	pickerName := ""
-	if p.PlayerID == b.selfID {
-		pickerName = "self"
-	} else if _, pickerCold := b.objectLocked(p.PlayerID); pickerCold != nil {
-		pickerName = pickerCold.Name
-	}
-	b.touch()
-	switch pickerName {
-	case "self":
-		b.recordLocked("picked up " + name)
-	case "":
-		b.recordLocked("item removed: " + name)
-	default:
-		b.recordLocked(pickerName + " picked up " + name)
-	}
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    obj, cold := b.objectLocked(p.ObjectID)
+    if obj == nil {
+        return
+    }
+    name := itemName(cold.Name, cold.TemplateID)
+    slot := b.world.slotLocked(p.ObjectID)
+    b.removeObjectAtLocked(slot, p.ObjectID)
+    pickerName := ""
+    if p.PlayerID == b.selfID {
+        pickerName = "self"
+    } else if _, pickerCold := b.objectLocked(p.PlayerID); pickerCold != nil {
+        pickerName = pickerCold.Name
+    }
+    b.touch()
+    switch pickerName {
+    case "self":
+        b.recordLocked("picked up " + name)
+    case "":
+        b.recordLocked("item removed: " + name)
+    default:
+        b.recordLocked(pickerName + " picked up " + name)
+    }
 }
 
 // objectNameLocked resolves the display name of an object id. The caller
 // must hold the state lock.
 func (b *Bot) objectNameLocked(objectID int32) string {
-	if objectID == b.selfID {
-		return b.char.Name
-	}
-	if _, cold := b.objectLocked(objectID); cold != nil && cold.Name != "" {
-		return cold.Name
-	}
+    if objectID == b.selfID {
+        return b.char.Name
+    }
+    if _, cold := b.objectLocked(objectID); cold != nil && cold.Name != "" {
+        return cold.Name
+    }
 
-	return "object " + strconv.Itoa(int(objectID))
+    return "object " + strconv.Itoa(int(objectID))
 }

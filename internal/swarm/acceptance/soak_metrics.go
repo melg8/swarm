@@ -5,11 +5,11 @@
 package acceptance
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
-	"time"
+    "encoding/json"
+    "fmt"
+    "os"
+    "path/filepath"
+    "time"
 )
 
 // metricsPath is the destination of the soak trail. The path is the
@@ -18,7 +18,7 @@ import (
 // on the first append and travels with the repo as the milestone
 // artifact (parallel agents on other tasks never touch it).
 func metricsPath() string {
-	return filepath.Join(metricsDir(), "metrics.jsonl")
+    return filepath.Join(metricsDir(), "metrics.jsonl")
 }
 
 // metricsDir resolves the runs directory: the SWARM_RUNS_DIR env
@@ -26,11 +26,11 @@ func metricsPath() string {
 // "runs" directory at the repository root (the parent of the
 // internal/ tree, two levels up from the acceptance package).
 func metricsDir() string {
-	if dir := os.Getenv("SWARM_RUNS_DIR"); dir != "" {
-		return dir
-	}
+    if dir := os.Getenv("SWARM_RUNS_DIR"); dir != "" {
+        return dir
+    }
 
-	return filepath.Join(repoRoot(), "runs")
+    return filepath.Join(repoRoot(), "runs")
 }
 
 // repoRoot walks up from the acceptance package source file to the
@@ -38,40 +38,40 @@ func metricsDir() string {
 // resolved at runtime against the caller's file so a go test run from
 // any working directory lands in the same runs/ directory.
 func repoRoot() string {
-	dir, err := filepath.Abs(".")
-	if err != nil {
-		return "."
-	}
-	for range 8 {
-		if _, err := os.Stat(
-			filepath.Join(dir, "AGENTS.md")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
+    dir, err := filepath.Abs(".")
+    if err != nil {
+        return "."
+    }
+    for range 8 {
+        if _, err := os.Stat(
+            filepath.Join(dir, "AGENTS.md")); err == nil {
+            return dir
+        }
+        parent := filepath.Dir(dir)
+        if parent == dir {
+            break
+        }
+        dir = parent
+    }
 
-	return dir
+    return dir
 }
 
 // soakMetrics is one row of runs/metrics.jsonl: the fields the M1
 // acceptance and the progress report read. The JSON tags are stable
 // (the renderer and any future analysis script depend on them).
 type soakMetrics struct {
-	Date        string  `json:"date"`
-	Scenario    string  `json:"scenario"`
-	DurationSec int64   `json:"durationSec"`
-	StartLevel  int32   `json:"startLevel"`
-	EndLevel    int32   `json:"endLevel"`
-	XpPerHour   float64 `json:"xpPerHour"`
-	Deaths      int     `json:"deaths"`
-	Adena       int32   `json:"adena"`
-	StuckEvents int     `json:"stuckEvents"`
-	Status      string  `json:"status"`
-	FailReason  string  `json:"failReason,omitempty"`
+    Date        string  `json:"date"`
+    Scenario    string  `json:"scenario"`
+    DurationSec int64   `json:"durationSec"`
+    StartLevel  int32   `json:"startLevel"`
+    EndLevel    int32   `json:"endLevel"`
+    XpPerHour   float64 `json:"xpPerHour"`
+    Deaths      int     `json:"deaths"`
+    Adena       int32   `json:"adena"`
+    StuckEvents int     `json:"stuckEvents"`
+    Status      string  `json:"status"`
+    FailReason  string  `json:"failReason,omitempty"`
 }
 
 // appendMetrics writes one JSON line to the metrics trail. The open
@@ -79,42 +79,42 @@ type soakMetrics struct {
 // interleave, and the single json.Marshal + Write keeps the line
 // atomic on the common path. A trailing newline terminates the row.
 func appendMetrics(path string, row soakMetrics) error {
-	payload, err := json.Marshal(row)
-	if err != nil {
-		return fmt.Errorf("marshal metrics: %w", err)
-	}
-	payload = append(payload, '\n')
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create metrics dir: %w", err)
-	}
-	file, err := os.OpenFile(path,
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("open metrics: %w", err)
-	}
-	defer func() {
-		_ = file.Close()
-	}()
-	if _, err := file.Write(payload); err != nil {
-		return fmt.Errorf("write metrics: %w", err)
-	}
+    payload, err := json.Marshal(row)
+    if err != nil {
+        return fmt.Errorf("marshal metrics: %w", err)
+    }
+    payload = append(payload, '\n')
+    if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+        return fmt.Errorf("create metrics dir: %w", err)
+    }
+    file, err := os.OpenFile(path,
+        os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+    if err != nil {
+        return fmt.Errorf("open metrics: %w", err)
+    }
+    defer func() {
+        _ = file.Close()
+    }()
+    if _, err := file.Write(payload); err != nil {
+        return fmt.Errorf("write metrics: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // xpPerHour computes the hourly experience rate from the cumulative
 // experience delta and the run duration. A zero or negative duration
 // returns zero (the renderer treats it as no data).
 func xpPerHour(startCum, endCum int64, duration time.Duration) float64 {
-	if duration <= 0 {
-		return 0
-	}
-	delta := endCum - startCum
-	if delta < 0 {
-		delta = 0
-	}
+    if duration <= 0 {
+        return 0
+    }
+    delta := endCum - startCum
+    if delta < 0 {
+        delta = 0
+    }
 
-	return float64(delta) / duration.Hours()
+    return float64(delta) / duration.Hours()
 }
 
 // soakExperienceTable is the cumulative experience needed to reach
@@ -126,33 +126,33 @@ func xpPerHour(startCum, endCum int64, duration time.Duration) float64 {
 // T-003 territory). The values are byte identical with
 // internal/swarm/state/experience.go.
 var soakExperienceTable = [...]int64{
-	0, 68, 363,
-	1168, 2884, 6038,
-	11287, 19423, 31378,
-	48229, 71201, 101676,
-	141192, 191452, 254327,
-	331864, 426284, 539995,
-	675590, 835854, 1023775,
-	1242536, 1495531, 1786365,
-	2118860, 2497059, 2925229,
-	3407873, 3949727, 4555766,
-	5231213, 5981539, 6812472,
-	7729999, 8740372, 9850111,
-	11066012, 12395149, 13844879,
-	15422851, 17137002, 18995573,
-	21007103, 23180442, 25524751,
-	28049509, 30764519, 33679907,
-	36806133, 40153995, 45524865,
-	51262204, 57383682, 63907585,
-	70852742, 80700339, 91162131,
-	102265326, 114038008, 126509030,
-	146307211, 167243291, 189363788,
-	212716741, 237351413, 271973532,
-	308441375, 346825235, 387197529,
-	429632402, 474205751, 532692055,
-	606319094, 696376867, 804219972,
-	931275828, 1151275834, 1511275834,
-	2099275834, 4200000000, 6300000000,
+    0, 68, 363,
+    1168, 2884, 6038,
+    11287, 19423, 31378,
+    48229, 71201, 101676,
+    141192, 191452, 254327,
+    331864, 426284, 539995,
+    675590, 835854, 1023775,
+    1242536, 1495531, 1786365,
+    2118860, 2497059, 2925229,
+    3407873, 3949727, 4555766,
+    5231213, 5981539, 6812472,
+    7729999, 8740372, 9850111,
+    11066012, 12395149, 13844879,
+    15422851, 17137002, 18995573,
+    21007103, 23180442, 25524751,
+    28049509, 30764519, 33679907,
+    36806133, 40153995, 45524865,
+    51262204, 57383682, 63907585,
+    70852742, 80700339, 91162131,
+    102265326, 114038008, 126509030,
+    146307211, 167243291, 189363788,
+    212716741, 237351413, 271973532,
+    308441375, 346825235, 387197529,
+    429632402, 474205751, 532692055,
+    606319094, 696376867, 804219972,
+    931275828, 1151275834, 1511275834,
+    2099275834, 4200000000, 6300000000,
 }
 
 // soakMaxLevel is the highest level the local table knows about.
@@ -178,9 +178,9 @@ const soakMaxLevel = 81
 // runs/metrics.jsonl written before the fix keep their inflated
 // values - the trail is append-only.
 func cumulativeSoakXP(level int32, exp int32) int64 {
-	if level < 1 {
-		return int64(exp)
-	}
+    if level < 1 {
+        return int64(exp)
+    }
 
-	return int64(exp)
+    return int64(exp)
 }

@@ -119,7 +119,10 @@ print('written:', out)
 PYEOF
 
 gofmt_out="${OUT}"
-if command -v gofmt >/dev/null 2>&1; then
-    gofmt -w "${gofmt_out}"
+# Spaces only, see AGENTS.md: gofmt-spaces is the formatter of record.
+if command -v gofmt-spaces >/dev/null 2>&1; then
+    gofmt-spaces -w "${gofmt_out}"
+elif command -v go >/dev/null 2>&1; then
+    (cd "${SWARM_ROOT}" && go run ./cmd/gofmt-spaces -w "${gofmt_out}")
 fi
 echo "done"

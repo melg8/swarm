@@ -5,56 +5,56 @@
 package fromauthserver
 
 import (
-	"github.com/melg8/swarm/internal/swarm/helpers"
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/helpers"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 type GGAuthPacket struct {
-	SessionID int32
-	Unknown   int32
+    SessionID int32
+    Unknown   int32
 }
 
 func NewGGAuthPacketFromBytes(data []byte) (*GGAuthPacket, error) {
-	reader := packet.NewReader(data)
-	packet := GGAuthPacket{
-		SessionID: 0,
-		Unknown:   0,
-	}
-	if err := packet.FromBytes(reader); err != nil {
-		return nil, err
-	}
+    reader := packet.NewReader(data)
+    packet := GGAuthPacket{
+        SessionID: 0,
+        Unknown:   0,
+    }
+    if err := packet.FromBytes(reader); err != nil {
+        return nil, err
+    }
 
-	return &packet, nil
+    return &packet, nil
 }
 
 func (p *GGAuthPacket) FromBytes(reader *packet.Reader) error {
-	sessionID, err := reader.ReadInt32()
-	if err != nil {
-		return err
-	}
-	unknown, err := reader.ReadInt32()
-	if err != nil {
-		return err
-	}
-	p.SessionID = sessionID
-	p.Unknown = unknown
+    sessionID, err := reader.ReadInt32()
+    if err != nil {
+        return err
+    }
+    unknown, err := reader.ReadInt32()
+    if err != nil {
+        return err
+    }
+    p.SessionID = sessionID
+    p.Unknown = unknown
 
-	return nil
+    return nil
 }
 
 func (p *GGAuthPacket) ToBytes(writer *packet.Writer) error {
-	if err := writer.WriteInt32(p.SessionID); err != nil {
-		return err
-	}
-	if err := writer.WriteInt32(p.Unknown); err != nil {
-		return err
-	}
+    if err := writer.WriteInt32(p.SessionID); err != nil {
+        return err
+    }
+    if err := writer.WriteInt32(p.Unknown); err != nil {
+        return err
+    }
 
-	return nil
+    return nil
 }
 
 func (p *GGAuthPacket) ToString() string {
-	return "\nGGAuthPacket:" +
-		"\n  SessionID: " + helpers.HexStringFromInt32(p.SessionID) +
-		"\n  Unknown: " + helpers.HexStringFromInt32(p.Unknown)
+    return "\nGGAuthPacket:" +
+        "\n  SessionID: " + helpers.HexStringFromInt32(p.SessionID) +
+        "\n  Unknown: " + helpers.HexStringFromInt32(p.Unknown)
 }

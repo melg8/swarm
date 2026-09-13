@@ -5,21 +5,21 @@
 package pathfind
 
 import (
-	"container/heap"
-	"fmt"
-	"math"
-	"time"
+    "container/heap"
+    "fmt"
+    "math"
+    "time"
 )
 
 // Movement scores of the search, matching the original constants: an
 // orthogonal cell step costs 10, a diagonal one 10*sqrt(2), and the
 // heuristic is the Manhattan distance of the cells times 10.
 const (
-	commonScore   = float32(10)
-	diagonalScore = commonScore * 1.41421356
-	// impassableScore marks a wall hit; half of the float32 maximum
-	// keeps the additions of the original overflow free.
-	impassableScore = float32(math.MaxFloat32 / 2)
+    commonScore   = float32(10)
+    diagonalScore = commonScore * 1.41421356
+    // impassableScore marks a wall hit; half of the float32 maximum
+    // keeps the additions of the original overflow free.
+    impassableScore = float32(math.MaxFloat32 / 2)
 )
 
 // Water plane constants of the C1 world. The water zones of the
@@ -30,13 +30,13 @@ const (
 // they exist (the elven village town trips crossed the whole lake
 // under the floating island before this cost existed).
 const (
-	// waterLevel is the water surface height; layers below it count
-	// as underwater.
-	waterLevel = int16(-3780)
-	// waterCostMultiplier scales the step cost of every move landing
-	// on an underwater cell: swimming is several times slower than
-	// running and burns the breath meter.
-	waterCostMultiplier = float32(3)
+    // waterLevel is the water surface height; layers below it count
+    // as underwater.
+    waterLevel = int16(-3780)
+    // waterCostMultiplier scales the step cost of every move landing
+    // on an underwater cell: swimming is several times slower than
+    // running and burns the breath meter.
+    waterCostMultiplier = float32(3)
 )
 
 // nodeKey identifies one search node: the cell plus the height of the
@@ -45,167 +45,167 @@ const (
 // its bridge deck layer away from the search (a single layer per cell
 // resolved on first touch did exactly that on the Elven village bridge).
 type nodeKey struct {
-	p Point
-	h int16
+    p Point
+    h int16
 }
 
 // node is one search node: a geodata cell resolved to one of its
 // layers, with the A* bookkeeping attached.
 type node struct {
-	key    nodeKey
-	coords Point
-	layer  Layer
-	parent *node
-	g, h   float32
-	seq    uint64
-	index  int
+    key    nodeKey
+    coords Point
+    layer  Layer
+    parent *node
+    g, h   float32
+    seq    uint64
+    index  int
 }
 
 // search is one path finding run: the node cache, the open and closed
 // sets and the target cell of the search. The caches are per run, the
 // parsed regions are shared through the engine.
 type search struct {
-	engine            *Engine
-	maxPassableHeight int
-	nodes             map[nodeKey]*node
-	missing           map[Point]bool
-	openSet           map[nodeKey]*node
-	closed            map[nodeKey]*node
-	queue             nodeQueue
-	target            Point
-	targetKey         nodeKey
-	// targetWorld is the world point of the goal; the approach
-	// searches measure the remaining 3D distance against it.
-	targetWorld Vec3
-	// approachRadius terminates the search on the first node within
-	// this 3D distance of targetWorld. Zero keeps the plain cell
-	// arrival semantics (any layer of the target cell).
-	approachRadius float64
-	// dry blocks every step onto an underwater cell: the shore
-	// walks of the hunt loop (the town trips, the deleveling, the
-	// zone returns) must never plan a swim - the click guard of the
-	// walker refuses wet legs, so a wet plan burns the re-path
-	// budget on identical refused routes and aborts (the delevel
-	// water loop of the 2026-09-10 state dump).
-	dry bool
-	// avoid holds the world patches this search must route around
-	// (the frozen-cell ban of the hunt loop recovery): a step onto a
-	// banned cell costs impassable, so the A* detours around the
-	// patch, and neither the direct line shortcut nor the smoothing
-	// may collapse a leg across it. The ban is the planner's own
-	// memory of ground the live server refused to walk although the
-	// geodata pack modeled it as open (the 2026-09-12 trainer hall
-	// aisle freeze: the plan entered through the west aisle column,
-	// the server walled it, the deterministic re-plan reproduced the
-	// identical route and the character stood frozen through the
-	// whole re-path budget).
-	avoid []AvoidArea
-	// neighborScratch and ringScratch are the reusable neighbor
-	// buffers of the expansion loop.
-	neighborScratch []*node
-	ringScratch     []*node
-	region          *Region
-	regionKey       RegionKey
-	explored        int
-	aborted         bool
-	seq             uint64
+    engine            *Engine
+    maxPassableHeight int
+    nodes             map[nodeKey]*node
+    missing           map[Point]bool
+    openSet           map[nodeKey]*node
+    closed            map[nodeKey]*node
+    queue             nodeQueue
+    target            Point
+    targetKey         nodeKey
+    // targetWorld is the world point of the goal; the approach
+    // searches measure the remaining 3D distance against it.
+    targetWorld Vec3
+    // approachRadius terminates the search on the first node within
+    // this 3D distance of targetWorld. Zero keeps the plain cell
+    // arrival semantics (any layer of the target cell).
+    approachRadius float64
+    // dry blocks every step onto an underwater cell: the shore
+    // walks of the hunt loop (the town trips, the deleveling, the
+    // zone returns) must never plan a swim - the click guard of the
+    // walker refuses wet legs, so a wet plan burns the re-path
+    // budget on identical refused routes and aborts (the delevel
+    // water loop of the 2026-09-10 state dump).
+    dry bool
+    // avoid holds the world patches this search must route around
+    // (the frozen-cell ban of the hunt loop recovery): a step onto a
+    // banned cell costs impassable, so the A* detours around the
+    // patch, and neither the direct line shortcut nor the smoothing
+    // may collapse a leg across it. The ban is the planner's own
+    // memory of ground the live server refused to walk although the
+    // geodata pack modeled it as open (the 2026-09-12 trainer hall
+    // aisle freeze: the plan entered through the west aisle column,
+    // the server walled it, the deterministic re-plan reproduced the
+    // identical route and the character stood frozen through the
+    // whole re-path budget).
+    avoid []AvoidArea
+    // neighborScratch and ringScratch are the reusable neighbor
+    // buffers of the expansion loop.
+    neighborScratch []*node
+    ringScratch     []*node
+    region          *Region
+    regionKey       RegionKey
+    explored        int
+    aborted         bool
+    seq             uint64
 }
 
 // newSearch prepares a fresh search over an engine.
 func newSearch(engine *Engine, maxPassableHeight uint16) *search {
-	return &search{
-		engine:            engine,
-		maxPassableHeight: int(maxPassableHeight),
-		nodes:             make(map[nodeKey]*node),
-		missing:           make(map[Point]bool),
-		openSet:           make(map[nodeKey]*node),
-		closed:            make(map[nodeKey]*node),
-		queue:             make(nodeQueue, 0, 256),
-		target:            Point{X: 0, Y: 0},
-		targetKey:         nodeKey{p: Point{X: 0, Y: 0}, h: 0},
-		targetWorld:       Vec3{X: 0, Y: 0, Z: 0},
-		approachRadius:    0,
-		dry:               false,
-		avoid:             nil,
-		neighborScratch:   nil,
-		ringScratch:       nil,
-		region:            nil,
-		regionKey:         RegionKey{Col: 0, Row: 0},
-		explored:          0,
-		aborted:           false,
-		seq:               0,
-	}
+    return &search{
+        engine:            engine,
+        maxPassableHeight: int(maxPassableHeight),
+        nodes:             make(map[nodeKey]*node),
+        missing:           make(map[Point]bool),
+        openSet:           make(map[nodeKey]*node),
+        closed:            make(map[nodeKey]*node),
+        queue:             make(nodeQueue, 0, 256),
+        target:            Point{X: 0, Y: 0},
+        targetKey:         nodeKey{p: Point{X: 0, Y: 0}, h: 0},
+        targetWorld:       Vec3{X: 0, Y: 0, Z: 0},
+        approachRadius:    0,
+        dry:               false,
+        avoid:             nil,
+        neighborScratch:   nil,
+        ringScratch:       nil,
+        region:            nil,
+        regionKey:         RegionKey{Col: 0, Row: 0},
+        explored:          0,
+        aborted:           false,
+        seq:               0,
+    }
 }
 
 // closestLayer returns the layer of a cell closest to z, going through
 // the cached region when possible: the walk is highly local, so one
 // pointer check replaces the engine cache lock on almost every access.
 func (s *search) closestLayer(p Point, z int16) (Layer, bool) {
-	key := CellToRegion(p)
-	if s.region == nil || s.regionKey != key {
-		entry, err := s.engine.entry(key)
-		if err != nil || entry.region == nil {
-			s.region, s.regionKey = nil, key
+    key := CellToRegion(p)
+    if s.region == nil || s.regionKey != key {
+        entry, err := s.engine.entry(key)
+        if err != nil || entry.region == nil {
+            s.region, s.regionKey = nil, key
 
-			return Layer{Height: 0, NSWE: 0}, false
-		}
-		s.region, s.regionKey = entry.region, key
-	}
+            return Layer{Height: 0, NSWE: 0}, false
+        }
+        s.region, s.regionKey = entry.region, key
+    }
 
-	return s.region.ClosestLayer(LocalCell(p), z)
+    return s.region.ClosestLayer(LocalCell(p), z)
 }
 
 // nodeAtWorld resolves a world position to its cell node. A position
 // without geodata is a hard error: the search has no meaningful start or
 // target without it.
 func (s *search) nodeAtWorld(position Vec3) (*node, error) {
-	coords := WorldToCell(position.X, position.Y)
-	node := s.node(coords, int16(position.Z))
-	if node == nil {
-		return nil, fmt.Errorf("%w at %.0f %.0f", ErrMissingCell,
-			position.X, position.Y)
-	}
+    coords := WorldToCell(position.X, position.Y)
+    node := s.node(coords, int16(position.Z))
+    if node == nil {
+        return nil, fmt.Errorf("%w at %.0f %.0f", ErrMissingCell,
+            position.X, position.Y)
+    }
 
-	return node, nil
+    return node, nil
 }
 
 // node returns the search node of a cell for the layer closest to z,
 // creating it on first use. Cells without geodata return nil and stay
 // cached as missing so the neighbour loops do not re-query them.
 func (s *search) node(coords Point, z int16) *node {
-	if s.missing[coords] {
-		return nil
-	}
-	layer, ok := s.closestLayer(coords, z)
-	if !ok {
-		s.missing[coords] = true
+    if s.missing[coords] {
+        return nil
+    }
+    layer, ok := s.closestLayer(coords, z)
+    if !ok {
+        s.missing[coords] = true
 
-		return nil
-	}
-	key := nodeKey{p: coords, h: layer.Height}
-	if existing, ok := s.nodes[key]; ok {
-		return existing
-	}
-	resolved := &node{
-		key:    key,
-		coords: coords,
-		layer:  layer,
-		parent: nil,
-		g:      0,
-		h:      0,
-		seq:    s.nextSeq(),
-		index:  0,
-	}
-	s.nodes[key] = resolved
+        return nil
+    }
+    key := nodeKey{p: coords, h: layer.Height}
+    if existing, ok := s.nodes[key]; ok {
+        return existing
+    }
+    resolved := &node{
+        key:    key,
+        coords: coords,
+        layer:  layer,
+        parent: nil,
+        g:      0,
+        h:      0,
+        seq:    s.nextSeq(),
+        index:  0,
+    }
+    s.nodes[key] = resolved
 
-	return resolved
+    return resolved
 }
 
 // nextSeq returns the insertion sequence for stable heap tie breaking.
 func (s *search) nextSeq() uint64 {
-	s.seq++
+    s.seq++
 
-	return s.seq
+    return s.seq
 }
 
 // run executes the whole search and fills the result statistics. The
@@ -221,101 +221,101 @@ func (s *search) nextSeq() uint64 {
 // of the town trips); with zero it succeeds on the first arrival on
 // the target cell at any layer (the original behavior).
 func (s *search) run(start, end Vec3, approachRadius float64) (*Result, error) {
-	began := time.Now()
-	from, err := s.nodeAtWorld(start)
-	if err != nil {
-		return nil, err
-	}
-	to, err := s.nodeAtWorld(end)
-	if err != nil {
-		return nil, err
-	}
-	s.target = to.coords
-	s.targetKey = to.key
-	s.targetWorld = end
-	s.approachRadius = approachRadius
+    began := time.Now()
+    from, err := s.nodeAtWorld(start)
+    if err != nil {
+        return nil, err
+    }
+    to, err := s.nodeAtWorld(end)
+    if err != nil {
+        return nil, err
+    }
+    s.target = to.coords
+    s.targetKey = to.key
+    s.targetWorld = end
+    s.approachRadius = approachRadius
 
-	result := &Result{
-		Found:     false,
-		Aborted:   false,
-		Waypoints: nil,
-		RawPath:   nil,
-		Duration:  0,
-		Explored:  0,
-		OpenLeft:  0,
-		Length:    0,
-	}
-	raw, smooth := s.directOrAstar(from, to)
-	result.Duration = time.Since(began)
-	result.Explored = s.explored
-	result.OpenLeft = len(s.openSet)
-	result.Aborted = s.aborted
-	if raw == nil {
-		return result, nil
-	}
-	result.Found = true
-	result.RawPath = nodesToWorld(raw)
-	result.Waypoints = nodesToWorld(smooth)
-	result.Length = pathLength(result.Waypoints)
+    result := &Result{
+        Found:     false,
+        Aborted:   false,
+        Waypoints: nil,
+        RawPath:   nil,
+        Duration:  0,
+        Explored:  0,
+        OpenLeft:  0,
+        Length:    0,
+    }
+    raw, smooth := s.directOrAstar(from, to)
+    result.Duration = time.Since(began)
+    result.Explored = s.explored
+    result.OpenLeft = len(s.openSet)
+    result.Aborted = s.aborted
+    if raw == nil {
+        return result, nil
+    }
+    result.Found = true
+    result.RawPath = nodesToWorld(raw)
+    result.Waypoints = nodesToWorld(smooth)
+    result.Length = pathLength(result.Waypoints)
 
-	return result, nil
+    return result, nil
 }
 
 // astar searches the cell grid and returns the raw node path from the
 // start to the target, or nil when the target is unreachable.
 func (s *search) astar(from *node) []*node {
-	from.g = 0
-	from.h = s.heuristic(from, s.target)
-	s.push(from)
-	for s.queue.Len() > 0 {
-		current := heap.Pop(&s.queue).(*node)
-		delete(s.openSet, current.key)
-		if s.nodeReached(current) {
-			return s.reconstruct(current)
-		}
-		if s.explored >= MaxSearchExpansions {
-			s.aborted = true
+    from.g = 0
+    from.h = s.heuristic(from, s.target)
+    s.push(from)
+    for s.queue.Len() > 0 {
+        current := heap.Pop(&s.queue).(*node)
+        delete(s.openSet, current.key)
+        if s.nodeReached(current) {
+            return s.reconstruct(current)
+        }
+        if s.explored >= MaxSearchExpansions {
+            s.aborted = true
 
-			return nil
-		}
-		s.closed[current.key] = current
-		s.explored++
-		// The wall proximity multiplier needs the 7x7 ring around the
-		// expanded cell; the original recomputes it per neighbour, the
-		// ring is identical for all of them.
-		ring := s.neighbors(current, 3)
-		for _, next := range s.neighbors(current, 1) {
-			if _, done := s.closed[next.key]; done {
-				continue
-			}
-			step := current.g + s.costTo(current, next, ring)
-			if step >= impassableScore {
-				// A wall hit: the cell is not walkable from here.
-				// The original library inserted it into the open set
-				// with an astronomic cost instead, which let a sealed
-				// target produce a wall crossing path; unreachable
-				// targets must report not found.
-				continue
-			}
-			if existing, inOpen := s.openSet[next.key]; inOpen {
-				if step >= existing.g {
-					continue
-				}
-				next.parent = current
-				next.g = step
-				next.h = s.heuristic(next, s.target)
-				heap.Fix(&s.queue, next.index)
+            return nil
+        }
+        s.closed[current.key] = current
+        s.explored++
+        // The wall proximity multiplier needs the 7x7 ring around the
+        // expanded cell; the original recomputes it per neighbour, the
+        // ring is identical for all of them.
+        ring := s.neighbors(current, 3)
+        for _, next := range s.neighbors(current, 1) {
+            if _, done := s.closed[next.key]; done {
+                continue
+            }
+            step := current.g + s.costTo(current, next, ring)
+            if step >= impassableScore {
+                // A wall hit: the cell is not walkable from here.
+                // The original library inserted it into the open set
+                // with an astronomic cost instead, which let a sealed
+                // target produce a wall crossing path; unreachable
+                // targets must report not found.
+                continue
+            }
+            if existing, inOpen := s.openSet[next.key]; inOpen {
+                if step >= existing.g {
+                    continue
+                }
+                next.parent = current
+                next.g = step
+                next.h = s.heuristic(next, s.target)
+                heap.Fix(&s.queue, next.index)
 
-				continue
-			}
-			next.parent = current
-			next.g = step
-			next.h = s.heuristic(next, s.target)
-			s.push(next)
-		}
-	}
+                continue
+            }
+            next.parent = current
+            next.g = step
+            next.h = s.heuristic(next, s.target)
+            s.push(next)
+        }
+    }
 
-	return nil
+    return nil
 }
 
 // directOrAstar answers the straight raster line between the start
@@ -337,19 +337,19 @@ func (s *search) astar(from *node) []*node {
 // defers to the A*, which weighs the swim against the bridge detour
 // and the walls against the detour itself.
 func (s *search) directOrAstar(from, to *node) ([]*node, []*node) {
-	direct := s.straightPath(from, to)
-	if len(direct) > 0 && direct[len(direct)-1].coords == to.coords &&
-		s.directLineDry(direct) && s.serverLegVerified(from, to) &&
-		s.legAllowed(from, to) {
-		return direct, []*node{direct[0], direct[len(direct)-1]}
-	}
+    direct := s.straightPath(from, to)
+    if len(direct) > 0 && direct[len(direct)-1].coords == to.coords &&
+        s.directLineDry(direct) && s.serverLegVerified(from, to) &&
+        s.legAllowed(from, to) {
+        return direct, []*node{direct[0], direct[len(direct)-1]}
+    }
 
-	raw := s.astar(from)
-	if raw == nil {
-		return nil, nil
-	}
+    raw := s.astar(from)
+    if raw == nil {
+        return nil, nil
+    }
 
-	return raw, s.smoothPath(raw)
+    return raw, s.smoothPath(raw)
 }
 
 // directLineDry reports whether every step of a raster line is
@@ -357,16 +357,16 @@ func (s *search) directOrAstar(from, to *node) ([]*node, []*node) {
 // penalty is the one cost dimension that can make a walkable
 // straight line clearly worse than a detour.
 func (s *search) directLineDry(direct []*node) bool {
-	for i := 0; i+1 < len(direct); i++ {
-		if !s.canStep(direct[i], direct[i+1]) {
-			return false
-		}
-		if direct[i+1].layer.Height < waterLevel {
-			return false
-		}
-	}
+    for i := 0; i+1 < len(direct); i++ {
+        if !s.canStep(direct[i], direct[i+1]) {
+            return false
+        }
+        if direct[i+1].layer.Height < waterLevel {
+            return false
+        }
+    }
 
-	return true
+    return true
 }
 
 // dryLine reports whether the whole raster line between two nodes
@@ -374,13 +374,13 @@ func (s *search) directLineDry(direct []*node) bool {
 // a line that touches a lake or sea bed anywhere is wet, whatever
 // its endpoints stand on.
 func (s *search) dryLine(from, to *node) bool {
-	for _, step := range s.straightPath(from, to) {
-		if step.layer.Height < waterLevel {
-			return false
-		}
-	}
+    for _, step := range s.straightPath(from, to) {
+        if step.layer.Height < waterLevel {
+            return false
+        }
+    }
 
-	return true
+    return true
 }
 
 // legDry reports whether the smoothing may replace the walk between
@@ -395,11 +395,11 @@ func (s *search) dryLine(from, to *node) bool {
 // escape of a character that already stands in a lake, and the water
 // is the only surface such a walk can use.
 func (s *search) legDry(from, to *node) bool {
-	if from.layer.Height < waterLevel || to.layer.Height < waterLevel {
-		return true
-	}
+    if from.layer.Height < waterLevel || to.layer.Height < waterLevel {
+        return true
+    }
 
-	return s.dryLine(from, to)
+    return s.dryLine(from, to)
 }
 
 // nodeReached reports whether a popped node satisfies the goal of
@@ -408,16 +408,16 @@ func (s *search) legDry(from, to *node) bool {
 // inside that ball whenever it is reachable), a plain run accepts the
 // first arrival on the target cell whatever layer the walk came on.
 func (s *search) nodeReached(current *node) bool {
-	if s.approachRadius > 0 {
-		world := nodeWorld(current)
-		dx := world.X - s.targetWorld.X
-		dy := world.Y - s.targetWorld.Y
-		dz := world.Z - s.targetWorld.Z
+    if s.approachRadius > 0 {
+        world := nodeWorld(current)
+        dx := world.X - s.targetWorld.X
+        dy := world.Y - s.targetWorld.Y
+        dz := world.Z - s.targetWorld.Z
 
-		return math.Sqrt(dx*dx+dy*dy+dz*dz) <= s.approachRadius
-	}
+        return math.Sqrt(dx*dx+dy*dy+dz*dz) <= s.approachRadius
+    }
 
-	return current.coords == s.target
+    return current.coords == s.target
 }
 
 // runEscape plans the way out of the water for a position whose
@@ -432,37 +432,37 @@ func (s *search) nodeReached(current *node) bool {
 // must be resolved by the caller; a start already above the water
 // level needs no escape and answers Found=false.
 func (s *search) runEscape(start Vec3) (*Result, error) {
-	began := time.Now()
-	from, err := s.nodeAtWorld(start)
-	if err != nil {
-		return nil, err
-	}
-	result := &Result{
-		Found:     false,
-		Aborted:   false,
-		Waypoints: nil,
-		RawPath:   nil,
-		Duration:  0,
-		Explored:  0,
-		OpenLeft:  0,
-		Length:    0,
-	}
-	if from.layer.Height >= waterLevel {
-		return result, nil
-	}
-	raw := s.escape(from)
-	result.Duration = time.Since(began)
-	result.Explored = s.explored
-	result.Aborted = s.aborted
-	if raw == nil {
-		return result, nil
-	}
-	result.Found = true
-	result.RawPath = nodesToWorld(raw)
-	result.Waypoints = nodesToWorld(s.smoothPath(raw))
-	result.Length = pathLength(result.Waypoints)
+    began := time.Now()
+    from, err := s.nodeAtWorld(start)
+    if err != nil {
+        return nil, err
+    }
+    result := &Result{
+        Found:     false,
+        Aborted:   false,
+        Waypoints: nil,
+        RawPath:   nil,
+        Duration:  0,
+        Explored:  0,
+        OpenLeft:  0,
+        Length:    0,
+    }
+    if from.layer.Height >= waterLevel {
+        return result, nil
+    }
+    raw := s.escape(from)
+    result.Duration = time.Since(began)
+    result.Explored = s.explored
+    result.Aborted = s.aborted
+    if raw == nil {
+        return result, nil
+    }
+    result.Found = true
+    result.RawPath = nodesToWorld(raw)
+    result.Waypoints = nodesToWorld(s.smoothPath(raw))
+    result.Length = pathLength(result.Waypoints)
 
-	return result, nil
+    return result, nil
 }
 
 // escape floods the walkable surface from the start and returns the
@@ -472,53 +472,53 @@ func (s *search) runEscape(start Vec3) (*Result, error) {
 // already touched and stops at the expansion cap so a lake without a
 // walkable shore cannot loop forever.
 func (s *search) escape(from *node) []*node {
-	queue := []*node{from}
-	seen := map[nodeKey]bool{from.key: true}
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-		if current.layer.Height >= waterLevel {
-			return s.reconstruct(current)
-		}
-		if s.explored >= MaxSearchExpansions {
-			s.aborted = true
+    queue := []*node{from}
+    seen := map[nodeKey]bool{from.key: true}
+    for len(queue) > 0 {
+        current := queue[0]
+        queue = queue[1:]
+        if current.layer.Height >= waterLevel {
+            return s.reconstruct(current)
+        }
+        if s.explored >= MaxSearchExpansions {
+            s.aborted = true
 
-			return nil
-		}
-		s.explored++
-		for _, next := range s.neighbors(current, 1) {
-			if seen[next.key] {
-				continue
-			}
-			if !s.canStep(current, next) {
-				continue
-			}
-			seen[next.key] = true
-			next.parent = current
-			queue = append(queue, next)
-		}
-	}
+            return nil
+        }
+        s.explored++
+        for _, next := range s.neighbors(current, 1) {
+            if seen[next.key] {
+                continue
+            }
+            if !s.canStep(current, next) {
+                continue
+            }
+            seen[next.key] = true
+            next.parent = current
+            queue = append(queue, next)
+        }
+    }
 
-	return nil
+    return nil
 }
 
 // push inserts a node into the open set.
 func (s *search) push(node *node) {
-	s.openSet[node.key] = node
-	heap.Push(&s.queue, node)
+    s.openSet[node.key] = node
+    heap.Push(&s.queue, node)
 }
 
 // reconstruct walks the parent chain of the target back to the start.
 func (s *search) reconstruct(target *node) []*node {
-	path := []*node{}
-	for current := target; current != nil; current = current.parent {
-		path = append(path, current)
-	}
-	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
-		path[i], path[j] = path[j], path[i]
-	}
+    path := []*node{}
+    for current := target; current != nil; current = current.parent {
+        path = append(path, current)
+    }
+    for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+        path[i], path[j] = path[j], path[i]
+    }
 
-	return path
+    return path
 }
 
 // costTo returns the movement cost between neighbouring cells, with the
@@ -526,52 +526,52 @@ func (s *search) reconstruct(target *node) []*node {
 // 7x7 ring, the more the step costs, pulling the path away from)
 // and the water penalty of the destination.
 func (s *search) costTo(current, next *node, ring []*node) float32 {
-	if !s.canStep(current, next) {
-		return impassableScore
-	}
-	if s.cellAvoided(next.coords) {
-		// The recovery ban: the live server proved this ground
-		// unwalkable for this session, the detour around it is the
-		// only plan worth planning.
-		return impassableScore
-	}
-	cost := commonScore
-	if current.coords.X != next.coords.X &&
-		current.coords.Y != next.coords.Y {
-		cost = diagonalScore
-	}
-	if next.layer.Height < waterLevel {
-		if s.dry {
-			// The dry searches treat the water as a wall: a
-			// shore walk with a wet leg is a plan the click
-			// guard refuses before it is ever sent.
-			return impassableScore
-		}
-		// The step lands underwater: swimming costs several land
-		// steps, so bridges and shores beat water crossings.
-		cost *= waterCostMultiplier
-	}
+    if !s.canStep(current, next) {
+        return impassableScore
+    }
+    if s.cellAvoided(next.coords) {
+        // The recovery ban: the live server proved this ground
+        // unwalkable for this session, the detour around it is the
+        // only plan worth planning.
+        return impassableScore
+    }
+    cost := commonScore
+    if current.coords.X != next.coords.X &&
+        current.coords.Y != next.coords.Y {
+        cost = diagonalScore
+    }
+    if next.layer.Height < waterLevel {
+        if s.dry {
+            // The dry searches treat the water as a wall: a
+            // shore walk with a wet leg is a plan the click
+            // guard refuses before it is ever sent.
+            return impassableScore
+        }
+        // The step lands underwater: swimming costs several land
+        // steps, so bridges and shores beat water crossings.
+        cost *= waterCostMultiplier
+    }
 
-	return cost * s.obstacleMultiplier(ring)
+    return cost * s.obstacleMultiplier(ring)
 }
 
 // obstacleMultiplier counts the walled cells of the ring: an open
 // neighbourhood multiplies by 1, a corridor multiplies by ring/obstacles.
 func (s *search) obstacleMultiplier(ring []*node) float32 {
-	if len(ring) == 0 {
-		return 1
-	}
-	obstacles := 0
-	for _, candidate := range ring {
-		if !candidate.layer.IsCompletelyOpen() {
-			obstacles++
-		}
-	}
-	if obstacles == 0 {
-		return 1
-	}
+    if len(ring) == 0 {
+        return 1
+    }
+    obstacles := 0
+    for _, candidate := range ring {
+        if !candidate.layer.IsCompletelyOpen() {
+            obstacles++
+        }
+    }
+    if obstacles == 0 {
+        return 1
+    }
 
-	return float32(len(ring)) / float32(obstacles)
+    return float32(len(ring)) / float32(obstacles)
 }
 
 // canStep mirrors the walkable surface rule of one cell step: the
@@ -592,12 +592,12 @@ func (s *search) obstacleMultiplier(ring []*node) float32 {
 // smoothing share the same strict symmetric form so no leg of the
 // smoothed path ever leaves the surface either.
 func (s *search) canStep(from, to *node) bool {
-	if !s.wallsOpen(from, to) {
-		return false
-	}
+    if !s.wallsOpen(from, to) {
+        return false
+    }
 
-	return heightDelta(from.layer.Height, to.layer.Height) <=
-		s.maxPassableHeight
+    return heightDelta(from.layer.Height, to.layer.Height) <=
+        s.maxPassableHeight
 }
 
 // wallsOpen reports whether the walls of both the source and the
@@ -634,41 +634,41 @@ func (s *search) canStep(from, to *node) bool {
 //
 //nolint:cyclop
 func (s *search) wallsOpen(from, to *node) bool {
-	if from.coords.Y > to.coords.Y && !from.layer.IsNorthOpen() {
-		return false
-	}
-	if from.coords.Y < to.coords.Y && !from.layer.IsSouthOpen() {
-		return false
-	}
-	if from.coords.X < to.coords.X && !from.layer.IsEastOpen() {
-		return false
-	}
-	if from.coords.X > to.coords.X && !from.layer.IsWestOpen() {
-		return false
-	}
-	// The target cell's wall in the reverse direction must also be
-	// open: a step onto a cell whose reverse wall is closed is a step
-	// the server refuses (the isCompletelyBlocked check of
-	// MoveToLocation rejects any target whose walls are all closed,
-	// and a target whose reverse wall alone is closed blocks the
-	// movement validation the same way).
-	if from.coords.Y > to.coords.Y && !to.layer.IsSouthOpen() {
-		return false
-	}
-	if from.coords.Y < to.coords.Y && !to.layer.IsNorthOpen() {
-		return false
-	}
-	if from.coords.X < to.coords.X && !to.layer.IsWestOpen() {
-		return false
-	}
-	if from.coords.X > to.coords.X && !to.layer.IsEastOpen() {
-		return false
-	}
-	if from.coords.X != to.coords.X && from.coords.Y != to.coords.Y {
-		return s.diagonalFlanksOpen(from, to)
-	}
+    if from.coords.Y > to.coords.Y && !from.layer.IsNorthOpen() {
+        return false
+    }
+    if from.coords.Y < to.coords.Y && !from.layer.IsSouthOpen() {
+        return false
+    }
+    if from.coords.X < to.coords.X && !from.layer.IsEastOpen() {
+        return false
+    }
+    if from.coords.X > to.coords.X && !from.layer.IsWestOpen() {
+        return false
+    }
+    // The target cell's wall in the reverse direction must also be
+    // open: a step onto a cell whose reverse wall is closed is a step
+    // the server refuses (the isCompletelyBlocked check of
+    // MoveToLocation rejects any target whose walls are all closed,
+    // and a target whose reverse wall alone is closed blocks the
+    // movement validation the same way).
+    if from.coords.Y > to.coords.Y && !to.layer.IsSouthOpen() {
+        return false
+    }
+    if from.coords.Y < to.coords.Y && !to.layer.IsNorthOpen() {
+        return false
+    }
+    if from.coords.X < to.coords.X && !to.layer.IsWestOpen() {
+        return false
+    }
+    if from.coords.X > to.coords.X && !to.layer.IsEastOpen() {
+        return false
+    }
+    if from.coords.X != to.coords.X && from.coords.Y != to.coords.Y {
+        return s.diagonalFlanksOpen(from, to)
+    }
 
-	return true
+    return true
 }
 
 // diagonalFlanksOpen mirrors the anti corner cut of the server for a
@@ -680,29 +680,29 @@ func (s *search) wallsOpen(from, to *node) bool {
 // diagonals rotate the same pair. A flank cell without geodata counts
 // as open: the server reads no wall from a region it has no data for.
 func (s *search) diagonalFlanksOpen(from, to *node) bool {
-	south := to.coords.Y > from.coords.Y
-	east := to.coords.X > from.coords.X
-	vertical := s.node(Point{X: from.coords.X, Y: to.coords.Y}, from.layer.Height)
-	if vertical != nil {
-		if east && !vertical.layer.IsEastOpen() {
-			return false
-		}
-		if !east && !vertical.layer.IsWestOpen() {
-			return false
-		}
-	}
-	horizontal := s.node(
-		Point{X: to.coords.X, Y: from.coords.Y}, from.layer.Height)
-	if horizontal != nil {
-		if south && !horizontal.layer.IsSouthOpen() {
-			return false
-		}
-		if !south && !horizontal.layer.IsNorthOpen() {
-			return false
-		}
-	}
+    south := to.coords.Y > from.coords.Y
+    east := to.coords.X > from.coords.X
+    vertical := s.node(Point{X: from.coords.X, Y: to.coords.Y}, from.layer.Height)
+    if vertical != nil {
+        if east && !vertical.layer.IsEastOpen() {
+            return false
+        }
+        if !east && !vertical.layer.IsWestOpen() {
+            return false
+        }
+    }
+    horizontal := s.node(
+        Point{X: to.coords.X, Y: from.coords.Y}, from.layer.Height)
+    if horizontal != nil {
+        if south && !horizontal.layer.IsSouthOpen() {
+            return false
+        }
+        if !south && !horizontal.layer.IsNorthOpen() {
+            return false
+        }
+    }
 
-	return true
+    return true
 }
 
 // canMoveTo reports whether the straight walk from one cell to an
@@ -713,21 +713,21 @@ func (s *search) diagonalFlanksOpen(from, to *node) bool {
 // smoothing use this strict form: a leg they verify must stay on one
 // walkable surface, never drop off it.
 func (s *search) canMoveTo(from, to *node) bool {
-	return s.canStep(from, to)
+    return s.canStep(from, to)
 }
 
 // heuristic is the Manhattan cell distance scaled like the step costs.
 func (s *search) heuristic(current *node, target Point) float32 {
-	dx := target.X - current.coords.X
-	dy := target.Y - current.coords.Y
-	if dx < 0 {
-		dx = -dx
-	}
-	if dy < 0 {
-		dy = -dy
-	}
+    dx := target.X - current.coords.X
+    dy := target.Y - current.coords.Y
+    if dx < 0 {
+        dx = -dx
+    }
+    if dy < 0 {
+        dy = -dy
+    }
 
-	return commonScore * float32(dx+dy)
+    return commonScore * float32(dx+dy)
 }
 
 // neighbors returns the existing cell nodes around a node: radius 1 is
@@ -735,44 +735,44 @@ func (s *search) heuristic(current *node, target Point) float32 {
 // proximity. Cells without geodata are skipped. The scratch buffer is
 // reused between expansions to keep the hot loop allocation free.
 func (s *search) neighbors(center *node, radius int) []*node {
-	scratch := s.neighborScratch[:0]
-	if radius > 1 {
-		scratch = s.ringScratch[:0]
-	}
-	for dx := -radius; dx <= radius; dx++ {
-		for dy := -radius; dy <= radius; dy++ {
-			if dx == 0 && dy == 0 {
-				continue
-			}
-			coords := Point{
-				X: center.coords.X + int32(dx),
-				Y: center.coords.Y + int32(dy),
-			}
-			if next := s.node(coords, center.layer.Height); next != nil {
-				scratch = append(scratch, next)
-			}
-		}
-	}
-	if radius > 1 {
-		s.ringScratch = scratch
-	} else {
-		s.neighborScratch = scratch
-	}
+    scratch := s.neighborScratch[:0]
+    if radius > 1 {
+        scratch = s.ringScratch[:0]
+    }
+    for dx := -radius; dx <= radius; dx++ {
+        for dy := -radius; dy <= radius; dy++ {
+            if dx == 0 && dy == 0 {
+                continue
+            }
+            coords := Point{
+                X: center.coords.X + int32(dx),
+                Y: center.coords.Y + int32(dy),
+            }
+            if next := s.node(coords, center.layer.Height); next != nil {
+                scratch = append(scratch, next)
+            }
+        }
+    }
+    if radius > 1 {
+        s.ringScratch = scratch
+    } else {
+        s.neighborScratch = scratch
+    }
 
-	return scratch
+    return scratch
 }
 
 // lineOfSight rasterizes the straight cell line between two nodes and
 // requires every step to be walkable.
 func (s *search) lineOfSight(from, to *node) bool {
-	path := s.straightPath(from, to)
-	for i := 0; i+1 < len(path); i++ {
-		if !s.canMoveTo(path[i], path[i+1]) {
-			return false
-		}
-	}
+    path := s.straightPath(from, to)
+    for i := 0; i+1 < len(path); i++ {
+        if !s.canMoveTo(path[i], path[i+1]) {
+            return false
+        }
+    }
 
-	return s.serverLegVerified(from, to)
+    return s.serverLegVerified(from, to)
 }
 
 // serverLegVerified answers whether the game server's click
@@ -787,19 +787,19 @@ func (s *search) lineOfSight(from, to *node) bool {
 // ActionFailed and the character freezes - the village plaza corner
 // of the 2026-09-10 town walk stuck report).
 func (s *search) serverLegVerified(from, to *node) bool {
-	fromX, fromY, fromZ := nodeClickWorld(from)
-	toX, toY, toZ := nodeClickWorld(to)
-	vx, vy, vz := s.engine.validLocation(fromX, fromY, fromZ, toX, toY, toZ)
+    fromX, fromY, fromZ := nodeClickWorld(from)
+    toX, toY, toZ := nodeClickWorld(to)
+    vx, vy, vz := s.engine.validLocation(fromX, fromY, fromZ, toX, toY, toZ)
 
-	return vx == toX && vy == toY && vz == toZ
+    return vx == toX && vy == toY && vz == toZ
 }
 
 // nodeClickWorld returns the world position of a node the way the
 // server names a click target: the cell center with the layer height.
 func nodeClickWorld(node *node) (int32, int32, int32) {
-	return node.coords.X*cellSize + worldMinX + cellSize/2,
-		node.coords.Y*cellSize + worldMinY + cellSize/2,
-		int32(node.layer.Height)
+    return node.coords.X*cellSize + worldMinX + cellSize/2,
+        node.coords.Y*cellSize + worldMinY + cellSize/2,
+        int32(node.layer.Height)
 }
 
 // straightPath walks the supercover line between two nodes in cell
@@ -808,33 +808,33 @@ func nodeClickWorld(node *node) (int32, int32, int32) {
 // of the original GetStraightPath, including the start height driving
 // the layer selection of the rastered cells.
 func (s *search) straightPath(from, to *node) []*node {
-	xS, yS := from.coords.X, from.coords.Y
-	xE, yE := to.coords.X, to.coords.Y
-	signX := sign(xE - xS)
-	signY := sign(yE - yS)
-	x0, y0 := int64(0), int64(0)
-	x1, y1 := int64(xE-xS), int64(yE-yS)
-	k := math.Abs(float64(y1-y0) / float64(x1-x0))
+    xS, yS := from.coords.X, from.coords.Y
+    xE, yE := to.coords.X, to.coords.Y
+    signX := sign(xE - xS)
+    signY := sign(yE - yS)
+    x0, y0 := int64(0), int64(0)
+    x1, y1 := int64(xE-xS), int64(yE-yS)
+    k := math.Abs(float64(y1-y0) / float64(x1-x0))
 
-	path := []*node{s.node(Point{X: xS, Y: yS}, from.layer.Height)}
-	x, y := x0, y0
-	for x != x1 || y != y1 {
-		t := float64(2*y*int64(signY)+1) / float64(2*x*int64(signX)+1)
-		if t >= k {
-			x += int64(signX)
-		}
-		if t <= k {
-			y += int64(signY)
-		}
-		next := s.node(
-			Point{X: xS + int32(x), Y: yS + int32(y)}, from.layer.Height)
-		if next == nil {
-			break
-		}
-		path = append(path, next)
-	}
+    path := []*node{s.node(Point{X: xS, Y: yS}, from.layer.Height)}
+    x, y := x0, y0
+    for x != x1 || y != y1 {
+        t := float64(2*y*int64(signY)+1) / float64(2*x*int64(signX)+1)
+        if t >= k {
+            x += int64(signX)
+        }
+        if t <= k {
+            y += int64(signY)
+        }
+        next := s.node(
+            Point{X: xS + int32(x), Y: yS + int32(y)}, from.layer.Height)
+        if next == nil {
+            break
+        }
+        path = append(path, next)
+    }
 
-	return path
+    return path
 }
 
 // smoothPath pulls the raw path straight: it keeps the last node that
@@ -848,42 +848,42 @@ func (s *search) straightPath(from, to *node) []*node {
 // lake while the sight lines across its bed stay open, and collapsing
 // them back would reintroduce the swim the search paid to avoid.
 func (s *search) smoothPath(path []*node) []*node {
-	if len(path) == 0 {
-		return nil
-	}
-	result := []*node{path[0]}
-	current := path[0]
-	for i := 1; i < len(path); i++ {
-		if s.lineOfSight(current, path[i]) && s.legDry(current, path[i]) &&
-			s.legAllowed(current, path[i]) {
-			continue
-		}
-		current = path[i-1]
-		result = append(result, current)
-	}
-	if current != path[len(path)-1] {
-		result = append(result, path[len(path)-1])
-	}
+    if len(path) == 0 {
+        return nil
+    }
+    result := []*node{path[0]}
+    current := path[0]
+    for i := 1; i < len(path); i++ {
+        if s.lineOfSight(current, path[i]) && s.legDry(current, path[i]) &&
+            s.legAllowed(current, path[i]) {
+            continue
+        }
+        current = path[i-1]
+        result = append(result, current)
+    }
+    if current != path[len(path)-1] {
+        result = append(result, path[len(path)-1])
+    }
 
-	return result
+    return result
 }
 
 // cellAvoided reports whether the cell falls inside one of the avoid
 // areas of the search: the recovery ban of the hunt loop, expressed in
 // world coordinates the caller derives from its own freeze reports.
 func (s *search) cellAvoided(p Point) bool {
-	if len(s.avoid) == 0 {
-		return false
-	}
-	center := CellToWorldCenter(p)
-	for _, area := range s.avoid {
-		if math.Hypot(center.X-area.Center.X, center.Y-area.Center.Y) <=
-			area.Radius {
-			return true
-		}
-	}
+    if len(s.avoid) == 0 {
+        return false
+    }
+    center := CellToWorldCenter(p)
+    for _, area := range s.avoid {
+        if math.Hypot(center.X-area.Center.X, center.Y-area.Center.Y) <=
+            area.Radius {
+            return true
+        }
+    }
 
-	return false
+    return false
 }
 
 // legAllowed reports whether the straight leg between two nodes stays
@@ -891,59 +891,59 @@ func (s *search) cellAvoided(p Point) bool {
 // may only collapse legs the ban does not cross, otherwise the shortcut
 // hands the walker back the very corridor the re-plan meant to detour.
 func (s *search) legAllowed(from, to *node) bool {
-	if len(s.avoid) == 0 {
-		return true
-	}
-	for _, step := range s.straightPath(from, to) {
-		if s.cellAvoided(step.coords) {
-			return false
-		}
-	}
+    if len(s.avoid) == 0 {
+        return true
+    }
+    for _, step := range s.straightPath(from, to) {
+        if s.cellAvoided(step.coords) {
+            return false
+        }
+    }
 
-	return true
+    return true
 }
 
 // sign returns the sign of an integer difference.
 func sign(v int32) int32 {
-	if v > 0 {
-		return 1
-	}
-	if v < 0 {
-		return -1
-	}
+    if v > 0 {
+        return 1
+    }
+    if v < 0 {
+        return -1
+    }
 
-	return 0
+    return 0
 }
 
 // nodesToWorld converts a node path to world cell centers with the layer
 // height as z.
 func nodesToWorld(path []*node) []Vec3 {
-	world := make([]Vec3, len(path))
-	for i, node := range path {
-		world[i] = nodeWorld(node)
-	}
+    world := make([]Vec3, len(path))
+    for i, node := range path {
+        world[i] = nodeWorld(node)
+    }
 
-	return world
+    return world
 }
 
 // nodeWorld is the world position of a node (cell center, layer height).
 func nodeWorld(node *node) Vec3 {
-	center := CellToWorldCenter(node.coords)
+    center := CellToWorldCenter(node.coords)
 
-	return Vec3{X: center.X, Y: center.Y, Z: float64(node.layer.Height)}
+    return Vec3{X: center.X, Y: center.Y, Z: float64(node.layer.Height)}
 }
 
 // pathLength sums the 3D segment lengths of a waypoint path.
 func pathLength(waypoints []Vec3) float64 {
-	length := 0.0
-	for i := 1; i < len(waypoints); i++ {
-		dx := waypoints[i].X - waypoints[i-1].X
-		dy := waypoints[i].Y - waypoints[i-1].Y
-		dz := waypoints[i].Z - waypoints[i-1].Z
-		length += math.Sqrt(dx*dx + dy*dy + dz*dz)
-	}
+    length := 0.0
+    for i := 1; i < len(waypoints); i++ {
+        dx := waypoints[i].X - waypoints[i-1].X
+        dy := waypoints[i].Y - waypoints[i-1].Y
+        dz := waypoints[i].Z - waypoints[i-1].Z
+        length += math.Sqrt(dx*dx + dy*dy + dz*dz)
+    }
 
-	return length
+    return length
 }
 
 // nodeQueue is the A* open set: a binary heap ordered by the f score,
@@ -956,39 +956,39 @@ func (q nodeQueue) Len() int { return len(q) }
 
 // Less orders the nodes by f score, then h, then insertion sequence.
 func (q nodeQueue) Less(i, j int) bool {
-	fi, fj := q[i].g+q[i].h, q[j].g+q[j].h
-	if fi != fj {
-		return fi < fj
-	}
-	if q[i].h != q[j].h {
-		return q[i].h < q[j].h
-	}
+    fi, fj := q[i].g+q[i].h, q[j].g+q[j].h
+    if fi != fj {
+        return fi < fj
+    }
+    if q[i].h != q[j].h {
+        return q[i].h < q[j].h
+    }
 
-	return q[i].seq < q[j].seq
+    return q[i].seq < q[j].seq
 }
 
 // Swap exchanges two heap entries and maintains the node indices for
 // heap.Fix.
 func (q nodeQueue) Swap(i, j int) {
-	q[i], q[j] = q[j], q[i]
-	q[i].index = i
-	q[j].index = j
+    q[i], q[j] = q[j], q[i]
+    q[i].index = i
+    q[j].index = j
 }
 
 // Push appends a node to the heap.
 func (q *nodeQueue) Push(value any) {
-	node := value.(*node)
-	node.index = len(*q)
-	*q = append(*q, node)
+    node := value.(*node)
+    node.index = len(*q)
+    *q = append(*q, node)
 }
 
 // Pop removes the best node from the heap.
 func (q *nodeQueue) Pop() any {
-	old := *q
-	item := old[len(old)-1]
-	old[len(old)-1] = nil
-	*q = old[:len(old)-1]
-	item.index = 0
+    old := *q
+    item := old[len(old)-1]
+    old[len(old)-1] = nil
+    *q = old[:len(old)-1]
+    item.index = 0
 
-	return item
+    return item
 }

@@ -5,10 +5,10 @@
 package webserver
 
 import (
-	"net/http"
+    "net/http"
 
-	"github.com/melg8/swarm/internal/swarm/session"
-	"github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/session"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // The session report endpoint of the web UI: the compact plain text
@@ -26,60 +26,60 @@ import (
 // the first microseconds); without a journal the endpoint answers 503
 // (the -session-dir "" mode).
 func (s *Server) SetSessionJournal(journal *session.Journal) {
-	s.journal = journal
-	mux := s.httpServer.Handler.(*http.ServeMux)
-	mux.HandleFunc(
-		"GET /api/bots/{id}/session-report", s.handleSessionReport)
+    s.journal = journal
+    mux := s.httpServer.Handler.(*http.ServeMux)
+    mux.HandleFunc(
+        "GET /api/bots/{id}/session-report", s.handleSessionReport)
 }
 
 // handleSessionReport serves the session report of one bot as plain
 // text.
 func (s *Server) handleSessionReport(w http.ResponseWriter, r *http.Request) {
-	if s.journal == nil {
-		http.Error(w, "session journal is disabled",
-			http.StatusServiceUnavailable)
+    if s.journal == nil {
+        http.Error(w, "session journal is disabled",
+            http.StatusServiceUnavailable)
 
-		return
-	}
-	bot, ok := s.lookupBot(w, r)
-	if !ok {
-		return
-	}
-	report, err := s.journal.Report(bot.ID(), liveView(bot))
-	if err != nil {
-		http.Error(w, "no session data: "+err.Error(), http.StatusNotFound)
+        return
+    }
+    bot, ok := s.lookupBot(w, r)
+    if !ok {
+        return
+    }
+    report, err := s.journal.Report(bot.ID(), liveView(bot))
+    if err != nil {
+        http.Error(w, "no session data: "+err.Error(), http.StatusNotFound)
 
-		return
-	}
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	// The report is plain text assembled in process from the journal
-	// aggregates (no user input reaches the response body), the same
-	// false positive the dump endpoint carries.
-	//nolint:gosec // in-process plain text, see above
-	if _, err := w.Write([]byte(report)); err != nil {
-		s.logger.Printf("Error writing session report: %v", err)
-	}
+        return
+    }
+    w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+    // The report is plain text assembled in process from the journal
+    // aggregates (no user input reaches the response body), the same
+    // false positive the dump endpoint carries.
+    //nolint:gosec // in-process plain text, see above
+    if _, err := w.Write([]byte(report)); err != nil {
+        s.logger.Printf("Error writing session report: %v", err)
+    }
 }
 
 // liveView builds the point-in-time block of the report header from
 // the tracker.
 func liveView(bot *state.Bot) *session.LiveView {
-	x, y, _, ok := bot.SelfPosition()
-	if !ok {
-		x, y = 0, 0
-	}
+    x, y, _, ok := bot.SelfPosition()
+    if !ok {
+        x, y = 0, 0
+    }
 
-	return &session.LiveView{
-		ID:     bot.ID(),
-		Status: string(bot.Status()),
-		Phase:  bot.Phase(),
-		Level:  bot.SelfLevel(),
-		ExpPercent: state.ExpPercent(bot.SelfLevel(),
-			int64(bot.SelfExp())),
-		Health:      bot.SelfHealthPercent(),
-		Adena:       int64(bot.InventoryStats().Adena),
-		X:           x,
-		Y:           y,
-		StartedUnix: bot.SessionStartedAt().Unix(),
-	}
+    return &session.LiveView{
+        ID:     bot.ID(),
+        Status: string(bot.Status()),
+        Phase:  bot.Phase(),
+        Level:  bot.SelfLevel(),
+        ExpPercent: state.ExpPercent(bot.SelfLevel(),
+            int64(bot.SelfExp())),
+        Health:      bot.SelfHealthPercent(),
+        Adena:       int64(bot.InventoryStats().Adena),
+        X:           x,
+        Y:           y,
+        StartedUnix: bot.SessionStartedAt().Unix(),
+    }
 }

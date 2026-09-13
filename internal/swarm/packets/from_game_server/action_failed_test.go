@@ -5,24 +5,24 @@
 package fromgameserver
 
 import (
-	"testing"
+    "testing"
 
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
-	"github.com/stretchr/testify/require"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/stretchr/testify/require"
 )
 
 func TestParseActionFailedPacket(t *testing.T) {
-	writer := packet.NewWriter()
-	require.NoError(t, writer.WriteInt8(actionFailedPacketID))
+    writer := packet.NewWriter()
+    require.NoError(t, writer.WriteInt8(actionFailedPacketID))
 
-	p := NewActionFailedPacket()
-	require.NoError(t, ParseActionFailedPacket(p, writer.Bytes()))
+    p := NewActionFailedPacket()
+    require.NoError(t, ParseActionFailedPacket(p, writer.Bytes()))
 }
 
 func TestParseActionFailedPacketRejectsWrongID(t *testing.T) {
-	writer := packet.NewWriter()
-	require.NoError(t, writer.WriteInt8(socialActionPacketID))
+    writer := packet.NewWriter()
+    require.NoError(t, writer.WriteInt8(socialActionPacketID))
 
-	p := NewActionFailedPacket()
-	require.Error(t, ParseActionFailedPacket(p, writer.Bytes()))
+    p := NewActionFailedPacket()
+    require.Error(t, ParseActionFailedPacket(p, writer.Bytes()))
 }

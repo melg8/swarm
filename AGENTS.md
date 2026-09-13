@@ -19,9 +19,9 @@ the documentation map below) and is read on demand, not upfront.
   itself. Node is only used by the four `tools/repro_*.js` web UI
   harnesses (plain JS, no npm).
 - **Module path**: `github.com/melg8/swarm`.
-- **Linter gate**: golangci-lint v2.13.2, strict (55 linters, see
-  `.golangci.yml`). Pinned versions of `task`, `gci`, `gofumpt` are
-  installed by `tools/install_dev_tools.sh`.
+- **Linter gate**: golangci-lint v2.13.2, strict (see
+  `.golangci.yml`). `task`, `gci` and the repository formatter
+  `gofmt-spaces` are installed by `tools/install_dev_tools.sh`.
 - **Server**: a locally hosted
   [L2J Mobius](https://gitlab.com/MobiusDevelopment/L2J_Mobius/)
   emulator, module `L2J_Mobius_C1_HarbingersOfWar` (Chronicle 1).
@@ -182,7 +182,7 @@ Go developer tools with `tools/install_dev_tools.sh`. The fast deploy
 brings up the Go toolchain, the Mobius C1 stack (login 2106, game
 7777, MariaDB 3306) and builds the bot; the dev-tools script fills the
 gap the fast deploy leaves open (`task`, `golangci-lint`, `gci`,
-`gofumpt`). Do not begin the actual work on an undeployed or broken
+`gofmt-spaces`). Do not begin the actual work on an undeployed or broken
 stack: nearly every task needs the live login server (2106), game
 server (7777) and MariaDB (3306) to reproduce, test and validate
 behavior. (A pure documentation change that touches no code needs
@@ -446,13 +446,14 @@ The full `task lint` (39 s) is the CI gate and runs against the whole
 tree - use it before a push, not on every save:
 
 ```bash
-task check:all            # lint + test (the CI gate, ~160 s with the stack up)
+task check:all            # lint + test + fmt:check (the CI gate, ~160 s with the stack up)
 task lint                 # golangci-lint run (full, ~39 s, all code)
 task lint:new             # golangci-lint run --new (~2 s, changed code only)
 task lint:fix             # golangci-lint run --fix
 task test:cover           # go test ./... --cover --count=1 (~123 s)
-task fmt                  # go fmt ./...
-task tidy                 # go mod tidy
+task fmt                  # gofmt-spaces + whitespace normalization (spaces only)
+task fmt:check            # fails on any tab left in a tracked text file
+task tidy                 # go mod tidy (re-tabs go.mod: run task fmt after)
 ```
 
 The branch carries a small set of accepted pre-existing lint findings
@@ -604,6 +605,20 @@ debugging session.
 
 Enforced by `.golangci-lint` config (strict, most linters enabled):
 
+- **Whitespace is spaces only, never tabs.** Four spaces per
+  indentation step, repository wide (Go, go.mod, the tools scripts,
+  the docs, the vendored skills). The formatter of record is
+  `gofmt-spaces` (`cmd/gofmt-spaces`, run through `task fmt`): it
+  formats exactly like gofmt but replaces every tab of the output
+  with four spaces, protecting the string literals; the
+  non-Go text files are widened by `tools/normalize_whitespace.sh`
+  (leading tabs of scripts and data, every tab of go.mod and the
+  markdown). Do **not** run the stock `gofmt`, `gofumpt`, `goimports`
+  or `golangci-lint fmt` on this tree - they all re-tab it (the
+  `formatters` set of the lint gate keeps only `gci` import grouping
+  for exactly that reason). `go mod tidy` re-tabs go.mod, so an
+  extra `task fmt` belongs after it. `task fmt:check` (part of
+  `task check:all`) fails on any tab left in a tracked text file.
 - Line length limit is 80 characters (`lll`).
 - Comments must end with a period (`godot`). Comments and identifiers
   are in English.
@@ -611,12 +626,16 @@ Enforced by `.golangci-lint` config (strict, most linters enabled):
   `SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>`
   followed by `SPDX-License-Identifier: MIT`. Copy it from any existing
   file (including shell scripts in `tools/`, which use `#` comments).
-- Format with `gofmt`/`gofumpt`; imports grouped by `gci`/`goimports`.
+- Imports grouped by `gci` (the only formatter the lint gate runs;
+  the whitespace itself belongs to `gofmt-spaces`, see above).
 - Function length and cyclomatic complexity are limited (`funlen`,
   `cyclop`, `gocyclo`). Split long functions instead of disabling
   linters.
 - Initialize all struct fields when constructing (`exhaustruct`);
   prefer `NewXxx()` constructors for parsed packet structs.
+  A gofmt-spaces note: it is a gofmt clone, so the gofumpt extras
+  (empty line trimming, the stricter idiom rules) are not enforced
+  anymore - do not rely on them appearing automatically.
 - Do not return `nil` error together with a `nil` value (`nilnil`); do
   not create dynamic errors with `fmt.Errorf` without wrapping
   (`err113` is planned to be enabled): prefer `errors.New` for static

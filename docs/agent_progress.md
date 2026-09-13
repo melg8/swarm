@@ -11,6 +11,84 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the repository-wide switch to spaces only (2026-09-13)
+
+Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user ordered the full whitespace conversion: every file of the
+repository must use spaces only (no tabs anywhere, the included
+vendored skills and go.mod too), the gofmt setup must be configured
+for spaces as well, and AGENTS.md must carry the explicit rule. The
+trigger was the recurring agent failure "my edits replaced the tabs
+with spaces, fixing with gofmt/gofumpt" - the tab policy fought the
+editing tools, so spaces become the single style.
+
+### What changed
+
+- `cmd/gofmt-spaces` (new): the formatter of record. It formats
+  exactly like gofmt (go/format.Source) and then widens every tab of
+  the canonical output to four spaces OUTSIDE string and character
+  literals (a go/scanner pass locates the literal spans, so the tab
+  of a literal is data and stays). Unit tests pin the literal
+  protection, the field alignment, the idempotence and the re-indent
+  of the wide 8-space files the session-journal round left behind.
+- `tools/normalize_whitespace.sh` (new): widens the tabs of the
+  tracked non-Go text files - every tab of go.mod and the markdown
+  (no string literals), only the leading whitespace run of scripts
+  and data (a tab inside a shell string literal is data).
+- `task fmt` runs both (the Go tree plus `.agents/skills`); the new
+  `task fmt:check` fails on any tab of a tracked text file and on
+  any gofmt-spaces-dirty Go file; it joined `task check:all`.
+- The lint gate: the `formatters` set keeps only `gci` import
+  grouping; gofmt/gofumpt/goimports are disabled (they all re-tab
+  the tree). `tools/install_dev_tools.sh` builds gofmt-spaces from
+  the repo instead of installing gofumpt.
+- The four npcdata generators call gofmt-spaces (the binary or
+  `go run ./cmd/gofmt-spaces`) instead of the stock gofmt, and the
+  system-messages heredoc emits the map entries space indented.
+- `tools/install_agent_skills.sh`: the vendored-skills drift check
+  compares content ignoring whitespace (`diff -r --brief -w`)
+  because the vendored copy is whitespace-normalized on purpose;
+  the install mode re-normalizes after every copy from upstream.
+- `.editorconfig` (new): indent_style space everywhere, 4 for Go,
+  2 for json/yml/js/css/html.
+- AGENTS.md: the "Whitespace is spaces only, never tabs" rule in
+  Code conventions (the formatter of record, the go mod tidy trap,
+  the fmt:check gate), the tech stack and command notes updated, the
+  go-verify-loop playbook teaches the new loop.
+
+### Verification
+
+- `git diff -w` is EMPTY over the whole change: the conversion is
+  provably whitespace-only (the 388 Go files, go.mod, the tools
+  scripts, the vendored skills).
+- `git grep -IP '\t'` over the tracked tree: no match - not a
+  single tab byte left (the binary geodata/icons/maps never carry
+  text tabs; the .l2j/.png/.jpg files are untouched).
+- go build, go vet, the full `go test ./...` (22 packages) green.
+- Full `golangci-lint run`: 50 issues, down from the 59 pre-existing
+  (the 8-space session files re-indented to 4 shed lll findings);
+  `--new` clean for the two gofmt-spaces files themselves after the
+  gosec G703 nolint (a formatter writes the paths it is pointed at,
+  the gofmt -w trust model) and a whitespace fix.
+- Known tradeoff: the tab-to-4-spaces widening pushed 78 production
+  lines 1-5 chars past the lll 80 limit (max-same-issues caps what
+  the report shows; the branch already carries lll findings, the
+  total count still dropped). A follow-up reflow can clear them if
+  the owner wants; it was NOT mixed into this commit to keep the
+  whitespace-only proof intact.
+- Pre-existing, untouched: `tools/install_agent_skills.sh check`
+  still reports the golang-project-layout drift (the vendored copy
+  lacks the skill the pinned upstream commit carries; the same on
+  origin before this task - a re-vendoring decision, not a
+  whitespace issue).
+
+- Status: done (2026-09-13).
+
 ## Active task: the spot geometry live audit, the starve livelock and the bow luring (2026-09-13)
 
 Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.

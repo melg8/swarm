@@ -204,7 +204,10 @@ print(
 )
 PYEOF
 
-# The generated maps must be gofmt clean (aligned columns).
-if command -v gofmt > /dev/null 2>&1; then
-    gofmt -w "${OUT}"
+# The generated maps must be gofmt-spaces clean (spaces only, see
+# AGENTS.md).
+if command -v gofmt-spaces >/dev/null 2>&1; then
+    gofmt-spaces -w "${OUT}"
+elif command -v go >/dev/null 2>&1; then
+    (cd "${SWARM_ROOT}" && go run ./cmd/gofmt-spaces -w "${OUT}")
 fi

@@ -5,9 +5,9 @@
 package fromgameserver
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const abnormalStatusUpdatePacketID = 0x97
@@ -23,9 +23,9 @@ const abnormalBuffCap = 64
 // the remaining seconds (a large value - 2147483647 - marks the
 // effects the server never times out).
 type BuffEntry struct {
-	SkillID int32
-	Level   int32
-	Time    int32
+    SkillID int32
+    Level   int32
+    Time    int32
 }
 
 // AbnormalStatusUpdatePacket is the active effect list of the
@@ -37,57 +37,57 @@ type BuffEntry struct {
 // Wire format (see AbnormalStatusUpdate.writeImpl): [opcode 0x97]
 // [count: 2] then per effect [skillId: 4][level: 2][time: 4].
 type AbnormalStatusUpdatePacket struct {
-	Buffs []BuffEntry
+    Buffs []BuffEntry
 }
 
 // NewAbnormalStatusUpdatePacket creates a packet ready for parsing
 // with a reusable entry buffer.
 func NewAbnormalStatusUpdatePacket() *AbnormalStatusUpdatePacket {
-	return &AbnormalStatusUpdatePacket{
-		Buffs: make([]BuffEntry, 0, 8),
-	}
+    return &AbnormalStatusUpdatePacket{
+        Buffs: make([]BuffEntry, 0, 8),
+    }
 }
 
 // ParseAbnormalStatusUpdatePacket reads the packet from payload bytes.
 func ParseAbnormalStatusUpdatePacket(
-	p *AbnormalStatusUpdatePacket, data []byte,
+    p *AbnormalStatusUpdatePacket, data []byte,
 ) error {
-	reader := packet.NewReader(data)
+    reader := packet.NewReader(data)
 
-	if err := expectPacketID(
-		reader, abnormalStatusUpdatePacketID); err != nil {
-		return err
-	}
-	count, err := reader.ReadInt16()
-	if err != nil {
-		return fmt.Errorf("failed to read buff count: %w", err)
-	}
-	if count < 0 || count > abnormalBuffCap {
-		return fmt.Errorf("implausible buff count %d", count)
-	}
-	p.Buffs = p.Buffs[:0]
-	for range count {
-		skillID, err := reader.ReadInt32()
-		if err != nil {
-			return fmt.Errorf(
-				"failed to read buff skill id: %w", err)
-		}
-		level, err := reader.ReadInt16()
-		if err != nil {
-			return fmt.Errorf(
-				"failed to read buff level: %w", err)
-		}
-		time, err := reader.ReadInt32()
-		if err != nil {
-			return fmt.Errorf(
-				"failed to read buff time: %w", err)
-		}
-		p.Buffs = append(p.Buffs, BuffEntry{
-			SkillID: skillID,
-			Level:   int32(level),
-			Time:    time,
-		})
-	}
+    if err := expectPacketID(
+        reader, abnormalStatusUpdatePacketID); err != nil {
+        return err
+    }
+    count, err := reader.ReadInt16()
+    if err != nil {
+        return fmt.Errorf("failed to read buff count: %w", err)
+    }
+    if count < 0 || count > abnormalBuffCap {
+        return fmt.Errorf("implausible buff count %d", count)
+    }
+    p.Buffs = p.Buffs[:0]
+    for range count {
+        skillID, err := reader.ReadInt32()
+        if err != nil {
+            return fmt.Errorf(
+                "failed to read buff skill id: %w", err)
+        }
+        level, err := reader.ReadInt16()
+        if err != nil {
+            return fmt.Errorf(
+                "failed to read buff level: %w", err)
+        }
+        time, err := reader.ReadInt32()
+        if err != nil {
+            return fmt.Errorf(
+                "failed to read buff time: %w", err)
+        }
+        p.Buffs = append(p.Buffs, BuffEntry{
+            SkillID: skillID,
+            Level:   int32(level),
+            Time:    time,
+        })
+    }
 
-	return nil
+    return nil
 }

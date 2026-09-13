@@ -18,18 +18,18 @@ package state
 // caller to hold the bot lock (the store itself is not
 // synchronized).
 type objectStore struct {
-	hot   []objectHot
-	cold  []objectCold
-	index map[int32]int32
+    hot   []objectHot
+    cold  []objectCold
+    index map[int32]int32
 }
 
 // newObjectStore creates the empty store.
 func newObjectStore() objectStore {
-	return objectStore{
-		hot:   nil,
-		cold:  nil,
-		index: make(map[int32]int32),
-	}
+    return objectStore{
+        hot:   nil,
+        cold:  nil,
+        index: make(map[int32]int32),
+    }
 }
 
 // lookupLocked returns the pointers to the hot and cold records of
@@ -38,13 +38,13 @@ func newObjectStore() objectStore {
 // finish their mutation before either happens. The caller must hold
 // a lock.
 func (s *objectStore) lookupLocked(
-	objectID int32,
+    objectID int32,
 ) (*objectHot, *objectCold) {
-	if slot, ok := s.index[objectID]; ok {
-		return &s.hot[slot], &s.cold[slot]
-	}
+    if slot, ok := s.index[objectID]; ok {
+        return &s.hot[slot], &s.cold[slot]
+    }
 
-	return nil, nil
+    return nil, nil
 }
 
 // upsertLocked returns the pointers to the existing records of the
@@ -53,24 +53,24 @@ func (s *objectStore) lookupLocked(
 // multiplier and unit item count. The caller must hold the write
 // lock.
 func (s *objectStore) upsertLocked(
-	objectID int32, kind int8,
+    objectID int32, kind int8,
 ) (*objectHot, *objectCold) {
-	if slot, ok := s.index[objectID]; ok {
-		return &s.hot[slot], &s.cold[slot]
-	}
-	//nolint:exhaustruct_v5 // the spawn defaults, the rest starts zero
-	s.hot = append(s.hot, objectHot{
-		ObjectID:      objectID,
-		Kind:          kind,
-		Running:       true,
-		MoveSpeedMult: 1,
-	})
-	//nolint:exhaustruct_v5 // the unit item count, the rest starts zero
-	s.cold = append(s.cold, objectCold{Count: 1})
-	slot := int32(len(s.hot) - 1)
-	s.index[objectID] = slot
+    if slot, ok := s.index[objectID]; ok {
+        return &s.hot[slot], &s.cold[slot]
+    }
+    //nolint:exhaustruct_v5 // the spawn defaults, the rest starts zero
+    s.hot = append(s.hot, objectHot{
+        ObjectID:      objectID,
+        Kind:          kind,
+        Running:       true,
+        MoveSpeedMult: 1,
+    })
+    //nolint:exhaustruct_v5 // the unit item count, the rest starts zero
+    s.cold = append(s.cold, objectCold{Count: 1})
+    slot := int32(len(s.hot) - 1)
+    s.index[objectID] = slot
 
-	return &s.hot[slot], &s.cold[slot]
+    return &s.hot[slot], &s.cold[slot]
 }
 
 // removeAtLocked frees a slot of the dense object arrays: the last
@@ -78,23 +78,23 @@ func (s *objectStore) upsertLocked(
 // follows them, so the arrays stay dense and length locked. The
 // caller must hold the write lock.
 func (s *objectStore) removeAtLocked(slot int32, objectID int32) {
-	last := int32(len(s.hot) - 1)
-	if slot != last {
-		s.hot[slot] = s.hot[last]
-		s.cold[slot] = s.cold[last]
-		s.index[s.hot[slot].ObjectID] = slot
-	}
-	s.hot = s.hot[:last]
-	s.cold = s.cold[:last]
-	delete(s.index, objectID)
+    last := int32(len(s.hot) - 1)
+    if slot != last {
+        s.hot[slot] = s.hot[last]
+        s.cold[slot] = s.cold[last]
+        s.index[s.hot[slot].ObjectID] = slot
+    }
+    s.hot = s.hot[:last]
+    s.cold = s.cold[:last]
+    delete(s.index, objectID)
 }
 
 // slotLocked resolves the slot of an object id, -1 when unknown. The
 // caller must hold a lock.
 func (s *objectStore) slotLocked(objectID int32) int32 {
-	if slot, ok := s.index[objectID]; ok {
-		return slot
-	}
+    if slot, ok := s.index[objectID]; ok {
+        return slot
+    }
 
-	return -1
+    return -1
 }

@@ -5,7 +5,7 @@
 package state
 
 import (
-	"slices"
+    "slices"
 )
 
 // inventoryStore is the inventory storage of one bot session: a dense
@@ -20,31 +20,31 @@ import (
 // materializing and sorting a copy first. Every method expects the
 // caller to hold the bot lock (the store itself is not synchronized).
 type inventoryStore struct {
-	items []InventoryItem
-	index map[int32]int32
-	// orderDirty reports that items left the canonical order: the
-	// next canonicalizeLocked call re-sorts and rebuilds the index.
-	orderDirty bool
+    items []InventoryItem
+    index map[int32]int32
+    // orderDirty reports that items left the canonical order: the
+    // next canonicalizeLocked call re-sorts and rebuilds the index.
+    orderDirty bool
 }
 
 // newInventoryStore creates the empty store.
 func newInventoryStore() inventoryStore {
-	return inventoryStore{
-		items:      nil,
-		index:      make(map[int32]int32),
-		orderDirty: false,
-	}
+    return inventoryStore{
+        items:      nil,
+        index:      make(map[int32]int32),
+        orderDirty: false,
+    }
 }
 
 // lookupLocked returns the tracked record of the object id. The caller
 // must hold a lock.
 func (s *inventoryStore) lookupLocked(objectID int32) (InventoryItem, bool) {
-	if slot, ok := s.index[objectID]; ok {
-		return s.items[slot], true
-	}
+    if slot, ok := s.index[objectID]; ok {
+        return s.items[slot], true
+    }
 
-	//nolint:exhaustruct_v5 // the zero value reports the miss
-	return InventoryItem{}, false
+    //nolint:exhaustruct_v5 // the zero value reports the miss
+    return InventoryItem{}, false
 }
 
 // upsertLocked stores the item record and reports the previous one: a
@@ -54,23 +54,23 @@ func (s *inventoryStore) lookupLocked(objectID int32) (InventoryItem, bool) {
 // the record position and costs no re-sort. The caller must hold the
 // write lock.
 func (s *inventoryStore) upsertLocked(
-	item InventoryItem,
+    item InventoryItem,
 ) (previous InventoryItem, existed bool) {
-	if slot, ok := s.index[item.ObjectID]; ok {
-		previous = s.items[slot]
-		if previous.Equipped != item.Equipped {
-			s.orderDirty = true
-		}
-		s.items[slot] = item
+    if slot, ok := s.index[item.ObjectID]; ok {
+        previous = s.items[slot]
+        if previous.Equipped != item.Equipped {
+            s.orderDirty = true
+        }
+        s.items[slot] = item
 
-		return previous, true
-	}
-	s.items = append(s.items, item)
-	s.index[item.ObjectID] = int32(len(s.items) - 1)
-	s.orderDirty = true
+        return previous, true
+    }
+    s.items = append(s.items, item)
+    s.index[item.ObjectID] = int32(len(s.items) - 1)
+    s.orderDirty = true
 
-	//nolint:exhaustruct_v5 // the zero value reports the miss
-	return InventoryItem{}, false
+    //nolint:exhaustruct_v5 // the zero value reports the miss
+    return InventoryItem{}, false
 }
 
 // removeLocked drops the record of the object id and reports whether
@@ -79,31 +79,31 @@ func (s *inventoryStore) upsertLocked(
 // marks it dirty for the batch end canonicalizeLocked call. The
 // caller must hold the write lock.
 func (s *inventoryStore) removeLocked(objectID int32) bool {
-	slot, ok := s.index[objectID]
-	if !ok {
-		return false
-	}
-	last := int32(len(s.items) - 1)
-	if slot != last {
-		s.items[slot] = s.items[last]
-		s.index[s.items[slot].ObjectID] = slot
-	}
-	s.items = s.items[:last]
-	delete(s.index, objectID)
-	s.orderDirty = true
+    slot, ok := s.index[objectID]
+    if !ok {
+        return false
+    }
+    last := int32(len(s.items) - 1)
+    if slot != last {
+        s.items[slot] = s.items[last]
+        s.index[s.items[slot].ObjectID] = slot
+    }
+    s.items = s.items[:last]
+    delete(s.index, objectID)
+    s.orderDirty = true
 
-	return true
+    return true
 }
 
 // replaceLocked swaps the whole tracked inventory with the given
 // records (the full ItemList packet apply). The caller must hold the
 // write lock.
 func (s *inventoryStore) replaceLocked(items []InventoryItem) {
-	s.items = s.items[:0]
-	clear(s.index)
-	s.items = append(s.items, items...)
-	s.orderDirty = true
-	s.canonicalizeLocked()
+    s.items = s.items[:0]
+    clear(s.index)
+    s.items = append(s.items, items...)
+    s.orderDirty = true
+    s.canonicalizeLocked()
 }
 
 // canonicalizeLocked restores the canonical widget order and rebuilds
@@ -112,13 +112,13 @@ func (s *inventoryStore) replaceLocked(items []InventoryItem) {
 // costs a microsecond on the rare mutation batches only. The caller
 // must hold the write lock.
 func (s *inventoryStore) canonicalizeLocked() {
-	if !s.orderDirty {
-		return
-	}
-	slices.SortFunc(s.items, compareInventoryItems)
-	clear(s.index)
-	for i := range s.items {
-		s.index[s.items[i].ObjectID] = int32(i)
-	}
-	s.orderDirty = false
+    if !s.orderDirty {
+        return
+    }
+    slices.SortFunc(s.items, compareInventoryItems)
+    clear(s.index)
+    for i := range s.items {
+        s.index[s.items[i].ObjectID] = int32(i)
+    }
+    s.orderDirty = false
 }

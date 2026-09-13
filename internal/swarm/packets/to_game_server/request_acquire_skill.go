@@ -5,9 +5,9 @@
 package togameserver
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const requestAcquireSkillPacketID = 0x6C
@@ -28,34 +28,34 @@ const requestAcquireSkillPacketID = 0x6C
 // Wire format (see RequestAcquireSkill.readImpl): [opcode 0x6C]
 // [skillId: 4][skillLevel: 4].
 type RequestAcquireSkillPacket struct {
-	SkillID int32
-	Level   int32
+    SkillID int32
+    Level   int32
 }
 
 // NewRequestAcquireSkillPacket creates a zero valued acquire request.
 func NewRequestAcquireSkillPacket() *RequestAcquireSkillPacket {
-	return &RequestAcquireSkillPacket{
-		SkillID: 0,
-		Level:   0,
-	}
+    return &RequestAcquireSkillPacket{
+        SkillID: 0,
+        Level:   0,
+    }
 }
 
 // ToBytes serializes the packet.
 func (p *RequestAcquireSkillPacket) ToBytes(
-	writer *packet.Writer,
+    writer *packet.Writer,
 ) error {
-	if err := writer.WriteInt8(requestAcquireSkillPacketID); err != nil {
-		return fmt.Errorf(
-			"failed to write acquire skill id: %w", err)
-	}
-	if err := writer.WriteInt32(p.SkillID); err != nil {
-		return fmt.Errorf(
-			"failed to write acquire skill id: %w", err)
-	}
-	if err := writer.WriteInt32(p.Level); err != nil {
-		return fmt.Errorf(
-			"failed to write acquire skill level: %w", err)
-	}
+    if err := writer.WriteInt8(requestAcquireSkillPacketID); err != nil {
+        return fmt.Errorf(
+            "failed to write acquire skill id: %w", err)
+    }
+    if err := writer.WriteInt32(p.SkillID); err != nil {
+        return fmt.Errorf(
+            "failed to write acquire skill id: %w", err)
+    }
+    if err := writer.WriteInt32(p.Level); err != nil {
+        return fmt.Errorf(
+            "failed to write acquire skill level: %w", err)
+    }
 
-	return nil
+    return nil
 }

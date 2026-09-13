@@ -73,57 +73,62 @@ lines = [header]
 for message_id in sorted(messages):
     name, text = messages[message_id]
     text = text.replace("\\", "\\\\").replace('"', '\\"')
-    lines.append(f'\t{message_id}: {{"{name}", "{text}"}},')
+    lines.append(f'    {message_id}: {{"{name}", "{text}"}},')
 lines.append("}")
 lines.append("")
 lines.append("""// SystemMessageText returns the client side text of a SystemMessage
 // packet id. Unknown ids fall back to the plain id so the chat window
 // still shows that something happened.
 func SystemMessageText(id int32) string {
-	if entry, ok := systemMessages[id]; ok {
-		return entry[1]
-	}
+    if entry, ok := systemMessages[id]; ok {
+        return entry[1]
+    }
 
-	return "system message " + itoa(int(id))
+    return "system message " + itoa(int(id))
 }
 
 // SystemMessageName returns the SystemMessageId enum name of a packet
 // id, empty when unknown.
 func SystemMessageName(id int32) string {
-	if entry, ok := systemMessages[id]; ok {
-		return entry[0]
-	}
+    if entry, ok := systemMessages[id]; ok {
+        return entry[0]
+    }
 
-	return ""
+    return ""
 }
 
 // itoa is a tiny int to string helper for the fallback text.
 func itoa(value int) string {
-	if value == 0 {
-		return "0"
-	}
-	digits := ""
-	negative := value < 0
-	if negative {
-		value = -value
-	}
-	for value > 0 {
-		digits = string(rune('0'+value%10)) + digits
-		value /= 10
-	}
-	if negative {
-		digits = "-" + digits
-	}
+    if value == 0 {
+        return "0"
+    }
+    digits := ""
+    negative := value < 0
+    if negative {
+        value = -value
+    }
+    for value > 0 {
+        digits = string(rune('0'+value%10)) + digits
+        value /= 10
+    }
+    if negative {
+        digits = "-" + digits
+    }
 
-	return digits
+    return digits
 }""")
 lines.append("")
 
 with open(out, "w", encoding="utf-8", newline="\n") as handle:
     handle.write("\n".join(lines))
 
-import subprocess
-import sys as _sys
-subprocess.run(["gofmt", "-w", out], check=False)
 print(f"Generated {len(messages)} system messages into {out}")
 PYEOF
+
+# Spaces only, see AGENTS.md: gofmt-spaces normalizes the spacing of
+# the generated file when the toolchain is around.
+if command -v gofmt-spaces >/dev/null 2>&1; then
+    gofmt-spaces -w "${OUT}"
+elif command -v go >/dev/null 2>&1; then
+    (cd "${SWARM_ROOT}" && go run ./cmd/gofmt-spaces -w "${OUT}")
+fi

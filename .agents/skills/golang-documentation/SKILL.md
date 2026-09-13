@@ -130,16 +130,16 @@ The comment starts with the function name and a verb phrase. Focus on **why** an
 //
 // Example:
 //
-//	tiers := []DiscountTier{
-//	    {MinQuantity: 10, PercentOff: 5},
-//	    {MinQuantity: 50, PercentOff: 15},
-//	    {MinQuantity: 100, PercentOff: 25},
-//	}
-//	finalPrice, err := CalculateDiscount(100.00, 75, tiers)
-//	if err != nil {
-//	    log.Fatalf("Discount calculation failed: %v", err)
-//	}
-//	log.Printf("Ordered 75 units at $100 each: final price = $%.2f", finalPrice)
+//    tiers := []DiscountTier{
+//        {MinQuantity: 10, PercentOff: 5},
+//        {MinQuantity: 50, PercentOff: 15},
+//        {MinQuantity: 100, PercentOff: 25},
+//    }
+//    finalPrice, err := CalculateDiscount(100.00, 75, tiers)
+//    if err != nil {
+//        log.Fatalf("Discount calculation failed: %v", err)
+//    }
+//    log.Printf("Ordered 75 units at $100 each: final price = $%.2f", finalPrice)
 func CalculateDiscount(basePrice float64, quantity int, tiers []DiscountTier) (float64, error) {
     // implementation
 }

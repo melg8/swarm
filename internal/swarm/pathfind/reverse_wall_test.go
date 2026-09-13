@@ -5,11 +5,11 @@
 package pathfind
 
 import (
-	"os"
-	"path/filepath"
-	"testing"
+    "os"
+    "path/filepath"
+    "testing"
 
-	"github.com/stretchr/testify/require"
+    "github.com/stretchr/testify/require"
 )
 
 // The reverse wall check of wallsOpen prevents the search from
@@ -23,64 +23,64 @@ import (
 // identical route (the 2026-09-11 town walk stuck loop).
 
 func TestWallsOpenRejectsTargetWithClosedReverseWall(t *testing.T) {
-	// Source cell: north wall open. Target cell (to the north): south
-	// wall CLOSED. The reverse check must reject the step.
-	from := &node{
-		key:    nodeKey{p: Point{X: 0, Y: 0}, h: -1000},
-		coords: Point{X: 0, Y: 0},
-		layer:  Layer{Height: -1000, NSWE: nsweNorth},
-	}
-	to := &node{
-		key:    nodeKey{p: Point{X: 0, Y: -1}, h: -1000},
-		coords: Point{X: 0, Y: -1},
-		layer:  Layer{Height: -1000, NSWE: nsweEast}, // south wall closed
-	}
-	s := newSearch(nil, DefaultMaxPassableHeight)
-	require.False(t, s.wallsOpen(from, to),
-		"the step to a cell whose reverse wall is closed must be rejected")
+    // Source cell: north wall open. Target cell (to the north): south
+    // wall CLOSED. The reverse check must reject the step.
+    from := &node{
+        key:    nodeKey{p: Point{X: 0, Y: 0}, h: -1000},
+        coords: Point{X: 0, Y: 0},
+        layer:  Layer{Height: -1000, NSWE: nsweNorth},
+    }
+    to := &node{
+        key:    nodeKey{p: Point{X: 0, Y: -1}, h: -1000},
+        coords: Point{X: 0, Y: -1},
+        layer:  Layer{Height: -1000, NSWE: nsweEast}, // south wall closed
+    }
+    s := newSearch(nil, DefaultMaxPassableHeight)
+    require.False(t, s.wallsOpen(from, to),
+        "the step to a cell whose reverse wall is closed must be rejected")
 }
 
 func TestWallsOpenAcceptsTargetWithOpenReverseWall(t *testing.T) {
-	// Source cell: north wall open. Target cell (to the north): south
-	// wall OPEN. The reverse check must accept the step.
-	from := &node{
-		key:    nodeKey{p: Point{X: 0, Y: 0}, h: -1000},
-		coords: Point{X: 0, Y: 0},
-		layer:  Layer{Height: -1000, NSWE: nsweNorth},
-	}
-	to := &node{
-		key:    nodeKey{p: Point{X: 0, Y: -1}, h: -1000},
-		coords: Point{X: 0, Y: -1},
-		layer:  Layer{Height: -1000, NSWE: nsweSouth},
-	}
-	s := newSearch(nil, DefaultMaxPassableHeight)
-	require.True(t, s.wallsOpen(from, to),
-		"the step to a cell whose reverse wall is open must be accepted")
+    // Source cell: north wall open. Target cell (to the north): south
+    // wall OPEN. The reverse check must accept the step.
+    from := &node{
+        key:    nodeKey{p: Point{X: 0, Y: 0}, h: -1000},
+        coords: Point{X: 0, Y: 0},
+        layer:  Layer{Height: -1000, NSWE: nsweNorth},
+    }
+    to := &node{
+        key:    nodeKey{p: Point{X: 0, Y: -1}, h: -1000},
+        coords: Point{X: 0, Y: -1},
+        layer:  Layer{Height: -1000, NSWE: nsweSouth},
+    }
+    s := newSearch(nil, DefaultMaxPassableHeight)
+    require.True(t, s.wallsOpen(from, to),
+        "the step to a cell whose reverse wall is open must be accepted")
 }
 
 func TestWallsOpenRejectsCompletelyBlockedTarget(t *testing.T) {
-	// Source cell: all walls open. Target cell: completely blocked
-	// (NSWE = 0). The reverse check must reject the step regardless
-	// of direction.
-	from := &node{
-		key:    nodeKey{p: Point{X: 0, Y: 0}, h: -1000},
-		coords: Point{X: 0, Y: 0},
-		layer:  Layer{Height: -1000, NSWE: nsweAll},
-	}
-	to := &node{
-		key:    nodeKey{p: Point{X: 1, Y: 0}, h: -1000},
-		coords: Point{X: 1, Y: 0},
-		layer:  Layer{Height: -1000, NSWE: 0}, // completely blocked
-	}
-	s := newSearch(nil, DefaultMaxPassableHeight)
-	require.False(t, s.wallsOpen(from, to),
-		"the step to a completely blocked cell must be rejected")
+    // Source cell: all walls open. Target cell: completely blocked
+    // (NSWE = 0). The reverse check must reject the step regardless
+    // of direction.
+    from := &node{
+        key:    nodeKey{p: Point{X: 0, Y: 0}, h: -1000},
+        coords: Point{X: 0, Y: 0},
+        layer:  Layer{Height: -1000, NSWE: nsweAll},
+    }
+    to := &node{
+        key:    nodeKey{p: Point{X: 1, Y: 0}, h: -1000},
+        coords: Point{X: 1, Y: 0},
+        layer:  Layer{Height: -1000, NSWE: 0}, // completely blocked
+    }
+    s := newSearch(nil, DefaultMaxPassableHeight)
+    require.False(t, s.wallsOpen(from, to),
+        "the step to a completely blocked cell must be rejected")
 }
 
 func TestLayerIsCompletelyBlocked(t *testing.T) {
-	require.True(t, Layer{NSWE: 0}.IsCompletelyBlocked())
-	require.False(t, Layer{NSWE: nsweNorth}.IsCompletelyBlocked())
-	require.False(t, Layer{NSWE: nsweAll}.IsCompletelyBlocked())
+    require.True(t, Layer{NSWE: 0}.IsCompletelyBlocked())
+    require.False(t, Layer{NSWE: nsweNorth}.IsCompletelyBlocked())
+    require.False(t, Layer{NSWE: nsweAll}.IsCompletelyBlocked())
 }
 
 // The dry path from the dump stuck position (the elven village teacher
@@ -92,20 +92,20 @@ func TestLayerIsCompletelyBlocked(t *testing.T) {
 // routes are dry; the new route is shorter and avoids the plaza detour
 // that triggered the stuck loop.
 func TestDryPathFromStuckSpotToHerbielFound(t *testing.T) {
-	engine := stuckSpotEngine(t)
-	from := Vec3{X: 44440, Y: 52552, Z: -2832}
-	herbiel := Vec3{X: 42766, Y: 50037, Z: -2984}
-	result, err := engine.FindPathApproachDry(
-		from, herbiel, 200, DefaultMaxPassableHeight)
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	require.True(t, result.Found, "the dry path to Herbiel must be found")
-	require.Greater(t, len(result.Waypoints), 1,
-		"the plan must be a real geodata route")
-	for _, wp := range result.Waypoints {
-		require.Greater(t, wp.Z, -3780.0,
-			"every waypoint must stand above the water surface")
-	}
+    engine := stuckSpotEngine(t)
+    from := Vec3{X: 44440, Y: 52552, Z: -2832}
+    herbiel := Vec3{X: 42766, Y: 50037, Z: -2984}
+    result, err := engine.FindPathApproachDry(
+        from, herbiel, 200, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.NotNil(t, result)
+    require.True(t, result.Found, "the dry path to Herbiel must be found")
+    require.Greater(t, len(result.Waypoints), 1,
+        "the plan must be a real geodata route")
+    for _, wp := range result.Waypoints {
+        require.Greater(t, wp.Z, -3780.0,
+            "every waypoint must stand above the water surface")
+    }
 }
 
 // The dry path from the stuck spot to the teacher Cobendell (44823
@@ -113,46 +113,46 @@ func TestDryPathFromStuckSpotToHerbielFound(t *testing.T) {
 // walks there. The path is short (the character stands near the
 // teacher plaza) and dry.
 func TestDryPathFromStuckSpotToCobendellFound(t *testing.T) {
-	engine := stuckSpotEngine(t)
-	from := Vec3{X: 44440, Y: 52552, Z: -2832}
-	cobendell := Vec3{X: 44823, Y: 52414, Z: -2792}
-	result, err := engine.FindPathApproachDry(
-		from, cobendell, 200, DefaultMaxPassableHeight)
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	require.True(t, result.Found, "the dry path to Cobendell must be found")
-	for _, wp := range result.Waypoints {
-		require.Greater(t, wp.Z, -3780.0,
-			"every waypoint must stand above the water surface")
-	}
+    engine := stuckSpotEngine(t)
+    from := Vec3{X: 44440, Y: 52552, Z: -2832}
+    cobendell := Vec3{X: 44823, Y: 52414, Z: -2792}
+    result, err := engine.FindPathApproachDry(
+        from, cobendell, 200, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.NotNil(t, result)
+    require.True(t, result.Found, "the dry path to Cobendell must be found")
+    for _, wp := range result.Waypoints {
+        require.Greater(t, wp.Z, -3780.0,
+            "every waypoint must stand above the water surface")
+    }
 }
 
 // stuckSpotEngine loads the real geodata pack for the stuck spot
 // reproduction tests, skipping the test when the pack is not available.
 func stuckSpotEngine(t *testing.T) *Engine {
-	t.Helper()
-	candidates := []string{
-		"data/geodata",
-	}
-	if dir, err := os.Getwd(); err == nil {
-		for range 6 {
-			candidates = append(candidates, filepath.Join(dir, "data", "geodata"))
-			parent := filepath.Dir(dir)
-			if parent == dir {
-				break
-			}
-			dir = parent
-		}
-	}
-	for _, c := range candidates {
-		if info, err := os.Stat(c); err == nil && info.IsDir() {
-			engine := NewEngine(c)
-			if engine.Stats().HasData {
-				return engine
-			}
-		}
-	}
-	t.Skip("no local geodata pack, the stuck spot reproduction needs it")
+    t.Helper()
+    candidates := []string{
+        "data/geodata",
+    }
+    if dir, err := os.Getwd(); err == nil {
+        for range 6 {
+            candidates = append(candidates, filepath.Join(dir, "data", "geodata"))
+            parent := filepath.Dir(dir)
+            if parent == dir {
+                break
+            }
+            dir = parent
+        }
+    }
+    for _, c := range candidates {
+        if info, err := os.Stat(c); err == nil && info.IsDir() {
+            engine := NewEngine(c)
+            if engine.Stats().HasData {
+                return engine
+            }
+        }
+    }
+    t.Skip("no local geodata pack, the stuck spot reproduction needs it")
 
-	return nil
+    return nil
 }

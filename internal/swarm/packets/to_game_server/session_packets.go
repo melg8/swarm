@@ -5,7 +5,7 @@
 package togameserver
 
 import (
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const enterWorldPacketID = 0x03
@@ -16,7 +16,7 @@ const enterWorldPacketID = 0x03
 type EnterWorld struct{}
 
 func (p *EnterWorld) ToBytes(writer *packet.Writer) error {
-	return writer.WriteInt8(enterWorldPacketID)
+    return writer.WriteInt8(enterWorldPacketID)
 }
 
 const requestNetPingPacketID byte = 0xA8
@@ -26,9 +26,9 @@ const requestNetPingPacketID byte = 0xA8
 type RequestNetPing struct{}
 
 func (p *RequestNetPing) ToBytes(writer *packet.Writer) error {
-	id := requestNetPingPacketID
+    id := requestNetPingPacketID
 
-	return writer.WriteInt8(int8(id))
+    return writer.WriteInt8(int8(id))
 }
 
 const logoutPacketID = 0x09
@@ -38,5 +38,5 @@ const logoutPacketID = 0x09
 type Logout struct{}
 
 func (p *Logout) ToBytes(writer *packet.Writer) error {
-	return writer.WriteInt8(logoutPacketID)
+    return writer.WriteInt8(logoutPacketID)
 }

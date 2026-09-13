@@ -5,12 +5,12 @@
 package hunt
 
 import (
-        "math"
-        "strconv"
-        "time"
+    "math"
+    "strconv"
+    "time"
 
-        "github.com/melg8/swarm/internal/swarm/npcdata"
-        "github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // Multi zone hunting: the hunting grounds of a region are compact
@@ -43,44 +43,44 @@ import (
 // safety), the Priority field adds a soft engage preference for the
 // exp richer mobs of the ground (see targetPriorityBonus).
 type ZoneMob struct {
-        // TemplateID is the npc template id of the spawn data.
-        TemplateID int32
-        // Name is the display name of the mob.
-        Name string
-        // Level is the mob level of the npc stats.
-        Level int32
-        // Count is the spawned count of the parent territory.
-        Count int32
-        // Priority biases the engage toward this species: every point
-        // makes the mob read as closer than it stands (soft tie break,
-        // distance still dominates far picks).
-        Priority int32
+    // TemplateID is the npc template id of the spawn data.
+    TemplateID int32
+    // Name is the display name of the mob.
+    Name string
+    // Level is the mob level of the npc stats.
+    Level int32
+    // Count is the spawned count of the parent territory.
+    Count int32
+    // Priority biases the engage toward this species: every point
+    // makes the mob read as closer than it stands (soft tie break,
+    // distance still dominates far picks).
+    Priority int32
 }
 
 // HuntingZone describes one hunting ground: the level band of its
 // mobs, the gear gate in zone gating points and the square the bot
 // leashes itself to (the engage zone of the hunt loop).
 type HuntingZone struct {
-        // ID is the stable identifier of the zone (region prefixed).
-        ID string
-        // Name is the display name of the map view.
-        Name string
-        // Region groups the zones of one territory (elven, orc, ...).
-        Region string
-        // MinLevel and MaxLevel are the mob level band of the zone.
-        MinLevel int32
-        MaxLevel int32
-        // MinGear is the zone gating points the equipped gear must reach
-        // before the bot hunts here (see gear.TotalGearPoints).
-        MinGear int32
-        // CX, CY and Half describe the hunting square.
-        CX   int32
-        CY   int32
-        Half int32
-        // Mobs lists every mob species of the spawn territory the square
-        // covers (all of them are farmed inside the square, the
-        // priorities bias the engage; empty for hand placed zones).
-        Mobs []ZoneMob
+    // ID is the stable identifier of the zone (region prefixed).
+    ID string
+    // Name is the display name of the map view.
+    Name string
+    // Region groups the zones of one territory (elven, orc, ...).
+    Region string
+    // MinLevel and MaxLevel are the mob level band of the zone.
+    MinLevel int32
+    MaxLevel int32
+    // MinGear is the zone gating points the equipped gear must reach
+    // before the bot hunts here (see gear.TotalGearPoints).
+    MinGear int32
+    // CX, CY and Half describe the hunting square.
+    CX   int32
+    CY   int32
+    Half int32
+    // Mobs lists every mob species of the spawn territory the square
+    // covers (all of them are farmed inside the square, the
+    // priorities bias the engage; empty for hand placed zones).
+    Mobs []ZoneMob
 }
 
 // regionElven is the region key of the elven lands zone registry.
@@ -136,37 +136,37 @@ const zoneOverrideSlack = 3
 // zoneDistance measures the anchor distance between a zone center and
 // a world position.
 func zoneDistance(zone HuntingZone, x int32, y int32) float64 {
-        return math.Hypot(float64(zone.CX-x), float64(zone.CY-y))
+    return math.Hypot(float64(zone.CX-x), float64(zone.CY-y))
 }
 
 // zoneBandRank compares the band of two zones for the picker ladder:
 // a positive rank means the first zone sits higher (the picker wants
 // it), zero means the same band (the tie break rules apply).
 func zoneBandRank(zone HuntingZone, other HuntingZone) int {
-        if zone.MaxLevel != other.MaxLevel {
-                if zone.MaxLevel > other.MaxLevel {
-                        return 1
-                }
-
-                return -1
-        }
-        if zone.MinLevel != other.MinLevel {
-                if zone.MinLevel > other.MinLevel {
-                        return 1
-                }
-
-                return -1
+    if zone.MaxLevel != other.MaxLevel {
+        if zone.MaxLevel > other.MaxLevel {
+            return 1
         }
 
-        return 0
+        return -1
+    }
+    if zone.MinLevel != other.MinLevel {
+        if zone.MinLevel > other.MinLevel {
+            return 1
+        }
+
+        return -1
+    }
+
+    return 0
 }
 
 // sameBand reports whether two zones belong to one rotation group:
 // the same mob level window (the rotation never changes difficulty,
 // only the square).
 func sameBand(zone HuntingZone, other HuntingZone) bool {
-        return zone.MinLevel == other.MinLevel &&
-                zone.MaxLevel == other.MaxLevel
+    return zone.MinLevel == other.MinLevel &&
+        zone.MaxLevel == other.MaxLevel
 }
 
 // PickHuntingZone returns the best zone of the list for the character
@@ -184,57 +184,57 @@ func sameBand(zone HuntingZone, other HuntingZone) bool {
 // cap that closed the ladder) hunts the starter band through the
 // starter fallback contest.
 func PickHuntingZone(
-        zones []HuntingZone, level int32, gearPoints int32,
-        currentID string, fromX int32, fromY int32, maxMinLevel int32,
+    zones []HuntingZone, level int32, gearPoints int32,
+    currentID string, fromX int32, fromY int32, maxMinLevel int32,
 ) (HuntingZone, bool) {
-        best := -1
-        for index := range zones {
-                candidate := zones[index]
-                if level < candidate.MaxLevel+zoneLevelLead ||
-                        gearPoints < candidate.MinGear {
-                        continue
-                }
-                if maxMinLevel >= 0 && candidate.MinLevel > maxMinLevel {
-                        continue
-                }
-                if best < 0 {
-                        best = index
-
-                        continue
-                }
-                rank := zoneBandRank(candidate, zones[best])
-                if rank > 0 {
-                        best = index
-
-                        continue
-                }
-                if rank < 0 {
-                        continue
-                }
-                // The same band: the current zone keeps its post, otherwise
-                // the nearest center wins.
-                if candidate.ID == currentID {
-                        if zones[best].ID != currentID {
-                                best = index
-                        }
-
-                        continue
-                }
-                if zones[best].ID == currentID {
-                        continue
-                }
-                if zoneDistance(candidate, fromX, fromY) <
-                        zoneDistance(zones[best], fromX, fromY) {
-                        best = index
-                }
+    best := -1
+    for index := range zones {
+        candidate := zones[index]
+        if level < candidate.MaxLevel+zoneLevelLead ||
+            gearPoints < candidate.MinGear {
+            continue
+        }
+        if maxMinLevel >= 0 && candidate.MinLevel > maxMinLevel {
+            continue
         }
         if best < 0 {
-                // Below every band or the cap closed the ladder: the
-                // starter band runs its own fallback contest.
-                return starterZone(zones, currentID, fromX, fromY)
-        }
+            best = index
 
-        return zones[best], true
+            continue
+        }
+        rank := zoneBandRank(candidate, zones[best])
+        if rank > 0 {
+            best = index
+
+            continue
+        }
+        if rank < 0 {
+            continue
+        }
+        // The same band: the current zone keeps its post, otherwise
+        // the nearest center wins.
+        if candidate.ID == currentID {
+            if zones[best].ID != currentID {
+                best = index
+            }
+
+            continue
+        }
+        if zones[best].ID == currentID {
+            continue
+        }
+        if zoneDistance(candidate, fromX, fromY) <
+            zoneDistance(zones[best], fromX, fromY) {
+            best = index
+        }
+    }
+    if best < 0 {
+        // Below every band or the cap closed the ladder: the
+        // starter band runs its own fallback contest.
+        return starterZone(zones, currentID, fromX, fromY)
+    }
+
+    return zones[best], true
 }
 
 // starterZone resolves the fallback of the picker: the starter band
@@ -245,41 +245,41 @@ func PickHuntingZone(
 // never bounces a sub-band character between the starter squares), an
 // open contest takes the nearest ground to the character.
 func starterZone(
-        zones []HuntingZone, currentID string, fromX int32, fromY int32,
+    zones []HuntingZone, currentID string, fromX int32, fromY int32,
 ) (HuntingZone, bool) {
-        if len(zones) == 0 {
-                return noZone, false
+    if len(zones) == 0 {
+        return noZone, false
+    }
+    best := 0
+    for index := 1; index < len(zones); index++ {
+        candidate := zones[index]
+        if !sameBand(candidate, zones[0]) {
+            continue
         }
-        best := 0
-        for index := 1; index < len(zones); index++ {
-                candidate := zones[index]
-                if !sameBand(candidate, zones[0]) {
-                        continue
-                }
-                if candidate.ID == currentID {
-                        if zones[best].ID != currentID {
-                                best = index
-                        }
+        if candidate.ID == currentID {
+            if zones[best].ID != currentID {
+                best = index
+            }
 
-                        continue
-                }
-                if zones[best].ID == currentID {
-                        continue
-                }
-                if zoneDistance(candidate, fromX, fromY) <
-                        zoneDistance(zones[best], fromX, fromY) {
-                        best = index
-                }
+            continue
         }
+        if zones[best].ID == currentID {
+            continue
+        }
+        if zoneDistance(candidate, fromX, fromY) <
+            zoneDistance(zones[best], fromX, fromY) {
+            best = index
+        }
+    }
 
-        return zones[best], true
+    return zones[best], true
 }
 
 // containsPoint reports whether the world point lies inside the
 // hunting square of the zone.
 func (z HuntingZone) containsPoint(x int32, y int32) bool {
-        return z.Half > 0 && x >= z.CX-z.Half && x <= z.CX+z.Half &&
-                y >= z.CY-z.Half && y <= z.CY+z.Half
+    return z.Half > 0 && x >= z.CX-z.Half && x <= z.CX+z.Half &&
+        y >= z.CY-z.Half && y <= z.CY+z.Half
 }
 
 // noZone is the zero zone of the not-found returns (exhaustruct
@@ -288,16 +288,16 @@ var noZone HuntingZone
 
 // zoneByID resolves a zone of the registry by its id.
 func (l *Loop) zoneByID(id string) (HuntingZone, bool) {
-        if id == "" {
-                return noZone, false
-        }
-        for index := range l.zones {
-                if l.zones[index].ID == id {
-                        return l.zones[index], true
-                }
-        }
-
+    if id == "" {
         return noZone, false
+    }
+    for index := range l.zones {
+        if l.zones[index].ID == id {
+            return l.zones[index], true
+        }
+    }
+
+    return noZone, false
 }
 
 // SetHuntingZones installs the zone registry of the deployment: the
@@ -306,17 +306,17 @@ func (l *Loop) zoneByID(id string) (HuntingZone, bool) {
 // the loop hunts with the plain SetHuntingZone square (or without a
 // zone at all). The legacy call stands the spot mode down.
 func (l *Loop) SetHuntingZones(zones []HuntingZone) {
-        l.spot = nil
-        l.zones = zones
-        l.zoneOverride = -1
-        l.zonePickedID = ""
-        l.zoneCheckAt = time.Time{}
-        l.zoneDeaths = nil
-        l.zoneDeathCap = -1
-        l.zoneDeathLevel = 0
-        l.zoneEmptySince = time.Time{}
-        l.zoneEmptyUntil = nil
-        l.publishZoneView()
+    l.spot = nil
+    l.zones = zones
+    l.zoneOverride = -1
+    l.zonePickedID = ""
+    l.zoneCheckAt = time.Time{}
+    l.zoneDeaths = nil
+    l.zoneDeathCap = -1
+    l.zoneDeathLevel = 0
+    l.zoneEmptySince = time.Time{}
+    l.zoneEmptyUntil = nil
+    l.publishZoneView()
 }
 
 // SetHuntingZoneRegion installs the registry of one region by name
@@ -324,20 +324,20 @@ func (l *Loop) SetHuntingZones(zones []HuntingZone) {
 // the spot anchored registry of the redesign (the square zones stay
 // available through SetHuntingZones for the legacy setups).
 func (l *Loop) SetHuntingZoneRegion(region string) {
-        l.zoneRegion = region
-        switch region {
-        case regionElven, "":
-                l.SetHuntingSpotRegion(regionElven)
-        case regionDion:
-                // The T-009 registry of the survey grounds: a deployment
-                // selects the region explicitly (the default elven flow is
-                // unchanged), the Dion gear catalog follows the region
-                // through shopCatalogForRegion.
-                l.SetHuntingZones(DionHuntingZones())
-        default:
-                l.logf("Hunt: no zone registry for region %q, hunting "+
-                        "without zones", region)
-        }
+    l.zoneRegion = region
+    switch region {
+    case regionElven, "":
+        l.SetHuntingSpotRegion(regionElven)
+    case regionDion:
+        // The T-009 registry of the survey grounds: a deployment
+        // selects the region explicitly (the default elven flow is
+        // unchanged), the Dion gear catalog follows the region
+        // through shopCatalogForRegion.
+        l.SetHuntingZones(DionHuntingZones())
+    default:
+        l.logf("Hunt: no zone registry for region %q, hunting "+
+            "without zones", region)
+    }
 }
 
 // userZoneSelect applies the manual zone selection of the web UI: the
@@ -346,24 +346,24 @@ func (l *Loop) SetHuntingZoneRegion(region string) {
 // space). The selection overrides the automatic picker until the
 // character outgrows the band.
 func (l *Loop) userZoneSelect(index int32) {
-        if l.spot != nil {
-                l.userSpotSelect(index)
+    if l.spot != nil {
+        l.userSpotSelect(index)
 
-                return
-        }
-        if len(l.zones) == 0 {
-                return
-        }
-        if index < 0 || int(index) >= len(l.zones) {
-                l.logf("Hunt: zone index %d out of range", index)
+        return
+    }
+    if len(l.zones) == 0 {
+        return
+    }
+    if index < 0 || int(index) >= len(l.zones) {
+        l.logf("Hunt: zone index %d out of range", index)
 
-                return
-        }
-        zone := l.zones[index]
-        l.zoneOverride = int(index)
-        l.logf("Hunt: user selected the hunting zone %s", zone.Name)
-        l.stopForZoneSwitch()
-        l.applyHuntingZone(zone)
+        return
+    }
+    zone := l.zones[index]
+    l.zoneOverride = int(index)
+    l.logf("Hunt: user selected the hunting zone %s", zone.Name)
+    l.stopForZoneSwitch()
+    l.applyHuntingZone(zone)
 }
 
 // stopForZoneSwitch halts the walks the manual zone selection makes
@@ -376,23 +376,23 @@ func (l *Loop) userZoneSelect(index int32) {
 // deleveling refuses the stop like it refuses every movement
 // command.
 func (l *Loop) stopForZoneSwitch() {
-        if l.phase == phaseDelevel {
-                return
+    if l.phase == phaseDelevel {
+        return
+    }
+    if l.phase == phaseUser && l.userKind == state.CommandMove {
+        l.resumeAuto()
+    }
+    if l.phase == phaseTownWalk || l.phase == phaseTownReturn {
+        l.resetTownTrip()
+        l.zoneReturn = false
+        l.zoneFails = 0
+    }
+    if x, y, z, ok := l.tracker.SelfPosition(); ok &&
+        l.tracker.SelfWalking() {
+        if err := l.game.WalkTo(x, y, z); err != nil {
+            l.logf("Hunt: zone switch stop walk failed: %v", err)
         }
-        if l.phase == phaseUser && l.userKind == state.CommandMove {
-                l.resumeAuto()
-        }
-        if l.phase == phaseTownWalk || l.phase == phaseTownReturn {
-                l.resetTownTrip()
-                l.zoneReturn = false
-                l.zoneFails = 0
-        }
-        if x, y, z, ok := l.tracker.SelfPosition(); ok &&
-                l.tracker.SelfWalking() {
-                if err := l.game.WalkTo(x, y, z); err != nil {
-                        l.logf("Hunt: zone switch stop walk failed: %v", err)
-                }
-        }
+    }
 }
 
 // maybeSwitchZone re-evaluates the automatic zone pick: a level gain
@@ -403,47 +403,47 @@ func (l *Loop) stopForZoneSwitch() {
 // running fight always finishes in the old square. The spot mode
 // branch replaces the whole ladder economy with the spot policy.
 func (l *Loop) maybeSwitchZone() {
-        if l.spot != nil {
-                l.spotEvaluate(time.Now())
+    if l.spot != nil {
+        l.spotEvaluate(time.Now())
 
-                return
+        return
+    }
+    if len(l.zones) == 0 {
+        return
+    }
+    now := time.Now()
+    l.resetZoneDeathState()
+    if l.zoneOverride < 0 {
+        l.maybeRotateEmptyZone(now)
+    }
+    if l.zonePickedID != "" && now.Sub(l.zoneCheckAt) < zoneSwitchPeriod {
+        return
+    }
+    l.zoneCheckAt = now
+    level := l.tracker.SelfLevel()
+    if l.zoneOverride >= 0 {
+        zone := l.zones[l.zoneOverride]
+        if level <= zone.MaxLevel+zoneOverrideSlack {
+            return
         }
-        if len(l.zones) == 0 {
-                return
-        }
-        now := time.Now()
-        l.resetZoneDeathState()
-        if l.zoneOverride < 0 {
-                l.maybeRotateEmptyZone(now)
-        }
-        if l.zonePickedID != "" && now.Sub(l.zoneCheckAt) < zoneSwitchPeriod {
-                return
-        }
-        l.zoneCheckAt = now
-        level := l.tracker.SelfLevel()
-        if l.zoneOverride >= 0 {
-                zone := l.zones[l.zoneOverride]
-                if level <= zone.MaxLevel+zoneOverrideSlack {
-                        return
-                }
-                l.zoneOverride = -1
-                l.logf("Hunt: outgrew the manual zone %s, resuming the "+
-                        "automatic picker", zone.Name)
-        }
-        fromX, fromY := l.selfZoneAnchor()
-        zone, ok := PickHuntingZone(l.zones, level, l.gearPoints(),
-                l.zonePickedID, fromX, fromY, l.zoneDeathCap)
-        if !ok || zone.ID == l.zonePickedID {
-                return
-        }
-        l.applyHuntingZone(zone)
-        if l.journal != nil {
-                l.journal.Zone(l.tracker.ID(), zone.Name,
-                        "the ladder re-pick at level "+strconv.Itoa(int(level)))
-        }
-        l.logf("Hunt: level %d with gear %d: hunting %s (levels "+
-                "%d-%d)", level, l.gearPoints(), zone.Name, zone.MinLevel,
-                zone.MaxLevel)
+        l.zoneOverride = -1
+        l.logf("Hunt: outgrew the manual zone %s, resuming the "+
+            "automatic picker", zone.Name)
+    }
+    fromX, fromY := l.selfZoneAnchor()
+    zone, ok := PickHuntingZone(l.zones, level, l.gearPoints(),
+        l.zonePickedID, fromX, fromY, l.zoneDeathCap)
+    if !ok || zone.ID == l.zonePickedID {
+        return
+    }
+    l.applyHuntingZone(zone)
+    if l.journal != nil {
+        l.journal.Zone(l.tracker.ID(), zone.Name,
+            "the ladder re-pick at level "+strconv.Itoa(int(level)))
+    }
+    l.logf("Hunt: level %d with gear %d: hunting %s (levels "+
+        "%d-%d)", level, l.gearPoints(), zone.Name, zone.MinLevel,
+        zone.MaxLevel)
 }
 
 // selfZoneAnchor returns the anchor of the nearest zone tie break:
@@ -451,14 +451,14 @@ func (l *Loop) maybeSwitchZone() {
 // square otherwise (the zone of the last hunt is a better guess of
 // the whereabouts than the origin of the world).
 func (l *Loop) selfZoneAnchor() (int32, int32) {
-        if x, y, _, ok := l.tracker.SelfPosition(); ok {
-                return x, y
-        }
-        if l.zoneHalf > 0 {
-                return l.zoneCX, l.zoneCY
-        }
+    if x, y, _, ok := l.tracker.SelfPosition(); ok {
+        return x, y
+    }
+    if l.zoneHalf > 0 {
+        return l.zoneCX, l.zoneCY
+    }
 
-        return 0, 0
+    return 0, 0
 }
 
 // maybeRotateEmptyZone rotates the hunting ground of a cleared-out
@@ -483,75 +483,75 @@ func (l *Loop) selfZoneAnchor() (int32, int32) {
 // guard either resets or holds the empty timer, and splitting it
 // would scatter that contract over helpers.
 func (l *Loop) maybeRotateEmptyZone(now time.Time) { //nolint:cyclop
-        zone := l.zone()
-        if zone == nil || l.zonePickedID == "" {
-                l.zoneEmptySince = time.Time{}
+    zone := l.zone()
+    if zone == nil || l.zonePickedID == "" {
+        l.zoneEmptySince = time.Time{}
 
-                return
-        }
-        if l.phase != phaseEngage || l.target != 0 || l.tripActive() ||
-                l.tracker.SelfUnderAttack() || l.tracker.SelfSitting() ||
-                !l.inZoneSelf() {
-                l.zoneEmptySince = time.Time{}
+        return
+    }
+    if l.phase != phaseEngage || l.target != 0 || l.tripActive() ||
+        l.tracker.SelfUnderAttack() || l.tracker.SelfSitting() ||
+        !l.inZoneSelf() {
+        l.zoneEmptySince = time.Time{}
 
-                return
-        }
-        selfX, selfY, _, ok := l.tracker.SelfPosition()
-        if !ok {
-                return
-        }
-        if math.Hypot(float64(zone.CX-selfX), float64(zone.CY-selfY)) >
-                float64(zone.Half) {
-                // The patrol walk has not brought the character to the middle
-                // yet: the emptiness reading of the far corners is not
-                // trustworthy.
-                l.zoneEmptySince = time.Time{}
+        return
+    }
+    selfX, selfY, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        return
+    }
+    if math.Hypot(float64(zone.CX-selfX), float64(zone.CY-selfY)) >
+        float64(zone.Half) {
+        // The patrol walk has not brought the character to the middle
+        // yet: the emptiness reading of the far corners is not
+        // trustworthy.
+        l.zoneEmptySince = time.Time{}
 
-                return
-        }
-        if l.tracker.ZoneHasPickable(
-                zone, l.maxTargetLevel(), l.activeSkips(now)) {
-                l.zoneEmptySince = time.Time{}
+        return
+    }
+    if l.tracker.ZoneHasPickable(
+        zone, l.maxTargetLevel(), l.activeSkips(now)) {
+        l.zoneEmptySince = time.Time{}
 
-                return
-        }
-        if l.zoneEmptySince.IsZero() {
-                l.zoneEmptySince = now
-
-                return
-        }
-        if now.Sub(l.zoneEmptySince) < zoneRotateAfter {
-                return
-        }
-        // The window is up: re-arm the timer either way, so a square
-        // without a rotation target waits out another full window instead
-        // of spinning the check every tick.
+        return
+    }
+    if l.zoneEmptySince.IsZero() {
         l.zoneEmptySince = now
-        next, ok := l.rotationZone(selfX, selfY, now)
-        if !ok {
-                return
-        }
-        current, currentOK := l.zoneByID(l.zonePickedID)
-        if currentOK {
-                // The rotated-away square keeps its cooldown: the next
-                // rotations of the band sweep forward past it instead of
-                // walking straight back into the cleared ground.
-                l.markZoneEmpty(current.ID, now)
-        }
-        l.applyHuntingZone(next)
-        l.zoneCheckAt = now
-        if l.journal != nil {
-                l.journal.Zone(l.tracker.ID(), next.Name,
-                        "the square cleared out")
-        }
-        if currentOK {
-                l.logf("Hunt: %s is cleared out, rotating to %s",
-                        current.Name, next.Name)
 
-                return
-        }
-        l.logf("Hunt: the zone is cleared out, rotating to %s",
-                next.Name)
+        return
+    }
+    if now.Sub(l.zoneEmptySince) < zoneRotateAfter {
+        return
+    }
+    // The window is up: re-arm the timer either way, so a square
+    // without a rotation target waits out another full window instead
+    // of spinning the check every tick.
+    l.zoneEmptySince = now
+    next, ok := l.rotationZone(selfX, selfY, now)
+    if !ok {
+        return
+    }
+    current, currentOK := l.zoneByID(l.zonePickedID)
+    if currentOK {
+        // The rotated-away square keeps its cooldown: the next
+        // rotations of the band sweep forward past it instead of
+        // walking straight back into the cleared ground.
+        l.markZoneEmpty(current.ID, now)
+    }
+    l.applyHuntingZone(next)
+    l.zoneCheckAt = now
+    if l.journal != nil {
+        l.journal.Zone(l.tracker.ID(), next.Name,
+            "the square cleared out")
+    }
+    if currentOK {
+        l.logf("Hunt: %s is cleared out, rotating to %s",
+            current.Name, next.Name)
+
+        return
+    }
+    l.logf("Hunt: the zone is cleared out, rotating to %s",
+        next.Name)
 }
 
 // markZoneEmpty starts the empty cooldown of a rotated-away zone and
@@ -559,23 +559,23 @@ func (l *Loop) maybeRotateEmptyZone(now time.Time) { //nolint:cyclop
 // registry holds a few hundred squares, the map must not grow
 // forever).
 func (l *Loop) markZoneEmpty(id string, now time.Time) {
-        if l.zoneEmptyUntil == nil {
-                l.zoneEmptyUntil = make(map[string]time.Time)
+    if l.zoneEmptyUntil == nil {
+        l.zoneEmptyUntil = make(map[string]time.Time)
+    }
+    for zoneID, until := range l.zoneEmptyUntil {
+        if now.After(until) {
+            delete(l.zoneEmptyUntil, zoneID)
         }
-        for zoneID, until := range l.zoneEmptyUntil {
-                if now.After(until) {
-                        delete(l.zoneEmptyUntil, zoneID)
-                }
-        }
-        l.zoneEmptyUntil[id] = now.Add(zoneEmptyCooldown)
+    }
+    l.zoneEmptyUntil[id] = now.Add(zoneEmptyCooldown)
 }
 
 // zoneCoolingDown reports whether the zone sits in its post-rotation
 // empty cooldown at the given time.
 func (l *Loop) zoneCoolingDown(id string, now time.Time) bool {
-        until, ok := l.zoneEmptyUntil[id]
+    until, ok := l.zoneEmptyUntil[id]
 
-        return ok && now.Before(until)
+    return ok && now.Before(until)
 }
 
 // rotationZone picks the rotation target of a cleared-out square: the
@@ -586,36 +586,36 @@ func (l *Loop) zoneCoolingDown(id string, now time.Time) bool {
 // back and forth between the two nearest squares. The death cap
 // holds even here: a demoted band is done for now.
 func (l *Loop) rotationZone(
-        selfX int32, selfY int32, now time.Time,
+    selfX int32, selfY int32, now time.Time,
 ) (HuntingZone, bool) {
-        current, ok := l.zoneByID(l.zonePickedID)
-        if !ok {
-                return noZone, false
+    current, ok := l.zoneByID(l.zonePickedID)
+    if !ok {
+        return noZone, false
+    }
+    best := -1
+    bestDist := math.MaxFloat64
+    for index := range l.zones {
+        candidate := l.zones[index]
+        if candidate.ID == current.ID ||
+            !sameBand(candidate, current) {
+            continue
         }
-        best := -1
-        bestDist := math.MaxFloat64
-        for index := range l.zones {
-                candidate := l.zones[index]
-                if candidate.ID == current.ID ||
-                        !sameBand(candidate, current) {
-                        continue
-                }
-                if l.zoneDeathCap >= 0 && candidate.MinLevel > l.zoneDeathCap {
-                        continue
-                }
-                if l.zoneCoolingDown(candidate.ID, now) {
-                        continue
-                }
-                if dist := zoneDistance(candidate, selfX, selfY); dist < bestDist {
-                        best = index
-                        bestDist = dist
-                }
+        if l.zoneDeathCap >= 0 && candidate.MinLevel > l.zoneDeathCap {
+            continue
         }
-        if best < 0 {
-                return noZone, false
+        if l.zoneCoolingDown(candidate.ID, now) {
+            continue
         }
+        if dist := zoneDistance(candidate, selfX, selfY); dist < bestDist {
+            best = index
+            bestDist = dist
+        }
+    }
+    if best < 0 {
+        return noZone, false
+    }
 
-        return l.zones[best], true
+    return l.zones[best], true
 }
 
 // noteZoneDeath counts a hunting death against the zone the death
@@ -631,7 +631,7 @@ func (l *Loop) rotationZone(
 // and never count. The spot mode replaces the band demotion with the
 // per spot death heat.
 func (l *Loop) noteZoneDeath() {
-        l.noteZoneRegression("death", "deaths")
+    l.noteZoneRegression("death", "deaths")
 }
 
 // noteZoneDanger counts one emergency logout against the zone it fired
@@ -645,10 +645,10 @@ func (l *Loop) noteZoneDeath() {
 // tracker's danger ring, so the next session's seedZoneDanger folds
 // it back in (see seedZoneDanger).
 func (l *Loop) noteZoneDanger() {
-        if x, y, _, ok := l.tracker.SelfPosition(); ok {
-                l.tracker.NoteDangerSpot(x, y)
-        }
-        l.noteZoneRegression("pile up", "pile ups")
+    if x, y, _, ok := l.tracker.SelfPosition(); ok {
+        l.tracker.NoteDangerSpot(x, y)
+    }
+    l.noteZoneRegression("pile up", "pile ups")
 }
 
 // noteZoneRegression is the shared counting core of the zone losses:
@@ -657,45 +657,45 @@ func (l *Loop) noteZoneDanger() {
 // band until the level changes. One label pair keeps the log lines
 // honest for both callers.
 func (l *Loop) noteZoneRegression(kind string, kinds string) {
-        if l.spot != nil {
-                l.spotNoteDeath(time.Now())
+    if l.spot != nil {
+        l.spotNoteDeath(time.Now())
 
-                return
-        }
-        zone, ok := l.deathZone()
-        if !ok {
-                return
-        }
-        if l.zoneDeaths == nil {
-                l.zoneDeaths = make(map[string]int32)
-        }
-        l.zoneDeaths[zone.ID]++
-        count := l.zoneDeaths[zone.ID]
-        if count < zoneDeathLimit {
-                l.logf("Hunt: %s %d of %d in %s",
-                        kind, count, zoneDeathLimit, zone.Name)
-                l.publishZoneView()
-
-                return
-        }
-        if l.zoneDeathCap < 0 || zone.MinLevel-1 < l.zoneDeathCap {
-                l.zoneDeathCap = zone.MinLevel - 1
-        }
-        // A manual zone selection dies with the demotion: the operator
-        // picked the ground, but the character keeps dying in it - the
-        // regression takes over instead of walking the corpse back into
-        // the same blows.
-        if l.zoneOverride >= 0 {
-                l.zoneOverride = -1
-        }
-        // Force the ladder re-pick on the next living tick: the gate of
-        // maybeSwitchZone passes with a zero evaluation time.
-        l.zoneCheckAt = time.Time{}
-        l.zoneEmptySince = time.Time{}
+        return
+    }
+    zone, ok := l.deathZone()
+    if !ok {
+        return
+    }
+    if l.zoneDeaths == nil {
+        l.zoneDeaths = make(map[string]int32)
+    }
+    l.zoneDeaths[zone.ID]++
+    count := l.zoneDeaths[zone.ID]
+    if count < zoneDeathLimit {
+        l.logf("Hunt: %s %d of %d in %s",
+            kind, count, zoneDeathLimit, zone.Name)
         l.publishZoneView()
-        l.logf("Hunt: %d %s in %s, the zone outguns the "+
-                "character: regressing to an easier band (capped below level "+
-                "%d) until the level grows", count, kinds, zone.Name, zone.MinLevel)
+
+        return
+    }
+    if l.zoneDeathCap < 0 || zone.MinLevel-1 < l.zoneDeathCap {
+        l.zoneDeathCap = zone.MinLevel - 1
+    }
+    // A manual zone selection dies with the demotion: the operator
+    // picked the ground, but the character keeps dying in it - the
+    // regression takes over instead of walking the corpse back into
+    // the same blows.
+    if l.zoneOverride >= 0 {
+        l.zoneOverride = -1
+    }
+    // Force the ladder re-pick on the next living tick: the gate of
+    // maybeSwitchZone passes with a zero evaluation time.
+    l.zoneCheckAt = time.Time{}
+    l.zoneEmptySince = time.Time{}
+    l.publishZoneView()
+    l.logf("Hunt: %d %s in %s, the zone outguns the "+
+        "character: regressing to an easier band (capped below level "+
+        "%d) until the level grows", count, kinds, zone.Name, zone.MinLevel)
 }
 
 // The danger spot window of the zone regression seeding: the emergency
@@ -712,36 +712,36 @@ const zoneDangerWindow = time.Hour
 // without ever regressing). Called once at the start of Run, after the
 // zone registry is wired.
 func (l *Loop) seedZoneDanger() {
-        for _, spot := range l.tracker.DangerSpots(zoneDangerWindow) {
-                for index := range l.zones {
-                        if !l.zones[index].containsPoint(spot.X, spot.Y) {
-                                continue
-                        }
-                        if l.zoneDeaths == nil {
-                                l.zoneDeaths = make(map[string]int32)
-                        }
-                        l.zoneDeaths[l.zones[index].ID]++
-                        l.logf("Hunt: carrying over an emergency logout at %d %d "+
-                                "into the zone regression of %s (count %d)",
-                                spot.X, spot.Y, l.zones[index].Name,
-                                l.zoneDeaths[l.zones[index].ID])
-                }
+    for _, spot := range l.tracker.DangerSpots(zoneDangerWindow) {
+        for index := range l.zones {
+            if !l.zones[index].containsPoint(spot.X, spot.Y) {
+                continue
+            }
+            if l.zoneDeaths == nil {
+                l.zoneDeaths = make(map[string]int32)
+            }
+            l.zoneDeaths[l.zones[index].ID]++
+            l.logf("Hunt: carrying over an emergency logout at %d %d "+
+                "into the zone regression of %s (count %d)",
+                spot.X, spot.Y, l.zones[index].Name,
+                l.zoneDeaths[l.zones[index].ID])
         }
+    }
 }
 
 // deathZone resolves the zone a death counts against: the square
 // that contains the death spot, the picked zone when the spot lies
 // between the squares (a flight that died outside every ground).
 func (l *Loop) deathZone() (HuntingZone, bool) {
-        if x, y, _, ok := l.tracker.SelfPosition(); ok {
-                for index := range l.zones {
-                        if l.zones[index].containsPoint(x, y) {
-                                return l.zones[index], true
-                        }
-                }
+    if x, y, _, ok := l.tracker.SelfPosition(); ok {
+        for index := range l.zones {
+            if l.zones[index].containsPoint(x, y) {
+                return l.zones[index], true
+            }
         }
+    }
 
-        return l.zoneByID(l.zonePickedID)
+    return l.zoneByID(l.zonePickedID)
 }
 
 // resetZoneDeathState clears the zone death bookkeeping when the
@@ -749,22 +749,22 @@ func (l *Loop) deathZone() (HuntingZone, bool) {
 // deleveling): the level is the measure of what the character pulls,
 // so every level change re-opens the demoted bands for a retry.
 func (l *Loop) resetZoneDeathState() {
-        level := l.tracker.SelfLevel()
-        if level == 0 || level == l.zoneDeathLevel {
-                return
-        }
-        first := l.zoneDeathLevel == 0
-        l.zoneDeathLevel = level
-        if len(l.zoneDeaths) == 0 && l.zoneDeathCap < 0 {
-                return
-        }
-        l.zoneDeaths = nil
-        l.zoneDeathCap = -1
-        l.publishZoneView()
-        if !first {
-                l.logf("Hunt: level %d: the zone death bookkeeping "+
-                        "resets", level)
-        }
+    level := l.tracker.SelfLevel()
+    if level == 0 || level == l.zoneDeathLevel {
+        return
+    }
+    first := l.zoneDeathLevel == 0
+    l.zoneDeathLevel = level
+    if len(l.zoneDeaths) == 0 && l.zoneDeathCap < 0 {
+        return
+    }
+    l.zoneDeaths = nil
+    l.zoneDeathCap = -1
+    l.publishZoneView()
+    if !first {
+        l.logf("Hunt: level %d: the zone death bookkeeping "+
+            "resets", level)
+    }
 }
 
 // applyHuntingZone switches the hunting square of the loop and the
@@ -777,13 +777,13 @@ func (l *Loop) resetZoneDeathState() {
 // of the square stays attackable, the priorities tilt the pick toward
 // the exp rich mobs.
 func (l *Loop) applyHuntingZone(zone HuntingZone) {
-        l.zonePickedID = zone.ID
-        l.zoneCX, l.zoneCY, l.zoneHalf = zone.CX, zone.CY, zone.Half
-        l.farmX, l.farmY, l.farmZ = 0, 0, 0
-        l.zoneEmptySince = time.Time{}
-        l.zoneMobPriority = zoneMobPriority(zone)
-        l.tracker.SetHuntingZone(zone.CX, zone.CY, zone.Half)
-        l.publishZoneView()
+    l.zonePickedID = zone.ID
+    l.zoneCX, l.zoneCY, l.zoneHalf = zone.CX, zone.CY, zone.Half
+    l.farmX, l.farmY, l.farmZ = 0, 0, 0
+    l.zoneEmptySince = time.Time{}
+    l.zoneMobPriority = zoneMobPriority(zone)
+    l.tracker.SetHuntingZone(zone.CX, zone.CY, zone.Half)
+    l.publishZoneView()
 }
 
 // zoneMobPriority builds the template id to priority map of a zone
@@ -797,19 +797,19 @@ func (l *Loop) applyHuntingZone(zone HuntingZone) {
 // the translation the bias never matched a scan template id and the
 // zone mob preferences stayed dead.
 func zoneMobPriority(zone HuntingZone) map[int32]int32 {
-        var priorities map[int32]int32
-        for index := range zone.Mobs {
-                mob := &zone.Mobs[index]
-                if mob.Priority <= 0 {
-                        continue
-                }
-                if priorities == nil {
-                        priorities = make(map[int32]int32, len(zone.Mobs))
-                }
-                priorities[npcdata.NPCWireTemplateID(mob.TemplateID)] = mob.Priority
+    var priorities map[int32]int32
+    for index := range zone.Mobs {
+        mob := &zone.Mobs[index]
+        if mob.Priority <= 0 {
+            continue
         }
+        if priorities == nil {
+            priorities = make(map[int32]int32, len(zone.Mobs))
+        }
+        priorities[npcdata.NPCWireTemplateID(mob.TemplateID)] = mob.Priority
+    }
 
-        return priorities
+    return priorities
 }
 
 // publishZoneView pushes the zone registry with the active marker to
@@ -817,25 +817,25 @@ func zoneMobPriority(zone HuntingZone) map[int32]int32 {
 // one the bot hunts in (or walks to), the death counts and the
 // demoted bands of the regression travel along for the zone panel.
 func (l *Loop) publishZoneView() {
-        if l.tracker == nil {
-                return
-        }
-        views := make([]state.ZoneView, 0, len(l.zones))
-        for _, zone := range l.zones {
-                views = append(views, state.ZoneView{ //nolint:exhaustruct_v5 // legacy zone
-                        ID:       zone.ID,
-                        Name:     zone.Name,
-                        Region:   zone.Region,
-                        MinLevel: zone.MinLevel,
-                        MaxLevel: zone.MaxLevel,
-                        MinGear:  zone.MinGear,
-                        CX:       zone.CX,
-                        CY:       zone.CY,
-                        Half:     zone.Half,
-                        Active:   zone.ID == l.zonePickedID,
-                        Deaths:   l.zoneDeaths[zone.ID],
-                        Demoted:  l.zoneDeathCap >= 0 && zone.MinLevel > l.zoneDeathCap,
-                })
-        }
-        l.tracker.SetHuntingZones(views)
+    if l.tracker == nil {
+        return
+    }
+    views := make([]state.ZoneView, 0, len(l.zones))
+    for _, zone := range l.zones {
+        views = append(views, state.ZoneView{ //nolint:exhaustruct_v5 // legacy zone
+            ID:       zone.ID,
+            Name:     zone.Name,
+            Region:   zone.Region,
+            MinLevel: zone.MinLevel,
+            MaxLevel: zone.MaxLevel,
+            MinGear:  zone.MinGear,
+            CX:       zone.CX,
+            CY:       zone.CY,
+            Half:     zone.Half,
+            Active:   zone.ID == l.zonePickedID,
+            Deaths:   l.zoneDeaths[zone.ID],
+            Demoted:  l.zoneDeathCap >= 0 && zone.MinLevel > l.zoneDeathCap,
+        })
+    }
+    l.tracker.SetHuntingZones(views)
 }

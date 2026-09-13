@@ -5,14 +5,14 @@
 package togameserver
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const (
-	requestUseItemPacketID  = 0x14
-	requestDropItemPacketID = 0x12
+    requestUseItemPacketID  = 0x14
+    requestDropItemPacketID = 0x12
 )
 
 // RequestUseItem uses an inventory item: equippable items toggle their
@@ -22,24 +22,24 @@ const (
 // Wire format (see UseItem.readImpl): [opcode 0x14][objectId: 4]. The
 // trailing ctrl flag of later chronicles is not part of the C1 format.
 type RequestUseItem struct {
-	ObjectID int32
+    ObjectID int32
 }
 
 // NewRequestUseItem creates a zero valued use item request.
 func NewRequestUseItem() *RequestUseItem {
-	return &RequestUseItem{ObjectID: 0}
+    return &RequestUseItem{ObjectID: 0}
 }
 
 // ToBytes serializes the packet.
 func (p *RequestUseItem) ToBytes(writer *packet.Writer) error {
-	if err := writer.WriteInt8(requestUseItemPacketID); err != nil {
-		return fmt.Errorf("failed to write use item id: %w", err)
-	}
-	if err := writer.WriteInt32(p.ObjectID); err != nil {
-		return fmt.Errorf("failed to write use item object id: %w", err)
-	}
+    if err := writer.WriteInt8(requestUseItemPacketID); err != nil {
+        return fmt.Errorf("failed to write use item id: %w", err)
+    }
+    if err := writer.WriteInt32(p.ObjectID); err != nil {
+        return fmt.Errorf("failed to write use item object id: %w", err)
+    }
 
-	return nil
+    return nil
 }
 
 // RequestDropItem drops an inventory item on the ground at the given
@@ -50,44 +50,44 @@ func (p *RequestUseItem) ToBytes(writer *packet.Writer) error {
 // Wire format (see RequestDropItem.readImpl): [opcode 0x12]
 // [objectId: 4][count: 4][x: 4][y: 4][z: 4].
 type RequestDropItem struct {
-	ObjectID int32
-	Count    int32
-	X        int32
-	Y        int32
-	Z        int32
+    ObjectID int32
+    Count    int32
+    X        int32
+    Y        int32
+    Z        int32
 }
 
 // NewRequestDropItem creates a zero valued drop item request.
 func NewRequestDropItem() *RequestDropItem {
-	return &RequestDropItem{
-		ObjectID: 0,
-		Count:    0,
-		X:        0,
-		Y:        0,
-		Z:        0,
-	}
+    return &RequestDropItem{
+        ObjectID: 0,
+        Count:    0,
+        X:        0,
+        Y:        0,
+        Z:        0,
+    }
 }
 
 // ToBytes serializes the packet.
 func (p *RequestDropItem) ToBytes(writer *packet.Writer) error {
-	if err := writer.WriteInt8(requestDropItemPacketID); err != nil {
-		return fmt.Errorf("failed to write drop item id: %w", err)
-	}
-	if err := writer.WriteInt32(p.ObjectID); err != nil {
-		return fmt.Errorf("failed to write drop object id: %w", err)
-	}
-	if err := writer.WriteInt32(p.Count); err != nil {
-		return fmt.Errorf("failed to write drop count: %w", err)
-	}
-	if err := writer.WriteInt32(p.X); err != nil {
-		return fmt.Errorf("failed to write drop x: %w", err)
-	}
-	if err := writer.WriteInt32(p.Y); err != nil {
-		return fmt.Errorf("failed to write drop y: %w", err)
-	}
-	if err := writer.WriteInt32(p.Z); err != nil {
-		return fmt.Errorf("failed to write drop z: %w", err)
-	}
+    if err := writer.WriteInt8(requestDropItemPacketID); err != nil {
+        return fmt.Errorf("failed to write drop item id: %w", err)
+    }
+    if err := writer.WriteInt32(p.ObjectID); err != nil {
+        return fmt.Errorf("failed to write drop object id: %w", err)
+    }
+    if err := writer.WriteInt32(p.Count); err != nil {
+        return fmt.Errorf("failed to write drop count: %w", err)
+    }
+    if err := writer.WriteInt32(p.X); err != nil {
+        return fmt.Errorf("failed to write drop x: %w", err)
+    }
+    if err := writer.WriteInt32(p.Y); err != nil {
+        return fmt.Errorf("failed to write drop y: %w", err)
+    }
+    if err := writer.WriteInt32(p.Z); err != nil {
+        return fmt.Errorf("failed to write drop z: %w", err)
+    }
 
-	return nil
+    return nil
 }

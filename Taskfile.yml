@@ -13,12 +13,29 @@ tasks:
   check:all:
     desc: Lint and test
     aliases: [all]
-    deps: [lint, test]
+    deps: [lint, test, fmt:check]
 
   fmt:
-    desc: Runs go fmt
+    desc: Formats the tree with spaces only (gofmt-spaces)
     cmds:
-      - go fmt ./...
+      - go run ./cmd/gofmt-spaces -w . .agents/skills
+      - bash tools/normalize_whitespace.sh
+
+  fmt:check:
+    desc: Fails when a file still contains a tab
+    cmds:
+      - |
+        out="$(go run ./cmd/gofmt-spaces -l . .agents/skills)"
+        if [ -n "$out" ]; then
+          echo "Error unformatted go files (run task fmt):" >&2
+          echo "$out" >&2
+          exit 1
+        fi
+      - |
+        if git grep -IlP '\t' -- .; then
+          echo "Error tracked text files still contain tabs (run task fmt)" >&2
+          exit 1
+        fi
 
   git:discard:
     desc: Discards unstaged changes

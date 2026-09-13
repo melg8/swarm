@@ -5,11 +5,11 @@
 package connection
 
 import (
-	"fmt"
+    "fmt"
 
-	fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
-	togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
-	"github.com/melg8/swarm/internal/swarm/state"
+    fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
+    togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // applyNpcHTMLMessage parses the server html dialog packet and stores
@@ -19,25 +19,25 @@ import (
 // and reads the NpcHTMLMessage reply to find the next bypass button
 // (see the H-002 verification and docs/protocol_description.md).
 func (gc *GameClient) applyNpcHTMLMessage(payload []byte) {
-	err := fromgameserver.ParseNpcHTMLMessage(&gc.npcHTML, payload)
-	if err != nil {
-		gc.logger.Printf("Failed to parse npc html: %v", err)
+    err := fromgameserver.ParseNpcHTMLMessage(&gc.npcHTML, payload)
+    if err != nil {
+        gc.logger.Printf("Failed to parse npc html: %v", err)
 
-		return
-	}
-	gc.htmlMu.Lock()
-	gc.lastHTML = gc.npcHTML
-	gc.htmlMu.Unlock()
-	if gc.tracker != nil {
-		gc.tracker.RecordEvent(fmt.Sprintf(
-			"npc html from %d: %d bytes",
-			gc.npcHTML.NpcObjID, len(gc.npcHTML.HTML)))
-		gc.tracker.ApplyDialog(state.DialogPageView{
-			NpcObjID: gc.npcHTML.NpcObjID,
-			ItemID:   gc.npcHTML.ItemID,
-			Links:    gc.dialogLinks(),
-		})
-	}
+        return
+    }
+    gc.htmlMu.Lock()
+    gc.lastHTML = gc.npcHTML
+    gc.htmlMu.Unlock()
+    if gc.tracker != nil {
+        gc.tracker.RecordEvent(fmt.Sprintf(
+            "npc html from %d: %d bytes",
+            gc.npcHTML.NpcObjID, len(gc.npcHTML.HTML)))
+        gc.tracker.ApplyDialog(state.DialogPageView{
+            NpcObjID: gc.npcHTML.NpcObjID,
+            ItemID:   gc.npcHTML.ItemID,
+            Links:    gc.dialogLinks(),
+        })
+    }
 }
 
 // dialogLinks extracts the bypass links of the current html through
@@ -48,19 +48,19 @@ func (gc *GameClient) applyNpcHTMLMessage(payload []byte) {
 // destination index); the tracker path serves the web UI and the M2
 // quest dialog walker.
 func (gc *GameClient) dialogLinks() []state.DialogLinkView {
-	parsed := fromgameserver.ParseHTMLLinks(gc.npcHTML.HTML)
-	if len(parsed) == 0 {
-		return nil
-	}
-	links := make([]state.DialogLinkView, 0, len(parsed))
-	for i := range parsed {
-		links = append(links, state.DialogLinkView{
-			Command: parsed[i].Command,
-			Text:    parsed[i].Text,
-		})
-	}
+    parsed := fromgameserver.ParseHTMLLinks(gc.npcHTML.HTML)
+    if len(parsed) == 0 {
+        return nil
+    }
+    links := make([]state.DialogLinkView, 0, len(parsed))
+    for i := range parsed {
+        links = append(links, state.DialogLinkView{
+            Command: parsed[i].Command,
+            Text:    parsed[i].Text,
+        })
+    }
 
-	return links
+    return links
 }
 
 // LastHTMLMessage returns a copy of the last NpcHTMLMessage the
@@ -68,19 +68,19 @@ func (gc *GameClient) dialogLinks() []state.DialogLinkView {
 // from). The zero value (a zero NpcObjID) means no html arrived yet.
 // Thread-safe: the dispatch goroutine writes, the hunt loop reads.
 func (gc *GameClient) LastHTMLMessage() fromgameserver.NpcHTMLMessage {
-	gc.htmlMu.Lock()
-	defer gc.htmlMu.Unlock()
+    gc.htmlMu.Lock()
+    defer gc.htmlMu.Unlock()
 
-	return gc.lastHTML
+    return gc.lastHTML
 }
 
 // LastHTMLDialog returns the npc object id and the html body of the
 // last NpcHTMLMessage, matching the hunt.GameAPI interface. A zero
 // npcObjID means no dialog arrived yet.
 func (gc *GameClient) LastHTMLDialog() (npcObjID int32, html string) {
-	msg := gc.LastHTMLMessage()
+    msg := gc.LastHTMLMessage()
 
-	return msg.NpcObjID, msg.HTML
+    return msg.NpcObjID, msg.HTML
 }
 
 // SendBypass sends a RequestBypassToServer command to the server
@@ -91,6 +91,6 @@ func (gc *GameClient) LastHTMLDialog() (npcObjID int32, html string) {
 // directly). An empty command is refused (the server disconnects on
 // an empty bypass).
 func (gc *GameClient) SendBypass(command string) error {
-	return gc.sendPacket(
-		&togameserver.RequestBypassToServer{Command: command})
+    return gc.sendPacket(
+        &togameserver.RequestBypassToServer{Command: command})
 }

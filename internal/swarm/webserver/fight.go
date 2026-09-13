@@ -5,8 +5,8 @@
 package webserver
 
 import (
-	"log"
-	"net/http"
+    "log"
+    "net/http"
 )
 
 // NewFightServer creates the web server of the fight animation test
@@ -17,20 +17,20 @@ import (
 // no API beyond the mode handshake - the fight loop, the variants
 // and the map background run entirely in the browser.
 func NewFightServer(address string, logger *log.Logger) *Server {
-	server := newServer(address, logger)
+    server := newServer(address, logger)
 
-	mux := server.httpServer.Handler.(*http.ServeMux)
-	mux.HandleFunc("GET /api/config", server.handleFightConfig)
+    mux := server.httpServer.Handler.(*http.ServeMux)
+    mux.HandleFunc("GET /api/config", server.handleFightConfig)
 
-	return server
+    return server
 }
 
 // handleFightConfig reports the fight showcase mode of the web UI.
 func (s *Server) handleFightConfig(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, s.logger, configResponse{
-		Mode:     modeFight,
-		Geodata:  nil,
-		MaxSteps: 0,
-		Defaults: nil,
-	})
+    writeJSON(w, s.logger, configResponse{
+        Mode:     modeFight,
+        Geodata:  nil,
+        MaxSteps: 0,
+        Defaults: nil,
+    })
 }

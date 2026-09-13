@@ -5,9 +5,9 @@
 package hunt
 
 import (
-	"time"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/gear"
+    "github.com/melg8/swarm/internal/swarm/gear"
 )
 
 // Auto equipment of the hunt loop: the gear planner of the gear
@@ -20,32 +20,32 @@ import (
 // toggle an item back off and the two sources never race on the same
 // item.
 type equipManager struct {
-	// profile scores the gear for the combat class of the character.
-	profile gear.Profile
-	// lastActionAt paces the use item requests between the player
-	// action flood protector windows.
-	lastActionAt time.Time
-	// starterRetryAt maps a starter item object id to the time its
-	// failed destroy request may retry.
-	starterRetryAt map[int32]time.Time
-	// equipScanVersion holds the tracker inventory version the last
-	// upgrade scan ran against, equipScanNone its empty result: the
-	// tick path skips the gear scoring while the bag is unchanged
-	// (the scan cost the full inventory walk of the planner).
-	equipScanVersion uint64
-	equipScanNone    bool
-	// starterScanVersion and starterScanNone gate the starter item
-	// scan the same way.
-	starterScanVersion uint64
-	starterScanNone    bool
-	// keepsCache holds the planned equip object ids of the last keeps
-	// scan and keepsVersion the tracker inventory version it ran
-	// against: the junk flows (the shop selling, the overflow destroy)
-	// consult the set on every tick, so the scan is cached per
-	// inventory mutation like the upgrade scan.
-	keepsCache   map[int32]bool
-	keepsVersion uint64
-	keepsScanned bool
+    // profile scores the gear for the combat class of the character.
+    profile gear.Profile
+    // lastActionAt paces the use item requests between the player
+    // action flood protector windows.
+    lastActionAt time.Time
+    // starterRetryAt maps a starter item object id to the time its
+    // failed destroy request may retry.
+    starterRetryAt map[int32]time.Time
+    // equipScanVersion holds the tracker inventory version the last
+    // upgrade scan ran against, equipScanNone its empty result: the
+    // tick path skips the gear scoring while the bag is unchanged
+    // (the scan cost the full inventory walk of the planner).
+    equipScanVersion uint64
+    equipScanNone    bool
+    // starterScanVersion and starterScanNone gate the starter item
+    // scan the same way.
+    starterScanVersion uint64
+    starterScanNone    bool
+    // keepsCache holds the planned equip object ids of the last keeps
+    // scan and keepsVersion the tracker inventory version it ran
+    // against: the junk flows (the shop selling, the overflow destroy)
+    // consult the set on every tick, so the scan is cached per
+    // inventory mutation like the upgrade scan.
+    keepsCache   map[int32]bool
+    keepsVersion uint64
+    keepsScanned bool
 }
 
 // equipActionPeriod paces the auto equipment requests: the Mobius
@@ -61,18 +61,18 @@ const starterRetryDelay = 10 * time.Second
 
 // newEquipManager creates the manager for the gear profile.
 func newEquipManager(profile gear.Profile) *equipManager {
-	return &equipManager{
-		profile:            profile,
-		lastActionAt:       time.Time{},
-		starterRetryAt:     make(map[int32]time.Time),
-		equipScanVersion:   0,
-		equipScanNone:      false,
-		starterScanVersion: 0,
-		starterScanNone:    false,
-		keepsCache:         nil,
-		keepsVersion:       0,
-		keepsScanned:       false,
-	}
+    return &equipManager{
+        profile:            profile,
+        lastActionAt:       time.Time{},
+        starterRetryAt:     make(map[int32]time.Time),
+        equipScanVersion:   0,
+        equipScanNone:      false,
+        starterScanVersion: 0,
+        starterScanNone:    false,
+        keepsCache:         nil,
+        keepsVersion:       0,
+        keepsScanned:       false,
+    }
 }
 
 // plannedEquipKeeps resolves the object ids the auto equipment will
@@ -84,26 +84,26 @@ func newEquipManager(profile gear.Profile) *equipManager {
 // adena and never destroyed for bag space. The set is cached per
 // inventory mutation; sessions without a gear profile keep nothing.
 func (l *Loop) plannedEquipKeeps() map[int32]bool {
-	manager := l.equip
-	if manager == nil || l.game == nil {
-		return nil
-	}
-	version := l.tracker.InventoryVersion()
-	if manager.keepsScanned && version == manager.keepsVersion {
-		return manager.keepsCache
-	}
-	manager.keepsCache = gear.PlannedEquips(manager.profile, l.equipment())
-	manager.keepsVersion = version
-	manager.keepsScanned = true
+    manager := l.equip
+    if manager == nil || l.game == nil {
+        return nil
+    }
+    version := l.tracker.InventoryVersion()
+    if manager.keepsScanned && version == manager.keepsVersion {
+        return manager.keepsCache
+    }
+    manager.keepsCache = gear.PlannedEquips(manager.profile, l.equipment())
+    manager.keepsVersion = version
+    manager.keepsScanned = true
 
-	return manager.keepsCache
+    return manager.keepsCache
 }
 
 // equipment builds the planner working set from the tracker.
 func (l *Loop) equipment() gear.Equipment {
-	return gear.NewEquipment(
-		l.tracker.InventoryItems(),
-		l.tracker.PaperdollSlotObjectIDs())
+    return gear.NewEquipment(
+        l.tracker.InventoryItems(),
+        l.tracker.PaperdollSlotObjectIDs())
 }
 
 // maybeEquipGear executes the next auto equipment action. It defers
@@ -114,43 +114,43 @@ func (l *Loop) equipment() gear.Equipment {
 // every inventory changing event (loot, buy, sell) the next call
 // re-plans and keeps the paperdoll up to date while the bot works.
 func (l *Loop) maybeEquipGear() {
-	manager := l.equip
-	if manager == nil || l.game == nil {
-		return
-	}
-	now := time.Now()
-	if !l.inventoryGateOpen() || len(l.userDeferred) > 0 {
-		return
-	}
-	if l.replacementSellingActive() {
-		// The sell first step of the replacement sales owns the
-		// affected slots right now: an auto equip here would pull the
-		// just unequipped pieces right back on before their sale.
-		return
-	}
-	if now.Sub(manager.lastActionAt) < equipActionPeriod {
-		return
-	}
-	// The scan cache: an unchanged bag since the last empty scan
-	// cannot hold a new upgrade, skip the inventory walk.
-	version := l.tracker.InventoryVersion()
-	if manager.equipScanNone && version == manager.equipScanVersion {
-		return
-	}
-	action, ok := gear.NextUpgrade(manager.profile, l.equipment())
-	manager.equipScanVersion = version
-	manager.equipScanNone = !ok
-	if !ok {
-		return
-	}
-	l.markInventoryAction(action.ObjectID)
-	if err := l.game.UseItem(action.ObjectID); err != nil {
-		l.logf("Hunt: gear equip failed: %v", err)
+    manager := l.equip
+    if manager == nil || l.game == nil {
+        return
+    }
+    now := time.Now()
+    if !l.inventoryGateOpen() || len(l.userDeferred) > 0 {
+        return
+    }
+    if l.replacementSellingActive() {
+        // The sell first step of the replacement sales owns the
+        // affected slots right now: an auto equip here would pull the
+        // just unequipped pieces right back on before their sale.
+        return
+    }
+    if now.Sub(manager.lastActionAt) < equipActionPeriod {
+        return
+    }
+    // The scan cache: an unchanged bag since the last empty scan
+    // cannot hold a new upgrade, skip the inventory walk.
+    version := l.tracker.InventoryVersion()
+    if manager.equipScanNone && version == manager.equipScanVersion {
+        return
+    }
+    action, ok := gear.NextUpgrade(manager.profile, l.equipment())
+    manager.equipScanVersion = version
+    manager.equipScanNone = !ok
+    if !ok {
+        return
+    }
+    l.markInventoryAction(action.ObjectID)
+    if err := l.game.UseItem(action.ObjectID); err != nil {
+        l.logf("Hunt: gear equip failed: %v", err)
 
-		return
-	}
-	manager.lastActionAt = now
-	l.logf("Hunt: gear: %s", action.Reason)
+        return
+    }
+    manager.lastActionAt = now
+    l.logf("Hunt: gear: %s", action.Reason)
 }
 
 // maybeDestroyReplacedStarters destroys the starter kit items a
@@ -165,51 +165,51 @@ func (l *Loop) maybeEquipGear() {
 // shows the replacement worn. Called on every tick of the
 // autonomous hunting phases right after the auto equipment.
 func (l *Loop) maybeDestroyReplacedStarters() {
-	manager := l.equip
-	if manager == nil || l.game == nil {
-		return
-	}
-	now := time.Now()
-	if !l.inventoryGateOpen() || len(l.userDeferred) > 0 {
-		return
-	}
-	if now.Sub(manager.lastActionAt) < equipActionPeriod {
-		return
-	}
-	// The scan cache: an unchanged bag since the last empty scan
-	// holds no replaced starters.
-	version := l.tracker.InventoryVersion()
-	if manager.starterScanNone && version == manager.starterScanVersion {
-		return
-	}
-	replaced := gear.ReplacedStarterItems(manager.profile, l.equipment())
-	manager.starterScanVersion = version
-	manager.starterScanNone = len(replaced) == 0
-	for _, drop := range replaced {
-		if until, ok := manager.starterRetryAt[drop.Item.ObjectID]; ok &&
-			now.Before(until) {
-			continue
-		}
-		l.markInventoryAction(drop.Item.ObjectID)
-		if err := l.game.DestroyItem(drop.Item.ObjectID,
-			drop.Item.Count); err != nil {
-			l.logf("Hunt: starter destroy failed: %v", err)
-			manager.starterRetryAt[drop.Item.ObjectID] = now.Add(starterRetryDelay)
+    manager := l.equip
+    if manager == nil || l.game == nil {
+        return
+    }
+    now := time.Now()
+    if !l.inventoryGateOpen() || len(l.userDeferred) > 0 {
+        return
+    }
+    if now.Sub(manager.lastActionAt) < equipActionPeriod {
+        return
+    }
+    // The scan cache: an unchanged bag since the last empty scan
+    // holds no replaced starters.
+    version := l.tracker.InventoryVersion()
+    if manager.starterScanNone && version == manager.starterScanVersion {
+        return
+    }
+    replaced := gear.ReplacedStarterItems(manager.profile, l.equipment())
+    manager.starterScanVersion = version
+    manager.starterScanNone = len(replaced) == 0
+    for _, drop := range replaced {
+        if until, ok := manager.starterRetryAt[drop.Item.ObjectID]; ok &&
+            now.Before(until) {
+            continue
+        }
+        l.markInventoryAction(drop.Item.ObjectID)
+        if err := l.game.DestroyItem(drop.Item.ObjectID,
+            drop.Item.Count); err != nil {
+            l.logf("Hunt: starter destroy failed: %v", err)
+            manager.starterRetryAt[drop.Item.ObjectID] = now.Add(starterRetryDelay)
 
-			return
-		}
-		manager.lastActionAt = now
-		l.logf("Hunt: gear: %s", drop.Reason)
+            return
+        }
+        manager.lastActionAt = now
+        l.logf("Hunt: gear: %s", drop.Reason)
 
-		return
-	}
+        return
+    }
 }
 
 // gearPoints reports the zone gating points of the equipped gear.
 func (l *Loop) gearPoints() int32 {
-	if l.equip == nil {
-		return 0
-	}
+    if l.equip == nil {
+        return 0
+    }
 
-	return gear.TotalGearPoints(l.equip.profile, l.equipment())
+    return gear.TotalGearPoints(l.equip.profile, l.equipment())
 }

@@ -5,45 +5,45 @@
 package main
 
 import (
-	"context"
-	"errors"
-	"flag"
-	"fmt"
-	"io"
-	"log"
-	"net"
-	"net/http"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
+    "context"
+    "errors"
+    "flag"
+    "fmt"
+    "io"
+    "log"
+    "net"
+    "net/http"
+    "os"
+    "os/signal"
+    "path/filepath"
+    "strconv"
+    "strings"
+    "sync"
+    "syscall"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/acceptance"
-	"github.com/melg8/swarm/internal/swarm/connection"
-	"github.com/melg8/swarm/internal/swarm/hunt"
-	"github.com/melg8/swarm/internal/swarm/memwatch"
-	"github.com/melg8/swarm/internal/swarm/pathfind"
-	"github.com/melg8/swarm/internal/swarm/proxy"
-	"github.com/melg8/swarm/internal/swarm/session"
-	"github.com/melg8/swarm/internal/swarm/spotaudit"
-	"github.com/melg8/swarm/internal/swarm/state"
-	"github.com/melg8/swarm/internal/swarm/webserver"
-	"github.com/melg8/swarm/internal/version"
+    "github.com/melg8/swarm/internal/swarm/acceptance"
+    "github.com/melg8/swarm/internal/swarm/connection"
+    "github.com/melg8/swarm/internal/swarm/hunt"
+    "github.com/melg8/swarm/internal/swarm/memwatch"
+    "github.com/melg8/swarm/internal/swarm/pathfind"
+    "github.com/melg8/swarm/internal/swarm/proxy"
+    "github.com/melg8/swarm/internal/swarm/session"
+    "github.com/melg8/swarm/internal/swarm/spotaudit"
+    "github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/webserver"
+    "github.com/melg8/swarm/internal/version"
 )
 
 // Default configuration values.
 const (
-	defaultLoginAddress = "127.0.0.1:2106"
-	defaultAccount      = "test1"
-	defaultPassword     = "test"
-	defaultCharName     = "test1"
-	defaultWebAddress   = "127.0.0.1:8080"
-	connectTimeout      = 10 * time.Second
-	defaultProxyLogPath = "proxy.log"
+    defaultLoginAddress = "127.0.0.1:2106"
+    defaultAccount      = "test1"
+    defaultPassword     = "test"
+    defaultCharName     = "test1"
+    defaultWebAddress   = "127.0.0.1:8080"
+    connectTimeout      = 10 * time.Second
+    defaultProxyLogPath = "proxy.log"
 )
 
 // Candidate geodata directories, checked in order when -geodata is empty:
@@ -53,294 +53,294 @@ const (
 // L2J_Mobius_C1_HarbingersOfWar/game folder, see AGENTS.md), then the bot
 // tree itself.
 var defaultGeodataCandidates = []string{
-	filepath.Join("data", "geodata"),
-	filepath.Join("..", "l2j_mobius", "L2J_Mobius_C1_HarbingersOfWar",
-		"dist", "game", "data", "geodata"),
-	filepath.Join("L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
-	filepath.Join("E:\\", "work", "lineage_workspace_fresh",
-		"L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
+    filepath.Join("data", "geodata"),
+    filepath.Join("..", "l2j_mobius", "L2J_Mobius_C1_HarbingersOfWar",
+        "dist", "game", "data", "geodata"),
+    filepath.Join("L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
+    filepath.Join("E:\\", "work", "lineage_workspace_fresh",
+        "L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
 }
 
 // Reconnect backoff of the 24/7 supervisor: a lost session is retried
 // with a growing pause, a long lived session resets the pause so a drop
 // after hours reconnects immediately.
 const (
-	reconnectMinDelay = 2 * time.Second
-	reconnectMaxDelay = 30 * time.Second
-	// A session shorter than this counts as a failed attempt and grows
-	// the backoff; a longer one resets it.
-	stableSessionTime = time.Minute
+    reconnectMinDelay = 2 * time.Second
+    reconnectMaxDelay = 30 * time.Second
+    // A session shorter than this counts as a failed attempt and grows
+    // the backoff; a longer one resets it.
+    stableSessionTime = time.Minute
 )
 
 // Character creation constants for the elven fighter.
 const (
-	elfRaceID     = 1
-	elfFighterID  = 18
-	male          = 0
-	defaultHair   = 0
-	defaultFace   = 0
-	characterSlot = 0
+    elfRaceID     = 1
+    elfFighterID  = 18
+    male          = 0
+    defaultHair   = 0
+    defaultFace   = 0
+    characterSlot = 0
 )
 
 type config struct {
-	loginAddress  string
-	account       string
-	password      string
-	charName      string
-	webAddress    string
-	hunt          bool
-	pathfindTest  bool
-	testFightUI   bool
-	testFightUIV1 bool
-	geodataDir    string
-	maxPassable   uint
-	proxy         bool
-	proxyLogin    string
-	proxyGame     string
-	proxyLog      string
-	bots          int
-	// acceptanceRun selects the headless acceptance test mode: the
-	// process launches no fleet bot supervisor, just the acceptance
-	// manager and the requested scenario. "list" prints the available
-	// scenario ids and exits; "all" runs every scenario in order, a
-	// specific id runs just that one. The exit code reflects the
-	// outcome (0 for a pass, 1 for a fail).
-	acceptanceRun string
-	// sessionDir is the directory of the persistent session journal
-	// ("logs" by default, empty disables the journal entirely).
-	sessionDir string
-	// sessionReport renders the compact session report of a journal
-	// file to stdout and exits (the post-mortem path: the run may be
-	// long over, the journal file carries the story).
-	sessionReport string
-	// sessionQuery streams the records of a journal file through the
-	// drill-down filters below and exits: the grep of the journal.
-	sessionQuery string
-	// sessionAnomalies scans a journal file for the ranked behavior
-	// findings of a long run and exits: the "where to look" tool
-	// every deep analysis starts from.
-	sessionAnomalies string
-	// queryFrom and queryTo bound the record window of the query and
-	// the report: RFC3339 timestamps or bare 15:04 clocks resolved
-	// against the first record date.
-	queryFrom string
-	queryTo   string
-	// queryEvents restricts the query to a comma separated list of
-	// journal event kinds (kill, death, story, ...).
-	queryEvents string
-	// queryMatch is a regular expression over the story text and the
-	// reason fields of the query.
-	queryMatch string
-	// queryContext prints the records within this duration around
-	// every query match.
-	queryContext time.Duration
-	// queryLimit caps the printed query records.
-	queryLimit int
-	// spotAudit runs the live spot geometry audit and exits: the
-	// probe character visits every spot anchor of the registry and
-	// the JSON evidence file collects what it actually sees.
-	spotAudit string
-	// auditWait is the knownlist settle window of every audit visit.
-	auditWait time.Duration
-	// auditAccount names the probe account of the audit (the password
-	// equals the account name, the character shares it).
-	auditAccount string
-	// auditAnchors optionally overrides the audited positions per
-	// spot id (the verification pass of the regenerated geometry).
-	auditAnchors string
-	// auditFilter audits only the spots whose id contains one of the
-	// comma separated substrings.
-	auditFilter string
-	// auditStride audits every Nth spot (0 or 1 audits every spot):
-	// the stratified sampling of a verification pass.
-	auditStride int
-	// auditFresh drops the resume state of the audit evidence file.
-	auditFresh bool
+    loginAddress  string
+    account       string
+    password      string
+    charName      string
+    webAddress    string
+    hunt          bool
+    pathfindTest  bool
+    testFightUI   bool
+    testFightUIV1 bool
+    geodataDir    string
+    maxPassable   uint
+    proxy         bool
+    proxyLogin    string
+    proxyGame     string
+    proxyLog      string
+    bots          int
+    // acceptanceRun selects the headless acceptance test mode: the
+    // process launches no fleet bot supervisor, just the acceptance
+    // manager and the requested scenario. "list" prints the available
+    // scenario ids and exits; "all" runs every scenario in order, a
+    // specific id runs just that one. The exit code reflects the
+    // outcome (0 for a pass, 1 for a fail).
+    acceptanceRun string
+    // sessionDir is the directory of the persistent session journal
+    // ("logs" by default, empty disables the journal entirely).
+    sessionDir string
+    // sessionReport renders the compact session report of a journal
+    // file to stdout and exits (the post-mortem path: the run may be
+    // long over, the journal file carries the story).
+    sessionReport string
+    // sessionQuery streams the records of a journal file through the
+    // drill-down filters below and exits: the grep of the journal.
+    sessionQuery string
+    // sessionAnomalies scans a journal file for the ranked behavior
+    // findings of a long run and exits: the "where to look" tool
+    // every deep analysis starts from.
+    sessionAnomalies string
+    // queryFrom and queryTo bound the record window of the query and
+    // the report: RFC3339 timestamps or bare 15:04 clocks resolved
+    // against the first record date.
+    queryFrom string
+    queryTo   string
+    // queryEvents restricts the query to a comma separated list of
+    // journal event kinds (kill, death, story, ...).
+    queryEvents string
+    // queryMatch is a regular expression over the story text and the
+    // reason fields of the query.
+    queryMatch string
+    // queryContext prints the records within this duration around
+    // every query match.
+    queryContext time.Duration
+    // queryLimit caps the printed query records.
+    queryLimit int
+    // spotAudit runs the live spot geometry audit and exits: the
+    // probe character visits every spot anchor of the registry and
+    // the JSON evidence file collects what it actually sees.
+    spotAudit string
+    // auditWait is the knownlist settle window of every audit visit.
+    auditWait time.Duration
+    // auditAccount names the probe account of the audit (the password
+    // equals the account name, the character shares it).
+    auditAccount string
+    // auditAnchors optionally overrides the audited positions per
+    // spot id (the verification pass of the regenerated geometry).
+    auditAnchors string
+    // auditFilter audits only the spots whose id contains one of the
+    // comma separated substrings.
+    auditFilter string
+    // auditStride audits every Nth spot (0 or 1 audits every spot):
+    // the stratified sampling of a verification pass.
+    auditStride int
+    // auditFresh drops the resume state of the audit evidence file.
+    auditFresh bool
 }
 
 func parseFlags() config {
-	cfg := config{
-		loginAddress:     "",
-		account:          "",
-		password:         "",
-		charName:         "",
-		webAddress:       "",
-		hunt:             false,
-		pathfindTest:     false,
-		testFightUI:      false,
-		testFightUIV1:    false,
-		geodataDir:       "",
-		maxPassable:      uint(pathfind.DefaultMaxPassableHeight),
-		proxy:            false,
-		proxyLogin:       "",
-		proxyGame:        "",
-		proxyLog:         "",
-		bots:             1,
-		acceptanceRun:    "",
-		sessionDir:       "",
-		sessionReport:    "",
-		sessionQuery:     "",
-		sessionAnomalies: "",
-		queryFrom:        "",
-		queryTo:          "",
-		queryEvents:      "",
-		queryMatch:       "",
-		queryContext:     0,
-		queryLimit:       0,
-		spotAudit:        "",
-		auditWait:        0,
-		auditAccount:     "",
-		auditAnchors:     "",
-		auditFilter:      "",
-		auditStride:      0,
-		auditFresh:       false,
-	}
-	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
-		"login server address")
-	flag.StringVar(&cfg.account, "account", defaultAccount, "account name")
-	flag.StringVar(&cfg.password, "password", defaultPassword, "password")
-	flag.StringVar(&cfg.charName, "char", defaultCharName, "character name")
-	flag.StringVar(&cfg.webAddress, "web", defaultWebAddress,
-		"web interface address, empty disables it")
-	flag.BoolVar(&cfg.hunt, "hunt", false,
-		"auto hunt: attack, pick up loot and manage inventory")
-	flag.BoolVar(&cfg.pathfindTest, "pathfind-test", false,
-		"map pathfinding test UI instead of the bot: no game connection, "+
-			"draggable start and end markers show the found path")
-	flag.BoolVar(&cfg.testFightUI, "test-fight-ui", false,
-		"fight FX comparison gallery instead of the bot: no game "+
-			"connection, a horizontal grid of numbered damage "+
-			"visualization variants, each shown with the enemy "+
-			"above, below, left and right of the character")
-	flag.BoolVar(&cfg.testFightUIV1, "test-fight-ui-v1", false,
-		"combat animation variant showcase UI (v1 idea set) instead of the "+
-			"bot: no game connection, a looping hero versus enemy demo fight "+
-			"plays every damage visualization idea side by side for picking one")
-	flag.StringVar(&cfg.geodataDir, "geodata", "",
-		"geodata directory with X_Y.l2j region files for the pathfind "+
-			"test (auto detected when empty)")
-	registerProxyFlags(&cfg)
-	flag.UintVar(&cfg.maxPassable, "max-passable",
-		uint(pathfind.DefaultMaxPassableHeight),
-		"maximum walkable height difference between neighbouring cells")
-	flag.IntVar(&cfg.bots, "bots", 1,
-		"number of concurrent bot sessions to launch in one process. "+
-			"When greater than 1, the bots share one web interface "+
-			"(the sidebar lists every bot) and one proxy (the web UI "+
-			"selects which bot a connecting C1 client attaches to). "+
-			"The account and char name of -account/-char become the "+
-			"base: bot 1 keeps them as-is, bot 2 appends '2', bot 3 "+
-			"'3' and so on (test1, test2, test3...). All bots are "+
-			"elven fighters, all share the same -login, -hunt, "+
-			"-geodata and proxy settings. The server auto-creates "+
-			"missing accounts, so the first run of -bots 3 makes "+
-			"test1, test2, test3 on the fly.")
-	flag.StringVar(&cfg.acceptanceRun, "acceptance", "",
-		"run an acceptance scenario headless instead of the bot: "+
-			"the value is a scenario id (soak, farm-readiness, "+
-			"bot-lifetime, proxy-relay) or 'all' to run every "+
-			"scenario in definition order, or 'list' to print "+
-			"the available ids and exit. No fleet bot supervisor "+
-			"runs; the acceptance manager launches the temp bot "+
-			"of the scenario, runs it and exits. The soak scenario "+
-			"reads SWARM_SOAK_MINUTES (default 10, the M1 proof "+
-			"sets 480) for the window length. Pass an empty "+
-			"-web to keep the UI off; the result prints to the "+
-			"log. Exit code: 0 for a pass, 1 for a fail.")
-	flag.StringVar(&cfg.sessionDir, "session-dir", "logs",
-		"directory of the persistent session journal (the JSONL "+
-			"record of every event since the application start, "+
-			"rotated and gzipped; the web UI session dump button "+
-			"renders its report). Empty disables the journal")
-	flag.StringVar(&cfg.sessionReport, "session-report", "",
-		"render the compact session report of a journal file to "+
-			"stdout and exit (the post-mortem analysis of a "+
-			"finished or crashed run; plain and gzipped journal "+
-			"segments both parse). With -account set, only that "+
-			"bot renders. -from/-to bound the records folded "+
-			"into the report")
-	flag.StringVar(&cfg.sessionQuery, "session-query", "",
-		"stream the records of a journal file through the drill-"+
-			"down filters and exit: the grep of the journal "+
-			"without reading the whole session. Filters: "+
-			"-account, -events, -match, -from, -to, -context, "+
-			"-limit")
-	flag.StringVar(&cfg.sessionAnomalies, "session-anomalies", "",
-		"scan a journal file for the ranked behavior findings of "+
-			"a long run and exit: emergency logout loops, "+
-			"repeated decision lines, trip abort loops, fight "+
-			"duration outliers, death streaks, stalls. Every "+
-			"finding carries its own -session-query drill-down")
-	flag.StringVar(&cfg.spotAudit, "spot-audit", "",
-		"run the live hunting spot audit instead of the bot: the probe "+
-			"character is injected at every spot anchor of the registry "+
-			"(the database position rewrite), waits out the knownlist and "+
-			"the JSON evidence file collects every attackable npc it sees "+
-			"with the leash verdict. The run resumes: spots already "+
-			"measured in the file are skipped, so a long registry audits "+
-			"across several foreground runs")
-	flag.DurationVar(&cfg.auditWait, "audit-wait", 12*time.Second,
-		"knownlist settle window of every spot visit of -spot-audit")
-	flag.StringVar(&cfg.auditAccount, "audit-account", "spotaudit",
-		"probe account of -spot-audit (the password equals the name, "+
-			"the character shares it)")
-	flag.StringVar(&cfg.auditAnchors, "audit-anchors", "",
-		"JSON file with per spot position overrides of -spot-audit "+
-			"(the verification pass of the regenerated geometry)")
-	flag.StringVar(&cfg.auditFilter, "audit-filter", "",
-		"audit only the spots whose id contains one of the comma "+
-			"separated substrings")
-	flag.IntVar(&cfg.auditStride, "audit-stride", 0,
-		"audit every Nth spot of -spot-audit (0 or 1 audits every "+
-			"spot): the stratified sampling of a verification pass")
-	flag.BoolVar(&cfg.auditFresh, "audit-fresh", false,
-		"re-measure every spot of -spot-audit, ignoring the resume state")
-	flag.StringVar(&cfg.queryFrom, "from", "",
-		"window start of -session-query/-session-report: RFC3339 "+
-			"or a bare 15:04 clock of the session day")
-	flag.StringVar(&cfg.queryTo, "to", "",
-		"window end of -session-query/-session-report: RFC3339 "+
-			"or a bare 15:04 clock of the session day")
-	flag.StringVar(&cfg.queryEvents, "events", "",
-		"comma separated event kinds of -session-query (story, "+
-			"kill, death, stall, trip-start, ...)")
-	flag.StringVar(&cfg.queryMatch, "match", "",
-		"regular expression over the text and reason fields of "+
-			"-session-query")
-	flag.DurationVar(&cfg.queryContext, "context", 0,
-		"print the records within this duration around every "+
-			"-session-query match")
-	flag.IntVar(&cfg.queryLimit, "limit", 0,
-		"cap on the printed -session-query records (0 keeps "+
-			"everything)")
-	flag.Parse()
+    cfg := config{
+        loginAddress:     "",
+        account:          "",
+        password:         "",
+        charName:         "",
+        webAddress:       "",
+        hunt:             false,
+        pathfindTest:     false,
+        testFightUI:      false,
+        testFightUIV1:    false,
+        geodataDir:       "",
+        maxPassable:      uint(pathfind.DefaultMaxPassableHeight),
+        proxy:            false,
+        proxyLogin:       "",
+        proxyGame:        "",
+        proxyLog:         "",
+        bots:             1,
+        acceptanceRun:    "",
+        sessionDir:       "",
+        sessionReport:    "",
+        sessionQuery:     "",
+        sessionAnomalies: "",
+        queryFrom:        "",
+        queryTo:          "",
+        queryEvents:      "",
+        queryMatch:       "",
+        queryContext:     0,
+        queryLimit:       0,
+        spotAudit:        "",
+        auditWait:        0,
+        auditAccount:     "",
+        auditAnchors:     "",
+        auditFilter:      "",
+        auditStride:      0,
+        auditFresh:       false,
+    }
+    flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
+        "login server address")
+    flag.StringVar(&cfg.account, "account", defaultAccount, "account name")
+    flag.StringVar(&cfg.password, "password", defaultPassword, "password")
+    flag.StringVar(&cfg.charName, "char", defaultCharName, "character name")
+    flag.StringVar(&cfg.webAddress, "web", defaultWebAddress,
+        "web interface address, empty disables it")
+    flag.BoolVar(&cfg.hunt, "hunt", false,
+        "auto hunt: attack, pick up loot and manage inventory")
+    flag.BoolVar(&cfg.pathfindTest, "pathfind-test", false,
+        "map pathfinding test UI instead of the bot: no game connection, "+
+            "draggable start and end markers show the found path")
+    flag.BoolVar(&cfg.testFightUI, "test-fight-ui", false,
+        "fight FX comparison gallery instead of the bot: no game "+
+            "connection, a horizontal grid of numbered damage "+
+            "visualization variants, each shown with the enemy "+
+            "above, below, left and right of the character")
+    flag.BoolVar(&cfg.testFightUIV1, "test-fight-ui-v1", false,
+        "combat animation variant showcase UI (v1 idea set) instead of the "+
+            "bot: no game connection, a looping hero versus enemy demo fight "+
+            "plays every damage visualization idea side by side for picking one")
+    flag.StringVar(&cfg.geodataDir, "geodata", "",
+        "geodata directory with X_Y.l2j region files for the pathfind "+
+            "test (auto detected when empty)")
+    registerProxyFlags(&cfg)
+    flag.UintVar(&cfg.maxPassable, "max-passable",
+        uint(pathfind.DefaultMaxPassableHeight),
+        "maximum walkable height difference between neighbouring cells")
+    flag.IntVar(&cfg.bots, "bots", 1,
+        "number of concurrent bot sessions to launch in one process. "+
+            "When greater than 1, the bots share one web interface "+
+            "(the sidebar lists every bot) and one proxy (the web UI "+
+            "selects which bot a connecting C1 client attaches to). "+
+            "The account and char name of -account/-char become the "+
+            "base: bot 1 keeps them as-is, bot 2 appends '2', bot 3 "+
+            "'3' and so on (test1, test2, test3...). All bots are "+
+            "elven fighters, all share the same -login, -hunt, "+
+            "-geodata and proxy settings. The server auto-creates "+
+            "missing accounts, so the first run of -bots 3 makes "+
+            "test1, test2, test3 on the fly.")
+    flag.StringVar(&cfg.acceptanceRun, "acceptance", "",
+        "run an acceptance scenario headless instead of the bot: "+
+            "the value is a scenario id (soak, farm-readiness, "+
+            "bot-lifetime, proxy-relay) or 'all' to run every "+
+            "scenario in definition order, or 'list' to print "+
+            "the available ids and exit. No fleet bot supervisor "+
+            "runs; the acceptance manager launches the temp bot "+
+            "of the scenario, runs it and exits. The soak scenario "+
+            "reads SWARM_SOAK_MINUTES (default 10, the M1 proof "+
+            "sets 480) for the window length. Pass an empty "+
+            "-web to keep the UI off; the result prints to the "+
+            "log. Exit code: 0 for a pass, 1 for a fail.")
+    flag.StringVar(&cfg.sessionDir, "session-dir", "logs",
+        "directory of the persistent session journal (the JSONL "+
+            "record of every event since the application start, "+
+            "rotated and gzipped; the web UI session dump button "+
+            "renders its report). Empty disables the journal")
+    flag.StringVar(&cfg.sessionReport, "session-report", "",
+        "render the compact session report of a journal file to "+
+            "stdout and exit (the post-mortem analysis of a "+
+            "finished or crashed run; plain and gzipped journal "+
+            "segments both parse). With -account set, only that "+
+            "bot renders. -from/-to bound the records folded "+
+            "into the report")
+    flag.StringVar(&cfg.sessionQuery, "session-query", "",
+        "stream the records of a journal file through the drill-"+
+            "down filters and exit: the grep of the journal "+
+            "without reading the whole session. Filters: "+
+            "-account, -events, -match, -from, -to, -context, "+
+            "-limit")
+    flag.StringVar(&cfg.sessionAnomalies, "session-anomalies", "",
+        "scan a journal file for the ranked behavior findings of "+
+            "a long run and exit: emergency logout loops, "+
+            "repeated decision lines, trip abort loops, fight "+
+            "duration outliers, death streaks, stalls. Every "+
+            "finding carries its own -session-query drill-down")
+    flag.StringVar(&cfg.spotAudit, "spot-audit", "",
+        "run the live hunting spot audit instead of the bot: the probe "+
+            "character is injected at every spot anchor of the registry "+
+            "(the database position rewrite), waits out the knownlist and "+
+            "the JSON evidence file collects every attackable npc it sees "+
+            "with the leash verdict. The run resumes: spots already "+
+            "measured in the file are skipped, so a long registry audits "+
+            "across several foreground runs")
+    flag.DurationVar(&cfg.auditWait, "audit-wait", 12*time.Second,
+        "knownlist settle window of every spot visit of -spot-audit")
+    flag.StringVar(&cfg.auditAccount, "audit-account", "spotaudit",
+        "probe account of -spot-audit (the password equals the name, "+
+            "the character shares it)")
+    flag.StringVar(&cfg.auditAnchors, "audit-anchors", "",
+        "JSON file with per spot position overrides of -spot-audit "+
+            "(the verification pass of the regenerated geometry)")
+    flag.StringVar(&cfg.auditFilter, "audit-filter", "",
+        "audit only the spots whose id contains one of the comma "+
+            "separated substrings")
+    flag.IntVar(&cfg.auditStride, "audit-stride", 0,
+        "audit every Nth spot of -spot-audit (0 or 1 audits every "+
+            "spot): the stratified sampling of a verification pass")
+    flag.BoolVar(&cfg.auditFresh, "audit-fresh", false,
+        "re-measure every spot of -spot-audit, ignoring the resume state")
+    flag.StringVar(&cfg.queryFrom, "from", "",
+        "window start of -session-query/-session-report: RFC3339 "+
+            "or a bare 15:04 clock of the session day")
+    flag.StringVar(&cfg.queryTo, "to", "",
+        "window end of -session-query/-session-report: RFC3339 "+
+            "or a bare 15:04 clock of the session day")
+    flag.StringVar(&cfg.queryEvents, "events", "",
+        "comma separated event kinds of -session-query (story, "+
+            "kill, death, stall, trip-start, ...)")
+    flag.StringVar(&cfg.queryMatch, "match", "",
+        "regular expression over the text and reason fields of "+
+            "-session-query")
+    flag.DurationVar(&cfg.queryContext, "context", 0,
+        "print the records within this duration around every "+
+            "-session-query match")
+    flag.IntVar(&cfg.queryLimit, "limit", 0,
+        "cap on the printed -session-query records (0 keeps "+
+            "everything)")
+    flag.Parse()
 
-	return cfg
+    return cfg
 }
 
 // registerProxyFlags declares the client proxy flags. The listener
 // defaults answer the hardcoded auth port 2106 of the classic C1 exe on
 // both loopback addresses (see proxy.DefaultLoginAddresses).
 func registerProxyFlags(cfg *config) {
-	flag.BoolVar(&cfg.proxy, "proxy", false,
-		"run the MITM proxy for real C1 clients: an emulated login "+
-			"server answering 2106 and 2107 on 127.0.0.1 and 127.0.0.2 "+
-			"(the classic C1 exe hardcodes the auth port 2106, the ini "+
-			"[URL] Port line is ignored by it) and an emulated game "+
-			"server on 127.0.0.1:7778 that attach a connecting client to "+
-			"the live bot session (any login/password pair is accepted, "+
-			"the char list shows the selected bot)")
-	flag.StringVar(&cfg.proxyLogin, "proxy-login",
-		strings.Join(proxy.DefaultLoginAddresses(), ","),
-		"comma separated login listen addresses of the proxy (the first "+
-			"is mandatory, the rest are optional fallbacks: 127.0.0.1:2106 "+
-			"intercepts hardcoded-port clients, the 127.0.0.2 pair answers "+
-			"ServerAddr=127.0.0.2 variants)")
-	flag.StringVar(&cfg.proxyGame,
-		"proxy-game", strings.Join(proxy.DefaultGameAddresses(), ","),
-		"comma separated game listen addresses of the proxy")
-	flag.StringVar(&cfg.proxyLog, "proxy-log", defaultProxyLogPath,
-		"file the proxy writes its client connection log to")
+    flag.BoolVar(&cfg.proxy, "proxy", false,
+        "run the MITM proxy for real C1 clients: an emulated login "+
+            "server answering 2106 and 2107 on 127.0.0.1 and 127.0.0.2 "+
+            "(the classic C1 exe hardcodes the auth port 2106, the ini "+
+            "[URL] Port line is ignored by it) and an emulated game "+
+            "server on 127.0.0.1:7778 that attach a connecting client to "+
+            "the live bot session (any login/password pair is accepted, "+
+            "the char list shows the selected bot)")
+    flag.StringVar(&cfg.proxyLogin, "proxy-login",
+        strings.Join(proxy.DefaultLoginAddresses(), ","),
+        "comma separated login listen addresses of the proxy (the first "+
+            "is mandatory, the rest are optional fallbacks: 127.0.0.1:2106 "+
+            "intercepts hardcoded-port clients, the 127.0.0.2 pair answers "+
+            "ServerAddr=127.0.0.2 variants)")
+    flag.StringVar(&cfg.proxyGame,
+        "proxy-game", strings.Join(proxy.DefaultGameAddresses(), ","),
+        "comma separated game listen addresses of the proxy")
+    flag.StringVar(&cfg.proxyLog, "proxy-log", defaultProxyLogPath,
+        "file the proxy writes its client connection log to")
 }
 
 // swarmDialer dials the login and game server connections with the
@@ -353,30 +353,30 @@ var swarmDialer = &net.Dialer{Timeout: connectTimeout}
 
 // connectLoginServer establishes the login server connection.
 func connectLoginServer(address string) (net.Conn, error) {
-	conn, err := swarmDialer.Dial("tcp", address)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to connect to login server: %w", err)
-	}
-	log.Println("Connected to login server at " + address)
+    conn, err := swarmDialer.Dial("tcp", address)
+    if err != nil {
+        return nil, fmt.Errorf(
+            "failed to connect to login server: %w", err)
+    }
+    log.Println("Connected to login server at " + address)
 
-	return conn, nil
+    return conn, nil
 }
 
 // connectGameServer establishes the game server connection from the auth
 // result.
 func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
-	address := fmt.Sprintf("%d.%d.%d.%d:%d",
-		auth.ServerIP[0], auth.ServerIP[1], auth.ServerIP[2], auth.ServerIP[3],
-		auth.ServerPort)
-	conn, err := swarmDialer.Dial("tcp", address)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to connect to game server: %w", err)
-	}
-	log.Println("Connected to game server at " + address)
+    address := fmt.Sprintf("%d.%d.%d.%d:%d",
+        auth.ServerIP[0], auth.ServerIP[1], auth.ServerIP[2], auth.ServerIP[3],
+        auth.ServerPort)
+    conn, err := swarmDialer.Dial("tcp", address)
+    if err != nil {
+        return nil, fmt.Errorf(
+            "failed to connect to game server: %w", err)
+    }
+    log.Println("Connected to game server at " + address)
 
-	return conn, nil
+    return conn, nil
 }
 
 // runBot performs one bot session: login, game handshake, authentication,
@@ -385,117 +385,117 @@ func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
 // bound to a derived context so it stops with the session. The optional
 // geodata engine serves the town trips of the hunt loop.
 func runBot( //nolint:funlen // linear session script
-	ctx context.Context, cfg config, tracker *state.Bot,
-	engine *pathfind.Engine, proxyServer *proxy.Server,
-	journal *session.Journal,
+    ctx context.Context, cfg config, tracker *state.Bot,
+    engine *pathfind.Engine, proxyServer *proxy.Server,
+    journal *session.Journal,
 ) error {
-	sessionCtx, cancelSession := context.WithCancel(ctx)
-	defer cancelSession()
+    sessionCtx, cancelSession := context.WithCancel(ctx)
+    defer cancelSession()
 
-	tracker.ResetSession()
+    tracker.ResetSession()
 
-	loginConn, err := connectLoginServer(cfg.loginAddress)
-	if err != nil {
-		return err
-	}
+    loginConn, err := connectLoginServer(cfg.loginAddress)
+    if err != nil {
+        return err
+    }
 
-	auth, err := connection.Authenticate(loginConn, cfg.account, cfg.password)
-	if err != nil {
-		return fmt.Errorf("failed to authenticate: %w", err)
-	}
+    auth, err := connection.Authenticate(loginConn, cfg.account, cfg.password)
+    if err != nil {
+        return fmt.Errorf("failed to authenticate: %w", err)
+    }
 
-	// The emulated login server of the proxy mirrors the Init packet of
-	// the real one, so its scrambled RSA modulus is published here.
-	if proxyServer != nil {
-		proxyServer.SetRsaModulus(auth.RsaPublicKey)
-	}
+    // The emulated login server of the proxy mirrors the Init packet of
+    // the real one, so its scrambled RSA modulus is published here.
+    if proxyServer != nil {
+        proxyServer.SetRsaModulus(auth.RsaPublicKey)
+    }
 
-	gameConn, err := connectGameServer(auth)
-	if err != nil {
-		return err
-	}
+    gameConn, err := connectGameServer(auth)
+    if err != nil {
+        return err
+    }
 
-	game, err := connection.NewGameClient(gameConn)
-	if err != nil {
-		return fmt.Errorf("game handshake failed: %w", err)
-	}
-	game.SetTracker(tracker)
+    game, err := connection.NewGameClient(gameConn)
+    if err != nil {
+        return fmt.Errorf("game handshake failed: %w", err)
+    }
+    game.SetTracker(tracker)
 
-	// The proxy observes the whole session (the recorder replays it to
-	// connecting C1 clients) and forwards their packets through the
-	// shared outbound cipher of the session. The registration must
-	// happen before the session starts reading so nothing is missed.
-	var sessionRecorder *proxy.Recorder
-	if proxyServer != nil {
-		sessionRecorder = proxyServer.RegisterSession(cfg.account, game, tracker)
-		game.SetTap(sessionRecorder.Record)
-		defer proxyServer.UnregisterSession(cfg.account, sessionRecorder)
-	}
+    // The proxy observes the whole session (the recorder replays it to
+    // connecting C1 clients) and forwards their packets through the
+    // shared outbound cipher of the session. The registration must
+    // happen before the session starts reading so nothing is missed.
+    var sessionRecorder *proxy.Recorder
+    if proxyServer != nil {
+        sessionRecorder = proxyServer.RegisterSession(cfg.account, game, tracker)
+        game.SetTap(sessionRecorder.Record)
+        defer proxyServer.UnregisterSession(cfg.account, sessionRecorder)
+    }
 
-	charList, err := game.Authenticate(connection.GameSessionParams{
-		Account:    auth.Account,
-		LoginOkID1: auth.LoginOkID1,
-		LoginOkID2: auth.LoginOkID2,
-		PlayOkID1:  auth.PlayOkID1,
-		PlayOkID2:  auth.PlayOkID2,
-	})
-	if err != nil {
-		return fmt.Errorf("game authentication failed: %w", err)
-	}
+    charList, err := game.Authenticate(connection.GameSessionParams{
+        Account:    auth.Account,
+        LoginOkID1: auth.LoginOkID1,
+        LoginOkID2: auth.LoginOkID2,
+        PlayOkID1:  auth.PlayOkID1,
+        PlayOkID2:  auth.PlayOkID2,
+    })
+    if err != nil {
+        return fmt.Errorf("game authentication failed: %w", err)
+    }
 
-	charList, err = game.EnsureCharacter(connection.CharacterParams{
-		Name:      cfg.charName,
-		Race:      elfRaceID,
-		Female:    male,
-		ClassID:   elfFighterID,
-		HairStyle: defaultHair,
-		HairColor: defaultHair,
-		Face:      defaultFace,
-	}, charList)
-	if err != nil {
-		return fmt.Errorf("failed to prepare character: %w", err)
-	}
+    charList, err = game.EnsureCharacter(connection.CharacterParams{
+        Name:      cfg.charName,
+        Race:      elfRaceID,
+        Female:    male,
+        ClassID:   elfFighterID,
+        HairStyle: defaultHair,
+        HairColor: defaultHair,
+        Face:      defaultFace,
+    }, charList)
+    if err != nil {
+        return fmt.Errorf("failed to prepare character: %w", err)
+    }
 
-	slot, charInfo, found := charList.FindCharacterByName(cfg.charName)
-	if !found {
-		return fmt.Errorf("character %s not found", cfg.charName)
-	}
-	log.Printf("Playing character %s of level %d",
-		charInfo.Name, charInfo.Level)
+    slot, charInfo, found := charList.FindCharacterByName(cfg.charName)
+    if !found {
+        return fmt.Errorf("character %s not found", cfg.charName)
+    }
+    log.Printf("Playing character %s of level %d",
+        charInfo.Name, charInfo.Level)
 
-	if err := game.EnterWorld(int32(slot)); err != nil {
-		return fmt.Errorf("failed to enter world: %w", err)
-	}
-	log.Println("Character " + cfg.charName + " entered the world")
-	if journal != nil {
-		journal.Connect(cfg.account, "entered",
-			"level "+strconv.Itoa(int(charInfo.Level)))
-	}
+    if err := game.EnterWorld(int32(slot)); err != nil {
+        return fmt.Errorf("failed to enter world: %w", err)
+    }
+    log.Println("Character " + cfg.charName + " entered the world")
+    if journal != nil {
+        journal.Connect(cfg.account, "entered",
+            "level "+strconv.Itoa(int(charInfo.Level)))
+    }
 
-	// The loop always runs: with -hunt it hunts autonomously, without
-	// it stays in the manual mode and only executes the commands of the
-	// web UI (map clicks, equipment drags) so the interface stays
-	// interactive in both launch modes.
-	loop := hunt.NewLoop(game, tracker)
-	// The hunt decisions mirror into the tracker event log: the web UI
-	// log tab and the state dump button then carry the reasoning of
-	// the loop (zone switches, escapes, stuck re-paths) next to the
-	// raw game events - the debugging material of the live sessions.
-	loop.SetLogger(huntEventLogger(tracker))
-	loop.SetJournal(journal)
-	if engine != nil {
-		loop.SetNavigator(hunt.NewNavigator(engine))
-	} else if cfg.hunt {
-		log.Println("Hunt runs without town trips: no geodata available")
-	}
-	if cfg.hunt {
-		loop.SetHuntingZoneRegion("elven")
-	} else {
-		loop.SetAutonomy(false)
-	}
-	go loop.Run(sessionCtx)
+    // The loop always runs: with -hunt it hunts autonomously, without
+    // it stays in the manual mode and only executes the commands of the
+    // web UI (map clicks, equipment drags) so the interface stays
+    // interactive in both launch modes.
+    loop := hunt.NewLoop(game, tracker)
+    // The hunt decisions mirror into the tracker event log: the web UI
+    // log tab and the state dump button then carry the reasoning of
+    // the loop (zone switches, escapes, stuck re-paths) next to the
+    // raw game events - the debugging material of the live sessions.
+    loop.SetLogger(huntEventLogger(tracker))
+    loop.SetJournal(journal)
+    if engine != nil {
+        loop.SetNavigator(hunt.NewNavigator(engine))
+    } else if cfg.hunt {
+        log.Println("Hunt runs without town trips: no geodata available")
+    }
+    if cfg.hunt {
+        loop.SetHuntingZoneRegion("elven")
+    } else {
+        loop.SetAutonomy(false)
+    }
+    go loop.Run(sessionCtx)
 
-	return game.Run(sessionCtx, cfg.charName)
+    return game.Run(sessionCtx, cfg.charName)
 }
 
 // huntEventLogger builds the logger of the hunt loop: the console copy
@@ -504,9 +504,9 @@ func runBot( //nolint:funlen // linear session script
 // format adds). The mirrored lines then stream to the web UI log tab
 // and travel inside the state dump.
 func huntEventLogger(tracker *state.Bot) *log.Logger {
-	mirror := huntEventMirror{tracker: tracker}
+    mirror := huntEventMirror{tracker: tracker}
 
-	return log.New(io.MultiWriter(os.Stdout, mirror), "", log.LstdFlags)
+    return log.New(io.MultiWriter(os.Stdout, mirror), "", log.LstdFlags)
 }
 
 // openSessionJournal opens the persistent session journal when the
@@ -514,36 +514,36 @@ func huntEventLogger(tracker *state.Bot) *log.Logger {
 // disables it). The journal carries the process identity line and
 // logs its path so the user knows what to attach to a report.
 func openSessionJournal(cfg config) *session.Journal {
-	if cfg.sessionDir == "" {
-		return nil
-	}
-	journal, err := session.NewJournal(cfg.sessionDir, log.Default())
-	if err != nil {
-		log.Printf("Session journal unavailable (continuing without): %v",
-			err)
+    if cfg.sessionDir == "" {
+        return nil
+    }
+    journal, err := session.NewJournal(cfg.sessionDir, log.Default())
+    if err != nil {
+        log.Printf("Session journal unavailable (continuing without): %v",
+            err)
 
-		return nil
-	}
-	journal.Build(version.Identity())
-	log.Printf("Session journal: %s", journal.Path())
+        return nil
+    }
+    journal.Build(version.Identity())
+    log.Printf("Session journal: %s", journal.Path())
 
-	return journal
+    return journal
 }
 
 // wireSessionBot connects one tracker to the journal: the event story
 // mirror (every recorded tracker event lands in the journal file) and
 // the periodic state sampler of the quantitative trail.
 func wireSessionBot(
-	ctx context.Context, journal *session.Journal, tracker *state.Bot,
+    ctx context.Context, journal *session.Journal, tracker *state.Bot,
 ) {
-	if journal == nil {
-		return
-	}
-	botID := tracker.ID()
-	tracker.SetEventSink(func(at time.Time, message string) {
-		journal.Story(botID, message, at)
-	})
-	go session.NewSampler(botID, tracker, journal).Run(ctx)
+    if journal == nil {
+        return
+    }
+    botID := tracker.ID()
+    tracker.SetEventSink(func(at time.Time, message string) {
+        journal.Story(botID, message, at)
+    })
+    go session.NewSampler(botID, tracker, journal).Run(ctx)
 }
 
 // runSessionReportCLI renders the session report of a journal file to
@@ -554,24 +554,24 @@ func wireSessionBot(
 // window bounds the records folded into the aggregates (the time-boxed
 // report of one interesting stretch of a long session).
 func runSessionReportCLI(cfg config) {
-	parsed, err := session.ParseJournalFileWindow(
-		cfg.sessionReport, cfg.queryFrom, cfg.queryTo)
-	if err != nil {
-		log.Fatalf("Session report: %v", err)
-	}
-	bots := parsed.Order
-	if explicitAccount() {
-		bots = []string{cfg.account}
-	}
-	for _, bot := range bots {
-		report, err := parsed.Report(bot)
-		if err != nil {
-			log.Fatalf("Session report: %v", err)
-		}
-		if _, err := os.Stdout.WriteString(report); err != nil {
-			log.Fatalf("Session report write: %v", err)
-		}
-	}
+    parsed, err := session.ParseJournalFileWindow(
+        cfg.sessionReport, cfg.queryFrom, cfg.queryTo)
+    if err != nil {
+        log.Fatalf("Session report: %v", err)
+    }
+    bots := parsed.Order
+    if explicitAccount() {
+        bots = []string{cfg.account}
+    }
+    for _, bot := range bots {
+        report, err := parsed.Report(bot)
+        if err != nil {
+            log.Fatalf("Session report: %v", err)
+        }
+        if _, err := os.Stdout.WriteString(report); err != nil {
+            log.Fatalf("Session report write: %v", err)
+        }
+    }
 }
 
 // explicitAccount reports whether the -account flag was passed on the
@@ -579,67 +579,67 @@ func runSessionReportCLI(cfg config) {
 // opt-in, so the default login account of the bot modes never filters
 // a journal whose bots carry other names.
 func explicitAccount() bool {
-	set := false
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "account" {
-			set = true
-		}
-	})
+    set := false
+    flag.Visit(func(f *flag.Flag) {
+        if f.Name == "account" {
+            set = true
+        }
+    })
 
-	return set
+    return set
 }
 
 // runSessionQueryCLI streams the filtered records of a journal file to
 // stdout: the drill-down tool every anomaly finding points at.
 func runSessionQueryCLI(cfg config) {
-	filter := session.QueryFilter{
-		Bot:     "",
-		Events:  strings.Split(cfg.queryEvents, ","),
-		Match:   cfg.queryMatch,
-		From:    cfg.queryFrom,
-		To:      cfg.queryTo,
-		Context: cfg.queryContext,
-		Limit:   cfg.queryLimit,
-	}
-	if cfg.queryEvents == "" {
-		filter.Events = nil
-	}
-	if explicitAccount() {
-		filter.Bot = cfg.account
-	}
-	if err := session.RunQuery(cfg.sessionQuery, filter, os.Stdout); err != nil {
-		log.Fatalf("Session query: %v", err)
-	}
+    filter := session.QueryFilter{
+        Bot:     "",
+        Events:  strings.Split(cfg.queryEvents, ","),
+        Match:   cfg.queryMatch,
+        From:    cfg.queryFrom,
+        To:      cfg.queryTo,
+        Context: cfg.queryContext,
+        Limit:   cfg.queryLimit,
+    }
+    if cfg.queryEvents == "" {
+        filter.Events = nil
+    }
+    if explicitAccount() {
+        filter.Bot = cfg.account
+    }
+    if err := session.RunQuery(cfg.sessionQuery, filter, os.Stdout); err != nil {
+        log.Fatalf("Session query: %v", err)
+    }
 }
 
 // runSessionAnomaliesCLI scans a journal file and prints the ranked
 // findings: the first tool of every post-mortem, it names the windows
 // the drill-down should isolate.
 func runSessionAnomaliesCLI(cfg config) {
-	if err := session.RunAnomalies(cfg.sessionAnomalies, os.Stdout); err != nil {
-		log.Fatalf("Session anomalies: %v", err)
-	}
+    if err := session.RunAnomalies(cfg.sessionAnomalies, os.Stdout); err != nil {
+        log.Fatalf("Session anomalies: %v", err)
+    }
 }
 
 // huntEventMirror writes hunt log lines into the bot event log.
 type huntEventMirror struct {
-	tracker *state.Bot
+    tracker *state.Bot
 }
 
 // Write implements io.Writer for the log package: one call carries one
 // complete line.
 func (m huntEventMirror) Write(p []byte) (int, error) {
-	line := strings.TrimSpace(string(p))
-	// The console prefix (date time) stays console only: the event log
-	// carries its own timestamps.
-	if at := strings.Index(line, "Hunt: "); at >= 0 {
-		line = line[at:]
-	}
-	if line != "" {
-		m.tracker.RecordEvent(line)
-	}
+    line := strings.TrimSpace(string(p))
+    // The console prefix (date time) stays console only: the event log
+    // carries its own timestamps.
+    if at := strings.Index(line, "Hunt: "); at >= 0 {
+        line = line[at:]
+    }
+    if line != "" {
+        m.tracker.RecordEvent(line)
+    }
 
-	return len(p), nil
+    return len(p), nil
 }
 
 // startMemoryWatch runs the process memory logger (one footprint
@@ -647,7 +647,7 @@ func (m huntEventMirror) Write(p []byte) (int, error) {
 // the long unattended runs demonstrate the memory behavior from the
 // log alone, not only from the web statistics chart.
 func startMemoryWatch(ctx context.Context) {
-	go memwatch.Watch(ctx, log.Default(), memwatch.DefaultPeriod)
+    go memwatch.Watch(ctx, log.Default(), memwatch.DefaultPeriod)
 }
 
 // runBotForever keeps the bot in the world around the clock: a lost
@@ -656,173 +656,173 @@ func startMemoryWatch(ctx context.Context) {
 // user stops the process with SIGINT/SIGTERM. The process never exits on
 // its own. The geodata engine survives the reconnects.
 func runBotForever(
-	ctx context.Context, cfg config, tracker *state.Bot, engine *pathfind.Engine,
-	proxyServer *proxy.Server, journal *session.Journal,
+    ctx context.Context, cfg config, tracker *state.Bot, engine *pathfind.Engine,
+    proxyServer *proxy.Server, journal *session.Journal,
 ) {
-	delay := reconnectMinDelay
-	for {
-		started := time.Now()
-		err := runBot(ctx, cfg, tracker, engine, proxyServer, journal)
-		if ctx.Err() != nil {
-			return
-		}
-		if err != nil {
-			// An emergency logout closes the socket itself, so
-			// the session error names the close ("use of closed
-			// network connection") instead of the pile up that
-			// drove it: the tracker carries the honest reason
-			// over the boundary and the lost record names it
-			// (once - later network drops of the same
-			// supervisor report themselves).
-			reason := err.Error()
-			if honest, ok := tracker.ConsumeEmergencyLogout(); ok {
-				reason = "emergency logout: " + honest
-			}
-			log.Println("Bot failed: " + reason)
-			if journal != nil {
-				journal.Lost(cfg.account, reason)
-			}
-		}
-		// An emergency logout of the hunt loop armed a login
-		// cooldown: honor it on top of the reconnect backoff so the
-		// next session starts after the danger window (the mobs
-		// reset, the character regenerates) instead of the seconds
-		// of the backoff.
-		if cooldown := tracker.LoginCooldownRemaining(); cooldown > delay {
-			log.Printf("Login cooldown %s holds the reconnect back",
-				cooldown)
-			delay = cooldown
-		}
-		if time.Since(started) >= stableSessionTime {
-			delay = reconnectMinDelay
-		}
-		log.Printf("Reconnecting in %s", delay)
-		if journal != nil {
-			journal.Connect(cfg.account, "reconnect-wait",
-				delay.String())
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(delay):
-		}
-		delay = min(delay*2, reconnectMaxDelay)
-	}
+    delay := reconnectMinDelay
+    for {
+        started := time.Now()
+        err := runBot(ctx, cfg, tracker, engine, proxyServer, journal)
+        if ctx.Err() != nil {
+            return
+        }
+        if err != nil {
+            // An emergency logout closes the socket itself, so
+            // the session error names the close ("use of closed
+            // network connection") instead of the pile up that
+            // drove it: the tracker carries the honest reason
+            // over the boundary and the lost record names it
+            // (once - later network drops of the same
+            // supervisor report themselves).
+            reason := err.Error()
+            if honest, ok := tracker.ConsumeEmergencyLogout(); ok {
+                reason = "emergency logout: " + honest
+            }
+            log.Println("Bot failed: " + reason)
+            if journal != nil {
+                journal.Lost(cfg.account, reason)
+            }
+        }
+        // An emergency logout of the hunt loop armed a login
+        // cooldown: honor it on top of the reconnect backoff so the
+        // next session starts after the danger window (the mobs
+        // reset, the character regenerates) instead of the seconds
+        // of the backoff.
+        if cooldown := tracker.LoginCooldownRemaining(); cooldown > delay {
+            log.Printf("Login cooldown %s holds the reconnect back",
+                cooldown)
+            delay = cooldown
+        }
+        if time.Since(started) >= stableSessionTime {
+            delay = reconnectMinDelay
+        }
+        log.Printf("Reconnecting in %s", delay)
+        if journal != nil {
+            journal.Connect(cfg.account, "reconnect-wait",
+                delay.String())
+        }
+        select {
+        case <-ctx.Done():
+            return
+        case <-time.After(delay):
+        }
+        delay = min(delay*2, reconnectMaxDelay)
+    }
 }
 
 func main() {
-	cfg := parseFlags()
-	log.SetOutput(os.Stdout)
+    cfg := parseFlags()
+    log.SetOutput(os.Stdout)
 
-	if cfg.sessionAnomalies != "" {
-		runSessionAnomaliesCLI(cfg)
+    if cfg.sessionAnomalies != "" {
+        runSessionAnomaliesCLI(cfg)
 
-		return
-	}
+        return
+    }
 
-	if cfg.sessionQuery != "" {
-		runSessionQueryCLI(cfg)
+    if cfg.sessionQuery != "" {
+        runSessionQueryCLI(cfg)
 
-		return
-	}
+        return
+    }
 
-	if cfg.sessionReport != "" {
-		runSessionReportCLI(cfg)
+    if cfg.sessionReport != "" {
+        runSessionReportCLI(cfg)
 
-		return
-	}
+        return
+    }
 
-	if cfg.testFightUI {
-		runTestFightUI(cfg)
+    if cfg.testFightUI {
+        runTestFightUI(cfg)
 
-		return
-	}
+        return
+    }
 
-	if cfg.pathfindTest {
-		runPathfindTest(cfg)
+    if cfg.pathfindTest {
+        runPathfindTest(cfg)
 
-		return
-	}
+        return
+    }
 
-	if cfg.testFightUIV1 {
-		runTestFightUIV1(cfg)
+    if cfg.testFightUIV1 {
+        runTestFightUIV1(cfg)
 
-		return
-	}
+        return
+    }
 
-	if cfg.spotAudit != "" {
-		runSpotAuditCLI(cfg)
+    if cfg.spotAudit != "" {
+        runSpotAuditCLI(cfg)
 
-		return
-	}
+        return
+    }
 
-	if cfg.acceptanceRun != "" {
-		runAcceptanceCLI(cfg)
+    if cfg.acceptanceRun != "" {
+        runAcceptanceCLI(cfg)
 
-		return
-	}
+        return
+    }
 
-	if cfg.bots > 1 {
-		runFleet(cfg)
+    if cfg.bots > 1 {
+        runFleet(cfg)
 
-		return
-	}
+        return
+    }
 
-	log.Println("Starting swarm bot for account " + cfg.account)
-	// The identity line pairs every bot log with the exact code state
-	// - the state dump of the web UI carries the same line.
-	log.Printf("Build: %s", version.Identity())
+    log.Println("Starting swarm bot for account " + cfg.account)
+    // The identity line pairs every bot log with the exact code state
+    // - the state dump of the web UI carries the same line.
+    log.Printf("Build: %s", version.Identity())
 
-	registry := state.NewRegistry()
-	tracker := state.NewBot(cfg.account)
-	tracker.SetKind(state.KindLongRunning)
-	registry.Add(tracker)
+    registry := state.NewRegistry()
+    tracker := state.NewBot(cfg.account)
+    tracker.SetKind(state.KindLongRunning)
+    registry.Add(tracker)
 
-	journal := openSessionJournal(cfg)
-	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
-	wireSessionBot(ctx, journal, tracker)
-	startMemoryWatch(ctx)
+    journal := openSessionJournal(cfg)
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGINT, syscall.SIGTERM)
+    wireSessionBot(ctx, journal, tracker)
+    startMemoryWatch(ctx)
 
-	var proxyServer *proxy.Server
-	if cfg.proxy {
-		proxyServer = startProxy(cfg)
-	}
+    var proxyServer *proxy.Server
+    if cfg.proxy {
+        proxyServer = startProxy(cfg)
+    }
 
-	// The geodata engine serves the town trips of the hunt and the
-	// long manual walks of the web UI (the server side pathfinder
-	// refuses far targets), so it loads in every mode.
-	var engine *pathfind.Engine
-	dir := cfg.geodataDir
-	if dir == "" {
-		dir = detectGeodataDir()
-	}
-	engine = pathfind.NewEngine(dir)
-	engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
-	stats := engine.Stats()
-	if stats.HasData {
-		log.Printf("Geodata ready: %d region files in %s, town trips "+
-			"and manual long walks enabled", stats.RegionFiles, stats.Dir)
-	} else {
-		log.Println("No geodata files found in " + stats.Dir +
-			", the bot hunts without town trips")
-	}
+    // The geodata engine serves the town trips of the hunt and the
+    // long manual walks of the web UI (the server side pathfinder
+    // refuses far targets), so it loads in every mode.
+    var engine *pathfind.Engine
+    dir := cfg.geodataDir
+    if dir == "" {
+        dir = detectGeodataDir()
+    }
+    engine = pathfind.NewEngine(dir)
+    engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+    stats := engine.Stats()
+    if stats.HasData {
+        log.Printf("Geodata ready: %d region files in %s, town trips "+
+            "and manual long walks enabled", stats.RegionFiles, stats.Dir)
+    } else {
+        log.Println("No geodata files found in " + stats.Dir +
+            ", the bot hunts without town trips")
+    }
 
-	web := startWebInterface(cfg, registry, nil, proxyServer)
-	attachAcceptance(web, registry, cfg, engine, proxyServer)
-	if web != nil && journal != nil {
-		web.SetSessionJournal(journal)
-	}
+    web := startWebInterface(cfg, registry, nil, proxyServer)
+    attachAcceptance(web, registry, cfg, engine, proxyServer)
+    if web != nil && journal != nil {
+        web.SetSessionJournal(journal)
+    }
 
-	runBotForever(ctx, cfg, tracker, engine, proxyServer, journal)
-	stop()
-	shutdownWebInterface(web)
-	shutdownProxy(proxyServer)
-	if journal != nil {
-		journal.Shutdown("process finished")
-		journal.Close()
-	}
-	log.Println("Bot finished")
+    runBotForever(ctx, cfg, tracker, engine, proxyServer, journal)
+    stop()
+    shutdownWebInterface(web)
+    shutdownProxy(proxyServer)
+    if journal != nil {
+        journal.Shutdown("process finished")
+        journal.Close()
+    }
+    log.Println("Bot finished")
 }
 
 // runFleet launches multiple bot sessions in one process: each bot gets
@@ -835,87 +835,87 @@ func main() {
 // stays alive until every bot supervisor returns (SIGINT/SIGTERM stops
 // them all through the shared context).
 func runFleet(cfg config) {
-	log.Printf("Starting swarm fleet of %d bots", cfg.bots)
-	log.Printf("Build: %s", version.Identity())
+    log.Printf("Starting swarm fleet of %d bots", cfg.bots)
+    log.Printf("Build: %s", version.Identity())
 
-	registry := state.NewRegistry()
-	trackers := make([]*state.Bot, 0, cfg.bots)
-	for i := range cfg.bots {
-		account := fleetAccountName(cfg.account, i)
-		tracker := state.NewBot(account)
-		tracker.SetKind(state.KindLongRunning)
-		registry.Add(tracker)
-		trackers = append(trackers, tracker)
-	}
-	log.Printf("Fleet accounts: %s", fleetAccountList(cfg.account, cfg.bots))
+    registry := state.NewRegistry()
+    trackers := make([]*state.Bot, 0, cfg.bots)
+    for i := range cfg.bots {
+        account := fleetAccountName(cfg.account, i)
+        tracker := state.NewBot(account)
+        tracker.SetKind(state.KindLongRunning)
+        registry.Add(tracker)
+        trackers = append(trackers, tracker)
+    }
+    log.Printf("Fleet accounts: %s", fleetAccountList(cfg.account, cfg.bots))
 
-	// The journal opens before the web interface so the session
-	// report endpoint registers with it (the fleet mode once missed
-	// the wiring: the button answered 404 while the journal itself
-	// kept collecting - the two symptoms of a fleet dump look broken).
-	journal := openSessionJournal(cfg)
+    // The journal opens before the web interface so the session
+    // report endpoint registers with it (the fleet mode once missed
+    // the wiring: the button answered 404 while the journal itself
+    // kept collecting - the two symptoms of a fleet dump look broken).
+    journal := openSessionJournal(cfg)
 
-	var proxyServer *proxy.Server
-	if cfg.proxy {
-		proxyServer = startProxy(cfg)
-	}
+    var proxyServer *proxy.Server
+    if cfg.proxy {
+        proxyServer = startProxy(cfg)
+    }
 
-	// The geodata engine is shared by all bots: the town trips and the
-	// manual long walks of every session read through the same LRU
-	// cache of parsed regions.
-	var engine *pathfind.Engine
-	dir := cfg.geodataDir
-	if dir == "" {
-		dir = detectGeodataDir()
-	}
-	engine = pathfind.NewEngine(dir)
-	engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
-	stats := engine.Stats()
-	if stats.HasData {
-		log.Printf("Geodata ready: %d region files in %s, town trips "+
-			"and manual long walks enabled", stats.RegionFiles, stats.Dir)
-	} else {
-		log.Println("No geodata files found in " + stats.Dir +
-			", the bot hunts without town trips")
-	}
+    // The geodata engine is shared by all bots: the town trips and the
+    // manual long walks of every session read through the same LRU
+    // cache of parsed regions.
+    var engine *pathfind.Engine
+    dir := cfg.geodataDir
+    if dir == "" {
+        dir = detectGeodataDir()
+    }
+    engine = pathfind.NewEngine(dir)
+    engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+    stats := engine.Stats()
+    if stats.HasData {
+        log.Printf("Geodata ready: %d region files in %s, town trips "+
+            "and manual long walks enabled", stats.RegionFiles, stats.Dir)
+    } else {
+        log.Println("No geodata files found in " + stats.Dir +
+            ", the bot hunts without town trips")
+    }
 
-	web := startWebInterface(cfg, registry, nil, proxyServer)
-	attachAcceptance(web, registry, cfg, engine, proxyServer)
-	if web != nil && journal != nil {
-		web.SetSessionJournal(journal)
-	}
+    web := startWebInterface(cfg, registry, nil, proxyServer)
+    attachAcceptance(web, registry, cfg, engine, proxyServer)
+    if web != nil && journal != nil {
+        web.SetSessionJournal(journal)
+    }
 
-	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
-	startMemoryWatch(ctx)
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGINT, syscall.SIGTERM)
+    startMemoryWatch(ctx)
 
-	for _, tracker := range trackers {
-		wireSessionBot(ctx, journal, tracker)
-	}
+    for _, tracker := range trackers {
+        wireSessionBot(ctx, journal, tracker)
+    }
 
-	// Launch every bot supervisor in its own goroutine. A per-bot
-	// config carries the derived account and char name; the rest of
-	// the flags (login, hunt, geodata, proxy) stay shared.
-	var wg sync.WaitGroup
-	for i, tracker := range trackers {
-		botCfg := cfg
-		botCfg.account = fleetAccountName(cfg.account, i)
-		botCfg.charName = botCfg.account
-		wg.Add(1)
-		go func(c config, t *state.Bot) {
-			defer wg.Done()
-			runBotForever(ctx, c, t, engine, proxyServer, journal)
-		}(botCfg, tracker)
-	}
-	wg.Wait()
-	stop()
-	shutdownWebInterface(web)
-	shutdownProxy(proxyServer)
-	if journal != nil {
-		journal.Shutdown("fleet finished")
-		journal.Close()
-	}
-	log.Println("Fleet finished")
+    // Launch every bot supervisor in its own goroutine. A per-bot
+    // config carries the derived account and char name; the rest of
+    // the flags (login, hunt, geodata, proxy) stay shared.
+    var wg sync.WaitGroup
+    for i, tracker := range trackers {
+        botCfg := cfg
+        botCfg.account = fleetAccountName(cfg.account, i)
+        botCfg.charName = botCfg.account
+        wg.Add(1)
+        go func(c config, t *state.Bot) {
+            defer wg.Done()
+            runBotForever(ctx, c, t, engine, proxyServer, journal)
+        }(botCfg, tracker)
+    }
+    wg.Wait()
+    stop()
+    shutdownWebInterface(web)
+    shutdownProxy(proxyServer)
+    if journal != nil {
+        journal.Shutdown("fleet finished")
+        journal.Close()
+    }
+    log.Println("Fleet finished")
 }
 
 // fleetAccountName derives the account name of bot i from the base
@@ -924,103 +924,103 @@ func runFleet(cfg config) {
 // digits plus the 1-based index (test1 -> test2, test3, ...). A base
 // without a trailing digit just appends the index (bot -> bot2, bot3).
 func fleetAccountName(base string, i int) string {
-	if i == 0 {
-		return base
-	}
-	stripped := strings.TrimRight(base, "0123456789")
+    if i == 0 {
+        return base
+    }
+    stripped := strings.TrimRight(base, "0123456789")
 
-	return stripped + strconv.Itoa(i+1)
+    return stripped + strconv.Itoa(i+1)
 }
 
 // fleetAccountList builds the comma separated account list for the
 // startup log line.
 func fleetAccountList(base string, count int) string {
-	if count <= 0 {
-		return ""
-	}
-	var sb strings.Builder
-	sb.WriteString(fleetAccountName(base, 0))
-	for i := 1; i < count; i++ {
-		sb.WriteString(", ")
-		sb.WriteString(fleetAccountName(base, i))
-	}
+    if count <= 0 {
+        return ""
+    }
+    var sb strings.Builder
+    sb.WriteString(fleetAccountName(base, 0))
+    for i := 1; i < count; i++ {
+        sb.WriteString(", ")
+        sb.WriteString(fleetAccountName(base, i))
+    }
 
-	return sb.String()
+    return sb.String()
 }
 
 // startProxy builds and runs the client proxy with its own log file so
 // the C1 client connection attempts can be diagnosed without digging
 // through the console output of the bot (see docs/proxy.md).
 func startProxy(cfg config) *proxy.Server {
-	file, err := os.OpenFile(cfg.proxyLog,
-		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	logger := log.New(file, "proxy ", log.LstdFlags|log.Lmicroseconds)
-	if err != nil {
-		logger = log.Default()
-		logger.Printf("Proxy log file %s unavailable: %v",
-			cfg.proxyLog, err)
-	}
-	// The log file stays open for the process lifetime: the OS closes
-	// it at exit, no deferred close here (the logger would write into a
-	// closed file otherwise).
+    file, err := os.OpenFile(cfg.proxyLog,
+        os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+    logger := log.New(file, "proxy ", log.LstdFlags|log.Lmicroseconds)
+    if err != nil {
+        logger = log.Default()
+        logger.Printf("Proxy log file %s unavailable: %v",
+            cfg.proxyLog, err)
+    }
+    // The log file stays open for the process lifetime: the OS closes
+    // it at exit, no deferred close here (the logger would write into a
+    // closed file otherwise).
 
-	server := proxy.NewServer(logger,
-		proxy.WithLoginAddresses(splitAddresses(cfg.proxyLogin)...),
-		proxy.WithGameAddresses(splitAddresses(cfg.proxyGame)...))
-	if err := server.Listen(); err != nil {
-		logger.Printf("Proxy failed to start: %v", err)
-		log.Printf("Proxy failed to start: %v", err)
+    server := proxy.NewServer(logger,
+        proxy.WithLoginAddresses(splitAddresses(cfg.proxyLogin)...),
+        proxy.WithGameAddresses(splitAddresses(cfg.proxyGame)...))
+    if err := server.Listen(); err != nil {
+        logger.Printf("Proxy failed to start: %v", err)
+        log.Printf("Proxy failed to start: %v", err)
 
-		return nil
-	}
-	go func() {
-		if err := server.Serve(); err != nil {
-			logger.Printf("Proxy stopped: %v", err)
-		}
-	}()
+        return nil
+    }
+    go func() {
+        if err := server.Serve(); err != nil {
+            logger.Printf("Proxy stopped: %v", err)
+        }
+    }()
 
-	logger.Printf("proxy started, login bound to %v, game bound to %v, log %s",
-		server.LoginAddrs(), server.GameAddrs(), cfg.proxyLog)
-	// The routing banner: a C1 client reaching none of the login
-	// listeners never appears in this file (the classic exe dials
-	// ServerAddr:2106 with the ini [URL] Port line ignored), so the
-	// banner names the address every client path lands on.
-	logger.Printf("client routing: a C1 client connects to the l2.ini "+
-		"ServerAddr on the hardcoded auth port 2106 unless its build "+
-		"honors the ini Port; this proxy answers 127.0.0.1 and "+
-		"127.0.0.2 on both 2106 and 2107 (bound: %v), the emulated "+
-		"login server then hands out the game address %v",
-		server.LoginAddrs(), server.GameAddrs())
-	log.Printf("Proxy for C1 clients ready: login %v, game %v, client log %s",
-		server.LoginAddrs(), server.GameAddrs(), cfg.proxyLog)
+    logger.Printf("proxy started, login bound to %v, game bound to %v, log %s",
+        server.LoginAddrs(), server.GameAddrs(), cfg.proxyLog)
+    // The routing banner: a C1 client reaching none of the login
+    // listeners never appears in this file (the classic exe dials
+    // ServerAddr:2106 with the ini [URL] Port line ignored), so the
+    // banner names the address every client path lands on.
+    logger.Printf("client routing: a C1 client connects to the l2.ini "+
+        "ServerAddr on the hardcoded auth port 2106 unless its build "+
+        "honors the ini Port; this proxy answers 127.0.0.1 and "+
+        "127.0.0.2 on both 2106 and 2107 (bound: %v), the emulated "+
+        "login server then hands out the game address %v",
+        server.LoginAddrs(), server.GameAddrs())
+    log.Printf("Proxy for C1 clients ready: login %v, game %v, client log %s",
+        server.LoginAddrs(), server.GameAddrs(), cfg.proxyLog)
 
-	return server
+    return server
 }
 
 // splitAddresses splits a comma separated flag value.
 func splitAddresses(value string) []string {
-	addresses := strings.Split(value, ",")
-	cleaned := make([]string, 0, len(addresses))
-	for _, address := range addresses {
-		address = strings.TrimSpace(address)
-		if address != "" {
-			cleaned = append(cleaned, address)
-		}
-	}
+    addresses := strings.Split(value, ",")
+    cleaned := make([]string, 0, len(addresses))
+    for _, address := range addresses {
+        address = strings.TrimSpace(address)
+        if address != "" {
+            cleaned = append(cleaned, address)
+        }
+    }
 
-	return cleaned
+    return cleaned
 }
 
 // shutdownProxy stops the client proxy.
 func shutdownProxy(server *proxy.Server) {
-	if server == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
-		log.Printf("Proxy shutdown failed: %v", err)
-	}
+    if server == nil {
+        return
+    }
+    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+    defer cancel()
+    if err := server.Shutdown(ctx); err != nil {
+        log.Printf("Proxy shutdown failed: %v", err)
+    }
 }
 
 // runTestFightUI serves the bot less fight FX comparison gallery: the
@@ -1029,66 +1029,66 @@ func shutdownProxy(server *proxy.Server) {
 // background of the gallery cells is the static tile pyramid shipped
 // with the web content.
 func runTestFightUI(cfg config) {
-	if cfg.webAddress == "" {
-		log.Println("Fight FX test needs the web interface, " +
-			"pass a -web address")
+    if cfg.webAddress == "" {
+        log.Println("Fight FX test needs the web interface, " +
+            "pass a -web address")
 
-		return
-	}
+        return
+    }
 
-	web := webserver.NewTestFightServer(cfg.webAddress, log.Default())
-	go func() {
-		if err := web.ListenAndServe(); err != nil {
-			log.Println("Web interface failed: " + err.Error())
-		}
-	}()
+    web := webserver.NewTestFightServer(cfg.webAddress, log.Default())
+    go func() {
+        if err := web.ListenAndServe(); err != nil {
+            log.Println("Web interface failed: " + err.Error())
+        }
+    }()
 
-	log.Println("Fight FX test UI is ready")
+    log.Println("Fight FX test UI is ready")
 
-	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-	<-ctx.Done()
-	shutdownWebInterface(web)
-	log.Println("Fight FX test finished")
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
+    <-ctx.Done()
+    shutdownWebInterface(web)
+    log.Println("Fight FX test finished")
 }
 
 // runPathfindTest serves the bot less map pathfinding test UI: the geodata
 // engine is loaded from the configured or auto detected directory and the
 // web interface answers path requests until the process is stopped.
 func runPathfindTest(cfg config) {
-	dir := cfg.geodataDir
-	if dir == "" {
-		dir = detectGeodataDir()
-	}
-	engine := pathfind.NewEngine(dir)
-	engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+    dir := cfg.geodataDir
+    if dir == "" {
+        dir = detectGeodataDir()
+    }
+    engine := pathfind.NewEngine(dir)
+    engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
 
-	stats := engine.Stats()
-	if stats.HasData {
-		log.Printf("Pathfind test: %d geodata region files in %s",
-			stats.RegionFiles, stats.Dir)
-	} else {
-		log.Println("Pathfind test: no geodata files found in " + stats.Dir +
-			", pass -geodata with the game server data/geodata directory")
-	}
+    stats := engine.Stats()
+    if stats.HasData {
+        log.Printf("Pathfind test: %d geodata region files in %s",
+            stats.RegionFiles, stats.Dir)
+    } else {
+        log.Println("Pathfind test: no geodata files found in " + stats.Dir +
+            ", pass -geodata with the game server data/geodata directory")
+    }
 
-	web := startWebInterface(cfg, nil, engine, nil)
-	if web == nil {
-		log.Println("Pathfind test needs the web interface, " +
-			"pass a -web address")
+    web := startWebInterface(cfg, nil, engine, nil)
+    if web == nil {
+        log.Println("Pathfind test needs the web interface, " +
+            "pass a -web address")
 
-		return
-	}
+        return
+    }
 
-	log.Println("Pathfind test UI is ready")
+    log.Println("Pathfind test UI is ready")
 
-	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-	<-ctx.Done()
-	shutdownWebInterface(web)
-	log.Println("Pathfind test finished")
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
+    <-ctx.Done()
+    shutdownWebInterface(web)
+    log.Println("Pathfind test finished")
 }
 
 // runTestFightUIV1 serves the combat animation variant showcase (the
@@ -1100,80 +1100,80 @@ func runPathfindTest(cfg config) {
 // variants in the browser and picks the winner for the live map
 // implementation.
 func runTestFightUIV1(cfg config) {
-	if cfg.webAddress == "" {
-		log.Println("Fight test UI needs the web interface, " +
-			"pass a -web address")
+    if cfg.webAddress == "" {
+        log.Println("Fight test UI needs the web interface, " +
+            "pass a -web address")
 
-		return
-	}
+        return
+    }
 
-	server := webserver.NewFightServer(cfg.webAddress, log.Default())
-	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			log.Printf("Web interface stopped: %v", err)
-		}
-	}()
+    server := webserver.NewFightServer(cfg.webAddress, log.Default())
+    go func() {
+        if err := server.ListenAndServe(); err != nil {
+            log.Printf("Web interface stopped: %v", err)
+        }
+    }()
 
-	log.Println("Fight test UI is ready")
+    log.Println("Fight test UI is ready")
 
-	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-	<-ctx.Done()
-	shutdownWebInterface(server)
-	log.Println("Fight test finished")
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
+    <-ctx.Done()
+    shutdownWebInterface(server)
+    log.Println("Fight test finished")
 }
 
 // detectGeodataDir picks the first candidate directory that exists.
 func detectGeodataDir() string {
-	for _, candidate := range defaultGeodataCandidates {
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate
-		}
-	}
-	log.Println("No geodata directory found, pass -geodata explicitly")
+    for _, candidate := range defaultGeodataCandidates {
+        if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+            return candidate
+        }
+    }
+    log.Println("No geodata directory found, pass -geodata explicitly")
 
-	return defaultGeodataCandidates[0]
+    return defaultGeodataCandidates[0]
 }
 
 // startWebInterface runs the web server in the background when enabled.
 // A non nil pathfind engine switches the server into the pathfind test
 // mode, otherwise the bot registry is served.
 func startWebInterface(
-	cfg config, registry *state.Registry, engine *pathfind.Engine,
-	proxyServer *proxy.Server,
+    cfg config, registry *state.Registry, engine *pathfind.Engine,
+    proxyServer *proxy.Server,
 ) *webserver.Server {
-	if cfg.webAddress == "" {
-		return nil
-	}
-	var server *webserver.Server
-	if engine != nil {
-		// The test opens on the hunting area: that is the terrain the
-		// bot actually walks and the most useful pathfind playground.
-		zoneX, zoneY, _ := hunt.DefaultHuntingZone()
-		server = webserver.NewPathfindServer(engine, cfg.webAddress,
-			log.Default(), webserver.PathfindOptions{
-				ViewCenter: &pathfind.Vec3{
-					X: float64(zoneX),
-					Y: float64(zoneY),
-					Z: 0,
-				},
-			})
-	} else {
-		server = webserver.NewServer(registry, cfg.webAddress, log.Default())
-		if proxyServer != nil {
-			server.SetProxy(proxyServer)
-		}
-	}
-	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			if !errors.Is(err, http.ErrServerClosed) {
-				log.Printf("Web interface stopped: %v", err)
-			}
-		}
-	}()
+    if cfg.webAddress == "" {
+        return nil
+    }
+    var server *webserver.Server
+    if engine != nil {
+        // The test opens on the hunting area: that is the terrain the
+        // bot actually walks and the most useful pathfind playground.
+        zoneX, zoneY, _ := hunt.DefaultHuntingZone()
+        server = webserver.NewPathfindServer(engine, cfg.webAddress,
+            log.Default(), webserver.PathfindOptions{
+                ViewCenter: &pathfind.Vec3{
+                    X: float64(zoneX),
+                    Y: float64(zoneY),
+                    Z: 0,
+                },
+            })
+    } else {
+        server = webserver.NewServer(registry, cfg.webAddress, log.Default())
+        if proxyServer != nil {
+            server.SetProxy(proxyServer)
+        }
+    }
+    go func() {
+        if err := server.ListenAndServe(); err != nil {
+            if !errors.Is(err, http.ErrServerClosed) {
+                log.Printf("Web interface stopped: %v", err)
+            }
+        }
+    }()
 
-	return server
+    return server
 }
 
 // attachAcceptance wires the acceptance test manager into the web
@@ -1181,16 +1181,16 @@ func startWebInterface(
 // bot registry, so they appear in the sidebar bot list and stay
 // connectable through the client proxy exactly like the fleet bots.
 func attachAcceptance(
-	web *webserver.Server, registry *state.Registry, cfg config,
-	engine *pathfind.Engine, proxyServer *proxy.Server,
+    web *webserver.Server, registry *state.Registry, cfg config,
+    engine *pathfind.Engine, proxyServer *proxy.Server,
 ) {
-	if web == nil {
-		return
-	}
-	manager := newAcceptanceManager(registry, cfg, engine, proxyServer)
-	web.SetAcceptance(manager)
-	log.Printf("Acceptance tests ready: %d scenarios on the accounts %s",
-		len(acceptance.Definitions()), acceptance.AccountList())
+    if web == nil {
+        return
+    }
+    manager := newAcceptanceManager(registry, cfg, engine, proxyServer)
+    web.SetAcceptance(manager)
+    log.Printf("Acceptance tests ready: %d scenarios on the accounts %s",
+        len(acceptance.Definitions()), acceptance.AccountList())
 }
 
 // newAcceptanceManager builds the acceptance manager from the shared
@@ -1198,17 +1198,17 @@ func attachAcceptance(
 // the same construction so the scenarios see the same wiring either
 // way.
 func newAcceptanceManager(
-	registry *state.Registry, cfg config,
-	engine *pathfind.Engine, proxyServer *proxy.Server,
+    registry *state.Registry, cfg config,
+    engine *pathfind.Engine, proxyServer *proxy.Server,
 ) *acceptance.Manager {
-	return acceptance.NewManager(acceptance.ManagerDeps{
-		Registry: registry,
-		Login:    cfg.loginAddress,
-		Engine:   engine,
-		Proxy:    proxyServer,
-		Logger:   log.Default(),
-		DBConfig: acceptance.DefaultDBConfig(),
-	}, acceptance.Definitions())
+    return acceptance.NewManager(acceptance.ManagerDeps{
+        Registry: registry,
+        Login:    cfg.loginAddress,
+        Engine:   engine,
+        Proxy:    proxyServer,
+        Logger:   log.Default(),
+        DBConfig: acceptance.DefaultDBConfig(),
+    }, acceptance.Definitions())
 }
 
 // runSpotAuditCLI measures the live hunting spot geometry: the probe
@@ -1222,35 +1222,35 @@ func newAcceptanceManager(
 // unaudited spot; -audit-fresh starts over. The exit code reflects
 // the audit completion (0 when every spot of the filter measured).
 func runSpotAuditCLI(cfg config) {
-	log.Println("Starting swarm spot audit CLI")
-	log.Printf("Build: %s", version.Identity())
+    log.Println("Starting swarm spot audit CLI")
+    log.Printf("Build: %s", version.Identity())
 
-	account := cfg.auditAccount
-	// The signal context stops the audit on SIGINT/SIGTERM. The stop
-	// call lands on the explicit cleanup path below (no defer) because
-	// os.Exit skips the deferred calls - the same shape the acceptance
-	// CLI uses.
-	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
-	err := spotaudit.Run(ctx, spotaudit.Config{
-		Login:    cfg.loginAddress,
-		Account:  account,
-		Password: account,
-		Char:     account,
-		DB:       acceptance.DefaultDBConfig(),
-		Wait:     cfg.auditWait,
-		Output:   cfg.spotAudit,
-		Anchors:  cfg.auditAnchors,
-		Filter:   cfg.auditFilter,
-		Stride:   cfg.auditStride,
-		Fresh:    cfg.auditFresh,
-	}, log.Default())
-	stop()
-	if err != nil {
-		log.Printf("Spot audit: FAIL %s", err.Error())
-		os.Exit(1)
-	}
-	log.Println("Spot audit: PASS")
+    account := cfg.auditAccount
+    // The signal context stops the audit on SIGINT/SIGTERM. The stop
+    // call lands on the explicit cleanup path below (no defer) because
+    // os.Exit skips the deferred calls - the same shape the acceptance
+    // CLI uses.
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGINT, syscall.SIGTERM)
+    err := spotaudit.Run(ctx, spotaudit.Config{
+        Login:    cfg.loginAddress,
+        Account:  account,
+        Password: account,
+        Char:     account,
+        DB:       acceptance.DefaultDBConfig(),
+        Wait:     cfg.auditWait,
+        Output:   cfg.spotAudit,
+        Anchors:  cfg.auditAnchors,
+        Filter:   cfg.auditFilter,
+        Stride:   cfg.auditStride,
+        Fresh:    cfg.auditFresh,
+    }, log.Default())
+    stop()
+    if err != nil {
+        log.Printf("Spot audit: FAIL %s", err.Error())
+        os.Exit(1)
+    }
+    log.Println("Spot audit: PASS")
 }
 
 // runAcceptanceCLI drives the acceptance scenarios headless: the
@@ -1267,72 +1267,72 @@ func runSpotAuditCLI(cfg config) {
 // them (the proxy relay scenario arms its own ephemeral proxy through
 // the manager, so the main -proxy flag stays off here).
 func runAcceptanceCLI(cfg config) {
-	log.Println("Starting swarm acceptance CLI")
-	log.Printf("Build: %s", version.Identity())
+    log.Println("Starting swarm acceptance CLI")
+    log.Printf("Build: %s", version.Identity())
 
-	if cfg.acceptanceRun == "list" {
-		for _, id := range acceptance.DefinitionsIDs() {
-			log.Println("  " + id)
-		}
+    if cfg.acceptanceRun == "list" {
+        for _, id := range acceptance.DefinitionsIDs() {
+            log.Println("  " + id)
+        }
 
-		return
-	}
+        return
+    }
 
-	registry := state.NewRegistry()
-	var proxyServer *proxy.Server
-	if cfg.proxy {
-		proxyServer = startProxy(cfg)
-	}
-	var engine *pathfind.Engine
-	dir := cfg.geodataDir
-	if dir == "" {
-		dir = detectGeodataDir()
-	}
-	engine = pathfind.NewEngine(dir)
-	engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+    registry := state.NewRegistry()
+    var proxyServer *proxy.Server
+    if cfg.proxy {
+        proxyServer = startProxy(cfg)
+    }
+    var engine *pathfind.Engine
+    dir := cfg.geodataDir
+    if dir == "" {
+        dir = detectGeodataDir()
+    }
+    engine = pathfind.NewEngine(dir)
+    engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
 
-	manager := newAcceptanceManager(registry, cfg, engine, proxyServer)
-	web := startWebInterface(cfg, registry, nil, proxyServer)
-	if web != nil {
-		web.SetAcceptance(manager)
-	}
+    manager := newAcceptanceManager(registry, cfg, engine, proxyServer)
+    web := startWebInterface(cfg, registry, nil, proxyServer)
+    if web != nil {
+        web.SetAcceptance(manager)
+    }
 
-	// The signal context stops the manager on SIGINT/SIGTERM. The
-	// stop call lands on the explicit cleanup path below (no defer)
-	// because os.Exit skips the deferred calls - the shutdown chain
-	// stays straight on both the pass and the fail path.
-	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
+    // The signal context stops the manager on SIGINT/SIGTERM. The
+    // stop call lands on the explicit cleanup path below (no defer)
+    // because os.Exit skips the deferred calls - the shutdown chain
+    // stays straight on both the pass and the fail path.
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGINT, syscall.SIGTERM)
 
-	var err error
-	switch cfg.acceptanceRun {
-	case "all":
-		log.Printf("Acceptance: running %d scenarios sequentially",
-			len(manager.IDs()))
-		err = manager.RunAll(ctx)
-	default:
-		log.Printf("Acceptance: running scenario %s",
-			cfg.acceptanceRun)
-		err = manager.Run(ctx, cfg.acceptanceRun)
-	}
-	stop()
-	shutdownWebInterface(web)
-	shutdownProxy(proxyServer)
-	if err != nil {
-		log.Printf("Acceptance: FAIL %s", err.Error())
-		os.Exit(1)
-	}
-	log.Println("Acceptance: PASS")
+    var err error
+    switch cfg.acceptanceRun {
+    case "all":
+        log.Printf("Acceptance: running %d scenarios sequentially",
+            len(manager.IDs()))
+        err = manager.RunAll(ctx)
+    default:
+        log.Printf("Acceptance: running scenario %s",
+            cfg.acceptanceRun)
+        err = manager.Run(ctx, cfg.acceptanceRun)
+    }
+    stop()
+    shutdownWebInterface(web)
+    shutdownProxy(proxyServer)
+    if err != nil {
+        log.Printf("Acceptance: FAIL %s", err.Error())
+        os.Exit(1)
+    }
+    log.Println("Acceptance: PASS")
 }
 
 // shutdownWebInterface gracefully stops the web server.
 func shutdownWebInterface(server *webserver.Server) {
-	if server == nil {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
-		log.Printf("Web interface shutdown failed: %v", err)
-	}
+    if server == nil {
+        return
+    }
+    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+    defer cancel()
+    if err := server.Shutdown(ctx); err != nil {
+        log.Printf("Web interface shutdown failed: %v", err)
+    }
 }

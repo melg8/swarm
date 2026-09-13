@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+# SPDX-License-Identifier: MIT
+
+# The repository whitespace policy is spaces only (see the "Code
+# conventions" section of AGENTS.md): four spaces per indentation step.
+# The formatter of record is cmd/gofmt-spaces (`task fmt`), not the
+# stock gofmt/gofumpt - both would re-tab the tree.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml,js,css,html}]
+indent_size = 2
+
+[*.md]
+# Two trailing spaces are a hard line break in markdown.
+trim_trailing_whitespace = false

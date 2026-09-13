@@ -5,10 +5,10 @@
 package gear
 
 import (
-	"sort"
+    "sort"
 
-	"github.com/melg8/swarm/internal/swarm/npcdata"
-	"github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // starterSet lists the item ids of the newbie kits the server never
@@ -21,10 +21,10 @@ import (
 // weighs 3300, the dagger 1160), the hunt loop destroys them through
 // ReplacedStarterItems once a better weapon or armor piece is worn.
 var starterSet = map[int32]bool{
-	10:   true, // Dagger (the elven fighter's starter weapon)
-	1146: true, // Squire's Shirt
-	1147: true, // Squire's Pants
-	2369: true, // Squire's Sword
+    10:   true, // Dagger (the elven fighter's starter weapon)
+    1146: true, // Squire's Shirt
+    1147: true, // Squire's Pants
+    2369: true, // Squire's Sword
 }
 
 // IsStarterItem reports whether the item id belongs to the newbie kit
@@ -33,18 +33,18 @@ var starterSet = map[int32]bool{
 // it - the destroy request is its only way out (see
 // ReplacedStarterItems).
 func IsStarterItem(itemID int32) bool {
-	return starterSet[itemID]
+    return starterSet[itemID]
 }
 
 // StarterDrop is one replaced starter item scheduled for destruction.
 type StarterDrop struct {
-	// Item is the inventory entry to destroy.
-	Item state.InventoryItem
-	// Weight is the unit weight of the item: the dead load the
-	// destruction frees.
-	Weight int32
-	// Reason is the human readable log line.
-	Reason string
+    // Item is the inventory entry to destroy.
+    Item state.InventoryItem
+    // Weight is the unit weight of the item: the dead load the
+    // destruction frees.
+    Weight int32
+    // Reason is the human readable log line.
+    Reason string
 }
 
 // ReplacedStarterItems returns the unequipped starter kit items whose
@@ -56,45 +56,45 @@ type StarterDrop struct {
 // and a starter item with no replacement in sight is never returned.
 // The order is deterministic (object ids ascending).
 func ReplacedStarterItems(
-	profile Profile, equipment Equipment,
+    profile Profile, equipment Equipment,
 ) []StarterDrop {
-	paperdoll := equipment.Paperdoll(profile)
-	replaced := make([]StarterDrop, 0, len(starterSet))
-	for _, item := range equipment.Items {
-		if item.Equipped || !starterSet[item.ItemID] {
-			continue
-		}
-		stats, ok := npcdata.ItemGearStats(item.ItemID)
-		if !ok {
-			continue
-		}
-		score := scoreStats(profile, stats)
-		if score <= 0 {
-			continue
-		}
-		current := starterReplacement(paperdoll, stats)
-		if paperdollEmpty(current) {
-			continue
-		}
-		if current.Score >= score {
-			replaced = append(replaced, StarterDrop{
-				Item:   item,
-				Weight: npcdata.ItemWeight(item.ItemID),
-				Reason: "destroying " + describeItem(ScoredItem{
-					Item:  item,
-					Stats: stats,
-					Score: score,
-					Slot:  slotInvalid,
-				}) + ": the equipped " + describeItem(current) +
-					" replaced it (unsellable, undroppable)",
-			})
-		}
-	}
-	sort.Slice(replaced, func(i int, j int) bool {
-		return replaced[i].Item.ObjectID < replaced[j].Item.ObjectID
-	})
+    paperdoll := equipment.Paperdoll(profile)
+    replaced := make([]StarterDrop, 0, len(starterSet))
+    for _, item := range equipment.Items {
+        if item.Equipped || !starterSet[item.ItemID] {
+            continue
+        }
+        stats, ok := npcdata.ItemGearStats(item.ItemID)
+        if !ok {
+            continue
+        }
+        score := scoreStats(profile, stats)
+        if score <= 0 {
+            continue
+        }
+        current := starterReplacement(paperdoll, stats)
+        if paperdollEmpty(current) {
+            continue
+        }
+        if current.Score >= score {
+            replaced = append(replaced, StarterDrop{
+                Item:   item,
+                Weight: npcdata.ItemWeight(item.ItemID),
+                Reason: "destroying " + describeItem(ScoredItem{
+                    Item:  item,
+                    Stats: stats,
+                    Score: score,
+                    Slot:  slotInvalid,
+                }) + ": the equipped " + describeItem(current) +
+                    " replaced it (unsellable, undroppable)",
+            })
+        }
+    }
+    sort.Slice(replaced, func(i int, j int) bool {
+        return replaced[i].Item.ObjectID < replaced[j].Item.ObjectID
+    })
 
-	return replaced
+    return replaced
 }
 
 // starterReplacement resolves the paperdoll entry a starter item of
@@ -103,22 +103,22 @@ func ReplacedStarterItems(
 // the chest (the one-piece blocks the legs slot and displaces the
 // starter pants with itself).
 func starterReplacement(
-	paperdoll [slotCount]ScoredItem, stats npcdata.GearStats,
+    paperdoll [slotCount]ScoredItem, stats npcdata.GearStats,
 ) ScoredItem {
-	if stats.BodyPart == partLegs &&
-		paperdoll[SlotChest].Stats.BodyPart == partOnepiece {
-		return paperdoll[SlotChest]
-	}
-	slots := SlotsForBodyPart(stats.BodyPart)
-	if len(slots) == 0 {
-		return clearedScoredItem
-	}
+    if stats.BodyPart == partLegs &&
+        paperdoll[SlotChest].Stats.BodyPart == partOnepiece {
+        return paperdoll[SlotChest]
+    }
+    slots := SlotsForBodyPart(stats.BodyPart)
+    if len(slots) == 0 {
+        return clearedScoredItem
+    }
 
-	return paperdoll[slots[0]]
+    return paperdoll[slots[0]]
 }
 
 // paperdollEmpty reports whether the paperdoll entry holds no item
 // (the zero entry Paperdoll leaves in slots without usable gear).
 func paperdollEmpty(entry ScoredItem) bool {
-	return entry.Item.ObjectID == 0 && entry.Stats.BodyPart == ""
+    return entry.Item.ObjectID == 0 && entry.Stats.BodyPart == ""
 }

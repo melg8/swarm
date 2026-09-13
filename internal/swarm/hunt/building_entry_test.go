@@ -5,13 +5,13 @@
 package hunt
 
 import (
-	"math"
-	"testing"
-	"time"
+    "math"
+    "testing"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/pathfind"
-	"github.com/melg8/swarm/internal/swarm/state"
-	"github.com/stretchr/testify/require"
+    "github.com/melg8/swarm/internal/swarm/pathfind"
+    "github.com/melg8/swarm/internal/swarm/state"
+    "github.com/stretchr/testify/require"
 )
 
 // The reproduction of the 2026-09-12 03:56 trainer hall freeze (the
@@ -28,19 +28,19 @@ import (
 // right up to the training npc - not talk to it through the wall
 // from wherever the geodata leg happened to end.
 const (
-	// aisleEntranceX/Y/Z is the dump freeze cell: the north end of
-	// the trainer hall west aisle column.
-	aisleEntranceX = int32(44744)
-	aisleEntranceY = int32(51992)
-	aisleEntranceZ = int32(-2792)
-	// elleniaX/Y/Z is the elven fighter teacher spawn inside the
-	// trainer hall (ElvenVillageNPCs.xml).
-	elleniaX = int32(45725)
-	elleniaY = int32(52105)
-	elleniaZ = int32(-2792)
-	// elleniaObjectID is the object id the reproduction gives the
-	// teacher npc.
-	elleniaObjectID = int32(87)
+    // aisleEntranceX/Y/Z is the dump freeze cell: the north end of
+    // the trainer hall west aisle column.
+    aisleEntranceX = int32(44744)
+    aisleEntranceY = int32(51992)
+    aisleEntranceZ = int32(-2792)
+    // elleniaX/Y/Z is the elven fighter teacher spawn inside the
+    // trainer hall (ElvenVillageNPCs.xml).
+    elleniaX = int32(45725)
+    elleniaY = int32(52105)
+    elleniaZ = int32(-2792)
+    // elleniaObjectID is the object id the reproduction gives the
+    // teacher npc.
+    elleniaObjectID = int32(87)
 )
 
 // aisleWalledServer builds the simulated server of the freeze model:
@@ -51,54 +51,54 @@ const (
 // The wall covers only the column interior: the entrance cell itself
 // stays walkable exactly the way the dump character stood on it.
 func aisleWalledServer(engine *pathfind.Engine) *reproServer {
-	return &reproServer{
-		nav: engine,
-		walled: []pathfind.AvoidArea{{
-			Center: pathfind.Vec3{X: 44728, Y: 52024, Z: -2792},
-			Radius: 24.0,
-		}},
-	}
+    return &reproServer{
+        nav: engine,
+        walled: []pathfind.AvoidArea{{
+            Center: pathfind.Vec3{X: 44728, Y: 52024, Z: -2792},
+            Radius: 24.0,
+        }},
+    }
 }
 
 // armTeachStop arms the learn leg of the dump: the character walks to
 // the teacher Ellenia inside the trainer hall.
 func armTeachStop(t *testing.T, loop *Loop) {
-	t.Helper()
-	loop.phase = phaseTownWalk
-	loop.tripStart = time.Now()
-	loop.tripStops = []tripStop{{
-		merchant: townNpc{
-			TemplateID: 7156, Name: "Ellenia",
-			X: elleniaX, Y: elleniaY, Z: elleniaZ,
-		},
-		teach: true,
-	}}
-	// The teach leg searches the close ring (the advanceTripStop
-	// teach radius), the wide trip ring stays the fallback.
-	loop.legRadius = npcApproachOffset
-	if !loop.startWalkLeg(pathfind.Vec3{
-		X: float64(elleniaX), Y: float64(elleniaY), Z: float64(elleniaZ),
-	}) {
-		loop.legRadius = tripApproachRadius
-	}
-	require.True(t, loop.startWalkLeg(pathfind.Vec3{
-		X: float64(elleniaX), Y: float64(elleniaY), Z: float64(elleniaZ),
-	}), "the aisle route must plan")
+    t.Helper()
+    loop.phase = phaseTownWalk
+    loop.tripStart = time.Now()
+    loop.tripStops = []tripStop{{
+        merchant: townNpc{
+            TemplateID: 7156, Name: "Ellenia",
+            X: elleniaX, Y: elleniaY, Z: elleniaZ,
+        },
+        teach: true,
+    }}
+    // The teach leg searches the close ring (the advanceTripStop
+    // teach radius), the wide trip ring stays the fallback.
+    loop.legRadius = npcApproachOffset
+    if !loop.startWalkLeg(pathfind.Vec3{
+        X: float64(elleniaX), Y: float64(elleniaY), Z: float64(elleniaZ),
+    }) {
+        loop.legRadius = tripApproachRadius
+    }
+    require.True(t, loop.startWalkLeg(pathfind.Vec3{
+        X: float64(elleniaX), Y: float64(elleniaY), Z: float64(elleniaZ),
+    }), "the aisle route must plan")
 }
 
 // spawnEllenia publishes the teacher npc the approach needs.
 func spawnEllenia(bot *state.Bot) {
-	bot.ApplyNpcInfo(state.NpcInfo{
-		ObjectID:   elleniaObjectID,
-		TemplateID: 7156 + npcDisplayOffset,
-		X:          elleniaX, Y: elleniaY, Z: elleniaZ,
-		Name: "Ellenia",
-	})
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID:   elleniaObjectID,
+        TemplateID: 7156 + npcDisplayOffset,
+        X:          elleniaX, Y: elleniaY, Z: elleniaZ,
+        Name: "Ellenia",
+    })
 }
 
 // dist2DToEllenia measures the planar distance to the teacher.
 func dist2DToEllenia(x, y int32) float64 {
-	return math.Hypot(float64(elleniaX-x), float64(elleniaY-y))
+    return math.Hypot(float64(elleniaX-x), float64(elleniaY-y))
 }
 
 // TestBuildingEntryWalksFromTheAisleEntrance pins the happy path of
@@ -108,37 +108,37 @@ func dist2DToEllenia(x, y int32) float64 {
 // and the talk click fires with the character standing right by the
 // npc.
 func TestBuildingEntryWalksFromTheAisleEntrance(t *testing.T) {
-	disablePace(t)
-	engine := reproEngine(t)
-	nav := NewNavigator(engine)
-	bot := newTestBot()
-	moveSelfTo(bot, aisleEntranceX, aisleEntranceY, aisleEntranceZ)
-	game := &fakeGame{}
-	loop := NewLoop(game, bot)
-	loop.SetNavigator(nav)
-	loop.lastHit = time.Now().Add(-time.Minute)
-	// The farm spot the trip return plans back to. Without it the
-	// zero spot sends the return leg dry search across the whole world
-	// pack - seconds of A* inside one tick (the production farm spot
-	// always sits inside the hunting zone, the search stays local).
-	loop.farmX, loop.farmY, loop.farmZ = elleniaX, elleniaY, elleniaZ
-	armTeachStop(t, loop)
-	sim := &reproServer{nav: engine, minZ: aisleEntranceZ}
-	spawnEllenia(bot)
-	loop.teacherID = elleniaObjectID
+    disablePace(t)
+    engine := reproEngine(t)
+    nav := NewNavigator(engine)
+    bot := newTestBot()
+    moveSelfTo(bot, aisleEntranceX, aisleEntranceY, aisleEntranceZ)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.SetNavigator(nav)
+    loop.lastHit = time.Now().Add(-time.Minute)
+    // The farm spot the trip return plans back to. Without it the
+    // zero spot sends the return leg dry search across the whole world
+    // pack - seconds of A* inside one tick (the production farm spot
+    // always sits inside the hunting zone, the search stays local).
+    loop.farmX, loop.farmY, loop.farmZ = elleniaX, elleniaY, elleniaZ
+    armTeachStop(t, loop)
+    sim := &reproServer{nav: engine, minZ: aisleEntranceZ}
+    spawnEllenia(bot)
+    loop.teacherID = elleniaObjectID
 
-	// The planned route is the dump walk: the aisle column south, the
-	// hall row east, the approach ring of the teacher.
-	require.GreaterOrEqual(t, len(loop.waypoints), 4,
-		"the aisle route carries the dump plan shape")
-	last := loop.waypoints[len(loop.waypoints)-1]
-	require.LessOrEqual(t, math.Hypot(
-		last.X-float64(elleniaX), last.Y-float64(elleniaY)), 200.0,
-		"the route ends inside the teacher approach ring")
+    // The planned route is the dump walk: the aisle column south, the
+    // hall row east, the approach ring of the teacher.
+    require.GreaterOrEqual(t, len(loop.waypoints), 4,
+        "the aisle route carries the dump plan shape")
+    last := loop.waypoints[len(loop.waypoints)-1]
+    require.LessOrEqual(t, math.Hypot(
+        last.X-float64(elleniaX), last.Y-float64(elleniaY)), 200.0,
+        "the route ends inside the teacher approach ring")
 
-	walkToTheTalk(t, loop, game, bot, sim)
-	require.Zero(t, loop.rePaths,
-		"the agreeing server walks the plan without any recovery")
+    walkToTheTalk(t, loop, game, bot, sim)
+    require.Zero(t, loop.rePaths,
+        "the agreeing server walks the plan without any recovery")
 }
 
 // TestBuildingEntryEscapesTheWalledAisle pins the freeze model of the
@@ -149,66 +149,66 @@ func TestBuildingEntryWalksFromTheAisleEntrance(t *testing.T) {
 // the building (the north and east approach), the walk reaches the
 // teacher and the talk click fires right by the npc.
 func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
-	disablePace(t)
-	engine := reproEngine(t)
-	nav := NewNavigator(engine)
-	bot := newTestBot()
-	moveSelfTo(bot, aisleEntranceX, aisleEntranceY, aisleEntranceZ)
-	game := &fakeGame{}
-	loop := NewLoop(game, bot)
-	loop.SetNavigator(nav)
-	loop.lastHit = time.Now().Add(-time.Minute)
-	// The farm spot the trip return plans back to. Without it the
-	// zero spot sends the return leg dry search across the whole world
-	// pack - seconds of A* inside one tick (the production farm spot
-	// always sits inside the hunting zone, the search stays local).
-	loop.farmX, loop.farmY, loop.farmZ = elleniaX, elleniaY, elleniaZ
-	armTeachStop(t, loop)
-	sim := aisleWalledServer(engine)
-	spawnEllenia(bot)
-	loop.teacherID = elleniaObjectID
+    disablePace(t)
+    engine := reproEngine(t)
+    nav := NewNavigator(engine)
+    bot := newTestBot()
+    moveSelfTo(bot, aisleEntranceX, aisleEntranceY, aisleEntranceZ)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.SetNavigator(nav)
+    loop.lastHit = time.Now().Add(-time.Minute)
+    // The farm spot the trip return plans back to. Without it the
+    // zero spot sends the return leg dry search across the whole world
+    // pack - seconds of A* inside one tick (the production farm spot
+    // always sits inside the hunting zone, the search stays local).
+    loop.farmX, loop.farmY, loop.farmZ = elleniaX, elleniaY, elleniaZ
+    armTeachStop(t, loop)
+    sim := aisleWalledServer(engine)
+    spawnEllenia(bot)
+    loop.teacherID = elleniaObjectID
 
-	// The walk clicks stall at the walled aisle: the simulated
-	// character never moves a cell onto the column, the stuck cycles
-	// fire (the walkDrive acceleration stands the freeze exposed in
-	// seconds instead of the 15 s real window) and the frozen abort
-	// climbs the escalation ladder.
-	drive := newWalkDrive()
-	deadline := time.Now().Add(60 * time.Second)
-	for time.Now().Before(deadline) {
-		drive.step(loop, game, bot, sim)
-		if loop.frozenStage > 0 {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	require.Positive(t, loop.frozenStage,
-		"the walled aisle must freeze the plan and arm the escalation")
-	require.Len(t, loop.frozenAreas, 1,
-		"the frozen aisle corridor joined the session avoid areas")
-	require.InDelta(t, 44728.0, loop.frozenAreas[0].Center.X, 1.0,
-		"the ban covers the frozen aisle column")
-	selfX, selfY, _, _ := bot.SelfPosition()
-	require.LessOrEqual(t, math.Hypot(
-		float64(selfX-44728), float64(selfY-51992)), 120.0,
-		"the character still stands at the entrance - the freeze signature")
+    // The walk clicks stall at the walled aisle: the simulated
+    // character never moves a cell onto the column, the stuck cycles
+    // fire (the walkDrive acceleration stands the freeze exposed in
+    // seconds instead of the 15 s real window) and the frozen abort
+    // climbs the escalation ladder.
+    drive := newWalkDrive()
+    deadline := time.Now().Add(60 * time.Second)
+    for time.Now().Before(deadline) {
+        drive.step(loop, game, bot, sim)
+        if loop.frozenStage > 0 {
+            break
+        }
+        time.Sleep(5 * time.Millisecond)
+    }
+    require.Positive(t, loop.frozenStage,
+        "the walled aisle must freeze the plan and arm the escalation")
+    require.Len(t, loop.frozenAreas, 1,
+        "the frozen aisle corridor joined the session avoid areas")
+    require.InDelta(t, 44728.0, loop.frozenAreas[0].Center.X, 1.0,
+        "the ban covers the frozen aisle column")
+    selfX, selfY, _, _ := bot.SelfPosition()
+    require.LessOrEqual(t, math.Hypot(
+        float64(selfX-44728), float64(selfY-51992)), 120.0,
+        "the character still stands at the entrance - the freeze signature")
 
-	// The re-planned route detours around the banned aisle: the walk
-	// crosses the north of the building and the east approach, and
-	// the teach stop talks to the teacher. The strictest server model
-	// walls even the last stretch of the east approach (the roof-only
-	// interior bands), so the close ring cannot close - the approach
-	// window bounds the wait and the talk fires from within the
-	// server interaction distance instead. The walk below drives the
-	// ticks synchronously, so the window is pre-expired: the
-	// approachTeacher arming observes a lapsed deadline and takes
-	// the same expiry branch the real 45 s wait would take, without
-	// the wait itself (the production semantics of the branch stay
-	// pinned by npc_approach_test.go).
-	loop.teacherWalkUntil = time.Now().Add(-time.Second)
-	walkToTheTalkMax(t, loop, game, bot, sim, npcInteractionDist)
-	require.NotEmpty(t, loop.frozenAreas,
-		"the session ban survives the trip for the later plans")
+    // The re-planned route detours around the banned aisle: the walk
+    // crosses the north of the building and the east approach, and
+    // the teach stop talks to the teacher. The strictest server model
+    // walls even the last stretch of the east approach (the roof-only
+    // interior bands), so the close ring cannot close - the approach
+    // window bounds the wait and the talk fires from within the
+    // server interaction distance instead. The walk below drives the
+    // ticks synchronously, so the window is pre-expired: the
+    // approachTeacher arming observes a lapsed deadline and takes
+    // the same expiry branch the real 45 s wait would take, without
+    // the wait itself (the production semantics of the branch stay
+    // pinned by npc_approach_test.go).
+    loop.teacherWalkUntil = time.Now().Add(-time.Second)
+    walkToTheTalkMax(t, loop, game, bot, sim, npcInteractionDist)
+    require.NotEmpty(t, loop.frozenAreas,
+        "the session ban survives the trip for the later plans")
 }
 
 // walkToTheTalk drives the loop and the simulated server until the
@@ -216,10 +216,10 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
 // character stands right by the npc (the close ring, not the wide
 // approach radius the geodata leg ends on) and the talk click fired.
 func walkToTheTalk(
-	t *testing.T, loop *Loop, game *fakeGame, bot *state.Bot, sim *reproServer,
+    t *testing.T, loop *Loop, game *fakeGame, bot *state.Bot, sim *reproServer,
 ) {
-	t.Helper()
-	walkToTheTalkMax(t, loop, game, bot, sim, npcApproachOffset+hopCoincideDist)
+    t.Helper()
+    walkToTheTalkMax(t, loop, game, bot, sim, npcApproachOffset+hopCoincideDist)
 }
 
 // walkToTheTalkMax is walkToTheTalk with the accepted talking
@@ -227,29 +227,29 @@ func walkToTheTalk(
 // last stretch of the approach - the talk then fires from within the
 // server interaction distance after the approach window).
 func walkToTheTalkMax(
-	t *testing.T, loop *Loop, game *fakeGame, bot *state.Bot, sim *reproServer,
-	maxDist2D float64,
+    t *testing.T, loop *Loop, game *fakeGame, bot *state.Bot, sim *reproServer,
+    maxDist2D float64,
 ) {
-	t.Helper()
-	drive := newWalkDrive()
-	deadline := time.Now().Add(120 * time.Second)
-	for time.Now().Before(deadline) {
-		drive.step(loop, game, bot, sim)
-		if containsClick(game.clicks, elleniaObjectID) {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	require.True(t, containsClick(game.clicks, elleniaObjectID),
-		"the teach stop must click the teacher npc")
-	selfX, selfY, _, ok := bot.SelfPosition()
-	require.True(t, ok)
-	t.Logf("the teach stop talked to Ellenia from %d %d (dist2D %.0f)",
-		selfX, selfY, dist2DToEllenia(selfX, selfY))
-	require.LessOrEqual(t, dist2DToEllenia(selfX, selfY), maxDist2D,
-		"the character must stand by the teacher - the close ring of "+
-			"the npc approach point on the agreeing servers, within the "+
-			"interaction distance on the walled ones")
+    t.Helper()
+    drive := newWalkDrive()
+    deadline := time.Now().Add(120 * time.Second)
+    for time.Now().Before(deadline) {
+        drive.step(loop, game, bot, sim)
+        if containsClick(game.clicks, elleniaObjectID) {
+            break
+        }
+        time.Sleep(5 * time.Millisecond)
+    }
+    require.True(t, containsClick(game.clicks, elleniaObjectID),
+        "the teach stop must click the teacher npc")
+    selfX, selfY, _, ok := bot.SelfPosition()
+    require.True(t, ok)
+    t.Logf("the teach stop talked to Ellenia from %d %d (dist2D %.0f)",
+        selfX, selfY, dist2DToEllenia(selfX, selfY))
+    require.LessOrEqual(t, dist2DToEllenia(selfX, selfY), maxDist2D,
+        "the character must stand by the teacher - the close ring of "+
+            "the npc approach point on the agreeing servers, within the "+
+            "interaction distance on the walled ones")
 }
 
 // walkDrive runs one iteration of the offline walk loop: the tick
@@ -263,47 +263,47 @@ func walkToTheTalkMax(
 // stuck window gives every plan time to click before the next
 // escalation judges it.
 type walkDrive struct {
-	plan    *[]pathfind.Vec3
-	stage   int
-	lastX   int32
-	lastY   int32
-	started bool
+    plan    *[]pathfind.Vec3
+    stage   int
+    lastX   int32
+    lastY   int32
+    started bool
 }
 
 func newWalkDrive() *walkDrive {
-	return &walkDrive{}
+    return &walkDrive{}
 }
 
 func (d *walkDrive) step(
-	loop *Loop, game *fakeGame, bot *state.Bot, sim *reproServer,
+    loop *Loop, game *fakeGame, bot *state.Bot, sim *reproServer,
 ) {
-	loop.moveAt = time.Time{}
-	loop.tick()
-	sim.consume(game)
-	sim.advance(bot)
-	// The grace: a tick that replaced the plan (a re-path, a ladder
-	// rung) gets its follow-up iteration free of stuck arming - the
-	// fresh plan must click first.
-	fresh := &loop.waypoints != d.plan || loop.frozenStage != d.stage
-	x, y, _, ok := bot.SelfPosition()
-	if ok {
-		if !fresh && d.started && sim.stalled &&
-			x == d.lastX && y == d.lastY && len(game.walks) > 0 {
-			armStuck(loop, bot)
-		}
-		d.lastX, d.lastY = x, y
-		d.started = true
-	}
-	d.plan, d.stage = &loop.waypoints, loop.frozenStage
+    loop.moveAt = time.Time{}
+    loop.tick()
+    sim.consume(game)
+    sim.advance(bot)
+    // The grace: a tick that replaced the plan (a re-path, a ladder
+    // rung) gets its follow-up iteration free of stuck arming - the
+    // fresh plan must click first.
+    fresh := &loop.waypoints != d.plan || loop.frozenStage != d.stage
+    x, y, _, ok := bot.SelfPosition()
+    if ok {
+        if !fresh && d.started && sim.stalled &&
+            x == d.lastX && y == d.lastY && len(game.walks) > 0 {
+            armStuck(loop, bot)
+        }
+        d.lastX, d.lastY = x, y
+        d.started = true
+    }
+    d.plan, d.stage = &loop.waypoints, loop.frozenStage
 }
 
 // containsClick reports whether the talk click reached the teacher.
 func containsClick(clicks []int32, objectID int32) bool {
-	for _, clicked := range clicks {
-		if clicked == objectID {
-			return true
-		}
-	}
+    for _, clicked := range clicks {
+        if clicked == objectID {
+            return true
+        }
+    }
 
-	return false
+    return false
 }

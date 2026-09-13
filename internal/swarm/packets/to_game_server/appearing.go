@@ -5,9 +5,9 @@
 package togameserver
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const appearingPacketID = 0x30
@@ -22,14 +22,14 @@ type AppearingPacket struct{}
 
 // NewAppearingPacket creates the teleport confirmation.
 func NewAppearingPacket() *AppearingPacket {
-	return &AppearingPacket{}
+    return &AppearingPacket{}
 }
 
 // ToBytes serializes the packet.
 func (p *AppearingPacket) ToBytes(writer *packet.Writer) error {
-	if err := writer.WriteInt8(appearingPacketID); err != nil {
-		return fmt.Errorf("failed to write appearing id: %w", err)
-	}
+    if err := writer.WriteInt8(appearingPacketID); err != nil {
+        return fmt.Errorf("failed to write appearing id: %w", err)
+    }
 
-	return nil
+    return nil
 }

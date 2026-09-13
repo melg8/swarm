@@ -5,42 +5,42 @@
 package crypt
 
 import (
-	"testing"
+    "testing"
 )
 
 func dataForBlowfishBenchmark(size int) []byte {
-	data := make([]byte, size)
-	for i := range data {
-		data[i] = byte(i % 256)
-	}
+    data := make([]byte, size)
+    for i := range data {
+        data[i] = byte(i % 256)
+    }
 
-	return data
+    return data
 }
 
 func BenchmarkBlowfish(b *testing.B) {
-	data := dataForBlowfishBenchmark(1000000)
-	authKey := DefaultAuthKey()
+    data := dataForBlowfishBenchmark(1000000)
+    authKey := DefaultAuthKey()
 
-	b.ResetTimer()
+    b.ResetTimer()
 
-	for range b.N {
-		err := authKey.DecryptInplace(data)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
+    for range b.N {
+        err := authKey.DecryptInplace(data)
+        if err != nil {
+            b.Fatal(err)
+        }
+    }
 }
 
 func BenchmarkBlowfishEncrypt(b *testing.B) {
-	data := dataForBlowfishBenchmark(1000000)
-	authKey := DefaultAuthKey()
+    data := dataForBlowfishBenchmark(1000000)
+    authKey := DefaultAuthKey()
 
-	b.ResetTimer()
+    b.ResetTimer()
 
-	for range b.N {
-		err := authKey.EncryptInplace(data)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
+    for range b.N {
+        err := authKey.EncryptInplace(data)
+        if err != nil {
+            b.Fatal(err)
+        }
+    }
 }

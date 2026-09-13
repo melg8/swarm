@@ -5,11 +5,11 @@
 package hunt
 
 import (
-	"testing"
-	"time"
+    "testing"
+    "time"
 
-	"github.com/melg8/swarm/internal/swarm/pathfind"
-	"github.com/stretchr/testify/require"
+    "github.com/melg8/swarm/internal/swarm/pathfind"
+    "github.com/stretchr/testify/require"
 )
 
 // The server click validation reactions of the waypoint follower: the
@@ -25,73 +25,73 @@ import (
 // character on the route start and a three waypoint plan whose first
 // bend sits close (the arrival radius swallows it) and the goal far.
 func newClickGuardLoop(
-	validate func(from, to pathfind.Vec3) (pathfind.Vec3, bool),
+    validate func(from, to pathfind.Vec3) (pathfind.Vec3, bool),
 ) (*Loop, *fakeGame, *fakeNavigator) {
-	bot := newTestBot()
-	// The character stands on the route start.
-	moveSelfTo(bot, 1000, 1000, 0)
-	game := &fakeGame{}
-	loop := NewLoop(game, bot)
-	nav := &fakeNavigator{found: true}
-	nav.validateHook = validate
-	loop.SetNavigator(nav)
-	// A plan the follower walks: the start, a close bend the arrival
-	// radius swallows and the far goal.
-	loop.waypoints = []pathfind.Vec3{
-		{X: 1000, Y: 1000, Z: 0},
-		{X: 1020, Y: 1000, Z: 0},
-		{X: 1600, Y: 1000, Z: 0},
-	}
-	loop.wpIndex = 0
-	loop.legDest = pathfind.Vec3{X: 1600, Y: 1000, Z: 0}
-	loop.lastHit = time.Now().Add(-time.Minute)
+    bot := newTestBot()
+    // The character stands on the route start.
+    moveSelfTo(bot, 1000, 1000, 0)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    nav := &fakeNavigator{found: true}
+    nav.validateHook = validate
+    loop.SetNavigator(nav)
+    // A plan the follower walks: the start, a close bend the arrival
+    // radius swallows and the far goal.
+    loop.waypoints = []pathfind.Vec3{
+        {X: 1000, Y: 1000, Z: 0},
+        {X: 1020, Y: 1000, Z: 0},
+        {X: 1600, Y: 1000, Z: 0},
+    }
+    loop.wpIndex = 0
+    loop.legDest = pathfind.Vec3{X: 1600, Y: 1000, Z: 0}
+    loop.lastHit = time.Now().Add(-time.Minute)
 
-	return loop, game, nav
+    return loop, game, nav
 }
 
 // follow drives one follower pass with the character position.
 func follow(loop *Loop) {
-	loop.followWaypoints(1000, 1000, 0, time.Now(), false)
+    loop.followWaypoints(1000, 1000, 0, time.Now(), false)
 }
 
 // TestFollowerSendsValidatedClick pins the default path: the
 // validation accepts the click and the follower sends it unchanged.
 func TestFollowerSendsValidatedClick(t *testing.T) {
-	loop, game, nav := newClickGuardLoop(nil)
-	follow(loop)
-	require.GreaterOrEqual(t, len(game.walks), 1,
-		"the validated click must be sent")
-	require.Equal(t, int32(1600), game.walks[0][0],
-		"the click targets the aimed waypoint")
-	require.Equal(t, 2, loop.wpIndex,
-		"the start and the close bend are swallowed by the arrival "+
-			"radius, the aim stays the far goal")
-	require.Zero(t, loop.rePaths, "no re-path fires")
-	require.Zero(t, nav.calls, "no re-plan search runs")
+    loop, game, nav := newClickGuardLoop(nil)
+    follow(loop)
+    require.GreaterOrEqual(t, len(game.walks), 1,
+        "the validated click must be sent")
+    require.Equal(t, int32(1600), game.walks[0][0],
+        "the click targets the aimed waypoint")
+    require.Equal(t, 2, loop.wpIndex,
+        "the start and the close bend are swallowed by the arrival "+
+            "radius, the aim stays the far goal")
+    require.Zero(t, loop.rePaths, "no re-path fires")
+    require.Zero(t, nav.calls, "no re-plan search runs")
 }
 
 // TestFollowerRefusedClickShortensLeg pins the shortening reaction:
 // the far click refuses, the half leg validates and the follower
 // sends the shortened target instead of the refused one.
 func TestFollowerRefusedClickShortensLeg(t *testing.T) {
-	loop, game, nav := newClickGuardLoop(
-		func(_, to pathfind.Vec3) (pathfind.Vec3, bool) {
-			// Refuse the full leg to the waypoint, accept the
-			// shortened prefixes.
-			if to.X >= 1500 {
-				return to, false
-			}
+    loop, game, nav := newClickGuardLoop(
+        func(_, to pathfind.Vec3) (pathfind.Vec3, bool) {
+            // Refuse the full leg to the waypoint, accept the
+            // shortened prefixes.
+            if to.X >= 1500 {
+                return to, false
+            }
 
-			return to, true
-		})
-	follow(loop)
-	require.GreaterOrEqual(t, len(game.walks), 1,
-		"the shortened click must be sent")
-	sent := float64(game.walks[0][0])
-	require.InDelta(t, 1300, sent, 1,
-		"the first shortening halves the 600 unit leg to the far goal")
-	require.Zero(t, loop.rePaths, "a shortened click needs no re-path")
-	require.Zero(t, nav.calls, "no re-plan search runs")
+            return to, true
+        })
+    follow(loop)
+    require.GreaterOrEqual(t, len(game.walks), 1,
+        "the shortened click must be sent")
+    sent := float64(game.walks[0][0])
+    require.InDelta(t, 1300, sent, 1,
+        "the first shortening halves the 600 unit leg to the far goal")
+    require.Zero(t, loop.rePaths, "a shortened click needs no re-path")
+    require.Zero(t, nav.calls, "no re-plan search runs")
 }
 
 // TestFollowerRefusedClickHopsToTheSwallowedBend pins the hop
@@ -100,25 +100,25 @@ func TestFollowerRefusedClickShortensLeg(t *testing.T) {
 // the escape step out of a trap cell the re-path would plan but the
 // cursor would skip.
 func TestFollowerRefusedClickHopsToTheSwallowedBend(t *testing.T) {
-	loop, game, nav := newClickGuardLoop(
-		func(_, to pathfind.Vec3) (pathfind.Vec3, bool) {
-			// Only the bend validates (the escape direction), every
-			// prefix toward the far goal refuses.
-			if to.X > 1021 {
-				return to, false
-			}
+    loop, game, nav := newClickGuardLoop(
+        func(_, to pathfind.Vec3) (pathfind.Vec3, bool) {
+            // Only the bend validates (the escape direction), every
+            // prefix toward the far goal refuses.
+            if to.X > 1021 {
+                return to, false
+            }
 
-			return to, true
-		})
-	// The bend is 20 units away: inside the arrival radius but beyond
-	// the coincide distance - the hop target.
-	follow(loop)
-	require.GreaterOrEqual(t, len(game.walks), 1,
-		"the hop click must be sent")
-	require.Equal(t, int32(1020), game.walks[0][0],
-		"the hop targets the swallowed plan bend")
-	require.Zero(t, loop.rePaths, "the hop replaces the re-path")
-	require.Zero(t, nav.calls, "no re-plan search runs")
+            return to, true
+        })
+    // The bend is 20 units away: inside the arrival radius but beyond
+    // the coincide distance - the hop target.
+    follow(loop)
+    require.GreaterOrEqual(t, len(game.walks), 1,
+        "the hop click must be sent")
+    require.Equal(t, int32(1020), game.walks[0][0],
+        "the hop targets the swallowed plan bend")
+    require.Zero(t, loop.rePaths, "the hop replaces the re-path")
+    require.Zero(t, nav.calls, "no re-plan search runs")
 }
 
 // TestFollowerRefusedClickRepathsAndAborts pins the terminal reaction:
@@ -128,57 +128,57 @@ func TestFollowerRefusedClickHopsToTheSwallowedBend(t *testing.T) {
 // rule: a re-path that produced no movement proves the fresh plan
 // cannot move the character either).
 func TestFollowerRefusedClickRepathsAndAborts(t *testing.T) {
-	loop, game, nav := newClickGuardLoop(
-		func(from, _ pathfind.Vec3) (pathfind.Vec3, bool) {
-			return from, false
-		})
-	loop.phase = phaseTownWalk
-	// The first refusal re-paths within the budget.
-	follow(loop)
-	require.Equal(t, 1, nav.calls,
-		"the first refusal re-paths once")
-	require.Equal(t, 1, loop.rePaths)
-	// The re-path refreshed the plan from the fake navigator:
-	// restore the test route so the next pass aims the same refused
-	// goal from the same cell.
-	loop.waypoints = []pathfind.Vec3{
-		{X: 1000, Y: 1000, Z: 0},
-		{X: 1020, Y: 1000, Z: 0},
-		{X: 1600, Y: 1000, Z: 0},
-	}
-	loop.wpIndex = 0
-	loop.moveAt = time.Time{}
-	// The second refusal from the same cell climbs the frozen leg
-	// escalation ladder: the frozen corridor joins the session bans
-	// and the detour re-plan runs (never the identical route again).
-	follow(loop)
-	require.Equal(t, 2, nav.calls,
-		"the frozen refusal re-plans the detour around the banned corridor")
-	require.Len(t, loop.frozenAreas, 1,
-		"the aimed waypoint joined the session avoid areas")
-	require.Equal(t, phaseTownWalk, loop.phase,
-		"the escalation keeps the trip walking")
+    loop, game, nav := newClickGuardLoop(
+        func(from, _ pathfind.Vec3) (pathfind.Vec3, bool) {
+            return from, false
+        })
+    loop.phase = phaseTownWalk
+    // The first refusal re-paths within the budget.
+    follow(loop)
+    require.Equal(t, 1, nav.calls,
+        "the first refusal re-paths once")
+    require.Equal(t, 1, loop.rePaths)
+    // The re-path refreshed the plan from the fake navigator:
+    // restore the test route so the next pass aims the same refused
+    // goal from the same cell.
+    loop.waypoints = []pathfind.Vec3{
+        {X: 1000, Y: 1000, Z: 0},
+        {X: 1020, Y: 1000, Z: 0},
+        {X: 1600, Y: 1000, Z: 0},
+    }
+    loop.wpIndex = 0
+    loop.moveAt = time.Time{}
+    // The second refusal from the same cell climbs the frozen leg
+    // escalation ladder: the frozen corridor joins the session bans
+    // and the detour re-plan runs (never the identical route again).
+    follow(loop)
+    require.Equal(t, 2, nav.calls,
+        "the frozen refusal re-plans the detour around the banned corridor")
+    require.Len(t, loop.frozenAreas, 1,
+        "the aimed waypoint joined the session avoid areas")
+    require.Equal(t, phaseTownWalk, loop.phase,
+        "the escalation keeps the trip walking")
 
-	// The third refusal from the same cell (the detour froze as well)
-	// climbs to the direct server routed walk: the follower drops the
-	// plan and arms the direct leg, bounded by its window.
-	loop.waypoints = []pathfind.Vec3{
-		{X: 1000, Y: 1000, Z: 0},
-		{X: 1020, Y: 1000, Z: 0},
-		{X: 1600, Y: 1000, Z: 0},
-	}
-	loop.wpIndex = 0
-	loop.moveAt = time.Time{}
-	follow(loop)
-	require.True(t, loop.directLeg,
-		"the frozen detour escalates to the direct server routed walk")
+    // The third refusal from the same cell (the detour froze as well)
+    // climbs to the direct server routed walk: the follower drops the
+    // plan and arms the direct leg, bounded by its window.
+    loop.waypoints = []pathfind.Vec3{
+        {X: 1000, Y: 1000, Z: 0},
+        {X: 1020, Y: 1000, Z: 0},
+        {X: 1600, Y: 1000, Z: 0},
+    }
+    loop.wpIndex = 0
+    loop.moveAt = time.Time{}
+    follow(loop)
+    require.True(t, loop.directLeg,
+        "the frozen detour escalates to the direct server routed walk")
 
-	// The direct window burning without the server moving the
-	// character aborts the trip.
-	loop.directLegUntil = time.Now().Add(-directLegWindow - time.Second)
-	follow(loop)
-	require.Equal(t, phaseEngage, loop.phase,
-		"the expired direct walk ends the trip back into the hunt")
-	require.Empty(t, game.walks,
-		"a refused click is never sent")
+    // The direct window burning without the server moving the
+    // character aborts the trip.
+    loop.directLegUntil = time.Now().Add(-directLegWindow - time.Second)
+    follow(loop)
+    require.Equal(t, phaseEngage, loop.phase,
+        "the expired direct walk ends the trip back into the hunt")
+    require.Empty(t, game.walks,
+        "a refused click is never sent")
 }

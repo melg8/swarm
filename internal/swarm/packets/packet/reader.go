@@ -5,11 +5,11 @@
 package packet
 
 import (
-	"encoding/binary"
-	"errors"
-	"math"
-	"unicode/utf16"
-	"unsafe"
+    "encoding/binary"
+    "errors"
+    "math"
+    "unicode/utf16"
+    "unsafe"
 )
 
 // ErrNotEnoughBytes is returned when a read request exceeds the buffer.
@@ -30,21 +30,21 @@ var ErrNotEnoughBytes = errors.New("not enough bytes to read")
 // readers call encoding/binary.LittleEndian directly, which the
 // compiler turns into a single unaligned load on little endian hosts.
 type Reader struct {
-	data   []byte
-	offset int
+    data   []byte
+    offset int
 }
 
 // NewReader creates a reader over data.
 func NewReader(buffer []byte) *Reader {
-	return &Reader{data: buffer, offset: 0}
+    return &Reader{data: buffer, offset: 0}
 }
 
 // Reset rebinds the reader to a new buffer and rewinds the offset.
 // Used by the benchmark loop to avoid reallocating the reader; the
 // production parse path constructs a fresh reader per packet.
 func (r *Reader) Reset(data []byte) {
-	r.data = data
-	r.offset = 0
+    r.data = data
+    r.offset = 0
 }
 
 // ReadBytes returns the next number bytes as a sub slice of the source
@@ -57,19 +57,19 @@ func (r *Reader) Reset(data []byte) {
 // packet just for the IP and tail slices it immediately copied or
 // compared.
 func (r *Reader) ReadBytes(number int) ([]byte, error) {
-	if number < 0 {
-		return nil, ErrNotEnoughBytes
-	}
+    if number < 0 {
+        return nil, ErrNotEnoughBytes
+    }
 
-	end := r.offset + number
-	if end > len(r.data) {
-		return nil, ErrNotEnoughBytes
-	}
+    end := r.offset + number
+    if end > len(r.data) {
+        return nil, ErrNotEnoughBytes
+    }
 
-	buf := r.data[r.offset:end]
-	r.offset = end
+    buf := r.data[r.offset:end]
+    r.offset = end
 
-	return buf, nil
+    return buf, nil
 }
 
 // Skip advances the offset by number bytes without allocating. The
@@ -78,78 +78,78 @@ func (r *Reader) ReadBytes(number int) ([]byte, error) {
 // after one bounds check, so skipping a 200 byte trail is now one
 // comparison instead of four Read calls.
 func (r *Reader) Skip(number int) error {
-	if number < 0 {
-		return ErrNotEnoughBytes
-	}
+    if number < 0 {
+        return ErrNotEnoughBytes
+    }
 
-	end := r.offset + number
-	if end > len(r.data) {
-		return ErrNotEnoughBytes
-	}
+    end := r.offset + number
+    if end > len(r.data) {
+        return ErrNotEnoughBytes
+    }
 
-	r.offset = end
+    r.offset = end
 
-	return nil
+    return nil
 }
 
 // ReadInt64 reads a little endian int64.
 func (r *Reader) ReadInt64() (int64, error) {
-	if r.offset+8 > len(r.data) {
-		return 0, ErrNotEnoughBytes
-	}
+    if r.offset+8 > len(r.data) {
+        return 0, ErrNotEnoughBytes
+    }
 
-	v := int64(binary.LittleEndian.Uint64(r.data[r.offset:]))
-	r.offset += 8
+    v := int64(binary.LittleEndian.Uint64(r.data[r.offset:]))
+    r.offset += 8
 
-	return v, nil
+    return v, nil
 }
 
 // ReadInt32 reads a little endian int32.
 func (r *Reader) ReadInt32() (int32, error) {
-	if r.offset+4 > len(r.data) {
-		return 0, ErrNotEnoughBytes
-	}
+    if r.offset+4 > len(r.data) {
+        return 0, ErrNotEnoughBytes
+    }
 
-	v := int32(binary.LittleEndian.Uint32(r.data[r.offset:]))
-	r.offset += 4
+    v := int32(binary.LittleEndian.Uint32(r.data[r.offset:]))
+    r.offset += 4
 
-	return v, nil
+    return v, nil
 }
 
 // ReadInt16 reads a little endian int16.
 func (r *Reader) ReadInt16() (int16, error) {
-	if r.offset+2 > len(r.data) {
-		return 0, ErrNotEnoughBytes
-	}
+    if r.offset+2 > len(r.data) {
+        return 0, ErrNotEnoughBytes
+    }
 
-	v := int16(binary.LittleEndian.Uint16(r.data[r.offset:]))
-	r.offset += 2
+    v := int16(binary.LittleEndian.Uint16(r.data[r.offset:]))
+    r.offset += 2
 
-	return v, nil
+    return v, nil
 }
 
 // ReadInt8 reads a single byte as a signed int8.
 func (r *Reader) ReadInt8() (int8, error) {
-	if r.offset >= len(r.data) {
-		return 0, ErrNotEnoughBytes
-	}
+    if r.offset >= len(r.data) {
+        return 0, ErrNotEnoughBytes
+    }
 
-	v := int8(r.data[r.offset])
-	r.offset++
+    v := int8(r.data[r.offset])
+    r.offset++
 
-	return v, nil
+    return v, nil
 }
 
 // ReadFloat64 reads a little endian float64.
 func (r *Reader) ReadFloat64() (float64, error) {
-	if r.offset+8 > len(r.data) {
-		return 0, ErrNotEnoughBytes
-	}
+    if r.offset+8 > len(r.data) {
+        return 0, ErrNotEnoughBytes
+    }
 
-	v := math.Float64frombits(binary.LittleEndian.Uint64(r.data[r.offset:]))
-	r.offset += 8
+    v := math.Float64frombits(binary.LittleEndian.Uint64(r.data[r.offset:]))
+    r.offset += 8
 
-	return v, nil
+    return v, nil
 }
 
 // ReadStringFromUtf16Format reads a null terminated UTF-16LE string.
@@ -169,70 +169,70 @@ func (r *Reader) ReadFloat64() (float64, error) {
 // decoder is kept as a last resort for surrogate pairs that the stdlib
 // Decode handles differently from the proxy transformer contract.
 func (r *Reader) ReadStringFromUtf16Format() (string, error) {
-	start := r.offset
-	end := start
-	data := r.data
-	for end+1 < len(data) {
-		if data[end] == 0 && data[end+1] == 0 {
-			break
-		}
-		end += 2
-	}
-	if end+1 >= len(data) {
-		// Never found a null terminator within the buffer.
-		r.offset = len(data)
+    start := r.offset
+    end := start
+    data := r.data
+    for end+1 < len(data) {
+        if data[end] == 0 && data[end+1] == 0 {
+            break
+        }
+        end += 2
+    }
+    if end+1 >= len(data) {
+        // Never found a null terminator within the buffer.
+        r.offset = len(data)
 
-		return "", ErrNotEnoughBytes
-	}
+        return "", ErrNotEnoughBytes
+    }
 
-	byteLen := end - start
-	unitCount := byteLen / 2
-	r.offset = end + 2
+    byteLen := end - start
+    unitCount := byteLen / 2
+    r.offset = end + 2
 
-	// Fast path: every UTF-16 unit fits in ASCII (the low byte is
-	// below 0x80 and the high byte is 0). L2 names are overwhelmingly
-	// ASCII, so this is the common case and collapses three
-	// allocations into one (the final string). The high byte check
-	// alone is not enough: a Latin-1 character like U+00E9 ('é')
-	// encodes as [0xE9, 0x00] in UTF-16LE, which has a zero high byte
-	// but a low byte above 0x80 - extracting just the low byte would
-	// produce a byte 0xE9 that is not valid UTF-8, so the resulting
-	// string would display as the replacement character instead of
-	// the original character.
-	ascii := true
-	for i := start; i < end; i += 2 {
-		if data[i] >= 0x80 || data[i+1] != 0 {
-			ascii = false
+    // Fast path: every UTF-16 unit fits in ASCII (the low byte is
+    // below 0x80 and the high byte is 0). L2 names are overwhelmingly
+    // ASCII, so this is the common case and collapses three
+    // allocations into one (the final string). The high byte check
+    // alone is not enough: a Latin-1 character like U+00E9 ('é')
+    // encodes as [0xE9, 0x00] in UTF-16LE, which has a zero high byte
+    // but a low byte above 0x80 - extracting just the low byte would
+    // produce a byte 0xE9 that is not valid UTF-8, so the resulting
+    // string would display as the replacement character instead of
+    // the original character.
+    ascii := true
+    for i := start; i < end; i += 2 {
+        if data[i] >= 0x80 || data[i+1] != 0 {
+            ascii = false
 
-			break
-		}
-	}
-	if ascii {
-		// Build the ASCII byte buffer and convert it to a string in
-		// place through unsafe.String: the byte slice and the string
-		// share the same backing array, so the GC keeps it alive as
-		// long as the string lives. This collapses the fast path to
-		// one allocation (the byte buffer); the previous string(buf)
-		// conversion copied the bytes into a second allocation. The
-		// unsafe form is the same trick strings.Builder.String uses.
-		buf := make([]byte, unitCount)
-		for i := range unitCount {
-			buf[i] = data[start+i*2]
-		}
+            break
+        }
+    }
+    if ascii {
+        // Build the ASCII byte buffer and convert it to a string in
+        // place through unsafe.String: the byte slice and the string
+        // share the same backing array, so the GC keeps it alive as
+        // long as the string lives. This collapses the fast path to
+        // one allocation (the byte buffer); the previous string(buf)
+        // conversion copied the bytes into a second allocation. The
+        // unsafe form is the same trick strings.Builder.String uses.
+        buf := make([]byte, unitCount)
+        for i := range unitCount {
+            buf[i] = data[start+i*2]
+        }
 
-		return unsafe.String(unsafe.SliceData(buf), unitCount), nil
-	}
+        return unsafe.String(unsafe.SliceData(buf), unitCount), nil
+    }
 
-	// BMP slow path: decode the UTF-16 units through the stdlib
-	// decoder. One allocation for the uint16 slice plus one for the
-	// final string - still better than the old three.
-	pairs := make([]uint16, unitCount)
-	for i := range unitCount {
-		pairs[i] = binary.LittleEndian.Uint16(data[start+i*2:])
-	}
+    // BMP slow path: decode the UTF-16 units through the stdlib
+    // decoder. One allocation for the uint16 slice plus one for the
+    // final string - still better than the old three.
+    pairs := make([]uint16, unitCount)
+    for i := range unitCount {
+        pairs[i] = binary.LittleEndian.Uint16(data[start+i*2:])
+    }
 
-	decoded := utf16.Decode(pairs)
+    decoded := utf16.Decode(pairs)
 
-	// utf16.Decode returns a []rune; string([]rune) is one allocation.
-	return string(decoded), nil
+    // utf16.Decode returns a []rune; string([]rune) is one allocation.
+    return string(decoded), nil
 }

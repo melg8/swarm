@@ -5,9 +5,9 @@
 package fromgameserver
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/melg8/swarm/internal/swarm/packets/packet"
+    "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
 const socialActionPacketID = 0x3D
@@ -24,25 +24,25 @@ const SocialActionLevelUp = 15
 // Wire format (see SocialAction.writeImpl): [opcode 0x3D]
 // [objectId: 4][actionId: 4].
 type SocialActionPacket struct {
-	ObjectID int32
-	ActionID int32
+    ObjectID int32
+    ActionID int32
 }
 
 // NewSocialActionPacket creates a zero valued packet ready for parsing.
 func NewSocialActionPacket() *SocialActionPacket {
-	return &SocialActionPacket{ObjectID: 0, ActionID: 0}
+    return &SocialActionPacket{ObjectID: 0, ActionID: 0}
 }
 
 // ParseSocialActionPacket reads the packet from payload bytes.
 func ParseSocialActionPacket(p *SocialActionPacket, data []byte) error {
-	reader := packet.NewReader(data)
+    reader := packet.NewReader(data)
 
-	if err := expectPacketID(reader, socialActionPacketID); err != nil {
-		return err
-	}
-	if err := readInt32Fields(reader, &p.ObjectID, &p.ActionID); err != nil {
-		return fmt.Errorf("failed to read social action: %w", err)
-	}
+    if err := expectPacketID(reader, socialActionPacketID); err != nil {
+        return err
+    }
+    if err := readInt32Fields(reader, &p.ObjectID, &p.ActionID); err != nil {
+        return fmt.Errorf("failed to read social action: %w", err)
+    }
 
-	return nil
+    return nil
 }
