@@ -145,12 +145,20 @@ const MapView = {
   // view), and every frame blits the visible slice with a single
   // drawImage - a GPU composite instead of a per frame re-raster of
   // dozens of scaled tiles. The cache re-renders on a zoom change, a
-  // layer toggle, a landed tile, a theme flip, a resize, or the
-  // camera leaving the slack box (see bgKey and ensureBackground).
+  // layer toggle, a committed batch of landed tiles (see
+  // tileArrived), a theme flip, a resize, or the camera leaving the
+  // slack box (see bgKey and ensureBackground).
   bg: {
     canvas: null, ctx: null, key: "",
     cx: 0, cy: 0, worldLeft: 0, worldTop: 0,
-    cssW: 0, cssH: 0, dpr: 1, marginX: 0, marginY: 0
+    cssW: 0, cssH: 0, dpr: 1, marginX: 0, marginY: 0,
+    // tilesCommitted is the arrival count the cache key rides (see
+    // tileArrived): the raw tileLoads counter would drop the key on
+    // every arrival of a streaming burst, so the arrivals commit in
+    // throttled batches instead. commitAt is the timestamp of the
+    // last commit and commitTimer holds the trailing batch.
+    tilesCommitted: 0,
+    commitAt: 0, commitTimer: 0
   },
 
   // huntBg caches the hunting zone layer the same way the bg cache
@@ -174,10 +182,13 @@ const MapView = {
   // drifting adena rate does not drop the hunt cache.
   huntKey: "",
 
-  // tileLoads counts the tile load completions of both pyramids
-  // (the map imagery and the geodata view): a landed tile changes
-  // what the background raster would paint, so the counter rides the
-  // cache key.
+  // tileLoads counts the tile arrivals of both pyramids (the map
+  // imagery, the geodata view, the loads and the misses). The cache
+  // key does NOT ride the raw counter: a zoom-out load burst lands
+  // dozens of tiles over seconds and every one of them would drop
+  // the key while the render loop keeps painting - the arrivals
+  // commit in throttled batches instead (bg.tilesCommitted, see
+  // tileArrived).
   tileLoads: 0,
 
   // colorsRev bumps on every theme refresh: the cache raster carries
@@ -889,16 +900,27 @@ const MapView = {
       return entry;
     }
     const img = new Image();
+    // decode() hands the jpeg decode to the image pipeline: without
+    // the hint the first drawImage of a landed tile decodes it inline
+    // - a stack of synchronous decodes inside a cache re-render of
+    // the zoomed out world (the low fps of a loading map).
     img.onload = () => {
-      entry.ready = true;
-      entry.img = img;
-      this.tileLoads += 1;
-      this.redraw();
+      const landed = () => {
+        entry.ready = true;
+        entry.img = img;
+        this.tileArrived();
+      };
+      if (typeof img.decode === "function") {
+        // An undecodable bitmap stays un-drawn: the ancestor walk
+        // keeps the coarser fallback of that region.
+        img.decode().then(landed, () => this.tileArrived());
+      } else {
+        landed();
+      }
     };
     img.onerror = () => {
       entry.missing = true;
-      this.tileLoads += 1;
-      this.redraw();
+      this.tileArrived();
     };
     img.src = path;
 
@@ -941,16 +963,27 @@ const MapView = {
       return entry;
     }
     const img = new Image();
+    // decode() hands the jpeg decode to the image pipeline: without
+    // the hint the first drawImage of a landed tile decodes it inline
+    // - a stack of synchronous decodes inside a cache re-render of
+    // the zoomed out world (the low fps of a loading map).
     img.onload = () => {
-      entry.ready = true;
-      entry.img = img;
-      this.tileLoads += 1;
-      this.redraw();
+      const landed = () => {
+        entry.ready = true;
+        entry.img = img;
+        this.tileArrived();
+      };
+      if (typeof img.decode === "function") {
+        // An undecodable bitmap stays un-drawn: the ancestor walk
+        // keeps the coarser fallback of that region.
+        img.decode().then(landed, () => this.tileArrived());
+      } else {
+        landed();
+      }
     };
     img.onerror = () => {
       entry.missing = true;
-      this.tileLoads += 1;
-      this.redraw();
+      this.tileArrived();
     };
     img.src = path;
 
@@ -1186,11 +1219,50 @@ const MapView = {
     return !!(box && box.checked);
   },
 
+  // tileArrived is the single arrival path of both tile pyramids
+  // (the imagery, the geodata view, the loads and the misses): it
+  // counts the arrival and commits it to the background cache key
+  // on a throttled cadence. A zoom-out burst lands dozens of tiles
+  // over seconds - committing each arrival straight into the key
+  // would re-raster the whole static world on EVERY animated frame
+  // of the load window (the render loop keeps painting while the
+  // tiles stream in, and each frame sees the dropped key: the low
+  // fps of a loading map that recovers once the burst goes quiet).
+  // The first arrival of a window commits immediately (the leading
+  // edge - the first coarse imagery appears at once), the rest of
+  // the burst coalesces into one trailing commit at the window end,
+  // so a streaming load costs at most a couple of cache rasters per
+  // second and the final state always lands (the trailing timer
+  // runs when the burst goes quiet, even with the render loop idle
+  // and the tab hidden - the commit does not need a paint).
+  tileArrived() {
+    this.tileLoads += 1;
+    const bg = this.bg;
+    const now = performance.now();
+    if (bg.commitAt === 0 || now - bg.commitAt >= tilesCommitMs) {
+      bg.commitAt = now;
+      bg.tilesCommitted = this.tileLoads;
+      this.redraw();
+
+      return;
+    }
+    if (bg.commitTimer) { return; }
+    const wait = Math.max(1, tilesCommitMs - (now - bg.commitAt));
+    bg.commitTimer = setTimeout(() => {
+      bg.commitTimer = 0;
+      bg.commitAt = performance.now();
+      if (bg.tilesCommitted !== this.tileLoads) {
+        bg.tilesCommitted = this.tileLoads;
+        this.redraw();
+      }
+    }, wait);
+  },
+
   // bgKey is the identity of the background raster: everything that
   // changes what drawMapBackground, drawGrid and drawZone would paint
   // rides it - the zoom (the tile pyramid level and the grid step
-  // derive from the scale), the landed tiles, the theme, the loaded
-  // zone region of the character, the geodata mode, the layer
+  // derive from the scale), the committed tile batches, the theme, the
+  // loaded zone region of the character, the geodata mode, the layer
   // toggles and the canvas geometry. A camera move alone does NOT
   // change the key: the cache is world anchored, so the camera pans
   // inside it until the slack box runs out.
@@ -1203,7 +1275,7 @@ const MapView = {
     const geo = this.pathfindEnabled() && this.geoEnabled()
       ? (this.pathfind.geoMode || "height") : "off";
 
-    return [this.scale, this.tileLoads, this.colorsRev, region, geo,
+    return [this.scale, this.bg.tilesCommitted, this.colorsRev, region, geo,
       this.layerChecked("show-map"), this.layerChecked("show-zone"),
       Math.round(rect.width), Math.round(rect.height), dpr].join("|");
   },
@@ -3395,6 +3467,15 @@ const fpsWorstShowMs = 8;
 // the cached world for a full viewport before the cache re-renders
 // (0.5 = one viewport of slack around the view).
 const bgMarginOfView = 0.5;
+
+// tilesCommitMs is the throttle window of the tile arrival commits
+// into the background cache key (see tileArrived): a zoom-out load
+// burst lands dozens of tiles over seconds, and every arrival would
+// otherwise re-raster the whole static world on the next animated
+// frame - the load window the users felt as the low fps of a
+// loading map. One immediate commit plus one coalesced commit per
+// window keeps the progressive refinement at a readable cadence.
+const tilesCommitMs = 250;
 
 // bgDevicePixels caps the offscreen cache raster: beyond it the cache
 // resolution steps down so even a 4K class viewport keeps the cache

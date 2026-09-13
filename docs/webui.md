@@ -303,14 +303,31 @@ dozen 512px tiles per paint and is visually indistinguishable on
   the raster stays in the tens of megabytes), and every frame
   composites it with a single `drawImage` - a GPU side copy instead
   of a per frame re-raster of dozens of scaled tiles. The cache
-  re-renders only on a zoom change, a layer toggle, a landed tile, a
-  theme flip, a resize, or the camera leaving the slack box (a
-  walking follow camera re-renders every half viewport of travel; a
-  drag re-renders every viewport). The blit offset snaps to whole
+  re-renders only on a zoom change, a layer toggle, a committed tile
+  batch, a theme flip, a resize, or the camera leaving the slack box
+  (a walking follow camera re-renders every half viewport of travel;
+  a drag re-renders every viewport). The blit offset snaps to whole
   device pixels so the grid stays crisp at rest. While the map tab is
   hidden the render loop stops and the data driven repaints
   (snapshots, kill polls, tile loads) skip the hidden canvas; the next
   snapshot repaints within one 300 ms poll.
+- **The tile arrivals commit in throttled batches** (`tileArrived`,
+  `tilesCommitMs`): a zoom-out makes the whole visible world start
+  loading at once, and the burst lands dozens of tiles over seconds.
+  A raw arrival counter in the cache key meant every one of those
+  arrivals dropped the key, so every animated frame of the load
+  window re-rasterized the entire static world - the low fps of a
+  loading map that recovers once the burst goes quiet. The arrivals
+  now commit in batches: the first tile of a window rasterizes
+  immediately (the first coarse imagery appears at once), the rest of
+  the burst coalesces into one trailing commit at the window end, and
+  the render loop between them stays blit only. A streaming load
+  costs at most a couple of cache rasters per second instead of one
+  per frame, and the final state always lands (the trailing timer
+  fires even with the render loop idle and the tab hidden). The
+  image loads also go through `decode()`, so the jpeg decode of a
+  landed tile happens in the image pipeline instead of the first
+  `drawImage` inside a cache re-render.
 - **The hunting zones render from their own offscreen cache**: the
   elven spot registry alone carries ~290 grounds and the zoomed out
   view has most of them on screen at once, so re-stroking the dashed

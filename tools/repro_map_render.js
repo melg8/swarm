@@ -205,14 +205,25 @@ function loadMapJs(mapFile) {
     };
     const checkboxes = {
         follow: true, "show-labels": false, "show-dest": false,
-        "show-zone": false, "show-targets": true,
+        "show-map": true, "show-zone": false, "show-targets": true,
         "show-hunt-zones": true, "show-aggro": true
     };
     const elements = new Map();
+    // The sandbox clock: performance.now() stands still unless a
+    // scenario advances it (advanceClock), so every timing behavior
+    // of map.js (the fps windows, the tile commit throttle) is
+    // deterministic under the scenario steps.
+    let clockNow = 0;
+    // The sandbox timers: setTimeout records the callback instead of
+    // scheduling it, and runTimers() fires the pending ones in order
+    // - the trailing commit of a tile storm lands inside the scenario
+    // without real time passing.
+    const timers = [];
+    let timerSeq = 0;
     const sandbox = {
         Math, JSON,
         Date: { now: () => 0 },
-        performance: { now: () => 0 },
+        performance: { now: () => clockNow },
         requestAnimationFrame: () => 0,
         document: {
             getElementById: (id) => {
@@ -247,8 +258,17 @@ function loadMapJs(mapFile) {
         getComputedStyle: () => ({
             getPropertyValue: (name) => THEME[name] || ""
         }),
-        setTimeout: () => 0,
-        clearTimeout: () => {}
+        setTimeout: (fn) => {
+            timerSeq += 1;
+            timers.push({ id: timerSeq, fn, canceled: false });
+
+            return timerSeq;
+        },
+        clearTimeout: (id) => {
+            for (const timer of timers) {
+                if (timer.id === id) { timer.canceled = true; }
+            }
+        }
     };
     vm.createContext(sandbox);
     vm.runInContext(fs.readFileSync(mapFile, "utf8"), sandbox,
@@ -257,6 +277,13 @@ function loadMapJs(mapFile) {
 
     return {
         MapView: sandbox.__MapView, record, elements,
+        advanceClock: (ms) => { clockNow += ms; },
+        runTimers: () => {
+            const due = timers.splice(0, timers.length);
+            for (const timer of due) {
+                if (!timer.canceled) { timer.fn(); }
+            }
+        },
         fireCanvas: (type, event) => fire(listeners.canvas, type, event),
         fireWindow: (type, event) => fire(listeners.window, type, event)
     };
@@ -1035,6 +1062,107 @@ function runScenarioHuntLayerCache(mapFile) {
     return results;
 }
 
+// runScenarioTileLoadStorm pins the throttled tile arrival commits
+// of the background cache: a zoom-out load burst lands dozens of
+// tiles over seconds, and a raw arrival counter in the cache key
+// would re-raster the whole static world on every animated frame of
+// the load window (the render loop keeps painting while the tiles
+// stream in - the low fps of a loading map). The first arrival of a
+// window commits immediately, the burst coalesces into one trailing
+// commit, and the steady frames between them stay blit only.
+function runScenarioTileLoadStorm(mapFile) {
+    const { MapView, record, advanceClock, runTimers } = loadMapJs(mapFile);
+    MapView.init();
+    MapView.update(buildSnapshot(0, false));
+    MapView.draw();
+
+    const results = [];
+    const bg = MapView.bg;
+    const bgRecord = bg.canvas && bg.canvas.__record;
+    check(results, "the background cache exists",
+        !!bgRecord, "the cache is missing");
+
+    // Zoom out to the far view: the cache walk of the wide world
+    // creates the pending tile entries of the burst (the sandbox has
+    // no Image, so nothing loads until this scenario lands them). The
+    // registry reset keeps every pending entry on the pyramid levels
+    // the far view actually walks (the initial close view created its
+    // entries at the full resolution level).
+    advanceClock(1000);
+    MapView.mapTiles = new Map();
+    MapView.zoom(0.125);
+    MapView.zoom(0.125);
+
+    // landTiles lands the next pending tiles exactly like the image
+    // loads would (the ready flag plus the arrival call of onload).
+    const landed = [];
+    const landTiles = (count) => {
+        let touched = 0;
+        for (const entry of MapView.mapTiles.values()) {
+            if (touched >= count) { break; }
+            if (entry.ready || entry.missing) { continue; }
+            entry.ready = true;
+            entry.img = { width: 512, height: 512 };
+            landed.push(entry.img);
+            MapView.tileArrived();
+            touched += 1;
+        }
+
+        return touched;
+    };
+
+    // The first arrival of a window commits on the spot: the tile
+    // rasterizes into the cache within its own arrival call.
+    const firstBlits = bgRecord.blits.length;
+    const firstCount = landTiles(1);
+    check(results, "the first landed tile commits immediately",
+        firstCount === 1 && bgRecord.blits.length > firstBlits
+        && bgRecord.blits.some((args) => args[0] === landed[0]),
+        (bgRecord.blits.length - firstBlits) + " tile blits for "
+        + firstCount + " arrivals");
+
+    // The burst: arrivals inside the commit window must not
+    // re-render the cache - neither on their own arrival nor on a
+    // steady frame painted while the burst streams.
+    advanceClock(40);
+    const stormBlits = bgRecord.blits.length;
+    const stormStrokes = bgRecord.strokes.length;
+    const mainBlits = record.blits.length;
+    const stormCount = landTiles(24);
+    MapView.draw();
+    check(results, "a burst inside the window re-rasters nothing",
+        stormCount === 24 && bgRecord.blits.length === stormBlits
+        && bgRecord.strokes.length === stormStrokes,
+        stormCount + " arrivals caused "
+        + (bgRecord.blits.length - stormBlits) + " tile blits");
+    check(results, "the steady frames of the storm stay blit only",
+        record.blits.length === mainBlits + 1,
+        (record.blits.length - mainBlits) + " main canvas blits");
+
+    // The window closes: the trailing commit lands the whole burst
+    // in one raster. The ancestor walk of the far view creates up to
+    // three pending entries per position (the chosen level plus the
+    // two coarser fallbacks) and draws exactly one of them, so the
+    // burst of N arrivals covers at least N / 3 positions.
+    advanceClock(260);
+    runTimers();
+    check(results, "the trailing commit rasterizes the burst once",
+        bgRecord.blits.length >= stormBlits + Math.ceil(stormCount / 3)
+        && bgRecord.strokes.length > stormStrokes,
+        (bgRecord.blits.length - stormBlits) + " tile blits for "
+        + stormCount + " arrivals");
+
+    // The cache is stable again: a steady frame paints no static
+    // geometry.
+    const settledStrokes = bgRecord.strokes.length;
+    MapView.draw();
+    check(results, "the settled cache re-rasters nothing",
+        bgRecord.strokes.length === settledStrokes,
+        (bgRecord.strokes.length - settledStrokes) + " new strokes");
+
+    return results;
+}
+
 function main() {
     const args = process.argv.slice(2);
     const verbose = args.includes("--verbose");
@@ -1057,6 +1185,7 @@ function main() {
         ["hunt zones view", runScenarioHuntZonesView(mapFile)],
         ["hunt layer cache", runScenarioHuntLayerCache(mapFile)],
         ["fps meter", runScenarioFpsMeter(mapFile)],
+        ["tile load storm", runScenarioTileLoadStorm(mapFile)],
         ["background cache", runScenarioBackgroundCache(mapFile)]
     ];
     let failed = 0;

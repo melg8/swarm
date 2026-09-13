@@ -3992,3 +3992,54 @@ code built it unconditionally).
 
 Status: done (2026-09-13, the hunt layer cache follow-up closed the
 zoomed out cpu load).
+
+### Progress (commit: the tile load storm throttle - the follow-up)
+
+The owner reported the map fps still dips for a while after a
+zoom-out while the background elements load, then recovers to the
+acceptable 40-50. Root cause: the background cache key carried the
+RAW tile arrival counter (bgKey used this.tileLoads), and a zoom-out
+starts dozens of tile loads at once - every arrival of the burst
+dropped the key, so EVERY animated frame of the load window
+re-rasterized the whole static world (the render loop keeps painting
+while the tiles stream in; each frame saw the stale key). Once the
+burst went quiet the key stabilized and the fps recovered - exactly
+the reported window.
+
+- map.js: the arrivals now commit in throttled batches (tileArrived,
+  bg.tilesCommitted/commitAt/commitTimer, the tilesCommitMs constant
+  of 250 ms). The first arrival of a window commits immediately (the
+  leading edge - the first coarse imagery appears at once), the rest
+  of the burst coalesces into one trailing commit at the window end:
+  a streaming load costs at most a couple of cache rasters per
+  second instead of one per animated frame, and the final state
+  always lands (the trailing timer fires even with the render loop
+  idle and the tab hidden - the commit does not need a paint).
+- map.js: the image loads go through img.decode() before the ready
+  flag - the jpeg decode of a landed tile happens in the image
+  pipeline instead of the first drawImage inside a cache re-render
+  (a stack of synchronous decodes was the other cost of a raster
+  during the load window). An undecodable bitmap stays un-drawn and
+  the ancestor walk keeps the coarser fallback.
+- map.js: bgKey rides bg.tilesCommitted instead of the raw counter.
+- tools/repro_map_render.js: the sandbox gained a mutable clock
+  (advanceClock) and a recording timer queue (runTimers), and the
+  checkbox defaults now mirror the page (show-map checked - the stub
+  default of false skipped the tile walk entirely). The new "tile
+  load storm" scenario (6 checks: the first arrival commits
+  immediately, a 24 tile burst inside the window re-rasters nothing
+  on its own arrivals nor on a steady frame, the steady frames stay
+  blit only, the trailing commit rasterizes the whole burst once,
+  the settled cache re-rasters nothing).
+- docs/webui.md: the render performance section documents the tile
+  commit throttle and the decode hint.
+
+### Verification (the follow-up)
+
+- All eight harnesses pass (map_render with the new "tile load
+  storm" scenario, movement, zone_hover, bot_switch, hud, stats,
+  gear, fight_ui); go build ./... and go test ./internal/swarm/
+  webserver green; task fmt:check green; task lint:new 0 issues.
+
+Status: done (2026-09-13, the tile load storm throttle closed the
+load window fps dip of the zoomed out map).
