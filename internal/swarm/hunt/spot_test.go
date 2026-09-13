@@ -94,7 +94,15 @@ func pickedSpotLoop(t *testing.T) (*Loop, *fakeGame, *spotHunter) {
 func TestElvenSpotRegistryShape(t *testing.T) {
 	spots := ElvenHuntingSpots()
 	require.Greater(t, len(spots), 30)
-	require.Less(t, len(spots), len(ElvenHuntingZones()))
+	// The regenerated registry cuts the spawn territories into
+	// visibility-sized pieces (every leash square inscribed in the
+	// 2048 knownlist circle): the elven grounds settle around 290
+	// spots - MORE than the 227 zone squares of the legacy registry,
+	// because a territory of 9480x4864 units needs six leashes for
+	// full coverage while the old single spot covered a third of its
+	// own ground (the 2026-09-13 audit: 25-40 percent in leash
+	// everywhere). The ceiling guards runaway slivers, not economy.
+	require.Less(t, len(spots), 400)
 	totalMass := 0.0
 	for index := range spots {
 		spot := spots[index]
@@ -111,7 +119,10 @@ func TestElvenSpotRegistryShape(t *testing.T) {
 		leash := spot.leashHalf()
 		require.LessOrEqual(t, float64(leash)*1.4143, 2048.5)
 		require.Positive(t, spot.Mass)
-		require.GreaterOrEqual(t, spot.Mass, 2.0)
+		// A single-mob piece is a valid anchor: the 15-20 s respawn
+		// keeps it fed (the singleton TERRITORIES still drop - the
+		// generator only emits pieces of territories with 2+ mobs).
+		require.GreaterOrEqual(t, spot.Mass, 1.0)
 		require.Positive(t, spot.RespawnMin)
 		require.GreaterOrEqual(t, spot.RespawnMax, spot.RespawnMin)
 		require.NotEmpty(t, spot.Mobs)

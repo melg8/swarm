@@ -148,9 +148,12 @@ type config struct {
 	// auditAnchors optionally overrides the audited positions per
 	// spot id (the verification pass of the regenerated geometry).
 	auditAnchors string
-	// auditFilter audits only the spots whose id contains the
-	// substring.
+	// auditFilter audits only the spots whose id contains one of the
+	// comma separated substrings.
 	auditFilter string
+	// auditStride audits every Nth spot (0 or 1 audits every spot):
+	// the stratified sampling of a verification pass.
+	auditStride int
 	// auditFresh drops the resume state of the audit evidence file.
 	auditFresh bool
 }
@@ -189,6 +192,7 @@ func parseFlags() config {
 		auditAccount:     "",
 		auditAnchors:     "",
 		auditFilter:      "",
+		auditStride:      0,
 		auditFresh:       false,
 	}
 	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
@@ -284,7 +288,11 @@ func parseFlags() config {
 		"JSON file with per spot position overrides of -spot-audit "+
 			"(the verification pass of the regenerated geometry)")
 	flag.StringVar(&cfg.auditFilter, "audit-filter", "",
-		"audit only the spots whose id contains the substring")
+		"audit only the spots whose id contains one of the comma "+
+			"separated substrings")
+	flag.IntVar(&cfg.auditStride, "audit-stride", 0,
+		"audit every Nth spot of -spot-audit (0 or 1 audits every "+
+			"spot): the stratified sampling of a verification pass")
 	flag.BoolVar(&cfg.auditFresh, "audit-fresh", false,
 		"re-measure every spot of -spot-audit, ignoring the resume state")
 	flag.StringVar(&cfg.queryFrom, "from", "",
@@ -1234,6 +1242,7 @@ func runSpotAuditCLI(cfg config) {
 		Output:   cfg.spotAudit,
 		Anchors:  cfg.auditAnchors,
 		Filter:   cfg.auditFilter,
+		Stride:   cfg.auditStride,
 		Fresh:    cfg.auditFresh,
 	}, log.Default())
 	stop()

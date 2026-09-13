@@ -70,6 +70,32 @@ while it runs up, then swap back to the melee weapon and fight.
   confirmed against the registry (the spider mass sits west of the
   spot-54 leash border). Next: the starve cooldown fix, then the
   audit tool.
+- Commit bf39c88 "hunt: the starved ground cools down and its zero
+  income scores zero" (2026-09-13): the starvation cooldown of
+  pickBest (5 min, the sweep moves forward through the registry
+  instead of ping-ponging between the two nearest grounds), the
+  trusted zero income scores zero (the bootstrap prior no longer
+  promises window mass a starved ground never delivered), the
+  livelock repro test.
+- The spotaudit package + the -spot-audit CLI: the probe character
+  visits every spot anchor through the DB position injection and
+  dumps the attackable npc population with the leash verdicts; the
+  evidence file resumes across foreground runs (71 spots measured in
+  three chunks).
+- The audit findings: the old leashes hold 25-40 percent of the
+  visible mobs everywhere (the anchors sit off the real mass, the
+  territory polygons span 3000-9500 units - a 1448 leash can never
+  cover them from one anchor).
+- The regeneration (tools/regenerate_spots_from_audit.py): the
+  territory polygons sampled on a 128 unit grid, cut into
+  visibility-sized pieces (the Chebyshev extent of a piece stays
+  under 1448), packed to the minimum piece count, the species counts
+  distributed by the area share - 292 spots from 106 territories, the
+  leash union covers 96.6 percent of the spawn ground sample points.
+- The verification audit (-audit-stride 7, 42 spots at the new
+  anchors): every piece observes at least half its own expected mass
+  inside its leash (zero LOW pieces), the anchors see their mass plus
+  the wandering neighbors - the geometry is live-confirmed.
 
 ## Active task: the statistics tab fixes - the exp resets, the adena zeros and the flicker (2026-09-13)
 

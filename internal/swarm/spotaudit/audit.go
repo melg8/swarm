@@ -83,9 +83,13 @@ type Config struct {
 	// Anchors optionally overrides the audited positions per spot id
 	// (the verification pass audits the re-generated geometry).
 	Anchors string
-	// Filter audits only the spots whose id contains the substring
-	// (empty audits everything not yet measured).
+	// Filter audits only the spots whose id contains one of the
+	// comma separated substrings (empty audits everything not yet
+	// measured).
 	Filter string
+	// Stride audits every Nth spot of the registry (0 or 1 audits
+	// every spot): the stratified sampling of the verification pass.
+	Stride int
 	// Fresh drops the resume state and re-measures every spot.
 	Fresh bool
 }
@@ -221,7 +225,10 @@ func auditRemaining(
 			return
 		}
 		spot := spots[index]
-		if cfg.Filter != "" && !strings.Contains(spot.ID, cfg.Filter) {
+		if !auditFilterMatches(cfg.Filter, spot.ID) {
+			continue
+		}
+		if cfg.Stride > 1 && index%cfg.Stride != 0 {
 			continue
 		}
 		if done[spot.ID] {
@@ -243,6 +250,21 @@ func auditRemaining(
 		logger.Printf("spot audit: %s (%s): %d attackable, %d in leash",
 			spot.ID, spot.Name, record.Attackable, record.InLeashCount)
 	}
+}
+
+// auditFilterMatches reports whether the spot id passes the filter:
+// a comma separated list of substrings (empty audits everything).
+func auditFilterMatches(filter string, spotID string) bool {
+	if filter == "" {
+		return true
+	}
+	for _, needle := range strings.Split(filter, ",") {
+		if needle != "" && strings.Contains(spotID, needle) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // auditSpot performs one probe visit: the position injection, the

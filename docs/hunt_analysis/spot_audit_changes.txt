@@ -1,0 +1,82 @@
+the elven spot regeneration report
+=================================
+
+old registry: 344 spots (audited live: 71)
+new registry: 292 spots from 106 territories
+the leash union covers 64592 of 66851 territory sample points (96.6%)
+
+the live audit cross-check (the observed mobs of every
+old anchor re-tested against the new covering leash):
+  Elder Red Keltir NE          (elven-spot-59 -> elven-spot-16): seen 18, old leash 4, new leash 4 
+  Gray Wolf N                  (elven-spot-58 -> elven-spot-24): seen 21, old leash 4, new leash 4 
+  Elder Red Keltir W           (elven-spot-57 -> elven-spot-35): seen 22, old leash 7, new leash 5 WORSE
+  Gray Wolf SW                 (elven-spot-50 -> elven-spot-46): seen 24, old leash 6, new leash 7 IMPROVED
+  Kaboo Orc Fighter Leader W   (elven-spot-52 -> elven-spot-165): seen 30, old leash 9, new leash 8 WORSE
+  Kaboo Orc Fighter Lieutenant SW (elven-spot-51 -> elven-spot-171): seen 19, old leash 6, new leash 4 WORSE
+  Kaboo Orc Fighter Leader W   (elven-spot-53 -> elven-spot-208): seen 21, old leash 5, new leash 4 WORSE
+  Crimson Spider W             (elven-spot-55 -> elven-spot-217): seen 21, old leash 8, new leash 5 WORSE
+  Crimson Spider W             (elven-spot-54 -> elven-spot-216): seen 19, old leash 4, new leash 3 WORSE
+  Pincer Spider SW             (elven-spot-56 -> elven-spot-255): seen 22, old leash 7, new leash 6 WORSE
+  Red Keltir SE                (elven-spot-22 -> elven-spot-02): seen 37, old leash 8, new leash 9 IMPROVED
+  Elder Red Keltir SW          (elven-spot-46 -> elven-spot-03): seen 31, old leash 8, new leash 8 
+  Red Keltir W                 (elven-spot-72 -> elven-spot-07): seen 29, old leash 9, new leash 10 IMPROVED
+  Red Keltir NW                (elven-spot-71 -> elven-spot-08): seen 37, old leash 6, new leash 4 WORSE
+  Red Keltir E                 (elven-spot-24 -> elven-spot-09): seen 27, old leash 6, new leash 3 WORSE
+  Elder Red Keltir NW          (elven-spot-49 -> elven-spot-15): seen 25, old leash 3, new leash 4 IMPROVED
+  Elder Red Keltir NE          (elven-spot-23 -> elven-spot-19): seen 16, old leash 3, new leash 3 
+  Gray Wolf E                  (elven-spot-25 -> elven-spot-09): seen 27, old leash 4, new leash 3 WORSE
+  Gray Wolf W                  (elven-spot-66 -> elven-spot-25): seen 28, old leash 8, new leash 6 WORSE
+  Gray Wolf NW                 (elven-spot-48 -> elven-spot-28): seen 18, old leash 7, new leash 3 WORSE
+  Gray Wolf NW                 (elven-spot-47 -> elven-spot-33): seen 28, old leash 7, new leash 1 WORSE
+  Goblin Raider SE             (elven-spot-21 -> elven-spot-40): seen 25, old leash 7, new leash 6 WORSE
+  Gray Wolf SW                 (elven-spot-60 -> elven-spot-43): seen 19, old leash 5, new leash 3 WORSE
+  Goblin Raider S              (elven-spot-03 -> elven-spot-45): seen 16, old leash 7, new leash 6 WORSE
+  Goblin Raider SE             (elven-spot-01 -> elven-spot-49): seen 22, old leash 11, new leash 8 WORSE
+  Gray Wolf SE                 (elven-spot-02 -> elven-spot-53): seen 24, old leash 8, new leash 6 WORSE
+  Kaboo Orc S                  (elven-spot-04 -> elven-spot-57): seen 13, old leash 7, new leash 8 IMPROVED
+  Kaboo Orc Grunt SE           (elven-spot-27 -> elven-spot-66): seen 26, old leash 6, new leash 3 WORSE
+  Kaboo Orc SE                 (elven-spot-28 -> elven-spot-67): seen 23, old leash 8, new leash 5 WORSE
+  Kaboo Orc Grunt SW           (elven-spot-67 -> elven-spot-75): seen 30, old leash 8, new leash 4 WORSE
+  Kaboo Orc Grunt S            (elven-spot-26 -> elven-spot-79): seen 23, old leash 5, new leash 5 
+  Kaboo Orc Grunt S            (elven-spot-05 -> elven-spot-87): seen 29, old leash 7, new leash 8 IMPROVED
+  Kaboo Orc Fighter SW         (elven-spot-68 -> elven-spot-96): seen 27, old leash 9, new leash 6 WORSE
+  Spore Fungus SW              (elven-spot-32 -> elven-spot-90): seen 31, old leash 6, new leash 1 WORSE
+  Spore Fungus SW              (elven-spot-30 -> elven-spot-103): seen 26, old leash 11, new leash 6 WORSE
+  Spore Fungus SW              (elven-spot-29 -> elven-spot-106): seen 28, old leash 7, new leash 10 IMPROVED
+  Kaboo Orc Fighter SW         (elven-spot-31 -> elven-spot-110): seen 31, old leash 8, new leash 5 WORSE
+  Kaboo Orc Fighter W          (elven-spot-06 -> elven-spot-131): seen 23, old leash 7, new leash 2 WORSE
+  Spore Fungus S               (elven-spot-33 -> elven-spot-113): seen 34, old leash 9, new leash 6 WORSE
+  Spore Fungus SW              (elven-spot-36 -> elven-spot-134): seen 28, old leash 6, new leash 4 WORSE
+  Spore Fungus S               (elven-spot-34 -> elven-spot-117): seen 23, old leash 8, new leash 7 WORSE
+  Spore Fungus SW              (elven-spot-35 -> elven-spot-143): seen 24, old leash 4, new leash 3 WORSE
+  Spore Fungus SW              (elven-spot-39 -> elven-spot-161): seen 15, old leash 8, new leash 9 IMPROVED
+  Spore Fungus SW              (elven-spot-07 -> elven-spot-139): seen 22, old leash 6, new leash 1 WORSE
+  Kaboo Orc Fighter W          (elven-spot-08 -> elven-spot-154): seen 21, old leash 12, new leash 7 WORSE
+  Kaboo Orc Fighter Lieutenant SW (elven-spot-37 -> elven-spot-150): seen 22, old leash 9, new leash 7 WORSE
+  Kaboo Orc Fighter Leader W   (elven-spot-09 -> elven-spot-158): seen 23, old leash 8, new leash 9 IMPROVED
+  Kaboo Orc Fighter Lieutenant SW (elven-spot-38 -> elven-spot-161): seen 24, old leash 10, new leash 10 
+  Kaboo Orc Fighter Lieutenant SW (elven-spot-10 -> elven-spot-177): seen 17, old leash 6, new leash 1 WORSE
+  Kaboo Orc Fighter Leader W   (elven-spot-40 -> elven-spot-182): seen 25, old leash 8, new leash 7 WORSE
+  Dryad SW                     (elven-spot-70 -> elven-spot-194): seen 33, old leash 5, new leash 5 
+  Dryad W                      (elven-spot-63 -> elven-spot-204): seen 26, old leash 3, new leash 6 IMPROVED
+  Kaboo Orc Fighter Leader SW  (elven-spot-69 -> elven-spot-194): seen 25, old leash 7, new leash 6 WORSE
+  Kaboo Orc Fighter Leader W   (elven-spot-41 -> elven-spot-201): seen 23, old leash 5, new leash 5 
+  Kaboo Orc Fighter Leader W   (elven-spot-11 -> elven-spot-211): seen 20, old leash 7, new leash 4 WORSE
+  Dryad Elder SW               (elven-spot-12 -> elven-spot-236): seen 20, old leash 9, new leash 6 WORSE
+  Dryad SW                     (elven-spot-61 -> elven-spot-172): seen 22, old leash 5, new leash 4 WORSE
+  Dryad Elder SW               (elven-spot-14 -> elven-spot-229): seen 14, old leash 4, new leash 3 WORSE
+  Hook Spider SW               (elven-spot-13 -> elven-spot-230): seen 17, old leash 12, new leash 8 WORSE
+  Dryad Elder W                (elven-spot-42 -> elven-spot-221): seen 20, old leash 6, new leash 4 WORSE
+  Lirein SW                    (elven-spot-44 -> elven-spot-247): seen 19, old leash 8, new leash 9 IMPROVED
+  Hook Spider SW               (elven-spot-43 -> elven-spot-243): seen 22, old leash 6, new leash 2 WORSE
+  Lirein W                     (elven-spot-15 -> elven-spot-252): seen 16, old leash 6, new leash 3 WORSE
+  Pincer Spider SW             (elven-spot-16 -> elven-spot-251): seen 14, old leash 6, new leash 6 
+  Lirein SW                    (elven-spot-64 -> elven-spot-253): seen 15, old leash 9, new leash 3 WORSE
+  Lirein SW                    (elven-spot-65 -> elven-spot-254): seen 21, old leash 6, new leash 5 WORSE
+  Pincer Spider SW             (elven-spot-17 -> elven-spot-267): seen 23, old leash 6, new leash 3 WORSE
+  Pincer Spider SW             (elven-spot-18 -> elven-spot-271): seen 16, old leash 10, new leash 1 WORSE
+  Lirein Elder SW              (elven-spot-45 -> elven-spot-277): seen 18, old leash 5, new leash 5 
+  Pincer Spider SW             (elven-spot-19 -> elven-spot-279): seen 17, old leash 10, new leash 5 WORSE
+  Lirein Elder SW              (elven-spot-20 -> elven-spot-291): seen 14, old leash 5, new leash 4 WORSE
+
+summary: 11 improved, 10 same, 50 worse
