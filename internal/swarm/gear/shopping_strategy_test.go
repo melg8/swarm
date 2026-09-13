@@ -370,7 +370,14 @@ func TestShoppingStrategyJourneyComparison(t *testing.T) {
     // the aggressive adena utilization) and the basic jewel set (both
     // halves of the pairs included) in ONE plan.
     profile := MeleeFighter{}
-    equipment := equipmentWith(nil, nil)
+    // The luring tool is owned (the top bow rung and the full
+    // quiver): the journey numbers stay about the combat gear.
+    equipment := equipmentWith(
+        []state.InventoryItem{
+            item(101, 272),
+            {ObjectID: 102, ItemID: 17, Count: arrowRestockTarget},
+        },
+        nil)
     plan := PlanPurchases(profile, equipment, elvenCatalog(), 100_000)
     require.NotEmpty(t, plan)
     weapons := weaponPurchases(plan)

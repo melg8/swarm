@@ -128,6 +128,13 @@ func (l *Loop) maybeEquipGear() {
         // just unequipped pieces right back on before their sale.
         return
     }
+    if l.lureArmed() {
+        // The lure owns the weapon slots while it runs: the auto
+        // equipment would pull the melee weapon back over the bow in
+        // the middle of the pull (the bow scores zero for the melee
+        // profile, the planner cannot know the lure wants it worn).
+        return
+    }
     if now.Sub(manager.lastActionAt) < equipActionPeriod {
         return
     }

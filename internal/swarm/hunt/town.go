@@ -1361,7 +1361,7 @@ func (l *Loop) extendShortClick(
     }
     candidates, count := extendShortClickCandidates(
         selfX, selfY, l.waypoints, l.wpIndex)
-    for c := 0; c < count; c++ {
+    for c := range count {
         sample := candidates[c]
         if waterGuard {
             if crossed, err := l.navigator.WaterCrossed(
@@ -2564,7 +2564,6 @@ func tripAbortCooldown(run int) time.Duration {
     for range max(0, run-tripAbortEscalateAfter) {
         cooldown *= 2
         if cooldown >= tripAbortMaxCooldown {
-
             return tripAbortMaxCooldown
         }
     }

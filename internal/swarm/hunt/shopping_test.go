@@ -635,18 +635,26 @@ func TestTripPlanFreezesPurchasesAgainstResale(t *testing.T) {
         PaperdollObjectIDs: test1DumpPaperdoll,
     })
 
-    // The trip arms on the shopping trigger and freezes its plan.
+    // The trip arms on the shopping trigger and freezes its plan: the
+    // Brandish milestone, the luring tool behind it (the Short Bow
+    // and the quiver, see gear/bow.go) and the feet upgrade.
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
-    require.Len(t, loop.tripPlan, 2, "the frozen plan holds both purchases")
-    require.Equal(t, int64(69999), gear.AdenaSpent(loop.tripPlan),
-        "the frozen plan matches the dump's worth")
+    require.Len(t, loop.tripPlan, 4, "the frozen plan holds its purchases")
+    require.Equal(t, int64(67344), gear.AdenaSpent(loop.tripPlan),
+        "the frozen plan carries the weapon, the tool and the feet")
     require.Equal(t, int32(1333), loop.tripPlan[0].ItemID,
         "the weapon milestone of the frozen plan is the Brandish")
     require.Equal(t, []int32{268451661}, loop.tripPlan[0].SellFirst)
-    require.Equal(t, int32(38), loop.tripPlan[1].ItemID,
-        "the feet upgrade of the frozen plan is the Low Boots")
-    require.Equal(t, []int32{268451634}, loop.tripPlan[1].SellFirst)
+    require.Equal(t, int32(13), loop.tripPlan[1].ItemID,
+        "the luring bow follows the weapon milestone")
+    require.Empty(t, loop.tripPlan[1].SellFirst,
+        "the tool displaces nothing")
+    require.Equal(t, int32(17), loop.tripPlan[2].ItemID,
+        "the quiver restock rides the plan")
+    require.Equal(t, int32(37), loop.tripPlan[3].ItemID,
+        "the feet upgrade of the eroded budget is the Leather Shoes")
+    require.Equal(t, []int32{268451634}, loop.tripPlan[3].SellFirst)
 
     // The sell stop routes to the weapon merchant of the frozen plan.
     unoren := townMerchants[0]
@@ -708,13 +716,17 @@ func TestTripPlanFreezesPurchasesAgainstResale(t *testing.T) {
     // Brandish at its merchant and the Low Boots at its own - never the
     // re-bought Apprentice's Shoes and never a purchase whose displaced
     // piece was not queued for the sale.
-    require.Len(t, loop.tripStops, 2)
+    require.Len(t, loop.tripStops, 3)
     require.Equal(t, int32(7147), loop.tripStops[0].merchant.TemplateID)
-    require.Len(t, loop.tripStops[0].buys, 1)
+    require.Len(t, loop.tripStops[0].buys, 2)
     require.Equal(t, int32(1333), loop.tripStops[0].buys[0].ItemID)
+    require.Equal(t, int32(13), loop.tripStops[0].buys[1].ItemID)
     require.Equal(t, int32(7148), loop.tripStops[1].merchant.TemplateID)
     require.Len(t, loop.tripStops[1].buys, 1)
-    require.Equal(t, int32(38), loop.tripStops[1].buys[0].ItemID)
+    require.Equal(t, int32(37), loop.tripStops[1].buys[0].ItemID)
+    require.Equal(t, int32(7150), loop.tripStops[2].merchant.TemplateID)
+    require.Len(t, loop.tripStops[2].buys, 1)
+    require.Equal(t, int32(17), loop.tripStops[2].buys[0].ItemID)
     for _, stop := range loop.tripStops {
         for _, purchase := range stop.buys {
             require.NotEqual(t, int32(1121), purchase.ItemID,
@@ -731,10 +743,12 @@ func TestTripPlanFreezesPurchasesAgainstResale(t *testing.T) {
     loop.sellAt = time.Now().Add(-buyPause - time.Second)
     loop.merchantPick = time.Now().Add(-2 * time.Second)
     loop.tick()
-    require.Len(t, game.buys, 1, "the frozen plan's weapon buys")
-    require.Len(t, game.buys[0], 1)
+    require.Len(t, game.buys, 1, "the frozen plan's weapon stop buys")
+    require.Len(t, game.buys[0], 2)
     require.Equal(t, int32(1333), game.buys[0][0].ItemID)
     require.Equal(t, int32(3014700), game.buys[0][0].ListID)
+    require.Equal(t, int32(13), game.buys[0][1].ItemID,
+        "the luring bow shares the weapon merchant stop")
 }
 
 // TestStopShoppingSkipsOwnedItems pins the last responsible moment of

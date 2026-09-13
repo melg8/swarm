@@ -233,6 +233,8 @@ type planWalk struct {
     candidates []purchaseCandidate
     equipment  Equipment
     strategy   *shopStrategy
+    profile    Profile
+    catalog    Catalog
     planned    map[int32]int32
     adena      int64
     spent      int64
@@ -257,6 +259,8 @@ func newPlanWalk(
         virtual:    SimulateInventory(profile, equipment),
         candidates: candidates,
         equipment:  equipment,
+        profile:    profile,
+        catalog:    catalog,
         strategy: &shopStrategy{
             floorIDs: cachedCheapestJewelIDs(profile, catalog, candidates),
         },
@@ -273,7 +277,9 @@ func newPlanWalk(
 }
 
 // runPhases walks the phases in the strategy order: the weapon
-// milestone, the basic jewel floor (the cheapest set of every slot,
+// milestone, the bow and quiver of the melee luring (the ranged tool
+// behind the weapon milestone - worn or planned - never ahead of it,
+// see bow.go), the basic jewel floor (the cheapest set of every slot,
 // both pair halves - the 261 adena outfit reserves ahead of the armor
 // maximization so every slot carries its basic jewel while the armor
 // set takes the rest), the pdef maximizing armor set and the shield
@@ -281,6 +287,10 @@ func newPlanWalk(
 // tailDone).
 func (w *planWalk) runPhases() {
     w.weaponPhase()
+    if w.tailDone() {
+        return
+    }
+    w.bowPhase()
     if w.tailDone() {
         return
     }

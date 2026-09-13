@@ -7,9 +7,10 @@ package gear
 import (
     "testing"
 
+    "github.com/stretchr/testify/require"
+
     "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/state"
-    "github.com/stretchr/testify/require"
 )
 
 // elvenCatalog mirrors the elven village shop deployment: the weapon
@@ -103,7 +104,10 @@ func TestPlanPurchasesArmorFloorFirst(t *testing.T) {
     // The next weapon milestone (the knife at 14374) stays out of
     // reach of the 1000 adena wallet.
     equipped := equipmentWith(
-        []state.InventoryItem{item(100, 1)},
+        []state.InventoryItem{
+            item(100, 1), item(101, 13),
+            {ObjectID: 102, ItemID: 17, Count: arrowRestockTarget},
+        },
         map[Slot]int32{SlotRHand: 100})
     plan := PlanPurchases(profile, equipped, elvenCatalog(), 1000)
     require.NotEmpty(t, plan)
@@ -151,10 +155,18 @@ func TestPlanPurchasesOneWeaponPerTrip(t *testing.T) {
         profile, equipment, elvenCatalog(), 10_000_000)
     require.NotEmpty(t, purchases)
     weapons := 0
+    bows := 0
     foundLongSword := false
     for _, purchase := range purchases {
         stats, ok := npcdata.ItemGearStats(purchase.ItemID)
         require.True(t, ok, "every purchase must carry gear stats")
+        if stats.WeaponType == "BOW" {
+            // The luring tool of the melee hunter rides the plan
+            // behind the milestone (see bow.go).
+            bows++
+
+            continue
+        }
         if stats.BodyPart == "rhand" || stats.BodyPart == "lrhand" {
             weapons++
             foundLongSword = purchase.ItemID == 2
@@ -172,6 +184,10 @@ func TestPlanPurchasesOneWeaponPerTrip(t *testing.T) {
         "one weapon purchase per trip, the chain is cut")
     require.True(t, foundLongSword,
         "the Long Sword is the top tier of the affordable weapon ladder")
+    require.Equal(t, 1, bows,
+        "one luring bow purchase per trip")
+    require.Equal(t, int32(272), lastBowPurchase(purchases).ItemID,
+        "the Forest Bow is the top bow rung of the elven weapon list")
     require.LessOrEqual(t, AdenaSpent(purchases), int64(10_000_000))
 }
 
@@ -210,11 +226,19 @@ func TestPlanPurchasesSkipsInventoryItems(t *testing.T) {
     purchases := PlanPurchases(
         profile, equipment, elvenCatalog(), 10_000_000)
     weapons := 0
+    bows := 0
     for _, purchase := range purchases {
         require.NotEqual(t, int32(3), purchase.ItemID,
             "the broadsword the inventory already carries must not be bought")
         stats, ok := npcdata.ItemGearStats(purchase.ItemID)
         require.True(t, ok)
+        if stats.WeaponType == "BOW" {
+            // The luring tool of the melee hunter (see bow.go): the
+            // 10M wallet buys the top bow rung.
+            bows++
+
+            continue
+        }
         if stats.BodyPart == "rhand" || stats.BodyPart == "lrhand" {
             weapons++
             require.Equal(t, int32(2), purchase.ItemID,
@@ -224,6 +248,21 @@ func TestPlanPurchasesSkipsInventoryItems(t *testing.T) {
             "the dirk intermediate must not be bought")
     }
     require.Equal(t, 1, weapons, "one weapon purchase per trip")
+    require.Equal(t, 1, bows, "one luring bow purchase per trip")
+    require.Equal(t, int32(272), lastBowPurchase(purchases).ItemID,
+        "the Forest Bow is the top bow rung of the elven weapon list")
+}
+
+// lastBowPurchase resolves the bow purchase of a plan.
+func lastBowPurchase(purchases []Purchase) Purchase {
+    for _, purchase := range purchases {
+        stats, ok := npcdata.ItemGearStats(purchase.ItemID)
+        if ok && stats.WeaponType == "BOW" {
+            return purchase
+        }
+    }
+
+    return Purchase{}
 }
 
 func TestPlanPurchasesSkipsEquippedGear(t *testing.T) {
@@ -262,9 +301,14 @@ func TestSimulateInventoryAppliesFreeUpgrades(t *testing.T) {
 // buys the top affordable tier, never an intermediate rung.
 func TestPlanPurchasesCreditsDisplacedGear(t *testing.T) {
     profile := MeleeFighter{}
-    // The character wears the sickle (18500 reference price).
+    // The character wears the sickle (18500 reference price) and
+    // already owns the luring tool (the top bow rung and the full
+    // quiver): the credit story stays about the weapon ladder.
     equipment := equipmentWith(
-        []state.InventoryItem{item(100, 153)},
+        []state.InventoryItem{
+            item(100, 153), item(101, 272),
+            {ObjectID: 102, ItemID: 17, Count: arrowRestockTarget},
+        },
         map[Slot]int32{SlotRHand: 100})
     purchases := PlanPurchases(profile, equipment, elvenCatalog(), 56000)
     var weapon *Purchase
@@ -402,7 +446,10 @@ func TestPlanPurchaseQueueCreditsDisplacedGear(t *testing.T) {
             "the missing tracks the cumulative shortfall")
         stats, ok := npcdata.ItemGearStats(purchase.ItemID)
         require.True(t, ok)
-        if stats.BodyPart == "rhand" || stats.BodyPart == "lrhand" {
+        if (stats.BodyPart == "rhand" || stats.BodyPart == "lrhand") &&
+            stats.WeaponType != "BOW" {
+            // The luring bows of the wanted tail (see bow.go) are the
+            // tool rungs, not the weapon milestone.
             weapon = purchase
         }
     }
@@ -580,7 +627,10 @@ func weaponPurchases(purchases []Purchase) []Purchase {
     var weapons []Purchase
     for _, purchase := range purchases {
         stats, ok := npcdata.ItemGearStats(purchase.ItemID)
-        if ok && (stats.BodyPart == "rhand" || stats.BodyPart == "lrhand") {
+        if ok && (stats.BodyPart == "rhand" || stats.BodyPart == "lrhand") &&
+            stats.WeaponType != "BOW" {
+            // The bow rides the plan as the luring tool (see bow.go),
+            // the weapon milestone assertions count the melee ladder.
             weapons = append(weapons, purchase)
         }
     }
@@ -623,8 +673,13 @@ func TestPlanPurchasesTopTierAfterSaleReplan(t *testing.T) {
 // intermediate sword.
 func TestPlanPurchasesReplacedWeaponTargetsTopTier(t *testing.T) {
     profile := MeleeFighter{}
+    // The luring tool is owned (the top bow rung and the full
+    // quiver): the trip story stays about the weapon ladder.
     equipment := equipmentWith(
-        []state.InventoryItem{item(100, 3)},
+        []state.InventoryItem{
+            item(100, 3), item(101, 272),
+            {ObjectID: 102, ItemID: 17, Count: arrowRestockTarget},
+        },
         map[Slot]int32{SlotRHand: 100})
     purchases := PlanPurchases(
         profile, equipment, weaponCatalog(), 56000)

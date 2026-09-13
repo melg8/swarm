@@ -112,8 +112,12 @@ func TestRound60DebtArmsOnStrandedReplacement(t *testing.T) {
     // sell, and the merchant pick of that flow is what the replacement
     // sale needs in reach.
     applyRound60Gear(bot, 6000, true)
+    // The luring tool is owned (see gear/bow.go): the 6000 wallet
+    // stays sized for the legs upgrade through the sell credit.
     bot.ApplyInventoryUpdate([]state.InventoryItem{
         {ObjectID: 300, ItemID: 1864, Count: 5, Type2: 5, Change: 1},
+        {ObjectID: 301, ItemID: 13, Count: 1, Change: 1},
+        {ObjectID: 302, ItemID: 17, Count: 600, Change: 1},
     })
     require.True(t, loop.shoppingWanted(),
         "the legs upgrade through the sell credit plans a trip")

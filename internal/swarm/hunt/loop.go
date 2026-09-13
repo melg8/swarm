@@ -456,6 +456,10 @@ type Loop struct {
     delevelCounted    bool
     engageAt          time.Time
     targetSkip        map[int32]time.Time
+    // lure is the ranged luring state of the current pick (nil when
+    // no lure runs): the melee answer to a covered target, see
+    // lure.go.
+    lure *lureState
     // The blind engage recovery state (see loop_los.go): the armed
     // reposition walk, its planned geodata waypoints and the attempt
     // budget for the current target.
@@ -854,6 +858,10 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         delevelCounted:    false,
         engageAt:          time.Time{},
         targetSkip:        nil,
+        lure:              nil,
+        questWalkAt:       time.Time{},
+        questPotionAt:     time.Time{},
+        questFightLogAt:   time.Time{},
         losAt:             time.Time{},
         losWaypoints:      nil,
         losWpIndex:        0,
@@ -1332,6 +1340,12 @@ func (l *Loop) engage() {
     // the fight here would walk home through the blows and leave the
     // loot on the ground (see adoptOutZoneFight).
     now := time.Now()
+    if l.lureArmed() && (l.lure.target != l.target || l.phase != phaseEngage) {
+        // The pick changed under the lure (a kill, a skip, a flee
+        // drop): the stale state stands down, the auto equipment
+        // restores the melee weapon.
+        l.clearLure()
+    }
     if !l.inZoneSelf() {
         if l.tracker.SelfUnderAttack() &&
             l.tracker.SelfHealthPercent() < reengageHealthPercent {
@@ -1597,9 +1611,17 @@ func (l *Loop) engage() {
             l.target = pick.ObjectID
             l.engageAt = now
             l.clearBlindRecovery()
+            // The covered pick answers with the ranged lure when the
+            // hunter owns the tool (see lure.go): the approach and the
+            // arm phases own the next ticks, the ordinary attack flow
+            // keeps running otherwise.
+            l.maybeBeginLure(now)
         }
     }
     if l.tracker.SelfFighting(l.target) {
+        if l.lureArmed() && l.lureTick(now) {
+            return
+        }
         // The confirmed running fight stamps its start once: the
         // kill journal record measures the real fight length
         // against it (engageAt re-anchors and cannot).
@@ -1652,6 +1674,7 @@ func (l *Loop) engage() {
                 dist := math.Hypot(
                     float64(x-selfX), float64(y-selfY))
                 if dist > userEngageRadius &&
+                    !l.lureArmed() &&
                     !l.chaseProgress(
                         &l.engLastDist, &l.engDistAt, dist, now) &&
                     !l.tracker.SelfWalking() &&
@@ -1678,6 +1701,9 @@ func (l *Loop) engage() {
         return
     }
     if now.Sub(l.lastHit) < engageRetryPeriod {
+        return
+    }
+    if l.lureArmed() && l.lureTick(now) {
         return
     }
     if err := l.game.AttackTarget(l.target); err != nil {
