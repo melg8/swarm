@@ -329,8 +329,15 @@ func ElvenKnightChain() QuestChain {
 				ItemIDs:     []int32{1205},
 				DropPercent: 70,
 				Target:      20,
-				GroundX:     -49896,
-				GroundY:     113960,
+				// The eastern edge of the ruins, not the bounding box
+				// center: the center holds five to six spawn points of
+				// the aggressive clan inside one scan radius and the
+				// live runs of 2026-09-12 died in the assisting crowd
+				// every time; the edge (two spawns in 1600) feeds the
+				// hunt one mob at a time and sits eleven thousand
+				// units closer to the Gludio approach.
+				GroundX: -40000,
+				GroundY: 113000,
 			}),
 			// The talk itself advances: page 30327-09,
 			// setCond(3), Sorius' Letter 1202.
