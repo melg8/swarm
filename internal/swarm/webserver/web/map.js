@@ -133,6 +133,41 @@ const MapView = {
     lastChip: "", lastChipAt: 0, lastLogAt: 0, chip: null
   },
 
+  // ---- the static background cache ----
+  //
+  // The map tiles, the grid and the loaded zone frame are camera
+  // only data: painting them costs the same whether the objects
+  // moved or not, and the render loop repainted them on every
+  // animation frame while anything moved (a hunting bot keeps
+  // something moving almost always - that was the open map cpu
+  // load). The cache rasterizes them once into an offscreen canvas
+  // anchored in world coordinates (one viewport of slack around the
+  // view), and every frame blits the visible slice with a single
+  // drawImage - a GPU composite instead of a per frame re-raster of
+  // dozens of scaled tiles. The cache re-renders on a zoom change, a
+  // layer toggle, a landed tile, a theme flip, a resize, or the
+  // camera leaving the slack box (see bgKey and ensureBackground).
+  bg: {
+    canvas: null, ctx: null, key: "",
+    cx: 0, cy: 0, worldLeft: 0, worldTop: 0,
+    cssW: 0, cssH: 0, dpr: 1, marginX: 0, marginY: 0
+  },
+
+  // tileLoads counts the tile load completions of both pyramids
+  // (the map imagery and the geodata view): a landed tile changes
+  // what the background raster would paint, so the counter rides the
+  // cache key.
+  tileLoads: 0,
+
+  // colorsRev bumps on every theme refresh: the cache raster carries
+  // the theme colors (the grid, its labels), so the key must drop it.
+  colorsRev: 0,
+
+  // viewDpr is the device pixel ratio the main canvas renders at
+  // (set by resize): the cache blit snaps to whole device pixels
+  // through it.
+  viewDpr: 1,
+
   // The live combat animation layer: the server observed swings and
   // damage landings replayed as short canvas effects (see
   // spawnCombatAnim). lastCombatSeq dedupes the events across the
@@ -248,16 +283,18 @@ const MapView = {
       // theme fills alike.
       tick: "#39424e"
     };
-    this.draw();
+    this.colorsRev += 1;
+    this.redraw();
   },
 
   resize() {
     const rect = this.canvas.parentElement.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
+    this.viewDpr = dpr;
     this.canvas.width = Math.max(1, Math.floor(rect.width * dpr));
     this.canvas.height = Math.max(1, Math.floor(rect.height * dpr));
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.draw();
+    this.redraw();
   },
 
   // A new snapshot arrives: sync the clock with the server, drop runtime
@@ -298,7 +335,10 @@ const MapView = {
         || (a.y - b.y) || (a.objectId - b.objectId));
     this.objectsText = this.buildObjectsText(snapshot);
     this.kickAnimation();
-    this.draw();
+    // The repaint of a data driven update goes through redraw: the
+    // snapshots keep arriving with the map tab hidden too, and
+    // painting a display:none canvas is pure cpu waste.
+    this.redraw();
   },
 
   // resetBot drops the observed bot state ahead of the first snapshot
@@ -316,7 +356,7 @@ const MapView = {
     this.combatAnims = [];
     this.lastCombatSeq = 0;
     this.userMark = null;
-    this.draw();
+    this.redraw();
   },
 
   // rebuildSocialMasks parses the clan mask strings of the fresh
@@ -482,12 +522,19 @@ const MapView = {
   },
 
   frame(ts) {
+    // The loop stops instead of ticking no-op frames while the map
+    // tab is hidden: painting a display:none canvas at the display
+    // refresh rate is pure cpu waste. The next snapshot (or the next
+    // map interaction) re-kicks the loop within one poll period.
+    if (!this.mapVisible()) {
+      this.animating = false;
+
+      return;
+    }
     const dt = Math.min(0.1, (ts - this.lastFrame) / 1000);
     this.lastFrame = ts;
-    if (this.mapVisible()) {
-      this.updateRuntime(dt);
-      this.draw();
-    }
+    this.updateRuntime(dt);
+    this.draw();
     if (this.needsMoreFrames()) {
       requestAnimationFrame((next) => this.frame(next));
     } else {
@@ -822,11 +869,13 @@ const MapView = {
     img.onload = () => {
       entry.ready = true;
       entry.img = img;
-      this.draw();
+      this.tileLoads += 1;
+      this.redraw();
     };
     img.onerror = () => {
       entry.missing = true;
-      this.draw();
+      this.tileLoads += 1;
+      this.redraw();
     };
     img.src = path;
 
@@ -872,11 +921,13 @@ const MapView = {
     img.onload = () => {
       entry.ready = true;
       entry.img = img;
-      this.draw();
+      this.tileLoads += 1;
+      this.redraw();
     };
     img.onerror = () => {
       entry.missing = true;
-      this.draw();
+      this.tileLoads += 1;
+      this.redraw();
     };
     img.src = path;
 
@@ -1045,15 +1096,30 @@ const MapView = {
 
   paint(ctx) {
     const rect = this.view;
-    ctx.clearRect(0, 0, rect.width, rect.height);
     const pathfind = this.pathfindEnabled();
-    if (!this.lastSnap && !pathfind) { return; }
+    if (!this.lastSnap && !pathfind) {
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      return;
+    }
 
     this.unitScale = this.computeUnitScale();
     this.labelCandidates = [];
-    this.drawMapBackground(ctx, rect);
-    if (pathfind) {
+    // The static world (the map or geodata tiles, the grid, the loaded
+    // zone frame) comes from the offscreen cache as one blit; the
+    // fallback path paints it directly (the sandboxed Node harnesses
+    // run without a real offscreen canvas). The hunt zones and the
+    // kill marks stay per frame on purpose: the zone labels carry the
+    // live economy fields (the respawn countdown, the adena rate) and
+    // the kill crosses fade with age - freezing either in a cache
+    // would need a re-render per snapshot and eat the win.
+    if (!this.blitBackground(ctx, rect)) {
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      this.drawMapBackground(ctx, rect);
       this.drawGrid(ctx, rect);
+      this.drawZone(ctx, rect);
+    }
+    if (pathfind) {
       this.drawPathfindOverlay(ctx);
       this.updateMapInfo();
 
@@ -1061,8 +1127,6 @@ const MapView = {
     }
     this.drawHuntingZone(ctx);
     this.drawKillMarks(ctx, rect);
-    this.drawGrid(ctx, rect);
-    this.drawZone(ctx, rect);
     this.drawTargetLinks(ctx);
     this.drawAggroRanges(ctx, rect);
     this.drawSocialLinks(ctx, rect);
@@ -1076,6 +1140,184 @@ const MapView = {
       this.drawLabels(ctx);
     }
     this.updateMapInfo();
+  },
+
+  // ---- the static background cache ----
+
+  // redraw is the data driven entry of the pipeline: the snapshots,
+  // the kill ring polls, the tile loads and the theme flips all fire
+  // with the map tab hidden too, and painting a display:none canvas
+  // burns the cpu for pixels nobody sees. The map interactions (a
+  // drag, a zoom, a layer toggle) only happen on the visible map, so
+  // they keep the direct draw. A skipped paint is never lost: the
+  // next snapshot (300 ms worst case) repaints the world.
+  redraw() {
+    if (this.mapVisible()) { this.draw(); }
+  },
+
+  // layerChecked reads one layer checkbox of the toolbar (the cache
+  // key runs outside the draw functions that read the boxes again).
+  layerChecked(id) {
+    const box = document.getElementById(id);
+
+    return !!(box && box.checked);
+  },
+
+  // bgKey is the identity of the background raster: everything that
+  // changes what drawMapBackground, drawGrid and drawZone would paint
+  // rides it - the zoom (the tile pyramid level and the grid step
+  // derive from the scale), the landed tiles, the theme, the loaded
+  // zone region of the character, the geodata mode, the layer
+  // toggles and the canvas geometry. A camera move alone does NOT
+  // change the key: the cache is world anchored, so the camera pans
+  // inside it until the slack box runs out.
+  bgKey(rect, dpr) {
+    const c = this.lastSnap && this.lastSnap.character;
+    const region = c && c.x
+      ? Math.floor(c.x / this.regionSize) + "_"
+        + Math.floor(c.y / this.regionSize)
+      : "x";
+    const geo = this.pathfindEnabled() && this.geoEnabled()
+      ? (this.pathfind.geoMode || "height") : "off";
+
+    return [this.scale, this.tileLoads, this.colorsRev, region, geo,
+      this.layerChecked("show-map"), this.layerChecked("show-zone"),
+      Math.round(rect.width), Math.round(rect.height), dpr].join("|");
+  },
+
+  // createBgCanvas makes the offscreen raster of the cache. The
+  // sandboxed Node harnesses run map.js against stub documents: a
+  // document without createElement, or a stub canvas without a 2d
+  // context, returns null and the map keeps the direct per frame
+  // static path (the behavior before the cache).
+  createBgCanvas() {
+    try {
+      if (typeof document === "undefined"
+        || typeof document.createElement !== "function") {
+        return null;
+      }
+      const canvas = document.createElement("canvas");
+      if (!canvas || typeof canvas.getContext !== "function") {
+        return null;
+      }
+
+      return canvas;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  // ensureBackground validates the cache for this frame and
+  // re-rasterizes it when the key dropped or the camera left the
+  // slack box. False means the caller must paint the static layers
+  // itself (no offscreen canvas in this environment).
+  ensureBackground(rect) {
+    const bg = this.bg;
+    if (!bg.canvas) {
+      bg.canvas = this.createBgCanvas();
+      if (!bg.canvas) { return false; }
+      const bctx = bg.canvas.getContext("2d");
+      // A context without drawImage (or a main context without it)
+      // cannot blit: keep the direct path instead of a half cache.
+      if (!bctx || typeof bctx.drawImage !== "function"
+        || !this.ctx || typeof this.ctx.drawImage !== "function") {
+        bg.canvas = null;
+
+        return false;
+      }
+      bg.ctx = bctx;
+    }
+    const dpr = this.viewDpr || 1;
+    const key = this.bgKey(rect, dpr);
+    const drifted = Math.abs(this.camX - bg.cx) > bg.marginX
+      || Math.abs(this.camY - bg.cy) > bg.marginY;
+    if (bg.key !== key || drifted) {
+      this.renderBackground(rect, dpr, key);
+    }
+
+    return true;
+  },
+
+  // renderBackground rasterizes the static world into the cache: the
+  // canvas covers the viewport plus one viewport of slack per side and
+  // is anchored at the current camera position in world coordinates.
+  // The static draw functions read the synced camera state, so the
+  // render swaps in the cache geometry for its duration and restores
+  // the real view in a finally - no input handler and no other draw
+  // can interleave (single threaded), and the dynamic layers below
+  // paint against the untouched real view.
+  renderBackground(rect, dpr, key) {
+    const bg = this.bg;
+    const cssW = Math.max(1, Math.round(rect.width * (1 + 2 * bgMarginOfView)));
+    const cssH = Math.max(1, Math.round(rect.height * (1 + 2 * bgMarginOfView)));
+    // The device pixel budget: a 4K class viewport at dpr 2 would hold
+    // a hundred megabytes of cache, so the cache resolution steps
+    // down to fit (the tile sources upscale anyway - one source pixel
+    // covers several device pixels at every zoom, so the imagery
+    // loses nothing).
+    let cd = Math.min(dpr, 2);
+    const fit = Math.sqrt(bgDevicePixels / (cssW * cssH));
+    if (cd > fit) { cd = Math.max(1, fit); }
+    const devW = Math.max(1, Math.round(cssW * cd));
+    const devH = Math.max(1, Math.round(cssH * cd));
+    if (bg.canvas.width !== devW) { bg.canvas.width = devW; }
+    if (bg.canvas.height !== devH) { bg.canvas.height = devH; }
+    const ctx = bg.ctx;
+    ctx.setTransform(cd, 0, 0, cd, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    const keepView = this.view;
+    const keepX = this.camX;
+    const keepY = this.camY;
+    const cacheView = {
+      width: cssW, height: cssH,
+      left: keepView.left, top: keepView.top
+    };
+    this.view = cacheView;
+    this.camX = bg.cx = keepX;
+    this.camY = bg.cy = keepY;
+    try {
+      this.drawMapBackground(ctx, cacheView);
+      this.drawGrid(ctx, cacheView);
+      this.drawZone(ctx, cacheView);
+    } finally {
+      this.view = keepView;
+      this.camX = keepX;
+      this.camY = keepY;
+    }
+    bg.cssW = cssW;
+    bg.cssH = cssH;
+    bg.dpr = cd;
+    bg.worldLeft = bg.cx - cssW / 2 / this.scale;
+    bg.worldTop = bg.cy - cssH / 2 / this.scale;
+    // The slack box: the camera may drift this far (in world units)
+    // before the cache re-renders - one viewport of overdraw minus a
+    // safety band, so the edge never shows a stale strip.
+    bg.marginX = Math.max(1, rect.width * bgMarginOfView - 64)
+      / this.scale;
+    bg.marginY = Math.max(1, rect.height * bgMarginOfView - 64)
+      / this.scale;
+    bg.key = key;
+  },
+
+  // blitBackground composites the cache onto the frame with one
+  // drawImage - a GPU side copy of a world anchored texture instead
+  // of the per frame re-raster of the tiles, the grid and the zone
+  // frame. The offset snaps to whole device pixels: a fractional
+  // offset makes the GPU resample the whole cache every frame (a
+  // permanent sub pixel smear of the grid), a snapped one pans in 1px
+  // steps at the display rate and stays crisp at rest.
+  blitBackground(ctx, rect) {
+    if (!this.ensureBackground(rect)) { return false; }
+    const bg = this.bg;
+    const dpr = this.viewDpr || 1;
+    const left = this.camX - rect.width / 2 / this.scale;
+    const top = this.camY - rect.height / 2 / this.scale;
+    const dx = Math.round((bg.worldLeft - left) * this.scale * dpr) / dpr;
+    const dy = Math.round((bg.worldTop - top) * this.scale * dpr) / dpr;
+    ctx.drawImage(bg.canvas, 0, 0, bg.canvas.width, bg.canvas.height,
+      dx, dy, bg.cssW, bg.cssH);
+
+    return true;
   },
 
   // ---- the fps meter ----
@@ -1468,7 +1710,7 @@ const MapView = {
   // frame - the poll period paces the fade steps well enough.
   setKillMarks(marks) {
     this.killMarks = Array.isArray(marks) ? marks : [];
-    this.draw();
+    this.redraw();
   },
 
   // drawSocialLinks paints the clan assist network of the living
@@ -2750,6 +2992,18 @@ const fpsBadColor = "#d93025";
 // fpsWorstShowMs is the paint time a single worst frame must exceed
 // before the chip shows it next to the average.
 const fpsWorstShowMs = 8;
+
+// bgMarginOfView is the overdraw of the static background cache: the
+// raster covers the viewport plus this fraction of it per side, so
+// the follow camera of a walking bot or a dragged view pans inside
+// the cached world for a full viewport before the cache re-renders
+// (0.5 = one viewport of slack around the view).
+const bgMarginOfView = 0.5;
+
+// bgDevicePixels caps the offscreen cache raster: beyond it the cache
+// resolution steps down so even a 4K class viewport keeps the cache
+// memory in the tens of megabytes, not the hundreds.
+const bgDevicePixels = 4096 * 2560;
 
 // socialWindowMs is how long the social animation marker stays visible
 // (the tracker side window in state/chat.go).

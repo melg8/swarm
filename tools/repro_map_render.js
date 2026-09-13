@@ -143,6 +143,9 @@ function makeRecordingContext(record) {
         },
         measureText: (text) => ({ width: (text || "").length * 6 }),
         setLineDash: (dash) => { record.dash = dash.slice(); },
+        // The background cache blit: the arguments land in the record
+        // so a scenario can assert what was composited and where.
+        drawImage: (...args) => { record.blits.push(args); },
         // style properties tracked through the record object
         get strokeStyle() { return record.style; },
         set strokeStyle(v) { record.style = v; },
@@ -178,8 +181,8 @@ function makeElementStub(checked) {
 // together with the stroke record.
 function loadMapJs(mapFile) {
     const record = {
-        strokes: [], fills: [], texts: [], style: "", fillStyle: "",
-        width: 1, dash: []
+        strokes: [], fills: [], texts: [], blits: [], style: "",
+        fillStyle: "", width: 1, dash: []
     };
     const listeners = { canvas: {}, window: {} };
     const listen = (registry) => (type, fn) => {
@@ -221,6 +224,23 @@ function loadMapJs(mapFile) {
                 }
 
                 return elements.get(id);
+            },
+            // The offscreen canvas of the static background cache: a
+            // stub canvas with its own recording context (exposed as
+            // __record) so a scenario can see what rasterized into
+            // the cache versus what painted per frame.
+            createElement: (tag) => {
+                if (tag !== "canvas") { return makeElementStub(false); }
+                const bgRecord = {
+                    strokes: [], fills: [], texts: [], blits: [],
+                    style: "", fillStyle: "", width: 1, dash: []
+                };
+
+                return {
+                    width: 0, height: 0,
+                    getContext: () => makeRecordingContext(bgRecord),
+                    __record: bgRecord
+                };
             }
         },
         window: { addEventListener: listen(listeners.window) },
@@ -840,6 +860,66 @@ function runScenarioFpsMeter(mapFile) {
     return results;
 }
 
+// runScenarioBackgroundCache pins the static world cache: the tiles,
+// the grid and the zone frame rasterize once into the offscreen
+// canvas and every later frame composites it with one drawImage
+// instead of re-stroking the grid; a camera pan inside the slack box
+// only shifts the blit, and a zoom re-rasters (the cache key carries
+// the scale). The dynamic layers (the unit markers) must keep
+// painting on every frame.
+function runScenarioBackgroundCache(mapFile) {
+    const { MapView, elements, record } = loadMapJs(mapFile);
+    MapView.init();
+    MapView.update(buildSnapshot(0, false));
+
+    const results = [];
+    const bg = MapView.bg;
+    const bgRecord = bg.canvas && bg.canvas.__record;
+    check(results, "the static world rasterizes into the offscreen cache",
+        !!bgRecord && bgRecord.strokes.length > 0,
+        "the cache is " + (bgRecord
+            ? "holding " + bgRecord.strokes.length + " grid strokes"
+            : "missing"));
+
+    const strokesBefore = bgRecord.strokes.length;
+    const blitsBefore = record.blits.length;
+    const fillsBefore = record.fills.length;
+    MapView.draw();
+    check(results, "a steady frame re-strokes no static geometry",
+        bgRecord.strokes.length === strokesBefore,
+        (bgRecord.strokes.length - strokesBefore) + " new strokes");
+    check(results, "a steady frame composites the cache once",
+        record.blits.length === blitsBefore + 1,
+        (record.blits.length - blitsBefore) + " blits");
+    check(results, "the dynamic units still paint on every frame",
+        record.fills.length > fillsBefore,
+        "the unit fills went " + fillsBefore + " -> " + record.fills.length);
+
+    // Pan the free camera inside the slack box: no re-raster, the
+    // blit offset tracks the camera (the world slides opposite to it).
+    elements.get("follow").checked = false;
+    MapView.syncPanAnchor();
+    const lastBlit = record.blits[record.blits.length - 1];
+    MapView.panAnchor.x += 200;
+    MapView.draw();
+    check(results, "a pan inside the slack re-rasters nothing",
+        bgRecord.strokes.length === strokesBefore,
+        (bgRecord.strokes.length - strokesBefore) + " new strokes");
+    const panned = record.blits[record.blits.length - 1];
+    check(results, "the blit offset follows the camera",
+        Math.abs((panned[5] - lastBlit[5]) + 200 * MapView.scale) <= 1,
+        "the blit dx moved " + (panned[5] - lastBlit[5])
+            + " instead of " + (-200 * MapView.scale).toFixed(2));
+
+    // A zoom changes the raster key: the cache re-renders.
+    MapView.zoom(1.5);
+    check(results, "a zoom re-rasters the cache",
+        bgRecord.strokes.length > strokesBefore,
+        (bgRecord.strokes.length - strokesBefore) + " new strokes");
+
+    return results;
+}
+
 function main() {
     const args = process.argv.slice(2);
     const verbose = args.includes("--verbose");
@@ -860,7 +940,8 @@ function main() {
         ["resting marker", runScenarioRestMarker(mapFile)],
         ["hunting zone", runScenarioHuntingZone(mapFile)],
         ["hunt zones view", runScenarioHuntZonesView(mapFile)],
-        ["fps meter", runScenarioFpsMeter(mapFile)]
+        ["fps meter", runScenarioFpsMeter(mapFile)],
+        ["background cache", runScenarioBackgroundCache(mapFile)]
     ];
     let failed = 0;
     for (const [name, results] of scenarios) {

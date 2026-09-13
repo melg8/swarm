@@ -117,7 +117,11 @@ function makeElementStub(checked) {
         addEventListener: () => {},
         classList: {
             add: () => {}, remove: () => {}, toggle: () => {},
-            contains: () => false
+            // The map tab reads "active" to decide whether painting is
+            // worth it (redraw): this harness paints the map and
+            // asserts on the painted output, so the map is visibly
+            // on - the same stub every other map harness uses.
+            contains: () => true
         },
         style: {},
         textContent: "",

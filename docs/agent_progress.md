@@ -3891,3 +3891,51 @@ Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.
   movement, zone_hover, bot_switch, and the fps scenario on the new
   element), go test ./internal/swarm/webserver green, task fmt:check
   green, task lint:new clean.
+
+### Progress (commit: the chip relocation)
+
+- index.html: the #map-fps chip left the map wrap, the #foot-fps item
+  joined the app footer after "updated" (margin-left: auto pins it to
+  the right end); style.css swapped the .map-fps block for .foot-fps.
+- map.js: fpsChip resolves #foot-fps, the reading reads
+  "fps: N - draw X ms" and the idle sentinel "fps: idle".
+- tools/repro_map_render.js: the fps meter scenario follows the new
+  element and the new text format.
+- docs/webui.md: the fps meter paragraph describes the status bar
+  placement.
+
+### Progress (commit: the static world cache + the hidden tab guards)
+
+- map.js: the offscreen background cache (bg state, bgKey,
+  createBgCanvas, ensureBackground, renderBackground, blitBackground,
+  the bgMarginOfView/bgDevicePixels constants). The paint pipeline
+  blits the static world (tiles or geodata, the grid, the loaded zone
+  frame) and keeps the hunt zones and the kill marks per frame (their
+  labels are live data). The sandboxed harnesses fall back to the
+  direct static path when no real offscreen canvas exists.
+- map.js: the tile load handlers bump tileLoads and repaint through
+  redraw; refreshColors bumps colorsRev; resize stores viewDpr.
+- map.js: frame() stops the rAF loop while the map tab is hidden and
+  the data driven repaints (update, setKillMarks, resetBot, tile
+  loads, resize, theme flips) go through redraw() which skips the
+  hidden canvas.
+- tools/repro_bot_switch.js: the element stub classList.contains
+  flipped to true - the harness paints and asserts painted output,
+  so its map is semantically visible (the same stub the other map
+  harnesses use; the false default predates the visibility guards).
+- tools/repro_map_render.js: the canvas stub createElement, a
+  drawImage entry on the recording contexts and the new "background
+  cache" scenario (7 checks: the raster lands in the cache, a steady
+  frame adds no static strokes and exactly one blit, the units keep
+  painting, a pan inside the slack only shifts the blit, a zoom
+  re-rasters).
+- docs/webui.md: the render performance section documents the cache.
+
+### Verification
+
+- All eight harnesses pass (map_render with the background cache
+  scenario, movement, zone_hover, bot_switch, hud, stats, gear,
+  fight_ui); go test ./internal/swarm/webserver green; task fmt:check
+  green; task lint:new 0 issues.
+
+Status: done (2026-09-13).

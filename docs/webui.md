@@ -294,6 +294,27 @@ dozen 512px tiles per paint and is visually indistinguishable on
 - **A grabbed map skips hover hit testing**: the drag itself repaints
   on every mousemove; re-querying what sits under the cursor on top
   of it doubled the per event work.
+- **The static world renders from an offscreen cache**: the map or
+  geodata tiles, the grid and the loaded zone frame are camera-only
+  data, but the render loop repainted them on every animation frame
+  while anything moved - the open map cpu load. They now rasterize
+  once into an offscreen canvas anchored in world coordinates (one
+  viewport of slack around the view, the device resolution capped so
+  the raster stays in the tens of megabytes), and every frame
+  composites it with a single `drawImage` - a GPU side copy instead
+  of a per frame re-raster of dozens of scaled tiles. The cache
+  re-renders only on a zoom change, a layer toggle, a landed tile, a
+  theme flip, a resize, or the camera leaving the slack box (a
+  walking follow camera re-renders every half viewport of travel; a
+  drag re-renders every viewport). The blit offset snaps to whole
+  device pixels so the grid stays crisp at rest. The hunt zones and
+  the kill marks stay per frame on purpose: their labels carry the
+  live economy fields (the respawn countdown, the adena rate) and
+  the crosses fade with age - caching them would re-render per
+  snapshot and eat the win. While the map tab is hidden the render
+  loop stops and the data driven repaints (snapshots, kill polls,
+  tile loads) skip the hidden canvas; the next snapshot repaints
+  within one 300 ms poll.
 
 The **fps meter** makes the frame budget visible: the counter item at
 the right end of the status bar (the app footer, `#foot-fps`) shows the
