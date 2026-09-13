@@ -469,16 +469,7 @@ func (c *statsCollector) sampleBot(
 	info := read.info
 	packets := bot.Packets()
 
-	hpPct := int16(-1)
-	if info.MaxHP > 0 {
-		hpPct = int16(info.CurHP / info.MaxHP * 100.0)
-		if hpPct < 0 {
-			hpPct = 0
-		}
-		if hpPct > 100 {
-			hpPct = 100
-		}
-	}
+	hpPct := int16(hpPercentOf(info))
 	flags := uint8(0)
 	if info.Status == state.StatusOnline {
 		flags |= sampleOnline
@@ -491,20 +482,7 @@ func (c *statsCollector) sampleBot(
 	packetPs := c.botPacketRate(id, packets)
 	sample := botSampleOf(now, read, hpPct, flags, packetPs)
 	series := c.seriesFor(id, bot)
-	previous, hasPrevious := series.ring.last()
-	if hasPrevious && sample.level <= 0 {
-		carryGapSample(&sample, previous)
-	}
-	if !series.based && sample.level > 0 {
-		series.expBase = sample.exp
-		series.adenaBase = sample.adena
-		series.levelBase = sample.level
-		series.based = true
-	}
-	series.ring.append(sample)
-	if hasPrevious {
-		c.noteBotEventsLocked(series, now, sample, previous)
-	}
+	c.appendSampleLocked(series, now, sample)
 	expGained := int64(0)
 	if series.based {
 		expGained = sample.exp - series.expBase
@@ -525,6 +503,30 @@ func (c *statsCollector) sampleBot(
 			agg.tickSum += metrics.TickEMA
 			agg.tickCount++
 		}
+	}
+}
+
+// appendSampleLocked folds one packed sample into its series: a sample
+// that landed inside the reconnect gap carries the last known
+// character, the first valid sample anchors the series baselines and
+// the transition events of the sample gap note against the previous
+// sample. The caller must hold the collector lock.
+func (c *statsCollector) appendSampleLocked(
+	series *botSeries, now time.Time, sample botSample,
+) {
+	previous, hasPrevious := series.ring.last()
+	if hasPrevious && sample.level <= 0 {
+		carryGapSample(&sample, previous)
+	}
+	if !series.based && sample.level > 0 {
+		series.expBase = sample.exp
+		series.adenaBase = sample.adena
+		series.levelBase = sample.level
+		series.based = true
+	}
+	series.ring.append(sample)
+	if hasPrevious {
+		c.noteBotEventsLocked(series, now, sample, previous)
 	}
 }
 

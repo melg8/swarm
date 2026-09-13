@@ -32,7 +32,11 @@ const StatsTab = {
   selectedBot: "",
   sortKey: "kills",
   sortDir: -1,
-  lastRefreshAt: 0
+  lastRefreshAt: 0,
+  // The rendered event set: the signature of the last render and the
+  // ago label elements it owns (the keyed rendering of the events).
+  eventsSignature: null,
+  eventAgoEls: null
 };
 
 // ---------- formatting helpers ----------
@@ -122,8 +126,15 @@ function statsColor(name) {
 // ---------- chart engine ----------
 
 // drawStatsChart renders a time series chart onto a canvas element.
-// series: [{color: "blue", points: [[unixSec, value], ...], fill: bool}]
-// opts: {yLabel: format function, min: fixed y minimum, area: default fill}
+// series: [{color: "blue", points: [[unixSec, value], ...], fill: bool,
+//   right: bool, steps: bool}]
+// opts: {yLabel: format function, min: fixed y minimum, area: default fill,
+//   yRightLabel: label format of the right axis}
+//
+// A series with right: true scales against its own right hand axis
+// (the level steps of the experience chart - a small integer range
+// next to a large exp scale), steps: true draws the value staircase
+// that a held level reads as.
 function drawStatsChart(canvas, series, opts) {
   if (!canvas || !canvas.getContext) { return; }
   const ctx = canvas.getContext("2d");
@@ -138,18 +149,27 @@ function drawStatsChart(canvas, series, opts) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
 
+  const left = series.filter((s) => !s.right && s.points.length);
+  const right = series.filter((s) => s.right && s.points.length);
   const points = [];
   let minT = Infinity;
   let maxT = -Infinity;
   let minV = opts && opts.min !== undefined ? opts.min : Infinity;
   let maxV = -Infinity;
+  let minR = Infinity;
+  let maxR = -Infinity;
   for (const s of series) {
     for (const p of s.points) {
       points.push(p);
       if (p[0] < minT) { minT = p[0]; }
       if (p[0] > maxT) { maxT = p[0]; }
-      if (p[1] < minV) { minV = p[1]; }
-      if (p[1] > maxV) { maxV = p[1]; }
+      if (s.right) {
+        if (p[1] < minR) { minR = p[1]; }
+        if (p[1] > maxR) { maxR = p[1]; }
+      } else {
+        if (p[1] < minV) { minV = p[1]; }
+        if (p[1] > maxV) { maxV = p[1]; }
+      }
     }
   }
   if (!points.length || minT > maxT) {
@@ -164,9 +184,17 @@ function drawStatsChart(canvas, series, opts) {
   const padV = (maxV - minV) * 0.08;
   maxV += padV;
   if (minV > 0) { minV = Math.max(0, minV - padV); }
+  let minRv = minR;
+  let maxRv = maxR;
+  if (right.length) {
+    if (maxR === minR) { maxRv = minR + 1; }
+    const padR = (maxRv - minRv) * 0.1;
+    maxRv += padR;
+    if (minRv > 0) { minRv = Math.max(0, minRv - padR); }
+  }
 
   const padL = 42;
-  const padR = 8;
+  const padR = right.length ? 34 : 8;
   const padT = 8;
   const padB = 16;
   const plotW = Math.max(width - padL - padR, 10);
@@ -174,6 +202,7 @@ function drawStatsChart(canvas, series, opts) {
   const spanT = Math.max(maxT - minT, 1);
   const x = (t) => padL + ((t - minT) / spanT) * plotW;
   const y = (v) => padT + plotH - ((v - minV) / (maxV - minV)) * plotH;
+  const yR = (v) => padT + plotH - ((v - minRv) / (maxRv - minRv)) * plotH;
 
   // Grid: four horizontal lines with the y labels, three time ticks.
   ctx.strokeStyle = statsColor("grid");
@@ -191,6 +220,17 @@ function drawStatsChart(canvas, series, opts) {
     ctx.stroke();
     ctx.fillText(fmtY(v), padL - 5, yy + 3);
   }
+  if (right.length) {
+    // The right axis of the secondary series (the level scale of the
+    // experience chart): three compact labels bound to the series color.
+    const fmtR = (opts && opts.yRightLabel) || statsFmtCompact;
+    ctx.fillStyle = statsColor(right[0].color);
+    for (let i = 0; i <= 2; i++) {
+      const v = minRv + ((maxRv - minRv) * (2 - i)) / 2;
+      const yy = Math.round(yR(v)) + 0.5;
+      ctx.fillText(fmtR(v), width - 3, yy + 3);
+    }
+  }
   ctx.textAlign = "center";
   for (let i = 0; i <= 3; i++) {
     const t = minT + (spanT * i) / 3;
@@ -203,11 +243,12 @@ function drawStatsChart(canvas, series, opts) {
   // The series lines with an optional translucent area fill.
   for (const s of series) {
     if (!s.points.length) { continue; }
+    const sy = s.right ? yR : y;
     const fill = s.fill || (opts && opts.area);
-    if (fill) {
+    if (fill && !s.right) {
       ctx.beginPath();
       ctx.moveTo(x(s.points[0][0]), padT + plotH);
-      for (const p of s.points) { ctx.lineTo(x(p[0]), y(p[1])); }
+      for (const p of s.points) { ctx.lineTo(x(p[0]), sy(p[1])); }
       ctx.lineTo(x(s.points[s.points.length - 1][0]), padT + plotH);
       ctx.closePath();
       ctx.fillStyle = statsColor(s.color);
@@ -219,8 +260,17 @@ function drawStatsChart(canvas, series, opts) {
     ctx.beginPath();
     for (let i = 0; i < s.points.length; i++) {
       const px = x(s.points[i][0]);
-      const py = y(s.points[i][1]);
-      if (i === 0) { ctx.moveTo(px, py); } else { ctx.lineTo(px, py); }
+      const py = sy(s.points[i][1]);
+      if (i === 0) {
+        ctx.moveTo(px, py);
+      } else if (s.steps) {
+        // The staircase: the value holds until the next sample flips
+        // it (a level is exactly such a held value).
+        ctx.lineTo(px, sy(s.points[i - 1][1]));
+        ctx.lineTo(px, py);
+      } else {
+        ctx.lineTo(px, py);
+      }
     }
     ctx.strokeStyle = statsColor(s.color);
     ctx.lineWidth = 1.6;
@@ -313,6 +363,9 @@ function statsRenderFleetKpis(payload) {
       "relogins of the run"),
     statsKpiCard("experience gained", statsFmtCompact(fleet.expGained || 0),
       "net of the fleet"),
+    statsKpiCard("adena income", statsFmtCompact(fleet.adenaGained || 0),
+      fleet.adenaPerHour ? statsFmtCompact(fleet.adenaPerHour) + " / hour"
+        : "net of the fleet"),
     statsKpiCard("avg tick", statsFmtTick(fleet.avgTickMs) + " ms",
       "hunt loop cadence"),
     statsKpiCard("memory", statsFmtRate(process.heapMB) + " MB",
@@ -349,6 +402,9 @@ function statsRenderFleetCharts(payload) {
   ]);
   drawStatsChart(document.getElementById("chart-fleet-exp"), [
     { color: "blue", points: statsZipPairs(at, h.expGained), fill: true }
+  ]);
+  drawStatsChart(document.getElementById("chart-fleet-adena"), [
+    { color: "gold", points: statsZipPairs(at, h.adena), fill: true }
   ]);
   drawStatsChart(document.getElementById("chart-fleet-tick"), [
     { color: "violet", points: statsZipPairs(at, h.avgTickMs) }
@@ -392,6 +448,8 @@ const STATS_TABLE_COLUMNS = [
   { key: "killsPerHour", label: "kills/h", value: (b) => b.killsPerHour,
     num: true },
   { key: "expGained", label: "exp+", value: (b) => b.expGained, num: true },
+  { key: "adenaPerHour", label: "adena/h", value: (b) => b.adenaPerHour,
+    num: true },
   { key: "rejoins", label: "rejoins", value: (b) => b.rejoins, num: true },
   { key: "hitRate", label: "hit%", value: (b) =>
     b.swingsMade ? b.hitRate * 100 : null, num: true },
@@ -473,6 +531,8 @@ function statsBotRow(bot) {
       td.textContent = statsFmtRate(v);
     } else if (col.key === "hitRate") {
       td.textContent = statsFmtRate(v);
+    } else if (col.key === "adenaPerHour") {
+      td.textContent = v ? statsFmtCompact(v) : "—";
     } else if (col.key === "avgTickMs") {
       td.textContent = statsFmtTick(v);
     } else {
@@ -508,6 +568,8 @@ function statsRenderBotOptions(bots) {
 // statsSelectBot opens the detail view of a bot.
 function statsSelectBot(id) {
   StatsTab.selectedBot = id;
+  StatsTab.eventsSignature = null;
+  StatsTab.eventAgoEls = null;
   const panel = document.getElementById("stats-bot");
   if (panel) { panel.classList.remove("hidden"); }
   const select = document.getElementById("stats-bot-select");
@@ -522,6 +584,8 @@ function statsSelectBot(id) {
 function statsCloseBot() {
   StatsTab.selectedBot = "";
   StatsTab.botView = null;
+  StatsTab.eventsSignature = null;
+  StatsTab.eventAgoEls = null;
   const panel = document.getElementById("stats-bot");
   if (panel) { panel.classList.add("hidden"); }
   if (StatsTab.fleet) {
@@ -564,7 +628,13 @@ function statsRenderBotDetail(payload) {
       "blows aimed at the bot"),
     statsKpiCard("damage taken", statsFmtCompact(payload.damageTaken),
       "HP lost in total"),
-    statsKpiCard("adena", statsFmtCompact(payload.adena), "wallet"),
+    statsKpiCard("adena", statsFmtCompact(payload.adena),
+      payload.adenaGained
+        ? statsFmtCompact(payload.adenaGained) + " net · " +
+            (payload.adenaPerHour
+              ? statsFmtCompact(payload.adenaPerHour) + " / hour"
+              : "growing")
+        : "wallet"),
     statsKpiCard("avg tick", statsFmtTick(payload.avgTickMs) + " ms",
       "worst " + statsFmtTick(payload.maxTickMs) + " ms (1 min)"),
     statsKpiCard("packet rate", statsFmtRate(payload.packetRate) + " /s",
@@ -578,9 +648,18 @@ function statsRenderBotDetail(payload) {
 
   const h = payload.history || {};
   const at = h.at || [];
+  // The experience chart carries the level on its own right hand
+  // scale: the exp line grows linearly through the level ups (the
+  // C1 exp is cumulative, the sampler holds it through the relogin
+  // gaps) while the golden staircase marks every level gained or
+  // dropped.
   drawStatsChart(document.getElementById("chart-bot-exp"), [
-    { color: "blue", points: statsZipPairs(at, h.expGained), fill: true }
-  ]);
+    { color: "blue", points: statsZipPairs(at, h.expGained), fill: true },
+    {
+      color: "gold", points: statsZipPairs(at, h.level),
+      right: true, steps: true
+    }
+  ], { yRightLabel: (v) => "lvl " + Math.round(v) });
   drawStatsChart(document.getElementById("chart-bot-kd"), [
     { color: "green", points: statsZipPairs(at, h.kills) },
     { color: "red", points: statsZipPairs(at, h.deaths) }
@@ -588,8 +667,12 @@ function statsRenderBotDetail(payload) {
   drawStatsChart(document.getElementById("chart-bot-hp"), [
     { color: "red", points: statsZipPairs(at, h.hpPercent) }
   ], { min: 0 });
+  // The adena chart draws the wallet and the net gained line: the
+  // wallet dips when the bot buys its gear, the net line shows the
+  // pure income.
   drawStatsChart(document.getElementById("chart-bot-adena"), [
-    { color: "gold", points: statsZipPairs(at, h.adena) }
+    { color: "gold", points: statsZipPairs(at, h.adena), fill: true },
+    { color: "green", points: statsZipPairs(at, h.adenaGained) }
   ]);
   drawStatsChart(document.getElementById("chart-bot-tick"), [
     { color: "violet", points: statsZipPairs(at, h.avgTickMs) }
@@ -732,21 +815,36 @@ const STATS_EVENT_KINDS = {
   offline: () => ({ text: "left the world", tone: "gray" })
 };
 
-// statsRenderEvents renders the recent events of the bot.
+// statsRenderEvents renders the recent events of the bot. The event
+// list is rebuilt ONLY when the observed event set changes: the five
+// second poll cycle of a steady bot re-renders the same events over
+// and over, and a full DOM rebuild every cycle reads as a flicker
+// (the row elements blink, the hover state resets). While the set
+// holds, the ago labels refresh in place.
 function statsRenderEvents(events) {
   const box = document.getElementById("stats-events");
   if (!box) { return; }
+  const recent = events.slice(-40);
+  const signature = recent
+    .map((e) => e.atMs + ":" + e.kind + ":" + e.value)
+    .join("|");
+  if (signature === StatsTab.eventsSignature) {
+    statsUpdateEventAges();
+    return;
+  }
+  StatsTab.eventsSignature = signature;
   while (box.firstChild) { box.removeChild(box.firstChild); }
-  if (!events.length) {
+  StatsTab.eventAgoEls = [];
+  if (!recent.length) {
     const empty = document.createElement("div");
     empty.className = "stats-empty";
     empty.textContent = "no events recorded yet";
     box.appendChild(empty);
     return;
   }
-  const recent = events.slice(-40).reverse();
+  const ordered = recent.slice().reverse();
   const nowSec = Date.now() / 1000;
-  for (const event of recent) {
+  for (const event of ordered) {
     const render = STATS_EVENT_KINDS[event.kind] || null;
     const row = document.createElement("div");
     row.className = "stats-event";
@@ -763,11 +861,22 @@ function statsRenderEvents(events) {
     const ago = document.createElement("span");
     ago.className = "stats-event-ago";
     ago.textContent = statsFmtAgo(Math.max(0, nowSec - event.atMs / 1000));
+    StatsTab.eventAgoEls.push({ atMs: event.atMs, el: ago });
     row.appendChild(time);
     row.appendChild(chip);
     row.appendChild(text);
     row.appendChild(ago);
     box.appendChild(row);
+  }
+}
+
+// statsUpdateEventAges refreshes the ago labels of the rendered
+// events in place (the set itself did not change).
+function statsUpdateEventAges() {
+  const nowSec = Date.now() / 1000;
+  for (const entry of StatsTab.eventAgoEls || []) {
+    entry.el.textContent =
+      statsFmtAgo(Math.max(0, nowSec - entry.atMs / 1000));
   }
 }
 

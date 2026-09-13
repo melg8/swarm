@@ -38,15 +38,17 @@ const DEFAULT_STATS_JS = path.join(__dirname, "..", "internal", "swarm",
     "webserver", "web", "stats.js");
 
 // makeElement returns a DOM element stub recording the written
-// textContent and the child operations.
+// textContent and the child operations (the textContent setter counts
+// its writes so the harness can assert in place updates).
 function makeElement() {
-    return {
-        textContent: "",
+    let text = "";
+    const el = {
         style: {},
         value: "",
         checked: false,
         children: [],
         dataset: {},
+        textWrites: 0,
         appendChild: function (child) {
             this.children.push(child);
 
@@ -58,6 +60,11 @@ function makeElement() {
         },
         get firstChild() {
             return this.children[0] || null;
+        },
+        get textContent() { return text; },
+        set textContent(v) {
+            text = String(v);
+            el.textWrites++;
         },
         classList: {
             _classes: new Set(),
@@ -78,10 +85,13 @@ function makeElement() {
         clientWidth: 320,
         clientHeight: 130
     };
+
+    return el;
 }
 
 // makeCanvas returns a canvas stub whose 2d context records every
-// draw call.
+// draw call (the stroke calls carry the stroke style at stroke time,
+// so the harness can assert WHICH series drew).
 function makeCanvas() {
     const calls = [];
     const ctx = {
@@ -92,7 +102,7 @@ function makeCanvas() {
         closePath: () => calls.push(["close"]),
         moveTo: (...a) => calls.push(["move", ...a]),
         lineTo: (...a) => calls.push(["line", ...a]),
-        stroke: () => calls.push(["stroke"]),
+        stroke: () => calls.push(["stroke", ctx.strokeStyle]),
         fill: () => calls.push(["fill"]),
         fillRect: (...a) => calls.push(["rect", ...a]),
         fillText: (...a) => calls.push(["text", ...a]),
@@ -120,7 +130,8 @@ function fleetPayload() {
         },
         fleet: {
             registered: 1, online: 1, kills: 57, deaths: 2, rejoins: 1,
-            expGained: 43000, killsPerHour: 57, avgTickMs: 1.2,
+            expGained: 43000, adenaGained: 11162, killsPerHour: 57,
+            adenaPerHour: 11162, avgTickMs: 1.2,
             packetRate: 33.5, hitRate: 0.86
         },
         bots: [
@@ -133,6 +144,7 @@ function fleetPayload() {
                 swingsLanded: 258, swingsTaken: 120, hitRate: 0.86,
                 damageTaken: 4500.5, avgTickMs: 1.2, maxTickMs: 25.5,
                 packetRate: 33.5, hpPercent: 78.5, adena: 13162,
+                adenaGained: 11162, adenaPerHour: 11162,
                 uptimeSec: 3600, lastKillAgoSec: 5, lastDeathAgoSec: 1800
             },
             {
@@ -156,6 +168,7 @@ function fleetPayload() {
             killsPerMin: [0, 0.8, 0.5, 1.3, 1.1],
             deathsPerMin: [0, 0, 0.05, 0, 0.05],
             expGained: [0, 9000, 15000, 30000, 43000],
+            adena: [2000, 5000, 7000, 11000, 13162],
             avgTickMs: [1.1, 1.2, 1.0, 1.3, 1.2],
             packetRate: [30, 33, 0, 35, 33.5],
             heapMB: [10, 11, 12, 12.4, 12.5],
@@ -175,7 +188,8 @@ function botPayload() {
         deaths: 2, kd: 28.5, killsPerHour: 57, deathsPerHour: 2, sessions: 2,
         rejoins: 1, swingsMade: 300, swingsLanded: 258, swingsTaken: 120,
         hitRate: 0.86, damageTaken: 4500.5, avgTickMs: 1.2, maxTickMs: 25.5,
-        packetRate: 33.5, hpPercent: 78.5, adena: 13162, uptimeSec: 3600,
+        packetRate: 33.5, hpPercent: 78.5, adena: 13162,
+        adenaGained: 11162, adenaPerHour: 11162, uptimeSec: 3600,
         lastKillAgoSec: 5, lastDeathAgoSec: 1800,
         phases: [
             { phase: "engage", seconds: 1800 },
@@ -196,6 +210,7 @@ function botPayload() {
             level: [11, 11, 12, 12, 12],
             hpPercent: [-1, 90, 0, 60, 78.5],
             adena: [2000, 5000, 7000, 11000, 13162],
+            adenaGained: [0, 3000, 5000, 9000, 11162],
             kills: [0, 12, 20, 40, 57],
             deaths: [0, 0, 1, 1, 2],
             killsPerMin: [0, 0.8, 0.5, 1.3, 1.1],
@@ -255,7 +270,9 @@ function loadStatsJs(statsFile) {
         " close: typeof statsCloseBot === 'function'" +
         " ? statsCloseBot : undefined," +
         " setWindow: typeof statsSetWindow === 'function'" +
-        " ? statsSetWindow : undefined };",
+        " ? statsSetWindow : undefined," +
+        " renderEvents: typeof statsRenderEvents === 'function'" +
+        " ? statsRenderEvents : undefined };",
         sandbox);
 
     return { stats: sandbox.__stats, elements, canvasIds, fetches, timers };
@@ -321,14 +338,30 @@ async function main() {
     const tbody = table.children[1];
     const headerCells = thead ? thead.children[0].children.length : 0;
     check(results, "bots table builds the header and rows",
-        table.children.length === 2 && !!tbody && headerCells === 14 &&
+        table.children.length === 2 && !!tbody && headerCells === 15 &&
         tbody.children.length === 2,
-        "expected thead with 14 columns and two rows, got " +
+        "expected thead with 15 columns and two rows, got " +
         table.children.length + " sections, " + headerCells +
         " columns, " + (tbody ? tbody.children.length : 0) + " rows");
     const options = elements.get("stats-bot-select").children;
     check(results, "bot selector lists every bot",
         options.length === 3, "expected three options (placeholder + 2)");
+
+    // The fleet adena income KPI card and the fleet adena chart.
+    const kpiTexts = [];
+    for (const card of elements.get("stats-kpis").children) {
+        kpiTexts.push(card.children[0].textContent + "|" +
+            card.children[1].textContent + "|" +
+            (card.children[2] ? card.children[2].textContent : ""));
+    }
+    check(results, "fleet adena income KPI renders",
+        kpiTexts.some((t) => t.indexOf("adena income|") === 0) &&
+        kpiTexts.some((t) => t.indexOf("/ hour") >= 0),
+        "no adena income card with the per hour sub line");
+    check(results, "fleet adena chart draws",
+        elements.get("chart-fleet-adena")
+            .getContext("2d")._calls.length > 4,
+        "the fleet adena canvas saw no drawing");
 
     // The updated clock.
     check(results, "update clock reports",
@@ -347,6 +380,18 @@ async function main() {
     check(results, "bot KPI cards render",
         elements.get("stats-bot-kpis").children.length >= 10,
         "expected at least ten bot KPI cards");
+    check(results, "bot adena income sub line renders",
+        (function () {
+            for (const card of elements.get("stats-bot-kpis").children) {
+                if (card.children[0].textContent === "adena" &&
+                    card.children[2] &&
+                    card.children[2].textContent.indexOf("/ hour") >= 0) {
+                    return true;
+                }
+            }
+            return false;
+        })(),
+        "the adena card carries no net and per hour sub line");
     check(results, "bot events render",
         elements.get("stats-events").children.length === 5,
         "expected five event rows, got " +
@@ -357,6 +402,65 @@ async function main() {
     check(results, "phase timeline draws",
         elements.get("bot-phase-strip").getContext("2d")._calls.length > 4,
         "the phase strip saw no drawing");
+
+    // The experience chart carries the level staircase on its own
+    // right hand scale: the gold series strokes and the lvl labels.
+    const expCalls = elements.get("chart-bot-exp").getContext("2d")._calls;
+    const goldStrokes = expCalls.filter((c) =>
+        c[0] === "stroke" && c[1] === "#9a6700").length;
+    const blueStrokes = expCalls.filter((c) =>
+        c[0] === "stroke" && c[1] === "#0969da").length;
+    const lvlLabels = expCalls.filter((c) =>
+        c[0] === "text" && typeof c[1] === "string" &&
+        c[1].indexOf("lvl") === 0).length;
+    check(results, "exp chart draws the exp line and the level staircase",
+        blueStrokes > 0 && goldStrokes > 0,
+        "expected the blue exp line and the gold level line, got " +
+        blueStrokes + " blue and " + goldStrokes + " gold strokes");
+    check(results, "exp chart labels the right level scale",
+        lvlLabels > 0,
+        "no lvl labels on the right axis");
+
+    // The adena chart draws the wallet and the net gained line.
+    const adenaCalls = elements.get("chart-bot-adena")
+        .getContext("2d")._calls;
+    check(results, "adena chart draws the wallet and the net line",
+        adenaCalls.filter((c) => c[0] === "stroke" && c[1] === "#9a6700")
+            .length > 0 &&
+        adenaCalls.filter((c) => c[0] === "stroke" && c[1] === "#1a7f37")
+            .length > 0,
+        "expected the gold wallet line and the green net line");
+
+    // The events re-render keeps the DOM while the set holds: the
+    // poll cycle of a steady bot must not rebuild the rows.
+    if (typeof stats.renderEvents !== "function") {
+        check(results, "events render is exposed", false,
+            "statsRenderEvents is not reachable in the sandbox");
+    } else {
+        const eventsBox = elements.get("stats-events");
+        const rowsBefore = eventsBox.children.slice();
+        const agoWrites = rowsBefore.map((row) =>
+            row.children[row.children.length - 1].textWrites);
+        stats.renderEvents(botPayload().events);
+        const rowsAfter = eventsBox.children;
+        check(results, "events re-render keeps the rows",
+            rowsAfter.length === rowsBefore.length &&
+            rowsBefore.every((el, i) => el === rowsAfter[i]),
+            "the unchanged event set rebuilt the DOM");
+        check(results, "events re-render refreshes the ago labels",
+            rowsAfter.length === agoWrites.length &&
+            rowsAfter.every((row, i) =>
+                row.children[row.children.length - 1].textWrites >
+                agoWrites[i]),
+            "the ago labels did not refresh in place");
+        const grown = botPayload().events.slice();
+        grown.push({ atMs: 1770000100000, kind: "kill", value: 1 });
+        stats.renderEvents(grown);
+        check(results, "a new event rebuilds the list",
+            eventsBox.children.length === rowsBefore.length + 1,
+            "expected one more row after a new event, got " +
+            eventsBox.children.length);
+    }
 
     // The window switch refetches with the new parameter.
     stats.setWindow(3600);
