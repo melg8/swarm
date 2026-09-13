@@ -3608,11 +3608,18 @@ logging gaps closed.
 
 ### Verification
 
-- go build, go vet: clean; the hunt, session, state and cmd suites
-  green (the new longrun_repro_test.go pins every fix against the
-  observed journal numbers).
-- Live E2E against the deployed stack: pending (the Mobius clone of
-  the deploy is still downloading).
+- go build, go vet: clean; the FULL suite green (the new
+  longrun_repro_test.go pins every fix against the observed journal
+  numbers), golangci-lint run --new: 0 issues.
+- The stack deployed per the mandatory first step (STACK_READY, the
+  three ports listening, 75 tables) and the E2E answered E2E_OK.
+- Live: a 150 s hunt run against the stack demonstrated the fixes end
+  to end - the honest lost record ("Bot failed: emergency logout: HP
+  50% under attack"), the structured logout event in the journal, the
+  fresh fight clocks (23 s, 18 s, 9 s, 15 s per kill instead of the
+  accumulating clock) and the kill positions in the drill-down.
+
+Status: done (2026-09-13). Commits 33c75ee..a3352f0.
 ## Active task: the memory leak hunt + the memory logging (owner-direct)
 
 Started: 2026-09-13 06:05 UTC. Branch: `feature/proxy-server`.
