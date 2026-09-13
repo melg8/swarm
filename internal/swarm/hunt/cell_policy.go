@@ -11,25 +11,28 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The cell policy: the decision core of the Voronoi cell hunting.
-// The hunter holds ONE cell (the convex polygon is the target leash,
-// the inscribed patrol square keeps the character on the ground),
-// reads the emptiness of the cell through the level window of the
-// engage, predicts the respawns of the kills it made and decides
-// between waiting (the respawn comes back before any walk could
-// reach an equivalent ground), drifting to the predicted respawn
-// position (corpse camping) and rotating to a NEIGHBOR cell (the
-// adjacency graph of the partition: the moves stay local, the walks
-// short). The rotation is paced by the respawn RIPENESS: a cell the
-// hunter cleared at T is unripe until T + its respawn window, so the
-// picker never walks back into a ground that holds nothing - the
-// depletion/oversaturation cycle of the circle geometry cannot build
-// (every spawn point of the ground belongs to exactly one cell, the
-// partition owns the whole respawn area). The far relocation fires
-// only when the level window empties the whole neighborhood. The
-// manual ground selection of the web UI is gone: the registry of a
-// full project grows past a thousand cells, a hand-switched list is
-// meaningless - the economy owns the rotation.
+// The cell policy: the decision core of the hexagon cell hunting.
+// The hunter holds ONE hexagon (the convex polygon is the ground
+// leash, the inscribed patrol square keeps the character anchored),
+// reads the emptiness of the KNOWNLIST through the level window (the
+// free-roam hunt fights the nearest visible enemy wherever it
+// stands - a ground holds nothing worth staying for only when
+// nothing at all is pickable in sight), predicts the respawns of
+// the kills it made and decides between waiting (the respawn comes
+// back before any walk could reach an equivalent ground), drifting
+// to the predicted respawn position (corpse camping) and rotating
+// to a NEIGHBOR hexagon (the hex grid ring: the moves stay local,
+// the walks short). The rotation is paced by the respawn RIPENESS:
+// a ground the hunter cleared at T is unripe until T + its respawn
+// window, so the picker never walks back into a ground that holds
+// nothing - the depletion/oversaturation cycle of the circle
+// geometry cannot build (every spawn point of the ground belongs to
+// exactly one hexagon, the uniform grid owns the whole respawn
+// area). The far relocation fires only when the level window
+// empties the whole neighborhood. The manual ground selection of
+// the web UI is gone: the registry of a full project grows past a
+// thousand cells, a hand-switched list is meaningless - the economy
+// owns the rotation.
 
 // The decision constants of the cell policy.
 const (
@@ -87,7 +90,13 @@ const (
     // huntMeshVersion identifies the registry payload the web client
     // caches: the version changes only when the registry changes (a
     // regeneration or a region switch), the client refetches then.
-    huntMeshVersion = "elven-cells-1"
+    huntMeshVersion = "elven-hexes-1"
+    // cellFollowPeriod paces the follow-ground switch: the free-roam
+    // hunt crosses the hexagon boundaries chasing the nearest visible
+    // enemy, and the held hexagon tracks the actual fight ground - a
+    // boundary fight must not ping-pong the registry, the switch
+    // fires at most once per period.
+    cellFollowPeriod = 10 * time.Second
 )
 
 // cellHunter is the cell mode state of one hunt loop: the held cell,
@@ -98,6 +107,10 @@ type cellHunter struct {
     // the held cell (-1 before the first pick).
     cells  []Cell
     picked int
+    // leashes caches the convex polygon of every cell of the
+    // registry (the ground scans resolve the containing hexagon
+    // without rebuilding the vertex slices per lookup).
+    leashes []*state.CellZone
     // hub shares the cell occupancy with the fleet, leave releases
     // the claim of the current cell.
     hub   *cellHub
@@ -109,6 +122,9 @@ type cellHunter struct {
     // precomputed static danger share per cell.
     metrics []cellMetric
     aggro   []float64
+    // followAt paces the follow-ground switch (the held hexagon
+    // tracks the ground the fight actually runs on).
+    followAt time.Time
     // enteredAt marks when the current stay began (the minimum stay
     // floors of the switch decisions).
     enteredAt time.Time
@@ -155,10 +171,14 @@ type cellHunter struct {
 // newCellHunter creates the cell mode state for a registry.
 func newCellHunter(cells []Cell, hub *cellHub) *cellHunter {
     hunter := &cellHunter{ //nolint:exhaustruct_v5 // session fields start zero
-        cells:  cells,
-        picked: -1,
-        hub:    hub,
-        leave:  nil,
+        cells:   cells,
+        picked:  -1,
+        hub:     hub,
+        leave:   nil,
+        leashes: make([]*state.CellZone, len(cells)),
+    }
+    for index := range cells {
+        hunter.leashes[index] = cells[index].targetZone()
     }
     hunter.metrics = make([]cellMetric, len(cells))
     hunter.aggro = make([]float64, len(cells))
@@ -264,6 +284,7 @@ func (l *Loop) cellEvaluate(now time.Time) {
         return
     }
     hunter.readSelf(l)
+    hunter.followGround(l, now)
     hunter.accumulate(l, now)
     hunter.publishView(l, now)
     hunter.waitOrRotate(l, now)
@@ -276,26 +297,85 @@ func (h *cellHunter) readSelf(l *Loop) {
     }
 }
 
+// groundOf resolves the registry index of the hexagon a world
+// position falls into (-1 outside every ground): the free-roam hunt
+// attributes the kills and the held ground by WHERE the action
+// happens, not by the stale held index. The scan over the convex
+// hexagons costs one containment test per cell - cheap at the call
+// cadence (a kill note, a paced follow check).
+func (h *cellHunter) groundOf(x int32, y int32) int {
+    for index := range h.leashes {
+        if h.leashes[index].Contains(x, y) {
+            return index
+        }
+    }
+
+    return -1
+}
+
+// followGround moves the held hexagon onto the ground the character
+// actually fights on: the free-roam hunt crosses the hexagon
+// boundaries chasing the nearest visible enemy, and the map
+// highlight, the metrics and the occupancy must track where the
+// fight really runs - not the ground the picker held when the roam
+// started. The fight target position drives the switch while a
+// fight runs (the mob stands in the hexagon the fight belongs to,
+// even when the character itself still straddles the boundary), the
+// character position otherwise. The switch respects the level
+// window (an outgrown ground never becomes the held one), the
+// starvation cooldown and the pacing floor - a boundary fight never
+// ping-pongs the registry. Every departure starts the ripeness
+// clock of the left ground, so the rotation returns exactly when
+// its respawn refilled it.
+func (h *cellHunter) followGround(l *Loop, now time.Time) {
+    if h.picked < 0 || !h.selfKnown {
+        return
+    }
+    if !h.followAt.IsZero() && now.Sub(h.followAt) < cellFollowPeriod {
+        return
+    }
+    x, y := h.selfX, h.selfY
+    if l.target != 0 {
+        if tx, ty, _, ok := l.tracker.ObjectPosition(l.target); ok {
+            x, y = tx, ty
+        }
+    }
+    ground := h.groundOf(x, y)
+    if ground < 0 || ground == h.picked {
+        return
+    }
+    if !cellEligible(h.cells[ground], h.level) ||
+        h.starveCoolingDown(h.cells[ground].ID, now) ||
+        !cellDelevelSafe(h.cells[ground], h.level) {
+        return
+    }
+    h.followAt = now
+    left := h.cells[h.picked].Name
+    h.foldVisit(h.picked)
+    h.markCleared(h.cells[h.picked].ID, now)
+    h.apply(l, ground, now)
+    l.logger.Printf("Hunt: the fight crossed into %s (was %s), "+
+        "following the ground", h.cells[ground].Name, left)
+}
+
 // standingGround resolves the hunting cell the character stands on
 // after a fresh login: the relogin handoff of the cell economy. The
 // ground counts as standing ground while the position falls inside
-// the cell polygon (the exact Voronoi assignment - the cell OWNS the
+// the cell polygon (the exact grid assignment - the cell OWNS the
 // ground the character stands on) and the cell stays inside the
 // level window of the character (an outgrown ground never resumes).
 // A character that logs in between the cells (a relogin mid-walk)
 // falls through to the scored pick.
 func (h *cellHunter) standingGround(x int32, y int32) (int, bool) {
-    for index := range h.cells {
-        cell := h.cells[index]
-        if !cellEligible(cell, h.level) {
-            continue
-        }
-        if cell.targetZone().Contains(x, y) {
-            return index, true
-        }
+    ground := h.groundOf(x, y)
+    if ground < 0 {
+        return -1, false
+    }
+    if !cellEligible(h.cells[ground], h.level) {
+        return -1, false
     }
 
-    return -1, false
+    return ground, true
 }
 
 // releaseClaim drops the fleet occupancy claim of the current cell:
@@ -606,7 +686,10 @@ func (h *cellHunter) foldVisit(index int) {
 // death place), the respawn window of the species bounds WHEN. The
 // record feeds the wait-or-rotate economy and the kill centroid EMA
 // of the map view (the dynamic focus: the patrol drifts toward the
-// ground the character actually farms).
+// ground the character actually farms). The kill attributes to the
+// hexagon the CORPSE lies on - the free-roam hunt fights across the
+// boundaries and the held index is not necessarily the ground the
+// mob died on.
 func (l *Loop) cellNoteKill(objectID int32, now time.Time) {
     h := l.cell
     if h == nil || h.picked < 0 {
@@ -618,14 +701,18 @@ func (l *Loop) cellNoteKill(objectID int32, now time.Time) {
         // it died at the character's feet.
         x, y = h.selfX, h.selfY
     }
+    ground := h.groundOf(x, y)
+    if ground < 0 {
+        ground = h.picked
+    }
     wire := l.tracker.ObjectTemplateID(objectID)
     rmin, rmax, found := cellMobRespawn(h.cells, wire)
     if !found {
-        cell := h.cells[h.picked]
+        cell := h.cells[ground]
         rmin, rmax = cell.RespawnMin, cell.RespawnMax
     }
     mid := time.Duration(rmin+rmax) * time.Second / 2
-    cell := h.cells[h.picked]
+    cell := h.cells[ground]
     h.kills = append(h.kills, killRecord{
         cellID: cell.ID, x: x, y: y, at: now,
         respawnAt: now.Add(mid),
@@ -634,7 +721,7 @@ func (l *Loop) cellNoteKill(objectID int32, now time.Time) {
     if len(h.kills) > cellKillLogCap {
         h.kills = h.kills[len(h.kills)-cellKillLogCap:]
     }
-    metric := &h.metrics[h.picked]
+    metric := &h.metrics[ground]
     metric.visitKills++
     if !metric.killPosKnown {
         metric.killX, metric.killY = float64(x), float64(y)
@@ -714,17 +801,23 @@ func (h *cellHunter) accumulate(l *Loop, now time.Time) {
 }
 
 // waitOrRotate is the economy between the fights: a pickable mob
-// inside the level window always wins (the engage takes it), a
-// predicted respawn within the patience window beats every walk (the
-// hunter drifts to the corpse position), and only a starved or
-// clearly outscored ground rotates to the neighbor. The guards
-// mirror the zone rotation: only a targetless, healthy, in-leash,
-// central engage phase reads the emptiness at all - running fights,
-// resting walks and town trips never rotate.
+// visible ANYWHERE in the knownlist always wins (the engage takes
+// it - the free-roam hunt does not fence the pick on the held
+// hexagon), a predicted respawn within the patience window beats
+// every walk (the hunter drifts to the corpse position), and only a
+// knownlist that holds NOTHING pickable at all lets the economy
+// decide between waiting out the respawn and rotating to the
+// neighbor. The guards mirror the zone rotation: only a targetless,
+// healthy, standing engage phase reads the emptiness at all -
+// running fights, resting walks and town trips never rotate. The
+// reading runs UNFENCED (the whole knownlist through the level
+// window): a mob of the neighbor hexagon the character already sees
+// is not emptiness, the bot walks and fights it - a ground counts as
+// zero-enemy only when nothing at all is in sight, and moving there
+// is the last resort of the economy.
 func (h *cellHunter) waitOrRotate(l *Loop, now time.Time) {
     if l.phase != phaseEngage || l.target != 0 || l.tripActive() ||
-        l.tracker.SelfUnderAttack() || l.tracker.SelfSitting() ||
-        !l.inZoneSelf() {
+        l.tracker.SelfUnderAttack() || l.tracker.SelfSitting() {
         h.emptySince = time.Time{}
 
         return
@@ -734,16 +827,7 @@ func (h *cellHunter) waitOrRotate(l *Loop, now time.Time) {
     if !ok {
         return
     }
-    // The emptiness reading is only trustworthy while the character
-    // stands central: the patrol walk brings it to the focus first,
-    // the far corners of the ground read empty from the edges of the
-    // knownlist.
-    if cellDistance(cell, selfX, selfY) > float64(cell.PatrolHalf) {
-        h.emptySince = time.Time{}
-
-        return
-    }
-    if l.tracker.ZoneHasPickableWindowed(h.leash,
+    if l.tracker.ZoneHasPickableWindowed(nil,
         h.windowFloor(), l.maxTargetLevel(), l.activeSkips(now)) {
         h.emptySince = time.Time{}
 

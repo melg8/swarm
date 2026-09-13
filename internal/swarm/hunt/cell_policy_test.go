@@ -467,3 +467,152 @@ func TestCellMobPrioritiesBiasWindow(t *testing.T) {
     // window (the floor is 5) - no priority at all.
     require.Empty(t, cellMobPriorities(cells[0], 13))
 }
+
+// TestCellPickTakesVisibleEnemyOutsideHeldCell pins the free-roam
+// pick: a windowed enemy standing INSIDE the neighbor ground (outside
+// the held hexagon polygon) is picked and attacked anyway - the hunt
+// never rigidly binds the fights to the held cell, the nearest
+// visible enemy owns the next fight wherever it stands.
+func TestCellPickTakesVisibleEnemyOutsideHeldCell(t *testing.T) {
+    loop, game, _ := pickedCellLoop(t)
+    bot := loop.tracker
+    // The enemy stands 1388 units east of the character - inside the
+    // rich neighbor polygon, far outside the home hexagon.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 300, TemplateID: 1000001, Attackable: true,
+        X: 47500, Y: 41500, Name: "Neighbor Gremlin",
+    })
+    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.tick()
+    require.Equal(t, int32(300), loop.target,
+        "the pick takes the visible enemy outside the held hexagon")
+    require.Contains(t, game.forces, int32(300),
+        "the attack request fires on the out-of-ground enemy")
+}
+
+// TestCellFollowGroundSwitch pins the follow switch: the fight
+// crosses the hexagon boundary and the held ground follows it - the
+// map highlight, the metrics and the occupancy track where the fight
+// actually runs. The left ground starts its ripeness clock.
+func TestCellFollowGroundSwitch(t *testing.T) {
+    loop, game, hunter := pickedCellLoop(t)
+    bot := loop.tracker
+    now := time.Now()
+    // A living fight target stands on the rich neighbor ground.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 300, TemplateID: 1000001, Attackable: true,
+        X: 47712, Y: 41500, Name: "Neighbor Gremlin",
+    })
+    loop.target = 300
+    loop.cellEvaluate(now)
+    require.Equal(t, "test-rich", loop.zonePickedID,
+        "the held ground follows the fight into the neighbor")
+    require.Equal(t, 1, globalCellHub.occupancy("test-rich"))
+    require.Equal(t, 0, globalCellHub.occupancy("test-home"))
+    // The left ground starts its ripeness clock: the rotation holds
+    // off until its respawn window passed.
+    require.False(t, hunter.ripe(hunter.cells[0], now))
+    require.True(t, hunter.ripe(hunter.cells[0],
+        now.Add(21*time.Second)))
+    // The pacing floor holds the registry: an immediate re-crossing
+    // of the boundary does not flip the held ground back.
+    bot.ApplyPlacement(state.Placement{
+        ObjectID: 100, X: 46900, Y: 41500, Z: -3400,
+    })
+    hunter.readSelf(loop)
+    loop.cellEvaluate(now.Add(2 * time.Second))
+    require.Equal(t, "test-rich", loop.zonePickedID,
+        "the follow switch respects the pacing floor")
+    _ = game
+}
+
+// TestCellOutGroundEnemiesKeepTheHunt pins the enemy-first engage
+// gate: a character outside its held hexagon that SEES a windowed
+// enemy keeps hunting it instead of walking home - only a knownlist
+// with nothing pickable at all walks the character back.
+func TestCellOutGroundEnemiesKeepTheHunt(t *testing.T) {
+    loop, game, _ := pickedCellLoop(t)
+    bot := loop.tracker
+    // The character stands past every ground of the mesh with an
+    // enemy in sight.
+    bot.ApplyPlacement(state.Placement{
+        ObjectID: 100, X: 49500, Y: 41500, Z: -3400,
+    })
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 300, TemplateID: 1000001, Attackable: true,
+        X: 49600, Y: 41500, Name: "Roam Gremlin",
+    })
+    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.tick()
+    require.Equal(t, phaseEngage, loop.phase,
+        "the hunt keeps running outside the ground")
+    require.Contains(t, game.forces, int32(300),
+        "the visible enemy is engaged, not walked away from")
+}
+
+// TestCellOutGroundWalksHomeWhenNothingVisible pins the last resort:
+// a character outside its held hexagon with NOTHING pickable in sight
+// walks home - moving toward a zero-enemy ground happens only when no
+// enemy stands visible anywhere.
+func TestCellOutGroundWalksHomeWhenNothingVisible(t *testing.T) {
+    loop, game, _ := pickedCellLoop(t)
+    bot := loop.tracker
+    bot.ApplyPlacement(state.Placement{
+        ObjectID: 100, X: 49500, Y: 41500, Z: -3400,
+    })
+    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.tick()
+    require.Empty(t, game.forces, "nothing is engaged")
+    require.NotEmpty(t, game.walks,
+        "the zero-enemy last resort walks the character home")
+    require.True(t, loop.zoneReturn, "the return leg armed")
+}
+
+// TestCellKillAttributesToTheGroundOfTheCorpse pins the free-roam
+// kill attribution: a kill that happened inside the NEIGHBOR ground
+// (the fight crossed the boundary) feeds the respawn overlay, the
+// visit kills and the kill centroid EMA of the ground the corpse
+// lies on - not the stale held cell.
+func TestCellKillAttributesToTheGroundOfTheCorpse(t *testing.T) {
+    loop, _, hunter := pickedCellLoop(t)
+    bot := loop.tracker
+    now := time.Now()
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 300, TemplateID: npcdata.NPCWireTemplateID(20014),
+        Attackable: true, X: 47712, Y: 41500, Name: "Neighbor Wolf",
+    })
+    loop.cellNoteKill(300, now)
+    require.NotEmpty(t, hunter.kills)
+    require.Equal(t, "test-rich", hunter.kills[0].cellID,
+        "the kill record belongs to the ground of the corpse")
+    require.Equal(t, 1, hunter.metrics[1].visitKills,
+        "the visit kills count on the neighbor ground")
+    require.True(t, hunter.metrics[1].killPosKnown)
+    require.InDelta(t, 47712.0, hunter.metrics[1].killX, 0.01)
+    require.Equal(t, 0, hunter.metrics[0].visitKills,
+        "the stale held ground counts no kill")
+}
+
+// TestCellRotationHoldsWhileEnemiesVisible pins the unfenced
+// emptiness reading: mobs visible in the NEIGHBOR ground from the
+// current position keep the economy quiet - the engage owns them
+// (the far walk goes there), the rotation to a zero-enemy ground
+// never fires while any enemy stands in sight.
+func TestCellRotationHoldsWhileEnemiesVisible(t *testing.T) {
+    loop, _, hunter := pickedCellLoop(t)
+    bot := loop.tracker
+    now := time.Now()
+    // A windowed mob of the rich neighbor stands in sight; the held
+    // home ground itself holds nothing.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 300, TemplateID: 1000001, Attackable: true,
+        X: 47500, Y: 41500, Name: "Neighbor Gremlin",
+    })
+    hunter.emptySince = now.Add(-5 * time.Second)
+    hunter.enteredAt = now.Add(-10 * time.Minute)
+    loop.cellEvaluate(now)
+    require.Equal(t, "test-home", loop.zonePickedID,
+        "a visible enemy keeps the economy quiet - no rotation")
+    require.True(t, hunter.emptySince.IsZero(),
+        "the emptiness reading resets while enemies are visible")
+}

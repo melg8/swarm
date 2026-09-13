@@ -433,6 +433,67 @@ func TestLoopLootsAfterKill(t *testing.T) {
     require.Equal(t, []int32{9}, game.pickups)
 }
 
+// TestLoopApproachesTheRangedKillAndLoots pins the ranged-kill loot
+// order: a mob shot down from a distance drops at its corpse - the
+// corpse sits far from the character and the drop broadcast can
+// trail the death packet. The loot phase records the kill position,
+// walks to the corpse while nothing is in sight, and picks the drop
+// up once it lands - never leaves the loot on the ground.
+func TestLoopApproachesTheRangedKillAndLoots(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.lastHit = time.Now().Add(-time.Minute)
+
+    // The mob dies at range: the corpse (46000, 50000) sits 1000
+    // units east of the character.
+    spawnMob(bot)
+    bot.ApplyStatusUpdate(7, []state.Attribute{
+        {ID: state.AttrCurHP, Value: 0},
+    })
+    bot.ApplySelfTarget(7)
+    loop.target = 7
+
+    loop.tick()
+    require.Equal(t, phaseLoot, loop.phase)
+    require.True(t, loop.killPosKnown, "the corpse position recorded")
+    require.Equal(t, int32(46000), loop.killX)
+    require.NotEmpty(t, game.walks,
+        "the corpse approach walk fires on the kill tick")
+
+    // The drop has not landed yet: the loot phase HOLDS (the corpse
+    // grace) instead of returning to the engage.
+    game.walks = nil
+    loop.lastHit = time.Now().Add(-2 * time.Second)
+    loop.lootMoveAt = time.Now().Add(-2 * time.Second)
+    loop.tick()
+    require.Equal(t, phaseLoot, loop.phase,
+        "the ranged kill holds the loot phase")
+    require.Empty(t, game.forces, "nothing is engaged mid-grace")
+
+    // The drop lands at the corpse: the search radius extends to it,
+    // the character walks there.
+    bot.ApplySpawnItem(state.ItemInfo{
+        ObjectID: 9, TemplateID: 57, X: 46000, Y: 50000, Z: -3500,
+    })
+    game.walks = nil
+    loop.lootMoveAt = time.Now().Add(-2 * time.Second)
+    loop.tick()
+    require.Equal(t, phaseLoot, loop.phase)
+    require.Equal(t, [][3]int32{{46000, 50000, -3500}}, game.walks,
+        "the walk runs to the drop at the corpse")
+
+    // The character arrives: the pickup fires.
+    bot.ApplyMovement(state.Movement{
+        ObjectID: 100, X: 46000, Y: 50000, Z: -3500,
+        DestX: 46000, DestY: 50000, DestZ: -3500,
+    })
+    loop.lootMoveAt = time.Now().Add(-2 * time.Second)
+    loop.tick()
+    require.Equal(t, []int32{9}, game.pickups,
+        "the drop of the ranged kill is picked up")
+}
+
 func TestLoopSkipsUnreachableLoot(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
@@ -886,14 +947,29 @@ func TestLoopSelectsNextTargetAfterKill(t *testing.T) {
     })
     bot.ApplySelfTarget(7)
 
-    // Loot finishes with no drops on the next ticks: the loop must
-    // select a new target instead of ping-ponging between the engage
-    // and loot phases around the stale dead selection. A second living
-    // mob stands by for the re-pick.
+    // A second living mob stands by for the re-pick.
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID: 8, TemplateID: 1000001, Attackable: true,
         X: 45900, Y: 50000, Name: "Second Gremlin",
     })
+
+    // The kill happened at RANGE (the corpse of the gremlin sits 1000
+    // units from the character - the fight never closed the distance
+    // in this fake world): the corpse grace walks the character to
+    // the drops instead of leaving them on the ground, so the loot
+    // phase holds and issues the approach leg.
+    loop.lastHit = time.Now().Add(-2 * time.Second)
+    loop.tick()
+    require.Equal(t, phaseLoot, loop.phase,
+        "a ranged kill holds the loot phase for the corpse walk")
+    require.NotEmpty(t, game.walks,
+        "the corpse approach walk fired toward the kill position")
+
+    // The grace window passes with no drops in sight: the loot
+    // finishes, the loop must select a new target instead of
+    // ping-ponging between the engage and loot phases around the
+    // stale dead selection.
+    loop.killAt = time.Now().Add(-lootKillGrace - time.Second)
     for range 3 {
         loop.lastHit = time.Now().Add(-2 * time.Second)
         loop.tick()

@@ -13,6 +13,32 @@ import (
     "time"
 )
 
+// The loot timing constants of the ranged-kill grace.
+const (
+    // lootKillGrace bounds how long the loot phase may hold after a
+    // kill whose corpse sits away from the character (the bow lure,
+    // the caster spells): the drops land at the corpse, their
+    // broadcast can trail the death packet, and the walk there costs
+    // seconds - the grace covers the approach and the broadcast lag
+    // instead of leaving the loot on the ground.
+    lootKillGrace = 15 * time.Second
+    // lootKillArriveGrace is the short hold AFTER the character
+    // reached the corpse: the drops that broadcast a moment behind
+    // the death packet still land within it, then the hunt resumes -
+    // a mob that dropped nothing never stalls the phase longer.
+    lootKillArriveGrace = 2 * time.Second
+    // lootKillApproachRadius is the distance that separates a melee
+    // kill from a ranged one: a corpse within it died at the
+    // character's feet (the melee range plus the scatter), a corpse
+    // beyond it died to a ranged shot or a spell - the character
+    // walks there and loots it instead of leaving the drops behind.
+    lootKillApproachRadius = 300.0
+    // lootKillSearchSlack widens the item search past the corpse
+    // distance: the drop broadcast lands the items at the corpse
+    // plus the scatter.
+    lootKillSearchSlack = 300.0
+)
+
 // restSittingHeld reports whether the resting logic still holds a
 // sitting character down: the health below the stand threshold, or a
 // caster whose mana has not recovered to the stand one yet.
@@ -94,6 +120,87 @@ func (l *Loop) rest() {
     l.restActionSit = wantSit
 }
 
+// noteKillPosition records where the killed mob died: the corpse
+// position of the target (the character position when the corpse
+// already vanished from the knownlist - it died at the feet). The
+// loot phase uses it for the ranged-kill grace walk: the drops land
+// at the corpse, and a mob shot down from a distance is approached
+// and looted, never left behind.
+func (l *Loop) noteKillPosition(objectID int32, now time.Time) {
+    l.killPosKnown = false
+    l.killWalked = false
+    l.killLooted = false
+    l.killAt = now
+    if x, y, z, ok := l.tracker.ObjectPosition(objectID); ok {
+        l.killX, l.killY, l.killZ = x, y, z
+        l.killPosKnown = true
+
+        return
+    }
+    if x, y, z, ok := l.tracker.SelfPosition(); ok {
+        l.killX, l.killY, l.killZ = x, y, z
+        l.killPosKnown = true
+    }
+}
+
+// killApproachWalk walks the looter to the corpse of a kill that
+// happened at range (the bow lure, the caster spell) and holds the
+// loot phase until the drops had their chance to land: the drops
+// spawn at the corpse and their broadcast can trail the death
+// packet, so the character walks there and the per tick item scan
+// picks up anything that appears on the way. A melee kill (the
+// corpse within lootKillApproachRadius) never holds the phase - the
+// ordinary scan radius already covers its drops. Reports whether
+// the loot phase stays held; false hands the phase back to the
+// engage (nothing more to loot).
+func (l *Loop) killApproachWalk() bool {
+    if !l.killPosKnown || l.killAt.IsZero() || l.killLooted {
+        return false
+    }
+    now := time.Now()
+    if now.Sub(l.killAt) > lootKillGrace {
+        // The grace expired: whatever dropped is on the ground
+        // within the scan radius or never dropped at all.
+        return false
+    }
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        // The position is unknown for a moment: hold the phase, the
+        // next tick retries.
+        return true
+    }
+    dist := math.Hypot(float64(l.killX-selfX), float64(l.killY-selfY))
+    if dist <= lootKillApproachRadius {
+        // A melee kill or the walk already arrived: the scan above
+        // covered the corpse radius, the drops either landed within
+        // it or never dropped. The arrival grace only holds for the
+        // approached corpses (the broadcast can trail the walk).
+        if !l.killWalked {
+            return false
+        }
+
+        return now.Sub(l.killAt) < lootKillArriveGrace
+    }
+    if now.Sub(l.lootMoveAt) < selectPeriod {
+        return true
+    }
+    l.killWalked = true
+    l.lootMoveAt = now
+    moveX, moveY := l.killX, l.killY
+    dx := float64(l.killX - selfX)
+    dy := float64(l.killY - selfY)
+    if dist > returnWalkLeg {
+        frac := returnWalkLeg / dist
+        moveX = int32(float64(selfX) + dx*frac)
+        moveY = int32(float64(selfY) + dy*frac)
+    }
+    if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
+        l.logf("Hunt: corpse approach walk failed: %v", err)
+    }
+
+    return true
+}
+
 // loot picks up the ground items around the character until none is left
 // within the loot radius, then hunts the next target. Farther items are
 // approached with an explicit walk first so the character visibly runs
@@ -102,10 +209,33 @@ func (l *Loop) rest() {
 // the drop often happens past the square line (the chase, the scatter
 // of the drop), and a drop left on the ground because a line on the
 // map crossed it is a pure loss - anything within the loot radius of
-// the character is picked up, wherever it lies.
+// the character is picked up, wherever it lies. The radius extends to
+// the corpse of the last kill (a mob shot down from a distance drops
+// at its corpse), and the corpse approach walk of the ranged kills
+// holds the phase until the drops land instead of leaving them behind.
 func (l *Loop) loot() {
-    item, ok := l.tracker.NearestGroundItemExcluding(lootRadius, l.skipped, nil)
+    radius := lootRadius
+    if l.killPosKnown {
+        if selfX, selfY, _, ok := l.tracker.SelfPosition(); ok {
+            dist := math.Hypot(
+                float64(l.killX-selfX), float64(l.killY-selfY))
+            if reach := dist + lootKillSearchSlack; reach > radius {
+                radius = reach
+            }
+        }
+    }
+    item, ok := l.tracker.NearestGroundItemExcluding(radius, l.skipped, nil)
+    if ok {
+        // A drop of the kill is in sight: the ordinary pickup flow
+        // owns the phase (the approach walk to it, the pickup
+        // request), the corpse grace stands down - the drops ARE
+        // being looted.
+        l.killLooted = true
+    }
     if !ok {
+        if l.killApproachWalk() {
+            return
+        }
         l.phase = phaseEngage
         l.target = 0
 

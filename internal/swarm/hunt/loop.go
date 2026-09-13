@@ -456,10 +456,23 @@ type Loop struct {
     delevelCounted    bool
     engageAt          time.Time
     targetSkip        map[int32]time.Time
-    // lure is the ranged luring state of the current pick (nil when
+    // The lure is the ranged luring state of the current pick (nil when
     // no lure runs): the melee answer to a covered target, see
     // lure.go.
     lure *lureState
+    // The corpse record of the last kill: the ranged kills (the bow
+    // lure, the caster spells) die far from the character, the drops
+    // land at the corpse and their broadcast can trail the death
+    // packet - the loot phase walks to the corpse and waits the grace
+    // window out instead of leaving the loot on the ground (see
+    // loop_actions.go).
+    killX        int32
+    killY        int32
+    killZ        int32
+    killAt       time.Time
+    killPosKnown bool
+    killWalked   bool
+    killLooted   bool
     // The blind engage recovery state (see loop_los.go): the armed
     // reposition walk, its planned geodata waypoints and the attempt
     // budget for the current target.
@@ -857,6 +870,13 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         engageAt:          time.Time{},
         targetSkip:        nil,
         lure:              nil,
+        killX:             0,
+        killY:             0,
+        killZ:             0,
+        killAt:            time.Time{},
+        killPosKnown:      false,
+        killWalked:        false,
+        killLooted:        false,
         questWalkAt:       time.Time{},
         questPotionAt:     time.Time{},
         questFightLogAt:   time.Time{},
@@ -1009,13 +1029,63 @@ func (l *Loop) zone() *state.Zone {
     return &state.Zone{CX: l.zoneCX, CY: l.zoneCY, Half: l.zoneHalf}
 }
 
+// pickZone returns the TARGET SEARCH FENCE of the engage: the cell
+// mode hunts the NEAREST VISIBLE enemy wherever it stands (nil - the
+// knownlist bounds the search, the hunt never rigidly binds the
+// fights to the held hexagon), the legacy zone mode keeps the
+// square leash. The far target walk and the targetless diagnostic
+// read the same fence.
+//
+//nolint:ireturn // nil and the square are both ZoneArea by design
+func (l *Loop) pickZone() state.ZoneArea {
+    if l.cell != nil {
+        return nil
+    }
+
+    return l.zone()
+}
+
+// onHeldGround reports whether the character stands on the held
+// hunting ground: the hexagon polygon in the cell mode (the
+// free-roam gate - the patrol square is the movement anchor, the
+// hexagon is the ground; the roam past the square but inside the
+// hexagon is ordinary hunting), the patrol square in the legacy
+// zone mode.
+func (l *Loop) onHeldGround() bool {
+    if l.cell != nil && l.cell.leash != nil {
+        x, y, _, ok := l.tracker.SelfPosition()
+
+        return !ok || l.cell.leash.Contains(x, y)
+    }
+
+    return l.inZoneSelf()
+}
+
+// cellEnemiesVisible reports whether the cell-mode hunt sees a
+// pickable enemy through the level window ANYWHERE in the knownlist:
+// the free-roam hunt keeps fighting wherever the enemies stand, so
+// the walk home only fires when nothing at all is visible (going to
+// a zero-enemy ground is the last resort). The legacy zone mode
+// keeps the strict return - the square leash owns the movement there.
+func (l *Loop) cellEnemiesVisible(now time.Time) bool {
+    if l.cell == nil {
+        return false
+    }
+
+    return l.tracker.ZoneHasPickableWindowed(nil,
+        l.minTargetLevel(), l.maxTargetLevel(), l.activeSkips(now))
+}
+
 // targetZone returns the TARGET LEASH of the loop: the convex
-// polygon of the held cell in the cell mode (the engage, the far
-// target search and the emptiness reading fence on the WHOLE cell -
-// the farm ground is the complete Voronoi ground, never a square
-// approximation of it), the movement square otherwise. The movement
-// machinery (the patrol, the return leg, the flee steps) keeps the
-// square zone() - the inscribed patrol square never leaves the cell.
+// polygon of the held cell in the cell mode (the emptiness reading
+// of the economy and the audit fence on the WHOLE hexagon - the
+// farm ground is the complete hexagon, never a square approximation
+// of it), the movement square otherwise. The movement machinery (the
+// patrol, the return leg, the flee steps) keeps the square zone() -
+// the inscribed patrol square never leaves the cell. The target
+// SEARCH itself runs unfenced in the cell mode (see pickZone) - the
+// hunt fights the nearest visible enemy even outside the held
+// hexagon.
 //
 //nolint:ireturn // the leash is polymorphic by design
 func (l *Loop) targetZone() state.ZoneArea {
@@ -1344,16 +1414,21 @@ func (l *Loop) recoverFromDeath() {
 //
 //nolint:cyclop,funlen,gocognit,maintidx
 func (l *Loop) engage() {
-    // The hunting zone leash: new fights start inside the square only,
-    // and a character outside of it (a village respawn, the walk home
-    // after a finished fight) walks back instead of hunting. Two
-    // exceptions: a hurt character under attack flees even outside the
-    // square (the leash walk home would drag it through the chasing
-    // pack), and a fight that crossed the square line is finished
-    // where it stands - the mob that dragged the character out (a
-    // chase, an aggressive pull) dies before the walk home, dropping
-    // the fight here would walk home through the blows and leave the
-    // loot on the ground (see adoptOutZoneFight).
+    // The hunting ground gate: a character outside its ground (a
+    // village respawn, the walk home after a finished fight) with
+    // NOTHING pickable in sight walks back instead of hunting - going
+    // to a zero-enemy ground is the LAST resort of the free-roam
+    // order. Three exceptions: a hurt character under attack flees
+    // even outside the ground (the leash walk home would drag it
+    // through the chasing pack), a fight that crossed the ground
+    // line is finished where it stands - the mob that dragged the
+    // character out (a chase, an aggressive pull) dies before the
+    // walk home, dropping the fight here would walk home through the
+    // blows and leave the loot on the ground (see adoptOutZoneFight)
+    // - and a pickable enemy visible from the CURRENT position keeps
+    // the hunt running wherever it stands: the cell mode never
+    // rigidly binds the fights to the held hexagon, the engage picks
+    // the nearest visible enemy (see pickZone).
     now := time.Now()
     if l.lureArmed() && (l.lure.target != l.target || l.phase != phaseEngage) {
         // The pick changed under the lure (a kill, a skip, a flee
@@ -1361,14 +1436,14 @@ func (l *Loop) engage() {
         // restores the melee weapon.
         l.clearLure()
     }
-    if !l.inZoneSelf() {
+    if !l.onHeldGround() {
         if l.tracker.SelfUnderAttack() &&
             l.tracker.SelfHealthPercent() < reengageHealthPercent {
             l.fleeFromThreat(now)
 
             return
         }
-        if !l.adoptOutZoneFight(now) {
+        if !l.adoptOutZoneFight(now) && !l.cellEnemiesVisible(now) {
             if l.weaponlessRunWanted() {
                 // The bare-handed errand outranks the walk
                 // home: the return walk through the
@@ -1398,6 +1473,8 @@ func (l *Loop) engage() {
 
             return
         }
+        // Enemies stand visible outside the ground: the ordinary
+        // pick flow below takes the nearest one wherever it stands.
     }
     if l.zoneReturn {
         l.zoneReturn = false
@@ -1448,6 +1525,7 @@ func (l *Loop) engage() {
         if l.cell != nil {
             l.cellNoteKill(l.target, now)
         }
+        l.noteKillPosition(l.target, now)
         l.journalKill(l.target, now)
         l.resetFightClock()
         l.logf("Hunt: target %d died, looting", l.target)
@@ -1610,7 +1688,7 @@ func (l *Loop) engage() {
                 return
             }
             pick, ok := l.tracker.NearestAttackablePreferredWindowed(
-                attackNearestRange, l.targetZone(), l.activeSkips(now),
+                attackNearestRange, l.pickZone(), l.activeSkips(now),
                 l.minTargetLevel(), l.maxTargetLevel(), true,
                 l.zoneMobPriority)
             if !ok {

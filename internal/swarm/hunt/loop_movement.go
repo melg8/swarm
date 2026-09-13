@@ -27,9 +27,12 @@ import (
 // on a fully empty square, a far pack keeps it armed). One paced
 // leg at a time - the per second target search of the engage
 // picks up any mob the leg comes past, so the character engages
-// the moment something valid enters the radius. Reports whether
-// the tick was handled (a far target exists); without one the
-// caller falls back to the center patrol.
+// the moment something valid enters the radius. The cell mode
+// drops the fence entirely (see pickZone): the leg walks toward
+// the nearest VISIBLE enemy wherever it stands - toward the zone
+// that holds the enemies, never into an enemy-less one. Reports
+// whether the tick was handled (a far target exists); without one
+// the caller falls back to the center patrol.
 func (l *Loop) walkToFarTarget(now time.Time) bool {
     if l.noTargetSince.IsZero() {
         l.noTargetSince = now
@@ -47,15 +50,15 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
         return false
     }
     pick, found := l.tracker.NearestAttackablePreferredWindowed(
-        farTargetRange, l.targetZone(), l.activeSkips(now),
+        farTargetRange, l.pickZone(), l.activeSkips(now),
         l.minTargetLevel(), l.maxTargetLevel(), true,
         l.zoneMobPriority)
     if !found {
-        // The far search scans the whole square: nothing in the zone
-        // is pickable at any distance. Explain the standing hunter in
-        // the log - the mobs the character sees, their positions and
-        // why the target search rejects them - instead of letting a
-        // fenced social pack look like a broken bot.
+        // The far search scanned everything the character sees: no
+        // pickable mob at any distance. Explain the standing hunter
+        // in the log - the mobs the character sees, their positions
+        // and why the target search rejects them - instead of letting
+        // a fenced social pack look like a broken bot.
         l.logNoPickableTargets(now)
 
         return false
@@ -97,7 +100,7 @@ func (l *Loop) logNoPickableTargets(now time.Time) {
     }
     l.noPickLogAt = now
     blocked := l.tracker.NearestBlockedTargetsWindowed(
-        l.targetZone(), l.minTargetLevel(), l.maxTargetLevel(),
+        l.pickZone(), l.minTargetLevel(), l.maxTargetLevel(),
         l.activeSkips(now), noPickLogLimit)
     if len(blocked) == 0 {
         l.logger.Printf("Hunt: no pickable target in the zone, " +
