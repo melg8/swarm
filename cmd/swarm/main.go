@@ -29,6 +29,7 @@ import (
 	"github.com/melg8/swarm/internal/swarm/pathfind"
 	"github.com/melg8/swarm/internal/swarm/proxy"
 	"github.com/melg8/swarm/internal/swarm/session"
+	"github.com/melg8/swarm/internal/swarm/spotaudit"
 	"github.com/melg8/swarm/internal/swarm/state"
 	"github.com/melg8/swarm/internal/swarm/webserver"
 	"github.com/melg8/swarm/internal/version"
@@ -135,6 +136,23 @@ type config struct {
 	queryContext time.Duration
 	// queryLimit caps the printed query records.
 	queryLimit int
+	// spotAudit runs the live spot geometry audit and exits: the
+	// probe character visits every spot anchor of the registry and
+	// the JSON evidence file collects what it actually sees.
+	spotAudit string
+	// auditWait is the knownlist settle window of every audit visit.
+	auditWait time.Duration
+	// auditAccount names the probe account of the audit (the password
+	// equals the account name, the character shares it).
+	auditAccount string
+	// auditAnchors optionally overrides the audited positions per
+	// spot id (the verification pass of the regenerated geometry).
+	auditAnchors string
+	// auditFilter audits only the spots whose id contains the
+	// substring.
+	auditFilter string
+	// auditFresh drops the resume state of the audit evidence file.
+	auditFresh bool
 }
 
 func parseFlags() config {
@@ -166,6 +184,12 @@ func parseFlags() config {
 		queryMatch:       "",
 		queryContext:     0,
 		queryLimit:       0,
+		spotAudit:        "",
+		auditWait:        0,
+		auditAccount:     "",
+		auditAnchors:     "",
+		auditFilter:      "",
+		auditFresh:       false,
 	}
 	flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
 		"login server address")
@@ -243,6 +267,26 @@ func parseFlags() config {
 			"repeated decision lines, trip abort loops, fight "+
 			"duration outliers, death streaks, stalls. Every "+
 			"finding carries its own -session-query drill-down")
+	flag.StringVar(&cfg.spotAudit, "spot-audit", "",
+		"run the live hunting spot audit instead of the bot: the probe "+
+			"character is injected at every spot anchor of the registry "+
+			"(the database position rewrite), waits out the knownlist and "+
+			"the JSON evidence file collects every attackable npc it sees "+
+			"with the leash verdict. The run resumes: spots already "+
+			"measured in the file are skipped, so a long registry audits "+
+			"across several foreground runs")
+	flag.DurationVar(&cfg.auditWait, "audit-wait", 12*time.Second,
+		"knownlist settle window of every spot visit of -spot-audit")
+	flag.StringVar(&cfg.auditAccount, "audit-account", "spotaudit",
+		"probe account of -spot-audit (the password equals the name, "+
+			"the character shares it)")
+	flag.StringVar(&cfg.auditAnchors, "audit-anchors", "",
+		"JSON file with per spot position overrides of -spot-audit "+
+			"(the verification pass of the regenerated geometry)")
+	flag.StringVar(&cfg.auditFilter, "audit-filter", "",
+		"audit only the spots whose id contains the substring")
+	flag.BoolVar(&cfg.auditFresh, "audit-fresh", false,
+		"re-measure every spot of -spot-audit, ignoring the resume state")
 	flag.StringVar(&cfg.queryFrom, "from", "",
 		"window start of -session-query/-session-report: RFC3339 "+
 			"or a bare 15:04 clock of the session day")
@@ -694,6 +738,12 @@ func main() {
 
 	if cfg.testFightUIV1 {
 		runTestFightUIV1(cfg)
+
+		return
+	}
+
+	if cfg.spotAudit != "" {
+		runSpotAuditCLI(cfg)
 
 		return
 	}
@@ -1151,6 +1201,47 @@ func newAcceptanceManager(
 		Logger:   log.Default(),
 		DBConfig: acceptance.DefaultDBConfig(),
 	}, acceptance.Definitions())
+}
+
+// runSpotAuditCLI measures the live hunting spot geometry: the probe
+// account visits every spot anchor of the registry through the
+// database position injection and the evidence file collects the
+// attackable npc population of every ground with the leash verdicts.
+// The stack must be up (login 2106, game 7777, MariaDB 3306) - the
+// audit is the live measurement the registry regeneration builds on
+// (tools/regenerate_spots_from_audit.py). The run resumes from the
+// evidence file, so an interrupted audit continues with the next
+// unaudited spot; -audit-fresh starts over. The exit code reflects
+// the audit completion (0 when every spot of the filter measured).
+func runSpotAuditCLI(cfg config) {
+	log.Println("Starting swarm spot audit CLI")
+	log.Printf("Build: %s", version.Identity())
+
+	account := cfg.auditAccount
+	// The signal context stops the audit on SIGINT/SIGTERM. The stop
+	// call lands on the explicit cleanup path below (no defer) because
+	// os.Exit skips the deferred calls - the same shape the acceptance
+	// CLI uses.
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+	err := spotaudit.Run(ctx, spotaudit.Config{
+		Login:    cfg.loginAddress,
+		Account:  account,
+		Password: account,
+		Char:     account,
+		DB:       acceptance.DefaultDBConfig(),
+		Wait:     cfg.auditWait,
+		Output:   cfg.spotAudit,
+		Anchors:  cfg.auditAnchors,
+		Filter:   cfg.auditFilter,
+		Fresh:    cfg.auditFresh,
+	}, log.Default())
+	stop()
+	if err != nil {
+		log.Printf("Spot audit: FAIL %s", err.Error())
+		os.Exit(1)
+	}
+	log.Println("Spot audit: PASS")
 }
 
 // runAcceptanceCLI drives the acceptance scenarios headless: the
