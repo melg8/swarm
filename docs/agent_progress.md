@@ -3842,3 +3842,52 @@ provable from the logs, not only from the UI charts.
   growing retainer anymore.
 
 Status: done (2026-09-13).
+
+## Active task: the map fps chip in the status bar + the cpu load of the open map (owner-direct)
+
+Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.
+
+### Context (owner request, Russian)
+
+- Move the fps plate off the map canvas into the bottom status bar
+  (the app footer) - it overlaps the map corner now.
+- The cpu load grew noticeably with the map open. Keep the fps high
+  but stop burning the cpu: analyze the render path and offload the
+  work where possible (a gpu blit counts).
+
+### Analysis (map.js render path)
+
+- The rAF loop repaints the WHOLE world every frame while anything
+  moves (a hunting bot keeps mobs moving almost always): the scaled
+  tile blits of a zoomed out view (a dozen+ drawImage per frame),
+  the grid pass and the loaded zone frame are camera-only data -
+  they cost the same whether the objects moved or not.
+- The SSE snapshots (300 ms) each trigger one extra full repaint.
+- While the map tab is hidden the loop keeps ticking no-op frames at
+  the display rate and update() keeps painting the hidden canvas.
+
+### Plan
+
+1. The fps item moves to the footer (foot-fps, right aligned,
+   "fps: N - draw X ms", idle reads "fps: idle").
+2. The static world (map/geodata tiles, grid, loaded zone frame)
+   rasterizes once into an offscreen canvas anchored in world
+   coordinates with one viewport of slack; every frame blits the
+   visible slice with one drawImage (a gpu composite). Re-render
+   triggers: zoom change, layer toggle, landed tile, theme flip,
+   resize, camera leaving the slack box. Sandbox documents without a
+   real canvas keep the direct per frame path (the harnesses).
+3. The rAF loop stops while the map tab is hidden; the data driven
+   repaints (update, kill marks, tile loads) skip the hidden canvas.
+   The bot_switch harness stub flips classList.contains to true (it
+   paints and asserts painted output - the map is semantically
+   visible there, the same stub as the other map harnesses).
+4. A new "background cache" scenario in tools/repro_map_render.js
+   pins the cache behavior; docs/webui.md gets the update.
+
+### Acceptance
+
+- All five map.js harnesses pass (map_render with the new scenario,
+  movement, zone_hover, bot_switch, and the fps scenario on the new
+  element), go test ./internal/swarm/webserver green, task fmt:check
+  green, task lint:new clean.
