@@ -223,11 +223,41 @@ func (l *Loop) fightTransitAttackers() error {
 		if err := l.drinkHealingPotion(); err != nil {
 			return err
 		}
-		if err := l.game.AttackTarget(attacker.ObjectID); err != nil {
-			return fmt.Errorf("the transit attack: %w", err)
+		if err := l.closeAndAttack(
+			attacker.X, attacker.Y, attacker.Z, attacker.ObjectID); err != nil {
+			return err
 		}
 		time.Sleep(questKillAttackPeriod)
 	}
+}
+
+// closeAndAttack swings at a mob: inside the engage radius the attack
+// request runs the fight; outside it the character walks up first
+// (the Mobius server does not move the character on a distant
+// attack - the official client approaches on its own; the first
+// live quest runs attacked from a thousand units away, hit nothing
+// and died standing).
+func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
+	selfX, selfY, _, ok := l.tracker.SelfPosition()
+	if !ok {
+		return errors.New("no self position for the fight")
+	}
+	if math.Hypot(float64(x-selfX), float64(y-selfY)) > userEngageRadius {
+		if time.Since(l.questWalkAt) < walkRequestPeriod {
+			return nil
+		}
+		l.questWalkAt = time.Now()
+		if err := l.game.WalkTo(x, y, z); err != nil {
+			return fmt.Errorf("the approach walk: %w", err)
+		}
+
+		return nil
+	}
+	if err := l.game.AttackTarget(objectID); err != nil {
+		return fmt.Errorf("the attack on object %d: %w", objectID, err)
+	}
+
+	return nil
 }
 
 // walkQuestRoute walks to the destination through planned geodata
@@ -808,7 +838,8 @@ func (l *Loop) farmQuestStage(
 		} else if err := l.restBetweenFights(ctx); err != nil {
 			return err
 		}
-		if err := l.game.AttackTarget(mob.ObjectID); err != nil {
+		if err := l.closeAndAttack(mob.X, mob.Y, mob.Z,
+			mob.ObjectID); err != nil {
 			return fmt.Errorf("the attack on %s: %w", mob.Name, err)
 		}
 		time.Sleep(questKillAttackPeriod)
