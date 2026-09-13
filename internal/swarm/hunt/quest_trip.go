@@ -209,6 +209,9 @@ func (l *Loop) fightTransitAttackers() error {
 		attacker.Name, attacker.ObjectID)
 	deadline := time.Now().Add(questTransitFightTimeout)
 	for {
+		if l.tracker.SelfHealthPercent() <= 0 {
+			return errors.New("the character died in the transit fight")
+		}
 		attacker, ok := l.tracker.NearestAttacker()
 		if !ok {
 			return nil
@@ -722,6 +725,9 @@ func (l *Loop) farmQuestStage(
 		}
 		if l.tracker.SelfHealthPercent() < questHealthFloor {
 			return errors.New("the health floor breached")
+		}
+		if l.tracker.SelfHealthPercent() <= 0 {
+			return errors.New("the character died on the kill ground")
 		}
 		mob, ok := l.tracker.NearestNpcByTemplates(
 			templates, questKillScanRadius)

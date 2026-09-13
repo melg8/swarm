@@ -938,6 +938,18 @@ func (gc *GameClient) EnterWorld(slot int32) error {
 	}
 	gc.logger.Println("Sent enter world request")
 
+	// The movement toggle of the official client entry: the server
+	// starts every session walking (Creature._isRunning defaults to
+	// false), and a bot that never flips it crosses the world at the
+	// walk speed - every hunt run of the project moved at 97 instead
+	// of ~170 units per second until the 2026-09-12 class transfer
+	// rounds pinned it.
+	run := togameserver.NewChangeMoveTypePacket()
+	run.TypeRun = 1
+	if err := gc.sendPacket(run); err != nil {
+		return fmt.Errorf("failed to send run toggle: %w", err)
+	}
+
 	return nil
 }
 

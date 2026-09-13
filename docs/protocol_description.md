@@ -279,6 +279,22 @@ clicking the item.
 | 21 | 4 | Origin Z |
 | 25 | 4 | Movement mode (1 = mouse) |
 
+### ChangeMoveType2 (0x1C)
+
+The movement toggle of the official client UI: the server starts every
+session WALKING (`Creature._isRunning` defaults to false) and this packet
+flips between walking and running (`ChangeMoveType2.runImpl` ->
+`Player.setRunning`/`setWalking`). The official client sends it with
+typeRun=1 on entry, so every bot session of this project that skipped it
+moved at the walk speed (97 instead of ~170 units per second on a level
+20 elven fighter - pinned live by the 2026-09-12 class transfer rounds).
+The bot sends it right after the EnterWorld request.
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x1C |
+| 1 | 4 | Type run (1 = run, 0 = walk) |
+
 ### Appearing (0x30)
 
 The teleport confirmation of the official client: the server keeps the

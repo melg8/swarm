@@ -131,6 +131,12 @@ func TestGameClientSendRawForwardsClientPackets(t *testing.T) {
 		payload := s.readEncrypted(conn, cipher)
 		require.Equal(s.t, byte(0x03), payload[0])
 
+		// The run toggle follows the enter world request (the
+		// server starts every session walking, see
+		// ChangeMoveTypePacket).
+		toggle := s.readEncrypted(conn, cipher)
+		require.Equal(s.t, byte(0x1C), toggle[0])
+
 		// Both raw packets of the relay arrive before the flow returns.
 		first := s.readEncrypted(conn, cipher)
 		second := s.readEncrypted(conn, cipher)
