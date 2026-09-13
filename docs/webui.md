@@ -596,31 +596,35 @@ through the half-on-full compaction).
 The fleet overview renders:
 
 - the KPI cards: bots online, kills (with the hourly rate), deaths
-  (with the K/D), rejoins, the net experience gained, the average
+  (with the K/D), rejoins, the net experience gained, the adena income
+  (the net gain of the fleet with the per hour rate), the average
   hunt tick, the process memory (heap and sys), the goroutine count
   (with the GC count and the last pause), the fleet packet rate, the
   collecting window and the landed swing share (the hit rate);
 - the history charts: online/registered bots, the cumulative kills
   and deaths, the per minute kill/death rates, the net experience,
-  the average hunt tick time (the loop cadence health of a loaded
-  process), the process memory, the fleet packet rate and the
-  goroutine count;
+  the fleet adena wallets, the average hunt tick time (the loop
+  cadence health of a loaded process), the process memory, the fleet
+  packet rate and the goroutine count;
 - the sortable comparison table of every registry bot (the kills,
-  deaths, K/D, kills per hour, the net experience, the rejoins, the
-  hit rate, the damage taken, the average tick, the uptime); a row
-  click opens the detail view of that bot. The acceptance test bots
-  are listed but stay out of the fleet aggregates.
+  deaths, K/D, kills per hour, the net experience, the adena per hour,
+  the rejoins, the hit rate, the damage taken, the average tick, the
+  uptime); a row click opens the detail view of that bot. The
+  acceptance test bots are listed but stay out of the fleet
+  aggregates.
 
 The per bot detail view adds the counter cards (the level with the
 window gain, kills, deaths, K/D, the net experience, the rejoins and
 sessions, the swing counters with the hit rate, the damage taken,
-the adena wallet, the average and the worst tick, the packet rate,
-the uptime, the ages of the last kill and death), the per bot
-history charts (experience, kills and deaths, health, adena, tick
-time, packet rate), the phase timeline strip, the phase distribution
-(the share of the window spent in every hunt phase) and the event
-timeline (the kills, deaths, rejoins, level changes and the
-online/offline transitions of the collected history).
+the adena wallet with its net gain and per hour rate, the average
+and the worst tick, the packet rate, the uptime, the ages of the
+last kill and death), the per bot history charts (experience with
+the level staircase, kills and deaths, health, the adena wallet with
+the net gained line, tick time, packet rate), the phase timeline
+strip, the phase distribution (the share of the window spent in every
+hunt phase) and the event timeline (the kills, deaths, rejoins, level
+changes and the online/offline transitions of the collected
+history).
 
 The counter sources (`state/metrics.go`): a kill counts when the
 object the character actively fights dies (the fighting target of
@@ -638,11 +642,44 @@ process reports the whole deployment story.
 
 The window selector (hour, 6 hours, day, everything) refetches both
 views with the matching `?window=` parameter; the endpoints
-downsample the rings to at most 256 points per response. The tab
-polls every 5 seconds while it is visible and stops while another
-tab holds the screen. The charts draw on plain canvases with the
-theme colors of the CSS variables - no framework, no bundler, no
-network dependency; every dynamic text lands through `textContent`.
+downsample the rings to at most 256 points per response. The
+downsampling picks the LAST sample of every epoch aligned time
+bucket (the bucket width derives from the requested window alone),
+so the served points are a pure function of the sample timestamps:
+consecutive polls of one window derive the very same points, a
+fresh sample only refreshes the trailing bucket and the window
+slide removes points at whole bucket granularity - the charts of a
+live poll cycle never flicker (an index stride re-aligned its picks
+on every change and the whole chart visibly jumped).
+
+Three stability rules of the collected series matter for the chart
+readability:
+
+- The experience is the C1 cumulative total (UserInfo broadcasts
+  `(int) getExp()`, the level derives from the experience table), so
+  the net gained line grows linearly THROUGH the level ups and never
+  resets; the level itself rides the same chart on its own right
+  hand scale drawn as a golden staircase (the level ups step up, the
+  delevel penalties step down).
+- A sample that lands inside the reconnect gap (the tracker
+  character zeroed by `ResetSession` before the fresh UserInfo
+  arrives) carries the last known character values: the exp, adena
+  and level of a bot do not change while it is away, and recording
+  the zero flash crashed the exp chart to the bottom and faked
+  "reached level 0" events. The live view holds the same last known
+  state through the gap.
+- The adena wallet comes from the inventory store
+  (`SelfSnapshot` sums the adena items), the net gained and the per
+  hour rate derive from the series baseline the first valid sample
+  anchors.
+
+The tab polls every 5 seconds while it is visible and stops while
+another tab holds the screen. The event list renders keyed: an
+unchanged event set keeps its DOM (only the ago labels refresh in
+place), a new event rebuilds the rows. The charts draw on plain
+canvases with the theme colors of the CSS variables - no framework,
+no bundler, no network dependency; every dynamic text lands through
+`textContent`.
 
 ## Endpoints
 

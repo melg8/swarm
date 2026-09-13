@@ -11,6 +11,98 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the statistics tab fixes - the exp resets, the adena zeros and the flicker (2026-09-13)
+
+Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user reported three defects of the new statistics tab: (1) the
+experience chart resets to zero when a player gains a level - the exp
+must grow linearly, with the level itself (the level ups and the
+delevel drops) on a separate scale of the same chart; (2) the adena
+growth shows zeros even on a long hunt - fix it and add an adena/hour
+metric; (3) the per bot metrics flicker on every recalculation - the
+hunt tick time, the packet rate, the phase timeline and the events
+visibly change between the five second polls.
+
+### Root causes
+
+- The adena zeros: `state.SelfSnapshot` hardcoded `adena: 0` (the
+  stats sampler reads the wallet from it); the full `Snapshot()` path
+  computed it correctly through `fillInventorySnapshot`.
+- The exp "reset": the tracker character is zeroed by `ResetSession`
+  during every relogin until the fresh UserInfo arrives; a statistics
+  sample that lands inside that gap recorded exp 0, level 0, adena 0 -
+  the expGained series crashed to the bottom (the chart "reset to
+  zero"), the live KPI cards flashed level 0 and the event ring
+  collected fake "reached level 0" events plus a second level event on
+  the recovery. The exp itself is the C1 cumulative total (verified
+  against the Mobius sources: `PlayableStat.addExp` does
+  `setExp(getExp()+value)`, UserInfo broadcasts `(int) getExp()`), so
+  the raw series never resets on a level up.
+- The flicker: the history downsampling picked every stride-th sample
+  by ARRAY INDEX - every appended sample and every window slide (the
+  cut follows the poll clock) re-aligned the picks, so the noisy
+  series (tick time, packet rate, phase colors) visibly jumped between
+  the polls once a window held more than the 256 point bound.
+
+### Acceptance criteria
+
+- The adena wallet of every stats sample and view comes from the
+  tracked inventory; the adena/hour metric exists in the per bot view,
+  the fleet view and the bots table.
+- A reconnect gap never zeroes a sample (the character facts carry
+  through), never fakes a level event and never flashes the live KPI
+  cards; the series baselines anchor on the first valid sample only.
+- The exp chart carries the level as a staircase on its own right hand
+  scale; the net exp line stays linear through the level ups.
+- The served history points are a pure function of the sample
+  timestamps (epoch aligned time buckets, the last sample per bucket)
+  - two polls of one window derive the same points; a fresh sample
+  only refreshes the trailing bucket.
+- The event list keeps its DOM while the event set is unchanged (the
+  ago labels refresh in place).
+- go build, the full test suite, `golangci-lint run --new` and all
+  six web UI harnesses green; a live smoke run against the deployed
+  stack verifies the series.
+
+### Progress
+
+- Commit 0301743 "state: SelfSnapshot carries the tracked adena
+  wallet" (2026-09-13): the compact self view now sums the adena items
+  of the inventory store instead of the hardcoded zero (the statistics
+  sampler and the proxy read the real wallet). Unit test added.
+- Commit 37ba95a "webserver: the stats samples survive the reconnect
+  gap and the adena income lands" (2026-09-13): the gap carry-forward
+  of the character facts (exp, adena, level, health), the `based`
+  baseline anchoring on the first valid sample, the live view hold
+  through the gap, the adena income metrics (AdenaGained/AdenaPerHour
+  of the bot view, AdenaGained/AdenaPerHour of the fleet view, the
+  fleet adena sample and history series) and the epoch aligned bucket
+  downsampling that replaces the index stride. Unit tests: the gap
+  carry, the adena income, the bucket picks and the poll stability.
+- Commit d8dd478 "webui: the level scale of the exp chart, the adena
+  income and the steady events" (2026-09-13): the chart engine gained
+  a per series right hand axis and step rendering (the golden level
+  staircase next to the blue exp line), the adena chart draws the
+  wallet plus the net gained line, the fleet adena chart and KPI card,
+  the adena income sub lines of the bot KPI card, the adena/h table
+  column and the keyed event rendering (the DOM survives an unchanged
+  event set, the ago labels refresh in place). The harness pins 25
+  checks including the level staircase, the adena lines and the keyed
+  events.
+- Live smoke run (2026-09-13): a fresh hunting bot leveled 1 -> 3
+  over ten polls - the exp series monotonically grew through both
+  level ups (no zero dips, no level 0 samples, no fake events), the
+  adena wallet grew 8 -> 58 with the per hour rate, and the history
+  prefix stayed identical between the polls.
+- Status: done (2026-09-13). go build, go vet, the full suite,
+  `golangci-lint run --new` (0 issues) and the harnesses green; the
+  live smoke run PASSED.
+
 ## Active task: the session journal and the session dump report (2026-09-12)
 
 Started: 2026-09-12. Branch: `feature/proxy-server`. Commits as melg8.
