@@ -647,8 +647,13 @@ function runScenarioHuntZonesView(mapFile) {
     MapView.draw();
 
     const results = [];
-    const future = record.strokes.filter((stroke) =>
-        stroke.style === "#5b9bd5" && stroke.segments.length >= 3);
+    // The hunt layer rasterizes into its own offscreen cache (see
+    // runScenarioHuntLayerCache): the blue square strokes land in
+    // the cache record while the main canvas composites the raster.
+    const hunt = MapView.huntBg;
+    const huntRecord = hunt.canvas && hunt.canvas.__record;
+    const future = (huntRecord ? huntRecord.strokes : []).filter(
+        (stroke) => stroke.style === "#5b9bd5" && stroke.segments.length >= 3);
     check(results, "inactive hunting zone draws the bright blue square",
         future.length > 0, "no bright blue square stroke");
 
@@ -920,6 +925,116 @@ function runScenarioBackgroundCache(mapFile) {
     return results;
 }
 
+// runScenarioHuntLayerCache pins the hunt layer cache: the spot
+// circles and the squares of the registry rasterize once into their
+// own offscreen canvas and every steady frame composites them with
+// one drawImage; the economy only registry ticks (the respawn
+// countdown, the adena rate) re-raster nothing, a visual change
+// (the active flag, a heat bucket) does, and the hovered zone still
+// reads its live label on top of the cached shapes.
+function runScenarioHuntLayerCache(mapFile) {
+    const { MapView, record, fireCanvas } = loadMapJs(mapFile);
+    MapView.init();
+    const base = buildSnapshot(0, false);
+    base.huntingZones = [
+        {
+            id: "s1", name: "Spot One", kind: "spot",
+            cx: WORLD.self.x, cy: WORLD.self.y, radius: 1200,
+            active: true, demoted: false, deaths: 2, deathHeat: 0.4,
+            killX: WORLD.self.x + 100, killY: WORLD.self.y + 100,
+            respawnMinSec: 15, respawnMaxSec: 20, minLevel: 1,
+            maxLevel: 3, nextRespawnSec: 30, adenaPerMin: 900,
+            occupancy: 1
+        },
+        {
+            id: "s2", name: "Spot Two", kind: "spot",
+            cx: WORLD.self.x - 8000, cy: WORLD.self.y + 8000,
+            radius: 900, active: false, demoted: false, deaths: 0,
+            deathHeat: 0, nextRespawnSec: -1, adenaPerMin: 0,
+            occupancy: 1
+        },
+        {
+            id: "r1", name: "Future Ground",
+            cx: WORLD.self.x + 9000, cy: WORLD.self.y - 9000,
+            half: 2500, active: false, demoted: false, deaths: 0,
+            minLevel: 4, maxLevel: 7, minGear: 0
+        }
+    ];
+    MapView.update(base);
+    MapView.draw();
+
+    const results = [];
+    const hunt = MapView.huntBg;
+    const huntRecord = hunt.canvas && hunt.canvas.__record;
+    check(results, "the hunt layer rasterizes into its own offscreen cache",
+        !!huntRecord && huntRecord.strokes.length > 0,
+        "the hunt cache is " + (huntRecord
+            ? "holding " + huntRecord.strokes.length + " strokes"
+            : "missing"));
+
+    // A steady frame re-strokes no zone geometry and composites both
+    // caches (the background and the hunt layer) with one blit each.
+    const cacheStrokes = huntRecord.strokes.length;
+    const blitsBefore = record.blits.length;
+    MapView.draw();
+    check(results, "a steady frame re-strokes no zone geometry",
+        huntRecord.strokes.length === cacheStrokes,
+        (huntRecord.strokes.length - cacheStrokes) + " new strokes");
+    check(results, "a steady frame composites the hunt cache once",
+        record.blits.length === blitsBefore + 2
+        && record.blits.some((args) => args[0] === hunt.canvas),
+        record.blits.length - blitsBefore + " blits");
+
+    // An economy only registry tick (the countdown, the adena rate)
+    // feeds the hovered label alone: the raster must not drop.
+    const economy = JSON.parse(JSON.stringify(base));
+    economy.huntingZones[0].nextRespawnSec = 29;
+    economy.huntingZones[0].adenaPerMin = 950;
+    economy.huntingZones[0].deaths = 3;
+    MapView.update(economy);
+    MapView.draw();
+    check(results, "an economy only update re-rasters nothing",
+        huntRecord.strokes.length === cacheStrokes,
+        (huntRecord.strokes.length - cacheStrokes) + " new strokes");
+
+    // A visual change (the active flag switch and a heat bucket step)
+    // re-renders the raster.
+    const switched = JSON.parse(JSON.stringify(base));
+    switched.huntingZones[0].active = false;
+    switched.huntingZones[0].deathHeat = 0.8;
+    switched.huntingZones[1].active = true;
+    MapView.update(switched);
+    MapView.draw();
+    check(results, "an active zone switch re-rasters the layer",
+        huntRecord.strokes.length > cacheStrokes,
+        (huntRecord.strokes.length - cacheStrokes) + " new strokes");
+
+    // The hovered spot still reads its live economy label on top of
+    // the cached shapes (the middle of the canvas sits inside s1).
+    record.texts.length = 0;
+    fireCanvas("mousemove", {
+        clientX: CANVAS_W / 2, clientY: CANVAS_H / 2
+    });
+    const label = record.texts.find(
+        (t) => t.text.startsWith("Spot One"));
+    check(results, "the hovered spot carries its live label",
+        !!label, "no Spot One label after the hover");
+    check(results, "the label carries the economy suffixes",
+        !!label && label.text.includes("a/min")
+        && label.text.includes("deaths"),
+        "the label reads " + (label ? label.text : "nothing"));
+
+    // A zoom changes the raster key (the screen radius of every
+    // circle derives from the scale): the cache re-renders.
+    const beforeZoom = huntRecord.strokes.length;
+    MapView.zoom(1.5);
+    check(results, "a zoom re-rasters the hunt cache",
+        huntRecord.strokes.length > beforeZoom,
+        (huntRecord.strokes.length - beforeZoom) + " new strokes");
+
+    return results;
+}
+
 function main() {
     const args = process.argv.slice(2);
     const verbose = args.includes("--verbose");
@@ -940,6 +1055,7 @@ function main() {
         ["resting marker", runScenarioRestMarker(mapFile)],
         ["hunting zone", runScenarioHuntingZone(mapFile)],
         ["hunt zones view", runScenarioHuntZonesView(mapFile)],
+        ["hunt layer cache", runScenarioHuntLayerCache(mapFile)],
         ["fps meter", runScenarioFpsMeter(mapFile)],
         ["background cache", runScenarioBackgroundCache(mapFile)]
     ];

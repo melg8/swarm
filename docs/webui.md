@@ -307,14 +307,40 @@ dozen 512px tiles per paint and is visually indistinguishable on
   theme flip, a resize, or the camera leaving the slack box (a
   walking follow camera re-renders every half viewport of travel; a
   drag re-renders every viewport). The blit offset snaps to whole
-  device pixels so the grid stays crisp at rest. The hunt zones and
-  the kill marks stay per frame on purpose: their labels carry the
-  live economy fields (the respawn countdown, the adena rate) and
-  the crosses fade with age - caching them would re-render per
-  snapshot and eat the win. While the map tab is hidden the render
-  loop stops and the data driven repaints (snapshots, kill polls,
-  tile loads) skip the hidden canvas; the next snapshot repaints
-  within one 300 ms poll.
+  device pixels so the grid stays crisp at rest. While the map tab is
+  hidden the render loop stops and the data driven repaints
+  (snapshots, kill polls, tile loads) skip the hidden canvas; the next
+  snapshot repaints within one 300 ms poll.
+- **The hunting zones render from their own offscreen cache**: the
+  elven spot registry alone carries ~290 grounds and the zoomed out
+  view has most of them on screen at once, so re-stroking the dashed
+  circles on every animation frame was the cpu load that survived the
+  background cache. The shapes (the circles, the squares, the anchor
+  dots, the kill centroid crosses) now rasterize into a second world
+  anchored cache exactly like the static world (the same slack box and
+  device pixel cap, sized for thin strokes instead of imagery) and
+  every frame composites them with one more `drawImage`. The layer
+  re-renders only when its pixels actually change - a zoom step, a
+  resize, a camera pan beyond the slack box, or a visual registry
+  change (a zone switch, a death heat bucket step, a kill centroid
+  move; see `huntZoneVisualKey`). The per second economy fields (the
+  respawn countdown, the adena rate, the occupancy, the death count)
+  deliberately stay out of the cache key: they only feed the label of
+  the hovered or listed zone, which `drawZoneEmphasis` paints fresh on
+  top of the cached shapes per frame (at most two zones match, a
+  couple of shapes), so the countdown still ticks live without
+  re-rastering ~290 circles every second. The base raster itself draws
+  in one path per style group (all future circles in a single stroke
+  call, the heat fills bucketed by alpha) instead of a save/restore,
+  two dash arrays and a label concatenation per zone.
+- **The kill crosses batch by fade bucket**: the fleet kill ring caps
+  at 96 marks; each cross used to cost its own begin/stroke round
+  trip per frame, the fade now quantizes into eight buckets that share
+  one stroke call each (a bucket step is invisible on a five minute
+  melt). The aggro circles skip sub pixel radii at the far zoom - a
+  circle that reads as a dot is unreadable clutter anyway, and the
+  packed field of the zoomed out view no longer strokes hundreds of
+  them.
 
 The **fps meter** makes the frame budget visible: the counter item at
 the right end of the status bar (the app footer, `#foot-fps`) shows the

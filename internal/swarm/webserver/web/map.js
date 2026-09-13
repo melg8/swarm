@@ -153,6 +153,27 @@ const MapView = {
     cssW: 0, cssH: 0, dpr: 1, marginX: 0, marginY: 0
   },
 
+  // huntBg caches the hunting zone layer the same way the bg cache
+  // holds the static world: the circles and the squares of the
+  // registry rasterize once into an offscreen, world anchored canvas
+  // and every frame composites them with one drawImage. The elven
+  // spot registry alone carries ~290 grounds and the zoomed out view
+  // has most of them on screen at once, so the per frame re-stroke
+  // of the dashed circles was the cpu load that survived the
+  // background cache (see huntZoneVisualKey for what invalidates
+  // it - the live economy label fields deliberately do not).
+  huntBg: {
+    canvas: null, ctx: null, key: "",
+    cx: 0, cy: 0, worldLeft: 0, worldTop: 0,
+    cssW: 0, cssH: 0, dpr: 1, marginX: 0, marginY: 0
+  },
+
+  // huntKey is the visual fingerprint of the zone registry of the
+  // current snapshot (computed once per update, not per frame): the
+  // label only fields stay out so a ticking respawn countdown or a
+  // drifting adena rate does not drop the hunt cache.
+  huntKey: "",
+
   // tileLoads counts the tile load completions of both pyramids
   // (the map imagery and the geodata view): a landed tile changes
   // what the background raster would paint, so the counter rides the
@@ -324,6 +345,7 @@ const MapView = {
     }
     this.ingestCombatEvents(snapshot);
     this.lastSnap = snapshot;
+    this.huntKey = this.huntZoneVisualKey(snapshot);
     this.rebuildSocialMasks(snapshot);
     // The stable draw order and the footer object counts derive from
     // the snapshot alone: computing them here keeps every frame of the
@@ -348,6 +370,7 @@ const MapView = {
   // marks stay - they belong to the whole deployment, not to one bot.
   resetBot() {
     this.lastSnap = null;
+    this.huntKey = "";
     this.runtime.clear();
     this.socialMasks.clear();
     this.projectionCache.clear();
@@ -1125,7 +1148,7 @@ const MapView = {
 
       return;
     }
-    this.drawHuntingZone(ctx);
+    this.drawHuntingZone(ctx, rect);
     this.drawKillMarks(ctx, rect);
     this.drawTargetLinks(ctx);
     this.drawAggroRanges(ctx, rect);
@@ -1422,37 +1445,47 @@ const MapView = {
     return Math.max(0.3, Math.min(1.6, factor));
   },
 
-  // drawHuntingZone outlines the hunting squares of the deployment
-  // (the registry the hunt loop switches through): every zone draws
-  // as a dashed rectangle with its name and level band, the active
-  // zone in bright amber with the thicker stroke, the future ones
-  // in a clearly readable soft blue with a light fill (the
-  // demonstration of the grounds the bot will hunt next, not a
-  // barely visible hint), the demoted bands of the death regression
-  // in red. The hunt zones checkbox of the toolbar hides the whole
-  // layer like the targets and the map background toggles. A
-  // snapshot without the zone registry falls back to the single
-  // legacy hunting square.
-  drawHuntingZone(ctx) {
-    if (!document.getElementById("show-hunt-zones").checked) { return; }
-    const zones = this.lastSnap.huntingZones;
-    if (Array.isArray(zones) && zones.length > 0) {
-      for (const zone of zones) {
-        if (zone.kind === "spot") {
-          this.drawHuntingSpotCircle(ctx, zone);
-        } else {
-          this.drawHuntingZoneRect(ctx, zone);
-        }
-      }
+  // drawHuntingZone paints the hunting grounds of the deployment
+  // (the registry the hunt loop switches through): every spot draws
+  // as a dashed circle with its anchor dot and kill cross, the
+  // legacy squares as dashed rectangles - the active ground in
+  // bright amber with the thicker stroke, the future ones in a
+  // clearly readable soft blue with a light fill (the demonstration
+  // of the grounds the bot will hunt next, not a barely visible
+  // hint), the demoted bands of the death regression in red. The
+  // shapes come out of the world anchored hunt cache as one blit
+  // (see huntBg) with the pointer and list emphasis painted fresh on
+  // top; environments without an offscreen canvas (the sandboxed
+  // Node harnesses) keep the direct batched path. The hunt zones
+  // checkbox of the toolbar hides the whole layer. A snapshot
+  // without the zone registry falls back to the single legacy
+  // hunting square - one shape needs no cache and draws directly.
+  drawHuntingZone(ctx, rect) {
+    if (!this.layerChecked("show-hunt-zones")) { return; }
+    const snap = this.lastSnap;
+    if (!snap) { return; }
+    const zones = Array.isArray(snap.huntingZones)
+      && snap.huntingZones.length > 0 ? snap.huntingZones : null;
+    if (!zones) {
+      const zone = snap.huntingZone;
+      if (!zone) { return; }
+      const legacy = [{
+        cx: zone.cx, cy: zone.cy, half: zone.half,
+        name: "hunting zone", minLevel: 0, maxLevel: 0, minGear: 0,
+        active: true,
+      }];
+      this.drawHuntingZoneDirect(ctx, rect, legacy);
+      this.drawZoneEmphasis(ctx, legacy);
+
       return;
     }
-    const zone = this.lastSnap.huntingZone;
-    if (!zone) { return; }
-    this.drawHuntingZoneRect(ctx, {
-      cx: zone.cx, cy: zone.cy, half: zone.half,
-      name: "hunting zone", minLevel: 0, maxLevel: 0, minGear: 0,
-      active: true,
-    });
+    if (this.blitHuntLayer(ctx, rect, zones)) {
+      this.drawZoneEmphasis(ctx, zones);
+
+      return;
+    }
+    this.drawHuntingZoneDirect(ctx, rect, zones);
+    this.drawZoneEmphasis(ctx, zones);
   },
 
   // zoneLabeled reports whether a zone carries its name label right
@@ -1465,13 +1498,6 @@ const MapView = {
         && this.hoverZone.kind === zone.kind)
       || (this.zoneFocus && this.zoneFocus.id === zone.id
         && this.zoneFocus.kind === zone.kind);
-  },
-
-  // zoneHighlighted reports whether a zone draws its hover or focus
-  // emphasis: a thicker stroke with the brighter fill so the hovered
-  // or listed ground reads at a glance.
-  zoneHighlighted(zone) {
-    return this.zoneLabeled(zone);
   },
 
   // zoneAt hit tests the hunting zones at one client point: the
@@ -1508,27 +1534,393 @@ const MapView = {
     return best;
   },
 
-  // drawHuntingSpotCircle draws one hunting spot of the spot
-  // anchored registry: the visibility bounded circle of the ground
-  // (the radius), the anchor dot, the kill centroid cross and the
-  // economy labels - the respawn window of the ground, the measured
-  // adena per minute, the death heat and the next respawn ETA of the
-  // active spot. The death heat tints the fill red (a ground that
-  // killed the character recently reads hot), the occupancy dimmed
-  // grounds carry the fleet marker.
-  drawHuntingSpotCircle(ctx, zone) {
-    const active = zone.active;
-    const highlighted = this.zoneHighlighted(zone);
-    const center = this.worldToScreen(zone.cx, zone.cy);
-    const radius = zone.radius * this.scale;
-    if (center.x + radius < 0 || center.y + radius < 0
-      || center.x - radius > this.view.width
-      || center.y - radius > this.view.height) {
-      return;
+  // ---- the hunt layer raster and the live emphasis ----
+  //
+  // The registry splits by what changes its pixels: the shapes (the
+  // circles, the squares, the anchor dots, the kill crosses) go into
+  // the world anchored offscreen cache below and every frame
+  // composites them with one drawImage, while the emphasis (the
+  // hovered or listed zone - its thicker stroke, its brighter fill
+  // and its name label with the live economy fields) paints fresh per
+  // frame on top. The economy fields change every second (the
+  // respawn countdown, the adena rate) but only feed the label of
+  // at most two zones, which is exactly why they stay out of the
+  // cache key.
+
+  // huntZoneVisualKey fingerprints the pixels of the registry: the
+  // geometry, the active and demoted markers, the death heat bucket
+  // (quantized - the heat fades over minutes, one bucket step is
+  // invisible) and the kill centroid. The label only fields (the
+  // respawn window, the countdown, the adena rate, the occupancy,
+  // the death count) change every second and never touch the
+  // raster, so they stay out - keeping them in would re-stroke every
+  // circle of the registry on every registry tick.
+  huntZoneVisualKey(snapshot) {
+    const zones = Array.isArray(snapshot.huntingZones)
+      ? snapshot.huntingZones : null;
+    if (!zones || zones.length === 0) {
+      return snapshot.huntingZone ? "legacy" : "none";
     }
-    // The name (with its economy suffixes) only reads while the
-    // pointer rests on the ground or the list focuses it.
-    const drawLabel = this.zoneLabeled(zone);
+    const parts = [];
+    for (const zone of zones) {
+      const heat = Math.min(0.55, (zone.deathHeat || 0) * 0.35);
+      parts.push(zone.id, zone.kind || "rect", zone.cx, zone.cy,
+        zone.radius || zone.half, zone.active ? "a" : "-",
+        zone.demoted ? "d" : "-", Math.round(heat * 20),
+        zone.killX || 0, zone.killY || 0);
+    }
+
+    return parts.join("|");
+  },
+
+  // huntLayerKey is the identity of the hunt raster: the zoom (the
+  // screen radius of every circle derives from the scale), the
+  // visual fingerprint of the registry, the theme revision and the
+  // canvas geometry. A camera pan alone does NOT change the key -
+  // the raster is world anchored and pans inside its slack box.
+  huntLayerKey(rect, dpr) {
+    return [this.scale, this.huntKey, this.colorsRev,
+      Math.round(rect.width), Math.round(rect.height), dpr].join("|");
+  },
+
+  // ensureHuntLayer validates the hunt cache for this frame and
+  // re-rasterizes it when the key dropped or the camera left the
+  // slack box. False means the caller must paint the layer itself
+  // (no offscreen canvas in this environment).
+  ensureHuntLayer(rect, zones) {
+    const hb = this.huntBg;
+    if (!hb.canvas) {
+      hb.canvas = this.createBgCanvas();
+      if (!hb.canvas) { return false; }
+      const hctx = hb.canvas.getContext("2d");
+      // A context without drawImage (or a main context without it)
+      // cannot blit: keep the direct path instead of a half cache.
+      if (!hctx || typeof hctx.drawImage !== "function"
+        || !this.ctx || typeof this.ctx.drawImage !== "function") {
+        hb.canvas = null;
+
+        return false;
+      }
+      hb.ctx = hctx;
+    }
+    const dpr = this.viewDpr || 1;
+    const key = this.huntLayerKey(rect, dpr);
+    const drifted = Math.abs(this.camX - hb.cx) > hb.marginX
+      || Math.abs(this.camY - hb.cy) > hb.marginY;
+    if (hb.key !== key || drifted) {
+      this.renderHuntLayer(rect, dpr, key, zones);
+    }
+
+    return true;
+  },
+
+  // renderHuntLayer rasterizes the hunting shapes into the cache.
+  // The swap of the view geometry mirrors renderBackground: the
+  // direct renderer reads the synced camera state, so the render
+  // runs with the cache geometry and restores the real view in a
+  // finally (no input handler and no other draw can interleave).
+  renderHuntLayer(rect, dpr, key, zones) {
+    const hb = this.huntBg;
+    const cssW = Math.max(1,
+      Math.round(rect.width * (1 + 2 * bgMarginOfView)));
+    const cssH = Math.max(1,
+      Math.round(rect.height * (1 + 2 * bgMarginOfView)));
+    // The device pixel budget of the shape layer is leaner than the
+    // imagery one (see huntDevicePixels): the circles are thin
+    // strokes, a stepped down raster of them upscales cleanly.
+    let cd = Math.min(dpr, 2);
+    const fit = Math.sqrt(huntDevicePixels / (cssW * cssH));
+    if (cd > fit) { cd = Math.max(1, fit); }
+    const devW = Math.max(1, Math.round(cssW * cd));
+    const devH = Math.max(1, Math.round(cssH * cd));
+    if (hb.canvas.width !== devW) { hb.canvas.width = devW; }
+    if (hb.canvas.height !== devH) { hb.canvas.height = devH; }
+    const ctx = hb.ctx;
+    ctx.setTransform(cd, 0, 0, cd, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    const keepView = this.view;
+    const keepX = this.camX;
+    const keepY = this.camY;
+    const cacheView = {
+      width: cssW, height: cssH,
+      left: keepView.left, top: keepView.top
+    };
+    this.view = cacheView;
+    this.camX = hb.cx = keepX;
+    this.camY = hb.cy = keepY;
+    try {
+      this.drawHuntingZoneDirect(ctx, cacheView, zones);
+    } finally {
+      this.view = keepView;
+      this.camX = keepX;
+      this.camY = keepY;
+    }
+    hb.cssW = cssW;
+    hb.cssH = cssH;
+    hb.dpr = cd;
+    hb.worldLeft = hb.cx - cssW / 2 / this.scale;
+    hb.worldTop = hb.cy - cssH / 2 / this.scale;
+    hb.marginX = Math.max(1, rect.width * bgMarginOfView - 64)
+      / this.scale;
+    hb.marginY = Math.max(1, rect.height * bgMarginOfView - 64)
+      / this.scale;
+    hb.key = key;
+  },
+
+  // blitHuntLayer composites the hunt cache onto the frame with one
+  // drawImage - the same whole device pixel snap as the background
+  // blit (a fractional offset would make the GPU resample the whole
+  // raster every frame and smear the dashes).
+  blitHuntLayer(ctx, rect, zones) {
+    if (!this.ensureHuntLayer(rect, zones)) { return false; }
+    const hb = this.huntBg;
+    const dpr = this.viewDpr || 1;
+    const left = this.camX - rect.width / 2 / this.scale;
+    const top = this.camY - rect.height / 2 / this.scale;
+    const dx = Math.round((hb.worldLeft - left) * this.scale * dpr) / dpr;
+    const dy = Math.round((hb.worldTop - top) * this.scale * dpr) / dpr;
+    ctx.drawImage(hb.canvas, 0, 0, hb.canvas.width, hb.canvas.height,
+      dx, dy, hb.cssW, hb.cssH);
+
+    return true;
+  },
+
+  // drawHuntingZoneDirect rasterizes the base shapes of the layer
+  // with one path per style group: the whole registry costs a
+  // handful of stroke and fill calls instead of a save/restore, two
+  // dash arrays and a label concatenation per zone (the per zone
+  // state round trips dwarfed the arcs themselves on the ~290 spot
+  // far view). The function paints no labels and no hover emphasis
+  // - those live in drawZoneEmphasis so the result stays cacheable.
+  drawHuntingZoneDirect(ctx, rect, zones) {
+    const vw = rect.width;
+    const vh = rect.height;
+    const futureSpots = [];
+    const activeSpots = [];
+    const futureRects = [];
+    const activeRects = [];
+    const demotedRects = [];
+    const futureDots = [];
+    const activeDots = [];
+    const futureCrosses = [];
+    const activeCrosses = [];
+    const futureHeat = new Map();
+    const activeHeat = new Map();
+    for (const zone of zones) {
+      if (zone.kind === "spot") {
+        const c = this.worldToScreen(zone.cx, zone.cy);
+        const r = zone.radius * this.scale;
+        if (c.x + r < 0 || c.y + r < 0
+          || c.x - r > vw || c.y - r > vh) {
+          continue;
+        }
+        const active = zone.active;
+        (active ? activeSpots : futureSpots).push([c.x, c.y, r]);
+        (active ? activeDots : futureDots).push([c.x, c.y]);
+        // The kill centroid cross (where the kills actually happen).
+        if (zone.killX || zone.killY) {
+          const k = this.worldToScreen(zone.killX, zone.killY);
+          if (k.x > -6 && k.y > -6 && k.x < vw + 6 && k.y < vh + 6) {
+            (active ? activeCrosses : futureCrosses).push([k.x, k.y]);
+          }
+        }
+        // The death heat fill: the warmer the ground, the redder. The
+        // alpha bucket keeps the fills batchable (one bucket step is
+        // invisible on a slowly fading heat).
+        const heat = Math.min(0.55, (zone.deathHeat || 0) * 0.35);
+        if (heat > 0.02) {
+          const bucket = Math.round(heat * 20);
+          const heatMap = active ? activeHeat : futureHeat;
+          let list = heatMap.get(bucket);
+          if (!list) { heatMap.set(bucket, (list = [])); }
+          list.push([c.x, c.y, r]);
+        }
+        continue;
+      }
+      const p = this.worldToScreen(
+        zone.cx - zone.half, zone.cy - zone.half);
+      const size = zone.half * 2 * this.scale;
+      if (p.x > vw || p.y > vh || p.x + size < 0 || p.y + size < 0) {
+        continue;
+      }
+      (zone.active ? activeRects : zone.demoted ? demotedRects
+        : futureRects).push([p.x, p.y, size]);
+    }
+    ctx.save();
+    // A light fill demonstrates the future grounds even at the far
+    // zoom where a thin dashed outline alone melts into the map.
+    if (futureRects.length > 0) {
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = zoneFutureFill;
+      ctx.beginPath();
+      for (const r of futureRects) {
+        ctx.moveTo(r[0], r[1]);
+        ctx.lineTo(r[0] + r[2], r[1]);
+        ctx.lineTo(r[0] + r[2], r[1] + r[2]);
+        ctx.lineTo(r[0], r[1] + r[2]);
+        ctx.closePath();
+      }
+      ctx.fill();
+    }
+    if (futureSpots.length > 0) {
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = zoneFutureFill;
+      ctx.beginPath();
+      for (const s of futureSpots) {
+        ctx.moveTo(s[0] + s[2], s[1]);
+        ctx.arc(s[0], s[1], s[2], 0, Math.PI * 2);
+      }
+      ctx.fill();
+    }
+    // The death heat fills, one path per alpha bucket.
+    for (const [heatMap, base] of [[futureHeat, 0.75],
+      [activeHeat, 0.95]]) {
+      for (const [bucket, list] of heatMap) {
+        ctx.globalAlpha = base;
+        ctx.fillStyle =
+          "rgba(217, 48, 37, " + (bucket / 20).toFixed(2) + ")";
+        ctx.beginPath();
+        for (const s of list) {
+          ctx.moveTo(s[0] + s[2], s[1]);
+          ctx.arc(s[0], s[1], s[2], 0, Math.PI * 2);
+        }
+        ctx.fill();
+      }
+    }
+    // The dashed outlines: every zone of the registry shares the
+    // dash pattern, so it is set once for the stroke passes below.
+    ctx.setLineDash([10, 6]);
+    if (futureRects.length > 0) {
+      ctx.globalAlpha = 0.7;
+      ctx.strokeStyle = zoneFutureColor;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const r of futureRects) {
+        ctx.moveTo(r[0], r[1]);
+        ctx.lineTo(r[0] + r[2], r[1]);
+        ctx.lineTo(r[0] + r[2], r[1] + r[2]);
+        ctx.lineTo(r[0], r[1] + r[2]);
+        ctx.closePath();
+      }
+      ctx.stroke();
+    }
+    if (demotedRects.length > 0) {
+      ctx.globalAlpha = 0.75;
+      ctx.strokeStyle = "#ff5c5c";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const r of demotedRects) {
+        ctx.moveTo(r[0], r[1]);
+        ctx.lineTo(r[0] + r[2], r[1]);
+        ctx.lineTo(r[0] + r[2], r[1] + r[2]);
+        ctx.lineTo(r[0], r[1] + r[2]);
+        ctx.closePath();
+      }
+      ctx.stroke();
+    }
+    if (activeRects.length > 0) {
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = "#f9ab00";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (const r of activeRects) {
+        ctx.moveTo(r[0], r[1]);
+        ctx.lineTo(r[0] + r[2], r[1]);
+        ctx.lineTo(r[0] + r[2], r[1] + r[2]);
+        ctx.lineTo(r[0], r[1] + r[2]);
+        ctx.closePath();
+      }
+      ctx.stroke();
+    }
+    if (futureSpots.length > 0) {
+      ctx.globalAlpha = 0.75;
+      ctx.strokeStyle = zoneFutureColor;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const s of futureSpots) {
+        ctx.moveTo(s[0] + s[2], s[1]);
+        ctx.arc(s[0], s[1], s[2], 0, Math.PI * 2);
+      }
+      ctx.stroke();
+    }
+    if (activeSpots.length > 0) {
+      ctx.globalAlpha = 0.95;
+      ctx.strokeStyle = "#f9ab00";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (const s of activeSpots) {
+        ctx.moveTo(s[0] + s[2], s[1]);
+        ctx.arc(s[0], s[1], s[2], 0, Math.PI * 2);
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    // The kill centroid crosses of the spots with known kill points.
+    for (const [list, alpha] of [[futureCrosses, 0.75],
+      [activeCrosses, 0.95]]) {
+      if (list.length === 0) { continue; }
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = killMarkColor;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (const k of list) {
+        ctx.moveTo(k[0] - 5, k[1] - 5);
+        ctx.lineTo(k[0] + 5, k[1] + 5);
+        ctx.moveTo(k[0] + 5, k[1] - 5);
+        ctx.lineTo(k[0] - 5, k[1] + 5);
+      }
+      ctx.stroke();
+    }
+    // The anchor dots of the spots.
+    if (futureDots.length > 0) {
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = zoneFutureColor;
+      ctx.beginPath();
+      for (const d of futureDots) {
+        ctx.moveTo(d[0] + 2.5, d[1]);
+        ctx.arc(d[0], d[1], 2.5, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    }
+    if (activeDots.length > 0) {
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = "#f9ab00";
+      ctx.beginPath();
+      for (const d of activeDots) {
+        ctx.moveTo(d[0] + 4, d[1]);
+        ctx.arc(d[0], d[1], 4, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  // drawZoneEmphasis paints the pointer and the list emphasis on top
+  // of the cached shapes: the hovered zone and the zone focused from
+  // the list panel re-stroke their outline with the highlight style,
+  // brighten their fill and carry their name label. At most two
+  // zones match (the hover and the focus), so the pass costs a
+  // couple of shapes per frame - which keeps the seconds changing
+  // economy fields (the respawn countdown, the adena rate) out of
+  // the cache without ever freezing them on screen.
+  drawZoneEmphasis(ctx, zones) {
+    for (const zone of zones) {
+      if (!this.zoneLabeled(zone)) { continue; }
+      if (zone.kind === "spot") {
+        this.drawSpotEmphasis(ctx, zone);
+      } else {
+        this.drawRectEmphasis(ctx, zone);
+      }
+    }
+  },
+
+  // spotLabel assembles the name of a hunting spot with its live
+  // economy suffixes: the respawn window of the ground, the
+  // measured adena per minute, the death count, the occupancy and
+  // the next respawn ETA of the active spot (see drawZoneEmphasis -
+  // the label is the only consumer of the per second registry
+  // fields).
+  spotLabel(zone) {
     let label = zone.name;
     if (zone.maxLevel > 0) {
       label += " · L" + zone.minLevel + "-" + zone.maxLevel;
@@ -1547,106 +1939,93 @@ const MapView = {
     if (zone.adenaPerMin > 0) {
       label += " · " + Math.round(zone.adenaPerMin) + "a/min";
     }
-    if (active) {
+    if (zone.active) {
       label += " · ACTIVE";
       if (zone.nextRespawnSec >= 0) {
         label += " · next " + zone.nextRespawnSec + "s";
       }
     }
-    ctx.save();
-    const heat = Math.min(0.55, (zone.deathHeat || 0) * 0.35);
-    const stroke = active ? "#f9ab00" : zoneFutureColor;
-    ctx.globalAlpha = active ? 0.95 : highlighted ? 0.95 : 0.75;
-    ctx.lineWidth = active || highlighted ? 2.5 : 1.5;
-    ctx.setLineDash([10, 6]);
-    ctx.strokeStyle = stroke;
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    if (heat > 0.02) {
-      // The death heat fill: the warmer the ground, the redder.
-      ctx.fillStyle = "rgba(217, 48, 37, " + heat.toFixed(2) + ")";
-      ctx.fill();
-    } else if (!active) {
-      ctx.fillStyle = highlighted ? zoneHoverFill : zoneFutureFill;
-      ctx.globalAlpha = highlighted ? 0.5 : 0.35;
-      ctx.fill();
-    }
-    // The anchor dot of the spot.
-    ctx.fillStyle = stroke;
-    ctx.beginPath();
-    ctx.arc(center.x, center.y, active ? 4 : 2.5, 0, Math.PI * 2);
-    ctx.fill();
-    // The kill centroid cross (where the kills actually happen).
-    if (zone.killX || zone.killY) {
-      const kill = this.worldToScreen(zone.killX, zone.killY);
-      ctx.strokeStyle = "#e37400";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(kill.x - 5, kill.y - 5);
-      ctx.lineTo(kill.x + 5, kill.y + 5);
-      ctx.moveTo(kill.x + 5, kill.y - 5);
-      ctx.lineTo(kill.x - 5, kill.y + 5);
-      ctx.stroke();
-    }
-    if (drawLabel) {
-      ctx.font = this.labelFont;
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
-      ctx.strokeText(label, center.x + 8, center.y - 8);
-      ctx.fillStyle = stroke;
-      ctx.fillText(label, center.x + 8, center.y - 8);
-    }
-    ctx.restore();
+
+    return label;
   },
 
-  // drawHuntingZoneRect draws one hunting zone square: the active
-  // zone in amber with the level band and the gear gate of its
-  // ladder step, the inactive zones in a bright soft blue with a
-  // light fill so the future grounds read at a glance, the demoted
-  // bands in red. The zone names wait for the pointer (the map hover
-  // or the list focus): the always-on labels of the far zoom smeared
-  // into one blob, so the far view shows the shapes alone.
-  drawHuntingZoneRect(ctx, zone) {
-    const active = zone.active;
-    const demoted = zone.demoted;
-    const highlighted = this.zoneHighlighted(zone);
-    const p1 = this.worldToScreen(zone.cx - zone.half, zone.cy - zone.half);
-    const size = zone.half * 2 * this.scale;
-    if (p1.x > this.view.width || p1.y > this.view.height
-      || p1.x + size < 0 || p1.y + size < 0) {
-      return;
-    }
-    const drawLabel = this.zoneLabeled(zone);
+  // rectLabel assembles the name of a registry square: the level
+  // band, the gear gate of its ladder step, the active and demoted
+  // markers and the death count.
+  rectLabel(zone) {
     let label = zone.name;
     if (zone.maxLevel > 0) {
       label += " · L" + zone.minLevel + "-" + zone.maxLevel;
     }
-    if (!active && zone.minGear > 0) {
+    if (!zone.active && zone.minGear > 0) {
       label += " · gear " + zone.minGear + "+";
     }
-    if (active) {
+    if (zone.active) {
       label += " · ACTIVE";
     }
-    if (demoted) {
+    if (zone.demoted) {
       label += " · too hard";
     }
     if (zone.deaths > 0) {
       label += " · " + zone.deaths +
         (zone.deaths === 1 ? " death" : " deaths");
     }
+
+    return label;
+  },
+
+  // drawSpotEmphasis highlights one hunting spot for the pointer or
+  // the list: the thicker circle, the brighter fill and the live
+  // economy label above the anchor (the base shapes underneath come
+  // from the cache or the direct pass and stay untouched).
+  drawSpotEmphasis(ctx, zone) {
+    const center = this.worldToScreen(zone.cx, zone.cy);
+    const radius = zone.radius * this.scale;
     ctx.save();
-    const stroke = active
-      ? "#f9ab00" : demoted ? "#ff5c5c" : zoneFutureColor;
+    const stroke = zone.active ? "#f9ab00" : zoneFutureColor;
+    ctx.globalAlpha = 0.95;
+    ctx.lineWidth = 2.5;
     ctx.strokeStyle = stroke;
-    ctx.globalAlpha = active ? 0.9 : demoted ? 0.75 : highlighted ? 0.95 : 0.7;
-    ctx.lineWidth = active ? 2 : highlighted ? 2 : 1.5;
-    if (!active && !demoted) {
-      // A light fill demonstrates the future grounds even at the far
-      // zoom where a thin dashed outline alone melts into the map; the
-      // hovered or listed zone brightens its fill.
-      ctx.fillStyle = highlighted ? zoneHoverFill : zoneFutureFill;
+    ctx.setLineDash([10, 6]);
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const heat = Math.min(0.55, (zone.deathHeat || 0) * 0.35);
+    if (!zone.active && heat <= 0.02) {
+      // A cold future ground brightens its fill on the hover; a hot
+      // one keeps the death heat tint of the base layer.
+      ctx.fillStyle = zoneHoverFill;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const label = this.spotLabel(zone);
+    ctx.font = this.labelFont;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
+    ctx.strokeText(label, center.x + 8, center.y - 8);
+    ctx.fillStyle = stroke;
+    ctx.fillText(label, center.x + 8, center.y - 8);
+    ctx.restore();
+  },
+
+  // drawRectEmphasis highlights one registry square for the pointer
+  // or the list: the thicker outline, the brighter fill and the name
+  // label at the corner (matching the base square of the layer).
+  drawRectEmphasis(ctx, zone) {
+    const p1 = this.worldToScreen(
+      zone.cx - zone.half, zone.cy - zone.half);
+    const size = zone.half * 2 * this.scale;
+    ctx.save();
+    const stroke = zone.active
+      ? "#f9ab00" : zone.demoted ? "#ff5c5c" : zoneFutureColor;
+    ctx.globalAlpha = 0.95;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 2;
+    if (!zone.active && !zone.demoted) {
+      ctx.fillStyle = zoneHoverFill;
       ctx.fillRect(p1.x, p1.y, size, size);
     }
     ctx.setLineDash([10, 6]);
@@ -1658,14 +2037,13 @@ const MapView = {
     ctx.closePath();
     ctx.stroke();
     ctx.setLineDash([]);
-    if (drawLabel) {
-      ctx.font = this.labelFont;
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
-      ctx.strokeText(label, p1.x + 6, p1.y + 14);
-      ctx.fillStyle = stroke;
-      ctx.fillText(label, p1.x + 6, p1.y + 14);
-    }
+    const label = this.rectLabel(zone);
+    ctx.font = this.labelFont;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
+    ctx.strokeText(label, p1.x + 6, p1.y + 14);
+    ctx.fillStyle = stroke;
+    ctx.fillText(label, p1.x + 6, p1.y + 14);
     ctx.restore();
   },
 
@@ -1673,14 +2051,16 @@ const MapView = {
   // kill of every bot (the /api/fleet/kills ring) draws as a small
   // orange cross that melts away with its age. The layer survives
   // the bot switches of the view - the marks live in the map, not in
-  // the snapshot of the observed bot.
+  // the snapshot of the observed bot. The fade quantizes into
+  // buckets: every cross of one bucket shares a single stroke call,
+  // so a full ring of kills costs a handful of strokes instead of
+  // one state round trip per cross (a bucket step of the alpha is
+  // invisible on a five minute melt).
   drawKillMarks(ctx, rect) {
-    if (!document.getElementById("show-kills").checked) { return; }
+    if (!this.layerChecked("show-kills")) { return; }
     if (!this.killMarks || this.killMarks.length === 0) { return; }
     const nowMs = Date.now() + this.clockOffsetMs;
-    ctx.save();
-    ctx.lineWidth = 1.5;
-    ctx.lineCap = "round";
+    const buckets = [];
     for (const mark of this.killMarks) {
       const age = nowMs - mark.atMs;
       if (!(age >= 0) || age > killMarkTTLms) { continue; }
@@ -1691,15 +2071,27 @@ const MapView = {
       }
       // The fresh kills read full strength, the old ones melt toward
       // a quarter opacity before the ring drops them.
-      const fade = age / killMarkTTLms;
+      const bucket = Math.min(killFadeBuckets - 1,
+        Math.floor(age / killMarkTTLms * killFadeBuckets));
+      (buckets[bucket] = buckets[bucket] || []).push(p);
+    }
+    ctx.save();
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = killMarkColor;
+    for (let bucket = 0; bucket < buckets.length; bucket++) {
+      const marks = buckets[bucket];
+      if (!marks) { continue; }
+      const fade = bucket / killFadeBuckets;
       ctx.globalAlpha = 0.95 - 0.7 * fade;
-      ctx.strokeStyle = killMarkColor;
       const size = 4 - 1.5 * fade;
       ctx.beginPath();
-      ctx.moveTo(p.x - size, p.y - size);
-      ctx.lineTo(p.x + size, p.y + size);
-      ctx.moveTo(p.x + size, p.y - size);
-      ctx.lineTo(p.x - size, p.y + size);
+      for (const p of marks) {
+        ctx.moveTo(p.x - size, p.y - size);
+        ctx.lineTo(p.x + size, p.y + size);
+        ctx.moveTo(p.x + size, p.y - size);
+        ctx.lineTo(p.x - size, p.y + size);
+      }
       ctx.stroke();
     }
     ctx.restore();
@@ -1931,6 +2323,10 @@ const MapView = {
         || c.y + radius < 0 || c.y - radius > rect.height) {
         continue;
       }
+      // A sub pixel radius circle at the far zoom is unreadable
+      // clutter anyway - skipping it keeps the packed field of the
+      // zoomed out view from stroking hundreds of dot circles.
+      if (radius < 4) { continue; }
       ctx.strokeStyle = obj.inCombat
         ? this.mapColors.combat : this.mapColors.aggressive;
       ctx.beginPath();
@@ -3004,6 +3400,17 @@ const bgMarginOfView = 0.5;
 // resolution steps down so even a 4K class viewport keeps the cache
 // memory in the tens of megabytes, not the hundreds.
 const bgDevicePixels = 4096 * 2560;
+
+// huntDevicePixels caps the hunt layer cache raster: the layer holds
+// thin vector strokes (the dashed circles, the crosses), so its
+// budget is leaner than the imagery cache - a stepped down raster
+// of a 1.5px dash upscales cleanly and keeps the second offscreen
+// canvas in the low tens of megabytes even on a 4K class viewport.
+const huntDevicePixels = 4096 * 1440;
+
+// killFadeBuckets is the quantization of the kill cross fade: every
+// cross of one bucket shares one stroke call (see drawKillMarks).
+const killFadeBuckets = 8;
 
 // socialWindowMs is how long the social animation marker stays visible
 // (the tracker side window in state/chat.go).
