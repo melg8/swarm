@@ -745,7 +745,13 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
 // walk keeps the health buffer full instead of arriving half dead
 // (the first live runs reached the kill ground at 26 percent and
 // died in seconds).
-const questWalkPotionHP = 60.0
+const questWalkPotionHP = 80.0
+
+// questPotionReuse is the reuse delay of the healing potions (the
+// C1 item table pins 10 s on the Lesser Healing Potion): a use
+// request inside the window is silently dropped by the server, so
+// the engine paces its own sends.
+const questPotionReuse = 10 * time.Second
 
 // drinkHealingPotion restores the health mid fight: the Lesser
 // Healing Potion of the inventory (when one is left) or the no-op
@@ -755,10 +761,15 @@ func (l *Loop) drinkHealingPotion() error {
 }
 
 // drinkHealingPotionAt drinks the first healing potion of the bag
-// when the health sits below the threshold (a no-op above it or
-// with the bag empty of potions).
+// when the health sits below the threshold and the reuse window of
+// the previous round has lapsed (a no-op above either gate or with
+// the bag empty of potions).
 func (l *Loop) drinkHealingPotionAt(threshold float64) error {
 	if l.tracker.SelfHealthPercent() >= threshold {
+		return nil
+	}
+	if !l.questPotionAt.IsZero() &&
+		time.Since(l.questPotionAt) < questPotionReuse {
 		return nil
 	}
 	for _, item := range l.tracker.InventoryItems() {
@@ -770,6 +781,7 @@ func (l *Loop) drinkHealingPotionAt(threshold float64) error {
 			if err := l.game.UseItem(item.ObjectID); err != nil {
 				return fmt.Errorf("the potion use: %w", err)
 			}
+			l.questPotionAt = time.Now()
 			l.awaitInventoryMutation(before, questEquipConfirmWait)
 
 			return nil

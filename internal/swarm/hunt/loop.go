@@ -353,9 +353,12 @@ type Loop struct {
 	// questWalkAt paces the quest trip walk requests (the flood
 	// protector mute of the 2026-09-12 class transfer run).
 	questWalkAt time.Time
-	stuckAt     time.Time
-	stuckX      int32
-	stuckY      int32
+	// questPotionAt paces the quest trip potion uses (the C1 reuse
+	// delay of the healing potions).
+	questPotionAt time.Time
+	stuckAt       time.Time
+	stuckX        int32
+	stuckY        int32
 	// stuckFast arms after the first stuck skip of a trip: subsequent
 	// stuck detections use the shorter stuckFastTimeout so the walker
 	// cycles through the remaining waypoints quickly instead of waiting

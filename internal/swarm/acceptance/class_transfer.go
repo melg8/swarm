@@ -84,13 +84,12 @@ const (
 const questNpcFindWait = 30 * time.Second
 
 // classTransferItems is the injected starter kit of the kill stages:
-// the Falchion sword, the Kite shield, the light armor pieces and
-// the Anguish jewels, trimmed to stay under the weight penalty zone
-// of a level 20 fighter (the first live run dressed the full Bone
-// set, hit 96 percent of the weight limit and lost both the run
-// speed and the regeneration - the sitting rest timed out at zero
-// health against the 17-21 band skeletons; the kit below weighs
-// ~7.9k of the ~13k limit, inside the healthy half).
+// the Falchion sword, the Kite shield, the Bone armor set and the
+// Anguish jewels - the dress the Dion shops of the 20-25 band sell
+// to a character of this level (docs/shopping_strategy.md), with
+// the healing potions of the transit fights (the C1 Lesser Healing
+// Potion is a slow heal over time with a ten second reuse, so the
+// stock carries enough rounds for the whole hunt).
 var classTransferItems = []ResetItem{
 	{ItemID: 68, Count: 1},    // Falchion
 	{ItemID: 629, Count: 1},   // Kite Shield
