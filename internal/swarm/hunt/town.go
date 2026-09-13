@@ -12,13 +12,14 @@
 package hunt
 
 import (
-	"math"
-	"strconv"
-	"time"
+        "math"
+        "strconv"
+        "strings"
+        "time"
 
-	"github.com/melg8/swarm/internal/swarm/gear"
-	"github.com/melg8/swarm/internal/swarm/pathfind"
-	"github.com/melg8/swarm/internal/swarm/state"
+        "github.com/melg8/swarm/internal/swarm/gear"
+        "github.com/melg8/swarm/internal/swarm/pathfind"
+        "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // npcDisplayOffset mirrors the display id offset the Mobius server adds
@@ -27,189 +28,204 @@ const npcDisplayOffset = 1000000
 
 // Timing and threshold constants of the town trips.
 const (
-	// tripSlotPercent triggers a town trip at this inventory fill level.
-	tripSlotPercent = 50.0
-	// tripWeightPercent triggers a town trip at this weight level.
-	tripWeightPercent = 50.0
-	// sellBatchSize is the maximum item count of one sell request.
-	sellBatchSize = 25
-	// sellPause paces the sell requests after the transaction flood
-	// protector of the server (10 seconds by default).
-	sellPause = 11 * time.Second
-	// walkRequestPeriod paces the ground click walks of the waypoint
-	// follower and the merchant approach.
-	walkRequestPeriod = 2 * time.Second
-	// waypointArriveDist is the distance within which the FINAL
-	// waypoint of a walk plan counts as reached: the wide trip
-	// arrival radius (two geodata cells of slack) so a leg ends
-	// even when the server stops the character slightly short of
-	// the clicked point.
-	waypointArriveDist = 150.0
-	// waypointPassDist is the tighter arrival radius of the
-	// INTERMEDIATE waypoints: a bridge ramp entry or a detour turn
-	// must be walked THROUGH, not merely seen from the side. The
-	// legacy wide radius here let the follower accept an entry
-	// waypoint it never reached, cut the corner and grind into the
-	// bridge railing side (the 2026-09-10 report: the plan held
-	// the smooth semicircle onto the bridge, the follower skipped
-	// it). Three geodata cells of slack.
-	waypointPassDist = 50.0
-	// waypointCorridor is the lateral distance from the segment
-	// towards the next waypoint within which a character counts
-	// as having PASSED the waypoint: only a character that moved
-	// past the waypoint on the route itself may skip it (a server
-	// correction, a jump), a character standing BESIDE the route
-	// - the bridge railing side - has not passed anything and
-	// walks back to the entry it missed.
-	waypointCorridor = 100.0
-	// maxMoveLeg splits the walk legs: the server refuses move requests
-	// with a target farther than 9900 units (MoveToLocation readImpl),
-	// and the smoothed geodata paths happily produce longer legs over
-	// the open terrain.
-	maxMoveLeg = 1000.0
-	// stuckTimeout is how long the character may stand still on a leg
-	// before the walker re-paths around the obstacle.
-	stuckTimeout = 15 * time.Second
-	// stuckFastTimeout is the shorter timeout that applies after the
-	// first stuck skip of a trip: once the walker knows the server
-	// refuses its clicks on this leg, waiting the full 15 seconds for
-	// every subsequent waypoint just burns the trip's time budget. The
-	// shorter window keeps the recovery responsive while still letting
-	// a slow server position broadcast land before the next skip.
-	stuckFastTimeout = 4 * time.Second
-	// maxRePaths bounds the re-paths of one trip before it aborts.
-	// The budget bounds only the full leg re-plan (startWalkLeg) - the
-	// waypoint skip of walkStuck does NOT consume it. This lets the
-	// walker cycle through several waypoints looking for one the server
-	// accepts without exhausting the budget, while still bounding the
-	// expensive re-plan operations.
-	maxRePaths = 3
-	// minWalkClick is the floor length of the ground clicks the
-	// waypoint follower sends. The server's own move validation can
-	// collapse a click onto the walker (the GeoEngine.getValidLocation
-	// correction), and Creature.moveToLocation only hands such a
-	// collapsed click over to the server side pathfinder when the
-	// ORIGINAL line was longer than 30 units: the pathfinding branch
-	// gates on (originalDistance - distance) > 30, so a shorter
-	// collapse is silently canceled with ActionFailed and the
-	// character never moves - the click stays eligible for the
-	// rescue only above the floor (the 2026-09-11 11:34 village
-	// return dump: the first plan waypoint sat 22 units out, every
-	// re-click of it froze through two whole trip cycles). The floor
-	// matches waypointPassDist: an intermediate waypoint under it
-	// counts as arrived, the follower only CLICKS one when the
-	// cursor is pinned on it (no clear successor line), and the
-	// pinned click then extends past it along the plan polyline.
-	minWalkClick = 50.0
-	// frozenRepathLimit bounds the consecutive stuck re-paths that
-	// start from the same cell without a single cell of movement in
-	// between: the re-path re-plans from the standing position, so
-	// a re-path that itself produced no movement proves the fresh
-	// plan cannot move the character either (the refusal the
-	// offline validation cannot see). The next identical re-path
-	// would burn a full stuck window on the same freeze - the trip
-	// aborts and hands the recovery to its callers instead (the
-	// zone return escalates to the direct server routed legs at
-	// once, the shop trip arms its cooldown).
-	frozenRepathLimit = 1
-	// frozenBanRadius is the radius of the avoid area a frozen leg
-	// bans: three geodata cells around the aimed waypoint close the
-	// corridor the server refused to walk without fencing in the
-	// standing character itself (the start cell of a search may sit
-	// inside its own ban - the search may always leave it).
-	frozenBanRadius = 48.0
-	// frozenBanMax bounds the session ban list: every frozen leg
-	// adds one area, and the list must never grow into a wall the
-	// planner cannot detour around at all.
-	frozenBanMax = 8
-	// directLegWindow bounds the direct server routed walk of a
-	// frozen town leg: the clicks go out at the walk request period
-	// and the window leaves room for a server pathfinder walk plus
-	// a few position broadcasts before the stop gives up.
-	directLegWindow = 45 * time.Second
-	// extendMarchStep is the stride of the forward route march of
-	// extendShortClickCandidates: one geodata cell.
-	extendMarchStep = 16.0
-	// extendCandidateMax bounds the forward route samples the
-	// short click extension tries: the first samples past the
-	// floor, each one march step further along the route - enough
-	// to step past a single route cell that walls the chord.
-	extendCandidateMax = 5
-	// merchantApproachDist is the distance the seller stands from the
-	// merchant: below the 250 units interaction distance of the server.
-	merchantApproachDist = 200.0
-	// npcInteractionDist is the server INTERACTION_DISTANCE of 250:
-	// the talk click (ClickObject) and the transactions succeed within
-	// this 3D distance of the npc. The approach walk aims the offset
-	// ring at 150 units 2D, and a small z gap (the trainer hall floor
-	// is 40 units above the approach deck) keeps dist3D above the
-	// approach gate (200) but well within this interaction gate - the
-	// talk click must fire from the offset ring, not wait for the
-	// approach gate that the z gap keeps unreachable (the 2026-09-11
-	// 05:45 dump looped forever on the offset ring).
-	npcInteractionDist = 250.0
-	// tripApproachRadius is the geodata search radius the trip walks
-	// end within: a merchant cell without a modeled floor layer (the
-	// elven village shops) or behind a counter stays reachable, the
-	// water deck below the shop - far in z - does not.
-	tripApproachRadius = 200.0
-	// merchantFindRadius is the radius around the character within
-	// which the spawned merchant npc is looked up once the shop point
-	// is reached.
-	merchantFindRadius = 2000.0
-	// merchantWaitTimeout bounds the wait for the merchant NpcInfo
-	// before the sale starts without a selected merchant.
-	merchantWaitTimeout = 45 * time.Second
-	// tripCooldown pauses new town trips after one ended, so a trip
-	// that cannot reach the shop does not restart every tick.
-	tripCooldown = 5 * time.Minute
-	// tripTimeout ends a trip that got stuck somewhere in between so
-	// the bot resumes hunting.
-	tripTimeout = 20 * time.Minute
-	// merchantDeckWindow bounds the server routed re-walk onto a
-	// merchant deck the geodata pack cannot reach (the village
-	// ramps): the ground clicks retry until the window closes.
-	merchantDeckWindow = 30 * time.Second
-	// skillListWaitLimit bounds the hold the first town trip of a
-	// session puts on its start while the server skill list has not
-	// arrived: the list lands within a second of the enter world, and
-	// a trip started ahead of it drops the learning stops silently.
-	skillListWaitLimit = 10 * time.Second
-	// clickShortenFloor bounds the halving of a walk click the
-	// server validation refuses: below it the refusal is local (the
-	// character stands boxed) and the follower hops or re-paths
-	// instead of crawling micro legs.
-	clickShortenFloor = 100.0
-	// hopCoincideDist is the distance under which a walked-past
-	// waypoint counts as stood on: the escape hop of a refused
-	// click targets the nearest plan bend between it and the
-	// waypoint arrival radius.
-	hopCoincideDist = 15.0
-	// npcApproachOffset is the 2D distance the bot stops short of
-	// a town npc when the approach walk clicks the ground: the
-	// click targets a point this many units from the npc toward
-	// the bot, keeping the click line outside the building walls.
-	// The server's getValidLocation walks a Bresenham line that
-	// can "step over" onto the roof layer when the click targets
-	// the npc's exact cell inside a building (the 2026-09-11 roof
-	// teleport report: the bot clicked Cobendell's spawn point,
-	// the line crossed the south wall and the height-step
-	// fallback resolved the target onto the roof at z -2456
-	// instead of the ground floor at z -2792). The offset keeps
-	// the click target on the surrounding deck, within the 250
-	// unit server interaction distance but outside the walled
-	// interior.
-	npcApproachOffset = 150.0
+        // tripSlotPercent triggers a town trip at this inventory fill level.
+        tripSlotPercent = 50.0
+        // tripWeightPercent triggers a town trip at this weight level.
+        tripWeightPercent = 50.0
+        // sellBatchSize is the maximum item count of one sell request.
+        sellBatchSize = 25
+        // sellPause paces the sell requests after the transaction flood
+        // protector of the server (10 seconds by default).
+        sellPause = 11 * time.Second
+        // walkRequestPeriod paces the ground click walks of the waypoint
+        // follower and the merchant approach.
+        walkRequestPeriod = 2 * time.Second
+        // waypointArriveDist is the distance within which the FINAL
+        // waypoint of a walk plan counts as reached: the wide trip
+        // arrival radius (two geodata cells of slack) so a leg ends
+        // even when the server stops the character slightly short of
+        // the clicked point.
+        waypointArriveDist = 150.0
+        // waypointPassDist is the tighter arrival radius of the
+        // INTERMEDIATE waypoints: a bridge ramp entry or a detour turn
+        // must be walked THROUGH, not merely seen from the side. The
+        // legacy wide radius here let the follower accept an entry
+        // waypoint it never reached, cut the corner and grind into the
+        // bridge railing side (the 2026-09-10 report: the plan held
+        // the smooth semicircle onto the bridge, the follower skipped
+        // it). Three geodata cells of slack.
+        waypointPassDist = 50.0
+        // waypointCorridor is the lateral distance from the segment
+        // towards the next waypoint within which a character counts
+        // as having PASSED the waypoint: only a character that moved
+        // past the waypoint on the route itself may skip it (a server
+        // correction, a jump), a character standing BESIDE the route
+        // - the bridge railing side - has not passed anything and
+        // walks back to the entry it missed.
+        waypointCorridor = 100.0
+        // maxMoveLeg splits the walk legs: the server refuses move requests
+        // with a target farther than 9900 units (MoveToLocation readImpl),
+        // and the smoothed geodata paths happily produce longer legs over
+        // the open terrain.
+        maxMoveLeg = 1000.0
+        // stuckTimeout is how long the character may stand still on a leg
+        // before the walker re-paths around the obstacle.
+        stuckTimeout = 15 * time.Second
+        // stuckFastTimeout is the shorter timeout that applies after the
+        // first stuck skip of a trip: once the walker knows the server
+        // refuses its clicks on this leg, waiting the full 15 seconds for
+        // every subsequent waypoint just burns the trip's time budget. The
+        // shorter window keeps the recovery responsive while still letting
+        // a slow server position broadcast land before the next skip.
+        stuckFastTimeout = 4 * time.Second
+        // stuckProgressUnits is the net progress margin of the stuck
+        // window: the current waypoint must come closer by this many
+        // units for the movement to count as progress. A walk covers
+        // hundreds of units over the stuck window whatever its speed,
+        // so the margin only filters the wobble (an oscillation that
+        // bounces between two tangent endpoints never improves its
+        // best distance by it).
+        stuckProgressUnits = 50.0
+        // tripAbortEscalateAfter is the abort streak the trip cooldown
+        // tolerates before it starts doubling: two identical aborts can
+        // be transient (a mob camped on the shore line, a slow server),
+        // a third names a deployment the retry cannot fix.
+        tripAbortEscalateAfter = 2
+        // tripAbortMaxCooldown caps the escalation of the abort streak.
+        tripAbortMaxCooldown = time.Hour
+        // maxRePaths bounds the re-paths of one trip before it aborts.
+        // The budget bounds only the full leg re-plan (startWalkLeg) - the
+        // waypoint skip of walkStuck does NOT consume it. This lets the
+        // walker cycle through several waypoints looking for one the server
+        // accepts without exhausting the budget, while still bounding the
+        // expensive re-plan operations.
+        maxRePaths = 3
+        // minWalkClick is the floor length of the ground clicks the
+        // waypoint follower sends. The server's own move validation can
+        // collapse a click onto the walker (the GeoEngine.getValidLocation
+        // correction), and Creature.moveToLocation only hands such a
+        // collapsed click over to the server side pathfinder when the
+        // ORIGINAL line was longer than 30 units: the pathfinding branch
+        // gates on (originalDistance - distance) > 30, so a shorter
+        // collapse is silently canceled with ActionFailed and the
+        // character never moves - the click stays eligible for the
+        // rescue only above the floor (the 2026-09-11 11:34 village
+        // return dump: the first plan waypoint sat 22 units out, every
+        // re-click of it froze through two whole trip cycles). The floor
+        // matches waypointPassDist: an intermediate waypoint under it
+        // counts as arrived, the follower only CLICKS one when the
+        // cursor is pinned on it (no clear successor line), and the
+        // pinned click then extends past it along the plan polyline.
+        minWalkClick = 50.0
+        // frozenRepathLimit bounds the consecutive stuck re-paths that
+        // start from the same cell without a single cell of movement in
+        // between: the re-path re-plans from the standing position, so
+        // a re-path that itself produced no movement proves the fresh
+        // plan cannot move the character either (the refusal the
+        // offline validation cannot see). The next identical re-path
+        // would burn a full stuck window on the same freeze - the trip
+        // aborts and hands the recovery to its callers instead (the
+        // zone return escalates to the direct server routed legs at
+        // once, the shop trip arms its cooldown).
+        frozenRepathLimit = 1
+        // frozenBanRadius is the radius of the avoid area a frozen leg
+        // bans: three geodata cells around the aimed waypoint close the
+        // corridor the server refused to walk without fencing in the
+        // standing character itself (the start cell of a search may sit
+        // inside its own ban - the search may always leave it).
+        frozenBanRadius = 48.0
+        // frozenBanMax bounds the session ban list: every frozen leg
+        // adds one area, and the list must never grow into a wall the
+        // planner cannot detour around at all.
+        frozenBanMax = 8
+        // directLegWindow bounds the direct server routed walk of a
+        // frozen town leg: the clicks go out at the walk request period
+        // and the window leaves room for a server pathfinder walk plus
+        // a few position broadcasts before the stop gives up.
+        directLegWindow = 45 * time.Second
+        // extendMarchStep is the stride of the forward route march of
+        // extendShortClickCandidates: one geodata cell.
+        extendMarchStep = 16.0
+        // extendCandidateMax bounds the forward route samples the
+        // short click extension tries: the first samples past the
+        // floor, each one march step further along the route - enough
+        // to step past a single route cell that walls the chord.
+        extendCandidateMax = 5
+        // merchantApproachDist is the distance the seller stands from the
+        // merchant: below the 250 units interaction distance of the server.
+        merchantApproachDist = 200.0
+        // npcInteractionDist is the server INTERACTION_DISTANCE of 250:
+        // the talk click (ClickObject) and the transactions succeed within
+        // this 3D distance of the npc. The approach walk aims the offset
+        // ring at 150 units 2D, and a small z gap (the trainer hall floor
+        // is 40 units above the approach deck) keeps dist3D above the
+        // approach gate (200) but well within this interaction gate - the
+        // talk click must fire from the offset ring, not wait for the
+        // approach gate that the z gap keeps unreachable (the 2026-09-11
+        // 05:45 dump looped forever on the offset ring).
+        npcInteractionDist = 250.0
+        // tripApproachRadius is the geodata search radius the trip walks
+        // end within: a merchant cell without a modeled floor layer (the
+        // elven village shops) or behind a counter stays reachable, the
+        // water deck below the shop - far in z - does not.
+        tripApproachRadius = 200.0
+        // merchantFindRadius is the radius around the character within
+        // which the spawned merchant npc is looked up once the shop point
+        // is reached.
+        merchantFindRadius = 2000.0
+        // merchantWaitTimeout bounds the wait for the merchant NpcInfo
+        // before the sale starts without a selected merchant.
+        merchantWaitTimeout = 45 * time.Second
+        // tripCooldown pauses new town trips after one ended, so a trip
+        // that cannot reach the shop does not restart every tick.
+        tripCooldown = 5 * time.Minute
+        // tripTimeout ends a trip that got stuck somewhere in between so
+        // the bot resumes hunting.
+        tripTimeout = 20 * time.Minute
+        // merchantDeckWindow bounds the server routed re-walk onto a
+        // merchant deck the geodata pack cannot reach (the village
+        // ramps): the ground clicks retry until the window closes.
+        merchantDeckWindow = 30 * time.Second
+        // skillListWaitLimit bounds the hold the first town trip of a
+        // session puts on its start while the server skill list has not
+        // arrived: the list lands within a second of the enter world, and
+        // a trip started ahead of it drops the learning stops silently.
+        skillListWaitLimit = 10 * time.Second
+        // clickShortenFloor bounds the halving of a walk click the
+        // server validation refuses: below it the refusal is local (the
+        // character stands boxed) and the follower hops or re-paths
+        // instead of crawling micro legs.
+        clickShortenFloor = 100.0
+        // hopCoincideDist is the distance under which a walked-past
+        // waypoint counts as stood on: the escape hop of a refused
+        // click targets the nearest plan bend between it and the
+        // waypoint arrival radius.
+        hopCoincideDist = 15.0
+        // npcApproachOffset is the 2D distance the bot stops short of
+        // a town npc when the approach walk clicks the ground: the
+        // click targets a point this many units from the npc toward
+        // the bot, keeping the click line outside the building walls.
+        // The server's getValidLocation walks a Bresenham line that
+        // can "step over" onto the roof layer when the click targets
+        // the npc's exact cell inside a building (the 2026-09-11 roof
+        // teleport report: the bot clicked Cobendell's spawn point,
+        // the line crossed the south wall and the height-step
+        // fallback resolved the target onto the roof at z -2456
+        // instead of the ground floor at z -2792). The offset keeps
+        // the click target on the surrounding deck, within the 250
+        // unit server interaction distance but outside the walled
+        // interior.
+        npcApproachOffset = 150.0
 )
 
 // townNpc is a town npc the trip machinery navigates to: a shop
 // merchant of the sell trips or a guard of the deleveling.
 type townNpc struct {
-	TemplateID int32
-	Name       string
-	X          int32
-	Y          int32
-	Z          int32
+        TemplateID int32
+        Name       string
+        X          int32
+        Y          int32
+        Z          int32
 }
 
 // zeroTownNpc is the not-found sentinel of the merchant and guard
@@ -225,10 +241,10 @@ var zeroTownNpc = townNpc{TemplateID: 0, Name: "", X: 0, Y: 0, Z: 0}
 // traders (30147..30150) map to the CT0 display ids through
 // CT0_to_C4_ids.txt of the npc stats.
 var townMerchants = []townNpc{
-	{TemplateID: 7147, Name: "Unoren", X: 44667, Y: 46896, Z: -2982},
-	{TemplateID: 7148, Name: "Ariel", X: 44683, Y: 46952, Z: -2981},
-	{TemplateID: 7149, Name: "Creamees", X: 42700, Y: 50057, Z: -2984},
-	{TemplateID: 7150, Name: "Herbiel", X: 42766, Y: 50037, Z: -2984},
+        {TemplateID: 7147, Name: "Unoren", X: 44667, Y: 46896, Z: -2982},
+        {TemplateID: 7148, Name: "Ariel", X: 44683, Y: 46952, Z: -2981},
+        {TemplateID: 7149, Name: "Creamees", X: 42700, Y: 50057, Z: -2984},
+        {TemplateID: 7150, Name: "Herbiel", X: 42766, Y: 50037, Z: -2984},
 }
 
 // dionMerchants are the shop merchants of the Town of Dion the 20-25
@@ -240,193 +256,193 @@ var townMerchants = []townNpc{
 // merchants when the active zone region is Dion (see
 // shopCatalogForRegion).
 var dionMerchants = []townNpc{
-	{TemplateID: 7060, Name: "Sabrin", X: 17999, Y: 144484, Z: -3048},
-	{TemplateID: 7061, Name: "Casey", X: 17948, Y: 144560, Z: -3048},
-	{TemplateID: 7062, Name: "Sonia", X: 19313, Y: 146229, Z: -3048},
-	{TemplateID: 7063, Name: "Lara", X: 19223, Y: 146228, Z: -3048},
+        {TemplateID: 7060, Name: "Sabrin", X: 17999, Y: 144484, Z: -3048},
+        {TemplateID: 7061, Name: "Casey", X: 17948, Y: 144560, Z: -3048},
+        {TemplateID: 7062, Name: "Sonia", X: 19313, Y: 146229, Z: -3048},
+        {TemplateID: 7063, Name: "Lara", X: 19223, Y: 146228, Z: -3048},
 }
 
 // Navigator plans walkable paths through the world geodata. The
 // pathfind engine is wrapped into one through NewNavigator; tests fake
 // the interface.
 type Navigator interface {
-	// FindPathApproach plans a walk that must end within the
-	// approach radius (3D) of the target point: the merchant stops
-	// use the interaction distance, the exact target is preferred
-	// whenever it is reachable.
-	FindPathApproach(start, end pathfind.Vec3, approachRadius float64) (
-		*pathfind.Result, error,
-	)
-	// FindPathApproachDryAvoiding plans the water walled walk around
-	// the given avoid areas: every waypoint of a found route stands
-	// above the water level and outside the banned ground, a target
-	// only swimming (or only reachable through the ban) reaches
-	// answers not found. The town legs navigate with it - a planned
-	// swim is a plan the click guard refuses leg by leg, and the
-	// session's frozen corridors must not be re-planned into.
-	FindPathApproachDryAvoiding(
-		start, end pathfind.Vec3, approachRadius float64,
-		avoid []pathfind.AvoidArea,
-	) (*pathfind.Result, error)
-	// FindPath plans a walk to the target cell arriving on whatever
-	// deck of it the walk reaches first.
-	FindPath(start, end pathfind.Vec3) (*pathfind.Result, error)
-	// ClosestHeight resolves the height of the layer at the world
-	// position closest to refZ - the deck the server itself picks
-	// for a destination named with that z. The zone return resolves
-	// its goal height through it before the approach search.
-	ClosestHeight(x, y float64, refZ int16) (int16, error)
-	// LineOfSight reports whether the geodata holds a clear straight
-	// line between two world positions: the blind engage recovery uses
-	// it to find a standing point that sees the obstructed target.
-	LineOfSight(start, end pathfind.Vec3) (bool, error)
-	// OverWater reports whether the walkable surface under the world
-	// position lies below the C1 water level: the character stands
-	// over a lake or sea bed (swimming or floating on it).
-	OverWater(x, y float64, refZ int16) bool
-	// WaterCrossed reports whether the straight line between two
-	// world positions crosses cells whose geodata surface lies below
-	// the water level (the pure water raster - a height step of the
-	// terrain is not water and never trips it). The town walker checks
-	// every click target with it before sending the move request.
-	WaterCrossed(start, end pathfind.Vec3) (bool, error)
-	// FindWaterEscape plans the walk out of the water to the nearest
-	// shore: a character standing over a lake bed cannot reach decks
-	// the water has no walkable connection to, so the only sensible
-	// walk is the one back to the shore.
-	FindWaterEscape(start pathfind.Vec3) (*pathfind.Result, error)
-	// ValidateClick mirrors the server-side validation of a
-	// mouse-mode move request: it answers the destination the
-	// server would actually walk to and whether the click runs at
-	// all. A refused click (the geodata correction collapses the
-	// target onto the walker) never moves the character - the
-	// follower reacts to it instead of sending it.
-	ValidateClick(from, to pathfind.Vec3) (pathfind.Vec3, bool)
+        // FindPathApproach plans a walk that must end within the
+        // approach radius (3D) of the target point: the merchant stops
+        // use the interaction distance, the exact target is preferred
+        // whenever it is reachable.
+        FindPathApproach(start, end pathfind.Vec3, approachRadius float64) (
+                *pathfind.Result, error,
+        )
+        // FindPathApproachDryAvoiding plans the water walled walk around
+        // the given avoid areas: every waypoint of a found route stands
+        // above the water level and outside the banned ground, a target
+        // only swimming (or only reachable through the ban) reaches
+        // answers not found. The town legs navigate with it - a planned
+        // swim is a plan the click guard refuses leg by leg, and the
+        // session's frozen corridors must not be re-planned into.
+        FindPathApproachDryAvoiding(
+                start, end pathfind.Vec3, approachRadius float64,
+                avoid []pathfind.AvoidArea,
+        ) (*pathfind.Result, error)
+        // FindPath plans a walk to the target cell arriving on whatever
+        // deck of it the walk reaches first.
+        FindPath(start, end pathfind.Vec3) (*pathfind.Result, error)
+        // ClosestHeight resolves the height of the layer at the world
+        // position closest to refZ - the deck the server itself picks
+        // for a destination named with that z. The zone return resolves
+        // its goal height through it before the approach search.
+        ClosestHeight(x, y float64, refZ int16) (int16, error)
+        // LineOfSight reports whether the geodata holds a clear straight
+        // line between two world positions: the blind engage recovery uses
+        // it to find a standing point that sees the obstructed target.
+        LineOfSight(start, end pathfind.Vec3) (bool, error)
+        // OverWater reports whether the walkable surface under the world
+        // position lies below the C1 water level: the character stands
+        // over a lake or sea bed (swimming or floating on it).
+        OverWater(x, y float64, refZ int16) bool
+        // WaterCrossed reports whether the straight line between two
+        // world positions crosses cells whose geodata surface lies below
+        // the water level (the pure water raster - a height step of the
+        // terrain is not water and never trips it). The town walker checks
+        // every click target with it before sending the move request.
+        WaterCrossed(start, end pathfind.Vec3) (bool, error)
+        // FindWaterEscape plans the walk out of the water to the nearest
+        // shore: a character standing over a lake bed cannot reach decks
+        // the water has no walkable connection to, so the only sensible
+        // walk is the one back to the shore.
+        FindWaterEscape(start pathfind.Vec3) (*pathfind.Result, error)
+        // ValidateClick mirrors the server-side validation of a
+        // mouse-mode move request: it answers the destination the
+        // server would actually walk to and whether the click runs at
+        // all. A refused click (the geodata correction collapses the
+        // target onto the walker) never moves the character - the
+        // follower reacts to it instead of sending it.
+        ValidateClick(from, to pathfind.Vec3) (pathfind.Vec3, bool)
 }
 
 // engineNavigator adapts a geodata engine to the Navigator interface,
 // applying the configured maximum passable height of the engine.
 type engineNavigator struct {
-	engine *pathfind.Engine
+        engine *pathfind.Engine
 }
 
 // NewNavigator wraps a geodata engine into the town trip navigator.
 // Returning the Navigator interface is the deliberate seam of the
 // hunt package (see the AGENTS.md interface map).
 func NewNavigator(engine *pathfind.Engine) Navigator { //nolint:ireturn
-	return engineNavigator{engine: engine}
+        return engineNavigator{engine: engine}
 }
 
 // FindPathApproach searches the walkable path with the engine settings
 // and the approach radius goal.
 func (e engineNavigator) FindPathApproach(
-	start, end pathfind.Vec3, approachRadius float64,
+        start, end pathfind.Vec3, approachRadius float64,
 ) (*pathfind.Result, error) {
-	return e.engine.FindPathApproach(
-		start, end, approachRadius, e.engine.MaxPassableHeight())
+        return e.engine.FindPathApproach(
+                start, end, approachRadius, e.engine.MaxPassableHeight())
 }
 
 // FindPathApproachDryAvoiding searches the water walled path around the
 // avoid areas with the engine settings and the approach radius goal.
 func (e engineNavigator) FindPathApproachDryAvoiding(
-	start, end pathfind.Vec3, approachRadius float64,
-	avoid []pathfind.AvoidArea,
+        start, end pathfind.Vec3, approachRadius float64,
+        avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
-	return e.engine.FindPathApproachDryAvoiding(
-		start, end, approachRadius, e.engine.MaxPassableHeight(), avoid)
+        return e.engine.FindPathApproachDryAvoiding(
+                start, end, approachRadius, e.engine.MaxPassableHeight(), avoid)
 }
 
 // FindPath searches the walkable path with the engine settings.
 func (e engineNavigator) FindPath(
-	start, end pathfind.Vec3,
+        start, end pathfind.Vec3,
 ) (*pathfind.Result, error) {
-	return e.engine.FindPath(start, end, e.engine.MaxPassableHeight())
+        return e.engine.FindPath(start, end, e.engine.MaxPassableHeight())
 }
 
 // ClosestHeight resolves the destination deck height with the engine.
 func (e engineNavigator) ClosestHeight(
-	x, y float64, refZ int16,
+        x, y float64, refZ int16,
 ) (int16, error) {
-	return e.engine.ClosestHeight(x, y, refZ)
+        return e.engine.ClosestHeight(x, y, refZ)
 }
 
 // LineOfSight answers the geodata sight line with the engine settings.
 func (e engineNavigator) LineOfSight(
-	start, end pathfind.Vec3,
+        start, end pathfind.Vec3,
 ) (bool, error) {
-	return e.engine.LineOfSight(start, end, e.engine.MaxPassableHeight())
+        return e.engine.LineOfSight(start, end, e.engine.MaxPassableHeight())
 }
 
 // OverWater answers the geodata water surface check with the engine.
 func (e engineNavigator) OverWater(x, y float64, refZ int16) bool {
-	return e.engine.OverWater(x, y, refZ)
+        return e.engine.OverWater(x, y, refZ)
 }
 
 // WaterCrossed answers the geodata water raster with the engine.
 func (e engineNavigator) WaterCrossed(
-	start, end pathfind.Vec3,
+        start, end pathfind.Vec3,
 ) (bool, error) {
-	return e.engine.WaterCrossed(start, end)
+        return e.engine.WaterCrossed(start, end)
 }
 
 // FindWaterEscape plans the nearest shore walk with the engine.
 func (e engineNavigator) FindWaterEscape(
-	start pathfind.Vec3,
+        start pathfind.Vec3,
 ) (*pathfind.Result, error) {
-	return e.engine.FindWaterEscape(start)
+        return e.engine.FindWaterEscape(start)
 }
 
 // ValidateClick mirrors the server move validation with the engine.
 func (e engineNavigator) ValidateClick(
-	from, to pathfind.Vec3,
+        from, to pathfind.Vec3,
 ) (pathfind.Vec3, bool) {
-	return e.engine.ValidateClick(from, to)
+        return e.engine.ValidateClick(from, to)
 }
 
 // nearestMerchant returns the town merchant closest to the point.
 func (l *Loop) nearestMerchant(
-	selfX int32, selfY int32,
+        selfX int32, selfY int32,
 ) (townNpc, bool) {
-	best := townNpc{
-		TemplateID: 0,
-		Name:       "",
-		X:          0,
-		Y:          0,
-		Z:          0,
-	}
-	bestDist := math.MaxFloat64
-	found := false
-	for _, merchant := range townMerchants {
-		dist := math.Hypot(
-			float64(merchant.X-selfX), float64(merchant.Y-selfY))
-		if dist < bestDist {
-			bestDist = dist
-			best = merchant
-			found = true
-		}
-	}
+        best := townNpc{
+                TemplateID: 0,
+                Name:       "",
+                X:          0,
+                Y:          0,
+                Z:          0,
+        }
+        bestDist := math.MaxFloat64
+        found := false
+        for _, merchant := range townMerchants {
+                dist := math.Hypot(
+                        float64(merchant.X-selfX), float64(merchant.Y-selfY))
+                if dist < bestDist {
+                        bestDist = dist
+                        best = merchant
+                        found = true
+                }
+        }
 
-	return best, found
+        return best, found
 }
 
 // merchantTemplates lists the packet template ids of the town merchants.
 func merchantTemplates() []int32 {
-	templates := make([]int32, 0, len(townMerchants))
-	for _, merchant := range townMerchants {
-		templates = append(templates, merchant.TemplateID+npcDisplayOffset)
-	}
+        templates := make([]int32, 0, len(townMerchants))
+        for _, merchant := range townMerchants {
+                templates = append(templates, merchant.TemplateID+npcDisplayOffset)
+        }
 
-	return templates
+        return templates
 }
 
 // tripActive reports whether a town trip is running.
 func (l *Loop) tripActive() bool {
-	switch l.phase {
-	case phaseTownWalk, phaseTownSell, phaseTownReturn:
-		return true
-	default:
-		return false
-	}
+        switch l.phase {
+        case phaseTownWalk, phaseTownSell, phaseTownReturn:
+                return true
+        default:
+                return false
+        }
 }
 
 // tripCooldownOver reports whether a new town trip may start. A
@@ -439,15 +455,22 @@ func (l *Loop) tripActive() bool {
 // level 14 fighter farmed the Kaboo woods without its legs armor
 // through the whole cooldown window).
 func (l *Loop) tripCooldownOver() bool {
-	if l.tripEndedAt.IsZero() {
-		return true
-	}
-	cooldown := tripCooldown
-	if l.weaponlessRunWanted() || l.gearDebtRunWanted() {
-		cooldown = weaponRunCooldown
-	}
+        if l.tripEndedAt.IsZero() {
+                return true
+        }
+        cooldown := tripCooldown
+        if l.weaponlessRunWanted() || l.gearDebtRunWanted() {
+                cooldown = weaponRunCooldown
+        } else if l.tripAbortRun > tripAbortEscalateAfter {
+                // The abort streak escalates: a trip that keeps failing
+                // the same way keeps failing it for a reason no retry
+                // fixes (no walkable path, no server routing), and the
+                // flat cooldown just burns the ticks between the
+                // identical aborts.
+                cooldown = tripAbortCooldown(l.tripAbortRun)
+        }
 
-	return time.Since(l.tripEndedAt) >= cooldown
+        return time.Since(l.tripEndedAt) >= cooldown
 }
 
 // inventoryFull reports whether the inventory passed a trip trigger
@@ -455,10 +478,10 @@ func (l *Loop) tripCooldownOver() bool {
 // maximum weight carried. The selling phase reuses it as the stop
 // condition: the trip returns once the inventory is back below it.
 func (l *Loop) inventoryFull() bool {
-	stats := l.tracker.InventoryStats()
+        stats := l.tracker.InventoryStats()
 
-	return stats.SlotPercent > tripSlotPercent ||
-		stats.WeightPercent > tripWeightPercent
+        return stats.SlotPercent > tripSlotPercent ||
+                stats.WeightPercent > tripWeightPercent
 }
 
 // maybeStartTownTrip begins a town trip when the inventory is full
@@ -467,172 +490,182 @@ func (l *Loop) inventoryFull() bool {
 // no geodata, no path) arms the cooldown, so a broken deployment does
 // not retry every tick.
 func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
-	// The first trip of a session waits for the server skill list:
-	// the learning stops plan on the skill queue and the packet burst
-	// of the enter world (UserInfo, ItemList, SkillList) races the
-	// first hunt ticks - a trip that starts between the ItemList and
-	// the SkillList silently plans without the learning (the observed
-	// sessions shopped on their first walk and never carried the
-	// teach stop). The wait is bounded: a server that never lists
-	// skills keeps the trips selling and shopping.
-	if !l.tracker.SkillsListed() &&
-		time.Since(l.tracker.SessionStartedAt()) < skillListWaitLimit {
-		return
-	}
-	// A bot outside the hunting zone returns first: the zone return
-	// owns the walk until the bot is back in the zone. A town trip
-	// started outside the zone (a village respawn after an emergency
-	// logout) would try to walk to the village shops - where the bot
-	// already stands - and then fail to return to the zone, leaving
-	// the bot stuck at the village (the 2026-09-11 06:00 dump: test3
-	// at 43000 50184, the learning trip started before the zone
-	// return, both failed with "no dry path", the bot never moved).
-	shopping := l.shoppingTripEnabled() && l.shoppingWanted()
-	learning := l.learnTripWanted()
-	// The weapon run outranks every other trip reason: a character
-	// without any weapon shops for one at once, whatever the inventory
-	// and the lesson queue say.
-	weaponRun := l.weaponlessRunWanted()
-	if l.navigator == nil || !l.tripCooldownOver() ||
-		(!l.inventoryFull() && !shopping && !learning && !weaponRun) {
-		return
-	}
-	// A bot outside the hunting zone returns first: the zone return
-	// owns the walk until the bot is back in the zone. The weapon run
-	// is the sole exception - a bare-handed character shops for a
-	// weapon at once, even outside the zone (punching mobs through the
-	// walk home is worse than a late return). The 2026-09-11 06:00
-	// dump showed a learning trip starting at the village (outside the
-	// zone) before the zone return, both searches failed with "no dry
-	// path", and the bot never moved.
-	if !weaponRun && l.zone() != nil && !l.inZoneSelf() {
-		return
-	}
-	// The walk needs a standing character: a resting one stands up
-	// first and the trip starts on a later tick.
-	if !l.standUpGuarded(time.Now()) {
-		return
-	}
-	selfX, selfY, _, ok := l.tracker.SelfPosition()
-	if !ok {
-		return
-	}
-	merchant, ok := l.nearestMerchant(selfX, selfY)
-	if !ok {
-		return
-	}
-	// The trip plan freezes here, ONCE: the purchases the planner
-	// picked against the current gear and adena are exactly what
-	// this trip sells and buys - the sell first step banks their
-	// SellFirst credits, the stop planning distributes the purchases
-	// and nothing re-plans in between (a re-plan at the shop ran
-	// against the freed slots and the fresh adena and drifted: it
-	// re-bought the piece the trip had just sold and planned
-	// purchases whose displaced pieces were never queued - the
-	// 2026-09-11 two pairs of gloves report).
-	l.tripPlan = l.shoppingPlan()
-	// The gear the trip starts with is the baseline the trip exits
-	// compare against: a slot the trip empties without landing the
-	// replacement becomes gear debt (see gearDebtCheck).
-	l.snapshotTripGear()
-	// The weapon leads the trip that buys it: the sell stop routes to
-	// the weapon purchase's merchant, so the sell-first of the replaced
-	// weapon and the buy share ONE stop (the junk sells at any
-	// merchant) and the replacement lands right after the sale instead
-	// of a village walk later - every abort in between used to leave
-	// the character bare-handed. A bare-handed character runs the
-	// weapon errand alone: the lessons and the books wait for the next
-	// trip, nothing outranks the weapon.
-	if weaponMerchant, ok := l.weaponStopMerchant(); ok {
-		merchant = weaponMerchant
-	}
-	// The walk back target: the farm spot when the trip starts inside
-	// the hunting zone, the zone center otherwise (a village respawn,
-	// a chase that ran away).
-	l.rememberFarmSpot()
-	l.tripStart = time.Now()
-	l.sold = make(map[int32]bool)
-	l.rePaths = 0
-	l.tripStops = []tripStop{{
-		merchant: merchant,
-		sell:     true,
-		buys:     nil,
-		teach:    false,
-	}}
-	l.buysPlanned = false
-	l.buyAt = time.Time{}
-	l.buyRequested = nil
-	l.buyConfirmAt = time.Time{}
-	l.buyRetries = 0
-	l.frozenStage = 0
-	l.directLeg = false
-	l.resetReplacementSales()
-	l.resetLearnState()
-	// The learning stops no longer ride the trip start: they plan
-	// AFTER the gear stops at the sell stop (see tickTownSell), so
-	// one town visit buys the weapon, the armor, the jewels, the
-	// books and teaches the lessons - the user rule of the one
-	// town visit. The weapon stop still runs FIRST (the sell stop
-	// routes to the weapon merchant), so a stuck teacher leg can
-	// no longer strand a bare-handed character: the weapon is
-	// bought and worn before the teacher leg ever runs.
-	l.phase = phaseTownWalk
-	stats := l.tracker.InventoryStats()
-	reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
-		strconv.FormatFloat(stats.WeightPercent, 'f', 0, 64) +
-		"% weight"
-	if !l.inventoryFull() {
-		reason = "the shop strategy plans purchases worth " +
-			strconv.FormatInt(gear.AdenaSpent(l.tripPlan), 10) +
-			" adena"
-	}
-	if weaponRun {
-		// The bare-handed errand names itself: the 2 damage punches of
-		// the dump report read at a glance in the log tail.
-		reason = "no weapon in hand, the weapon run comes first"
-	}
-	if learning {
-		// The learning contributes its lesson budget to the reason:
-		// a learning-only trip names it, a combined one appends it.
-		lessons := l.learnableLessons()
-		lessonReason := strconv.Itoa(len(lessons)) + " lessons worth " +
-			strconv.FormatInt(spTotal(lessons), 10) + " sp wait at " +
-			"the teacher"
-		if l.inventoryFull() || shopping {
-			reason += ", " + lessonReason
-		} else {
-			reason = lessonReason
-		}
-	}
-	if l.gearDebtRunWanted() {
-		// The refill names itself: the stranded slot of the dump
-		// report reads at a glance in the log tail.
-		reason += " (the gear debt refill)"
-	}
-	// The trigger plan cache drops: the frozen trip plan owns the
-	// trip now, the cache only feeds the widget view between the
-	// recomputes.
-	l.shoppingPlanCache = nil
-	l.shoppingPlanAt = time.Time{}
-	l.shoppingPlanAdena = 0
-	if l.journal != nil {
-		l.journal.TripStart(l.tracker.ID(), reason)
-	}
-	l.logf("Hunt: %s, walking to the trader %s", reason,
-		merchant.Name)
-	l.legRadius = tripApproachRadius
-	if !l.startWalkLeg(townNpcPosition(merchant)) {
-		l.abortTownTrip("no walkable path to the shop")
-	}
+        // The first trip of a session waits for the server skill list:
+        // the learning stops plan on the skill queue and the packet burst
+        // of the enter world (UserInfo, ItemList, SkillList) races the
+        // first hunt ticks - a trip that starts between the ItemList and
+        // the SkillList silently plans without the learning (the observed
+        // sessions shopped on their first walk and never carried the
+        // teach stop). The wait is bounded: a server that never lists
+        // skills keeps the trips selling and shopping.
+        if !l.tracker.SkillsListed() &&
+                time.Since(l.tracker.SessionStartedAt()) < skillListWaitLimit {
+                return
+        }
+        // A bot outside the hunting zone returns first: the zone return
+        // owns the walk until the bot is back in the zone. A town trip
+        // started outside the zone (a village respawn after an emergency
+        // logout) would try to walk to the village shops - where the bot
+        // already stands - and then fail to return to the zone, leaving
+        // the bot stuck at the village (the 2026-09-11 06:00 dump: test3
+        // at 43000 50184, the learning trip started before the zone
+        // return, both failed with "no dry path", the bot never moved).
+        shopping := l.shoppingTripEnabled() && l.shoppingWanted()
+        learning := l.learnTripWanted()
+        // The weapon run outranks every other trip reason: a character
+        // without any weapon shops for one at once, whatever the inventory
+        // and the lesson queue say.
+        weaponRun := l.weaponlessRunWanted()
+        if l.navigator == nil || !l.tripCooldownOver() ||
+                (!l.inventoryFull() && !shopping && !learning && !weaponRun) {
+                return
+        }
+        // A bot outside the hunting zone returns first: the zone return
+        // owns the walk until the bot is back in the zone. The weapon run
+        // is the sole exception - a bare-handed character shops for a
+        // weapon at once, even outside the zone (punching mobs through the
+        // walk home is worse than a late return). The 2026-09-11 06:00
+        // dump showed a learning trip starting at the village (outside the
+        // zone) before the zone return, both searches failed with "no dry
+        // path", and the bot never moved.
+        if !weaponRun && l.zone() != nil && !l.inZoneSelf() {
+                return
+        }
+        // The walk needs a standing character: a resting one stands up
+        // first and the trip starts on a later tick.
+        if !l.standUpGuarded(time.Now()) {
+                return
+        }
+        selfX, selfY, _, ok := l.tracker.SelfPosition()
+        if !ok {
+                return
+        }
+        merchant, ok := l.nearestMerchant(selfX, selfY)
+        if !ok {
+                return
+        }
+        // The trip plan freezes here, ONCE: the purchases the planner
+        // picked against the current gear and adena are exactly what
+        // this trip sells and buys - the sell first step banks their
+        // SellFirst credits, the stop planning distributes the purchases
+        // and nothing re-plans in between (a re-plan at the shop ran
+        // against the freed slots and the fresh adena and drifted: it
+        // re-bought the piece the trip had just sold and planned
+        // purchases whose displaced pieces were never queued - the
+        // 2026-09-11 two pairs of gloves report).
+        l.tripPlan = l.shoppingPlan()
+        // The gear the trip starts with is the baseline the trip exits
+        // compare against: a slot the trip empties without landing the
+        // replacement becomes gear debt (see gearDebtCheck).
+        l.snapshotTripGear()
+        // The weapon leads the trip that buys it: the sell stop routes to
+        // the weapon purchase's merchant, so the sell-first of the replaced
+        // weapon and the buy share ONE stop (the junk sells at any
+        // merchant) and the replacement lands right after the sale instead
+        // of a village walk later - every abort in between used to leave
+        // the character bare-handed. A bare-handed character runs the
+        // weapon errand alone: the lessons and the books wait for the next
+        // trip, nothing outranks the weapon.
+        if weaponMerchant, ok := l.weaponStopMerchant(); ok {
+                merchant = weaponMerchant
+        }
+        // The walk back target: the farm spot when the trip starts inside
+        // the hunting zone, the zone center otherwise (a village respawn,
+        // a chase that ran away).
+        l.rememberFarmSpot()
+        l.tripStart = time.Now()
+        l.sold = make(map[int32]bool)
+        l.rePaths = 0
+        l.tripStops = []tripStop{{
+                merchant: merchant,
+                sell:     true,
+                buys:     nil,
+                teach:    false,
+        }}
+        l.buysPlanned = false
+        l.buyAt = time.Time{}
+        l.buyRequested = nil
+        l.buyConfirmAt = time.Time{}
+        l.buyRetries = 0
+        l.frozenStage = 0
+        l.directLeg = false
+        l.resetReplacementSales()
+        l.resetLearnState()
+        // The learning stops no longer ride the trip start: they plan
+        // AFTER the gear stops at the sell stop (see tickTownSell), so
+        // one town visit buys the weapon, the armor, the jewels, the
+        // books and teaches the lessons - the user rule of the one
+        // town visit. The weapon stop still runs FIRST (the sell stop
+        // routes to the weapon merchant), so a stuck teacher leg can
+        // no longer strand a bare-handed character: the weapon is
+        // bought and worn before the teacher leg ever runs.
+        l.phase = phaseTownWalk
+        stats := l.tracker.InventoryStats()
+        reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
+                strconv.FormatFloat(stats.WeightPercent, 'f', 0, 64) +
+                "% weight"
+        if !l.inventoryFull() {
+                reason = "the shop strategy plans purchases worth " +
+                        strconv.FormatInt(gear.AdenaSpent(l.tripPlan), 10) +
+                        " adena"
+        }
+        if weaponRun {
+                // The bare-handed errand names itself: the 2 damage punches of
+                // the dump report read at a glance in the log tail.
+                reason = "no weapon in hand, the weapon run comes first"
+        }
+        if learning {
+                // The learning contributes its lesson budget to the reason:
+                // a learning-only trip names it, a combined one appends it.
+                lessons := l.learnableLessons()
+                lessonReason := strconv.Itoa(len(lessons)) + " lessons worth " +
+                        strconv.FormatInt(spTotal(lessons), 10) + " sp wait at " +
+                        "the teacher"
+                if l.inventoryFull() || shopping {
+                        reason += ", " + lessonReason
+                } else {
+                        reason = lessonReason
+                }
+        }
+        if l.gearDebtRunWanted() {
+                // The refill names itself: the stranded slot of the dump
+                // report reads at a glance in the log tail.
+                reason += " (the gear debt refill)"
+        }
+        // The trigger plan cache drops: the frozen trip plan owns the
+        // trip now, the cache only feeds the widget view between the
+        // recomputes.
+        l.shoppingPlanCache = nil
+        l.shoppingPlanAt = time.Time{}
+        l.shoppingPlanAdena = 0
+        if l.journal != nil {
+                l.journal.TripStart(l.tracker.ID(), reason)
+        }
+        l.logf("Hunt: %s, walking to the trader %s", reason,
+                merchant.Name)
+        l.legRadius = tripApproachRadius
+        if !l.startWalkLeg(townNpcPosition(merchant)) {
+                // The dry search walls the water off and the shop sits
+                // across it on this deployment (the observed six hour
+                // run: 47 trips aborted on "no walkable path to the
+                // shop" while the shopping plan starved); the non-dry
+                // fallback routes through it and the click guard of the
+                // follower walks the shore legs - the same escalation
+                // the zone return runs when its dry search fails for
+                // unknown reasons.
+                if !l.startWalkLegSearch(townNpcPosition(merchant), true) {
+                        l.abortTownTrip("no walkable path to the shop")
+                }
+        }
 }
 
 // townNpcPosition returns the spawn point of the npc.
 func townNpcPosition(npc townNpc) pathfind.Vec3 {
-	return pathfind.Vec3{
-		X: float64(npc.X),
-		Y: float64(npc.Y),
-		Z: float64(npc.Z),
-	}
+        return pathfind.Vec3{
+                X: float64(npc.X),
+                Y: float64(npc.Y),
+                Z: float64(npc.Z),
+        }
 }
 
 // npcApproachPoint computes the ground click target for a town npc
@@ -644,89 +677,89 @@ func townNpcPosition(npc townNpc) pathfind.Vec3 {
 // bot's own x and y are returned (the click collapses to a no-op the
 // caller skips in favor of the talk click).
 func npcApproachPoint(
-	npcX, npcY, npcZ, selfX, selfY int32,
+        npcX, npcY, npcZ, selfX, selfY int32,
 ) (int32, int32, int32) {
-	dx := float64(selfX - npcX)
-	dy := float64(selfY - npcY)
-	dist := math.Hypot(dx, dy)
-	if dist < 1 {
-		return npcX, npcY, npcZ
-	}
-	frac := npcApproachOffset / dist
-	if frac >= 1 {
-		return selfX, selfY, npcZ
-	}
-	ax := float64(npcX) + dx*frac
-	ay := float64(npcY) + dy*frac
+        dx := float64(selfX - npcX)
+        dy := float64(selfY - npcY)
+        dist := math.Hypot(dx, dy)
+        if dist < 1 {
+                return npcX, npcY, npcZ
+        }
+        frac := npcApproachOffset / dist
+        if frac >= 1 {
+                return selfX, selfY, npcZ
+        }
+        ax := float64(npcX) + dx*frac
+        ay := float64(npcY) + dy*frac
 
-	return int32(math.Round(ax)), int32(math.Round(ay)), npcZ
+        return int32(math.Round(ax)), int32(math.Round(ay)), npcZ
 }
 
 // rememberFarmSpot stores the walk home target of a trip: the position
 // of the character when it starts inside the hunting zone, the zone
 // center otherwise (a village respawn, a chase that ran away).
 func (l *Loop) rememberFarmSpot() {
-	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
-	if !ok {
-		return
-	}
-	if l.inZoneSelf() {
-		l.farmX, l.farmY, l.farmZ = selfX, selfY, selfZ
+        selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+        if !ok {
+                return
+        }
+        if l.inZoneSelf() {
+                l.farmX, l.farmY, l.farmZ = selfX, selfY, selfZ
 
-		return
-	}
-	zone := l.zone()
-	if zone == nil {
-		l.farmX, l.farmY, l.farmZ = selfX, selfY, selfZ
+                return
+        }
+        zone := l.zone()
+        if zone == nil {
+                l.farmX, l.farmY, l.farmZ = selfX, selfY, selfZ
 
-		return
-	}
-	l.farmX, l.farmY, l.farmZ = zone.CX, zone.CY, selfZ
+                return
+        }
+        l.farmX, l.farmY, l.farmZ = zone.CX, zone.CY, selfZ
 }
 
 // walkToward sends a ground click walk to the point at most once per
 // walk request period, sharing the move pacing of the trip machinery.
 func (l *Loop) walkToward(x, y, z int32, now time.Time) {
-	if !l.moveAt.IsZero() && now.Sub(l.moveAt) < walkRequestPeriod {
-		return
-	}
-	l.moveAt = now
-	if err := l.game.WalkTo(x, y, z); err != nil {
-		l.logf("Hunt: walk request failed: %v", err)
-	}
+        if !l.moveAt.IsZero() && now.Sub(l.moveAt) < walkRequestPeriod {
+                return
+        }
+        l.moveAt = now
+        if err := l.game.WalkTo(x, y, z); err != nil {
+                l.logf("Hunt: walk request failed: %v", err)
+        }
 }
 
 // tickTownTrip advances the running town trip by one decision.
 func (l *Loop) tickTownTrip() {
-	if time.Since(l.tripStart) > tripTimeout {
-		l.abortTownTrip("trip timed out")
+        if time.Since(l.tripStart) > tripTimeout {
+                l.abortTownTrip("trip timed out")
 
-		return
-	}
-	if l.interruptTripForAttacker(time.Now()) {
-		return
-	}
-	switch l.phase {
-	case phaseTownWalk:
-		if l.walkTownWaypoints() {
-			l.enterSellPhase()
-		}
-	case phaseTownSell:
-		l.tickTownSell()
-	case phaseTownReturn:
-		// Entering the zone with a target in reach ends the walk:
-		// the hunt answers whatever the entry radius offers
-		// instead of marching to the center first.
-		if l.engagesOnZoneEntry() {
-			return
-		}
-		if l.walkTownWaypoints() {
-			l.endTownTrip("back at the farm spot")
-		}
-	default:
-		// The non-town phases never reach the town tick (the trip
-		// trigger starts the walk phase first).
-	}
+                return
+        }
+        if l.interruptTripForAttacker(time.Now()) {
+                return
+        }
+        switch l.phase {
+        case phaseTownWalk:
+                if l.walkTownWaypoints() {
+                        l.enterSellPhase()
+                }
+        case phaseTownSell:
+                l.tickTownSell()
+        case phaseTownReturn:
+                // Entering the zone with a target in reach ends the walk:
+                // the hunt answers whatever the entry radius offers
+                // instead of marching to the center first.
+                if l.engagesOnZoneEntry() {
+                        return
+                }
+                if l.walkTownWaypoints() {
+                        l.endTownTrip("back at the farm spot")
+                }
+        default:
+                // The non-town phases never reach the town tick (the trip
+                // trigger starts the walk phase first).
+        }
 }
 
 // interruptTripForAttacker answers the aggro that reaches the
@@ -743,25 +776,25 @@ func (l *Loop) tickTownTrip() {
 // chase never shakes). It reports whether the tick was consumed by
 // the answer.
 func (l *Loop) interruptTripForAttacker(now time.Time) bool {
-	attacker, ok := l.tracker.NearestAttacker()
-	if !ok {
-		return false
-	}
-	l.resetTownTrip()
-	if l.attackerEngageable(attacker.ObjectID) {
-		l.target = attacker.ObjectID
-		l.engageAt = now
-		l.clearBlindRecovery()
-		l.logger.Printf("Hunt: town trip interrupted: %s is on us, "+
-			"fighting it", attacker.Name)
+        attacker, ok := l.tracker.NearestAttacker()
+        if !ok {
+                return false
+        }
+        l.resetTownTrip()
+        if l.attackerEngageable(attacker.ObjectID) {
+                l.target = attacker.ObjectID
+                l.engageAt = now
+                l.clearBlindRecovery()
+                l.logger.Printf("Hunt: town trip interrupted: %s is on us, "+
+                        "fighting it", attacker.Name)
 
-		return true
-	}
-	l.logger.Printf("Hunt: town trip interrupted: %s is on us and "+
-		"cannot be won, switching to the defense", attacker.Name)
-	l.fleeFromThreat(now)
+                return true
+        }
+        l.logger.Printf("Hunt: town trip interrupted: %s is on us and "+
+                "cannot be won, switching to the defense", attacker.Name)
+        l.fleeFromThreat(now)
 
-	return true
+        return true
 }
 
 // startWalkLeg plans the walk to the destination and arms the waypoint
@@ -778,7 +811,7 @@ func (l *Loop) interruptTripForAttacker(now time.Time) bool {
 // walk plan view - the dump shows the whole walk from it. It reports
 // whether the leg was planned.
 func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
-	return l.startWalkLegSearch(dest, false)
+        return l.startWalkLegSearch(dest, false)
 }
 
 // startZoneReturnLeg plans the zone return walk with a non-dry
@@ -795,13 +828,13 @@ func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
 // legs is still safe to walk - the bot follows the dry parts and
 // re-plans at the waterline. It reports whether the leg was planned.
 func (l *Loop) startZoneReturnLeg(dest pathfind.Vec3) bool {
-	if l.startWalkLegSearch(dest, false) {
-		return true
-	}
-	l.logger.Printf("Hunt: no dry zone return path to %d %d, "+
-		"trying the non-dry search", int(dest.X), int(dest.Y))
+        if l.startWalkLegSearch(dest, false) {
+                return true
+        }
+        l.logger.Printf("Hunt: no dry zone return path to %d %d, "+
+                "trying the non-dry search", int(dest.X), int(dest.Y))
 
-	return l.startWalkLegSearch(dest, true)
+        return l.startWalkLegSearch(dest, true)
 }
 
 // startWalkLegSearch plans the walk to the destination through either
@@ -814,54 +847,54 @@ func (l *Loop) startZoneReturnLeg(dest pathfind.Vec3) bool {
 // planner detours instead of reproducing the frozen corridor. It
 // reports whether the leg was planned.
 func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
-	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
-	if !ok {
-		return false
-	}
-	from := pathfind.Vec3{
-		X: float64(selfX),
-		Y: float64(selfY),
-		Z: float64(selfZ),
-	}
-	radius := l.legRadius
-	if radius <= 0 {
-		radius = tripApproachRadius
-	}
-	var result *pathfind.Result
-	var err error
-	if nonDry {
-		result, err = l.navigator.FindPathApproach(from, dest, radius)
-	} else {
-		result, err = l.navigator.FindPathApproachDryAvoiding(
-			from, dest, radius, l.frozenAreas)
-	}
-	if err != nil {
-		l.logf("Hunt: town trip path search failed: %v", err)
+        selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+        if !ok {
+                return false
+        }
+        from := pathfind.Vec3{
+                X: float64(selfX),
+                Y: float64(selfY),
+                Z: float64(selfZ),
+        }
+        radius := l.legRadius
+        if radius <= 0 {
+                radius = tripApproachRadius
+        }
+        var result *pathfind.Result
+        var err error
+        if nonDry {
+                result, err = l.navigator.FindPathApproach(from, dest, radius)
+        } else {
+                result, err = l.navigator.FindPathApproachDryAvoiding(
+                        from, dest, radius, l.frozenAreas)
+        }
+        if err != nil {
+                l.logf("Hunt: town trip path search failed: %v", err)
 
-		return false
-	}
-	if result == nil || !result.Found || len(result.Waypoints) == 0 {
-		if !nonDry {
-			l.logf("Hunt: no dry path to %d %d, the walk would "+
-				"swim", int(dest.X), int(dest.Y))
-		} else {
-			l.logf("Hunt: no path to %d %d at all",
-				int(dest.X), int(dest.Y))
-		}
+                return false
+        }
+        if result == nil || !result.Found || len(result.Waypoints) == 0 {
+                if !nonDry {
+                        l.logf("Hunt: no dry path to %d %d, the walk would "+
+                                "swim", int(dest.X), int(dest.Y))
+                } else {
+                        l.logf("Hunt: no path to %d %d at all",
+                                int(dest.X), int(dest.Y))
+                }
 
-		return false
-	}
-	l.waypoints = result.Waypoints
-	l.wpIndex = 0
-	l.legDest = dest
-	l.legStart = from
-	l.waterEscape = false
-	l.directLeg = false
-	l.moveAt = time.Time{}
-	l.stuckAt = time.Time{}
-	l.stuckFast = false
+                return false
+        }
+        l.waypoints = result.Waypoints
+        l.wpIndex = 0
+        l.legDest = dest
+        l.legStart = from
+        l.waterEscape = false
+        l.directLeg = false
+        l.moveAt = time.Time{}
+        l.stuckAt = time.Time{}
+        l.stuckFast = false
 
-	return true
+        return true
 }
 
 // waypointDistance measures the distance from the character to a
@@ -873,13 +906,13 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
 // city railing. The geodata waypoints carry the real layer height,
 // so the z axis is exact for them.
 func waypointDistance(
-	wp pathfind.Vec3, selfX, selfY, selfZ int32,
+        wp pathfind.Vec3, selfX, selfY, selfZ int32,
 ) float64 {
-	dx := wp.X - float64(selfX)
-	dy := wp.Y - float64(selfY)
-	dz := wp.Z - float64(selfZ)
+        dx := wp.X - float64(selfX)
+        dy := wp.Y - float64(selfY)
+        dz := wp.Z - float64(selfZ)
 
-	return math.Sqrt(dx*dx + dy*dy + dz*dz)
+        return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }
 
 // waypointArrived reports whether the follower counts the waypoint at
@@ -893,16 +926,16 @@ func waypointDistance(
 // radius: the wide slack would end the walk a whole ring short of the
 // teacher.
 func waypointArrived(
-	waypoints []pathfind.Vec3, index int, selfX, selfY, selfZ int32,
-	finalArrive float64,
+        waypoints []pathfind.Vec3, index int, selfX, selfY, selfZ int32,
+        finalArrive float64,
 ) bool {
-	radius := waypointPassDist
-	if index == len(waypoints)-1 {
-		radius = finalArrive
-	}
+        radius := waypointPassDist
+        if index == len(waypoints)-1 {
+                radius = finalArrive
+        }
 
-	return waypointDistance(waypoints[index], selfX, selfY, selfZ) <=
-		radius
+        return waypointDistance(waypoints[index], selfX, selfY, selfZ) <=
+                radius
 }
 
 // finalArriveRadius answers the arrival radius of the final waypoint
@@ -914,11 +947,11 @@ func waypointArrived(
 // clicks whose lines cross the roof-only interior bands (the trainer
 // hall rows carry the floor, the spaces between them do not).
 func (l *Loop) finalArriveRadius() float64 {
-	if l.legRadius > 0 && l.legRadius < tripApproachRadius {
-		return waypointPassDist
-	}
+        if l.legRadius > 0 && l.legRadius < tripApproachRadius {
+                return waypointPassDist
+        }
 
-	return waypointArriveDist
+        return waypointArriveDist
 }
 
 // waypointPassed reports whether the character already moved past the
@@ -937,25 +970,25 @@ func (l *Loop) finalArriveRadius() float64 {
 // distance, and a segment that degenerates in the plane (a vertical
 // drop) never passes the character by the lateral logic.
 func waypointPassed(
-	wp, next pathfind.Vec3, selfX, selfY int32,
+        wp, next pathfind.Vec3, selfX, selfY int32,
 ) bool {
-	segX := next.X - wp.X
-	segY := next.Y - wp.Y
-	segLen := math.Hypot(segX, segY)
-	if segLen < 1 {
-		// A vertical drop segment: no planar pass geometry.
-		return false
-	}
-	selfDX := float64(selfX) - wp.X
-	selfDY := float64(selfY) - wp.Y
-	along := (selfDX*segX + selfDY*segY) / segLen
-	if along <= 0 {
-		// Still before the waypoint: nothing passed yet.
-		return false
-	}
-	lateral := math.Abs(selfDX*segY-selfDY*segX) / segLen
+        segX := next.X - wp.X
+        segY := next.Y - wp.Y
+        segLen := math.Hypot(segX, segY)
+        if segLen < 1 {
+                // A vertical drop segment: no planar pass geometry.
+                return false
+        }
+        selfDX := float64(selfX) - wp.X
+        selfDY := float64(selfY) - wp.Y
+        along := (selfDX*segX + selfDY*segY) / segLen
+        if along <= 0 {
+                // Still before the waypoint: nothing passed yet.
+                return false
+        }
+        lateral := math.Abs(selfDX*segY-selfDY*segX) / segLen
 
-	return lateral <= waypointCorridor
+        return lateral <= waypointCorridor
 }
 
 // walkTownWaypoints follows the planned waypoints with ground click
@@ -978,43 +1011,43 @@ func waypointPassed(
 // current position to the leg destination, bounded by the re-path
 // budget of the trip.
 func (l *Loop) walkTownWaypoints() bool {
-	selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
-	if !ok {
-		return false
-	}
-	if l.directLeg {
-		// The frozen leg escalation handed the walk to the
-		// server's own routing: the geodata plan proved unable
-		// to move the character, the plain follower has nothing
-		// left to follow (see walkDirectLeg).
-		return l.walkDirectLeg(time.Now(), selfX, selfY, selfZ)
-	}
-	if l.navigator != nil {
-		if l.navigator.OverWater(
-			float64(selfX), float64(selfY), int16(selfZ)) {
-			return l.walkWaterEscape(selfX, selfY, selfZ)
-		}
-		if l.waterEscape {
-			// The character is back on dry ground: the escape is done,
-			// the interrupted leg re-plans from the shore with a fresh
-			// re-path budget (the escape was a recovery, not a failure).
-			l.waterEscape = false
-			l.rePaths = 0
-			l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
-			l.stuckFast = false
-			l.logger.Printf("Hunt: back on the shore at %d %d %d, "+
-				"re-planning the walk", selfX, selfY, selfZ)
-			if !l.startWalkLeg(l.legDest) {
-				l.abortTownTrip("no walkable path from the shore")
+        selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+        if !ok {
+                return false
+        }
+        if l.directLeg {
+                // The frozen leg escalation handed the walk to the
+                // server's own routing: the geodata plan proved unable
+                // to move the character, the plain follower has nothing
+                // left to follow (see walkDirectLeg).
+                return l.walkDirectLeg(time.Now(), selfX, selfY, selfZ)
+        }
+        if l.navigator != nil {
+                if l.navigator.OverWater(
+                        float64(selfX), float64(selfY), int16(selfZ)) {
+                        return l.walkWaterEscape(selfX, selfY, selfZ)
+                }
+                if l.waterEscape {
+                        // The character is back on dry ground: the escape is done,
+                        // the interrupted leg re-plans from the shore with a fresh
+                        // re-path budget (the escape was a recovery, not a failure).
+                        l.waterEscape = false
+                        l.rePaths = 0
+                        l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
+                        l.stuckFast = false
+                        l.logger.Printf("Hunt: back on the shore at %d %d %d, "+
+                                "re-planning the walk", selfX, selfY, selfZ)
+                        if !l.startWalkLeg(l.legDest) {
+                                l.abortTownTrip("no walkable path from the shore")
 
-				return false
-			}
+                                return false
+                        }
 
-			return false
-		}
-	}
+                        return false
+                }
+        }
 
-	return l.followWaypoints(selfX, selfY, selfZ, time.Now(), true)
+        return l.followWaypoints(selfX, selfY, selfZ, time.Now(), true)
 }
 
 // walkDirectLeg drives the server routed walk of a frozen town leg:
@@ -1032,50 +1065,50 @@ func (l *Loop) walkTownWaypoints() bool {
 // grinding refused clicks forever. It reports whether the leg
 // arrived at its destination.
 func (l *Loop) walkDirectLeg(
-	now time.Time, selfX, selfY, selfZ int32,
+        now time.Time, selfX, selfY, selfZ int32,
 ) bool {
-	radius := l.legRadius
-	if radius <= 0 {
-		radius = tripApproachRadius
-	}
-	if waypointDistance(l.legDest, selfX, selfY, selfZ) <= radius {
-		l.directLeg = false
-		l.logf("Hunt: the server routed walk reached %d %d",
-			int32(l.legDest.X), int32(l.legDest.Y))
+        radius := l.legRadius
+        if radius <= 0 {
+                radius = tripApproachRadius
+        }
+        if waypointDistance(l.legDest, selfX, selfY, selfZ) <= radius {
+                l.directLeg = false
+                l.logf("Hunt: the server routed walk reached %d %d",
+                        int32(l.legDest.X), int32(l.legDest.Y))
 
-		return true
-	}
-	if now.After(l.directLegUntil) {
-		l.directLeg = false
-		l.abortTownTrip("the server routed walk made no progress")
+                return true
+        }
+        if now.After(l.directLegUntil) {
+                l.directLeg = false
+                l.abortTownTrip("the server routed walk made no progress")
 
-		return false
-	}
-	moveX, moveY, moveZ := l.directLegTarget(selfX, selfY)
-	if l.navigator != nil {
-		crossed, err := l.navigator.WaterCrossed(pathfind.Vec3{
-			X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-		}, pathfind.Vec3{
-			X: float64(moveX), Y: float64(moveY), Z: float64(moveZ),
-		})
-		if err == nil && crossed {
-			// The straight line to the target would swim: the
-			// geodata shore route owns that case, and it just
-			// failed - the trip ends with its cooldown.
-			l.directLeg = false
-			l.abortTownTrip("the server routed walk would swim")
+                return false
+        }
+        moveX, moveY, moveZ := l.directLegTarget(selfX, selfY)
+        if l.navigator != nil {
+                crossed, err := l.navigator.WaterCrossed(pathfind.Vec3{
+                        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+                }, pathfind.Vec3{
+                        X: float64(moveX), Y: float64(moveY), Z: float64(moveZ),
+                })
+                if err == nil && crossed {
+                        // The straight line to the target would swim: the
+                        // geodata shore route owns that case, and it just
+                        // failed - the trip ends with its cooldown.
+                        l.directLeg = false
+                        l.abortTownTrip("the server routed walk would swim")
 
-			return false
-		}
-	}
-	if ax, ay, dodged := l.steerClearOfAggro(
-		selfX, selfY, selfZ, moveX, moveY, moveZ,
-		int32(l.legDest.X), int32(l.legDest.Y), now); dodged {
-		moveX, moveY = ax, ay
-	}
-	l.walkToward(moveX, moveY, moveZ, now)
+                        return false
+                }
+        }
+        if ax, ay, dodged := l.steerClearOfAggro(
+                selfX, selfY, selfZ, moveX, moveY, moveZ,
+                int32(l.legDest.X), int32(l.legDest.Y), now); dodged {
+                moveX, moveY = ax, ay
+        }
+        l.walkToward(moveX, moveY, moveZ, now)
 
-	return false
+        return false
 }
 
 // directLegTarget resolves the click target of the direct server
@@ -1085,14 +1118,14 @@ func (l *Loop) walkDirectLeg(
 // leg destination itself for every other target (the return leg, the
 // farm spot).
 func (l *Loop) directLegTarget(selfX, selfY int32) (int32, int32, int32) {
-	if len(l.tripStops) > 0 {
-		npc := l.tripStops[0].merchant
-		if townNpcPosition(npc) == l.legDest {
-			return npcApproachPoint(npc.X, npc.Y, npc.Z, selfX, selfY)
-		}
-	}
+        if len(l.tripStops) > 0 {
+                npc := l.tripStops[0].merchant
+                if townNpcPosition(npc) == l.legDest {
+                        return npcApproachPoint(npc.X, npc.Y, npc.Z, selfX, selfY)
+                }
+        }
 
-	return int32(l.legDest.X), int32(l.legDest.Y), int32(l.legDest.Z)
+        return int32(l.legDest.X), int32(l.legDest.Y), int32(l.legDest.Z)
 }
 
 // advanceWaypoints walks the waypoint cursor forward as far as the
@@ -1108,22 +1141,22 @@ func (l *Loop) directLegTarget(selfX, selfY int32) (int32, int32, int32) {
 // plaza waypoint through the railing). The gated waypoint stays the
 // target: walking onto it re-opens the line.
 func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
-	for l.wpIndex < len(l.waypoints) {
-		arrived := waypointArrived(
-			l.waypoints, l.wpIndex, selfX, selfY, selfZ,
-			l.finalArriveRadius())
-		passed := !arrived && l.wpIndex+1 < len(l.waypoints) &&
-			waypointPassed(l.waypoints[l.wpIndex],
-				l.waypoints[l.wpIndex+1], selfX, selfY)
-		if !arrived && !passed {
-			return
-		}
-		if !l.legAdvanceClear(selfX, selfY, selfZ, l.wpIndex+1) {
-			return
-		}
-		l.wpIndex++
-		l.moveAt = time.Time{}
-	}
+        for l.wpIndex < len(l.waypoints) {
+                arrived := waypointArrived(
+                        l.waypoints, l.wpIndex, selfX, selfY, selfZ,
+                        l.finalArriveRadius())
+                passed := !arrived && l.wpIndex+1 < len(l.waypoints) &&
+                        waypointPassed(l.waypoints[l.wpIndex],
+                                l.waypoints[l.wpIndex+1], selfX, selfY)
+                if !arrived && !passed {
+                        return
+                }
+                if !l.legAdvanceClear(selfX, selfY, selfZ, l.wpIndex+1) {
+                        return
+                }
+                l.wpIndex++
+                l.moveAt = time.Time{}
+        }
 }
 
 // followWaypoints is the shared waypoint follower core of the town
@@ -1135,32 +1168,32 @@ func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
 // or not (the water escape: its legs intentionally cross the water
 // back to the shore).
 func (l *Loop) followWaypoints(
-	selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
+        selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
 ) bool {
-	l.advanceWaypoints(selfX, selfY, selfZ)
-	if l.wpIndex >= len(l.waypoints) {
-		return true
-	}
-	if l.walkStuck(now, selfX, selfY) {
-		return false
-	}
-	// The stuck handling may have re-planned the leg: the fresh plan
-	// starts at the standing cell, so its wp 0 IS the character's own
-	// position and a click at it is the self-click the server always
-	// collapses (distance below the cancellation limit) - the round 56
-	// reproduction caught the recovery burning a second re-path on
-	// exactly that refusal. Re-run the cursor advance so the click
-	// below aims the fresh plan's first real waypoint instead.
-	l.advanceWaypoints(selfX, selfY, selfZ)
-	if l.wpIndex >= len(l.waypoints) {
-		return true
-	}
-	if !l.moveAt.IsZero() && now.Sub(l.moveAt) < walkRequestPeriod {
-		return false
-	}
-	l.clickWaypoint(selfX, selfY, selfZ, now, waterGuard)
+        l.advanceWaypoints(selfX, selfY, selfZ)
+        if l.wpIndex >= len(l.waypoints) {
+                return true
+        }
+        if l.walkStuck(now, selfX, selfY) {
+                return false
+        }
+        // The stuck handling may have re-planned the leg: the fresh plan
+        // starts at the standing cell, so its wp 0 IS the character's own
+        // position and a click at it is the self-click the server always
+        // collapses (distance below the cancellation limit) - the round 56
+        // reproduction caught the recovery burning a second re-path on
+        // exactly that refusal. Re-run the cursor advance so the click
+        // below aims the fresh plan's first real waypoint instead.
+        l.advanceWaypoints(selfX, selfY, selfZ)
+        if l.wpIndex >= len(l.waypoints) {
+                return true
+        }
+        if !l.moveAt.IsZero() && now.Sub(l.moveAt) < walkRequestPeriod {
+                return false
+        }
+        l.clickWaypoint(selfX, selfY, selfZ, now, waterGuard)
 
-	return false
+        return false
 }
 
 // clickWaypoint aims the current waypoint, bends the click around the
@@ -1173,74 +1206,93 @@ func (l *Loop) followWaypoints(
 // being sent. Without a navigator both guards stay off (the walk was
 // planned elsewhere, the follower only walks it).
 func (l *Loop) clickWaypoint(
-	selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
+        selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
 ) {
-	wp := l.waypoints[l.wpIndex]
-	dx := wp.X - float64(selfX)
-	dy := wp.Y - float64(selfY)
-	dist := math.Hypot(dx, dy)
-	moveX, moveY, moveZ := wp.X, wp.Y, wp.Z
-	if dist > maxMoveLeg {
-		frac := maxMoveLeg / dist
-		moveX = float64(selfX) + dx*frac
-		moveY = float64(selfY) + dy*frac
-		moveZ = float64(selfZ) + (wp.Z-float64(selfZ))*frac
-	}
-	if l.extendArmed {
-		// The recovery of a stuck leg (extendArmed): the stuck
-		// proved the plain clicks of this leg do not move the
-		// character (a server side refusal the offline click
-		// validation cannot see), so the primary target under
-		// the server rescue floor or behind the character on
-		// the route gives way to the forward route samples.
-		behind := waypointBehindRoute(
-			l.waypoints, l.wpIndex, selfX, selfY)
-		if behind || dist < minWalkClick {
-			extX, extY, extZ, ok := l.extendShortClick(
-				selfX, selfY, selfZ, waterGuard,
-				moveX, moveY, moveZ)
-			if ok {
-				moveX, moveY, moveZ = extX, extY, extZ
-			} else if behind {
-				// No forward sample validates and the
-				// waypoint is behind: clicking it walks
-				// the character backward into the pocket
-				// the route samples just escaped. Hold
-				// the click - the stuck window re-plans
-				// from the standing cell, and the
-				// planner knows the wall the server-side
-				// routing has to route around.
-				return
-			}
-		}
-	}
-	// The aggro-aware steering: the camps of idle aggressive mobs
-	// sitting on the leg bend it sideways (see loop_avoid.go). Every
-	// transit walk passes through it - the town runs both ways, the
-	// returns to the farm spot, the inter-ground walks of the spot
-	// economy - while the mobs at the destination stay exempt.
-	moveXI, moveYI := int32(math.Round(moveX)), int32(math.Round(moveY))
-	moveZI := int32(math.Round(moveZ))
-	if ax, ay, dodged := l.steerClearOfAggro(
-		selfX, selfY, selfZ, moveXI, moveYI, moveZI,
-		int32(l.legDest.X), int32(l.legDest.Y), now); dodged {
-		moveX, moveY = float64(ax), float64(ay)
-	}
-	if waterGuard && l.navigator != nil && l.clickWouldEnterWater(
-		selfX, selfY, selfZ, moveX, moveY, moveZ) {
-		return
-	}
-	// The server click validation runs last: the server refuses
-	// whole lines its Bresenham raster walks into walled corners -
-	// a refused click never moves the character.
-	if l.navigator != nil && !l.clickServerValidated(
-		selfX, selfY, selfZ, &moveX, &moveY, &moveZ, now) {
-		return
-	}
-	l.moveAt = now
-	if err := l.game.WalkTo(int32(moveX), int32(moveY), int32(moveZ)); err != nil {
-		l.logf("Hunt: town walk request failed: %v", err)
-	}
+        wp := l.waypoints[l.wpIndex]
+        dx := wp.X - float64(selfX)
+        dy := wp.Y - float64(selfY)
+        dist := math.Hypot(dx, dy)
+        moveX, moveY, moveZ := wp.X, wp.Y, wp.Z
+        if dist > maxMoveLeg {
+                frac := maxMoveLeg / dist
+                moveX = float64(selfX) + dx*frac
+                moveY = float64(selfY) + dy*frac
+                moveZ = float64(selfZ) + (wp.Z-float64(selfZ))*frac
+        }
+        if l.extendArmed {
+                // The recovery of a stuck leg (extendArmed): the stuck
+                // proved the plain clicks of this leg do not move the
+                // character (a server side refusal the offline click
+                // validation cannot see), so the primary target under
+                // the server rescue floor or behind the character on
+                // the route gives way to the forward route samples.
+                behind := waypointBehindRoute(
+                        l.waypoints, l.wpIndex, selfX, selfY)
+                if behind || dist < minWalkClick {
+                        extX, extY, extZ, ok := l.extendShortClick(
+                                selfX, selfY, selfZ, waterGuard,
+                                moveX, moveY, moveZ)
+                        if ok {
+                                moveX, moveY, moveZ = extX, extY, extZ
+                        } else if behind {
+                                // No forward sample validates and the
+                                // waypoint is behind: clicking it walks
+                                // the character backward into the pocket
+                                // the route samples just escaped. Hold
+                                // the click - the stuck window re-plans
+                                // from the standing cell, and the
+                                // planner knows the wall the server-side
+                                // routing has to route around.
+                                return
+                        }
+                }
+        }
+        // A click target inside an idle mob's trigger circle cannot be
+        // reached by any tangent arc (the tangent side flips at every
+        // re-issue, see legTargetThreatened): skip the waypoint ahead
+        // instead of ping-ponging around the camp for hours. The skip
+        // reuses the stuck machinery's clear-successor gate, so the cursor
+        // only jumps onto a waypoint the standing cell can click directly.
+        moveXI, moveYI := int32(math.Round(moveX)), int32(math.Round(moveY))
+        moveZI := int32(math.Round(moveZ))
+        if l.legTargetThreatened(moveXI, moveYI,
+                int32(l.legDest.X), int32(l.legDest.Y)) {
+                if next := l.nextClearWaypoint(selfX, selfY, selfZ); next > l.wpIndex {
+                        l.wpIndex = next
+                        l.moveAt = time.Time{}
+                        l.logger.Printf("Hunt: the waypoint sits inside an aggro "+
+                                "circle, skipping ahead (cursor %d of %d)",
+                                l.wpIndex, len(l.waypoints))
+
+                        return
+                }
+                // No clear successor: the stuck escalation owns the leg.
+        }
+        // The aggro-aware steering: the camps of idle aggressive mobs
+        // sitting on the leg bend it sideways (see loop_avoid.go). Every
+        // transit walk passes through it - the town runs both ways, the
+        // returns to the farm spot, the inter-ground walks of the spot
+        // economy - while the mobs at the destination stay exempt.
+        if ax, ay, dodged := l.steerClearOfAggro(
+                selfX, selfY, selfZ, moveXI, moveYI, moveZI,
+                int32(l.legDest.X), int32(l.legDest.Y), now); dodged {
+                moveX, moveY = float64(ax), float64(ay)
+        }
+        if waterGuard && l.navigator != nil && l.clickWouldEnterWater(
+                selfX, selfY, selfZ, moveX, moveY, moveZ) {
+                return
+        }
+        // The server click validation runs last: the server refuses
+        // whole lines its Bresenham raster walks into walled corners -
+        // a refused click never moves the character.
+        if l.navigator != nil && !l.clickServerValidated(
+                selfX, selfY, selfZ, &moveX, &moveY, &moveZ, now) {
+                return
+        }
+        l.moveAt = now
+        if err := l.game.WalkTo(int32(moveX), int32(moveY), int32(moveZ)); err != nil {
+                l.logf("Hunt: town walk request failed: %v", err)
+        }
 }
 
 // waypointBehindRoute reports whether the waypoint at the index sits
@@ -1260,26 +1312,26 @@ func (l *Loop) clickWaypoint(
 // the character (the normal pull back onto the route, the round 56
 // gated waypoint design) never triggers it.
 func waypointBehindRoute(
-	waypoints []pathfind.Vec3, index int, selfX, selfY int32,
+        waypoints []pathfind.Vec3, index int, selfX, selfY int32,
 ) bool {
-	if index+1 >= len(waypoints) {
-		return false
-	}
-	wp := waypoints[index]
-	next := waypoints[index+1]
-	fdx := next.X - wp.X
-	fdy := next.Y - wp.Y
-	if math.Hypot(fdx, fdy) < 1 {
-		return false
-	}
-	if math.Hypot(wp.X-float64(selfX), wp.Y-float64(selfY)) >
-		waypointPassDist {
-		// The waypoint sits far away: the character has not passed
-		// it, whatever the segment direction says.
-		return false
-	}
+        if index+1 >= len(waypoints) {
+                return false
+        }
+        wp := waypoints[index]
+        next := waypoints[index+1]
+        fdx := next.X - wp.X
+        fdy := next.Y - wp.Y
+        if math.Hypot(fdx, fdy) < 1 {
+                return false
+        }
+        if math.Hypot(wp.X-float64(selfX), wp.Y-float64(selfY)) >
+                waypointPassDist {
+                // The waypoint sits far away: the character has not passed
+                // it, whatever the segment direction says.
+                return false
+        }
 
-	return (wp.X-float64(selfX))*fdx+(wp.Y-float64(selfY))*fdy < 0
+        return (wp.X-float64(selfX))*fdx+(wp.Y-float64(selfY))*fdy < 0
 }
 
 // extendShortClick re-aims a click whose primary target sits under the
@@ -1298,33 +1350,33 @@ func waypointBehindRoute(
 // refusal machinery of clickServerValidated answers it exactly like
 // today.
 func (l *Loop) extendShortClick(
-	selfX, selfY, selfZ int32, waterGuard bool,
-	primX, primY, primZ float64,
+        selfX, selfY, selfZ int32, waterGuard bool,
+        primX, primY, primZ float64,
 ) (float64, float64, float64, bool) {
-	if l.navigator == nil {
-		return primX, primY, primZ, true
-	}
-	from := pathfind.Vec3{
-		X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-	}
-	candidates, count := extendShortClickCandidates(
-		selfX, selfY, l.waypoints, l.wpIndex)
-	for c := 0; c < count; c++ {
-		sample := candidates[c]
-		if waterGuard {
-			if crossed, err := l.navigator.WaterCrossed(
-				from, sample); err == nil && crossed {
-				continue
-			}
-		}
-		if _, ok := l.navigator.ValidateClick(from, sample); !ok {
-			continue
-		}
+        if l.navigator == nil {
+                return primX, primY, primZ, true
+        }
+        from := pathfind.Vec3{
+                X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+        }
+        candidates, count := extendShortClickCandidates(
+                selfX, selfY, l.waypoints, l.wpIndex)
+        for c := 0; c < count; c++ {
+                sample := candidates[c]
+                if waterGuard {
+                        if crossed, err := l.navigator.WaterCrossed(
+                                from, sample); err == nil && crossed {
+                                continue
+                        }
+                }
+                if _, ok := l.navigator.ValidateClick(from, sample); !ok {
+                        continue
+                }
 
-		return sample.X, sample.Y, sample.Z, true
-	}
+                return sample.X, sample.Y, sample.Z, true
+        }
 
-	return primX, primY, primZ, false
+        return primX, primY, primZ, false
 }
 
 // extendShortClickCandidates marches the forward route of the plan
@@ -1341,44 +1393,44 @@ func (l *Loop) extendShortClick(
 // cycle). A route whose whole forward stretch stays under the floor
 // collects nothing - the arrival case keeps its plain waypoint click.
 func extendShortClickCandidates(
-	selfX, selfY int32,
-	waypoints []pathfind.Vec3, index int,
+        selfX, selfY int32,
+        waypoints []pathfind.Vec3, index int,
 ) ([extendCandidateMax]pathfind.Vec3, int) {
-	var out [extendCandidateMax]pathfind.Vec3
-	count := 0
-	px, py := float64(selfX), float64(selfY)
-	for i := index; i+1 < len(waypoints) && count < extendCandidateMax; i++ {
-		from, to := waypoints[i], waypoints[i+1]
-		fdx, fdy := to.X-from.X, to.Y-from.Y
-		seg := math.Hypot(fdx, fdy)
-		if seg < 1 {
-			continue
-		}
-		steps := int(seg/extendMarchStep) + 1
-		for s := 1; s <= steps && count < extendCandidateMax; s++ {
-			frac := float64(s) / float64(steps)
-			qx := from.X + fdx*frac
-			qy := from.Y + fdy*frac
-			relX, relY := qx-px, qy-py
-			if math.Hypot(relX, relY) < minWalkClick ||
-				relX*fdx+relY*fdy <= 0 {
-				// Under the rescue floor or backward along the
-				// route: a sample behind the character pulls the
-				// walk back off the ground the extension just
-				// walked (the 2026-09-11 11:34 reproduction
-				// ping ponged on exactly the samples near the
-				// pinned waypoint the character already passed).
-				continue
-			}
-			out[count] = pathfind.Vec3{
-				X: qx, Y: qy,
-				Z: from.Z + (to.Z-from.Z)*frac,
-			}
-			count++
-		}
-	}
+        var out [extendCandidateMax]pathfind.Vec3
+        count := 0
+        px, py := float64(selfX), float64(selfY)
+        for i := index; i+1 < len(waypoints) && count < extendCandidateMax; i++ {
+                from, to := waypoints[i], waypoints[i+1]
+                fdx, fdy := to.X-from.X, to.Y-from.Y
+                seg := math.Hypot(fdx, fdy)
+                if seg < 1 {
+                        continue
+                }
+                steps := int(seg/extendMarchStep) + 1
+                for s := 1; s <= steps && count < extendCandidateMax; s++ {
+                        frac := float64(s) / float64(steps)
+                        qx := from.X + fdx*frac
+                        qy := from.Y + fdy*frac
+                        relX, relY := qx-px, qy-py
+                        if math.Hypot(relX, relY) < minWalkClick ||
+                                relX*fdx+relY*fdy <= 0 {
+                                // Under the rescue floor or backward along the
+                                // route: a sample behind the character pulls the
+                                // walk back off the ground the extension just
+                                // walked (the 2026-09-11 11:34 reproduction
+                                // ping ponged on exactly the samples near the
+                                // pinned waypoint the character already passed).
+                                continue
+                        }
+                        out[count] = pathfind.Vec3{
+                                X: qx, Y: qy,
+                                Z: from.Z + (to.Z-from.Z)*frac,
+                        }
+                        count++
+                }
+        }
 
-	return out, count
+        return out, count
 }
 
 // clickServerValidated gates a walk click through the server
@@ -1395,48 +1447,48 @@ func extendShortClickCandidates(
 // re-path of the stuck path. It reports whether the click target in
 // the move pointers may be sent.
 func (l *Loop) clickServerValidated(
-	selfX, selfY, selfZ int32,
-	moveX, moveY, moveZ *float64, now time.Time,
+        selfX, selfY, selfZ int32,
+        moveX, moveY, moveZ *float64, now time.Time,
 ) bool {
-	from := pathfind.Vec3{
-		X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-	}
-	if _, ok := l.navigator.ValidateClick(from,
-		pathfind.Vec3{X: *moveX, Y: *moveY, Z: *moveZ}); ok {
-		return true
-	}
-	if l.shortenClickLeg(selfX, selfY, selfZ, moveX, moveY, moveZ, from) {
-		return true
-	}
-	if l.clickEscapeHop(selfX, selfY, selfZ, moveX, moveY, moveZ) {
-		return true
-	}
-	// No local escape works: re-path from the current position like
-	// the stuck path does, bounded by the same budget. A re-path
-	// from the cell the previous one already planned from (and
-	// moved nothing on) proves the fresh plan cannot move the
-	// character either: the trip aborts for its callers' recovery.
-	if l.noteRepathCell(selfX, selfY) {
-		l.abortFrozenTrip(
-			"the server refuses the walk click from this cell")
+        from := pathfind.Vec3{
+                X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+        }
+        if _, ok := l.navigator.ValidateClick(from,
+                pathfind.Vec3{X: *moveX, Y: *moveY, Z: *moveZ}); ok {
+                return true
+        }
+        if l.shortenClickLeg(selfX, selfY, selfZ, moveX, moveY, moveZ, from) {
+                return true
+        }
+        if l.clickEscapeHop(selfX, selfY, selfZ, moveX, moveY, moveZ) {
+                return true
+        }
+        // No local escape works: re-path from the current position like
+        // the stuck path does, bounded by the same budget. A re-path
+        // from the cell the previous one already planned from (and
+        // moved nothing on) proves the fresh plan cannot move the
+        // character either: the trip aborts for its callers' recovery.
+        if l.noteRepathCell(selfX, selfY) {
+                l.abortFrozenTrip(
+                        "the server refuses the walk click from this cell")
 
-		return false
-	}
-	l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
-	l.rePaths++
-	if l.rePaths > maxRePaths {
-		l.abortTownTrip("the server refuses every walk click")
+                return false
+        }
+        l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+        l.rePaths++
+        if l.rePaths > maxRePaths {
+                l.abortTownTrip("the server refuses every walk click")
 
-		return false
-	}
-	l.logger.Printf("Hunt: the server would refuse the walk click to "+
-		"%d %d, re-pathing (%d of %d)",
-		int32(*moveX), int32(*moveY), l.rePaths, maxRePaths)
-	if !l.startWalkLeg(l.legDest) {
-		l.abortTownTrip("re-path failed")
-	}
+                return false
+        }
+        l.logger.Printf("Hunt: the server would refuse the walk click to "+
+                "%d %d, re-pathing (%d of %d)",
+                int32(*moveX), int32(*moveY), l.rePaths, maxRePaths)
+        if !l.startWalkLeg(l.legDest) {
+                l.abortTownTrip("re-path failed")
+        }
 
-	return false
+        return false
 }
 
 // shortenClickLeg halves a refused click leg toward its target until a
@@ -1446,28 +1498,28 @@ func (l *Loop) clickServerValidated(
 // a shorter prefix passes. It reports whether the move pointers carry
 // a validated shorter target.
 func (l *Loop) shortenClickLeg(
-	selfX, selfY, selfZ int32,
-	moveX, moveY, moveZ *float64, from pathfind.Vec3,
+        selfX, selfY, selfZ int32,
+        moveX, moveY, moveZ *float64, from pathfind.Vec3,
 ) bool {
-	dx := *moveX - float64(selfX)
-	dy := *moveY - float64(selfY)
-	dz := *moveZ - float64(selfZ)
-	full := math.Hypot(dx, dy)
-	for leg := full / 2; leg >= clickShortenFloor; leg /= 2 {
-		frac := leg / full
-		shortX := float64(selfX) + dx*frac
-		shortY := float64(selfY) + dy*frac
-		shortZ := float64(selfZ) + dz*frac
-		if _, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
-			X: shortX, Y: shortY, Z: shortZ,
-		}); ok {
-			*moveX, *moveY, *moveZ = shortX, shortY, shortZ
+        dx := *moveX - float64(selfX)
+        dy := *moveY - float64(selfY)
+        dz := *moveZ - float64(selfZ)
+        full := math.Hypot(dx, dy)
+        for leg := full / 2; leg >= clickShortenFloor; leg /= 2 {
+                frac := leg / full
+                shortX := float64(selfX) + dx*frac
+                shortY := float64(selfY) + dy*frac
+                shortZ := float64(selfZ) + dz*frac
+                if _, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
+                        X: shortX, Y: shortY, Z: shortZ,
+                }); ok {
+                        *moveX, *moveY, *moveZ = shortX, shortY, shortZ
 
-			return true
-		}
-	}
+                        return true
+                }
+        }
 
-	return false
+        return false
 }
 
 // clickEscapeHop walks the nearest plan bend the arrival slack
@@ -1480,38 +1532,38 @@ func (l *Loop) shortenClickLeg(
 // validate from there. It reports whether the move pointers carry a
 // validated hop target.
 func (l *Loop) clickEscapeHop(
-	selfX, selfY, selfZ int32,
-	moveX, moveY, moveZ *float64,
+        selfX, selfY, selfZ int32,
+        moveX, moveY, moveZ *float64,
 ) bool {
-	from := pathfind.Vec3{
-		X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-	}
-	for j := l.wpIndex - 1; j >= 0; j-- {
-		wp := l.waypoints[j]
-		dist := waypointDistance(wp, selfX, selfY, selfZ)
-		if dist > waypointPassDist {
-			// Deeper waypoints stand farther back along the
-			// route: walking to them retraces the route
-			// instead of escaping the spot.
-			break
-		}
-		if dist <= hopCoincideDist {
-			// Stood on it: no hop needed.
-			continue
-		}
-		if _, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
-			X: wp.X, Y: wp.Y, Z: wp.Z,
-		}); ok {
-			*moveX, *moveY, *moveZ = wp.X, wp.Y, wp.Z
-			l.logger.Printf("Hunt: walk click refused, hopping "+
-				"back to the plan bend at %d %d",
-				int32(wp.X), int32(wp.Y))
+        from := pathfind.Vec3{
+                X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+        }
+        for j := l.wpIndex - 1; j >= 0; j-- {
+                wp := l.waypoints[j]
+                dist := waypointDistance(wp, selfX, selfY, selfZ)
+                if dist > waypointPassDist {
+                        // Deeper waypoints stand farther back along the
+                        // route: walking to them retraces the route
+                        // instead of escaping the spot.
+                        break
+                }
+                if dist <= hopCoincideDist {
+                        // Stood on it: no hop needed.
+                        continue
+                }
+                if _, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
+                        X: wp.X, Y: wp.Y, Z: wp.Z,
+                }); ok {
+                        *moveX, *moveY, *moveZ = wp.X, wp.Y, wp.Z
+                        l.logger.Printf("Hunt: walk click refused, hopping "+
+                                "back to the plan bend at %d %d",
+                                int32(wp.X), int32(wp.Y))
 
-			return true
-		}
-	}
+                        return true
+                }
+        }
 
-	return false
+        return false
 }
 
 // clickWouldEnterWater verifies the straight line of a ground click
@@ -1524,44 +1576,44 @@ func (l *Loop) clickEscapeHop(
 // paralyzed under its cliff). It reports whether the click was
 // refused and the walk re-planned.
 func (l *Loop) clickWouldEnterWater(
-	selfX, selfY, selfZ int32, moveX, moveY, moveZ float64,
+        selfX, selfY, selfZ int32, moveX, moveY, moveZ float64,
 ) bool {
-	crossed, err := l.navigator.WaterCrossed(
-		pathfind.Vec3{
-			X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-		},
-		pathfind.Vec3{X: moveX, Y: moveY, Z: moveZ},
-	)
-	if err != nil || !crossed {
-		// A line the geodata cannot verify stays on the old behavior:
-		// the walk was planned over the same data, the drift the
-		// guard exists for shows up as a wet line, not an error. The
-		// check itself is water only: a click over a height step of
-		// the terrain (the village deck ramps, the plaza above the
-		// shops) is a normal walk the server routing handles - the
-		// teacher legs of the learning trips died on the line of sight
-		// half of the old dry check, which read those ramps as water
-		// and aborted every trip that carried them.
-		return false
-	}
-	l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
-	l.stuckFast = false
-	l.rePaths++
-	if l.rePaths > maxRePaths {
-		l.abortTownTrip("the walk would cross water")
+        crossed, err := l.navigator.WaterCrossed(
+                pathfind.Vec3{
+                        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+                },
+                pathfind.Vec3{X: moveX, Y: moveY, Z: moveZ},
+        )
+        if err != nil || !crossed {
+                // A line the geodata cannot verify stays on the old behavior:
+                // the walk was planned over the same data, the drift the
+                // guard exists for shows up as a wet line, not an error. The
+                // check itself is water only: a click over a height step of
+                // the terrain (the village deck ramps, the plaza above the
+                // shops) is a normal walk the server routing handles - the
+                // teacher legs of the learning trips died on the line of sight
+                // half of the old dry check, which read those ramps as water
+                // and aborted every trip that carried them.
+                return false
+        }
+        l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
+        l.stuckFast = false
+        l.rePaths++
+        if l.rePaths > maxRePaths {
+                l.abortTownTrip("the walk would cross water")
 
-		return true
-	}
-	l.logger.Printf("Hunt: the walk would enter water at %d %d, "+
-		"re-pathing around the shore (%d of %d)",
-		selfX, selfY, l.rePaths, maxRePaths)
-	if !l.startWalkLeg(l.legDest) {
-		l.abortTownTrip("re-path failed")
+                return true
+        }
+        l.logger.Printf("Hunt: the walk would enter water at %d %d, "+
+                "re-pathing around the shore (%d of %d)",
+                selfX, selfY, l.rePaths, maxRePaths)
+        if !l.startWalkLeg(l.legDest) {
+                l.abortTownTrip("re-path failed")
 
-		return true
-	}
+                return true
+        }
 
-	return true
+        return true
 }
 
 // walkWaterEscape drives the shore recovery while the character
@@ -1576,29 +1628,29 @@ func (l *Loop) clickWouldEnterWater(
 // once the character is dry (walkTownWaypoints routes back to the
 // normal follower then).
 func (l *Loop) walkWaterEscape(
-	selfX, selfY, selfZ int32,
+        selfX, selfY, selfZ int32,
 ) bool {
-	if !l.waterEscape {
-		if !l.planWaterEscape(selfX, selfY, selfZ) {
-			l.abortTownTrip("stuck in the water without a shore path")
-		}
+        if !l.waterEscape {
+                if !l.planWaterEscape(selfX, selfY, selfZ) {
+                        l.abortTownTrip("stuck in the water without a shore path")
+                }
 
-		return false
-	}
-	if !l.followWaypoints(selfX, selfY, selfZ, time.Now(), false) {
-		return false
-	}
-	l.rePaths++
-	if l.rePaths > maxRePaths {
-		l.abortTownTrip("the water escape could not leave the water")
+                return false
+        }
+        if !l.followWaypoints(selfX, selfY, selfZ, time.Now(), false) {
+                return false
+        }
+        l.rePaths++
+        if l.rePaths > maxRePaths {
+                l.abortTownTrip("the water escape could not leave the water")
 
-		return false
-	}
-	if !l.planWaterEscape(selfX, selfY, selfZ) {
-		l.abortTownTrip("stuck in the water without a shore path")
-	}
+                return false
+        }
+        if !l.planWaterEscape(selfX, selfY, selfZ) {
+                l.abortTownTrip("stuck in the water without a shore path")
+        }
 
-	return false
+        return false
 }
 
 // planWaterEscape arms the walk out of the water to the nearest
@@ -1606,31 +1658,31 @@ func (l *Loop) walkWaterEscape(
 // cursor restarts and the stuck tracking clears so the slow swim
 // gets a fresh stuck window. It reports whether an escape was found.
 func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
-	from := pathfind.Vec3{
-		X: float64(selfX),
-		Y: float64(selfY),
-		Z: float64(selfZ),
-	}
-	result, err := l.navigator.FindWaterEscape(from)
-	if err != nil || result == nil || !result.Found ||
-		len(result.Waypoints) == 0 {
-		l.logger.Printf("Hunt: no walkable shore from %d %d %d: %v",
-			selfX, selfY, selfZ, err)
+        from := pathfind.Vec3{
+                X: float64(selfX),
+                Y: float64(selfY),
+                Z: float64(selfZ),
+        }
+        result, err := l.navigator.FindWaterEscape(from)
+        if err != nil || result == nil || !result.Found ||
+                len(result.Waypoints) == 0 {
+                l.logger.Printf("Hunt: no walkable shore from %d %d %d: %v",
+                        selfX, selfY, selfZ, err)
 
-		return false
-	}
-	l.waypoints = result.Waypoints
-	l.wpIndex = 0
-	l.waterEscape = true
-	l.moveAt = time.Time{}
-	l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
-	l.stuckFast = false
-	last := result.Waypoints[len(result.Waypoints)-1]
-	l.logger.Printf("Hunt: character stands in the water at %d %d %d, "+
-		"escaping to the shore at %d %d %d",
-		selfX, selfY, selfZ, int32(last.X), int32(last.Y), int32(last.Z))
+                return false
+        }
+        l.waypoints = result.Waypoints
+        l.wpIndex = 0
+        l.waterEscape = true
+        l.moveAt = time.Time{}
+        l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
+        l.stuckFast = false
+        last := result.Waypoints[len(result.Waypoints)-1]
+        l.logger.Printf("Hunt: character stands in the water at %d %d %d, "+
+                "escaping to the shore at %d %d %d",
+                selfX, selfY, selfZ, int32(last.X), int32(last.Y), int32(last.Z))
 
-	return true
+        return true
 }
 
 // legAdvanceClear reports whether the follower may advance past the
@@ -1653,79 +1705,126 @@ func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
 // the line. A line the geodata cannot verify stays clear - the
 // follower then keeps the pre-gate behavior.
 func (l *Loop) legAdvanceClear(
-	selfX, selfY, selfZ int32, next int,
+        selfX, selfY, selfZ int32, next int,
 ) bool {
-	if next >= len(l.waypoints) || l.navigator == nil {
-		return true
-	}
-	walkable, err := l.navigator.LineOfSight(
-		pathfind.Vec3{
-			X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-		},
-		l.waypoints[next],
-	)
-	if err != nil {
-		return true
-	}
+        if next >= len(l.waypoints) || l.navigator == nil {
+                return true
+        }
+        walkable, err := l.navigator.LineOfSight(
+                pathfind.Vec3{
+                        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+                },
+                l.waypoints[next],
+        )
+        if err != nil {
+                return true
+        }
 
-	return walkable
+        return walkable
 }
 
 // walkStuck tracks the movement progress of the walker and re-paths
-// around the obstacle once the character stands still for too long.
-// The first stuck of a trip waits the full stuckTimeout (a slow server
-// position broadcast must not trip a false stuck); subsequent stucks
-// within the same trip wait the shorter stuckFastTimeout - once the
-// walker knows the server refuses its clicks on this leg, waiting the
-// full window for every waypoint just burns the trip's time budget.
-// The skip of a waypoint does NOT consume the re-path budget: only the
-// full leg re-plan (startWalkLeg) does. It reports whether the trip had
-// to abort.
+// around the obstacle once the character stands still for too long OR
+// wobbles without net progress toward the current waypoint. The same
+// cell check alone misses the oscillation loops: the aggro steering
+// flips its tangent side whenever the leg target sits inside a threat
+// circle, and the character ping-pongs between the two tangent
+// endpoints - every hop moves, so a plain movement reset never fires,
+// while the walk makes no progress at all (the observed delevel walk
+// burned an hour between two points 300 units apart). The net progress
+// gate resets the window only when the waypoint cursor advanced or the
+// current waypoint came measurably closer; anything else that outlives
+// the timeout is a stuck and runs the recovery below. The first stuck
+// of a trip waits the full stuckTimeout (a slow server position
+// broadcast must not trip a false stuck); subsequent stucks within the
+// same trip wait the shorter stuckFastTimeout - once the walker knows
+// the server refuses its clicks on this leg, waiting the full window
+// for every waypoint just burns the trip's time budget. The skip of a
+// waypoint does NOT consume the re-path budget: only the full leg
+// re-plan (startWalkLeg) does. It reports whether the trip had to
+// abort.
 func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
-	if l.stuckAt.IsZero() {
-		l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+        if l.stuckAt.IsZero() {
+                l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+                l.stuckWP = l.wpIndex
+                l.stuckBest = l.stuckWaypointDistance(selfX, selfY)
 
-		return false
-	}
-	if selfX != l.stuckX || selfY != l.stuckY {
-		l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+                return false
+        }
+        if l.stuckProgressed(selfX, selfY) {
+                l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+                l.stuckWP = l.wpIndex
+                l.stuckBest = l.stuckWaypointDistance(selfX, selfY)
 
-		return false
-	}
-	timeout := stuckTimeout
-	if l.stuckFast {
-		timeout = stuckFastTimeout
-	}
-	if now.Sub(l.stuckAt) < timeout {
-		return false
-	}
-	l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
-	if l.waterEscape {
-		return l.stuckWaterEscape(now, selfX, selfY)
-	}
+                return false
+        }
+        timeout := stuckTimeout
+        if l.stuckFast {
+                timeout = stuckFastTimeout
+        }
+        if now.Sub(l.stuckAt) < timeout {
+                return false
+        }
+        l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+        l.stuckWP = l.wpIndex
+        l.stuckBest = l.stuckWaypointDistance(selfX, selfY)
+        if l.waterEscape {
+                return l.stuckWaterEscape(now, selfX, selfY)
+        }
 
-	return l.stuckTownWalk(now, selfX, selfY)
+        return l.stuckTownWalk(now, selfX, selfY)
+}
+
+// stuckWaypointDistance measures the planar distance from the position
+// to the current waypoint (0 without a plan: the follower only runs
+// over a planned leg).
+func (l *Loop) stuckWaypointDistance(selfX int32, selfY int32) float64 {
+        if l.wpIndex < 0 || l.wpIndex >= len(l.waypoints) {
+                return 0
+        }
+        wp := l.waypoints[l.wpIndex]
+
+        return math.Hypot(wp.X-float64(selfX), wp.Y-float64(selfY))
+}
+
+// stuckProgressed reports whether the walk made net progress since the
+// stuck window opened: the waypoint cursor advanced AND the character
+// moved (a cursor bump alone - a passed waypoint of a freshly planned
+// route - is plan bookkeeping, not ground covered), or the character
+// moved and the current waypoint came closer by the progress margin. A
+// standstill and an oscillation both fail the gate; a detour climb
+// passes it (every waypoint of the route approaches in turn).
+func (l *Loop) stuckProgressed(selfX int32, selfY int32) bool {
+        moved := selfX != l.stuckX || selfY != l.stuckY
+        if !moved {
+                return false
+        }
+        if l.wpIndex != l.stuckWP {
+                return true
+        }
+
+        return l.stuckWaypointDistance(selfX, selfY) < l.stuckBest-stuckProgressUnits
 }
 
 // stuckWaterEscape re-plans the water escape itself when the character
 // stands still mid-escape. The town leg is meaningless until the
 // character is back ashore. Consumes the re-path budget.
 func (l *Loop) stuckWaterEscape(_ time.Time, selfX int32, selfY int32) bool {
-	l.rePaths++
-	if l.rePaths > maxRePaths {
-		l.abortTownTrip("walk stuck")
+        l.rePaths++
+        if l.rePaths > maxRePaths {
+                l.abortTownTrip("walk stuck")
 
-		return true
-	}
-	l.logger.Printf("Hunt: water escape stuck, re-planning "+
-		"(%d of %d)", l.rePaths, maxRePaths)
-	if !l.planWaterEscape(selfX, selfY, l.selfZForEscape()) {
-		l.abortTownTrip("water escape re-plan failed")
+                return true
+        }
+        l.logger.Printf("Hunt: water escape stuck, re-planning "+
+                "(%d of %d)", l.rePaths, maxRePaths)
+        if !l.planWaterEscape(selfX, selfY, l.selfZForEscape()) {
+                l.abortTownTrip("water escape re-plan failed")
 
-		return true
-	}
+                return true
+        }
 
-	return false
+        return false
 }
 
 // stuckTownWalk drives the town leg stuck recovery: first try to SKIP
@@ -1750,49 +1849,51 @@ func (l *Loop) stuckWaterEscape(_ time.Time, selfX int32, selfY int32) bool {
 // the first skip so subsequent stuck detections fire on the shorter
 // window.
 func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
-	next := l.nextClearWaypoint(selfX, selfY, l.selfZForEscape())
-	if next > l.wpIndex {
-		l.wpIndex = next
-		l.moveAt = time.Time{}
-		l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
-		l.stuckFast = true
-		l.logger.Printf("Hunt: town walk stuck, skipping waypoint "+
-			"(cursor %d of %d)", l.wpIndex, len(l.waypoints))
+        next := l.nextClearWaypoint(selfX, selfY, l.selfZForEscape())
+        if next > l.wpIndex {
+                l.wpIndex = next
+                l.moveAt = time.Time{}
+                l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+                l.stuckWP = l.wpIndex
+                l.stuckBest = l.stuckWaypointDistance(selfX, selfY)
+                l.stuckFast = true
+                l.logger.Printf("Hunt: town walk stuck, skipping waypoint "+
+                        "(cursor %d of %d)", l.wpIndex, len(l.waypoints))
 
-		return false
-	}
-	if l.noteRepathCell(selfX, selfY) {
-		// The previous re-path started from this very cell and
-		// its fresh plan moved the character nowhere: the next
-		// re-path would plan the identical route into the same
-		// refusal (see frozenRepathLimit). The trip ends and
-		// the recovery hands over to its callers.
-		l.abortFrozenTrip("walk stuck, no movement since the re-path")
+                return false
+        }
+        if l.noteRepathCell(selfX, selfY) {
+                // The previous re-path started from this very cell and
+                // its fresh plan moved the character nowhere: the next
+                // re-path would plan the identical route into the same
+                // refusal (see frozenRepathLimit). The trip ends and
+                // the recovery hands over to its callers.
+                l.abortFrozenTrip("walk stuck, no movement since the re-path")
 
-		return true
-	}
-	// The stuck found no clear successor (the pinned cursor): the
-	// plain waypoint clicks of this leg do not move the character
-	// - arm the short click extension for the recovery clicks.
-	l.extendArmed = true
-	l.rePaths++
-	if l.rePaths > maxRePaths {
-		l.abortTownTrip("walk stuck")
+                return true
+        }
+        // The stuck found no clear successor (the pinned cursor): the
+        // plain waypoint clicks of this leg do not move the character
+        // - arm the short click extension for the recovery clicks.
+        l.extendArmed = true
+        l.rePaths++
+        if l.rePaths > maxRePaths {
+                l.abortTownTrip("walk stuck")
 
-		return true
-	}
-	l.logf("Hunt: town walk stuck, re-pathing (%d of %d)",
-		l.rePaths, maxRePaths)
-	if l.journal != nil {
-		l.journal.Repath(l.tracker.ID(), l.rePaths)
-	}
-	if !l.startWalkLeg(l.legDest) {
-		l.abortTownTrip("re-path failed")
+                return true
+        }
+        l.logf("Hunt: town walk stuck, re-pathing (%d of %d)",
+                l.rePaths, maxRePaths)
+        if l.journal != nil {
+                l.journal.Repath(l.tracker.ID(), l.rePaths)
+        }
+        if !l.startWalkLeg(l.legDest) {
+                l.abortTownTrip("re-path failed")
 
-		return true
-	}
+                return true
+        }
 
-	return false
+        return false
 }
 
 // noteRepathCell records the cell a stuck re-path plans from and
@@ -1806,15 +1907,15 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 // re-paths clears the counter - a different plan shape then has a
 // different first leg to try.
 func (l *Loop) noteRepathCell(selfX int32, selfY int32) bool {
-	frozen := selfX == l.repathX && selfY == l.repathY
-	if frozen {
-		l.frozenRepaths++
-	} else {
-		l.frozenRepaths = 0
-	}
-	l.repathX, l.repathY = selfX, selfY
+        frozen := selfX == l.repathX && selfY == l.repathY
+        if frozen {
+                l.frozenRepaths++
+        } else {
+                l.frozenRepaths = 0
+        }
+        l.repathX, l.repathY = selfX, selfY
 
-	return l.frozenRepaths >= frozenRepathLimit
+        return l.frozenRepaths >= frozenRepathLimit
 }
 
 // abortFrozenTrip ends a trip whose re-path produced no movement and
@@ -1827,14 +1928,14 @@ func (l *Loop) noteRepathCell(selfX int32, selfY int32) bool {
 // trips keep their cooldown recovery when the ladder is exhausted:
 // the hunt continues and the next trip retries from a fresh state.
 func (l *Loop) abortFrozenTrip(reason string) {
-	wasReturn := l.phase == phaseTownReturn
-	if !wasReturn && l.escalateFrozenLeg() {
-		return
-	}
-	l.abortTownTrip(reason)
-	if wasReturn {
-		l.zoneFails = zoneReturnFailBudget
-	}
+        wasReturn := l.phase == phaseTownReturn
+        if !wasReturn && l.escalateFrozenLeg() {
+                return
+        }
+        l.abortTownTrip(reason)
+        if wasReturn {
+                l.zoneFails = zoneReturnFailBudget
+        }
 }
 
 // escalateFrozenLeg climbs the recovery ladder of a frozen town walk
@@ -1860,29 +1961,29 @@ func (l *Loop) abortFrozenTrip(reason string) {
 // back to the plain trip abort with its cooldown. The ladder reports
 // whether a rung took over the recovery (the caller skips its abort).
 func (l *Loop) escalateFrozenLeg() bool {
-	if l.phase != phaseTownWalk || l.navigator == nil {
-		return false
-	}
-	if l.frozenStage == 0 {
-		l.frozenStage = 1
-		if l.banFrozenCorridor() {
-			l.logf("Hunt: the walk froze on this corridor, " +
-				"re-planning the detour around it")
-			if l.startWalkLeg(l.legDest) {
-				return true
-			}
-			// No route around the ban: the direct walk is the
-			// only rung left.
-		}
-	}
-	if l.frozenStage == 1 {
-		l.frozenStage = 2
-		l.armDirectLeg("the detour route froze as well")
+        if l.phase != phaseTownWalk || l.navigator == nil {
+                return false
+        }
+        if l.frozenStage == 0 {
+                l.frozenStage = 1
+                if l.banFrozenCorridor() {
+                        l.logf("Hunt: the walk froze on this corridor, " +
+                                "re-planning the detour around it")
+                        if l.startWalkLeg(l.legDest) {
+                                return true
+                        }
+                        // No route around the ban: the direct walk is the
+                        // only rung left.
+                }
+        }
+        if l.frozenStage == 1 {
+                l.frozenStage = 2
+                l.armDirectLeg("the detour route froze as well")
 
-		return true
-	}
+                return true
+        }
 
-	return false
+        return false
 }
 
 // banFrozenCorridor adds the aimed waypoint of the frozen leg to the
@@ -1892,39 +1993,39 @@ func (l *Loop) escalateFrozenLeg() bool {
 // area was added - an area that already covers the waypoint (or a
 // full ban list) changes no plan and skips the rung.
 func (l *Loop) banFrozenCorridor() bool {
-	if l.wpIndex >= len(l.waypoints) || len(l.frozenAreas) >= frozenBanMax {
-		return false
-	}
-	wp := l.waypoints[l.wpIndex]
-	for _, area := range l.frozenAreas {
-		if math.Hypot(area.Center.X-wp.X, area.Center.Y-wp.Y) <=
-			area.Radius+frozenBanRadius {
-			return false
-		}
-	}
-	l.frozenAreas = append(l.frozenAreas, pathfind.AvoidArea{
-		Center: wp,
-		Radius: frozenBanRadius,
-	})
-	l.logf("Hunt: banning the frozen corridor at %.0f %.0f for the "+
-		"session", wp.X, wp.Y)
+        if l.wpIndex >= len(l.waypoints) || len(l.frozenAreas) >= frozenBanMax {
+                return false
+        }
+        wp := l.waypoints[l.wpIndex]
+        for _, area := range l.frozenAreas {
+                if math.Hypot(area.Center.X-wp.X, area.Center.Y-wp.Y) <=
+                        area.Radius+frozenBanRadius {
+                        return false
+                }
+        }
+        l.frozenAreas = append(l.frozenAreas, pathfind.AvoidArea{
+                Center: wp,
+                Radius: frozenBanRadius,
+        })
+        l.logf("Hunt: banning the frozen corridor at %.0f %.0f for the "+
+                "session", wp.X, wp.Y)
 
-	return true
+        return true
 }
 
 // armDirectLeg switches the frozen town leg to the direct server
 // routed walk (see walkDirectLeg): the waypoint plan dies, the walk
 // plan view carries the single destination leg and the window starts.
 func (l *Loop) armDirectLeg(reason string) {
-	l.directLeg = true
-	l.directLegUntil = time.Now().Add(directLegWindow)
-	l.waypoints = []pathfind.Vec3{l.legDest}
-	l.wpIndex = 0
-	l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
-	l.stuckFast = false
-	l.moveAt = time.Time{}
-	l.logf("Hunt: %s, walking to %d %d by the server routing",
-		reason, int32(l.legDest.X), int32(l.legDest.Y))
+        l.directLeg = true
+        l.directLegUntil = time.Now().Add(directLegWindow)
+        l.waypoints = []pathfind.Vec3{l.legDest}
+        l.wpIndex = 0
+        l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
+        l.stuckFast = false
+        l.moveAt = time.Time{}
+        l.logf("Hunt: %s, walking to %d %d by the server routing",
+                reason, int32(l.legDest.X), int32(l.legDest.Y))
 }
 
 // nextClearWaypoint scans the plan ahead for the first waypoint the
@@ -1934,13 +2035,13 @@ func (l *Loop) armDirectLeg(reason string) {
 // It returns the index of the first clear successor, or the current
 // cursor when no successor ahead is reachable.
 func (l *Loop) nextClearWaypoint(selfX, selfY, selfZ int32) int {
-	for next := l.wpIndex + 1; next < len(l.waypoints); next++ {
-		if l.legAdvanceClear(selfX, selfY, selfZ, next) {
-			return next
-		}
-	}
+        for next := l.wpIndex + 1; next < len(l.waypoints); next++ {
+                if l.legAdvanceClear(selfX, selfY, selfZ, next) {
+                        return next
+                }
+        }
 
-	return l.wpIndex
+        return l.wpIndex
 }
 
 // selfZForEscape returns the current character z for the escape
@@ -1949,38 +2050,38 @@ func (l *Loop) nextClearWaypoint(selfX, selfY, selfZ int32) int {
 // tracker on demand (0 when the position is not known yet - the
 // escape planner resolves the layer of the standing cell anyway).
 func (l *Loop) selfZForEscape() int32 {
-	_, _, z, ok := l.tracker.SelfPosition()
-	if !ok {
-		return 0
-	}
+        _, _, z, ok := l.tracker.SelfPosition()
+        if !ok {
+                return 0
+        }
 
-	return z
+        return z
 }
 
 // enterSellPhase switches into the selling and shopping state at the
 // shop. The log names the stop honestly: the first stop sells the
 // junk, the buy stops of the frozen plan only trade.
 func (l *Loop) enterSellPhase() {
-	l.phase = phaseTownSell
-	l.sellPhaseAt = time.Now()
-	l.sellAt = time.Time{}
-	l.buyAt = time.Time{}
-	l.merchantID = 0
-	l.merchantPick = time.Time{}
-	l.merchantDeckUntil = time.Time{}
-	l.directLeg = false
-	if l.sellableStop() {
-		l.logf("Hunt: shop reached, selling the junk")
+        l.phase = phaseTownSell
+        l.sellPhaseAt = time.Now()
+        l.sellAt = time.Time{}
+        l.buyAt = time.Time{}
+        l.merchantID = 0
+        l.merchantPick = time.Time{}
+        l.merchantDeckUntil = time.Time{}
+        l.directLeg = false
+        if l.sellableStop() {
+                l.logf("Hunt: shop reached, selling the junk")
 
-		return
-	}
-	if len(l.tripStops) > 0 {
-		l.logf("Hunt: shop reached at %s",
-			l.tripStops[0].merchant.Name)
+                return
+        }
+        if len(l.tripStops) > 0 {
+                l.logf("Hunt: shop reached at %s",
+                        l.tripStops[0].merchant.Name)
 
-		return
-	}
-	l.logf("Hunt: shop reached")
+                return
+        }
+        l.logf("Hunt: shop reached")
 }
 
 // tickTownSell runs the sell stop (the first trip stop) and the buy
@@ -1995,85 +2096,85 @@ func (l *Loop) enterSellPhase() {
 //
 //nolint:cyclop,gocognit // the town sell trip legs
 func (l *Loop) tickTownSell() {
-	now := time.Now()
-	if l.teachStop() {
-		// The teacher stop: approach the class master, click it and
-		// learn the queued lessons (see learning.go). The stop carries
-		// no buys and never sells - the junk selling belongs to the
-		// first stop of the trip. A teacher that never showed up (or
-		// stands out of reach) skips the lessons - the requests
-		// resolve their trainer through the last folk npc and cannot
-		// run without it.
-		if !l.handleTeacher(now) {
-			return
-		}
-		if l.teacherID > 0 && !l.tickTeacherLessons(now) {
-			return
-		}
-		l.advanceTripStop()
+        now := time.Now()
+        if l.teachStop() {
+                // The teacher stop: approach the class master, click it and
+                // learn the queued lessons (see learning.go). The stop carries
+                // no buys and never sells - the junk selling belongs to the
+                // first stop of the trip. A teacher that never showed up (or
+                // stands out of reach) skips the lessons - the requests
+                // resolve their trainer through the last folk npc and cannot
+                // run without it.
+                if !l.handleTeacher(now) {
+                        return
+                }
+                if l.teacherID > 0 && !l.tickTeacherLessons(now) {
+                        return
+                }
+                l.advanceTripStop()
 
-		return
-	}
-	if l.sellableStop() {
-		if l.junkRemaining() {
-			if !l.handleMerchant(now, merchantTemplates()) {
-				return
-			}
-			l.sellJunk()
+                return
+        }
+        if l.sellableStop() {
+                if l.junkRemaining() {
+                        if !l.handleMerchant(now, merchantTemplates()) {
+                                return
+                        }
+                        l.sellJunk()
 
-			return
-		}
-		if !l.replaceDone {
-			// The replacement purchases sell their displaced pieces
-			// first: the credit the plan counted on must be banked
-			// before the buys spend it.
-			if !l.stepReplacementSales(now) {
-				return
-			}
-			l.replaceDone = true
-		}
-		if !l.buysPlanned {
-			stats := l.tracker.InventoryStats()
-			l.logf("Hunt: shop: junk sold (%d slots left, "+
-				"%.0f%% weight), distributing the trip plan",
-				stats.Slots, stats.WeightPercent)
-			l.planShoppingStops()
-			// The learning stops close the trip: the books and
-			// the teacher ride BEHIND the gear stops, so one
-			// town visit buys the weapon, the armor, the jewels,
-			// the books and teaches the lessons (the user rule
-			// of the one town visit - the books stop merges with
-			// the gear stop of its merchant when they match, see
-			// planLearnStops). The weapon stop already ran (the
-			// sell stop routes to the weapon merchant), so an
-			// abort on the teacher leg never strands a
-			// bare-handed character.
-			l.planLearnStops()
-		}
-	}
-	if l.stopBuysPending() {
-		if !l.handleMerchant(now, l.stopMerchantTemplates()) {
-			return
-		}
-		// The buys need the selected merchant within the interaction
-		// distance: without it the sells still work, the buys are
-		// skipped.
-		if l.merchantID > 0 {
-			l.tickStopShopping(now)
-		} else {
-			l.resetStopBuys("no merchant in reach for the buys")
-		}
+                        return
+                }
+                if !l.replaceDone {
+                        // The replacement purchases sell their displaced pieces
+                        // first: the credit the plan counted on must be banked
+                        // before the buys spend it.
+                        if !l.stepReplacementSales(now) {
+                                return
+                        }
+                        l.replaceDone = true
+                }
+                if !l.buysPlanned {
+                        stats := l.tracker.InventoryStats()
+                        l.logf("Hunt: shop: junk sold (%d slots left, "+
+                                "%.0f%% weight), distributing the trip plan",
+                                stats.Slots, stats.WeightPercent)
+                        l.planShoppingStops()
+                        // The learning stops close the trip: the books and
+                        // the teacher ride BEHIND the gear stops, so one
+                        // town visit buys the weapon, the armor, the jewels,
+                        // the books and teaches the lessons (the user rule
+                        // of the one town visit - the books stop merges with
+                        // the gear stop of its merchant when they match, see
+                        // planLearnStops). The weapon stop already ran (the
+                        // sell stop routes to the weapon merchant), so an
+                        // abort on the teacher leg never strands a
+                        // bare-handed character.
+                        l.planLearnStops()
+                }
+        }
+        if l.stopBuysPending() {
+                if !l.handleMerchant(now, l.stopMerchantTemplates()) {
+                        return
+                }
+                // The buys need the selected merchant within the interaction
+                // distance: without it the sells still work, the buys are
+                // skipped.
+                if l.merchantID > 0 {
+                        l.tickStopShopping(now)
+                } else {
+                        l.resetStopBuys("no merchant in reach for the buys")
+                }
 
-		return
-	}
-	if len(l.tripStops) > 1 || (len(l.tripStops) == 1 &&
-		!l.tripStops[0].sell && !l.stopBuysPending()) ||
-		l.buysPlanned {
-		l.advanceTripStop()
+                return
+        }
+        if len(l.tripStops) > 1 || (len(l.tripStops) == 1 &&
+                !l.tripStops[0].sell && !l.stopBuysPending()) ||
+                l.buysPlanned {
+                l.advanceTripStop()
 
-		return
-	}
-	l.startReturnLeg()
+                return
+        }
+        l.startReturnLeg()
 }
 
 // handleMerchant approaches the shop merchant and selects it like the
@@ -2083,36 +2184,36 @@ func (l *Loop) tickTownSell() {
 // list), so a merchant that never shows up only delays it; the buys
 // need the merchant, their stops skip the purchases instead.
 func (l *Loop) handleMerchant(now time.Time, templates []int32) bool {
-	if l.merchantID < 0 {
-		return true
-	}
-	if l.merchantID > 0 {
-		return l.approachMerchant(now)
-	}
-	if now.Sub(l.merchantPick) < selectPeriod {
-		return false
-	}
-	l.merchantPick = now
-	l.merchantDeckUntil = time.Time{}
-	merchant, ok := l.tracker.NearestNpcByTemplates(
-		templates, merchantFindRadius)
-	if ok {
-		l.merchantID = merchant.ObjectID
-		l.logf("Hunt: trading with " + merchant.Name)
+        if l.merchantID < 0 {
+                return true
+        }
+        if l.merchantID > 0 {
+                return l.approachMerchant(now)
+        }
+        if now.Sub(l.merchantPick) < selectPeriod {
+                return false
+        }
+        l.merchantPick = now
+        l.merchantDeckUntil = time.Time{}
+        merchant, ok := l.tracker.NearestNpcByTemplates(
+                templates, merchantFindRadius)
+        if ok {
+                l.merchantID = merchant.ObjectID
+                l.logf("Hunt: trading with " + merchant.Name)
 
-		return false
-	}
-	if now.Sub(l.sellPhaseAt) < merchantWaitTimeout {
-		return false
-	}
-	l.merchantID = -1
-	if l.stopBuysPending() {
-		// The buys cannot run without the selected merchant: skip
-		// them instead of waiting forever.
-		l.resetStopBuys("merchant never showed up")
-	}
+                return false
+        }
+        if now.Sub(l.sellPhaseAt) < merchantWaitTimeout {
+                return false
+        }
+        l.merchantID = -1
+        if l.stopBuysPending() {
+                // The buys cannot run without the selected merchant: skip
+                // them instead of waiting forever.
+                l.resetStopBuys("merchant never showed up")
+        }
 
-	return true
+        return true
 }
 
 // approachMerchant walks to the merchant, selects it inside the
@@ -2137,74 +2238,74 @@ func (l *Loop) handleMerchant(now time.Time, templates []int32) bool {
 // the z gap keeps the dist3D above the approach gate (200) - see
 // approachTeacher for the same fix and the 2026-09-11 05:45 dump.
 func (l *Loop) approachMerchant(now time.Time) bool {
-	x, y, z, ok := l.tracker.ObjectPosition(l.merchantID)
-	if !ok {
-		l.merchantID = -1
+        x, y, z, ok := l.tracker.ObjectPosition(l.merchantID)
+        if !ok {
+                l.merchantID = -1
 
-		return true
-	}
-	selfX, selfY, selfZ, _ := l.tracker.SelfPosition()
-	dist2D := math.Hypot(float64(x-selfX), float64(y-selfY))
-	dz := float64(z - selfZ)
-	dist3D := math.Sqrt(dist2D*dist2D + dz*dz)
-	// The merchant select fires within the server interaction distance
-	// (250 in 3D) even when the approach gate (200) is not met: the
-	// offset ring lands the bot at ~150 units 2D from the npc, and a
-	// small z gap keeps dist3D above 200 but within 250. Without this
-	// early return the bot looped on the offset ring forever (the
-	// 2026-09-11 05:45 dump).
-	if dist3D <= npcInteractionDist {
-		return l.selectMerchant(now)
-	}
-	if dist3D > merchantApproachDist {
-		ax, ay, az := npcApproachPoint(x, y, z, selfX, selfY)
-		approachDist2D := math.Hypot(
-			float64(ax-selfX), float64(ay-selfY))
-		if dist2D <= merchantApproachDist {
-			// The geodata pack misses some village ramps: the character
-			// stands under the merchant deck (the 2D distance is met,
-			// the z is not). The approach point collapses onto the
-			// bot's own cell - the click is a no-op the server
-			// collapses, the deck window bounds the wait before the
-			// merchant is given up. Clicking the merchant's exact cell
-			// here teleported the bot onto the roof (the 2026-09-11
-			// report), so the offset keeps the click safe even when it
-			// cannot help.
-			if l.merchantDeckUntil.IsZero() {
-				l.merchantDeckUntil = now.Add(merchantDeckWindow)
-				l.logf("Hunt: %s stands on another deck (z %d vs "+
-					"%d), re-walking by server routing",
-					l.tracker.ObjectName(l.merchantID), selfZ, z)
-			}
-			if now.Before(l.merchantDeckUntil) {
-				if approachDist2D > hopCoincideDist {
-					l.walkToward(ax, ay, az, now)
-				}
+                return true
+        }
+        selfX, selfY, selfZ, _ := l.tracker.SelfPosition()
+        dist2D := math.Hypot(float64(x-selfX), float64(y-selfY))
+        dz := float64(z - selfZ)
+        dist3D := math.Sqrt(dist2D*dist2D + dz*dz)
+        // The merchant select fires within the server interaction distance
+        // (250 in 3D) even when the approach gate (200) is not met: the
+        // offset ring lands the bot at ~150 units 2D from the npc, and a
+        // small z gap keeps dist3D above 200 but within 250. Without this
+        // early return the bot looped on the offset ring forever (the
+        // 2026-09-11 05:45 dump).
+        if dist3D <= npcInteractionDist {
+                return l.selectMerchant(now)
+        }
+        if dist3D > merchantApproachDist {
+                ax, ay, az := npcApproachPoint(x, y, z, selfX, selfY)
+                approachDist2D := math.Hypot(
+                        float64(ax-selfX), float64(ay-selfY))
+                if dist2D <= merchantApproachDist {
+                        // The geodata pack misses some village ramps: the character
+                        // stands under the merchant deck (the 2D distance is met,
+                        // the z is not). The approach point collapses onto the
+                        // bot's own cell - the click is a no-op the server
+                        // collapses, the deck window bounds the wait before the
+                        // merchant is given up. Clicking the merchant's exact cell
+                        // here teleported the bot onto the roof (the 2026-09-11
+                        // report), so the offset keeps the click safe even when it
+                        // cannot help.
+                        if l.merchantDeckUntil.IsZero() {
+                                l.merchantDeckUntil = now.Add(merchantDeckWindow)
+                                l.logf("Hunt: %s stands on another deck (z %d vs "+
+                                        "%d), re-walking by server routing",
+                                        l.tracker.ObjectName(l.merchantID), selfZ, z)
+                        }
+                        if now.Before(l.merchantDeckUntil) {
+                                if approachDist2D > hopCoincideDist {
+                                        l.walkToward(ax, ay, az, now)
+                                }
 
-				return false
-			}
-			l.logf("Hunt: %s stays out of reach, the sells work "+
-				"without it and its buys are skipped",
-				l.tracker.ObjectName(l.merchantID))
-			l.merchantID = -1
+                                return false
+                        }
+                        l.logf("Hunt: %s stays out of reach, the sells work "+
+                                "without it and its buys are skipped",
+                                l.tracker.ObjectName(l.merchantID))
+                        l.merchantID = -1
 
-			return true
-		}
+                        return true
+                }
 
-		// Far away on the same level: a plain approach walk to the
-		// offset point, not the merchant's exact cell. The dist3D <=
-		// npcInteractionDist early return above takes over once the bot
-		// arrives at the offset ring (the talk click lands from the ring
-		// even with a small z gap).
-		if approachDist2D > hopCoincideDist {
-			l.walkToward(ax, ay, az, now)
-		}
+                // Far away on the same level: a plain approach walk to the
+                // offset point, not the merchant's exact cell. The dist3D <=
+                // npcInteractionDist early return above takes over once the bot
+                // arrives at the offset ring (the talk click lands from the ring
+                // even with a small z gap).
+                if approachDist2D > hopCoincideDist {
+                        l.walkToward(ax, ay, az, now)
+                }
 
-		return false
-	}
-	// dist3D in (merchantApproachDist, npcInteractionDist]: the bot is
-	// on the offset ring, the merchant select proceeds.
-	return l.selectMerchant(now)
+                return false
+        }
+        // dist3D in (merchantApproachDist, npcInteractionDist]: the bot is
+        // on the offset ring, the merchant select proceeds.
+        return l.selectMerchant(now)
 }
 
 // selectMerchant re-requests the merchant selection once per select
@@ -2212,22 +2313,22 @@ func (l *Loop) approachMerchant(now time.Time) bool {
 // transactions need the merchant as the selected target
 // (RequestBuyItem checks it server side).
 func (l *Loop) selectMerchant(now time.Time) bool {
-	if l.tracker.SelfTargetID() != l.merchantID {
-		// The transactions need the merchant as the selected target
-		// (RequestBuyItem checks it server side): re-request the
-		// selection once per second until the tracker confirmed it
-		// and only then report ready.
-		if now.Sub(l.merchantPick) >= selectPeriod {
-			l.merchantPick = now
-			if err := l.game.AttackTarget(l.merchantID); err != nil {
-				l.logf("Hunt: merchant select failed: %v", err)
-			}
-		}
+        if l.tracker.SelfTargetID() != l.merchantID {
+                // The transactions need the merchant as the selected target
+                // (RequestBuyItem checks it server side): re-request the
+                // selection once per second until the tracker confirmed it
+                // and only then report ready.
+                if now.Sub(l.merchantPick) >= selectPeriod {
+                        l.merchantPick = now
+                        if err := l.game.AttackTarget(l.merchantID); err != nil {
+                                l.logf("Hunt: merchant select failed: %v", err)
+                        }
+                }
 
-		return false
-	}
+                return false
+        }
 
-	return true
+        return true
 }
 
 // sellableJunk lists the inventory junk of the sell trips without
@@ -2237,16 +2338,16 @@ func (l *Loop) selectMerchant(now time.Time) bool {
 // protector once per trip - the destroy flow of the replaced starters
 // owns them instead.
 func (l *Loop) sellableJunk() []state.InventoryItem {
-	junk := make([]state.InventoryItem, 0, 8)
-	for _, entry := range l.tracker.SellableItemsExcluding(
-		l.plannedEquipKeeps()) {
-		if gear.IsStarterItem(entry.ItemID) {
-			continue
-		}
-		junk = append(junk, entry)
-	}
+        junk := make([]state.InventoryItem, 0, 8)
+        for _, entry := range l.tracker.SellableItemsExcluding(
+                l.plannedEquipKeeps()) {
+                if gear.IsStarterItem(entry.ItemID) {
+                        continue
+                }
+                junk = append(junk, entry)
+        }
 
-	return junk
+        return junk
 }
 
 // junkRemaining reports whether sellable inventory items are left the
@@ -2257,13 +2358,13 @@ func (l *Loop) sellableJunk() []state.InventoryItem {
 // must not eat it) and so does the unsellable newbie kit (the destroy
 // flow owns it).
 func (l *Loop) junkRemaining() bool {
-	for _, item := range l.sellableJunk() {
-		if !l.sold[item.ObjectID] {
-			return true
-		}
-	}
+        for _, item := range l.sellableJunk() {
+                if !l.sold[item.ObjectID] {
+                        return true
+                }
+        }
 
-	return false
+        return false
 }
 
 // sellJunk sells the next batch of inventory junk, most junky items
@@ -2271,39 +2372,39 @@ func (l *Loop) junkRemaining() bool {
 // what it refuses to sell, so re-offering it forever would stall the
 // trip. An empty batch (nothing left to sell) ends the selling.
 func (l *Loop) sellJunk() {
-	now := time.Now()
-	if !l.sellAt.IsZero() && now.Sub(l.sellAt) < sellPause {
-		return
-	}
-	l.sellAt = now
-	junk := l.sellableJunk()
-	batch := make([]state.InventoryItem, 0, sellBatchSize)
-	for _, item := range junk {
-		if l.sold[item.ObjectID] {
-			continue
-		}
-		batch = append(batch, item)
-		if len(batch) >= sellBatchSize {
-			break
-		}
-	}
-	if len(batch) == 0 {
-		l.startReturnLeg()
+        now := time.Now()
+        if !l.sellAt.IsZero() && now.Sub(l.sellAt) < sellPause {
+                return
+        }
+        l.sellAt = now
+        junk := l.sellableJunk()
+        batch := make([]state.InventoryItem, 0, sellBatchSize)
+        for _, item := range junk {
+                if l.sold[item.ObjectID] {
+                        continue
+                }
+                batch = append(batch, item)
+                if len(batch) >= sellBatchSize {
+                        break
+                }
+        }
+        if len(batch) == 0 {
+                l.startReturnLeg()
 
-		return
-	}
-	if err := l.game.SellItems(batch); err != nil {
-		l.logf("Hunt: sell request failed: %v", err)
+                return
+        }
+        if err := l.game.SellItems(batch); err != nil {
+                l.logf("Hunt: sell request failed: %v", err)
 
-		return
-	}
-	for _, item := range batch {
-		l.sold[item.ObjectID] = true
-	}
-	if l.journal != nil {
-		l.journal.Sell(l.tracker.ID(), len(batch))
-	}
-	l.logf("Hunt: offered %d items for sale", len(batch))
+                return
+        }
+        for _, item := range batch {
+                l.sold[item.ObjectID] = true
+        }
+        if l.journal != nil {
+                l.journal.Sell(l.tracker.ID(), len(batch))
+        }
+        l.logf("Hunt: offered %d items for sale", len(batch))
 }
 
 // engagesOnZoneEntry ends the return walk the moment the hunting
@@ -2314,31 +2415,31 @@ func (l *Loop) sellJunk() {
 // search apply here too). The next engage tick picks the target
 // the search found.
 func (l *Loop) engagesOnZoneEntry() bool {
-	zone := l.zone()
-	if zone == nil || !l.inZoneSelf() {
-		return false
-	}
-	// A bare-handed character with an affordable weapon keeps walking
-	// home: the zone entry fight would farm with the fists, and the
-	// weapon run owns the next ticks anyway (the trip end arms the
-	// short weapon run cooldown).
-	if l.weaponlessRunWanted() {
-		return false
-	}
-	now := time.Now()
-	if now.Sub(l.lastHit) < selectPeriod {
-		return false
-	}
-	pick, ok := l.tracker.NearestAttackablePreferred(
-		attackNearestRange, zone, l.activeSkips(now),
-		l.maxTargetLevel(), true, l.zoneMobPriority)
-	if !ok {
-		return false
-	}
-	l.endTownTrip("a target stands inside the zone")
-	l.logf("Hunt: engaging %s on the zone entry", pick.Name)
+        zone := l.zone()
+        if zone == nil || !l.inZoneSelf() {
+                return false
+        }
+        // A bare-handed character with an affordable weapon keeps walking
+        // home: the zone entry fight would farm with the fists, and the
+        // weapon run owns the next ticks anyway (the trip end arms the
+        // short weapon run cooldown).
+        if l.weaponlessRunWanted() {
+                return false
+        }
+        now := time.Now()
+        if now.Sub(l.lastHit) < selectPeriod {
+                return false
+        }
+        pick, ok := l.tracker.NearestAttackablePreferred(
+                attackNearestRange, zone, l.activeSkips(now),
+                l.maxTargetLevel(), true, l.zoneMobPriority)
+        if !ok {
+                return false
+        }
+        l.endTownTrip("a target stands inside the zone")
+        l.logf("Hunt: engaging %s on the zone entry", pick.Name)
 
-	return true
+        return true
 }
 
 // startReturnLeg plans the walk back to the farm spot. The leg is a
@@ -2351,28 +2452,28 @@ func (l *Loop) engagesOnZoneEntry() bool {
 // died back to back from the same cell in one second, leaving the
 // character to the direct zone legs and the permanent freeze.
 func (l *Loop) startReturnLeg() {
-	l.phase = phaseTownReturn
-	l.repathX, l.repathY = 0, 0
-	l.frozenRepaths = 0
-	destX, destY, destZ := l.farmX, l.farmY, l.farmZ
-	if zone := l.zone(); zone != nil &&
-		(!zone.Contains(destX, destY) || (destX == 0 && destY == 0)) {
-		// The farm spot belongs to a previous square (a zone switch
-		// mid trip): return to the new center instead.
-		destX, destY = zone.CX, zone.CY
-	}
-	dest := pathfind.Vec3{
-		X: float64(destX),
-		Y: float64(destY),
-		Z: float64(destZ),
-	}
-	l.legRadius = tripApproachRadius
-	if !l.startWalkLeg(dest) {
-		l.abortTownTrip("no walkable path back to the farm spot")
+        l.phase = phaseTownReturn
+        l.repathX, l.repathY = 0, 0
+        l.frozenRepaths = 0
+        destX, destY, destZ := l.farmX, l.farmY, l.farmZ
+        if zone := l.zone(); zone != nil &&
+                (!zone.Contains(destX, destY) || (destX == 0 && destY == 0)) {
+                // The farm spot belongs to a previous square (a zone switch
+                // mid trip): return to the new center instead.
+                destX, destY = zone.CX, zone.CY
+        }
+        dest := pathfind.Vec3{
+                X: float64(destX),
+                Y: float64(destY),
+                Z: float64(destZ),
+        }
+        l.legRadius = tripApproachRadius
+        if !l.startWalkLeg(dest) {
+                l.abortTownTrip("no walkable path back to the farm spot")
 
-		return
-	}
-	l.logf("Hunt: walking back to the farm spot")
+                return
+        }
+        l.logf("Hunt: walking back to the farm spot")
 }
 
 // clearTalkedTarget drops the npc selection a stop or a whole trip
@@ -2382,54 +2483,93 @@ func (l *Loop) startReturnLeg() {
 // villager as its target (the forced attacks on it only burn the
 // stuck timeout). The call is a no-op without a selection.
 func (l *Loop) clearTalkedTarget() {
-	if l.tracker.SelfTargetID() == 0 {
-		return
-	}
-	if err := l.game.ClearTarget(); err != nil {
-		l.logger.Printf("Hunt: target clear failed: %v", err)
-	}
+        if l.tracker.SelfTargetID() == 0 {
+                return
+        }
+        if err := l.game.ClearTarget(); err != nil {
+                l.logger.Printf("Hunt: target clear failed: %v", err)
+        }
 }
 
 // endTownTrip finishes the trip and arms the trigger cooldown. The
 // frozen trip plan dies with it: the next trip freezes a fresh one
 // against the gear the purchases reached.
 func (l *Loop) endTownTrip(reason string) {
-	l.clearTalkedTarget()
-	// The trip answer for the gear debt: whatever kept the trip
-	// from landing the replacements (a refused buy, an abort, a
-	// session death the relogin resumed), the exits compare the
-	// reached paperdoll against the trip start here.
-	l.gearDebtCheck()
-	l.phase = phaseEngage
-	l.target = 0
-	l.clearBlindRecovery()
-	l.lootID = 0
-	l.waypoints = nil
-	l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
-	l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
-	l.waterEscape = false
-	l.extendArmed = false
-	l.directLeg = false
-	l.frozenStage = 0
-	l.repathX, l.repathY = 0, 0
-	l.frozenRepaths = 0
-	l.tripPlan = nil
-	l.tripStops = nil
-	l.buysPlanned = false
-	l.buyRequested = nil
-	l.buyConfirmAt = time.Time{}
-	l.buyRetries = 0
-	l.shoppingPlanCache = nil
-	l.shoppingPlanAt = time.Time{}
-	l.shoppingPlanAdena = 0
-	l.resetReplacementSales()
-	l.resetLearnState()
-	l.tripEndedAt = time.Now()
-	if l.journal != nil {
-		l.journal.TripEnd(l.tracker.ID(), reason,
-			time.Since(l.tripStart))
-	}
-	l.logf("Hunt: town trip ended: " + reason)
+        l.clearTalkedTarget()
+        // The trip answer for the gear debt: whatever kept the trip
+        // from landing the replacements (a refused buy, an abort, a
+        // session death the relogin resumed), the exits compare the
+        // reached paperdoll against the trip start here.
+        l.gearDebtCheck()
+        l.phase = phaseEngage
+        l.target = 0
+        l.clearBlindRecovery()
+        l.lootID = 0
+        l.waypoints = nil
+        l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.waterEscape = false
+        l.extendArmed = false
+        l.directLeg = false
+        l.frozenStage = 0
+        l.repathX, l.repathY = 0, 0
+        l.frozenRepaths = 0
+        l.tripPlan = nil
+        l.tripStops = nil
+        l.buysPlanned = false
+        l.buyRequested = nil
+        l.buyConfirmAt = time.Time{}
+        l.buyRetries = 0
+        l.shoppingPlanCache = nil
+        l.shoppingPlanAt = time.Time{}
+        l.shoppingPlanAdena = 0
+        l.resetReplacementSales()
+        l.resetLearnState()
+        l.tripEndedAt = time.Now()
+        l.noteTripAbortRun(reason)
+        if l.journal != nil {
+                l.journal.TripEnd(l.tracker.ID(), reason,
+                        time.Since(l.tripStart))
+        }
+        l.logf("Hunt: town trip ended: " + reason)
+}
+
+// noteTripAbortRun maintains the consecutive abort streak of the trip
+// cooldown escalation: an aborted trip grows it, every other ending
+// (a completed sell, a farm spot return, a death handover) resets it.
+// The escalation log lands once per growth past the threshold so the
+// operator sees the cooldown change.
+func (l *Loop) noteTripAbortRun(reason string) {
+        if strings.HasPrefix(reason, tripAbortPrefix) {
+                l.tripAbortRun++
+                if l.tripAbortRun > tripAbortEscalateAfter {
+                        l.logf("Hunt: %d aborted trips in a row, the next "+
+                                "trip waits %s", l.tripAbortRun,
+                                tripAbortCooldown(l.tripAbortRun))
+                }
+
+                return
+        }
+        l.tripAbortRun = 0
+}
+
+// tripAbortPrefix marks the aborted trip endings of the streak.
+const tripAbortPrefix = "aborted, "
+
+// tripAbortCooldown renders the escalating cooldown of an abort
+// streak: the base cooldown for the tolerated prefix, then a doubling
+// per abort capped at the hour.
+func tripAbortCooldown(run int) time.Duration {
+        cooldown := tripCooldown
+        for range max(0, run-tripAbortEscalateAfter) {
+                cooldown *= 2
+                if cooldown >= tripAbortMaxCooldown {
+
+                        return tripAbortMaxCooldown
+                }
+        }
+
+        return cooldown
 }
 
 // abortTownTrip finishes a failed trip with a log line. A deleveling
@@ -2439,12 +2579,12 @@ func (l *Loop) endTownTrip(reason string) {
 // blocker - the reported bot hung cycling "deleveling to 9" and
 // "the walk would cross water" forever (the 2026-09-10 state dump).
 func (l *Loop) abortTownTrip(reason string) {
-	if l.phase == phaseDelevel {
-		l.abortDelevel(reason)
+        if l.phase == phaseDelevel {
+                l.abortDelevel(reason)
 
-		return
-	}
-	l.endTownTrip("aborted, " + reason)
+                return
+        }
+        l.endTownTrip("aborted, " + reason)
 }
 
 // resetTownTrip drops the trip state after a death. The village
@@ -2456,32 +2596,32 @@ func (l *Loop) abortTownTrip(reason string) {
 // the sell first step already emptied stays a debt even though the
 // trip never reached its end.
 func (l *Loop) resetTownTrip() {
-	if !l.tripActive() {
-		return
-	}
-	l.gearDebtCheck()
-	l.phase = phaseEngage
-	l.target = 0
-	l.clearBlindRecovery()
-	l.lootID = 0
-	l.waypoints = nil
-	l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
-	l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
-	l.waterEscape = false
-	l.extendArmed = false
-	l.directLeg = false
-	l.frozenStage = 0
-	l.repathX, l.repathY = 0, 0
-	l.frozenRepaths = 0
-	l.tripPlan = nil
-	l.tripStops = nil
-	l.buysPlanned = false
-	l.buyRequested = nil
-	l.buyConfirmAt = time.Time{}
-	l.buyRetries = 0
-	l.resetReplacementSales()
-	l.resetLearnState()
-	l.tripEndedAt = time.Time{}
+        if !l.tripActive() {
+                return
+        }
+        l.gearDebtCheck()
+        l.phase = phaseEngage
+        l.target = 0
+        l.clearBlindRecovery()
+        l.lootID = 0
+        l.waypoints = nil
+        l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.waterEscape = false
+        l.extendArmed = false
+        l.directLeg = false
+        l.frozenStage = 0
+        l.repathX, l.repathY = 0, 0
+        l.frozenRepaths = 0
+        l.tripPlan = nil
+        l.tripStops = nil
+        l.buysPlanned = false
+        l.buyRequested = nil
+        l.buyConfirmAt = time.Time{}
+        l.buyRetries = 0
+        l.resetReplacementSales()
+        l.resetLearnState()
+        l.tripEndedAt = time.Time{}
 }
 
 // standUpGuarded stands a sitting character up before an action the
@@ -2498,34 +2638,34 @@ func (l *Loop) resetTownTrip() {
 // guard holds the caller through the settle window so the first walk
 // request lands on a movable character.
 func (l *Loop) standUpGuarded(now time.Time) bool {
-	if !l.tracker.SelfSitting() {
-		// Standing already: a stand transition of this guard went
-		// out recently - hold the caller through the server side
-		// stand window, then consume the transition so it never
-		// lingers into the rest logic.
-		if !l.restActionAt.IsZero() && !l.restActionSit {
-			if now.Sub(l.restActionAt) < standSettlePeriod {
-				return false
-			}
-			l.restActionAt = time.Time{}
-		}
+        if !l.tracker.SelfSitting() {
+                // Standing already: a stand transition of this guard went
+                // out recently - hold the caller through the server side
+                // stand window, then consume the transition so it never
+                // lingers into the rest logic.
+                if !l.restActionAt.IsZero() && !l.restActionSit {
+                        if now.Sub(l.restActionAt) < standSettlePeriod {
+                                return false
+                        }
+                        l.restActionAt = time.Time{}
+                }
 
-		return true
-	}
-	// Sitting: a transition is in flight (the rest sit request or this
-	// guard's stand) - wait out its confirmation window before the
-	// stand request, never double toggle.
-	if !l.restActionAt.IsZero() &&
-		now.Sub(l.restActionAt) < restRetryPeriod {
-		return false
-	}
-	if err := l.game.ActionSitStand(); err != nil {
-		l.logf("Hunt: stand up failed: %v", err)
+                return true
+        }
+        // Sitting: a transition is in flight (the rest sit request or this
+        // guard's stand) - wait out its confirmation window before the
+        // stand request, never double toggle.
+        if !l.restActionAt.IsZero() &&
+                now.Sub(l.restActionAt) < restRetryPeriod {
+                return false
+        }
+        if err := l.game.ActionSitStand(); err != nil {
+                l.logf("Hunt: stand up failed: %v", err)
 
-		return false
-	}
-	l.restActionAt = now
-	l.restActionSit = false
+                return false
+        }
+        l.restActionAt = now
+        l.restActionSit = false
 
-	return false
+        return false
 }
