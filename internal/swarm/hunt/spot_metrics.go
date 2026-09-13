@@ -179,9 +179,14 @@ func (h *spotHunter) spotScore(index int, now time.Time) float64 {
 // the real loot starts flowing).
 func (h *spotHunter) spotValue(spot *Spot, metric *spotMetric) float64 {
 	if metric.trusted() {
-		if rate := metric.adenaPerMin(); rate > 0 {
-			return rate
-		}
+		// A trusted rate is the honest income of THIS character on
+		// THIS ground - including the zero. The old fall-through kept
+		// the bootstrap prior whenever the measured rate sat at zero,
+		// so a starved ground (minutes of active time, no adena, no
+		// kills - the leash holds nothing pickable) kept promising its
+		// window-mass prior forever and the economy bounced the hunter
+		// back onto it (the 2026-09-13 two-ground livelock).
+		return metric.adenaPerMin()
 	}
 	windowMass := spotWindowMass(*spot, h.level)
 	if windowMass <= 0 {

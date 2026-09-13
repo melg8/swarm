@@ -11,6 +11,66 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the spot geometry live audit, the starve livelock and the bow luring (2026-09-13)
+
+Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user reported three connected problems of the long-run spot
+hunting: (1) test3 does not hunt - it ping-pongs between two spots
+("Kaboo Orc Fighter Leader W" elven-spot-53 and "Crimson Spider W"
+elven-spot-54, 1142 units apart) forever: both leash squares read
+empty (the real spiders stand at x 14563-14703, 62-160 units WEST of
+the spot-54 leash border x>=14765; the orcs at x 19053 sit beyond the
+spot-53 leash x<=18332), every 90 s the starved switch moves the
+hunter to the other ground, which starves identically - a livelock
+with zero kills; (2) the spot geometry itself is wrong - the anchors
+were clustered from the registry square centers (spawn polygons),
+never measured against the live spawn positions, so the fix is a live
+audit: launch the real C1 stack, DB-inject the probe character at
+every spot anchor, dump what the character actually sees (the
+knownlist npc population), and regenerate the spot registry so the
+anchors sit on the measured mob centroids, the radii cover the real
+mobs and the leashes stay inside the visibility squares; (3) melee
+bots must carry a bow: buy bow + arrows, upgrade the bow over time,
+restock arrows on the town trips, and LURE fenced mobs (a mob blocked
+behind other monsters, unpullable by a walk without aggroing the
+pack): equip the bow, shoot the mob from afar, hold the position
+while it runs up, then swap back to the melee weapon and fight.
+
+### Acceptance criteria
+
+- A starved ground carries a starvation cooldown: the picker never
+  walks straight back into a spot that just starved; when every
+  alternative cools down the hunter waits out the respawn instead of
+  bouncing. A repro test pins the two-spot livelock.
+- `-spot-audit FILE` runs the live measurement: for every spot of the
+  registry it DB-injects the probe character at the anchor, enters
+  the world, waits out the knownlist, dumps the attackable npcs
+  (name, wire template, level, position, distance) and logs out; the
+  JSON file carries the full evidence.
+- The regenerated spots_elven.go anchors/radii/counts come from the
+  audit measurements: the observed mobs of every spot sit inside its
+  leash square, the leash stays inside the 2048 visibility circle, the
+  mob counts match the observed population.
+- The bow luring: the melee bot owns a bow and arrows (bought,
+  upgraded, restocked), and the engage answers a fenced target with
+  the ranged pull instead of standing idle.
+- go build, the full suite, `golangci-lint run --new` and the live
+  smoke runs green.
+
+### Progress
+
+- Started: the analysis of the uploaded journal
+  (session-20260913-102700-23540) located the livelock (the starve
+  lines and the two patrol positions); the geometry mismatch is
+  confirmed against the registry (the spider mass sits west of the
+  spot-54 leash border). Next: the starve cooldown fix, then the
+  audit tool.
+
 ## Active task: the statistics tab fixes - the exp resets, the adena zeros and the flicker (2026-09-13)
 
 Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.

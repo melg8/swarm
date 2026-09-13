@@ -364,6 +364,64 @@ func TestSpotMeasuredRateReplacesBootstrap(t *testing.T) {
 	require.InDelta(t, 1200.0, measured, 0.001)
 }
 
+func TestSpotTrustedZeroIncomeScoresZero(t *testing.T) {
+	_, _, hunter := pickedSpotLoop(t)
+	metric := &hunter.metrics[hunter.picked]
+	// Ten active minutes without a single adena: the ground starved
+	// under the character, the honest rate is zero and the economy
+	// must stop promising the bootstrap prior of the window mass (the
+	// old fall-through kept the full prior score on a starved ground
+	// and bounced the hunter back onto it).
+	metric.activeMin = 10
+	metric.adena = 0
+	measured := hunter.spotValue(&hunter.spots[hunter.picked], metric)
+	require.InDelta(t, 0.0, measured, 0.001)
+	require.InDelta(t, 0.0, hunter.spotScore(hunter.picked, time.Now()),
+		0.001)
+	// A starved visit with no history is untrusted and keeps the
+	// prior: the first trial of a ground stays optimistic.
+	metric.activeMin = 0
+	metric.visitActiveMin = 1.5
+	metric.visitAdena = 0
+	prior := hunter.spotValue(&hunter.spots[hunter.picked], metric)
+	require.Greater(t, prior, 0.0)
+}
+
+func TestSpotStarvedCooldownBreaksTheLivelock(t *testing.T) {
+	loop, _, hunter := pickedSpotLoop(t)
+	bot := loop.tracker
+	now := time.Now()
+	// The home ground starves: the hunter switches to the rich ground
+	// and the left ground starts its starvation cooldown.
+	hunter.emptySince = now.Add(-70 * time.Second)
+	hunter.enteredAt = now.Add(-2 * time.Minute)
+	loop.spotEvaluate(now)
+	require.Equal(t, "test-rich", loop.zonePickedID)
+	require.True(t, hunter.starveCoolingDown("test-home", now))
+	require.False(t, hunter.starveCoolingDown("test-rich", now))
+	// The walk to the rich ground lands the character on its anchor:
+	// the second starve reading happens there.
+	bot.ApplyPlacement(state.Placement{ObjectID: 100, X: 49000, Y: 54000, Z: -3400})
+	// The rich ground starves identically two minutes later: the only
+	// alternative (the home ground) sits in its five minute cooldown,
+	// so the hunter KEEPS the rich ground instead of bouncing back -
+	// the two nearest grounds can no longer ping-pong the hunter
+	// between themselves while both leashes read empty.
+	later := now.Add(2 * time.Minute)
+	hunter.emptySince = later.Add(-70 * time.Second)
+	hunter.enteredAt = later.Add(-2 * time.Minute)
+	loop.spotEvaluate(later)
+	require.Equal(t, "test-rich", loop.zonePickedID)
+	// The cooldown expires: the home ground re-opens for the contest
+	// and the next starved switch may walk back to it.
+	expired := now.Add(6 * time.Minute)
+	require.False(t, hunter.starveCoolingDown("test-home", expired))
+	hunter.emptySince = expired.Add(-70 * time.Second)
+	hunter.enteredAt = expired.Add(-2 * time.Minute)
+	loop.spotEvaluate(expired)
+	require.Equal(t, "test-home", loop.zonePickedID)
+}
+
 func TestSpotAccumulateAttributesAdena(t *testing.T) {
 	loop, _, hunter := pickedSpotLoop(t)
 	now := time.Now()

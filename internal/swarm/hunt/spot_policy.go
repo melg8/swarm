@@ -52,6 +52,20 @@ const (
 	// ground, so the hunter never ping-pongs between comparable
 	// spots.
 	spotSwitchMargin = 1.25
+	// spotStarveCooldown holds a starved ground out of the switch
+	// contest: the starved path of evaluateSwitch moves the hunter
+	// to the best ALTERNATIVE, and without a cooldown the two
+	// nearest grounds bounce the hunter between themselves forever
+	// (the 2026-09-13 test3 livelock: spot-53 and spot-54 sat 1142
+	// units apart, both leashes read empty every visit, the hunter
+	// starved at 53, moved to 54, starved there, moved back - a
+	// 15 minute session with zero fights). A ground that starved
+	// gets the same cooldown the legacy zone rotation gave its
+	// cleared squares (zoneEmptyCooldown): the sweep moves FORWARD
+	// through the registry instead of ping-ponging. The window
+	// spans several respawn cycles, so a ground whose respawn
+	// actually feeds the leash re-opens with live mobs on it.
+	spotStarveCooldown = 5 * time.Minute
 	// spotWindowFloorSlack is the level distance below the
 	// character that still pays full adena (mob level + 8, the C1
 	// drop penalty edge): mobs below the floor never enter a
@@ -122,6 +136,10 @@ type spotHunter struct {
 	// userOverride holds the manual spot selection of the web UI
 	// (index into the registry, -1 = automatic economy).
 	userOverride int
+	// starvedUntil holds the starvation cooldown of every ground
+	// the hunter starved on: spot id -> the moment it re-opens for
+	// the switch contest.
+	starvedUntil map[string]time.Time
 }
 
 // newSpotHunter creates the spot mode state for a registry.
@@ -361,11 +379,37 @@ func (h *spotHunter) windowFloor() int32 {
 	return floor
 }
 
+// markStarved starts the starvation cooldown of a ground the hunter
+// leaves empty: the switch never walks straight back into it. The
+// expired entries of the map leave on the way (the registry holds a
+// few dozen grounds, the map must not grow forever).
+func (h *spotHunter) markStarved(spotID string, now time.Time) {
+	if h.starvedUntil == nil {
+		h.starvedUntil = make(map[string]time.Time)
+	}
+	for id, until := range h.starvedUntil {
+		if now.After(until) {
+			delete(h.starvedUntil, id)
+		}
+	}
+	h.starvedUntil[spotID] = now.Add(spotStarveCooldown)
+}
+
+// starveCoolingDown reports whether the ground sits in its
+// post-starvation cooldown at the given time.
+func (h *spotHunter) starveCoolingDown(spotID string, now time.Time) bool {
+	until, ok := h.starvedUntil[spotID]
+
+	return ok && now.Before(until)
+}
+
 // pickBest resolves the best scoring eligible spot (the fallback
 // ranks by the mob level distance when nothing passes the window).
 // The exclude index keeps a ground out of the contest (the switch
 // paths pick the best ALTERNATIVE, the initial pick excludes
-// nothing).
+// nothing). A ground cooling down from a recent starvation stays out
+// of the contest too - the starved switch must sweep FORWARD through
+// the registry, never back into the ground that just starved.
 func (h *spotHunter) pickBest(exclude int, now time.Time) (int, float64) {
 	best := -1
 	bestScore := 0.0
@@ -374,6 +418,12 @@ func (h *spotHunter) pickBest(exclude int, now time.Time) (int, float64) {
 			continue
 		}
 		if !spotEligible(h.spots[index], h.level) {
+			continue
+		}
+		if h.starveCoolingDown(h.spots[index].ID, now) {
+			// The ground starved recently: the sweep moves
+			// forward through the registry instead of
+			// walking back into the empty leash.
 			continue
 		}
 		if !spotDelevelSafe(h.spots[index], h.level) {
@@ -388,14 +438,32 @@ func (h *spotHunter) pickBest(exclude int, now time.Time) (int, float64) {
 		}
 	}
 	if best < 0 && exclude < 0 {
-		// The level window holds no ground at all: the closest
-		// mob level distance wins (a character above or below
-		// every window still hunts something).
+		// The level window holds no ground at all (or every
+		// ground of the window cools down from a starvation
+		// while the registry offers nothing else): the closest
+		// mob level distance wins - a character above or below
+		// every window still hunts something, and a starved
+		// cooldown map must not idle a fresh session that
+		// never picked a ground yet.
 		bestGap := int32(1 << 30)
 		for index := range h.spots {
+			if h.starveCoolingDown(h.spots[index].ID, now) {
+				continue
+			}
 			gap := spotLevelDistance(h.spots[index], h.level)
 			if gap < bestGap {
 				bestGap, best = gap, index
+			}
+		}
+		if best < 0 {
+			// Everything cools down: the level-distance
+			// fallback ignores the cooldown so a starved
+			// session still picks a ground to stand on.
+			for index := range h.spots {
+				gap := spotLevelDistance(h.spots[index], h.level)
+				if gap < bestGap {
+					bestGap, best = gap, index
+				}
 			}
 		}
 
@@ -671,6 +739,12 @@ func (h *spotHunter) evaluateSwitch(
 		stayed >= spotMinStay
 	if !starved && !better {
 		return
+	}
+	if starved {
+		// The left ground keeps its starvation cooldown: the
+		// next starved switch sweeps forward past it instead
+		// of walking straight back into the empty leash.
+		h.markStarved(spot.ID, now)
 	}
 	if starved && !better {
 		l.logger.Printf("Hunt: %s starved (waited %s, respawn eta "+
