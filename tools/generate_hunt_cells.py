@@ -1,50 +1,43 @@
 #!/usr/bin/env python3
-"""Generate the elven hunting CELL registry: the Voronoi partition of
-the spawn ground.
+"""Generate the elven hunting CELL registry: the uniform HEXAGON grid
+partition of the spawn ground.
 
-Why: the spot registry anchored the hunting on CIRCLES - one anchor
-per visibility-sized piece of a territory, the leash square inscribed
-in the circle. The circle geometry has a structural failure the user
-measured live (2026-09-13): a circle that covers HALF of a respawn
-ground farms that half to exhaustion while the other half accumulates
-an unfarmed mob mass (the Dryad case); the followup circle that
-covers the second half then faces an oversaturated ground it cannot
-clear. The partition must own every spawn point EXACTLY ONCE - that
-is the definition of a Voronoi cell:
+Why a hex grid (the 2026-09-13 user order): the Voronoi partition
+solved the half-covered respawn failure (every ground point owned by
+exactly one cell), but its cells varied in shape and size with the
+seed placement - thin slivers next to fat blocks, patrol squares from
+260 to 678. The hexagon grid replaces it with ONE hexagon shape at
+ONE size over the whole map:
 
   1. the spawn territory polygons of the Mobius XML are sampled on a
      dense uniform grid (the spawn distribution is uniform over the
      polygon area);
-  2. the sample cloud is cut into visibility-sized pieces (the same
-     median cut + greedy packing the spot generator used - the live
-     audited geometry of 2026-09-13 validated this seed placement),
-     and every piece centroid becomes one Voronoi SEED;
-  3. the cell of a seed is the convex polygon of the points closer to
-     it than to any other seed (the half-plane intersection against
-     the ground envelope, Sutherland-Hodgman clipping), so every
-     ground point - every spawn point, every respawn - belongs to
-     EXACTLY ONE cell: the half-covered respawn failure is impossible
-     by construction;
-  4. every sample point is assigned to its nearest seed (the exact
-     Voronoi assignment), the mob counts of a territory species
-     distribute over the cells by the sample share (largest
-     remainder, the territory total is preserved);
-  5. cells whose sample extent from the focus exceeds the visibility
-     budget split (a fresh seed at the far half centroid, recompute),
-     so the whole cell stays inside the knownlist circle of a bot
-     standing anywhere in its patrol square: no "left part loaded,
-     right part not" depletion;
-  6. the adjacency graph of the partition (the seeds whose bisector
-     bounds the cell) rides along - the cell rotation of the hunt
-     policy walks the graph, never the far map.
+  2. every sample point maps ANALYTICALLY onto its hexagon (the axial
+     cube rounding of the flat-top hex grid - no nearest-seed search,
+     no clipping): the plane is fully covered by construction, so
+     every spawn point, every respawn, belongs to EXACTLY ONE hexagon
+     of one fixed size - the half-covered respawn failure stays
+     impossible;
+  3. the hexagon circumradius HEX_RADIUS is sized to the visibility
+     budget: the patrol square inscribed in the hexagon plus the hex
+     extent from the focus stays inside the guaranteed knownlist
+     circle (~2048 units, the Mobius world region grid), so a bot
+     standing anywhere in its patrol square sees the WHOLE hexagon -
+     no "left part loaded, right part not" depletion;
+  4. the mob counts of a territory species distribute over the
+     hexagons by the sample share (largest remainder, the territory
+     total is preserved);
+  5. the adjacency graph is the hex grid ring itself (the six grid
+     neighbors present in the registry, symmetric by construction) -
+     the rotation of the hunt policy walks the mesh, never the far
+     map.
 
-Every cell carries: the focus (the sample centroid - the patrol
-destination), the patrol square (the axis-aligned square inscribed
-in the cell polygon at the focus, bounded so the whole cell stays
-visible from inside it - the movement leash of the square-based hunt
-machinery), the convex polygon (the target leash - the engage, the
-far search and the emptiness reading use the WHOLE cell), the mob
-composition, the respawn window, the mass and the neighbors.
+Every cell carries: the focus (the hexagon center - the patrol
+destination), the patrol square (the axis-aligned square inscribed in
+the hexagon at the center, the movement leash of the square-based
+hunt machinery), the hexagon polygon (the target leash - the engage,
+the far search and the emptiness reading use the WHOLE hexagon), the
+mob composition, the respawn window, the mass and the neighbors.
 
 Inputs (env-overridable):
   MOBIUS_C1  the L2J_Mobius_C1_HarbingersOfWar dist tree
@@ -60,7 +53,6 @@ the JSON twin and the report. Re-run after any spawn data change.
 import json
 import math
 import os
-import re
 import xml.etree.ElementTree as ET
 
 MOBIUS_C1 = os.environ.get(
@@ -83,7 +75,7 @@ REPORT = os.environ.get(
     os.path.join(HERE, "..", "docs", "hunt_analysis", "cells_report.txt"))
 
 # The elven village: the ordering anchor of the registry (the starter
-# fallback of a fresh character is the village nearest cell of the
+# fallback of a fresh character is the village nearest hexagon of the
 # lowest band).
 VILLAGE_X, VILLAGE_Y = 46112, 41500
 
@@ -91,43 +83,34 @@ VILLAGE_X, VILLAGE_Y = 46112, 41500
 # world grid broadcasts the own region plus the 8 adjacent ones).
 VISIBILITY_RADIUS = 2048
 
-# The leash square half of the seed pieces (the Chebyshev extent the
-# seed cutting respects, inherited from the live audited geometry).
-SQRT2 = math.sqrt(2.0)
-LEASH_HALF = int(round(VISIBILITY_RADIUS / SQRT2))
+# The hexagon circumradius of the uniform grid: every hexagon of the
+# registry is exactly this size. The visibility budget sizes it: the
+# axis-aligned square inscribed in a flat-top hexagon of radius R has
+# half 0.634*R, the farthest hexagon point sits R from the center, and
+# 0.634*R*sqrt(2) + R = 1.897*R must stay under the knownlist radius -
+# R = 1000 leaves 152 units of headroom for the wander of the border
+# mobs past the hexagon edge.
+HEX_RADIUS = 1000
 
-# The maximum Euclidean sample radius of a cell from its focus: the
-# whole cell must stay inside the knownlist circle of a bot standing
-# anywhere in the patrol square (patrol half + cell radius <= the
-# visibility radius), with the patrol floor leaving this headroom.
-CELL_RADIUS_MAX = 1600
+# The grid pitch derived from the circumradius: the flat-top hexagon
+# column pitch is 1.5*R, the row pitch sqrt(3)*R, the odd columns
+# shift half a row.
+HEX_COL_PITCH = 1.5 * HEX_RADIUS
+HEX_ROW_PITCH = math.sqrt(3.0) * HEX_RADIUS
 
-# The minimum patrol square half: a thinner cell keeps the floor and
-# the report flags it (the movement leash tightens, the target leash
-# stays the whole polygon).
+# The minimum patrol square half: a hexagon never goes below this
+# (the registry keeps the uniform geometry, the floor only guards the
+# rounding of the emitted integers).
 PATROL_HALF_FLOOR = 256
 
-# The ground envelope margin around the spawn sample bounding box:
-# the polygon of an edge cell extends this far past the ground into
-# the empty map (the wander jitter of the border mobs).
-ENVELOPE_MARGIN = 512
-
 # The polygon sampling grid: the spawn distribution is uniform over
-# the polygon area, a 128 unit grid resolves the pieces finely enough
-# while a full elven territory holds a few hundred samples.
+# the polygon area, a 128 unit grid resolves the assignment finely
+# enough while a full elven territory holds a few hundred samples.
 SAMPLE_STEP = 128
-
-# A piece smaller than this Chebyshev extent is not worth its own
-# anchor (the wander jitter covers it from the neighbor).
-MIN_PIECE_EXTENT = 600
 
 # The live measured respawn window of the elven lands (AGENTS.md):
 # 15-20 s per mob.
 DEFAULT_RESPAWN = (15, 20)
-
-# The densification iteration bound (the split loop converges in a
-# few rounds; the bound breaks a pathological oscillation).
-DENSIFY_MAX_ROUNDS = 12
 
 COMPASS = ["E", "NE", "N", "NW", "W", "SW", "S", "SE"]
 
@@ -198,6 +181,19 @@ def load_territories():
     return territories
 
 
+def sample_polygon(nodes):
+    """The uniform grid samples of the polygon interior."""
+    xs = [p[0] for p in nodes]
+    ys = [p[1] for p in nodes]
+    samples = []
+    for gx in range(min(xs), max(xs) + 1, SAMPLE_STEP):
+        for gy in range(min(ys), max(ys) + 1, SAMPLE_STEP):
+            if point_in_polygon(gx, gy, nodes):
+                samples.append((gx, gy))
+
+    return samples
+
+
 def point_in_polygon(x, y, nodes):
     """The ray crossing point-in-polygon test."""
     inside = False
@@ -215,411 +211,69 @@ def point_in_polygon(x, y, nodes):
     return inside
 
 
-def polygon_bbox(nodes):
-    xs = [p[0] for p in nodes]
-    ys = [p[1] for p in nodes]
+def hex_of_point(x, y):
+    """The offset coordinates of the hexagon a world point falls into:
+    the axial fractional coordinates of the flat-top grid rounded to
+    the nearest hexagon center (the cube rounding - the point maps to
+    the hexagon whose center sits nearest, which for a tessellation
+    IS the hexagon containing it). The grid covers the plane, so every
+    point answers a hexagon: the complete-coverage partition property
+    holds by construction, no clipping, no search."""
+    qf = (2.0 / 3.0) * x / HEX_RADIUS
+    rf = (math.sqrt(3.0) / 3.0) * y / HEX_RADIUS - qf / 2.0
+    # The cube rounding: round all three axes, the largest rounding
+    # error gives way so the sum stays zero.
+    xf, yf, zf = qf, rf, -qf - rf
+    xq, yq, zq = round(xf), round(yf), round(zf)
+    dx, dy, dz = abs(xq - xf), abs(yq - yf), abs(zq - zf)
+    if dx > dy and dx > dz:
+        xq = -yq - zq
+    elif dy > dz:
+        yq = -xq - zq
+    else:
+        zq = -xq - yq
+    q, r = xq, yq
+    # The odd-q offset rows: odd columns shift half a row down.
+    row = r + (q - (q & 1)) // 2
 
-    return min(xs), min(ys), max(xs), max(ys)
-
-
-def sample_polygon(nodes):
-    """The uniform grid samples of the polygon interior."""
-    x0, y0, x1, y1 = polygon_bbox(nodes)
-    samples = []
-    for gx in range(x0, x1 + 1, SAMPLE_STEP):
-        for gy in range(y0, y1 + 1, SAMPLE_STEP):
-            if point_in_polygon(gx, gy, nodes):
-                samples.append((gx, gy))
-
-    return samples
-
-
-def centroid(samples):
-    if not samples:
-        return 0.0, 0.0
-    n = float(len(samples))
-
-    return sum(p[0] for p in samples) / n, sum(p[1] for p in samples) / n
-
-
-def chebyshev_extent(samples, cx, cy):
-    """The Chebyshev (square) extent of the samples from a center."""
-    reach = 0
-    for x, y in samples:
-        reach = max(reach, abs(int(round(x)) - int(round(cx))),
-                    abs(int(round(y)) - int(round(cy))))
-
-    return reach
+    return q, row
 
 
-def euclidean_radius(samples, cx, cy):
-    """The Euclidean radius of the samples from a center."""
-    radius = 0.0
-    for x, y in samples:
-        radius = max(radius, math.hypot(x - cx, y - cy))
+def hex_center(q, row):
+    """The world center of the hexagon at the offset coordinates: the
+    column pitch 1.5*R, the row pitch sqrt(3)*R, the odd columns
+    shifted half a row."""
+    x = int(round(HEX_COL_PITCH * q))
+    y = int(round(HEX_ROW_PITCH * (row + (q & 1) / 2.0)))
 
-    return radius
-
-
-def split_samples(samples):
-    """Split the sample cloud by the median of its widest axis."""
-    spread_x = max(p[0] for p in samples) - min(p[0] for p in samples)
-    spread_y = max(p[1] for p in samples) - min(p[1] for p in samples)
-    axis = 0 if spread_x >= spread_y else 1
-    ordered = sorted(samples, key=lambda p: p[axis])
-    mid = len(ordered) // 2
-
-    return ordered[:mid], ordered[mid:]
+    return x, y
 
 
-def cluster_territories(territories):
-    """The grid adjacency clusters of the territories: the centroids
-    landing in the same or 8-adjacent 2048 cells share one ground
-    (the same clustering the spot generator applied to the registry
-    squares - a seed of one ground never falls into another,
-    disconnected ground)."""
-    cells = {}
-    for terr in territories:
-        cx, cy = centroid(terr["samples"])
-        terr["cx"], terr["cy"] = cx, cy
-        cells.setdefault((int(cx) // 2048, int(cy) // 2048), []).append(terr)
-    seen = set()
-    clusters = []
-    for start in cells:
-        if start in seen:
-            continue
-        stack = [start]
-        seen.add(start)
-        terrs = []
-        while stack:
-            gx, gy = stack.pop()
-            terrs.extend(cells[(gx, gy)])
-            for dx in (-1, 0, 1):
-                for dy in (-1, 0, 1):
-                    nxt = (gx + dx, gy + dy)
-                    if nxt in cells and nxt not in seen:
-                        seen.add(nxt)
-                        stack.append(nxt)
-        clusters.append(terrs)
+def hex_polygon(cx, cy):
+    """The six counter-clockwise vertices of the flat-top hexagon at
+    the center: the circumradius HEX_RADIUS, the vertices at the
+    multiples of 60 degrees, every hexagon of the registry carries the
+    exact same shape and size."""
+    third = math.pi / 3.0
+    verts = []
+    for corner in range(6):
+        angle = third * corner
+        vx = int(round(cx + HEX_RADIUS * math.cos(angle)))
+        vy = int(round(cy + HEX_RADIUS * math.sin(angle)))
+        verts.append((vx, vy))
 
-    return clusters
+    return verts
 
 
-def cut_pieces(samples):
-    """Recursively cut the sample cloud until every piece fits the
-    leash square (the Chebyshev extent from the piece centroid stays
-    under LEASH_HALF)."""
-    queue = [samples]
-    pieces = []
-    while queue:
-        cloud = queue.pop()
-        cx, cy = centroid(cloud)
-        reach = chebyshev_extent(cloud, cx, cy)
-        if reach <= LEASH_HALF:
-            pieces.append(cloud)
+def hex_neighbor_offsets(q):
+    """The six grid neighbor offsets of the odd-q hex layout: the east
+    and west columns, the two diagonal step rows (the parity of the
+    column decides which way the diagonals lean), the north and the
+    south."""
+    if q & 1:
+        return [(1, 1), (1, 0), (0, 1), (0, -1), (-1, 1), (-1, 0)]
 
-            continue
-        left, right = split_samples(cloud)
-        if not left or not right:
-            # A degenerate cloud (all samples on one line): keep it as
-            # is, the split loop cannot separate it further.
-            pieces.append(cloud)
-
-            continue
-        queue.append(left)
-        queue.append(right)
-
-    return pieces
-
-
-def pack_pieces(pieces):
-    """The greedy packing of the cut pieces: a piece absorbs its
-    nearest neighbor while the merged cloud still fits the leash
-    square, so the piece count approaches the minimum the ground
-    needs (the live audited seed placement)."""
-    packed = [list(piece) for piece in pieces]
-    merged = True
-    while merged:
-        merged = False
-        packed.sort(key=lambda c: -len(c))
-        for host_i in range(len(packed)):
-            host = packed[host_i]
-            hx, hy = centroid(host)
-            best_j = -1
-            best_dist = None
-            for other_i in range(len(packed)):
-                if other_i == host_i:
-                    continue
-                ox, oy = centroid(packed[other_i])
-                dist = max(abs(ox - hx), abs(oy - hy))
-                if best_dist is None or dist < best_dist:
-                    best_dist, best_j = dist, other_i
-            if best_j < 0:
-                continue
-            candidate = host + packed[best_j]
-            ccx, ccy = centroid(candidate)
-            if chebyshev_extent(candidate, ccx, ccy) <= LEASH_HALF:
-                packed[host_i] = candidate
-                packed.pop(best_j)
-                merged = True
-
-                break
-
-    return packed
-
-
-def build_seeds(territories):
-    """The Voronoi seed set: the packed piece centroids of every
-    territory cluster (the live audited spot anchors of the 2026-09-13
-    geometry - the same cutting, the same packing). Returns the seeds
-    and the cluster membership of every seed (the ground naming)."""
-    seeds = []
-    seed_clusters = []
-    for cluster in cluster_territories(territories):
-        cloud = []
-        for terr in cluster:
-            cloud.extend(terr["samples"])
-        if not cloud:
-            continue
-        pieces = pack_pieces(cut_pieces(cloud))
-        for piece in pieces:
-            cx, cy = centroid(piece)
-            seeds.append((int(round(cx)), int(round(cy))))
-            seed_clusters.append(len(seeds) - 1)
-
-    return seeds, seed_clusters
-
-
-def clip_halfplane(poly, dx, dy, c):
-    """Clip the convex polygon (CCW vertex list) against the closed
-    half-plane  dx*x + dy*y <= c  (the bisector of the two seeds it
-    comes from keeps the points nearer to the owner). Returns the
-    clipped polygon."""
-    if not poly:
-        return poly
-    out = []
-    n = len(poly)
-    for i in range(n):
-        ax, ay = poly[i]
-        bx, by = poly[(i + 1) % n]
-        fa = dx * ax + dy * ay - c
-        fb = dx * bx + dy * by - c
-        a_in = fa <= 0.0
-        b_in = fb <= 0.0
-        if a_in and b_in:
-            out.append((bx, by))
-        elif a_in and not b_in:
-            t = fa / (fa - fb)
-            out.append((ax + (bx - ax) * t, ay + (by - ay) * t))
-        elif not a_in and b_in:
-            t = fa / (fa - fb)
-            out.append((ax + (bx - ax) * t, ay + (by - ay) * t))
-            out.append((bx, by))
-        # both out: nothing
-    # The degenerate repeats (a vertex exactly on the line twice)
-    # collapse here.
-    dedup = []
-    for p in out:
-        if not dedup or p != dedup[-1]:
-            dedup.append(p)
-    if len(dedup) > 1 and dedup[0] == dedup[-1]:
-        dedup.pop()
-
-    return dedup
-
-
-def polygon_area(poly):
-    """The signed area of the polygon (positive when CCW)."""
-    total = 0.0
-    n = len(poly)
-    for i in range(n):
-        ax, ay = poly[i]
-        bx, by = poly[(i + 1) % n]
-        total += ax * by - bx * ay
-
-    return total / 2.0
-
-
-def bisector(seed_a, seed_b):
-    """The bisector half-plane of two seeds: the points nearer to
-    seed_a than to seed_b satisfy  dx*x + dy*y <= c."""
-    ax, ay = seed_a
-    bx, by = seed_b
-    dx = 2.0 * (bx - ax)
-    dy = 2.0 * (by - ay)
-    c = (bx * bx + by * by) - (ax * ax + ay * ay)
-
-    return dx, dy, c
-
-
-def normalize_polygon(poly):
-    """The emitted polygon form: the vertices rounded to integers (the
-    runtime leash arithmetic runs on ints) with the collinear and the
-    rounding-concave vertices dropped (a rounded vertex can turn a
-    hair right - the containment test of the leash assumes a convex
-    counter-clockwise ring)."""
-    rounded = [(int(round(x)), int(round(y))) for x, y in poly]
-    if len(rounded) < 3:
-        return rounded
-    kept = []
-    n = len(rounded)
-    for i in range(n):
-        ax, ay = rounded[(i - 1) % n]
-        bx, by = rounded[i]
-        cx, cy = rounded[(i + 1) % n]
-        cross = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
-        if cross > 0:
-            kept.append((bx, by))
-    if len(kept) < 3:
-        # A fully degenerate ring (a sliver thinner than the rounding
-        # step): keep the raw rounded ring, the leash of such a cell
-        # is its focus neighborhood anyway.
-        return rounded
-
-    return kept
-
-
-def voronoi_cells(seeds, envelope):
-    """The Voronoi diagram of the seeds clipped to the rectangular
-    envelope: the convex cell polygon of every seed (CCW) plus the
-    neighbor seeds whose bisector bounds it. The half-plane
-    intersection IS the Voronoi cell - every point of the plane
-    closer to the seed than to any other satisfies every bisector
-    half-plane, so the exact cell shape falls out of the clipping."""
-    x0, y0, x1, y1 = envelope
-    box = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
-    cells = []
-    for i, seed in enumerate(seeds):
-        poly = list(box)
-        # A seed outside the envelope owns nothing (the seeds sit on
-        # the ground, inside by construction).
-        for j, other in enumerate(seeds):
-            if j == i:
-                continue
-            dx, dy, c = bisector(seed, other)
-            poly = clip_halfplane(poly, dx, dy, c)
-            if not poly:
-                break
-        neighbors = set()
-        if poly and polygon_area(poly) > 0.0:
-            for j, other in enumerate(seeds):
-                if j == i:
-                    continue
-                dx, dy, c = bisector(seed, other)
-                norm = math.hypot(dx, dy)
-                if norm <= 0.0:
-                    continue
-                # A bisector bounds the cell when a polygon edge lies
-                # on its line (both endpoints within one unit of it).
-                n = len(poly)
-                for e in range(n):
-                    ax, ay = poly[e]
-                    bx, by = poly[(e + 1) % n]
-                    if (abs(dx * ax + dy * ay - c) <= norm and
-                            abs(dx * bx + dy * by - c) <= norm):
-                        neighbors.add(j)
-
-                        break
-        cells.append({
-            "seed": i, "polygon": poly if poly else [],
-            "neighbors": neighbors,
-        })
-
-    return cells
-
-
-def assign_nearest(samples, seeds):
-    """The exact Voronoi assignment: every sample point to its
-    nearest seed (the first seed wins the ties - deterministic).
-    Vectorized through numpy when available (the plain loop over
-    ~15k samples x ~300 seeds costs seconds per densify round)."""
-    try:
-        import numpy
-    except ImportError:
-        numpy = None
-    if numpy is not None and len(samples) > 0:
-        pts = numpy.asarray(samples, dtype=numpy.float64)
-        sd = numpy.asarray(seeds, dtype=numpy.float64)
-        owners = []
-        for start in range(0, len(pts), 4096):
-            chunk = pts[start:start + 4096]
-            d = ((chunk[:, None, :] - sd[None, :, :]) ** 2).sum(-1)
-            owners.extend(d.argmin(1).tolist())
-
-        return owners
-    owners = []
-    for x, y in samples:
-        best_i = 0
-        best_d = None
-        for i, (sx, sy) in enumerate(seeds):
-            d = (x - sx) * (x - sx) + (y - sy) * (y - sy)
-            if best_d is None or d < best_d:
-                best_d, best_i = d, i
-        owners.append(best_i)
-
-    return owners
-
-
-def ground_envelope(samples):
-    """The bounding box of the whole spawn ground widened by the
-    envelope margin: the edge cells extend this far into the empty
-    map, the border mobs wander inside it."""
-    xs = [p[0] for p in samples]
-    ys = [p[1] for p in samples]
-
-    return (min(xs) - ENVELOPE_MARGIN, min(ys) - ENVELOPE_MARGIN,
-            max(xs) + ENVELOPE_MARGIN, max(ys) + ENVELOPE_MARGIN)
-
-
-def densify(seeds, samples):
-    """The stabilization loop of the partition: drop the seeds that
-    own no samples (the diagram fills the hole), split the cells
-    whose sample radius from the focus exceeds the visibility budget
-    (a fresh seed at the far half centroid). Returns the stable seed
-    list and the per-seed sample buckets of the final assignment."""
-    all_samples = [p for cloud in samples for p in cloud]
-    for _ in range(DENSIFY_MAX_ROUNDS):
-        owners = assign_nearest(all_samples, seeds)
-        buckets = [[] for _ in seeds]
-        for point, owner in zip(all_samples, owners):
-            buckets[owner].append(point)
-        drop = [i for i, b in enumerate(buckets) if not b]
-        if drop:
-            keep = [i for i, b in enumerate(buckets) if b]
-            seeds = [seeds[i] for i in keep]
-            buckets = [buckets[i] for i in keep]
-
-            continue
-        grew = False
-        for bucket in buckets:
-            if len(bucket) < 2:
-                continue
-            cx, cy = centroid(bucket)
-            if euclidean_radius(bucket, cx, cy) <= CELL_RADIUS_MAX:
-                continue
-            left, right = split_samples(bucket)
-            if not left or not right:
-                continue
-            lx, ly = centroid(left)
-            rx, ry = centroid(right)
-            if math.hypot(lx - cx, ly - cy) >= math.hypot(rx - cx, ry - cy):
-                fresh = (int(round(lx)), int(round(ly)))
-            else:
-                fresh = (int(round(rx)), int(round(ry)))
-            if fresh in seeds:
-                continue
-            seeds = seeds + [fresh]
-            grew = True
-
-            break
-        if grew:
-            continue
-
-        return seeds, buckets
-
-    raise SystemExit(
-        "error: the densification did not converge in %d rounds"
-        % DENSIFY_MAX_ROUNDS)
+    return [(1, 0), (1, -1), (0, 1), (0, -1), (-1, 0), (-1, -1)]
 
 
 def point_in_convex(poly, x, y):
@@ -635,13 +289,41 @@ def point_in_convex(poly, x, y):
     return True
 
 
+def point_in_convex_slack(poly, x, y, slack):
+    """The tolerant containment test: the point stays within slack
+    units PAST the edge. The sample assignment runs against the
+    integer-rounded hexagon polygon - a spawn sample sitting exactly
+    on the analytic boundary line can fall a rounding hair (under
+    half a unit) outside the emitted polygon while the analytic grid
+    still owns it."""
+    n = len(poly)
+    for i in range(n):
+        ax, ay = poly[i]
+        bx, by = poly[(i + 1) % n]
+        cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax)
+        edge = math.hypot(bx - ax, by - ay)
+        if cross < -slack * edge:
+            return False
+
+    return True
+
+
+def euclidean_radius(samples, cx, cy):
+    """The Euclidean radius of the samples from a center."""
+    radius = 0.0
+    for x, y in samples:
+        radius = max(radius, math.hypot(x - cx, y - cy))
+
+    return radius
+
+
 def inscribed_patrol_half(poly, fx, fy, radius):
     """The axis-aligned patrol square half centered at the focus: the
     largest square that stays inside the convex polygon (the
     inward-normal distance of every edge divided by its |nx| + |ny|),
     capped so the whole cell stays inside the knownlist circle from
-    ANY point of the square (the corner sits radius x sqrt(2) from
-    the focus, the farthest cell sample radius away: half x sqrt(2) +
+    ANY point of the square (the corner sits half x sqrt(2) from the
+    focus, the farthest cell sample radius away: half x sqrt(2) +
     radius <= the visibility radius), floored at the patrol
     minimum."""
     best = None
@@ -664,8 +346,8 @@ def inscribed_patrol_half(poly, fx, fy, radius):
             best = limit
     if best is None:
         return PATROL_HALF_FLOOR
-    visible = (VISIBILITY_RADIUS - radius) / SQRT2
-    half = int(math.floor(min(best, visible, float(LEASH_HALF))))
+    visible = (VISIBILITY_RADIUS - radius) / math.sqrt(2.0)
+    half = int(math.floor(min(best, visible, float(HEX_RADIUS))))
     if half < PATROL_HALF_FLOOR:
         half = PATROL_HALF_FLOOR
 
@@ -698,64 +380,99 @@ def largest_remainder(count, weights):
 
 
 def build_cells(territories, species):
-    """The cell registry: the Voronoi partition of the ground (every
-    sample point assigned to exactly one cell by the nearest seed),
-    the mob composition by the largest-remainder sample share (the
-    territory totals preserved), the focus/patrol/neighbors geometry,
-    the compass naming and the band ordering."""
+    """The cell registry: the uniform hexagon grid partition of the
+    ground (every sample point maps analytically to exactly one
+    hexagon), the mob composition by the largest-remainder sample
+    share (the territory totals preserved), the focus/patrol/
+    neighbors geometry, the compass naming and the band ordering."""
     all_samples = []
     for terr in territories:
         terr["samples"] = sample_polygon(terr["nodes"])
         all_samples.extend(terr["samples"])
     if not all_samples:
         raise SystemExit("error: the spawn XML holds no ground samples")
-    seeds, _ = build_seeds(territories)
-    sample_clouds = [terr["samples"] for terr in territories]
-    seeds, buckets = densify(seeds, sample_clouds)
-    envelope = ground_envelope(all_samples)
-    cells_raw = voronoi_cells(seeds, envelope)
-    for cell in cells_raw:
-        # The emitted geometry is integer: the runtime leash and the
-        # patrol square derive from the same rounded ring the Go
-        # registry carries (a patrol square computed against the float
-        # polygon can poke a corner out of the rounded one).
-        cell["polygon"] = normalize_polygon(cell["polygon"])
-    for i in range(len(seeds)):
-        bucket = buckets[i]
-        if not bucket:
-            raise SystemExit(
-                "error: the cell of seed %d owns no samples" % i)
-        fx, fy = centroid(bucket)
-        cells_raw[i]["focus"] = (int(round(fx)), int(round(fy)))
-        cells_raw[i]["radius"] = euclidean_radius(bucket, fx, fy)
-        cells_raw[i]["samples"] = bucket
-        cells_raw[i]["mass"] = {}
+    # The registry hexagons: every grid hexagon owning at least one
+    # sample point. The map (q, row) -> index keeps the grid identity
+    # for the neighbor pass.
+    grid = {}
+    order = []
+    for x, y in all_samples:
+        coords = hex_of_point(x, y)
+        if coords not in grid:
+            grid[coords] = len(order)
+            order.append({
+                "coords": coords, "samples": [],
+                "mass": {}, "seed_index": 0,
+            })
+        order[grid[coords]]["samples"].append((x, y))
     # The mob distribution: the owner of every territory sample comes
-    # from the exact Voronoi assignment against the final seed list.
+    # from the same analytic hexagon lookup.
     for terr in territories:
         if not terr["samples"]:
             continue
-        terr_owners = assign_nearest(terr["samples"], seeds)
         cell_counts = {}
-        for owner in terr_owners:
-            cell_counts[owner] = cell_counts.get(owner, 0) + 1
+        for x, y in terr["samples"]:
+            index = grid[hex_of_point(x, y)]
+            cell_counts[index] = cell_counts.get(index, 0) + 1
         for tid, count in terr["npcs"]:
             weights = {cell: float(n) for cell, n in cell_counts.items()}
             for cell, given in largest_remainder(count, weights).items():
-                cells_raw[cell]["mass"][tid] = (
-                    cells_raw[cell]["mass"].get(tid, 0) + given)
-    # The dominant species of a cell names it: "<species> <compass>-
+                order[cell]["mass"][tid] = (
+                    order[cell]["mass"].get(tid, 0) + given)
+    # The geometry of every hexagon: the center focus, the uniform
+    # polygon, the inscribed patrol square, the grid neighbors that
+    # exist in the registry.
+    for index, cell in enumerate(order):
+        q, row = cell["coords"]
+        fx, fy = hex_center(q, row)
+        cell["focus_x"], cell["focus_y"] = fx, fy
+        cell["polygon"] = hex_polygon(fx, fy)
+        cell["radius"] = euclidean_radius(cell["samples"], fx, fy)
+        cell["neighbors"] = []
+        for dq, drow in hex_neighbor_offsets(q):
+            neighbor = (q + dq, row + drow)
+            if neighbor in grid:
+                cell["neighbors"].append(grid[neighbor])
+    # The generator-side invariant guards: the sample points the
+    # registry assigns to a hexagon actually fall inside its emitted
+    # integer polygon (the rounding of the vertices moves an edge by
+    # at most half a unit, a sample on the boundary line maps to the
+    # neighbor the analytic rounding chose - only a sample DEEP
+    # outside the polygon would be a grid bug), and the patrol square
+    # stays inside the hexagon.
+    for cell in order:
+        poly = cell["polygon"]
+        fx, fy = cell["focus_x"], cell["focus_y"]
+        patrol = inscribed_patrol_half(poly, fx, fy, cell["radius"])
+        cell["patrol_half"] = patrol
+        for corner in ((fx - patrol, fy - patrol),
+                       (fx + patrol, fy - patrol),
+                       (fx + patrol, fy + patrol),
+                       (fx - patrol, fy + patrol)):
+            if not point_in_convex(poly, *corner):
+                raise SystemExit(
+                    "error: the patrol square of %r leaves the hexagon "
+                    "at %r" % (cell["coords"], corner))
+        outside = 0
+        for x, y in cell["samples"]:
+            if not point_in_convex_slack(poly, x, y, 2.0):
+                outside += 1
+        if outside > 0:
+            raise SystemExit(
+                "error: %d samples of the hexagon %r fall outside its "
+                "polygon - the grid math broke" % (outside, cell["coords"]))
+    # The dominant species of a hexagon names it: "<species> <compass>-
     # <sequence>" (the compass octant from the village, the sequence
-    # disambiguates the shared octants). A cell the largest-remainder
-    # rounding left without mobs (the corner ground of a sparse
-    # territory) names after the empty ground: it stays a pass
-    # through neighbor of the partition, the picker never selects it.
+    # disambiguates the shared octants). A hexagon the
+    # largest-remainder rounding left without mobs (the corner ground
+    # of a sparse territory) names after the empty ground: it stays a
+    # pass through neighbor of the partition, the picker never
+    # selects it.
     octant_seq = {}
     ground_seq = {}
     cells = []
-    for i in range(len(seeds)):
-        cell = cells_raw[i]
-        fx, fy = cell["focus"]
+    for index, cell in enumerate(order):
+        fx, fy = cell["focus_x"], cell["focus_y"]
         octant = compass(fx, fy, VILLAGE_X, VILLAGE_Y)
         positive = {
             tid: count for tid, count in cell["mass"].items()
@@ -781,25 +498,13 @@ def build_cells(territories, species):
                 "respawn": DEFAULT_RESPAWN,
             })
         mobs.sort(key=lambda m: -m["level"])
-        patrol = inscribed_patrol_half(
-            cell["polygon"], fx, fy, cell["radius"])
-        # The generator-side invariant guard: the patrol square stays
-        # inside the emitted polygon (the registry test pins the same
-        # property, the assert catches the drift at generation time).
-        for corner in ((fx - patrol, fy - patrol),
-                       (fx + patrol, fy - patrol),
-                       (fx + patrol, fy + patrol),
-                       (fx - patrol, fy + patrol)):
-            if not point_in_convex(cell["polygon"], *corner):
-                raise SystemExit(
-                    "error: the patrol square of %s leaves the cell at "
-                    "%r" % (cell.get("name"), corner))
         cells.append({
             "name": name, "focus_x": fx, "focus_y": fy,
-            "patrol_half": patrol, "radius": cell["radius"],
+            "patrol_half": cell["patrol_half"],
+            "radius": cell["radius"],
             "mobs": mobs, "polygon": cell["polygon"],
-            "neighbors": sorted(cell["neighbors"]),
-            "samples": cell["samples"], "seed_index": i,
+            "neighbors": cell["neighbors"],
+            "samples": cell["samples"], "seed_index": index,
         })
     # The registry order: the lowest band first, the village nearest
     # ground of the band leads (the starter fallback of the picker).
@@ -817,27 +522,26 @@ def build_cells(territories, species):
 
     cells.sort(key=band_key)
     # The neighbor indices remap onto the sorted registry order.
-    order = {}
+    remap = {}
     for index, cell in enumerate(cells):
-        order[cell["seed_index"]] = index
+        remap[cell["seed_index"]] = index
     for cell in cells:
         cell["neighbors"] = sorted(
-            order[j] for j in cell["neighbors"] if j in order)
+            remap[j] for j in cell["neighbors"] if j in remap)
     for index, cell in enumerate(cells, start=1):
-        cell["id"] = "elven-cell-%03d" % index
+        cell["id"] = "elven-hex-%03d" % index
 
     return cells
 
 
 def cross_check_audit(cells):
     """Validate the partition against the live audit evidence: every
-    observed mob of every audited anchor lands in exactly one cell
-    (the partition covers the world by construction, the audit pins
-    it against live positions), and the mob cloud a standing bot
-    sees decomposes over the anchor cell plus its near neighbors
-    (the mesh scale property: the bot's own cell plus the 1-2 hop
-    ring holds the visible mass, so the cell rotation moves short
-    distances)."""
+    observed mob of every audited anchor lands in exactly one hexagon
+    (the grid covers the world by construction, the audit pins it
+    against live positions), and the mob cloud a standing bot sees
+    decomposes over the anchor hexagon plus its near neighbors (the
+    mesh scale property: the bot's own hexagon plus the 1-2 hop ring
+    holds the visible mass, so the rotation moves short distances)."""
     if not os.path.exists(AUDIT):
         return []
     with open(AUDIT, encoding="utf-8") as fh:
@@ -886,8 +590,8 @@ def cross_check_audit(cells):
 
                     break
             if owner is None:
-                # The observation belongs to no cell (a position off
-                # the ground envelope or a corrupted record).
+                # The observation belongs to no hexagon (a position
+                # off the audited ground or a corrupted record).
                 unowned += 1
 
                 continue
@@ -932,35 +636,38 @@ def render_go(cells):
     lines.append(
         "// Mobius spawn territory polygons; DO NOT EDIT by hand -")
     lines.append(
-        "// re-run the generator instead. Every cell is one Voronoi")
+        "// re-run the generator instead. Every cell is one hexagon of")
     lines.append(
-        "// cell of the spawn ground partition: the seeds are the")
+        "// the UNIFORM grid partition: the flat-top hexagons of one")
     lines.append(
-        "// visibility-sized piece centroids of the live audited")
+        "// circumradius tile the whole map, every sample point maps")
     lines.append(
-        "// 2026-09-13 spot geometry, the polygon is the half-plane")
+        "// analytically (the axial cube rounding) onto exactly ONE")
     lines.append(
-        "// intersection (the points nearer to the seed than to any")
+        "// hexagon - the half-covered respawn failure is impossible by")
     lines.append(
-        "// other), every spawn sample point belongs to exactly ONE")
+        "// construction - the hexagon extent from the focus stays")
     lines.append(
-        "// cell (the nearest seed assignment), the cell extent from")
+        "// inside the knownlist circle, the patrol square is the")
     lines.append(
-        "// the focus stays inside the knownlist circle, and the")
+        "// axis-aligned square inscribed in the hexagon at the center,")
     lines.append(
-        "// patrol square is the axis-aligned square inscribed in the")
+        "// and the neighbors are the six grid ring members present in")
     lines.append(
-        "// polygon at the focus. See docs/hunting_cells.md for the")
-    lines.append("// model and docs/hunting.md for the hunt policy.")
+        "// the registry. See docs/hunting_cells.md for the model and")
+    lines.append("// docs/hunting.md for the hunt policy.")
     lines.append("")
     lines.append("package hunt")
     lines.append("")
     lines.append(
         "// elvenHuntingCells partitions the elven spawn ground in")
+    lines.append("//")
     lines.append(
-        "//    %d Voronoi hunting cells." % len(cells))
+        "//    %d uniform hexagon hunting cells." % len(cells))
+    lines.append("//")
     lines.append(
         "// The first entry is the starter fallback of the cell picker")
+    lines.append("//")
     lines.append(
         "//    (the village nearest cell of the lowest band).")
     lines.append("var elvenHuntingCells = []Cell{")
@@ -985,19 +692,22 @@ def render_go(cells):
             "        RespawnMin: %d, RespawnMax: %d, Mass: %s,"
             % (DEFAULT_RESPAWN[0], DEFAULT_RESPAWN[1],
                format_mass(mass)))
-        lines.append("        Mobs: []CellMob{")
-        for mob in cell["mobs"]:
-            lines.append("            {")
-            lines.append(
-                '                TemplateID: %d, Name: "%s",'
-                % (mob["template_id"], mob["name"]))
-            lines.append(
-                "                Level: %d, Count: %d, "
-                "RespawnMin: %d, RespawnMax: %d,"
-                % (mob["level"], mob["count"],
-                   mob["respawn"][0], mob["respawn"][1]))
-            lines.append("            },")
-        lines.append("        },")
+        if cell["mobs"]:
+            lines.append("        Mobs: []CellMob{")
+            for mob in cell["mobs"]:
+                lines.append("            {")
+                lines.append(
+                    '                TemplateID: %d, Name: "%s",'
+                    % (mob["template_id"], mob["name"]))
+                lines.append(
+                    "                Level: %d, Count: %d, "
+                    "RespawnMin: %d, RespawnMax: %d,"
+                    % (mob["level"], mob["count"],
+                       mob["respawn"][0], mob["respawn"][1]))
+                lines.append("            },")
+            lines.append("        },")
+        else:
+            lines.append("        Mobs: []CellMob{},")
         lines.append("        Vertices: []CellVertex{")
         for vx, vy in cell["polygon"]:
             lines.append("            {X: %d, Y: %d}," % (int(round(vx)),
@@ -1053,8 +763,9 @@ def render_json(cells):
 
 def render_report(cells, territories, evidence):
     """The human readable generation report: the partition invariants
-    (the coverage, the extent, the patrol, the mass preservation, the
-    adjacency symmetry) and the audit cross-check."""
+    (the coverage, the uniform size, the patrol, the mass
+    preservation, the adjacency symmetry) and the audit
+    cross-check."""
     total_spawn = sum(
         count for terr in territories
         for _, count in terr["npcs"])
@@ -1082,20 +793,44 @@ def render_report(cells, territories, evidence):
                     break
             if not found:
                 symmetric = False
+    # The uniform geometry: every hexagon carries six vertices, the
+    # same circumradius (the registry pins the size against the
+    # generator drift) and the same area.
+    uniform_vertex_count = all(
+        len(cell["polygon"]) == 6 for cell in cells)
+    areas = []
+    for cell in cells:
+        poly = cell["polygon"]
+        area = 0.0
+        for i in range(len(poly)):
+            ax, ay = poly[i]
+            bx, by = poly[(i + 1) % len(poly)]
+            area += ax * by - bx * ay
+        areas.append(abs(area) / 2.0)
+    hex_area = 3.0 * math.sqrt(3.0) / 2.0 * HEX_RADIUS ** 2
+    uniform_area = all(
+        abs(area - hex_area) <= hex_area * 0.02 for area in areas)
     lines = []
     lines.append("elven hunting cells generation report")
     lines.append("====================================")
     lines.append("")
-    lines.append("cells: %d" % len(cells))
+    lines.append("cells: %d (uniform hexagons, circumradius %d)"
+                 % (len(cells), HEX_RADIUS))
     lines.append(
         "spawn mass: %d mobs over %d territories, the cells carry %d "
         "(preserved: %s)"
         % (total_spawn, len(territories), cell_mass,
            "yes" if total_spawn == cell_mass else "NO"))
     lines.append(
+        "hexagon size: %d corners everywhere: %s, area %d (uniform: "
+        "%s, expected %d)"
+        % (6, "yes" if uniform_vertex_count else "NO",
+           int(round(sum(areas) / max(1, len(areas)))),
+           "yes" if uniform_area else "NO", int(round(hex_area))))
+    lines.append(
         "cell radius (focus -> farthest sample): min %d, median %d, "
         "max %d (budget %d)"
-        % (radii[0], radii[len(radii) // 2], radii[-1], CELL_RADIUS_MAX))
+        % (radii[0], radii[len(radii) // 2], radii[-1], HEX_RADIUS))
     lines.append(
         "patrol half: min %d, median %d, max %d"
         % (patrols[0], patrols[len(patrols) // 2], patrols[-1]))
@@ -1110,7 +845,8 @@ def render_report(cells, territories, evidence):
         "patrol floor cells: %d (the inscribed square tighter than %d)"
         % (len(flagged), PATROL_HALF_FLOOR))
     visible_ok = all(
-        cell["patrol_half"] * SQRT2 + cell["radius"] <= VISIBILITY_RADIUS
+        cell["patrol_half"] * math.sqrt(2.0) + cell["radius"]
+        <= VISIBILITY_RADIUS
         for cell in cells)
     lines.append(
         "visibility invariant (patrol*sqrt(2) + radius <= %d): %s"

@@ -1,13 +1,14 @@
 elven hunting cells generation report
 ====================================
 
-cells: 349
+cells: 540 (uniform hexagons, circumradius 1000)
 spawn mass: 812 mobs over 106 territories, the cells carry 812 (preserved: yes)
-cell radius (focus -> farthest sample): min 819, median 1254, max 1595 (budget 1600)
-patrol half: min 260, median 510, max 678
-adjacency: 1982 edges, symmetric: yes, mean degree 5.7
+hexagon size: 6 corners everywhere: yes, area 2598000 (uniform: yes, expected 2598076)
+cell radius (focus -> farthest sample): min 856, median 967, max 998 (budget 1000)
+patrol half: min 633, median 633, max 633
+adjacency: 2876 edges, symmetric: yes, mean degree 5.3
 patrol floor cells: 0 (the inscribed square tighter than 256)
 visibility invariant (patrol*sqrt(2) + radius <= 2048): yes
 samples: 66851 assigned, every cell owns at least one
 
-audit cross-check (71 anchors, 1629 observed mobs): 1628 belong to exactly one cell (99.9%, the partition coverage pinned against the live positions); the visible cloud of a standing bot decomposes into the own cell 228 (14%), the 1-hop ring 847, the 2-hop ring 495, beyond the 2-hop ring 58 - the mesh scale keeps the farm moves short
+audit cross-check (71 anchors, 1629 observed mobs): 1607 belong to exactly one cell (98.6%, the partition coverage pinned against the live positions); the visible cloud of a standing bot decomposes into the own cell 201 (12%), the 1-hop ring 688, the 2-hop ring 584, beyond the 2-hop ring 134 - the mesh scale keeps the farm moves short

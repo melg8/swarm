@@ -11,12 +11,12 @@ import (
     "github.com/stretchr/testify/require"
 )
 
-// The registry invariants pin the committed Voronoi partition against
-// the generator drift: the convexity and the orientation of every
-// cell polygon, the symmetric adjacency, the patrol square and the
-// focus inside the polygon, the mass arithmetic and the ordering.
-// A regeneration that breaks one of these is a generator bug, not a
-// data change.
+// The registry invariants pin the committed hexagon partition against
+// the generator drift: the uniform size of every hexagon, the
+// convexity and the orientation of every polygon, the symmetric
+// adjacency, the patrol square and the focus inside the polygon, the
+// mass arithmetic and the ordering. A regeneration that breaks one
+// of these is a generator bug, not a data change.
 
 // cross2 computes the z cross product of the edge AB with AC.
 func cross2(ax, ay, bx, by, cx, cy int32) int64 {
@@ -130,6 +130,56 @@ func TestElvenCellRegistryInvariants(t *testing.T) {
             }
         })
     }
+}
+
+func TestElvenCellRegistryUniformHexagons(t *testing.T) {
+    cells := ElvenHuntingCells()
+    require.NotEmpty(t, cells)
+    // The partition is a UNIFORM hexagon grid: every cell carries the
+    // exact same flat-top hexagon shape at the same circumradius and
+    // the same area - a registry of mixed shapes means the generator
+    // drifted off the grid (the old Voronoi cells varied by design,
+    // the hex grid must not).
+    const reference = 1000.0
+    for index := range cells {
+        cell := &cells[index]
+        t.Run(cell.ID, func(t *testing.T) {
+            require.Len(t, cell.Vertices, 6,
+                "a uniform hexagon carries exactly six corners")
+            // The circumradius: every vertex sits the same distance
+            // from the focus (the hexagon center).
+            for _, v := range cell.Vertices {
+                radius := math.Hypot(
+                    float64(v.X-cell.FocusX), float64(v.Y-cell.FocusY))
+                require.InDelta(t, reference, radius, 1.0,
+                    "the hexagon circumradius drifted")
+            }
+            // The area: the shoelace of the hexagon ring.
+            area := 0.0
+            n := len(cell.Vertices)
+            for i := range cell.Vertices {
+                a := cell.Vertices[i]
+                b := cell.Vertices[(i+1)%n]
+                area += float64(a.X)*float64(b.Y) -
+                    float64(b.X)*float64(a.Y)
+            }
+            area = math.Abs(area) / 2
+            require.InDelta(t, 3*math.Sqrt(3)/2*reference*reference,
+                area, 5000.0, "the hexagon area drifted")
+        })
+    }
+    // The patrol square is uniform too: the inscribed square of the
+    // same hexagon shape lands at the same half everywhere.
+    halves := make(map[int32]int, 4)
+    for index := range cells {
+        halves[cells[index].PatrolHalf]++
+    }
+    require.Len(t, halves, 1,
+        "the uniform hexagons carry one patrol half, got %v", halves)
+    // The registry count stays inside the order of the previous
+    // Voronoi partition (a size regression would inflate the mesh).
+    require.Less(t, len(cells), 800)
+    require.Greater(t, len(cells), 100)
 }
 
 func TestElvenCellRegistryOrderAndMass(t *testing.T) {
