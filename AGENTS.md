@@ -62,7 +62,8 @@ one of them is the reference for its subsystem:
 | Document | What it covers |
 | --- | --- |
 | `docs/deployment.md` | Bringing the stack up (fast deploy, bootstrap, scripts), Windows host layout, stack logs, the Mobius operational pitfalls (flood protector, login re-registration, slow SIGTERM) |
-| `docs/hunting.md` | The autonomous hunt: hunt loop, combat safety, blind engage recovery, multi-zone hunting, auto equipment, shop strategy execution, town trips, deleveling, live-validated facts |
+| `docs/hunting.md` | The autonomous hunt: hunt loop, combat safety, blind engage recovery, multi-zone hunting, the Voronoi cell system, auto equipment, shop strategy execution, town trips, deleveling, live-validated facts |
+| `docs/hunting_cells.md` | The Voronoi cell hunting: the ground partition, the visibility budget, the ripeness-paced neighbor rotation, the mesh endpoint, the registry invariants |
 | `docs/shopping_strategy.md` | The shop strategy reasoning, prices, purchase phases and the was/is level journey comparison |
 | `docs/webui.md` | The web interface: launch modes, map rendering, movement interpolation, HUD, equipment and shop queue widgets, interactivity, the bot statistics tab, snapshot encoding, the state tracker internals, repro harnesses |
 | `docs/session_journal.md` | The persistent session journal: the JSONL record of the whole run (events, samples, kills, trips, purchases), the session dump report of the web UI, the offline -session-report CLI |

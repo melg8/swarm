@@ -144,25 +144,25 @@ colors from the same variables).
   ring around the bot itself when the bot is the target). A mob ringed
   in violet is claimed by someone else - the precondition for not
   training other players' mobs. The tooltips show what a unit targets.
-- Zone drawing: the map draws every zone (active amber, the future
-  grounds in a bright soft blue with a light fill - the demonstration
-  of where the bot will hunt next, dimmed hints do not read; demoted
-  bands red - the names read only while the pointer rests inside the
-  ground: a mousemove over a spot circle or a legacy square lights its
-  label with the economy suffixes and the highlight stroke, the far
-  zoom stays a clean shape field instead of a smeared label blob; the
-  `hunt zones` row of the map toolbar view dropdown hides the whole
-  layer like the targets and map background toggles) and the floating
-  collapsible zone panel of the map (bottom right corner, collapsed by
-  default, the count chip carries the registry total; the left sidebar
-  lists bots only) carries the death counts and switches zones manually
-  (the `zone` command, index in the Count field; the override holds
-  until the character outgrows the band or dies it out). Hovering a
-  list entry focuses the map on its ground (`focusZone` of
-  `web/map.js`): the camera pins to the zone center, the zoom fits the
-  ground span, the zone highlights with its name, and leaving the item
-  restores the camera the user had (the follow flag, the pan anchor,
-  the zoom).
+- Zone drawing: the cell mode draws the Voronoi partition - the
+  static mesh edges stroke as ONE cached raster (a thin outline per
+  boundary, no fills, no shading of the inactive cells) and exactly
+  ONE highlighted element: the cell the bot holds or walks to (the
+  light amber fill, the bright stroke, the focus dot and the live
+  label with the farming/moving marker, the respawn clock and the
+  measured income; the map answers "which zone is the bot going to"
+  through this element alone). The mesh payload arrives once per
+  registry version through `GET /api/hunt-mesh` (the ETag is the
+  version) - the mesh bytes never ride the per-second snapshot, which
+  carries only the version marker and the live record of the held
+  cell. The pointer hover resolves the cell under the cursor through
+  the polygon hit test and lights its name label. The manual zone
+  panel and the `zone` command retired with the spot mode (the
+  registry of a full project grows past a thousand cells - the hunt
+  economy owns the rotation). The legacy zone mode keeps the square
+  drawing of the registry grounds (the active amber, the demoted red,
+  the pointer-hover labels) and the same toolbar `hunt zones` toggle
+  hides both layers.
 - Threat data: the npc level, `aggroRange` and `isAggressive` ai flags
   come from the generated `internal/swarm/npcdata` maps (the C1 data
   pack marks every monster `isAggressive=false`: they only defend). The
@@ -329,10 +329,14 @@ dozen 512px tiles per paint and is visually indistinguishable on
   landed tile happens in the image pipeline instead of the first
   `drawImage` inside a cache re-render.
 - **The hunting zones render from their own offscreen cache**: the
-  elven spot registry alone carries ~290 grounds and the zoomed out
-  view has most of them on screen at once, so re-stroking the dashed
-  circles on every animation frame was the cpu load that survived the
-  background cache. The shapes (the circles, the squares, the anchor
+  zoomed out view has most of the registry on screen at once, so
+  re-stroking the shapes on every animation frame was the cpu load
+  that survived the background cache. The cell mode draws the static
+  partition edges into a version-keyed raster (the mesh never changes
+  at runtime - the cache key is the version, the zoom and the canvas
+  geometry alone, the active cell highlight paints fresh per frame as
+  one polygon plus its label); the legacy spot/square registry keeps
+  the shape-keyed cache below. The shapes (the circles, the squares, the anchor
   dots, the kill centroid crosses) now rasterize into a second world
   anchored cache exactly like the static world (the same slack box and
   device pixel cap, sized for thin strokes instead of imagery) and

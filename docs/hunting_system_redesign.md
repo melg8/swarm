@@ -1,7 +1,15 @@
 # Redesign of the hunting system: spot-anchored farming with respawn awareness and efficiency scoring
 
 Research document, 2026-09-10. Branch `feature/proxy-server`. Author: melg8
-(agent session). Source data: the generated zone registry
+(agent session).
+
+SUPERSEDED (2026-09-13): the spot-anchored circles retired for the
+Voronoi cell partition (`docs/hunting_cells.md`) - the circle cover
+owned only part of every respawn ground and bred the
+depletion/oversaturation cycle the partition kills by construction.
+The economy sections below (the respawn overlay, the efficiency
+scoring, the level window, the fleet occupancy) carried into the cell
+policy almost verbatim; the geometry did not. Source data: the generated zone registry
 (`internal/swarm/hunt/zones_elven.go` — the parsed Mobius
 `ElvenStarting.xml`), `internal/swarm/npcdata` (aggressive flags, aggro and
 clan help ranges), the live-validated server facts of `AGENTS.md`, a

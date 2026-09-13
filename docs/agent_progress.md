@@ -128,8 +128,32 @@ The requirements:
   snapshot (both encode paths mirrored, the golden test extended),
   the /api/hunt-mesh endpoint serves the static payload with the
   ETag.
-- Next: the web UI (the Voronoi edge layer, the active cell
-  highlight, the zone panel removal) and the docs.
+- Commit 7029f6f "webui: the voronoi cell layer and the manual zone
+  control retirement" (2026-09-13): the map draws the partition (the
+  static mesh edges as one version-keyed cached raster - no fills, no
+  shading of the inactive cells - plus exactly ONE highlighted
+  element: the cell the bot holds or walks to with the farming/moving
+  marker, the respawn clock and the measured income), the mesh
+  payload fetches once per version through the new
+  `/api/hunt-mesh` endpoint (the ETag is the version, the endpoint
+  test pins the 304 and the 404 paths), the snapshot carries only the
+  version marker plus the live cell record, the zone list panel, the
+  hunt buttons and the focus machinery retire from the DOM, the CSS,
+  app.js and map.js, the harnesses follow (the zone focus scenario
+  became the hunt cell layer scenario: the mesh fetch, the edge
+  strokes, the single highlight, the moving marker; the HUD zone
+  panel checks removed). All eight harnesses green.
+- Commit (docs): `docs/hunting_cells.md` (the design: the partition,
+  the visibility budget, the ripeness rotation, the mesh endpoint,
+  the invariants), the hunting.md spot section rewritten as the cell
+  section, the webui.md zone drawing and cache sections updated, the
+  hunting_system_redesign.md superseded note, the README/AGENTS doc
+  maps.
+- Status: done (2026-09-13). go build, go vet, the full `go test
+  ./...` suite, `golangci-lint run --new` (only the branch wide gci
+  formatter artifact the whole tree carries), `task fmt:check` and
+  all eight web UI harnesses green; the live smoke run of the
+  deployed stack verifies the cell rotation.
 
 ## Active task: the repository-wide switch to spaces only (2026-09-13)
 

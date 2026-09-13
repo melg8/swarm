@@ -18,10 +18,10 @@ The four pillars, each detailed in its section below:
   `docs/shopping_strategy.md`) plans and executes the purchases.
 - **Multi-zone hunting** (`hunt/zones.go`, the generated registry
   `hunt/zones_elven.go`) climbs the mob level ladder of the region.
-- **Spot-anchored hunting** (`hunt/spot*.go`, the generated registry
-  `hunt/spots_elven.go`) replaces the ladder on the elven lands:
-  visibility bounded anchors, respawn awareness and measured scoring
-  (the redesign of `docs/hunting_system_redesign.md`).
+- **Voronoi cell hunting** (`hunt/cell*.go`, the generated registry
+  `hunt/cells_elven.go`) replaces the ladder on the elven lands: the
+  spawn ground partition, the respawn-paced neighbor rotation and the
+  measured scoring (the design of `docs/hunting_cells.md`).
 
 Extension path: a mage class implements `gear.Profile` (mAtk weapons,
 robe preference - the planner, the strategy and the trip execution
@@ -239,68 +239,35 @@ manages its own budgets). Covered by hunt/loop_los_test.go
 stale stance timeout, timeout hold, attempt scoping, fresh fight
 guard) and the state tracker test of the refusal recording.
 
-## Spot-anchored hunting (hunt/spot*.go, hunt/spots_elven.go)
+## Voronoi cell hunting (hunt/cell*.go, hunt/cells_elven.go)
 
-The spot mode replaces the square zone ladder of the elven lands (the
-redesign of `docs/hunting_system_redesign.md`; `main.go` wires it
-through `SetHuntingZoneRegion("elven")` -> `SetHuntingSpotRegion`).
-The measured failures of the squares drive it: the 2048-unit
-WorldRegion grid makes only ~2048 units of knownlist guaranteed, so
-the 1300-1900-half squares lose their far corners from the knownlist
-once the bot walks to an edge; the same-band squares overlap by 64
-percent (227 squares over 73 territories, a median of 3 mobs each);
-the 10 s rotation always abandons grounds that refill in 15-20 s.
-
-- **The registry** (`tools/generate_hunt_spots.py` ->
-  `hunt/spots_elven.go`, 71 spots): the territory anchors cluster by
-  grid adjacency, every cluster splits until it fits the visibility
-  circle, the spot is the mass weighted centroid with `Radius` clamped
-  to 2048, the species composition and the per-species respawn
-  windows (the Mobius spawn XML when the tree is present, the measured
-  15-20 s elven window otherwise). The leash square INSCRIBES in the
-  circle (`leashHalf` = radius / sqrt(2)): every point the engage
-  square covers stays inside the guaranteed knownlist of the anchor,
-  the "cleared ground is not cleared" failure cannot happen by
-  construction.
-- **The white-green window**: the target search filters on
-  `[max(1, L-8), L+2]` (the C1 full-adena edge mob level + 8, the hard
-  engage ceiling stays `targetMaxLevelSlack`), the engage priorities
-  bias `[L-4, L-1]` strongest (full loot, few swings - the gold
-  optimum), `[L-5, L]` medium, the wide window tail weakest.
-- **The respawn overlay**: every kill records the corpse position and
-  the window midpoint of its species as the predicted respawn (the
-  server default keeps spawns near the death place); the wait-or-move
-  economy holds a ground whose predicted respawn lands within
-  `spotWaitPatience` (20 s) and drifts the hunter toward the predicted
-  corpse position - waiting beats the ~14 s walk to any equivalent
-  ground.
-- **The economy**: `spotScore = value x safety x proximity /
-  (1 + occupancy)`. The value starts as the bootstrap prior (window
-  mass x respawn turnover x level-priced kills) and becomes the
-  measured adena per active minute after 5 minutes on the ground (rest
-  included, town trips excluded); the safety folds the static
-  aggressive share and the decayed per-spot death heat (half-life 30
-  minutes - no band demotion, the heat fades on its own); the
-  occupancy divides the score across the fleet (`spotHub` shared by
-  every loop of the process, the swarm spreads over the spots of one
-  quality). A voluntary switch needs the alternative 25 percent above
-  (`spotSwitchMargin`) after a 5 minute fair trial
-  (`spotMinStay`); a starved ground (60 s of emptiness, no pending
-  respawn) leaves after 90 s. A death re-picks at once: the fresh heat
-  crushed the score of the ground, the village restart aims at the
-  easier alternative.
-- **The views**: `ZoneView` carries the spot economy (kind "spot",
-  radius, respawn window, expected population, measured rate, death
-  heat, next respawn ETA, occupancy, kill centroid EMA); the web map
-  draws the spots as circles with the economy labels, and
-  `tools/visualize_hunt_spots.py` renders the standalone interactive
-  map of the registry (or of a live state dump, or of a simulated
-  session: `--simulate N`) for offline study.
+The cell mode replaces the square zone ladder of the elven lands (the
+design and the full reasoning live in `docs/hunting_cells.md`;
+`main.go` wires it through `SetHuntingZoneRegion("elven")` ->
+`SetHuntingCellRegion`). The partition owns every spawn point of the
+ground exactly once (the nearest-seed Voronoi assignment - the
+half-covered respawn failure of the circle geometry cannot build),
+the cell extent stays inside the knownlist circle from anywhere in
+its patrol square (the emptiness reading never lies about the load
+boundary), and the rotation moves through the adjacency graph paced
+by the respawn ripeness: a ground cleared at T is unripe until T +
+its respawn window, so the hunter cycles its neighborhood at the
+respawn rate - the walks stay short, no ground depletes while its
+neighbor saturates. The economy of the spot era carries over (the
+measured income, the death heat, the occupancy division of the
+fleet, the white-green window, the respawn overlay with the corpse
+camping); the manual ground selection is gone (the registry of a
+full project grows past a thousand cells - the economy owns the
+rotation, the map hover shows the cell info read-only). The web map
+draws the partition edges as one cached stroke raster and highlights
+exactly one element: the cell the bot holds or walks to; the static
+mesh is served per version through `/api/hunt-mesh`.
 
 The legacy square system stays for the manual `SetHuntingZones`
 setups and the generated registries of the regions that have not
-migrated yet; `SetHuntingZones` stands the spot mode down and
-`SetHuntingSpots` stands the zone mode down - one loop, two registries.
+migrated yet; `SetHuntingZones` stands the cell mode down and
+`SetHuntingCells` stands the zone mode down - one loop, two
+registries.
 
 ## Multi-zone hunting (hunt/zones.go, hunt/zones_elven.go)
 
@@ -406,7 +373,7 @@ dress stages and the death cap.
 
 A deployment selects the band explicitly through
 `SetHuntingZoneRegion("dion")`: the loop installs
-`DionHuntingZones()` (the zone registry stands the spot mode down)
+`DionHuntingZones()` (the zone registry stands the cell mode down)
 and records the region for the gear catalog selection of the shopping
 trips (`shopCatalogForRegion` selects the Dion merchants at the 20
 percent Dion tax, hunt/shopping.go of T-017). The default elven flow
