@@ -133,6 +133,44 @@ func TestSnapshotInventoryEnchant(t *testing.T) {
 	require.Equal(t, int16(3), snap.Inventory[0].Enchant)
 }
 
+// TestSelfSnapshotCarriesAdenaAndSlots pins the compact self view: the
+// adena wallet and the slot count come from the inventory store, so the
+// statistics sampler and the proxy CharSelected patch read the live
+// values instead of the zero placeholders an early version wrote.
+func TestSelfSnapshotCarriesAdenaAndSlots(t *testing.T) {
+	bot := NewBot("acc1")
+	bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+	bot.ApplyUserInfo(UserInfo{
+		Name: "test1", Level: 5, Exp: 4000,
+		MaxHP: 100, CurHP: 90, MaxMP: 50, CurMP: 40,
+	})
+
+	self := bot.SelfSnapshot()
+	require.Equal(t, int32(0), self.Adena)
+	require.Equal(t, 0, self.InventorySlots)
+
+	bot.ApplyItemList([]InventoryItem{
+		// Adena stack plus a second adena row of a fresh pickup:
+		// the wallet is the sum of every adena entry.
+		{ObjectID: 3, ItemID: 57, Count: 4242, Type2: 4, Change: 1},
+		{ObjectID: 9, ItemID: 57, Count: 58, Type2: 4, Change: 1},
+		{
+			ObjectID: 4, ItemID: 1146, Count: 1, Type2: 1,
+			Equipped: true, BodyPart: 0x400, Change: 1,
+		},
+	})
+
+	self = bot.SelfSnapshot()
+	require.Equal(t, int32(4300), self.Adena)
+	require.Equal(t, 3, self.InventorySlots)
+	require.Equal(t, int32(5), self.Level)
+	require.Equal(t, int32(4000), self.Exp)
+	// The full snapshot agrees on the same aggregates.
+	snap := bot.Snapshot()
+	require.Equal(t, snap.Character.Adena, self.Adena)
+	require.Equal(t, snap.Character.InventorySlots, self.InventorySlots)
+}
+
 // TestSellableItemsExcludingKeepsPlannedEquips pins the keep set of
 // the shop sell selection: the object ids the hunt loop passes (the
 // planned equips of the auto equipment - the looted or bought upgrades

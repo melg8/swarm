@@ -2282,12 +2282,17 @@ type KillMarkView struct {
 // alone (no world, inventory or event copies). The proxy uses it to
 // patch the entering world packets of a connecting client with the
 // position, vitals and level the bot has right now, so the reconnection
-// replay never spawns the client at a stale login-time place.
+// replay never spawns the client at a stale login-time place. The
+// adena sum and the slot count come from the inventory store, so the
+// statistics sampler and the proxy read the real wallet, not a zero
+// placeholder.
 func (b *Bot) SelfSnapshot() CharacterSnapshot {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	return b.characterSnapshotLocked(time.Now(), 0, len(b.inventory.items))
+	adena, slots := b.inventoryTotalsLocked()
+
+	return b.characterSnapshotLocked(time.Now(), adena, slots)
 }
 
 // Snapshot returns a deep copy of the current state for serialization.
