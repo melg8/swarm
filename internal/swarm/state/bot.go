@@ -483,6 +483,17 @@ type Bot struct {
 	// honors after an emergency logout. The tracker outlives the
 	// sessions, so the cooldown spans them (see SetLoginCooldown).
 	loginCooldownUntil time.Time
+	// emergencyReason carries the honest cause of the last intentional
+	// emergency logout across the session boundary: the supervisor
+	// consumes it once when the session unwinds, so the lost-session
+	// record names the pile up instead of the misleading "use of
+	// closed network connection" of the socket close.
+	emergencyReason string
+	// dangerSpots is the capped ring of the recent emergency logout
+	// positions (see NoteDangerSpot): the zone regression of the hunt
+	// loop folds them back in on every fresh session, because an
+	// emergency logout ends the loop instance that counted it.
+	dangerSpots []DangerSpot
 	// metrics holds the lifetime statistics counters of the tracker
 	// (see metrics.go): the kills, deaths, sessions, swings and
 	// damage of the whole deployment history of the bot, surviving
@@ -499,6 +510,8 @@ func NewBot(id string) *Bot {
 		phase:              "",
 		phaseAt:            time.Time{},
 		loginCooldownUntil: time.Time{},
+		emergencyReason:    "",
+		dangerSpots:        nil,
 		selfID:             0,
 		char:               newCharacterState(),
 		world:              newObjectStore(),
@@ -1156,6 +1169,77 @@ func (b *Bot) LoginCooldownRemaining() time.Duration {
 	}
 
 	return remaining
+}
+
+// DangerSpot is one recorded emergency logout position: the ground the
+// character had to leave stays dangerous until the level changes (the
+// zone regression of the hunt loop counts the recent spots of its
+// square against it).
+type DangerSpot struct {
+	X  int32
+	Y  int32
+	At time.Time
+}
+
+// The danger spot ring cap: eight recent emergency logouts name the
+// ground that keeps kicking the character out without keeping a
+// per-mountain ledger of every spot of the world.
+const dangerSpotCap = 8
+
+// NoteDangerSpot records the position of one emergency logout into the
+// capped ring of the recent danger spots. The ring survives the session
+// resets (an emergency logout ends the loop instance that would count
+// it), so the next session's zone regression still sees how hostile
+// the ground was.
+func (b *Bot) NoteDangerSpot(x int32, y int32) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.dangerSpots = append(b.dangerSpots, DangerSpot{X: x, Y: y, At: time.Now()})
+	if len(b.dangerSpots) > dangerSpotCap {
+		b.dangerSpots = append(b.dangerSpots[:0], b.dangerSpots[1:]...)
+	}
+	b.touch()
+}
+
+// DangerSpots returns the emergency logout spots younger than the
+// window (the regression of the hunt loop decides which zones they
+// count against; the level change clears the whole bookkeeping there).
+func (b *Bot) DangerSpots(window time.Duration) []DangerSpot {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	cutoff := time.Now().Add(-window)
+	spots := make([]DangerSpot, 0, len(b.dangerSpots))
+	for _, spot := range b.dangerSpots {
+		if spot.At.After(cutoff) {
+			spots = append(spots, spot)
+		}
+	}
+
+	return spots
+}
+
+// SetEmergencyLogout records the honest reason of the intentional
+// emergency logout: the supervisor consumes it when the session
+// unwinds and replaces the misleading socket-close error of the lost
+// record with it.
+func (b *Bot) SetEmergencyLogout(reason string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.emergencyReason = reason
+	b.touch()
+}
+
+// ConsumeEmergencyLogout returns the recorded emergency logout reason
+// once: the first lost-session record after the logout carries it, the
+// later network drops of the same supervisor report themselves.
+func (b *Bot) ConsumeEmergencyLogout() (string, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	reason := b.emergencyReason
+	b.emergencyReason = ""
+	b.touch()
+
+	return reason, reason != ""
 }
 
 // ResetSession clears the observed world state before a new login. The
