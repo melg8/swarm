@@ -75,11 +75,16 @@ const questTransferArriveRadius = 2000.0
 // const) is a test seam: the transfer tests shorten it.
 var questTransferArriveWait = 20 * time.Second
 
-// questRestSitHP is the health share the kill stage sits down at:
+// questRestSitHP is the health share the kill stage retreats at:
 // the manual trip has no rest phase of the hunt loop, so the farm
 // loop itself parks the character until the sitting regeneration
-// covers the next fights.
-const questRestSitHP = 40.0
+// covers the next fights. The live runs pinned the honest fight
+// cost of the Ruins of Agony pair at 70-80 percent of the health
+// bar (two assisting skeletons of the 17-22 band hit through the
+// full D-grade dress at ~60 health per second), so the retreat
+// must fire well above the health floor - waiting for 40 percent
+// sent the hunter back into the crowd at 13 and it never came out.
+const questRestSitHP = 55.0
 
 // questRestStandHP is the health share the rest stands up at.
 const questRestStandHP = 85.0
