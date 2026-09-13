@@ -208,7 +208,14 @@ func (h *healingGame) ActionSitStand() error {
 	if err := h.fakeGame.ActionSitStand(); err != nil {
 		return err
 	}
-	if h.sits == 1 {
+	// The server confirms the toggle through the ChangeWaitType
+	// broadcast: the sit drives the regeneration, the stand frees
+	// the walk.
+	sitting := h.sits%2 == 1
+	h.bot.ApplyWaitType(state.WaitType{
+		ObjectID: 100, Sitting: sitting,
+	})
+	if sitting {
 		// The sit toggle: the regeneration covers the rest.
 		h.bot.ApplyStatusUpdate(100, []state.Attribute{
 			{ID: state.AttrCurHP, Value: 90},

@@ -278,6 +278,15 @@ func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
 func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
+		// A seated character cannot walk: every click of the seated
+		// answers ActionFailed. The stand runs first (a lost toggle
+		// of the previous rest, a server side surprise).
+		if l.tracker.SelfSitting() {
+			l.logf("quest: the walk waits for the stand up")
+			if err := l.ensureStanding(); err != nil {
+				return err
+			}
+		}
 		// The transit defense: an aggressive mob that targets the
 		// character interrupts the walk - the passive transit of the
 		// first live runs dragged a growing chaser tail through the
@@ -862,6 +871,32 @@ func (l *Loop) farmQuestStage(
 	}
 }
 
+// ensureStanding stands the character up and waits for the server
+// confirmation of the transition: a sit/stand toggle the flood
+// protector dropped leaves the character seated, and every later
+// walk click of a seated character answers ActionFailed (the
+// 2026-09-13 run: the rested hunter returned to the ground and
+// ground the whole walk budget against the seated state).
+func (l *Loop) ensureStanding() error {
+	if !l.tracker.SelfSitting() {
+		return nil
+	}
+	for range 3 {
+		if err := l.game.ActionSitStand(); err != nil {
+			return fmt.Errorf("the stand request: %w", err)
+		}
+		deadline := time.Now().Add(3 * time.Second)
+		for time.Now().Before(deadline) {
+			if !l.tracker.SelfSitting() {
+				return nil
+			}
+			time.Sleep(gatekeeperPollPeriod)
+		}
+	}
+
+	return errors.New("the character stays seated")
+}
+
 // restBetweenFights parks a tired character: below the sit threshold
 // the character sits down and waits for the sitting regeneration to
 // reach the stand threshold (the rest timeout stands up anyway - the
@@ -889,8 +924,8 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
 		if attacker, ok := l.tracker.NearestAttacker(); ok {
 			l.logf("quest: the rest aborted - %s attacks",
 				attacker.Name)
-			if err := l.game.ActionSitStand(); err != nil {
-				return fmt.Errorf("the stand request: %w", err)
+			if err := l.ensureStanding(); err != nil {
+				return err
 			}
 
 			return nil
@@ -906,8 +941,8 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
 		}
 		time.Sleep(questWalkPoll)
 	}
-	if err := l.game.ActionSitStand(); err != nil {
-		return fmt.Errorf("the stand request: %w", err)
+	if err := l.ensureStanding(); err != nil {
+		return err
 	}
 	l.logf("quest: the rest ended at %.0f%% health",
 		l.tracker.SelfHealthPercent())
