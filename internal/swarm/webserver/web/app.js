@@ -440,20 +440,14 @@ function selectBot(botId) {
     App.source.close();
     App.source = null;
   }
-  // The zone focus of the list panel belongs to the previous bot's
-  // registry: release it before the new stream repaints the map (the
-  // list rebuild never fires the mouseleave of the removed item).
-  MapView.blurZone();
+  // The zone hover of the pointer belongs to the previous bot's
+  // registry: clear it before the new stream repaints the map.
   MapView.hoverZone = null;
   // The map state of the previous bot (its world objects, its zones,
   // its walk line, its combat effects) must not linger under the new
   // bot's HUD while the event stream reconnects - the blank frame
   // reads as loading, the stale frame as wrong data.
   MapView.resetBot();
-  // The zone list cache belongs to the previous registry: an equal
-  // rebuild key would keep its DOM alive across the switch.
-  renderZones.lastKey = null;
-  renderZones.hoveredId = null;
   openEventStream(botId);
   renderBotList();
   resetPanels();
@@ -500,7 +494,6 @@ function renderSnapshot() {
   renderShopping(snap);
   renderSkills(snap);
   renderSkillQueue(snap);
-  renderZones(snap);
   renderBuffs(snap);
   renderChat(snap);
   renderLog(snap);
@@ -780,125 +773,6 @@ function initSessionButton() {
       window.open(url, "_blank");
       flashDumpButton(button, "failed");
     }
-  });
-}
-
-// ---- hunting zones panel ----
-
-// The zone panel starts collapsed: the map corner chip carries the
-// count, the click on the head expands the scrollable list. The
-// sidebar stays the bots-only overview.
-const zonePanelCollapsed = { value: true };
-
-// initZonePanel wires the collapse toggle of the zone panel head.
-function initZonePanel() {
-  const head = document.getElementById("zone-panel-head");
-  const panel = document.getElementById("zone-panel");
-  if (!head || !panel) { return; }
-  head.addEventListener("click", () => {
-    zonePanelCollapsed.value = !zonePanelCollapsed.value;
-    applyZonePanelState();
-  });
-}
-
-// applyZonePanelState syncs the panel DOM with the collapse flag.
-function applyZonePanelState() {
-  const panel = document.getElementById("zone-panel");
-  const chev = document.getElementById("zone-panel-chev");
-  if (!panel) { return; }
-  panel.classList.toggle("collapsed", zonePanelCollapsed.value);
-  if (chev) {
-    chev.textContent = zonePanelCollapsed.value ? "\u25B8" : "\u25BE";
-  }
-}
-
-// renderZones refreshes the hunting zone list of the floating map
-// panel: every zone of the registry with its level band and gear
-// gate, the active one highlighted (the ground the bot hunts in or
-// walks to), the demoted bands of the death regression marked, a
-// hunt button switching the zone of the bot (the manual override of
-// the automatic picker).
-function renderZones(snap) {
-  const section = document.getElementById("zone-panel");
-  const list = document.getElementById("zone-list");
-  const count = document.getElementById("zone-panel-count");
-  if (!section || !list) { return; }
-  const zones = Array.isArray(snap.huntingZones) ? snap.huntingZones : [];
-  if (zones.length === 0) {
-    section.classList.add("hidden");
-    return;
-  }
-  section.classList.remove("hidden");
-  if (count) { count.textContent = String(zones.length); }
-  applyZonePanelState();
-  // The rebuild key covers only the fields the items actually show:
-  // the volatile economy of the registry (the respawn countdown, the
-  // adena rate, the occupancy) changes every second but never reaches
-  // this DOM, so a stable key keeps the list (and the hover focus of
-  // the entries) alive between the real registry changes.
-  const domKey = zones.map((zone) => [
-    zone.id, zone.name, zone.region, zone.minLevel, zone.maxLevel,
-    zone.minGear, zone.active, zone.demoted, zone.deaths
-  ].join("|")).join(";");
-  if (renderZones.lastKey === domKey) { return; }
-  renderZones.lastKey = domKey;
-  // The rebuilt list destroys the hovered item without a mouseleave:
-  // release the focus, then re-focus the same zone when the pointer
-  // still rests on the list.
-  MapView.blurZone();
-  list.textContent = "";
-  zones.forEach((zone, index) => {
-    const item = document.createElement("li");
-    item.className = "zone-item" + (zone.active ? " active" : "") +
-      (zone.demoted ? " lost" : "");
-    // Hovering the list entry focuses the map on its zone: the camera
-    // pins to the ground, the zone highlights and carries its name
-    // (see MapView.focusZone). Leaving the item restores the camera.
-    item.addEventListener("mouseenter", () => {
-      renderZones.hoveredId = zone.id;
-      MapView.focusZone(zone);
-    });
-    item.addEventListener("mouseleave", () => {
-      if (renderZones.hoveredId === zone.id) {
-        renderZones.hoveredId = null;
-      }
-      MapView.blurZone();
-    });
-    const row = document.createElement("div");
-    row.className = "zone-row";
-    const info = document.createElement("div");
-    const name = document.createElement("div");
-    name.className = "zone-name";
-    name.textContent = zone.name;
-    name.title = zone.id + " · " + zone.region;
-    const meta = document.createElement("div");
-    meta.className = "zone-meta";
-    meta.textContent = "L" + zone.minLevel + "-" + zone.maxLevel +
-      (zone.minGear > 0 ? " · gear " + zone.minGear + "+" : "") +
-      (zone.active ? " · hunting" : "") +
-      (zone.demoted ? " · too hard" : "") +
-      (zone.deaths > 0
-        ? " · " + zone.deaths + (zone.deaths === 1 ? " death" : " deaths")
-        : "");
-    info.appendChild(name);
-    info.appendChild(meta);
-    const button = document.createElement("button");
-    button.className = "zone-hunt-btn";
-    button.textContent = zone.active ? "here" : "hunt";
-    button.title = "switch the hunting zone of the bot to " + zone.name;
-    button.addEventListener("click", () => {
-      postCommand({ kind: "zone", count: index });
-    });
-    row.appendChild(info);
-    row.appendChild(button);
-    item.appendChild(row);
-    if (renderZones.hoveredId === zone.id) {
-      // The pointer still rests on the list over this zone: the fresh
-      // item takes the focus back after the rebuild.
-      item.classList.add("hovered");
-      MapView.focusZone(zone);
-    }
-    list.appendChild(item);
   });
 }
 

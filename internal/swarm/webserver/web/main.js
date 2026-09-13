@@ -12,7 +12,6 @@ SPDX-License-Identifier: MIT
 window.addEventListener("DOMContentLoaded", async () => {
   initTheme();
   initTabs();
-  initZonePanel();
   initBuffsPanel();
 
   let config = null;

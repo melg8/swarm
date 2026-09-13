@@ -47,13 +47,6 @@ const MapView = {
   // otherwise, the far zoom showed a smeared blob of labels.
   hoverZone: null,
 
-  // The zone focused from the zone list panel (see focusZone): the
-  // camera pins to the zone center, the zone highlights and carries
-  // its name label. zoneFocusSaved holds the camera state to restore
-  // on blurZone.
-  zoneFocus: null,
-  zoneFocusSaved: null,
-
   // The fleet wide kill marks of /api/fleet/kills (every recent kill
   // of every bot): drawn as the crosses of the whole deployment so
   // they survive the bot switches of the view (the per zone kill
@@ -181,6 +174,26 @@ const MapView = {
   // label only fields stay out so a ticking respawn countdown or a
   // drifting adena rate does not drop the hunt cache.
   huntKey: "",
+
+  // huntMesh caches the static Voronoi hunt mesh of the cell mode
+  // (the /api/hunt-mesh payload: the version plus the convex cell
+  // polygons). The mesh is the same for the whole deployment, the
+  // fetch happens once per version and the per second snapshot only
+  // carries the version marker and the live record of the held
+  // cell. huntMeshFetching guards the in-flight request.
+  huntMesh: null,
+  huntMeshFetching: false,
+
+  // cellBg caches the edge raster of the mesh the same way huntBg
+  // holds the spot circles: the partition edges never change at
+  // runtime, so the cache key is only the mesh version, the zoom and
+  // the canvas geometry. The ACTIVE cell highlight paints fresh per
+  // frame on top (one polygon plus its label).
+  cellBg: {
+    canvas: null, ctx: null, key: "",
+    cx: 0, cy: 0, worldLeft: 0, worldTop: 0,
+    cssW: 0, cssH: 0, dpr: 1, marginX: 0, marginY: 0
+  },
 
   // tileLoads counts the tile arrivals of both pyramids (the map
   // imagery, the geodata view, the loads and the misses). The cache
@@ -357,6 +370,7 @@ const MapView = {
     this.ingestCombatEvents(snapshot);
     this.lastSnap = snapshot;
     this.huntKey = this.huntZoneVisualKey(snapshot);
+    this.syncHuntMesh(snapshot);
     this.rebuildSocialMasks(snapshot);
     // The stable draw order and the footer object counts derive from
     // the snapshot alone: computing them here keeps every frame of the
@@ -461,7 +475,7 @@ const MapView = {
     this.view.height = rect.height;
     this.view.left = rect.left;
     this.view.top = rect.top;
-    this.followOn = !this.pathfindEnabled() && !this.zoneFocus
+    this.followOn = !this.pathfindEnabled()
       && document.getElementById("follow").checked;
     const pos = this.followOn ? this.charPos() : this.panAnchor;
     this.camX = pos.x;
@@ -1536,6 +1550,11 @@ const MapView = {
     if (!this.layerChecked("show-hunt-zones")) { return; }
     const snap = this.lastSnap;
     if (!snap) { return; }
+    if (snap.huntMesh) {
+      this.drawHuntCells(ctx, rect, snap);
+
+      return;
+    }
     const zones = Array.isArray(snap.huntingZones)
       && snap.huntingZones.length > 0 ? snap.huntingZones : null;
     if (!zones) {
@@ -1561,15 +1580,12 @@ const MapView = {
   },
 
   // zoneLabeled reports whether a zone carries its name label right
-  // now: only the zone under the map cursor (hoverZone) and the zone
-  // focused from the list panel (zoneFocus) read their names - the
-  // always-on labels of the far zoom smeared into one unreadable
-  // blob, so the names wait for the pointer.
+  // now: only the zone under the map cursor (hoverZone) reads its
+  // name - the always-on labels of the far zoom smeared into one
+  // unreadable blob, so the names wait for the pointer.
   zoneLabeled(zone) {
-    return (this.hoverZone && this.hoverZone.id === zone.id
-        && this.hoverZone.kind === zone.kind)
-      || (this.zoneFocus && this.zoneFocus.id === zone.id
-        && this.zoneFocus.kind === zone.kind);
+    return this.hoverZone && this.hoverZone.id === zone.id
+      && this.hoverZone.kind === zone.kind;
   },
 
   // zoneAt hit tests the hunting zones at one client point: the
@@ -1579,6 +1595,9 @@ const MapView = {
   zoneAt(clientX, clientY) {
     const snap = this.lastSnap;
     if (!snap) { return null; }
+    if (snap.huntMesh && this.huntMesh) {
+      return this.cellAt(clientX, clientY);
+    }
     const zones = snap.huntingZones;
     if (!Array.isArray(zones) || zones.length === 0) {
       return snap.huntingZone || null;
@@ -1755,6 +1774,327 @@ const MapView = {
       dx, dy, hb.cssW, hb.cssH);
 
     return true;
+  },
+
+  // ---- the voronoi cell layer ----
+  //
+  // The cell mode draws the partition itself: the static mesh edges
+  // (one thin stroke per boundary, no fills, no shading - the render
+  // load of a 1k+ cell registry stays a single cached raster) and
+  // exactly ONE highlighted element: the cell the bot holds or walks
+  // to (the fill, the bright stroke and the live label). The mesh
+  // payload arrives once per registry version through
+  // /api/hunt-mesh; the live record of the held cell rides the
+  // snapshot.
+
+  // syncHuntMesh fetches the mesh when the snapshot carries a
+  // version the cache does not hold. The fetch is async and
+  // one-at-a-time; the layer simply draws nothing until the payload
+  // lands (a missing mesh never blocks the rest of the map).
+  syncHuntMesh(snapshot) {
+    const version = snapshot.huntMesh;
+    if (!version) { return; }
+    if (this.huntMesh && this.huntMesh.version === version) {
+      return;
+    }
+    if (this.huntMeshFetching) { return; }
+    if (typeof fetch !== "function") { return; }
+    this.huntMeshFetching = true;
+    fetch("/api/hunt-mesh")
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error("hunt mesh " + res.status);
+        }
+
+        return res.json();
+      })
+      .then((mesh) => {
+        this.huntMesh = mesh;
+        this.cellBg.key = "";
+        this.huntMeshFetching = false;
+        this.redraw();
+      })
+      .catch(() => {
+        // A failed fetch retries on the next snapshot tick: the
+        // registry endpoint is static, a transient failure is a
+        // transient server hiccup.
+        this.huntMeshFetching = false;
+      });
+  },
+
+  // cellMeshIndex builds the id lookup of the cached mesh (the
+  // active cell of the snapshot resolves through it).
+  cellMeshIndex() {
+    if (!this.huntMesh || this.huntMesh._index) {
+      return this.huntMesh ? this.huntMesh._index : null;
+    }
+    const index = new Map();
+    for (const cell of this.huntMesh.cells) {
+      index.set(cell.id, cell);
+    }
+    this.huntMesh._index = index;
+
+    return index;
+  },
+
+  // drawHuntCells paints the partition: the cached edge raster plus
+  // the fresh highlight of the active cell and the hover labels.
+  drawHuntCells(ctx, rect, snap) {
+    const mesh = this.huntMesh;
+    if (!mesh || mesh.version !== snap.huntMesh) {
+      this.syncHuntMesh(snap);
+
+      return;
+    }
+    this.blitCellMeshLayer(ctx, rect, mesh);
+    this.drawActiveCell(ctx, rect, snap);
+  },
+
+  // cellPath appends one cell polygon to the ctx path (the flat
+  // x,y vertex list, closed).
+  cellPath(ctx, cell) {
+    const verts = cell.verts;
+    let first = this.worldToScreen(verts[0], verts[1]);
+    ctx.moveTo(first.x, first.y);
+    for (let i = 2; i + 1 < verts.length; i += 2) {
+      const p = this.worldToScreen(verts[i], verts[i + 1]);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+  },
+
+  // cellBBoxVisible reports whether the polygon bounding box of the
+  // cell intersects the view (the edge raster skips the offscreen
+  // cells).
+  cellBBoxVisible(cell, vw, vh) {
+    const verts = cell.verts;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity,
+      maxY = -Infinity;
+    for (let i = 0; i + 1 < verts.length; i += 2) {
+      const p = this.worldToScreen(verts[i], verts[i + 1]);
+      if (p.x < minX) { minX = p.x; }
+      if (p.y < minY) { minY = p.y; }
+      if (p.x > maxX) { maxX = p.x; }
+      if (p.y > maxY) { maxY = p.y; }
+    }
+
+    return maxX >= 0 && maxY >= 0 && minX <= vw && minY <= vh;
+  },
+
+  // drawCellMeshRaster strokes every cell edge of the mesh into the
+  // given context: one path, one stroke, no fills, no dashes - the
+  // outline of the whole partition costs a single stroke call.
+  drawCellMeshRaster(ctx, vw, vh, mesh) {
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = zoneFutureColor;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const cell of mesh.cells) {
+      if (!this.cellBBoxVisible(cell, vw, vh)) { continue; }
+      this.cellPath(ctx, cell);
+    }
+    ctx.stroke();
+    ctx.restore();
+  },
+
+  // blitCellMeshLayer composites the cached edge raster onto the
+  // frame: the cache rasterizes once per (mesh version, zoom, canvas
+  // geometry) and pans inside its slack box; a camera pan alone
+  // never re-strokes the mesh. Environments without an offscreen
+  // canvas (the Node harnesses) paint the raster directly.
+  blitCellMeshLayer(ctx, rect, mesh) {
+    const cb = this.cellBg;
+    if (!cb.canvas) {
+      cb.canvas = this.createBgCanvas();
+      if (!cb.canvas) {
+        this.drawCellMeshRaster(ctx, rect.width, rect.height, mesh);
+
+        return;
+      }
+      cb.ctx = cb.canvas.getContext("2d");
+    }
+    const dpr = this.viewDpr || 1;
+    const key = [mesh.version, this.scale, this.colorsRev,
+      Math.round(rect.width), Math.round(rect.height), dpr].join("|");
+    const drifted = Math.abs(this.camX - cb.cx) > cb.marginX
+      || Math.abs(this.camY - cb.cy) > cb.marginY;
+    if (cb.key !== key || drifted) {
+      this.renderCellMeshLayer(rect, dpr, key, mesh);
+    }
+    const cssW = cb.cssW, cssH = cb.cssH;
+    const left = this.camX - rect.width / 2 / this.scale;
+    const top = this.camY - rect.height / 2 / this.scale;
+    const dx = Math.round((cb.worldLeft - left) * this.scale * dpr) / dpr;
+    const dy = Math.round((cb.worldTop - top) * this.scale * dpr) / dpr;
+    ctx.drawImage(cb.canvas, 0, 0, cb.canvas.width, cb.canvas.height,
+      dx, dy, cssW, cssH);
+  },
+
+  // renderCellMeshLayer rasterizes the mesh edges into the cache
+  // with the cache geometry swapped in (the same swap dance the
+  // background and the hunt caches run).
+  renderCellMeshLayer(rect, dpr, key, mesh) {
+    const cb = this.cellBg;
+    const cssW = Math.max(1,
+      Math.round(rect.width * (1 + 2 * bgMarginOfView)));
+    const cssH = Math.max(1,
+      Math.round(rect.height * (1 + 2 * bgMarginOfView)));
+    let cd = Math.min(dpr, 2);
+    const fit = Math.sqrt(huntDevicePixels / (cssW * cssH));
+    if (cd > fit) { cd = Math.max(1, fit); }
+    const devW = Math.max(1, Math.round(cssW * cd));
+    const devH = Math.max(1, Math.round(cssH * cd));
+    if (cb.canvas.width !== devW) { cb.canvas.width = devW; }
+    if (cb.canvas.height !== devH) { cb.canvas.height = devH; }
+    const ctx = cb.ctx;
+    ctx.setTransform(cd, 0, 0, cd, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    const keepView = this.view;
+    const keepX = this.camX;
+    const keepY = this.camY;
+    this.view = { width: cssW, height: cssH,
+      left: keepView.left, top: keepView.top };
+    this.camX = cb.cx = keepX;
+    this.camY = cb.cy = keepY;
+    try {
+      this.drawCellMeshRaster(ctx, cssW, cssH, mesh);
+    } finally {
+      this.view = keepView;
+      this.camX = keepX;
+      this.camY = keepY;
+    }
+    cb.cssW = cssW;
+    cb.cssH = cssH;
+    cb.dpr = cd;
+    cb.worldLeft = cb.cx - cssW / 2 / this.scale;
+    cb.worldTop = cb.cy - cssH / 2 / this.scale;
+    cb.marginX = Math.max(1, rect.width * bgMarginOfView - 64)
+      / this.scale;
+    cb.marginY = Math.max(1, rect.height * bgMarginOfView - 64)
+      / this.scale;
+    cb.key = key;
+  },
+
+  // drawActiveCell highlights the ONE cell the bot holds or walks
+  // to: the light fill, the bright stroke and the minimal label
+  // (the name, the band, the respawn clock and the income of the
+  // live record). The hovered cell of the pointer draws its name
+  // label too - the rest of the map stays outline only.
+  drawActiveCell(ctx, rect, snap) {
+    const live = snap.huntCell;
+    if (!live || !live.id) { return; }
+    const index = this.cellMeshIndex();
+    const cell = index ? index.get(live.id) : null;
+    if (!cell) { return; }
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = "#f9ab00";
+    ctx.beginPath();
+    this.cellPath(ctx, cell);
+    ctx.fill();
+    ctx.globalAlpha = 0.95;
+    ctx.strokeStyle = "#f9ab00";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    this.cellPath(ctx, cell);
+    ctx.stroke();
+    // The focus dot of the cell (the walk destination).
+    const focus = this.worldToScreen(cell.focusX, cell.focusY);
+    ctx.fillStyle = "#f9ab00";
+    ctx.beginPath();
+    ctx.arc(focus.x, focus.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    this.drawCellLabel(ctx, live, focus, true);
+    ctx.restore();
+    // The hovered cell label (never the active one twice).
+    if (this.hoverZone && this.hoverZone.kind === "cell"
+        && this.hoverZone.id !== live.id) {
+      const hovered = index.get(this.hoverZone.id);
+      if (hovered) {
+        ctx.save();
+        const p = this.worldToScreen(hovered.focusX, hovered.focusY);
+        this.drawCellLabel(ctx, {
+          id: hovered.id, name: hovered.name,
+          state: "hover", minLevel: hovered.minLevel,
+          maxLevel: hovered.maxLevel, spawnMass: hovered.mass
+        }, p, false);
+        ctx.restore();
+      }
+    }
+  },
+
+  // drawCellLabel writes the label block of a cell near the anchor:
+  // the name with the state marker, the level band and the mass; the
+  // active cell adds the respawn clock and the measured income of
+  // the live record.
+  drawCellLabel(ctx, live, anchor, active) {
+    let label = live.name;
+    if (active) {
+      label += live.state === "moving"
+        ? " · moving" : " · hunting";
+    }
+    if (live.maxLevel > 0) {
+      label += " · L" + live.minLevel + "-" + live.maxLevel;
+    }
+    if (live.spawnMass > 0) {
+      label += " · " + live.spawnMass + " mobs";
+    }
+    if (active) {
+      if (live.respawnMaxSec > 0) {
+        label += " · resp " + live.respawnMinSec + "-"
+          + live.respawnMaxSec + "s";
+      }
+      if (live.adenaPerMin > 0) {
+        label += " · " + Math.round(live.adenaPerMin) + "a/min";
+      }
+      if (live.nextRespawnSec >= 0) {
+        label += " · next " + live.nextRespawnSec + "s";
+      }
+      if (live.occupancy > 1) {
+        label += " · " + live.occupancy + " bots";
+      }
+    }
+    ctx.font = this.labelFont;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(15, 18, 22, 0.7)";
+    ctx.strokeText(label, anchor.x + 8, anchor.y - 8);
+    ctx.fillStyle = active ? "#f9ab00" : zoneFutureColor;
+    ctx.fillText(label, anchor.x + 8, anchor.y - 8);
+  },
+
+  // cellAt hit tests the mesh cells at one client point: the flat
+  // vertex polygon containment (the edges walk counter-clockwise,
+  // the inside keeps the point on the left of every edge). The
+  // synthesized zone record feeds the tooltip path of the pointer.
+  cellAt(clientX, clientY) {
+    const world = this.screenToWorld(
+      clientX - this.view.left, clientY - this.view.top);
+    const index = this.cellMeshIndex();
+    if (!index) { return null; }
+    for (const cell of this.huntMesh.cells) {
+      const verts = cell.verts;
+      let inside = true;
+      for (let i = 0; i + 1 < verts.length; i += 2) {
+        const ax = verts[i], ay = verts[i + 1];
+        const bx = verts[(i + 2) % verts.length];
+        const by = verts[(i + 3) % verts.length];
+        if ((bx - ax) * (world.y - ay) -
+            (by - ay) * (world.x - ax) < 0) {
+          inside = false;
+
+          break;
+        }
+      }
+      if (!inside) { continue; }
+
+      return {
+        id: cell.id, name: cell.name, kind: "cell",
+        cx: cell.focusX, cy: cell.focusY, half: 300
+      };
+    }
+
+    return null;
   },
 
   // drawHuntingZoneDirect rasterizes the base shapes of the layer
@@ -2254,51 +2594,6 @@ const MapView = {
     }
     ctx.setLineDash([]);
     ctx.restore();
-  },
-
-  // focusZone pins the map on one hunting zone (the hover of the
-  // zone list panel): the camera centers on the zone, the zoom fits
-  // its span, the zone highlights and carries its name label. The
-  // camera state is saved once so a chain of hovers restores the
-  // view the user had before the first one.
-  focusZone(zone) {
-    if (!zone || !this.lastSnap) { return; }
-    if (!this.zoneFocusSaved) {
-      this.zoneFocusSaved = {
-        follow: document.getElementById("follow").checked,
-        panAnchor: { x: this.panAnchor.x, y: this.panAnchor.y },
-        scale: this.scale
-      };
-    }
-    this.zoneFocus = zone;
-    const span = zone.kind === "spot"
-      ? Math.max(zone.radius || 0, zone.half || 0) * 2
-      : zone.half * 2;
-    const fit = Math.min(this.view.width, this.view.height) * 0.55
-      / Math.max(span, 1);
-    this.scale = Math.max(0.008, Math.min(1.5, fit));
-    this.panAnchor = { x: zone.cx, y: zone.cy };
-    this.kickAnimation();
-    this.draw();
-  },
-
-  // blurZone releases the zone focus of the list panel and restores
-  // the saved camera: the follow flag, the free pan anchor and the
-  // zoom the user had before the hover chain began.
-  blurZone() {
-    if (!this.zoneFocus) { return; }
-    this.zoneFocus = null;
-    const saved = this.zoneFocusSaved;
-    this.zoneFocusSaved = null;
-    if (saved) {
-      document.getElementById("follow").checked = saved.follow;
-      if (!saved.follow) {
-        this.panAnchor = saved.panAnchor;
-      }
-      this.scale = saved.scale;
-    }
-    this.kickAnimation();
-    this.draw();
   },
 
   drawGrid(ctx, rect) {
@@ -3403,7 +3698,7 @@ const MapView = {
   },
 
   followEnabled() {
-    if (this.pathfindEnabled() || this.zoneFocus) { return false; }
+    if (this.pathfindEnabled()) { return false; }
 
     return document.getElementById("follow").checked;
   }

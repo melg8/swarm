@@ -219,15 +219,19 @@ function loadMapJs(mapFile) {
             getPropertyValue: (name) => THEME[name] || ""
         }),
         setTimeout: () => 0,
-        clearTimeout: () => {}
+        clearTimeout: () => {},
+        // The hunt mesh layer fetches /api/hunt-mesh: the scenarios
+        // program the stub before the update that triggers the sync.
+        fetch: (url) => sandbox.__fetchImpl(url)
     };
+    sandbox.__fetchImpl = () => Promise.reject(new Error("no mesh"));
     vm.createContext(sandbox);
     vm.runInContext(fs.readFileSync(mapFile, "utf8"), sandbox,
         { filename: "map.js" });
     vm.runInContext("globalThis.__MapView = MapView;", sandbox);
 
     return {
-        MapView: sandbox.__MapView, record, elements,
+        MapView: sandbox.__MapView, record, elements, sandbox,
         fireCanvas: (type, event) => fire(listeners.canvas, type, event),
         fireWindow: (type, event) => fire(listeners.window, type, event)
     };
@@ -301,55 +305,106 @@ function check(results, name, ok, detail) {
     results.push({ name, ok, detail });
 }
 
-// Scenario 1: the zone list focus. focusZone pins the camera on the
-// ground and lights the label; blurZone restores the saved camera.
-function runScenarioZoneFocus(mapFile) {
-    const { MapView, record, elements } = loadMapJs(mapFile);
+// Scenario 1: the Voronoi hunt cell layer. The snapshot carries the
+// mesh version and the live record of the held cell; the layer
+// fetches the static mesh once, strokes the partition edges (no
+// fills, no shading of the inactive cells) and highlights exactly
+// ONE element: the cell the bot holds, with its live label.
+const CELL_MESH = {
+    version: "test-cells-1",
+    cells: [
+        { id: "c1", name: "Home Cell", minLevel: 1, maxLevel: 4,
+          focusX: 45000, focusY: 50000, mass: 6,
+          verts: [44500, 49500, 45500, 49500, 45500, 50500,
+                  44500, 50500] },
+        { id: "c2", name: "Neighbor Cell", minLevel: 5, maxLevel: 8,
+          focusX: 46500, focusY: 51500, mass: 12,
+          verts: [45500, 50500, 47500, 50500, 47500, 52500,
+                  45500, 52500] }
+    ]
+};
+
+function cellSnapshot(cellID, state) {
+    const snap = buildSnapshot();
+    snap.huntingZones = [];
+    snap.huntMesh = CELL_MESH.version;
+    snap.huntCell = {
+        id: cellID, name: "Home Cell", state: state,
+        minLevel: 1, maxLevel: 4, spawnMass: 6,
+        respawnMinSec: 15, respawnMaxSec: 20,
+        nextRespawnSec: 7, adenaPerMin: 42, deathHeat: 0,
+        occupancy: 1, killX: 0, killY: 0
+    };
+
+    return snap;
+}
+
+async function runScenarioHuntCells(mapFile) {
+    const { MapView, record, sandbox } = loadMapJs(mapFile);
     MapView.init();
-    MapView.update(buildSnapshot());
+    // The mesh fetch resolves through the stub of the sandbox: the
+    // json() answer carries the cell payload of the scenario.
+    let fetches = 0;
+    sandbox.__fetchImpl = () => {
+        fetches++;
+
+        return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(CELL_MESH)
+        });
+    };
+    MapView.update(cellSnapshot("c1", "farming"));
 
     const results = [];
-    const before = MapView.worldToScreen(48000, 53000);
+    // The update triggered the mesh sync: the fetch fired once and
+    // the cache holds the payload after the promise drains.
+    await new Promise((resolve) => setImmediate(resolve));
+    MapView.update(cellSnapshot("c1", "farming"));
+    check(results, "the hunt mesh fetches once per version",
+        fetches === 1 && !!MapView.huntMesh
+            && MapView.huntMesh.version === "test-cells-1",
+        "huntMesh is " + JSON.stringify(MapView.huntCell && null)
+            + ", fetches " + fetches);
 
-    const zone = MapView.lastSnap.huntingZones[1];
-    MapView.focusZone(zone);
-
-    // The camera centers the zone: its anchor lands mid canvas.
-    const anchor = MapView.worldToScreen(48000, 53000);
-    check(results, "focusZone centers the zone anchor",
-        Math.abs(anchor.x - CANVAS_W / 2) < 2
-        && Math.abs(anchor.y - CANVAS_H / 2) < 2,
-        "anchor at " + JSON.stringify(anchor));
-
-    // The zone carries its name while focused.
+    record.strokes.length = 0;
     record.texts.length = 0;
     MapView.draw();
-    const label = record.texts.filter(
-        (t) => t.text.startsWith("Deep Forest")).length;
-    check(results, "focused zone carries the name label",
-        label > 0, "no Deep Forest label while focused");
+    // The partition edges: the strokes of the cell polygons (the
+    // flat vertex lists draw as closed paths).
+    const edgeStroke = record.strokes.find(
+        (s) => s.segments.length >= 3
+            && s.segments.some((seg) =>
+                Math.hypot(seg[0] - worldToScreen(44500, 49500).x,
+                    seg[1] - worldToScreen(44500, 49500).y) < 3));
+    check(results, "the mesh edges stroke the partition outlines",
+        !!edgeStroke, "no cell edge stroke found");
 
-    // The follow flag survives: the checkbox stays on, the camera
-    // just ignores it during the focus.
-    check(results, "focusZone leaves the follow checkbox on",
-        elements.get("follow").checked === true,
-        "follow checkbox changed");
+    // The active cell: the ONLY highlighted element - its label
+    // carries the name, the state and the live economy.
+    const label = record.texts.find(
+        (t) => t.text.startsWith("Home Cell")
+            && t.text.indexOf("hunting") >= 0
+            && t.text.indexOf("42a/min") >= 0
+            && t.text.indexOf("next 7s") >= 0);
+    check(results, "the held cell carries the live label",
+        !!label, "no live Home Cell label, texts: "
+        + record.texts.map((t) => t.text).join(" | "));
 
-    MapView.blurZone();
-    const after = MapView.worldToScreen(48000, 53000);
-    check(results, "blurZone restores the camera",
-        Math.abs(after.x - before.x) < 2
-        && Math.abs(after.y - before.y) < 2,
-        "expected " + JSON.stringify(before) + ", got "
-        + JSON.stringify(after));
-    check(results, "blurZone releases the label",
-        (() => {
-            record.texts.length = 0;
-            MapView.draw();
+    // The inactive neighbor stays outline only: no fill, no label.
+    const neighborLabel = record.texts.filter(
+        (t) => t.text.startsWith("Neighbor Cell")).length;
+    check(results, "the inactive cells stay outline only",
+        neighborLabel === 0, "Neighbor Cell labeled without a hover");
 
-            return record.texts.filter(
-                (t) => t.text.startsWith("Deep Forest")).length === 0;
-        })(), "label still drawn after the blur");
+    // The moving state: the label flips when the bot walks to the
+    // cell (the map answers which zone the bot is heading to).
+    record.texts.length = 0;
+    MapView.update(cellSnapshot("c1", "moving"));
+    MapView.draw();
+    const moving = record.texts.find(
+        (t) => t.text.startsWith("Home Cell") && t.text.indexOf("moving") >= 0);
+    check(results, "the moving marker names the travel target",
+        !!moving, "no moving label");
 
     return results;
 }
@@ -550,7 +605,7 @@ function runScenarioSpotHover(mapFile) {
     return results;
 }
 
-function main() {
+async function main() {
     const args = process.argv.slice(2);
     const verbose = args.includes("--verbose");
     const mapIndex = args.indexOf("--map");
@@ -561,7 +616,7 @@ function main() {
     }
 
     const scenarios = [
-        ["zone list focus", runScenarioZoneFocus(mapFile)],
+        ["hunt cell layer", await runScenarioHuntCells(mapFile)],
         ["fleet kill crosses", runScenarioKillMarks(mapFile)],
         ["social links", runScenarioSocialLinks(mapFile)],
         ["tile ancestor fallback", runScenarioTileFallback(mapFile)],
@@ -588,4 +643,7 @@ function main() {
     console.log("ALL PASS");
 }
 
-main();
+main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+});
