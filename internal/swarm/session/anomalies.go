@@ -404,12 +404,15 @@ type tripLoop struct {
         stat   *reasonStat
 }
 
-// tripLoops returns the trip end reasons that repeated enough to count
-// as a loop, ranked by count.
+// tripLoops returns the FAILED trip end reasons that repeated enough
+// to count as a loop, ranked by count. The failure vocabulary: the
+// aborted trips, the timeouts, the refused walks - the successful
+// endings ("back at the farm spot", the combat handover) never loop
+// anything.
 func (a *anomalyBot) tripLoops() []tripLoop {
         var loops []tripLoop
         for reason, stat := range a.tripReasons {
-                if stat.count >= tripLoopMin {
+                if stat.count >= tripLoopMin && tripFailed(reason) {
                         loops = append(loops, tripLoop{reason: reason, stat: stat})
                 }
         }
@@ -418,6 +421,22 @@ func (a *anomalyBot) tripLoops() []tripLoop {
         })
 
         return loops
+}
+
+// tripFailed reports whether a trip end reason names a failure: the
+// markers of the aborted, timed out and refused endings of the town
+// trip machinery.
+func tripFailed(reason string) bool {
+        for _, marker := range [...]string{
+                "abort", "fail", "timeout", "timed out", "no walkable",
+                "stuck", "refus", "would swim", "could not", "never",
+        } {
+                if strings.Contains(reason, marker) {
+                        return true
+                }
+        }
+
+        return false
 }
 
 // The finding kinds of the ranked report.
@@ -572,8 +591,11 @@ func (r *anomalyRender) patternFindings(a *anomalyBot) []finding {
         return findings
 }
 
-// tripFindings flags the town trip loops: one trip reason repeating
-// over the session burned its cooldowns without progress.
+// tripFindings flags the town trip loops: one FAILED trip reason
+// repeating over the session burned its cooldowns without progress.
+// The successful endings (the farm spot return, the combat handover)
+// never count - a bot that keeps finishing its trips is healthy
+// whatever the reason distribution looks like.
 func (r *anomalyRender) tripFindings(a *anomalyBot) []finding {
         var findings []finding
         for _, loop := range a.tripLoops() {
