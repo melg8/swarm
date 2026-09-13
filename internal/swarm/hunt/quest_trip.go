@@ -94,6 +94,11 @@ var questRestTimeout = 3 * time.Minute
 // Lesser Healing Potion of the classic item table).
 const questPotionItemID = 1060
 
+// questTransitFightTimeout bounds one transit fight of the route
+// walk: an aggressive mob that chases the walking character must die
+// inside it or the walk gives up on the leg.
+const questTransitFightTimeout = 2 * time.Minute
+
 // questEquipConfirmWait bounds the wait for the inventory mutation
 // after one equip request of EquipBaggedGear.
 const questEquipConfirmWait = 5 * time.Second
@@ -190,6 +195,38 @@ func (l *Loop) walkToQuestPoint(
 	}
 }
 
+// fightTransitAttackers clears the mobs that chase the walking
+// character: the fight engages the nearest attacker until the
+// tracker holds no living mob that targets us, then returns (the
+// walk re-plans its segment from the standing cell). A no-op when
+// nothing attacks.
+func (l *Loop) fightTransitAttackers() error {
+	attacker, ok := l.tracker.NearestAttacker()
+	if !ok {
+		return nil
+	}
+	l.logf("quest: the transit fight - %s (object %d) chases",
+		attacker.Name, attacker.ObjectID)
+	deadline := time.Now().Add(questTransitFightTimeout)
+	for {
+		attacker, ok := l.tracker.NearestAttacker()
+		if !ok {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf(
+				"the transit fight with %s timed out", attacker.Name)
+		}
+		if err := l.drinkHealingPotion(); err != nil {
+			return err
+		}
+		if err := l.game.AttackTarget(attacker.ObjectID); err != nil {
+			return fmt.Errorf("the transit attack: %w", err)
+		}
+		time.Sleep(questKillAttackPeriod)
+	}
+}
+
 // walkQuestRoute walks to the destination through planned geodata
 // segments: one long leg (tens of thousands of units) exceeds the
 // shipped expansion cap of one search, so the route splits into
@@ -201,6 +238,15 @@ func (l *Loop) walkToQuestPoint(
 func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
+		// The transit defense: an aggressive mob that targets the
+		// character interrupts the walk - the passive transit of the
+		// first live runs dragged a growing chaser tail through the
+		// Ruins of Agony and died at the kill ground door (a stack
+		// of five assisting skeletons hits harder than the potions
+		// heal). The fight clears the chasers, then the walk replans.
+		if err := l.fightTransitAttackers(); err != nil {
+			return err
+		}
 		// The aggressive transit mobs grind the walking character
 		// down: keep the health buffer full on the way.
 		if l.tracker.SelfHealthPercent() < questWalkPotionHP {

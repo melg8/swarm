@@ -93,7 +93,8 @@ const questNpcFindWait = 30 * time.Second
 var classTransferItems = []ResetItem{
 	{ItemID: 68, Count: 1},    // Falchion
 	{ItemID: 629, Count: 1},   // Kite Shield
-	{ItemID: 29, Count: 1},    // Leather Pants
+	{ItemID: 24, Count: 1},    // Bone Breastplate
+	{ItemID: 31, Count: 1},    // Bone Gaiters
 	{ItemID: 45, Count: 1},    // Bone Helmet
 	{ItemID: 49, Count: 1},    // Gloves
 	{ItemID: 1123, Count: 1},  // Blue Buckskin Boots
