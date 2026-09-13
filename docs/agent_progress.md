@@ -3613,3 +3613,36 @@ logging gaps closed.
   observed journal numbers).
 - Live E2E against the deployed stack: pending (the Mobius clone of
   the deploy is still downloading).
+## Active task: the memory leak hunt + the memory logging (owner-direct)
+
+Started: 2026-09-13 06:05 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. The owner reported (Russian): a slow continuous
+memory growth on the long runs (the process memory chart: the heap
+baseline creeps up for hours while the bot count, the goroutines and
+the packet rate stay flat); asked to find and fix the leak and to log
+the used memory at least once a minute, so a growth report is
+provable from the logs, not only from the UI charts.
+
+### Investigation
+
+- The static audit of the usual suspects found them all bounded: the
+  state rings (events 512, chat 64, combat 64), the stats collector
+  rings (2048 with the half on full compaction), the journal
+  aggregator (appendCapped everywhere), the pathfind region LRU, the
+  object store (dense swap removals, ResetSession clears the world).
+- A live fleet soak (24 bots against the deployed stack, two heap
+  profiles 5 minutes apart, the same packet load) diffed the
+  inuse_space: one retainer - gear.buildCatalogCandidates under the
+  hunt shopping refresh chain - held 16.5 MB of the 20 MB growth
+  (about a megabyte per bot per minute, the exact chart shape).
+
+### Progress (commit: the process memory logger)
+
+- internal/swarm/memwatch: the process memory logger - one
+  "Memory: heap %.1f MB, sys %.1f MB, goroutines %d, gc %d" line a
+  minute (DefaultPeriod, the baseline line lands at once), wired into
+  the single mode and the fleet mode of cmd/swarm until the shutdown
+  context ends. The two guard cases (nil logger, non positive
+  period) return at once.
+- Verified: go build, go vet, golangci-lint run --new 0 issues, the
+  package tests green.
