@@ -86,6 +86,6 @@ func (l *Loop) awaitDialog(npcObjID int32) (string, error) {
 			return "", errors.New(
 				"gatekeeper: the teleport list dialog never arrived")
 		}
-		time.Sleep(gatekeeperPollPeriod)
+		pace(gatekeeperPollPeriod)
 	}
 }

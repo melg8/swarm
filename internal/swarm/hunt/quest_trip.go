@@ -161,7 +161,7 @@ func (l *Loop) FindQuestNpc(
 				"the npc %s (template %d) never appeared",
 				npc.Name, npc.TemplateID)
 		}
-		time.Sleep(questWalkPoll)
+		pace(questWalkPoll)
 	}
 }
 
@@ -196,7 +196,7 @@ func (l *Loop) walkToQuestPoint(
 			return fmt.Errorf(
 				"the walk to (%d, %d) did not arrive", x, y)
 		}
-		time.Sleep(questWalkPoll)
+		pace(questWalkPoll)
 	}
 }
 
@@ -239,7 +239,7 @@ func (l *Loop) fightTransitAttackers() error {
 				l.tracker.ObjectHealthPercent(attacker.ObjectID),
 				l.tracker.SelfHealthPercent())
 		}
-		time.Sleep(questKillAttackPeriod)
+		pace(questKillAttackPeriod)
 	}
 }
 
@@ -331,7 +331,7 @@ func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
 		// waypoints.
 		now := time.Now()
 		if now.Sub(l.questWalkAt) < walkRequestPeriod {
-			time.Sleep(questWalkPoll)
+			pace(questWalkPoll)
 
 			continue
 		}
@@ -428,7 +428,7 @@ func (l *Loop) followWaypoint(
 		}
 		selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
 		if !ok {
-			time.Sleep(questWalkPoll)
+			pace(questWalkPoll)
 
 			continue
 		}
@@ -465,7 +465,7 @@ func (l *Loop) followWaypoint(
 		// run stalled ten minutes on the mute).
 		now := time.Now()
 		if sent && (moving || now.Sub(l.questWalkAt) < walkRequestPeriod) {
-			time.Sleep(questWalkPoll)
+			pace(questWalkPoll)
 
 			continue
 		}
@@ -486,7 +486,7 @@ func (l *Loop) followWaypoint(
 		}
 		sent = true
 		l.questWalkAt = now
-		time.Sleep(questWalkPoll)
+		pace(questWalkPoll)
 	}
 }
 
@@ -505,7 +505,7 @@ func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
 		}
 		selfX, selfY, _, ok := l.tracker.SelfPosition()
 		if !ok {
-			time.Sleep(questWalkPoll)
+			pace(questWalkPoll)
 
 			continue
 		}
@@ -517,7 +517,7 @@ func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
 			questArriveRadius {
 			return true
 		}
-		time.Sleep(questWalkPoll)
+		pace(questWalkPoll)
 	}
 }
 
@@ -700,7 +700,7 @@ func (l *Loop) awaitTransferPage(
 				"the gatekeeper dialog with %q never arrived",
 				destLabel)
 		}
-		time.Sleep(gatekeeperPollPeriod)
+		pace(gatekeeperPollPeriod)
 	}
 }
 
@@ -730,7 +730,7 @@ func (l *Loop) awaitTransferArrival(
 			return fmt.Errorf(
 				"the teleport to %s never landed", transfer.DestLabel)
 		}
-		time.Sleep(questWalkPoll)
+		pace(questWalkPoll)
 	}
 }
 
@@ -885,7 +885,7 @@ func (l *Loop) farmQuestStage(
 			mob.ObjectID); err != nil {
 			return fmt.Errorf("the attack on %s: %w", mob.Name, err)
 		}
-		time.Sleep(questKillAttackPeriod)
+		pace(questKillAttackPeriod)
 	}
 }
 
@@ -908,7 +908,7 @@ func (l *Loop) ensureStanding() error {
 			if !l.tracker.SelfSitting() {
 				return nil
 			}
-			time.Sleep(gatekeeperPollPeriod)
+			pace(gatekeeperPollPeriod)
 		}
 	}
 
@@ -957,7 +957,7 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
 
 			break
 		}
-		time.Sleep(questWalkPoll)
+		pace(questWalkPoll)
 	}
 	if err := l.ensureStanding(); err != nil {
 		return err
@@ -1076,6 +1076,6 @@ func (l *Loop) awaitInventoryMutation(
 		if time.Now().After(deadline) {
 			return false
 		}
-		time.Sleep(gatekeeperPollPeriod)
+		pace(gatekeeperPollPeriod)
 	}
 }

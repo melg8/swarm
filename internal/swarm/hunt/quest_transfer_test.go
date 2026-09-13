@@ -125,8 +125,15 @@ func TestDriveQuestTransferFlow(t *testing.T) {
 
 // TestDriveQuestTransferMissingDestination pins the lookup guard: a
 // destination the teleport list does not carry fails the hop with
-// the reason naming it.
+// the reason naming it. The label wait shrinks to the test stub
+// period: the list page of the fake gatekeeper is static, so the
+// production 20 s wait can only lapse - its expiry path is what the
+// assertion pins (the sibling stuck arrival test shrinks it too).
 func TestDriveQuestTransferMissingDestination(t *testing.T) {
+	original := questTransferArriveWait
+	questTransferArriveWait = 200 * time.Millisecond
+	t.Cleanup(func() { questTransferArriveWait = original })
+
 	bot := newTestBot()
 	bot.ApplyNpcInfo(state.NpcInfo{
 		ObjectID: 11, TemplateID: 1007256, Attackable: false,

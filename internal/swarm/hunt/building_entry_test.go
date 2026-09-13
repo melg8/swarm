@@ -108,6 +108,7 @@ func dist2DToEllenia(x, y int32) float64 {
 // and the talk click fires with the character standing right by the
 // npc.
 func TestBuildingEntryWalksFromTheAisleEntrance(t *testing.T) {
+	disablePace(t)
 	engine := reproEngine(t)
 	nav := NewNavigator(engine)
 	bot := newTestBot()
@@ -116,6 +117,11 @@ func TestBuildingEntryWalksFromTheAisleEntrance(t *testing.T) {
 	loop := NewLoop(game, bot)
 	loop.SetNavigator(nav)
 	loop.lastHit = time.Now().Add(-time.Minute)
+	// The farm spot the trip return plans back to. Without it the
+	// zero spot sends the return leg dry search across the whole world
+	// pack - seconds of A* inside one tick (the production farm spot
+	// always sits inside the hunting zone, the search stays local).
+	loop.farmX, loop.farmY, loop.farmZ = elleniaX, elleniaY, elleniaZ
 	armTeachStop(t, loop)
 	sim := &reproServer{nav: engine, minZ: aisleEntranceZ}
 	spawnEllenia(bot)
@@ -143,6 +149,7 @@ func TestBuildingEntryWalksFromTheAisleEntrance(t *testing.T) {
 // the building (the north and east approach), the walk reaches the
 // teacher and the talk click fires right by the npc.
 func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
+	disablePace(t)
 	engine := reproEngine(t)
 	nav := NewNavigator(engine)
 	bot := newTestBot()
@@ -151,6 +158,11 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
 	loop := NewLoop(game, bot)
 	loop.SetNavigator(nav)
 	loop.lastHit = time.Now().Add(-time.Minute)
+	// The farm spot the trip return plans back to. Without it the
+	// zero spot sends the return leg dry search across the whole world
+	// pack - seconds of A* inside one tick (the production farm spot
+	// always sits inside the hunting zone, the search stays local).
+	loop.farmX, loop.farmY, loop.farmZ = elleniaX, elleniaY, elleniaZ
 	armTeachStop(t, loop)
 	sim := aisleWalledServer(engine)
 	spawnEllenia(bot)
@@ -168,7 +180,7 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
 		if loop.frozenStage > 0 {
 			break
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 	}
 	require.Positive(t, loop.frozenStage,
 		"the walled aisle must freeze the plan and arm the escalation")
@@ -187,7 +199,13 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
 	// walls even the last stretch of the east approach (the roof-only
 	// interior bands), so the close ring cannot close - the approach
 	// window bounds the wait and the talk fires from within the
-	// server interaction distance instead.
+	// server interaction distance instead. The walk below drives the
+	// ticks synchronously, so the window is pre-expired: the
+	// approachTeacher arming observes a lapsed deadline and takes
+	// the same expiry branch the real 45 s wait would take, without
+	// the wait itself (the production semantics of the branch stay
+	// pinned by npc_approach_test.go).
+	loop.teacherWalkUntil = time.Now().Add(-time.Second)
 	walkToTheTalkMax(t, loop, game, bot, sim, npcInteractionDist)
 	require.NotEmpty(t, loop.frozenAreas,
 		"the session ban survives the trip for the later plans")
@@ -220,7 +238,7 @@ func walkToTheTalkMax(
 		if containsClick(game.clicks, elleniaObjectID) {
 			break
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 	}
 	require.True(t, containsClick(game.clicks, elleniaObjectID),
 		"the teach stop must click the teacher npc")

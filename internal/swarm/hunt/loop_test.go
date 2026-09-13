@@ -18,6 +18,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// disablePace swaps the protocol pacing sleeps for a no-op and
+// schedules the restore through t.Cleanup. The blocking waits of the
+// hunt flows (quest_walker, gatekeeper_step, quest_trip) pace the
+// requests against the server flood protectors; the tests drive the
+// same flows synchronously, so every wait would burn its real
+// seconds on a fake server that answers instantly anyway. The
+// relative request order the pacing protects stays untouched.
+func disablePace(t *testing.T) {
+	t.Helper()
+	original := pace
+	pace = func(time.Duration) {}
+	t.Cleanup(func() { pace = original })
+}
+
 // fakeGame records the actions of the hunt loop and simulates the Mobius
 // double click semantics: the first attack request for a new target only
 // selects it, the repeated request starts the fight.

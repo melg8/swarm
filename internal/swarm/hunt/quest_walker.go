@@ -23,6 +23,14 @@ import (
 // unit tests shorten it to keep the timeout case under a second.
 var questDialogWait = 5 * time.Second
 
+// pace blocks the caller for one protocol pacing wait: the flood
+// protector pause between the two talk clicks, the dialog and walk
+// poll periods. The production build sleeps; the tests swap it for a
+// no-op so the synchronous drive loops do not pay the real seconds
+// of the server pacing they model (see disablePace in loop_test.go).
+// The package tests never run in parallel, the swap is race free.
+var pace = time.Sleep
+
 // questDialogPoll paces the new-page wait: the walker reads the
 // last dialog every tick until the page from the npc changes or
 // the wait lapses (the same period as the gatekeeper dialog poll).
@@ -110,7 +118,7 @@ func (l *Loop) DriveDialog(npcObjID int32, steps []DialogStep) error {
 		// previous one inside the 3 s window is dropped silently.
 		if !lastBypass.IsZero() {
 			if wait := dialogBypassPace - time.Since(lastBypass); wait > 0 {
-				time.Sleep(wait)
+				pace(wait)
 			}
 		}
 		lastBypass = time.Now()
@@ -145,7 +153,7 @@ func (l *Loop) talkToNpc(npcObjID int32) error {
 	if err := l.game.ClickObject(npcObjID); err != nil {
 		return err
 	}
-	time.Sleep(dialogClickPause)
+	pace(dialogClickPause)
 
 	return l.game.ClickObject(npcObjID)
 }
@@ -172,7 +180,7 @@ func (l *Loop) awaitNewDialogPage(
 			return "", errors.New(
 				"the next page never arrived")
 		}
-		time.Sleep(questDialogPoll)
+		pace(questDialogPoll)
 	}
 }
 
