@@ -22,8 +22,8 @@ the area you are about to touch, not all of them.
 
 | Document | Area |
 | --- | --- |
-| [hunting.md](hunting.md) | The autonomous hunt: hunt loop, combat safety, blind engage recovery, the Voronoi cell hunting, multi-zone hunting, auto equipment, shop strategy execution, town trips, deleveling, live-validated facts |
-| [hunting_cells.md](hunting_cells.md) | The Voronoi cell hunting: the ground partition, the visibility budget, the ripeness-paced neighbor rotation, the mesh endpoint, the registry invariants |
+| [hunting.md](hunting.md) | The autonomous hunt: hunt loop, combat safety, blind engage recovery, the hexagon cell hunting, multi-zone hunting, auto equipment, shop strategy execution, town trips, deleveling, live-validated facts |
+| [hunting_cells.md](hunting_cells.md) | The hexagon cell hunting: the uniform ground partition, the enemy-first roam, the visibility budget, the ripeness-paced neighbor rotation, the mesh endpoint, the registry invariants |
 | [shopping_strategy.md](shopping_strategy.md) | The shop strategy reasoning, the prices, the purchase phases and the was/is level journey comparison |
 | [pathfinding.md](pathfinding.md) | The geodata pathfinder: format, engine, deviations from the original, test UI, benchmarks, geodata visualization |
 | [navigation_analysis.md](navigation_analysis.md) | The measured gaps on the road to universal A to B world navigation |

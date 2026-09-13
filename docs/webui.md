@@ -144,20 +144,23 @@ colors from the same variables).
   ring around the bot itself when the bot is the target). A mob ringed
   in violet is claimed by someone else - the precondition for not
   training other players' mobs. The tooltips show what a unit targets.
-- Zone drawing: the cell mode draws the Voronoi partition - the
-  static mesh edges stroke as ONE cached raster (a thin outline per
-  boundary, no fills, no shading of the inactive cells) and exactly
-  ONE highlighted element: the cell the bot holds or walks to (the
-  light amber fill, the bright stroke, the focus dot and the live
-  label with the farming/moving marker, the respawn clock and the
-  measured income; the map answers "which zone is the bot going to"
-  through this element alone). The mesh payload arrives once per
-  registry version through `GET /api/hunt-mesh` (the ETag is the
-  version) - the mesh bytes never ride the per-second snapshot, which
-  carries only the version marker and the live record of the held
-  cell. The pointer hover resolves the cell under the cursor through
-  the polygon hit test and lights its name label. The manual zone
-  panel and the `zone` command retired with the spot mode (the
+- Zone drawing: the cell mode draws EXACTLY TWO hexagons of the
+  uniform grid partition - the ACTIVE one (the cell the bot fights
+  in or walks to: the light amber fill, the bright stroke, the focus
+  dot and the live label with the farming/moving marker, the respawn
+  clock and the measured income; the map answers "which zone is the
+  bot going to" through this element alone) and the HOVERED one (the
+  hexagon under the map cursor: the dashed outline, the light fill
+  and the name label of the mesh record). Every other hexagon stays
+  invisible - the full-partition edge raster retired with the
+  Voronoi layer (a 1k+ hexagon partition would drown the map). The
+  mesh payload arrives once per registry version through
+  `GET /api/hunt-mesh` (the ETag is the version) - the mesh bytes
+  never ride the per-second snapshot, which carries only the version
+  marker and the live record of the held cell. The pointer hover
+  resolves the cell under the cursor through the polygon hit test.
+  The manual zone panel and the `zone` command retired with the spot
+  mode (the
   registry of a full project grows past a thousand cells - the hunt
   economy owns the rotation). The legacy zone mode keeps the square
   drawing of the registry grounds (the active amber, the demoted red,

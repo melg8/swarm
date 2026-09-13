@@ -11,6 +11,94 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the hex grid, the enemy-first hunt and the ranged-kill loot (2026-09-13)
+
+Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user order (2026-09-13, Russian), four changes over the Voronoi
+cell partition landed earlier the same day:
+
+1. The partition becomes a UNIFORM HEXAGON grid - same hex size over
+   the whole map (the Voronoi cells varied in shape and size with the
+   seed placement).
+2. The map view shows ONLY the hex the fight runs in (the active one)
+   and the hex under the cursor - every other hex stays invisible
+   (the full-partition edge raster of the Voronoi layer retires).
+3. The hunt moves enemy-first: the target pick and the far walk drop
+   the held-cell fence - the bot fights the NEAREST VISIBLE enemy
+   wherever it stands (even outside the held hex), walks to a zone
+   that holds visible enemies, and only ever moves toward an
+   enemy-less zone as the last resort (nothing pickable visible at
+   all). The held hex follows the actual fight ground (the map
+   highlight tracks where the bot really farms), the kills attribute
+   to the hex the corpse lies in.
+4. A mob killed at RANGE (the bow lure, the caster spells) is looted
+   properly: the bot walks to the corpse, waits out the drop
+   broadcast, picks up the loot and the adena - never leaves them on
+   the ground.
+
+### Plan
+
+1. `tools/generate_hunt_cells.py`: the hex grid partition (flat-top
+   hexagons of one circumradius, the analytic point-to-hex
+   assignment, the 6-neighbor adjacency from the grid), the mob
+   distribution and the naming/ordering/report kept.
+2. `hunt`: the mesh version bump, the unfenced target search, the
+   out-of-ground engage gate (fight the visible enemies outside the
+   hex, walk home only when nothing is visible), the follow-ground
+   switch, the corpse-position kill attribution, the loot kill grace
+   walk.
+3. `webui/map.js`: the active hex + the hovered hex only, the edge
+   raster and its cache retire.
+4. Tests: the registry invariants (the uniform hex geometry), the
+   policy scenarios, the loot grace, the harnesses.
+5. Docs: hunting_cells.md, hunting.md, webui.md, this entry.
+
+### Progress
+
+- tools/generate_hunt_cells.py: the hex grid partition (the flat-top
+  hexagons of the 1000 circumradius, the analytic axial cube
+  rounding point-to-hex, the 6-ring adjacency from the odd-q layout,
+  the largest-remainder mob distribution and the naming/ordering/
+  report kept). 540 uniform hexagons, the 812 mob mass preserved,
+  the visibility invariant 633*sqrt(2)+1000=1896 <= 2048, the
+  symmetric adjacency (2876 edges, mean degree 5.3), the audit
+  cross-check 98.6 percent coverage. The generator output is
+  gofmt-spaces clean.
+- hunt: the mesh version "elven-hexes-1", the leashes cache and
+  groundOf, the followGround switch (the held hexagon follows the
+  actual fight, paced 10 s, the ripeness marking of the left
+  ground), the corpse-position kill attribution, the UNFENCED
+  emptiness reading of waitOrRotate, the pickZone/onHeldGround/
+  cellEnemiesVisible enemy-first engage gate (fight the visible
+  enemies outside the hexagon, walk home only when nothing pickable
+  is visible - the legacy zone mode keeps the strict return), the
+  unfenced far-target walk and the targetless diagnostic, the
+  noteKillPosition/killApproachWalk ranged-kill loot grace (the
+  corpse approach, the 15 s grace, the melee-kill and the
+  already-looted exemptions).
+- webui: map.js draws the active hexagon + the hovered hexagon only
+  (drawActiveCell, drawHoveredCell), the edge raster, its cache and
+  the cellBg state retired; the mesh fetch and the hover hit test
+  stay.
+- Tests: the uniform hexagon registry pins (6 corners, one
+  circumradius, one area, one patrol half), the enemy-first scenarios
+  (the out-of-ground pick, the follow switch, the hold-vs-walk-home
+  gate, the kill attribution, the visible-enemy rotation hold), the
+  ranged-kill loot grace tests, the updated zone-hover harness (the
+  inactive hexagons draw nothing, the hovered hexagon draws, the
+  pointer leaving hides it).
+- Verification: go build/vet, the full go test ./... suite, task
+  fmt:check, golangci-lint run --new (the three gci formatter
+  artifacts on the touched files - the spaces-vs-tabs branch-wide
+  fight the tree documents, the full-gate count unchanged 49=49 vs
+  HEAD), all eight web harnesses green.
+- Status: done (2026-09-13), pushing as the atomic commits below.
+
 ## Active task: the Voronoi cell partition of the hunting map (2026-09-13)
 
 Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.

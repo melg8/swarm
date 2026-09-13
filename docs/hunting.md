@@ -18,10 +18,11 @@ The four pillars, each detailed in its section below:
   `docs/shopping_strategy.md`) plans and executes the purchases.
 - **Multi-zone hunting** (`hunt/zones.go`, the generated registry
   `hunt/zones_elven.go`) climbs the mob level ladder of the region.
-- **Voronoi cell hunting** (`hunt/cell*.go`, the generated registry
+- **Hexagon cell hunting** (`hunt/cell*.go`, the generated registry
   `hunt/cells_elven.go`) replaces the ladder on the elven lands: the
-  spawn ground partition, the respawn-paced neighbor rotation and the
-  measured scoring (the design of `docs/hunting_cells.md`).
+  uniform hexagon partition, the respawn-paced neighbor rotation, the
+  enemy-first free roam and the measured scoring (the design of
+  `docs/hunting_cells.md`).
 
 Extension path: a mage class implements `gear.Profile` (mAtk weapons,
 robe preference - the planner, the strategy and the trip execution
@@ -239,29 +240,38 @@ manages its own budgets). Covered by hunt/loop_los_test.go
 stale stance timeout, timeout hold, attempt scoping, fresh fight
 guard) and the state tracker test of the refusal recording.
 
-## Voronoi cell hunting (hunt/cell*.go, hunt/cells_elven.go)
+## Hexagon cell hunting (hunt/cell*.go, hunt/cells_elven.go)
 
 The cell mode replaces the square zone ladder of the elven lands (the
 design and the full reasoning live in `docs/hunting_cells.md`;
 `main.go` wires it through `SetHuntingZoneRegion("elven")` ->
-`SetHuntingCellRegion`). The partition owns every spawn point of the
-ground exactly once (the nearest-seed Voronoi assignment - the
+`SetHuntingCellRegion`). The partition is a UNIFORM hexagon grid
+(one circumradius over the whole map) that owns every spawn point of
+the ground exactly once (the analytic point-to-hex assignment - the
 half-covered respawn failure of the circle geometry cannot build),
-the cell extent stays inside the knownlist circle from anywhere in
+the hexagon extent stays inside the knownlist circle from anywhere in
 its patrol square (the emptiness reading never lies about the load
-boundary), and the rotation moves through the adjacency graph paced
+boundary), and the rotation moves through the grid adjacency paced
 by the respawn ripeness: a ground cleared at T is unripe until T +
 its respawn window, so the hunter cycles its neighborhood at the
 respawn rate - the walks stay short, no ground depletes while its
-neighbor saturates. The economy of the spot era carries over (the
-measured income, the death heat, the occupancy division of the
-fleet, the white-green window, the respawn overlay with the corpse
-camping); the manual ground selection is gone (the registry of a
-full project grows past a thousand cells - the economy owns the
-rotation, the map hover shows the cell info read-only). The web map
-draws the partition edges as one cached stroke raster and highlights
-exactly one element: the cell the bot holds or walks to; the static
-mesh is served per version through `/api/hunt-mesh`.
+neighbor saturates. The hunt roams enemy-first: the pick takes the
+nearest VISIBLE enemy wherever it stands (no held-hexagon fence for
+new fights), the far walk goes to the zone that holds the enemies,
+the walk home fires only when nothing pickable is visible at all,
+and the held hexagon follows the actual fight ground (the map
+highlight tracks where the bot really farms); the kills of a ranged
+shot are looted at the corpse - the bot approaches and picks up the
+drops and the adena, never leaves them on the ground. The economy of
+the spot era carries over (the measured income, the death heat, the
+occupancy division of the fleet, the white-green window, the respawn
+overlay with the corpse camping); the manual ground selection is
+gone (the registry of a full project grows past a thousand cells -
+the economy owns the rotation, the map hover shows the cell info
+read-only). The web map draws EXACTLY TWO hexagons: the one the bot
+fights in (the active cell highlight with the live label) and the
+one under the cursor; the static mesh is served per version through
+`/api/hunt-mesh`.
 
 The legacy square system stays for the manual `SetHuntingZones`
 setups and the generated registries of the regions that have not
