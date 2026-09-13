@@ -390,8 +390,17 @@ type Bot struct {
     combat    combatFeed
     zone      *Zone
     zoneViews []ZoneView
+    // huntMeshVersion and huntMeshJSON cache the encoded Voronoi
+    // hunt mesh of the cell hunting (the static registry payload the
+    // version keyed endpoint serves - see SetHuntingCells), huntCell
+    // is the live record of the cell the loop holds. Both survive the
+    // session resets like the zone policy: the fresh loop republishes
+    // the live record after its first pick.
+    huntMeshVersion string
+    huntMeshJSON    []byte
+    huntCell        CellLiveView
     // killMarks carries the recent kills of the hunt loop (the kill
-    // ring of the spot hunter): the positions feed the fleet wide
+    // ring of the cell hunter): the positions feed the fleet wide
     // cross layer of the map, so the crosses survive the bot switches
     // of the web view.
     killMarks []KillMarkView
@@ -523,6 +532,9 @@ func NewBot(id string) *Bot {
         combat:             newCombatFeed(),
         zone:               nil,
         zoneViews:          nil,
+        huntMeshVersion:    "",
+        huntMeshJSON:       nil,
+        huntCell:           CellLiveView{}, //nolint:exhaustruct_v5 // zero
         packets:            0,
         version:            0,
         started:            time.Now(),
@@ -2278,11 +2290,16 @@ type Snapshot struct {
     CombatEvents []CombatEventView `json:"combatEvents"`
     HuntingZone  *Zone             `json:"huntingZone"`
     HuntingZones []ZoneView        `json:"huntingZones"`
-    Packets      int64             `json:"packets"`
-    Version      uint64            `json:"version"`
-    ServerTimeMs int64             `json:"serverTimeMs"`
-    StartedAt    time.Time         `json:"startedAt"`
-    UpdatedAt    time.Time         `json:"updatedAt"`
+    // HuntMesh is the version of the installed Voronoi hunt mesh
+    // (empty when no cell-mode registry is installed), HuntCell the
+    // live record of the cell the loop holds (nil when none).
+    HuntMesh     string        `json:"huntMesh"`
+    HuntCell     *CellLiveView `json:"huntCell"`
+    Packets      int64         `json:"packets"`
+    Version      uint64        `json:"version"`
+    ServerTimeMs int64         `json:"serverTimeMs"`
+    StartedAt    time.Time     `json:"startedAt"`
+    UpdatedAt    time.Time     `json:"updatedAt"`
     // Diagnostics is the health view of the live state: the
     // liveness ages and rates, the combat nuance, the known
     // list summary and the hunt loop internals (see
@@ -2485,6 +2502,11 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
     snap.Events = b.log.appendNewest(snap.Events, snapshotEvents)
     snap.Chat = b.chat.appendAll(snap.Chat)
     snap.HuntingZone = b.zone
+    snap.HuntMesh = b.huntMeshVersion
+    if b.huntCell.ID != "" {
+        liveCopy := b.huntCell
+        snap.HuntCell = &liveCopy
+    }
     snap.HuntingZones = make([]ZoneView, len(b.zoneViews))
     copy(snap.HuntingZones, b.zoneViews)
     b.fillInventorySnapshot(&snap)

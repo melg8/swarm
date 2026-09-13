@@ -19,8 +19,11 @@
 package hunt
 
 // elvenHuntingCells partitions the elven spawn ground in
+//
 //    349 Voronoi hunting cells.
+//
 // The first entry is the starter fallback of the cell picker
+//
 //    (the village nearest cell of the lowest band).
 var elvenHuntingCells = []Cell{
     {
@@ -7605,8 +7608,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 47100, FocusY: 44175, PatrolHalf: 412,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 46281, Y: 43626},
             {X: 48032, Y: 43820},
@@ -7625,8 +7627,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 44755, FocusY: 38435, PatrolHalf: 496,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 44714, Y: 40407},
             {X: 43910, Y: 39082},
@@ -7642,8 +7643,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 47786, FocusY: 38265, PatrolHalf: 284,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 47415, Y: 37857},
             {X: 48673, Y: 38094},
@@ -7660,8 +7660,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 42661, FocusY: 39353, PatrolHalf: 466,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 43910, Y: 39082},
             {X: 44714, Y: 40407},
@@ -7677,8 +7676,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 49159, FocusY: 38563, PatrolHalf: 298,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 49412, Y: 40191},
             {X: 49044, Y: 40500},
@@ -7694,8 +7692,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 52469, FocusY: 40021, PatrolHalf: 505,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 56520, Y: 34218},
             {X: 56520, Y: 35606},
@@ -7712,8 +7709,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 52539, FocusY: 43155, PatrolHalf: 549,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 53543, Y: 42196},
             {X: 53422, Y: 44002},
@@ -7729,8 +7725,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 54289, FocusY: 43216, PatrolHalf: 455,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 56520, Y: 43945},
             {X: 53784, Y: 44267},
@@ -7745,8 +7740,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 38421, FocusY: 35270, PatrolHalf: 407,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 38639, Y: 35955},
             {X: 32092, Y: 33057},
@@ -7761,8 +7755,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 52981, FocusY: 52632, PatrolHalf: 619,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 51845, Y: 52942},
             {X: 52191, Y: 51935},
@@ -7778,8 +7771,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 54228, FocusY: 54635, PatrolHalf: 465,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 53400, Y: 55128},
             {X: 53639, Y: 53531},
@@ -7793,8 +7785,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 31064, FocusY: 47126, PatrolHalf: 476,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 31836, Y: 47445},
             {X: 31128, Y: 47875},
@@ -7810,8 +7801,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 52183, FocusY: 56782, PatrolHalf: 456,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 52884, Y: 56171},
             {X: 53143, Y: 56691},
@@ -7827,8 +7817,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 41162, FocusY: 59296, PatrolHalf: 440,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 40474, Y: 60398},
             {X: 40742, Y: 58394},
@@ -7843,8 +7832,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 27404, FocusY: 40971, PatrolHalf: 511,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 26998, Y: 40124},
             {X: 32025, Y: 41580},
@@ -7860,8 +7848,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 27473, FocusY: 37985, PatrolHalf: 595,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 32126, Y: 33881},
             {X: 32427, Y: 35770},
@@ -7876,8 +7863,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 26643, FocusY: 42082, PatrolHalf: 501,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 30707, Y: 42973},
             {X: 30335, Y: 43399},
@@ -7892,8 +7878,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 34566, FocusY: 57633, PatrolHalf: 545,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 34878, Y: 56656},
             {X: 35636, Y: 57357},
@@ -7908,8 +7893,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 29670, FocusY: 53258, PatrolHalf: 522,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 30255, Y: 51817},
             {X: 30325, Y: 51839},
@@ -7924,8 +7908,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 26069, FocusY: 38213, PatrolHalf: 567,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 25474, Y: 38993},
             {X: 25365, Y: 37533},
@@ -7941,8 +7924,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 28275, FocusY: 51403, PatrolHalf: 490,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 30255, Y: 51817},
             {X: 28722, Y: 52489},
@@ -7957,8 +7939,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 35350, FocusY: 59113, PatrolHalf: 490,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 34355, Y: 58702},
             {X: 35443, Y: 58105},
@@ -7973,8 +7954,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 23791, FocusY: 40810, PatrolHalf: 439,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 24130, Y: 41667},
             {X: 22733, Y: 41378},
@@ -7990,8 +7970,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 23776, FocusY: 44358, PatrolHalf: 586,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 23161, Y: 45286},
             {X: 22721, Y: 45042},
@@ -8006,8 +7985,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 22867, FocusY: 40007, PatrolHalf: 432,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 22289, Y: 40972},
             {X: 22269, Y: 39106},
@@ -8022,8 +8000,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 31806, FocusY: 60185, PatrolHalf: 537,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 32298, Y: 58968},
             {X: 32903, Y: 59514},
@@ -8038,8 +8015,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 22290, FocusY: 37413, PatrolHalf: 441,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 23110, Y: 37422},
             {X: 22160, Y: 38508},
@@ -8055,8 +8031,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 26133, FocusY: 55476, PatrolHalf: 401,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 26511, Y: 56277},
             {X: 24158, Y: 55073},
@@ -8072,8 +8047,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 25750, FocusY: 56282, PatrolHalf: 260,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 24158, Y: 55073},
             {X: 26511, Y: 56277},
@@ -8088,8 +8062,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 20590, FocusY: 45155, PatrolHalf: 602,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 21460, Y: 45927},
             {X: 19777, Y: 46201},
@@ -8105,8 +8078,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 20904, FocusY: 48649, PatrolHalf: 468,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 19562, Y: 48486},
             {X: 19863, Y: 47719},
@@ -8123,8 +8095,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 26622, FocusY: 59186, PatrolHalf: 441,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 25796, Y: 59752},
             {X: 25893, Y: 58651},
@@ -8140,8 +8111,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 19833, FocusY: 39574, PatrolHalf: 489,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 19632, Y: 36965},
             {X: 20613, Y: 39976},
@@ -8156,8 +8126,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 25405, FocusY: 58012, PatrolHalf: 323,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 24994, Y: 57025},
             {X: 26163, Y: 56990},
@@ -8172,8 +8141,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 24301, FocusY: 57760, PatrolHalf: 511,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 23939, Y: 58617},
             {X: 23478, Y: 57547},
@@ -8188,8 +8156,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 18503, FocusY: 39982, PatrolHalf: 369,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 19246, Y: 40510},
             {X: 15447, Y: 39969},
@@ -8205,8 +8172,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 20732, FocusY: 53472, PatrolHalf: 479,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 22824, Y: 54022},
             {X: 21024, Y: 54908},
@@ -8224,8 +8190,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 22004, FocusY: 56125, PatrolHalf: 507,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 21024, Y: 54908},
             {X: 22824, Y: 54022},
@@ -8240,8 +8205,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 17133, FocusY: 42825, PatrolHalf: 535,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 17746, Y: 41871},
             {X: 17879, Y: 43356},
@@ -8256,8 +8220,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 21652, FocusY: 57507, PatrolHalf: 485,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 22433, Y: 56934},
             {X: 22609, Y: 57327},
@@ -8272,8 +8235,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 17281, FocusY: 51431, PatrolHalf: 546,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 17938, Y: 50377},
             {X: 18097, Y: 52224},
@@ -8289,8 +8251,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 20318, FocusY: 57894, PatrolHalf: 543,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 21310, Y: 59891},
             {X: 19350, Y: 62559},
@@ -8306,8 +8267,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 16039, FocusY: 50641, PatrolHalf: 532,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 17034, Y: 50332},
             {X: 16421, Y: 51447},
@@ -8322,8 +8282,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 14775, FocusY: 50883, PatrolHalf: 361,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 12484, Y: 50524},
             {X: 12503, Y: 50437},
@@ -8339,8 +8298,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 15813, FocusY: 56475, PatrolHalf: 617,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 14398, Y: 55811},
             {X: 14538, Y: 55151},
@@ -8357,8 +8315,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 15723, FocusY: 58028, PatrolHalf: 578,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 16658, Y: 62447},
             {X: 15670, Y: 61242},
@@ -8373,8 +8330,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 14493, FocusY: 57324, PatrolHalf: 470,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 14398, Y: 55811},
             {X: 15262, Y: 57200},
@@ -8389,8 +8345,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 12805, FocusY: 54096, PatrolHalf: 460,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 12073, Y: 52101},
             {X: 12443, Y: 52330},
@@ -8405,8 +8360,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 13994, FocusY: 58350, PatrolHalf: 445,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 14875, Y: 58020},
             {X: 15670, Y: 61242},
@@ -8421,8 +8375,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 11546, FocusY: 54583, PatrolHalf: 407,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 11557, Y: 52751},
             {X: 12462, Y: 55071},
@@ -8437,8 +8390,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 11245, FocusY: 58390, PatrolHalf: 564,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 10482, Y: 59014},
             {X: 10718, Y: 57601},
@@ -8453,8 +8405,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 7715, FocusY: 49284, PatrolHalf: 520,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: -176, Y: 37016},
             {X: -117, Y: 37084},
@@ -8470,8 +8421,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 7622, FocusY: 50545, PatrolHalf: 510,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 6968, Y: 51009},
             {X: 6635, Y: 49807},
@@ -8486,8 +8436,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 10067, FocusY: 59787, PatrolHalf: 446,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 10482, Y: 59014},
             {X: 11518, Y: 59767},
@@ -8504,8 +8453,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 6202, FocusY: 50828, PatrolHalf: 457,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 6968, Y: 51009},
             {X: 6083, Y: 51803},
@@ -8520,8 +8468,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 11108, FocusY: 62939, PatrolHalf: 431,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 18273, Y: 65823},
             {X: 18315, Y: 66010},
@@ -8537,8 +8484,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 5276, FocusY: 52026, PatrolHalf: 492,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 6083, Y: 51803},
             {X: 6135, Y: 52294},
@@ -8554,8 +8500,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 8480, FocusY: 60774, PatrolHalf: 426,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 7718, Y: 60259},
             {X: 7856, Y: 60082},
@@ -8572,8 +8517,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 6928, FocusY: 58343, PatrolHalf: 588,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 7582, Y: 56125},
             {X: 8334, Y: 57468},
@@ -8590,8 +8534,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 9407, FocusY: 65308, PatrolHalf: 499,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 9644, Y: 64277},
             {X: 18179, Y: 70394},
@@ -8607,8 +8550,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 4237, FocusY: 54601, PatrolHalf: 462,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 5159, Y: 54063},
             {X: 5270, Y: 54225},
@@ -8623,8 +8565,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 7182, FocusY: 62823, PatrolHalf: 631,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 7922, Y: 63718},
             {X: 6092, Y: 63791},
@@ -8639,8 +8580,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 3865, FocusY: 57903, PatrolHalf: 576,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 4346, Y: 58938},
             {X: 3333, Y: 58697},
@@ -8656,8 +8596,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 3527, FocusY: 59630, PatrolHalf: 605,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 2610, Y: 59271},
             {X: 3333, Y: 58697},
@@ -8674,8 +8613,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 1725, FocusY: 59602, PatrolHalf: 525,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: -176, Y: 57760},
             {X: 2610, Y: 59271},
@@ -8689,8 +8627,7 @@ var elvenHuntingCells = []Cell{
         Region: regionElven, MinLevel: 0, MaxLevel: 0,
         FocusX: 3726, FocusY: 70589, PatrolHalf: 370,
         RespawnMin: 15, RespawnMax: 20, Mass: 0.0,
-        Mobs: []CellMob{
-        },
+        Mobs: []CellMob{},
         Vertices: []CellVertex{
             {X: 2380, Y: 69433},
             {X: 4416, Y: 68805},

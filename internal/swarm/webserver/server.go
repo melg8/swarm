@@ -266,6 +266,7 @@ func newServer(address string, logger *log.Logger) *Server {
     server.initIconsDir(logger)
 
     mux.HandleFunc("GET /icons/{name}", server.serveIcons)
+    mux.HandleFunc("GET /api/hunt-mesh", server.handleHuntMesh)
 
     staticFS, err := fs.Sub(webContent, "web")
     if err != nil {

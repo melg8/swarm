@@ -25,11 +25,11 @@ import (
     "github.com/melg8/swarm/internal/swarm/acceptance"
     "github.com/melg8/swarm/internal/swarm/connection"
     "github.com/melg8/swarm/internal/swarm/hunt"
+    "github.com/melg8/swarm/internal/swarm/huntaudit"
     "github.com/melg8/swarm/internal/swarm/memwatch"
     "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/proxy"
     "github.com/melg8/swarm/internal/swarm/session"
-    "github.com/melg8/swarm/internal/swarm/spotaudit"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/melg8/swarm/internal/swarm/webserver"
     "github.com/melg8/swarm/internal/version"
@@ -136,10 +136,10 @@ type config struct {
     queryContext time.Duration
     // queryLimit caps the printed query records.
     queryLimit int
-    // spotAudit runs the live spot geometry audit and exits: the
-    // probe character visits every spot anchor of the registry and
+    // huntAudit runs the live hunting ground audit and exits: the
+    // probe character visits every cell focus of the registry and
     // the JSON evidence file collects what it actually sees.
-    spotAudit string
+    huntAudit string
     // auditWait is the knownlist settle window of every audit visit.
     auditWait time.Duration
     // auditAccount names the probe account of the audit (the password
@@ -187,7 +187,7 @@ func parseFlags() config {
         queryMatch:       "",
         queryContext:     0,
         queryLimit:       0,
-        spotAudit:        "",
+        huntAudit:        "",
         auditWait:        0,
         auditAccount:     "",
         auditAnchors:     "",
@@ -271,30 +271,30 @@ func parseFlags() config {
             "repeated decision lines, trip abort loops, fight "+
             "duration outliers, death streaks, stalls. Every "+
             "finding carries its own -session-query drill-down")
-    flag.StringVar(&cfg.spotAudit, "spot-audit", "",
-        "run the live hunting spot audit instead of the bot: the probe "+
-            "character is injected at every spot anchor of the registry "+
+    flag.StringVar(&cfg.huntAudit, "hunt-audit", "",
+        "run the live hunting ground audit instead of the bot: the probe "+
+            "character is injected at every cell focus of the registry "+
             "(the database position rewrite), waits out the knownlist and "+
             "the JSON evidence file collects every attackable npc it sees "+
-            "with the leash verdict. The run resumes: spots already "+
-            "measured in the file are skipped, so a long registry audits "+
-            "across several foreground runs")
+            "with the polygon leash verdict. The run resumes: cells "+
+            "already measured in the file are skipped, so a long registry "+
+            "audits across several foreground runs")
     flag.DurationVar(&cfg.auditWait, "audit-wait", 12*time.Second,
-        "knownlist settle window of every spot visit of -spot-audit")
-    flag.StringVar(&cfg.auditAccount, "audit-account", "spotaudit",
-        "probe account of -spot-audit (the password equals the name, "+
+        "knownlist settle window of every cell visit of -hunt-audit")
+    flag.StringVar(&cfg.auditAccount, "audit-account", "huntaudit",
+        "probe account of -hunt-audit (the password equals the name, "+
             "the character shares it)")
     flag.StringVar(&cfg.auditAnchors, "audit-anchors", "",
-        "JSON file with per spot position overrides of -spot-audit "+
+        "JSON file with per cell position overrides of -hunt-audit "+
             "(the verification pass of the regenerated geometry)")
     flag.StringVar(&cfg.auditFilter, "audit-filter", "",
-        "audit only the spots whose id contains one of the comma "+
+        "audit only the cells whose id contains one of the comma "+
             "separated substrings")
     flag.IntVar(&cfg.auditStride, "audit-stride", 0,
-        "audit every Nth spot of -spot-audit (0 or 1 audits every "+
-            "spot): the stratified sampling of a verification pass")
+        "audit every Nth cell of -hunt-audit (0 or 1 audits every "+
+            "cell): the stratified sampling of a verification pass")
     flag.BoolVar(&cfg.auditFresh, "audit-fresh", false,
-        "re-measure every spot of -spot-audit, ignoring the resume state")
+        "re-measure every cell of -hunt-audit, ignoring the resume state")
     flag.StringVar(&cfg.queryFrom, "from", "",
         "window start of -session-query/-session-report: RFC3339 "+
             "or a bare 15:04 clock of the session day")
@@ -750,8 +750,8 @@ func main() {
         return
     }
 
-    if cfg.spotAudit != "" {
-        runSpotAuditCLI(cfg)
+    if cfg.huntAudit != "" {
+        runHuntAuditCLI(cfg)
 
         return
     }
@@ -1211,18 +1211,19 @@ func newAcceptanceManager(
     }, acceptance.Definitions())
 }
 
-// runSpotAuditCLI measures the live hunting spot geometry: the probe
-// account visits every spot anchor of the registry through the
+// runHuntAuditCLI measures the live hunting ground geometry: the
+// probe account visits every cell focus of the registry through the
 // database position injection and the evidence file collects the
-// attackable npc population of every ground with the leash verdicts.
-// The stack must be up (login 2106, game 7777, MariaDB 3306) - the
-// audit is the live measurement the registry regeneration builds on
-// (tools/regenerate_spots_from_audit.py). The run resumes from the
-// evidence file, so an interrupted audit continues with the next
-// unaudited spot; -audit-fresh starts over. The exit code reflects
+// attackable npc population of every ground with the polygon leash
+// verdicts. The stack must be up (login 2106, game 7777, MariaDB
+// 3306) - the audit is the live measurement the registry
+// regeneration builds on (tools/generate_hunt_cells.py). The run
+// resumes from the evidence file, so an interrupted audit continues
+// with the next unaudited cell; -audit-fresh starts over. The exit
+// code reflects
 // the audit completion (0 when every spot of the filter measured).
-func runSpotAuditCLI(cfg config) {
-    log.Println("Starting swarm spot audit CLI")
+func runHuntAuditCLI(cfg config) {
+    log.Println("Starting swarm hunt audit CLI")
     log.Printf("Build: %s", version.Identity())
 
     account := cfg.auditAccount
@@ -1232,14 +1233,14 @@ func runSpotAuditCLI(cfg config) {
     // CLI uses.
     ctx, stop := signal.NotifyContext(context.Background(),
         syscall.SIGINT, syscall.SIGTERM)
-    err := spotaudit.Run(ctx, spotaudit.Config{
+    err := huntaudit.Run(ctx, huntaudit.Config{
         Login:    cfg.loginAddress,
         Account:  account,
         Password: account,
         Char:     account,
         DB:       acceptance.DefaultDBConfig(),
         Wait:     cfg.auditWait,
-        Output:   cfg.spotAudit,
+        Output:   cfg.huntAudit,
         Anchors:  cfg.auditAnchors,
         Filter:   cfg.auditFilter,
         Stride:   cfg.auditStride,
@@ -1247,10 +1248,10 @@ func runSpotAuditCLI(cfg config) {
     }, log.Default())
     stop()
     if err != nil {
-        log.Printf("Spot audit: FAIL %s", err.Error())
+        log.Printf("Hunt audit: FAIL %s", err.Error())
         os.Exit(1)
     }
-    log.Println("Spot audit: PASS")
+    log.Println("Hunt audit: PASS")
 }
 
 // runAcceptanceCLI drives the acceptance scenarios headless: the

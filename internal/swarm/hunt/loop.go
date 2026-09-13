@@ -672,14 +672,13 @@ type Loop struct {
     gearDebt map[int]int32
     // The multi zone hunting state (see zones.go): the registry of the
     // deployment, the picked and the manually overridden zone. The
-    // spot mode (see spot_policy.go) replaces the registry with the
-    // spot anchored alternative - the zone fields then mirror the
-    // leash square of the active spot.
+    // cell mode (see cell_policy.go) replaces the registry with the
+    // Voronoi partition alternative - the zone fields then mirror
+    // the patrol square of the held cell.
     zones        []HuntingZone
-    spot         *spotHunter
+    cell         *cellHunter
     zoneRegion   string
     zonePickedID string
-    zoneOverride int
     zoneCheckAt  time.Time
     // The death regression bookkeeping of the multi zone hunting (see
     // zones.go): the per zone death counts of the session, the band
@@ -833,9 +832,8 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         tripStart:         time.Time{},
         tripEndedAt:       time.Time{},
         zones:             nil,
-        spot:              nil,
+        cell:              nil,
         zonePickedID:      "",
-        zoneOverride:      -1,
         zoneCheckAt:       time.Time{},
         zoneDeaths:        nil,
         zoneDeathCap:      -1,
@@ -1011,6 +1009,23 @@ func (l *Loop) zone() *state.Zone {
     return &state.Zone{CX: l.zoneCX, CY: l.zoneCY, Half: l.zoneHalf}
 }
 
+// targetZone returns the TARGET LEASH of the loop: the convex
+// polygon of the held cell in the cell mode (the engage, the far
+// target search and the emptiness reading fence on the WHOLE cell -
+// the farm ground is the complete Voronoi ground, never a square
+// approximation of it), the movement square otherwise. The movement
+// machinery (the patrol, the return leg, the flee steps) keeps the
+// square zone() - the inscribed patrol square never leaves the cell.
+//
+//nolint:ireturn // the leash is polymorphic by design
+func (l *Loop) targetZone() state.ZoneArea {
+    if l.cell != nil && l.cell.leash != nil {
+        return l.cell.leash
+    }
+
+    return l.zone()
+}
+
 // inZoneSelf reports whether the character stands inside the hunting
 // zone (always true when the zone is disabled).
 func (l *Loop) inZoneSelf() bool {
@@ -1041,7 +1056,7 @@ func (l *Loop) Run(ctx context.Context) {
     // restart, a lost connection) unwinds the whole loop together
     // with its spotHunter, and the claim must not outlive it (see
     // spotHunter.releaseClaim).
-    defer l.releaseSpotClaim()
+    defer l.releaseCellClaim()
     // The emergency logout spots of the previous sessions count against
     // their zones from the first tick: the regression counters of this
     // loop instance start at zero, but the tracker carried the danger
@@ -1063,12 +1078,12 @@ func (l *Loop) Run(ctx context.Context) {
     }
 }
 
-// releaseSpotClaim hands the fleet occupancy claim of the hunted spot
+// releaseCellClaim hands the fleet occupancy claim of the hunted cell
 // back to the hub when the loop stops. Idempotent: a second call (a
-// stop after a spot release) is a no-op.
-func (l *Loop) releaseSpotClaim() {
-    if l.spot != nil {
-        l.spot.releaseClaim()
+// stop after a cell release) is a no-op.
+func (l *Loop) releaseCellClaim() {
+    if l.cell != nil {
+        l.cell.releaseClaim()
     }
 }
 
@@ -1430,8 +1445,8 @@ func (l *Loop) engage() {
         l.target = serverTarget
     }
     if l.target != 0 && !l.tracker.ObjectAlive(l.target) {
-        if l.spot != nil {
-            l.spotNoteKill(l.target, now)
+        if l.cell != nil {
+            l.cellNoteKill(l.target, now)
         }
         l.journalKill(l.target, now)
         l.resetFightClock()
@@ -1595,7 +1610,7 @@ func (l *Loop) engage() {
                 return
             }
             pick, ok := l.tracker.NearestAttackablePreferredWindowed(
-                attackNearestRange, l.zone(), l.activeSkips(now),
+                attackNearestRange, l.targetZone(), l.activeSkips(now),
                 l.minTargetLevel(), l.maxTargetLevel(), true,
                 l.zoneMobPriority)
             if !ok {

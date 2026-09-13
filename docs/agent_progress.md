@@ -11,6 +11,126 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the Voronoi cell partition of the hunting map (2026-09-13)
+
+Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user order (2026-09-13, Russian): abandon the hunting zones as
+intersecting circles and split the hunting map with a Voronoi
+diagram (possibly with the focus points moving on the farm results).
+The driver is the depletion/oversaturation failure of the circle
+geometry: a circle that covers HALF of a respawn ground (the Dryad
+case) farms that half to exhaustion while the other half
+accumulates an unfarmed mob mass; the followup circle that covers
+the second half then faces an oversaturated ground it cannot clear.
+The requirements:
+
+- The partition must give EVERY spawn point of the ground exactly
+  one owning cell - no respawn area is ever half-covered again (the
+  Voronoi assignment fixes this by construction).
+- The cell geometry must respect the loading/visibility budget: the
+  cell extent from its focus stays inside the guaranteed knownlist
+  circle (~2048 units, the Mobius world region grid), so a bot
+  standing anywhere in its patrol square sees the whole cell - no
+  "left part loaded, right part not" depletion.
+- The cell switch algorithm must let the bots travel the map freely
+  WITHOUT far runs: the primary moves are the adjacent cells
+  (the Voronoi neighbor graph), the rotation is paced by the respawn
+  ripeness (a cell cleared at T is ripe at T + respawn window), so
+  neither depletion nor oversaturation can build up.
+- The map view carries the minimal set: the cell the bot is heading
+  to as ONE highlighted element, the rest of the map outlined by
+  the cell edges only (no permanent fills or shading - the render
+  load matters), the static mesh served once per registry version
+  (not in every live snapshot).
+- The manual zone management retires entirely: the zone count of a
+  full project grows past 1k, a hand-switched list is meaningless.
+  The zone panel, the hunt buttons and the CommandZone path go.
+
+### Plan
+
+1. `tools/generate_hunt_cells.py`: the Voronoi partition generator -
+   the seeds are the live-audited spot anchors (the 2026-09-13
+   audit-validated geometry), the cells are the half-plane clipped
+   Voronoi polygons over the spawn ground envelope, the mob
+   composition comes from the territory sample points assigned by
+   the nearest seed (complete coverage by construction), cells whose
+   extent exceeds the leash bound split until stable. Emits
+   `hunt/cells_elven.go` + the JSON twin + the change report.
+2. `state`: the `ZoneArea` interface (the square `*Zone` satisfies
+   it) + the convex `CellZone` polygon leash; the target searches
+   take the area, the movement machinery keeps the inscribed patrol
+   square.
+3. `hunt`: the `cellHunter` replaces the `spotHunter` - the polygon
+   target leash, the neighbor-first rotation paced by the respawn
+   ripeness, the kill-EMA dynamic focus, the shared occupancy hub,
+   the level windows and the death heat of the spot economy ported.
+   The spot registry files retire.
+4. `webserver`: the static hunt mesh endpoint + the slim live cell
+   view in the snapshot.
+5. `webui`: the Voronoi edge layer + the active cell highlight; the
+   zone list panel and the manual zone command are removed.
+6. Docs: `docs/hunting_cells.md`, the hunting.md sections, this
+   progress log.
+
+### Acceptance criteria
+
+- Every spawn sample point of the registry maps to exactly one cell
+  (the generator test pins the total mob mass and the coverage).
+- Every cell: the maximum distance from the focus to any assigned
+  sample point stays under the leash bound (1448); the patrol square
+  is inscribed in the cell polygon; the neighbor relation is
+  symmetric.
+- The rotation: a cleared cell is not re-entered before its respawn
+  window passes (ripeness); the picker prefers adjacent cells; the
+  far relocation only fires when the level window empties the
+  neighborhood; a repro test pins the no-depletion rotation.
+- The map: the mesh edges render for all cells, the active cell is
+  the only highlighted element, no fills on inactive cells, the mesh
+  payload is fetched once per registry version.
+- No manual zone control path remains (state, webserver, hunt, JS).
+- `task check:all`, `golangci-lint run --new`, the web UI harnesses
+  and a live smoke run against the deployed stack are green.
+
+### Progress
+
+- Commit 3b1bb7e "state: the zone area interface and the convex cell
+  zone" (2026-09-13): the ZoneArea interface (the square *Zone
+  satisfies it, the scans take the area), the convex CellZone
+  polygon leash with the int64 cross products, the nil semantics
+  through areaNil, the containment tests.
+- Commit 3af3958 "hunt: the voronoi cell registry generator and the
+  cell model" (2026-09-13): tools/generate_hunt_cells.py (the seeds
+  from the audited piece centroids, the half-plane clipped Voronoi
+  cells, the nearest-seed mob assignment, the densification to the
+  visibility budget, the inscribed patrol square, the neighbor
+  graph), the 349 cell elven registry (812 mobs preserved, the
+  patrol*sqrt(2)+radius <= 2048 invariant, the symmetric adjacency,
+  the live audit cross-check: 99.9 percent of the 1629 observed mobs
+  belong to exactly one cell) and the registry invariant tests.
+- Commit (next) "hunt: the cell policy replaces the spot mode": the
+  cellHunter economy (the polygon target leash through
+  Loop.targetZone, the patrol square movement, the neighbor-first
+  rotation paced by the respawn ripeness - a cleared cell re-opens
+  only after its respawn window - the starve livelock net, the
+  2-hop ring widening, the far relocation only when the level
+  window empties the neighborhood, the kill-EMA, the occupancy hub,
+  the death heat, the income attribution), the spot files retire
+  (spot.go, spot_policy.go, spot_metrics.go, spots_elven.go and
+  their tests), the manual zone selection retires (CommandZone
+  path, userZoneSelect, the zoneOverride machinery), the spotaudit
+  package becomes huntaudit (the -hunt-audit flag, the polygon
+  leash verdicts), the state hunt mesh + live cell record ride the
+  snapshot (both encode paths mirrored, the golden test extended),
+  the /api/hunt-mesh endpoint serves the static payload with the
+  ETag.
+- Next: the web UI (the Voronoi edge layer, the active cell
+  highlight, the zone panel removal) and the docs.
+
 ## Active task: the repository-wide switch to spaces only (2026-09-13)
 
 Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.

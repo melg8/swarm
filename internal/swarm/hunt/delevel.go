@@ -159,14 +159,14 @@ func (l *Loop) delevelWanted() bool {
     if level <= 0 {
         return false
     }
-    median := l.tracker.MedianZoneMobLevel(l.zone())
+    median := l.tracker.MedianZoneMobLevel(l.targetZone())
     if median <= 0 {
         return false
     }
     if level-median < delevelTriggerDiff {
         return false
     }
-    if static := l.anchoredSpotMedian(); static > 0 &&
+    if static := l.anchoredCellMedian(); static > 0 &&
         level-static < delevelTriggerDiff {
         return false
     }
@@ -174,21 +174,22 @@ func (l *Loop) delevelWanted() bool {
     return level >= delevelMinLevel
 }
 
-// anchoredSpotMedian returns the count weighted median mob level of
-// the currently anchored spot (0 when none is picked): the designed
-// mob mix of the ground, the stable counterpart of the live median.
-func (l *Loop) anchoredSpotMedian() int32 {
-    if l.spot == nil || l.spot.picked < 0 || l.spot.picked >= len(l.spot.spots) {
+// anchoredCellMedian returns the count weighted median mob level of
+// the currently held cell (0 when none is picked): the designed mob
+// mix of the ground, the stable counterpart of the live median.
+func (l *Loop) anchoredCellMedian() int32 {
+    if l.cell == nil || l.cell.picked < 0 ||
+        l.cell.picked >= len(l.cell.cells) {
         return 0
     }
 
-    return spotMedianLevel(l.spot.spots[l.spot.picked])
+    return cellMedianLevel(l.cell.cells[l.cell.picked])
 }
 
 // startDelevel begins the deleveling: the target level is computed from
 // the median zone mob level and the walk to the nearest guard starts.
 func (l *Loop) startDelevel() {
-    median := l.tracker.MedianZoneMobLevel(l.zone())
+    median := l.tracker.MedianZoneMobLevel(l.targetZone())
     target := median + delevelTargetGap
     if target < luckyProtectLevel {
         // The Lucky newbie protection absorbs the death exp penalty

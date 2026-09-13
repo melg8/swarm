@@ -259,59 +259,6 @@ func TestLoopKeepsZoneDuringCooldown(t *testing.T) {
     require.Equal(t, first, loop.zonePickedID)
 }
 
-func TestUserZoneSelectOverridesPicker(t *testing.T) {
-    bot := newTestBot()
-    game := &fakeGame{}
-    loop := NewLoop(game, bot)
-    zones := ElvenHuntingZones()
-    loop.SetHuntingZones(zones)
-    setZoneTestLevel(bot, 1)
-    loop.tick()
-
-    // The user selects a far fighter ground: the override applies at
-    // once.
-    fighter := nearestZoneIndexOfBand(zones, 8, 10, 30000, 52000, nil)
-    require.GreaterOrEqual(t, fighter, 0)
-    loop.userZoneSelect(int32(fighter))
-    require.Equal(t, zones[fighter].ID, loop.zonePickedID)
-    require.Equal(t, fighter, loop.zoneOverride)
-
-    // The automatic picker respects the override while the level
-    // stays inside the band slack.
-    setZoneTestLevel(bot, 10)
-    loop.zoneCheckAt = time.Now().Add(-zoneSwitchPeriod)
-    loop.tick()
-    require.Equal(t, zones[fighter].ID, loop.zonePickedID)
-
-    // Outgrowing the band (level beyond max + slack) resumes the
-    // automatic picker. The full shop dress (212 points) opens the
-    // lieutenant band, the elder band waits for its 260 gear gate.
-    setZoneTestLevel(bot, 16)
-    equipZoneWithGear(bot, 212)
-    loop.zoneCheckAt = time.Now().Add(-zoneSwitchPeriod)
-    loop.tick()
-    require.Equal(t, -1, loop.zoneOverride)
-    picked, ok := loop.zoneByID(loop.zonePickedID)
-    require.True(t, ok)
-    requireZoneOfBand(t, picked, 9, 12, 180)
-}
-
-func TestUserZoneSelectBounds(t *testing.T) {
-    bot := newTestBot()
-    game := &fakeGame{}
-    loop := NewLoop(game, bot)
-    zones := ElvenHuntingZones()
-    loop.SetHuntingZones(zones)
-    setZoneTestLevel(bot, 1)
-    loop.tick()
-    first := loop.zonePickedID
-
-    loop.userZoneSelect(-1)
-    require.Equal(t, first, loop.zonePickedID)
-    loop.userZoneSelect(int32(len(zones)))
-    require.Equal(t, first, loop.zonePickedID)
-}
-
 func TestZoneDeathsDemoteTheBand(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
@@ -441,14 +388,14 @@ func TestZoneDemotionBreaksTheManualOverride(t *testing.T) {
     equipZoneWithGear(bot, 212)
     loop.tick()
 
-    // The operator forces a far fighter ground of the 8-10 band (way
-    // above what the level 8 character pulls - the band opens at 11).
+    // A far fighter ground of the 8-10 band (way above what the
+    // level 8 character pulls - the band opens at 11) applied
+    // directly: the regression test target is the demotion.
     fighter := zoneIndexAt(zones, 34769, 51063)
     require.GreaterOrEqual(t, fighter, 0)
     requireZoneOfBand(t, zones[fighter], 8, 10, 140)
-    loop.userZoneSelect(int32(fighter))
+    loop.applyHuntingZone(zones[fighter])
     require.Equal(t, zones[fighter].ID, loop.zonePickedID)
-    require.Equal(t, fighter, loop.zoneOverride)
     bot.ApplyPlacement(state.Placement{
         ObjectID: 100, X: 34769, Y: 51063, Z: -3400,
     })
@@ -456,9 +403,6 @@ func TestZoneDemotionBreaksTheManualOverride(t *testing.T) {
     for range 3 {
         zoneDeathKill(bot, loop)
     }
-    require.Equal(t, -1, loop.zoneOverride,
-        "the demotion releases the manual zone selection")
-
     // The next living tick re-picks with the cap: the fighter band is
     // below the cap line, the goblin band is the highest one left.
     zoneDeathWaitRevival(bot)
@@ -758,20 +702,21 @@ func TestZoneSwitchStopsTheRunningWalks(t *testing.T) {
     loop.tick()
     require.Equal(t, zones[0].ID, loop.zonePickedID)
 
-    // The bot walks a manual move toward the east when the user
-    // switches the zone: the manual phase ends and the server walk is
-    // stopped (one walk request to the current spot replaces the
-    // running destination).
+    // The bot walks a manual move toward the east when the ground
+    // switches: the manual phase ends and the server walk is stopped
+    // (one walk request to the current spot replaces the running
+    // destination).
     loop.phase = phaseUser
     loop.userKind = "move"
     bot.ApplyMovement(state.Movement{
         ObjectID: 100, X: 45000, Y: 50000, Z: -3500,
         DestX: 47000, DestY: 50000, DestZ: -3500,
     })
-    loop.userZoneSelect(1)
+    loop.stopForZoneSwitch()
+    loop.applyHuntingZone(zones[1])
     require.Equal(t, zones[1].ID, loop.zonePickedID)
     require.NotEqual(t, phaseUser, loop.phase,
-        "the manual move phase ends with the zone switch")
+        "the manual move phase ends with the ground switch")
     require.NotEmpty(t, game.walks, "the running walk is stopped")
     stop := game.walks[len(game.walks)-1]
     require.Equal(t, [3]int32{45000, 50000, -3500}, stop,
@@ -787,16 +732,18 @@ func TestZoneSwitchStopsTheRunningWalks(t *testing.T) {
         ObjectID: 100, X: 45000, Y: 50000, Z: -3500,
         DestX: 47000, DestY: 50000, DestZ: -3500,
     })
-    loop.userZoneSelect(2)
+    loop.stopForZoneSwitch()
+    loop.applyHuntingZone(zones[2])
     require.Equal(t, phaseEngage, loop.phase,
-        "the trip walk phase ends with the zone switch")
+        "the trip walk phase ends with the ground switch")
     require.False(t, loop.zoneReturn)
     require.Zero(t, loop.zoneFails)
 
     // The deleveling refuses the stop: its guard walk must finish.
     game.walks = nil
     loop.phase = phaseDelevel
-    loop.userZoneSelect(3)
+    loop.stopForZoneSwitch()
+    loop.applyHuntingZone(zones[3])
     require.Equal(t, phaseDelevel, loop.phase)
     require.Empty(t, game.walks)
 }
@@ -815,7 +762,8 @@ func TestZoneSwitchDropsTheStaleFarmSpot(t *testing.T) {
     // ground): a zone switch must drop it, a return leg aims at the
     // new zone center instead of walking to the old square.
     loop.farmX, loop.farmY, loop.farmZ = 46200, 41600, -3455
-    loop.userZoneSelect(1)
+    loop.stopForZoneSwitch()
+    loop.applyHuntingZone(zones[1])
     require.Equal(t, zones[1].ID, loop.zonePickedID)
     require.Zero(t, loop.farmX)
     require.Zero(t, loop.farmY)

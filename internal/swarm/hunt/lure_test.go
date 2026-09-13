@@ -15,23 +15,18 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// lureTestSpots anchors one spot at the test character position: the
-// level 6 window of the Crimson Spider ground.
-func lureTestSpots() []Spot {
-    return []Spot{
-        {
-            ID: "lure-home", Name: "Lure Ground", Region: "elven",
-            MinLevel: 1, MaxLevel: 20,
-            AnchorX: 45000, AnchorY: 50000, Radius: 2048,
-            RespawnMin: 15, RespawnMax: 20, Mass: 4,
-            Mobs: []SpotMob{
+// lureTestCells anchors one cell at the test character position: the
+// level 16 window of the Dryad ground.
+func lureTestCells() []Cell {
+    return []Cell{
+        quadCell("lure-home", "Lure Ground", 45000, 50000, 1400, nil,
+            []CellMob{
                 {
                     TemplateID: 20013, Name: "Dryad",
                     Level: 13, Count: 4,
                     RespawnMin: 15, RespawnMax: 20,
                 },
-            },
-        },
+            }),
     }
 }
 
@@ -82,7 +77,7 @@ func TestLureAnswersTheCoveredPick(t *testing.T) {
     lureTestWorld(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.SetHuntingSpots(lureTestSpots())
+    loop.SetHuntingCells(lureTestCells())
     loop.tick()
     require.Equal(t, "lure-home", loop.zonePickedID)
 
@@ -169,7 +164,7 @@ func TestLureHoldsThePositionWhileThePullRuns(t *testing.T) {
     lureTestWorld(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.SetHuntingSpots(lureTestSpots())
+    loop.SetHuntingCells(lureTestCells())
     loop.tick()
 
     // The pull is running: the spider at 300 units and closing, the
@@ -207,7 +202,7 @@ func TestLureAbortsWhenThePullNeverEngages(t *testing.T) {
     lureTestWorld(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.SetHuntingSpots(lureTestSpots())
+    loop.SetHuntingCells(lureTestCells())
     loop.tick()
 
     loop.target = 7001
@@ -234,7 +229,7 @@ func TestUncoveredPickHuntsNormally(t *testing.T) {
     })
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.SetHuntingSpots(lureTestSpots())
+    loop.SetHuntingCells(lureTestCells())
     loop.tick()
 
     loop.tick()
@@ -255,7 +250,7 @@ func TestLureNeedsTheTool(t *testing.T) {
     })
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.SetHuntingSpots(lureTestSpots())
+    loop.SetHuntingCells(lureTestCells())
     loop.tick()
 
     loop.tick()

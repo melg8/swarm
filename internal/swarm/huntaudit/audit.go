@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package spotaudit measures the real hunting spot geometry on the
-// live Mobius C1 stack: for every spot of the registry it injects the
+// Package huntaudit measures the real hunting ground geometry on the
+// live Mobius C1 stack: for every cell of the registry it injects the
 // probe character at the anchor (the database position rewrite of the
 // acceptance scenarios - the character wakes up standing exactly on
 // the anchor), waits out the knownlist broadcast and dumps every
@@ -25,7 +25,7 @@
 // run is resumable - the tool reloads its own output at startup and
 // skips the spots already measured - so a long registry audits across
 // several foreground runs without repeating the work.
-package spotaudit
+package huntaudit
 
 import (
     "context"
@@ -162,13 +162,13 @@ type AuditFile struct {
     Spots   []SpotRecord `json:"spots"`
 }
 
-// Run audits the spot registry on the live stack: one probe session
-// per unaudited spot, the evidence file grows after every visit.
+// Run audits the cell registry on the live stack: one probe session
+// per unaudited cell, the evidence file grows after every visit.
 func Run(ctx context.Context, cfg Config, logger *log.Logger) error {
     if cfg.Wait <= 0 {
         cfg.Wait = defaultWait
     }
-    spots := hunt.ElvenHuntingSpots()
+    cells := hunt.ElvenHuntingCells()
     anchors, err := loadAnchors(cfg.Anchors)
     if err != nil {
         return err
@@ -199,67 +199,67 @@ func Run(ctx context.Context, cfg Config, logger *log.Logger) error {
             return err
         }
     }
-    logger.Printf("spot audit: %d spots in the registry, %d already "+
-        "measured, probe %s (char %d)", len(spots), len(audit.Spots),
+    logger.Printf("hunt audit: %d cells in the registry, %d already "+
+        "measured, probe %s (char %d)", len(cells), len(audit.Spots),
         cfg.Account, charID)
-    auditRemaining(ctx, cfg, db, charID, spots, anchors, done, audit, logger)
+    auditRemaining(ctx, cfg, db, charID, cells, anchors, done, audit, logger)
     if err := writeAudit(cfg.Output, cfg.Account, cfg.Wait, audit); err != nil {
         return err
     }
-    logger.Printf("spot audit: %d of %d spots measured, evidence in %s",
-        len(audit.Spots), len(spots), cfg.Output)
+    logger.Printf("hunt audit: %d of %d cells measured, evidence in %s",
+        len(audit.Spots), len(cells), cfg.Output)
 
     return nil
 }
 
-// auditRemaining visits every unaudited spot of the registry in
+// auditRemaining visits every unaudited cell of the registry in
 // order, growing the evidence file after each visit (the resume
-// protocol: an interrupted run continues with the next spot).
+// protocol: an interrupted run continues with the next cell).
 func auditRemaining(
     ctx context.Context, cfg Config, db *acceptance.DB, charID int64,
-    spots []hunt.Spot, anchors map[string]anchor, done map[string]bool,
+    cells []hunt.Cell, anchors map[string]anchor, done map[string]bool,
     audit *AuditFile, logger *log.Logger,
 ) {
-    for index := range spots {
+    for index := range cells {
         if ctx.Err() != nil {
             return
         }
-        spot := spots[index]
-        if !auditFilterMatches(cfg.Filter, spot.ID) {
+        cell := cells[index]
+        if !auditFilterMatches(cfg.Filter, cell.ID) {
             continue
         }
         if cfg.Stride > 1 && index%cfg.Stride != 0 {
             continue
         }
-        if done[spot.ID] {
+        if done[cell.ID] {
             continue
         }
-        record, err := auditSpot(ctx, cfg, db, charID, spot, anchors, logger)
+        record, err := auditCell(ctx, cfg, db, charID, cell, anchors, logger)
         if err != nil {
-            logger.Printf("spot audit: %s failed: %v", spot.ID, err)
+            logger.Printf("hunt audit: %s failed: %v", cell.ID, err)
 
             continue
         }
         audit.Spots = append(audit.Spots, record)
-        done[spot.ID] = true
+        done[cell.ID] = true
         if err := writeAudit(cfg.Output, cfg.Account, cfg.Wait, audit); err != nil {
-            logger.Printf("spot audit: evidence write failed: %v", err)
+            logger.Printf("hunt audit: evidence write failed: %v", err)
 
             return
         }
-        logger.Printf("spot audit: %s (%s): %d attackable, %d in leash",
-            spot.ID, spot.Name, record.Attackable, record.InLeashCount)
+        logger.Printf("hunt audit: %s (%s): %d attackable, %d in leash",
+            cell.ID, cell.Name, record.Attackable, record.InLeashCount)
     }
 }
 
-// auditFilterMatches reports whether the spot id passes the filter:
+// auditFilterMatches reports whether the cell id passes the filter:
 // a comma separated list of substrings (empty audits everything).
-func auditFilterMatches(filter string, spotID string) bool {
+func auditFilterMatches(filter string, cellID string) bool {
     if filter == "" {
         return true
     }
     for _, needle := range strings.Split(filter, ",") {
-        if needle != "" && strings.Contains(spotID, needle) {
+        if needle != "" && strings.Contains(cellID, needle) {
             return true
         }
     }
@@ -267,32 +267,29 @@ func auditFilterMatches(filter string, spotID string) bool {
     return false
 }
 
-// auditSpot performs one probe visit: the position injection, the
-// session with the knownlist settle window, the npc dump and the
-// graceful logout.
-func auditSpot(
+// auditCell performs one probe visit: the position injection at the
+// cell focus, the session with the knownlist settle window, the npc
+// dump with the polygon leash verdicts and the graceful logout.
+func auditCell(
     ctx context.Context, cfg Config, db *acceptance.DB,
-    charID int64, spot hunt.Spot, anchors map[string]anchor,
+    charID int64, cell hunt.Cell, anchors map[string]anchor,
     logger *log.Logger,
 ) (SpotRecord, error) {
-    ax, ay, radius := spot.AnchorX, spot.AnchorY, spot.Radius
+    ax, ay := cell.FocusX, cell.FocusY
+    leash := hunt.CellLeash(cell)
     var z int32 = defaultZ
-    if override, ok := anchors[spot.ID]; ok {
+    if override, ok := anchors[cell.ID]; ok {
         ax, ay, z = override.X, override.Y, override.Z
-        if override.Radius > 0 {
-            radius = override.Radius
-        }
     }
     waitCharacterOffline(db, charID, logger)
     if err := injectPosition(db, charID, ax, ay, z); err != nil {
         return SpotRecord{}, fmt.Errorf("position inject: %w", err)
     }
+    //nolint:exhaustruct_v5 // the zero fields grow below
     record := SpotRecord{
-        ID: spot.ID, Name: spot.Name,
+        ID: cell.ID, Name: cell.Name,
         AnchorX: ax, AnchorY: ay, AnchorZ: z,
-        Radius: radius, LeashHalf: leashHalf(radius),
         StandingX: 0, StandingY: 0, StandingZ: 0,
-        Attackable: 0, InLeashCount: 0, Npcs: nil,
     }
     tracker := state.NewBot(cfg.Account)
     sessionCtx, cancel := context.WithCancel(ctx)
@@ -309,7 +306,7 @@ func auditSpot(
         return SpotRecord{}, errors.New("audit canceled")
     case <-time.After(cfg.Wait):
     }
-    record.Npcs = collectNpcs(tracker, ax, ay, record.LeashHalf)
+    record.Npcs = collectNpcs(tracker, ax, ay, leash)
     record.Attackable = len(record.Npcs)
     for index := range record.Npcs {
         if record.Npcs[index].InLeash {
@@ -428,7 +425,7 @@ func ensureCharacter(cfg Config) error {
 // collectNpcs dumps the attackable npc population of the tracker
 // with the leash verdict of every mob.
 func collectNpcs(
-    tracker *state.Bot, ax int32, ay int32, half int32,
+    tracker *state.Bot, ax int32, ay int32, leash *state.CellZone,
 ) []NpcRecord {
     ids := tracker.KnownObjectIDs()
     npcs := make([]NpcRecord, 0, len(ids))
@@ -453,31 +450,13 @@ func collectNpcs(
             Y:          y,
             Z:          z,
             Distance:   math.Hypot(float64(x-ax), float64(y-ay)),
-            InLeash:    inLeashSquare(x, y, ax, ay, half),
+            InLeash:    leash.Contains(x, y),
             Attackable: true,
             Alive:      tracker.ObjectAlive(id),
         })
     }
 
     return npcs
-}
-
-// inLeashSquare reports whether the world point sits inside the leash
-// square of the anchor (the engage geometry: a mob outside the square
-// never enters a fight, whatever its distance).
-func inLeashSquare(x int32, y int32, ax int32, ay int32, half int32) bool {
-    return x >= ax-half && x <= ax+half && y >= ay-half && y <= ay+half
-}
-
-// leashHalf mirrors hunt.Spot.leashHalf: the square inscribed in the
-// visibility circle of the radius.
-func leashHalf(radius int32) int32 {
-    half := int32(math.Round(float64(radius) / math.Sqrt2))
-    if half < 1 {
-        half = 1
-    }
-
-    return half
 }
 
 // gameAddress renders the game server endpoint of the auth result.

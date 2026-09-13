@@ -304,11 +304,10 @@ func (l *Loop) zoneByID(id string) (HuntingZone, bool) {
 // loop picks the zone for the character state on the next tick and
 // re-evaluates it as the level and the gear grow. Without a registry
 // the loop hunts with the plain SetHuntingZone square (or without a
-// zone at all). The legacy call stands the spot mode down.
+// zone at all). The legacy call stands the cell mode down.
 func (l *Loop) SetHuntingZones(zones []HuntingZone) {
-    l.spot = nil
+    l.cell = nil
     l.zones = zones
-    l.zoneOverride = -1
     l.zonePickedID = ""
     l.zoneCheckAt = time.Time{}
     l.zoneDeaths = nil
@@ -321,13 +320,13 @@ func (l *Loop) SetHuntingZones(zones []HuntingZone) {
 
 // SetHuntingZoneRegion installs the registry of one region by name
 // ("elven"): the map of the future deployments. The elven lands run
-// the spot anchored registry of the redesign (the square zones stay
-// available through SetHuntingZones for the legacy setups).
+// the Voronoi cell registry (the square zones stay available through
+// SetHuntingZones for the legacy setups).
 func (l *Loop) SetHuntingZoneRegion(region string) {
     l.zoneRegion = region
     switch region {
     case regionElven, "":
-        l.SetHuntingSpotRegion(regionElven)
+        l.SetHuntingCellRegion(regionElven)
     case regionDion:
         // The T-009 registry of the survey grounds: a deployment
         // selects the region explicitly (the default elven flow is
@@ -340,35 +339,9 @@ func (l *Loop) SetHuntingZoneRegion(region string) {
     }
 }
 
-// userZoneSelect applies the manual zone selection of the web UI: the
-// index refers to the zone registry order (the spot registry order in
-// the spot mode - the map view lists both through the same index
-// space). The selection overrides the automatic picker until the
-// character outgrows the band.
-func (l *Loop) userZoneSelect(index int32) {
-    if l.spot != nil {
-        l.userSpotSelect(index)
-
-        return
-    }
-    if len(l.zones) == 0 {
-        return
-    }
-    if index < 0 || int(index) >= len(l.zones) {
-        l.logf("Hunt: zone index %d out of range", index)
-
-        return
-    }
-    zone := l.zones[index]
-    l.zoneOverride = int(index)
-    l.logf("Hunt: user selected the hunting zone %s", zone.Name)
-    l.stopForZoneSwitch()
-    l.applyHuntingZone(zone)
-}
-
-// stopForZoneSwitch halts the walks the manual zone selection makes
-// pointless: a manual move, a town trip walk to the trader or back
-// and a zone return leg all aimed at the old square. The server
+// stopForZoneSwitch halts the walks a ground switch makes pointless:
+// a manual move, a town trip walk to the trader or back and a zone
+// return leg all aimed at the old square. The server
 // keeps a walk running until the next move request replaces its
 // destination, so one walk request to the current spot stops it. The
 // selling stop (the character stands at the merchant) keeps running
@@ -403,8 +376,8 @@ func (l *Loop) stopForZoneSwitch() {
 // running fight always finishes in the old square. The spot mode
 // branch replaces the whole ladder economy with the spot policy.
 func (l *Loop) maybeSwitchZone() {
-    if l.spot != nil {
-        l.spotEvaluate(time.Now())
+    if l.cell != nil {
+        l.cellEvaluate(time.Now())
 
         return
     }
@@ -413,23 +386,12 @@ func (l *Loop) maybeSwitchZone() {
     }
     now := time.Now()
     l.resetZoneDeathState()
-    if l.zoneOverride < 0 {
-        l.maybeRotateEmptyZone(now)
-    }
+    l.maybeRotateEmptyZone(now)
     if l.zonePickedID != "" && now.Sub(l.zoneCheckAt) < zoneSwitchPeriod {
         return
     }
     l.zoneCheckAt = now
     level := l.tracker.SelfLevel()
-    if l.zoneOverride >= 0 {
-        zone := l.zones[l.zoneOverride]
-        if level <= zone.MaxLevel+zoneOverrideSlack {
-            return
-        }
-        l.zoneOverride = -1
-        l.logf("Hunt: outgrew the manual zone %s, resuming the "+
-            "automatic picker", zone.Name)
-    }
     fromX, fromY := l.selfZoneAnchor()
     zone, ok := PickHuntingZone(l.zones, level, l.gearPoints(),
         l.zonePickedID, fromX, fromY, l.zoneDeathCap)
@@ -657,8 +619,8 @@ func (l *Loop) noteZoneDanger() {
 // band until the level changes. One label pair keeps the log lines
 // honest for both callers.
 func (l *Loop) noteZoneRegression(kind string, kinds string) {
-    if l.spot != nil {
-        l.spotNoteDeath(time.Now())
+    if l.cell != nil {
+        l.cellNoteDeath(time.Now())
 
         return
     }
@@ -680,13 +642,6 @@ func (l *Loop) noteZoneRegression(kind string, kinds string) {
     }
     if l.zoneDeathCap < 0 || zone.MinLevel-1 < l.zoneDeathCap {
         l.zoneDeathCap = zone.MinLevel - 1
-    }
-    // A manual zone selection dies with the demotion: the operator
-    // picked the ground, but the character keeps dying in it - the
-    // regression takes over instead of walking the corpse back into
-    // the same blows.
-    if l.zoneOverride >= 0 {
-        l.zoneOverride = -1
     }
     // Force the ladder re-pick on the next living tick: the gate of
     // maybeSwitchZone passes with a zero evaluation time.

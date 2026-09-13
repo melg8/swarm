@@ -292,12 +292,12 @@ func TestSetHuntingZoneRegionInstallsDionRegistry(t *testing.T) {
     // 20-25 band registry installed (the default elven flow is
     // unchanged) and the region recorded for the gear catalog
     // selection of the shopping trips (shopCatalogForRegion).
-    loop := NewLoop(&fakeGame{}, spotTestBot(t))
+    loop := NewLoop(&fakeGame{}, cellTestBot(t))
     loop.SetHuntingZoneRegion(regionDion)
 
     zones := DionHuntingZones()
     require.Len(t, loop.zones, len(zones))
     require.Equal(t, zones[0].ID, loop.zones[0].ID)
     require.Equal(t, regionDion, loop.zoneRegion)
-    require.Nil(t, loop.spot, "the zone registry stands the spot mode down")
+    require.Nil(t, loop.cell, "the zone registry stands the cell mode down")
 }

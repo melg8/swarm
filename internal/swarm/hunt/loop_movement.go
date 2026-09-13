@@ -47,7 +47,7 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
         return false
     }
     pick, found := l.tracker.NearestAttackablePreferredWindowed(
-        farTargetRange, l.zone(), l.activeSkips(now),
+        farTargetRange, l.targetZone(), l.activeSkips(now),
         l.minTargetLevel(), l.maxTargetLevel(), true,
         l.zoneMobPriority)
     if !found {
@@ -97,7 +97,7 @@ func (l *Loop) logNoPickableTargets(now time.Time) {
     }
     l.noPickLogAt = now
     blocked := l.tracker.NearestBlockedTargetsWindowed(
-        l.zone(), l.minTargetLevel(), l.maxTargetLevel(),
+        l.targetZone(), l.minTargetLevel(), l.maxTargetLevel(),
         l.activeSkips(now), noPickLogLimit)
     if len(blocked) == 0 {
         l.logger.Printf("Hunt: no pickable target in the zone, " +

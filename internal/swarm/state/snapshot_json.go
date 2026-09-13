@@ -63,6 +63,8 @@ func snapshotJSONSize(s Snapshot) int {
     }
     size += 160 * len(s.CombatEvents)
     size += 160 * len(s.HuntingZones)
+    size += 320
+    size += 320
     size += 704 + len(s.Diagnostics.Hunt.LastAction)
     for i := range s.Events {
         size += len(s.Events[i].Message)
@@ -113,6 +115,14 @@ func appendSnapshotJSON(dst []byte, s Snapshot) []byte {
     dst = appendZoneJSON(dst, s.HuntingZone)
     dst = append(dst, `,"huntingZones":`...)
     dst = appendZoneViewsJSON(dst, s.HuntingZones)
+    dst = appendHuntMeshVersionJSON(dst, s.HuntMesh)
+    dst = append(dst, `,"huntCell":`...)
+    if s.HuntCell == nil {
+        //nolint:exhaustruct_v5 // the zero view encodes null
+        dst = appendCellLiveJSON(dst, CellLiveView{})
+    } else {
+        dst = appendCellLiveJSON(dst, *s.HuntCell)
+    }
     dst = append(dst, `,"packets":`...)
     dst = strconv.AppendInt(dst, s.Packets, 10)
     dst = append(dst, `,"version":`...)

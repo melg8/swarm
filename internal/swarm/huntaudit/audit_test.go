@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-package spotaudit
+package huntaudit
 
 import (
     "encoding/json"
@@ -37,26 +37,22 @@ func newCollectBot(t *testing.T) *state.Bot {
     return bot
 }
 
-func TestInLeashSquareMatchesTheEngageGeometry(t *testing.T) {
-    // The spot-54 geometry of the 2026-09-13 livelock: the anchor
-    // 15936 52218 with the 1656 radius leash (half 1171) fences out
-    // the observed spider mass at x 14563-14703.
-    ax, ay, half := int32(15936), int32(52218), leashHalf(1656)
-    require.Equal(t, int32(1171), half)
-    require.False(t, inLeashSquare(14703, 51897, ax, ay, half))
-    require.False(t, inLeashSquare(14605, 51493, ax, ay, half))
-    require.True(t, inLeashSquare(14765, 51897, ax, ay, half))
-    require.True(t, inLeashSquare(ax, ay, ax, ay, half))
-    // The corners of the leash square touch the visibility circle.
-    require.True(t, inLeashSquare(ax+half, ay+half, ax, ay, half))
-    require.False(t, inLeashSquare(ax+half+1, ay, ax, ay, half))
-}
-
-func TestLeashHalfInscribesTheVisibilityCircle(t *testing.T) {
-    require.Equal(t, int32(1448), leashHalf(2048))
-    require.Equal(t, int32(1171), leashHalf(1656))
-    require.Equal(t, int32(1), leashHalf(0))
-    require.Equal(t, int32(707), leashHalf(1000))
+func TestCollectNpcsVerdictsUseThePolygonLeash(t *testing.T) {
+    bot := newCollectBot(t)
+    // A cell polygon around the observation field: the western
+    // spiders fall inside, the eastern dryad outside.
+    leash := state.NewCellZone([]state.ZoneVertex{
+        {X: 14600, Y: 51300},
+        {X: 14900, Y: 51300},
+        {X: 14900, Y: 51950},
+        {X: 14600, Y: 51950},
+    })
+    npcs := collectNpcs(bot, 14750, 51625, leash)
+    // The friendly villager is not attackable: it never records.
+    require.Len(t, npcs, 2)
+    require.True(t, npcs[0].InLeash)
+    require.False(t, npcs[1].InLeash)
+    require.InDelta(t, 276.0, npcs[0].Distance, 1.0)
 }
 
 func TestAuditFileRoundTripAndResume(t *testing.T) {
@@ -122,7 +118,17 @@ func TestLoadAnchors(t *testing.T) {
 
 func TestCollectNpcsFiltersAndVerdicts(t *testing.T) {
     tracker := newCollectBot(t)
-    npcs := collectNpcs(tracker, 15936, 52218, leashHalf(1656))
+    // The spot-54 anchor with its square leash inscribed in the
+    // 1656 radius: the western spider mass falls outside, the
+    // eastern dryad inside.
+    half := int32(1171)
+    leash := state.NewCellZone([]state.ZoneVertex{
+        {X: 15936 - half, Y: 52218 - half},
+        {X: 15936 + half, Y: 52218 - half},
+        {X: 15936 + half, Y: 52218 + half},
+        {X: 15936 - half, Y: 52218 + half},
+    })
+    npcs := collectNpcs(tracker, 15936, 52218, leash)
     // The friendly villager never lands in the dump, the attackable
     // mob does with its leash verdict.
     require.Len(t, npcs, 2)

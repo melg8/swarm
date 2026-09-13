@@ -77,7 +77,11 @@ func (b *Bot) appendSnapshotJSONLocked(dst []byte, now time.Time) []byte {
     dst = appendZoneJSON(dst, b.zone)
     dst = append(dst, `,"huntingZones":[`...)
     dst = b.appendLiveZoneViewsJSON(dst)
-    dst = append(dst, `],"packets":`...)
+    dst = append(dst, `]`...)
+    dst = appendHuntMeshVersionJSON(dst, b.huntMeshVersion)
+    dst = append(dst, `,"huntCell":`...)
+    dst = appendCellLiveJSON(dst, b.huntCell)
+    dst = append(dst, `,"packets":`...)
     dst = strconv.AppendInt(dst, b.packets, 10)
     dst = append(dst, `,"version":`...)
     dst = strconv.AppendUint(dst, b.version, 10)
@@ -546,6 +550,7 @@ func (b *Bot) snapshotJSONSizeLocked() int {
     size += 256 * len(b.skillQueue)
     size += 160 * len(b.combat.events)
     size += 160 * len(b.zoneViews)
+    size += 320
     for i := count; i > 0; i-- {
         index := (b.log.head - i + eventCapacity) % eventCapacity
         size += len(b.log.ring[index].Message)

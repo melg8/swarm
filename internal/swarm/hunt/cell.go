@@ -126,6 +126,13 @@ func (c Cell) targetZone() *state.CellZone {
     return state.NewCellZone(vertices)
 }
 
+// CellLeash returns the convex polygon leash of the cell (the exact
+// Voronoi ground): the audit tool and the tests reuse the same
+// containment the hunt scans run.
+func CellLeash(cell Cell) *state.CellZone {
+    return cell.targetZone()
+}
+
 // cellDistance measures the focus distance between a cell and a
 // world position.
 func cellDistance(cell Cell, x int32, y int32) float64 {
@@ -164,7 +171,7 @@ func cellEligible(cell Cell, level int32) bool {
     if low < 1 {
         low = 1
     }
-    high := level + spotMaxLevelSlack
+    high := level + cellMaxLevelSlack
     for index := range cell.Mobs {
         mob := &cell.Mobs[index]
         if mob.Level >= low && mob.Level <= high {
@@ -284,7 +291,7 @@ func cellMobPriorities(cell Cell, level int32) map[int32]int32 {
             priority = 3
         case mob.Level >= level-5 && mob.Level <= level:
             priority = 2
-        case mob.Level >= level-8 && mob.Level <= level+spotMaxLevelSlack:
+        case mob.Level >= level-8 && mob.Level <= level+cellMaxLevelSlack:
             priority = 1
         }
         if priority <= 0 {
