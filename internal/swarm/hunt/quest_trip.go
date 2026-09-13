@@ -382,6 +382,15 @@ func (l *Loop) followWaypoint(
 		} else if stuckSince.IsZero() {
 			stuckSince = time.Now()
 		}
+		// The potions ride the follower poll: one planned segment
+		// runs over a minute and the chaser damage of that minute
+		// undid the whole buffer of the first live runs (the walk
+		// only drank between the segments, arriving at 39 percent).
+		if err := l.drinkHealingPotionAt(questWalkPotionHP); err != nil {
+			l.logf("quest: the potion drink failed: %v", err)
+
+			return false
+		}
 		if !stuckSince.IsZero() && time.Since(stuckSince) >= questStuckWait {
 			return false
 		}
@@ -683,6 +692,50 @@ func (l *Loop) driveQuestTalk(
 	return l.DriveDialog(target.ObjectID, route)
 }
 
+// questRetreatDistance is how far the retreat walks out of the mob
+// radius before the sitting rest starts.
+const questRetreatDistance = 2600.0
+
+// retreatAndRest walks the tired hunter out of the quest mob radius,
+// sits the health back to the stand threshold and returns to the kill
+// ground. The retreat direction runs through the standing cell away
+// from the nearest quest mob; the return ride is the ordinary segment
+// walk of the ground.
+func (l *Loop) retreatAndRest(ctx context.Context, stage QuestStage) error {
+	_, _, selfZ, ok := l.tracker.SelfPosition()
+	if !ok {
+		return errors.New("no self position for the retreat")
+	}
+	selfX, selfY, _, _ := l.tracker.SelfPosition()
+	templates := make([]int32, 0, len(stage.Kill.Mobs))
+	for _, mob := range stage.Kill.Mobs {
+		templates = append(templates, mob+npcDisplayOffset)
+	}
+	awayX, awayY := selfX, selfY
+	if mob, found := l.tracker.NearestNpcByTemplates(
+		templates, questKillScanRadius); found {
+		dx := float64(selfX - mob.X)
+		dy := float64(selfY - mob.Y)
+		if dist := math.Hypot(dx, dy); dist > 1 {
+			awayX = int32(float64(selfX) + dx/dist*questRetreatDistance)
+			awayY = int32(float64(selfY) + dy/dist*questRetreatDistance)
+		}
+	}
+	l.logf("quest: the retreat from the mob crowd to (%d, %d)",
+		awayX, awayY)
+	if err := l.walkToQuestPoint(
+		awayX, awayY, selfZ, questWalkTimeout); err != nil {
+		return fmt.Errorf("the retreat walk: %w", err)
+	}
+	if err := l.restBetweenFights(ctx); err != nil {
+		return err
+	}
+	l.logf("quest: the rested hunter returns to the kill ground")
+
+	return l.walkToQuestPoint(
+		stage.Kill.GroundX, stage.Kill.GroundY, selfZ, questWalkTimeout)
+}
+
 // farmQuestStage runs a kill stage: the walk to the kill ground and
 // the engage loop over the quest mobs until the journal counters
 // fill the target. The attacks ride the double click semantics (the
@@ -728,6 +781,18 @@ func (l *Loop) farmQuestStage(
 		}
 		if l.tracker.SelfHealthPercent() <= 0 {
 			return errors.New("the character died on the kill ground")
+		}
+		// The retreat policy: a tired hunter on the ground walks out
+		// of the mob radius, sits the health back and returns - the
+		// standing fight to the last drop loses to the assisting
+		// clans (the live runs held the ground at 30 percent health
+		// until the floor took them).
+		if l.tracker.SelfHealthPercent() < questRestSitHP {
+			if err := l.retreatAndRest(ctx, stage); err != nil {
+				return err
+			}
+
+			continue
 		}
 		mob, ok := l.tracker.NearestNpcByTemplates(
 			templates, questKillScanRadius)
