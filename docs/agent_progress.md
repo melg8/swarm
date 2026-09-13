@@ -3938,4 +3938,57 @@ Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.
   fight_ui); go test ./internal/swarm/webserver green; task fmt:check
   green; task lint:new 0 issues.
 
-Status: done (2026-09-13).
+### Progress (commit: the hunt layer cache - the follow-up)
+
+The owner reported the cpu load still there at the zoomed out view
+and pointed at the number of hunting circles - confirmed: the elven
+spot registry carries 292 grounds (hunt/spots_elven.go) and the far
+view keeps them all on screen, so every animation frame paid a
+save/restore, two dash array allocations and a full label string
+concatenation PER ZONE (the label only draws on hover, but the old
+code built it unconditionally).
+
+- map.js: the hunt layer cache (huntBg state, huntKey,
+  huntZoneVisualKey, huntLayerKey, ensureHuntLayer, renderHuntLayer,
+  blitHuntLayer, the huntDevicePixels constant). The shapes (the
+  circles, the squares, the anchor dots, the kill centroid crosses)
+  rasterize into a second world anchored offscreen cache exactly
+  like the static background (the same slack box pattern) and every
+  frame composites them with one drawImage. The visual fingerprint
+  keeps the per second economy fields (the respawn countdown, the
+  adena rate, the occupancy, the death count) out of the cache key -
+  they only feed labels, so a ticking countdown no longer re-rasters
+  the registry.
+- map.js: drawHuntingZoneDirect replaces drawHuntingSpotCircle and
+  drawHuntingZoneRect - one path per style group (all future circles
+  in a single stroke call, the heat fills bucketed by the alpha
+  bucket, the dots and the crosses batched per group) instead of a
+  state round trip per zone; no label work in the base pass at all.
+- map.js: drawZoneEmphasis + drawSpotEmphasis/drawRectEmphasis +
+  spotLabel/rectLabel paint the hovered or listed zone fresh on top
+  of the cached shapes (the thicker stroke, the brighter fill and
+  the live economy label) - at most two zones match, a couple of
+  shapes per frame. The legacy single square keeps the direct path
+  (one shape needs no cache).
+- map.js: the kill crosses batch by fade bucket (killFadeBuckets,
+  96 marks cost eight strokes instead of ninety six); the aggro
+  circles skip the sub pixel radii of the far zoom (radius < 4 px).
+- tools/repro_map_render.js: the new "hunt layer cache" scenario (8
+  checks: the raster lands in the hunt cache, the steady frame
+  re-strokes nothing and composites both caches, the economy only
+  update re-rasters nothing, the active zone switch re-rasters, the
+  hovered spot carries its live economy label, a zoom re-rasters);
+  the "hunt zones view" scenario reads the square strokes from the
+  hunt cache record.
+- docs/webui.md: the render performance section documents the hunt
+  layer cache, the kill cross batching and the aggro sub pixel skip.
+
+### Verification (the follow-up)
+
+- All eight harnesses pass (map_render with the new "hunt layer
+  cache" scenario, movement, zone_hover, bot_switch, hud, stats,
+  gear, fight_ui); go build ./... and go test ./... green; task
+  fmt:check green; task lint:new 0 issues.
+
+Status: done (2026-09-13, the hunt layer cache follow-up closed the
+zoomed out cpu load).
