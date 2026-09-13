@@ -393,6 +393,19 @@ func (l *Loop) followPlannedSegment(
 			return true
 		}
 	}
+	// The degenerate plan guard: the approach search may answer with
+	// a waypoint inside its own approach radius of the character (a
+	// segment short enough that the arrival check of the follower
+	// closes at once) - the segment then "completes" without moving a
+	// cell and the route loop above would spin the planner in a busy
+	// loop (the 2026-09-13 retreat run burned nineteen thousand
+	// plans a second for four minutes straight). A plan that moved
+	// nothing reports false, the caller falls through to the direct
+	// click.
+	afterX, afterY, _, ok := l.tracker.SelfPosition()
+	if ok && afterX == selfX && afterY == selfY {
+		return false
+	}
 
 	return true
 }
