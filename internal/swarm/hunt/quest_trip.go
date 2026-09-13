@@ -227,6 +227,13 @@ func (l *Loop) fightTransitAttackers() error {
 			attacker.X, attacker.Y, attacker.Z, attacker.ObjectID); err != nil {
 			return err
 		}
+		if time.Since(l.questFightLogAt) >= 3*time.Second {
+			l.questFightLogAt = time.Now()
+			l.logf("quest: the transit fight - %s at %.0f%% hp, "+
+				"the hunter at %.0f%%", attacker.Name,
+				l.tracker.ObjectHealthPercent(attacker.ObjectID),
+				l.tracker.SelfHealthPercent())
+		}
 		time.Sleep(questKillAttackPeriod)
 	}
 }
@@ -757,6 +764,15 @@ func (l *Loop) retreatAndRest(ctx context.Context, stage QuestStage) error {
 		awayX, awayY, selfZ, questWalkTimeout); err != nil {
 		return fmt.Errorf("the retreat walk: %w", err)
 	}
+	// The retreat point sits outside the aggro radius of the mob it
+	// fled, but a chaser that already locked on walks those 2600
+	// units in twenty seconds and beats the sitting hunter to death
+	// (the 2026-09-13 run: a Tracker Skeleton Leader ground the rest
+	// from 20 to 0 percent for three minutes). Nothing may target the
+	// character when the sit lands.
+	if err := l.fightTransitAttackers(); err != nil {
+		return fmt.Errorf("the retreat fight: %w", err)
+	}
 	if err := l.restBetweenFights(ctx); err != nil {
 		return err
 	}
@@ -866,6 +882,18 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
 			_ = l.game.ActionSitStand()
 
 			return fmt.Errorf("cancelled: %w", err)
+		}
+		// A fresh attacker aborts the rest: the sitting regeneration
+		// loses to any chaser still swinging (stand up, the caller's
+		// fight clears it, the next rest tries again).
+		if attacker, ok := l.tracker.NearestAttacker(); ok {
+			l.logf("quest: the rest aborted - %s attacks",
+				attacker.Name)
+			if err := l.game.ActionSitStand(); err != nil {
+				return fmt.Errorf("the stand request: %w", err)
+			}
+
+			return nil
 		}
 		hp := l.tracker.SelfHealthPercent()
 		if hp >= questRestStandHP {

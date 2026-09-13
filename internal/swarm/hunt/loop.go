@@ -356,9 +356,11 @@ type Loop struct {
 	// questPotionAt paces the quest trip potion uses (the C1 reuse
 	// delay of the healing potions).
 	questPotionAt time.Time
-	stuckAt       time.Time
-	stuckX        int32
-	stuckY        int32
+	// questFightLogAt paces the quest trip fight diagnostics.
+	questFightLogAt time.Time
+	stuckAt         time.Time
+	stuckX          int32
+	stuckY          int32
 	// stuckFast arms after the first stuck skip of a trip: subsequent
 	// stuck detections use the shorter stuckFastTimeout so the walker
 	// cycles through the remaining waypoints quickly instead of waiting
