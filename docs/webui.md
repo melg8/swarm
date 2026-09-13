@@ -295,18 +295,20 @@ dozen 512px tiles per paint and is visually indistinguishable on
   on every mousemove; re-querying what sits under the cursor on top
   of it doubled the per event work.
 
-The **fps meter** makes the frame budget visible: the chip pinned to
-the top right of the map shows the render rate of the last half
-second window with the average paint cost (`58 fps · draw 2.1 ms`, the
-worst frame joins when it spiked - `worst 40.2 ms`), colored green at
-45 fps and up, amber at 28 and up, red below. Every paint counts -
-the rAF loop and the event driven repaints alike - and when nothing
-has painted for a while the chip reads `idle` (the render loop stops
-when nothing can move; a stopped loop is a fact worth seeing, not a
-frozen reading). Every five seconds the same numbers land in the
-browser console (`map fps: 58 fps · draw avg 2.1 ms · worst 3.4 ms`),
-so a lag report pastes the measurements next to the build identity of
-the state dump.
+The **fps meter** makes the frame budget visible: the counter item at
+the right end of the status bar (the app footer, `#foot-fps`) shows the
+map render rate of the last half second window with the average paint
+cost (`fps: 58 · draw 2.1 ms`, the worst frame joins when it spiked -
+`worst 40.2 ms`), colored green at 45 fps and up, amber at 28 and up,
+red below. It lived on the map canvas corner before and overlapped the
+HUD panels at the narrow window widths. Every paint counts - the rAF
+loop and the event driven repaints alike - and when nothing has painted
+for a while the chip reads `fps: idle` (the render loop stops when
+nothing can move; a stopped loop is a fact worth seeing, not a frozen
+reading). Every five seconds the same numbers land in the browser
+console (`map fps: 58 fps · draw avg 2.1 ms · worst 3.4 ms`), so a lag
+report pastes the measurements next to the build identity of the state
+dump.
 
 ## Combat animation layer (map.js + state combatEvents)
 

@@ -811,9 +811,9 @@ function runScenarioFpsMeter(mapFile) {
         + MapView.fps.paints);
 
     MapView.renderFpsChip(60, 2.1, 3.0);
-    const chip = elements.get("map-fps");
+    const chip = elements.get("foot-fps");
     check(results, "the chip reads the window fps and draw cost",
-        chip.textContent === "60 fps · draw 2.1 ms",
+        chip.textContent === "fps: 60 · draw 2.1 ms",
         "chip says " + JSON.stringify(chip.textContent));
     check(results, "a healthy window colors the chip green",
         chip.style.color === "#188038",
@@ -821,7 +821,7 @@ function runScenarioFpsMeter(mapFile) {
 
     MapView.renderFpsChip(20, 9.4, 40.2);
     check(results, "a starved window colors the chip red and shows the worst frame",
-        chip.textContent === "20 fps · draw 9.4 ms · worst 40.2 ms"
+        chip.textContent === "fps: 20 · draw 9.4 ms · worst 40.2 ms"
         && chip.style.color === "#d93025",
         "chip says " + JSON.stringify(chip.textContent)
         + " color " + JSON.stringify(chip.style.color));

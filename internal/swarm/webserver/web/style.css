@@ -897,25 +897,13 @@ body.mode-pathfind .bot-status { display: none; }
 
 .map-tooltip .tt-name { color: var(--text-bright); font-size: 12px; }
 
-/* The fps counter chip of the map: the render rate and the paint cost
-   of the last half second window, colored by health through an inline
-   color (the meter keeps the browser work to one textContent write).
-   It reads like a diagnostic, not a HUD panel - monospace, dim border,
-   no interaction. */
-.map-fps {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  z-index: 5;
-  color: var(--text-dim);
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 2px 7px;
-  font-family: var(--mono);
-  font-size: 11px;
-  white-space: nowrap;
-  pointer-events: none;
+/* The fps counter item of the status bar: the map render rate and the
+   paint cost of the last half second window, colored by health through
+   an inline color (the meter keeps the browser work to one textContent
+   write). The margin-left pins it to the right end of the bar so the
+   diagnostic reads apart from the telemetry items. */
+.foot-fps {
+  margin-left: auto;
 }
 
 .map-rose {

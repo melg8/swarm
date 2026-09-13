@@ -1117,7 +1117,7 @@ const MapView = {
   // happens when the text changed - a steady 60 fps window must not
   // dirty the DOM at all.
   renderFpsChip(fps, avgMs, worstMs) {
-    let text = fps + " fps · draw " + avgMs.toFixed(1) + " ms";
+    let text = "fps: " + fps + " · draw " + avgMs.toFixed(1) + " ms";
     if (worstMs > Math.max(fpsWorstShowMs, 3 * Math.max(avgMs, 0.1))) {
       text += " · worst " + worstMs.toFixed(1) + " ms";
     }
@@ -1140,11 +1140,11 @@ const MapView = {
     const f = this.fps;
     if (f.windowStart === 0) { return; }
     if (performance.now() - f.lastChipAt < 1500) { return; }
-    if (f.lastChip === "idle") { return; }
-    f.lastChip = "idle";
+    if (f.lastChip === "fps: idle") { return; }
+    f.lastChip = "fps: idle";
     const chip = this.fpsChip();
     if (chip) {
-      chip.textContent = "idle";
+      chip.textContent = "fps: idle";
       chip.style.color = "";
     }
   },
@@ -1158,11 +1158,13 @@ const MapView = {
       + avgMs.toFixed(1) + " ms · worst " + worstMs.toFixed(1) + " ms");
   },
 
-  // fpsChip resolves the counter element once: it lives in the map
-  // corner (index.html #map-fps).
+  // fpsChip resolves the counter element once: it lives in the
+  // status bar at the right end of the app footer (index.html
+  // #foot-fps) - it shared the map corner with the HUD panels before
+  // and overlapped them at the narrow window widths.
   fpsChip() {
     if (!this.fps.chip && typeof document !== "undefined") {
-      this.fps.chip = document.getElementById("map-fps");
+      this.fps.chip = document.getElementById("foot-fps");
     }
 
     return this.fps.chip;
