@@ -72,14 +72,25 @@ func TestSessionReportRenders(t *testing.T) {
 			return false
 		}
 		body := response.Body.String()
-		if !strings.Contains(body, "Kaboo Orc") {
-			return false
-		}
-		require.Contains(t, body, "swarm session report")
-		require.Contains(t, body, "bot: test1")
-		require.Contains(t, body, "live now: level 5")
-		require.Contains(t, body, "Hunt: the hunt decision")
-
-		return true
+		// Boolean checks only: a require inside the condition calls
+		// FailNow on the first transient miss (the kill and the story
+		// land on two separate aggregator writes, the report can
+		// observe the gap between them) and turns the poll into a
+		// guaranteed timeout failure.
+		return strings.Contains(body, "Kaboo Orc") &&
+			strings.Contains(body, "Hunt: the hunt decision")
 	}, 10*time.Second, 20*time.Millisecond, "the report must render")
+
+	// The full report shape is asserted once the poll guarantees the
+	// aggregate carries both records.
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(
+		http.MethodGet, "/api/bots/test1/session-report", nil)
+	server.httpServer.Handler.ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code)
+	body := response.Body.String()
+	require.Contains(t, body, "swarm session report")
+	require.Contains(t, body, "bot: test1")
+	require.Contains(t, body, "live now: level 5")
+	require.Contains(t, body, "Hunt: the hunt decision")
 }

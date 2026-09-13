@@ -487,7 +487,15 @@ func pickedTimes(times []int64, picks []int) []int64 {
 // sample and every window slide, and the whole chart visibly jumped).
 func TestStatsHistoryStableAcrossPolls(t *testing.T) {
 	server, _ := newStatsServer(t)
-	base := time.Now().Add(-6*time.Hour - 15*time.Minute)
+	// The base phase is pinned 45 s past a whole 90 s bucket mark:
+	// a base inside the first 15 s of a bucket puts the oldest sample
+	// on the window edge and the trailing sample on a bucket edge, and
+	// then the 5 s poll shift of the stability check and the trailing
+	// bucket refresh legitimately move the picked prefix (the observed
+	// flake). 45 s past the mark sits mid-bucket, every check below is
+	// phase independent.
+	base := time.Now().Add(-6*time.Hour - 15*time.Minute).
+		Truncate(90 * time.Second).Add(45 * time.Second)
 	for i := range 1500 {
 		server.stats.sample(base.Add(time.Duration(i) * statsSamplePeriod))
 	}
