@@ -3453,3 +3453,71 @@ the cause and fix it.
   farming after SIGCONT (dev log round 80).
 
 Status: done (2026-09-12).
+
+## Active task: the long-run log analysis - tools, behavior fixes, logging gaps (owner-direct)
+
+Started: 2026-09-13 05:15 UTC. Branch: `feature/proxy-server`.
+Commits as melg8. The owner attached the six hour fleet journal of the
+Windows deployment (logs.7z: session-20260913-015130-28264.jsonl,
+62531 records, test1/test2/test3) and asked for three things: the
+missing analysis tools (so nobody reads the whole session by hand
+again), the long-run behavior problems found and fixed, and the
+logging gaps closed.
+
+### Investigation (the journal analysis)
+
+- The exploratory pass over the attached journal found four
+  time-wasters and one measurement bug:
+  1. 138 emergency logouts (test1: 85, test3: 35, test2: 18): the bots
+     re-enter the aggressive spider ground, pile up 3 mobs, logout,
+     relogin (median test1 session 82 s) and walk back into the same
+     pack. The supervisor booked every one as "game connection lost:
+     use of closed network connection" - a lie that hid the loop.
+  2. The steering tangent flip-flop: during test2's delevel walk the
+     bot ping-ponged 60 minutes between 28732 51927 and 28603 52218
+     ("steering the walk around Kaboo Orc Fighter at 29176 52406" x717
+     story lines). The waypoint sat 338 units inside the 600 unit
+     aggro+clearance circle: no tangent arc can land there, and the
+     side flips at every re-issue.
+  3. The town trip abort loop: 47 identical "aborted, no walkable path
+     to the shop" trips (the dry search refuses the water crossing),
+     retried every ~5 minutes for the whole run while a 62214 adena
+     shopping plan starved.
+  4. The fight clock accumulation: fightStartAt never reset on a kill
+     and the Mobius id free list recycles object ids, so camping one
+     spawn point accumulated the clock across kills - one lieutenant
+     spawn reads "avg 79.9s, max 4369s" over 188 kills; test1's spider
+     fights grew 155s -> 1958s monotonically.
+- Environment: the fast deploy started (Mobius sparse-clone in
+  progress); Go 1.24 unpacked to ~/opt independently so the tooling
+  and the fixes build and test while the stack comes up.
+
+### Result (in progress - see the commits)
+
+- session: the -session-anomalies CLI (the ranked findings scanner:
+  logout loops, repeated decision lines, trip abort loops, fight
+  outliers, death streaks, stalls, gaps, mute - every finding with a
+  ready-made drill-down command) and the -session-query CLI (the grep
+  of the journal: bot/event/regex/time filters, grep -C style context
+  windows, the record cap). The report gained the -from/-to window.
+- hunt: the fight clock resets on the kill and the dropped target.
+- hunt: the follower skips waypoints inside an idle camp's trigger
+  circle (legTargetThreatened) and the walk stuck detection got the
+  net-progress watchdog (an oscillation without net progress fires
+  the skip/re-path escalation like a standstill does).
+- hunt: the emergency logout counts against the zone regression (the
+  danger spot ring of the tracker carries it across the session
+  boundary, the fresh loop seeds its counters from it), the journal
+  gains the structured logout event and the supervisor's lost record
+  names the honest reason.
+- hunt: the town trip start falls back to the non-dry search (the
+  zone return escalation) and the abort streak doubles the trip
+  cooldown (5m base, capped at 1h).
+
+### Verification
+
+- go build, go vet: clean; the hunt, session, state and cmd suites
+  green (the new longrun_repro_test.go pins every fix against the
+  observed journal numbers).
+- Live E2E against the deployed stack: pending (the Mobius clone of
+  the deploy is still downloading).

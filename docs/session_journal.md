@@ -49,7 +49,16 @@ One JSON object per line with short flat keys (the kill line reads
 | `zone` | `mob,r` | a hunting zone switch with the reason |
 | `stall` | `r,dur,x,y` | a stagnation watch event (xp or position hold) |
 | `repath` | `n` | a stuck-and-replanned walk leg |
+| `logout` | `r,ti` | one intentional emergency logout of the hunt safety layer: the honest cause (the mob pile up, the critical health) and the login cooldown - the supervisor's lost record carries the same reason instead of the misleading socket-close error |
 | `connect` / `lost` / `shutdown` | `r,m` | the session lifecycle of the supervisor |
+
+The fight clock honesty: the `kill` duration anchor resets with every
+kill (and every dropped target), because the Mobius object id free
+list hands the SAME id to the respawn of the same spawn point - a
+stale anchor matching the recycled id would inherit the elapsed
+seconds of every earlier fight against it (the observed six hour run
+credited one lieutenant spawn with a 4369 second "fight" accumulated
+over 188 kills of the recycled id).
 
 ## The data volume (measured)
 
@@ -85,7 +94,31 @@ before NewJournal finished).
 - **The offline CLI** `swarm -session-report <file>` renders the same
   report from any journal file (plain or gzipped, a torn final line of
   a crashed run is skipped): the post-mortem path for a run that is
-  already over. `-account` selects one bot of a fleet journal.
+  already over. `-account` selects one bot of a fleet journal. The
+  `-from`/`-to` window bounds the records folded into the aggregates
+  (RFC3339 timestamps or bare `15:04` clocks of the session day - a
+  run crossing midnight binds 01:30 to the morning after the 22:51
+  start), so one interesting stretch of a long session reports alone.
+- **The anomaly scan** `swarm -session-anomalies <file>` answers
+  "where should I look": it streams the journal once and prints the
+  ranked behavior findings of the long run - emergency logout loops
+  (the closed-socket reconnect churn of a bot re-entering too-hot
+  ground), repeated decision lines (a loop re-issuing the same shape
+  every tick: steering ping-pongs, walled leg retries, targetless
+  patrols), town trip abort loops, fight duration outliers (the
+  respawn clock suspicion - the server recycles object ids), death
+  streaks with their position clusters, stagnation stalls, offline
+  gaps and the story flood mute. Every finding carries its count, its
+  time window and a ready-made `swarm -session-query` drill-down
+  command line, so the deep dive starts with a copy-paste.
+- **The drill-down query** `swarm -session-query <file>` is the grep
+  of the journal: it streams the records through the filters
+  (`-account`, `-events kill,death`, `-match "steering"`, `-from`,
+  `-to`, `-limit`) and prints one compact line per record. The
+  `-context 2m` flag prints the records within a time window around
+  every match as dimmed context lines (the `~` prefix), the analog of
+  `grep -C` for a time series - the six hour fleet journal answers a
+  windowed question without reading anything else.
 - **The raw file** rides along when the questions need the full
   record trail: attach it to the report and the agent greps the
   timeline directly.
