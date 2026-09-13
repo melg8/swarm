@@ -5485,3 +5485,46 @@ keep succeeding, no packet arrives) - fired the watchdog at exactly
 resumed farming within 30 s. The old behavior on the same scenario:
 the bot blocks on the read forever - precisely the reported "stuck
 and does nothing".
+
+## Round 81: the continuous memory leak - the gear cache keyed on the per call copy (2026-09-13)
+
+Problem: the owner reported (Russian) a slow continuous memory growth
+on the long runs (the fleet statistics chart: the heap baseline
+creeping from ~140 MB toward ~280 MB over 7 hours) while the bot
+count, the goroutine count and the packet rate stayed flat - the
+memory grew with time, not with the fleet.
+
+Investigation: the static audit of the usual suspects found them all
+bounded (the state rings, the stats collector compaction, the journal
+aggregator caps, the pathfind LRU, the object store swap removals),
+so the round built a live fleet soak (24 bots against the deployed
+stack, two heap profiles 5 minutes apart) and diffed the inuse_space:
+a single retainer - gear.buildCatalogCandidates under the hunt
+shopping refresh chain - held 16.5 MB of the 20 MB growth.
+
+Root cause: the gear shopping caches (candidateCache, jewelIDCache)
+keyed on `&catalog` - the address of the function parameter, a by
+value copy. Every call (each bot replans every 5 s through
+refreshShoppingCache) built a fresh key, missed the cache and stored
+a new entry (a full candidate slice plus the escaped catalog copy)
+that nothing ever freed. The cache comment claimed the pointer is
+"stable for the package level townShopCatalog var" - true for the
+original, but the address taken was the local copy's, so the caches
+grew by two entries per replan forever.
+
+Fix: the cache key hashes the catalog content (the merchants, the tax
+rates and the buylist ids, FNV-1a) plus the profile name instead of a
+pointer: equal content hits one entry whatever copy travels, a
+changed catalog rebuilds. The maps are bounded by the distinct
+catalog contents again (two regions times the profiles today).
+
+Verification: the regression suite pins the fix (equal content
+returns the same slice without growing the cache, 50 replans keep
+both caches at one entry per content, every content dimension - a
+merchant, a tax rate, a buylist - flips the hash), the full suite
+green, lint clean. The repeat soak with the identical shape and load:
+the heap growth over the same 5 minute window dropped from +14.9 MB
+to +1.3 MB (the warmup of the young sessions), the pprof diff shows
+no growing retainer anymore. The process log now carries the memory
+line once a minute (internal/swarm/memwatch), so the next growth
+report is provable from the log alone.

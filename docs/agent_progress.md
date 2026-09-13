@@ -3646,3 +3646,28 @@ provable from the logs, not only from the UI charts.
   period) return at once.
 - Verified: go build, go vet, golangci-lint run --new 0 issues, the
   package tests green.
+
+### Result (commit: the gear cache leak fix)
+
+- internal/swarm/gear: the candidateCache and jewelIDCache keys
+  replaced the `&catalog` pointer (the address of the by value
+  parameter copy - a fresh key per call, two leaked entries per
+  replan: a full candidate slice plus the escaped catalog copy) with
+  the catalog content hash (the merchants, the tax rates, the buylist
+  ids) plus the profile name. Equal content hits one entry, a changed
+  catalog rebuilds, the maps stay bounded by the distinct contents.
+- shopping_cache_test.go: the regression pins (the same content
+  returns the same slice; 50 replans keep both caches at one entry
+  per content; every content dimension flips the hash).
+- docs/development_log.md: Round 81 carries the full RCA.
+
+### Verification
+
+- go build, go vet, golangci-lint run --new: 0 issues; the full
+  suite green (21 packages).
+- The repeat live soak (24 bots, the same 5 minute window, the same
+  packet load 125k packets): the heap growth dropped from +14.9 MB
+  to +1.3 MB (the young session warmup), the pprof diff shows no
+  growing retainer anymore.
+
+Status: done (2026-09-13).
