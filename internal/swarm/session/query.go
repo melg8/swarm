@@ -322,8 +322,8 @@ func formatQueryRecord(r record) string {
 		fmt.Fprintf(&payload, "lv %d xp %d adena %d hp %.0f%% at %d %d phase %s",
 			r.Lv, r.Xp, r.Ad, r.Hp, r.X, r.Y, r.Ph)
 	case kindKill:
-		fmt.Fprintf(&payload, "%s (lvl %d) in %s, hp left %.0f%%",
-			r.Mob, r.Lvl, durText(r.Dur), r.Hp)
+		fmt.Fprintf(&payload, "%s (lvl %d) in %s, hp left %.0f%% at %d %d",
+			r.Mob, r.Lvl, durText(r.Dur), r.Hp, r.X, r.Y)
 	case kindDeath:
 		fmt.Fprintf(&payload, "died at level %d, position %d %d", r.Lv, r.X, r.Y)
 	case kindLevel:
@@ -333,8 +333,8 @@ func formatQueryRecord(r record) string {
 	case kindTripEnd:
 		fmt.Fprintf(&payload, "trip ends: %s (%s)", r.R, durText(r.Dur))
 	case kindStall:
-		fmt.Fprintf(&payload, "%s stall held %s at %d %d",
-			r.R, durText(r.Dur), r.X, r.Y)
+		fmt.Fprintf(&payload, "%s stall held %s at %d %d phase %s",
+			r.R, durText(r.Dur), r.X, r.Y, r.Ph)
 	case kindConnect:
 		fmt.Fprintf(&payload, "connect %s %s", r.R, r.M)
 	case kindLost:

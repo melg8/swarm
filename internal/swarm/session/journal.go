@@ -363,16 +363,21 @@ func (j *Journal) Level(bot string, level int32, exp int64) {
         j.send(r)
 }
 
-// Kill records one killed mob: the fight duration in seconds and the
-// health percent the character ended the fight with.
+// Kill records one killed mob: the fight duration in seconds, the
+// health percent the character ended the fight with and the position
+// the fight ended at (the drill-down locates the bad fights of a long
+// run on the map without pulling the samples around every kill).
 func (j *Journal) Kill(
         bot string, mob string, level int32, fightSec float64, health float64,
+        x int32, y int32,
 ) {
         r := newRecord(bot, kindKill, time.Now())
         r.Mob = mob
         r.Lvl = level
         r.Dur = fightSec
         r.Hp = health
+        r.X = x
+        r.Y = y
         j.send(r)
 }
 
@@ -424,15 +429,19 @@ func (j *Journal) Zone(bot string, name string, reason string) {
         j.send(r)
 }
 
-// Stall records a stagnation watch event (an xp or position hold).
+// Stall records a stagnation watch event (an xp or position hold) with
+// the hunt phase it fired in: the phase separates the stalled delevel
+// walks from the stalled farms in the drill-down.
 func (j *Journal) Stall(
         bot string, kind string, held time.Duration, x int32, y int32,
+        phase string,
 ) {
         r := newRecord(bot, kindStall, time.Now())
         r.R = kind
         r.Dur = held.Seconds()
         r.X = x
         r.Y = y
+        r.Ph = phase
         j.send(r)
 }
 

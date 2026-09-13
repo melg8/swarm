@@ -59,7 +59,7 @@ func TestSessionReportRenders(t *testing.T) {
 	require.NoError(t, err)
 	defer journal.Close()
 	server.SetSessionJournal(journal)
-	journal.Kill("test1", "Kaboo Orc", 4, 8.2, 87.5)
+	journal.Kill("test1", "Kaboo Orc", 4, 8.2, 87.5, 45000, 50000)
 	journal.Story("test1", "Hunt: the hunt decision",
 		time.Unix(1700000000, 0))
 

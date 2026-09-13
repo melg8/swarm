@@ -34,7 +34,7 @@ func writeTestJournal(t *testing.T, path string) {
 		Phase: "engage",
 	})
 	_ = r
-	journal.Kill("test1", "Kaboo Orc", 4, 8.2, 87.5)
+	journal.Kill("test1", "Kaboo Orc", 4, 8.2, 87.5, 0, 0)
 	journal.Close()
 	require.NoError(t, os.Rename(journal.Path(), path))
 }

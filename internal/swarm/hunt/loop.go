@@ -941,8 +941,12 @@ func (l *Loop) journalKill(objectID int32, now time.Time) {
                 now.After(l.fightStartAt) {
                 fight = now.Sub(l.fightStartAt).Seconds()
         }
+        var x, y int32
+        if selfX, selfY, _, ok := l.tracker.SelfPosition(); ok {
+            x, y = selfX, selfY
+        }
         l.journal.Kill(l.tracker.ID(), mob, mobLevel, fight,
-                l.tracker.SelfHealthPercent())
+                l.tracker.SelfHealthPercent(), x, y)
 }
 
 // resetFightClock drops the fight duration anchor of the killed or
