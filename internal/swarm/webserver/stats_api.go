@@ -93,7 +93,9 @@ type fleetStats struct {
 	Deaths       int64   `json:"deaths"`
 	Rejoins      int64   `json:"rejoins"`
 	ExpGained    int64   `json:"expGained"`
+	AdenaGained  int64   `json:"adenaGained"`
 	KillsPerHour float64 `json:"killsPerHour"`
+	AdenaPerHour float64 `json:"adenaPerHour"`
 	AvgTickMs    float64 `json:"avgTickMs"`
 	PacketRate   float64 `json:"packetRate"`
 	HitRate      float64 `json:"hitRate"`
@@ -130,6 +132,8 @@ type botStatsView struct {
 	PacketRate      float64 `json:"packetRate"`
 	HpPercent       float64 `json:"hpPercent"`
 	Adena           int64   `json:"adena"`
+	AdenaGained     int64   `json:"adenaGained"`
+	AdenaPerHour    float64 `json:"adenaPerHour"`
 	UptimeSec       int64   `json:"uptimeSec"`
 	LastKillAgoSec  int64   `json:"lastKillAgoSec"`
 	LastDeathAgoSec int64   `json:"lastDeathAgoSec"`
@@ -145,6 +149,7 @@ type fleetHistory struct {
 	KillsPerMin  []float64 `json:"killsPerMin"`
 	DeathsPerMin []float64 `json:"deathsPerMin"`
 	ExpGained    []int64   `json:"expGained"`
+	Adena        []int64   `json:"adena"`
 	AvgTickMs    []float64 `json:"avgTickMs"`
 	PacketRate   []float64 `json:"packetRate"`
 	HeapMB       []float64 `json:"heapMB"`
@@ -176,6 +181,7 @@ type botHistory struct {
 	Level       []int32   `json:"level"`
 	HpPercent   []float64 `json:"hpPercent"`
 	Adena       []int64   `json:"adena"`
+	AdenaGained []int64   `json:"adenaGained"`
 	Kills       []int32   `json:"kills"`
 	Deaths      []int32   `json:"deaths"`
 	KillsPerMin []float64 `json:"killsPerMin"`
@@ -291,6 +297,7 @@ func (c *statsCollector) fleetView(
 		fleet.Deaths += int64(read.metrics.Deaths)
 		fleet.Rejoins += int64(rejoinsOf(read.metrics.Sessions))
 		fleet.ExpGained += expGainedOf(read, series)
+		fleet.AdenaGained += adenaGainedOf(read, series)
 		fleet.PacketRate += lastPacketRate(series)
 		if read.metrics.TickCount > 0 {
 			tickSum += read.metrics.TickEMA.Seconds() * 1000
@@ -303,6 +310,7 @@ func (c *statsCollector) fleetView(
 		fleet.AvgTickMs = tickSum / float64(tickBots)
 	}
 	fleet.KillsPerHour = ratePerHour(fleet.Kills, collection)
+	fleet.AdenaPerHour = ratePerHour(fleet.AdenaGained, collection)
 	if swingsMade > 0 {
 		fleet.HitRate = float64(swingsLanded) / float64(swingsMade)
 	}
@@ -342,7 +350,10 @@ func (c *statsCollector) botView(
 
 // botViewFrom builds the live counter view of one bot: the tracker
 // reads of the caller plus the baselines and the last sample of the
-// series (nil while the collector has none yet).
+// series (nil while the collector has none yet). A live read that
+// lands inside the reconnect gap (the zeroed tracker character) holds
+// the last known character facts of the series instead of flashing
+// level 0, experience 0 and adena 0 through the KPI cards.
 func botViewFrom(read botNow, series *botSeries, now time.Time) botStatsView {
 	uptimeSec := int64(0)
 	if !read.startedAt.IsZero() {
@@ -377,6 +388,8 @@ func botViewFrom(read botNow, series *botSeries, now time.Time) botStatsView {
 		PacketRate:      lastPacketRate(series),
 		HpPercent:       hpPercentOf(read.info),
 		Adena:           int64(read.character.Adena),
+		AdenaGained:     0,
+		AdenaPerHour:    0,
 		UptimeSec:       uptimeSec,
 		LastKillAgoSec:  agoSec(read.metrics.LastKillAt, now),
 		LastDeathAgoSec: agoSec(read.metrics.LastDeathAt, now),
@@ -387,26 +400,53 @@ func botViewFrom(read botNow, series *botSeries, now time.Time) botStatsView {
 	}
 	if series != nil && series.ring.count > 0 {
 		view.ExpGained = expGainedOf(read, series)
-		view.LevelGained = read.info.Level - series.levelBase
+		view.AdenaGained = adenaGainedOf(read, series)
+		if series.based {
+			view.LevelGained = read.info.Level - series.levelBase
+		}
+		if read.info.Level <= 0 {
+			holdGapView(&view, series)
+		}
+		view.AdenaPerHour = ratePerHour(view.AdenaGained, uptimeSec)
 	}
 
 	return view
 }
 
-// fleetHistoryLocked downsamples the fleet ring of a window. The
-// caller must hold the collector lock.
+// holdGapView replaces the character facts of a live view that landed
+// inside the reconnect gap with the last known sample of the series:
+// the KPI cards must not flash zeros while the bot relogs (the status
+// badge keeps telling the truth - connecting or offline).
+func holdGapView(view *botStatsView, series *botSeries) {
+	last, ok := series.ring.last()
+	if !ok || last.level <= 0 {
+		return
+	}
+	view.Level = last.level
+	view.ExpPercent = state.ExpPercent(last.level, last.exp)
+	view.Adena = last.adena
+	view.HpPercent = hpOfSample(last)
+	if series.based {
+		view.ExpGained = last.exp - series.expBase
+		view.AdenaGained = last.adena - series.adenaBase
+		view.LevelGained = last.level - series.levelBase
+	}
+}
+
+// fleetHistoryLocked downsamples the fleet ring of a window: the
+// last sample of every epoch aligned time bucket (see bucketPicks -
+// the picks stay identical across the polls of one window, so the
+// charts never flicker). The caller must hold the collector lock.
 func (c *statsCollector) fleetHistoryLocked(
 	now time.Time, window time.Duration,
 ) fleetHistory {
 	windowed := c.windowedFleetLocked(now, window)
 	history := fleetHistory{} //nolint:exhaustruct_v5 // the series start empty
-	stride := historyStride(len(windowed))
+	times := fleetSampleTimes(windowed)
+	bucketSec := historyBucketSec(window, spanSeconds(times))
 	prevAt := int64(0)
 	prevKills, prevDeaths := int64(0), int64(0)
-	for i := range windowed {
-		if i%stride != 0 && i != len(windowed)-1 {
-			continue
-		}
+	for _, i := range bucketPicks(times, bucketSec) {
 		sample := windowed[i]
 		history.At = append(history.At, sample.at)
 		history.Online = append(history.Online, sample.online)
@@ -414,6 +454,7 @@ func (c *statsCollector) fleetHistoryLocked(
 		history.Kills = append(history.Kills, sample.kills)
 		history.Deaths = append(history.Deaths, sample.deaths)
 		history.ExpGained = append(history.ExpGained, sample.expGained)
+		history.Adena = append(history.Adena, sample.adena)
 		history.AvgTickMs = append(history.AvgTickMs,
 			decodeMs(sample.tickAvgMs))
 		history.PacketRate = append(history.PacketRate,
@@ -457,8 +498,10 @@ func (c *statsCollector) windowedFleetLocked(
 	return windowed
 }
 
-// botHistoryLocked downsamples the per bot ring of a window. The
-// caller must hold the collector lock.
+// botHistoryLocked downsamples the per bot ring of a window: the last
+// sample of every epoch aligned time bucket (see bucketPicks - the
+// picks stay identical across the polls of one window, so the charts
+// never flicker). The caller must hold the collector lock.
 func (c *statsCollector) botHistoryLocked(
 	series *botSeries, now time.Time, window time.Duration,
 ) botHistory {
@@ -467,13 +510,11 @@ func (c *statsCollector) botHistoryLocked(
 		windowed = append(windowed, sample)
 	})
 	history := botHistory{} //nolint:exhaustruct_v5 // the series start empty
-	stride := historyStride(len(windowed))
+	times := sampleTimes(windowed)
+	bucketSec := historyBucketSec(window, spanSeconds(times))
 	prevAt := int64(0)
 	prevKills := int64(0)
-	for i := range windowed {
-		if i%stride != 0 && i != len(windowed)-1 {
-			continue
-		}
+	for _, i := range bucketPicks(times, bucketSec) {
 		sample := windowed[i]
 		history.At = append(history.At, sample.at)
 		history.Exp = append(history.Exp, sample.exp)
@@ -492,6 +533,8 @@ func (c *statsCollector) botHistoryLocked(
 		}
 		history.ExpGained = append(history.ExpGained,
 			sample.exp-series.expBase)
+		history.AdenaGained = append(history.AdenaGained,
+			sample.adena-series.adenaBase)
 		if len(history.At) == 1 {
 			history.KillsPerMin = append(history.KillsPerMin, 0)
 		} else {
@@ -548,18 +591,95 @@ func (c *statsCollector) phaseSharesLocked(
 	return visible
 }
 
-// historyStride returns the stride that keeps the point count of a
-// windowed series under the served bound.
-func historyStride(count int) int {
-	if count <= 1 {
-		return 1
+// historyBucketSec returns the fixed bucket width of a history window:
+// the downsampling serves the last sample of every epoch aligned
+// bucket, so the served points are a pure function of the sample
+// timestamps - two polls of the same window derive the very same
+// points however far apart they run (the old index stride re-aligned
+// its picks on every appended sample and every window slide, and the
+// charts visibly jumped between the polls). A window request fixes
+// the bucket from its own seconds alone; the unbounded walk (window 0)
+// derives it from the observed span rounded up to the sample period
+// so it only grows in rare, coarse steps.
+func historyBucketSec(window time.Duration, spanSec int64) int64 {
+	if window > 0 {
+		return roundUpSampleSec(
+			(int64(window/time.Second) + statsHistoryMaxPoints - 1) /
+				statsHistoryMaxPoints)
 	}
-	stride := (count + statsHistoryMaxPoints - 1) / statsHistoryMaxPoints
-	if stride < 1 {
-		return 1
+	if spanSec <= statsHistoryMaxPoints*int64(
+		statsSamplePeriod/time.Second) {
+		return int64(statsSamplePeriod / time.Second)
 	}
 
-	return stride
+	return roundUpSampleSec(
+		(spanSec + statsHistoryMaxPoints - 1) / statsHistoryMaxPoints)
+}
+
+// roundUpSampleSec rounds a bucket width up to a whole multiple of the
+// sample period (never below one sample period).
+func roundUpSampleSec(sec int64) int64 {
+	sample := int64(statsSamplePeriod / time.Second)
+	if sec < sample {
+		return sample
+	}
+
+	return ((sec + sample - 1) / sample) * sample
+}
+
+// sampleTimes collects the timestamps of the windowed bot samples.
+func sampleTimes(samples []botSample) []int64 {
+	times := make([]int64, len(samples))
+	for i := range samples {
+		times[i] = samples[i].at
+	}
+
+	return times
+}
+
+// fleetSampleTimes collects the timestamps of the windowed fleet
+// samples.
+func fleetSampleTimes(samples []fleetSample) []int64 {
+	times := make([]int64, len(samples))
+	for i := range samples {
+		times[i] = samples[i].at
+	}
+
+	return times
+}
+
+// spanSeconds returns the time span of the collected timestamps.
+func spanSeconds(times []int64) int64 {
+	if len(times) == 0 {
+		return 0
+	}
+
+	return times[len(times)-1] - times[0]
+}
+
+// bucketPicks returns the indices of the windowed samples the history
+// serves: the LAST sample of every epoch aligned bucket (bucket
+// boundaries at the whole multiples of bucketSec) plus the newest
+// sample. Because the buckets align to absolute time, the picks are a
+// pure function of the sample timestamps: consecutive polls derive
+// the same points, and a new sample only refreshes the value of its
+// still open trailing bucket or opens the next one - no reshuffling
+// of the picked set (the old index stride flickered that way).
+func bucketPicks(times []int64, bucketSec int64) []int {
+	if len(times) == 0 {
+		return nil
+	}
+	picks := make([]int, 0, len(times))
+	lastBucket := times[0] / bucketSec
+	for i := 1; i < len(times); i++ {
+		bucket := times[i] / bucketSec
+		if bucket != lastBucket {
+			picks = append(picks, i-1)
+			lastBucket = bucket
+		}
+	}
+
+	return append(picks, len(times)-1)
 }
 
 // rateFloor returns the rate denominator between two picked samples
@@ -619,13 +739,25 @@ func perMinute(delta int64, seconds float64) float64 {
 }
 
 // expGainedOf computes the net experience gain of a bot against its
-// series baseline (a deleveling drop reads as a real loss).
+// series baseline (a deleveling drop reads as a real loss). A series
+// without a valid baseline yet (opened inside a reconnect gap) reports
+// no gain.
 func expGainedOf(read botNow, series *botSeries) int64 {
-	if series == nil || series.ring.count == 0 {
+	if series == nil || series.ring.count == 0 || !series.based {
 		return 0
 	}
 
 	return int64(read.character.Exp) - series.expBase
+}
+
+// adenaGainedOf computes the net adena gain of a bot against its series
+// baseline (a gear purchase reads as a real spend).
+func adenaGainedOf(read botNow, series *botSeries) int64 {
+	if series == nil || series.ring.count == 0 || !series.based {
+		return 0
+	}
+
+	return int64(read.character.Adena) - series.adenaBase
 }
 
 // lastPacketRate reads the observed packet rate of the last sample.

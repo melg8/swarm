@@ -252,10 +252,16 @@ func (r *sampleRing) last() (botSample, bool) {
 // event log and the baselines the derived views compute against.
 type botSeries struct {
 	bot *state.Bot
-	// expBase and levelBase anchor the "gained" views: the values of
-	// the first sample of the series (a deleveling drop reads as a
-	// real loss of the net view).
+	// based marks that the baselines hold real character values: the
+	// anchor waits for the first valid sample (level > 0), so a series
+	// opened inside a reconnect gap does not anchor its baselines on
+	// the zeroed tracker character.
+	based bool
+	// expBase, adenaBase and levelBase anchor the "gained" views: the
+	// values of the first valid sample of the series (a deleveling drop
+	// reads as a real loss of the net view).
 	expBase   int64
+	adenaBase int64
 	levelBase int32
 	ring      sampleRing
 	events    []statsEvent
@@ -265,7 +271,9 @@ type botSeries struct {
 func newBotSeries(bot *state.Bot) *botSeries {
 	return &botSeries{
 		bot:       bot,
+		based:     false,
 		expBase:   0,
+		adenaBase: 0,
 		levelBase: 0,
 		ring:      sampleRing{}, //nolint:exhaustruct_v5 // the zero ring
 		events:    nil,
@@ -293,6 +301,7 @@ type fleetSample struct {
 	kills      int64
 	deaths     int64
 	expGained  int64
+	adena      int64
 	tickAvgMs  uint16
 	packetPs   uint16
 	heapMB     uint16
@@ -376,6 +385,7 @@ func (c *statsCollector) sample(now time.Time) {
 		kills:      aggregates.kills,
 		deaths:     aggregates.deaths,
 		expGained:  aggregates.expGained,
+		adena:      aggregates.adena,
 		tickAvgMs:  encodeMs(tickAvg),
 		packetPs:   encodeRate(aggregates.packetRate),
 		heapMB:     uint16(mem.HeapAlloc >> 20),
@@ -401,6 +411,7 @@ type fleetAggregates struct {
 	kills      int64
 	deaths     int64
 	expGained  int64
+	adena      int64
 	tickSum    time.Duration
 	tickCount  int
 	packetRate float64
@@ -426,6 +437,23 @@ func botSampleOf(
 		dmgTaken: uint32(read.metrics.DamageTaken),
 		swings:   uint32(read.metrics.SwingsLanded),
 	}
+}
+
+// carryGapSample fills a sample that landed inside the reconnect gap:
+// ResetSession zeroed the tracker character and the fresh UserInfo of
+// the new session has not arrived yet, so the character facts read as
+// zeros. The character does not change while the bot is away (the
+// exp, the adena and the level of the relogin answer come back exactly
+// as they were, a death penalty lands before the logout), so the
+// sample carries the last known values instead of recording a zero
+// flash that crashes the history charts and fakes level 0 events. The
+// connection facts (the online flag, the packet rate, the phase) stay
+// untouched - they are real.
+func carryGapSample(sample *botSample, previous botSample) {
+	sample.exp = previous.exp
+	sample.adena = previous.adena
+	sample.level = previous.level
+	sample.hpPct = previous.hpPct
 }
 
 // sampleBot reads one tracker into its series (with the transition
@@ -464,14 +492,23 @@ func (c *statsCollector) sampleBot(
 	sample := botSampleOf(now, read, hpPct, flags, packetPs)
 	series := c.seriesFor(id, bot)
 	previous, hasPrevious := series.ring.last()
-	series.ring.append(sample)
-	if !hasPrevious {
+	if hasPrevious && sample.level <= 0 {
+		carryGapSample(&sample, previous)
+	}
+	if !series.based && sample.level > 0 {
 		series.expBase = sample.exp
+		series.adenaBase = sample.adena
 		series.levelBase = sample.level
-	} else {
+		series.based = true
+	}
+	series.ring.append(sample)
+	if hasPrevious {
 		c.noteBotEventsLocked(series, now, sample, previous)
 	}
-	expGained := sample.exp - series.expBase
+	expGained := int64(0)
+	if series.based {
+		expGained = sample.exp - series.expBase
+	}
 	c.mu.Unlock()
 
 	if info.Kind == "" || info.Kind == state.KindLongRunning {
@@ -482,6 +519,7 @@ func (c *statsCollector) sampleBot(
 		agg.kills += int64(metrics.Kills)
 		agg.deaths += int64(metrics.Deaths)
 		agg.expGained += expGained
+		agg.adena += sample.adena
 		agg.packetRate += packetPs
 		if metrics.TickCount > 0 {
 			agg.tickSum += metrics.TickEMA

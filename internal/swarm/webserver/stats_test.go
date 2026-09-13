@@ -284,6 +284,9 @@ func TestStatsRateMath(t *testing.T) {
 	require.EqualValues(t, 0, rejoinsOf(0))
 	require.EqualValues(t, 0, rejoinsOf(1))
 	require.EqualValues(t, 3, rejoinsOf(4))
+	// The adena income of an hour long window.
+	require.InDelta(t, 1200.0, ratePerHour(1200, 3600), 0.001)
+	require.InDelta(t, 2400.0, ratePerHour(1200, 1800), 0.001)
 }
 
 func TestStatsFleetExcludesAcceptanceBots(t *testing.T) {
@@ -319,4 +322,207 @@ func TestStatsFleetExcludesAcceptanceBots(t *testing.T) {
 	require.Len(t, response.Bots, 2)
 	require.Equal(t, 1, response.Fleet.Registered)
 	require.EqualValues(t, 1, response.Fleet.Kills)
+}
+
+// TestStatsGapCarriesTheCharacter pins the reconnect gap handling of
+// the sampler: ResetSession zeroes the tracker character until the
+// fresh UserInfo arrives, and the samples must carry the last known
+// exp, adena, level and health through that window instead of
+// recording a zero flash (the zero flash crashed the exp chart to the
+// bottom and faked "reached level 0" events).
+func TestStatsGapCarriesTheCharacter(t *testing.T) {
+	server, bot := newStatsServer(t)
+	bot.ApplyItemList([]state.InventoryItem{
+		{ObjectID: 3, ItemID: 57, Count: 5000, Type2: 4, Change: 1},
+	})
+	now := time.Now()
+	server.stats.sample(now.Add(-2 * time.Minute))
+	series := server.stats.bots["test1"]
+	require.NotNil(t, series)
+	require.True(t, series.based)
+	require.Equal(t, int64(5000), series.expBase)
+	require.Equal(t, int64(5000), series.adenaBase)
+
+	// The reconnect gap: the tracker character reads as zeroed.
+	bot.ResetSession()
+	server.stats.sample(now.Add(-time.Minute))
+	gap, ok := series.ring.last()
+	require.True(t, ok)
+	require.Equal(t, int32(10), gap.level)
+	require.Equal(t, int64(5000), gap.exp)
+	require.Equal(t, int64(5000), gap.adena)
+	for _, event := range series.events {
+		require.NotEqual(t, eventLevel, event.Kind,
+			"the gap must not fake a level event")
+	}
+
+	// The live view holds the last known character through the gap.
+	recorder := httptest.NewRecorder()
+	server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
+		http.MethodGet, "/api/stats/test1", nil))
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var response botStatsResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Equal(t, int32(10), response.Level)
+	require.Equal(t, int64(5000), response.Adena)
+	require.Equal(t, int64(0), response.ExpGained)
+
+	// The recovery: the fresh UserInfo of the new session lands with
+	// the grown character, the history continues from the same
+	// baselines.
+	bot.SetOnline("Test1")
+	bot.ApplyUserInfo(state.UserInfo{
+		Name: "Test1", Level: 11,
+		MaxHP: 120, CurHP: 90, MaxMP: 60, CurMP: 50, Exp: 6000,
+	})
+	bot.ApplyItemList([]state.InventoryItem{
+		{ObjectID: 3, ItemID: 57, Count: 5100, Type2: 4, Change: 1},
+	})
+	server.stats.sample(now)
+	recorder = httptest.NewRecorder()
+	server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
+		http.MethodGet, "/api/stats/test1", nil))
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Equal(t, int32(11), response.Level)
+	require.Equal(t, int64(1000), response.ExpGained)
+	require.Equal(t, int64(100), response.AdenaGained)
+	// Exactly one level event (10 -> 11), nothing from the gap.
+	levelEvents := 0
+	for _, event := range series.events {
+		if event.Kind == eventLevel {
+			levelEvents++
+		}
+	}
+	require.Equal(t, 1, levelEvents)
+}
+
+// TestStatsAdenaIncome pins the adena wallet series and the income
+// metrics: the samples carry the tracked wallet, the bot view reports
+// the net gain against the series baseline and the fleet aggregates
+// the same numbers.
+func TestStatsAdenaIncome(t *testing.T) {
+	server, bot := newStatsServer(t)
+	now := time.Now()
+	bot.ApplyItemList([]state.InventoryItem{
+		{ObjectID: 3, ItemID: 57, Count: 5000, Type2: 4, Change: 1},
+	})
+	server.stats.sample(now.Add(-time.Hour))
+	bot.ApplyInventoryUpdate([]state.InventoryItem{
+		{ObjectID: 3, ItemID: 57, Count: 6200, Type2: 4, Change: 2},
+	})
+	server.stats.sample(now)
+
+	recorder := httptest.NewRecorder()
+	server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
+		http.MethodGet, "/api/stats/test1", nil))
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var response botStatsResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Equal(t, int64(6200), response.Adena)
+	require.Equal(t, int64(1200), response.AdenaGained)
+	// The young tracker (an uptime under a second) reports no hourly
+	// rate yet - the same convention as the kills per hour.
+	require.InDelta(t, 0.0, response.AdenaPerHour, 0.001)
+	require.NotEmpty(t, response.History.Adena)
+	require.Equal(t, int64(6200),
+		response.History.Adena[len(response.History.Adena)-1])
+	require.Len(t, response.History.AdenaGained,
+		len(response.History.Adena))
+	require.Equal(t, int64(1200),
+		response.History.AdenaGained[len(response.History.AdenaGained)-1])
+
+	recorder = httptest.NewRecorder()
+	server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
+		http.MethodGet, "/api/stats", nil))
+	var fleet statsResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &fleet))
+	require.Equal(t, int64(1200), fleet.Fleet.AdenaGained)
+	// The fresh collector (an uptime under a second) reports no hourly
+	// rate yet; the per hour formula itself is pinned in TestStatsRateMath.
+	require.InDelta(t, 0.0, fleet.Fleet.AdenaPerHour, 0.001)
+	require.NotEmpty(t, fleet.History.Adena)
+	require.Equal(t, int64(6200),
+		fleet.History.Adena[len(fleet.History.Adena)-1])
+}
+
+// TestStatsBucketPicks pins the downsampling primitives: the buckets
+// align to absolute time, every bucket serves its LAST sample and the
+// newest sample always lands in the set. The front stability is the
+// core anti flicker property: dropping leading samples of a partially
+// covered first bucket never reshuffles the picked timestamps.
+func TestStatsBucketPicks(t *testing.T) {
+	times := []int64{0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150}
+	picks := bucketPicks(times, 90)
+	require.Equal(t, []int64{75, 150}, pickedTimes(times, picks))
+
+	// Sliding the window front drops at most the first sample of the
+	// first bucket: the picked timestamps stay the same until the
+	// whole bucket drained.
+	for drop := 1; drop <= 5; drop++ {
+		sliding := bucketPicks(times[drop:], 90)
+		require.Equal(t, []int64{75, 150}, pickedTimes(
+			times[drop:], sliding))
+	}
+	// The whole first bucket drained: its pick leaves, the rest stays.
+	drained := bucketPicks(times[6:], 90)
+	require.Equal(t, []int64{150}, pickedTimes(times[6:], drained))
+}
+
+// pickedTimes maps the pick indices to their timestamps.
+func pickedTimes(times []int64, picks []int) []int64 {
+	values := make([]int64, len(picks))
+	for i, pick := range picks {
+		values[i] = times[pick]
+	}
+
+	return values
+}
+
+// TestStatsHistoryStableAcrossPolls pins the downsampling stability:
+// the served history points are a pure function of the sample
+// timestamps, so the charts of a live poll cycle never flicker - the
+// same data serves the same points, and a fresh sample only refreshes
+// the trailing bucket while the picked prefix of the older polls stays
+// picked (the old index stride re-aligned its picks on every appended
+// sample and every window slide, and the whole chart visibly jumped).
+func TestStatsHistoryStableAcrossPolls(t *testing.T) {
+	server, _ := newStatsServer(t)
+	base := time.Now().Add(-6*time.Hour - 15*time.Minute)
+	for i := range 1500 {
+		server.stats.sample(base.Add(time.Duration(i) * statsSamplePeriod))
+	}
+	series := server.stats.bots["test1"]
+	require.NotNil(t, series)
+	const window = 6 * time.Hour
+	history := func(pollAt time.Time) []int64 {
+		server.stats.mu.Lock()
+		defer server.stats.mu.Unlock()
+
+		return cLockedHistoryAt(t, server, series, pollAt, window)
+	}
+	at1 := history(base.Add(1499 * statsSamplePeriod))
+	require.LessOrEqual(t, len(at1), statsHistoryMaxPoints)
+	require.Greater(t, len(at1), statsHistoryMaxPoints/2)
+	// The same data serves the same points (the poll clock alone must
+	// not move a single served sample).
+	at2 := history(base.Add(1499*statsSamplePeriod + 5*time.Second))
+	require.Equal(t, at1, at2)
+	// A fresh sample lands: only the trailing bucket refreshes (or
+	// opens the next one), the picked prefix stays picked.
+	server.stats.sample(base.Add(1500 * statsSamplePeriod))
+	at3 := history(base.Add(1499 * statsSamplePeriod))
+	require.Equal(t, at1[:len(at1)-1], at3[:len(at1)-1])
+	require.Equal(t, base.Add(1500*statsSamplePeriod).Unix(),
+		at3[len(at3)-1])
+	require.LessOrEqual(t, len(at3), statsHistoryMaxPoints)
+}
+
+// cLockedHistoryAt reads the history timestamps under the held lock.
+func cLockedHistoryAt(
+	t *testing.T, server *Server, series *botSeries,
+	pollAt time.Time, window time.Duration,
+) []int64 {
+	t.Helper()
+
+	return server.stats.botHistoryLocked(series, pollAt, window).At
 }
