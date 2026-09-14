@@ -11,9 +11,10 @@ import (
     "testing"
     "time"
 
+    "github.com/stretchr/testify/require"
+
     "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
-    "github.com/stretchr/testify/require"
 )
 
 // The tests of the aggro-aware walk steering (see loop_avoid.go).
@@ -186,7 +187,7 @@ func TestZoneLegSteersAroundCamp(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     zone := &state.Zone{CX: 46500, CY: 50000, Half: 800}
-    loop.walkZoneLeg(zone, 45000, 50000, -3500)
+    loop.walkZoneLeg(zone, 45000, 50000, -3500, time.Now())
     require.Len(t, game.walks, 1)
     walk := game.walks[0]
     require.NotEqual(t, int32(50000), walk[1])

@@ -172,7 +172,7 @@ func (l *Loop) patrolToCenter(now time.Time) {
         return
     }
     l.lastHit = now
-    l.walkZoneLeg(zone, selfX, selfY, selfZ)
+    l.walkZoneLeg(zone, selfX, selfY, selfZ, now)
 }
 
 // adoptOutZoneFight keeps the fight that crossed the hunting zone
@@ -286,7 +286,7 @@ func (l *Loop) returnToZone() {
     }
     if (l.navigator == nil) || l.zoneFails >= zoneReturnFailBudget {
         l.phase = phaseEngage
-        l.walkZoneLeg(zone, selfX, selfY, selfZ)
+        l.walkZoneLeg(zone, selfX, selfY, selfZ, now)
 
         return
     }
@@ -307,7 +307,7 @@ func (l *Loop) returnToZone() {
         // No geodata path: direct legs toward the zone, the server
         // stops them at obstacles and the next second plans again.
         l.phase = phaseEngage
-        l.walkZoneLeg(zone, selfX, selfY, selfZ)
+        l.walkZoneLeg(zone, selfX, selfY, selfZ, now)
 
         return
     }
@@ -356,10 +356,19 @@ func (l *Loop) zoneReturnDestination(
 // enters carries its own prey. The click guard runs before the
 // request: a leg the server would cancel never moves the character,
 // so a refused leg re-arms the pathfound return instead of grinding
-// refused clicks forever (see guardZoneLegClick).
+// refused clicks forever (see guardZoneLegClick). The no-movement
+// stall of noteZoneLegStall runs first: legs the offline guard
+// blessed but the server silently refuses (a wall the geodata pack
+// does not model) grind nothing forever without it - the terminal
+// freeze of the 2026-09-14 08:42 dump, whose bot stood at the village
+// terrace clicking the collapsed southwest leg once a second with no
+// stuck window, no abort and no log line left to see.
 func (l *Loop) walkZoneLeg(
-    zone *state.Zone, selfX int32, selfY int32, selfZ int32,
+    zone *state.Zone, selfX int32, selfY int32, selfZ int32, now time.Time,
 ) {
+    if l.noteZoneLegStall(now, selfX, selfY) {
+        return
+    }
     moveX, moveY := zone.CX, zone.CY
     dx := float64(zone.CX - selfX)
     dy := float64(zone.CY - selfY)
@@ -370,7 +379,7 @@ func (l *Loop) walkZoneLeg(
     }
     if ax, ay, dodged := l.steerClearOfAggro(
         selfX, selfY, selfZ, moveX, moveY, selfZ, zone.CX, zone.CY,
-        time.Now()); dodged {
+        now); dodged {
         moveX, moveY = ax, ay
     }
     if !l.guardZoneLegClick(selfX, selfY, selfZ, moveX, moveY) {
@@ -379,6 +388,48 @@ func (l *Loop) walkZoneLeg(
     if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
         l.logf("Hunt: walk back failed: %v", err)
     }
+}
+
+// noteZoneLegStall watches the direct zone legs for the freeze the
+// offline click guard cannot see: a server wall the geodata pack does
+// not model passes the ValidateClick port, the click goes out and the
+// server silently cancels it - the character never moves a cell while
+// the legs keep going out once a second (the terminal state of the
+// 2026-09-14 08:42 dump: after three aborted zone return trips the
+// budget-gated direct legs ground against the village railing forever
+// with no detector left). The window baselines on the first leg send,
+// re-baselines on every cell change and fires when the position holds
+// past the stuck timeout: the stall re-arms the pathfound zone return
+// (the zone return fail budget clears, the same recovery the offline
+// refusal of guardZoneLegClick arms) so the next tick plans a fresh
+// geodata route - whose frozen corridor ban the ladder keeps widening
+// (see banFrozenCorridor), so every stall window buys a different
+// route instead of reproducing the identical frozen one. It reports
+// whether the stall fired (the caller holds the click of this tick).
+func (l *Loop) noteZoneLegStall(
+    now time.Time, selfX int32, selfY int32,
+) bool {
+    if l.navigator == nil {
+        // No geodata: the direct legs are the whole return machinery,
+        // the pathfound re-arm the stall arms has nothing to plan.
+        return false
+    }
+    if l.zoneLegAt.IsZero() || selfX != l.zoneLegX || selfY != l.zoneLegY {
+        l.zoneLegAt, l.zoneLegX, l.zoneLegY = now, selfX, selfY
+
+        return false
+    }
+    held := now.Sub(l.zoneLegAt)
+    if held < stuckTimeout {
+        return false
+    }
+    l.zoneLegAt = time.Time{}
+    l.logf("Hunt: the direct zone legs moved nothing for %s at %d %d, "+
+        "re-arming the pathfound return",
+        held.Round(time.Second), selfX, selfY)
+    l.zoneFails = 0
+
+    return true
 }
 
 // guardZoneLegClick validates one direct zone leg through the server

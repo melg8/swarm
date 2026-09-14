@@ -37,6 +37,28 @@ const (
     // on an underwater cell: swimming is several times slower than
     // running and burns the breath meter.
     waterCostMultiplier = float32(3)
+    // avoidEscapeMultiplier scales the step cost of every move landing
+    // on an escape cell of the avoid area that holds the search
+    // start: the walker stands inside its own ban (the widening of
+    // the frozen corridor recovery grows the patch past the standing
+    // cell), and the only honest route out crosses it. Expensive, so
+    // the search leaves at the nearest edge and never prefers the
+    // banned ground - but never impassable, or the start is sealed in
+    // and every later search answers no route (the 2026-09-14 08:42
+    // dump: the widened corridor ban swallowed the crept standing
+    // cell, the dry search explored one cell and the trips fell back
+    // to the ban-less route forever).
+    avoidEscapeMultiplier = float32(6)
+    // avoidEscapeRadius bounds the escape cells of the ban that holds
+    // the search start: only the cells within this radius of the
+    // standing cell stay plannable, the rest of the own ban keeps its
+    // wall. The neighborhood of the standing cell is the ground the
+    // character itself arrived through, so planning out of it is
+    // honest - but a route that threads DEEP into the own ban toward
+    // a goal sealed behind it must still answer not found (the
+    // trainer hall aisle contract: the sealed goal falls back to the
+    // next recovery rung instead of re-planning the frozen corridor).
+    avoidEscapeRadius = 256.0
 )
 
 // nodeKey identifies one search node: the cell plus the height of the
@@ -100,6 +122,17 @@ type search struct {
     // identical route and the character stood frozen through the
     // whole re-path budget).
     avoid []AvoidArea
+    // escapeIdx is the index of the avoid area that contains the
+    // search start (-1 when the start sits on no ban): its cells
+    // within avoidEscapeRadius of the start cost avoidEscapeMultiplier
+    // instead of impassable, so a walker that stands inside its own
+    // ban can always plan its way out of it (the documented intent of
+    // the start exemption - the widening of a ban makes the
+    // deep-interior start the common case, not the edge case).
+    escapeIdx int
+    // startWorld is the world position of the search start: the
+    // escape ring of the own ban measures against it.
+    startWorld Vec3
     // neighborScratch and ringScratch are the reusable neighbor
     // buffers of the expansion loop.
     neighborScratch []*node
@@ -127,6 +160,8 @@ func newSearch(engine *Engine, maxPassableHeight uint16) *search {
         approachRadius:    0,
         dry:               false,
         avoid:             nil,
+        escapeIdx:         -1,
+        startWorld:        Vec3{X: 0, Y: 0, Z: 0},
         neighborScratch:   nil,
         ringScratch:       nil,
         region:            nil,
@@ -234,6 +269,8 @@ func (s *search) run(start, end Vec3, approachRadius float64) (*Result, error) {
     s.targetKey = to.key
     s.targetWorld = end
     s.approachRadius = approachRadius
+    s.startWorld = start
+    s.escapeIdx = s.startAvoidIndex(from)
 
     result := &Result{
         Found:     false,
@@ -529,7 +566,8 @@ func (s *search) costTo(current, next *node, ring []*node) float32 {
     if !s.canStep(current, next) {
         return impassableScore
     }
-    if s.cellAvoided(next.coords) {
+    escape, avoided := s.cellAvoidedEscape(next.coords)
+    if avoided && !escape {
         // The recovery ban: the live server proved this ground
         // unwalkable for this session, the detour around it is the
         // only plan worth planning.
@@ -550,6 +588,12 @@ func (s *search) costTo(current, next *node, ring []*node) float32 {
         // The step lands underwater: swimming costs several land
         // steps, so bridges and shores beat water crossings.
         cost *= waterCostMultiplier
+    }
+    if escape {
+        // The ban that holds the start: the only honest route out
+        // of it crosses its own ground - expensive, never sealed
+        // (see avoidEscapeMultiplier).
+        cost *= avoidEscapeMultiplier
     }
 
     return cost * s.obstacleMultiplier(ring)
@@ -884,6 +928,53 @@ func (s *search) cellAvoided(p Point) bool {
     }
 
     return false
+}
+
+// cellAvoidedEscape splits the avoid answer of cellAvoided: the cell
+// is avoided, and when it belongs to (only) the avoid area that holds
+// the search start AND sits within avoidEscapeRadius of the start it
+// is an escape cell - passable at the heavy avoidEscapeMultiplier
+// instead of impassable. A cell inside any OTHER area stays a wall
+// even when the escape area overlaps it: the route out of the own ban
+// must not thread a foreign ban to escape, and the own ban beyond the
+// start neighborhood keeps its wall too (the sealed goal contract).
+func (s *search) cellAvoidedEscape(p Point) (escape bool, avoided bool) {
+    if len(s.avoid) == 0 {
+        return false, false
+    }
+    center := CellToWorldCenter(p)
+    escapeOnly := false
+    for i, area := range s.avoid {
+        if math.Hypot(center.X-area.Center.X, center.Y-area.Center.Y) >
+            area.Radius {
+            continue
+        }
+        if i != s.escapeIdx {
+            return false, true
+        }
+        if math.Hypot(center.X-s.startWorld.X, center.Y-s.startWorld.Y) >
+            avoidEscapeRadius {
+            return false, true
+        }
+        escapeOnly = true
+    }
+
+    return escapeOnly, escapeOnly
+}
+
+// startAvoidIndex answers the index of the first avoid area that
+// contains the world cell of the search start (-1 when the start sits
+// on no ban): the escape exemption of cellAvoidedEscape keys on it.
+func (s *search) startAvoidIndex(from *node) int {
+    center := CellToWorldCenter(from.coords)
+    for i, area := range s.avoid {
+        if math.Hypot(center.X-area.Center.X, center.Y-area.Center.Y) <=
+            area.Radius {
+            return i
+        }
+    }
+
+    return -1
 }
 
 // legAllowed reports whether the straight leg between two nodes stays

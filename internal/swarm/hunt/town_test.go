@@ -10,9 +10,10 @@ import (
     "testing"
     "time"
 
+    "github.com/stretchr/testify/require"
+
     "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
-    "github.com/stretchr/testify/require"
 )
 
 // fakeNavigator plans straight two point paths: the start (reached
@@ -126,6 +127,33 @@ func (f *fakeNavigator) FindPathApproach(
     start, end pathfind.Vec3, _ float64,
 ) (*pathfind.Result, error) {
     f.approachEnds = append(f.approachEnds, end)
+
+    return f.result(start, end)
+}
+
+// FindPathApproachAvoiding plans the water permitting approach search
+// around the avoid areas: it records the ban the loop passed and
+// answers the configured avoiding route (nil: the plain result - the
+// ban made no difference to the fake planner).
+func (f *fakeNavigator) FindPathApproachAvoiding(
+    start, end pathfind.Vec3, _ float64, avoid []pathfind.AvoidArea,
+) (*pathfind.Result, error) {
+    f.avoiding = append(f.avoiding, avoid)
+    if f.avoidRoute != nil {
+        f.calls++
+        f.callsAt = append(f.callsAt, time.Now())
+
+        return &pathfind.Result{
+            Found:     true,
+            Aborted:   false,
+            Waypoints: f.avoidRoute,
+            RawPath:   f.avoidRoute,
+            Duration:  0,
+            Explored:  0,
+            OpenLeft:  0,
+            Length:    0,
+        }, nil
+    }
 
     return f.result(start, end)
 }

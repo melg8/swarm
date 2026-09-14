@@ -134,9 +134,22 @@ const (
     // standing character itself (the start cell of a search may sit
     // inside its own ban - the search may always leave it).
     frozenBanRadius = 48.0
+    // frozenBanMaxRadius caps the widening of a single frozen
+    // corridor ban: a detour that freezes on ground an existing ban
+    // already covers proves the server wall is wider than the ban
+    // models, so the ban doubles its radius until the re-plan routes
+    // around the whole walled approach. Six doublings (48 -> 1536)
+    // cover a misread region the size of a village quarter while the
+    // search still finds the detours around it (the sweeps of the
+    // 2026-09-14 08:42 dump: radius 384 already flips the elven
+    // village exit from the walled southwest corridor to the shop
+    // deck route, 1200 flips it to the far north detour).
+    frozenBanMaxRadius = 1536.0
     // frozenBanMax bounds the session ban list: every frozen leg
     // adds one area, and the list must never grow into a wall the
-    // planner cannot detour around at all.
+    // planner cannot detour around at all. The widening of an
+    // existing ban does not count against the cap - the wall model
+    // grows in place, the list only counts its centers.
     frozenBanMax = 8
     // directLegWindow bounds the direct server routed walk of a
     // frozen town leg: the clicks go out at the walk request period
@@ -273,6 +286,15 @@ type Navigator interface {
     FindPathApproach(start, end pathfind.Vec3, approachRadius float64) (
         *pathfind.Result, error,
     )
+    // FindPathApproachAvoiding plans the water permitting walk
+    // around the given avoid areas: the zone return fallback - the
+    // dry search may fail under the accumulated bans while a wet
+    // detour around them still exists, and a fallback that ignored
+    // the bans reproduced the very corridor they exist to detour.
+    FindPathApproachAvoiding(
+        start, end pathfind.Vec3, approachRadius float64,
+        avoid []pathfind.AvoidArea,
+    ) (*pathfind.Result, error)
     // FindPathApproachDryAvoiding plans the water walled walk around
     // the given avoid areas: every waypoint of a found route stands
     // above the water level and outside the banned ground, a target
@@ -340,6 +362,17 @@ func (e engineNavigator) FindPathApproach(
 ) (*pathfind.Result, error) {
     return e.engine.FindPathApproach(
         start, end, approachRadius, e.engine.MaxPassableHeight())
+}
+
+// FindPathApproachAvoiding searches the water permitting path around
+// the avoid areas with the engine settings and the approach radius
+// goal.
+func (e engineNavigator) FindPathApproachAvoiding(
+    start, end pathfind.Vec3, approachRadius float64,
+    avoid []pathfind.AvoidArea,
+) (*pathfind.Result, error) {
+    return e.engine.FindPathApproachAvoiding(
+        start, end, approachRadius, e.engine.MaxPassableHeight(), avoid)
 }
 
 // FindPathApproachDryAvoiding searches the water walled path around the
@@ -863,7 +896,8 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
     var result *pathfind.Result
     var err error
     if nonDry {
-        result, err = l.navigator.FindPathApproach(from, dest, radius)
+        result, err = l.navigator.FindPathApproachAvoiding(
+            from, dest, radius, l.frozenAreas)
     } else {
         result, err = l.navigator.FindPathApproachDryAvoiding(
             from, dest, radius, l.frozenAreas)
@@ -893,6 +927,11 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
     l.moveAt = time.Time{}
     l.stuckAt = time.Time{}
     l.stuckFast = false
+    // A planned geodata leg owns the movement now: the direct zone
+    // leg stall watcher stands down (its window would otherwise read
+    // a trip's frozen standstill as its own and fire early on the
+    // legs the budget gate resumes after the trip ends).
+    l.zoneLegAt = time.Time{}
 
     return true
 }
@@ -1485,7 +1524,10 @@ func (l *Loop) clickServerValidated(
         "%d %d, re-pathing (%d of %d)",
         int32(*moveX), int32(*moveY), l.rePaths, maxRePaths)
     if !l.startWalkLeg(l.legDest) {
-        l.abortTownTrip("re-path failed")
+        // The re-path found no route: the same freeze evidence the
+        // stuck path carries - the ladder owns it (see
+        // stuckTownWalk).
+        l.abortFrozenTrip("re-path failed")
     }
 
     return false
@@ -1888,7 +1930,15 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
         l.journal.Repath(l.tracker.ID(), l.rePaths)
     }
     if !l.startWalkLeg(l.legDest) {
-        l.abortTownTrip("re-path failed")
+        // The fresh plan found no route (the bans plus the water may
+        // wall every dry one): the freeze evidence still belongs to
+        // the escalation ladder - the rungs widen the ban and re-plan
+        // with the water permitting fallback instead of aborting the
+        // trip back into the identical cycle (the 2026-09-14 08:42
+        // dump: the re-path failure aborted past the ladder, the
+        // corridor route returned through the ban-less fallback and
+        // the bot looped on it forever).
+        l.abortFrozenTrip("re-path failed")
 
         return true
     }
@@ -2033,19 +2083,44 @@ func (l *Loop) startZoneReturnOrWalkLeg() bool {
 // banFrozenCorridor adds the aimed waypoint of the frozen leg to the
 // session's avoid areas: every later dry search routes around the
 // patch, so the corridor the server refused to walk stays out of each
-// following plan (the next trip included). It reports whether a fresh
-// area was added - an area that already covers the waypoint (or a
-// full ban list) changes no plan and skips the rung.
+// following plan (the next trip included). A waypoint an existing ban
+// already covers does not skip the rung: the detour just froze on
+// ground inside the ban's reach, so the server wall is wider than the
+// ban models - the covering ban widens (its radius doubles, capped at
+// frozenBanMaxRadius) and the re-plan routes around the enlarged
+// patch. Without the widening the 2026-09-14 08:42 dump (build
+// 6e45624, bot test3) cycled forever: the corridor ban at 43512 50504
+// covered every detour waypoint the deterministic planner produced
+// from the village terrace (the detour's first waypoint sat 66 units
+// from the ban center, inside the radius-plus-floor coverage), no rung
+// ever changed the plan shape again, and the ladder fell straight to
+// the water-guarded direct walk each trip. It reports whether a fresh
+// re-plan is warranted - a new area, a widened one, false only when
+// the aimed waypoint sits on no ban, the list is full, or the covering
+// ban already sits at the cap.
 func (l *Loop) banFrozenCorridor() bool {
-    if l.wpIndex >= len(l.waypoints) || len(l.frozenAreas) >= frozenBanMax {
+    if l.wpIndex >= len(l.waypoints) {
         return false
     }
     wp := l.waypoints[l.wpIndex]
-    for _, area := range l.frozenAreas {
-        if math.Hypot(area.Center.X-wp.X, area.Center.Y-wp.Y) <=
+    for i := range l.frozenAreas {
+        area := &l.frozenAreas[i]
+        if math.Hypot(area.Center.X-wp.X, area.Center.Y-wp.Y) >
             area.Radius+frozenBanRadius {
+            continue
+        }
+        if area.Radius >= frozenBanMaxRadius {
             return false
         }
+        area.Radius = math.Min(area.Radius*2, frozenBanMaxRadius)
+        l.logf("Hunt: widening the frozen corridor ban at %.0f %.0f "+
+            "to the radius %.0f for the session",
+            area.Center.X, area.Center.Y, area.Radius)
+
+        return true
+    }
+    if len(l.frozenAreas) >= frozenBanMax {
+        return false
     }
     l.frozenAreas = append(l.frozenAreas, pathfind.AvoidArea{
         Center: wp,

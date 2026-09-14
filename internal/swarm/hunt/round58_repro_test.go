@@ -144,7 +144,8 @@ func TestReproRound58ZoneLegGuardRefusalReArmsPathfoundReturn(t *testing.T) {
 
     zone := loop.zone()
     require.NotNil(t, zone)
-    loop.walkZoneLeg(zone, reproRound58X, reproRound58Y, reproRound58Z)
+    loop.walkZoneLeg(zone, reproRound58X, reproRound58Y, reproRound58Z,
+        time.Now())
 
     require.Empty(t, game.walks,
         "the refused direct leg is never sent to the server")
@@ -155,7 +156,9 @@ func TestReproRound58ZoneLegGuardRefusalReArmsPathfoundReturn(t *testing.T) {
     // the working direct legs of the open ground.
     nav.refuseClicks = false
     loop.zoneFails = zoneReturnFailBudget
-    loop.walkZoneLeg(zone, reproRound58X, reproRound58Y, reproRound58Z)
+    loop.zoneLegAt = time.Time{}
+    loop.walkZoneLeg(zone, reproRound58X, reproRound58Y, reproRound58Z,
+        time.Now())
     require.Len(t, game.walks, 1,
         "a validated direct leg is sent")
     require.Equal(t, zoneReturnFailBudget, loop.zoneFails,

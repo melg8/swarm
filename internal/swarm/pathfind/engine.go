@@ -274,6 +274,27 @@ func (e *Engine) FindPathApproach(
     return search.run(start, end, approachRadius)
 }
 
+// FindPathApproachAvoiding is the water permitting form of
+// FindPathApproachDryAvoiding: the search routes around the avoid
+// areas exactly like the dry form (a foreign ban is a wall, the ban
+// holding the start is the expensive way out) but a wet route stays
+// a legal answer. The zone return fallback navigates with it: the
+// dry search failing under the accumulated bans must hand the bot a
+// route that still respects them - the ban-less fallback reproduced
+// the very corridor the bans exist to detour (the 2026-09-14 08:42
+// dump: the widened bans made every dry search fail, the fallback
+// re-planned the frozen corridor route and the bot cycled through it
+// for the rest of the session).
+func (e *Engine) FindPathApproachAvoiding(
+    start, end Vec3, approachRadius float64, maxPassableHeight uint16,
+    avoid []AvoidArea,
+) (*Result, error) {
+    search := newSearch(e, maxPassableHeight)
+    search.avoid = avoid
+
+    return search.run(start, end, approachRadius)
+}
+
 // FindPathApproachDry is the water walled form of FindPathApproach:
 // every step of the search onto an underwater cell costs impassable,
 // so the waypoints of a found route all stand above the water level (a

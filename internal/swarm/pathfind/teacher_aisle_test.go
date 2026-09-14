@@ -244,3 +244,74 @@ func TestAvoidingSearchRefusesGoalsInsideTheBan(t *testing.T) {
     require.False(t, result.Found,
         "a goal sealed inside the ban must answer not found")
 }
+
+// The escape ring of the own ban (the 2026-09-14 08:42 dump): the
+// frozen corridor recovery widens its bans by doubling the radius, and
+// a character that crept toward the frozen corridor can end up
+// standing DEEP inside its own ban - 129 units from the center of a
+// 192 radius patch. The strict ban sealed such a start (the search
+// expanded one cell and answered no route - every neighbor sat inside
+// the ban too), the zone return then fell back to the ban-less search
+// and re-planned the very corridor the ban exists to detour. The
+// escape ring keeps the neighborhood of the standing cell plannable
+// so the search always finds the way OUT of its own ban, while the
+// ban beyond the ring and every foreign ban keep their walls.
+var (
+    // escapeRingStart is the crept standing cell of the dump: 129
+    // units from the center of the widened corridor ban below.
+    escapeRingStart = Vec3{X: 45352, Y: 49720, Z: -3056}
+    // escapeRingBanCenter is the corridor ban the dump's ladder armed
+    // at the aimed waypoint of the crept plan.
+    escapeRingBanCenter = Vec3{X: 45288, Y: 49832, Z: -2992}
+    // escapeRingZone is the held cell center of the dump (the walk
+    // goal of the zone return).
+    escapeRingZone = Vec3{X: 36000, Y: 46765, Z: -3712}
+)
+
+// TestAvoidingSearchEscapesTheOwnBanFromDeepInside pins the unsealing:
+// the dry avoiding search from the crept cell (deep inside the widened
+// corridor ban, a foreign corridor ban between it and the goal) must
+// find the route out - through the escape ring of the own ban, around
+// the foreign ban, dry all the way to the zone. The sealed start (the
+// pre-fix behavior) answered not found and trapped the trips on the
+// ban-less corridor fallback forever.
+func TestAvoidingSearchEscapesTheOwnBanFromDeepInside(t *testing.T) {
+    engine := townTestEngine(t)
+    bans := []AvoidArea{
+        {Center: escapeRingBanCenter, Radius: 192.0},
+        {Center: Vec3{X: 43512, Y: 50504, Z: -2992}, Radius: 192.0},
+    }
+    result, err := engine.FindPathApproachDryAvoiding(
+        escapeRingStart, escapeRingZone, 200, DefaultMaxPassableHeight, bans)
+    require.NoError(t, err)
+    require.True(t, result.Found,
+        "the deep-interior start of the own ban must stay escapable")
+    require.Greater(t, result.Explored, 1,
+        "the search must expand past the start cell (the pre-fix seal)")
+
+    // The route leaves the own ban through the ring and never returns:
+    // after the first waypoint outside the ban circle, no later
+    // waypoint may sit inside it again.
+    left := false
+    for i, wp := range result.Waypoints {
+        inside := math.Hypot(
+            wp.X-escapeRingBanCenter.X, wp.Y-escapeRingBanCenter.Y) <= 192
+        if !inside {
+            left = true
+
+            continue
+        }
+        require.False(t, left && i > 0,
+            "waypoint %d re-enters the own ban after leaving it", i)
+        // The in-ban waypoints of the escape stay within the ring.
+        require.LessOrEqual(t,
+            math.Hypot(wp.X-escapeRingStart.X, wp.Y-escapeRingStart.Y),
+            avoidEscapeRadius+16,
+            "the escape waypoint %d stays inside the start ring", i)
+    }
+    // The route never enters the foreign corridor ban.
+    for i, wp := range result.Waypoints {
+        require.Greater(t, math.Hypot(wp.X-43512, wp.Y-50504), 192.0,
+            "waypoint %d must stay outside the foreign corridor ban", i)
+    }
+}

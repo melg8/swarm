@@ -455,19 +455,26 @@ type Loop struct {
     tripEndedAt       time.Time
     zoneReturn        bool
     zoneFails         int
-    roadFights        int
-    delevelTarget     int32
-    delevelGuard      int32
-    delevelTried      map[string]bool
-    delevelFight      time.Time
-    delevelEnd        time.Time
-    delevelExp        int32
-    delevelLevel      int32
-    delevelFree       int
-    delevelWait       time.Time
-    delevelCounted    bool
-    engageAt          time.Time
-    targetSkip        map[int32]time.Time
+    // zoneLegAt/zoneLegX/zoneLegY hold the no-movement window of the
+    // direct zone legs (see noteZoneLegStall): the baseline arms on
+    // the first leg send, a cell change re-baselines it and a hold
+    // past the stuck timeout re-arms the pathfound zone return.
+    zoneLegAt      time.Time
+    zoneLegX       int32
+    zoneLegY       int32
+    roadFights     int
+    delevelTarget  int32
+    delevelGuard   int32
+    delevelTried   map[string]bool
+    delevelFight   time.Time
+    delevelEnd     time.Time
+    delevelExp     int32
+    delevelLevel   int32
+    delevelFree    int
+    delevelWait    time.Time
+    delevelCounted bool
+    engageAt       time.Time
+    targetSkip     map[int32]time.Time
     // The lure is the ranged luring state of the current pick (nil when
     // no lure runs): the melee answer to a covered target, see
     // lure.go.
@@ -868,6 +875,9 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         zoneMobPriority:   nil,
         zoneReturn:        false,
         zoneFails:         0,
+        zoneLegAt:         time.Time{},
+        zoneLegX:          0,
+        zoneLegY:          0,
         roadFights:        0,
         delevelTarget:     0,
         delevelGuard:      0,

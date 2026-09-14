@@ -11,6 +11,121 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the widening frozen corridor ban and the zone leg grind stall (2026-09-14)
+
+Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user attached the state dump of `test3` (build 6e45624, uptime
+1m33s): the level 15 character stood at x 45768 y 49848 z -3056 (the
+elven village south terrace deck) with the held cell "Kaboo Orc
+Fighter SW-7" 10200 units away at 36000 46765, the walk plan empty,
+the character outside the zone and nothing moving it. The event log
+carried three identical trip cycles - the town walk stuck, the
+corridor ban at 43512 50504, "the detour route froze as well, walking
+to 36000 46765 by the server routing", "town trip ended: aborted, the
+server routed walk would swim" - and after the third abort ("3
+aborted trips in a row, the next trip waits 10m0s") ten seconds of
+total silence: no Hunt line, no walk, a frozen character.
+
+### Root cause (three interlocking defects)
+
+1. The frozen corridor ban never grew: `banFrozenCorridor` answered
+   "covered, skip the rung" for every later freeze (the detour's
+   aimed waypoint sat 66 units from the ban center, inside the
+   radius-plus-floor coverage of 96), so no rung ever changed the plan
+   shape again and the deterministic planner reproduced the same
+   walled southwest corridor every trip (the geodata pack models it
+   open, the user's server - PathFinding=2, its own A* plus the
+   geodata correction - walls it).
+2. The budget-gated direct zone legs ground silently: after the third
+   abort `zoneFails` reached the budget and `walkZoneLeg` sent
+   1000-unit hops that pass the offline click validation but are
+   silently canceled by the server - with no movement watcher, no
+   abort and no log line (the regression of the 2026-09-12 01:50
+   report through the new abort path).
+3. The composition holes the widening exposed: the avoid areas sealed
+   a start standing deep inside its own ban (the search expanded one
+   cell and answered no route - the documented "the start cell stays
+   allowed" intent never held past the boundary ring), the non-dry
+   zone return fallback ignored the bans entirely (reproducing the
+   very corridor they exist to detour) and the re-path failure
+   aborted past the escalation ladder.
+
+### Fix
+
+- `banFrozenCorridor` widens the covering ban (the radius doubles,
+  capped at `frozenBanMaxRadius` 1536) instead of skipping the rung:
+  every frozen trip pushes the modeled wall outward until the re-plan
+  routes around the whole walled approach (the radius sweep against
+  the real pack: 384 flips the village exit from the walled
+  southwest corridor to the shop deck route).
+- `walkZoneLeg` runs the `noteZoneLegStall` no-movement window: a
+  position that holds past the stuck timeout while the direct legs go
+  out logs one honest line and re-arms the pathfound zone return
+  (the same recovery the offline refusal arms), so the grind feeds
+  the widening ladder instead of grinding silently forever.
+- The search escape ring (`pathfind/search.go`): the cells of the ban
+  holding the start within `avoidEscapeRadius` (256) of the standing
+  cell cost `avoidEscapeMultiplier` (6) instead of impassable - the
+  way out of the own ban always exists, foreign bans and the own ban
+  beyond the ring keep their walls (the sealed goal contract of the
+  trainer hall aisle tests holds).
+- The non-dry fallback respects the bans: `FindPathApproachAvoiding`
+  (the engine, the Navigator, `startWalkLegSearch`) threads the avoid
+  areas into the water permitting search.
+- The re-path failure escalates through `abortFrozenTrip` (both the
+  stuck path and the refused click path), so the ladder owns the
+  freeze evidence.
+
+### Acceptance criteria
+
+- `TestReproCorridorWidenDoublesTheCoveredBan` pins the widening
+  itself: the covered detour waypoint doubles the covering ban's
+  radius (48 -> 96 -> 192 -> 384), the capped ban answers false, a
+  fresh waypoint arms a new area and the area count cap blocks new
+  areas but never the widening.
+- `TestReproCorridorWidenEscapesTheWalledApproach` replays the whole
+  dump standoff against the real geodata pack with a server model
+  that walls the southwest approach (the walled patches of
+  `reproWidenWalls`): the widening ladder must push the plan off the
+  corridor (the radius 384 shop deck route) and the walk must arrive
+  inside the zone - the inversion of the dump signature.
+- `TestReproZoneLegGrindStallReArmsThePathfoundReturn` pins the
+  grind stall: the window fires within the stuck timeout, the log
+  names the frozen legs, the fail budget clears and the next
+  returnToZone tick plans a fresh geodata route.
+- `TestReproZoneLegStallRebaselinesOnMovement` and
+  `TestReproZoneLegStallStandsDownOnPlannedLeg` pin the honest-flow
+  guards: a moving character never stalls, a planned leg stands the
+  watcher down.
+- `TestAvoidingSearchEscapesTheOwnBanFromDeepInside` (pathfind) pins
+  the escape ring: the search from the dump's crept cell (129 units
+  inside its own 192-radius ban, a foreign corridor ban between it
+  and the goal) finds the dry route out, the escape waypoints stay
+  within the ring and the route never re-enters the own ban or
+  touches the foreign one.
+- The existing contracts stay green: the round 57/58 repro tests,
+  the trainer hall aisle avoid tests (including the sealed goal),
+  the full hunt and pathfind suites, `task fmt:check`, the
+  `golangci-lint run --new` verdict (the three gci formatter
+  artifacts on the touched files aside - the spaces-vs-tabs
+  branch-wide fight the tree documents) and `tools/mobius_e2e.sh 45`
+  (E2E_OK).
+
+### Status: done
+
+- Commit 1 (the fix + the six tests + this entry): the widening
+  `banFrozenCorridor`, the `noteZoneLegStall` grind stall, the
+  search escape ring, the `FindPathApproachAvoiding` fallback, the
+  re-path failure escalation, the corridor widen repro tests, the
+  pathfind escape ring test, the agent_progress entry. All
+  `internal/swarm/hunt` and `internal/swarm/pathfind` tests green,
+  `go build`/`go vet` clean, `gofmt-spaces` clean, E2E_OK.
+
 ## Active task: the zone return escalation ladder (2026-09-14)
 
 Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.
