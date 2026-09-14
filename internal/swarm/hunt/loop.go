@@ -234,6 +234,18 @@ const (
     // tracker only knows the mobs the server showed the character,
     // so this stays inside the loaded region block anyway.
     farTargetRange = 6000.0
+    // deckReachableZ is the z gap a direct walk can clear: the
+    // cell mode treats a visible mob whose z differs from the
+    // character's z by more than this threshold as unreachable by a
+    // direct walk (the village terrace deck sits ~600 units above
+    // the field deck, the straight line crosses the railing and the
+    // server cancels the move). The threshold matches the deck step
+    // the elven lands geography models (the village at z -2992, the
+    // fields at z -3500..-3600) and stays under the small height
+    // steps of the field itself (the gentle terrain undulation
+    // stays under 200 units, well inside the threshold). See the
+    // cellEnemiesVisible deck gate and the 2026-09-14 07:53 dump.
+    deckReachableZ = 400.0
     // noPickLogPeriod paces the targetless diagnostic of the
     // engage: the nearest rejected mobs with their positions and
     // the rejection reasons print at most once per period while
@@ -1067,13 +1079,50 @@ func (l *Loop) onHeldGround() bool {
 // the walk home only fires when nothing at all is visible (going to
 // a zero-enemy ground is the last resort). The legacy zone mode
 // keeps the strict return - the square leash owns the movement there.
+//
+// The deck gate: a mob on a DIFFERENT deck than the character (a z
+// gap past the deckReachableZ threshold) reads as unreachable by a
+// direct walk - the straight line from the village terrace to the
+// field deck below crosses the village railing and the deck edge,
+// the server's geodata correction collapses the click target onto
+// the walker cell and the move is silently canceled. The dump of
+// 2026-09-14 07:53 (build 140aa42, bot test2) showed exactly this
+// freeze: the level 14 character stood on the Elven Village terrace
+// (z -2992) with its held cell on the field deck (z -3576), the
+// knownlist held pickable mobs on the field deck, the cell mode
+// read them as visible and the engage fell through to the direct
+// walk of the pick flow - the walk never moved the character and
+// the pathfound zone return (the ramp walk down to the field deck)
+// never armed. The deck gate drops the cross-deck mobs from the
+// visible reading so the engage falls through to returnToZone and
+// the pathfinder walks the character down the ramp.
 func (l *Loop) cellEnemiesVisible(now time.Time) bool {
     if l.cell == nil {
         return false
     }
+    pick, ok := l.tracker.NearestAttackablePreferredWindowed(
+        math.MaxFloat64, nil, l.activeSkips(now),
+        l.minTargetLevel(), l.maxTargetLevel(), true,
+        l.zoneMobPriority)
+    if !ok {
+        return false
+    }
+    _, _, selfZ, selfOK := l.tracker.SelfPosition()
+    if !selfOK {
+        // No self position: the deck gate cannot run, the legacy
+        // behavior stands (the knownlist reading alone).
+        return true
+    }
+    // A mob whose z the server never reported (z == 0) passes the
+    // deck gate: the same convention the level filter uses for an
+    // unresolved template (level 0 passes every window). A stale
+    // z reading would freeze a bot whose only visible mob sits on
+    // an unresolved z - the legacy behavior stands for it.
+    if pick.Z != 0 && math.Abs(float64(pick.Z-selfZ)) > deckReachableZ {
+        return false
+    }
 
-    return l.tracker.ZoneHasPickableWindowed(nil,
-        l.minTargetLevel(), l.maxTargetLevel(), l.activeSkips(now))
+    return true
 }
 
 // targetZone returns the TARGET LEASH of the loop: the convex

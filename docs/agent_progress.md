@@ -11,6 +11,94 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the deck gate of the cell mode visible-enemy reading (2026-09-14)
+
+Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user attached the state dump of `test2` (build 140aa42, uptime
+1m57s): the level 14 character stood at x 42712 y 49128 z -2992 (the
+Elven Village terrace deck) while its held hunting cell "Kaboo Orc
+Fighter SW-7" sat 7000 units west at center 36000 46765 on the field
+deck (z ~-3576). The dump listed pickable mobs in the knownlist (Kaboo
+Orc Grunt level 7 at 3157 units, Green Dryad level 8 at 3799, Kaboo
+Orc Archer level 8 at 3830, Spore Fungus level 9 at 4108) - all on
+the field deck below the terrace. The hunt log carried a single
+"level 14: holding the cell Kaboo Orc Fighter SW-7" line and nothing
+else for the whole uptime: no "outside the hunting zone,
+pathfinding back", no "engaging", no "far target walk". The bot
+neither moved nor engaged.
+
+### Root cause
+
+The engage phase gates the pathfound zone return on
+`cellEnemiesVisible`, and `cellEnemiesVisible` answered true (the
+knownlist held pickable mobs on the field deck). The pick flow that
+followed tried to walk straight toward the nearest visible mob
+(`walkToFarTarget` -> `game.WalkTo` with `selfZ`), but the straight
+line from the village terrace to the field deck crosses the village
+railing and the deck edge - the server's geodata correction
+collapses the click target onto the walker cell, the move is
+silently canceled and the character never moves. The pathfound zone
+return (the only path that walks the character down the terrace ramp
+to the field deck) never armed because the visible-mob reading held
+its gate shut.
+
+### Fix
+
+`loop.go::cellEnemiesVisible` now reads the nearest pickable mob
+through `NearestAttackablePreferredWindowed` (instead of the boolean
+`ZoneHasPickableWindowed`) and checks the z gap between the mob and
+the character. A mob on a different deck than the character (a z gap
+past the new `deckReachableZ` threshold, 400 units) reads as
+unreachable by a direct walk - the cell mode treats the knownlist as
+empty of directly-reachable enemies and the engage falls through to
+`returnToZone`, which plans the geodata route down the terrace ramp.
+The threshold matches the deck step the elven lands geography models
+(the village terrace at z -2992, the fields at z -3500..-3600) and
+stays under the small height steps of the field itself (the gentle
+terrain undulation stays under 200 units). A mob whose z the server
+never reported (z == 0) passes the deck gate - the same convention
+the level filter uses for an unresolved template (level 0 passes
+every window), so a stale z reading never freezes a bot whose only
+visible mob sits on an unresolved z. The fresh-experience path (the
+common position stall of the previous commit) is unaffected - the
+deck gate only fires inside the engage's `cellEnemiesVisible` branch.
+
+### Acceptance criteria
+
+- A repro test that builds the exact dump standoff (the character on
+  the village terrace, the held cell on the field deck, the nearest
+  visible mob on the field deck) asserts that the zone return arms,
+  the loop enters the pathfound town return phase, the pathfinder
+  plans the ramp walk and the first waypoint walks
+  (`TestReproDeckVillageReturnToZoneOnDifferentDeck`).
+- A repro test that asserts the direct walk toward the cross-deck mob
+  never fires - the walks of the tick stay on the pathfound route
+  (the first waypoint sits under 2000 units west, the direct mob
+  walk would head 3157 units west)
+  (`TestReproDeckVillageNoDirectWalkTowardCrossDeckMob`).
+- A regression guard that moves the character onto the field deck
+  next to the mob (same deck, same z) and asserts the engage picks
+  the mob directly (a forced attack fires, no zone return arms) -
+  the free-roam hunt keeps its design on the same deck
+  (`TestReproDeckVillageEngagesSameDeckMob`).
+- The existing cell mode contract test `TestCellOutGroundEnemiesKeepTheHunt`
+  stays green (the mob whose z the server never reported passes the
+  deck gate the way an unresolved level passes the level filter).
+- The full `internal/swarm/hunt` test suite stays green.
+
+### Status: done
+
+- Commit 1 (the fix + the three repro tests + this entry): the
+  deck gate of `cellEnemiesVisible`, the `deckReachableZ` constant,
+  the three deck repro tests, the agent_progress entry. All
+  `internal/swarm/hunt` tests green, `go build`/`go vet` clean,
+  `gofmt-spaces` clean.
+
 ## Active task: the stagnation soft reset after the hard recovery (2026-09-14)
 
 Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.
