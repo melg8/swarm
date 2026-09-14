@@ -1,0 +1,203 @@
+region file: ../../data/geodata/21_19.l2j
+parse: 50 ms, 4400271 layers after dedup (1 duplicates dropped), 186723 stacked columns, 436561 underwater layers
+audits: 190 ms, nswe-lost pairs 413692, merge hazards 388005
+bridge-like deck-over-water columns: 1560
+sheet drop: 4303 islands with 5626 layers removed (< 4 layers)
+sheet sizes: largest 3401351 478734 392631 22578 10176, sheets>=100: 75, >=1000: 20, >=10000: 5, covered layers 4400122
+    tiny sheet coverage: <4: 5626 layers (4303 sheets), <16: 12972, <64: 27235, <100: 28529
+sheets: 190 ms, 5778 sheets (12 water class)
+[recast] rcBuildContours: Multiple outlines for region 251.
+[recast] rcBuildContours: Multiple outlines for region 371.
+[recast] rcBuildContours: Multiple outlines for region 371.
+[recast] rcBuildContours: Multiple outlines for region 371.
+[recast] rcBuildContours: Multiple outlines for region 371.
+[recast] rcBuildContours: Multiple outlines for region 371.
+[recast] rcBuildContours: Multiple outlines for region 1463.
+[recast] rcBuildContours: Multiple outlines for region 338.
+[recast] rcBuildContours: Multiple outlines for region 348.
+[recast] rcBuildContours: Multiple outlines for region 348.
+[recast] rcBuildContours: Multiple outlines for region 1345.
+[recast] rcBuildContours: Multiple outlines for region 278.
+[recast] rcBuildContours: Multiple outlines for region 373.
+[recast] rcBuildContours: Multiple outlines for region 1715.
+[recast] rcBuildContours: Multiple outlines for region 1737.
+[recast] rcBuildContours: Multiple outlines for region 1737.
+[recast] rcBuildContours: Multiple outlines for region 1134.
+[recast] rcBuildContours: Multiple outlines for region 1153.
+[recast] rcBuildContours: Multiple outlines for region 1041.
+[recast] rcBuildContours: Multiple outlines for region 1119.
+[recast] rcBuildContours: Multiple outlines for region 777.
+[recast] rcBuildContours: Multiple outlines for region 777.
+[recast] rcBuildContours: Multiple outlines for region 777.
+[recast] rcBuildContours: Multiple outlines for region 777.
+[recast] rcBuildContours: Multiple outlines for region 679.
+[recast] rcBuildContours: Multiple outlines for region 2065.
+[recast] rcBuildContours: Multiple outlines for region 2065.
+[recast] rcBuildContours: Multiple outlines for region 2065.
+[recast] rcBuildContours: Multiple outlines for region 2065.
+[recast] rcBuildContours: Multiple outlines for region 2065.
+[recast] rcBuildContours: Multiple outlines for region 2065.
+[recast] rcBuildContours: Multiple outlines for region 2065.
+[recast] rcBuildContours: Multiple outlines for region 2065.
+[recast] rcBuildContours: Multiple outlines for region 2065.
+[recast] rcBuildContours: Multiple outlines for region 1050.
+[recast] rcBuildContours: Multiple outlines for region 222.
+[recast] delaunayHull: Removing dangling face 47 [37,35,-1].
+[recast] delaunayHull: Removing dangling face 49 [37,35,-1].
+[recast] delaunayHull: Removing dangling face 50 [37,35,-1].
+[recast] delaunayHull: Removing dangling face 51 [37,35,-1].
+[recast] delaunayHull: Removing dangling face 51 [37,35,-1].
+[recast] delaunayHull: Removing dangling face 33 [14,19,-1].
+[recast] delaunayHull: Removing dangling face 34 [20,22,-1].
+[recast] delaunayHull: Removing dangling face 36 [20,22,-1].
+[recast] delaunayHull: Removing dangling face 38 [20,22,-1].
+[recast] delaunayHull: Removing dangling face 40 [20,22,-1].
+[recast] delaunayHull: Removing dangling face 42 [20,22,-1].
+[recast] delaunayHull: Removing dangling face 44 [20,22,-1].
+[recast] delaunayHull: Removing dangling face 27 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 29 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 31 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 33 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 35 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 37 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 39 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 41 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 43 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 45 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 45 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 47 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 49 [21,17,-1].
+[recast] delaunayHull: Removing dangling face 35 [25,11,-1].
+[recast] delaunayHull: Removing dangling face 24 [15,18,-1].
+[recast] delaunayHull: Removing dangling face 15 [10,12,-1].
+[recast] delaunayHull: Removing dangling face 17 [10,12,-1].
+[recast] delaunayHull: Removing dangling face 19 [16,8,-1].
+[recast] delaunayHull: Removing dangling face 20 [16,8,-1].
+[recast] delaunayHull: Removing dangling face 22 [16,8,-1].
+[recast] delaunayHull: Removing dangling face 23 [16,8,-1].
+[recast] delaunayHull: Removing dangling face 26 [17,14,-1].
+[recast] delaunayHull: Removing dangling face 27 [17,14,-1].
+[recast] delaunayHull: Removing dangling face 29 [17,14,-1].
+[recast] delaunayHull: Removing dangling face 12 [2,11,-1].
+[recast] delaunayHull: Removing dangling face 29 [18,20,-1].
+[recast] delaunayHull: Removing dangling face 31 [19,21,-1].
+[recast] delaunayHull: Removing dangling face 103 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 105 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 105 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 107 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 109 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 109 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 107 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 107 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 109 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 111 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 112 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 114 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 114 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 115 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 117 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 118 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 120 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 120 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 120 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 122 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 123 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 124 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 126 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 124 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 125 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 126 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 129 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 129 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 131 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 130 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 130 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 132 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 134 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 136 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 136 [52,60,-1].
+[recast] delaunayHull: Removing dangling face 33 [16,20,-1].
+[recast] delaunayHull: Removing dangling face 83 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 85 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 87 [36,37,-1].
+[recast] delaunayHull: Removing dangling face 87 [36,37,-1].
+[recast] delaunayHull: Removing dangling face 91 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 93 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 95 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 97 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 99 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 101 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 103 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 105 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 107 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 109 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 110 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 112 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 114 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 116 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 118 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 120 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 122 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 124 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 126 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 128 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 130 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 132 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 134 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 135 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 137 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 139 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 141 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 143 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 145 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 147 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 149 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 148 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 150 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 152 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 154 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 156 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 158 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 159 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 160 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 162 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 164 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 166 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 166 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 168 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 169 [51,28,-1].
+[recast] delaunayHull: Removing dangling face 171 [51,28,-1].
+build: 5081 ms total, compact spans 4394496, 2934 regions, 14062 polys (525 water), 23149 verts, 31391 contour points, navmesh data 2885924 bytes
+build rc timer total: -0 ms
+tile exported: results/navmesh_21_19.bin (2885924 bytes)
+link validation: killed 0 vertical links
+graph audit: 14062 polys, 0 one-way links, 1344 components (largest 10630)
+village start: (45768, -3056, 49848)
+bridge column: (44920, 50792) deck z -3048, water z -3928 (delta 880)
+
+[1] nearest poly under the bridge (44920, -3928, 50792): poly 22113 area=WATER z~-3840 -> nearest z -3920
+    nearest poly on the deck (44920, -3048, 50792): poly 23556 area=GROUND z~-3032 -> nearest z -3036
+
+[2] village -> under the bridge, swim allowed (water 3x): 38 polys, partial: no
+    straight path 13 corners:
+    [0] (45768, -3056, 49848)
+    [1] (43792, -3008, 50480)
+    [2] (43760, -3000, 50496)
+    [3] (43680, -2968, 50544)
+    [4] (42352, -2992, 51472)
+    [5] (41728, -2968, 51872)
+    [6] (41168, -3104, 52288)
+    [7] (40768, -3176, 52496)
+    [8] (40848, -3280, 52448)
+    [9] (41088, -3416, 52400)
+    [10] (41600, -3552, 52384)
+    [11] (42080, -3768, 52352)
+    [12] (44920, -3920, 50792)
+
+[3] the same route with the dry filter: 9 polys, partial: yes
+    closest reachable dry point: (44916, -3048, 50817)
+
+[4] water escape under the bridge -> village deck: 39 polys, partial: no
+
+[5] random pairs: 200/200 routable, avg 339.1 us per findPath+findStraightPath
+[6] the hard pair (village -> under the bridge): 169.1 us per query
