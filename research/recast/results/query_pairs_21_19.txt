@@ -1,4 +1,4 @@
-# region 21_19 pairs: x1 y1 z1 x2 y2 z2
+# region 21_19 pairs (Recast axis order): x1 height1 y1 x2 height2 y2
 60264 -1336 51496 42488 -3928 47464
 35224 -3696 36200 51160 -3456 48264
 51752 -3504 45864 48984 -3656 35880

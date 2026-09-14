@@ -1330,7 +1330,7 @@ int main(int argc, char** argv) {
             std::printf("FATAL: cannot write %s\n", pairsPath);
             return 1;
         }
-        std::fprintf(pairs, "# region 21_19 pairs: x1 y1 z1 x2 y2 z2\n");
+        std::fprintf(pairs, "# region 21_19 pairs (Recast axis order): x1 height1 y1 x2 height2 y2\n");
         uint64_t rng = 42;
         auto nextRand = [&rng]() {
             rng = rng * 6364136223846793005ULL + 1442695040888963407ULL;
