@@ -1,0 +1,85 @@
+mesh: 88 polygons (39 water, 49 ground), 130 vertices
+build: heightfield 46110 spans, compact 46110 spans, 7 regions -> 88 polys, navmesh data 13648 bytes, 10.9 ms total
+
+[1] nearest poly of (1448, -288, 728) [UNDER the bridge, on the water]: poly 160 area=WATER flags=0x2 z~-288 -> nearest z -288
+    nearest poly of (1448, 0, 728) [ON the bridge deck]: poly 193 area=GROUND flags=0x1 z~0 -> nearest z 0
+    nearest poly of (1448, -100, 728) [mid height between the two]: poly 193 area=GROUND flags=0x1 z~0 -> nearest z 0
+
+[2] village deck (1544, 0, 1544) -> under the bridge (1448, -288, 728), swim allowed (water 3x):
+  found (full): 19 polys in the corridor:
+    poly 211 area=GROUND flags=0x1 z~0
+    poly 210 area=GROUND flags=0x1 z~0
+    poly 207 area=GROUND flags=0x1 z~0
+    poly 193 area=GROUND flags=0x1 z~0
+    poly 170 area=GROUND flags=0x1 z~0
+    poly 132 area=GROUND flags=0x1 z~0
+    poly 134 area=GROUND flags=0x1 z~0
+    poly 136 area=GROUND flags=0x1 z~0
+    poly 131 area=GROUND flags=0x1 z~0
+    poly 137 area=GROUND flags=0x1 z~0
+    poly 135 area=GROUND flags=0x1 z~0
+    poly 162 area=WATER flags=0x2 z~-288
+    poly 164 area=WATER flags=0x2 z~-288
+    poly 166 area=WATER flags=0x2 z~-288
+    poly 167 area=WATER flags=0x2 z~-288
+    poly 168 area=WATER flags=0x2 z~-288
+    poly 165 area=WATER flags=0x2 z~-288
+    poly 163 area=WATER flags=0x2 z~-288
+    poly 160 area=WATER flags=0x2 z~-288
+  straight path (13 corners):
+    [0] (1544, 0, 1544)
+    [1] (1455, 0, 803)
+    [2] (1454, 0, 795)
+    [3] (1450, 0, 768)
+    [4] (1437, 0, 656)
+    [5] (1423, 0, 544)
+    [6] (1408, 0, 416)
+    [7] (1408, -160, 544)
+    [8] (1408, -288, 672)
+    [9] (1420, -288, 688)
+    [10] (1422, -288, 691)
+    [11] (1424, -288, 694)
+    [12] (1448, -288, 728) END
+  default filter findPath: status 0x40000000, 19 polys, partial: no
+  raw status 0x40000000, out-of-nodes: no, partial: no
+  sliced: 65 iters, finalize status 0x40000000, 19 polys, partial: no
+  avg query 3.69 us (findPath+findStraightPath, 20k iterations)
+  links of the last corridor poly: ->poly 163 ->poly 157 ->poly 192
+  mesh links: 178 total, 4 cross-area
+  water polys: 39 linked, 0 isolated; ground polys: 49 linked, 0 isolated
+  cross-area link pairs: 135(G)->162(W) 143(G)->186(W) 162(W)->135(G) 186(W)->143(G)
+  BFS from the target water poly 144 reaches 88 polys
+  island deck poly 211 reachable from it: YES
+  reverse BFS from the island poly 211 reaches 88 polys, target water poly in it: YES
+
+[3] the same route with the dry filter (swim excluded):
+  found (PARTIAL - the closest dry poly): 4 polys:
+    poly 211 area=GROUND flags=0x1 z~0
+    poly 210 area=GROUND flags=0x1 z~0
+    poly 207 area=GROUND flags=0x1 z~0
+    poly 193 area=GROUND flags=0x1 z~0
+  straight path (5 corners):
+    [0] (1544, 0, 1544)
+    [1] (1457, 0, 801)
+    [2] (1456, 0, 794)
+    [3] (1453, 0, 768)
+    [4] (1448, -288, 728) END
+
+[4] water escape: under the bridge -> village deck (water cost 8x):
+  found: 19 polys
+  straight path (13 corners):
+    [0] (1448, -288, 728)
+    [1] (1424, -288, 694)
+    [2] (1422, -288, 691)
+    [3] (1420, -288, 688)
+    [4] (1408, -288, 672)
+    [5] (1408, -160, 544)
+    [6] (1408, 0, 416)
+    [7] (1423, 0, 544)
+    [8] (1437, 0, 656)
+    [9] (1450, 0, 768)
+    [10] (1454, 0, 795)
+    [11] (1455, 0, 803)
+    [12] (1544, 0, 1544) END
+
+[5] raycast island center -> mainland (1544, 392): HIT at t=0.67 (the cliff edge), normal (0.0, 0.0, 1.0), 1 polys walked

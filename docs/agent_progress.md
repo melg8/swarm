@@ -10,6 +10,64 @@ finished task entries and older progress streams move to
 `agent_progress_archive.md` (append-only, same order). The permanent
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
+
+## Active task: the recastnavigation research - what a Detour navmesh gives the geodata pathfinder (2026-09-14)
+
+Started: 2026-09-14. Branch: `feature/new-pathfind` (based on the
+feature/proxy-server tip e3f8267). Commits as melg8. Other agents may
+push to the same branch concurrently - rebase before every push.
+
+### Goal
+
+The owner task: research
+https://github.com/recastnavigation/recastnavigation as the candidate
+replacement for the grid A* of `internal/swarm/pathfind`. The hard
+case that motivates it: a route from the elven village to a point
+UNDER the bridge - on the water below the floating village - where
+the x and y coordinates match a walkable deck column but the z sits
+hundreds of units below it. The current engine answers the case with
+crutches (the 3x water cost, the dry wall, the water escape BFS, the
+legDry smoothing rule). Questions to answer with runnable evidence:
+what results does the navmesh give in the stacked-layer case, what
+does the transition cost, how hard is the geodata port, how hard is
+a Go port, how much faster/slower/more universal is it.
+
+### Progress
+
+- research scaffold `research/recast/` (README, pinned-clone build.sh,
+  experiments): upstream 9f4ce64 built with the sandbox g++ (no cmake,
+  no new toolchain - the bot itself stays pure Go), upstream tests 33
+  cases / 5000 assertions green.
+- experiment A+B (`experiments/bridge_water.cpp`,
+  `results/bridge_water.txt`): the synthetic floating-village world
+  proves the same x/y different z disambiguation (findNearestPoly
+  picks the water poly under the bridge, the deck poly on top, the
+  mid-height point resolves to the nearer surface), the full
+  village -> under-bridge route crosses the bridge, descends the shore
+  and swims at 3.7 us per query, the dry filter answers the honest
+  partial (closest dry poly), the water escape is an ordinary
+  findPath with a water area cost (no dedicated BFS) and the raycast
+  reproduces the line of sight semantics.
+- porting hazard found and documented: stacked walkable surfaces that
+  are additionally within walkableClimb of each other laterally (a low
+  bridge deck over its own ramp) merge into ONE self-overlapping
+  region; the traced contours come out mangled and the poly link
+  graph breaks silently (one way links, unreachable water). The
+  synthetic world models the real village topology with a bridge
+  abutment; the geodata converter must audit the real regions for
+  such spots before trusting the mesh.
+
+### Next
+
+- experiment C: the l2j -> Recast converter over the real 21_19
+  elven village region (span import, water areas, the real
+  under-bridge coordinates, the NSWE fidelity audit).
+- experiment D: build/query benchmarks against the current grid
+  engine on the same endpoints.
+- the Go port assessment (the query engine is the runtime piece; the
+  build pipeline can stay offline) and the final report
+  `docs/recast_pathfinding.md`.
+
 ## Active task: the cursor key escape - the reproduction of the refusing cell even the official client cannot walk (2026-09-14)
 
 Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.
