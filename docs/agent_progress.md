@@ -11,6 +11,77 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the fast stuck window of the town walk re-path (2026-09-14)
+
+Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user attached the state dump of `test3` (build c7a0855, uptime
+19s): the level 15 character stood at x 45768 y 49848 z -3056 (the
+Elven Village south terrace deck) in the townReturn phase, the
+pathfound zone return held the 6 waypoint route to the Kaboo Orc
+Fighter SW-7 cell (dest 36000 46765 -3712), the first waypoint sat at
+43512 50504 -2992 (the village plaza corner). The hunt log carried
+"outside the hunting zone, pathfinding back" then a single "town
+walk stuck, re-pathing (1 of 3)" line at 16s of uptime - the click to
+wp1 was validated against the offline click port (passed), sent to the
+server, but the server silently canceled the move. The character
+never moved a cell, the stuck timeout fired at 15s, the re-path
+planned the identical route, and the next detection waited the FULL
+15s stuckTimeout again.
+
+### Root cause
+
+`stuckTownWalk` arms `stuckFast = true` on the WAYPOINT SKIP branch
+(`nextClearWaypoint` finds a clear successor) but NOT on the RE-PATH
+branch (no clear successor, the leg re-plans). The re-path proved
+the plain clicks of this leg do not move the character - the same
+evidence the waypoint skip carries - so the fast window belongs
+there too. Without it the recovery burns the full 15s per re-path
+detection (3 re-paths * 15s = 45s + the abort) for a freeze the
+fast window (4s) would have caught in ~12s.
+
+### Fix
+
+`town.go::stuckTownWalk` arms `stuckFast = true` and re-baselines
+the stuck window (`stuckAt`, `stuckX`, `stuckY`, `stuckWP`,
+`stuckBest`) from the re-path tick on the re-path branch, the same
+way the waypoint skip branch does. The next stuck detection fires on
+`stuckFastTimeout` (4s) instead of the full `stuckTimeout` (15s),
+so the recovery of the dump's freeze completes in ~12s instead of
+~45s.
+
+### Acceptance criteria
+
+- A repro test that builds the dump standoff (the character at 45768
+  49848 -3056, the 6 waypoint zone return, the line of sight blocked
+  to every forward waypoint) asserts that after the first stuck
+  re-path `stuckFast` is true and the next detection fires within
+  `stuckFastTimeout + 2s` (`TestStuckRepathArmsFastWindow`).
+- A regression guard that the waypoint skip branch still arms the
+  fast window after the fix
+  (`TestStuckSkipWaypointStillArmsFastWindow`).
+- A repro test that the re-path arm re-baselines the stuck window
+  from the re-path tick (`stuckAt` moves past the original
+  baseline, `stuckX/Y/WP` reset to the standing cell and the
+  current cursor - `TestStuckRepathRebaselinesStuckWindow`).
+- The existing `TestWalkStuckRepathsAfterAllWaypointsSkipped` and
+  `TestWalkStuckSkipNeedsAClearLine` tests updated to assert
+  `stuckFast == true` after the re-plan (the corrected behavior).
+- The full `internal/swarm/hunt` test suite stays green.
+
+### Status: done
+
+- Commit 1 (the fix + the three repro tests + the two existing test
+  updates + this entry): the re-path arm of `stuckTownWalk`, the
+  `stuckFast` and the stuck window re-baseline, the three stuck fast
+  repro tests, the two existing test updates, the agent_progress
+  entry. All `internal/swarm/hunt` tests green, `go build`/`go vet`
+  clean, `gofmt-spaces` clean.
+
 ## Active task: the deck gate of the cell mode visible-enemy reading (2026-09-14)
 
 Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.

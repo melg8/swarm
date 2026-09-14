@@ -1892,6 +1892,21 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 
         return true
     }
+    // The re-path proved the plain clicks of this leg do not move
+    // the character: arm the fast stuck window for the next detection
+    // (4 s instead of 15 s) and re-baseline the stuck window from
+    // the re-path tick, so the next stuck fires on the fast timeout
+    // the same way the waypoint skip arm does. Without this the
+    // first re-path waits the full 15 s before the next detection
+    // - the dump of 2026-09-14 08:13 (build c7a0855, bot test3)
+    // showed the bot sitting at 45768 49848 -3056 through the whole
+    // stuckTimeout after a re-path that did not move it a cell, the
+    // recovery burned 30 s of the trip budget on a freeze the fast
+    // window would have caught in 4 s.
+    l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+    l.stuckWP = l.wpIndex
+    l.stuckBest = l.stuckWaypointDistance(selfX, selfY)
+    l.stuckFast = true
 
     return false
 }

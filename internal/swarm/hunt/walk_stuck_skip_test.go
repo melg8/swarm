@@ -122,8 +122,12 @@ func TestWalkStuckRepathsAfterAllWaypointsSkipped(t *testing.T) {
         "the re-plan must consume the re-path budget")
     require.Equal(t, 1, loop.wpIndex,
         "the re-planned cursor must advance past the standing wp 0 onto the first real waypoint")
-    require.False(t, loop.stuckFast,
-        "the re-plan must clear the fast stuck flag")
+    require.True(t, loop.stuckFast,
+        "the re-plan arms the fast stuck window - the plain clicks "+
+            "of the leg did not move the character, the next "+
+            "stuck detection fires on the fast timeout (4s) instead "+
+            "of the full stuckTimeout (15s), the recovery of the "+
+            "2026-09-14 08:13 dump")
     require.Positive(t, nav.calls,
         "the re-plan must call the navigator")
 }
@@ -328,8 +332,9 @@ func TestWalkStuckSkipNeedsAClearLine(t *testing.T) {
         "the blocked successor lines must force the re-path")
     require.Equal(t, 1, loop.wpIndex,
         "the re-planned cursor must advance onto the first real waypoint")
-    require.False(t, loop.stuckFast,
-        "the re-plan must clear the fast stuck flag")
+    require.True(t, loop.stuckFast,
+        "the re-plan arms the fast stuck window - the plain clicks "+
+            "of the leg did not move the character")
 }
 
 // TestWalkStuckSkipJumpsToTheFirstClearWaypoint pins the forward scan
