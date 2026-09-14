@@ -5528,3 +5528,153 @@ to +1.3 MB (the warmup of the young sessions), the pprof diff shows
 no growing retainer anymore. The process log now carries the memory
 line once a minute (internal/swarm/memwatch), so the next growth
 report is provable from the log alone.
+
+## Round 82: the refused walk clicks - the ActionFailed channel the bot discarded (2026-09-14)
+
+Scope: the 2026-09-14 10:18 state dump of the user's server (build
+c22d529, bot test3, phase townReturn, uptime 7m24s): the level 15
+character stood at the elven village center and never moved a single
+cell through NINE aborted trips while the corridor bans grew (the
+widened r768 ban at 43512 50504 plus six fresh bans sealing the whole
+northern exit for the session), the direct zone legs ground in 15 s
+stall windows and every server routed walk aborted at once on "the
+server routed walk would swim". The user's hypothesis: "it might be
+something with anti water laws, maybe they need to be changed".
+
+### Problem statement
+
+The dump character stood at 45768 49848 -3056 with the held cell
+10200 units away, the walk plan holding 17 waypoints it could never
+walk, and the event log cycling the full escalation ladder per trip
+without a single cell of movement: the plain clicks froze (the stuck
+re-path), the detour froze (the corridor ban widened), the server
+routed walk aborted on the water guard - and the abort backoff
+doubled up to the one hour wait. The other fleet bots kept moving in
+open ground (the dump objects show moving players), so the world
+itself was walkable; only this character's clicks died.
+
+### Root cause analysis
+
+The live reproduction on the local reference stack (the full geodata
+pack, `PathFinding = 2` - the reference deployment layout the sandbox
+fast deploy disables with its `sed`) walks the IDENTICAL scenario
+cleanly: the injected temp3 at the dump position exits the village
+through the exact "frozen corridor" 43512 50504 (the MOVEDBG
+diagnostics patch of the local Mobius checkout shows every click
+ACCEPTED, one A* found=true) and engages in the zone in ~90 seconds.
+The user's server build differs from the reference master (the dump's
+unknown packet fingerprints - 0x57 with 53 bytes against the
+reference's 5, the 0xe7/21 bytes that does not exist on the reference
+master - pin a different server build) and refuses the village exit
+clicks its own way. Three bot side defects turned that server
+behavior into the frozen dump:
+
+1. The ActionFailed channel was parsed and discarded. The server
+   answers every refused MoveToLocation with ActionFailed (0x35, the
+   one byte refusal answer); the bot's `applyActionFailed` logged the
+   line and dropped the packet - the hunt loop "kept driving its own
+   retry logic without reacting to it". Every stuck verdict therefore
+   read as a "frozen corridor": the ladder banned innocent corridors,
+   the widening sealed the village exits for the session and the
+   honest diagnosis never appeared anywhere.
+
+2. The server routed fallback clicked the zone center ~10200 units
+   away. Mobius `MoveToLocation.runImpl` refuses a request beyond
+   9900 units outright (the huge distance cap) and
+   `Creature.moveToLocation` walks a player click beyond 3000 units
+   as a straight line with no geodata correction and no server
+   pathfinding - the single far click was structurally dead: over
+   the cap it bounced with ActionFailed, under it the straight line
+   crossed the lake the water guard refused (the user's "anti water
+   law" suspicion was right in spirit - but the guard refused a walk
+   the server could never execute anyway).
+
+3. The zone leg grind stall re-armed the pathfound return on refusal
+   evidence too: the cycle the server kept refusing restarted every
+   15 s for seven minutes of the dump.
+
+The A*-failure branch of the reference `Creature.moveToLocation`
+deserves a note: the old "silently reject the move" behavior is gone
+(upstream now falls back to direct movement - the commented out
+ActionFailed block), so a reference master never freezes a walker the
+way the user's older build does.
+
+### Reproduction
+
+- Live: `tools/swarm_fast_deploy.sh` then enable the reference
+  deployment layout by hand (`cp data/geodata/*.l2j` into
+  `dist/game/data/geodata/`, set `PathFinding = 2` in
+  `dist/game/config/GeoEngine.ini`, restart the game server through
+  `tools/mobius_start.sh`), inject the dump character (the acceptance
+  `resetCharacter` pattern: level 15, the dump position 45768 49848
+  -3056, the dump inventory) and run the bot with `-hunt`. The walk
+  exits the village and engages in the zone (~90 s) - proving the
+  reference server accepts the clicks the user's server refuses. The
+  MOVEDBG patch (logging only) names every server side decision.
+- Offline: `hunt/refusal_signal_repro_test.go` - the refusing click
+  server (ActionFailed per click, the character never moves) and the
+  target specific variant (only the long clicks are refused).
+
+### Fix
+
+The bot adapts to the server (no server behavior changes; the MOVEDBG
+patch is logging only):
+
+1. `state/bot.go`: `ApplyActionFailed`/`LastActionFailed` record the
+   arrival time of the last refusal answer; the connection dispatch
+   forwards it, the dump prints its age next to the session header
+   ("last action failed: 3s ago") so a refusing server names itself
+   in the next report.
+2. `hunt/town.go`: `refusalEvidence` correlates the ActionFailed
+   arrival with the sent click (inside `refusalAnswerWindow`); a
+   stuck verdict with refusal evidence first varies the aim at the
+   same waypoint (`sendVariedAim`: the half and the quarter click -
+   the Bresenham prefix of a split leg rasterizes differently - then
+   the perpendicular offsets; every variant passes the offline click
+   port and the water guard; the click geometry caps at maxMoveLeg).
+   The corridor ban rung of the frozen trip escalation is skipped for
+   legs with refusal evidence (the `legRefused` latch): a leg the
+   server refused does not name a frozen corridor, banning it would
+   seal innocent ground for the session.
+3. `hunt/town.go`: the server routed walk hops (`directHopMax` 2500)
+   instead of clicking the far target once - every hop stays under
+   the 3000 straight line boundary so the server's own geodata
+   routing owns it, the hop passes the offline click port before it
+   leaves and the water guard checks the actual hop line, shortening
+   to the dry shore prefix when the direction crosses water. A
+   refused routed hop aborts the trip early with the honest reason.
+4. `hunt/loop_movement.go`: the zone leg stall splits on the ground
+   covered: a character that progressed re-arms the pathfound return
+   (the partially refusing deployment - the varied aims walk it
+   out), a character that stood on the same cell as the previous
+   refusal stall holds the return backoff (the fully refusing
+   deployment - the cycle the server keeps refusing does not
+   restart). `walkZoneLeg` records its click in the shared `moveAt`
+   slot so the evidence correlates.
+
+### Verification
+
+- go build/vet, `task fmt:check`, `golangci-lint run --new` (the
+  three documented gci spaces-vs-tabs artifacts of the branch aside),
+  the full `go test ./...` green (23 packages).
+- The five new tests of `refusal_signal_repro_test.go`: the refuse
+  all server never bans a corridor and the grind holds the backoff;
+  the target specific refusal walks out through the varied aims
+  without a single ban; the routed hops stay under the cap, pass the
+  offline port and carry the character; `shortenWetHop` halves to the
+  dry prefix; the correlation window pins the freshness bounds.
+- Live: the injected dump scenario on the geodata stack (the fixed
+  build) walks to the zone and engages - no regression against the
+  reference deployment - and `tools/mobius_e2e.sh 45` stays E2E_OK.
+
+### Follow ups
+
+- The gatekeeper teleport graph (H-002) would end the far zone return
+  problem outright: a village gatekeeper hop to the western lands
+  replaces the 10200 unit walk for the price of the fee.
+- The manual long walk follower (`hunt/user.go`) and the blind engage
+  recovery walker still ignore the refusal evidence; the same
+  correlation would harden them.
+- The MOVEDBG logging patch stays in the local Mobius checkout only
+  (never committed to the swarm repository - the server integrity
+  rules).

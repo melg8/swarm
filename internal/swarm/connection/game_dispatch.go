@@ -12,6 +12,7 @@ package connection
 
 import (
     "fmt"
+    "time"
 
     fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
     "github.com/melg8/swarm/internal/swarm/state"
@@ -58,9 +59,14 @@ func (gc *GameClient) handleServerPacket(payload []byte) {
     }
 }
 
-// applyActionFailed validates and logs the refusal answer of the
-// server. The packet carries no details, so the hunt loop keeps
-// driving its own retry logic without reacting to it.
+// applyActionFailed validates the refusal answer of the server and
+// hands its arrival time to the state tracker: the hunt walk
+// machinery reads it as the online refusal evidence - a walk click
+// that got the answer while the character stood still is a server
+// side refusal the offline click validation cannot see (see
+// hunt.Loop.refusalEvidence). The packet itself carries no details
+// about which request failed, so the loop keeps driving its own
+// retry logic around the timestamp.
 func (gc *GameClient) applyActionFailed(payload []byte) {
     if err := fromgameserver.ParseActionFailedPacket(
         &gc.actionFailed, payload); err != nil {
@@ -69,6 +75,9 @@ func (gc *GameClient) applyActionFailed(payload []byte) {
         return
     }
     gc.logger.Println("Action failed")
+    if gc.tracker != nil {
+        gc.tracker.ApplyActionFailed(time.Now())
+    }
 }
 
 // applySystemMessage parses SystemMessage and forwards the formatted

@@ -10,6 +10,108 @@ finished task entries and older progress streams move to
 `agent_progress_archive.md` (append-only, same order). The permanent
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
+## Active task: the server refused walk clicks - the ActionFailed refusal channel (2026-09-14)
+
+Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user attached the state dump of `test3` (build c22d529, uptime
+7m24s): the level 15 character stood at x 45768 y 49848 z -3056 (the
+elven village center) in the townReturn phase, never moving a single
+cell through nine aborted trips, while the corridor bans grew
+(43512 50504 widened to r768, then the fresh bans 44104 49544,
+44200 49560, 44296 49576, 44392 49592, 44488 49608 - the whole
+northern exit sealed for the session), the direct zone legs ground
+("moved nothing for 16s, re-arming the pathfound return") and every
+server routed walk aborted on "the server routed walk would swim".
+The user's hypothesis: "it might be something with anti water laws,
+maybe they need to be changed".
+
+### Root cause (the missing refusal channel)
+
+Live reproduction on the local stack with the full geodata pack and
+`PathFinding = 2` (the reference deployment layout the sandbox fast
+deploy disables, `tools/swarm_fast_deploy.sh` sed) walks the SAME
+dump scenario cleanly: temp3 injected at the dump position exits the
+village through the exact "frozen corridor" 43512 50504 and engages
+in the zone in ~90 s (the MOVEDBG diagnostics patch: every click
+ACCEPTED, one A* found=true). The user's server build differs from
+the reference master (the dump's unknown packet fingerprints 0x57/53
+bytes and 0xe7/21 bytes do not exist on the local master) and
+refuses the village-exit clicks its own way - while other fleet bots
+in open ground keep moving. The bot has no channel for that answer:
+
+1. The server answers every refused move with ActionFailed (0x35);
+   the bot parses it (`connection/game_dispatch.go::applyActionFailed`)
+   and DISCARDS it ("the hunt loop keeps driving its own retry logic
+   without reacting to it") - only a log line survives.
+2. Every stuck verdict therefore reads as a "frozen corridor": the
+   ladder bans innocent corridors, the widening seals village exits
+   for the session and the abort backoff climbs to 1h while the real
+   diagnosis (the server refuses the clicks) never appears anywhere.
+3. The server routed fallback clicks the zone center ~10000 units
+   away: beyond the server's 9900 request cap (refused outright) and
+   over the 3000 unit boundary where Mobius walks player clicks in a
+   straight line (the water guard correctly rejects the wet line -
+   the "anti water law" the user suspects is right in spirit but it
+   guards an impossible geometry).
+
+### Progress (commit: the refusal channel, the varied aim and the hop walk)
+
+- The diagnosis closed the loop the dump opened: the local reference
+  stack (geodata + PathFinding = 2, the reference deployment layout
+  the fast deploy disables) walks the identical dump scenario cleanly
+  - the user's server build (its unknown packet fingerprints pin it)
+  refuses the clicks. The bot had no channel for that answer, so
+  every stuck verdict poisoned the planner instead.
+- The state tracker records the ActionFailed arrivals
+  (ApplyActionFailed/LastActionFailed), the connection dispatch
+  forwards them and the dump prints the age of the last refusal next
+  to the session header.
+- The hunt walk machinery reads them as the online refusal evidence
+  (refusalEvidence, a freshness window of 4 s around the sent click):
+  the stuck verdict varies the aim first (the half/quarter click and
+  the perpendicular offsets, all offline validated and water
+  guarded), the corridor ban rung is skipped for refused legs (the
+  legRefused latch), the routed walk hops under the 3000 straight
+  line boundary (offline validated per hop, wet hops shortened to
+  the dry prefix, refused hops abort with the honest reason) and the
+  zone leg stall holds the return backoff on the unmoved cell.
+- The dump-character live rerun on the geodata stack walks to the
+  zone and engages (no regression); `tools/mobius_e2e.sh 45` prints
+  E2E_OK.
+### Acceptance criteria
+
+- The tracker records the ActionFailed arrivals; the hunt loop reads
+  them as refusal evidence correlated with the sent click.
+- A stuck verdict with refusal evidence varies the click aim
+  (shorter prefixes, sideways offsets) instead of assuming the
+  corridor froze; the corridor ban rung is skipped for legs whose
+  freeze evidence carries ActionFailed answers.
+- The server routed walk hops toward its target in capped legs
+  (under the straight line semantics and the request cap), the water
+  guard checks the hop line, and a refused routed leg aborts early
+  with an honest reason.
+- The zone leg stall does not re-arm the pathfound return forever
+  when the server refuses the legs.
+- The dump carries the last ActionFailed arrival.
+- Repro tests: a refusing server never bans a corridor; a partially
+  refusing server is walked out through the varied aim; the direct
+  leg hops arrive; the live geodata stack still walks the dump
+  scenario (no regression) and E2E_OK.
+
+### Status: done
+
+- Commit 1 (the fix + the five tests + the docs): the ActionFailed
+  refusal channel end to end, the varied aim ladder, the corridor
+  ban gate, the hop walk of the server routed fallback, the zone leg
+  stall split, the refusal signal repro tests, the round 82
+  development log entry, this progress entry. All tests green (23
+  packages), fmt:check clean, lint:new carries only the three
+  documented gci artifacts, E2E_OK on the geodata stack.
 
 ## Active task: the widening frozen corridor ban and the zone leg grind stall (2026-09-14)
 

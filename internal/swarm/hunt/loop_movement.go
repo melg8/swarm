@@ -385,6 +385,13 @@ func (l *Loop) walkZoneLeg(
     if !l.guardZoneLegClick(selfX, selfY, selfZ, moveX, moveY) {
         return
     }
+    // The click timestamp lands in the shared moveAt slot so the
+    // online refusal evidence correlates the zone legs with the
+    // ActionFailed answers the same way it correlates the town walk
+    // clicks (see refusalEvidence): without it the legs bypass the
+    // channel and a server that refuses them reads as a plain
+    // freeze.
+    l.moveAt = now
     if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
         l.logf("Hunt: walk back failed: %v", err)
     }
@@ -422,6 +429,39 @@ func (l *Loop) noteZoneLegStall(
     held := now.Sub(l.zoneLegAt)
     if held < stuckTimeout {
         return false
+    }
+    // The refusal answer separates the two stall families: without
+    // it the legs froze mid corridor (the re-arm below answers -
+    // the fresh geodata route widens the bans). With it the server
+    // refused the click itself, and the answer splits once more by
+    // the ground covered since the last refusal stall: a character
+    // that PROGRESSED (the server accepts some clicks - the
+    // partially refusing deployment) re-arms the pathfound return
+    // whose follower varies its aims through the refusals, while a
+    // character that stood on the very same cell holds the return
+    // backoff - the re-arm would only restart the cycle the server
+    // keeps refusing (the 2026-09-14 10:18 dump: the stall re-armed
+    // the pathfound return every 15 s for seven minutes on a server
+    // that refused every click).
+    if l.refusalEvidence() {
+        l.zoneLegAt = time.Time{}
+        if selfX == l.zoneRefusalX && selfY == l.zoneRefusalY {
+            l.zoneFails = zoneReturnFailBudget
+            l.logf("Hunt: the direct zone legs moved nothing for %s "+
+                "at %d %d and the server refused the clicks, "+
+                "holding the return backoff",
+                held.Round(time.Second), selfX, selfY)
+
+            return true
+        }
+        l.zoneRefusalX, l.zoneRefusalY = selfX, selfY
+        l.zoneFails = 0
+        l.logf("Hunt: the direct zone legs moved nothing for %s at "+
+            "%d %d and the server refused the clicks, re-arming "+
+            "the pathfound return",
+            held.Round(time.Second), selfX, selfY)
+
+        return true
     }
     l.zoneLegAt = time.Time{}
     l.logf("Hunt: the direct zone legs moved nothing for %s at %d %d, "+

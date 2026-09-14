@@ -40,6 +40,13 @@ const (
     // walkRequestPeriod paces the ground click walks of the waypoint
     // follower and the merchant approach.
     walkRequestPeriod = 2 * time.Second
+    // refusalAnswerWindow bounds how long after a walk click the
+    // ActionFailed answer still counts as ITS answer: the server
+    // answers a refused request within a moment, so a refusal hours
+    // old is not the answer to the click just sent. The window
+    // covers the answer of the previous click too (a slow answer
+    // racing the next request of the walk request period).
+    refusalAnswerWindow = 4 * time.Second
     // waypointArriveDist is the distance within which the FINAL
     // waypoint of a walk plan counts as reached: the wide trip
     // arrival radius (two geodata cells of slack) so a leg ends
@@ -156,6 +163,34 @@ const (
     // and the window leaves room for a server pathfinder walk plus
     // a few position broadcasts before the stop gives up.
     directLegWindow = 45 * time.Second
+    // refusalVariantsMax bounds the varied aim attempts one leg
+    // spends on the online refusal answer (see stuckTownWalk): the
+    // server refuses a click for its own reasons (a different build
+    // or geodata validates the same line differently), and the
+    // refusal is target specific - a shorter prefix or a sideways
+    // offset of the same waypoint often walks where the plain aim
+    // bounced. The variants are cheap (one click each, no re-plan),
+    // so a small ladder covers the common target specific refusals
+    // before the leg falls back to the re-path machinery.
+    refusalVariantsMax = 4
+    // refusalVariantStep is the sideways offset of the perpendicular
+    // refusal variants: about twelve geodata cells off the route
+    // line, far enough to bend the click raster away from the walled
+    // flank the server refused, close enough to stay on the same
+    // walkable deck the plan already verified.
+    refusalVariantStep = 192.0
+    // directHopMax caps one hop of the direct server routed walk
+    // (see walkDirectLeg): Mobius walks a player click beyond 3000
+    // units as a straight line (no geodata correction, no server
+    // pathfinding - Creature.moveToLocation skips both) and refuses
+    // a click beyond 9900 outright (MoveToLocation.runImpl caps the
+    // request distance), so the single far click of the old fallback
+    // never moved anything: over the cap it bounced with
+    // ActionFailed, under it the straight line crossed the water the
+    // guard refuses. A hop under the boundary keeps the server's own
+    // geodata routing on the click - the routing the fallback exists
+    // for - while the water guard checks the actual hop line.
+    directHopMax = 2500.0
     // extendMarchStep is the stride of the forward route march of
     // extendShortClickCandidates: one geodata cell.
     extendMarchStep = 16.0
@@ -609,6 +644,8 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
     l.tripStart = time.Now()
     l.sold = make(map[int32]bool)
     l.rePaths = 0
+    l.legRefused = false
+    l.refusalVariants = 0
     l.tripStops = []tripStop{{
         merchant: merchant,
         sell:     true,
@@ -622,6 +659,8 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
     l.buyRetries = 0
     l.frozenStage = 0
     l.directLeg = false
+    l.legRefused = false
+    l.refusalVariants = 0
     l.resetReplacementSales()
     l.resetLearnState()
     // The learning stops no longer ride the trip start: they plan
@@ -927,6 +966,12 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
     l.moveAt = time.Time{}
     l.stuckAt = time.Time{}
     l.stuckFast = false
+    // A fresh plan is a fresh leg: the varied aim budget of the
+    // online refusal answer re-arms (the legRefused latch itself
+    // stays - it carries the trip level evidence the frozen trip
+    // escalation gate reads, a re-path inside the same trip must
+    // not erase it).
+    l.refusalVariants = 0
     // A planned geodata leg owns the movement now: the direct zone
     // leg stall watcher stands down (its window would otherwise read
     // a trip's frozen standstill as its own and fire early on the
@@ -1123,7 +1168,64 @@ func (l *Loop) walkDirectLeg(
 
         return false
     }
+    // The routed walk hops instead of clicking the far target once:
+    // Mobius walks a player click beyond 3000 units as a straight
+    // line (no geodata correction, no pathfinding) and refuses one
+    // beyond 9900 outright, so the single far click of the old
+    // fallback either bounced with ActionFailed or walked the wet
+    // straight line the water guard refused - the fallback could
+    // never move anything (the 2026-09-14 10:18 dump: every "the
+    // server routed walk would swim" abort clicked a target 10200
+    // units away). A hop under the boundary keeps the server's own
+    // geodata routing on each click, which is the routing the
+    // fallback exists for.
     moveX, moveY, moveZ := l.directLegTarget(selfX, selfY)
+    hopDX := float64(moveX) - float64(selfX)
+    hopDY := float64(moveY) - float64(selfY)
+    if hopDist := math.Hypot(hopDX, hopDY); hopDist > directHopMax {
+        frac := directHopMax / hopDist
+        moveX = int32(float64(selfX) + hopDX*frac)
+        moveY = int32(float64(selfY) + hopDY*frac)
+        moveZ = int32(float64(selfZ) +
+            (float64(moveZ)-float64(selfZ))*frac)
+    }
+    // A refused routed hop aborts early: the refusal answer of the
+    // server arrived for the last click and the character did not
+    // move - the window would burn on clicks the server keeps
+    // bouncing, the trip ends with the honest reason instead (the
+    // dump of the same report ground the 45 s window on a server
+    // that refused everything).
+    if l.refusalEvidence() {
+        l.legRefused = true
+        l.directLeg = false
+        l.abortTownTrip("the server refused the routed walk clicks")
+
+        return false
+    }
+    // The hop passes the same offline click port the planned clicks
+    // do: a hop whose line the reference server collapses (the far
+    // half of a long line rasterizes differently than the planned
+    // leg) is shortened toward its validating prefix - the Bresenham
+    // prefix of a split hop is not a prefix of the full raster, a
+    // shorter line often validates where the full hop bounced. A hop
+    // no prefix validates is held for this tick (the window and the
+    // refusal shortcut own the outcome), never sent blind.
+    if l.navigator != nil {
+        from := pathfind.Vec3{
+            X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+        }
+        hopX, hopY, hopZ := float64(moveX), float64(moveY), float64(moveZ)
+        if _, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
+            X: hopX, Y: hopY, Z: hopZ,
+        }); !ok {
+            if !l.shortenClickLeg(
+                selfX, selfY, selfZ, &hopX, &hopY, &hopZ, from) {
+                return false
+            }
+            moveX, moveY, moveZ =
+                int32(hopX), int32(hopY), int32(hopZ)
+        }
+    }
     if l.navigator != nil {
         crossed, err := l.navigator.WaterCrossed(pathfind.Vec3{
             X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
@@ -1131,13 +1233,22 @@ func (l *Loop) walkDirectLeg(
             X: float64(moveX), Y: float64(moveY), Z: float64(moveZ),
         })
         if err == nil && crossed {
-            // The straight line to the target would swim: the
-            // geodata shore route owns that case, and it just
-            // failed - the trip ends with its cooldown.
-            l.directLeg = false
-            l.abortTownTrip("the server routed walk would swim")
+            // The hop line would swim: shorten the hop toward its
+            // dry prefix first - the walkable shore prefix carries
+            // the character to the waterline, from where the next
+            // hop re-aims - and only abort when even the shortest
+            // sensible hop stays wet (the direction is water
+            // blocked, the geodata shore route owns it and it
+            // already failed).
+            hopX, hopY, hopZ, dry := l.shortenWetHop(
+                selfX, selfY, selfZ, moveX, moveY, moveZ)
+            if !dry {
+                l.directLeg = false
+                l.abortTownTrip("the server routed walk would swim")
 
-            return false
+                return false
+            }
+            moveX, moveY, moveZ = hopX, hopY, hopZ
         }
     }
     if ax, ay, dodged := l.steerClearOfAggro(
@@ -1148,6 +1259,44 @@ func (l *Loop) walkDirectLeg(
     l.walkToward(moveX, moveY, moveZ, now)
 
     return false
+}
+
+// shortenWetHop halves a hop whose line crosses water toward its dry
+// prefix: the direct leg hops along the straight line to the leg
+// target, and a lake on that line must not end the walk while a dry
+// shore prefix still carries the character to the waterline - from
+// there the next hop re-aims along the line and the planner's shore
+// route owns the crossing itself. The halving floor matches the walk
+// click floor (minWalkClick): a shorter hop cannot carry a
+// meaningful step anyway. A geodata error counts as dry (the same
+// contract the water guard uses: a line the geodata cannot verify
+// stays walkable). It returns the shortened hop and whether a dry
+// prefix was found at all.
+func (l *Loop) shortenWetHop(
+    selfX, selfY, selfZ int32,
+    moveX, moveY, moveZ int32,
+) (int32, int32, int32, bool) {
+    from := pathfind.Vec3{
+        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+    }
+    dx := float64(moveX) - float64(selfX)
+    dy := float64(moveY) - float64(selfY)
+    dz := float64(moveZ) - float64(selfZ)
+    full := math.Hypot(dx, dy)
+    for leg := full / 2; leg >= minWalkClick; leg /= 2 {
+        frac := leg / full
+        hopX := int32(float64(selfX) + dx*frac)
+        hopY := int32(float64(selfY) + dy*frac)
+        hopZ := int32(float64(selfZ) + dz*frac)
+        crossed, err := l.navigator.WaterCrossed(from, pathfind.Vec3{
+            X: float64(hopX), Y: float64(hopY), Z: float64(hopZ),
+        })
+        if err != nil || !crossed {
+            return hopX, hopY, hopZ, true
+        }
+    }
+
+    return moveX, moveY, moveZ, false
 }
 
 // directLegTarget resolves the click target of the direct server
@@ -1765,6 +1914,129 @@ func (l *Loop) legAdvanceClear(
     return walkable
 }
 
+// refusalEvidence reports whether the server answered the last walk
+// click of this leg with ActionFailed while the character stood
+// still: the one byte refusal answer is the only online channel that
+// names a server side move refusal (the offline click validation
+// port mirrors the reference Mobius master, but a deployment running
+// a different build or geodata validates the same click differently
+// - the 2026-09-14 10:18 dump: every click of every plan bounced
+// while the local reference stack walked the identical scenario
+// cleanly, and the dump's unknown packet fingerprints 0x57/53 bytes
+// and 0xe7/21 bytes do not exist on the reference master). The
+// correlation is the sent click timestamp: the answer arrives after
+// the request, and a click the server accepted moves the character
+// instead (the stuck verdict calling this already proved it did
+// not).
+func (l *Loop) refusalEvidence() bool {
+    if l.moveAt.IsZero() {
+        return false
+    }
+    failedAt := l.tracker.LastActionFailed()
+
+    return failedAt.After(l.moveAt) &&
+        failedAt.Sub(l.moveAt) <= refusalAnswerWindow
+}
+
+// sendVariedAim answers a stuck verdict with refusal evidence by
+// varying the aim at the current waypoint instead of assuming the
+// corridor froze: the server refused THIS click, and the refusal is
+// target specific - the Bresenham raster of a shorter prefix or a
+// sideways offset of the same waypoint often validates where the
+// plain aim bounced. The variant list walks from the safest
+// variation (half of the leg) to the sideways probes (the
+// perpendicular offsets that relocate the character off the refused
+// flank). Each variant passes the same offline gates as a planned
+// click (the server click port and the water guard on its line);
+// the first gate-passing variant is clicked. It reports whether a
+// variant was sent (the caller resets the stuck window for it).
+func (l *Loop) sendVariedAim(
+    selfX, selfY, selfZ int32, now time.Time,
+) bool {
+    if l.navigator == nil || l.wpIndex >= len(l.waypoints) ||
+        l.refusalVariants >= refusalVariantsMax {
+        return false
+    }
+    wp := l.waypoints[l.wpIndex]
+    from := pathfind.Vec3{
+        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+    }
+    for ; l.refusalVariants < refusalVariantsMax; l.refusalVariants++ {
+        variant := refusalVariantTarget(
+            wp, from, l.refusalVariants)
+        if variant == nil {
+            continue
+        }
+        to := pathfind.Vec3{
+            X: variant[0], Y: variant[1], Z: variant[2],
+        }
+        if _, ok := l.navigator.ValidateClick(from, to); !ok {
+            continue
+        }
+        crossed, err := l.navigator.WaterCrossed(from, to)
+        if err == nil && crossed {
+            continue
+        }
+        l.refusalVariants++
+        l.logf("Hunt: the server refused the walk click, "+
+            "varying the aim to %.0f %.0f (%d of %d)",
+            to.X, to.Y, l.refusalVariants, refusalVariantsMax)
+        l.moveAt = now
+        if err := l.game.WalkTo(
+            int32(to.X), int32(to.Y), int32(to.Z)); err != nil {
+            l.logf("Hunt: town walk request failed: %v", err)
+        }
+
+        return true
+    }
+
+    return false
+}
+
+// refusalVariantTarget computes the varied click target of one
+// refusal variant index. The variation works on the CLICK geometry,
+// not the raw waypoint distance: the plain click caps at maxMoveLeg
+// (the follower's leg splitting), so the variants must sit INSIDE
+// that cap or they aim farther than the click that just bounced. On
+// the capped leg, variant 0 halves the click (the Bresenham prefix
+// of a split leg rasterizes differently than the full line), 1
+// quarters it, 2 and 3 bend the half click sideways (left and right
+// of the route direction - the probe that relocates the character
+// off the refused flank while keeping the forward progress). It
+// returns nil when the click is too short to vary.
+func refusalVariantTarget(
+    wp pathfind.Vec3, from pathfind.Vec3, index int,
+) *[3]float64 {
+    dx := wp.X - from.X
+    dy := wp.Y - from.Y
+    full := math.Hypot(dx, dy)
+    if full < minWalkClick {
+        return nil
+    }
+    // The click geometry: the plain click caps at maxMoveLeg, the
+    // variants vary the click - never the raw waypoint distance.
+    click := full
+    if click > maxMoveLeg {
+        click = maxMoveLeg
+    }
+    frac := 0.5
+    side := 0.0
+    switch index {
+    case 1:
+        frac = 0.25
+    case 2:
+        side = refusalVariantStep
+    case 3:
+        side = -refusalVariantStep
+    }
+    ux, uy := dx/full, dy/full
+    x := from.X + ux*click*frac - uy*side
+    y := from.Y + uy*click*frac + ux*side
+    z := from.Z + (wp.Z-from.Z)*(click*frac/full)
+
+    return &[3]float64{x, y, z}
+}
+
 // walkStuck tracks the movement progress of the walker and re-paths
 // around the obstacle once the character stands still for too long OR
 // wobbles without net progress toward the current waypoint. The same
@@ -1891,6 +2163,37 @@ func (l *Loop) stuckWaterEscape(_ time.Time, selfX int32, selfY int32) bool {
 // the first skip so subsequent stuck detections fire on the shorter
 // window.
 func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
+    // The online refusal answer separates the server side refusal
+    // from the corridor freeze: an ActionFailed that answered the
+    // sent click while the character stood still names a refusal
+    // the offline validation cannot see (a different server build
+    // or geodata), and the refusal is target specific - varying the
+    // aim at the same waypoint (a shorter prefix, a sideways
+    // offset) often walks where the plain click bounced. The
+    // refusal branch runs BEFORE the waypoint skip: the skip aims a
+    // FARTHER waypoint (a worse target for a length sensitive
+    // refusal), the variation keeps the near aim the plan already
+    // holds. The corridor ban machinery below answers the OTHER
+    // family: a click the server accepted but never delivered on
+    // (the frozen corridor). Latching the refusal also arms the
+    // escalation gate (see escalateFrozenLeg): a leg the server
+    // refused does not name a frozen corridor, banning it would
+    // seal innocent ground for the rest of the session.
+    if l.refusalEvidence() {
+        if !l.legRefused {
+            l.legRefused = true
+            l.logf("Hunt: the server refused the walk click " +
+                "(ActionFailed), varying the aim")
+        }
+        if l.sendVariedAim(selfX, selfY, l.selfZForEscape(), now) {
+            l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+            l.stuckWP = l.wpIndex
+            l.stuckBest = l.stuckWaypointDistance(selfX, selfY)
+            l.stuckFast = true
+
+            return false
+        }
+    }
     next := l.nextClearWaypoint(selfX, selfY, l.selfZForEscape())
     if next > l.wpIndex {
         l.wpIndex = next
@@ -2046,7 +2349,20 @@ func (l *Loop) escalateFrozenLeg() bool {
     }
     if l.frozenStage == 0 {
         l.frozenStage = 1
-        if l.banFrozenCorridor() {
+        if l.legRefused {
+            // The freeze evidence carries ActionFailed answers: the
+            // server refused the clicks themselves, the corridor is
+            // not frozen. Banning it would seal innocent ground for
+            // the rest of the session (the 2026-09-14 10:18 dump:
+            // six corridor bans and a widened r768 ban across both
+            // village exits while the server refused every click for
+            // its own reasons - a build whose validation the offline
+            // port cannot mirror). The direct leg rung takes over
+            // instead: its fresh short clicks probe whether the
+            // server accepts anything from this position at all.
+            l.logf("Hunt: the server refused the clicks of this " +
+                "leg, skipping the corridor ban")
+        } else if l.banFrozenCorridor() {
             l.logf("Hunt: the walk froze on this corridor, " +
                 "re-planning the detour around it")
             if l.startZoneReturnOrWalkLeg() {
@@ -2143,6 +2459,7 @@ func (l *Loop) armDirectLeg(reason string) {
     l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
     l.stuckFast = false
     l.moveAt = time.Time{}
+    l.refusalVariants = 0
     l.logf("Hunt: %s, walking to %d %d by the server routing",
         reason, int32(l.legDest.X), int32(l.legDest.Y))
 }

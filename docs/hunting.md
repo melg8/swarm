@@ -613,6 +613,37 @@ The short form:
   mid trip or not - clears the cooldown: the village restart lands next
   to the shops and a full inventory sells right after the revival
   instead of walking to the farm spot with the junk first.
+- The ActionFailed refusal channel (the 2026-09-14 10:18 dump): the
+  server answers every refused MoveToLocation with the one byte
+  ActionFailed (0x35), and the tracker records its arrival
+  (state.ApplyActionFailed) while the dump prints its age next to the
+  session header - a server that refuses the walk requests names
+  itself in the report. The walk machinery reads the timestamp as the
+  online refusal evidence (refusalEvidence, valid inside a 4 s window
+  around the sent click - walkZoneLeg records its clicks in the
+  shared moveAt slot too): a stuck verdict with the evidence first
+  varies the aim at the current waypoint (sendVariedAim - the half
+  and the quarter of the capped click, then the perpendicular
+  offsets, every variant offline validated and water guarded) because
+  the refusal is target specific; the corridor ban rung of the
+  escalation ladder is SKIPPED for a leg whose evidence latched
+  (legRefused) - a leg the server refused does not name a frozen
+  corridor, banning it would seal innocent ground for the session
+  (the dump poisoned six corridors and a widened r768 ban across both
+  village exits of a server whose build simply refuses those clicks);
+  the server routed walk hops under the 3000 straight line boundary
+  (directHopMax 2500: Mobius refuses a request beyond 9900 units
+  outright and walks a player click beyond 3000 as a plain straight
+  line with no geodata routing - the old single far click of the
+  fallback was structurally dead), every hop passes the offline click
+  port, a wet hop line shortens to its dry shore prefix and a refused
+  routed hop aborts the trip early with the honest reason; and the
+  direct zone leg stall splits on the ground covered - a character
+  that progressed re-arms the pathfound return (the partially
+  refusing deployment walks out through the varied aims), a
+  character that stood on the same cell as the previous refusal stall
+  holds the return backoff (the fully refusing deployment never
+  restarts the cycle the server keeps refusing).
 - Water safety of the trips (the 2026-09-10 stuck regression): the
   server moves characters into water without any hesitation - its own
   move routing carries no water cost, its getValidLocation accepts the

@@ -432,6 +432,31 @@ type Loop struct {
     // stop target directly - bounded by directLegUntil.
     directLeg      bool
     directLegUntil time.Time
+    // legRefused latches the online refusal evidence of the current
+    // leg: the server answered a click of this leg with
+    // ActionFailed while the character stood still (see
+    // refusalEvidence). The corridor ban rung of the frozen trip
+    // escalation reads it - a leg the server refused does not name a
+    // frozen corridor, banning it would seal innocent ground for the
+    // session (the 2026-09-14 10:18 dump: six corridor bans and a
+    // widened r768 ban across both village exits while the server
+    // refused every click for its own reasons). It clears on the leg
+    // boundaries with the other leg state.
+    legRefused bool
+    // refusalVariants counts the varied aim attempts spent on the
+    // current leg (see stuckTownWalk): the refusal answer of the
+    // server is target specific - a shorter prefix or a sideways
+    // offset of the same waypoint often walks where the plain click
+    // was refused - so the stuck verdict varies the aim before it
+    // re-paths the whole leg.
+    refusalVariants int
+    // zoneRefusalX/Y remembers the cell where the server's refusal
+    // answers last stalled the direct zone legs: a later refusal
+    // stall on the very same cell (no ground covered in between)
+    // holds the return backoff instead of re-arming the cycle the
+    // server keeps refusing (see noteZoneLegStall).
+    zoneRefusalX int32
+    zoneRefusalY int32
     // legRadius is the approach radius the current town leg searches
     // its route within: the wide trip ring (tripApproachRadius) for
     // the merchant stops and the returns, the close ring
@@ -796,6 +821,10 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         frozenStage:       0,
         directLeg:         false,
         directLegUntil:    time.Time{},
+        legRefused:        false,
+        refusalVariants:   0,
+        zoneRefusalX:      0,
+        zoneRefusalY:      0,
         farmX:             0,
         farmY:             0,
         farmZ:             0,

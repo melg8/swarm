@@ -84,8 +84,15 @@ func writeDumpHeader(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintf(b, "session: started %s, uptime %s\n",
         snap.StartedAt.Format(time.RFC3339),
         time.Since(snap.StartedAt).Round(time.Second))
-    fmt.Fprintf(b, "packets: %d, state version %d\n\n",
+    fmt.Fprintf(b, "packets: %d, state version %d\n",
         snap.Packets, snap.Version)
+    if !snap.ActionFailedAt.IsZero() {
+        fmt.Fprintf(b, "last action failed: %s ago (the server "+
+            "refused a request, see the refusal lines of the hunt "+
+            "events)\n",
+            time.Since(snap.ActionFailedAt).Round(time.Second))
+    }
+    fmt.Fprintf(b, "\n")
 }
 
 // writeDumpCharacter writes the full character sheet of the dump.

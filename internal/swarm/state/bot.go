@@ -425,6 +425,17 @@ type Bot struct {
     // carries.
     huntLastAction   string
     huntLastActionAt time.Time
+    // actionFailedAt records the arrival time of the last
+    // ActionFailed (0x35) answer of the server: the server refuses
+    // a request - a move click its geodata collapses, an action
+    // while the character is held - and answers with the one byte
+    // packet. The hunt walk machinery reads it as the online
+    // refusal evidence: the offline click validation port cannot
+    // see a server side refusal (a different server build or
+    // geodata validates the same click differently), the
+    // ActionFailed answer is the only channel that names it (see
+    // hunt.Loop.refusalEvidence).
+    actionFailedAt time.Time
     // packetWindow feeds the packet rate of the diagnostics
     // view (see packetRateWindow).
     packetWindow packetRateWindow
@@ -1989,6 +2000,29 @@ func (b *Bot) RecordEvent(message string) {
     b.recordLocked(message)
 }
 
+// ApplyActionFailed records the arrival of an ActionFailed (0x35)
+// answer of the server. The packet carries no request identity, so
+// only the arrival time is stored: the hunt loop correlates it with
+// the walk request it sent (refusalEvidence) - a click that got the
+// answer while the character stood still is a server side refusal
+// the offline click validation cannot see. The version stays
+// untouched: the field feeds the hunt decisions and the state dump,
+// not the SSE snapshot, so the encode path pays nothing for it.
+func (b *Bot) ApplyActionFailed(at time.Time) {
+    b.mu.Lock()
+    b.actionFailedAt = at
+    b.mu.Unlock()
+}
+
+// LastActionFailed returns the arrival time of the last ActionFailed
+// answer of the server (the zero time when none arrived).
+func (b *Bot) LastActionFailed() time.Time {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.actionFailedAt
+}
+
 // EventSink receives every recorded event with its timestamp. The
 // session journal installs it to mirror the full event story into its
 // persistent file. The contract is strict: the sink is called while
@@ -2300,6 +2334,14 @@ type Snapshot struct {
     ServerTimeMs int64         `json:"serverTimeMs"`
     StartedAt    time.Time     `json:"startedAt"`
     UpdatedAt    time.Time     `json:"updatedAt"`
+    // ActionFailedAt is the arrival time of the last ActionFailed
+    // (0x35) refusal answer of the server (the zero time when none
+    // arrived): the dump prints its age next to the session header
+    // so a server that refuses the move requests names itself in
+    // the report (see ApplyActionFailed). The JSON tag stays "-":
+    // the field feeds the Go side dump only, the wire payload of
+    // the snapshot stays byte identical.
+    ActionFailedAt time.Time `json:"-"`
     // Diagnostics is the health view of the live state: the
     // liveness ages and rates, the combat nuance, the known
     // list summary and the hunt loop internals (see
@@ -2449,27 +2491,28 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
             InventoryMax:   0,
             Adena:          0,
         },
-        Inventory:    nil,
-        Objects:      make([]ObjectSnapshot, 0, len(b.world.hot)),
-        CombatEvents: make([]CombatEventView, 0, len(b.combat.events)),
-        Events:       make([]Event, 0, min(b.log.length, snapshotEvents)),
-        Chat:         make([]ChatEvent, 0, b.chat.length),
-        WalkPath:     nil,
-        WalkOrigin:   nil,
-        WalkIndex:    0,
-        WalkDest:     nil,
-        Shopping:     nil,
-        Skills:       nil,
-        SkillPlan:    nil,
-        Buffs:        nil,
-        HuntingZone:  nil,
-        HuntingZones: nil,
-        Packets:      b.packets,
-        Version:      b.version,
-        ServerTimeMs: now.UnixMilli(),
-        StartedAt:    b.started,
-        UpdatedAt:    b.updated,
-        Diagnostics:  Diagnostics{}, //nolint:exhaustruct_v5 // filled below
+        Inventory:      nil,
+        Objects:        make([]ObjectSnapshot, 0, len(b.world.hot)),
+        CombatEvents:   make([]CombatEventView, 0, len(b.combat.events)),
+        Events:         make([]Event, 0, min(b.log.length, snapshotEvents)),
+        Chat:           make([]ChatEvent, 0, b.chat.length),
+        WalkPath:       nil,
+        WalkOrigin:     nil,
+        WalkIndex:      0,
+        WalkDest:       nil,
+        Shopping:       nil,
+        Skills:         nil,
+        SkillPlan:      nil,
+        Buffs:          nil,
+        HuntingZone:    nil,
+        HuntingZones:   nil,
+        Packets:        b.packets,
+        Version:        b.version,
+        ServerTimeMs:   now.UnixMilli(),
+        StartedAt:      b.started,
+        UpdatedAt:      b.updated,
+        ActionFailedAt: b.actionFailedAt,
+        Diagnostics:    Diagnostics{}, //nolint:exhaustruct_v5 // filled below
     }
     if b.walkPlan != nil && time.Since(b.walkPlanAt) <= walkPlanTTL {
         snap.WalkPath = make([]WalkPoint, len(b.walkPlan.Points))
