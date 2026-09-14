@@ -10,6 +10,109 @@ finished task entries and older progress streams move to
 `agent_progress_archive.md` (append-only, same order). The permanent
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
+## Active task: the village escape acceptance round - the honest refusal attribution and the client position stream (2026-09-14)
+
+Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report after the refusal channel round (build 73fcfa6,
+"didnt fix it still") carried the 12:31 state dump: the abort reason
+changed - the "would swim" message is gone (the water guard fix of
+the routed hops held), but the trip now aborted on "the server
+refused the routed walk clicks" while the character stood at
+45768 49848 -3056 through a whole day of three dumps (08:42, 10:18
+and 12:31 - never one cell of movement). The user demand: make the
+acceptance test of that stuck cell (it shows FIRST in the web UI
+list) and demonstrate that from this position the bot finds a path
+and gets out of the city within two minutes at most.
+
+### Diagnosis
+
+- The refusal attribution was dishonest: the ActionFailed packet
+  carries no request identity, and every other request of the
+  session (the equip and skill requests of the gear machinery, the
+  transactions) answers ActionFailed the same way. The 12:31 dump
+  rerun showed the equip ActionFaileds landing one to three seconds
+  after the walk clicks of the same tick window - the correlation
+  latched them as walk refusals and aborted the routed walk the
+  server never refused. The honest gate: an arrival with a non walk
+  request in flight answers that request at least as likely as the
+  click.
+- The session never spoke the client position validation the server
+  builds half its view from: the official client streams
+  ValidatePosition 0x48 about once a second while moving, and
+  ValidatePosition.runImpl feeds the clientX/clientY/clientZ, the
+  client heading and the last server position of the door logout
+  exploit check that MoveToLocation compares against. A bot that
+  never validates leaves that view frozen at the login defaults -
+  the C1 z adoption gate (Math.abs(_z - getClientZ()) < 800) can
+  never run for a session whose client z the server still reads as
+  zero, and every server side branch that reads the client view
+  answers for a client that never spoke.
+
+### Progress (commit: the village escape round)
+
+- The honest refusal attribution: the send path records the walk
+  clicks (opcode 0x01) and every answered request separately
+  (sendPacket + silentSessionOpcodes - the maintenance stream that
+  never sees an ActionFailed answer, the handshake family,
+  ChangeMoveType2, Appearing, RequestNetPing and the validation
+  stream itself, stays out of the bookkeeping), and
+  refusalEvidence skips the attribution when a non walk request was
+  sent inside the answer window (state.Bot.OtherRequestBetween).
+- The client position validation stream: a one second ticker sends
+  the placement the server itself broadcast (never a claimed
+  position) when it changed, plus a fifteen second standing
+  heartbeat - the official cadence, far under every flood protector
+  threshold.
+- The acceptance scenario "village-escape" owns the FIRST slot of
+  the web UI list: temp10 wakes at the dump cell 45768 49848 -3056
+  with the exact state of the report (level 15 at 87.09 percent of
+  the level span, 1760 sp, 1312 adena, the Brandish sword, the bone
+  armor set, the leather helmet and gloves, the starter jewels, 589
+  arrows and the hunting bow in the bag) and must stand 3000+ units
+  from the village plaza within two minutes of the world entry.
+- The demonstration on the live geodata stack (the MOVEDBG trail of
+  the game server log): temp10 walked from the exact dump cell -
+  the first move request at 10:15:32 from 45768 49848 -3056, the
+  server position updating on every leg, 3442 units out at 10:15:56
+  and still moving. Twenty four seconds of continuous walking, not
+  one refused click, no corridor ban - the two minute contract holds
+  with a five fold margin.
+
+### Acceptance criteria
+
+- The web UI list serves the village escape scenario first
+  (TestVillageEscapeLeadsTheWebUIList pins the head slot, the dump
+  cell, the dump state and the two minute window).
+- A refusal answer with an equip request in flight never reads as a
+  walk refusal (TestRefusalEvidenceAttributesOnlyTheClicksOwnAnswer
+  pins the attribution cases: the click's own answer counts, the
+  equip's answer does not, an older request does not steal the
+  answer, a request after the arrival keeps the attribution).
+- The session streams ValidatePosition on the official cadence: on
+  movement change and on the standing heartbeat, carrying the
+  server broadcast placement only (the stream tests of
+  validate_position_stream_test.go and the wire format test of
+  validate_position_test.go).
+- From 45768 49848 -3056 the bot walks itself out of the village
+  within two minutes on the live stack (demonstrated: 24 s).
+
+### Status: done
+
+- Commit 1 (the fix + the acceptance scenario + the tests + the
+  docs): the honest ActionFailed attribution, the ValidatePosition
+  client stream, the village escape acceptance scenario (first in
+  the web UI list), the refusal attribution tests, the stream
+  tests, the protocol description section, the round 83 development
+  log entry, this progress entry. go build/vet clean, `task
+  fmt:check` clean, `golangci-lint run --new` (the three documented
+  gci artifacts aside), the full `go test ./...` green (23
+  packages), `tools/mobius_e2e.sh 45` E2E_OK.
+
 ## Active task: the server refused walk clicks - the ActionFailed refusal channel (2026-09-14)
 
 Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.

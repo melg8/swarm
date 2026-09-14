@@ -26,6 +26,8 @@ const (
     gearPassword   = "temp5"
     entryAccount   = "temp6"
     entryPassword  = "temp6"
+    escapeAccount  = "temp10"
+    escapePassword = "temp10"
 )
 
 // Scenario timeouts: the farm readiness runs the one town visit
@@ -81,12 +83,49 @@ const (
     defenseAuraSkillID = 91
 )
 
-// Definitions returns the acceptance scenario list: the farm
+// villageEscapeTimeout bounds the refused-click escape scenario:
+// the escape window itself is the two minutes of the user contract
+// (villageEscapeWindow, measured from the world entry), the scenario
+// budget adds the character injection, the login handshake and the
+// graceful shutdown around it.
+const villageEscapeTimeout = 5 * time.Minute
+
+// Definitions returns the acceptance scenario list: the village
+// escape of the refused-click dump first (the newest stuck report
+// owns the head of the list the web UI serves), then the farm
 // readiness round of the user, plus the in-process mirrors of the two
 // existing e2e harnesses (tools/mobius_e2e.sh and tools/proxy_e2e.sh)
 // so the whole acceptance suite runs from one place.
 func Definitions() []TestDef {
     return []TestDef{
+        {
+            ID:      "village-escape",
+            Title:   "village escape · the refused-click dump cell",
+            Account: escapeAccount,
+            Timeout: villageEscapeTimeout,
+            Description: "Start: the elven fighter temp10 wakes at the " +
+                "reported stuck cell of the 2026-09-14 12:31 dump " +
+                "(45768 49848 -3056, the elven village plaza - the " +
+                "position test3 held through a whole day of three dumps) " +
+                "as the level 15 character of the report with the exact " +
+                "state it carried - 87.09 percent of level 15, 1760 sp, " +
+                "1312 adena, the Brandish sword, the bone armor set, the " +
+                "leather helmet and gloves, the starter jewels, 589 " +
+                "arrows and the hunting bow in the bag. Flow: the bot " +
+                "walks itself out of the village - the walk plans the " +
+                "geodata route through the village streets, the follower " +
+                "clicks its legs and the stuck recovery (the varied aim, " +
+                "the corridor detours, the server routed hops) owns every " +
+                "refused click along the way. Pass: the character stands " +
+                "outside the city - 3000+ units from the village plaza, " +
+                "past every wall, gate and deck of the geodata - within " +
+                "two minutes of the world entry (the dump day held " +
+                "characters on that cell forever; the reproductions of " +
+                "the corridor and refusal rounds live in " +
+                "hunt/corridor_widen_repro_test.go and " +
+                "hunt/refusal_signal_repro_test.go).",
+            Scenario: villageEscapeScenario,
+        },
         {
             ID:      classTransferScenarioID,
             Title:   "class transfer · the M2 accept stage",

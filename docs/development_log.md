@@ -5678,3 +5678,105 @@ patch is logging only):
 - The MOVEDBG logging patch stays in the local Mobius checkout only
   (never committed to the swarm repository - the server integrity
   rules).
+
+## Round 83: the false refusal attribution and the silent client - the village escape acceptance round (2026-09-14)
+
+Scope: the 2026-09-14 12:31 state dump of the user's server (build
+73fcfa6, bot test3, phase townReturn, uptime 1m6s): the level 15
+character stood at the elven village center (45768 49848 -3056)
+through a whole day of three dumps and never moved a single cell,
+while the abort reason changed shape - the "would swim" message of
+the routed hops was gone (the water guard fix held) but the trip now
+died on "the server refused the routed walk clicks" with "last
+action failed: 1s ago". The user verdict: "didnt fix it still" - and
+the demand: the acceptance test of that stuck cell, first in the web
+UI list, demonstrating the escape within two minutes.
+
+### Problem statement
+
+The refusal channel of round 82 correlated every ActionFailed
+arrival with the last walk click inside a four second window - but
+the ActionFailed packet carries no request identity, and every other
+request of the session answers it the same way. The 12:31 dump rerun
+showed the equip ActionFaileds of the gear machinery landing one to
+three seconds after the walk clicks of the same tick window: the
+correlation latched them as walk refusals, the routed walk aborted on
+a refusal the server never sent for the click, and the character
+spent its whole day on that plaza. The second silence ran the other
+direction: the bot never sent the client position validation the
+official client streams about once a second - ValidatePosition 0x48
+feeds the server's clientX/clientY/clientZ view, the client heading
+and the last server position of the door logout exploit check that
+MoveToLocation compares against, and the C1 z adoption gate reads
+the client z directly (Math.abs(_z - getClientZ()) < 800 - a branch
+that can never run for a session whose client z the server still
+reads as zero).
+
+### Root cause analysis
+
+- The attribution owned every arrival: the walk click was the only
+  request the tracker recorded, so ANY ActionFailed of the window
+  read as its answer. The equip and skill requests of the gear swap
+  machinery answer ActionFailed identically, and their refusals ride
+  the walk clicks of the same tick window - attributing them to the
+  click latched refusals the walk never saw.
+- The session was a silent client: half the server's session view
+  builds from the ValidatePosition stream the official client sends
+  from its own movement simulation. A bot that never validates
+  leaves that view frozen at the login defaults, and every server
+  side branch that reads it answers for a client that never spoke.
+
+### Fix
+
+- The honest attribution: the send path classifies every outbound
+  request by its serialized opcode - the walk clicks (0x01) land in
+  the move bookkeeping, the answered requests (the equips, the
+  skills, the transactions) in the other bookkeeping, and the
+  maintenance stream that never sees an ActionFailed answer (the
+  handshake family, ChangeMoveType2, Appearing, RequestNetPing and
+  the validation stream itself) stays out of both
+  (connection.silentSessionOpcodes). refusalEvidence skips the
+  attribution when a non walk request was sent inside the answer
+  window: the arrival answers that request at least as likely as the
+  click (state.Bot.OtherRequestBetween).
+- The client position stream: a one second ticker sends
+  ValidatePosition with the placement the server itself broadcast
+  (never a claimed position) whenever it changed, plus a fifteen
+  second standing heartbeat - the official cadence, far under every
+  flood protector threshold.
+- The acceptance scenario "village-escape" owns the first slot of
+  the web UI list: temp10 wakes at the dump cell with the exact
+  state of the report (level 15 at 87.09 percent, 1760 sp, 1312
+  adena, the Brandish sword, the bone armor set, the leather helmet
+  and gloves, the starter jewels, 589 arrows and the hunting bow)
+  and passes standing 3000+ units from the village plaza within two
+  minutes of the world entry.
+
+### Verification
+
+- go build/vet, `task fmt:check`, `golangci-lint run --new` (the
+  three documented gci spaces-vs-tabs artifacts of the branch
+  aside), the full `go test ./...` green (23 packages).
+- The new tests: TestRefusalEvidenceAttributesOnlyTheClicksOwnAnswer
+  (the four attribution cases), the village escape definition tests
+  (the head slot of the web UI list, the dump cell, the dump state,
+  the two minute window), the ValidatePosition stream tests (the
+  movement cadence, the standing heartbeat, the server broadcast
+  placement only) and the wire format test.
+- Live: the injected dump character on the geodata stack walked from
+  the exact plaza cell - the MOVEDBG trail shows twenty four seconds
+  of continuous movement from 45768 49848 -3056 to 3442 units out
+  and still moving, not one refused click, no corridor ban - and
+  `tools/mobius_e2e.sh 45` stays E2E_OK.
+
+### Follow ups
+
+- The manual long walk follower (`hunt/user.go`) and the blind engage
+  recovery walker still read the refusal evidence through the shared
+  window; their own send bookkeeping would harden them the same way.
+- The flood protector thresholds of the reference server leave room
+  for a denser validation cadence if a deployment ever needs it; the
+  official cadence stays the contract.
+- The MOVEDBG logging patch stays in the local Mobius checkout only
+  (never committed to the swarm repository - the server integrity
+  rules).

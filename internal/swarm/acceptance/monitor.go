@@ -39,6 +39,9 @@ const (
     checkLesson  = "lesson"
 )
 
+// The village escape condition id.
+const checkEscape = "escape"
+
 // The teacher hall geometry of the building entry scenario: the class
 // master Ellenia of the elven fighters stands inside the trainer hall
 // (ElvenVillageNPCs.xml), the interaction ring the scenario accepts

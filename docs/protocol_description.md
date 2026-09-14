@@ -295,6 +295,33 @@ The bot sends it right after the EnterWorld request.
 | 0 | 1 | Opcode 0x1C |
 | 1 | 4 | Type run (1 = run, 0 = walk) |
 
+### ValidatePosition (0x48)
+
+The periodic client position validation the official client streams from
+its own movement simulation - roughly one report per second while the
+character moves and a sparse heartbeat while it stands. The server builds
+half of its session view from it (`ValidatePosition.runImpl`): the
+`clientX/clientY/clientZ` fields (the C1 z adoption branch reads
+`Math.abs(_z - player.getClientZ())`), the client heading and - when no
+door stands between the server and the reported placement - the last
+server position of the door logout exploit check that `MoveToLocation`
+compares against. A session that never validates leaves all of it frozen
+at the login defaults, so every server side branch that reads the client
+view answers for a client that never spoke. The bot mirrors the official
+cadence: a one second ticker sends the placement the server itself
+broadcast (never a claimed position), only when it changed, plus a 15
+second heartbeat while standing still - far under every flood protector
+threshold.
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x48 |
+| 1 | 4 | X (client side position) |
+| 5 | 4 | Y |
+| 9 | 4 | Z |
+| 13 | 4 | Heading |
+| 17 | 4 | Vehicle id (0 on foot) |
+
 ### Appearing (0x30)
 
 The teleport confirmation of the official client: the server keeps the

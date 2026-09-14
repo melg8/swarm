@@ -436,6 +436,16 @@ type Bot struct {
     // ActionFailed answer is the only channel that names it (see
     // hunt.Loop.refusalEvidence).
     actionFailedAt time.Time
+    // moveRequestAt records the send time of the last walk click
+    // (MoveToLocation 0x01) and otherRequestAt the send time of the
+    // last non walk request: the ActionFailed answer carries no
+    // request identity, so the refusal channel compares the two to
+    // decide whether an arrival may be attributed to the click at
+    // all (an equip or transaction refusal riding the click would
+    // otherwise latch a walk refusal that never happened, see
+    // OtherRequestBetween).
+    moveRequestAt  time.Time
+    otherRequestAt time.Time
     // packetWindow feeds the packet rate of the diagnostics
     // view (see packetRateWindow).
     packetWindow packetRateWindow
@@ -708,6 +718,19 @@ func (b *Bot) SelfPosition() (int32, int32, int32, bool) {
     }
 
     return b.char.X, b.char.Y, b.char.Z, true
+}
+
+// SelfHeading returns the last observed heading of the played
+// character (the client position validation reports it alongside the
+// placement, the server stores it as the client heading).
+func (b *Bot) SelfHeading() int32 {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+    if b.selfID == 0 {
+        return 0
+    }
+
+    return b.char.Heading
 }
 
 // SelfSitting reports whether the character is sitting. The hunt loop
@@ -2021,6 +2044,46 @@ func (b *Bot) LastActionFailed() time.Time {
     defer b.mu.RUnlock()
 
     return b.actionFailedAt
+}
+
+// ApplyMoveRequestSent records the send time of the last walk click
+// (MoveToLocation 0x01): the ActionFailed answer the refusal channel
+// correlates has to belong to the click, and the only other requests
+// of the session (the equips, the skills, the transactions) answer
+// ActionFailed the same way, so their send times tell the correlation
+// which arrival may be attributed to the click at all (see
+// OtherRequestBetween).
+func (b *Bot) ApplyMoveRequestSent(at time.Time) {
+    b.mu.Lock()
+    b.moveRequestAt = at
+    b.mu.Unlock()
+}
+
+// ApplyOtherRequestSent records the send time of the last NON walk
+// request of the session - an action request the server may answer
+// with ActionFailed (an equip, a skill, a transaction; the send path
+// skips the maintenance stream that never sees that answer, see
+// connection.silentSessionOpcodes): an ActionFailed arriving after
+// such a request answers it at least as likely as the walk click, so
+// the refusal channel skips the attribution (see OtherRequestBetween).
+func (b *Bot) ApplyOtherRequestSent(at time.Time) {
+    b.mu.Lock()
+    b.otherRequestAt = at
+    b.mu.Unlock()
+}
+
+// OtherRequestBetween reports whether a non walk request was sent
+// inside the answer window (after the walk click, before the
+// ActionFailed arrival): the answer packet carries no request
+// identity, so an arrival with such a request in flight may answer
+// that request instead of the click - attributing it to the click
+// would latch a refusal that never happened (the equip refusals of
+// the gear swaps ride the walk clicks exactly this way).
+func (b *Bot) OtherRequestBetween(after, before time.Time) bool {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.otherRequestAt.After(after) && b.otherRequestAt.Before(before)
 }
 
 // EventSink receives every recorded event with its timestamp. The

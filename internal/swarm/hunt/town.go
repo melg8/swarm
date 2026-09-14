@@ -1928,6 +1928,17 @@ func (l *Loop) legAdvanceClear(
 // the request, and a click the server accepted moves the character
 // instead (the stuck verdict calling this already proved it did
 // not).
+//
+// The attribution is honest about the answer's owner: the ActionFailed
+// packet carries no request identity, and every other request of the
+// session (the equip and skill requests of the gear machinery, the
+// transactions) answers ActionFailed the same way. An arrival with a
+// non walk request sent after the click belongs to that request at
+// least as likely as to the click - the gear swap refusals ride the
+// walk clicks exactly this way (the 2026-09-14 12:31 dump rerun: the
+// equip ActionFaileds landed one to three seconds after the walk
+// clicks of the same tick window) - so the correlation skips them
+// instead of latching a walk refusal that never happened.
 func (l *Loop) refusalEvidence() bool {
     if l.moveAt.IsZero() {
         return false
@@ -1935,7 +1946,8 @@ func (l *Loop) refusalEvidence() bool {
     failedAt := l.tracker.LastActionFailed()
 
     return failedAt.After(l.moveAt) &&
-        failedAt.Sub(l.moveAt) <= refusalAnswerWindow
+        failedAt.Sub(l.moveAt) <= refusalAnswerWindow &&
+        !l.tracker.OtherRequestBetween(l.moveAt, failedAt)
 }
 
 // sendVariedAim answers a stuck verdict with refusal evidence by

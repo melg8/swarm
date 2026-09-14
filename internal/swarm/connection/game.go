@@ -31,7 +31,48 @@ const (
     gameHandshakeWait = 30 * time.Second
     packetChanSize    = 32
     bufferInitialSize = 4096
+    // validatePositionPeriod paces the client position validation the
+    // official client streams while its character moves: the ticker
+    // only sends when the observed placement actually changed (or the
+    // standing heartbeat elapsed), so a calm session stays quiet.
+    validatePositionPeriod = time.Second
+    // validatePositionIdleGap bounds the standing heartbeat of the
+    // validation: a character that stands still keeps the server's
+    // clientX/clientY/clientZ view fresh at a whisper rate instead of
+    // the movement rate, far under every flood protector threshold.
+    validatePositionIdleGap = 15 * time.Second
+    // moveToLocationClientPacketID mirrors togameserver.
+    // moveToLocationPacketID: the send path classifies the request by
+    // its serialized opcode so the tracker can attribute the
+    // ActionFailed answers honestly (see sendPacket).
+    moveToLocationClientPacketID = 0x01
 )
+
+// silentSessionOpcodes lists the outbound maintenance opcodes that
+// never own an ActionFailed answer - the refusal attribution
+// bookkeeping of sendPacket skips them. The set is the complement of
+// the answered family of the reference server (the ActionFailed grep
+// of the Mobius C1 clientpackets: the move, attack, action, skill,
+// item and transaction requests all answer it, the maintenance
+// stream never does): the handshake family (ProtocolVersion 0x00,
+// AuthLogin 0x08, CharacterCreate 0x0B, CharacterSelect 0x0D), the
+// in-session maintenance (ChangeMoveType2 0x1C, Appearing 0x30,
+// RequestNetPing 0xA8 which answers NetPing) and the client position
+// validation stream (ValidatePosition 0x48, which the server answers
+// with nothing at all). Counting any of these as a request would
+// dismiss the genuine walk refusals that arrive while the stream
+// flows - the one second validation ticker alone would shadow every
+// refusal of a moving session (see sendPacket).
+var silentSessionOpcodes = map[byte]bool{
+    0x00: true, // ProtocolVersion
+    0x08: true, // AuthLogin
+    0x0B: true, // CharacterCreate
+    0x0D: true, // CharacterSelect
+    0x1C: true, // ChangeMoveType2
+    0x30: true, // Appearing
+    0x48: true, // ValidatePosition
+    0xA8: true, // RequestNetPing
+}
 
 // gameSilenceTimeout bounds the absolute packet silence of a live
 // game session. The server answers every RequestNetPing with a
@@ -627,6 +668,66 @@ func (gc *GameClient) RestartAtVillage() error {
     return nil
 }
 
+// positionValidation is the send state of the client position
+// validation loop: the placement of the last report and its moment,
+// so the ticker sends only what the official client sends - a
+// validation whenever the observed placement changed (the movement
+// rate) and a sparse heartbeat while the character stands still (see
+// validatePositionIdleGap).
+type positionValidation struct {
+    x, y, z  int32
+    heading  int32
+    reported bool
+    at       time.Time
+}
+
+// validatePosition sends the client position validation of the
+// official client (ValidatePosition 0x48) when the observed placement
+// of the character changed since the last report, or when the idle
+// heartbeat elapsed while the character stood still. The official
+// client streams this packet from its own movement simulation and the
+// server builds half of its session view from it: the clientZ the z
+// adoption gate reads, the last server position the door logout
+// exploit check compares, the client heading. A bot that never
+// validates leaves that view frozen at its defaults - the C1
+// clientZ adoption branch (Math.abs(_z - player.getClientZ()) < 800)
+// can never run for a session whose client z the server still reads
+// as zero - and every deployment whose movement validation expects
+// the client liveness signal answers the silence its own way. The
+// report carries exactly the tracker placement the server itself
+// broadcast: nothing is claimed the server did not say.
+func (gc *GameClient) validatePosition(validation *positionValidation) error {
+    if gc.tracker == nil {
+        return nil
+    }
+    x, y, z, ok := gc.tracker.SelfPosition()
+    if !ok {
+        return nil
+    }
+    heading := gc.tracker.SelfHeading()
+    now := time.Now()
+    changed := !validation.reported || x != validation.x || y != validation.y ||
+        z != validation.z || heading != validation.heading
+    idle := now.Sub(validation.at) >= validatePositionIdleGap
+    if !changed && !idle {
+        return nil
+    }
+    request := togameserver.NewValidatePositionPacket()
+    request.X = x
+    request.Y = y
+    request.Z = z
+    request.Heading = heading
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to send validate position: %w", err)
+    }
+    validation.x, validation.y, validation.z = x, y, z
+    validation.heading = heading
+    validation.reported = true
+    validation.at = now
+
+    return nil
+}
+
 // WalkTo makes the character walk to a world point, exactly like a
 // ground click of the official client (client MoveToLocation 0x01 in
 // mouse mode). The hunt loop uses it to run toward a drop: this build of
@@ -664,6 +765,24 @@ func (gc *GameClient) sendPacket(data crypt.Serializable) error {
     }
     if gc.trace {
         gc.logger.Printf("Sent packet id 0x%02x", writer.Bytes()[0])
+    }
+    if gc.tracker != nil {
+        // The request bookkeeping of the refusal channel: the walk
+        // clicks (opcode 0x01) and the action requests (the equips,
+        // the skills, the transactions) answer ActionFailed the same
+        // way, so their send times decide which arrival may be
+        // attributed to a click at all (an equip refusal riding the
+        // click would otherwise read as a refused walk, see
+        // state.Bot.OtherRequestBetween). The maintenance stream
+        // never owns an ActionFailed answer, so its opcodes stay out
+        // of the bookkeeping (see silentSessionOpcodes).
+        opcode := writer.Bytes()[0]
+        now := time.Now()
+        if opcode == moveToLocationClientPacketID {
+            gc.tracker.ApplyMoveRequestSent(now)
+        } else if !silentSessionOpcodes[opcode] {
+            gc.tracker.ApplyOtherRequestSent(now)
+        }
     }
 
     gc.writeMu.Lock()
@@ -1056,8 +1175,11 @@ func (gc *GameClient) run(ctx context.Context, characterName string) error {
 
     pingTicker := time.NewTicker(gamePingPeriod)
     defer pingTicker.Stop()
+    validateTicker := time.NewTicker(validatePositionPeriod)
+    defer validateTicker.Stop()
 
-    err := gc.runLoop(ctx, packets, pingTicker, characterName)
+    err := gc.runLoop(ctx, packets, pingTicker, validateTicker,
+        characterName)
     // The logout is only announced while the connection is still usable:
     // after a transport error the packet would fail and only spam the log.
     gc.disconnect(err == nil)
@@ -1073,15 +1195,29 @@ func (gc *GameClient) run(ctx context.Context, characterName string) error {
 // re-arms the timer, and a session that stays silent past
 // gameSilenceTimeout unwinds with an error so the supervisor
 // reconnects instead of blocking on a dead socket forever (see
-// gameSilenceTimeout).
+// gameSilenceTimeout). The validateTicker drives the client position
+// validation of the official client (see validatePosition).
 func (gc *GameClient) runLoop(
     ctx context.Context,
     packets <-chan gamePacket,
     pingTicker *time.Ticker,
+    validateTicker *time.Ticker,
     characterName string,
 ) error {
     silence := time.NewTimer(gameSilenceTimeout)
     defer silence.Stop()
+    // The validation state: the last placement the session reported
+    // and the moment of the last report, so the ticker sends only on
+    // a change (the movement rate) or on the idle heartbeat (see
+    // validatePositionIdleGap).
+    validation := positionValidation{
+        x:        0,
+        y:        0,
+        z:        0,
+        heading:  0,
+        reported: false,
+        at:       time.Time{},
+    }
     for {
         select {
         case <-ctx.Done():
@@ -1091,6 +1227,10 @@ func (gc *GameClient) runLoop(
         case <-pingTicker.C:
             if err := gc.sendPacket(&togameserver.RequestNetPing{}); err != nil {
                 return fmt.Errorf("failed to send net ping: %w", err)
+            }
+        case <-validateTicker.C:
+            if err := gc.validatePosition(&validation); err != nil {
+                return fmt.Errorf("failed to validate position: %w", err)
             }
         case <-silence.C:
             return fmt.Errorf("game session silent for %s, closing the "+
