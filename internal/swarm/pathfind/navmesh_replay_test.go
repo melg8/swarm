@@ -20,9 +20,16 @@ import (
 // 339 us per findPath+findStraightPath, the hard bridge pair 169 us)
 // through the current grid A* engine, so the research report compares
 // the two engines on identical endpoints. The pairs file is a copy of
-// research/recast/results/query_pairs_21_19.txt; the test skips when
-// the geodata directory is absent.
+// research/recast/results/query_pairs_21_19.txt. The replay is
+// opt-in (SWARM_NAVMESH_REPLAY=1) because the grid engine needs
+// about 10 minutes for the 200 region wide pairs - that cost is the
+// research finding, not a regression the suite should pay for; the
+// recorded numbers live in research/recast/results/.
 func TestNavmeshPairReplay(t *testing.T) {
+    if os.Getenv("SWARM_NAVMESH_REPLAY") != "1" {
+        t.Skip("the research pair replay is opt-in:" +
+            " SWARM_NAVMESH_REPLAY=1")
+    }
     pairs := loadNavmeshPairs(t, "testdata/navmesh_pairs_21_19.txt")
     engine := NewEngine("../../../data/geodata")
     if !engine.Stats().HasData {
