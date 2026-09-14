@@ -31,6 +31,20 @@ type GameAPI interface {
     // WalkTo makes the character walk to a world point, like a ground
     // click of the official client.
     WalkTo(x int32, y int32, z int32) error
+    // CursorKeyWalkTo sends the keyboard-mode move request (the
+    // cursor keys of the official client, MoveToLocation movement
+    // mode 0): the server arms the cursor key movement of the
+    // session and every following ValidatePosition claim moves the
+    // character server-side without any click validation - the
+    // cursor key escape of a click-refusing cell (see
+    // Loop.beginCursorKeyEscape).
+    CursorKeyWalkTo(x int32, y int32, z int32) error
+    // ClaimValidatePosition reports a claimed client position: while
+    // the cursor key movement is armed the server syncs the claim
+    // straight into the world and broadcasts it, so the claims walk
+    // the character - the arrow-key movement stream of the official
+    // client, the only movement a click-refusing cell answers.
+    ClaimValidatePosition(x int32, y int32, z int32, heading int32) error
     // PickupItem clicks a ground item to walk to it and pick it up.
     PickupItem(item state.LootItem) error
     // ActionSitStand toggles between sitting and standing.
@@ -432,6 +446,23 @@ type Loop struct {
     // stop target directly - bounded by directLegUntil.
     directLeg      bool
     directLegUntil time.Time
+    // cursorEscape carries the cursor key escape of a click-refusing
+    // cell (see beginCursorKeyEscape): the armed state, the claimed
+    // dry steps toward the escape aim, the claim cursor and the
+    // follow bookkeeping. The escape emulates the arrow keys of the
+    // official client - the movement mode 0 arm plus the claimed
+    // ValidatePosition stream the server follows without any click
+    // validation - because the 2026-09-14 15:10 report proved the
+    // user's server answers NO mouse click from the dump cell at
+    // all: even the official client stood frozen on the plaza cell
+    // until the player walked it out with the arrows.
+    cursorEscape cursorEscapeState
+    // cursorEscapes counts the cursor key escape attempts spent by
+    // the current town trip: a server that ignores the claims too
+    // (keyboard movement disabled, a build without the cursor key
+    // branch) burns the attempts and the trip aborts with the
+    // honest reason instead of grinding the escape ladder forever.
+    cursorEscapes int
     // legRefused latches the online refusal evidence of the current
     // leg: the server answered a click of this leg with
     // ActionFailed while the character stood still (see

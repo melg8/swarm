@@ -36,26 +36,28 @@ func disablePace(t *testing.T) {
 // double click semantics: the first attack request for a new target only
 // selects it, the repeated request starts the fight.
 type fakeGame struct {
-    forces    []int32
-    pickups   []int32
-    walks     [][3]int32
-    sits      int
-    restarts  int
-    destroys  [][2]int32
-    sells     [][]state.InventoryItem
-    buys      [][]gear.Purchase
-    uses      []int32
-    drops     [][5]int32
-    clicks    []int32
-    clears    int
-    lessons   [][2]int32
-    casts     []int32
-    noTargets bool
-    logouts   int
-    bypasses  []string
-    htmlNPC   int32
-    htmlBody  string
-    lastError error
+    forces      []int32
+    pickups     []int32
+    walks       [][3]int32
+    cursorWalks [][3]int32
+    claims      [][4]int32
+    sits        int
+    restarts    int
+    destroys    [][2]int32
+    sells       [][]state.InventoryItem
+    buys        [][]gear.Purchase
+    uses        []int32
+    drops       [][5]int32
+    clicks      []int32
+    clears      int
+    lessons     [][2]int32
+    casts       []int32
+    noTargets   bool
+    logouts     int
+    bypasses    []string
+    htmlNPC     int32
+    htmlBody    string
+    lastError   error
 }
 
 func (f *fakeGame) AttackTarget(objectID int32) error {
@@ -72,6 +74,30 @@ func (f *fakeGame) WalkTo(x int32, y int32, z int32) error {
         return f.lastError
     }
     f.walks = append(f.walks, [3]int32{x, y, z})
+
+    return nil
+}
+
+// CursorKeyWalkTo records the keyboard-mode move request of the
+// cursor key escape (the movement mode 0 arm).
+func (f *fakeGame) CursorKeyWalkTo(x int32, y int32, z int32) error {
+    if f.lastError != nil {
+        return f.lastError
+    }
+    f.cursorWalks = append(f.cursorWalks, [3]int32{x, y, z})
+
+    return nil
+}
+
+// ClaimValidatePosition records the claimed client position of the
+// cursor key escape (the arrow-key movement stream).
+func (f *fakeGame) ClaimValidatePosition(
+    x int32, y int32, z int32, heading int32,
+) error {
+    if f.lastError != nil {
+        return f.lastError
+    }
+    f.claims = append(f.claims, [4]int32{x, y, z, heading})
 
     return nil
 }

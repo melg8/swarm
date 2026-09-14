@@ -265,8 +265,17 @@ to sit while moving, casting or attacking (`RequestActionUse.runImpl` case 0,
 The ground click movement request of the official client: the server walks
 the character to the target point (`MoveToLocation.runImpl`). Mode 1 is the
 mouse click; keyboard mode (0) is ignored unless keyboard movement is
-enabled on the server. The hunt loop walks to a drop with it before
-clicking the item.
+enabled on the server (the reference default). The hunt loop walks to a
+drop with it before clicking the item, and the cursor key escape of a
+click-refusing cell arms the keyboard mode: the mode 0 branch of
+`MoveToLocation.runImpl` adopts the packet origin within the thousand unit
+window, latches the player's cursor key flag and sets the move intention,
+so every following ValidatePosition claim moves the character server-side
+without any click validation - the arrow-key movement the official client
+streams from its own movement simulation, the only movement a
+click-refusing cell answers (the 2026-09-14 15:10 report: even the
+official client stood frozen on the village plaza cell until the player
+walked the arrows; a mouse-mode click clears the flag again).
 
 | Offset | Size | Field |
 |--------|------|-------|
@@ -311,7 +320,14 @@ view answers for a client that never spoke. The bot mirrors the official
 cadence: a one second ticker sends the placement the server itself
 broadcast (never a claimed position), only when it changed, plus a 15
 second heartbeat while standing still - far under every flood protector
-threshold.
+threshold. While the cursor key escape of a click-refusing cell runs,
+the claimed placements own the stream instead: the cursor key branch of
+`ValidatePosition.runImpl` syncs each claimed placement straight into
+the world and broadcasts it (the arrow-key movement the official client
+streams, the only movement a click-refusing cell answers - the
+2026-09-14 15:10 report), so the echo ticker stands down for the claims
+and the first mouse-mode walk returns it (see
+`GameClient.ClaimValidatePosition`).
 
 | Offset | Size | Field |
 |--------|------|-------|

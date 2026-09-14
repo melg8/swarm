@@ -5780,3 +5780,108 @@ reads as zero).
 - The MOVEDBG logging patch stays in the local Mobius checkout only
   (never committed to the swarm repository - the server integrity
   rules).
+
+## Round 84: the refusing cell even the official client cannot click - the cursor key escape (2026-09-14)
+
+Scope: the 2026-09-14 15:10 state dump of the user's server (build
+70d49c5, bot temp10 - the acceptance character running the
+village-escape scenario against the user's own deployment): the level
+15 character stood at the village plaza cell 45768 49848 -3056 through
+three session restarts and the whole escalation ladder - the stuck
+re-paths, the corridor ban at 43512 50504, the detour freeze and the
+server routed walk aborting on "the server refused the routed walk
+clicks" - never moving a single cell. The user's follow-up closed the
+case: from that exact point even the OFFICIAL CLIENT cannot move by
+clicking; only the ARROW KEYS walked the character, and after the
+arrow walk the clicks worked again.
+
+### Problem statement
+
+The honest refusal attribution of round 83 held on the user's server:
+the routed walk clicks were really refused - the user's own client met
+the same refusal on the same cell. The bot had the correct verdict and
+no recovery: a cell whose geodata the server's own path check refuses
+answers no mouse click at all, and the abort-backoff ladder just
+re-runs the identical refusal forever. The user demanded the
+reproduction of exactly that situation - a cell no click can leave,
+walked out the arrow way.
+
+### Root cause analysis
+
+The Mobius C1 source explains both halves of the user's observation.
+`MoveToLocation` carries a movement mode field ("is 0 if cursor keys
+are used 1 if mouse is used"): the mode 0 branch adopts the packet
+origin within the thousand unit window and latches the player's cursor
+key flag, and while that flag holds, the cursor key branch of
+`ValidatePosition.runImpl` syncs EVERY claimed placement straight into
+the world and broadcasts it - the character follows the client's own
+movement simulation with no click validation at all. That is the arrow
+walk: the client-side movement stream the server follows blindly. A
+mouse-mode click clears the flag again. The bot only ever sent mode 1
+and only ever echoed the server-broadcast placement - it owned neither
+half of the arrow mechanism, so a click-refusing cell froze it exactly
+the way it froze the official client's mouse clicks.
+
+### Fix
+
+- The cursor key escape (hunt/town.go): the routed walk refusal
+  verdict arms the escape instead of aborting at once - the movement
+  mode 0 arm (CursorKeyWalkTo) plus the claimed ValidatePosition steps
+  toward the validated dry hop aim (one run-speed step per second, the
+  official client cadence), the follow probe ends an attempt after
+  five unacknowledged claims, the settle window re-arms the leg window
+  and the clicks resume from the escaped ground. Three attempts per
+  trip, the corridor bans stay off (the refusal evidence owns the
+  verdict), the water guard holds for the claims (a claim never names
+  a wet cell).
+- The connection primitives (connection/game.go): CursorKeyWalkTo
+  sends the mode 0 request with the tracked origin;
+  ClaimValidatePosition sends the claimed placement and gates the echo
+  ticker - the echo of the broadcast position would lag the claims one
+  broadcast behind and snap the character back a step each tick while
+  the cursor key flag holds - and the first mouse-mode walk returns
+  the echo.
+- The reproduction (hunt/cursor_escape_repro_test.go): the
+  cursorKeyServer models the reported server honestly - the mouse
+  clicks whose origin stands within the refusal radius of the dump
+  cell answer ActionFailed (the refusal the official client met
+  live), the cursor key arm latches the flag, the claims move the
+  character, an accepted mouse click clears the flag.
+
+### Verification
+
+- go build/vet, `task fmt:check`, `golangci-lint run --new` (the
+  three documented gci spaces-vs-tabs artifacts of the branch aside),
+  the full hunt, connection and packets suites green.
+- TestReproCursorKeyEscapeWalksOutOfTheRefusingCell: the escape walks
+  the character out of the refusing plaza cell claim by claim, the
+  clicks resume from the escaped ground, the walk reaches the hunting
+  zone, every claimed step line stays dry, no corridor ban arms.
+- TestReproCursorKeyEscapeAbortsWhenTheServerIgnoresTheClaims: a
+  server that drops the mode 0 requests silently (the keyboard
+  movement disabled) burns the escape attempts and aborts with the
+  honest reason - the frozen-client reproduction, the character never
+  moving a cell.
+- The stream tests: the cursor key arm carries the movement mode 0
+  with the tracked origin; the claims own the validation stream while
+  the escape runs and the first mouse-mode walk returns the echo.
+- Live: `tools/mobius_e2e.sh 45` stays E2E_OK (the reference stack
+  walks its clicks - the escape never arms there).
+
+### Follow ups
+
+- The acceptance scenario village-escape runs the escape machinery
+  through the real hunt loop on the user's deployment - the next
+  dump of that run names the refusing radius of their server the
+  escape actually walked.
+- The refusal radius of the user's plaza cell is unknown (their
+  geodata anomaly): the per-hop escape re-tests the ground after
+  every 2500 unit escape, a wider pocket would burn the attempts and
+  name itself in the abort - a dump of that abort would size it.
+- The claims walk straight lines only: a refusing pocket whose dry
+  route bends (a wall between the plaza and the aim) would exhaust
+  the straight-step ladder - the route-following claims (the planner
+  waypoints interpolated) would harden it.
+- The MOVEDBG logging patch stays in the local Mobius checkout only
+  (never committed to the swarm repository - the server integrity
+  rules).

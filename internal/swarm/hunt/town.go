@@ -191,6 +191,39 @@ const (
     // geodata routing on the click - the routing the fallback exists
     // for - while the water guard checks the actual hop line.
     directHopMax = 2500.0
+    // cursorEscapeStep is one claimed step of the cursor key escape:
+    // about one second of run speed, the cadence the official client
+    // streams its own movement simulation at while the player walks
+    // with the arrows - the claim pace of the escape matches the
+    // client the server already trusts.
+    cursorEscapeStep = 144.0
+    // cursorEscapePeriod paces the claimed steps of the cursor key
+    // escape: one claim per second, the official client cadence of
+    // the ValidatePosition stream (far under every flood protector
+    // threshold of the reference server).
+    cursorEscapePeriod = time.Second
+    // cursorEscapeFollowClaims bounds the patience of the escape's
+    // follow probe: this many claims with no server position change
+    // prove the server ignores the stream (the keyboard movement
+    // disabled, a build without the cursor key branch of
+    // ValidatePosition), and the trip ends with the honest reason
+    // instead of grinding claims into the silence.
+    cursorEscapeFollowClaims = 5
+    // cursorEscapeSettle bounds the wait for the position broadcasts
+    // after the last claimed step: the server answers each claim
+    // with a ValidateLocation broadcast, and the settle window lets
+    // the tracker catch up before the leg resumes its clicks.
+    cursorEscapeSettle = 2 * time.Second
+    // cursorEscapeAttemptsMax bounds the cursor key escape attempts
+    // of one town trip: a pocket that keeps refusing the clicks
+    // after the escapes walks a wider problem than the escape
+    // exists for, the honest abort owns it.
+    cursorEscapeAttemptsMax = 3
+    // cursorEscapeFollowStep is the movement margin that proves the
+    // server follows the claims: any drift past it from the escape
+    // origin re-arms the follow patience (the character moved - the
+    // claims own it).
+    cursorEscapeFollowStep = 64.0
     // extendMarchStep is the stride of the forward route march of
     // extendShortClickCandidates: one geodata cell.
     extendMarchStep = 16.0
@@ -1162,6 +1195,16 @@ func (l *Loop) walkDirectLeg(
 
         return true
     }
+    // The cursor key escape owns the leg while it runs: the server
+    // refused the routed clicks and the arrow emulation walks the
+    // character off the refusing ground claim by claim (see
+    // driveCursorKeyEscape) - the click machinery below stays down
+    // until the escape ends.
+    if l.cursorEscape.armed {
+        l.driveCursorKeyEscape(now, selfX, selfY)
+
+        return false
+    }
     if now.After(l.directLegUntil) {
         l.directLeg = false
         l.abortTownTrip("the server routed walk made no progress")
@@ -1188,19 +1231,6 @@ func (l *Loop) walkDirectLeg(
         moveY = int32(float64(selfY) + hopDY*frac)
         moveZ = int32(float64(selfZ) +
             (float64(moveZ)-float64(selfZ))*frac)
-    }
-    // A refused routed hop aborts early: the refusal answer of the
-    // server arrived for the last click and the character did not
-    // move - the window would burn on clicks the server keeps
-    // bouncing, the trip ends with the honest reason instead (the
-    // dump of the same report ground the 45 s window on a server
-    // that refused everything).
-    if l.refusalEvidence() {
-        l.legRefused = true
-        l.directLeg = false
-        l.abortTownTrip("the server refused the routed walk clicks")
-
-        return false
     }
     // The hop passes the same offline click port the planned clicks
     // do: a hop whose line the reference server collapses (the far
@@ -1256,9 +1286,255 @@ func (l *Loop) walkDirectLeg(
         int32(l.legDest.X), int32(l.legDest.Y), now); dodged {
         moveX, moveY = ax, ay
     }
+    // A refused routed hop hands the leg to the cursor key escape
+    // or aborts early: the branch sits after the hop validation and
+    // the water guard so the escape aims at the validated dry hop
+    // the clicks would have walked. The refusal answer of the
+    // server arrived for the last click and the character did not
+    // move - the 2026-09-14 15:10 report proved the user's server
+    // answers NO click from that cell at all (even the official
+    // client stood frozen until the player walked the arrows), so
+    // the escape emulates exactly that: the cursor key arm plus the
+    // claimed ValidatePosition stream the server follows without
+    // any click validation. A server that ignores the claims too
+    // burns the escape attempts and the trip ends with the honest
+    // reason instead of grinding clicks it keeps bouncing.
+    if l.refusalEvidence() {
+        if l.beginCursorKeyEscape(
+            selfX, selfY, selfZ, moveX, moveY, moveZ) {
+            return false
+        }
+        l.legRefused = true
+        l.directLeg = false
+        l.abortTownTrip("the server refused the routed walk clicks")
+
+        return false
+    }
     l.walkToward(moveX, moveY, moveZ, now)
 
     return false
+}
+
+// cursorEscapeState carries the armed cursor key escape: the origin
+// the refusal verdict stood at, the claimed dry steps toward the
+// validated hop aim, the claim cursor and the follow bookkeeping
+// (see beginCursorKeyEscape).
+type cursorEscapeState struct {
+    armed   bool
+    originX int32
+    originY int32
+    steps   [][3]int32
+    next    int
+    // lastClaimAt paces the claims at the official client cadence.
+    lastClaimAt time.Time
+    // claimsSinceMove counts the claims since the last observed
+    // server position change: the follow probe of the escape.
+    claimsSinceMove int
+}
+
+// zeroCursorEscape returns the cleared escape state of the leg and
+// trip boundaries: every field explicit (the exhaustruct convention
+// of the repository).
+func zeroCursorEscape() cursorEscapeState {
+    return cursorEscapeState{
+        armed:           false,
+        originX:         0,
+        originY:         0,
+        steps:           nil,
+        next:            0,
+        lastClaimAt:     time.Time{},
+        claimsSinceMove: 0,
+    }
+}
+
+// beginCursorKeyEscape arms the cursor key escape of a click
+// refusing cell: the routed walk clicks bounced with ActionFailed
+// while the character stood still, and the 2026-09-14 15:10 report
+// proved the user's server answers NO mouse click from such a cell
+// at all - even the official client stood frozen on the village
+// plaza cell until the player walked it out with the ARROW KEYS.
+// The escape emulates exactly that movement: the keyboard-mode move
+// request (MoveToLocation movement mode 0) arms the server's cursor
+// key handling, and the claimed ValidatePosition stream the official
+// client drives from its own movement simulation moves the character
+// server-side without any click validation (ValidatePosition.runImpl
+// syncs the claimed placement into the world and broadcasts it). The
+// claimed steps follow the validated dry hop aim the click would
+// have walked, one run-speed step per second. It reports whether the
+// escape armed; a server that ignores the claims burns the attempts
+// (see driveCursorKeyEscape) and the caller keeps its honest abort.
+func (l *Loop) beginCursorKeyEscape(
+    selfX, selfY, selfZ, aimX, aimY, aimZ int32,
+) bool {
+    if l.cursorEscapes >= cursorEscapeAttemptsMax {
+        return false
+    }
+    steps := l.cursorEscapeSteps(selfX, selfY, selfZ, aimX, aimY, aimZ)
+    if len(steps) == 0 {
+        // No dry step exists toward the aim: the water guard owns
+        // this direction, the honest abort of the caller stands.
+        return false
+    }
+    l.cursorEscapes++
+    l.cursorEscape = cursorEscapeState{
+        armed:           true,
+        originX:         selfX,
+        originY:         selfY,
+        steps:           steps,
+        next:            0,
+        lastClaimAt:     time.Time{},
+        claimsSinceMove: 0,
+    }
+    l.legRefused = true
+    if err := l.game.CursorKeyWalkTo(aimX, aimY, aimZ); err != nil {
+        l.logf("Hunt: the cursor key arm failed: %v", err)
+    }
+    l.logf("Hunt: the server refused the routed walk clicks, trying "+
+        "the cursor key escape toward %d %d (%d claimed steps)",
+        aimX, aimY, len(steps))
+
+    return true
+}
+
+// cursorEscapeSteps builds the claimed steps of the cursor key
+// escape: the straight line from the standing cell toward the
+// validated hop aim, interpolated into run-speed steps whose lines
+// stay dry (the water guard holds for the claims the same way it
+// holds for the clicks - a claim never names a wet cell). The steps
+// stop at the aim or at the first wet prefix, whichever comes first.
+func (l *Loop) cursorEscapeSteps(
+    selfX, selfY, selfZ, aimX, aimY, aimZ int32,
+) [][3]int32 {
+    total := math.Hypot(float64(aimX-selfX), float64(aimY-selfY))
+    if total < 1 {
+        return nil
+    }
+    var steps [][3]int32
+    prevX, prevY, prevZ := selfX, selfY, selfZ
+    for walked := cursorEscapeStep; walked < total; walked += cursorEscapeStep {
+        frac := walked / total
+        stepX := int32(float64(selfX) +
+            float64(aimX-selfX)*frac)
+        stepY := int32(float64(selfY) +
+            float64(aimY-selfY)*frac)
+        stepZ := int32(float64(selfZ) +
+            float64(aimZ-selfZ)*frac)
+        if l.navigator != nil {
+            crossed, err := l.navigator.WaterCrossed(
+                pathfind.Vec3{
+                    X: float64(prevX), Y: float64(prevY),
+                    Z: float64(prevZ),
+                },
+                pathfind.Vec3{
+                    X: float64(stepX), Y: float64(stepY),
+                    Z: float64(stepZ),
+                })
+            if err == nil && crossed {
+                break
+            }
+        }
+        steps = append(steps, [3]int32{stepX, stepY, stepZ})
+        prevX, prevY, prevZ = stepX, stepY, stepZ
+    }
+    // The aim itself closes the ladder when it is not already the
+    // last interpolated step.
+    if len(steps) == 0 ||
+        steps[len(steps)-1][0] != aimX || steps[len(steps)-1][1] != aimY {
+        if l.navigator != nil {
+            crossed, err := l.navigator.WaterCrossed(
+                pathfind.Vec3{
+                    X: float64(prevX), Y: float64(prevY),
+                    Z: float64(prevZ),
+                },
+                pathfind.Vec3{
+                    X: float64(aimX), Y: float64(aimY),
+                    Z: float64(aimZ),
+                })
+            if err == nil && crossed {
+                return steps
+            }
+        }
+        steps = append(steps, [3]int32{aimX, aimY, aimZ})
+    }
+
+    return steps
+}
+
+// driveCursorKeyEscape advances the armed cursor key escape by one
+// decision: the claims pace at the official client cadence (one
+// run-speed step per second), the follow probe watches the server
+// position - the server that follows the claims moves the character
+// and the escape runs its ladder to the aim, the server that ignores
+// them (the keyboard movement disabled, a build without the cursor
+// key branch of ValidatePosition) burns the follow patience and the
+// escape ends with the honest log line for the caller's abort
+// ladder. The settle window after the last claim lets the position
+// broadcasts land before the leg resumes its clicks.
+func (l *Loop) driveCursorKeyEscape(
+    now time.Time, selfX, selfY int32,
+) {
+    // The follow probe: any drift past the margin from the escape
+    // origin re-arms the patience (the character moved - the claims
+    // own it).
+    moved := math.Hypot(
+        float64(selfX-l.cursorEscape.originX),
+        float64(selfY-l.cursorEscape.originY))
+    if moved > cursorEscapeFollowStep {
+        l.cursorEscape.claimsSinceMove = 0
+    } else if l.cursorEscape.claimsSinceMove >= cursorEscapeFollowClaims {
+        l.cursorEscape.armed = false
+        l.logf("Hunt: the cursor key escape made no progress - " +
+            "the server ignores the claimed positions")
+
+        return
+    }
+    // The claim pacing: one run-speed step per second, the official
+    // client cadence of the ValidatePosition stream.
+    if !l.cursorEscape.lastClaimAt.IsZero() &&
+        now.Sub(l.cursorEscape.lastClaimAt) < cursorEscapePeriod {
+        return
+    }
+    if l.cursorEscape.next < len(l.cursorEscape.steps) {
+        step := l.cursorEscape.steps[l.cursorEscape.next]
+        heading := cursorEscapeHeading(selfX, selfY, step[0], step[1])
+        if err := l.game.ClaimValidatePosition(
+            step[0], step[1], step[2], heading); err != nil {
+            l.logf("Hunt: the claimed position failed: %v", err)
+        }
+        l.cursorEscape.next++
+        l.cursorEscape.lastClaimAt = now
+        l.cursorEscape.claimsSinceMove++
+
+        return
+    }
+    // The ladder is claimed out: settle for the position broadcasts,
+    // then hand the leg back to its clicks - re-armed with a fresh
+    // window so the hops probe the server from the escaped ground.
+    if now.Sub(l.cursorEscape.lastClaimAt) >= cursorEscapeSettle {
+        aim := l.cursorEscape.steps[len(l.cursorEscape.steps)-1]
+        l.cursorEscape.armed = false
+        l.directLegUntil = now.Add(directLegWindow)
+        l.logf("Hunt: the cursor key escape walked to %d %d, "+
+            "resuming the server routed clicks", aim[0], aim[1])
+    }
+}
+
+// cursorEscapeHeading renders the L2 heading of a step direction:
+// the 65536-unit turn with zero at north, the cosmetic facing the
+// official client reports alongside its claimed positions (the
+// server stores it without validating - ValidatePosition.runImpl
+// calls it "no real need to validate heading").
+func cursorEscapeHeading(
+    fromX, fromY, toX, toY int32,
+) int32 {
+    dx := float64(toX - fromX)
+    dy := float64(toY - fromY)
+    angle := math.Atan2(dx, dy)
+    if angle < 0 {
+        angle += 2 * math.Pi
+    }
+
+    return int32(angle * 65536 / (2 * math.Pi))
 }
 
 // shortenWetHop halves a hop whose line crosses water toward its dry
@@ -2472,6 +2748,10 @@ func (l *Loop) armDirectLeg(reason string) {
     l.stuckFast = false
     l.moveAt = time.Time{}
     l.refusalVariants = 0
+    // A fresh routed leg starts a fresh escape state: the attempts
+    // stay counted per trip, the armed ladder never leaks across
+    // the leg boundary.
+    l.cursorEscape = zeroCursorEscape()
     l.logf("Hunt: %s, walking to %d %d by the server routing",
         reason, int32(l.legDest.X), int32(l.legDest.Y))
 }
@@ -2959,6 +3239,8 @@ func (l *Loop) endTownTrip(reason string) {
     l.waterEscape = false
     l.extendArmed = false
     l.directLeg = false
+    l.cursorEscape = zeroCursorEscape()
+    l.cursorEscapes = 0
     l.frozenStage = 0
     l.repathX, l.repathY = 0, 0
     l.frozenRepaths = 0
@@ -3057,6 +3339,8 @@ func (l *Loop) resetTownTrip() {
     l.waterEscape = false
     l.extendArmed = false
     l.directLeg = false
+    l.cursorEscape = zeroCursorEscape()
+    l.cursorEscapes = 0
     l.frozenStage = 0
     l.repathX, l.repathY = 0, 0
     l.frozenRepaths = 0

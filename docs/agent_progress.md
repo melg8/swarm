@@ -10,6 +10,105 @@ finished task entries and older progress streams move to
 `agent_progress_archive.md` (append-only, same order). The permanent
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
+## Active task: the cursor key escape - the reproduction of the refusing cell even the official client cannot walk (2026-09-14)
+
+Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user report after the village escape round (build 70d49c5): the
+acceptance character temp10 ran on the user's own server and stood at
+the dump cell 45768 49848 -3056 again (the 15:10 state dump, uptime
+3m46s, three session restarts, the full escalation ladder, the abort
+"the server refused the routed walk clicks"). The user then proved
+the refusal server side with the OFFICIAL CLIENT: from that exact
+point the client's own ground clicks die too, only the ARROW KEYS
+moved the character, and after the arrow walk the clicks worked
+again. The demand: the reproduction of that situation - a cell no
+click can leave, walked out the arrow way.
+
+### Diagnosis (the Mobius source closed it)
+
+- `MoveToLocation` carries a movement mode field ("is 0 if cursor
+  keys are used 1 if mouse is used"): the mode 0 branch latches the
+  player's cursor key flag and adopts the packet origin within the
+  thousand unit window.
+- While that flag holds, the cursor key branch of
+  `ValidatePosition.runImpl` syncs EVERY claimed placement straight
+  into the world and broadcasts it - the character follows the
+  client's own movement simulation with NO click validation at all.
+  That is the arrow walk: the only movement a click-refusing cell
+  answers. A mouse-mode click clears the flag again (the session
+  returns to the mouse movement).
+- The honest attribution of the previous round held: the routed walk
+  clicks were REALLY refused (the user's client met the same
+  refusal) - the refusal evidence verdict was true, the recovery
+  was missing.
+
+### Progress (commit: the cursor key escape)
+
+- The reproduction (hunt/cursor_escape_repro_test.go): the
+  cursorKeyServer models the reported server honestly - the mouse
+  clicks whose origin stands within the refusal radius of the dump
+  cell answer ActionFailed and never move the character (the
+  refusal the official client met live), the cursor key arm latches
+  the flag, the claims move the character (the cursor key branch),
+  an accepted mouse click clears the flag. Two tests pin the
+  contract: the escape walks the character out of the refusing cell
+  and the clicks resume from the escaped ground (the walk reaches
+  the zone, every claimed step stays dry - the water guard holds
+  for the claims); a server that ignores the claims too (the
+  keyboard movement disabled) burns the escape attempts and aborts
+  with the honest reason - the frozen-client reproduction.
+- The escape (hunt/town.go): the routed walk refusal verdict arms
+  the cursor key escape instead of aborting at once - the movement
+  mode 0 arm (CursorKeyWalkTo) plus the claimed ValidatePosition
+  steps toward the validated dry hop aim (one run-speed step per
+  second, the official client cadence), the follow probe watches
+  the server position (five unclaimed claims end the attempt), the
+  settle window re-arms the leg window and the clicks resume. Three
+  attempts per trip, the corridor bans stay off (the refusal
+  evidence owns the verdict), the resets clear the state on every
+  trip and leg boundary.
+- The connection primitives (connection/game.go): CursorKeyWalkTo
+  sends the mode 0 request with the tracked origin,
+  ClaimValidatePosition sends the claimed placement and gates the
+  echo ticker (the echo would lag the claims one broadcast behind
+  and snap the character back while the flag holds), the first
+  mouse-mode walk returns the echo (claimsOwnStream). The stream
+  tests pin the mode, the claim semantics and the gate.
+
+### Acceptance criteria
+
+- The reproduction runs on the real geodata pack: the refusing cell
+  with the cursor key semantics modeled, the escape walks out, the
+  clicks resume, the walk reaches the zone
+  (TestReproCursorKeyEscapeWalksOutOfTheRefusingCell).
+- A server that ignores the claims aborts honestly after the
+  attempts burn, no corridor ban, the character never moves a cell
+  (TestReproCursorKeyEscapeAbortsWhenTheServerIgnoresTheClaims) -
+  the reproduction of the user's frozen client.
+- The cursor key arm carries the movement mode 0 and the tracked
+  origin; the claims own the validation stream while the escape
+  runs and the first mouse-mode walk returns the echo
+  (TestGameClientCursorKeyWalkSendsTheKeyboardMode,
+  TestGameClientClaimsOwnTheValidationStream).
+- The claimed steps never cross water (the per-claim water guard of
+  the escape test).
+
+### Status: done
+
+- Commit 1 (the reproduction + the escape + the tests + the docs):
+  the cursor key escape of a click-refusing cell, the cursorKeyServer
+  reproduction model, the connection primitives, the stream tests,
+  the protocol description sections, the round 84 development log
+  entry, this progress entry. go build/vet clean, the full hunt,
+  connection and packets suites green, `task fmt:check` clean,
+  `golangci-lint run --new` (the three documented gci artifacts
+  aside), `tools/mobius_e2e.sh 45` E2E_OK.
+
 ## Active task: the village escape acceptance round - the honest refusal attribution and the client position stream (2026-09-14)
 
 Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.

@@ -19,6 +19,21 @@ const (
     // keyboard mode requests unless keyboard movement is enabled, so the
     // bot always walks in mouse mode.
     MoveModeMouse int32 = 1
+    // MoveModeCursorKeys is the movement mode the official client
+    // sends while the player walks with the arrow keys: the server
+    // arms the cursor key movement of the session
+    // (MoveToLocation.runImpl adopts the packet origin within the
+    // thousand unit window and latches the cursor key flag), and
+    // every ValidatePosition the session streams afterwards moves
+    // the character server-side without any click validation
+    // (ValidatePosition.runImpl syncs the claimed placement into the
+    // world and broadcasts it). A server whose geodata seals the
+    // standing cell answers no mouse click at all - the cursor key
+    // stream is the only movement that still walks (the 2026-09-14
+    // 15:10 report: even the official client stood frozen on the
+    // village plaza cell until the player walked it out with the
+    // arrows).
+    MoveModeCursorKeys int32 = 0
 )
 
 // MoveToLocationRequestPacket asks the game server to walk the character

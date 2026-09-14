@@ -17,8 +17,12 @@ import (
 // test doubles.
 type benchGame struct{}
 
-func (b *benchGame) AttackTarget(_ int32) error        { return nil }
-func (b *benchGame) WalkTo(_, _, _ int32) error        { return nil }
+func (b *benchGame) AttackTarget(_ int32) error          { return nil }
+func (b *benchGame) WalkTo(_, _, _ int32) error          { return nil }
+func (b *benchGame) CursorKeyWalkTo(_, _, _ int32) error { return nil }
+func (b *benchGame) ClaimValidatePosition(_, _, _, _ int32) error {
+    return nil
+}
 func (b *benchGame) PickupItem(_ state.LootItem) error { return nil }
 func (b *benchGame) ActionSitStand() error             { return nil }
 func (b *benchGame) RestartAtVillage() error           { return nil }

@@ -41,6 +41,35 @@ func validatePositionBody(t *testing.T, payload []byte) (
 func absorbingFlow(
     validations chan<- []byte,
 ) func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt) {
+    return absorbingFlowWithMoves(validations, nil)
+}
+
+// forwardCapture fans a received client packet into the capture
+// channels: the validation stream (0x48) and the move requests
+// (0x01) - a nil channel skips its family.
+func forwardCapture(
+    payload []byte, validations, moves chan<- []byte,
+) {
+    if len(payload) > 0 && payload[0] == 0x48 && validations != nil {
+        select {
+        case validations <- payload:
+        default:
+        }
+    }
+    if len(payload) > 0 && payload[0] == 0x01 && moves != nil {
+        select {
+        case moves <- payload:
+        default:
+        }
+    }
+}
+
+// absorbingFlowWithMoves extends the absorbing flow with the move
+// request channel (opcode 0x01, the mouse and the cursor key walks
+// the session sends) alongside the validation stream.
+func absorbingFlowWithMoves(
+    validations, moves chan<- []byte,
+) func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt) {
     return func(s *fakeGameServer, conn net.Conn, cipher *crypt.GameCrypt) {
         s.characterFlow(conn, cipher)
 
@@ -79,12 +108,7 @@ func absorbingFlow(
 
                 return
             }
-            if len(payload) > 0 && payload[0] == 0x48 {
-                select {
-                case validations <- payload:
-                default:
-                }
-            }
+            forwardCapture(payload, validations, moves)
         }
     }
 }
@@ -313,4 +337,111 @@ func TestGameClientRunStreamsThePositionValidation(t *testing.T) {
     }
     require.GreaterOrEqual(t, reports, 2,
         "the session ticker drove the validation stream")
+}
+
+// awaitMove waits for the next move request (opcode 0x01) of the
+// session and returns its decoded fields: the target, the origin and
+// the movement mode.
+func awaitMove(
+    t *testing.T, moves <-chan []byte,
+) (target [3]int32, origin [3]int32, mode int32) {
+    t.Helper()
+    select {
+    case payload := <-moves:
+        require.Len(t, payload, 29)
+        require.Equal(t, byte(0x01), payload[0])
+        for i := range 3 {
+            target[i] = int32(binary.LittleEndian.Uint32(
+                payload[1+i*4 : 5+i*4]))
+            origin[i] = int32(binary.LittleEndian.Uint32(
+                payload[13+i*4 : 17+i*4]))
+        }
+        mode = int32(binary.LittleEndian.Uint32(payload[25:29]))
+
+        return target, origin, mode
+    case <-time.After(2 * time.Second):
+        t.Fatal("the session never sent the expected move request")
+
+        return [3]int32{}, [3]int32{}, 0
+    }
+}
+
+// TestGameClientCursorKeyWalkSendsTheKeyboardMode pins the cursor key
+// arm of the escape: the request carries the movement mode 0 (the
+// cursor keys of the official client - the mode the server's
+// MoveToLocation.readImpl reads as "cursor keys are used") and the
+// origin resolves to the tracked placement, exactly the packet the
+// official client sends when the player starts an arrow walk.
+func TestGameClientCursorKeyWalkSendsTheKeyboardMode(t *testing.T) {
+    validations := make(chan []byte, 16)
+    moves := make(chan []byte, 16)
+    server := startFakeGameServer(t)
+    server.flow = absorbingFlowWithMoves(validations, moves)
+
+    client, tracker := newValidatingSession(t, server)
+    tracker.ApplyPlacement(state.Placement{
+        ObjectID: 100, X: 45400, Y: 50000, Z: -3040, Heading: 32114,
+    })
+
+    require.NoError(t, client.CursorKeyWalkTo(43000, 51000, -2992))
+    target, origin, mode := awaitMove(t, moves)
+    require.Equal(t, [3]int32{43000, 51000, -2992}, target)
+    require.Equal(t, [3]int32{45400, 50000, -3040}, origin,
+        "the cursor key arm carries the tracked origin")
+    require.Equal(t, int32(0), mode,
+        "the cursor key arm walks in the keyboard movement mode")
+
+    // The mouse click of the same session walks in the mouse mode -
+    // the mode the server reads as a ground click.
+    require.NoError(t, client.WalkTo(44000, 50500, -3000))
+    _, _, mode = awaitMove(t, moves)
+    require.Equal(t, int32(1), mode,
+        "the plain walk stays in the mouse movement mode")
+}
+
+// TestGameClientClaimsOwnTheValidationStream pins the claim semantics
+// of the cursor key escape: the claimed placement is reported as
+// claimed (never the tracker echo), the echo ticker of the validation
+// stands down while the claims own the stream - the echo of the
+// broadcast position would lag the claims by one broadcast and snap
+// the character back a step each tick while the server's cursor key
+// flag holds - and the first mouse-mode walk returns the stream to
+// the echo.
+func TestGameClientClaimsOwnTheValidationStream(t *testing.T) {
+    validations := make(chan []byte, 16)
+    server := startFakeGameServer(t)
+    server.flow = absorbingFlow(validations)
+
+    client, tracker := newValidatingSession(t, server)
+
+    // The claim: the claimed placement, not the tracker echo.
+    require.NoError(t, client.ClaimValidatePosition(
+        45600, 49900, -3050, 16000))
+    x, y, z, heading := awaitValidation(t, validations)
+    require.Equal(t, int32(45600), x)
+    require.Equal(t, int32(49900), y)
+    require.Equal(t, int32(-3050), z)
+    require.Equal(t, int32(16000), heading)
+
+    // While the claims own the stream, the echo stays quiet even for
+    // a changed tracker placement.
+    tracker.ApplyPlacement(state.Placement{
+        ObjectID: 100, X: 45400, Y: 50000, Z: -3040, Heading: 32114,
+    })
+    validation := positionValidation{}
+    require.NoError(t, client.validatePosition(&validation))
+    select {
+    case payload := <-validations:
+        t.Fatalf("the echo leaked past the claims: %v", payload)
+    case <-time.After(300 * time.Millisecond):
+    }
+
+    // The mouse click returns the stream to the echo.
+    require.NoError(t, client.WalkTo(45000, 50000, -3040))
+    require.NoError(t, client.validatePosition(&validation))
+    x, y, z, heading = awaitValidation(t, validations)
+    require.Equal(t, int32(45400), x)
+    require.Equal(t, int32(50000), y)
+    require.Equal(t, int32(-3040), z)
+    require.Equal(t, int32(32114), heading)
 }

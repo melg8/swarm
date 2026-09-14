@@ -218,6 +218,14 @@ type GameClient struct {
     statusAttrs    [statusAttrsCapacity]state.Attribute
     htmlMu         sync.Mutex
     lastHTML       fromgameserver.NpcHTMLMessage
+    // claimsOwnStream gates the echo ticker of the client position
+    // validation while the cursor key escape drives the session:
+    // the claimed placements own the stream exactly the way the
+    // official client's own movement simulation does while the
+    // player walks with the arrows, and the echo of the broadcast
+    // position would fight the claims one broadcast behind (see
+    // ClaimValidatePosition).
+    claimsOwnStream atomic.Bool
 }
 
 // statusAttrsCapacity bounds the scratch attributes of status updates.
@@ -247,50 +255,51 @@ var bufferPool = sync.Pool{
 // exhaustruct convention), which exceeds the line budget.
 func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
     client := &GameClient{
-        conn:           conn,
-        crypt:          nil,
-        writeMu:        sync.Mutex{},
-        logger:         log.Default(),
-        trace:          os.Getenv(packetTraceEnv) != "",
-        packetCount:    atomic.Int64{},
-        readBuf:        nil,
-        tracker:        nil,
-        tap:            nil,
-        rawWriteBuf:    nil,
-        npcInfo:        *fromgameserver.NewNpcInfoPacket(),
-        userInfo:       *fromgameserver.NewUserInfoPacket(),
-        charInfo:       *fromgameserver.NewCharInfoPacket(),
-        moveTo:         *fromgameserver.NewMoveToLocationPacket(),
-        moveToPawn:     *fromgameserver.NewMoveToPawnPacket(),
-        stopMove:       *fromgameserver.NewStopMovePacket(),
-        validateLoc:    *fromgameserver.NewValidateLocationPacket(),
-        deleted:        *fromgameserver.NewDeleteObjectPacket(),
-        dropItem:       *fromgameserver.NewDropItemPacket(),
-        spawnItem:      *fromgameserver.NewSpawnItemPacket(),
-        getItem:        *fromgameserver.NewGetItemPacket(),
-        statusUpd:      *fromgameserver.NewStatusUpdatePacket(),
-        attack:         *fromgameserver.NewAttackPacket(),
-        attackStart:    *fromgameserver.NewAutoAttackStartPacket(),
-        attackStop:     *fromgameserver.NewAutoAttackStopPacket(),
-        beginRotation:  *fromgameserver.NewBeginRotationPacket(),
-        stopRotation:   *fromgameserver.NewStopRotationPacket(),
-        changeMoveType: *fromgameserver.NewChangeMoveTypePacket(),
-        changeWait:     *fromgameserver.NewChangeWaitTypePacket(),
-        teleport:       *fromgameserver.NewTeleportToLocationPacket(),
-        myTarget:       *fromgameserver.NewMyTargetSelectedPacket(),
-        targetSelected: *fromgameserver.NewTargetSelectedPacket(),
-        targetDropped:  *fromgameserver.NewTargetUnselectedPacket(),
-        systemMessage:  *fromgameserver.NewSystemMessagePacket(),
-        socialAction:   *fromgameserver.NewSocialActionPacket(),
-        actionFailed:   *fromgameserver.NewActionFailedPacket(),
-        itemList:       *fromgameserver.NewItemListPacket(),
-        invUpdate:      *fromgameserver.NewInventoryUpdatePacket(),
-        skillList:      *fromgameserver.NewSkillListPacket(),
-        questList:      *fromgameserver.NewQuestListPacket(),
-        abnormalStatus: *fromgameserver.NewAbnormalStatusUpdatePacket(),
-        invItems:       nil,
-        skills:         nil,
-        statusAttrs:    [statusAttrsCapacity]state.Attribute{},
+        conn:            conn,
+        crypt:           nil,
+        writeMu:         sync.Mutex{},
+        logger:          log.Default(),
+        trace:           os.Getenv(packetTraceEnv) != "",
+        packetCount:     atomic.Int64{},
+        readBuf:         nil,
+        tracker:         nil,
+        tap:             nil,
+        rawWriteBuf:     nil,
+        npcInfo:         *fromgameserver.NewNpcInfoPacket(),
+        userInfo:        *fromgameserver.NewUserInfoPacket(),
+        charInfo:        *fromgameserver.NewCharInfoPacket(),
+        moveTo:          *fromgameserver.NewMoveToLocationPacket(),
+        moveToPawn:      *fromgameserver.NewMoveToPawnPacket(),
+        stopMove:        *fromgameserver.NewStopMovePacket(),
+        validateLoc:     *fromgameserver.NewValidateLocationPacket(),
+        deleted:         *fromgameserver.NewDeleteObjectPacket(),
+        dropItem:        *fromgameserver.NewDropItemPacket(),
+        spawnItem:       *fromgameserver.NewSpawnItemPacket(),
+        getItem:         *fromgameserver.NewGetItemPacket(),
+        statusUpd:       *fromgameserver.NewStatusUpdatePacket(),
+        attack:          *fromgameserver.NewAttackPacket(),
+        attackStart:     *fromgameserver.NewAutoAttackStartPacket(),
+        attackStop:      *fromgameserver.NewAutoAttackStopPacket(),
+        beginRotation:   *fromgameserver.NewBeginRotationPacket(),
+        stopRotation:    *fromgameserver.NewStopRotationPacket(),
+        changeMoveType:  *fromgameserver.NewChangeMoveTypePacket(),
+        changeWait:      *fromgameserver.NewChangeWaitTypePacket(),
+        teleport:        *fromgameserver.NewTeleportToLocationPacket(),
+        myTarget:        *fromgameserver.NewMyTargetSelectedPacket(),
+        targetSelected:  *fromgameserver.NewTargetSelectedPacket(),
+        targetDropped:   *fromgameserver.NewTargetUnselectedPacket(),
+        systemMessage:   *fromgameserver.NewSystemMessagePacket(),
+        socialAction:    *fromgameserver.NewSocialActionPacket(),
+        actionFailed:    *fromgameserver.NewActionFailedPacket(),
+        itemList:        *fromgameserver.NewItemListPacket(),
+        invUpdate:       *fromgameserver.NewInventoryUpdatePacket(),
+        skillList:       *fromgameserver.NewSkillListPacket(),
+        questList:       *fromgameserver.NewQuestListPacket(),
+        abnormalStatus:  *fromgameserver.NewAbnormalStatusUpdatePacket(),
+        invItems:        nil,
+        skills:          nil,
+        statusAttrs:     [statusAttrsCapacity]state.Attribute{},
+        claimsOwnStream: atomic.Bool{},
     }
 
     writer := packet.NewWriter()
@@ -700,6 +709,15 @@ func (gc *GameClient) validatePosition(validation *positionValidation) error {
     if gc.tracker == nil {
         return nil
     }
+    // The cursor key claims own the stream while the escape runs:
+    // the echo of the broadcast position would lag the claims by one
+    // broadcast and snap the character back a step each tick while
+    // the server's cursor key flag holds (the claimed placements
+    // move the character unconditionally, see
+    // ClaimValidatePosition).
+    if gc.claimsOwnStream.Load() {
+        return nil
+    }
     x, y, z, ok := gc.tracker.SelfPosition()
     if !ok {
         return nil
@@ -738,6 +756,12 @@ func (gc *GameClient) WalkTo(x int32, y int32, z int32) error {
     if !ok {
         return errors.New("failed to walk: own position is unknown")
     }
+    // The mouse click returns the session to the mouse movement
+    // mode: the server clears the cursor key flag the cursor key
+    // escape armed (MoveToLocation.runImpl), so the echo ticker of
+    // the client position validation owns the stream again (see
+    // claimsOwnStream).
+    gc.claimsOwnStream.Store(false)
     request := togameserver.NewMoveToLocationRequestPacket()
     request.TargetX = x
     request.TargetY = y
@@ -748,6 +772,74 @@ func (gc *GameClient) WalkTo(x int32, y int32, z int32) error {
     request.Mode = togameserver.MoveModeMouse
     if err := gc.sendPacket(request); err != nil {
         return fmt.Errorf("failed to send move to location: %w", err)
+    }
+
+    return nil
+}
+
+// CursorKeyWalkTo sends the keyboard-mode move request (MoveToLocation
+// 0x01 in cursor key mode, the arrow keys of the official client): the
+// server arms the cursor key movement of the session - the packet's
+// origin is adopted within the thousand unit window and the cursor key
+// flag latches - and every ValidatePosition the session streams
+// afterwards moves the character server-side without any click
+// validation (ValidatePosition.runImpl syncs the claimed placement
+// into the world and broadcasts it). The ground a click-refusing cell
+// owns answers no mouse click at all; the cursor key stream is the
+// movement that still walks it off (the 2026-09-14 15:10 report: even
+// the official client stood frozen on the village plaza cell until
+// the player walked the arrows). The hunt loop arms it only for the
+// cursor key escape of a click-refusing stuck (see
+// hunt.Loop.beginCursorKeyEscape).
+func (gc *GameClient) CursorKeyWalkTo(
+    x int32, y int32, z int32,
+) error {
+    selfX, selfY, selfZ, ok := gc.tracker.SelfPosition()
+    if !ok {
+        return errors.New(
+            "failed to walk with the cursor keys: own position is unknown")
+    }
+    request := togameserver.NewMoveToLocationRequestPacket()
+    request.TargetX = x
+    request.TargetY = y
+    request.TargetZ = z
+    request.OriginX = selfX
+    request.OriginY = selfY
+    request.OriginZ = selfZ
+    request.Mode = togameserver.MoveModeCursorKeys
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf(
+            "failed to send the cursor key move: %w", err)
+    }
+
+    return nil
+}
+
+// ClaimValidatePosition reports a CLAIMED client position of the
+// character (ValidatePosition 0x48): while the server's cursor key
+// movement is armed, the claimed placement is synced straight into
+// the world and broadcast (ValidatePosition.runImpl - the cursor key
+// branch), so the claims walk the character without any click
+// validation. This is the packet stream the official client drives
+// from its own movement simulation while the player walks with the
+// arrows - the arrow walk being the only movement a click-refusing
+// cell answers (the 2026-09-14 15:10 report). The claims gate the
+// echo ticker (see claimsOwnStream): the echo of the broadcast
+// position would otherwise lag the claims by one broadcast and snap
+// the character back a step each tick while the cursor key flag
+// holds. The first mouse-mode walk clears the gate (see WalkTo).
+func (gc *GameClient) ClaimValidatePosition(
+    x int32, y int32, z int32, heading int32,
+) error {
+    request := togameserver.NewValidatePositionPacket()
+    request.X = x
+    request.Y = y
+    request.Z = z
+    request.Heading = heading
+    gc.claimsOwnStream.Store(true)
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf(
+            "failed to send the claimed position: %w", err)
     }
 
     return nil
