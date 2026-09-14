@@ -69,6 +69,7 @@ one of them is the reference for its subsystem:
 | `docs/session_journal.md` | The persistent session journal: the JSONL record of the whole run (events, samples, kills, trips, purchases), the session dump report of the web UI, the offline -session-report CLI |
 | `docs/pathfinding.md` | The geodata pathfinder: format, engine, deviations from the original, test UI, benchmarks, geodata visualization |
 | `docs/navigation_analysis.md` | The measured gaps on the road to universal A to B world navigation (continue navigation work from there) |
+| `docs/recast_pathfinding.md` | The recastnavigation research of feature/new-pathfind: what the Detour navmesh gives the geodata pathfinder, the sheet decomposition converter, the Go runtime prototype and the migration verdict |
 | `docs/proxy.md` | The MITM client proxy: running it, the l2.ini recipes, the protocol the client sees, the relogin handoff, debugging proxy.log |
 | `docs/protocol_description.md` | The wire protocol: packet framing, the login and game flows, per-packet layouts (originally written against l2j-lisvus; Mobius C1 is the current reference) |
 | `docs/development_log.md` | The permanent record of the development rounds with root cause analyses - read it before reworking movement rendering or the hunt behavior |
