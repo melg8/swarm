@@ -11,6 +11,91 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the stagnation soft reset after the hard recovery (2026-09-14)
+
+Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user attached the session journal of `test2` (build 12f873ce) and
+asked why the bot got stuck, to fix it and to write tests. The dump
+showed a 3h20m freeze: the bot stood at 42712 49128 -2992 from
+00:36:07Z to 03:56:38Z, phase `engage` throughout, no kills, no
+deaths, no purchases, no Hunt log lines for 3h9m. The stagnation
+watch fired once at 03:45:55Z (the position stall, the soft reset)
+and again at 03:55:55Z (the experience stall, the hard recovery)
+without unsticking the bot.
+
+### Root cause (the part the fix addresses)
+
+The two stagnation windows overlap on the same tick when the bot has
+been frozen long enough. `observeStagnation` runs the experience
+check before the position check. When the experience stall fires the
+hard recovery, `stagnationHardRecover` arms `logoutDone` and resets
+`stagPosFires` to zero (alongside `stagXPFires`). The position
+check then runs in the SAME tick, reads the held position as a fresh
+first fire (because `stagPosFires` is zero again) and runs
+`stagnationSoftReset` on the dying session. The soft reset calls
+`standUpGuarded` and `resetTownTrip` into the pending unwind - the
+redundant packets never reach the server before the socket closes,
+the relogin inherits none of the cleanup, and the misleading
+"clearing the loop state" log line lands next to the honest
+"rebuilding the session" one. The journal of the 03:55:55Z tick
+shows exactly this sequence: the xp stall, the emergency logout,
+the position stall, the soft reset, the lost connection, the
+reconnect at the same cell.
+
+### Fix
+
+`stagnation.go::observeStagnation` skips `observeStagnationPosition`
+when `l.logoutDone` is true after `observeStagnationXP`. The hard
+recovery already owns the unwind; the position check has nothing
+useful to add on the same tick. The fresh-experience path (the
+common position stall) is unaffected - the gate only fires when the
+hard recovery has armed `logoutDone` in the same call.
+
+### Acceptance criteria
+
+- A unit test that arms both windows overdue and calls
+  `observeStagnation` asserts that exactly one logout fires
+  (`game.logouts == 1`), `loop.logoutDone` is true, the frozen
+  target is NOT cleared by the soft reset and the "clearing the
+  loop state" log line does NOT land in the sink - only the
+  "rebuilding the session" line of the hard recovery
+  (`TestStagnationXPHardRecoverySkipsPositionSoftReset`).
+- A regression guard that arms only the position window (fresh
+  experience) verifies the soft reset still runs in the common
+  path: the target drops, the "clearing the loop state" log lands,
+  no logout fires
+  (`TestStagnationPositionSoftResetStillRunsAfterXPFresh`).
+- The full `internal/swarm/hunt` test suite stays green (the
+  existing stagnation contracts unchanged).
+
+### Open question (out of scope for this commit)
+
+The dump also shows that the soft reset at 03:45:55Z did not unstick
+the bot: the position held for another 10 minutes until the
+experience stall fired the hard recovery. The bot stood outside the
+held cell "Kaboo Orc Fighter SW-7" (the cell sits at 35000-37000
+45899-47631, the bot at 42712 49128 - ~7000 units away), and the
+engage phase should have called `returnToZone` to walk back. The
+journal shows zero Hunt log lines for that 10 minute stretch
+(`returnToZone` logs "Hunt: outside the hunting zone, pathfinding
+back" on its first call), which suggests the loop either did not
+reach `returnToZone` or reached it without logging - the deeper
+freeze is not reachable from the journal alone. A live repro with
+the dump-state diagnostics (see the `dump-state-repro` skill) is
+the next step.
+
+### Status: done
+
+- Commit 1 (the fix + the two repro tests + this entry): the gate
+  in `observeStagnation`, the two new stagnation tests, the
+  agent_progress entry. All `internal/swarm/hunt` tests green,
+  `go build`/`go vet` clean, `gofmt-spaces` clean.
+
 ## Active task: the hex grid, the enemy-first hunt and the ranged-kill loot (2026-09-13)
 
 Started: 2026-09-13. Branch: `feature/proxy-server`. Commits as melg8.

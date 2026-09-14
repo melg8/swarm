@@ -73,6 +73,21 @@ const (
 // fresh - the supervisor relogin is not a livelock) and on the
 // manual only sessions (an interactive character is allowed to
 // stand still).
+//
+// The experience check runs first. When it fires the hard recovery
+// it arms logoutDone (the one shot emergency logout gate of the
+// tick), and the position check must NOT run after it: the hard
+// recovery resets stagPosFires to zero, so the position branch
+// would otherwise read the held position as a fresh first fire and
+// run the soft reset on the dying session (the 2026-09-14 03:55
+// dump: the xp stall fired the emergency logout, the same tick the
+// position stall ran stagnationSoftReset which called standUpGuarded
+// and resetTownTrip into the pending unwind - the redundant work
+// never reaches the server before the socket closes, but the
+// misleading "clearing the loop state" log line landed anyway and
+// the relogin inherited none of the cleanup). Skipping the position
+// check after the hard recovery keeps the unwind clean and the log
+// honest.
 func (l *Loop) observeStagnation(now time.Time) {
     if !l.autonomous || l.tracker.Status() != state.StatusOnline {
         l.resetStagnationWatch()
@@ -80,6 +95,9 @@ func (l *Loop) observeStagnation(now time.Time) {
         return
     }
     l.observeStagnationXP(now)
+    if l.logoutDone {
+        return
+    }
     l.observeStagnationPosition(now)
 }
 

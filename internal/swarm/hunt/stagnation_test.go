@@ -369,3 +369,79 @@ func TestStagnationDelevelExemptFromRecovery(t *testing.T) {
     require.Contains(t, sink.String(),
         "the delevel phase owns its own recovery")
 }
+
+// TestStagnationXPHardRecoverySkipsPositionSoftReset: when the
+// experience stall fires the hard recovery (the emergency logout),
+// the position stall that is also overdue on the same tick must NOT
+// run its soft reset afterwards. The hard recovery arms logoutDone
+// and resets stagPosFires to zero, so without the gate the position
+// branch reads the held cell as a fresh first fire and runs
+// stagnationSoftReset on the dying session - the redundant
+// standUpGuarded and resetTownTrip calls fire into the pending
+// unwind and the misleading "clearing the loop state" log line
+// lands next to the honest "rebuilding the session" one (the
+// 2026-09-14 03:55 dump: the bot sat at 42712 49128 for 3h20m, the
+// xp window fired the emergency logout, the same tick the position
+// window fired the soft reset, the relogin inherited neither and
+// the bot stood at the same cell again).
+func TestStagnationXPHardRecoverySkipsPositionSoftReset(t *testing.T) {
+    bot := stagnationBot()
+    game := &fakeGame{}
+    loop, sink := newStagnationLoop(bot, game)
+    // Arm both windows as overdue: the experience stall fires the
+    // hard recovery, the position stall would fire the soft reset
+    // on the same tick without the gate.
+    armStagnationXP(loop, bot)
+    armStagnationPosition(loop, bot)
+    loop.target = 1234
+
+    loop.observeStagnation(time.Now())
+
+    // The hard recovery fired exactly once.
+    require.Equal(t, 1, game.logouts,
+        "the xp stall rebuilds the session")
+    require.True(t, loop.logoutDone,
+        "the hard recovery arms the logout gate")
+
+    // The soft reset did NOT run on the same tick: the frozen
+    // target stays (the relogin rebuilds the loop, the per-tick
+    // target is irrelevant to the unwind) and the misleading
+    // "clearing the loop state" log line stays out of the sink.
+    require.Equal(t, int32(1234), loop.target,
+        "the soft reset after the hard recovery never clears the target")
+    require.NotContains(t, sink.String(),
+        "clearing the loop state",
+        "the soft reset must not run after the hard recovery")
+    require.Contains(t, sink.String(),
+        "rebuilding the session",
+        "the hard recovery log line is the only recovery of the tick")
+}
+
+// TestStagnationPositionSoftResetStillRunsAfterXPFresh: the gate
+// that skips the position check after the hard recovery must NOT
+// skip it when the experience window is fresh (the common path:
+// only the position stall is overdue, the soft reset is the right
+// answer). The regression guard against the over-broad skip.
+func TestStagnationPositionSoftResetStillRunsAfterXPFresh(t *testing.T) {
+    bot := stagnationBot()
+    game := &fakeGame{}
+    loop, sink := newStagnationLoop(bot, game)
+    // The experience window is fresh (the kill just landed), the
+    // position window is overdue.
+    loop.stagXP = bot.SelfExp()
+    loop.stagXPAt = time.Now()
+    armStagnationPosition(loop, bot)
+    loop.target = 1234
+
+    loop.observeStagnation(time.Now())
+
+    // The soft reset ran: the target dropped, the log line landed,
+    // no logout fired.
+    require.Zero(t, game.logouts,
+        "the fresh experience window does not fire the hard recovery")
+    require.Zero(t, loop.target,
+        "the soft reset clears the frozen target")
+    require.Contains(t, sink.String(),
+        "clearing the loop state",
+        "the soft reset runs when only the position stall is overdue")
+}
