@@ -52,21 +52,43 @@ a Go port, how much faster/slower/more universal is it.
   are additionally within walkableClimb of each other laterally (a low
   bridge deck over its own ramp) merge into ONE self-overlapping
   region; the traced contours come out mangled and the poly link
-  graph breaks silently (one way links, unreachable water). The
-  synthetic world models the real village topology with a bridge
-  abutment; the geodata converter must audit the real regions for
-  such spots before trusting the mesh.
+  graph breaks silently (one way links, unreachable water).
+- experiment C (`experiments/geodata_navmesh.cpp`,
+  `results/geodata_navmesh.txt`): the naive span import of the real
+  21_19 region CRASHES (137k vertex contour, 7335 overlapping
+  regions) exactly as the hazard predicts; the implemented fix is the
+  sheet decomposition (2D manifold surfaces, greedy graph coloring
+  of areas, link height validation) which builds a healthy 14 062
+  polygon / 2.89 MB Detour tile in 5.1 s offline (0 one-way links).
+  The l2j block order trap (x-strip major blocks) is documented. The
+  real bridge query works: village dump cell -> water under the
+  bridge deck (880 units of stack) in 169 us, the dry filter answers
+  the closest dry point, the reverse escape routes out of the water.
+- experiment D: the 200 random pair replay through both engines - the
+  grid engine answers 129/200 (39 aborted at the 1M cap, 2.94 s
+  average, the hard pair 5.17 s / 500k nodes), the Detour tile 200
+  / 200 at 339 us average. The fidelity audit: 413 692 NSWE walled
+  neighbour pairs the height-only mesh would connect (the invisible
+  wall gap and its three mitigations are in the report).
+- the Go runtime prototype `internal/swarm/pathfind/navmesh`: parses
+  the exported Detour tile (1.45 ms, 96x cheaper than the l2j region
+  parse), answers the hard bridge pair in 571 us with the Detour A*,
+  the nearest poly disambiguation passes on the real bridge column,
+  the pair replay runs 163/200 at 915 us (the misses trace to the
+  prototype's height approximation, noted with the production fix).
+- the final report `docs/recast_pathfinding.md`: the comparison
+  table, the crutch-by-crutch mapping, the port effort estimate
+  (~5-6k Go LOC) and the verdict - port the Detour runtime, build
+  the mesh in Go from the geodata with the sheet decomposition, keep
+  the grid engine as the validation layer.
 
 ### Next
 
-- experiment C: the l2j -> Recast converter over the real 21_19
-  elven village region (span import, water areas, the real
-  under-bridge coordinates, the NSWE fidelity audit).
-- experiment D: build/query benchmarks against the current grid
-  engine on the same endpoints.
-- the Go port assessment (the query engine is the runtime piece; the
-  build pipeline can stay offline) and the final report
-  `docs/recast_pathfinding.md`.
+The research task is complete; the report's migration path is the
+pending implementation decision of the owner. The concrete follow
+ups when the migration is approved: the offline tile builder cmd,
+the multi region tile loading, the funnel string pulling, the NSWE
+link filter and the pooled query allocations.
 
 ## Active task: the cursor key escape - the reproduction of the refusing cell even the official client cannot walk (2026-09-14)
 
