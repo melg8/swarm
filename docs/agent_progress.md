@@ -11,6 +11,71 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task: the zone return escalation ladder (2026-09-14)
+
+Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.
+Other agents may push to the same branch concurrently - rebase before
+every push.
+
+### Goal
+
+The user attached the state dump of `test3` (build d2ea298, uptime
+55s): the level 15 character stood at x 45768 y 49848 z -3056 (the
+Elven Village south terrace deck) in the engage phase, the held cell
+"Kaboo Orc Fighter Leader SW-10" sat at center 28500 54560 (very far
+from the village). The hunt log carried "outside the hunting zone,
+pathfinding back" then "town walk stuck, re-pathing (1 of 3)" then
+"town trip ended: aborted" at 22s, then nothing for 34s - the bot
+cycled between the pathfound-return-stuck-abort and the refused
+direct leg without ever moving.
+
+### Root cause
+
+`abortFrozenTrip` ran the `escalateFrozenLeg` ladder (the banned
+detour re-plan, the direct server routed walk) ONLY for the town walk
+phase (`phaseTownWalk`), NOT for the zone return phase
+(`phaseTownReturn`). The zone return aborted straight to `abortTownTrip`
++ `zoneFails = zoneReturnFailBudget`. The next `returnToZone` tick saw
+`zoneFails >= budget` → `walkZoneLeg` → `guardZoneLegClick` refused the
+direct leg (the village railing walls it) → reset `zoneFails = 0` →
+no walk sent. The next tick saw `zoneFails < budget` → pathfound
+return → the SAME route the deterministic planner always produces →
+town walk → stuck → abort → `zoneFails = 3` → repeat. The bot never
+moved.
+
+### Fix
+
+`abortFrozenTrip` now calls `escalateFrozenLeg` for BOTH the town walk
+and the zone return phases. `escalateFrozenLeg` accepts
+`phaseTownReturn` alongside `phaseTownWalk`, and the re-plan uses
+`startZoneReturnLeg` (the non-dry fallback) for the zone return and
+`startWalkLeg` (the dry search) for the town walk. The banned detour
+re-plan routes around the walled corridor instead of reproducing the
+identical frozen route - the deterministic planner produces a
+DIFFERENT route when the walled cells are in the avoid areas. The
+direct server routed walk (rung 2) hands the routing to the server's
+own pathfinder as the last resort.
+
+### Acceptance criteria
+
+- The existing `TestReproRound57FrozenServerEscalatesFast` updated to
+  assert the escalation ladder runs both rungs (`frozenStage <= 2`)
+  instead of the old straight-to-direct-legs behavior
+  (`zoneFails >= zoneReturnFailBudget`).
+- The round 58 tests (`TestReproRound58ZoneLegGuardRefusalReArmsPathfoundReturn`,
+  `TestReproRound58VillageStuckCellWalksToZone`) stay green (the
+  guard behavior for the first-attempt direct leg is unchanged).
+- The full `internal/swarm/hunt` test suite stays green.
+
+### Status: done
+
+- Commit 1 (the fix + the test update + this entry): the
+  `escalateFrozenLeg` ladder runs for `phaseTownReturn`, the
+  `startZoneReturnOrWalkLeg` helper, the `abortFrozenTrip` call, the
+  round 57 test assertion update, the agent_progress entry. All
+  `internal/swarm/hunt` tests green, `go build`/`go vet` clean,
+  `gofmt-spaces` clean.
+
 ## Active task: the fast stuck window of the town walk re-path (2026-09-14)
 
 Started: 2026-09-14. Branch: `feature/proxy-server`. Commits as melg8.

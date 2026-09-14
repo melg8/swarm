@@ -1935,18 +1935,22 @@ func (l *Loop) noteRepathCell(selfX int32, selfY int32) bool {
 
 // abortFrozenTrip ends a trip whose re-path produced no movement and
 // escalates the recovery of the frozen leg before giving up: the town
-// walk legs try the escalation ladder (the banned detour re-plan, the
-// direct server routed walk - see escalateFrozenLeg), the zone return
-// goes straight to the direct server routed legs (walkZoneLeg) - the
-// pathfound legs cannot move this character, so burning two more full
-// trip cycles of frozen re-paths first helps nobody. The shopping
-// trips keep their cooldown recovery when the ladder is exhausted:
-// the hunt continues and the next trip retries from a fresh state.
+// walk legs and the zone return legs both try the escalation ladder
+// (the banned detour re-plan, the direct server routed walk - see
+// escalateFrozenLeg). Without the ladder the zone return cycles between
+// the pathfound-return-stuck-abort and the refused direct leg, never
+// moving: the deterministic planner re-plans the identical route the
+// server keeps refusing (the 2026-09-14 08:25 dump, build d2ea298: the
+// bot stood at the village terrace for 34s after the abort, no walk
+// sent, no Hunt log). The banned detour re-plan routes around the
+// walled corridor instead of reproducing it. The shopping trips keep
+// their cooldown recovery when the ladder is exhausted: the hunt
+// continues and the next trip retries from a fresh state.
 func (l *Loop) abortFrozenTrip(reason string) {
-    wasReturn := l.phase == phaseTownReturn
-    if !wasReturn && l.escalateFrozenLeg() {
+    if l.escalateFrozenLeg() {
         return
     }
+    wasReturn := l.phase == phaseTownReturn
     l.abortTownTrip(reason)
     if wasReturn {
         l.zoneFails = zoneReturnFailBudget
@@ -1976,7 +1980,18 @@ func (l *Loop) abortFrozenTrip(reason string) {
 // back to the plain trip abort with its cooldown. The ladder reports
 // whether a rung took over the recovery (the caller skips its abort).
 func (l *Loop) escalateFrozenLeg() bool {
-    if l.phase != phaseTownWalk || l.navigator == nil {
+    if l.navigator == nil {
+        return false
+    }
+    // The ladder runs for both the town walk legs (phaseTownWalk) and
+    // the zone return legs (phaseTownReturn): both follow a planned
+    // geodata route whose clicks the server may refuse, and both need
+    // the banned detour re-plan to route around the walled corridor
+    // instead of reproducing the identical frozen route (the
+    // 2026-09-14 08:25 dump: the zone return at the village terrace
+    // cycled between the pathfound-return-stuck-abort and the refused
+    // direct leg because the ladder never ran for it).
+    if l.phase != phaseTownWalk && l.phase != phaseTownReturn {
         return false
     }
     if l.frozenStage == 0 {
@@ -1984,7 +1999,7 @@ func (l *Loop) escalateFrozenLeg() bool {
         if l.banFrozenCorridor() {
             l.logf("Hunt: the walk froze on this corridor, " +
                 "re-planning the detour around it")
-            if l.startWalkLeg(l.legDest) {
+            if l.startZoneReturnOrWalkLeg() {
                 return true
             }
             // No route around the ban: the direct walk is the
@@ -1999,6 +2014,20 @@ func (l *Loop) escalateFrozenLeg() bool {
     }
 
     return false
+}
+
+// startZoneReturnOrWalkLeg re-plans the frozen leg with the right
+// search for the phase: the zone return (phaseTownReturn) uses the
+// non-dry fallback (startZoneReturnLeg), the town walk (phaseTownWalk)
+// uses the dry search (startWalkLeg). The zone return must allow
+// water crossings as a fallback - the path through the village ramp
+// may need to cross a water cell the dry search walls off.
+func (l *Loop) startZoneReturnOrWalkLeg() bool {
+    if l.phase == phaseTownReturn {
+        return l.startZoneReturnLeg(l.legDest)
+    }
+
+    return l.startWalkLeg(l.legDest)
 }
 
 // banFrozenCorridor adds the aimed waypoint of the frozen leg to the
