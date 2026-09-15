@@ -1,0 +1,194 @@
+// SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+//
+// SPDX-License-Identifier: MIT
+
+package navmesh
+
+import (
+    "math"
+    "testing"
+
+    "github.com/stretchr/testify/require"
+)
+
+// sampleTile builds a two polygon tile with an internal link, an
+// external link and a two node BVTree: the minimal production shape
+// that exercises every wire structure.
+func sampleTile() *Tile {
+    tile := &Tile{
+        Col:   21,
+        Row:   19,
+        Climb: 40,
+        Polys: []Poly{
+            {
+                X0: 100, Y0: 200, X1: 110, Y1: 210,
+                H00: -3000, H10: -2992, H01: -2996, H11: -2988,
+                FirstLink: 0, Area: AreaGround,
+            },
+            {
+                X0: 110, Y0: 200, X1: 120, Y1: 210,
+                H00: -2992, H10: -2984, H01: -2988, H11: -2980,
+                FirstLink: 1, Area: AreaWater,
+            },
+        },
+        Links: []Link{
+            {Side: SideMaxX, To: 1, Next: -1, T0: 203, T1: 206},
+            {Side: SideMinX, To: 0, Next: 2, T0: 203, T1: 206},
+            {Side: SideMaxY, To: -1, Next: -1, T0: 112, T1: 115},
+        },
+        ExtLinks: []ExtLink{{Col: 22, Row: 19, Poly: 7}},
+        BVTree: []BVNode{
+            {BMin: [3]uint16{100, 646, 200}, BMax: [3]uint16{110, 647, 210},
+                I: -2},
+            {BMin: [3]uint16{100, 646, 200}, BMax: [3]uint16{110, 647, 210},
+                I: 0},
+            {BMin: [3]uint16{110, 646, 200}, BMax: [3]uint16{120, 647, 210},
+                I: 1},
+        },
+    }
+    tile.worldMinX = (float64(tile.Col) - tileZeroCol) * tileWorldSize
+    tile.worldMinY = (float64(tile.Row) - tileZeroRow) * tileWorldSize
+
+    return tile
+}
+
+// TestTileRoundtrip encodes and decodes the sample tile and compares
+// every structure field by field.
+func TestTileRoundtrip(t *testing.T) {
+    original := sampleTile()
+    data, err := EncodeTile(original)
+    require.NoError(t, err)
+
+    tile, err := DecodeTile(data)
+    require.NoError(t, err)
+    require.Equal(t, original.Col, tile.Col)
+    require.Equal(t, original.Row, tile.Row)
+    require.Equal(t, original.Climb, tile.Climb)
+    require.Equal(t, original.Polys, tile.Polys)
+    require.Equal(t, original.Links, tile.Links)
+    require.Equal(t, original.ExtLinks, tile.ExtLinks)
+    require.Equal(t, original.BVTree, tile.BVTree)
+
+    // The world anchor derives from the region key: region 21_19
+    // anchors at world (32768, 32768).
+    require.InDelta(t, 32768, tile.WorldMinX(), 1e-9)
+    require.InDelta(t, 32768, tile.WorldMinY(), 1e-9)
+}
+
+// TestTileDecodeRejects checks the corrupt tile guards: the bad magic,
+// the bad version, truncation and a trailing byte.
+func TestTileDecodeRejects(t *testing.T) {
+    data, err := EncodeTile(sampleTile())
+    require.NoError(t, err)
+
+    badMagic := append([]byte{}, data...)
+    badMagic[0] = 'X'
+    _, err = DecodeTile(badMagic)
+    require.ErrorIs(t, err, ErrBadTile)
+
+    badVersion := append([]byte{}, data...)
+    badVersion[4] = 9
+    _, err = DecodeTile(badVersion)
+    require.ErrorIs(t, err, ErrBadTile)
+
+    _, err = DecodeTile(data[:len(data)-1])
+    require.ErrorIs(t, err, ErrBadTile)
+
+    _, err = DecodeTile(append(append([]byte{}, data...), 0))
+    require.ErrorIs(t, err, ErrBadTile)
+
+    _, err = DecodeTile(nil)
+    require.ErrorIs(t, err, ErrBadTile)
+
+    empty := &Tile{Col: 21, Row: 19, Climb: 40}
+    _, err = EncodeTile(empty)
+    require.ErrorIs(t, err, ErrBadTile)
+}
+
+// TestPolyRefPacking pins the reference packing: the roundtrip of the
+// region key and the polygon index, the null reference and the
+// negative region keys (the geodata grid sits at the negative world
+// quadrant edge).
+func TestPolyRefPacking(t *testing.T) {
+    ref := RefOf(21, 19, 4)
+    col, row := TileOf(ref)
+    require.EqualValues(t, 21, col)
+    require.EqualValues(t, 19, row)
+    require.EqualValues(t, 4, PolyOf(ref))
+
+    neg := RefOf(-3, 5, 0)
+    col, row = TileOf(neg)
+    require.EqualValues(t, -3, col)
+    require.EqualValues(t, 5, row)
+    require.EqualValues(t, 0, PolyOf(neg))
+
+    var null PolyRef
+    require.EqualValues(t, -1, PolyOf(null))
+}
+
+// TestRegionOfWorld pins the world to region mapping against the
+// geodata anchors: region 21_19 spans world [32768, 65536) per axis.
+func TestRegionOfWorld(t *testing.T) {
+    col, row := RegionOfWorld(45768, 49848)
+    require.EqualValues(t, 21, col)
+    require.EqualValues(t, 19, row)
+
+    col, row = RegionOfWorld(32768, 32768)
+    require.EqualValues(t, 21, col)
+    require.EqualValues(t, 19, row)
+
+    col, row = RegionOfWorld(32767.9, 65536)
+    require.EqualValues(t, 20, col)
+    require.EqualValues(t, 20, row)
+}
+
+// TestHeightAndClosest exercises the bilinear surface of a rectangle
+// polygon: the four corners interpolate exactly, the center averages,
+// and the closest point clamps onto the boundary.
+func TestHeightAndClosest(t *testing.T) {
+    tile := sampleTile()
+    poly := &tile.Polys[0]
+    x0, y0, x1, y1 := tile.WorldRect(poly)
+    require.InDelta(t, 32768+100*16, x0, 1e-9)
+    require.InDelta(t, 32768+200*16, y0, 1e-9)
+    require.InDelta(t, 32768+110*16, x1, 1e-9)
+    require.InDelta(t, 32768+210*16, y1, 1e-9)
+
+    require.InDelta(t, -3000, tile.HeightAt(poly, x0, y0), 1e-9)
+    require.InDelta(t, -2992, tile.HeightAt(poly, x1, y0), 1e-9)
+    require.InDelta(t, -2996, tile.HeightAt(poly, x0, y1), 1e-9)
+    require.InDelta(t, -2988, tile.HeightAt(poly, x1, y1), 1e-9)
+    centerH := tile.HeightAt(poly, (x0+x1)*0.5, (y0+y1)*0.5)
+    require.InDelta(t, (-3000-2992-2996-2988)*0.25, centerH, 1e-9)
+
+    // Outside the footprint: the position clamps onto the boundary
+    // with the boundary height.
+    cx, cy, cz := tile.ClosestPoint(poly, x0-500, y0-500, 0)
+    require.InDelta(t, x0, cx, 1e-9)
+    require.InDelta(t, y0, cy, 1e-9)
+    require.InDelta(t, -3000, cz, 1e-9)
+    require.False(t, math.IsNaN(cz))
+}
+
+// TestPortal covers the portal world segments of all four sides: the
+// span of link 0 (the maxx side of poly 0, y cells 203..206) maps to
+// the world boundary line of x1 with the span endpoints.
+func TestPortal(t *testing.T) {
+    tile := sampleTile()
+    poly := &tile.Polys[0]
+    link := &tile.Links[0]
+    ax, ay, bx, by := tile.Portal(poly, link)
+    x0, _, x1, _ := tile.WorldRect(poly)
+    require.InDelta(t, x1, ax, 1e-9)
+    require.InDelta(t, tile.WorldMinY()+203*16, ay, 1e-9)
+    require.InDelta(t, x1, bx, 1e-9)
+    require.InDelta(t, tile.WorldMinY()+207*16, by, 1e-9)
+
+    // A full side portal of the minx side.
+    full := Link{Side: SideMinX, T0: poly.Y0, T1: poly.Y1 - 1}
+    ax, ay, bx, by = tile.Portal(poly, &full)
+    require.InDelta(t, x0, ax, 1e-9)
+    require.InDelta(t, tile.WorldMinY()+float64(poly.Y0)*16, ay, 1e-9)
+    require.InDelta(t, x0, bx, 1e-9)
+    require.InDelta(t, tile.WorldMinY()+float64(poly.Y1)*16, by, 1e-9)
+}
