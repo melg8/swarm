@@ -97,10 +97,28 @@ pieces from the research verdict:
   two-lane synthetic world pin the semantics: the early stop, the
   start-poly radius, the lane detour with waypoint-outside-ban, the
   sealed goal, the escape way-out and the foreign ban precedence.
+- `hunt.NewNavmeshNavigator` - the hybrid behind the Navigator seam:
+  the five route queries (FindPathApproach, the avoiding/dry
+  avoiding forms with the bans converted into mesh disks, FindPath,
+  FindWaterEscape) serve from the mesh corridor search and fall back
+  to the grid engine on EVERY answer the mesh cannot serve (a
+  missing tile, a dropped island sheet, a sealed goal, a partial
+  closest-reachable corridor - round one keeps the grid engine the
+  reachability authority, so the hybrid can only add routes, never
+  lose them); the validation layer (ValidateClick, the sight lines,
+  the water rasters, the deck heights) never leaves the engine. Five
+  tests pin the seam: the synthetic corridor route + escape served
+  from the mesh with an engine-less fallback proving the mesh
+  answered, the no-mesh fallback surfacing the engine error, the ban
+  flow sealing the mesh route, the REAL hard pair (the elven village
+  deck to the water under the bridge, 21_19 built straight from the
+  shipped geodata through navbuild.BuildRegion - the 5.17 s grid
+  walk answers from the mesh in one call) and the validation answers
+  identical through the hybrid and the engine on the real pack.
 
 ### Next
 
-The hybrid navigator behind the Navigator seam of the hunt package
-(the mesh serving the long routes, the grid engine staying the click
-validation and the fallback authority), then the main.go wiring of
-the tile directory, then the acceptance evidence update.
+The main.go wiring of the tile directory (the -navmesh flag, the
+data/navmesh autodetection, the hybrid installed behind
+SetNavigator), then the docs/navmesh.md scope update with the
+acceptance evidence.
