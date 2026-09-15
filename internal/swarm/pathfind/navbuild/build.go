@@ -6,6 +6,8 @@ package navbuild
 
 import (
     "errors"
+    "fmt"
+    "sort"
     "time"
 
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
@@ -185,4 +187,56 @@ func droppedLayerCount(sh *sheets) int {
     }
 
     return count
+}
+
+// StitchAll stitches every build of the map against its present
+// neighbours (the phase B of the offline cmd): every region pairs
+// with the west/east/north/south builds that exist, a missing
+// neighbour stays a wall the runtime re-stitches lazily when its tile
+// appears. The answer is the total count of the external links added.
+func StitchAll(builds map[navmesh.RegionKey]*RegionBuild,
+    opts Options,
+) (int, error) {
+    keys := make([]navmesh.RegionKey, 0, len(builds))
+    for key := range builds {
+        keys = append(keys, key)
+    }
+    sort.Slice(keys, func(i, j int) bool {
+        if keys[i].Col != keys[j].Col {
+            return keys[i].Col < keys[j].Col
+        }
+
+        return keys[i].Row < keys[j].Row
+    })
+
+    added := 0
+    for _, key := range keys {
+        build := builds[key]
+        var neighbors [4]*borderStrips
+        west := builds[navmesh.RegionKey{Col: key.Col - 1, Row: key.Row}]
+        if west != nil {
+            neighbors[stripWest] = &west.Strips
+        }
+        east := builds[navmesh.RegionKey{Col: key.Col + 1, Row: key.Row}]
+        if east != nil {
+            neighbors[stripEast] = &east.Strips
+        }
+        north := builds[navmesh.RegionKey{Col: key.Col, Row: key.Row - 1}]
+        if north != nil {
+            neighbors[stripNorth] = &north.Strips
+        }
+        south := builds[navmesh.RegionKey{Col: key.Col, Row: key.Row + 1}]
+        if south != nil {
+            neighbors[stripSouth] = &south.Strips
+        }
+        count, err := StitchRegion(build.Tile, build.Strips, neighbors,
+            opts)
+        if err != nil {
+            return added, fmt.Errorf("region %d_%d: %w", key.Col, key.Row,
+                err)
+        }
+        added += count
+    }
+
+    return added, nil
 }

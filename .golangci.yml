@@ -140,9 +140,10 @@ linters:
       - legacy
       - std-error-handling
     rules:
-      - path: cmd/geotest/
+      - path: cmd/(geotest|navmesh-build)/
         linters:
-          # The geotest CLI tool prints its findings to stdout by design.
+          # The geotest and navmesh-build CLI tools print their
+          # findings to stdout by design.
           - forbidigo
       - path: _test\.go
         linters:

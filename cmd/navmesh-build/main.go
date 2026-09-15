@@ -1,0 +1,111 @@
+// SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+//
+// SPDX-License-Identifier: MIT
+
+// navmesh-build converts the l2j geodata region files into navigation
+// mesh tiles (docs/navmesh.md): the offline half of the
+// feature/new-pathfind port. Every X_Y.l2j region of the geodata
+// directory becomes an X_Y.nm tile in the output directory, the
+// neighbouring regions stitch their border strips, and the audit
+// lines report the sheet decomposition and the link health per
+// region.
+//
+// Usage:
+//
+//    go run ./cmd/navmesh-build -geodata data/geodata -out data/navmesh
+//
+// The build is idempotent: a region whose tile file already carries a
+// newer mtime than the region file is skipped unless -force is set.
+package main
+
+import (
+    "flag"
+    "fmt"
+    "os"
+    "strconv"
+    "strings"
+    "time"
+
+    "github.com/melg8/swarm/internal/swarm/pathfind/navbuild"
+    "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
+)
+
+func main() {
+    geodataDir := flag.String("geodata", "data/geodata",
+        "the geodata directory with the X_Y.l2j region files")
+    outDir := flag.String("out", "data/navmesh",
+        "the output directory for the X_Y.nm tiles")
+    regions := flag.String("regions", "",
+        "the comma separated region keys to build (col_row pairs),"+
+            " default: every region of the geodata directory")
+    force := flag.Bool("force", false,
+        "rebuild the regions whose tile file is already fresh")
+    flag.Parse()
+
+    if err := run(*geodataDir, *outDir, *regions, *force); err != nil {
+        fmt.Println("Error:", err)
+        os.Exit(1)
+    }
+}
+
+// run executes the build over the requested regions.
+func run(geodataDir, outDir, regionsSpec string, force bool) error {
+    keys, err := regionKeys(geodataDir, regionsSpec)
+    if err != nil {
+        return err
+    }
+    if len(keys) == 0 {
+        return fmt.Errorf("no geodata regions under %s", geodataDir)
+    }
+    if err := os.MkdirAll(outDir, 0o755); err != nil {
+        return fmt.Errorf("create the output directory: %w", err)
+    }
+
+    started := time.Now()
+    stats, err := navbuild.BuildPack(geodataDir, outDir, keys,
+        navbuild.DefaultOptions(), force,
+        func(format string, args ...any) {
+            fmt.Printf(format+"\n", args...)
+        })
+    if err != nil {
+        return err
+    }
+    fmt.Printf("built %d regions (%d skipped, %d failed), %d polys,"+
+        " %d links, %d external links, %.1f MB of tiles in %s\n",
+        stats.Built, stats.Skipped, stats.Failed, stats.Polys,
+        stats.Links, stats.Stitched,
+        float64(stats.TileBytes)/(1024*1024),
+        time.Since(started).Round(time.Millisecond))
+
+    return nil
+}
+
+// regionKeys resolves the region keys of the run: the explicit
+// specification or the directory listing.
+func regionKeys(geodataDir, regionsSpec string,
+) ([]navmesh.RegionKey, error) {
+    if regionsSpec == "" {
+        return navbuild.RegionKeysOfDir(geodataDir)
+    }
+    specs := strings.Split(regionsSpec, ",")
+    keys := make([]navmesh.RegionKey, 0, len(specs))
+    for _, spec := range specs {
+        colText, rowText, found := strings.Cut(strings.TrimSpace(spec),
+            "_")
+        if !found {
+            return nil, fmt.Errorf("bad region spec %q", spec)
+        }
+        col, err := strconv.Atoi(colText)
+        if err != nil || col < -32768 || col > 32767 {
+            return nil, fmt.Errorf("bad region col %q: %w", colText, err)
+        }
+        row, err := strconv.Atoi(rowText)
+        if err != nil || row < -32768 || row > 32767 {
+            return nil, fmt.Errorf("bad region row %q: %w", rowText, err)
+        }
+        keys = append(keys, navmesh.RegionKey{ //nolint:gosec // guarded
+            Col: int16(col), Row: int16(row)})
+    }
+
+    return keys, nil
+}
