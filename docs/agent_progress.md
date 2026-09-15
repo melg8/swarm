@@ -81,11 +81,26 @@ pieces from the research verdict:
 - `docs/navmesh.md`: the subsystem reference (the tile format, the
   build pipeline, the measured comparison table, the corrupt-region
   note, the not-wired-yet scope).
+- The live integration round opened. The corridor search gained the
+  two contracts the Navigator seam needs: the approach radius goal
+  (the FindPathApproach stop condition - the first polygon whose
+  closest surface point lies within the 3D radius of the end, the
+  polygon-granularity form of the grid nodeReached) and the avoid
+  areas (the recovery bans: Filter.Avoid carries AvoidCircle disks,
+  a polygon whose footprint a ban touches walls the search - the
+  over-walling direction, so no funnelled leg ever enters the banned
+  ground; the ban holding the start opens its escape ring within 256
+  units at the 6x multiplier, the foreign ban wins over the escape
+  ring - the rectangle granularity port of the grid
+  cellAvoidedEscape rules). `RouteApproach` is the new facade entry,
+  `Route` degenerates to it at radius zero. Six tests over a fresh
+  two-lane synthetic world pin the semantics: the early stop, the
+  start-poly radius, the lane detour with waypoint-outside-ban, the
+  sealed goal, the escape way-out and the foreign ban precedence.
 
 ### Next
 
-The live integration round: the hunt loop consuming the navmesh
-corridors while the grid engine stays the click validation of every
-smoothed leg (on the acceptance stack of feature/proxy-server), then
-the runtime optimization headroom (the flat tile array, the per-tile
-poly index) if the fleet benchmark asks for it.
+The hybrid navigator behind the Navigator seam of the hunt package
+(the mesh serving the long routes, the grid engine staying the click
+validation and the fallback authority), then the main.go wiring of
+the tile directory, then the acceptance evidence update.

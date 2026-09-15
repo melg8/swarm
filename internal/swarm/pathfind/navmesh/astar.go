@@ -198,12 +198,31 @@ type astarResult struct {
     capped   bool
 }
 
+// emptyResult is the no-answer of the corridor search (a missing
+// start polygon).
+func emptyResult() astarResult {
+    return astarResult{
+        corridor: nil,
+        end:      Pos{X: 0, Y: 0, Z: 0},
+        reached:  false,
+        partial:  false,
+        explored: 0,
+        capped:   false,
+    }
+}
+
 // astarGoal selects the stop condition of the corridor search: the
 // ordinary search stops at one target polygon, the water escape stops
-// at the first ground polygon.
+// at the first ground polygon. The approach radius widens the
+// ordinary goal: the search also stops on the first polygon whose
+// closest surface point lies within the radius of the end position.
 type astarGoal struct {
     target PolyRef
     escape bool
+    // approach is the 3D radius of the FindPathApproach goal (the
+    // merchant interaction distance of the town trips); zero keeps
+    // the exact target contract.
+    approach float64
 }
 
 // reached reports whether a settled polygon satisfies the goal.
@@ -213,6 +232,28 @@ func (g astarGoal) reached(poly *Poly, ref PolyRef) bool {
     }
 
     return g.escape && poly != nil && poly.Area == AreaGround
+}
+
+// approachReached reports whether a settled polygon already
+// satisfies an approach radius goal: the closest surface point of
+// the polygon lies within the 3D radius of the search end. This is
+// the polygon-granularity form of the grid nodeReached rule (the
+// first node within the approach radius of the target point): the
+// walker may stand anywhere on the rectangle, so the closest point
+// of the whole surface decides, not a cell center. The stacked-layer
+// disambiguation rides the z axis of the test unchanged - a deck
+// floating over the end position answers with its own height, the
+// vertical gap keeps it outside the radius.
+func (g astarGoal) approachReached(tile *Tile, poly *Poly, end Pos) bool {
+    if g.approach <= 0 || tile == nil || poly == nil {
+        return false
+    }
+    cx, cy, cz := tile.ClosestPoint(poly, end.X, end.Y, end.Z)
+    dx := end.X - cx
+    dy := end.Y - cy
+    dz := end.Z - cz
+
+    return math.Sqrt(dx*dx+dy*dy+dz*dz) <= g.approach
 }
 
 // astar runs the corridor search over the mesh. The step cost is the
@@ -226,7 +267,7 @@ func (g astarGoal) reached(poly *Poly, ref PolyRef) bool {
 // searches turn into the closest reachable dry point.
 func (m *Mesh) astar(
     state *queryState, goal astarGoal, startRef PolyRef, startPos Pos,
-    endPos Pos, filter Filter,
+    endPos Pos, filter Filter, avoid avoidCtx,
 ) astarResult {
     state.reset(goal.escape)
     startH := dist3(startPos, endPos)
@@ -235,28 +276,14 @@ func (m *Mesh) astar(
     }
     startTile, startPoly := m.polyOfRef(startRef)
     if startTile == nil {
-        return astarResult{
-            corridor: nil,
-            end:      Pos{X: 0, Y: 0, Z: 0},
-            reached:  false,
-            partial:  false,
-            explored: 0,
-            capped:   false,
-        }
+        return emptyResult()
     }
     state.create(startRef, noParent, startPos, 0, startH, startTile,
         startPoly)
     state.bestH = startH
     state.push(0)
 
-    result := astarResult{
-        corridor: nil,
-        end:      Pos{X: 0, Y: 0, Z: 0},
-        reached:  false,
-        partial:  false,
-        explored: 0,
-        capped:   false,
-    }
+    result := emptyResult()
     for {
         idx, ok := state.pop()
         if !ok {
@@ -268,7 +295,8 @@ func (m *Mesh) astar(
         }
         node.closed = true
         result.explored++
-        if goal.reached(node.poly, node.ref) {
+        if goal.reached(node.poly, node.ref) ||
+            goal.approachReached(node.tile, node.poly, endPos) {
             result.corridor = state.corridorOf(idx)
             result.reached = true
             // The ordinary search ends at the requested position; the
@@ -287,7 +315,7 @@ func (m *Mesh) astar(
 
             break
         }
-        m.expand(state, node, idx, endPos, filter)
+        m.expand(state, node, idx, endPos, filter, avoid)
     }
 
     if state.best != 0 {
@@ -301,9 +329,12 @@ func (m *Mesh) astar(
 
 // expand relaxes every link of one settled node. The internal links
 // resolve inside the node tile without any mesh lookup (the map and
-// the lock only serve the rare cross region links).
+// the lock only serve the rare cross region links). The avoid
+// context walls the links onto banned polygons and prices the escape
+// polygons of the ban holding the start (the recovery ban rules of
+// the grid costTo - the rectangle granularity form, see avoid.go).
 func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
-    endPos Pos, filter Filter,
+    endPos Pos, filter Filter, avoid avoidCtx,
 ) {
     tile := node.tile
     poly := node.poly
@@ -314,28 +345,18 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
     for li := poly.FirstLink; li >= 0 && int(li) < len(tile.Links); {
         link := &tile.Links[li]
         li = link.Next
-        var targetRef PolyRef
-        var targetTile *Tile
-        var targetPoly *Poly
-        if link.To >= 0 {
-            // The internal link stays inside the node tile.
-            if int(link.To) >= len(tile.Polys) {
-                continue
-            }
-            targetRef = RefOf(tile.Col, tile.Row, uint32(link.To))
-            targetTile = tile
-            targetPoly = &tile.Polys[link.To]
-        } else {
-            targetRef = m.resolveLink(tile, link)
-            if targetRef == 0 {
-                continue
-            }
-            targetTile, targetPoly = m.polyOfRef(targetRef)
-            if targetTile == nil {
-                continue
-            }
+        targetRef, targetTile, targetPoly := m.linkTarget(tile, link)
+        if targetTile == nil {
+            continue
         }
         if !filter.AllowWater && targetPoly.Area == AreaWater {
+            continue
+        }
+        ban := avoid.state(targetTile, targetPoly)
+        if ban == avoidWall {
+            // The recovery ban: the live server proved this ground
+            // unwalkable for this session, the detour around it is
+            // the only plan worth planning.
             continue
         }
         ax, ay, bx, by := tile.Portal(poly, link)
@@ -344,25 +365,72 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
         mid := Pos{X: midX, Y: midY, Z: midZ}
         g := node.g + dist3(node.pos, mid)*
             (areaCost[poly.Area]+areaCost[targetPoly.Area])*0.5
+        if ban == avoidEscape {
+            // The ban that holds the start: the only honest route out
+            // of it crosses its own ground - expensive, never sealed.
+            g *= avoidEscapeMultiplier
+        }
         h := dist3(mid, endPos)
         if state.escape {
             h = 0
         }
-        existing, ok := state.index[targetRef]
-        if !ok {
-            created := state.create(targetRef, idx, mid, g, h,
-                targetTile, targetPoly)
-            state.push(created)
-        } else if !state.nodes[existing].closed {
-            other := &state.nodes[existing]
-            if g < other.g {
-                other.g = g
-                other.f = g + h
-                other.parent = idx
-                other.pos = mid
-                state.fix(existing)
-            }
+        relax(state, idx, targetRef, targetTile, targetPoly, mid, g, h)
+    }
+}
+
+// linkTarget resolves one link of a node polygon to its target
+// reference, tile and polygon: the internal link stays inside the
+// node tile (no mesh lookup), the external one resolves through the
+// mesh. A link the mesh cannot resolve answers nil tiles - the caller
+// treats it as a wall.
+func (m *Mesh) linkTarget(
+    tile *Tile, link *Link,
+) (PolyRef, *Tile, *Poly) {
+    if link.To >= 0 {
+        if int(link.To) >= len(tile.Polys) {
+            return 0, nil, nil
         }
+
+        return RefOf(tile.Col, tile.Row, uint32(link.To)), tile,
+            &tile.Polys[link.To]
+    }
+    targetRef := m.resolveLink(tile, link)
+    if targetRef == 0 {
+        return 0, nil, nil
+    }
+    targetTile, targetPoly := m.polyOfRef(targetRef)
+    if targetTile == nil {
+        return 0, nil, nil
+    }
+
+    return targetRef, targetTile, targetPoly
+}
+
+// relax relaxes one link target of the corridor search: a reference
+// the search has not seen yet becomes a fresh node, an open one
+// improves through the cheaper parent.
+func relax(
+    state *queryState, idx uint32, targetRef PolyRef,
+    targetTile *Tile, targetPoly *Poly, mid Pos, g, h float64,
+) {
+    existing, ok := state.index[targetRef]
+    if !ok {
+        created := state.create(targetRef, idx, mid, g, h,
+            targetTile, targetPoly)
+        state.push(created)
+
+        return
+    }
+    if state.nodes[existing].closed {
+        return
+    }
+    other := &state.nodes[existing]
+    if g < other.g {
+        other.g = g
+        other.f = g + h
+        other.parent = idx
+        other.pos = mid
+        state.fix(existing)
     }
 }
 

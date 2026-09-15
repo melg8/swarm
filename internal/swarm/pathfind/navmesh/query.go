@@ -23,18 +23,24 @@ type Filter struct {
     // AllowWater keeps the water polygons walkable; a false value
     // walls them (the dry searches of the hunt loop).
     AllowWater bool
+    // Avoid carries the recovery bans of the hunt loop (see
+    // AvoidCircle): every polygon whose footprint a ban touches
+    // walls the search - except the escape polygons of the ban that
+    // holds the start (the way-out rule of the grid engine, priced
+    // at the avoidEscapeMultiplier). A nil slice bans nothing.
+    Avoid []AvoidCircle
 }
 
 // DefaultFilter is the swim allowing search with the 3x water cost.
 func DefaultFilter() Filter {
-    return Filter{WaterCost: 3, AllowWater: true}
+    return Filter{WaterCost: 3, AllowWater: true, Avoid: nil}
 }
 
 // DryFilter walls the water polygons: a route only exists over dry
 // ground, an unreachable dry target answers the partial corridor to
 // the closest reachable dry point.
 func DryFilter() Filter {
-    return Filter{WaterCost: 3, AllowWater: false}
+    return Filter{WaterCost: 3, AllowWater: false, Avoid: nil}
 }
 
 // escapeWaterCost prices the water polygons of the escape search (the
@@ -66,13 +72,29 @@ type Route struct {
 }
 
 // Route searches the walkable route from start to end under the
-// filter. The start and end resolve onto the mesh through the 3D
-// nearest polygon (the stacked-layer disambiguation: a point under a
-// bridge binds to the water polygon, the same x/y at deck height to
-// the bridge polygon). A missing mesh under either endpoint answers
-// NoNavmeshError; an unreachable destination answers Found=false with
-// Partial set when a closest-reachable corridor exists.
+// filter: the exact destination contract (Found only when the
+// destination polygon itself is reached, the partial answer carries
+// the closest reachable corridor otherwise).
 func (m *Mesh) Route(start, end Pos, filter Filter) (*Route, error) {
+    return m.RouteApproach(start, end, 0, filter)
+}
+
+// RouteApproach searches the walkable route from start to end
+// succeeding on the first polygon whose closest surface point lies
+// within the approach radius (3D) of the end position - the
+// FindPathApproach contract of the grid engine: the merchant stops
+// hold their interaction distance, a destination behind a counter or
+// on a floor layer the mesh does not model is still reached on the
+// surrounding deck. A radius of zero degenerates to Route. The start
+// and end resolve onto the mesh through the 3D nearest polygon (the
+// stacked-layer disambiguation: a point under a bridge binds to the
+// water polygon, the same x/y at deck height to the bridge polygon).
+// A missing mesh under either endpoint answers NoNavmeshError; an
+// unreachable destination answers Found=false with Partial set when
+// a closest-reachable corridor exists.
+func (m *Mesh) RouteApproach(
+    start, end Pos, approachRadius float64, filter Filter,
+) (*Route, error) {
     startRef, startPos, ok := m.FindNearestPoly(start)
     if !ok {
         return nil, wrapNoNavmesh(start)
@@ -100,8 +122,10 @@ func (m *Mesh) Route(start, end Pos, filter Filter) (*Route, error) {
         return route, nil
     }
 
-    result := m.astar(state, astarGoal{target: endRef, escape: false},
-        startRef, startPos, endPos, filter)
+    avoid := newAvoidCtx(filter.Avoid, start)
+    result := m.astar(state,
+        astarGoal{target: endRef, escape: false, approach: approachRadius},
+        startRef, startPos, endPos, filter, avoid)
     route.Explored = result.explored
     route.Corridor = result.corridor
     switch {
@@ -157,9 +181,16 @@ func (m *Mesh) WaterEscape(start Pos) (*Route, error) {
 
     state := m.acquireState()
     defer m.releaseState(state)
-    filter := Filter{WaterCost: escapeWaterCost, AllowWater: true}
-    result := m.astar(state, astarGoal{target: 0, escape: true}, startRef,
-        startPos, start, filter)
+    filter := Filter{
+        WaterCost:  escapeWaterCost,
+        AllowWater: true,
+        Avoid:      nil,
+    }
+    result := m.astar(state, astarGoal{
+        target:   0,
+        escape:   true,
+        approach: 0,
+    }, startRef, startPos, start, filter, noAvoid())
 
     route := &Route{
         Found:     false,
