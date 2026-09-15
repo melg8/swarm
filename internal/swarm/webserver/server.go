@@ -22,6 +22,7 @@ import (
 
     "github.com/melg8/swarm/internal/swarm/acceptance"
     "github.com/melg8/swarm/internal/swarm/pathfind"
+    "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
     "github.com/melg8/swarm/internal/swarm/session"
     "github.com/melg8/swarm/internal/swarm/state"
 )
@@ -39,6 +40,9 @@ const (
     // modeFight is the combat animation variant showcase of the
     // -test-fight-ui-v1 run: a looping demo fight on every variant.
     modeFight = "fight"
+    // modeNavmesh is the 3D navmesh viewer mode (NewNavmeshServer):
+    // the interactive mesh inspection of the -show-navmesh flag.
+    modeNavmesh = "navmesh"
 
     // defaultPathfindScale is the initial map zoom of the pathfind
     // test, a bit closer than the bot map default.
@@ -120,6 +124,16 @@ type Server struct {
     // stats is the bot statistics collector (nil in the bot less
     // modes): the sampler goroutine of the statistics endpoints.
     stats *statsCollector
+    // navmeshMesh serves the navmesh viewer mode (nil in every other
+    // mode): the tile mesh of the -show-navmesh run.
+    navmeshMesh *navmesh.Mesh
+    // navmeshTiles are the flag selected tiles of the viewer (nil or
+    // empty means every tile of the directory - the stitched world).
+    navmeshTiles []navmesh.RegionKey
+    // navmeshGeo caches the encoded geometry payloads of the served
+    // tiles; navmeshGeoMu guards the lazy fills.
+    navmeshGeo   map[navmesh.RegionKey][]byte
+    navmeshGeoMu sync.Mutex
 }
 
 // ProxyController drives the client proxy from the web UI: which bot a
@@ -255,6 +269,10 @@ func newServer(address string, logger *log.Logger) *Server {
         eventsDone:   make(chan struct{}),
         shutdown:     nil,
         stats:        nil,
+        navmeshMesh:  nil,
+        navmeshTiles: nil,
+        navmeshGeo:   nil,
+        navmeshGeoMu: sync.Mutex{},
     }
     //nolint:exhaustruct_v5 // the zero defaults of http.Server are intended
     server.httpServer = &http.Server{

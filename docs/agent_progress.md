@@ -159,12 +159,46 @@ pieces from the research verdict:
   arming on the partial, the quest segment walking it through the
   moving game simulator, the bare not found still aborting).
 
+- 2026-09-15: the mesh viewer round landed (the owner request: an
+  interactive 3D viewer over the built meshes, a double click pair
+  builds a route with a construction timer, launched by a
+  `-show-navmesh` flag, loading either one named mesh or all meshes
+  of the directory stitched together). `webserver.NewNavmeshServer`
+  adds the fourth bot less mode behind the embedded web interface:
+  `GET /api/navmesh/tiles` (the listing with the derived world
+  footprints, no decode - through the new `Mesh.TileFiles`), `GET
+  /api/navmesh/geometry/{col}_{row}` (the binary NMV1 payload: a 24
+  byte header, the contiguous int16 corner block, the area tail;
+  ~25 B per polygon, ETag revalidation, a process lifetime cache)
+  and `POST /api/navmesh/path` (the measured `Route` call with the
+  swim/dry filter select of the hunt loop's two search profiles).
+  The page is `web/navmesh_view.js` over the vendored three.js r160
+  module build (`web/vendor/`, offline like the rest of the
+  interface): the polygon quads tessellate client side with the
+  height ramp terrain colors and the flat water blue, a minimal
+  orbit rig (drag rotate, wheel dolly, right drag pan), the double
+  click raycast arms the start then asks the route, and the result
+  panel carries the status badge, the construction timer
+  (microsecond resolution under a millisecond), the waypoint count,
+  the corridor/explored poly counts and the path length. The
+  `-show-navmesh` flag is a custom `flag.Value` with `IsBoolFlag`:
+  the bare form opens every tile stitched, `-show-navmesh=21_19`
+  (comma separated) opens the named tiles, the route queries always
+  run over the full directory mesh. Verified live in a headless
+  browser over the four elven tiles: the REAL hard pair (village
+  deck -> water under the bridge) draws its 49 waypoint funnel with
+  a 8.8 ms timer against the grid engine's 5.17 s flood; the VLM
+  review of the screenshots confirms the watertight terrain, the
+  cliff geometry and the marker/path rendering. Five webserver API
+  tests (config/tiles/geometry binary layout/etag 304/path with the
+  swim found and dry partial answers) plus the flag parse pin; the
+  lint stays at the pre-existing 68 findings, the full suite green.
+
 ### Next
 
-The partial round closes: the closest-reachable corridors surface
-through the Navigator contract and the town/quest legs walk them.
-The follow-up candidates (NOT started): the acceptance stack switch
-to the hybrid once the live sessions prove it (which may also skip
+The viewer round closes the tooling side of the port. The
+follow-up candidates (NOT started): the acceptance stack switch to
+the hybrid once the live sessions prove it (which may also skip
 the engine confirmation flood on mesh partials - the ~13 s the real
 hard pair dry search pays today), the Detour-parity optimization if
 the fleet benchmark asks for it.

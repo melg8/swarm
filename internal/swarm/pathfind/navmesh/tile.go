@@ -186,6 +186,17 @@ func RegionOfWorld(x, y float64) (int16, int16) {
         int16(math.Floor(y/tileWorldSize)) + tileZeroRow
 }
 
+// TileWorldSize returns the world size of one region tile (32768).
+func TileWorldSize() float64 { return tileWorldSize }
+
+// TileZeroCol returns the region file name anchor of the world x
+// axis (the region of world x is floor(x/tileWorldSize) + 20).
+func TileZeroCol() int16 { return tileZeroCol }
+
+// TileZeroRow returns the region file name anchor of the world y
+// axis (the anchor the region row derives from, 18).
+func TileZeroRow() int16 { return tileZeroRow }
+
 // WorldMinX returns the world x anchor of the region (the min corner
 // of the local cell column 0).
 func (t *Tile) WorldMinX() float64 { return t.worldMinX }

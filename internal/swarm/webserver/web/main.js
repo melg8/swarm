@@ -30,6 +30,17 @@ window.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  if (config && config.mode === "navmesh") {
+    document.body.classList.add("mode-navmesh");
+    // The viewer is an ES module over the vendored three.js build, so
+    // it boots through a dynamic import instead of a script tag.
+    import("/navmesh_view.js")
+      .then((mod) => mod.init(config))
+      .catch((err) => console.error("navmesh viewer boot failed:", err));
+
+    return;
+  }
+
   if (config && config.mode === "fight") {
     document.body.classList.add("mode-fight");
     FightUI.init();

@@ -9,6 +9,7 @@ import (
     "testing"
 
     "github.com/melg8/swarm/internal/swarm/acceptance"
+    "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -44,6 +45,47 @@ func TestHuntEventLoggerKeepsTheConsoleFormat(t *testing.T) {
     require.Contains(t, console.lines[0], "Hunt: fleeing the fight with 7")
     require.Regexp(t, `^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `,
         console.lines[0], "the console prefix stays")
+}
+
+// TestNavmeshShowFlagParsesTheTileSelection pins the -show-navmesh
+// flag contract: the bare boolean forms toggle the viewer over every
+// stitched tile, the col_row list names the tiles to open and the
+// malformed values refuse to parse.
+func TestNavmeshShowFlagParsesTheTileSelection(t *testing.T) {
+    t.Run("the boolean forms", func(t *testing.T) {
+        var flag navmeshShowFlag
+        require.NoError(t, flag.Set("true"))
+        require.True(t, flag.enabled)
+        require.Empty(t, flag.tiles)
+        require.Equal(t, "true", flag.String())
+
+        require.NoError(t, flag.Set("false"))
+        require.False(t, flag.enabled)
+        require.Equal(t, "false", flag.String())
+    })
+
+    t.Run("the tile list", func(t *testing.T) {
+        var flag navmeshShowFlag
+        require.NoError(t, flag.Set("21_19, 22_19"))
+        require.True(t, flag.enabled)
+        require.Equal(t, []navmesh.RegionKey{
+            {Col: 21, Row: 19},
+            {Col: 22, Row: 19},
+        }, flag.tiles)
+        require.Equal(t, "21_19,22_19", flag.String())
+    })
+
+    t.Run("the malformed values refuse", func(t *testing.T) {
+        var flag navmeshShowFlag
+        require.Error(t, flag.Set("21"))
+        require.Error(t, flag.Set("ab_cd"))
+        require.Error(t, flag.Set("21_19,"))
+    })
+
+    t.Run("the bare flag form is boolean", func(t *testing.T) {
+        var flag navmeshShowFlag
+        require.True(t, flag.IsBoolFlag())
+    })
 }
 
 // linesRecorder collects the console lines of the logger.

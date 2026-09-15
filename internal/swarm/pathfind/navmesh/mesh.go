@@ -9,6 +9,7 @@ import (
     "fmt"
     "os"
     "path/filepath"
+    "sort"
     "strconv"
     "strings"
     "sync"
@@ -116,6 +117,28 @@ func (m *Mesh) Stats() Stats {
     defer m.mu.Unlock()
 
     return Stats{Dir: m.dir, TileFiles: len(m.files), Loaded: len(m.tiles)}
+}
+
+// TileFiles lists the region keys of the tile files found in the mesh
+// directory, ordered col first then row: the directory scan without
+// a single tile decode (the viewer listing and the flag validation).
+func (m *Mesh) TileFiles() []RegionKey {
+    m.mu.Lock()
+    defer m.mu.Unlock()
+
+    keys := make([]RegionKey, 0, len(m.files))
+    for key := range m.files {
+        keys = append(keys, key)
+    }
+    sort.Slice(keys, func(i, j int) bool {
+        if keys[i].Col != keys[j].Col {
+            return keys[i].Col < keys[j].Col
+        }
+
+        return keys[i].Row < keys[j].Row
+    })
+
+    return keys
 }
 
 // scanFiles counts the tile files of the directory.

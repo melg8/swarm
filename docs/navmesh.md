@@ -178,6 +178,74 @@ go test ./internal/swarm/pathfind/navmesh/ ./internal/swarm/pathfind/navbuild/ -
 go test ./internal/swarm/pathfind/navbuild/ -run '^$' -bench BenchmarkReal -benchmem
 ```
 
+## The mesh viewer
+
+The `-show-navmesh` launch mode serves a bot less 3D inspection
+surface for the built tiles (the same embedded web interface the
+bot control uses, no game connection):
+
+```bash
+# every tile of the directory stitched together:
+go run ./cmd/swarm -show-navmesh
+
+# one named tile (comma separated keys also work):
+go run ./cmd/swarm -show-navmesh=21_19
+
+# an explicit tile directory and port:
+go run ./cmd/swarm -show-navmesh -navmesh data/navmesh -web 127.0.0.1:8080
+```
+
+The viewer renders the rectangle polygons as an exaggerated terrain
+(height ramp for the ground, flat blue for the water areas; the
+height scale selector lifts the subtle geodata relief to 2x/4x). A
+double click on the mesh arms the green start marker, the second
+double click picks the destination and asks the server for the real
+corridor search - the same `Route` call the hunt loop's hybrid
+navigator issues - and the answer draws the funnel polyline with its
+waypoints plus the measured construction time. The timer is the
+server side `time.Since` around the query: the first route over a
+cold region honestly includes the lazy tile decode (~1.45 ms per
+tile), exactly what a cold bot pays. The elven hard pair (the
+village deck at (45768, 49848, -3056) to the water under the bridge
+at (44920, 50792, -3928)) answers in single digit milliseconds
+where the grid engine floods for 5.17 s - the viewer is the fastest
+way to see the stacked-layer walk the port bought.
+
+The flag selection bounds the initially VISIBLE tiles only: the
+route queries always run over the full directory mesh, so a path may
+leave the visible tiles (the checkbox list loads more tiles on
+demand, the polyline draws wherever it walks). The swim/dry filter
+select mirrors the hunt loop's two search profiles (water priced 3x
+versus walled).
+
+The endpoints behind the page (the mode of `GET /api/config` is
+`navmesh`):
+
+- `GET /api/navmesh/tiles` - the tile file listing with the derived
+  world footprints, no tile decoded;
+- `GET /api/navmesh/geometry/{col}_{row}` - the binary NMV1 payload
+  of one tile: a 24 byte header (magic, region key, world anchors,
+  the height range, the poly count), then a contiguous int16 corner
+  block (four corners per polygon, the corner order X0Y0 X1Y0 X0Y1
+  X1Y1, each a cellX/cellY/height triple - the world position is
+  worldMin + cell*16), then the area bytes (0 ground, 1 water). The
+  triangles never ride the wire: every polygon is its own quad of
+  four consecutive corners and the viewer tessellates. The payload
+  is immutable per tile, so an ETag revalidates for free and the
+  server caches the encoded bytes (~25 bytes per polygon, about
+  2.3 MB for the dense elven regions);
+- `POST /api/navmesh/path` - `{start, end, filter}` positions and
+  the reply `{found, partial, waypoints, durationMs, explored,
+  corridor, filter}` of the measured `Route` call.
+
+Three.js itself is vendored (`web/vendor/three.module.min.js`, the
+r160 module build, MIT) so the viewer works offline like the rest of
+the interface; the page boots through the dynamic import of
+`main.js` on the `navmesh` mode. The geometry of the full stitched
+pack is a few hundred megabytes of GPU buffers - the viewer targets
+the working set of a handful of regions, not the whole 165 tile
+pack at once.
+
 ## The live integration
 
 The hunt loop consumes the mesh since the live integration round:

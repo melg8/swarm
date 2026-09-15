@@ -373,7 +373,7 @@ cmd/swarm/                     Application entry point (flags: login,
                                account, password, char, web, hunt, bots,
                                proxy, pathfind-test, test-fight-ui,
                                test-fight-ui-v1, geodata, navmesh,
-                               max-passable).
+                               show-navmesh, max-passable).
 cmd/navmesh-build/             The offline geodata -> navmesh tile
                                converter of feature/new-pathfind
                                (docs/navmesh.md).
@@ -451,7 +451,9 @@ task run:app              # or: go run ./cmd/swarm -web 127.0.0.1:8080
 
 The bot less launch modes (`-pathfind-test`, `-test-fight-ui`,
 `-test-fight-ui-v1`) are described in docs/webui.md and
-docs/pathfinding.md.
+docs/pathfinding.md; the 3D navmesh viewer of `-show-navmesh`
+(bare flag: every tile stitched; `-show-navmesh=21_19`: the named
+tiles) is described in docs/navmesh.md.
 
 Tests and linters (run both before considering work done). The single
 fastest verification of changed code is `task lint:new` (2 s on a
