@@ -251,7 +251,7 @@ func (m *Mesh) astar(
 
     result := astarResult{
         corridor: nil,
-        end:      Pos{},
+        end:      Pos{X: 0, Y: 0, Z: 0},
         reached:  false,
         partial:  false,
         explored: 0,
