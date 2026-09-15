@@ -274,6 +274,7 @@ func (s *search) run(start, end Vec3, approachRadius float64) (*Result, error) {
 
     result := &Result{
         Found:     false,
+        Partial:   false,
         Aborted:   false,
         Waypoints: nil,
         RawPath:   nil,
@@ -476,6 +477,7 @@ func (s *search) runEscape(start Vec3) (*Result, error) {
     }
     result := &Result{
         Found:     false,
+        Partial:   false,
         Aborted:   false,
         Waypoints: nil,
         RawPath:   nil,

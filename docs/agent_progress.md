@@ -130,13 +130,41 @@ pieces from the research verdict:
   honest not-wired-yet residue (the acceptance stack stays on the
   pure engine navigator, the partial waypoints stay unexposed);
   AGENTS.md and docs/hunting.md follow the wiring.
+- The partial round landed. `pathfind.Result.Partial` extends the
+  seam contract (Found=false with Partial set and waypoints ending
+  at the closest reachable point; the grid engine itself never sets
+  it - its searches answer the bare not found). The hybrid's two
+  avoiding forms (FindPathApproachAvoiding,
+  FindPathApproachDryAvoiding) serve the mesh partial corridors
+  through it: the engine run comes FIRST on every mesh partial (a
+  full engine route the mesh missed still wins, an engine error
+  still surfaces - the can-only-add rule holds), and only after the
+  engine's own clean not found does meshPartial serve the mesh funnel
+  waypoints (Aborted carried from the engine verdict, Explored the
+  sum of both searches). The strict forms (FindPathApproach,
+  FindPath) never surface partials - the blind engage recovery and
+  the user walks keep their verdict semantics. The consumers:
+  startWalkLegSearch arms the follower on the partial waypoints (the
+  town legs and zone returns walk toward the closest reachable point
+  instead of aborting; the bare not found still refuses to plan),
+  followPlannedSegment walks the partial quest segments (the
+  re-plan loop and the no-progress guard stay the safety net). Four
+  hybrid tests (the synthetic shore world with the engine geodata
+  built as flat blocks in the hunt tests: the partial served after
+  the engine confirmation, the engine route winning over the mesh
+  partial of a broken chain, the engine error surfacing without
+  geodata; the REAL hard pair dry - the elven village deck to the
+  water under the bridge answers the dry partial with every waypoint
+  above the water level) plus three consumer pins (the town leg
+  arming on the partial, the quest segment walking it through the
+  moving game simulator, the bare not found still aborting).
 
 ### Next
 
-The round closes: the hunt loop consumes the navmesh corridors with
-the grid engine as the click validation and the fallback authority.
-The follow-up candidates (NOT started): the partial corridor
-waypoints through the Navigator contract (the closest reachable dry
-point instead of the abort), the acceptance stack switch to the
-hybrid once the live sessions prove it, the Detour-parity
-optimization if the fleet benchmark asks for it.
+The partial round closes: the closest-reachable corridors surface
+through the Navigator contract and the town/quest legs walk them.
+The follow-up candidates (NOT started): the acceptance stack switch
+to the hybrid once the live sessions prove it (which may also skip
+the engine confirmation flood on mesh partials - the ~13 s the real
+hard pair dry search pays today), the Detour-parity optimization if
+the fleet benchmark asks for it.

@@ -979,7 +979,7 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
 
         return false
     }
-    if result == nil || !result.Found || len(result.Waypoints) == 0 {
+    if result == nil || len(result.Waypoints) == 0 {
         if !nonDry {
             l.logf("Hunt: no dry path to %d %d, the walk would "+
                 "swim", int(dest.X), int(dest.Y))
@@ -989,6 +989,22 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
         }
 
         return false
+    }
+    if !result.Found {
+        // The partial round (docs/navmesh.md): both engines agree the
+        // destination is unreachable under the filter, and the mesh
+        // funnel still holds the walkable corridor toward it - the
+        // leg walks the closest reachable point instead of aborting
+        // at the start position, so the trip continues from wherever
+        // the ground ends (the shore of a swim-only destination, the
+        // border of the sealed corridor).
+        if !nonDry {
+            l.logf("Hunt: no dry route to %d %d, walking the "+
+                "closest reachable point", int(dest.X), int(dest.Y))
+        } else {
+            l.logf("Hunt: no route to %d %d, walking the closest "+
+                "reachable point", int(dest.X), int(dest.Y))
+        }
     }
     l.waypoints = result.Waypoints
     l.wpIndex = 0

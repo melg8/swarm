@@ -380,14 +380,25 @@ func (l *Loop) followPlannedSegment(
     }
     result, err := l.navigator.FindPathApproachDryAvoiding(
         from, dest, questArriveRadius, l.frozenAreas)
-    if err != nil || result == nil || !result.Found ||
-        len(result.Waypoints) == 0 {
+    if err != nil || result == nil || len(result.Waypoints) == 0 {
         return false
     }
+    // The partial round (docs/navmesh.md): a segment the dry search
+    // cannot complete still walks its closest reachable waypoints -
+    // the loop re-plans from wherever the corridor ends, so the
+    // quest route keeps making ground instead of dropping to the
+    // direct click at the first sealed segment.
+    partial := !result.Found
     waypoints := result.Waypoints
-    l.logf("quest: walking a planned segment to (%d, %d) through "+
-        "%d waypoints from (%d, %d)", segX, segY, len(waypoints),
-        selfX, selfY)
+    if partial {
+        l.logf("quest: walking a partial segment toward (%d, %d), "+
+            "the closest reachable dry point is %d waypoints ahead",
+            segX, segY, len(waypoints))
+    } else {
+        l.logf("quest: walking a planned segment to (%d, %d) through "+
+            "%d waypoints from (%d, %d)", segX, segY, len(waypoints),
+            selfX, selfY)
+    }
     for i := range waypoints {
         if !l.followWaypoint(waypoints, i, deadline) {
             return true

@@ -75,6 +75,12 @@ type fakeNavigator struct {
     // dryMiss makes the dry approach searches answer not found: the
     // walk would need a swim (the water loop regression tests).
     dryMiss bool
+    // partialRoute makes the dry approach searches answer the partial
+    // closest-reachable corridor (Found=false with Partial set and
+    // these waypoints - the navmesh hybrid partial round): the leg
+    // planners accept it and walk toward the closest reachable point
+    // instead of aborting.
+    partialRoute []pathfind.Vec3
 }
 
 func (f *fakeNavigator) result(
@@ -160,11 +166,28 @@ func (f *fakeNavigator) FindPathApproachAvoiding(
 
 // FindPathApproachDry plans the water walled approach search: it
 // shares the routes of the ordinary search unless dryMiss is armed -
-// the swim only destination answers not found.
+// the swim only destination answers not found - or partialRoute is
+// armed - the closest reachable corridor of the partial round.
 func (f *fakeNavigator) FindPathApproachDry(
     start, end pathfind.Vec3, _ float64,
 ) (*pathfind.Result, error) {
     f.approachEnds = append(f.approachEnds, end)
+    if f.partialRoute != nil {
+        f.calls++
+        f.callsAt = append(f.callsAt, time.Now())
+
+        return &pathfind.Result{
+            Found:     false,
+            Partial:   true,
+            Aborted:   false,
+            Waypoints: f.partialRoute,
+            RawPath:   nil,
+            Duration:  0,
+            Explored:  0,
+            OpenLeft:  0,
+            Length:    0,
+        }, nil
+    }
     if f.dryMiss {
         f.calls++
 

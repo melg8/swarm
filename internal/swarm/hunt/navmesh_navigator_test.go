@@ -11,6 +11,7 @@ package hunt
 // never leaves the engine.
 
 import (
+    "encoding/binary"
     "os"
     "path/filepath"
     "testing"
@@ -308,4 +309,232 @@ func TestNavmeshNavigatorValidationStaysOnEngine(t *testing.T) {
     require.Equal(t, engineErr, err)
     require.Equal(t, engineHeight, height)
     require.NoError(t, err)
+}
+
+// huntFlatRegion writes a synthetic flat block geodata region 21_19:
+// the land block square (bx, by below landBlocks) stands at landH,
+// the rest of the region at bedH - the same world the hunt tiles
+// model, in the engine's own file format (the flat block: one byte
+// kind zero plus the raw little endian height, all walls open).
+func huntFlatRegion(
+    t *testing.T, dir string, landBlocks int, landH, bedH int16,
+) {
+    t.Helper()
+    data := make([]byte, 0, 3*256*256)
+    word := make([]byte, 2)
+    for bx := range 256 {
+        for by := range 256 {
+            height := bedH
+            if bx < landBlocks && by < landBlocks {
+                height = landH
+            }
+            data = append(data, 0)
+            binary.LittleEndian.PutUint16(word, uint16(height))
+            data = append(data, word...)
+        }
+    }
+    require.NoError(t, os.WriteFile(
+        filepath.Join(dir, "21_19.l2j"), data, 0o600))
+}
+
+// huntWorldOf converts a region local cell into the world position of
+// its lower corner (the same anchor the hunt tile rects use).
+func huntWorldOf(localCell int) float64 {
+    return 32768 + float64(localCell)*16
+}
+
+// shoreWorldTile builds the synthetic shore world tile: dry mainland
+// A, dry shore band B east of it, water C east of the band - the mesh
+// counterpart of the flat block geodata the partial tests write for
+// the engine.
+func shoreWorldTile(t *testing.T) *navmesh.Tile {
+    t.Helper()
+
+    return huntTile(t, 21, 19, []nmRect{
+        {x0: 0, y0: 0, x1: 160, y1: 320, h: -3770, area: navmesh.AreaGround},
+        {x0: 160, y0: 0, x1: 320, y1: 320, h: -3770, area: navmesh.AreaGround},
+        {x0: 320, y0: 0, x1: 480, y1: 320, h: -3800, area: navmesh.AreaWater},
+    }, []nmLink{
+        {poly: 0, side: navmesh.SideMaxX, to: 1, t0: 0, t1: 319},
+        {poly: 1, side: navmesh.SideMinX, to: 0, t0: 0, t1: 319},
+        {poly: 1, side: navmesh.SideMaxX, to: 2, t0: 0, t1: 319},
+        {poly: 2, side: navmesh.SideMinX, to: 1, t0: 0, t1: 319},
+    })
+}
+
+// shoreWorldMesh writes the shore world tile into its own directory
+// and answers the mesh over it.
+func shoreWorldMesh(t *testing.T) *navmesh.Mesh {
+    t.Helper()
+    dir := t.TempDir()
+    data, err := navmesh.EncodeTile(shoreWorldTile(t))
+    require.NoError(t, err)
+    require.NoError(t, os.WriteFile(
+        filepath.Join(dir, "21_19.nm"), data, 0o600))
+
+    return navmesh.NewMesh(dir)
+}
+
+// TestNavmeshNavigatorPartialServesClosestReachable pins the partial
+// round of the dry avoiding form: the destination sits on the water
+// polygon the dry filter walls, so the mesh answers the
+// closest-reachable corridor and the engine - over the same synthetic
+// world - confirms the destination unreachable with its own clean not
+// found; the hybrid then serves the partial waypoints through
+// Result.Partial instead of the bare abort (the walk toward the shore
+// the town legs can make).
+func TestNavmeshNavigatorPartialServesClosestReachable(t *testing.T) {
+    mesh := shoreWorldMesh(t)
+    geodataDir := t.TempDir()
+    huntFlatRegion(t, geodataDir, 40, -3770, -3800)
+
+    engine := pathfind.NewEngine(geodataDir)
+    navigator := NewNavmeshNavigator(engine, mesh)
+
+    start := pathfind.Vec3{
+        X: huntWorldOf(80), Y: huntWorldOf(160), Z: -3770,
+    }
+    end := pathfind.Vec3{
+        X: huntWorldOf(400), Y: huntWorldOf(160), Z: -3800,
+    }
+
+    // The premise: the engine over the same world answers the clean
+    // not found for the swim-only destination.
+    engineResult, err := engine.FindPathApproachDryAvoiding(
+        start, end, 150, engine.MaxPassableHeight(), nil)
+    require.NoError(t, err)
+    require.NotNil(t, engineResult)
+    require.False(t, engineResult.Found)
+
+    // The hybrid serves the mesh partial corridor after that
+    // confirmation: the walk ends at the closest reachable dry point.
+    result, err := navigator.FindPathApproachDryAvoiding(
+        start, end, 150, nil)
+    require.NoError(t, err)
+    require.NotNil(t, result)
+    require.False(t, result.Found)
+    require.True(t, result.Partial)
+    require.NotEmpty(t, result.Waypoints)
+    require.GreaterOrEqual(t, len(result.Waypoints), 2)
+    // The corridor stays dry: every waypoint stands above the water
+    // level, the last one is the shore border of the band B.
+    for i, wp := range result.Waypoints {
+        require.GreaterOrEqual(t, wp.Z, -3780.0,
+            "partial waypoint %d must stay dry", i)
+    }
+    last := result.Waypoints[len(result.Waypoints)-1]
+    require.InDelta(t, huntWorldOf(320), last.X, 1.0)
+    require.InDelta(t, huntWorldOf(160), last.Y, 64.0)
+    require.Greater(t, result.Length, 3000.0)
+}
+
+// TestNavmeshNavigatorPartialDefersToEngineRoute pins the
+// can-only-add rule of the partial round: a mesh that models less
+// ground than the engine (the C-D link missing - the corridor ends at
+// C) answers a partial, but the engine holds the full route, and the
+// engine route WINS - the hybrid never trades a found route for a
+// partial walk.
+func TestNavmeshNavigatorPartialDefersToEngineRoute(t *testing.T) {
+    // The broken-chain world: A-B-C linked, D isolated (no C-D link).
+    tile := huntTile(t, 21, 19, []nmRect{
+        {x0: 0, y0: 0, x1: 160, y1: 320, h: -3770, area: navmesh.AreaGround},
+        {x0: 160, y0: 0, x1: 320, y1: 320, h: -3770, area: navmesh.AreaGround},
+        {x0: 320, y0: 0, x1: 480, y1: 320, h: -3770, area: navmesh.AreaGround},
+        {x0: 480, y0: 0, x1: 640, y1: 320, h: -3770, area: navmesh.AreaGround},
+    }, []nmLink{
+        {poly: 0, side: navmesh.SideMaxX, to: 1, t0: 0, t1: 319},
+        {poly: 1, side: navmesh.SideMinX, to: 0, t0: 0, t1: 319},
+        {poly: 1, side: navmesh.SideMaxX, to: 2, t0: 0, t1: 319},
+        {poly: 2, side: navmesh.SideMinX, to: 1, t0: 0, t1: 319},
+    })
+    meshDir := t.TempDir()
+    data, err := navmesh.EncodeTile(tile)
+    require.NoError(t, err)
+    require.NoError(t, os.WriteFile(
+        filepath.Join(meshDir, "21_19.nm"), data, 0o600))
+    // The engine geodata is all land: the full route exists there.
+    geodataDir := t.TempDir()
+    huntFlatRegion(t, geodataDir, 256, -3770, -3770)
+
+    mesh := navmesh.NewMesh(meshDir)
+    engine := pathfind.NewEngine(geodataDir)
+    navigator := NewNavmeshNavigator(engine, mesh)
+
+    start := pathfind.Vec3{
+        X: huntWorldOf(80), Y: huntWorldOf(160), Z: -3770,
+    }
+    end := pathfind.Vec3{
+        X: huntWorldOf(560), Y: huntWorldOf(160), Z: -3770,
+    }
+    result, err := navigator.FindPathApproachDryAvoiding(
+        start, end, 150, nil)
+    require.NoError(t, err)
+    require.NotNil(t, result)
+    require.True(t, result.Found)
+    require.False(t, result.Partial)
+    require.NotEmpty(t, result.Waypoints)
+    // The engine route crosses into D - the mesh chain would have
+    // ended at the C border (world 32768 + 480*16).
+    last := result.Waypoints[len(result.Waypoints)-1]
+    require.Greater(t, last.X, 32768+480*16.0)
+}
+
+// TestNavmeshNavigatorPartialNeedsEngineVerdict pins the confirmation
+// rule: the mesh partial alone never serves - an engine that cannot
+// even answer (no geodata under the endpoints) surfaces its error,
+// the hybrid never invents a walk out of a mesh corridor without the
+// engine verdict.
+func TestNavmeshNavigatorPartialNeedsEngineVerdict(t *testing.T) {
+    mesh := shoreWorldMesh(t)
+    engine := pathfind.NewEngine(t.TempDir())
+    navigator := NewNavmeshNavigator(engine, mesh)
+
+    start := pathfind.Vec3{
+        X: huntWorldOf(80), Y: huntWorldOf(160), Z: -3770,
+    }
+    end := pathfind.Vec3{
+        X: huntWorldOf(400), Y: huntWorldOf(160), Z: -3800,
+    }
+    _, err := navigator.FindPathApproachDryAvoiding(start, end, 150, nil)
+    require.Error(t, err,
+        "the engine without geodata answers the honest error, the "+
+            "mesh partial never serves without the engine verdict")
+}
+
+// TestNavmeshNavigatorHardPairPartial pins the partial round on the
+// REAL elven village pair: the village deck to the water under the
+// bridge - the motivating stacked-layer walk of the whole port -
+// planned DRY answers the mesh partial corridor to the closest
+// reachable dry point once the engine confirms the water destination
+// unreachable without a swim. The walk the town legs then make ends
+// on the shore instead of aborting on the deck.
+func TestNavmeshNavigatorHardPairPartial(t *testing.T) {
+    navigator, _ := realNavmeshNavigator(t)
+
+    village := pathfind.Vec3{X: 45768, Y: 49848, Z: -3056}
+    water := pathfind.Vec3{X: 44920, Y: 50792, Z: -3928}
+    result, err := navigator.FindPathApproachDryAvoiding(
+        village, water, 150, nil)
+    require.NoError(t, err)
+    require.NotNil(t, result)
+    require.False(t, result.Found)
+    require.True(t, result.Partial)
+    require.NotEmpty(t, result.Waypoints)
+    // Every waypoint of the partial walk stays dry: the corridor
+    // walls the water polygons, the funnel never dips below the
+    // C1 water level.
+    for i, wp := range result.Waypoints {
+        require.GreaterOrEqual(t, wp.Z, -3780.0,
+            "partial waypoint %d must stay dry", i)
+    }
+    // The walk leaves the deck toward the water - the closest
+    // reachable point of the dry corridor.
+    require.Greater(t, result.Length, 300.0)
+    // The engine confirmation is already proven BY the partial
+    // serving: Result.Partial only surfaces after the engine answered
+    // its own not found for the same query (the hybrid runs the
+    // engine internally before serving the mesh corridor) - the
+    // production profile of an unreachable dry destination stays the
+    // mesh milliseconds plus the one engine flood the round one
+    // fallback already paid.
 }

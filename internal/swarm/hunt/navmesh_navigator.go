@@ -16,6 +16,16 @@ package hunt
 // decomposition dropped, a sealed goal - the hybrid can only ADD
 // routes (the milliseconds of the mesh corridor instead of the
 // seconds of the grid flood), never lose them.
+//
+// The partial round extends the avoiding forms: when the mesh
+// answers a closest-reachable corridor (the destination unreachable
+// under the filter) and the engine CONFIRMS the destination with its
+// own not found, the hybrid serves the mesh partial waypoints through
+// Result.Partial - the walk toward the closest reachable point instead
+// of the bare abort at the start position. The engine still runs
+// first on every mesh partial, so a full route the mesh missed keeps
+// winning (the can-only-add rule holds), and an engine error still
+// surfaces as the honest verdict.
 
 import (
     "math"
@@ -59,40 +69,63 @@ func (n navmeshNavigator) FindPathApproach(
 
 // FindPathApproachAvoiding plans the water permitting walk around the
 // avoid areas through the mesh corridor search (the ban walls with
-// the escape ring of the own ban), falling back to the grid engine.
+// the escape ring of the own ban). The mesh partial corridors surface
+// through Result.Partial once the engine confirms the destination
+// unreachable: the waypoints then end at the closest reachable point
+// around the bans (the walk-what-you-can contract of the zone return
+// fallback), while a full engine route the mesh missed still wins.
 func (n navmeshNavigator) FindPathApproachAvoiding(
     start, end pathfind.Vec3, approachRadius float64,
     avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
+    began := time.Now()
     filter := navmesh.DefaultFilter()
     filter.Avoid = avoidCircles(avoid)
-    if result := n.meshRoute(start, end, approachRadius,
-        filter); result != nil {
+    route, meshErr := n.mesh.RouteApproach(
+        meshPos(start), meshPos(end), approachRadius, filter)
+    if result := meshResult(route, meshErr, began); result != nil {
         return result, nil
     }
-
-    return n.engine.FindPathApproachAvoiding(
+    engineResult, engineErr := n.engine.FindPathApproachAvoiding(
         start, end, approachRadius, n.engine.MaxPassableHeight(), avoid)
+    if partial := meshPartial(
+        route, meshErr, engineResult, engineErr, began,
+    ); partial != nil {
+        return partial, nil
+    }
+
+    return engineResult, engineErr
 }
 
 // FindPathApproachDryAvoiding plans the water walled walk around the
 // avoid areas through the mesh corridor search, falling back to the
 // grid engine: a dry target the mesh cannot reach answers the engine
-// verdict (the mesh partial corridors surface as Found=false today -
-// surfacing the closest-reachable waypoints is the follow-up round).
+// verdict (the engine full route wins), and when the engine also
+// confirms the target unreachable the mesh partial corridor surfaces
+// through Result.Partial - the waypoints end at the closest reachable
+// dry point, the walk the town legs make instead of aborting at the
+// start position.
 func (n navmeshNavigator) FindPathApproachDryAvoiding(
     start, end pathfind.Vec3, approachRadius float64,
     avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
+    began := time.Now()
     filter := navmesh.DryFilter()
     filter.Avoid = avoidCircles(avoid)
-    if result := n.meshRoute(start, end, approachRadius,
-        filter); result != nil {
+    route, meshErr := n.mesh.RouteApproach(
+        meshPos(start), meshPos(end), approachRadius, filter)
+    if result := meshResult(route, meshErr, began); result != nil {
         return result, nil
     }
-
-    return n.engine.FindPathApproachDryAvoiding(
+    engineResult, engineErr := n.engine.FindPathApproachDryAvoiding(
         start, end, approachRadius, n.engine.MaxPassableHeight(), avoid)
+    if partial := meshPartial(
+        route, meshErr, engineResult, engineErr, began,
+    ); partial != nil {
+        return partial, nil
+    }
+
+    return engineResult, engineErr
 }
 
 // FindPath plans the exact destination walk through the mesh corridor
@@ -164,7 +197,9 @@ func (n navmeshNavigator) ValidateClick(
 // FULL corridor, nil otherwise: no mesh under an endpoint, no
 // corridor under the filter, or a partial (closest-reachable) answer
 // - all of them hand the question back to the grid engine, which
-// stays the authority on reachability for the round one contract.
+// stays the authority on reachability (the strict forms never
+// surface a partial; the avoiding forms confirm one through
+// meshPartial after their engine run).
 func (n navmeshNavigator) meshRoute(
     start, end pathfind.Vec3, approachRadius float64,
     filter navmesh.Filter,
@@ -186,6 +221,60 @@ func meshResult(
         len(route.Waypoints) == 0 {
         return nil
     }
+    waypoints, length := meshWaypoints(route)
+
+    return &pathfind.Result{
+        Found:     true,
+        Partial:   false,
+        Aborted:   false,
+        Waypoints: waypoints,
+        RawPath:   nil,
+        Duration:  time.Since(began),
+        Explored:  route.Explored,
+        OpenLeft:  0,
+        Length:    length,
+    }
+}
+
+// meshPartial maps the confirmed mesh partial onto the pathfind
+// result of the Navigator contract, nil unless BOTH engines agree
+// the destination is unreachable: the mesh holds a closest-reachable
+// corridor (route.Partial with funnel waypoints) AND the engine run
+// after it answered a clean not found (no error, no route - an
+// aborted or exhausted engine search still counts, its verdict is
+// the best available one and the partial walk stays genuinely
+// walkable under the filter). The served answer carries Found=false
+// with Partial set: the consumers that understand it walk toward the
+// closest reachable point, the strict ones keep treating it as the
+// not found they already handle.
+func meshPartial(
+    route *navmesh.Route, meshErr error,
+    engineResult *pathfind.Result, engineErr error, began time.Time,
+) *pathfind.Result {
+    if meshErr != nil || route == nil || !route.Partial ||
+        len(route.Waypoints) == 0 ||
+        engineErr != nil || engineResult == nil || engineResult.Found ||
+        len(engineResult.Waypoints) > 0 {
+        return nil
+    }
+    waypoints, length := meshWaypoints(route)
+
+    return &pathfind.Result{
+        Found:     false,
+        Partial:   true,
+        Aborted:   engineResult.Aborted,
+        Waypoints: waypoints,
+        RawPath:   nil,
+        Duration:  time.Since(began),
+        Explored:  route.Explored + engineResult.Explored,
+        OpenLeft:  engineResult.OpenLeft,
+        Length:    length,
+    }
+}
+
+// meshWaypoints converts the funnel waypoints of a mesh route into
+// the pathfind vectors together with the walked length.
+func meshWaypoints(route *navmesh.Route) ([]pathfind.Vec3, float64) {
     waypoints := make([]pathfind.Vec3, len(route.Waypoints))
     length := 0.0
     for i, wp := range route.Waypoints {
@@ -198,16 +287,7 @@ func meshResult(
         }
     }
 
-    return &pathfind.Result{
-        Found:     true,
-        Aborted:   false,
-        Waypoints: waypoints,
-        RawPath:   nil,
-        Duration:  time.Since(began),
-        Explored:  route.Explored,
-        OpenLeft:  0,
-        Length:    length,
-    }
+    return waypoints, length
 }
 
 // meshPos converts a pathfind vector into the mesh position.

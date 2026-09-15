@@ -223,7 +223,17 @@ func (e *Engine) touch(entry *cacheEntry) {
 // Result of a path search: the smoothed waypoints the walker follows,
 // the raw cell path for debugging and the search statistics.
 type Result struct {
-    Found     bool
+    Found bool
+    // Partial reports the closest-reachable answer of a search whose
+    // destination is unreachable under its filter: the waypoints then
+    // end at the closest reachable point instead of the destination.
+    // The grid engine itself never answers one (its searches report
+    // the bare not found); the navmesh hybrid serves the mesh partial
+    // corridors through this flag once the engine has confirmed the
+    // destination truly unreachable - the consumer can walk the
+    // waypoints toward the closest reachable point instead of
+    // aborting the leg at the start position.
+    Partial   bool
     Aborted   bool
     Waypoints []Vec3
     RawPath   []Vec3
