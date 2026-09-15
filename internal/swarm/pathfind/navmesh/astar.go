@@ -12,9 +12,11 @@ import "math"
 // of walking every polygon of every loaded region.
 const maxQueryNodes = 65536
 
-// astarNode is one node of the corridor search: the polygon, its
-// entry position (the portal midpoint), the parent, the costs and the
-// open heap bookkeeping.
+// astarNode is one node of the corridor search: the polygon with its
+// tile (resolved once at relaxation - the mesh lookup per settled
+// node is the hot path cost this cache removes), the entry position
+// (the portal midpoint), the parent, the costs and the open heap
+// bookkeeping.
 type astarNode struct {
     ref     PolyRef
     parent  uint32
@@ -23,6 +25,8 @@ type astarNode struct {
     f       float64
     closed  bool
     heapIdx int32
+    tile    *Tile
+    poly    *Poly
 }
 
 // noParent marks the root of the parent chain.
@@ -57,7 +61,7 @@ func (s *queryState) reset(escape bool) {
 // create appends a fresh node for a reference (the caller guarantees
 // the reference is new).
 func (s *queryState) create(ref PolyRef, parent uint32, pos Pos,
-    g, h float64,
+    g, h float64, tile *Tile, poly *Poly,
 ) uint32 {
     s.nodes = append(s.nodes, astarNode{
         ref:     ref,
@@ -67,6 +71,8 @@ func (s *queryState) create(ref PolyRef, parent uint32, pos Pos,
         f:       g + h,
         closed:  false,
         heapIdx: notInHeap,
+        tile:    tile,
+        poly:    poly,
     })
     idx := uint32(len(s.nodes) - 1)
     s.index[ref] = idx
@@ -227,7 +233,19 @@ func (m *Mesh) astar(
     if goal.escape {
         startH = 0
     }
-    state.create(startRef, noParent, startPos, 0, startH)
+    startTile, startPoly := m.polyOfRef(startRef)
+    if startTile == nil {
+        return astarResult{
+            corridor: nil,
+            end:      Pos{X: 0, Y: 0, Z: 0},
+            reached:  false,
+            partial:  false,
+            explored: 0,
+            capped:   false,
+        }
+    }
+    state.create(startRef, noParent, startPos, 0, startH, startTile,
+        startPoly)
     state.bestH = startH
     state.push(0)
 
@@ -250,8 +268,7 @@ func (m *Mesh) astar(
         }
         node.closed = true
         result.explored++
-        _, poly := m.polyOfRef(node.ref)
-        if goal.reached(poly, node.ref) {
+        if goal.reached(node.poly, node.ref) {
             result.corridor = state.corridorOf(idx)
             result.reached = true
             // The ordinary search ends at the requested position; the
@@ -282,25 +299,41 @@ func (m *Mesh) astar(
     return result
 }
 
-// expand relaxes every link of one settled node.
+// expand relaxes every link of one settled node. The internal links
+// resolve inside the node tile without any mesh lookup (the map and
+// the lock only serve the rare cross region links).
 func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
     endPos Pos, filter Filter,
 ) {
-    tile, poly := m.polyOfRef(node.ref)
-    if tile == nil {
+    tile := node.tile
+    poly := node.poly
+    if tile == nil || poly == nil {
         return
     }
     areaCost := [2]float64{1, filter.WaterCost}
     for li := poly.FirstLink; li >= 0 && int(li) < len(tile.Links); {
         link := &tile.Links[li]
         li = link.Next
-        targetRef := m.resolveLink(tile, link)
-        if targetRef == 0 {
-            continue
-        }
-        targetTile, targetPoly := m.polyOfRef(targetRef)
-        if targetTile == nil {
-            continue
+        var targetRef PolyRef
+        var targetTile *Tile
+        var targetPoly *Poly
+        if link.To >= 0 {
+            // The internal link stays inside the node tile.
+            if int(link.To) >= len(tile.Polys) {
+                continue
+            }
+            targetRef = RefOf(tile.Col, tile.Row, uint32(link.To))
+            targetTile = tile
+            targetPoly = &tile.Polys[link.To]
+        } else {
+            targetRef = m.resolveLink(tile, link)
+            if targetRef == 0 {
+                continue
+            }
+            targetTile, targetPoly = m.polyOfRef(targetRef)
+            if targetTile == nil {
+                continue
+            }
         }
         if !filter.AllowWater && targetPoly.Area == AreaWater {
             continue
@@ -317,7 +350,8 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
         }
         existing, ok := state.index[targetRef]
         if !ok {
-            created := state.create(targetRef, idx, mid, g, h)
+            created := state.create(targetRef, idx, mid, g, h,
+                targetTile, targetPoly)
             state.push(created)
         } else if !state.nodes[existing].closed {
             other := &state.nodes[existing]

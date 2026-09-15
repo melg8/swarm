@@ -291,3 +291,9 @@ func (m *Mesh) resolveLink(tile *Tile, link *Link) PolyRef {
 
     return RefOf(int16(ext.Col), int16(ext.Row), ext.Poly)
 }
+
+// PolyOf returns the tile and polygon of a reference (nil when the
+// tile is unavailable or the index is stale).
+func (m *Mesh) PolyOf(ref PolyRef) (*Tile, *Poly) {
+    return m.polyOfRef(ref)
+}

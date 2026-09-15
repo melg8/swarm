@@ -1,0 +1,188 @@
+// SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+//
+// SPDX-License-Identifier: MIT
+
+package navbuild
+
+import (
+    "errors"
+    "time"
+
+    "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
+)
+
+// Options are the builder tunables. The defaults mirror the research
+// round (docs/recast_pathfinding.md): the 40 unit climb of the server
+// HEIGHT_INCREASE_LIMIT, the 16 unit dedup delta of the l2j duplicate
+// noise, the 4 layer island filter and the 24 unit bilinear height
+// tolerance of the rectangle corner surfaces.
+type Options struct {
+    Climb           int32
+    DedupDelta      int32
+    MinSheetLayers  int32
+    HeightTolerance float64
+}
+
+// DefaultOptions returns the production tunables.
+func DefaultOptions() Options {
+    return Options{
+        Climb:           40,
+        DedupDelta:      16,
+        MinSheetLayers:  4,
+        HeightTolerance: 24,
+    }
+}
+
+// BuildStats is the audit summary of one region build.
+type BuildStats struct {
+    Layers           int
+    StackedColumns   int
+    UnderwaterLayers int
+    Sheets           int
+    DroppedSheets    int
+    DroppedLayers    int
+    Polys            int
+    WaterPolys       int
+    Links            int
+    NSWEBlockedPairs int
+    BuildTime        time.Duration
+}
+
+// RegionBuild is the phase A result of one region: the tile with the
+// polygons, the internal links and the BVTree (no external links
+// yet), plus the border strips the phase B stitching pairs against
+// the neighbours.
+type RegionBuild struct {
+    Tile   *navmesh.Tile
+    Strips borderStrips
+    Stats  BuildStats
+}
+
+// BuildRegion runs the offline build of one region: the parse and
+// dedup, the sheet decomposition, the rectangle polygons with the
+// height-bounded splits, the internal links with the NSWE portal
+// spans and the bounding volume tree.
+func BuildRegion(
+    data []byte, col, row int16, opts Options,
+) (*RegionBuild, error) {
+    started := time.Now()
+    rl, err := extractRegion(data, col, row, opts.DedupDelta)
+    if err != nil {
+        return nil, err
+    }
+    sh := assignSheets(rl, opts.Climb, opts.MinSheetLayers)
+    rects, polyAt := buildRects(rl, sh, opts.HeightTolerance)
+    acc, strips := buildInternalLinks(rl, sh, polyAt, opts.Climb)
+    specs := acc.emit()
+
+    tile := assembleTile(col, row, opts.Climb, rects, specs)
+    tile.BVTree = buildBVTree(tile, rects)
+
+    stats := collectStats(rl, sh, acc, tile)
+    stats.BuildTime = time.Since(started)
+
+    return &RegionBuild{Tile: tile, Strips: strips, Stats: stats}, nil
+}
+
+// assembleTile converts the rectangle polygons into the wire tile and
+// chains the link specs.
+func assembleTile(col, row int16, climb int32, rects []rectPoly,
+    specs []linkSpec,
+) *navmesh.Tile {
+    tile := &navmesh.Tile{
+        Col:      col,
+        Row:      row,
+        Climb:    climb,
+        Polys:    make([]navmesh.Poly, len(rects)),
+        Links:    make([]navmesh.Link, 0, len(specs)),
+        ExtLinks: nil,
+        BVTree:   nil,
+    }
+    for i, rect := range rects {
+        tile.Polys[i] = navmesh.Poly{
+            X0: rect.x0, Y0: rect.y0, X1: rect.x1, Y1: rect.y1,
+            H00: rect.h00, H10: rect.h10, H01: rect.h01,
+            H11:       rect.h11,
+            FirstLink: -1,
+            Area:      rect.area,
+        }
+    }
+    for _, spec := range specs {
+        appendLink(tile, spec)
+    }
+
+    return tile
+}
+
+// StitchRegion runs the phase B of one region: the external links
+// against the neighbour strips are appended to the decoded tile. The
+// neighbours array is indexed by the own side (see stitchBorders).
+func StitchRegion(tile *navmesh.Tile, own borderStrips,
+    neighbors [4]*borderStrips, opts Options,
+) (int, error) {
+    if tile == nil {
+        return 0, errors.New("stitch region: the tile is nil")
+    }
+
+    return stitchBorders(tile, own, neighbors, opts.Climb), nil
+}
+
+// collectStats summarizes the build for the audits.
+func collectStats(rl *regionLayers, sh *sheets, acc *linkAccumulator,
+    tile *navmesh.Tile,
+) BuildStats {
+    stats := BuildStats{
+        Layers:           len(rl.layers),
+        StackedColumns:   0,
+        UnderwaterLayers: 0,
+        Sheets:           sh.count,
+        DroppedSheets:    droppedSheetCount(sh),
+        DroppedLayers:    droppedLayerCount(sh),
+        Polys:            len(tile.Polys),
+        WaterPolys:       0,
+        Links:            len(tile.Links),
+        NSWEBlockedPairs: acc.blockedPairs,
+        BuildTime:        0,
+    }
+    for idx := range rl.cellCnt {
+        if rl.cellCnt[idx] >= 2 {
+            stats.StackedColumns++
+        }
+    }
+    for _, layer := range rl.layers {
+        if layer.h < waterLevel {
+            stats.UnderwaterLayers++
+        }
+    }
+    for i := range tile.Polys {
+        if tile.Polys[i].Area == navmesh.AreaWater {
+            stats.WaterPolys++
+        }
+    }
+
+    return stats
+}
+
+// droppedSheetCount counts the island sheets.
+func droppedSheetCount(sh *sheets) int {
+    count := 0
+    for s := range sh.count {
+        if sh.dropped[s] {
+            count++
+        }
+    }
+
+    return count
+}
+
+// droppedLayerCount counts the layers of the dropped sheets.
+func droppedLayerCount(sh *sheets) int {
+    count := 0
+    for _, sheet := range sh.sheetOf {
+        if sheet >= 0 && sh.dropped[sheet] {
+            count++
+        }
+    }
+
+    return count
+}
