@@ -34,43 +34,58 @@ pieces from the research verdict:
    inside the open cell pairs of every shared edge),
 5. the pooled query allocations.
 
-### Design decisions (locked at the start)
+### Progress
 
-- The mesh builder replaces the whole Recast pipeline: geodata
-  layers -> dedup (16 unit bands) -> sheets (2D manifolds, 40 unit
-  climb, one layer per column per sheet, island filter < 4 layers)
-  -> rectangle polygons per sheet (maximal rectangle decomposition,
-  split until the bilinear corner height error stays within 24 units
-  of every cell height - exact per vertex heights, no detail mesh).
-- The NSWE walls become portal spans: a link between two polygons
-  carries the maximal open cell span of the shared edge, so the
-  funnel can only cross where the geodata walls are open. This
-  closes the 413k invisible-wall gap of the height-only import at
-  cell pair granularity.
-- The native tile format (rectangle polys: cell bounds + 4 exact
-  corner heights + Detour-style link chains + quantized BVTree)
-  replaces the Detour binary of the research round; the research
-  parser moves to navmesh/prototype unchanged.
-- The water semantics stay the research model: water polys carry a
-  3x area cost (the dry searches exclude them, the escape prices
-  them high) - H-001 stays a hypothesis either way.
-- The hunt loop wiring is NOT part of this round: the port ships
-  the builder, the runtime, the CLI and the replay evidence; the
-  live integration follows on the acceptance stack of
-  feature/proxy-server.
+- `pathfind.ParseRegionData` + `Region.LayerStack` (the exported
+  region access the builder walks without the engine cache, with the
+  reusable stack buffer) - commit 25a463d.
+- the research prototype isolated as
+  `pathfind/navmesh/prototype` (unchanged behavior, its own suite) -
+  commit 1ee48e7.
+- the production runtime `pathfind/navmesh`: the native rectangle
+  tile format (cell bounds, four exact corner heights, Detour-style
+  link chains with the NSWE portal spans, the quantized BVTree; the
+  full encode/decode roundtrip and the corruption guards), the Mesh
+  (lazy multi region tile loading with the LRU), the A* corridor
+  search (pooled state, the area-cost water pricing, the partial
+  closest-reachable answer), the funnel string pulling (the
+  findStraightPath port with the portal span restriction) and the
+  Route/RouteDry/WaterEscape facades - commit c5c32b9. 17 unit tests
+  over the synthetic corridor world (the stacked disambiguation, the
+  dry partial, the escape, the portal span restriction, the cross
+  region routes, the LRU).
+- the Go mesh builder `pathfind/navbuild`: the geodata flatten +
+  dedup, the sheet decomposition (the top-down flood of the 2D
+  manifolds with the one-layer-per-column rule and the island
+  filter), the maximal rectangle decomposition with the
+  height-variation-aligned splits bounded by the 24 unit bilinear
+  tolerance, the NSWE portal span link walk (the wallsOpen rule) and
+  the BVTree port - commit d3bb9ac. The synthetic world suite plus
+  the real region suite: 21_19 builds in 1.7 s into 91 453 polygons
+  (7 045 water) with 5 778 sheets / 4 303 islands - the SAME sheet
+  numbers the C++ research experiment produced - zero one-way links,
+  the hard bridge pair answers (the full swim corridor 171 polys,
+  the dry partial, the reverse escape), the 200 pair replay classifies
+  133 full + 59 partial + 8 isolated (the C++ "200/200" counted the
+  partials as success through dtStatusSucceed - the honest split is
+  documented in docs/navmesh.md).
+- `cmd/navmesh-build` + `navbuild.BuildPack`: the two-phase pack
+  build with flat memory (phase A writes the tiles immediately and
+  retains value-copied border strips - the field pointer would pin
+  the whole 200 MB build, the first version OOMed at 2.4 GB; phase B
+  re-decodes only the stitched tiles) - commit 2117ef0. The full
+  165-region pack builds in 4m25s at 604 MB peak RSS, 1.9 GB of
+  tiles, 193 784 external links. Seven pack regions fail the l2j
+  parse (16_10, 17_20..17_25) - pre-existing corrupt files the grid
+  engine parser rejects identically, documented in docs/navmesh.md.
+- `docs/navmesh.md`: the subsystem reference (the tile format, the
+  build pipeline, the measured comparison table, the corrupt-region
+  note, the not-wired-yet scope).
 
-### Acceptance criteria
+### Next
 
-- `go build ./...`, the new suites and `task lint:new` green;
-  `task fmt:check` clean.
-- The builder builds the real 21_19 region from `data/geodata` in
-  one command and the tile passes the health audit (zero one-way
-  links).
-- The hard bridge pair (village dump cell 45768 49848 -3056 ->
-  water under the bridge 44920 -3928 50792) answers: the full swim
-  corridor, the dry partial with the closest dry point, the reverse
-  escape.
-- The 200 pair replay reaches >= 195/200 routable (the C++ Detour
-  answered 200/200, the prototype 163/200).
-- The benchmarks answer the microsecond claim (findPath+funnel on
-  the hard pair, tile decode, region build).
+The live integration round: the hunt loop consuming the navmesh
+corridors while the grid engine stays the click validation of every
+smoothed leg (on the acceptance stack of feature/proxy-server), then
+the runtime optimization headroom (the flat tile array, the per-tile
+poly index) if the fleet benchmark asks for it.

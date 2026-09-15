@@ -68,6 +68,7 @@ one of them is the reference for its subsystem:
 | `docs/webui.md` | The web interface: launch modes, map rendering, movement interpolation, HUD, equipment and shop queue widgets, interactivity, the bot statistics tab, snapshot encoding, the state tracker internals, repro harnesses |
 | `docs/session_journal.md` | The persistent session journal: the JSONL record of the whole run (events, samples, kills, trips, purchases), the session dump report of the web UI, the offline -session-report CLI |
 | `docs/pathfinding.md` | The geodata pathfinder: format, engine, deviations from the original, test UI, benchmarks, geodata visualization |
+| `docs/navmesh.md` | The navmesh pathfinding of feature/new-pathfind: the Detour-style runtime, the Go mesh builder from the geodata, the tile format, the pack cmd, the measured comparison |
 | `docs/navigation_analysis.md` | The measured gaps on the road to universal A to B world navigation (continue navigation work from there) |
 | `docs/recast_pathfinding.md` | The recastnavigation research of feature/new-pathfind: what the Detour navmesh gives the geodata pathfinder, the sheet decomposition converter, the Go runtime prototype and the migration verdict |
 | `docs/proxy.md` | The MITM client proxy: running it, the l2.ini recipes, the protocol the client sees, the relogin handoff, debugging proxy.log |
@@ -372,8 +373,15 @@ cmd/swarm/                     Application entry point (flags: login,
                                account, password, char, web, hunt, bots,
                                proxy, pathfind-test, test-fight-ui,
                                test-fight-ui-v1, geodata, max-passable).
+cmd/navmesh-build/             The offline geodata -> navmesh tile
+                               converter of feature/new-pathfind
+                               (docs/navmesh.md).
 internal/swarm/
   pathfind/                    Geodata path finder (docs/pathfinding.md).
+  pathfind/navmesh/            The navmesh runtime: tiles, mesh, A*,
+                               funnel (docs/navmesh.md).
+  pathfind/navbuild/           The offline navmesh mesh builder from
+                               the geodata (docs/navmesh.md).
   connection/                  Login flow (authentificator), game session
                                (game.go), packet framing (wire.go).
   crypt/                       Login Blowfish framing (login_crypt.go),
