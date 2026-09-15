@@ -28,6 +28,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/huntaudit"
     "github.com/melg8/swarm/internal/swarm/memwatch"
     "github.com/melg8/swarm/internal/swarm/pathfind"
+    "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
     "github.com/melg8/swarm/internal/swarm/proxy"
     "github.com/melg8/swarm/internal/swarm/session"
     "github.com/melg8/swarm/internal/swarm/state"
@@ -59,6 +60,14 @@ var defaultGeodataCandidates = []string{
     filepath.Join("L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
     filepath.Join("E:\\", "work", "lineage_workspace_fresh",
         "L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
+}
+
+// Candidate navmesh tile directories, checked in order when -navmesh
+// is empty: the tiles are the offline output of cmd/navmesh-build and
+// live in the bot tree (data/navmesh is the documented default of the
+// build command), never in the server tree.
+var defaultNavmeshCandidates = []string{
+    filepath.Join("data", "navmesh"),
 }
 
 // Reconnect backoff of the 24/7 supervisor: a lost session is retried
@@ -93,6 +102,7 @@ type config struct {
     testFightUI   bool
     testFightUIV1 bool
     geodataDir    string
+    navmeshDir    string
     maxPassable   uint
     proxy         bool
     proxyLogin    string
@@ -170,6 +180,7 @@ func parseFlags() config {
         testFightUI:      false,
         testFightUIV1:    false,
         geodataDir:       "",
+        navmeshDir:       "",
         maxPassable:      uint(pathfind.DefaultMaxPassableHeight),
         proxy:            false,
         proxyLogin:       "",
@@ -219,6 +230,11 @@ func parseFlags() config {
     flag.StringVar(&cfg.geodataDir, "geodata", "",
         "geodata directory with X_Y.l2j region files for the pathfind "+
             "test (auto detected when empty)")
+    flag.StringVar(&cfg.navmeshDir, "navmesh", "",
+        "navmesh tile directory with X_Y.nm files (the "+
+            "cmd/navmesh-build output); the hunt routes serve "+
+            "from the mesh when the tiles exist, empty "+
+            "autodetects data/navmesh")
     registerProxyFlags(&cfg)
     flag.UintVar(&cfg.maxPassable, "max-passable",
         uint(pathfind.DefaultMaxPassableHeight),
@@ -386,8 +402,8 @@ func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
 // geodata engine serves the town trips of the hunt loop.
 func runBot( //nolint:funlen // linear session script
     ctx context.Context, cfg config, tracker *state.Bot,
-    engine *pathfind.Engine, proxyServer *proxy.Server,
-    journal *session.Journal,
+    engine *pathfind.Engine, mesh *navmesh.Mesh,
+    proxyServer *proxy.Server, journal *session.Journal,
 ) error {
     sessionCtx, cancelSession := context.WithCancel(ctx)
     defer cancelSession()
@@ -483,11 +499,7 @@ func runBot( //nolint:funlen // linear session script
     // raw game events - the debugging material of the live sessions.
     loop.SetLogger(huntEventLogger(tracker))
     loop.SetJournal(journal)
-    if engine != nil {
-        loop.SetNavigator(hunt.NewNavigator(engine))
-    } else if cfg.hunt {
-        log.Println("Hunt runs without town trips: no geodata available")
-    }
+    installNavigator(loop, engine, mesh, cfg.hunt)
     if cfg.hunt {
         loop.SetHuntingZoneRegion("elven")
     } else {
@@ -496,6 +508,27 @@ func runBot( //nolint:funlen // linear session script
     go loop.Run(sessionCtx)
 
     return game.Run(sessionCtx, cfg.charName)
+}
+
+// installNavigator binds the path planning behind the Navigator
+// seam of the hunt loop: the navmesh hybrid when the tile mesh
+// exists (the live integration round of docs/navmesh.md - the long
+// routes serve from the mesh corridor search, the grid engine stays
+// the click validation and the fallback authority), the pure grid
+// engine navigator otherwise. Without geodata the loop hunts without
+// the town trips at all.
+func installNavigator(
+    loop *hunt.Loop, engine *pathfind.Engine, mesh *navmesh.Mesh,
+    huntMode bool,
+) {
+    switch {
+    case engine != nil && mesh != nil:
+        loop.SetNavigator(hunt.NewNavmeshNavigator(engine, mesh))
+    case engine != nil:
+        loop.SetNavigator(hunt.NewNavigator(engine))
+    case huntMode:
+        log.Println("Hunt runs without town trips: no geodata available")
+    }
 }
 
 // huntEventLogger builds the logger of the hunt loop: the console copy
@@ -654,15 +687,16 @@ func startMemoryWatch(ctx context.Context) {
 // session (server restart, kicked connection, network failure) is logged
 // and the whole login flow is retried with a growing backoff until the
 // user stops the process with SIGINT/SIGTERM. The process never exits on
-// its own. The geodata engine survives the reconnects.
+// its own. The geodata engine and the navmesh mesh survive the
+// reconnects.
 func runBotForever(
     ctx context.Context, cfg config, tracker *state.Bot, engine *pathfind.Engine,
-    proxyServer *proxy.Server, journal *session.Journal,
+    mesh *navmesh.Mesh, proxyServer *proxy.Server, journal *session.Journal,
 ) {
     delay := reconnectMinDelay
     for {
         started := time.Now()
-        err := runBot(ctx, cfg, tracker, engine, proxyServer, journal)
+        err := runBot(ctx, cfg, tracker, engine, mesh, proxyServer, journal)
         if ctx.Err() != nil {
             return
         }
@@ -808,13 +842,18 @@ func main() {
             ", the bot hunts without town trips")
     }
 
+    // The navmesh tiles of the offline build accelerate the long
+    // hunt routes when they exist (see loadNavmesh); a missing tile
+    // set keeps everything on the grid engine.
+    mesh := loadNavmesh(cfg)
+
     web := startWebInterface(cfg, registry, nil, proxyServer)
     attachAcceptance(web, registry, cfg, engine, proxyServer)
     if web != nil && journal != nil {
         web.SetSessionJournal(journal)
     }
 
-    runBotForever(ctx, cfg, tracker, engine, proxyServer, journal)
+    runBotForever(ctx, cfg, tracker, engine, mesh, proxyServer, journal)
     stop()
     shutdownWebInterface(web)
     shutdownProxy(proxyServer)
@@ -895,7 +934,8 @@ func runFleet(cfg config) {
 
     // Launch every bot supervisor in its own goroutine. A per-bot
     // config carries the derived account and char name; the rest of
-    // the flags (login, hunt, geodata, proxy) stay shared.
+    // the flags (login, hunt, geodata, navmesh, proxy) stay shared.
+    mesh := loadNavmesh(cfg)
     var wg sync.WaitGroup
     for i, tracker := range trackers {
         botCfg := cfg
@@ -904,7 +944,7 @@ func runFleet(cfg config) {
         wg.Add(1)
         go func(c config, t *state.Bot) {
             defer wg.Done()
-            runBotForever(ctx, c, t, engine, proxyServer, journal)
+            runBotForever(ctx, c, t, engine, mesh, proxyServer, journal)
         }(botCfg, tracker)
     }
     wg.Wait()
@@ -1134,6 +1174,53 @@ func detectGeodataDir() string {
     log.Println("No geodata directory found, pass -geodata explicitly")
 
     return defaultGeodataCandidates[0]
+}
+
+// detectNavmeshDir picks the first candidate directory that holds at
+// least one tile file, "" when none does: the mesh is an accelerator
+// over the geodata engine, not a dependency - an absent tile set
+// keeps the navigator on the pure grid engine without a word of
+// noise.
+func detectNavmeshDir() string {
+    for _, candidate := range defaultNavmeshCandidates {
+        entries, err := os.ReadDir(candidate)
+        if err != nil {
+            continue
+        }
+        for _, entry := range entries {
+            if strings.HasSuffix(entry.Name(), ".nm") {
+                return candidate
+            }
+        }
+    }
+
+    return ""
+}
+
+// loadNavmesh builds the mesh over the navmesh tile directory when
+// the tiles exist: the explicit -navmesh value wins, the autodetected
+// data/navmesh follows, and a directory without tiles answers nil so
+// the hunt loop installs the plain engine navigator.
+func loadNavmesh(cfg config) *navmesh.Mesh {
+    dir := cfg.navmeshDir
+    if dir == "" {
+        dir = detectNavmeshDir()
+    }
+    if dir == "" {
+        return nil
+    }
+    mesh := navmesh.NewMesh(dir)
+    stats := mesh.Stats()
+    if stats.TileFiles == 0 {
+        log.Println("No navmesh tiles found in " + dir +
+            ", the hunt routes stay on the grid engine")
+
+        return nil
+    }
+    log.Printf("Navmesh ready: %d tiles in %s, the long hunt routes "+
+        "serve from the mesh", stats.TileFiles, stats.Dir)
+
+    return mesh
 }
 
 // startWebInterface runs the web server in the background when enabled.

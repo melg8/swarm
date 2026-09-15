@@ -115,10 +115,28 @@ pieces from the research verdict:
   shipped geodata through navbuild.BuildRegion - the 5.17 s grid
   walk answers from the mesh in one call) and the validation answers
   identical through the hybrid and the engine on the real pack.
+- The runtime wiring landed (cmd/swarm/main.go): the -navmesh flag
+  names the tile directory explicitly, the empty value autodetects
+  data/navmesh (the build command's documented output), and the mesh
+  installs `hunt.NewNavmeshNavigator` behind SetNavigator for every
+  bot of the fleet - a directory without tiles keeps the plain
+  engine navigator silently. data/navmesh joined .gitignore (the
+  tiles are derived from the tracked geodata, 1.9 GB for the full
+  pack, rebuildable in ~4.5 min). The smoke run against the four
+  elven region tiles (21_19, 22_19, 21_20, 22_20 - 62 MB, 8 s build)
+  logs the readiness line in both the autodetect and the explicit
+  flag mode. docs/navmesh.md gained the live integration section
+  (the seam, the fallback rule, the ban granularity note) and the
+  honest not-wired-yet residue (the acceptance stack stays on the
+  pure engine navigator, the partial waypoints stay unexposed);
+  AGENTS.md and docs/hunting.md follow the wiring.
 
 ### Next
 
-The main.go wiring of the tile directory (the -navmesh flag, the
-data/navmesh autodetection, the hybrid installed behind
-SetNavigator), then the docs/navmesh.md scope update with the
-acceptance evidence.
+The round closes: the hunt loop consumes the navmesh corridors with
+the grid engine as the click validation and the fallback authority.
+The follow-up candidates (NOT started): the partial corridor
+waypoints through the Navigator contract (the closest reachable dry
+point instead of the abort), the acceptance stack switch to the
+hybrid once the live sessions prove it, the Detour-parity
+optimization if the fleet benchmark asks for it.

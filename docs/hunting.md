@@ -527,9 +527,13 @@ The short form:
   scenario (acceptance/gearGapReset: the exact dump character must
   buy its legs armor back).
 - The path plan comes from the pathfind engine through the
-  hunt.Navigator interface (set in main.go with hunt.NewNavigator from
-  the auto detected geodata directory; without geodata the bot hunts
-  without trips). A waypoint follower walks the smoothed path with
+  hunt.Navigator interface (set in main.go with hunt.NewNavmeshNavigator
+  when the navmesh tile directory holds tiles - the long routes serve
+  from the mesh corridor search, the grid engine stays the click
+  validation and the fallback authority - and with hunt.NewNavigator
+  from the auto detected geodata directory otherwise; without geodata
+  the bot hunts without trips). A waypoint follower walks the smoothed
+  path with
   ground click walks (one per 2 s; an intermediate waypoint counts as
   reached within 50 units - a bridge ramp entry or a detour turn must
   be walked through, not seen from the side - and the final waypoint

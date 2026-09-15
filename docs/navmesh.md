@@ -178,11 +178,63 @@ go test ./internal/swarm/pathfind/navmesh/ ./internal/swarm/pathfind/navbuild/ -
 go test ./internal/swarm/pathfind/navbuild/ -run '^$' -bench BenchmarkReal -benchmem
 ```
 
+## The live integration
+
+The hunt loop consumes the mesh since the live integration round:
+`hunt.NewNavmeshNavigator` (internal/swarm/hunt/navmesh_navigator.go)
+installs the hybrid behind the same `Navigator` seam the pure grid
+engine navigator used - the town trips, the zone returns, the quest
+trips and the user walks plan their routes without knowing which
+engine answered.
+
+- **The route queries serve from the mesh**: FindPathApproach, both
+  avoiding forms (the frozen corridor bans of the session convert
+  into mesh ban disks), FindPath and FindWaterEscape run the corridor
+  search with the approach radius goal (the polygon-granularity form
+  of the grid nodeReached) and answer the funnel waypoints as the
+  pathfind.Result contract of the seam.
+- **Every answer the mesh cannot serve falls back to the grid
+  engine**: a missing tile under an endpoint, ground the sheet
+  decomposition dropped, a sealed goal under the bans, a partial
+  closest-reachable corridor. Round one keeps the grid engine the
+  reachability authority - the hybrid can only ADD routes (the
+  milliseconds of the mesh corridor instead of the seconds of the
+  grid flood), never lose them. The partial corridors of the mesh
+  (the closest reachable dry point) surface as Found=false today,
+  exactly like the grid partials; surfacing their waypoints is the
+  follow-up round.
+- **The validation layer never leaves the grid engine**:
+  ValidateClick (the click guard of every walked leg), the sight
+  lines, the water rasters and the deck heights stay on the raster
+  the server itself walks. The mesh plans, the raster validates -
+  the division the acceptance stack of the town trips already
+  enforces leg by leg.
+- **The recovery bans wall the mesh at rectangle granularity**: a
+  polygon whose footprint a ban disk touches walls the corridor
+  search (the over-walling direction - no funnelled leg ever enters
+  the banned ground, where the grid only keeps the cell centers of
+  the smoothed legs out), the ban holding the start opens its escape
+  ring within 256 units of the start at the 6x multiplier, a foreign
+  ban wins over the escape ring. The ban disks come from the same
+  freeze reports the grid bans come from - one report, two engines,
+  the same detour.
+
+The runtime wiring (cmd/swarm/main.go): the `-navmesh` flag names the
+tile directory explicitly, the empty value autodetects
+`data/navmesh` (the documented output of the build command); a
+directory without tiles keeps the plain engine navigator without a
+word of noise. The geodata engine and the mesh share the process and
+survive the reconnects; the mesh LRU holds 32 tiles (~a route
+neighborhood) by default.
+
 ## What is NOT wired yet
 
-The hunt loop and the walker still navigate on the grid engine; the
-navmesh subsystem ships the builder, the runtime, the CLI and the
-replay evidence. The live integration (the hunt loop consuming the
-navmesh corridors, the grid engine reduced to the click validation
-of every smoothed leg) is the follow-up round on the acceptance
-stack of `feature/proxy-server`.
+The acceptance stack still installs the pure engine navigator (its
+regression scenarios pin the click validation machinery of the grid
+engine); the mesh serves the live hunt loops only. The partial
+corridor waypoints (the closest reachable dry point of a dry search
+that cannot reach) stay unexposed through the Navigator contract -
+the follow-up round decides whether the town trips should walk them
+instead of aborting. The Detour-parity optimization headroom (the
+flat tile array, the per-tile poly index) stays future work until
+the fleet benchmark asks for it.
