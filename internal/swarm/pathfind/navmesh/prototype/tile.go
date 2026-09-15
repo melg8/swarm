@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package navmesh is the research prototype of the Detour runtime
+// Package prototype is the research prototype of the Detour runtime
 // query engine in pure Go: it parses the navigation mesh tile the
 // research/recast C++ converter exports from the l2j geodata and
 // answers nearest polygon and path queries over it. It is the Go
 // feasibility half of the feature/new-pathfind research round
 // (docs/recast_pathfinding.md): the build pipeline stays offline,
 // the runtime is this package.
-package navmesh
+package prototype
 
 import (
     "encoding/binary"

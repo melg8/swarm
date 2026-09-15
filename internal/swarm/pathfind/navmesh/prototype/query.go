@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-package navmesh
+package prototype
 
 import (
     "container/heap"

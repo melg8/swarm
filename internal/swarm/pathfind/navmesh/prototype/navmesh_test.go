@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-package navmesh
+package prototype
 
 import (
     "bufio"
@@ -24,7 +24,7 @@ func nowNanos() int64 {
 // 21_19 elven village region (14062 polygons, 525 water). The file
 // lives in the research results and travels with the repository as
 // the reproducible evidence of the report.
-const researchTile = "../../../../research/recast/results/navmesh_21_19.bin"
+const researchTile = "../../../../../research/recast/results/navmesh_21_19.bin"
 
 // loadResearchTile parses the exported tile or skips the test when
 // the research artifact is absent.
