@@ -15,9 +15,12 @@ import (
 
 // Options are the builder tunables. The defaults mirror the research
 // round (docs/recast_pathfinding.md): the 40 unit climb of the server
-// HEIGHT_INCREASE_LIMIT, the 16 unit dedup delta of the l2j duplicate
-// noise, the 4 layer island filter and the 24 unit bilinear height
-// tolerance of the rectangle corner surfaces.
+// HEIGHT_INCREASE_LIMIT, the 32 unit dedup delta of the l2j duplicate
+// noise (the measured region noise sits at 16/24/32 unit deltas -
+// both-open pairs of the same surface; the elven region of the
+// research round showed none of it, the 22_xx column shows 54k pairs
+// per region), the 4 layer island filter and the 24 unit bilinear
+// height tolerance of the rectangle corner surfaces.
 type Options struct {
     Climb           int32
     DedupDelta      int32
@@ -29,7 +32,7 @@ type Options struct {
 func DefaultOptions() Options {
     return Options{
         Climb:           40,
-        DedupDelta:      16,
+        DedupDelta:      32,
         MinSheetLayers:  4,
         HeightTolerance: 24,
     }

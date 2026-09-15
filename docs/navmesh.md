@@ -72,8 +72,16 @@ entry is unchanged.
 
 1. **Parse and dedup** - the region file goes through the exported
    pathfind parser (`ParseRegionData`), the cell stacks flatten into
-   the builder layout, and the within-16-unit duplicate layers merge
-   (the l2j generator noise; the higher surface wins).
+   the builder layout, and the within-32-unit duplicate layers merge
+   (the l2j generator noise; the higher surface wins). The measured
+   regions carry the same surface twice with a 0..32 unit jitter -
+   both layers open, the lower copy often wall restricted (the 22_xx
+   column counts ~54k such pairs per region; the elven region of the
+   research round showed none, which is why the first round shipped
+   the 16 unit rule that missed the 24/32 noise entirely). A real
+   stacked floor never sits within 32 units of its ceiling, so the
+   merge keeps every genuine deck: unmerged, the duplicates render as
+   z-fighting polygon layers over the same ground.
 2. **The sheet decomposition** - the walkable layers flood into 2D
    manifolds top down: the fill moves to neighbour column layers
    within the 40 unit climb of the same wetness class and never
@@ -196,20 +204,41 @@ go run ./cmd/swarm -show-navmesh -navmesh data/navmesh -web 127.0.0.1:8080
 ```
 
 The viewer renders the rectangle polygons as an exaggerated terrain
-(height ramp for the ground, flat blue for the water areas; the
-height scale selector lifts the subtle geodata relief to 2x/4x). A
-double click on the mesh arms the green start marker, the second
-double click picks the destination and asks the server for the real
-corridor search - the same `Route` call the hunt loop's hybrid
-navigator issues - and the answer draws the funnel polyline with its
-waypoints plus the measured construction time. The timer is the
-server side `time.Since` around the query: the first route over a
-cold region honestly includes the lazy tile decode (~1.45 ms per
-tile), exactly what a cold bot pays. The elven hard pair (the
-village deck at (45768, 49848, -3056) to the water under the bridge
-at (44920, 50792, -3928)) answers in single digit milliseconds
-where the grid engine floods for 5.17 s - the viewer is the fastest
-way to see the stacked-layer walk the port bought.
+(height ramp for the ground, depth ramp for the water - the geodata
+water class is everything below the C1 water level, so the blue
+deepens with the riverbed instead of faking a flat surface at a
+height the ground never held; the height scale selector lifts the
+subtle geodata relief to 2x/4x). The render carries three honesty
+rules the defect round taught it: the logarithmic depth buffer keeps
+the 32768 unit tiles from z fighting at the viewing distances of the
+stitched world, the balanced light rig (a dominant hemisphere plus a
+sun and a counter fill) keeps the steep cascade quads of the l2j
+slope smoothing cells - a fifth of the polygons - readable instead of
+black, and the merged duplicate layers of the 32 unit dedup leave no
+stacked surfaces to flicker. A double click on the mesh arms the
+green start marker, the second double click picks the destination
+and asks the server for the real corridor search - the same `Route`
+call the hunt loop's hybrid navigator issues - and the answer draws
+the funnel polyline with its waypoints plus the measured construction
+time. The timer is the server side `time.Since` around the query:
+the first route over a cold region honestly includes the lazy tile
+decode (~1.45 ms per tile), exactly what a cold bot pays. The elven
+hard pair (the village deck at (45768, 49848, -3056) to the water
+under the bridge at (44920, 50792, -3928)) answers in single digit
+milliseconds where the grid engine floods for 5.17 s - the viewer is
+the fastest way to see the stacked-layer walk the port bought.
+
+The inspection surface answers the three questions a route debug
+session asks. Which square am I looking at: every loaded tile draws
+its region grid outline above the geometry, the outline under the
+cursor lights up amber, and the readout bar at the top names the tile
+with its region local cell (a progressive raycast sweep - one tile
+per frame, the nearest bounding sphere first - so the answer tracks
+the pointer without ever blocking the orbit). Where does the route
+run: the result panel carries the from/to rows with their tile keys
+and world coordinates, and every waypoint wears a label with its
+index and coordinates (the toggle lives in the display section next
+to the polygon edge overlay).
 
 The flag selection bounds the initially VISIBLE tiles only: the
 route queries always run over the full directory mesh, so a path may

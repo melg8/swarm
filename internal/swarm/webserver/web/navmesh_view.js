@@ -12,6 +12,22 @@ SPDX-License-Identifier: MIT
 // double click picks the destination, the server runs the real
 // corridor search (the same query the hunt loop asks) and the answer
 // draws as the funnel polyline with the measured construction time.
+//
+// The defect round taught the render its honesty rules: the
+// logarithmic depth buffer keeps the 32768 unit tiles from z fighting
+// at the viewing distances of the stitched world, the balanced
+// hemisphere lighting keeps the steep cascade quads (the l2j slope
+// smoothing cells - a fifth of the polygons) readable instead of
+// black, and the water areas render as the submerged terrain they
+// really are: the geodata water class is everything below the C1
+// water level, so the blue ramps with depth instead of faking a flat
+// surface at heights the riverbed never held.
+//
+// The inspection surface: every loaded tile carries its region grid
+// outline, the cursor readout names the tile square under the pointer
+// with its region local cell and world coordinates (a progressive
+// raycast sweep - one tile per frame, the nearest bounding sphere
+// first), and every route waypoint wears its coordinates as a label.
 // The module boots through the dynamic import of main.js; three.js
 // itself is vendored at web/vendor/three.module.min.js so the viewer
 // works offline like the rest of the interface.
@@ -24,9 +40,20 @@ const GEO_MAGIC = 0x31564d4e;
 const GEO_HEADER = 24;
 const CELL_SIZE = 16;
 
+// The C1 water surface height (navbuild.waterLevel): the water class
+// polygons are the layers below it - the submerged terrain.
+const WATER_LEVEL = -3780;
+
+// The water depth ramp: the shallow shore approaches the light blue,
+// the deep riverbed fades toward the dark navy.
+const WATER_SHALLOW = { r: 86, g: 152, b: 220 };
+const WATER_DEEP = { r: 16, g: 32, b: 60 };
+// The depth that maps to the fully deep color (the deepest riverbeds
+// of the shipped pack sit ~2500 units under the surface).
+const WATER_DEEP_RANGE = 1800;
+
 // The terrain palette: the ground polygons ramp through the height
-// range of the tile, the water polygons keep the flat blue.
-const WATER_COLOR = { r: 62, g: 130, b: 214 };
+// range of the tile (the per tile ramp doubles as the tile identity).
 const GROUND_LOW = { r: 47, g: 84, b: 58 };
 const GROUND_HIGH = { r: 172, g: 158, b: 128 };
 
@@ -36,6 +63,11 @@ const START_COLOR = 0x3fd66a;
 const END_COLOR = 0xff5c5c;
 const PATH_COLOR = 0xffb020;
 const WAYPOINT_COLOR = 0xffffff;
+
+// The tile grid outline colors: every loaded tile draws its region
+// rectangle, the tile under the cursor lights up.
+const TILE_OUTLINE_COLOR = 0x586063;
+const TILE_HOVER_COLOR = 0xffb020;
 
 // The Viewer bundles the three.js state behind one object so the init
 // stays a single closure.
@@ -49,9 +81,24 @@ const viewer = {
   filter: "swim",
   pendingStart: null,
   path: null,
+  routeStart: null,
+  routeEnd: null,
   startMarker: null,
   endMarker: null,
   markerRadius: 24,
+  waypointLabels: null,
+  showWaypointCoords: true,
+  showEdges: false,
+  hover: {
+    pointer: new THREE.Vector2(),
+    hasPointer: false,
+    cameraPosition: new THREE.Vector3(),
+    cameraQuaternion: new THREE.Quaternion(),
+    candidates: [],
+    best: null,
+    hitTile: null,
+    swept: false,
+  },
 };
 
 // init boots the viewer for the /api/config payload of the navmesh
@@ -93,6 +140,10 @@ function buildSurface(navmesh) {
   root.id = "navmesh-view";
   root.innerHTML = `
     <canvas id="nmv-canvas"></canvas>
+    <div class="nmv-cursor" id="nmv-cursor">
+      <span class="nmv-cursor-tile" id="nmv-cursor-tile">&mdash;</span>
+      <span id="nmv-cursor-pos">move the pointer over the mesh</span>
+    </div>
     <div class="nmv-panel nmv-side">
       <div class="nmv-title">swarm &middot; navmesh viewer</div>
       <div class="nmv-sub" id="nmv-dir"></div>
@@ -111,11 +162,17 @@ function buildSurface(navmesh) {
         <option value="2">2x</option>
         <option value="4">4x</option>
       </select>
+      <div class="nmv-section">display</div>
+      <label class="nmv-row"><input type="checkbox"
+        id="nmv-waypoint-coords" checked>
+        <span>waypoint coordinates</span></label>
+      <label class="nmv-row"><input type="checkbox" id="nmv-edges">
+        <span>polygon edges</span></label>
       <div class="nmv-section">legend</div>
       <div class="nmv-row"><span class="nmv-swatch nmv-ground"></span>
         <span>ground (height ramp)</span></div>
       <div class="nmv-row"><span class="nmv-swatch nmv-water"></span>
-        <span>water area</span></div>
+        <span>water (depth ramp)</span></div>
       <button id="nmv-clear" class="btn nmv-clear">clear route</button>
     </div>
     <div class="nmv-panel nmv-result" id="nmv-result">
@@ -141,6 +198,10 @@ function buildSurface(navmesh) {
       canvas,
       antialias: true,
       powerPreference: "high-performance",
+      // The stitched world spans hundreds of thousands of units; the
+      // log depth buffer keeps the stacked surfaces from z fighting
+      // at every viewing distance.
+      logarithmicDepthBuffer: true,
     });
   } catch (err) {
     showStatus("error", "WebGL is unavailable: " + err.message);
@@ -151,15 +212,24 @@ function buildSurface(navmesh) {
 
   viewer.scene = new THREE.Scene();
   viewer.camera = new THREE.PerspectiveCamera(
-    60, 1, 8, 400000);
-  const hemi = new THREE.HemisphereLight(0xdfe7f0, 0x2c241a, 0.9);
+    60, 1, 16, 400000);
+  // The balanced three light rig: the hemisphere alone keeps every
+  // face readable (the steep cascade quads of the l2j slope smoothing
+  // cells would fall to black under a single hard sun), the sun and
+  // the counter fill keep the relief.
+  const hemi = new THREE.HemisphereLight(0xe8eef4, 0x8a8064, 0.95);
   viewer.scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffffff, 1.15);
+  const sun = new THREE.DirectionalLight(0xffffff, 0.55);
   sun.position.set(0.45, 1, 0.25);
   viewer.scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xdfe7f0, 0.3);
+  fill.position.set(-0.5, 0.4, -0.35);
+  viewer.scene.add(fill);
 
   viewer.rig = createOrbitRig(viewer.camera, canvas);
   canvas.addEventListener("dblclick", onDoubleClick);
+  canvas.addEventListener("pointermove", onPointerMove);
+  canvas.addEventListener("pointerleave", onPointerLeave);
 
   document.getElementById("nmv-filter").addEventListener("change", (e) => {
     viewer.filter = e.target.value;
@@ -171,6 +241,16 @@ function buildSurface(navmesh) {
     setAllTiles(e.target.checked);
   });
   document.getElementById("nmv-clear").addEventListener("click", clearRoute);
+  document.getElementById("nmv-waypoint-coords").addEventListener(
+    "change", (e) => {
+      viewer.showWaypointCoords = e.target.checked;
+      if (viewer.waypointLabels) {
+        viewer.waypointLabels.visible = e.target.checked;
+      }
+    });
+  document.getElementById("nmv-edges").addEventListener("change", (e) => {
+    setEdgesVisible(e.target.checked);
+  });
 
   const resize = () => {
     const width = window.innerWidth, height = window.innerHeight;
@@ -183,12 +263,14 @@ function buildSurface(navmesh) {
   requestAnimationFrame(renderLoop);
 }
 
-// renderLoop redraws the scene (the tiles are static, but the camera
-// rig and the route overlays move between frames).
+// renderLoop redraws the scene and drives the progressive cursor
+// raycast: one candidate tile per frame, so the readout never blocks
+// the orbit.
 function renderLoop() {
   if (viewer.rig) {
     viewer.rig.update();
   }
+  hoverStep();
   if (viewer.renderer) {
     viewer.renderer.render(viewer.scene, viewer.camera);
   }
@@ -299,6 +381,7 @@ function addTileRow(tile, checked) {
     info: tile,
     loading: false,
     visible: checked,
+    edges: null,
   });
 }
 
@@ -365,7 +448,7 @@ async function ensureTile(tile) {
       throw new Error("http " + response.status);
     }
     const buffer = await response.arrayBuffer();
-    entry.mesh = buildTileMesh(buffer);
+    entry.mesh = buildTileMesh(key, buffer);
     entry.mesh.visible = entry.visible;
     viewer.scene.add(entry.mesh);
     if (status) {
@@ -384,10 +467,13 @@ async function ensureTile(tile) {
 
 // buildTileMesh decodes the NMV1 payload into one draw call: the
 // positions float block (worldMin + cell * 16), the per corner colors
-// (the ground height ramp or the flat water blue) and the quad
-// indices (0 2 1 / 0 2 3 - both triangles face up in the viewer
-// mapping y = world height).
-function buildTileMesh(buffer) {
+// (the ground height ramp or the water depth ramp - both flat per
+// polygon so a warped quad reads as one surface) and the quad indices
+// (0 2 1 / 0 2 3 - both triangles face up in the viewer mapping
+// y = world height). The tile mesh carries the region grid outline
+// and the lazily built edge overlay as children, so the height scale
+// and the visibility apply to them too.
+function buildTileMesh(key, buffer) {
   const view = new DataView(buffer);
   if (view.getUint32(0, true) !== GEO_MAGIC) {
     throw new Error("bad geometry magic");
@@ -418,19 +504,21 @@ function buildTileMesh(buffer) {
       positions[dst] = worldMinX + cellX * CELL_SIZE;
       positions[dst + 1] = height;
       positions[dst + 2] = worldMinY + cellY * CELL_SIZE;
-      if (water) {
-        colors[dst] = WATER_COLOR.r;
-        colors[dst + 1] = WATER_COLOR.g;
-        colors[dst + 2] = WATER_COLOR.b;
-      } else {
-        const t = Math.min(1, Math.max(0, (height - minH) / span));
-        colors[dst] = GROUND_LOW.r + (GROUND_HIGH.r - GROUND_LOW.r) * t;
-        colors[dst + 1] = GROUND_LOW.g + (GROUND_HIGH.g - GROUND_LOW.g) * t;
-        colors[dst + 2] = GROUND_LOW.b + (GROUND_HIGH.b - GROUND_LOW.b) * t;
-      }
     }
     // One flat color per polygon reads better than per corner
-    // gradients over a warped quad: copy the first corner color.
+    // gradients over a warped quad: the mean corner height drives the
+    // ramp (the ground height ramp or the water depth ramp).
+    const mean = sumH / 4;
+    const t = water
+      ? Math.min(1, Math.max(0, (WATER_LEVEL - mean) / WATER_DEEP_RANGE))
+      : Math.min(1, Math.max(0, (mean - minH) / span));
+    const low = water ? WATER_SHALLOW : GROUND_LOW;
+    const high = water ? WATER_DEEP : GROUND_HIGH;
+    for (let channel = 0; channel < 3; channel++) {
+      const base = [low.r, low.g, low.b][channel];
+      const peak = [high.r, high.g, high.b][channel];
+      colors[poly * 12 + channel] = base + (peak - base) * t;
+    }
     for (let corner = 1; corner < 4; corner++) {
       const dst = (poly * 4 + corner) * 3;
       colors[dst] = colors[poly * 12];
@@ -463,12 +551,263 @@ function buildTileMesh(buffer) {
     vertexColors: true,
     flatShading: true,
     side: THREE.DoubleSide,
+    // The surface steps back a hair so the coplanar edge overlay of
+    // the polygon toggle wins the depth test.
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
   });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.userData.polys = polyCount;
+  mesh.userData.key = key;
   mesh.scale.y = viewer.heightScale;
+  mesh.add(buildTileOutline(worldMinX, worldMinY, maxH));
 
   return mesh;
+}
+
+// buildTileOutline draws the region grid rectangle of one tile above
+// its highest geometry, the persistent answer to "which square am I
+// looking at".
+function buildTileOutline(worldMinX, worldMinY, maxH) {
+  const size = 32768;
+  const lift = maxH + 24;
+  const points = [
+    worldMinX, lift, worldMinY,
+    worldMinX + size, lift, worldMinY,
+    worldMinX + size, lift, worldMinY + size,
+    worldMinX, lift, worldMinY + size,
+    worldMinX, lift, worldMinY,
+  ];
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position",
+    new THREE.BufferAttribute(new Float32Array(points), 3));
+  const outline = new THREE.Line(geometry, new THREE.LineBasicMaterial({
+    color: TILE_OUTLINE_COLOR,
+    transparent: true,
+    opacity: 0.8,
+  }));
+  outline.userData.outline = true;
+
+  return outline;
+}
+
+// buildTileEdges builds the quad perimeter overlay of one tile (no
+// tessellation diagonals): the rectangle structure of the mesh as the
+// eye sees it.
+function buildTileEdges(mesh) {
+  const positions = mesh.geometry.getAttribute("position");
+  const count = mesh.userData.polys;
+  const edges = new Float32Array(count * 8 * 3);
+  for (let poly = 0; poly < count; poly++) {
+    const base = poly * 12;
+    const dst = poly * 24;
+    // The quad perimeter 0-1-3-2-0 of the corner order
+    // (x0,y0) (x1,y0) (x0,y1) (x1,y1).
+    for (let e = 0; e < 4; e++) {
+      const from = [0, 1, 3, 2][e];
+      const to = [1, 3, 2, 0][e];
+      for (let c = 0; c < 3; c++) {
+        edges[dst + e * 6 + c] = positions.array[base + from * 3 + c];
+        edges[dst + e * 6 + 3 + c] = positions.array[base + to * 3 + c];
+      }
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position",
+    new THREE.BufferAttribute(edges, 3));
+  const overlay = new THREE.LineSegments(geometry,
+    new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.16,
+    }));
+
+  return overlay;
+}
+
+// setEdgesVisible toggles the polygon edge overlay of every loaded
+// tile, building it lazily on the first enable.
+function setEdgesVisible(visible) {
+  viewer.showEdges = visible;
+  for (const entry of viewer.tiles.values()) {
+    if (!entry.mesh) {
+      continue;
+    }
+    if (visible && !entry.edges) {
+      entry.edges = buildTileEdges(entry.mesh);
+      entry.mesh.add(entry.edges);
+    }
+    if (entry.edges) {
+      entry.edges.visible = visible;
+    }
+  }
+}
+
+// onPointerMove arms the progressive cursor raycast.
+function onPointerMove(event) {
+  if (!viewer.renderer) {
+    return;
+  }
+  const rect = event.target.getBoundingClientRect();
+  viewer.hover.pointer.set(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1);
+  viewer.hover.hasPointer = true;
+  restartHoverSweep();
+}
+
+// onPointerLeave clears the cursor readout.
+function onPointerLeave() {
+  viewer.hover.hasPointer = false;
+  viewer.hover.candidates = [];
+  viewer.hover.best = null;
+  viewer.hover.swept = false;
+  setHoverTile(null);
+  clearCursorReadout();
+}
+
+// clearCursorReadout resets the readout bar to the idle text.
+function clearCursorReadout() {
+  setHoverTile(null);
+  const tile = document.getElementById("nmv-cursor-tile");
+  const pos = document.getElementById("nmv-cursor-pos");
+  if (tile) {
+    tile.innerHTML = "&mdash;";
+  }
+  if (pos) {
+    pos.textContent = "pointer over no tile";
+  }
+}
+
+// restartHoverSweep re-runs the sphere pass: the visible tiles whose
+// bounding sphere the cursor ray enters become the candidates,
+// ordered by the entry distance so the readout is right after the
+// first frames.
+function restartHoverSweep() {
+  const hover = viewer.hover;
+  hover.candidates = [];
+  hover.best = null;
+  if (!viewer.camera || !hover.hasPointer) {
+    return;
+  }
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(hover.pointer, viewer.camera);
+  const ray = raycaster.ray;
+  const sphere = new THREE.Sphere();
+  const entries = [];
+  for (const entry of viewer.tiles.values()) {
+    if (!entry.mesh || !entry.mesh.visible) {
+      continue;
+    }
+    if (!entry.mesh.geometry.boundingSphere) {
+      entry.mesh.geometry.computeBoundingSphere();
+    }
+    sphere.copy(entry.mesh.geometry.boundingSphere);
+    sphere.applyMatrix4(entry.mesh.matrixWorld);
+    const point = new THREE.Vector3();
+    if (ray.intersectSphere(sphere, point)) {
+      entries.push({
+        mesh: entry.mesh,
+        distance: ray.origin.distanceTo(point),
+      });
+    }
+  }
+  entries.sort((a, b) => a.distance - b.distance);
+  hover.candidates = entries.map((e) => e.mesh);
+  hover.swept = true;
+}
+
+// hoverStep advances the progressive raycast: one candidate tile per
+// frame, the readout updating with the best hit so far. A camera move
+// (orbit, pan, zoom) restarts the sweep so the answer tracks what the
+// eye actually sees once it settles. A drained sweep without a hit
+// clears the readout - the pointer rests over the tile gaps of the
+// stitched world.
+function hoverStep() {
+  const hover = viewer.hover;
+  if (!viewer.camera || !hover.hasPointer) {
+    return;
+  }
+  const cameraMoved =
+    !viewer.camera.position.equals(hover.cameraPosition) ||
+    !viewer.camera.quaternion.equals(hover.cameraQuaternion);
+  if (cameraMoved) {
+    hover.cameraPosition.copy(viewer.camera.position);
+    hover.cameraQuaternion.copy(viewer.camera.quaternion);
+    restartHoverSweep();
+    return;
+  }
+  if (hover.candidates.length === 0) {
+    if (hover.swept && !hover.best) {
+      hover.swept = false;
+      clearCursorReadout();
+    }
+    return;
+  }
+  const mesh = hover.candidates.shift();
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(hover.pointer, viewer.camera);
+  const hits = raycaster.intersectObject(mesh, false);
+  if (hits.length > 0 &&
+    (!hover.best || hits[0].distance < hover.best.distance)) {
+    hover.best = hits[0];
+    hover.hitTile = mesh.userData.key;
+    updateCursorReadout(hover.best, mesh.userData.key);
+    setHoverTile(mesh.userData.key);
+  }
+}
+
+// updateCursorReadout writes the tile square, the region local cell
+// and the world coordinates of the point under the pointer.
+function updateCursorReadout(hit, key) {
+  const tile = document.getElementById("nmv-cursor-tile");
+  const pos = document.getElementById("nmv-cursor-pos");
+  if (!tile || !pos) {
+    return;
+  }
+  const worldX = hit.point.x;
+  const worldY = hit.point.z;
+  const worldZ = hit.point.y / viewer.heightScale;
+  const localCellX = Math.floor(
+    (worldX - Math.floor(worldX / 32768) * 32768) / CELL_SIZE);
+  const localCellY = Math.floor(
+    (worldY - Math.floor(worldY / 32768) * 32768) / CELL_SIZE);
+  tile.textContent = key;
+  pos.textContent =
+    "cell " + localCellX + " " + localCellY +
+    "  \u00b7  x " + Math.round(worldX) +
+    "  y " + Math.round(worldY) +
+    "  z " + Math.round(worldZ);
+}
+
+// setHoverTile lights the region outline of the hovered tile and dims
+// the previous one.
+function setHoverTile(key) {
+  if (viewer.hover.tileKey === key) {
+    return;
+  }
+  if (viewer.hover.tileKey) {
+    const previous = viewer.tiles.get(viewer.hover.tileKey);
+    if (previous && previous.mesh) {
+      const outline = previous.mesh.children.find(
+        (child) => child.userData.outline);
+      if (outline) {
+        outline.material.color.setHex(TILE_OUTLINE_COLOR);
+      }
+    }
+  }
+  viewer.hover.tileKey = key;
+  if (key) {
+    const entry = viewer.tiles.get(key);
+    if (entry && entry.mesh) {
+      const outline = entry.mesh.children.find(
+        (child) => child.userData.outline);
+      if (outline) {
+        outline.material.color.setHex(TILE_HOVER_COLOR);
+      }
+    }
+  }
 }
 
 // setHeightScale exaggerates the vertical axis of every tile (the
@@ -541,6 +880,8 @@ async function requestRoute(start, end) {
   document.getElementById("nmv-timer").textContent = "";
   document.getElementById("nmv-timer-sub").textContent = "";
   document.getElementById("nmv-stats").innerHTML = "";
+  viewer.routeStart = start;
+  viewer.routeEnd = end;
   try {
     const response = await fetch("/api/navmesh/path", {
       method: "POST",
@@ -562,8 +903,8 @@ async function requestRoute(start, end) {
 }
 
 // renderRouteAnswer draws the funnel waypoints and fills the result
-// panel: the status, the measured construction time and the search
-// statistics.
+// panel: the status, the measured construction time, the search
+// statistics and the from/to coordinates of the clicked pair.
 function renderRouteAnswer(answer) {
   viewer.path = answer;
   if (answer.error) {
@@ -589,17 +930,33 @@ function renderRouteAnswer(answer) {
   }
   const stats = document.getElementById("nmv-stats");
   const waypoints = answer.waypoints || [];
-  const rows = [
+  const rows = [];
+  if (viewer.routeStart && viewer.routeEnd) {
+    rows.push(["from", formatCoordRow(viewer.routeStart)]);
+    rows.push(["to", formatCoordRow(viewer.routeEnd)]);
+    rows.push(["spacer", ""]);
+  }
+  rows.push(
     ["waypoints", String(waypoints.length)],
     ["corridor polys", String(answer.corridor)],
     ["explored polys", String(answer.explored)],
     ["path length", Math.round(routeLength(waypoints)).toLocaleString() +
       " units"],
-    ["filter", answer.filter],
-  ];
+    ["filter", answer.filter]);
   stats.innerHTML = rows.map(([name, value]) =>
-    `<div class="nmv-stat"><span>${name}</span><b>${value}</b></div>`)
+    name === "spacer"
+      ? `<div class="nmv-stat nmv-stat-gap"></div>`
+      : `<div class="nmv-stat"><span>${name}</span><b>${value}</b></div>`)
     .join("");
+}
+
+// formatCoordRow renders one clicked endpoint with its tile square.
+function formatCoordRow(point) {
+  const key = String(Math.floor(point.x / 32768) + 20) + "_" +
+    String(Math.floor(point.y / 32768) + 18);
+
+  return key + " &middot; " + Math.round(point.x) + ", " +
+    Math.round(point.y) + ", " + Math.round(point.z);
 }
 
 // formatMicros renders a sub millisecond construction time in
@@ -618,9 +975,9 @@ function routeLength(waypoints) {
   return total;
 }
 
-// drawRouteOverlays rebuilds the path line, the waypoint dots and
-// the endpoint markers from the last answer (the height scale change
-// re-renders through it).
+// drawRouteOverlays rebuilds the path line, the waypoint dots, the
+// coordinate labels and the endpoint markers from the last answer
+// (the height scale change re-renders through it).
 function drawRouteOverlays(answer) {
   clearRouteOverlays();
   const waypoints = answer.waypoints || [];
@@ -658,8 +1015,65 @@ function drawRouteOverlays(answer) {
   viewer.scene.add(dots);
   viewer.routeDots = dots;
 
+  const labels = new THREE.Group();
+  labels.visible = viewer.showWaypointCoords;
+  for (let i = 0; i < waypoints.length; i++) {
+    labels.add(makeWaypointLabel(i, waypoints.length, waypoints[i]));
+  }
+  viewer.scene.add(labels);
+  viewer.waypointLabels = labels;
+
   drawStartMarker(waypoints[0]);
   drawEndMarker(waypoints[waypoints.length - 1]);
+}
+
+// makeWaypointLabel builds one screen fixed sprite carrying the
+// waypoint index and its world coordinates.
+function makeWaypointLabel(index, total, waypoint) {
+  const text = (index + 1) + "/" + total + "  " +
+    Math.round(waypoint.x) + ", " + Math.round(waypoint.y) + ", " +
+    Math.round(waypoint.z);
+  const scale = 2;
+  const canvas = document.createElement("canvas");
+  let ctx = canvas.getContext("2d");
+  const font = "26px ui-monospace, monospace";
+  ctx.font = font;
+  const width = Math.ceil(ctx.measureText(text).width) + 28;
+  canvas.width = width * scale;
+  canvas.height = 44 * scale;
+  ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+  ctx.font = font;
+  ctx.fillStyle = "rgba(13, 17, 23, 0.78)";
+  ctx.fillRect(0, 0, width, 44);
+  ctx.strokeStyle = "rgba(240, 246, 252, 0.25)";
+  ctx.strokeRect(0.5, 0.5, width - 1, 43);
+  ctx.fillStyle = index === 0
+    ? "#3fd66a"
+    : index === total - 1 ? "#ff5c5c" : "#e6edf3";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 14, 22);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: texture,
+    sizeAttenuation: false,
+    depthTest: false,
+    transparent: true,
+  }));
+  sprite.renderOrder = 12;
+  // The screen fixed scale: the label height occupies ~4.4% of the
+  // viewport height at any zoom.
+  const heightFraction = 0.044;
+  sprite.scale.set(
+    heightFraction * (width / 44), heightFraction, 1);
+  sprite.position.set(
+    waypoint.x,
+    waypoint.z * viewer.heightScale + viewer.markerRadius * 1.6,
+    waypoint.y);
+
+  return sprite;
 }
 
 // drawStartMarker places the green start sphere.
@@ -668,7 +1082,7 @@ function drawStartMarker(world) {
     viewer.scene.remove(viewer.startMarker);
     viewer.startMarker = null;
   }
-  viewer.startMarker = makeMarker(START_COLOR);
+  viewer.startMarker = makeMarker(START_COLOR, true);
   placeMarker(viewer.startMarker, world);
 }
 
@@ -678,31 +1092,57 @@ function drawEndMarker(world) {
     viewer.scene.remove(viewer.endMarker);
     viewer.endMarker = null;
   }
-  viewer.endMarker = makeMarker(END_COLOR);
+  viewer.endMarker = makeMarker(END_COLOR, false);
   placeMarker(viewer.endMarker, world);
 }
 
-// makeMarker builds one depthTest free sphere (the endpoints stay
-// visible through the terrain).
-function makeMarker(color) {
-  const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 16, 12),
-    new THREE.MeshBasicMaterial({
-      color,
-      depthTest: false,
-      transparent: true,
-    }));
-  mesh.renderOrder = 11;
+// makeMarker builds one screen fixed endpoint dot (a sprite: the
+// from/to endpoints stay visible at every zoom - the world scaled
+// sphere of the first round vanished into sub pixels at the world
+// view) with a ring for the start and a solid disc for the end.
+function makeMarker(color, ring) {
+  const scale = 4;
+  const canvas = document.createElement("canvas");
+  canvas.width = 32 * scale;
+  canvas.height = 32 * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+  const gradient = ctx.createRadialGradient(16, 16, 2, 16, 16, 15);
+  gradient.addColorStop(0, "rgba(255,255,255,0.95)");
+  gradient.addColorStop(0.25, "rgba(255,255,255,0.0)");
+  gradient.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 32, 32);
+  ctx.lineWidth = 3.2;
+  ctx.strokeStyle = "#" + color.toString(16).padStart(6, "0");
+  ctx.beginPath();
+  ctx.arc(16, 16, 12, 0, Math.PI * 2);
+  if (ring) {
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.fill();
+    ctx.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: texture,
+    sizeAttenuation: false,
+    depthTest: false,
+    transparent: true,
+  }));
+  sprite.renderOrder = 11;
+  // The screen fixed size: ~5% of the viewport height.
+  sprite.scale.set(0.05, 0.05, 1);
 
-  return mesh;
+  return sprite;
 }
 
-// placeMarker positions one endpoint sphere over the world position.
+// placeMarker positions one endpoint dot over the world position.
 function placeMarker(marker, world) {
-  const radius = viewer.markerRadius;
-  marker.scale.setScalar(radius);
   marker.position.set(
-    world.x, world.z * viewer.heightScale + radius * 0.9, world.y);
+    world.x, world.z * viewer.heightScale, world.y);
   viewer.scene.add(marker);
 }
 
@@ -711,6 +1151,8 @@ function placeMarker(marker, world) {
 function clearRoute() {
   viewer.pendingStart = null;
   viewer.path = null;
+  viewer.routeStart = null;
+  viewer.routeEnd = null;
   clearRouteOverlays();
   showStatus("idle", "double click the mesh");
   document.getElementById("nmv-timer").textContent = "";
@@ -718,9 +1160,11 @@ function clearRoute() {
   document.getElementById("nmv-stats").innerHTML = "";
 }
 
-// clearRouteOverlays removes the line, the dots and the markers.
+// clearRouteOverlays removes the line, the dots, the labels and the
+// markers.
 function clearRouteOverlays() {
-  for (const key of ["routeLine", "routeDots", "startMarker", "endMarker"]) {
+  for (const key of ["routeLine", "routeDots", "waypointLabels",
+    "startMarker", "endMarker"]) {
     if (viewer[key]) {
       viewer.scene.remove(viewer[key]);
       viewer[key] = null;
@@ -743,6 +1187,12 @@ function showStatus(kind, text) {
   if (timerSub && !timerSub.textContent) {
     timerSub.textContent = text;
   }
+}
+
+// window.__nmv exposes the viewer state for the browser console and
+// the acceptance probes of the round (read only).
+if (typeof window !== "undefined") {
+  window.__nmv = viewer;
 }
 
 export { init };

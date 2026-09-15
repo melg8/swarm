@@ -3331,7 +3331,7 @@ body.mode-navmesh .app { display: none; }
 }
 
 .nmv-ground { background: linear-gradient(90deg, #2f543a, #ac9e80); }
-.nmv-water { background: #3e82d6; }
+.nmv-water { background: linear-gradient(90deg, #5698dc, #10203c); }
 
 .nmv-clear {
   width: 100%;
@@ -3388,6 +3388,47 @@ body.mode-navmesh .app { display: none; }
   color: var(--text);
   font-family: var(--mono);
   font-weight: 600;
+}
+
+.nmv-cursor {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  max-width: 60vw;
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.nmv-cursor-tile {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: #ffb020;
+  font-size: 13px;
+}
+
+.nmv-cursor span {
+  font-family: var(--mono);
+}
+
+.nmv-stat-gap {
+  border-top: 1px solid var(--border-soft);
+  margin: 4px 0;
+  height: 1px;
+}
+
+.nmv-stat b.nmv-coords {
+  font-weight: 400;
+  white-space: nowrap;
 }
 
 .nmv-hint {

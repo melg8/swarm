@@ -55,7 +55,7 @@ type regionLayers struct {
 // the within-delta duplicate layers runs during the copy (the same
 // rule the research converter used - the l2j multilayer cells carry
 // the same surface twice with a small jitter, and no real walkable
-// geometry stacks two surfaces 16 units apart in one cell).
+// geometry stacks two surfaces 32 units apart in one cell).
 func extractRegion(
     data []byte, col, row int16, dedupDelta int32,
 ) (*regionLayers, error) {
@@ -85,7 +85,7 @@ func extractRegion(
             count := 0
             for _, layer := range stack {
                 if count > 0 &&
-                    abs16(layer.Height-kept) < dedupDelta {
+                    abs16(layer.Height-kept) <= dedupDelta {
                     // The within-delta duplicate: keep the higher
                     // surface (the one the character stands on).
                     if layer.Height > kept {

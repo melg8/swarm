@@ -304,3 +304,78 @@ func writeAndLoad(t *testing.T, tiles ...*navmesh.Tile) *navmesh.Mesh {
 
     return navmesh.NewMesh(dir)
 }
+
+// TestExtractRegionDedupNoise pins the duplicate layer noise rule of
+// the shipped geodata: the measured l2j regions carry the same
+// walkable surface twice with a 16/24/32 unit jitter (both layers
+// open, the lower copy often wall restricted), and a real stacked
+// floor never sits within 32 units of its ceiling. The within-delta
+// pairs must merge into the higher surface - the old 16 unit rule
+// missed the 24/32 noise entirely and the stacked duplicates became
+// z-fighting polygon layers of the viewer.
+func TestExtractRegionDedupNoise(t *testing.T) {
+    data := writeRegionFile(t, func(cx, cy int) []layerSpec {
+        switch {
+        case cx < 16 && cy < 16:
+            // The measured pair: the open floor with its restricted
+            // duplicate 24 units below.
+            return []layerSpec{
+                {h: -2032, nswe: 0x02},
+                {h: -2008, nswe: 0x0F},
+            }
+        case cx >= 16 && cx < 32 && cy < 16:
+            // A three step chain 32 units apart: one surface stored
+            // thrice.
+            return []layerSpec{
+                {h: -2104, nswe: 0x0F},
+                {h: -2072, nswe: 0x0F},
+                {h: -2040, nswe: 0x0F},
+            }
+        case cx < 16 && cy >= 16 && cy < 32:
+            // A real stacked floor: 1496 units of headroom, both
+            // layers must survive.
+            return []layerSpec{
+                {h: -3504, nswe: 0x0F},
+                {h: -2008, nswe: 0x0F},
+            }
+        default:
+            return nil
+        }
+    })
+
+    rl, err := extractRegion(data, 21, 19, DefaultOptions().DedupDelta)
+    require.NoError(t, err)
+
+    // The measured pair collapses to the higher open surface.
+    stack := stackOf(t, rl, 0, 0)
+    require.Len(t, stack, 1)
+    require.Equal(t, cellLayer{h: -2008, nswe: 0x0F}, stack[0])
+
+    // The chain collapses to its top.
+    stack = stackOf(t, rl, 16, 0)
+    require.Len(t, stack, 1)
+    require.Equal(t, cellLayer{h: -2040, nswe: 0x0F}, stack[0])
+
+    // The real floor stack survives untouched.
+    stack = stackOf(t, rl, 0, 16)
+    require.Len(t, stack, 2)
+    require.Equal(t, cellLayer{h: -3504, nswe: 0x0F}, stack[0])
+    require.Equal(t, cellLayer{h: -2008, nswe: 0x0F}, stack[1])
+
+    // The build keeps two sheets: the merged top floor and the real
+    // lower floor - no duplicate sheet in between.
+    build, err := BuildRegion(data, 21, 19, DefaultOptions())
+    require.NoError(t, err)
+    require.Equal(t, 2, build.Stats.Sheets)
+    require.Equal(t, 256, build.Stats.StackedColumns,
+        "only the real stack may hold two layers")
+}
+
+// stackOf reads the kept layer stack of one cell.
+func stackOf(t *testing.T, rl *regionLayers, cx, cy int) []cellLayer {
+    t.Helper()
+    idx := cx*regionCellsSide + cy
+    off, cnt := int(rl.cellOff[idx]), int(rl.cellCnt[idx])
+
+    return rl.layers[off : off+cnt]
+}

@@ -194,6 +194,45 @@ pieces from the research verdict:
   swim found and dry partial answers) plus the flag parse pin; the
   lint stays at the pre-existing 68 findings, the full suite green.
 
+- 2026-09-15: the viewer defect round landed (the owner report: a
+  mesh full of black triangles and elements at wrong heights -
+  detached fragments). The diagnosis ran through the scratch
+  `cmd/navanalyze` (kept as the diagnostic companion): the black
+  triangles were the steep cascade quads of the l2j slope smoothing
+  cells (a fifth of the polygons) falling to black under the single
+  hard sun, the detached fragments were the unmerged duplicate
+  layers of the geodata noise - the measured regions carry the same
+  surface twice with a 0..32 unit jitter (both layers open, the
+  lower copy often wall restricted, ~54k pairs per region of the
+  22_xx column; the elven region of the research round showed none,
+  which is why the 16 unit rule shipped), and the flat water planes
+  sat at heights the riverbed never held. The fixes: the builder
+  dedup delta lifts to 32 units (a real stacked floor never sits
+  within 32 units of its ceiling - a genuine deck keeps both
+  layers, pinned by TestExtractRegionDedupNoise), the light rig
+  rebalances to a dominant hemisphere with the sun and the counter
+  fill, the logarithmic depth buffer keeps the stitched world from
+  z fighting at every viewing distance, and the water renders as
+  the submerged terrain it really is - a depth ramp toward the dark
+  navy of the deepest riverbeds. The inspection surface the owner
+  asked for: the top readout bar names the tile square under the
+  cursor with its region local cell and world coordinates (a
+  progressive raycast sweep - one tile per frame, the nearest
+  bounding sphere first), every loaded tile draws its region grid
+  outline with the hovered one lit amber, the result panel carries
+  the from/to rows with their tile keys and world coordinates, and
+  every route waypoint wears a label with its index and coordinates
+  (toggleable, next to the polygon edge overlay). Verified live in
+  a headless browser over the 11 tile stitched world: the full pack
+  loads (11/11 tiles), the terrain reads clean at every zoom (the
+  VLM review of the overview and the route closeups confirms no
+  black triangles, no floating fragments, no seams between the
+  tiles, the water following the riverbed contours), the cursor
+  readout tracks the pointer (tile 22_16, cell 883 883, world
+  coordinates verified against the region anchors), and a 129
+  waypoint route answers in 79.6 ms with its from/to rows and
+  readable waypoint labels.
+
 ### Next
 
 The viewer round closes the tooling side of the port. The
