@@ -336,6 +336,45 @@ pieces from the research verdict:
   records, the crossing split, the flat skip) live in
   TestNavmeshGeometryEndpoint and TestEncodeNavmeshGeometryWalls.
 
+- 2026-09-16: the tessellation round landed (the owner report over
+  the view link cam=51366,46831,-2966: the grass is still not fully
+  filled and there are black triangles). One root cause behind both
+  symptoms, present since the first viewer commit: the surface quad
+  tessellation read the row-major wire corners (0 = min corner,
+  1 = +x, 2 = +y, 3 = the opposite) but drew the two triangles as
+  (0,2,1)+(0,2,3) - both anchored on the shared 0-2 edge, so the
+  right quarter of EVERY polygon (the triangle between the east
+  edge and the two diagonals) never rendered: the clear color shone
+  through as one see-through wedge per rectangle, scaling with the
+  rectangle size - the big maximal rectangles read as the large
+  black triangles, the dense small-rectangle fields read as the
+  unfilled grass with zebra-stripe gaps. The wall filler quads were
+  immune (their corners ride the wire in cyclic order, where the
+  same index pair is a correct 0-2 diagonal split), which is why
+  the earlier rounds kept chasing lighting and height-step ghosts.
+  The fix: the surface tessellation now splits along the 1-2
+  anti-diagonal - (0,2,1) covers the lower-left half, (1,2,3) the
+  upper-right one - while the walls keep their cyclic 0-2 split,
+  and TestNavmeshViewScriptContract pins both index runs against a
+  silent regression. Measured over the reported view (before ->
+  after): clear-color pixels 174 401 of 1.44 M (12.11 percent, 515
+  components, the largest a 596x165 slab) -> 440 (0.03 percent, 2
+  small components); the top-down check of the same area: 8.39 ->
+  0.03 percent; the elven village view: 0.00 percent with no
+  zebra stripes (the VLM review of all three screenshots confirms
+  the continuous surface). The leftover specks are honest voids,
+  proven twice: the cursor raycast over the largest one answers
+  "no tile" (no polygon exists there), and the new navbuild
+  coverage audit TestRealRegionWalkableCoverage proves every
+  walkable layer of every kept sheet carries a polygon (21_19:
+  4 400 066 walkable layers, 4 394 442 covered, 5 624 dropped
+  island layers, 0 holes) - the specks are the island sheets the
+  four-layer minimum drops by design (a scratch probe of the
+  largest oblique-view void found only DROPPED sheet verdicts in
+  its cells). The route search and the double click picking
+  re-verified live on the fixed geometry (a 254 unit pair answered
+  in 53 us with 2 waypoints).
+
 The follow-up candidates (NOT started): the acceptance stack switch to
 the hybrid once the live sessions prove it (which may also skip
 the engine confirmation flood on mesh partials - the ~13 s the real

@@ -231,14 +231,26 @@ hemisphere, a sun and a counter fill - the floor keeps the steep
 cascade quads of the l2j slope smoothing cells readable instead of
 black, because a steep quad tessellates into two triangles whose
 flat normals face apart and the away-facing half would fall to
-black without it) keeps every face above the darkness, and the
+black without it) keeps every face above the darkness, the quad
+tessellation splits every surface polygon along the corner 1-2
+anti-diagonal (the wire corners are row-major, so the two triangles
+are (0,2,1) and (1,2,3) - the original (0,2,1)+(0,2,3) pair
+anchored both triangles on the shared 0-2 edge and left the right
+quarter of every polygon see-through, the recurring black-triangles
+report: 12.11 percent of the reported view fell to the clear color
+before the fix, 0.03 after), and the
 merged duplicate layers of the 32 unit dedup leave no stacked
-surfaces to flicker. A double click on the mesh arms the
-green start marker, the second double click picks the destination
-and asks the server for the real corridor search - the same `Route`
-call the hunt loop's hybrid navigator issues - and the answer draws
-the funnel polyline with its waypoints plus the measured construction
-time. The timer is the server side `time.Since` around the query:
+surfaces to flicker. The voids that remain are honest: the island
+sheets under the four-layer minimum (4301 of them in 21_19, 5624
+layer instances) and the fully blocked cells render as the clear
+color - the coverage audit (navbuild coverage_test.go) proves every
+walkable layer of every kept sheet carries a polygon. A double
+click on the mesh arms the green start marker, the second double
+click picks the destination and asks the server for the real
+corridor search - the same `Route` call the hunt loop's hybrid
+navigator issues - and the answer draws the funnel polyline with its
+waypoints plus the measured construction time. The timer is the
+server side `time.Since` around the query:
 the first route over a cold region honestly includes the lazy tile
 decode (~1.45 ms per tile), exactly what a cold bot pays. The elven
 hard pair (the village deck at (45768, 49848, -3056) to the water

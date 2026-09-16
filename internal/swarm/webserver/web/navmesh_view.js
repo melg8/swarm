@@ -661,10 +661,14 @@ async function ensureTile(tile) {
 // positions float block (worldMin + cell * 16), the per corner colors
 // (the ground height ramp or the water depth ramp - both flat per
 // polygon so a warped quad reads as one surface) and the quad indices
-// (0 2 1 / 0 2 3 - both triangles face up in the viewer mapping
-// y = world height). The tile mesh carries the region grid outline
-// and the lazily built edge overlay as children, so the height scale
-// and the visibility apply to them too.
+// of the two tessellations: the surface quads are row-major on the
+// wire (corner 2 sits diagonal to 1), so they split along the 1-2
+// anti-diagonal - (0 2 1) (1 2 3), both triangles face up in the
+// viewer mapping y = world height - while the wall quads are cyclic
+// (emitter lo, emitter hi, target hi, target lo) and split along the
+// 0-2 diagonal - (0 2 1) (0 2 3). The tile mesh carries the region
+// grid outline and the lazily built edge overlay as children, so the
+// height scale and the visibility apply to them too.
 function buildTileMesh(key, buffer) {
   const view = new DataView(buffer);
   if (view.getUint32(0, true) !== GEO_MAGIC) {
@@ -742,10 +746,31 @@ function buildTileMesh(key, buffer) {
       hA0, hA1, hB0, hB1, minH, span);
   }
 
+  // The surface tessellation: the wire corners are row-major (0 is
+  // the min corner, 1 the +x one, 2 the +y one, 3 the opposite), so
+  // the two triangles split along the 1-2 anti-diagonal: (0,2,1)
+  // covers the lower-left half, (1,2,3) the upper-right one. The
+  // previous (0,2,1)+(0,2,3) pair anchored both triangles on the
+  // shared 0-2 edge and left the right quarter of every polygon
+  // unpainted - the see-through triangles of the owner reports, one
+  // missing wedge per rectangle scaling with its size.
   const indices = new Uint32Array(quadCount * 6);
-  for (let quad = 0; quad < quadCount; quad++) {
-    const base = quad * 4;
-    const at = quad * 6;
+  for (let poly = 0; poly < polyCount; poly++) {
+    const base = poly * 4;
+    const at = poly * 6;
+    indices[at] = base;
+    indices[at + 1] = base + 2;
+    indices[at + 2] = base + 1;
+    indices[at + 3] = base + 1;
+    indices[at + 4] = base + 2;
+    indices[at + 5] = base + 3;
+  }
+  // The wall quads carry their corners in cyclic order (emitter lo,
+  // emitter hi, target hi, target lo), so the 0-2 diagonal split
+  // covers the full quad.
+  for (let wall = 0; wall < wallCount; wall++) {
+    const base = (polyCount + wall) * 4;
+    const at = (polyCount + wall) * 6;
     indices[at] = base;
     indices[at + 1] = base + 2;
     indices[at + 2] = base + 1;

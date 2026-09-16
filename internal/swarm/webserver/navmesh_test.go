@@ -453,4 +453,20 @@ func TestNavmeshViewScriptContract(t *testing.T) {
             "the connection overlay contract is missing from the viewer"+
                 " script")
     }
+
+    // The quad tessellations: the surface quads read their corners
+    // row-major off the wire, so the two triangles split along the
+    // 1-2 anti-diagonal - the second triangle must be (1,2,3). The
+    // old (0,2,3) second triangle anchored both triangles on the
+    // shared 0-2 edge and left the right quarter of every polygon
+    // unpainted: the see-through black triangles of the owner
+    // reports. The cyclic wall corners keep the 0-2 diagonal split.
+    require.Contains(t, source, "indices[at + 3] = base + 1;\n"+
+        "    indices[at + 4] = base + 2;\n"+
+        "    indices[at + 5] = base + 3;",
+        "the surface tessellation must cover the full quad")
+    require.Contains(t, source, `indices[at + 3] = base;`,
+        "the wall tessellation must keep the 0-2 diagonal split")
+    require.Contains(t, source, `split along the 1-2 anti-diagonal`,
+        "the tessellation rationale comment is missing")
 }
