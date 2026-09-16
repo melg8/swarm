@@ -29,10 +29,23 @@ SPDX-License-Identifier: MIT
 // raycast sweep - one tile per frame, the nearest bounding sphere
 // first), and every route waypoint wears its coordinates as a label.
 //
+// The solid surface round closed the two standing render defects: the
+// height step walls (the NMV2 wall block) fill the vertical gaps
+// between the bilinear surfaces of adjacent rectangles - the polygon
+// corners come from each rectangle's own inside cells, so every
+// geodata height step used to read as a see-through black wedge - and
+// the edge connections overlay draws the real link portals of the
+// mesh as small open spans, green for the field to field connections,
+// blue for the water to water ones and teal for the shore pairs: the
+// honest answer of where a route may cross each shared edge.
+//
 // The camera is a flight rig: wasd flies along the view vector (the
 // airplane feel - W follows the pitch), q/e descend and climb, the
 // pointer drag yaws and pitches, the wheel retunes the cruise speed
-// and shift boosts. The feedback channel: the copy button freezes
+// and shift boosts. The framing and the restore write the euler
+// angles directly (order YXZ, roll always zero) - a lookAt under the
+// default XYZ order once left a z angle behind that read as a rolled
+// horizon. The feedback channel: the copy button freezes
 // the whole view state - the camera pose, the route pair, the tile
 // selection, the filter and the height scale - into one URL the
 // owner pastes back; the viewer boots from those query parameters
@@ -44,10 +57,13 @@ SPDX-License-Identifier: MIT
 
 import * as THREE from "/vendor/three.module.min.js";
 
-// The binary geometry contract of the server (navmesh.go): the NMV1
-// header, the contiguous int16 corner block and the area tail.
-const GEO_MAGIC = 0x31564d4e;
-const GEO_HEADER = 24;
+// The binary geometry contract of the server (navmesh_geometry.go):
+// the NMV2 header, the contiguous int16 corner block, the area tail,
+// the link portal records (the edge connections overlay) and the
+// height step wall records (the vertical filler between the bilinear
+// surfaces of adjacent rectangles).
+const GEO_MAGIC = 0x32564d4e;
+const GEO_HEADER = 32;
 const CELL_SIZE = 16;
 
 // The C1 water surface height (navbuild.waterLevel): the water class
@@ -78,6 +94,26 @@ const WAYPOINT_COLOR = 0xffffff;
 // rectangle, the tile under the cursor lights up.
 const TILE_OUTLINE_COLOR = 0x586063;
 const TILE_HOVER_COLOR = 0xffb020;
+
+// The edge connection classes of the link portal records: green for
+// the field to field connections, blue for the water to water ones,
+// teal for the shore pairs and gray for the links into tiles that did
+// not resolve.
+const CONNECTION_CLASSES = [
+  [0.21, 0.84, 0.4],
+  [0.3, 0.62, 1.0],
+  [0.16, 0.8, 0.69],
+  [0.55, 0.58, 0.62],
+];
+// The connection portals ride a small lift off the surface so the
+// depth test never eats them at grazing angles.
+const CONNECTION_LIFT = 10;
+
+// The wall filler darkens the surface ramp so the vertical cracks it
+// closes read as shaded cliff faces instead of navigable surface. The
+// shade stays close to the surface: the ambient floor of the light rig
+// already keeps the steep faces out of the black.
+const WALL_SHADE = 0.88;
 
 // The Viewer bundles the three.js state behind one object so the init
 // stays a single closure.
@@ -223,12 +259,18 @@ function buildSurface(navmesh) {
         id="nmv-waypoint-coords" checked>
         <span>waypoint coordinates</span></label>
       <label class="nmv-row"><input type="checkbox" id="nmv-edges">
-        <span>polygon edges</span></label>
+        <span>edge connections</span></label>
       <div class="nmv-section">legend</div>
       <div class="nmv-row"><span class="nmv-swatch nmv-ground"></span>
         <span>ground (height ramp)</span></div>
       <div class="nmv-row"><span class="nmv-swatch nmv-water"></span>
         <span>water (depth ramp)</span></div>
+      <div class="nmv-row"><span class="nmv-swatch nmv-conn-ground"></span>
+        <span>field connections</span></div>
+      <div class="nmv-row"><span class="nmv-swatch nmv-conn-water"></span>
+        <span>water connections</span></div>
+      <div class="nmv-row"><span class="nmv-swatch nmv-conn-shore"></span>
+        <span>shore connections</span></div>
       <div class="nmv-section">share this view</div>
       <input type="text" id="nmv-link" class="nmv-link" readonly
         title="the camera, the route pair and the tile selection as one link">
@@ -274,16 +316,20 @@ function buildSurface(navmesh) {
   viewer.scene = new THREE.Scene();
   viewer.camera = new THREE.PerspectiveCamera(
     60, 1, 16, 400000);
-  // The balanced three light rig: the hemisphere alone keeps every
-  // face readable (the steep cascade quads of the l2j slope smoothing
-  // cells would fall to black under a single hard sun), the sun and
-  // the counter fill keep the relief.
-  const hemi = new THREE.HemisphereLight(0xe8eef4, 0x8a8064, 0.95);
+  // The balanced four light rig: the ambient floor keeps every face
+  // readable (a steep quad tessellates into two triangles whose flat
+  // normals face apart - without the floor the away-facing half falls
+  // to black and reads as a hole, the "black triangles" of the solid
+  // surface round), the hemisphere models the sky, the sun and the
+  // counter fill keep the relief.
+  const ambient = new THREE.AmbientLight(0xffffff, 0.42);
+  viewer.scene.add(ambient);
+  const hemi = new THREE.HemisphereLight(0xe8eef4, 0x8a8064, 0.6);
   viewer.scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffffff, 0.55);
+  const sun = new THREE.DirectionalLight(0xffffff, 0.45);
   sun.position.set(0.45, 1, 0.25);
   viewer.scene.add(sun);
-  const fill = new THREE.DirectionalLight(0xdfe7f0, 0.3);
+  const fill = new THREE.DirectionalLight(0xdfe7f0, 0.25);
   fill.position.set(-0.5, 0.4, -0.35);
   viewer.scene.add(fill);
 
@@ -311,7 +357,7 @@ function buildSurface(navmesh) {
       }
     });
   document.getElementById("nmv-edges").addEventListener("change", (e) => {
-    setEdgesVisible(e.target.checked);
+    setConnectionsVisible(e.target.checked);
   });
 
   const resize = () => {
@@ -346,6 +392,9 @@ function renderLoop() {
 // retunes the cruise speed. No damping - the debug viewer prefers
 // the direct response.
 function createFlyRig(camera, dom) {
+  // The YXZ order is fixed once here, before any framing touch:
+  // the euler values then mean yaw/pitch/roll from the start.
+  camera.rotation.order = "YXZ";
   const rig = {
     camera,
     yaw: Math.PI / 4,
@@ -355,9 +404,11 @@ function createFlyRig(camera, dom) {
     clock: new THREE.Clock(),
     update() {
       const dt = Math.min(this.clock.getDelta(), 0.1);
-      camera.rotation.order = "YXZ";
-      camera.rotation.y = this.yaw;
-      camera.rotation.x = this.pitch;
+      // The full euler write (with the zero roll) keeps the camera
+      // honest: a stale rotation.z from a lookAt elsewhere would roll
+      // the horizon (the boot framing bug of the last round - the
+      // euler order flip reinterpreted the lookAt angles as roll).
+      camera.rotation.set(this.pitch, this.yaw, 0);
       // The movement basis: the full pitched forward vector and its
       // horizontal right wing.
       const forward = new THREE.Vector3(
@@ -487,11 +538,17 @@ function frameInitialTiles(tiles) {
     target.x + size * 0.75,
     Math.max(2500, size * 0.7),
     target.z + size * 0.75);
-  viewer.camera.lookAt(target);
-  const euler = new THREE.Euler().setFromQuaternion(
-    viewer.camera.quaternion, "YXZ");
-  viewer.rig.yaw = euler.y;
-  viewer.rig.pitch = euler.x;
+  // The framing pose is computed, never taken from lookAt: a lookAt
+  // under the default XYZ euler order leaves a z angle behind that
+  // the YXZ rig would read as roll (the tilted horizon of the last
+  // round). The analytic route writes yaw and pitch directly.
+  const dirX = target.x - viewer.camera.position.x;
+  const dirZ = target.z - viewer.camera.position.z;
+  const flat = Math.hypot(dirX, dirZ);
+  viewer.rig.yaw = Math.atan2(-dirX, -dirZ);
+  viewer.rig.pitch = Math.atan2(
+    target.y - viewer.camera.position.y, flat);
+  viewer.camera.rotation.set(viewer.rig.pitch, viewer.rig.yaw, 0);
   viewer.rig.speed = Math.max(400, size * 0.18);
   showFlightSpeed(viewer.rig.speed);
   viewer.markerRadius = Math.max(10, Math.min(60, size * 0.0022));
@@ -516,7 +573,7 @@ function addTileRow(tile, checked) {
     info: tile,
     loading: false,
     visible: checked,
-    edges: null,
+    connections: null,
   });
 }
 
@@ -618,12 +675,23 @@ function buildTileMesh(key, buffer) {
   const minH = view.getInt16(16, true);
   const maxH = view.getInt16(18, true);
   const polyCount = view.getUint32(20, true);
+  const linkCount = view.getUint32(24, true);
+  const wallCount = view.getUint32(28, true);
   const corners = new Int16Array(buffer, GEO_HEADER, polyCount * 12);
   const areas = new Uint8Array(
     buffer, GEO_HEADER + polyCount * 24, polyCount);
+  // The link portal block follows the padded area tail; the wall
+  // block closes the payload. Every record is sixteen bytes and the
+  // blocks stay four byte aligned, so the u16 views read them whole.
+  const linksBase = align4(GEO_HEADER + polyCount * 25);
+  const wallsBase = linksBase + linkCount * 16;
+  const links = new Uint16Array(buffer, linksBase, linkCount * 8);
+  const walls = new Uint16Array(buffer, wallsBase, wallCount * 8);
+  const wallMeta = new Uint8Array(buffer, wallsBase, wallCount * 16);
 
-  const positions = new Float32Array(polyCount * 12);
-  const colors = new Uint8Array(polyCount * 12);
+  const quadCount = polyCount + wallCount;
+  const positions = new Float32Array(quadCount * 12);
+  const colors = new Uint8Array(quadCount * 12);
   const span = Math.max(1, maxH - minH);
   for (let poly = 0; poly < polyCount; poly++) {
     const water = areas[poly] === 1;
@@ -643,29 +711,41 @@ function buildTileMesh(key, buffer) {
     // One flat color per polygon reads better than per corner
     // gradients over a warped quad: the mean corner height drives the
     // ramp (the ground height ramp or the water depth ramp).
-    const mean = sumH / 4;
-    const t = water
-      ? Math.min(1, Math.max(0, (WATER_LEVEL - mean) / WATER_DEEP_RANGE))
-      : Math.min(1, Math.max(0, (mean - minH) / span));
-    const low = water ? WATER_SHALLOW : GROUND_LOW;
-    const high = water ? WATER_DEEP : GROUND_HIGH;
-    for (let channel = 0; channel < 3; channel++) {
-      const base = [low.r, low.g, low.b][channel];
-      const peak = [high.r, high.g, high.b][channel];
-      colors[poly * 12 + channel] = base + (peak - base) * t;
-    }
-    for (let corner = 1; corner < 4; corner++) {
-      const dst = (poly * 4 + corner) * 3;
-      colors[dst] = colors[poly * 12];
-      colors[dst + 1] = colors[poly * 12 + 1];
-      colors[dst + 2] = colors[poly * 12 + 2];
-    }
+    writeQuadColor(colors, poly,
+      surfaceRamp(water, sumH / 4, minH, span));
   }
 
-  const indices = new Uint32Array(polyCount * 6);
-  for (let poly = 0; poly < polyCount; poly++) {
-    const base = poly * 4;
-    const at = poly * 6;
+  // The height step walls: vertical filler quads along the shared
+  // edges of adjacent rectangles. The record carries the fixed edge
+  // coordinate and the span bounds as tile local world offsets, plus
+  // the two surface height profiles at the span ends.
+  for (let wall = 0; wall < wallCount; wall++) {
+    const src = wall * 8;
+    const meta = wall * 16;
+    const horizontal = wallMeta[meta + 15] === 1;
+    const fixed = (horizontal ? worldMinY : worldMinX) + walls[src];
+    const lo = (horizontal ? worldMinX : worldMinY) + walls[src + 1];
+    const hi = (horizontal ? worldMinX : worldMinY) + walls[src + 2];
+    const hA0 = signedShort(walls[src + 3]);
+    const hA1 = signedShort(walls[src + 4]);
+    const hB0 = signedShort(walls[src + 5]);
+    const hB1 = signedShort(walls[src + 6]);
+    const water = wallMeta[meta + 14] === 1;
+    const base = (polyCount + wall) * 12;
+    // Corner order: the emitter profile at lo and hi, then the
+    // target profile back through hi and lo - one closed quad.
+    writeWallCorner(positions, base, horizontal, fixed, lo, hA0);
+    writeWallCorner(positions, base + 3, horizontal, fixed, hi, hA1);
+    writeWallCorner(positions, base + 6, horizontal, fixed, hi, hB1);
+    writeWallCorner(positions, base + 9, horizontal, fixed, lo, hB0);
+    writeWallColor(colors, polyCount + wall, water,
+      hA0, hA1, hB0, hB1, minH, span);
+  }
+
+  const indices = new Uint32Array(quadCount * 6);
+  for (let quad = 0; quad < quadCount; quad++) {
+    const base = quad * 4;
+    const at = quad * 6;
     indices[at] = base;
     indices[at + 1] = base + 2;
     indices[at + 2] = base + 1;
@@ -686,19 +766,95 @@ function buildTileMesh(key, buffer) {
     vertexColors: true,
     flatShading: true,
     side: THREE.DoubleSide,
-    // The surface steps back a hair so the coplanar edge overlay of
-    // the polygon toggle wins the depth test.
+    // The surface steps back a hair so the lifted connection overlay
+    // of the edges toggle wins the depth test.
     polygonOffset: true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1,
   });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.userData.polys = polyCount;
+  mesh.userData.walls = wallCount;
   mesh.userData.key = key;
+  mesh.userData.links = {
+    view: links,
+    meta: new Uint8Array(buffer, linksBase, linkCount * 16),
+    count: linkCount,
+    worldMinX,
+    worldMinY,
+  };
   mesh.scale.y = viewer.heightScale;
   mesh.add(buildTileOutline(worldMinX, worldMinY, maxH));
 
   return mesh;
+}
+
+// align4 rounds a byte offset up to the four byte block boundary.
+function align4(offset) {
+  return (offset + 3) & ~3;
+}
+
+// signedShort reads one two's complement height out of the raw u16
+// view of a record block.
+function signedShort(value) {
+  return value > 32767 ? value - 65536 : value;
+}
+
+// surfaceRamp colors one surface height: the ground height ramp or
+// the water depth ramp of the legend.
+function surfaceRamp(water, height, minH, span) {
+  const t = water
+    ? Math.min(1, Math.max(0, (WATER_LEVEL - height) / WATER_DEEP_RANGE))
+    : Math.min(1, Math.max(0, (height - minH) / span));
+  const low = water ? WATER_SHALLOW : GROUND_LOW;
+  const high = water ? WATER_DEEP : GROUND_HIGH;
+
+  return [
+    low.r + (high.r - low.r) * t,
+    low.g + (high.g - low.g) * t,
+    low.b + (high.b - low.b) * t,
+  ];
+}
+
+// writeQuadColor paints all four corners of one surface quad with
+// one flat color (0..255 channels).
+function writeQuadColor(colors, quad, color) {
+  for (let corner = 0; corner < 4; corner++) {
+    const dst = (quad * 4 + corner) * 3;
+    colors[dst] = color[0];
+    colors[dst + 1] = color[1];
+    colors[dst + 2] = color[2];
+  }
+}
+
+// writeWallCorner places one wall corner: the fixed edge coordinate,
+// the position along the span and the height of the owning profile.
+function writeWallCorner(positions, dst, horizontal, fixed, along, height) {
+  if (horizontal) {
+    positions[dst] = along;
+    positions[dst + 1] = height;
+    positions[dst + 2] = fixed;
+  } else {
+    positions[dst] = fixed;
+    positions[dst + 1] = height;
+    positions[dst + 2] = along;
+  }
+}
+
+// writeWallColor paints one wall quad with the surface ramp of its
+// area at the profile heights, darkened so the filler reads as a
+// shaded cliff face instead of navigable surface.
+function writeWallColor(colors, quad, water, hA0, hA1, hB0, hB1,
+  minH, span,
+) {
+  const heights = [hA0, hA1, hB1, hB0];
+  for (let corner = 0; corner < 4; corner++) {
+    const color = surfaceRamp(water, heights[corner], minH, span);
+    const dst = (quad * 4 + corner) * 3;
+    colors[dst] = color[0] * WALL_SHADE;
+    colors[dst + 1] = color[1] * WALL_SHADE;
+    colors[dst + 2] = color[2] * WALL_SHADE;
+  }
 }
 
 // buildTileOutline draws the region grid rectangle of one tile above
@@ -727,54 +883,73 @@ function buildTileOutline(worldMinX, worldMinY, maxH) {
   return outline;
 }
 
-// buildTileEdges builds the quad perimeter overlay of one tile (no
-// tessellation diagonals): the rectangle structure of the mesh as the
-// eye sees it.
-function buildTileEdges(mesh) {
-  const positions = mesh.geometry.getAttribute("position");
-  const count = mesh.userData.polys;
-  const edges = new Float32Array(count * 8 * 3);
-  for (let poly = 0; poly < count; poly++) {
-    const base = poly * 12;
-    const dst = poly * 24;
-    // The quad perimeter 0-1-3-2-0 of the corner order
-    // (x0,y0) (x1,y0) (x0,y1) (x1,y1).
-    for (let e = 0; e < 4; e++) {
-      const from = [0, 1, 3, 2][e];
-      const to = [1, 3, 2, 0][e];
-      for (let c = 0; c < 3; c++) {
-        edges[dst + e * 6 + c] = positions.array[base + from * 3 + c];
-        edges[dst + e * 6 + 3 + c] = positions.array[base + to * 3 + c];
-      }
-    }
+// buildTileConnections builds the edge connections overlay of one
+// tile: every link portal of the mesh as its open world span, one
+// line segment per connection, colored by the area pair of the
+// polygons it joins - green for the field to field connections, blue
+// for the water to water ones, teal for the shore pairs. The spans
+// are the honest answer of "where may a route cross this edge": the
+// NSWE walls of the geodata clip them to the open cell runs, so a
+// long shared edge between two rectangles shows its gates, not its
+// full length.
+function buildTileConnections(mesh) {
+  const links = mesh.userData.links;
+  if (!links || links.count === 0) {
+    return null;
+  }
+  const positions = new Float32Array(links.count * 6);
+  const colors = new Float32Array(links.count * 6);
+  for (let i = 0; i < links.count; i++) {
+    const src = i * 8;
+    const record = i * 16;
+    positions[i * 6] = links.worldMinX + links.view[src];
+    positions[i * 6 + 1] =
+      signedShort(links.view[src + 2]) + CONNECTION_LIFT;
+    positions[i * 6 + 2] = links.worldMinY + links.view[src + 1];
+    positions[i * 6 + 3] = links.worldMinX + links.view[src + 3];
+    positions[i * 6 + 4] =
+      signedShort(links.view[src + 5]) + CONNECTION_LIFT;
+    positions[i * 6 + 5] = links.worldMinY + links.view[src + 4];
+    const color = CONNECTION_CLASSES[links.meta[record + 12]] ||
+      CONNECTION_CLASSES[3];
+    colors[i * 6] = color[0];
+    colors[i * 6 + 1] = color[1];
+    colors[i * 6 + 2] = color[2];
+    colors[i * 6 + 3] = color[0];
+    colors[i * 6 + 4] = color[1];
+    colors[i * 6 + 5] = color[2];
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position",
-    new THREE.BufferAttribute(edges, 3));
+    new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("color",
+    new THREE.BufferAttribute(colors, 3));
   const overlay = new THREE.LineSegments(geometry,
     new THREE.LineBasicMaterial({
-      color: 0xffffff,
+      vertexColors: true,
       transparent: true,
-      opacity: 0.16,
+      opacity: 0.95,
     }));
 
   return overlay;
 }
 
-// setEdgesVisible toggles the polygon edge overlay of every loaded
-// tile, building it lazily on the first enable.
-function setEdgesVisible(visible) {
+// setConnectionsVisible toggles the edge connections overlay of every
+// loaded tile, building it lazily on the first enable.
+function setConnectionsVisible(visible) {
   viewer.showEdges = visible;
   for (const entry of viewer.tiles.values()) {
     if (!entry.mesh) {
       continue;
     }
-    if (visible && !entry.edges) {
-      entry.edges = buildTileEdges(entry.mesh);
-      entry.mesh.add(entry.edges);
+    if (visible && !entry.connections) {
+      entry.connections = buildTileConnections(entry.mesh);
+      if (entry.connections) {
+        entry.mesh.add(entry.connections);
+      }
     }
-    if (entry.edges) {
-      entry.edges.visible = visible;
+    if (entry.connections) {
+      entry.connections.visible = visible;
     }
   }
 }

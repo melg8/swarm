@@ -3332,6 +3332,9 @@ body.mode-navmesh .app { display: none; }
 
 .nmv-ground { background: linear-gradient(90deg, #2f543a, #ac9e80); }
 .nmv-water { background: linear-gradient(90deg, #5698dc, #10203c); }
+.nmv-conn-ground { background: #35d666; }
+.nmv-conn-water { background: #4d9eff; }
+.nmv-conn-shore { background: #29cdb0; }
 
 .nmv-clear {
   width: 100%;

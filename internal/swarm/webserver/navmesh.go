@@ -29,32 +29,11 @@ import (
 // -show-navmesh=21_19 opens the named tiles only - the route queries
 // always run over the full directory mesh, so a path may leave the
 // visible tiles (the polyline draws wherever it walks).
-
-// navmeshGeoMagic is the magic word of the binary geometry payload
-// ('NMV1' little endian). The fixed header of navmeshGeoHeaderSize
-// bytes follows: magic u32, col i16, row i16, worldMinX i32,
-// worldMinY i32, minH i16, maxH i16, polyCount u32; then the
-// contiguous corner block and the area tail block described on
-// navmeshGeoRecordSize (0 ground, 1 water).
-const navmeshGeoMagic = 0x31564D4E
-
-// navmeshGeoHeaderSize is the fixed prefix of the geometry payload.
-const navmeshGeoHeaderSize = 24
-
-// navmeshGeoCornerStride is the wire size of one polygon corner
-// triple (cellX, cellY, height as int16).
-const navmeshGeoCornerStride = 6
-
-// navmeshGeoRecordSize is the wire size of one polygon: four corner
-// triples plus the area byte. The layout keeps the corner block
-// contiguous (every polygon contributes twelve int16 values in a
-// row, the corner order X0Y0 X1Y0 X0Y1 X1Y1 - the world position of
-// a corner is worldMin + cell*16) with the area bytes as one tail
-// block, so the viewer reads the corners as a single Int16Array
-// view. The triangles themselves never ride the wire: every polygon
-// is its own quad of four consecutive corners, the viewer
-// tessellates (0, 2, 1) (0, 2, 3).
-const navmeshGeoRecordSize = navmeshGeoCornerStride*4 + 1
+//
+// The binary geometry contract of the tile endpoint lives in
+// navmesh_geometry.go: the NMV2 payload of the surface quads, the
+// link portals of the edge connections overlay and the height step
+// walls that close the cracks between adjacent bilinear surfaces.
 
 // navmeshPathBodyLimit caps the JSON request of a route query.
 const navmeshPathBodyLimit = 4096
@@ -371,7 +350,7 @@ func (s *Server) navmeshGeometry(key navmesh.RegionKey,
         return nil, "", fmt.Errorf("load navmesh tile %d_%d: %w", key.Col,
             key.Row, err)
     }
-    payload, err := encodeNavmeshGeometry(tile)
+    payload, err := encodeNavmeshGeometry(s.navmeshMesh, tile)
     if err != nil {
         return nil, "", err
     }
@@ -380,72 +359,15 @@ func (s *Server) navmeshGeometry(key navmesh.RegionKey,
     return payload, navmeshGeoETag(key, payload), nil
 }
 
-// navmeshGeoETag derives the immutable geometry tag of a tile.
+// navmeshGeoETag derives the immutable geometry tag of a tile: the
+// region key with the three block counts of the NMV2 payload.
 func navmeshGeoETag(key navmesh.RegionKey, payload []byte) string {
-    return fmt.Sprintf(`"nmv1-%d_%d-%d"`, key.Col, key.Row,
-        binary.LittleEndian.Uint32(payload[20:24]))
+    return fmt.Sprintf(`"nmv2-%d_%d-%d-%d-%d"`, key.Col, key.Row,
+        binary.LittleEndian.Uint32(payload[20:24]),
+        binary.LittleEndian.Uint32(payload[24:28]),
+        binary.LittleEndian.Uint32(payload[28:32]))
 }
 
-// encodeNavmeshGeometry renders one tile into the binary NMV1 payload
-// the viewer tessellates: the quantized corner quads of every
-// rectangle polygon plus the area bytes.
-func encodeNavmeshGeometry(tile *navmesh.Tile) ([]byte, error) {
-    if len(tile.Polys) == 0 {
-        return nil, fmt.Errorf("tile %d_%d holds no polygons", tile.Col,
-            tile.Row)
-    }
-    if int64(len(tile.Polys))*navmeshGeoRecordSize > 1<<31 {
-        return nil, fmt.Errorf("tile %d_%d too large: %d polys", tile.Col,
-            tile.Row, len(tile.Polys))
-    }
-
-    minX := tile.WorldMinX()
-    minY := tile.WorldMinY()
-    minH, maxH := int16(32767), int16(-32768)
-    for i := range tile.Polys {
-        poly := &tile.Polys[i]
-        for _, h := range []int16{poly.H00, poly.H10, poly.H01, poly.H11} {
-            if h < minH {
-                minH = h
-            }
-            if h > maxH {
-                maxH = h
-            }
-        }
-    }
-
-    size := navmeshGeoHeaderSize + len(tile.Polys)*navmeshGeoRecordSize
-    payload := make([]byte, size)
-    binary.LittleEndian.PutUint32(payload[0:], navmeshGeoMagic)
-    binary.LittleEndian.PutUint16(payload[4:], uint16(tile.Col))
-    binary.LittleEndian.PutUint16(payload[6:], uint16(tile.Row))
-    binary.LittleEndian.PutUint32(payload[8:], uint32(int32(minX)))
-    binary.LittleEndian.PutUint32(payload[12:], uint32(int32(minY)))
-    binary.LittleEndian.PutUint16(payload[16:], uint16(minH))
-    binary.LittleEndian.PutUint16(payload[18:], uint16(maxH))
-    binary.LittleEndian.PutUint32(payload[20:], uint32(len(tile.Polys)))
-
-    offset := navmeshGeoHeaderSize
-    for i := range tile.Polys {
-        poly := &tile.Polys[i]
-        writeGeoCorner(payload, offset, poly.X0, poly.Y0, int32(poly.H00))
-        writeGeoCorner(payload, offset+6, poly.X1, poly.Y0, int32(poly.H10))
-        writeGeoCorner(payload, offset+12, poly.X0, poly.Y1, int32(poly.H01))
-        writeGeoCorner(payload, offset+18, poly.X1, poly.Y1, int32(poly.H11))
-        offset += navmeshGeoCornerStride * 4
-    }
-    areas := navmeshGeoHeaderSize + len(tile.Polys)*navmeshGeoCornerStride*4
-    for i := range tile.Polys {
-        payload[areas+i] = tile.Polys[i].Area
-    }
-
-    return payload, nil
-}
-
-// writeGeoCorner stores one quantized polygon corner (the cell
-// coordinates and the exact geodata height).
-func writeGeoCorner(payload []byte, offset int, cellX, cellY, height int32) {
-    binary.LittleEndian.PutUint16(payload[offset:], uint16(cellX))
-    binary.LittleEndian.PutUint16(payload[offset+2:], uint16(cellY))
-    binary.LittleEndian.PutUint16(payload[offset+4:], uint16(height))
-}
+// encodeNavmeshGeometry, the NMV2 payload encoder of the tile
+// endpoint, lives in navmesh_geometry.go together with the link
+// portal and height step wall emission.

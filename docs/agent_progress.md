@@ -292,6 +292,50 @@ pieces from the research verdict:
   `TestNavmeshViewScriptContract` pins the boot contract (the rig
   controls, the parameter names, the copy wiring) against drift.
 
+- 2026-09-16: the solid surface round landed (the owner report over
+  two pasted view links: the view is tilted sideways, the render
+  still has black triangles, and the request to show the small edge
+  connections between the polygons colored green for fields and blue
+  for water). All three answers, each verified live in the headless
+  browser over the real 21_19: (1) the tilt was a real roll the boot
+  framing leaked - `lookAt` under the default XYZ euler order left a
+  z angle behind, the YXZ rig reinterpreted it and never zeroed it
+  (a measured rotation.z of 0.503, a 28.8 degree horizon roll); the
+  framing now computes the yaw and the pitch analytically and the
+  rig writes the full euler every frame with the roll pinned at
+  zero (rotation.z measures exactly 0). (2) the black triangles had
+  two roots. The big one: adjacent rectangles sample their own
+  inside cells for the shared edge heights, so 536 724 of the
+  604 191 adjacency pairs of 21_19 disagree about the edge height -
+  every geodata step rendered as a see-through black wedge (the
+  pixel-exact clear color behind the crack). The NMV2 geometry
+  payload now carries the height step walls: the vertical filler
+  quads between the two bilinear surfaces, emitted through the
+  MaxX/MaxY sides only (every shared edge walled exactly once), the
+  crossing split keeps the quads simple when the profiles meet
+  inside the span, and the region borders resolve their targets in
+  the east and north neighbor tiles through the mesh. The smaller
+  root: a steep quad tessellates into two triangles whose flat
+  normals face apart and the away-facing half fell to black under
+  the old light rig - the rig now carries an ambient floor
+  (ambient 0.42, hemisphere 0.6, sun 0.45, fill 0.25) so no face
+  drops into the darkness; the dark-face pixels of the two reported
+  views measure 0.4 percent of the screen and the wedges are gone
+  (what remains black is the honest void of the unwalkable cells -
+  pixel-exact clear color with no geometry). (3) the edge
+  connections overlay replaces the white polygon perimeter overlay:
+  every real link portal of the tile rides the surface as its open
+  world span (the NSWE gates, not the full shared edge), colored
+  green for the field-field pairs, blue for the water-water ones,
+  teal for the shore pairs and gray for the unresolved external
+  targets - the legend carries the four swatches and
+  `TestNavmeshViewScriptContract` pins the decode, the classes and
+  the toggle. The payload: 244 837 polygons + 552 168 walls +
+  275 830 links = 18.5 MB for 21_19, the layout check and the
+  endpoint pin (header counts, the portal records, the wall
+  records, the crossing split, the flat skip) live in
+  TestNavmeshGeometryEndpoint and TestEncodeNavmeshGeometryWalls.
+
 The follow-up candidates (NOT started): the acceptance stack switch to
 the hybrid once the live sessions prove it (which may also skip
 the engine confirmation flood on mesh partials - the ~13 s the real

@@ -223,14 +223,17 @@ The viewer renders the rectangle polygons as an exaggerated terrain
 water class is everything below the C1 water level, so the blue
 deepens with the riverbed instead of faking a flat surface at a
 height the ground never held; the height scale selector lifts the
-subtle geodata relief to 2x/4x). The render carries three honesty
-rules the defect round taught it: the logarithmic depth buffer keeps
-the 32768 unit tiles from z fighting at the viewing distances of the
-stitched world, the balanced light rig (a dominant hemisphere plus a
-sun and a counter fill) keeps the steep cascade quads of the l2j
-slope smoothing cells - a fifth of the polygons - readable instead of
-black, and the merged duplicate layers of the 32 unit dedup leave no
-stacked surfaces to flicker. A double click on the mesh arms the
+subtle geodata relief to 2x/4x). The render carries the honesty
+rules the rounds taught it: the logarithmic depth buffer keeps the
+32768 unit tiles from z fighting at the viewing distances of the
+stitched world, the balanced light rig (an ambient floor plus a
+hemisphere, a sun and a counter fill - the floor keeps the steep
+cascade quads of the l2j slope smoothing cells readable instead of
+black, because a steep quad tessellates into two triangles whose
+flat normals face apart and the away-facing half would fall to
+black without it) keeps every face above the darkness, and the
+merged duplicate layers of the 32 unit dedup leave no stacked
+surfaces to flicker. A double click on the mesh arms the
 green start marker, the second double click picks the destination
 and asks the server for the real corridor search - the same `Route`
 call the hunt loop's hybrid navigator issues - and the answer draws
@@ -252,8 +255,15 @@ per frame, the nearest bounding sphere first - so the answer tracks
 the pointer without ever blocking the flight). Where does the route
 run: the result panel carries the from/to rows with their tile keys
 and world coordinates, and every waypoint wears a label with its
-index and coordinates (the toggle lives in the display section next
-to the polygon edge overlay).
+index and coordinates. Where may a route cross between polygons:
+the `edge connections` toggle draws the real link portals of the
+mesh - the open spans the NSWE walls leave - as small colored
+segments riding the surface, green for the field to field
+connections, blue for the water to water ones, teal for the shore
+pairs and gray for the links into tiles that did not resolve (the
+legend carries the four swatches). A long shared edge between two
+rectangles shows its gates, not its full length: the portal span
+is the honest answer the funnel respects.
 
 The camera is a flight rig (the owner request replacing the orbit):
 WASD flies along the full view vector - W follows the pitch like an
@@ -261,7 +271,11 @@ airplane - Q and E descend and climb, the pointer drag yaws and
 pitches, Shift boosts 4x and the wheel retunes the cruise speed (the
 panel carries the speed readout; the keys sit on the window so the
 canvas focus never matters, and the form fields keep their own
-typing).
+typing). The framing and the restore write the euler angles
+directly under the YXZ order with the roll pinned at zero: the
+original `lookAt` framing left a z angle behind under the default
+XYZ order and the first frames read it as a rolled horizon - the
+owner's tilted-view report of the solid surface round.
 
 The feedback channel closes the loop between the owner session and
 the agent session (the owner request: reproduce the exact view
@@ -292,17 +306,31 @@ The endpoints behind the page (the mode of `GET /api/config` is
 
 - `GET /api/navmesh/tiles` - the tile file listing with the derived
   world footprints, no tile decoded;
-- `GET /api/navmesh/geometry/{col}_{row}` - the binary NMV1 payload
-  of one tile: a 24 byte header (magic, region key, world anchors,
-  the height range, the poly count), then a contiguous int16 corner
-  block (four corners per polygon, the corner order X0Y0 X1Y0 X0Y1
-  X1Y1, each a cellX/cellY/height triple - the world position is
-  worldMin + cell*16), then the area bytes (0 ground, 1 water). The
-  triangles never ride the wire: every polygon is its own quad of
-  four consecutive corners and the viewer tessellates. The payload
-  is immutable per tile, so an ETag revalidates for free and the
-  server caches the encoded bytes (~25 bytes per polygon, about
-  2.3 MB for the dense elven regions);
+- `GET /api/navmesh/geometry/{col}_{row}` - the binary NMV2 payload
+  of one tile (the encoder lives in navmesh_geometry.go): a 32 byte
+  header (magic, region key, world anchors, the height range, the
+  poly, link and wall counts), then a contiguous int16 corner block
+  (four corners per polygon, the corner order X0Y0 X1Y0 X0Y1 X1Y1,
+  each a cellX/cellY/height triple - the world position is
+  worldMin + cell*16), the area bytes (0 ground, 1 water), the link
+  portal records and the height step wall records. The link portals
+  carry the world span of every connection with the area class of
+  the pair (the edge connections overlay); the walls carry the
+  vertical filler quads between the bilinear surfaces of adjacent
+  rectangles - the polygon corners come from each rectangle's own
+  inside cells, so neighbors disagree about the height of a shared
+  edge and the disagreement would render as see-through black
+  wedges (the owner's black-triangles report: 536 724 of the 604 191
+  adjacency pairs of 21_19 step). The walls emit through the
+  MaxX/MaxY sides only, so every shared edge is walled once, and the
+  region borders resolve their targets in the east and north
+  neighbor tiles through the mesh. The triangles never ride the
+  wire: every polygon is its own quad of four consecutive corners
+  and the viewer tessellates. The payload is immutable per tile, so
+  an ETag revalidates for free and the server caches the encoded
+  bytes (about 75 bytes per polygon all blocks together, roughly
+  18.5 MB for the dense 21_19 - 244 837 polygons, 552 168 walls,
+  275 830 links);
 - `POST /api/navmesh/path` - `{start, end, filter}` positions and
   the reply `{found, partial, waypoints, durationMs, explored,
   corridor, filter}` of the measured `Route` call.
