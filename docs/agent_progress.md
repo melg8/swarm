@@ -375,6 +375,54 @@ pieces from the research verdict:
   re-verified live on the fixed geometry (a 254 unit pair answered
   in 53 us with 2 waypoints).
 
+- 2026-09-17: the floating worlds round landed (the owner report:
+  the bridge and the elven village must hang in the air above the
+  water but connect into it instead, and the mother tree must not
+  fuse its branches into the ground - "eto kasaetsya ne tolko etogo
+  mesta", it is map wide). Two root causes, both fixed:
+
+  1. The height step walls had no height cap: the NMV2 encoder
+     walled EVERY XY adjacent polygon pair, so a floating deck over
+     the lake got a 700 unit green curtain down to the water and
+     every branch a grey stalagmite to the ground (21_19 carried
+     ~22k fabricated walls over 80 units). The honest crack scale
+     of the build is the 40 climb + 24 bilinear tolerance; the
+     filler now refuses anything taller than 80 units - a taller
+     step is the open air between two separate worlds and the void
+     is the honest answer (the cap dropped the 21_19 wall block
+     from 445 889 to 423 984 records, the worst surviving step is
+     exactly 80, TestEncodeNavmeshGeometryWalls pins the over-cap
+     rejection next to the crossing split and the flat skip).
+
+  2. The geodata structural encoding walked straight into the mesh:
+     the giant trees of the elven forest carry their canopies as
+     stacked walkable-flagged layers (the trunk helixes step within
+     the climb range but wall every step of the way up - the sheet
+     flood crosses them because it ignores the NSWE walls by
+     design, so a "ramp" of polygons fused the tree into the
+     ground). The new dropIslandComponents builds the sheet graph
+     over engine steps (the paired NSWE walls plus the climb rule,
+     the exact canStep of the grid search, the wetness split
+     ignored) and rejects every component that touches no region
+     border - the seam where the neighbour region may continue the
+     walk. The measured 21_19: 1386 floating sheets / 60 118 layers
+     dropped (polys 244 837 -> 217 904), while the bridge deck, the
+     village decks, the shore and the water survive - the grid
+     engine confirms the verdicts (a ground-to-canopy search
+     arrives at the terrain under the tree, never at the branch
+     height; TestRealRegionFloatingIslands pins the drop and the
+     survivors, TestBuildRegionIslandFilter pins the synthetic
+     border/separation semantics).
+
+  The full pack rebuilt (158 regions, 57.3 M polys, 4.3 GB, the 7
+  known corrupt edge regions aside) and the viewer re-verified over
+  the two reported views: the bridge and the village now float with
+  open air gaps to the lake (the VLM before/after review answers
+  PASS on both), the mother tree lost its fusion and the distant
+  terrain walls that remain are the honest climb-step fillers. The
+  user route of the report (33 680,56 807 -> 47 028,50 833, swim)
+  still answers found in ~4 ms over the rebuilt mesh.
+
 The follow-up candidates (NOT started): the acceptance stack switch to
 the hybrid once the live sessions prove it (which may also skip
 the engine confirmation flood on mesh partials - the ~13 s the real

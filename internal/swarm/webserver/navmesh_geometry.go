@@ -107,6 +107,18 @@ const (
 // viewing distance of the stitched world.
 const navmeshWallMinStep = 0.5
 
+// navmeshWallMaxStep is the largest height difference a wall may
+// close. The honest crack scale of the build is the climb range of
+// the linked surfaces (40) plus the bilinear corner tolerance of the
+// rectangle surfaces (24) - every wall the crack filler ever needs
+// sits below it. A taller step between two surfaces is not a crack
+// but the open air between two separate worlds - the floating deck
+// over the lake, the tree canopy over the ground - and the void is
+// the honest answer there: the fabricated curtain is what fused the
+// elven village into the water and grew the mother tree into the
+// ground.
+const navmeshWallMaxStep = 80.0
+
 // geoTarget is one rectangle interval a wall may close onto: the
 // target polygon with its cell range along the crossing axis.
 type geoTarget struct {
@@ -433,11 +445,21 @@ func geoWallSpans(writer *[]byte, fixed, lo, hi float64,
         hB(hiCell), area, orient)
 }
 
-// geoWall appends one wall quad record.
+// geoWall appends one wall quad record. The height cap drops the
+// walls whose surfaces sit further apart than the honest crack scale:
+// those are not cracks but separate worlds with open air between
+// them.
 func geoWall(writer *[]byte, fixed, lo, hi, hA0, hA1, hB0, hB1 float64,
     area uint8, orient uint8,
 ) {
     if hi-lo < 1 {
+        return
+    }
+    step := math.Abs(hA0 - hB0)
+    if edge := math.Abs(hA1 - hB1); edge > step {
+        step = edge
+    }
+    if step > navmeshWallMaxStep {
         return
     }
     base := len(*writer)

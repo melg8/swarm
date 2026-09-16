@@ -127,10 +127,12 @@ func buildPackPhaseA(keys []navmesh.RegionKey, geodataDir, outDir string,
         if info, err := os.Stat(tilePathOf(outDir, key)); err == nil {
             stats.TileBytes += info.Size()
         }
-        log("region %d_%d: %d layers, %d sheets (%d islands),"+
-            " %d polys (%d water), %d links, %d blocked pairs, %s",
+        log("region %d_%d: %d layers, %d sheets (%d islands,"+
+            " %d floating), %d polys (%d water), %d links,"+
+            " %d blocked pairs, %s",
             key.Col, key.Row, build.Stats.Layers, build.Stats.Sheets,
-            build.Stats.DroppedSheets, build.Stats.Polys,
+            build.Stats.DroppedSheets, build.Stats.IslandSheets,
+            build.Stats.Polys,
             build.Stats.WaterPolys, build.Stats.Links,
             build.Stats.NSWEBlockedPairs,
             build.Stats.BuildTime.String())

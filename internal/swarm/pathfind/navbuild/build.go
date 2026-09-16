@@ -46,6 +46,8 @@ type BuildStats struct {
     Sheets           int
     DroppedSheets    int
     DroppedLayers    int
+    IslandSheets     int
+    IslandLayers     int
     Polys            int
     WaterPolys       int
     Links            int
@@ -143,6 +145,8 @@ func collectStats(rl *regionLayers, sh *sheets, acc *linkAccumulator,
         Sheets:           sh.count,
         DroppedSheets:    droppedSheetCount(sh),
         DroppedLayers:    droppedLayerCount(sh),
+        IslandSheets:     islandSheetCount(sh),
+        IslandLayers:     islandLayerCount(sh),
         Polys:            len(tile.Polys),
         WaterPolys:       0,
         Links:            len(tile.Links),
@@ -173,6 +177,30 @@ func droppedSheetCount(sh *sheets) int {
     count := 0
     for s := range sh.count {
         if sh.dropped[s] {
+            count++
+        }
+    }
+
+    return count
+}
+
+// islandSheetCount counts the floating component drops.
+func islandSheetCount(sh *sheets) int {
+    count := 0
+    for s := range sh.count {
+        if sh.island[s] {
+            count++
+        }
+    }
+
+    return count
+}
+
+// islandLayerCount counts the layers of the floating components.
+func islandLayerCount(sh *sheets) int {
+    count := 0
+    for _, sheet := range sh.sheetOf {
+        if sheet >= 0 && sh.island[sheet] {
             count++
         }
     }

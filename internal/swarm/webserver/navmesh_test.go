@@ -22,7 +22,8 @@ import (
 
 // newNavmeshTestServer builds a navmesh viewer server over a temp
 // tile directory holding one synthetic region: three flat ground
-// polygons in a row, the last one water, linked through the maxx
+// polygons in a row, the last one water stepping down 48 units (the
+// shore crack the wall filler closes), linked through the maxx
 // portals. The world anchors sit at the origin (region 20_18), so
 // the polygons span x 0..48 of the y strip 0..16.
 func newNavmeshTestServer(
@@ -38,8 +39,8 @@ func newNavmeshTestServer(
                 H11: 0, FirstLink: 0, Area: navmesh.AreaGround},
             {X0: 1, Y0: 0, X1: 2, Y1: 1, H00: 0, H10: 0, H01: 0,
                 H11: 0, FirstLink: 1, Area: navmesh.AreaGround},
-            {X0: 2, Y0: 0, X1: 3, Y1: 1, H00: -300, H10: -300,
-                H01: -300, H11: -300, FirstLink: -1,
+            {X0: 2, Y0: 0, X1: 3, Y1: 1, H00: -48, H10: -48,
+                H01: -48, H11: -48, FirstLink: -1,
                 Area: navmesh.AreaWater},
         },
         Links: []navmesh.Link{
@@ -158,7 +159,7 @@ func TestNavmeshGeometryEndpoint(t *testing.T) {
     require.EqualValues(t, 18, int16(binary.LittleEndian.Uint16(payload[6:8])))
     require.EqualValues(t, 0, int32(binary.LittleEndian.Uint32(payload[8:12])))
     require.EqualValues(t, 0, int32(binary.LittleEndian.Uint32(payload[12:16])))
-    require.EqualValues(t, -300, int16(binary.LittleEndian.Uint16(payload[16:18])))
+    require.EqualValues(t, -48, int16(binary.LittleEndian.Uint16(payload[16:18])))
     require.EqualValues(t, 0, int16(binary.LittleEndian.Uint16(payload[18:20])))
     require.EqualValues(t, 3, binary.LittleEndian.Uint32(payload[20:24]))
     require.EqualValues(t, 2, binary.LittleEndian.Uint32(payload[24:28]))
@@ -209,7 +210,7 @@ func TestNavmeshGeometryEndpoint(t *testing.T) {
         payload[linksBase+navmeshGeoLinkStride+navmeshGeoLinkStride-4])
 
     // The wall block: the flat ground pair emits nothing, the shore
-    // step (0 against -300) emits one vertical wall at the shared
+    // step (0 against -48) emits one vertical wall at the shared
     // edge x 32 spanning y 0..16.
     wallsBase := linksBase + 2*navmeshGeoLinkStride
     wallPart := func(part int) uint16 {
@@ -221,8 +222,8 @@ func TestNavmeshGeometryEndpoint(t *testing.T) {
     require.EqualValues(t, 16, wallPart(2))
     require.EqualValues(t, 0, int16(wallPart(3)))
     require.EqualValues(t, 0, int16(wallPart(4)))
-    require.EqualValues(t, -300, int16(wallPart(5)))
-    require.EqualValues(t, -300, int16(wallPart(6)))
+    require.EqualValues(t, -48, int16(wallPart(5)))
+    require.EqualValues(t, -48, int16(wallPart(6)))
     require.Equal(t, navmesh.AreaGround, payload[wallsBase+14])
     require.Equal(t, navmeshWallVertical, payload[wallsBase+15])
 
@@ -258,7 +259,7 @@ func TestNavmeshPathEndpoint(t *testing.T) {
 
     t.Run("the swim route reaches the water polygon", func(t *testing.T) {
         recorder := navmeshPost(t, server, "/api/navmesh/path",
-            `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-300},`+
+            `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-48},`+
                 `"filter":"swim"}`)
 
         require.Equal(t, http.StatusOK, recorder.Code)
@@ -274,7 +275,7 @@ func TestNavmeshPathEndpoint(t *testing.T) {
         last := response.Waypoints[len(response.Waypoints)-1]
         require.InDelta(t, 40, last.X, 0.01)
         require.InDelta(t, 8, last.Y, 0.01)
-        require.InDelta(t, -300, last.Z, 0.01)
+        require.InDelta(t, -48, last.Z, 0.01)
         require.Greater(t, response.DurationMs, float64(0))
         require.GreaterOrEqual(t, response.Explored, 1)
         require.GreaterOrEqual(t, response.Corridor, 2)
@@ -282,7 +283,7 @@ func TestNavmeshPathEndpoint(t *testing.T) {
 
     t.Run("the dry filter answers the partial corridor", func(t *testing.T) {
         recorder := navmeshPost(t, server, "/api/navmesh/path",
-            `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-300},`+
+            `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-48},`+
                 `"filter":"dry"}`)
 
         require.Equal(t, http.StatusOK, recorder.Code)
@@ -323,19 +324,27 @@ func TestEncodeNavmeshGeometryWalls(t *testing.T) {
     tile := &navmesh.Tile{
         Col: 20, Row: 18, Climb: 40,
         Polys: []navmesh.Poly{
-            // A rises 0 -> 400 along its MaxX edge; B sits flat at
-            // 200 on its MinX edge: the profiles cross at the span
+            // A rises 0 -> 64 along its MaxX edge; B sits flat at
+            // 32 on its MinX edge: the profiles cross at the span
             // middle.
             {X0: 0, Y0: 0, X1: 2, Y1: 4, H00: 0, H10: 0, H01: 0,
-                H11: 400, FirstLink: -1, Area: navmesh.AreaGround},
-            {X0: 2, Y0: 0, X1: 4, Y1: 4, H00: 200, H10: 0, H01: 200,
+                H11: 64, FirstLink: -1, Area: navmesh.AreaGround},
+            {X0: 2, Y0: 0, X1: 4, Y1: 4, H00: 32, H10: 0, H01: 32,
                 H11: 0, FirstLink: -1, Area: navmesh.AreaGround},
             // C matches the MaxY profile of A exactly (the flat
             // skip) and steps down into D.
             {X0: 0, Y0: 4, X1: 1, Y1: 6, H00: 0, H10: 200, H01: 0,
                 H11: 0, FirstLink: -1, Area: navmesh.AreaGround},
-            {X0: 0, Y0: 6, X1: 1, Y1: 8, H00: -100, H10: -100,
+            {X0: 0, Y0: 6, X1: 1, Y1: 8, H00: -48, H10: -48,
                 H01: 0, H11: 0, FirstLink: -1, Area: navmesh.AreaGround},
+            // E and F sit 300 units apart - two separate worlds
+            // (the floating deck over the lake): the open air
+            // between them stays open, no curtain fills it.
+            {X0: 4, Y0: 0, X1: 5, Y1: 4, H00: 0, H10: 0, H01: 0,
+                H11: 0, FirstLink: -1, Area: navmesh.AreaGround},
+            {X0: 5, Y0: 0, X1: 6, Y1: 4, H00: -300, H10: -300,
+                H01: -300, H11: -300, FirstLink: -1,
+                Area: navmesh.AreaWater},
         },
     }
     mesh := navmesh.NewMesh(t.TempDir())
@@ -345,7 +354,7 @@ func TestEncodeNavmeshGeometryWalls(t *testing.T) {
     polyCount := int(binary.LittleEndian.Uint32(payload[20:24]))
     linkCount := int(binary.LittleEndian.Uint32(payload[24:28]))
     wallCount := int(binary.LittleEndian.Uint32(payload[28:32]))
-    require.Equal(t, 4, polyCount)
+    require.Equal(t, 6, polyCount)
     require.Equal(t, 0, linkCount)
     require.Equal(t, 3, wallCount)
 
@@ -358,33 +367,33 @@ func TestEncodeNavmeshGeometryWalls(t *testing.T) {
         return payload[wallsBase+wall*navmeshGeoWallStride+15]
     }
     // The crossing split: two vertical walls at x 32, the first
-    // spanning y 0..32 with the emitter rising 0 -> 200, the second
-    // y 32..64 rising 200 -> 400, both against the flat 200 target.
+    // spanning y 0..32 with the emitter rising 0 -> 32, the second
+    // y 32..64 rising 32 -> 64, both against the flat 32 target.
     require.EqualValues(t, 32, part(0, 0))
     require.EqualValues(t, 0, part(0, 1))
     require.EqualValues(t, 32, part(0, 2))
     require.EqualValues(t, 0, int16(part(0, 3)))
-    require.EqualValues(t, 200, int16(part(0, 4)))
-    require.EqualValues(t, 200, int16(part(0, 5)))
-    require.EqualValues(t, 200, int16(part(0, 6)))
+    require.EqualValues(t, 32, int16(part(0, 4)))
+    require.EqualValues(t, 32, int16(part(0, 5)))
+    require.EqualValues(t, 32, int16(part(0, 6)))
     require.Equal(t, navmeshWallVertical, orient(0))
     require.EqualValues(t, 32, part(1, 0))
     require.EqualValues(t, 32, part(1, 1))
     require.EqualValues(t, 64, part(1, 2))
-    require.EqualValues(t, 200, int16(part(1, 3)))
-    require.EqualValues(t, 400, int16(part(1, 4)))
-    require.EqualValues(t, 200, int16(part(1, 5)))
-    require.EqualValues(t, 200, int16(part(1, 6)))
+    require.EqualValues(t, 32, int16(part(1, 3)))
+    require.EqualValues(t, 64, int16(part(1, 4)))
+    require.EqualValues(t, 32, int16(part(1, 5)))
+    require.EqualValues(t, 32, int16(part(1, 6)))
     require.Equal(t, navmeshWallVertical, orient(1))
     // The horizontal step: one wall at y 96, the emitter flat at 0
-    // against the target flat at -100.
+    // against the target flat at -48.
     require.EqualValues(t, 96, part(2, 0))
     require.EqualValues(t, 0, part(2, 1))
     require.EqualValues(t, 16, part(2, 2))
     require.EqualValues(t, 0, int16(part(2, 3)))
     require.EqualValues(t, 0, int16(part(2, 4)))
-    require.EqualValues(t, -100, int16(part(2, 5)))
-    require.EqualValues(t, -100, int16(part(2, 6)))
+    require.EqualValues(t, -48, int16(part(2, 5)))
+    require.EqualValues(t, -48, int16(part(2, 6)))
     require.Equal(t, navmeshWallHorizontal, orient(2))
 }
 

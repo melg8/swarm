@@ -166,8 +166,12 @@ func TestBuildRegionQueries(t *testing.T) {
     require.InDelta(t, -3784, pos.Z, 1e-6)
 }
 
-// TestBuildRegionIslandFilter pins the island drop: a two cell
-// isolated patch (smaller than the minimum) produces no polygon.
+// TestBuildRegionIslandFilter pins the island drops: a two cell
+// isolated patch dies at the size filter, a ten by ten floating
+// platform dies at the component filter (no within-climb step reaches
+// it from anywhere and it touches no region border) and a border
+// touching platform survives - the neighbour region decides its fate
+// at the stitching phase, not this region's build.
 func TestBuildRegionIslandFilter(t *testing.T) {
     data := writeRegionFile(t, func(cx, cy int) []layerSpec {
         if cx >= 100 && cx < 102 && cy >= 100 && cy < 101 &&
@@ -177,17 +181,23 @@ func TestBuildRegionIslandFilter(t *testing.T) {
         if cx >= 200 && cx < 210 && cy >= 200 && cy < 210 {
             return []layerSpec{{h: -2000, nswe: 0x0F}}
         }
+        if cy >= 400 && cy < 410 && cx < 10 {
+            return []layerSpec{{h: -3000, nswe: 0x0F}}
+        }
 
         return nil
     })
     build, err := BuildRegion(data, 21, 19, DefaultOptions())
     require.NoError(t, err)
-    // Both patches are islands (no neighbour within the climb); the
-    // 2 cell patch dies at the island filter, the 10x10 patch stays
-    // as an isolated polygon.
-    require.Equal(t, 2, build.Stats.Sheets)
-    require.Equal(t, 1, build.Stats.DroppedSheets)
+    // Three sheets: the two cell patch dies at the size filter, the
+    // interior 10x10 platform dies at the island filter, the border
+    // strip stays for the stitching phase.
+    require.Equal(t, 3, build.Stats.Sheets)
+    require.Equal(t, 2, build.Stats.DroppedSheets)
+    require.Equal(t, 1, build.Stats.IslandSheets)
+    require.Equal(t, 100, build.Stats.IslandLayers)
     require.Len(t, build.Tile.Polys, 1)
+    require.EqualValues(t, 0, build.Tile.Polys[0].X0)
 }
 
 // TestBuildRegionRectSplit pins the height-bounded split: a curved

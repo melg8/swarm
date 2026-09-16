@@ -90,7 +90,27 @@ entry is unchanged.
    crashed the naive Recast import (the 137k vertex contour). Sheets
    smaller than 4 layers are unreachable islands (no neighbour
    within the climb range anywhere); the grid engine cannot reach
-   them either.
+   them either. **The floating component drop** then rejects the
+   islands no walk can EVER reach: the sheet graph joins two sheets
+   when a layer of one admits an engine step into a neighbour layer
+   of the other (the paired NSWE walls plus the climb rule - the
+   exact `canStep` the grid search walks; the wetness split is
+   ignored because the engine steps between the shore and the water
+   freely), and a component survives only when one of its sheets
+   touches the region border - the seam where the neighbour region
+   may continue the walk. Everything else is the geodata structural
+   encoding: the giant trees of the elven forest carry their canopies
+   as stacked layers hundreds of units over the ground, the trunk
+   helixes step within the climb range but wall every step of the
+   way up, and the floating village decks skirt down towards the
+   lake bed. No character can stand on any of it - the grid engine
+   confirms it (a ground-to-canopy search arrives at the terrain
+   under the tree, never at the branch height) - so the mesh must
+   not pretend otherwise: keeping the canopy rendered the mother
+   tree as a walkable ramp fused into the ground (the measured round
+   dropped 1386 floating sheets / 60 118 layers from 21_19 alone,
+   `navbuild/floating_test.go` pins the drop and the survival of the
+   bridge deck, the village deck and the water).
 3. **The rectangle decomposition** - every sheet splits into maximal
    rectangles (extend right, then down), and every rectangle splits
    recursively along the axis that carries the height variation
@@ -333,16 +353,24 @@ The endpoints behind the page (the mode of `GET /api/config` is
   inside cells, so neighbors disagree about the height of a shared
   edge and the disagreement would render as see-through black
   wedges (the owner's black-triangles report: 536 724 of the 604 191
-  adjacency pairs of 21_19 step). The walls emit through the
-  MaxX/MaxY sides only, so every shared edge is walled once, and the
-  region borders resolve their targets in the east and north
-  neighbor tiles through the mesh. The triangles never ride the
-  wire: every polygon is its own quad of four consecutive corners
-  and the viewer tessellates. The payload is immutable per tile, so
-  an ETag revalidates for free and the server caches the encoded
-  bytes (about 75 bytes per polygon all blocks together, roughly
-  18.5 MB for the dense 21_19 - 244 837 polygons, 552 168 walls,
-  275 830 links);
+  adjacency pairs of 21_19 step). The filler is height capped: the
+  honest crack scale is the 40 unit climb plus the 24 unit bilinear
+  corner tolerance, and a wall may never close more than 80 units -
+  a taller step between two surfaces is not a crack but the open air
+  between two separate worlds (the floating deck over the lake, the
+  tree canopy over the ground), and the void is the honest answer
+  there. The uncapped wall of the first rounds curtained the
+  floating village down to the water and grew grey stalagmites
+  under every branch (21_19 lost ~22k fabricated walls to the cap:
+  445 889 -> 423 984, the worst surviving step exactly 80). The
+  walls emit through the MaxX/MaxY sides only, so every shared edge
+  is walled once, and the region borders resolve their targets in
+  the east and north neighbor tiles through the mesh. The triangles
+  never ride the wire: every polygon is its own quad of four
+  consecutive corners and the viewer tessellates. The payload is
+  immutable per tile, so an ETag revalidates for free and the
+  server caches the encoded bytes (roughly 16.4 MB for the dense
+  21_19 - 217 904 polygons, 423 984 walls, 259 332 links);
 - `POST /api/navmesh/path` - `{start, end, filter}` positions and
   the reply `{found, partial, waypoints, durationMs, explored,
   corridor, filter}` of the measured `Route` call.
