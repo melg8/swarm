@@ -46,8 +46,18 @@ const cellsTotal = regionCellsSide * regionCellsSide
 // splits them until the bilinear corner-height surface stays within
 // tolerance of every covered cell height. The answer is the polygon
 // list and the layer-instance-to-polygon map the link walk consumes.
+//
+// The growth respects the NSWE walls: a rectangle only spans cells
+// whose mutual steps are open (the paired walls of both sides plus
+// the climb height rule), so the interior of every polygon is
+// walkable by construction - the contract the link walk's
+// same-polygon skip and the funnel legs rely on. The wall-blind
+// growth of the first rounds let a single polygon swallow walled
+// cell pairs (the Dion merchant quarter measured 1.24M such pairs in
+// 21_22, 1.43M in 22_22): the corridor search then tunnelled
+// straight through the buildings and the bots walked out of town.
 func buildRects(rl *regionLayers, sh *sheets,
-    heightTolerance float64,
+    heightTolerance float64, climb int32,
 ) ([]rectPoly, []int32) {
     builder := &rectBuilder{
         grid:    make([]int32, cellsTotal),
@@ -68,7 +78,8 @@ func buildRects(rl *regionLayers, sh *sheets,
         if sh.dropped[sheet] {
             continue
         }
-        builder.decomposeSheet(rl, sh, members, sheet, heightTolerance)
+        builder.decomposeSheet(rl, sh, members, sheet, heightTolerance,
+            climb)
     }
 
     return builder.polys, builder.polyAt
@@ -93,7 +104,7 @@ func sheetMembers(sh *sheets) [][]uint32 {
 // decomposeSheet runs the maximal rectangle decomposition of one sheet
 // with the height-bounded splits.
 func (b *rectBuilder) decomposeSheet(rl *regionLayers, sh *sheets,
-    members [][]uint32, sheet int, heightTolerance float64,
+    members [][]uint32, sheet int, heightTolerance float64, climb int32,
 ) {
     for _, j := range members[sheet] {
         b.grid[rl.cellIndexOf[j]] = int32(j)
@@ -105,8 +116,8 @@ func (b *rectBuilder) decomposeSheet(rl *regionLayers, sh *sheets,
         }
         cx := int(cell / regionCellsSide)
         cy := int(cell % regionCellsSide)
-        x1 := b.extendRight(cx, cy)
-        y1 := b.extendDown(cx, cy, x1)
+        x1 := b.extendRight(cx, cy, climb)
+        y1 := b.extendDown(cx, cy, x1, climb)
         b.markCovered(cx, cy, x1, y1)
         b.emitRect(cx, cy, x1, y1, sh.class[sheet], heightTolerance)
     }
@@ -120,11 +131,13 @@ func (b *rectBuilder) decomposeSheet(rl *regionLayers, sh *sheets,
 }
 
 // extendRight grows the rectangle width while the row stays in the
-// sheet and uncovered.
-func (b *rectBuilder) extendRight(cx, cy int) int32 {
+// sheet, uncovered and the horizontal step into the new cell crosses
+// no wall.
+func (b *rectBuilder) extendRight(cx, cy int, climb int32) int32 {
     x1 := int32(cx + 1)
     for x1 < regionCellsSide &&
-        b.free(int(x1), cy) {
+        b.free(int(x1), cy) &&
+        b.hStepOpen(int(x1)-1, cy, climb) {
         x1++
     }
 
@@ -132,14 +145,22 @@ func (b *rectBuilder) extendRight(cx, cy int) int32 {
 }
 
 // extendDown grows the rectangle height while every cell of the next
-// row stays in the sheet and uncovered (the exact cover invariant:
-// the emitted rectangles never overlap).
-func (b *rectBuilder) extendDown(cx, cy int, x1 int32) int32 {
+// row stays in the sheet, uncovered, the vertical step into it
+// crosses no wall and the row itself holds no interior wall (the
+// exact cover invariant: the emitted rectangles never overlap; the
+// wall invariant: every adjacent cell pair inside one polygon is an
+// open step, so the interior stays walkable by construction).
+func (b *rectBuilder) extendDown(cx, cy int, x1 int32, climb int32) int32 {
     y1 := int32(cy + 1)
 rows:
     for y1 < regionCellsSide {
         for x := int32(cx); x < x1; x++ {
-            if !b.free(int(x), int(y1)) {
+            if !b.free(int(x), int(y1)) ||
+                !b.vStepOpen(int(x), int(y1)-1, climb) {
+                break rows
+            }
+            if x > int32(cx) &&
+                !b.hStepOpen(int(x)-1, int(y1), climb) {
                 break rows
             }
         }
@@ -147,6 +168,43 @@ rows:
     }
 
     return y1
+}
+
+// hStepOpen reports whether the horizontal step between the cells
+// (x, y) and (x+1, y) of the current sheet is an open passage: the
+// east wall of the source, the west wall of the target (the
+// wallsOpen rule of the grid search) and the climb height range.
+func (b *rectBuilder) hStepOpen(x, y int, climb int32) bool {
+    a := b.grid[x*regionCellsSide+y]
+    c := b.grid[(x+1)*regionCellsSide+y]
+    if a < 0 || c < 0 {
+        return false
+    }
+
+    return stepOpen(b.layers[a], b.layers[c], 1, 0, climb)
+}
+
+// vStepOpen reports whether the vertical step between the cells
+// (x, y) and (x, y+1) of the current sheet is an open passage.
+func (b *rectBuilder) vStepOpen(x, y int, climb int32) bool {
+    a := b.grid[x*regionCellsSide+y]
+    c := b.grid[x*regionCellsSide+y+1]
+    if a < 0 || c < 0 {
+        return false
+    }
+
+    return stepOpen(b.layers[a], b.layers[c], 0, 1, climb)
+}
+
+// stepOpen reports whether the cell layer pair admits the step in
+// (dx, dy): the paired NSWE walls of both sides plus the climb
+// height rule - the same canStep the grid search walks on.
+func stepOpen(a, b cellLayer, dx, dy int32, climb int32) bool {
+    if abs16(a.h-b.h) > climb {
+        return false
+    }
+
+    return nsweOpen(a, b, dx, dy)
 }
 
 // free reports whether a cell belongs to the current sheet and no

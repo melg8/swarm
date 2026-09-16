@@ -235,9 +235,37 @@ pieces from the research verdict:
 
 ### Next
 
-The viewer round closes the tooling side of the port. The
-follow-up candidates (NOT started): the acceptance stack switch to
+- 2026-09-16: the wall-honest rectangle decomposition landed (the
+  owner report: the bots walk out of the town through the buildings,
+  the viewer routes cross the walls). The root cause: the maximal
+  rectangle growth of `navbuild/rect.go` ignored the NSWE walls - a
+  rectangle spanned any cells of one sheet, and because the link walk
+  skips the cell pairs inside one polygon ("the interior is walkable
+  by construction"), a single polygon swallowed whole wall segments:
+  the corridor search then funnelled straight through (the audit of
+  the shipped pack counted 1.24M swallowed pairs in 21_22, 1.43M in
+  22_22, 1.02M in 22_19, 0.41M in 21_19). The fix: `hStepOpen`/
+  `vStepOpen` gate every horizontal and vertical cell pair inside
+  the growing rectangle (the paired NSWE walls of both sides plus
+  the climb height rule - the same `canStep` the grid search walks
+  on), `buildRects` takes the climb. The honest decomposition
+  multiplies the polygon count (21_19: 91k -> 245k, 22_22: 127k ->
+  567k) - the price of routes that respect the walls; the pack must
+  be rebuilt (`cmd/navmesh-build`, data/navmesh is gitignored). The
+  regression pin: `TestBuildRegionInteriorWall` (a wall segment
+  INSIDE the would-be maximal rectangle splits the decomposition -
+  the case a border-only wall check misses) and
+  `TestBuildRegionInteriorWalls` (the full audit of the real 21_19
+  and 21_22: 6.06M + 4.79M same-polygon neighbour pairs, zero walls
+  swallowed). The honest side effect: 3 of the 200 research replay
+  pairs lost their (wall-tunnelling) corridors - the grid engine
+  confirms all 11 isolated pairs are genuinely unreachable, the
+  replay pin and docs/navmesh.md carry the new split (128 full +
+  61 partial + 11 isolated).
+
+The follow-up candidates (NOT started): the acceptance stack switch to
 the hybrid once the live sessions prove it (which may also skip
 the engine confirmation flood on mesh partials - the ~13 s the real
 hard pair dry search pays today), the Detour-parity optimization if
-the fleet benchmark asks for it.
+the fleet benchmark asks for it, the route-vs-engine replay harness
+over the Dion hunting grounds.

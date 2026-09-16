@@ -96,7 +96,19 @@ entry is unchanged.
    recursively along the axis that carries the height variation
    until the bilinear corner surface stays within the 24 unit
    tolerance of every covered cell. The split axis rule matters: a
-   curved valley must cut across the curvature, not along it.
+   curved valley must cut across the curvature, not along it. The
+   growth respects the NSWE walls: a rectangle only spans cells
+   whose mutual steps are open (the paired walls of both sides plus
+   the climb height rule - `hStepOpen`/`vStepOpen` check every
+   horizontal and vertical pair inside the growing rectangle), so
+   the interior of every polygon is walkable by construction. The
+   wall-blind growth of the first rounds let a single polygon
+   swallow walled cell pairs (the town regions measured them by the
+   million) and the corridor search tunnelled straight through the
+   buildings; `navbuild/wall_test.go` audits every same-polygon
+   neighbour pair of the real regions for the open-step contract.
+   The honest growth multiplies the polygon count (21_19: 91k ->
+   245k) - the price of routes that respect the walls.
 4. **The links** - the adjacent cell layer pairs of the whole region
    accumulate the open portal spans: the pair needs the height
    difference within the climb AND the NSWE walls open in both
@@ -126,17 +138,20 @@ layers, 186k stacked columns) on the sandbox:
 | Metric | grid A* (current) | Detour C++ (research) | this port |
 |---|---|---|---|
 | the hard bridge pair (village -> water under the bridge) | 5.17 s, 500k nodes | 169 us | 7.7 ms full Route (A* 171 polys + funnel) |
-| 200 random region pairs | 129/200, avg 2.94 s | "200/200"*, avg 339 us | 133 full + 59 partial = 192/200, avg ~10 ms |
+| 200 random region pairs | 129/200, avg 2.94 s | "200/200"*, avg 339 us | 128 full + 61 partial = 189/200, avg ~7 ms |
 | the region data at runtime | ~20 MB parsed, 140 ms load | 2.89 MB tile | 12.9 MB tile, 7.6 ms decode |
-| the offline build | n/a | 5.1 s per region | 1.7 s per region |
+| the offline build | n/a | 5.1 s per region | 2.0 s per region, 244 837 polys |
 | the pack build (165 regions) | n/a | ~14 min estimated | 4m25s, 1.9 GB of tiles, 604 MB peak RSS |
 
 \* the research number counted `DT_PARTIAL_RESULT` as success - the
-honest split is 133 full corridors + 59 closest-reachable partials +
-8 isolated starts (island surfaces no walk leaves; the C++ audit
-reported them as separate components). The 59 partials are the
-correct Detour behavior for unreachable targets under the filter,
-not misses.
+honest split is 128 full corridors + 61 closest-reachable partials +
+11 isolated starts (island surfaces no walk leaves; the C++ audit
+reported the first 8 as separate components, the wall-honest
+rectangle growth of 2026-09-16 unmasked the last 3 whose corridors
+used to tunnel through the walls a single polygon swallowed - the
+grid engine answers every one of the 11 with its own clean not
+found). The 61 partials are the correct Detour behavior for
+unreachable targets under the filter, not misses.
 
 The 7.7 ms hard-pair number sits ~45x over the C++ Detour: the
 Go runtime resolves every link target through the tile map (a

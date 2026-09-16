@@ -76,7 +76,7 @@ func BuildRegion(
         return nil, err
     }
     sh := assignSheets(rl, opts.Climb, opts.MinSheetLayers)
-    rects, polyAt := buildRects(rl, sh, opts.HeightTolerance)
+    rects, polyAt := buildRects(rl, sh, opts.HeightTolerance, opts.Climb)
     acc, strips := buildInternalLinks(rl, sh, polyAt, opts.Climb)
     specs := acc.emit()
 
