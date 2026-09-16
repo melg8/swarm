@@ -249,18 +249,43 @@ its region grid outline above the geometry, the outline under the
 cursor lights up amber, and the readout bar at the top names the tile
 with its region local cell (a progressive raycast sweep - one tile
 per frame, the nearest bounding sphere first - so the answer tracks
-the pointer without ever blocking the orbit). Where does the route
+the pointer without ever blocking the flight). Where does the route
 run: the result panel carries the from/to rows with their tile keys
 and world coordinates, and every waypoint wears a label with its
 index and coordinates (the toggle lives in the display section next
 to the polygon edge overlay).
+
+The camera is a flight rig (the owner request replacing the orbit):
+WASD flies along the full view vector - W follows the pitch like an
+airplane - Q and E descend and climb, the pointer drag yaws and
+pitches, Shift boosts 4x and the wheel retunes the cruise speed (the
+panel carries the speed readout; the keys sit on the window so the
+canvas focus never matters, and the form fields keep their own
+typing).
+
+The feedback channel closes the loop between the owner session and
+the agent session (the owner request: reproduce the exact view
+locally and let the route answer itself). The `copy view link`
+button freezes the whole view state into one URL - the camera pose
+(world x, y, height, yaw, pitch), the armed or answered route pair,
+the visible tile selection, the route filter and the height scale -
+and copies it to the clipboard (the link field itself always holds
+the URL for manual selection where the clipboard API is
+unavailable). A paste of that URL boots the viewer into the exact
+view: the query parameters restore the camera, the tiles, the filter
+and the scale, and the route pair re-runs automatically - the result
+panel, the polyline and the markers rebuild on their own. The
+parameters live in `navmesh_view.js` (`parseViewParams` is the boot
+half, `buildViewStateUrl` the copy half) and
+`TestNavmeshViewScriptContract` pins them against drift.
 
 The flag selection bounds the initially VISIBLE tiles only: the
 route queries always run over the full directory mesh, so a path may
 leave the visible tiles (the checkbox list loads more tiles on
 demand, the polyline draws wherever it walks). The swim/dry filter
 select mirrors the hunt loop's two search profiles (water priced 3x
-versus walled).
+versus walled), and the `tiles=` parameter of a shared link
+overrides the flag selection the same way.
 
 The endpoints behind the page (the mode of `GET /api/config` is
 `navmesh`):

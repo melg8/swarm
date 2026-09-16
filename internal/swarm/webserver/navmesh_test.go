@@ -267,3 +267,50 @@ func TestEncodeNavmeshGeometryRejectsEmptyTiles(t *testing.T) {
     _, err := encodeNavmeshGeometry(&navmesh.Tile{Col: 20, Row: 18})
     require.Error(t, err)
 }
+
+// TestNavmeshViewScriptContract pins the feedback channel of the
+// viewer script (navmesh_view.js): the view state link parameters the
+// boot parses, the flight rig controls and the copy button wiring.
+// The script itself runs in the browser - the live verification of
+// the round drove it headlessly - this pin keeps the boot contract
+// from drifting silently (a renamed parameter or a dropped button
+// would break every link already shared).
+func TestNavmeshViewScriptContract(t *testing.T) {
+    script, err := os.ReadFile(filepath.Join("web", "navmesh_view.js"))
+    require.NoError(t, err)
+    source := string(script)
+
+    // The flight rig: wasd flies, q/e climb and descend, the wheel
+    // retunes the speed, the drag yaws and pitches.
+    for _, control := range []string{
+        `createFlyRig(viewer.camera, canvas)`,
+        `"KeyW"`, `"KeyA"`, `"KeyS"`, `"KeyD"`, `"KeyQ"`, `"KeyE"`,
+        `rig.pitch = Math.min(1.55, Math.max(-1.55, rig.pitch - dy`,
+    } {
+        require.Contains(t, source, control,
+            "the flight rig control is missing from the viewer script")
+    }
+
+    // The view state link: the boot parses the camera pose, the route
+    // pair, the tile selection, the filter and the scale; the copy
+    // button builds the URL back.
+    for _, part := range []string{
+        `search.get("cam")`, `search.get("from")`, `search.get("to")`,
+        `search.get("tiles")`, `search.get("filter")`,
+        `search.get("scale")`,
+        `params.set("cam"`, `params.set("from"`, `params.set("to"`,
+        `params.set("tiles"`, `params.set("filter"`, `params.set("scale"`,
+        `copyViewState)`, `id="nmv-copy"`, `id="nmv-link"`,
+    } {
+        require.Contains(t, source, part,
+            "the view state link contract is missing from the viewer"+
+                " script")
+    }
+
+    // The boot restores the route pair and runs the search on its own.
+    require.Contains(t, source, `void requestRoute(view.from, view.to)`,
+        "the restored route pair must run automatically")
+    // The camera restores through the world axes mapping (three y is
+    // the height, scaled).
+    require.Contains(t, source, `cam.x, cam.z * viewer.heightScale, cam.y`)
+}

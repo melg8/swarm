@@ -28,6 +28,16 @@ SPDX-License-Identifier: MIT
 // with its region local cell and world coordinates (a progressive
 // raycast sweep - one tile per frame, the nearest bounding sphere
 // first), and every route waypoint wears its coordinates as a label.
+//
+// The camera is a flight rig: wasd flies along the view vector (the
+// airplane feel - W follows the pitch), q/e descend and climb, the
+// pointer drag yaws and pitches, the wheel retunes the cruise speed
+// and shift boosts. The feedback channel: the copy button freezes
+// the whole view state - the camera pose, the route pair, the tile
+// selection, the filter and the height scale - into one URL the
+// owner pastes back; the viewer boots from those query parameters
+// and re-runs the route automatically, so a pasted link reproduces
+// the exact view and its answer anywhere the viewer runs.
 // The module boots through the dynamic import of main.js; three.js
 // itself is vendored at web/vendor/three.module.min.js so the viewer
 // works offline like the rest of the interface.
@@ -103,9 +113,14 @@ const viewer = {
 
 // init boots the viewer for the /api/config payload of the navmesh
 // mode. It builds the full screen surface, loads the tile geometries
-// of the initial selection and wires the double click search.
+// of the initial selection and wires the double click search. The
+// view state link of the copy button overrides the boot: its query
+// parameters restore the camera pose, the tile selection, the
+// filter, the height scale and the route pair - and the route runs
+// again on its own, so the pasted link answers itself.
 function init(config) {
   const navmesh = config.navmesh;
+  const view = parseViewParams();
   buildSurface(navmesh);
 
   if (!navmesh || !navmesh.tiles || navmesh.tiles.length === 0) {
@@ -114,16 +129,54 @@ function init(config) {
     return;
   }
 
-  const initial = navmesh.initialTiles && navmesh.initialTiles.length > 0
+  let initial = navmesh.initialTiles && navmesh.initialTiles.length > 0
     ? navmesh.initialTiles
     : navmesh.tiles;
+  if (view.tiles) {
+    const known = new Set(navmesh.tiles.map(tileKey));
+    const wanted = view.tiles.filter((key) => known.has(key));
+    if (wanted.length > 0) {
+      const wantedSet = new Set(wanted);
+      initial = navmesh.tiles.filter((tile) => wantedSet.has(tileKey(tile)));
+    }
+  }
   const initialKeys = new Set(initial.map(tileKey));
   for (const tile of navmesh.tiles) {
     addTileRow(tile, initialKeys.has(tileKey(tile)));
   }
-  frameInitialTiles(initial);
+  syncAllBox();
+  if (view.filter) {
+    viewer.filter = view.filter;
+    const select = document.getElementById("nmv-filter");
+    if (select) {
+      select.value = view.filter;
+    }
+  }
+  if (view.scale) {
+    setHeightScale(view.scale);
+    const select = document.getElementById("nmv-height");
+    if (select) {
+      select.value = String(view.scale);
+    }
+  }
+  if (view.cam) {
+    applyCameraState(view.cam);
+  } else {
+    frameInitialTiles(initial);
+  }
   for (const tile of initial) {
     void ensureTile(tile);
+  }
+  if (view.from && view.to) {
+    viewer.routeStart = view.from;
+    viewer.routeEnd = view.to;
+    drawStartMarker(view.from);
+    drawEndMarker(view.to);
+    void requestRoute(view.from, view.to);
+  } else if (view.from) {
+    viewer.pendingStart = view.from;
+    drawStartMarker(view.from);
+    showStatus("start set", "double click the destination");
   }
 }
 
@@ -147,6 +200,9 @@ function buildSurface(navmesh) {
     <div class="nmv-panel nmv-side">
       <div class="nmv-title">swarm &middot; navmesh viewer</div>
       <div class="nmv-sub" id="nmv-dir"></div>
+      <div class="nmv-section">flight</div>
+      <div class="nmv-row"><span>speed</span>
+        <span class="nmv-tile-status" id="nmv-speed"></span></div>
       <div class="nmv-section">tiles</div>
       <label class="nmv-row"><input type="checkbox" id="nmv-all" checked>
         <span>all stitched</span></label>
@@ -173,6 +229,10 @@ function buildSurface(navmesh) {
         <span>ground (height ramp)</span></div>
       <div class="nmv-row"><span class="nmv-swatch nmv-water"></span>
         <span>water (depth ramp)</span></div>
+      <div class="nmv-section">share this view</div>
+      <input type="text" id="nmv-link" class="nmv-link" readonly
+        title="the camera, the route pair and the tile selection as one link">
+      <button id="nmv-copy" class="btn nmv-copy">copy view link</button>
       <button id="nmv-clear" class="btn nmv-clear">clear route</button>
     </div>
     <div class="nmv-panel nmv-result" id="nmv-result">
@@ -182,9 +242,10 @@ function buildSurface(navmesh) {
       <div class="nmv-timer-sub" id="nmv-timer-sub"></div>
       <div class="nmv-stats" id="nmv-stats"></div>
     </div>
-    <div class="nmv-hint">drag rotates &middot; wheel zooms &middot;
-      right drag pans &middot; double click: first the start, then the
-      destination</div>`;
+    <div class="nmv-hint">wasd + q/e flies &middot; shift boosts &middot;
+      drag looks &middot; wheel retunes the speed &middot; double click:
+      first the start, then the destination &middot; the copy button
+      shares this exact view</div>`;
   document.body.appendChild(root);
 
   if (navmesh) {
@@ -226,7 +287,7 @@ function buildSurface(navmesh) {
   fill.position.set(-0.5, 0.4, -0.35);
   viewer.scene.add(fill);
 
-  viewer.rig = createOrbitRig(viewer.camera, canvas);
+  viewer.rig = createFlyRig(viewer.camera, canvas);
   canvas.addEventListener("dblclick", onDoubleClick);
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerleave", onPointerLeave);
@@ -241,6 +302,7 @@ function buildSurface(navmesh) {
     setAllTiles(e.target.checked);
   });
   document.getElementById("nmv-clear").addEventListener("click", clearRoute);
+  document.getElementById("nmv-copy").addEventListener("click", copyViewState);
   document.getElementById("nmv-waypoint-coords").addEventListener(
     "change", (e) => {
       viewer.showWaypointCoords = e.target.checked;
@@ -277,74 +339,138 @@ function renderLoop() {
   requestAnimationFrame(renderLoop);
 }
 
-// createOrbitRig is the minimal orbit camera of the viewer: left drag
-// rotates around the target, the wheel dollies, right drag (or
-// shift-drag) pans the target. No damping - the debug viewer prefers
+// createFlyRig is the flight camera of the viewer: the pointer drag
+// yaws and pitches the view, wasd flies along the full view vector
+// (the airplane feel - W follows the pitch into the ground and out
+// of it), q and e descend and climb, shift boosts 4x and the wheel
+// retunes the cruise speed. No damping - the debug viewer prefers
 // the direct response.
-function createOrbitRig(camera, dom) {
+function createFlyRig(camera, dom) {
   const rig = {
     camera,
-    target: new THREE.Vector3(),
-    radius: 60000,
-    phi: 0.95,
-    theta: Math.PI / 4,
+    yaw: Math.PI / 4,
+    pitch: -0.6,
+    speed: 2400,
+    keys: new Set(),
+    clock: new THREE.Clock(),
     update() {
-      const sinPhi = Math.sin(this.phi);
-      this.camera.position.set(
-        this.target.x + this.radius * sinPhi * Math.sin(this.theta),
-        this.target.y + this.radius * Math.cos(this.phi),
-        this.target.z + this.radius * sinPhi * Math.cos(this.theta));
-      this.camera.lookAt(this.target);
+      const dt = Math.min(this.clock.getDelta(), 0.1);
+      camera.rotation.order = "YXZ";
+      camera.rotation.y = this.yaw;
+      camera.rotation.x = this.pitch;
+      // The movement basis: the full pitched forward vector and its
+      // horizontal right wing.
+      const forward = new THREE.Vector3(
+        -Math.sin(this.yaw) * Math.cos(this.pitch),
+        Math.sin(this.pitch),
+        -Math.cos(this.yaw) * Math.cos(this.pitch));
+      const right = new THREE.Vector3(-forward.z, 0, forward.x);
+      const move = new THREE.Vector3();
+      if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) {
+        move.add(forward);
+      }
+      if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) {
+        move.sub(forward);
+      }
+      if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) {
+        move.add(right);
+      }
+      if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) {
+        move.sub(right);
+      }
+      if (this.keys.has("KeyE")) {
+        move.y += 1;
+      }
+      if (this.keys.has("KeyQ")) {
+        move.y -= 1;
+      }
+      if (move.lengthSq() > 0) {
+        const boost = this.keys.has("ShiftLeft") ||
+          this.keys.has("ShiftRight") ? 4 : 1;
+        camera.position.addScaledVector(move.normalize(),
+          this.speed * boost * dt);
+      }
     },
   };
-  let mode = null;
-  let lastX = 0, lastY = 0;
 
+  let dragging = false;
+  let lastX = 0, lastY = 0;
   dom.addEventListener("contextmenu", (e) => e.preventDefault());
   dom.addEventListener("pointerdown", (e) => {
-    mode = (e.button === 0 && !e.shiftKey) ? "rotate" : "pan";
+    if (e.button !== 0) {
+      return;
+    }
+    dragging = true;
     lastX = e.clientX;
     lastY = e.clientY;
     dom.setPointerCapture(e.pointerId);
   });
   dom.addEventListener("pointermove", (e) => {
-    if (!mode) {
+    if (!dragging) {
       return;
     }
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     lastX = e.clientX;
     lastY = e.clientY;
-    if (mode === "rotate") {
-      rig.theta -= dx * 0.005;
-      rig.phi = Math.min(1.52, Math.max(0.08, rig.phi - dy * 0.005));
-    } else {
-      const scale = rig.radius * 0.0016;
-      const forward = new THREE.Vector3();
-      rig.camera.getWorldDirection(forward);
-      const right = new THREE.Vector3().crossVectors(
-        forward, new THREE.Vector3(0, 1, 0)).normalize();
-      const up = new THREE.Vector3().crossVectors(
-        right, forward).normalize();
-      rig.target.addScaledVector(right, -dx * scale);
-      rig.target.addScaledVector(up, dy * scale);
-    }
+    rig.yaw -= dx * 0.0042;
+    rig.pitch = Math.min(1.55, Math.max(-1.55, rig.pitch - dy * 0.0042));
   });
-  const release = () => { mode = null; };
+  const release = () => { dragging = false; };
   dom.addEventListener("pointerup", release);
   dom.addEventListener("pointercancel", release);
   dom.addEventListener("wheel", (e) => {
     e.preventDefault();
-    const factor = e.deltaY > 0 ? 1.12 : 1 / 1.12;
-    rig.radius = Math.min(300000, Math.max(120, rig.radius * factor));
+    const factor = e.deltaY > 0 ? 1.25 : 1 / 1.25;
+    rig.speed = Math.min(400000, Math.max(60, rig.speed * factor));
+    showFlightSpeed(rig.speed);
   }, { passive: false });
+
+  // The keys live on the window so the canvas focus never matters;
+  // the form fields keep their own keys.
+  const formTag = (target) => target instanceof Element &&
+    (target.tagName === "INPUT" || target.tagName === "SELECT" ||
+      target.tagName === "TEXTAREA" || target.tagName === "BUTTON");
+  window.addEventListener("keydown", (e) => {
+    if (formTag(e.target)) {
+      return;
+    }
+    if (FLY_KEYS.has(e.code)) {
+      rig.keys.add(e.code);
+      e.preventDefault();
+    }
+  });
+  window.addEventListener("keyup", (e) => {
+    rig.keys.delete(e.code);
+  });
+  window.addEventListener("blur", () => {
+    rig.keys.clear();
+  });
+  showFlightSpeed(rig.speed);
 
   return rig;
 }
 
-// frameInitialTiles aims the camera at the union of the initially
-// selected tiles.
+// FLY_KEYS are the flight controls the rig claims (the arrows ride
+// along so the viewer answers without a wasd reach).
+const FLY_KEYS = new Set([
+  "KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE",
+  "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+  "ShiftLeft", "ShiftRight",
+]);
+
+// showFlightSpeed writes the cruise speed readout of the panel.
+function showFlightSpeed(speed) {
+  const cell = document.getElementById("nmv-speed");
+  if (cell) {
+    cell.textContent = Math.round(speed).toLocaleString() + " u/s";
+  }
+}
+
+// frameInitialTiles aims the flight camera at the union of the
+// initially selected tiles: a three quarter orbit offset above the
+// center, the cruise speed scaled to the world span.
 function frameInitialTiles(tiles) {
-  if (!tiles || tiles.length === 0 || !viewer.rig) {
+  if (!tiles || tiles.length === 0 || !viewer.rig || !viewer.camera) {
     return;
   }
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -355,10 +481,19 @@ function frameInitialTiles(tiles) {
     maxY = Math.max(maxY, tile.maxY);
   }
   const size = Math.max(maxX - minX, maxY - minY);
-  viewer.rig.target.set((minX + maxX) / 2, 0, (minY + maxY) / 2);
-  viewer.rig.radius = Math.max(200, size * 1.1);
-  viewer.rig.phi = 0.95;
-  viewer.rig.theta = Math.PI / 4;
+  const target = new THREE.Vector3(
+    (minX + maxX) / 2, 0, (minY + maxY) / 2);
+  viewer.camera.position.set(
+    target.x + size * 0.75,
+    Math.max(2500, size * 0.7),
+    target.z + size * 0.75);
+  viewer.camera.lookAt(target);
+  const euler = new THREE.Euler().setFromQuaternion(
+    viewer.camera.quaternion, "YXZ");
+  viewer.rig.yaw = euler.y;
+  viewer.rig.pitch = euler.x;
+  viewer.rig.speed = Math.max(400, size * 0.18);
+  showFlightSpeed(viewer.rig.speed);
   viewer.markerRadius = Math.max(10, Math.min(60, size * 0.0022));
 }
 
@@ -1186,6 +1321,164 @@ function showStatus(kind, text) {
   const timerSub = document.getElementById("nmv-timer-sub");
   if (timerSub && !timerSub.textContent) {
     timerSub.textContent = text;
+  }
+}
+
+// The view state link is the feedback channel of the viewer (the
+// owner request: reproduce the exact view locally and let the route
+// answer itself). The query parameters:
+//   cam=x,y,z,yaw,pitch  the flight camera over the GAME WORLD axes
+//                         (x, y horizontal, z height - the same
+//                         triple the cursor readout shows)
+//   from=x,y,z           the route start (world axes)
+//   to=x,y,z             the route destination
+//   tiles=21_19,22_19    the visible tile selection (omitted = all)
+//   filter=swim|dry      the route filter
+//   scale=1|2|4          the height exaggeration
+// The world axes mapping matters: the viewer renders three y as the
+// height, so a pasted link reads the same at every height scale (the
+// restore re-applies the scale of the link itself).
+
+// parseViewParams reads the boot state off the page URL.
+function parseViewParams() {
+  const search = new URLSearchParams(window.location.search);
+  const view = {
+    cam: parseCameraParam(search.get("cam")),
+    from: parsePointParam(search.get("from")),
+    to: parsePointParam(search.get("to")),
+    tiles: null,
+    filter: null,
+    scale: null,
+  };
+  const tiles = search.get("tiles");
+  if (tiles) {
+    view.tiles = tiles.split(",")
+      .map((key) => key.trim()).filter((key) => key !== "");
+  }
+  const filter = search.get("filter");
+  if (filter === "swim" || filter === "dry") {
+    view.filter = filter;
+  }
+  const scale = Number(search.get("scale"));
+  if (scale === 1 || scale === 2 || scale === 4) {
+    view.scale = scale;
+  }
+
+  return view;
+}
+
+// parsePointParam reads one world x,y,z triple.
+function parsePointParam(text) {
+  if (!text) {
+    return null;
+  }
+  const parts = text.split(",").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
+    return null;
+  }
+
+  return { x: parts[0], y: parts[1], z: parts[2] };
+}
+
+// parseCameraParam reads the camera pose (the world position plus
+// the yaw and the pitch).
+function parseCameraParam(text) {
+  if (!text) {
+    return null;
+  }
+  const parts = text.split(",").map(Number);
+  if (parts.length !== 5 || parts.some((n) => !Number.isFinite(n))) {
+    return null;
+  }
+
+  return {
+    x: parts[0], y: parts[1], z: parts[2],
+    yaw: parts[3], pitch: parts[4],
+  };
+}
+
+// applyCameraState restores the flight camera from the link pose.
+function applyCameraState(cam) {
+  if (!viewer.rig || !viewer.camera) {
+    return;
+  }
+  viewer.camera.position.set(
+    cam.x, cam.z * viewer.heightScale, cam.y);
+  viewer.rig.yaw = cam.yaw;
+  viewer.rig.pitch = cam.pitch;
+}
+
+// buildViewStateUrl freezes the current view into the link: the
+// camera pose, the armed or answered route pair, the visible tiles,
+// the filter and the height scale.
+function buildViewStateUrl() {
+  const params = new URLSearchParams();
+  if (viewer.rig && viewer.camera) {
+    params.set("cam", [
+      Math.round(viewer.camera.position.x),
+      Math.round(viewer.camera.position.z),
+      Math.round(viewer.camera.position.y / viewer.heightScale),
+      viewer.rig.yaw.toFixed(4),
+      viewer.rig.pitch.toFixed(4),
+    ].join(","));
+  }
+  const start = viewer.routeStart || viewer.pendingStart;
+  if (start) {
+    params.set("from", formatPointParam(start));
+  }
+  if (viewer.routeEnd) {
+    params.set("to", formatPointParam(viewer.routeEnd));
+  }
+  const visible = [];
+  for (const [key, entry] of viewer.tiles) {
+    if (entry.visible) {
+      visible.push(key);
+    }
+  }
+  if (visible.length > 0 && visible.length < viewer.tiles.size) {
+    params.set("tiles", visible.join(","));
+  }
+  params.set("filter", viewer.filter);
+  params.set("scale", String(viewer.heightScale));
+
+  return window.location.origin + window.location.pathname + "?" +
+    params.toString();
+}
+
+// formatPointParam renders one world triple for the link.
+function formatPointParam(point) {
+  return Math.round(point.x) + "," + Math.round(point.y) + "," +
+    Math.round(point.z);
+}
+
+// copyViewState fills the link field and copies it to the clipboard;
+// the legacy selection fallback keeps the headless and plain http
+// environments working (the async clipboard API needs a secure
+// context, the sandbox browsers often are not one).
+async function copyViewState() {
+  const url = buildViewStateUrl();
+  const field = document.getElementById("nmv-link");
+  if (field) {
+    field.value = url;
+  }
+  const button = document.getElementById("nmv-copy");
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(url);
+    copied = true;
+  } catch (err) {
+    if (field) {
+      field.focus();
+      field.select();
+      copied = document.execCommand("copy");
+    }
+  }
+  if (button) {
+    const label = button.textContent;
+    button.textContent = copied ? "copied" : "select and copy";
+    window.setTimeout(() => {
+      button.textContent = label;
+    }, 1600);
   }
 }
 

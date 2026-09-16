@@ -263,6 +263,35 @@ pieces from the research verdict:
   replay pin and docs/navmesh.md carry the new split (128 full +
   61 partial + 11 isolated).
 
+- 2026-09-16: the viewer feedback round landed (the owner request:
+  a camera that flies like a plane, a button that copies the camera
+  position with the view direction and the route A/B pair, and a
+  launch mechanism that restores the position from that data). The
+  orbit rig is replaced by the flight rig: WASD flies along the full
+  view vector (W follows the pitch), Q/E descend and climb, the
+  pointer drag yaws and pitches, Shift boosts 4x, the wheel retunes
+  the cruise speed (the panel carries the speed readout; the frame
+  delta drives the movement so the speed is frame-rate honest). The
+  feedback channel: the `copy view link` button freezes the whole
+  view state - the camera pose over the game world axes (x, y,
+  height, yaw, pitch), the armed or answered route pair, the visible
+  tile selection, the filter, the height scale - into one URL (the
+  clipboard write falls back to field selection for the non-secure
+  contexts). The launch mechanism: the boot parses the same query
+  parameters, restores the camera, the tiles, the filter and the
+  scale, and the restored route pair re-runs on its own - a pasted
+  link reproduces the exact view AND its answer. Verified live in a
+  headless browser over the rebuilt six-region world: the flight
+  controls move the camera along the view vector (the W probe moved
+  it 1760 units into the pitch), the drag changes the yaw/pitch, the
+  wheel the speed, the copy button builds the full link, and the
+  link roundtrip (move the camera, copy, reopen) restores the pose
+  to the unit and re-runs the hard bridge pair (34 waypoints, 5.7
+  ms); the VLM review of the screenshots confirms the terrain, the
+  route polyline with its markers and the panels.
+  `TestNavmeshViewScriptContract` pins the boot contract (the rig
+  controls, the parameter names, the copy wiring) against drift.
+
 The follow-up candidates (NOT started): the acceptance stack switch to
 the hybrid once the live sessions prove it (which may also skip
 the engine confirmation flood on mesh partials - the ~13 s the real
