@@ -15,14 +15,16 @@ layer it already is; this subsystem answers the long routes.
 The offline `cmd/navmesh-build` converts every `X_Y.l2j` geodata
 region into an `X_Y.nm` navigation mesh tile: the walkable cell
 layers are partitioned into 2D manifold **sheets**, every sheet
-decomposes into rectangle polygons with exact corner heights, and the
-polygon links carry the open NSWE portal spans of the shared edges.
-The runtime (`internal/swarm/pathfind/navmesh`) loads the tiles
-lazily and answers the queries over them: the 3D nearest polygon
-resolution (the stacked-layer disambiguation), the A* corridor
-search with the water area pricing, the funnel string pulling and
-the water escape. No C++ anywhere: the Recast build pipeline is
-replaced by the sheet decomposition the research round proved.
+decomposes into maximal rectangles of one exact cell height (the
+faithful square port - the mesh represents the raw l2j squares as
+they are), and the polygon links carry the open NSWE portal spans of
+the shared edges. The runtime (`internal/swarm/pathfind/navmesh`)
+loads the tiles lazily and answers the queries over them: the 3D
+nearest polygon resolution (the stacked-layer disambiguation), the
+A* corridor search with the water area pricing, the funnel string
+pulling and the water escape. No C++ anywhere: the Recast build
+pipeline is replaced by the sheet decomposition the research round
+proved.
 
 ## The tile format
 
@@ -35,18 +37,19 @@ bounding volume tree - every section 4 byte aligned, little endian.
   (`X0 <= cx < X1`, `Y0 <= cy < Y1`, half open). The world rectangle
   spans the grid vertices `X0*16 .. X1*16` anchored at the region
   origin `((col-20)*32768, (row-18)*32768)`.
-- **The corner heights come from the sheet's own vertex field**: the
-  value at a grid vertex is the average of the sheet's cells around
-  it, so two rectangles of one sheet read the same height at their
-  shared edge endpoints and the surfaces join seamlessly (the
-  inside-cell corners of the first rounds disagreed by the full 8
-  unit quantization step on every slope adjacency - the shingled
-  "roof sheets" of the owner report). A vertex shared with another
-  sheet (a deck edge, a cliff) keeps the sheet's own level, so
-  genuine steps stay sharp. The interior height is the bilinear
-  interpolation of the four - the build splits every rectangle until
-  the interpolated surface stays within 24 units of every covered
-  cell height, so no detail mesh exists or is needed.
+- **Every polygon is flat at the exact geodata height of its cells**:
+  the rectangle growth only ever spans cells of one height, so the
+  four corners carry that height and the surface is the square the
+  raw l2j geometry holds - the port changes nothing about where the
+  ground sits, the visual and the actual representation alike (the
+  owner's porting directive). The bilinear vertex field of the
+  earlier rounds (the average of the sheet's cells around each grid
+  vertex, split-bounded by the 24 unit tolerance) smoothed the
+  quantization staircase into interpolated surfaces; the staircase is
+  the honest l2j answer and the mesh keeps it now. The same-height
+  neighbors join seamlessly (identical edge heights on both sides),
+  the height changes render as the genuine steps the geodata
+  encodes.
 - **The links are Detour-style chains** (`FirstLink` into a flat
   store, `Next` splicing): every link leaves through one rectangle
   side and carries `T0..T1` - the **inclusive cell range along the
@@ -118,12 +121,8 @@ entry is unchanged.
    `navbuild/floating_test.go` pins the drop and the survival of the
    bridge deck, the village deck and the water).
 3. **The rectangle decomposition** - every sheet splits into maximal
-   rectangles (extend right, then down), and every rectangle splits
-   recursively along the axis that carries the height variation
-   until the bilinear corner surface stays within the 24 unit
-   tolerance of every covered cell. The split axis rule matters: a
-   curved valley must cut across the curvature, not along it. The
-   growth respects the NSWE walls: a rectangle only spans cells
+   rectangles of one exact cell height (extend right, then down).
+   The growth respects the NSWE walls: a rectangle only spans cells
    whose mutual steps are open (the paired walls of both sides plus
    the climb height rule - `hStepOpen`/`vStepOpen` check every
    horizontal and vertical pair inside the growing rectangle), so
@@ -133,8 +132,13 @@ entry is unchanged.
    million) and the corridor search tunnelled straight through the
    buildings; `navbuild/wall_test.go` audits every same-polygon
    neighbour pair of the real regions for the open-step contract.
-   The honest growth multiplies the polygon count (21_19: 91k ->
-   245k) - the price of routes that respect the walls.
+   The growth respects the exact height the same way: two cells of
+   a different height never share a rectangle, which is what pins
+   the faithful square port (the staircase of the slopes decomposes
+   into the per-height strips the geodata encodes). The honest
+   growth multiplies the polygon count (21_19: 91k -> 373k) - the
+   price of routes that respect the walls and represent the squares
+   as they are.
 4. **The links** - the adjacent cell layer pairs of the whole region
    accumulate the open portal spans: the pair needs the height
    difference within the climb AND the NSWE walls open in both
@@ -163,11 +167,11 @@ layers, 186k stacked columns) on the sandbox:
 
 | Metric | grid A* (current) | Detour C++ (research) | this port |
 |---|---|---|---|
-| the hard bridge pair (village -> water under the bridge) | 5.17 s, 500k nodes | 169 us | 7.7 ms full Route (A* 171 polys + funnel) |
-| 200 random region pairs | 129/200, avg 2.94 s | "200/200"*, avg 339 us | 128 full + 61 partial = 189/200, avg ~7 ms |
-| the region data at runtime | ~20 MB parsed, 140 ms load | 2.89 MB tile | 12.9 MB tile, 7.6 ms decode |
-| the offline build | n/a | 5.1 s per region | 2.0 s per region, 244 837 polys |
-| the pack build (165 regions) | n/a | ~14 min estimated | 4m25s, 1.9 GB of tiles, 604 MB peak RSS |
+| the hard bridge pair (village -> water under the bridge) | 5.17 s, 500k nodes | 169 us | 219 polys + funnel, 14.9 ms warm, 24.8 ms cold (the decode included) |
+| 200 random region pairs | 129/200, avg 2.94 s | "200/200"*, avg 339 us | 128 full + 61 partial = 189/200 (the pre-exact-port replay; the exact mesh answers the same corridors over more polygons) |
+| the region data at runtime | ~20 MB parsed, 140 ms load | 2.89 MB tile | 44.2 MB tile, 26.4 ms decode |
+| the offline build | n/a | 5.1 s per region | 2.7 s per region, 372 846 polys |
+| the pack build (165 regions) | n/a | ~14 min estimated | 4m25s, 1.9 GB of tiles pre-exact-port; the exact square port multiplies the tile bytes ~3.4x (the four dense measured regions hold 287.7 MB) |
 
 \* the research number counted `DT_PARTIAL_RESULT` as success - the
 honest split is 128 full corridors + 61 closest-reachable partials +
@@ -179,13 +183,18 @@ grid engine answers every one of the 11 with its own clean not
 found). The 61 partials are the correct Detour behavior for
 unreachable targets under the filter, not misses.
 
-The 7.7 ms hard-pair number sits ~45x over the C++ Detour: the
+The 14.9 ms warm hard-pair number sits ~90x over the C++ Detour: the
 Go runtime resolves every link target through the tile map (a
 mutex-guarded LRU) where Detour dereferences flat arrays, and the
-nearest-poly query allocates its candidate buffer. The pooled query
-state (one node array + one heap per call) keeps the allocations at
-22 per route. The corridor itself is 171 polygons - the A* expands
-14k nodes over them. This is still three orders of magnitude under
+nearest-poly query allocates its candidate buffer. The exact square
+port multiplied the polygon and link counts (every height run edge
+of the quantized staircase is a polygon boundary with its portal),
+which roughly doubled the warm route time of the bilinear rounds -
+the honest price of representing the l2j squares as they are. The
+pooled query state (one node array + one heap per call) keeps the
+allocations low, the cold route adds the lazy tile decode (~26 ms
+per 44 MB tile), exactly what a cold bot pays. The corridor itself
+is 219 polygons. This is still two orders of magnitude under
 the grid engine's 5.17 s on the same pair, and the fleet-scale plan
 (~2.9 s of route queries per bot-minute during hunts) fits the 100
 bot budget comfortably; the Detour-parity optimization (the flat
@@ -354,32 +363,34 @@ The endpoints behind the page (the mode of `GET /api/config` is
   portal records and the height step wall records. The link portals
   carry the world span of every connection with the area class of
   the pair (the edge connections overlay); the walls carry the
-  vertical filler quads between the bilinear surfaces of adjacent
-  rectangles. Since the vertex corner field landed, the rectangles of
-  one sheet agree about every shared edge and the filler only closes
-  the steps between different sheets (the genuine terraces); before
-  it, the corners came from each rectangle's own inside cells and
-  every geodata step rendered as a see-through black wedge (the
-  owner's black-triangles report: 536 724 of the 604 191 adjacency
-  pairs of 21_19 stepped) and later as the shingled roof sheets of
-  the slopes. The filler is height capped: the
-  honest crack scale is the 40 unit climb plus the 24 unit bilinear
-  corner tolerance, and a wall may never close more than 80 units -
+  vertical filler quads between the flat surfaces of adjacent
+  rectangles. Every polygon is flat at its exact cell height, so the
+  same-height neighbors agree about the shared edge byte for byte
+  (no filler there, the surfaces join seamlessly) and the filler
+  closes exactly the genuine height steps of the geodata - the
+  quantized staircase of the slopes renders as the steps it is, the
+  same picture the original cells render draws. Before the exact
+  square port the corners came from the bilinear vertex field: the
+  interpolation smoothed the staircase (the shingled roof sheets the
+  owner first reported) and the filler closed the surfaces the
+  interpolation left disagreeing. The owner's porting directive
+  pinned the faithful squares and both the smoothing and the
+  disagreement went away with it. The filler is height capped: the
+  honest crack scale is the 40 unit climb of the linked surfaces,
+  and a wall may never close more than 80 units -
   a taller step between two surfaces is not a crack but the open air
   between two separate worlds (the floating deck over the lake, the
   tree canopy over the ground), and the void is the honest answer
   there. The uncapped wall of the first rounds curtained the
   floating village down to the water and grew grey stalagmites
-  under every branch (21_19 lost ~22k fabricated walls to the cap:
-  445 889 -> 423 984, the worst surviving step exactly 80). The
+  under every branch. The
   walls emit through the MaxX/MaxY sides only, so every shared edge
   is walled once, and the region borders resolve their targets in
   the east and north neighbor tiles through the mesh. The triangles
   never ride the wire: every polygon is its own quad of four
   consecutive corners and the viewer tessellates. The payload is
   immutable per tile, so an ETag revalidates for free and the
-  server caches the encoded bytes (roughly 16.4 MB for the dense
-  21_19 - 217 904 polygons, 423 984 walls, 259 332 links);
+  server caches the encoded bytes;
 - `POST /api/navmesh/path` - `{start, end, filter}` positions and
   the reply `{found, partial, waypoints, durationMs, explored,
   corridor, filter}` of the measured `Route` call.

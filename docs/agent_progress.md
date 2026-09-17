@@ -471,6 +471,40 @@ over the Dion hunting grounds.
   NOT DONE YET (the interrupted session): the tile rebuild and the
   visual before/after verification of the owner's two views.
 
+- 2026-09-17: the exact square port replaced the bilinear vertex
+  field (the owner's changed position: the original l2j geometry IS
+  squares, so the detour version must port it as close as possible
+  WITHOUT changing its visual or actual representation): the
+  rectangle growth now spans only the cells of one exact geodata
+  height, every polygon is flat at that height (all four corners
+  equal), the vertexHeight averaging, the bilinear tolerance split
+  and the Options.HeightTolerance tunable are gone. The quantization
+  staircase the interpolation used to smooth away is the honest l2j
+  answer the mesh now carries - the mesh variant and the original
+  cells render of the viewer draw the same geometry, the comparison
+  toggle turned into the port audit. The NSWE wall fidelity, the
+  sheet decomposition, the island drops and the 32 unit dedup are
+  untouched (the port concerns the surface representation, not the
+  reachability filtering). The height step walls close exactly the
+  genuine steps now: same-height neighbors join byte for byte, the
+  filler's job shrank to the real staircase. 21_19 measured:
+  372 846 polys (was 245k wall honest bilinear, 390 596 orig rects),
+  1 013 866 links (was 259 332 - every height run edge is a polygon
+  boundary with its portal now), 44.2 MB tile (was 12.9), 26.4 ms
+  decode, the hard pair 14.9 ms warm over 219 polys (was 7.7 ms
+  over 171 - the honest price of the faithful squares, still 350x
+  under the grid engine). Tests: the vertex round's seam pinning
+  became the exact contract (exact_test.go: the flat corners, the
+  per-height strips of the slope, the sharp shore step), the
+  RectExactHeights build test pins the parabolic valley port,
+  buildRects lost the tolerance argument. The four dense tiles are
+  rebuilt (data/navmesh -force) and the owner's two views verified
+  against the exact mesh. The lint etiquette: the gci formatter
+  wants to re-tab the whole tree (its gofmt passthrough vs the
+  spaces only policy - the pre-existing systemic conflict, the
+  formatter of record stays gofmt-spaces); the new code adds zero
+  non gci issues.
+
 - 2026-09-17: the geometry variant toggle landed in the viewer (the
   owner comparison request, the client half): a "geometry" select
   switches live between the detour mesh and the original l2j cells
