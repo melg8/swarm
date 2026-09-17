@@ -45,7 +45,7 @@ func TestWholeMapHopTrace(t *testing.T) {
 		state: state, coarse: coarse,
 		bans: make(map[abstractEdgeRef]bool),
 	}
-	chain := mesh.coarseChain(&query, endRef, endPos)
+	chain := mesh.coarseChain(&query, endRef, endPos, true)
 	t.Logf("chain: edges=%d clusters=%d explored=%d reached=%t",
 		len(chain.edges), len(chain.clusters), chain.explored,
 		chain.reached)
@@ -58,14 +58,10 @@ func TestWholeMapHopTrace(t *testing.T) {
 
 				continue
 			}
-			dst := edge.dstComp
-			if dst == 0 {
-				dst = mesh.edgeDstComp(ref, edge)
-			}
-			t.Logf("  edge %d: %d_%d #%d -> %d_%d/%d srcComp=%d"+
-				" dstComp=%d", i, ref.Region.Col, ref.Region.Row,
-				ref.Index, edge.to.Col, edge.to.Row, edge.to.ID,
-				edge.srcComp, dst)
+			t.Logf("  edge %d: %d_%d #%d -> %d_%d/%d srcComp=%d",
+				i, ref.Region.Col, ref.Region.Row,
+				ref.Index, edge.to.Col, edge.to.Row,
+				edge.to.ID, edge.srcComp)
 		}
 		last := chain.clusters[len(chain.clusters)-1]
 		t.Logf("partial chain ends at %d_%d/%d", last.Col, last.Row,

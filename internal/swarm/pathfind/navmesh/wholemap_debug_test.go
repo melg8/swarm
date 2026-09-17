@@ -51,7 +51,7 @@ func TestWholeMapChainDebug(t *testing.T) {
 		state: state, coarse: coarse,
 		bans: make(map[abstractEdgeRef]bool),
 	}
-	chain := mesh.coarseChain(&query, endRef, endPos)
+	chain := mesh.coarseChain(&query, endRef, endPos, true)
 	t.Logf("coarse chain: edges=%d clusters=%d explored=%d reached=%t",
 		len(chain.edges), len(chain.clusters), chain.explored,
 		chain.reached)

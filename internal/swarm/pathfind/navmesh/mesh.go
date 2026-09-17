@@ -114,16 +114,16 @@ func NewMesh(dir string) *Mesh {
 		abstractCapacity: abstractCacheCapacity,
 		coarsePool: sync.Pool{New: func() any {
 			return &coarseState{
-				nodes: nil,
-				index: make(map[coarseNodeKey]int32, 1024),
-				open:  nil,
-				best:  -1,
-				bestH: 0,
+				nodes:   nil,
+				index:   make(map[coarseNodeKey]int32, 1024),
+				settled: make(map[coarseCompKey]bool, 1024),
+				open:    nil,
+				best:    -1,
+				bestH:   0,
 			}
 		}},
 		hops:     make(map[hopKey][]PolyRef),
 		hopOrder: make([]hopKey, 0, hopCacheCapacity),
-		dstComps: make(map[abstractEdgeRef]uint32),
 	}
 	mesh.scanFiles()
 
