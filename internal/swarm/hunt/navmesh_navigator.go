@@ -37,10 +37,15 @@ import (
 
 // navmeshNavigator is the hybrid navigator of the live integration
 // round: the route planning on the mesh, the validation on the grid
-// engine.
+// engine. The capsule clearance of the engine (SetCapsuleClearance)
+// governs the mesh answers too: the funnel pivots pull inward from
+// the portal span ends and the served waypoints run through the
+// clearance post pass - one radius, both engines.
 type navmeshNavigator struct {
-    engine *pathfind.Engine
-    mesh   *navmesh.Mesh
+    engine    *pathfind.Engine
+    mesh      *navmesh.Mesh
+    capsule   *pathfind.Capsule
+    clearance float64
 }
 
 // NewNavmeshNavigator wraps a geodata engine and a navigation mesh
@@ -49,7 +54,39 @@ type navmeshNavigator struct {
 func NewNavmeshNavigator( //nolint:ireturn
     engine *pathfind.Engine, mesh *navmesh.Mesh,
 ) Navigator {
-    return navmeshNavigator{engine: engine, mesh: mesh}
+    clearance := engine.CapsuleRadius()
+    var capsule *pathfind.Capsule
+    if clearance > 0 {
+        capsule = pathfind.NewCapsule(engine)
+    }
+
+    return navmeshNavigator{
+        engine:    engine,
+        mesh:      mesh,
+        capsule:   capsule,
+        clearance: clearance,
+    }
+}
+
+// clearedFilter arms the funnel pivot clearance of the mesh search
+// from the engine's capsule radius.
+func (n navmeshNavigator) clearedFilter(filter navmesh.Filter) navmesh.Filter {
+    filter.WaypointClearance = n.clearance
+
+    return filter
+}
+
+// clearedWaypoints runs the mesh funnel waypoints through the capsule
+// clearance post pass when the engine arms it (the legs of the funnel
+// answer can still graze a wall the pivots already avoid).
+func (n navmeshNavigator) clearedWaypoints(
+    waypoints []pathfind.Vec3,
+) []pathfind.Vec3 {
+    if n.capsule == nil || len(waypoints) == 0 {
+        return waypoints
+    }
+
+    return n.capsule.ApplyPath(waypoints, n.clearance)
 }
 
 // FindPathApproach plans the walk through the mesh corridor search
@@ -59,7 +96,7 @@ func (n navmeshNavigator) FindPathApproach(
     start, end pathfind.Vec3, approachRadius float64,
 ) (*pathfind.Result, error) {
     if result := n.meshRoute(start, end, approachRadius,
-        navmesh.DefaultFilter()); result != nil {
+        n.clearedFilter(navmesh.DefaultFilter())); result != nil {
         return result, nil
     }
 
@@ -79,16 +116,16 @@ func (n navmeshNavigator) FindPathApproachAvoiding(
     avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
     began := time.Now()
-    filter := navmesh.DefaultFilter()
+    filter := n.clearedFilter(navmesh.DefaultFilter())
     filter.Avoid = avoidCircles(avoid)
     route, meshErr := n.mesh.RouteApproach(
         meshPos(start), meshPos(end), approachRadius, filter)
-    if result := meshResult(route, meshErr, began); result != nil {
+    if result := n.meshResult(route, meshErr, began); result != nil {
         return result, nil
     }
     engineResult, engineErr := n.engine.FindPathApproachAvoiding(
         start, end, approachRadius, n.engine.MaxPassableHeight(), avoid)
-    if partial := meshPartial(
+    if partial := n.meshPartial(
         route, meshErr, engineResult, engineErr, began,
     ); partial != nil {
         return partial, nil
@@ -110,16 +147,16 @@ func (n navmeshNavigator) FindPathApproachDryAvoiding(
     avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
     began := time.Now()
-    filter := navmesh.DryFilter()
+    filter := n.clearedFilter(navmesh.DryFilter())
     filter.Avoid = avoidCircles(avoid)
     route, meshErr := n.mesh.RouteApproach(
         meshPos(start), meshPos(end), approachRadius, filter)
-    if result := meshResult(route, meshErr, began); result != nil {
+    if result := n.meshResult(route, meshErr, began); result != nil {
         return result, nil
     }
     engineResult, engineErr := n.engine.FindPathApproachDryAvoiding(
         start, end, approachRadius, n.engine.MaxPassableHeight(), avoid)
-    if partial := meshPartial(
+    if partial := n.meshPartial(
         route, meshErr, engineResult, engineErr, began,
     ); partial != nil {
         return partial, nil
@@ -134,7 +171,7 @@ func (n navmeshNavigator) FindPath(
     start, end pathfind.Vec3,
 ) (*pathfind.Result, error) {
     if result := n.meshRoute(start, end, 0,
-        navmesh.DefaultFilter()); result != nil {
+        n.clearedFilter(navmesh.DefaultFilter())); result != nil {
         return result, nil
     }
 
@@ -149,7 +186,7 @@ func (n navmeshNavigator) FindWaterEscape(
 ) (*pathfind.Result, error) {
     began := time.Now()
     route, err := n.mesh.WaterEscape(meshPos(start))
-    if result := meshResult(route, err, began); result != nil {
+    if result := n.meshResult(route, err, began); result != nil {
         return result, nil
     }
 
@@ -208,20 +245,20 @@ func (n navmeshNavigator) meshRoute(
     route, err := n.mesh.RouteApproach(meshPos(start), meshPos(end),
         approachRadius, filter)
 
-    return meshResult(route, err, began)
+    return n.meshResult(route, err, began)
 }
 
 // meshResult maps one mesh route answer onto the pathfind result of
 // the Navigator contract, nil when the answer is not a full found
 // route (the fallback marker).
-func meshResult(
+func (n navmeshNavigator) meshResult(
     route *navmesh.Route, err error, began time.Time,
 ) *pathfind.Result {
     if err != nil || route == nil || !route.Found ||
         len(route.Waypoints) == 0 {
         return nil
     }
-    waypoints, length := meshWaypoints(route)
+    waypoints, length := n.meshWaypoints(route)
 
     return &pathfind.Result{
         Found:     true,
@@ -247,7 +284,7 @@ func meshResult(
 // with Partial set: the consumers that understand it walk toward the
 // closest reachable point, the strict ones keep treating it as the
 // not found they already handle.
-func meshPartial(
+func (n navmeshNavigator) meshPartial(
     route *navmesh.Route, meshErr error,
     engineResult *pathfind.Result, engineErr error, began time.Time,
 ) *pathfind.Result {
@@ -257,7 +294,7 @@ func meshPartial(
         len(engineResult.Waypoints) > 0 {
         return nil
     }
-    waypoints, length := meshWaypoints(route)
+    waypoints, length := n.meshWaypoints(route)
 
     return &pathfind.Result{
         Found:     false,
@@ -273,8 +310,11 @@ func meshPartial(
 }
 
 // meshWaypoints converts the funnel waypoints of a mesh route into
-// the pathfind vectors together with the walked length.
-func meshWaypoints(route *navmesh.Route) ([]pathfind.Vec3, float64) {
+// the pathfind vectors together with the walked length, and runs them
+// through the capsule clearance post pass when the engine arms it.
+func (n navmeshNavigator) meshWaypoints(
+    route *navmesh.Route,
+) ([]pathfind.Vec3, float64) {
     waypoints := make([]pathfind.Vec3, len(route.Waypoints))
     length := 0.0
     for i, wp := range route.Waypoints {
@@ -286,8 +326,25 @@ func meshWaypoints(route *navmesh.Route) ([]pathfind.Vec3, float64) {
             length += math.Sqrt(dx*dx + dy*dy + dz*dz)
         }
     }
+    waypoints = n.clearedWaypoints(waypoints)
+    if n.capsule != nil {
+        length = pathLengthOf(waypoints)
+    }
 
     return waypoints, length
+}
+
+// pathLengthOf sums the 3D segment lengths of the waypoints.
+func pathLengthOf(waypoints []pathfind.Vec3) float64 {
+    length := 0.0
+    for i := 1; i < len(waypoints); i++ {
+        dx := waypoints[i].X - waypoints[i-1].X
+        dy := waypoints[i].Y - waypoints[i-1].Y
+        dz := waypoints[i].Z - waypoints[i-1].Z
+        length += math.Sqrt(dx*dx + dy*dy + dz*dz)
+    }
+
+    return length
 }
 
 // meshPos converts a pathfind vector into the mesh position.

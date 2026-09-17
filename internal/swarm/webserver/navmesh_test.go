@@ -16,6 +16,7 @@ import (
     "strings"
     "testing"
 
+    "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
     "github.com/stretchr/testify/require"
 )
@@ -29,6 +30,17 @@ import (
 func newNavmeshTestServer(
     t *testing.T, initial []navmesh.RegionKey,
 ) *Server {
+    t.Helper()
+
+    return NewNavmeshServer(navmesh.NewMesh(writeNavmeshTestTile(t)),
+        "127.0.0.1:0", log.New(io.Discard, "", 0),
+        NavmeshOptions{InitialTiles: initial})
+}
+
+// writeNavmeshTestTile serializes the synthetic three polygon tile of
+// the navmesh viewer tests into a fresh temp tile directory and
+// answers the directory path.
+func writeNavmeshTestTile(t *testing.T) string {
     t.Helper()
     tile := &navmesh.Tile{
         Col:   20,
@@ -56,8 +68,7 @@ func newNavmeshTestServer(
     require.NoError(t, os.WriteFile(
         filepath.Join(dir, "20_18.nm"), data, 0o600))
 
-    return NewNavmeshServer(navmesh.NewMesh(dir), "127.0.0.1:0",
-        log.New(io.Discard, "", 0), NavmeshOptions{InitialTiles: initial})
+    return dir
 }
 
 // navmeshGet exercises one handler with a fresh recorder.
@@ -478,4 +489,39 @@ func TestNavmeshViewScriptContract(t *testing.T) {
         "the wall tessellation must keep the 0-2 diagonal split")
     require.Contains(t, source, `split along the 1-2 anti-diagonal`,
         "the tessellation rationale comment is missing")
+}
+
+// TestNavmeshPathWithEngine pins the engine wiring of the viewer: an
+// armed geodata engine answers the route with the clearance pivots
+// and the clearance post pass active (the flat test world has no
+// walls to push away from, so the waypoints stay exact), and the
+// answer keeps its shape.
+func TestNavmeshPathWithEngine(t *testing.T) {
+    tileDir := writeNavmeshTestTile(t)
+    geoDir := t.TempDir()
+    // A flat region 20_18 at height 0: every block is a flat block.
+    region := make([]byte, 0, 65536*3)
+    for range 65536 {
+        region = append(region, 0, 0, 0)
+    }
+    require.NoError(t, os.WriteFile(
+        filepath.Join(geoDir, "20_18.l2j"), region, 0o600))
+    engine := pathfind.NewEngine(geoDir)
+    engine.SetCapsuleClearance(pathfind.DefaultCollisionRadius)
+
+    server := NewNavmeshServer(navmesh.NewMesh(tileDir), "127.0.0.1:0",
+        log.New(io.Discard, "", 0), NavmeshOptions{Engine: engine})
+    recorder := navmeshPost(t, server, "/api/navmesh/path",
+        `{"start":{"x":8,"y":8,"z":0},"end":{"x":24,"y":8,"z":0},`+
+            `"filter":"swim"}`)
+
+    require.Equal(t, http.StatusOK, recorder.Code)
+
+    var response navmeshPathResponse
+    require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+    require.True(t, response.Found)
+    require.NotEmpty(t, response.Waypoints)
+    require.InDelta(t, 8, response.Waypoints[0].X, 0.01)
+    last := response.Waypoints[len(response.Waypoints)-1]
+    require.InDelta(t, 24, last.X, 0.01)
 }

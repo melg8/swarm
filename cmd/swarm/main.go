@@ -853,6 +853,12 @@ func main() {
     }
     engine = pathfind.NewEngine(dir)
     engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+    // The capsule clearance keeps every planned waypoint and leg away
+    // from the walls: the server movement validation is cell level and
+    // never checks the character capsule (the elven fighter template
+    // radius 7.5), so the planner owns the clearance
+    // (docs/pathfinding.md).
+    engine.SetCapsuleClearance(pathfind.DefaultCollisionRadius)
     stats := engine.Stats()
     if stats.HasData {
         log.Printf("Geodata ready: %d region files in %s, town trips "+
@@ -929,6 +935,8 @@ func runFleet(cfg config) {
     }
     engine = pathfind.NewEngine(dir)
     engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+    // The capsule clearance of the bot fleet (docs/pathfinding.md).
+    engine.SetCapsuleClearance(pathfind.DefaultCollisionRadius)
     stats := engine.Stats()
     if stats.HasData {
         log.Printf("Geodata ready: %d region files in %s, town trips "+
@@ -1123,6 +1131,9 @@ func runPathfindTest(cfg config) {
     }
     engine := pathfind.NewEngine(dir)
     engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+    // The capsule clearance keeps the test UI routes away from the
+    // walls like the live bot plans them (docs/pathfinding.md).
+    engine.SetCapsuleClearance(pathfind.DefaultCollisionRadius)
 
     stats := engine.Stats()
     if stats.HasData {
@@ -1254,6 +1265,17 @@ func runNavmeshViewer(cfg config) {
         return
     }
 
+    // The geodata engine serves the original geometry variant and the
+    // capsule clearance of the route answers (the same armed radius
+    // the bot runs with).
+    geoDir := cfg.geodataDir
+    if geoDir == "" {
+        geoDir = detectGeodataDir()
+    }
+    engine := pathfind.NewEngine(geoDir)
+    engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+    engine.SetCapsuleClearance(pathfind.DefaultCollisionRadius)
+
     initial := cfg.navmeshShow.tiles
     if len(initial) > 0 {
         initial = intersectTiles(mesh, initial)
@@ -1272,7 +1294,10 @@ func runNavmeshViewer(cfg config) {
     }
 
     server := webserver.NewNavmeshServer(mesh, cfg.webAddress,
-        log.Default(), webserver.NavmeshOptions{InitialTiles: initial})
+        log.Default(), webserver.NavmeshOptions{
+            InitialTiles: initial,
+            Engine:       engine,
+        })
     go func() {
         if err := server.ListenAndServe(); err != nil {
             if !errors.Is(err, http.ErrServerClosed) {

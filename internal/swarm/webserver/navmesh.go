@@ -16,6 +16,7 @@ import (
     "strings"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
@@ -44,6 +45,10 @@ type NavmeshOptions struct {
     // selection opens every tile of the directory (the stitched
     // world). The -show-navmesh=21_19 form of the flag fills it.
     InitialTiles []navmesh.RegionKey
+    // Engine is the geodata engine behind the original geometry and
+    // the capsule clearance of the route answers. A nil engine keeps
+    // the viewer mesh only with the raw funnel pivots (the tests).
+    Engine *pathfind.Engine
 }
 
 // NewNavmeshServer creates the web server of the navmesh viewer mode:
@@ -56,6 +61,10 @@ func NewNavmeshServer(
     server := newServer(address, logger)
     server.navmeshMesh = mesh
     server.navmeshTiles = options.InitialTiles
+    server.navmeshEngine = options.Engine
+    if options.Engine != nil && options.Engine.CapsuleRadius() > 0 {
+        server.navmeshCapsule = pathfind.NewCapsule(options.Engine)
+    }
 
     mux := server.httpServer.Handler.(*http.ServeMux)
     mux.HandleFunc("GET /api/config", server.handleNavmeshConfig)
@@ -222,6 +231,11 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     if request.Filter != "dry" {
         filter, filterName = navmesh.DefaultFilter(), "swim"
     }
+    clearance := 0.0
+    if s.navmeshEngine != nil {
+        clearance = s.navmeshEngine.CapsuleRadius()
+    }
+    filter.WaypointClearance = clearance
 
     start := navmesh.Pos{X: request.Start.X, Y: request.Start.Y,
         Z: request.Start.Z}
@@ -252,7 +266,21 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         response.Partial = route.Partial
         response.Explored = route.Explored
         response.Corridor = len(route.Corridor)
-        response.Waypoints = toNavmeshPoints(route.Waypoints)
+        waypoints := route.Waypoints
+        if s.navmeshCapsule != nil && len(waypoints) > 0 {
+            // The funnel pivot clearance covers the turns; the post
+            // pass covers the legs that still graze a wall.
+            vecs := make([]pathfind.Vec3, len(waypoints))
+            for i, wp := range waypoints {
+                vecs[i] = pathfind.Vec3{X: wp.X, Y: wp.Y, Z: wp.Z}
+            }
+            vecs = s.navmeshCapsule.ApplyPath(vecs, clearance)
+            waypoints = make([]navmesh.Pos, len(vecs))
+            for i, vec := range vecs {
+                waypoints[i] = navmesh.Pos{X: vec.X, Y: vec.Y, Z: vec.Z}
+            }
+        }
+        response.Waypoints = toNavmeshPoints(waypoints)
     }
     writeJSON(w, s.logger, response)
 }

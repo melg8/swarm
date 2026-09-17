@@ -130,6 +130,13 @@ type Server struct {
     // navmeshTiles are the flag selected tiles of the viewer (nil or
     // empty means every tile of the directory - the stitched world).
     navmeshTiles []navmesh.RegionKey
+    // navmeshEngine is the geodata engine of the viewer mode (nil in
+    // the tests): the original geometry source and the clearance
+    // radius holder.
+    navmeshEngine *pathfind.Engine
+    // navmeshCapsule answers the wall clearance questions of the
+    // route answers (nil when the engine is nil or unarmed).
+    navmeshCapsule *pathfind.Capsule
     // navmeshGeo caches the encoded geometry payloads of the served
     // tiles; navmeshGeoMu guards the lazy fills.
     navmeshGeo   map[navmesh.RegionKey][]byte
@@ -256,23 +263,25 @@ func (s *Server) handleProxySelect(w http.ResponseWriter, r *http.Request) {
 func newServer(address string, logger *log.Logger) *Server {
     mux := http.NewServeMux()
     server := &Server{
-        registry:     nil,
-        pathfinder:   nil,
-        pathfindView: nil,
-        geodataTiles: newGeodataTileCache(),
-        iconsDir:     atomic.Value{},
-        proxy:        nil,
-        acceptance:   nil,
-        journal:      nil,
-        logger:       logger,
-        httpServer:   nil,
-        eventsDone:   make(chan struct{}),
-        shutdown:     nil,
-        stats:        nil,
-        navmeshMesh:  nil,
-        navmeshTiles: nil,
-        navmeshGeo:   nil,
-        navmeshGeoMu: sync.Mutex{},
+        registry:       nil,
+        pathfinder:     nil,
+        pathfindView:   nil,
+        geodataTiles:   newGeodataTileCache(),
+        iconsDir:       atomic.Value{},
+        proxy:          nil,
+        acceptance:     nil,
+        journal:        nil,
+        logger:         logger,
+        httpServer:     nil,
+        eventsDone:     make(chan struct{}),
+        shutdown:       nil,
+        stats:          nil,
+        navmeshMesh:    nil,
+        navmeshTiles:   nil,
+        navmeshEngine:  nil,
+        navmeshCapsule: nil,
+        navmeshGeo:     nil,
+        navmeshGeoMu:   sync.Mutex{},
     }
     //nolint:exhaustruct_v5 // the zero defaults of http.Server are intended
     server.httpServer = &http.Server{
