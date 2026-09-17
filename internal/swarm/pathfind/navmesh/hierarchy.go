@@ -32,6 +32,7 @@ const maxHopperNodes = 32768
 // maxCoarseAttempts bounds the ban and replan cycles of one query.
 const maxCoarseAttempts = 3
 
+
 // maxConfinedNodes bounds the corridor confined fallback search: the
 // allowed set keeps the exploration inside the coarse chain clusters,
 // so the bound only guards the pathological mazes.
@@ -41,21 +42,32 @@ const maxConfinedNodes = 262144
 // portal pair answers that serve every later route through them).
 const hopCacheCapacity = 4096
 
-// coarseNode is one node of the cluster level search.
+// coarseNode is one node of the cluster level search: the (cluster,
+// entry component) pair - the component naming the polygon the search
+// stands on when entering the cluster (the coarse chain through a
+// cluster is verified polygon level connectivity, see abstract.go).
 type coarseNode struct {
-    key     clusterKey
-    parent  int32
-    edgeRef abstractEdgeRef
-    pos     Pos
-    g, f    float64
-    closed  bool
-    heapIdx int32
+    key       clusterKey
+    entryComp uint32
+    parent    int32
+    edgeRef   abstractEdgeRef
+    pos       Pos
+    g, f      float64
+    closed    bool
+    heapIdx   int32
+}
+
+// coarseNodeKey is the search state identity: the cluster and the
+// component the search entered it through.
+type coarseNodeKey struct {
+    key  clusterKey
+    comp uint32
 }
 
 // coarseState is the pooled search state of the cluster level.
 type coarseState struct {
     nodes []coarseNode
-    index map[clusterKey]int32
+    index map[coarseNodeKey]int32
     open  []int32
     best  int32
     bestH float64
@@ -290,9 +302,27 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
     if _, ok := startAbstract.index[startKey.ID]; !ok {
         return result
     }
+    goalAbstract := m.abstractOf(RegionKey{Col: goalCol, Row: goalRow})
+    if goalAbstract == nil {
+        return result
+    }
+    // The search states carry the component the crossing stood on:
+    // the start stands on the start polygon's component, the goal
+    // terminal answers only the entry into the end polygon's one.
+    startComp := uint32(0)
+    if startIdx := PolyOf(q.startRef); startIdx >= 0 &&
+        int(startIdx) < len(startAbstract.comps) {
+        startComp = startAbstract.comps[startIdx]
+    }
+    goalComp := uint32(0)
+    if endIdx := PolyOf(endRef); endIdx >= 0 &&
+        int(endIdx) < len(goalAbstract.comps) {
+        goalComp = goalAbstract.comps[endIdx]
+    }
     q.coarse.nodes = append(q.coarse.nodes, coarseNode{
-        key:    startKey,
-        parent: -1,
+        key:       startKey,
+        entryComp: startComp,
+        parent:    -1,
         edgeRef: abstractEdgeRef{Region: RegionKey{Col: 0, Row: 0},
             Index: 0},
         pos:     q.startPos,
@@ -301,7 +331,7 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
         closed:  false,
         heapIdx: -1,
     })
-    q.coarse.index[startKey] = 0
+    q.coarse.index[coarseNodeKey{key: startKey, comp: startComp}] = 0
     q.coarse.push(0)
 
     for {
@@ -315,7 +345,7 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
         }
         node.closed = true
         result.explored++
-        if node.key == goalKey {
+        if node.key == goalKey && node.entryComp == goalComp {
             result.reached = true
             result.edges, result.clusters = coarseChainWalk(q.coarse, idx)
 
@@ -353,6 +383,13 @@ func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos) {
         if q.bans[ref] {
             continue
         }
+        if edge.srcComp != node.entryComp {
+            // The component gate: the crossing the search stands on
+            // and this crossing live in different link components of
+            // the cluster - no polygon path connects them, chaining
+            // the edge would fake the connectivity.
+            continue
+        }
         if !q.filter.AllowWater && (edge.srcArea == AreaWater ||
             edge.dstArea == AreaWater) {
             // The dry search never enters the water polygons (the
@@ -360,11 +397,21 @@ func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos) {
             // refinement hop decides it for real).
             continue
         }
+        dstComp := edge.dstComp
+        if dstComp == 0 {
+            // The external target: its component lives in the
+            // neighbour abstract (resolved once, cached).
+            dstComp = m.edgeDstComp(ref, edge)
+            if dstComp == 0 {
+                continue
+            }
+        }
         dstArea := edge.dstArea
         if dstArea == unknownArea {
             dstArea = AreaGround
         }
-        existing, seen := q.coarse.index[edge.to]
+        nodeKey := coarseNodeKey{key: edge.to, comp: dstComp}
+        existing, seen := q.coarse.index[nodeKey]
         if seen && q.coarse.nodes[existing].closed {
             continue
         }
@@ -375,16 +422,17 @@ func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos) {
         if !seen {
             created := int32(len(q.coarse.nodes))
             q.coarse.nodes = append(q.coarse.nodes, coarseNode{
-                key:     edge.to,
-                parent:  idx,
-                edgeRef: ref,
-                pos:     edge.mid,
-                g:       g,
-                f:       g + h,
-                closed:  false,
-                heapIdx: -1,
+                key:       edge.to,
+                entryComp: dstComp,
+                parent:    idx,
+                edgeRef:   ref,
+                pos:       edge.mid,
+                g:         g,
+                f:         g + h,
+                closed:    false,
+                heapIdx:   -1,
             })
-            q.coarse.index[edge.to] = created
+            q.coarse.index[nodeKey] = created
             q.coarse.push(created)
             if h < q.coarse.bestH {
                 q.coarse.bestH = h
@@ -403,6 +451,34 @@ func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos) {
             q.coarse.fix(existing)
         }
     }
+}
+
+// edgeDstComp resolves and caches the link component of an external
+// edge target: the target polygon index rides the source tile's
+// external link record, the component labels live in the neighbour
+// abstract (built once, cached forever). Zero answers when the
+// neighbour is absent (the coarse search treats the edge as a wall,
+// the refinement semantics for a missing neighbour).
+func (m *Mesh) edgeDstComp(ref abstractEdgeRef, edge *abstractEdge) uint32 {
+    m.hierMu.Lock()
+    cached, ok := m.dstComps[ref]
+    m.hierMu.Unlock()
+    if ok {
+        return cached
+    }
+    comp := uint32(0)
+    if edge.extPoly != 0 && edge.extPoly != 0xFFFFFFFF {
+        neighbour := m.abstractOf(RegionKey{Col: edge.extCol,
+            Row: edge.extRow})
+        if neighbour != nil && int(edge.extPoly) < len(neighbour.comps) {
+            comp = neighbour.comps[edge.extPoly]
+        }
+    }
+    m.hierMu.Lock()
+    m.dstComps[ref] = comp
+    m.hierMu.Unlock()
+
+    return comp
 }
 
 // coarseChainWalk walks the parent chain and returns the crossed edge

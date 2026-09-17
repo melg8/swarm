@@ -52,9 +52,9 @@ func TestLongRouteDiagonalSwim(t *testing.T) {
     require.NoError(t, err)
     elapsed := time.Since(began)
 
-    t.Logf("diagonal swim route: found=%t partial=%t explored=%d"+
-        " corridor=%d waypoints=%d %s",
-        route.Found, route.Partial, route.Explored,
+    t.Logf("diagonal swim route: found=%t partial=%t hierarchical=%t"+
+        " explored=%d corridor=%d waypoints=%d %s",
+        route.Found, route.Partial, route.Hierarchical, route.Explored,
         len(route.Corridor), len(route.Waypoints), elapsed)
     if len(route.Waypoints) > 0 {
         first := route.Waypoints[0]

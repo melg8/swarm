@@ -18,14 +18,17 @@ import (
     "sync"
 )
 
-// DefaultMeshCapacity bounds how many tiles stay loaded. One tile of
-// a dense region costs a few megabytes, so the default keeps the
-// working set of any long route (a handful of regions) resident with
-// headroom; the loads are cheap (the whole tile decodes in about a
-// millisecond) so an eviction is not a stall. A capacity of zero or
-// less means unlimited (the full 165 region pack is feasible at
-// roughly half a gigabyte).
-const DefaultMeshCapacity = 32
+// DefaultMeshCapacity bounds how many tiles stay loaded. The exact
+// square port inflated the dense region tiles into the hundreds of
+// megabytes of heap (the 2.6M polygon region holds 230 MB of polys
+// and links, whole map 100M polys), so the default keeps the working
+// set of a route (the current region and its neighbours) resident
+// without risking the memory; the loads are cheap (the whole tile
+// decodes in well under a second, the hop corridors cache across
+// evictions) so an eviction is not a stall. A capacity of zero or
+// less means unlimited (fine for the sparse tiles, a memory hazard on
+// the dense whole map pack).
+const DefaultMeshCapacity = 4
 
 // tileFileExt is the tile file extension under the mesh directory.
 const tileFileExt = ".nm"
@@ -53,6 +56,7 @@ type Mesh struct {
     hierMu     sync.Mutex
     hops       map[hopKey][]PolyRef
     hopOrder   []hopKey
+    dstComps   map[abstractEdgeRef]uint32
 }
 
 // tileEntry is one loaded, failed or missing tile in the cache.
@@ -107,7 +111,7 @@ func NewMesh(dir string) *Mesh {
         coarsePool: sync.Pool{New: func() any {
             return &coarseState{
                 nodes: nil,
-                index: make(map[clusterKey]int32, 1024),
+                index: make(map[coarseNodeKey]int32, 1024),
                 open:  nil,
                 best:  -1,
                 bestH: 0,
@@ -115,6 +119,7 @@ func NewMesh(dir string) *Mesh {
         }},
         hops:     make(map[hopKey][]PolyRef),
         hopOrder: make([]hopKey, 0, hopCacheCapacity),
+        dstComps: make(map[abstractEdgeRef]uint32),
     }
     mesh.scanFiles()
 

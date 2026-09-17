@@ -107,7 +107,20 @@ type abstractEdge struct {
     link int32
     // mid is the portal midpoint: the world position the hop searches
     // through (on the shared edge, at the surface height).
-    mid     Pos
+    mid Pos
+    // srcComp is the link component of the source polygon; dstComp is
+    // the component of the target polygon (known at build time for
+    // the internal links, zero until the coarse search resolves it
+    // through the neighbour abstract for the external ones).
+    srcComp uint32
+    dstComp uint32
+    // extTarget names the neighbour side of an external crossing (the
+    // record the source tile already carries): the coarse search
+    // resolves the target component through it without a neighbour
+    // tile decode. Zero poly marks the internal edges.
+    extCol  int16
+    extRow  int16
+    extPoly uint32
     srcArea uint8
     dstArea uint8
 }
@@ -126,11 +139,14 @@ type abstractNode struct {
 }
 
 // abstractClassKey dedupes the parallel edges of one node: the
-// target cluster plus the area pair of the crossing.
+// target cluster, the area pair of the crossing and the source
+// component (the crossings of different components serve different
+// parts of the cluster and must all survive the dedupe).
 type abstractClassKey struct {
     to      clusterKey
     srcArea uint8
     dstArea uint8
+    srcComp uint32
 }
 
 // regionAbstract is the level 1 graph of one region: the clusters
@@ -140,6 +156,13 @@ type regionAbstract struct {
     nodes []abstractNode
     index map[clusterID]int32
     edges []abstractEdge
+    // comps is the link component id per polygon of the source tile
+    // (the whole tile link graph is bidirectional, the union find
+    // over the links labels it): the coarse search chains two edges
+    // through one cluster only when the crossing they stand on and
+    // the crossing they leave through share the component - the
+    // intra cluster connectivity the HPA* entrance analysis gives.
+    comps []uint32
     // polys is the polygon count of the source tile (the level 0
     // size the doc arithmetic quotes).
     polys int
@@ -186,21 +209,24 @@ func buildAbstract(tile *Tile) *regionAbstract {
         nodes: nil,
         index: make(map[clusterID]int32, clustersPerSide*clustersPerSide),
         edges: nil,
+        comps: linkComponents(tile),
         polys: len(tile.Polys),
     }
     markClusters(tile, abstract)
-    self := clusterKey{Col: tile.Col, Row: tile.Row, ID: 0}
     for pi := range tile.Polys {
         poly := &tile.Polys[pi]
         for li := poly.FirstLink; li >= 0 && int(li) < len(tile.Links); {
             link := &tile.Links[li]
+            current := li
             li = link.Next
             sourceID := clusterOfEdgeSource(tile, poly, link)
-            edge, ok := abstractEdgeOf(tile, int32(pi), link)
+            edge, ok := abstractEdgeOf(tile, abstract.comps, int32(pi),
+                int32(current), link)
             if !ok {
                 continue
             }
-            if edge.to == self && edge.to.ID == sourceID {
+            if edge.to.Col == tile.Col && edge.to.Row == tile.Row &&
+                edge.to.ID == sourceID {
                 // The link stays inside one cluster: the coarse graph
                 // does not see it (the refinement searches the real
                 // mesh).
@@ -214,6 +240,7 @@ func buildAbstract(tile *Tile) *regionAbstract {
                 to:      edge.to,
                 srcArea: edge.srcArea,
                 dstArea: edge.dstArea,
+                srcComp: edge.srcComp,
             }
             if idx, seen := node.classes[class]; seen {
                 // Keep the crossing closest to the side center: the
@@ -234,6 +261,55 @@ func buildAbstract(tile *Tile) *regionAbstract {
     }
 
     return abstract
+}
+
+// linkComponents labels every polygon of the tile with its link
+// component (union find over the internal links; the tile link graph
+// is bidirectional by construction, the labels are the strongly
+// connected pieces the coarse chain verification needs).
+func linkComponents(tile *Tile) []uint32 {
+    parent := make([]uint32, len(tile.Polys))
+    for i := range parent {
+        parent[i] = uint32(i)
+    }
+    var find func(uint32) uint32
+    find = func(x uint32) uint32 {
+        for parent[x] != x {
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        }
+
+        return x
+    }
+    union := func(a, b uint32) {
+        ra, rb := find(a), find(b)
+        if ra != rb {
+            parent[rb] = ra
+        }
+    }
+    for pi := range tile.Polys {
+        poly := &tile.Polys[pi]
+        for li := poly.FirstLink; li >= 0 && int(li) < len(tile.Links); {
+            link := &tile.Links[li]
+            li = link.Next
+            if link.To >= 0 && int(link.To) < len(tile.Polys) {
+                union(uint32(pi), uint32(link.To))
+            }
+        }
+    }
+    comps := make([]uint32, len(tile.Polys))
+    ids := make(map[uint32]uint32)
+    for pi := range parent {
+        root := find(uint32(pi))
+        id, ok := ids[root]
+        if !ok {
+            id = uint32(len(ids) + 1)
+            ids[root] = id
+        }
+        comps[pi] = id
+    }
+
+    return comps
 }
 
 // edgeCrossingDistance measures how far a crossing sits from the
@@ -286,20 +362,25 @@ func (a *regionAbstract) nodeOf(id clusterID) *abstractNode {
 // abstractEdgeOf derives the coarse edge of one mesh link: the
 // crossing midpoint, the source and target clusters and the target
 // polygon reference (internal links name it directly, external ones
-// resolve at refinement time).
-func abstractEdgeOf(tile *Tile, poly int32, link *Link,
+// resolve at refinement time). The link index rides the edge: the
+// external target and its component resolve through the source tile's
+// link store.
+func abstractEdgeOf(tile *Tile, comps []uint32, poly int32,
+    linkIdx int32, link *Link,
 ) (abstractEdge, bool) {
     p := &tile.Polys[poly]
     ax, ay, bx, by := tile.Portal(p, link)
     edge := abstractEdge{
         to:    clusterKey{Col: 0, Row: 0, ID: 0},
         toRef: 0,
-        link:  0,
+        link:  linkIdx,
         mid: Pos{
             X: (ax + bx) * 0.5,
             Y: (ay + by) * 0.5,
             Z: tile.HeightAt(p, (ax+bx)*0.5, (ay+by)*0.5),
         },
+        srcComp: comps[poly],
+        dstComp: 0,
         srcArea: p.Area,
         dstArea: unknownArea,
     }
@@ -316,7 +397,7 @@ func abstractEdgeOf(tile *Tile, poly int32, link *Link,
         cy++
     }
     if link.To >= 0 {
-        return abstractInternalEdge(tile, link, edge, cx, cy)
+        return abstractInternalEdge(tile, comps, link, edge, cx, cy)
     }
 
     return abstractExternalEdge(tile, link, edge, cx, cy)
@@ -325,13 +406,13 @@ func abstractEdgeOf(tile *Tile, poly int32, link *Link,
 // abstractInternalEdge finishes the coarse edge of an internal link:
 // the target polygon of the same tile names the target cluster, the
 // polygon reference and the surface area (false on a corrupt link).
-func abstractInternalEdge(tile *Tile, link *Link, edge abstractEdge,
-    cx, cy int32,
+func abstractInternalEdge(tile *Tile, comps []uint32, link *Link,
+    edge abstractEdge, cx, cy int32,
 ) (abstractEdge, bool) {
     if int(link.To) >= len(tile.Polys) {
         return abstractEdge{to: clusterKey{Col: 0, Row: 0, ID: 0},
             toRef: 0, link: 0, mid: Pos{X: 0, Y: 0, Z: 0},
-            srcArea: 0, dstArea: 0}, false
+            srcComp: 0, dstComp: 0, srcArea: 0, dstArea: 0}, false
     }
     target := &tile.Polys[link.To]
     edge.to = clusterKey{
@@ -339,6 +420,7 @@ func abstractInternalEdge(tile *Tile, link *Link, edge abstractEdge,
         ID: clusterOfCell(clampCell(cx), clampCell(cy)),
     }
     edge.toRef = RefOf(tile.Col, tile.Row, uint32(link.To))
+    edge.dstComp = comps[link.To]
     edge.dstArea = target.Area
 
     return edge, true
@@ -355,13 +437,13 @@ func abstractExternalEdge(tile *Tile, link *Link, edge abstractEdge,
     if int(extIdx) >= len(tile.ExtLinks) {
         return abstractEdge{to: clusterKey{Col: 0, Row: 0, ID: 0},
             toRef: 0, link: 0, mid: Pos{X: 0, Y: 0, Z: 0},
-            srcArea: 0, dstArea: 0}, false
+            srcComp: 0, dstComp: 0, srcArea: 0, dstArea: 0}, false
     }
     ext := &tile.ExtLinks[extIdx]
     if ext.Poly == 0xFFFFFFFF {
         return abstractEdge{to: clusterKey{Col: 0, Row: 0, ID: 0},
             toRef: 0, link: 0, mid: Pos{X: 0, Y: 0, Z: 0},
-            srcArea: 0, dstArea: 0}, false
+            srcComp: 0, dstComp: 0, srcArea: 0, dstArea: 0}, false
     }
     ncx, ncy := cx, cy
     switch link.Side {
@@ -378,6 +460,9 @@ func abstractExternalEdge(tile *Tile, link *Link, edge abstractEdge,
         Col: int16(ext.Col), Row: int16(ext.Row),
         ID: clusterOfCell(clampCell(ncx), clampCell(ncy)),
     }
+    edge.extCol = int16(ext.Col)
+    edge.extRow = int16(ext.Row)
+    edge.extPoly = ext.Poly
 
     return edge, true
 }
