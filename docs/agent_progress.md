@@ -429,3 +429,48 @@ the engine confirmation flood on mesh partials - the ~13 s the real
 hard pair dry search pays today), the Detour-parity optimization if
 the fleet benchmark asks for it, the route-vs-engine replay harness
 over the Dion hunting grounds.
+
+- 2026-09-17: the capsule clearance round landed (the owner report: the
+  pathfinding ignores the character collision capsule and puts the
+  waypoints too close to the wall edges and corners - the character
+  sticks in the passage and clips every bend). The server movement
+  validation is cell level and never checks the capsule (the elven
+  fighter template radius 7.5), so the planner owns the clearance:
+  `pathfind.Capsule` (pathfind/capsule.go) answers the wall clearance
+  of a point (the exact distance to the nearest closed NSWE wall edge
+  of the layer nearest the reference z, exact within one cell) and
+  `ApplyPath` enforces the radius over a planned waypoint path (the
+  interior waypoints pushed off the walls by the damped projection,
+  every leg sampled and bent around the walls through pushed-in
+  anchor chains, every move validated by the engine line of sight,
+  the first and the last waypoints never move, the honest fallback
+  keeps the original geometry). The mesh funnel pulls its pivots
+  inward from the portal span ends by the same radius
+  (`Filter.WaypointClearance`, offsetPortal; a span narrower than
+  twice the radius pivots at its middle). The engine post pass arms
+  through `Engine.SetCapsuleClearance` - the bot wiring, the pathfind
+  test UI and the navmesh viewer arm it with the template radius, the
+  hunt hybrid serves the mesh answers through the same radius (the
+  cleared filter plus the cleared waypoints). The viewer route
+  endpoint clears the mesh answers through the viewer engine. Tests:
+  the clearance pins (push off the wall, the pillar bend chain, the
+  no-churn contract, the solid block fallback, the engine
+  integration), the funnel pivot pins (the L corridor raw pivot on
+  the wall boundary vs the cleared pivot at the radius). The same
+  round fixed the shingled slope rendering (the owner report: the
+  terrain steps down like roof sheets instead of joining edge to
+  edge - hills, not stairs): the rectangle corners read the sheet's
+  own VERTEX field now (the average of the sheet's cells around the
+  grid vertex), so the adjacent rectangles of one sheet agree about
+  every shared edge (the inside-cell corners disagreed by the full 8
+  unit quantization step on EVERY slope adjacency) while different
+  sheets keep their own levels and genuine cliffs stay sharp
+  (navbuild/rect.go vertexHeight, the vertex tests pin the seam free
+  join and the sharp shore step). The mesh pack must be rebuilt for
+  the new geometry (data/navmesh is gitignored, cmd/navmesh-build).
+  NOT DONE YET (the interrupted session): the viewer waypoint
+  coordinates checkbox default off, the geometry variant toggle (the
+  detour mesh vs the original l2j cells render plus the geom URL
+  parameter with the camera and the route preserved), the tile
+  rebuild and the visual before/after verification of the owner's
+  two views.
