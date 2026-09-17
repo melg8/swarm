@@ -37,6 +37,14 @@ type Filter struct {
     // than twice the radius pivots at its middle (the deepest point
     // of a narrow doorway). Zero keeps the exact pivots.
     WaypointClearance float64
+    // Smooth runs the shortcut pass over the funnel answer (the
+    // smoothing): the greedy farthest visible merge walks the corridor
+    // and folds the waypoints into the longest chords that cross every
+    // intermediate portal inside its open span and keep the
+    // WaypointClearance radius from the wall edges of the crossed
+    // polygons. It needs the pivot clearance armed - a zero
+    // WaypointClearance keeps the raw funnel answer.
+    Smooth bool
 }
 
 // DefaultFilter is the swim allowing search with the 3x water cost.
@@ -46,6 +54,7 @@ func DefaultFilter() Filter {
         AllowWater:        true,
         Avoid:             nil,
         WaypointClearance: 0,
+        Smooth:            false,
     }
 }
 
@@ -58,6 +67,7 @@ func DryFilter() Filter {
         AllowWater:        false,
         Avoid:             nil,
         WaypointClearance: 0,
+        Smooth:            false,
     }
 }
 
@@ -73,9 +83,8 @@ const (
     nearestHalfZ  = 600
 )
 
-// Route is one navigation answer: the funnel waypoints the walker
-// follows, the polygon corridor they never leave and the search
-// statistics.
+// Route is one navigation answer: the waypoints the walker follows,
+// the polygon corridor they never leave and the search statistics.
 type Route struct {
     // Found reports whether the requested destination was reached.
     Found bool
@@ -83,10 +92,34 @@ type Route struct {
     // destination is unreachable under the filter (the dry search of
     // a swim-only target): the waypoints then end at the closest
     // reachable point, the corridor is the walkable part of it.
-    Partial   bool
+    Partial bool
+    // Waypoints is the walk answer: the smoothed funnel when the
+    // filter arms the shortcut pass, the raw funnel otherwise.
     Waypoints []Pos
-    Corridor  []PolyRef
-    Explored  int
+    // RawWaypoints is the unsmoothed funnel answer, populated when
+    // the shortcut pass ran (the comparison variant the viewer
+    // toggles against); nil keeps "the waypoints are the raw funnel".
+    RawWaypoints []Pos
+    Corridor     []PolyRef
+    Explored     int
+}
+
+// answerWaypoints fills the route waypoints from the corridor: the
+// raw funnel answer, smoothed through the shortcut pass when the
+// filter arms it (the raw answer rides along for the comparison).
+func (m *Mesh) answerWaypoints(route *Route, corridor []PolyRef,
+    startPos, endPos Pos, filter Filter,
+) {
+    wps := m.straightPathWps(corridor, startPos, endPos,
+        filter.WaypointClearance)
+    if filter.Smooth && filter.WaypointClearance > 0 {
+        route.RawWaypoints = funnelPositions(wps)
+        route.Waypoints = m.smoothPath(corridor, wps,
+            filter.WaypointClearance)
+
+        return
+    }
+    route.Waypoints = funnelPositions(wps)
 }
 
 // Route searches the walkable route from start to end under the
@@ -134,8 +167,8 @@ func (m *Mesh) RouteApproach(
 
     if startRef == endRef {
         route.Corridor = []PolyRef{startRef}
-        route.Waypoints = m.straightPath(route.Corridor, startPos,
-            endPos, filter.WaypointClearance)
+        m.answerWaypoints(route, route.Corridor, startPos, endPos,
+            filter)
         route.Found = true
 
         return route, nil
@@ -150,15 +183,15 @@ func (m *Mesh) RouteApproach(
     switch {
     case result.reached:
         route.Found = true
-        route.Waypoints = m.straightPath(result.corridor, startPos,
-            endPos, filter.WaypointClearance)
+        m.answerWaypoints(route, result.corridor, startPos, endPos,
+            filter)
     case result.partial && len(result.corridor) > 1:
         route.Partial = true
         // The partial answer funnels toward the original end: the
         // projection onto the last corridor polygon is the closest
         // reachable point of it (the dry search contract).
-        route.Waypoints = m.straightPath(result.corridor, startPos,
-            endPos, filter.WaypointClearance)
+        m.answerWaypoints(route, result.corridor, startPos, endPos,
+            filter)
     default:
         route.Corridor = nil
     }

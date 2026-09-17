@@ -129,19 +129,22 @@ type navmeshPathRequest struct {
 }
 
 // navmeshPathResponse is the reply of POST /api/navmesh/path: the
-// funnel waypoints of the corridor search with the measured
-// construction time (the first query of a region may include the lazy
-// tile decode, roughly a millisecond per tile - the number stays
-// honest, it is what a cold bot pays too).
+// waypoints of the corridor search with the measured construction
+// time (the first query of a region may include the lazy tile
+// decode, roughly a millisecond per tile - the number stays honest,
+// it is what a cold bot pays too). The smoothed answer rides in
+// waypoints when the capsule clearance arms the shortcut pass; the
+// raw funnel answer rides in rawWaypoints for the comparison toggle.
 type navmeshPathResponse struct {
-    Found      bool           `json:"found"`
-    Partial    bool           `json:"partial"`
-    Error      string         `json:"error,omitempty"`
-    Waypoints  []navmeshPoint `json:"waypoints"`
-    DurationMs float64        `json:"durationMs"`
-    Explored   int            `json:"explored"`
-    Corridor   int            `json:"corridor"`
-    Filter     string         `json:"filter"`
+    Found        bool           `json:"found"`
+    Partial      bool           `json:"partial"`
+    Error        string         `json:"error,omitempty"`
+    Waypoints    []navmeshPoint `json:"waypoints"`
+    RawWaypoints []navmeshPoint `json:"rawWaypoints,omitempty"`
+    DurationMs   float64        `json:"durationMs"`
+    Explored     int            `json:"explored"`
+    Corridor     int            `json:"corridor"`
+    Filter       string         `json:"filter"`
 }
 
 // handleNavmeshConfig answers the mode and the tile listing of the
@@ -291,6 +294,7 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         clearance = s.navmeshEngine.CapsuleRadius()
     }
     filter.WaypointClearance = clearance
+    filter.Smooth = clearance > 0
 
     start := navmesh.Pos{X: request.Start.X, Y: request.Start.Y,
         Z: request.Start.Z}
@@ -301,14 +305,15 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     duration := time.Since(began)
 
     response := navmeshPathResponse{
-        Found:      false,
-        Partial:    false,
-        Error:      "",
-        Waypoints:  []navmeshPoint{},
-        DurationMs: float64(duration.Nanoseconds()) / 1e6,
-        Explored:   0,
-        Corridor:   0,
-        Filter:     filterName,
+        Found:        false,
+        Partial:      false,
+        Error:        "",
+        Waypoints:    []navmeshPoint{},
+        RawWaypoints: nil,
+        DurationMs:   float64(duration.Nanoseconds()) / 1e6,
+        Explored:     0,
+        Corridor:     0,
+        Filter:       filterName,
     }
     if err != nil {
         response.Error = err.Error()
@@ -322,19 +327,20 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         response.Explored = route.Explored
         response.Corridor = len(route.Corridor)
         response.Waypoints = toNavmeshPoints(
-            s.clearedWaypoints(route, clearance))
+            s.clearedWaypoints(route.Waypoints, clearance))
+        response.RawWaypoints = toNavmeshPoints(
+            s.clearedWaypoints(route.RawWaypoints, clearance))
     }
     writeJSON(w, s.logger, response)
 }
 
-// clearedWaypoints runs the route waypoints through the capsule
+// clearedWaypoints runs the answer waypoints through the capsule
 // clearance post pass when the viewer engine arms it: the funnel
-// pivot clearance covers the turns, the post pass covers the legs
-// that still graze a wall.
-func (s *Server) clearedWaypoints(route *navmesh.Route,
+// pivot clearance covers the turns, the smoothing covers the merged
+// legs, the post pass covers whatever still grazes a wall.
+func (s *Server) clearedWaypoints(waypoints []navmesh.Pos,
     clearance float64,
 ) []navmesh.Pos {
-    waypoints := route.Waypoints
     if s.navmeshCapsule == nil || len(waypoints) == 0 {
         return waypoints
     }

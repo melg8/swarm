@@ -130,6 +130,11 @@ const viewer = {
   // (the same NMV2 contract, the /api/navmesh/original endpoint). The
   // route, the camera and the tile selection live above the variant.
   variant: "mesh",
+  // The route variant of the comparison toggle: "smooth" draws the
+  // smoothed answer (the shortcut pass merged the funnel pivots the
+  // corridor geometry allows), "raw" draws the raw funnel steps. One
+  // search serves both - the answer carries the two waypoint lists.
+  pathVariant: "smooth",
   pendingStart: null,
   path: null,
   routeStart: null,
@@ -214,6 +219,13 @@ function init(config) {
       select.value = view.geom;
     }
   }
+  if (view.path) {
+    viewer.pathVariant = view.path;
+    const select = document.getElementById("nmv-path");
+    if (select) {
+      select.value = view.path;
+    }
+  }
   if (view.cam) {
     applyCameraState(view.cam);
   } else {
@@ -279,6 +291,10 @@ function buildSurface(navmesh) {
         <option value="4">4x</option>
       </select>
       <div class="nmv-section">display</div>
+      <select id="nmv-path" class="nmv-select">
+        <option value="smooth" selected>smoothed route (capsule clear)</option>
+        <option value="raw">raw funnel steps</option>
+      </select>
       <label class="nmv-row"><input type="checkbox"
         id="nmv-waypoint-coords">
         <span>waypoint coordinates</span></label>
@@ -367,6 +383,9 @@ function buildSurface(navmesh) {
   });
   document.getElementById("nmv-geom").addEventListener("change", (e) => {
     setVariant(e.target.value);
+  });
+  document.getElementById("nmv-path").addEventListener("change", (e) => {
+    setPathVariant(e.target.value);
   });
   document.getElementById("nmv-height").addEventListener("change", (e) => {
     setHeightScale(Number(e.target.value));
@@ -1323,9 +1342,10 @@ async function requestRoute(start, end) {
   }
 }
 
-// renderRouteAnswer draws the funnel waypoints and fills the result
-// panel: the status, the measured construction time, the search
-// statistics and the from/to coordinates of the clicked pair.
+// renderRouteAnswer draws the route waypoints of the active variant
+// and fills the result panel: the status, the measured construction
+// time, the search statistics and the from/to coordinates of the
+// clicked pair.
 function renderRouteAnswer(answer) {
   viewer.path = answer;
   if (answer.error) {
@@ -1350,7 +1370,8 @@ function renderRouteAnswer(answer) {
     timerSub.textContent = "ms construction time";
   }
   const stats = document.getElementById("nmv-stats");
-  const waypoints = answer.waypoints || [];
+  const waypoints = activeWaypoints(answer);
+  const raw = answer.rawWaypoints || [];
   const rows = [];
   if (viewer.routeStart && viewer.routeEnd) {
     rows.push(["from", formatCoordRow(viewer.routeStart)]);
@@ -1364,11 +1385,37 @@ function renderRouteAnswer(answer) {
     ["path length", Math.round(routeLength(waypoints)).toLocaleString() +
       " units"],
     ["filter", answer.filter]);
+  if (raw.length > 0) {
+    rows.push(["raw funnel steps", String(raw.length)]);
+  }
   stats.innerHTML = rows.map(([name, value]) =>
     name === "spacer"
       ? `<div class="nmv-stat nmv-stat-gap"></div>`
       : `<div class="nmv-stat"><span>${name}</span><b>${value}</b></div>`)
     .join("");
+}
+
+// activeWaypoints picks the waypoint list the route variant toggle
+// names: the smoothed answer, or the raw funnel steps it merged. A
+// missing raw list (the shortcut pass did not run) keeps the answer
+// waypoints.
+function activeWaypoints(answer) {
+  if (viewer.pathVariant === "raw" &&
+      Array.isArray(answer.rawWaypoints) &&
+      answer.rawWaypoints.length > 0) {
+    return answer.rawWaypoints;
+  }
+
+  return answer.waypoints || [];
+}
+
+// setPathVariant redraws the last answer through the newly picked
+// route variant (the same search, the other waypoint list).
+function setPathVariant(variant) {
+  viewer.pathVariant = variant === "raw" ? "raw" : "smooth";
+  if (viewer.path) {
+    renderRouteAnswer(viewer.path);
+  }
 }
 
 // formatCoordRow renders one clicked endpoint with its tile square.
@@ -1398,10 +1445,11 @@ function routeLength(waypoints) {
 
 // drawRouteOverlays rebuilds the path line, the waypoint dots, the
 // coordinate labels and the endpoint markers from the last answer
-// (the height scale change re-renders through it).
+// through the active route variant (the height scale change and the
+// variant toggle re-render through it).
 function drawRouteOverlays(answer) {
   clearRouteOverlays();
-  const waypoints = answer.waypoints || [];
+  const waypoints = activeWaypoints(answer);
   if (waypoints.length === 0) {
     return;
   }
@@ -1640,6 +1688,7 @@ function parseViewParams() {
     filter: null,
     scale: null,
     geom: null,
+    path: null,
   };
   const tiles = search.get("tiles");
   if (tiles) {
@@ -1657,6 +1706,10 @@ function parseViewParams() {
   const geom = search.get("geom");
   if (geom === "mesh" || geom === "orig") {
     view.geom = geom;
+  }
+  const path = search.get("path");
+  if (path === "smooth" || path === "raw") {
+    view.path = path;
   }
 
   return view;
@@ -1736,6 +1789,7 @@ function buildViewStateUrl() {
   params.set("filter", viewer.filter);
   params.set("scale", String(viewer.heightScale));
   params.set("geom", viewer.variant);
+  params.set("path", viewer.pathVariant);
 
   return window.location.origin + window.location.pathname + "?" +
     params.toString();

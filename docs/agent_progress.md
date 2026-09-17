@@ -557,3 +557,28 @@ over the Dion hunting grounds.
   parameter with the camera and the route preserved), the tile
   rebuild and the visual before/after verification of the owner's
   two views.
+
+- 2026-09-17: the route shortcut pass (the smoothing) landed: the
+  funnel on the exact square mesh pivots at every clearance pinhole
+  and the walker micro steers (the owner walk plan stuck at wp 25);
+  Filter.Smooth arms the greedy farthest visible merge in
+  navmesh/smooth.go - every merged chord crosses the intermediate
+  portals inside their open spans and keeps the capsule radius from
+  the wall spans (the link complement per polygon side), the raw
+  funnel answer rides in Route.RawWaypoints. The viewer route variant
+  toggle (smoothed vs raw, the path= URL parameter, one search serves
+  both) draws the two answers; the bot navigator and the viewer arm
+  the pass with the engine capsule radius. The owner repro route
+  (21_19 swim) answers 63 smoothed waypoints of 81 raw, the granular
+  legs (< 16 units) drop from 7 to 1. Tests: the corner under the
+  capsule stays (the chord 5.66 off the inner wall is refused), the
+  open boundary merge (the funnel pivot at a soft span end folds),
+  the void detour keeps every pivot, the portal index chain, the
+  unarmed contract. KNOWN NEXT: the grid per cell walls (the
+  diagonal anti corner cut) are finer than the mesh side level link
+  spans - 26 of 62 smoothed legs still hold a grid wall sample under
+  the radius (worst 1.6 units near the owner stuck area), the grid
+  capsule pass re-fragments the answer with micro anchors; the next
+  round binds the shortcut pass to the grid wall oracle (the
+  LegGuard seam) so the merged chords clear the server accurate
+  raster directly.

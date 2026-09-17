@@ -393,7 +393,33 @@ The endpoints behind the page (the mode of `GET /api/config` is
   server caches the encoded bytes;
 - `POST /api/navmesh/path` - `{start, end, filter}` positions and
   the reply `{found, partial, waypoints, durationMs, explored,
-  corridor, filter}` of the measured `Route` call.
+  corridor, filter}` of the measured `Route` call. When the capsule
+  clearance arms the shortcut pass the reply carries the two variants
+  of the walk: `waypoints` is the smoothed answer (the merged chords)
+  and `rawWaypoints` is the raw funnel answer it merged - the viewer
+  route variant toggle draws one or the other from one search (the
+  `path=smooth|raw` view link parameter restores the pick).
+
+## The shortcut pass (the smoothing)
+
+The funnel on the exact square mesh pivots at every portal the
+clearance shrinks into a pinhole: a 16 unit portal loses 7.5 off both
+span ends, one unit of window stays, and a long walk turns at every
+height run edge - the walker micro steers through a hundred plus
+waypoints and hooks on the dense turns (the owner report with the
+walk plan aiming at wp 25). `Filter.Smooth` arms the shortcut pass
+(smooth.go): the greedy farthest visible merge walks the corridor and
+folds the funnel waypoints into the longest chords that (a) cross
+every intermediate portal inside its open span - the corridor
+fidelity, no chord leaves the polygon chain - and (b) keep the
+WaypointClearance radius from every wall edge of the crossed
+polygons - the walls are the side portions without a link, the same
+closed edges the capsule clearance pass pushes away from. The merged
+answer keeps the pivots no safe chord skips, so it never adds a turn;
+the raw funnel answer rides along in `Route.RawWaypoints` for the
+comparison. The open spans of the mesh are whole geodata cells
+(16 units), so every span holds a crossing a 7.5 capsule clears and
+the pass never dead ends.
 
 Three.js itself is vendored (`web/vendor/three.module.min.js`, the
 r160 module build, MIT) so the viewer works offline like the rest of

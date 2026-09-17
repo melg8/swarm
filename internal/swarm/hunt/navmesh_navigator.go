@@ -69,9 +69,13 @@ func NewNavmeshNavigator( //nolint:ireturn
 }
 
 // clearedFilter arms the funnel pivot clearance of the mesh search
-// from the engine's capsule radius.
+// from the engine's capsule radius and runs the shortcut pass over
+// the funnel answer: the pivots keep the turns off the wall corners,
+// the merged legs keep the capsule away from every wall the corridor
+// crosses - one radius, both contracts.
 func (n navmeshNavigator) clearedFilter(filter navmesh.Filter) navmesh.Filter {
     filter.WaypointClearance = n.clearance
+    filter.Smooth = n.clearance > 0
 
     return filter
 }

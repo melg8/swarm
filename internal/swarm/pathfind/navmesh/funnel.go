@@ -10,6 +10,17 @@ import "math"
 // portal advance guard and the waypoint deduplication.
 const funnelEpsilon = 1e-4
 
+// funnelWp is one waypoint of the raw funnel answer: the position and
+// the corridor index of the portal the waypoint sits on (-1 for the
+// start projection before the first portal, len(corridor)-1 for the
+// end projection). The portal index is the corridor walk address the
+// shortcut pass replays: a chord leaving the waypoint crosses the
+// portals after it, a chord arriving at it ends on its portal edge.
+type funnelWp struct {
+    pos    Pos
+    portal int32
+}
+
 // straightPath turns a polygon corridor into walk waypoints through
 // the funnel algorithm of dtNavMeshQuery::findStraightPath: the
 // portals of the corridor (the open spans of the shared edges) narrow
@@ -29,6 +40,26 @@ const funnelEpsilon = 1e-4
 func (m *Mesh) straightPath(corridor []PolyRef, startPos, endPos Pos,
     clearance float64,
 ) []Pos {
+    return funnelPositions(m.straightPathWps(corridor, startPos, endPos,
+        clearance))
+}
+
+// funnelPositions strips the funnel waypoints down to their positions.
+func funnelPositions(wps []funnelWp) []Pos {
+    positions := make([]Pos, len(wps))
+    for i, wp := range wps {
+        positions[i] = wp.pos
+    }
+
+    return positions
+}
+
+// straightPathWps is the funnel answer with the corridor walk
+// addresses (the portal index of every waypoint) the shortcut pass
+// replays.
+func (m *Mesh) straightPathWps(corridor []PolyRef, startPos, endPos Pos,
+    clearance float64,
+) []funnelWp {
     if len(corridor) == 0 {
         return nil
     }
@@ -47,15 +78,16 @@ func (m *Mesh) straightPath(corridor []PolyRef, startPos, endPos Pos,
         endPos.Y, endPos.Z)
     closestEnd := Pos{X: ex, Y: ey, Z: ez}
 
-    waypoints := make([]Pos, 0, len(corridor)+1)
-    waypoints = appendWaypoint(waypoints, closestStart)
+    waypoints := make([]funnelWp, 0, len(corridor)+1)
+    waypoints = appendWp(waypoints, closestStart, -1)
 
     if len(corridor) > 1 {
         m.runFunnel(corridor, closestStart, closestEnd, clearance,
             &waypoints)
     }
 
-    waypoints = appendWaypoint(waypoints, closestEnd)
+    waypoints = appendWp(waypoints, closestEnd,
+        int32(len(corridor)-1))
 
     return waypoints
 }
@@ -69,7 +101,7 @@ func (m *Mesh) straightPath(corridor []PolyRef, startPos, endPos Pos,
 // which is the negative of the Detour dtTriArea2D - every comparison
 // of the upstream algorithm flips with it.
 func (m *Mesh) runFunnel(corridor []PolyRef, closestStart, closestEnd Pos,
-    clearance float64, waypoints *[]Pos,
+    clearance float64, waypoints *[]funnelWp,
 ) {
     cone := funnelCone{
         apex:       closestStart,
@@ -97,13 +129,13 @@ func (m *Mesh) runFunnel(corridor []PolyRef, closestStart, closestEnd Pos,
             continue
         }
         if apex, inverted := cone.narrowRight(right, i); inverted {
-            *waypoints = appendWaypoint(*waypoints, apex)
+            *waypoints = appendWp(*waypoints, apex, int32(cone.apexIndex))
             i = cone.apexIndex + 1
 
             continue
         }
         if apex, inverted := cone.narrowLeft(left, i); inverted {
-            *waypoints = appendWaypoint(*waypoints, apex)
+            *waypoints = appendWp(*waypoints, apex, int32(cone.apexIndex))
             i = cone.apexIndex + 1
 
             continue
@@ -286,15 +318,16 @@ func offsetPortal(left, right Pos, radius float64) (Pos, Pos) {
     return pulled(left, 1), pulled(right, -1)
 }
 
-// appendWaypoint appends a funnel corner unless it duplicates the
-// previous one in 2D.
-func appendWaypoint(waypoints []Pos, point Pos) []Pos {
+// appendWp appends a funnel corner with its corridor portal unless it
+// duplicates the previous one in 2D (the duplicate keeps the earlier
+// portal: the positions coincide, the walk address only tightens).
+func appendWp(waypoints []funnelWp, point Pos, portal int32) []funnelWp {
     if len(waypoints) > 0 &&
-        same2D(waypoints[len(waypoints)-1], point) {
+        same2D(waypoints[len(waypoints)-1].pos, point) {
         return waypoints
     }
 
-    return append(waypoints, point)
+    return append(waypoints, funnelWp{pos: point, portal: portal})
 }
 
 // triArea2D is the signed 2D triangle area with the standard cross
