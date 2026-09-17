@@ -40,16 +40,21 @@ func main() {
             " default: every region of the geodata directory")
     force := flag.Bool("force", false,
         "rebuild the regions whose tile file is already fresh")
+    compress := flag.Bool("compress", true,
+        "gzip the tile files in place (the runtime detects the format "+
+            "by the magic word; roughly half the disk)")
     flag.Parse()
 
-    if err := run(*geodataDir, *outDir, *regions, *force); err != nil {
+    if err := run(*geodataDir, *outDir, *regions, *force,
+        *compress); err != nil {
         fmt.Println("Error:", err)
         os.Exit(1)
     }
 }
 
 // run executes the build over the requested regions.
-func run(geodataDir, outDir, regionsSpec string, force bool) error {
+func run(geodataDir, outDir, regionsSpec string, force, compress bool,
+) error {
     keys, err := regionKeys(geodataDir, regionsSpec)
     if err != nil {
         return err
@@ -69,6 +74,15 @@ func run(geodataDir, outDir, regionsSpec string, force bool) error {
         })
     if err != nil {
         return err
+    }
+    if compress {
+        // The sidecars stay plain (kilobytes), the tiles compress.
+        saved, err := navbuild.CompressTileDir(outDir)
+        if err != nil {
+            return err
+        }
+        fmt.Printf("compressed %d tiles, %.1f MB saved\n",
+            saved.Count, float64(saved.Bytes)/(1024*1024))
     }
     fmt.Printf("built %d regions (%d skipped, %d failed), %d polys,"+
         " %d links, %d external links, %.1f MB of tiles in %s\n",

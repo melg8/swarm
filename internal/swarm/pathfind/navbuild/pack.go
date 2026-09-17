@@ -49,16 +49,28 @@ func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
     if log == nil {
         log = func(string, ...any) {}
     }
-    strips := buildPackPhaseA(keys, geodataDir, outDir, opts, force,
+    strips, err := buildPackPhaseA(keys, geodataDir, outDir, opts, force,
         &stats, log)
+    if err != nil {
+        return stats, err
+    }
 
-    // The phase B: only the regions whose neighbours were built in
-    // this pass (or skipped with a fresh tile - their strips are
-    // absent, the stitch then legitimately adds nothing: the fresh
-    // tile of a previous run already carries its links).
-    order := make([]navmesh.RegionKey, 0, len(strips))
-    for key := range strips {
-        order = append(order, key)
+    // The phase B stitches every requested region whose tile file
+    // exists: the strips come from the in-pass builds or, for the
+    // tiles of earlier passes, from the sidecar files (the chunked
+    // pack builds stitch their cross chunk borders on the final full
+    // pass). The stitch dedupes against the links the tile already
+    // carries, so the repeated passes add nothing.
+    order := make([]navmesh.RegionKey, 0, len(keys))
+    for _, key := range keys {
+        if _, ok := strips[key]; ok {
+            order = append(order, key)
+
+            continue
+        }
+        if _, err := os.Stat(tilePathOf(outDir, key)); err == nil {
+            order = append(order, key)
+        }
     }
     sort.Slice(order, func(i, j int) bool {
         if order[i].Col != order[j].Col {
@@ -68,6 +80,16 @@ func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
         return order[i].Row < order[j].Row
     })
     for _, key := range order {
+        own, ok := strips[key]
+        if !ok {
+            loaded, loadedOK := readStripsSidecar(outDir, key)
+            if !loadedOK {
+                // No in-pass strip and no sidecar: the tile of an
+                // older build cannot pair against anything new.
+                continue
+            }
+            own = &loaded
+        }
         var neighbors [4]*borderStrips
         for side, delta := range [4][2]int16{{-1, 0}, {1, 0}, {0, -1},
             {0, 1}} {
@@ -76,17 +98,25 @@ func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
             }
             if strip, ok := strips[neighbor]; ok {
                 neighbors[side] = strip
+
+                continue
+            }
+            if _, err := os.Stat(tilePathOf(outDir, neighbor)); err != nil {
+                continue
+            }
+            loaded, loadedOK := readStripsSidecar(outDir, neighbor)
+            if loadedOK {
+                neighbors[side] = &loaded
             }
         }
         if neighbors[0] == nil && neighbors[1] == nil &&
             neighbors[2] == nil && neighbors[3] == nil {
             continue
         }
-        added, err := stitchPackTile(outDir, key, strips[key], neighbors,
-            opts)
+        added, err := stitchPackTile(outDir, key, own, neighbors, opts)
         if err != nil {
-            return stats, fmt.Errorf("stitch %d_%d: %w", key.Col, key.Row,
-                err)
+            return stats, fmt.Errorf("stitch %d_%d: %w", key.Col,
+                key.Row, err)
         }
         stats.Stitched += added
     }
@@ -100,7 +130,7 @@ func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
 func buildPackPhaseA(keys []navmesh.RegionKey, geodataDir, outDir string,
     opts Options, force bool, stats *PackStats,
     log func(format string, args ...any),
-) map[navmesh.RegionKey]*borderStrips {
+) (map[navmesh.RegionKey]*borderStrips, error) {
     strips := make(map[navmesh.RegionKey]*borderStrips, len(keys))
     for _, key := range keys {
         build, err := buildPackRegion(geodataDir, outDir, key, opts,
@@ -121,6 +151,10 @@ func buildPackPhaseA(keys []navmesh.RegionKey, geodataDir, outDir string,
         // (hundreds of megabytes per dense region) for the phase B.
         own := build.Strips
         strips[key] = &own
+        if err := writeStripsSidecar(outDir, key, own); err != nil {
+            return nil, fmt.Errorf("sidecar %d_%d: %w", key.Col,
+                key.Row, err)
+        }
         stats.Built++
         stats.Polys += build.Stats.Polys
         stats.Links += build.Stats.Links
@@ -138,7 +172,7 @@ func buildPackPhaseA(keys []navmesh.RegionKey, geodataDir, outDir string,
             build.Stats.BuildTime.String())
     }
 
-    return strips
+    return strips, nil
 }
 
 // buildPackRegion builds one region and writes its tile unless the
@@ -188,7 +222,12 @@ func stitchPackTile(outDir string, key navmesh.RegionKey,
     if err != nil {
         return 0, fmt.Errorf("read the tile: %w", err)
     }
-    tile, err := navmesh.DecodeTile(data)
+    raw, compressed, err := maybeDecompressTile(data)
+    if err != nil {
+        return 0, fmt.Errorf("decompress %d_%d: %w", key.Col, key.Row,
+            err)
+    }
+    tile, err := navmesh.DecodeTile(raw)
     if err != nil {
         return 0, fmt.Errorf("decode the tile: %w", err)
     }
@@ -203,8 +242,21 @@ func stitchPackTile(outDir string, key navmesh.RegionKey,
     if err != nil {
         return 0, fmt.Errorf("re-encode: %w", err)
     }
-    if err := os.WriteFile(tilePath, encoded, 0o600); err != nil {
-        return 0, fmt.Errorf("rewrite the tile: %w", err)
+    encoded, err = maybeCompressTile(encoded, compressed)
+    if err != nil {
+        return 0, fmt.Errorf("re-compress %d_%d: %w", key.Col, key.Row,
+            err)
+    }
+    // The atomic rewrite: a killed build must never leave a half
+    // written tile behind.
+    tmp := tilePath + ".tmp"
+    //nolint:gosec // the tmp path is the tile path plus .tmp, the
+    // tile path is the validated out dir plus the region key pair.
+    if err := os.WriteFile(tmp, encoded, 0o600); err != nil {
+        return 0, fmt.Errorf("write the tile: %w", err)
+    }
+    if err := os.Rename(tmp, tilePath); err != nil {
+        return 0, fmt.Errorf("replace the tile: %w", err)
     }
 
     return added, nil

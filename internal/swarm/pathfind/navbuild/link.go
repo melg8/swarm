@@ -355,6 +355,39 @@ func neighborStrip(neighbors [4]*borderStrips, ownSide, theirSide int,
     return &neighbors[ownSide].strips[theirSide]
 }
 
+// existingSpans collects the border positions the tile already links
+// through one side toward one neighbour region: the re-stitch guard
+// that keeps the repeated pack passes from duplicating the external
+// links.
+func existingSpans(tile *navmesh.Tile, side uint8, col, row int16,
+) map[uint32]*[regionCellsSide]bool {
+    covered := make(map[uint32]*[regionCellsSide]bool)
+    for pi := range tile.Polys {
+        poly := &tile.Polys[pi]
+        for li := poly.FirstLink; li >= 0 && int(li) < len(tile.Links); {
+            link := &tile.Links[li]
+            li = link.Next
+            if link.Side != side || link.To >= 0 {
+                continue
+            }
+            ext := &tile.ExtLinks[-link.To-1]
+            if ext.Col != int32(col) || ext.Row != int32(row) {
+                continue
+            }
+            mask, ok := covered[uint32(pi)]
+            if !ok {
+                mask = &[regionCellsSide]bool{}
+                covered[uint32(pi)] = mask
+            }
+            for pos := link.T0; pos <= link.T1; pos++ {
+                mask[pos] = true
+            }
+        }
+    }
+
+    return covered
+}
+
 // stitchSide pairs one own strip against the neighbour strip of the
 // opposite edge and appends the external links to the tile.
 func stitchSide(tile *navmesh.Tile, own, neighbor *borderStrip,
@@ -364,6 +397,7 @@ func stitchSide(tile *navmesh.Tile, own, neighbor *borderStrip,
     if neighbor == nil {
         return 0
     }
+    covered := existingSpans(tile, side, col, row)
     acc := newLinkAccumulator()
     for pos := range regionCellsSide {
         ownFrom := int(own.offsets[pos])
@@ -372,6 +406,12 @@ func stitchSide(tile *navmesh.Tile, own, neighbor *borderStrip,
         nbTo := int(neighbor.offsets[pos+1])
         for i := ownFrom; i < ownTo; i++ {
             a := own.entries[i]
+            if mask, linked := covered[a.poly]; linked && mask[pos] {
+                // The tile already links this border cell pair (a
+                // previous pass stitched it): the re-stitch adds
+                // nothing.
+                continue
+            }
             for j := nbFrom; j < nbTo; j++ {
                 b := neighbor.entries[j]
                 if abs16(a.h-b.h) > climb {
