@@ -604,3 +604,44 @@ over the Dion hunting grounds.
   granular raw dots vs the clean smoothed line, the toggle and the
   path= link parameter restore both ways, screenshots in the agent
   download archive.
+
+- 2026-09-17: the server move limit round: the owner asked to check
+  the game server sources for the movement distance restriction the
+  smoothing could trip. The Mobius C1 sources answer twice
+  (network/clientpackets/MoveToLocation.java,
+  entity/actor/Creature.java moveToLocation): the 9900 unit packet
+  refusal (the walker's own maxMoveLeg = 1000 split already covers
+  it) and the WATER clamp - the destination of every swimming move
+  request scales onto the 700 unit sphere around the current
+  position (the isInWater divider), and a target beyond it never
+  answers. The smoothed open water legs (the owner repro runs the
+  swim filter, the measured max leg 1070) trip exactly that clamp:
+  the server stops the character short of every such waypoint and
+  the follower never sees the arrival. Capsule.ShortenPath now
+  answers the server clamp per anchor (the new legLimit probe over
+  the engine water raster, the same OverWater oracle the water
+  escape uses): a leg that leaves a water position splits at the
+  clamp distance, the fold resumes from the split over the same
+  horizon, the dry anchored legs keep their unclamped merge. Tests:
+  the water legs cap (the split preserves the walk length and the
+  endpoints), the dry flip (the long clear chord survives). The
+  viewer smoothed variant rides the same fold.
+
+- 2026-09-17: the double click pathfind round: the owner asked for
+  the webui double click to run the pathfind and store the points
+  into the dump state as if the bot itself planned them - the manual
+  test loop of the stuck reports (move the bot by hand, call the
+  pathfind with the map clicks, watch where it sticks, report the
+  problem area). The manual move planner no longer waits for the
+  2000 unit threshold: every manual move plans through the
+  navigator (the mesh corridor, the capsule clearance, the wall
+  guard - one pipeline with the bot's own walks), a failed search
+  still falls through to the direct server routed walk. The dump
+  keeps the most recent plan after its walk ends (the state last
+  walk record, the "last walk plan (...)" dump section - the live
+  plan expires with the walk, the stuck report needs the whole
+  planned walk after it too); the dump parser reads the new section
+  and the ApplyDump replay restores it as the walk plan of the repro
+  bot. Tests: the near click plans and walks the plan, the
+  replacement plans fresh, the record survives the expired plan and
+  the clear (state), the dump round trip (webserver).
