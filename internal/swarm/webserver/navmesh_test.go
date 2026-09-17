@@ -457,6 +457,13 @@ func TestNavmeshViewScriptContract(t *testing.T) {
     // the height, scaled).
     require.Contains(t, source, `cam.x, cam.z * viewer.heightScale, cam.y`)
 
+    // The waypoint coordinates labels default off (the owner request:
+    // the state starts false and the checkbox ships unchecked).
+    require.Contains(t, source, `showWaypointCoords: false`,
+        "the waypoint coordinates state must default to false")
+    require.NotRegexp(t, `(?s)id="nmv-waypoint-coords"[^>]*checked`, source,
+        "the waypoint coordinates checkbox must ship unchecked")
+
     // The edge connections overlay: the NMV2 decode, the area classes
     // and the toggle wiring of the link portal rendering.
     for _, part := range []string{

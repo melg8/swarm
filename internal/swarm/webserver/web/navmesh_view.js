@@ -133,7 +133,10 @@ const viewer = {
   endMarker: null,
   markerRadius: 24,
   waypointLabels: null,
-  showWaypointCoords: true,
+  // The waypoint coordinates labels start hidden (the owner request:
+  // the route reads cleaner without the coordinate wall - one click
+  // brings them back).
+  showWaypointCoords: false,
   showEdges: false,
   hover: {
     pointer: new THREE.Vector2(),
@@ -256,7 +259,7 @@ function buildSurface(navmesh) {
       </select>
       <div class="nmv-section">display</div>
       <label class="nmv-row"><input type="checkbox"
-        id="nmv-waypoint-coords" checked>
+        id="nmv-waypoint-coords">
         <span>waypoint coordinates</span></label>
       <label class="nmv-row"><input type="checkbox" id="nmv-edges">
         <span>edge connections</span></label>

@@ -468,8 +468,14 @@ over the Dion hunting grounds.
   (navbuild/rect.go vertexHeight, the vertex tests pin the seam free
   join and the sharp shore step). The mesh pack must be rebuilt for
   the new geometry (data/navmesh is gitignored, cmd/navmesh-build).
-  NOT DONE YET (the interrupted session): the viewer waypoint
-  coordinates checkbox default off, the geometry variant toggle (the
+  NOT DONE YET (the interrupted session): the tile rebuild and the
+  visual before/after verification of the owner's two views.
+
+- 2026-09-17: the viewer waypoint coordinates checkbox default off
+  landed (the owner request): the state starts false and the
+  checkbox ships unchecked - one click brings the coordinate wall
+  back. TestNavmeshViewScriptContract pins the default. Remaining
+  from the interrupted session: the geometry variant toggle (the
   detour mesh vs the original l2j cells render plus the geom URL
   parameter with the camera and the route preserved), the tile
   rebuild and the visual before/after verification of the owner's
