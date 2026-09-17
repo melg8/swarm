@@ -35,12 +35,6 @@ const (
     // userAttackTimeout bounds a manual attack that never starts the
     // fight (an unreachable or protected target).
     userAttackTimeout = 30 * time.Second
-    // userPathfindDistance is the straight line distance above which a
-    // manual move switches to the geodata planner: the server side
-    // pathfinder silently refuses far targets (observed stuck walks on
-    // requests past a few thousand units), so long clicks follow the
-    // bot planned waypoints instead, one server accepted leg at a time.
-    userPathfindDistance = 2000.0
     // userApproachRadius is the geodata search goal of a long manual
     // move: the walk ends within this 3D distance of the clicked point,
     // so a click onto a shop interior cell or a walled structure still
@@ -370,8 +364,13 @@ func (l *Loop) tickUserMove(now time.Time) {
 
         return
     }
-    if dist >= userPathfindDistance && l.navigator != nil &&
-        !l.userPathTried {
+    if l.navigator != nil && !l.userPathTried {
+        // Every manual move plans through the navigator (the owner
+        // request: the map double click IS the pathfind call - the
+        // planned waypoints publish into the walk plan view and the
+        // state dump exactly like the bot's own planned walks, so a
+        // stuck leg reads at a glance). A failed or missing path
+        // falls through to the direct server routed walk.
         l.userPathTried = true
         l.planUserWalk(selfX, selfY, selfZ)
 

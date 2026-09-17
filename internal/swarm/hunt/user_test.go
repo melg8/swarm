@@ -479,10 +479,14 @@ func TestUserMoveFarWalkPlansLegs(t *testing.T) {
         "the completed path must resume the autonomous hunting")
 }
 
-// TestUserMoveNearWalkGoesDirect pins the short click behavior: a
-// click inside the planning distance never asks the navigator and
-// walks straight to the point.
-func TestUserMoveNearWalkGoesDirect(t *testing.T) {
+// TestUserMoveNearWalkPlansToo pins the owner pathfind test round:
+// every manual move plans through the navigator - the map double
+// click IS the pathfind call, a near click included. The planned
+// waypoints land in the walk plan view and the state dump exactly
+// like the bot's own planned walks, and the follower walks the plan
+// (the near leg reaches the clicked point in one server accepted
+// click).
+func TestUserMoveNearWalkPlansToo(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     loop := NewLoop(game, bot)
@@ -495,15 +499,18 @@ func TestUserMoveNearWalkGoesDirect(t *testing.T) {
     })
     loop.tick()
 
+    require.NotNil(t, loop.userWaypoints,
+        "the near click must plan the geodata path too")
+    require.Equal(t, 1, navigator.calls,
+        "the near click asks the navigator once")
+    loop.tick()
     require.Equal(t, [][3]int32{{45600, 50400, -3500}}, game.walks,
-        "the near click must walk directly")
-    require.Equal(t, 0, navigator.calls,
-        "the near click must not plan a geodata path")
+        "the planned near leg walks straight to the clicked point")
 }
 
 // TestUserMoveReplaceDropsThePlannedPath pins the replacement: a new
-// move command drops the leg plan of the previous click, the new click
-// starts fresh.
+// move command drops the leg plan of the previous click and plans
+// its own fresh path, the new click never walks the old plan.
 func TestUserMoveReplaceDropsThePlannedPath(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
@@ -523,10 +530,13 @@ func TestUserMoveReplaceDropsThePlannedPath(t *testing.T) {
     })
     loop.tick()
 
-    require.Nil(t, loop.userWaypoints,
-        "the new move command must drop the old leg plan")
-    require.Equal(t, [][3]int32{{45600, 50400, -3500}}, game.walks[len(game.walks)-1:],
-        "the new click must walk directly (inside the planning distance)")
+    require.NotNil(t, loop.userWaypoints,
+        "the replacement click plans its own fresh path")
+    require.Equal(t, 2, navigator.calls,
+        "each move asks the navigator exactly once")
+    loop.tick()
+    require.Equal(t, [][3]int32{{45600, 50400, -3500}}, game.walks,
+        "only the replacement plan walks")
 }
 
 // TestUserSwapWaitsForServerConfirmation pins the inventory pacing: the

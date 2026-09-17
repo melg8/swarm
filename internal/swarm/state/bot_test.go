@@ -807,6 +807,61 @@ func TestWalkPlanExpires(t *testing.T) {
     require.Empty(t, bot.Snapshot().WalkPath)
 }
 
+// TestLastWalkPlanSurvivesTheWalk pins the post walk record of the
+// owner pathfind test round: the live plan expires with the walk
+// (the TTL, the clear), the last plan record survives it - the dump
+// of a stuck leg names the whole planned walk even when the walk is
+// already over - and the next published plan overwrites the record.
+func TestLastWalkPlanSurvivesTheWalk(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+    origin := WalkPoint{X: 45000, Y: 50000, Z: -3500}
+    dest := WalkPoint{X: 46200, Y: 51100, Z: -3500}
+    plan := WalkPlan{
+        Origin: &origin,
+        Points: []WalkPoint{
+            {X: 45600, Y: 50400, Z: -3500},
+            {X: 46000, Y: 51000, Z: -3500},
+        },
+        Index: 1,
+        Dest:  &dest,
+    }
+    bot.SetWalkPlan(plan)
+    snap := bot.Snapshot()
+    require.Equal(t, plan.Points, snap.LastWalkPath,
+        "the published plan records itself as the last plan")
+    require.Equal(t, plan.Origin, snap.LastWalkOrigin)
+    require.Equal(t, plan.Index, snap.LastWalkIndex)
+    require.Equal(t, plan.Dest, snap.LastWalkDest)
+    require.False(t, snap.LastWalkAt.IsZero())
+
+    // The record is a copy: a later mutation of the published slice
+    // never rewrites it.
+    plan.Points[0].X = 1
+    require.Equal(t, int32(45600), snap.LastWalkPath[0].X)
+
+    // The live plan expires, the record stays.
+    bot.walkPlanAt = time.Now().Add(-2 * walkPlanTTL)
+    expired := bot.Snapshot()
+    require.Empty(t, expired.WalkPath)
+    require.Equal(t, []WalkPoint{
+        {X: 45600, Y: 50400, Z: -3500},
+        {X: 46000, Y: 51000, Z: -3500},
+    }, expired.LastWalkPath,
+        "the last plan survives the expired live plan")
+
+    // Clearing the live plan keeps the record too.
+    bot.ClearWalkPlan()
+    require.Empty(t, bot.Snapshot().WalkPath)
+    require.Len(t, bot.Snapshot().LastWalkPath, 2)
+
+    // The next published plan overwrites the record.
+    replacement := WalkPlan{Points: []WalkPoint{{X: 9, Y: 9, Z: 9}}}
+    bot.SetWalkPlan(replacement)
+    require.Equal(t, replacement.Points, bot.Snapshot().LastWalkPath)
+}
+
 // TestResetSessionClearsWalkPlan pins the session boundary: a fresh
 // login never inherits the walk plan of the previous session.
 func TestResetSessionClearsWalkPlan(t *testing.T) {

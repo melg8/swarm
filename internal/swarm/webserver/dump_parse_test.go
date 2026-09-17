@@ -176,6 +176,53 @@ func TestParseDumpNoWalkPlan(t *testing.T) {
     require.Nil(t, snap.WalkDest)
 }
 
+// TestParseDumpLastWalkPlan pins the post walk record of the owner
+// pathfind test round: the live plan is gone (the walk ended), the
+// dump prints the "last walk plan (...)" section and the parser
+// routes it into the last plan view - and the ApplyDump replay
+// restores it as the walk plan of the repro bot, so a stuck leg
+// report reproduces the whole planned walk.
+func TestParseDumpLastWalkPlan(t *testing.T) {
+    bot := state.NewBot("test1")
+    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    origin := state.WalkPoint{X: 45000, Y: 50000, Z: -3500}
+    dest := state.WalkPoint{X: 46200, Y: 51100, Z: -3500}
+    bot.SetWalkPlan(state.WalkPlan{
+        Origin: &origin,
+        Points: []state.WalkPoint{
+            {X: 45600, Y: 50400, Z: -3500},
+            {X: 46000, Y: 51000, Z: -3500},
+        },
+        Index: 1,
+        Dest:  &dest,
+    })
+    bot.ClearWalkPlan()
+
+    dump := BuildStateDump(bot)
+    require.Contains(t, dump,
+        "last walk plan (2 waypoints, aiming at wp 1):")
+    require.Contains(t, dump, "  from 45000 50000 -3500")
+    require.Contains(t, dump, "wp 0: 45600 50400 -3500 (passed)")
+    require.Contains(t, dump, "wp 1: 46000 51000 -3500  <-- TARGET")
+    require.Contains(t, dump, "  dest 46200 51100 -3500")
+
+    snap, err := ParseDump(dump)
+    require.NoError(t, err)
+    require.Empty(t, snap.WalkPath,
+        "the live plan stayed absent after the clear")
+    require.Len(t, snap.LastWalkPath, 2)
+    require.Equal(t, int32(45600), snap.LastWalkPath[0].X)
+    require.Equal(t, &origin, snap.LastWalkOrigin)
+    require.Equal(t, &dest, snap.LastWalkDest)
+    require.Equal(t, 1, snap.LastWalkIndex)
+
+    repro := state.NewBot("repro")
+    repro.SetCharacter("repro", 200, 18, 45000, 50000, -3500, 50, 30)
+    ApplyDump(repro, snap)
+    require.Equal(t, snap.LastWalkPath, repro.Snapshot().WalkPath,
+        "the last plan replays as the walk plan of the repro bot")
+}
+
 // TestParseDumpNoHuntingZone pins the "hunting zone: none" case: the
 // snapshot carries no hunting zone.
 func TestParseDumpNoHuntingZone(t *testing.T) {

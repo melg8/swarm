@@ -375,25 +375,50 @@ func writeDumpObjects(b *strings.Builder, snap state.Snapshot) {
 // whole leg from the planning origin (where we wanted to go from) to
 // the final destination (where we want to arrive), with every passed
 // waypoint marked and the waypoint the follower currently aims at
-// emphasized - a stuck or drifting walk reads at a glance.
+// emphasized - a stuck or drifting walk reads at a glance. When the
+// live plan is already gone (the walk arrived, timed out or the loop
+// left the phase), the most recent plan prints instead - the report
+// of a stuck leg needs the whole planned walk even when the walk is
+// over (the owner pathfind test round: the double click plans, the
+// bot walks, the dump names the waypoint it stuck on).
 func writeDumpWalkPlan(b *strings.Builder, snap state.Snapshot) {
     if snap.WalkPath == nil {
-        fmt.Fprintf(b, "walk plan: none\n\n")
+        if snap.LastWalkPath == nil {
+            fmt.Fprintf(b, "walk plan: none\n\n")
+
+            return
+        }
+        writeWalkPlanSection(b, "last walk plan (",
+            snap.LastWalkPath, snap.LastWalkOrigin,
+            snap.LastWalkIndex, snap.LastWalkDest)
 
         return
     }
-    target := snap.WalkIndex
-    if target < 0 || target >= len(snap.WalkPath) {
-        target = len(snap.WalkPath) - 1
+    writeWalkPlanSection(b, "walk plan (", snap.WalkPath,
+        snap.WalkOrigin, snap.WalkIndex, snap.WalkDest)
+}
+
+// writeWalkPlanSection prints one walk plan section under the given
+// header prefix: the waypoint count and the follower cursor, the
+// planning origin, every waypoint with the aimed one emphasized and
+// the final destination.
+func writeWalkPlanSection(
+    b *strings.Builder, headerPrefix string,
+    path []state.WalkPoint, origin *state.WalkPoint, index int,
+    dest *state.WalkPoint,
+) {
+    target := index
+    if target < 0 || target >= len(path) {
+        target = len(path) - 1
     }
-    fmt.Fprintf(b, "walk plan (%d waypoints, aiming at wp %d):\n",
-        len(snap.WalkPath), target)
-    if snap.WalkOrigin != nil {
+    fmt.Fprintf(b, "%s%d waypoints, aiming at wp %d):\n",
+        headerPrefix, len(path), target)
+    if origin != nil {
         fmt.Fprintf(b, "  from %d %d %d\n",
-            snap.WalkOrigin.X, snap.WalkOrigin.Y, snap.WalkOrigin.Z)
+            origin.X, origin.Y, origin.Z)
     }
-    for i := range snap.WalkPath {
-        wp := &snap.WalkPath[i]
+    for i := range path {
+        wp := &path[i]
         switch {
         case i == target:
             fmt.Fprintf(b, "  wp %d: %d %d %d  <-- TARGET\n",
@@ -405,9 +430,9 @@ func writeDumpWalkPlan(b *strings.Builder, snap state.Snapshot) {
             fmt.Fprintf(b, "  wp %d: %d %d %d\n", i, wp.X, wp.Y, wp.Z)
         }
     }
-    if snap.WalkDest != nil {
+    if dest != nil {
         fmt.Fprintf(b, "  dest %d %d %d\n",
-            snap.WalkDest.X, snap.WalkDest.Y, snap.WalkDest.Z)
+            dest.X, dest.Y, dest.Z)
     }
     fmt.Fprintln(b)
 }

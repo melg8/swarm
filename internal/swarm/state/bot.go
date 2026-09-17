@@ -461,6 +461,14 @@ type Bot struct {
     // glance in the dump.
     walkPlan   *WalkPlan
     walkPlanAt time.Time
+    // lastWalkPlan keeps the most recent published walk plan after
+    // its walk ended: the live plan expires with the walk (the TTL,
+    // the arrive, the timeout), the report of a stuck leg needs the
+    // whole planned walk even when the walk is already over (see
+    // rememberWalkPlanLocked). The next published plan overwrites
+    // the record; nothing clears it.
+    lastWalkPlan   *WalkPlan
+    lastWalkPlanAt time.Time
     // shopping holds the published purchase queue of the shop
     // strategy (see SetShoppingPlan): what the bot plans to buy next
     // with the prices and the missing adena, nil while nothing is
@@ -1389,7 +1397,30 @@ func (b *Bot) SetWalkPlan(plan WalkPlan) {
     }
     b.walkPlan = &plan
     b.walkPlanAt = time.Now()
+    b.rememberWalkPlanLocked(&plan)
     b.touch()
+}
+
+// rememberWalkPlanLocked copies the plan into the last walk record
+// (the caller must hold the state write lock): a deep copy, so a
+// later mutation of the published slice never rewrites the record
+// the dump already reads.
+func (b *Bot) rememberWalkPlanLocked(plan *WalkPlan) {
+    record := WalkPlan{ //nolint:exhaustruct_v5 // the optional views fill below
+        Index: plan.Index,
+    }
+    if plan.Origin != nil {
+        origin := *plan.Origin
+        record.Origin = &origin
+    }
+    if plan.Dest != nil {
+        dest := *plan.Dest
+        record.Dest = &dest
+    }
+    record.Points = make([]WalkPoint, len(plan.Points))
+    copy(record.Points, plan.Points)
+    b.lastWalkPlan = &record
+    b.lastWalkPlanAt = time.Now()
 }
 
 // ClearWalkPlan drops the published walk plan (a no-op when none
@@ -2361,6 +2392,16 @@ type Snapshot struct {
     // WalkDest is the final destination of the published walk,
     // null when the plan itself carries it.
     WalkDest *WalkPoint `json:"walkDest"`
+    // LastWalkPath carries the most recent published walk plan after
+    // its walk ended (see state lastWalkPlan): the report of a stuck
+    // leg needs the whole planned walk even when the live plan is
+    // already gone. The fields ride the Go side dump only, the wire
+    // payload of the snapshot stays byte identical (the json "-").
+    LastWalkPath   []WalkPoint `json:"-"`
+    LastWalkOrigin *WalkPoint  `json:"-"`
+    LastWalkIndex  int         `json:"-"`
+    LastWalkDest   *WalkPoint  `json:"-"`
+    LastWalkAt     time.Time   `json:"-"`
     // Shopping carries the published purchase queue of the shop
     // strategy (see SetShoppingPlan): what the bot plans to buy next
     // with the prices and the missing adena, null when nothing is
@@ -2563,6 +2604,11 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
         WalkOrigin:     nil,
         WalkIndex:      0,
         WalkDest:       nil,
+        LastWalkPath:   nil,
+        LastWalkOrigin: nil,
+        LastWalkIndex:  0,
+        LastWalkDest:   nil,
+        LastWalkAt:     time.Time{},
         Shopping:       nil,
         Skills:         nil,
         SkillPlan:      nil,
@@ -2583,6 +2629,15 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
         snap.WalkOrigin = b.walkPlan.Origin
         snap.WalkIndex = b.walkPlan.Index
         snap.WalkDest = b.walkPlan.Dest
+    }
+    if b.lastWalkPlan != nil {
+        snap.LastWalkPath = make([]WalkPoint,
+            len(b.lastWalkPlan.Points))
+        copy(snap.LastWalkPath, b.lastWalkPlan.Points)
+        snap.LastWalkOrigin = b.lastWalkPlan.Origin
+        snap.LastWalkIndex = b.lastWalkPlan.Index
+        snap.LastWalkDest = b.lastWalkPlan.Dest
+        snap.LastWalkAt = b.lastWalkPlanAt
     }
     if b.shoppingPlanLive(now) {
         entries := make([]ShoppingEntryView, len(b.shopping.Entries))

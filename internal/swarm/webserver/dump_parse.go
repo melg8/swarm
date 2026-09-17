@@ -71,6 +71,16 @@ func ApplyDump(bot *state.Bot, snap state.Snapshot) {
             Index:  snap.WalkIndex,
             Dest:   snap.WalkDest,
         })
+    } else if len(snap.LastWalkPath) > 0 {
+        // The dump carried only the last plan (the walk ended before
+        // the dump): the record IS the planned walk of the report,
+        // the repro replays it as the walk plan.
+        bot.SetWalkPlan(state.WalkPlan{
+            Origin: snap.LastWalkOrigin,
+            Points: snap.LastWalkPath,
+            Index:  snap.LastWalkIndex,
+            Dest:   snap.LastWalkDest,
+        })
     }
     for _, ev := range snap.Events {
         bot.RecordEvent(ev.Message)
@@ -226,8 +236,10 @@ func (p *dumpParser) dispatchSection(header string) error {
         return p.parseBag()
     case strings.HasPrefix(header, "objects"):
         return p.parseObjects()
+    case strings.HasPrefix(header, "last walk plan ("):
+        return p.parseWalkPlan(header, true)
     case strings.HasPrefix(header, "walk plan"):
-        return p.parseWalkPlan(header)
+        return p.parseWalkPlan(header, false)
     case strings.HasPrefix(header, "recent combat"):
         return p.parseCombat()
     case strings.HasPrefix(header, "chat"):
@@ -606,15 +618,17 @@ func parseObjectLine(line string) (state.ObjectSnapshot, bool) {
 }
 
 // parseWalkPlan reads the "walk plan (N waypoints, aiming at wp M):"
-// section.
-func (p *dumpParser) parseWalkPlan(header string) error {
+// section, or its post walk form "last walk plan (...)" (the most
+// recent plan kept after its walk ended - the stuck leg report).
+// The last flag routes the fields into the last plan view of the
+// snapshot.
+func (p *dumpParser) parseWalkPlan(header string, last bool) error {
     if strings.Contains(header, "none") {
         return nil
     }
     count := parseInt32(takeAfter(header, "waypoints"))
     aimingRest := takeAfter(header, "aiming at wp ")
     aiming := parseInt32(takeBefore(aimingRest, ")"))
-    p.snap.WalkIndex = int(aiming)
     points := make([]state.WalkPoint, 0, count)
     var origin *state.WalkPoint
     var dest *state.WalkPoint
@@ -645,9 +659,17 @@ func (p *dumpParser) parseWalkPlan(header string) error {
             points = append(points, wp)
         }
     }
-    p.snap.WalkPath = points
-    p.snap.WalkOrigin = origin
-    p.snap.WalkDest = dest
+    if last {
+        p.snap.LastWalkPath = points
+        p.snap.LastWalkOrigin = origin
+        p.snap.LastWalkDest = dest
+        p.snap.LastWalkIndex = int(aiming)
+    } else {
+        p.snap.WalkPath = points
+        p.snap.WalkOrigin = origin
+        p.snap.WalkDest = dest
+        p.snap.WalkIndex = int(aiming)
+    }
 
     return nil
 }
