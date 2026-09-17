@@ -141,7 +141,8 @@ func TestTownLegFlatProbe(t *testing.T) {
 		result.reached, result.partial, result.capped, result.explored,
 		time.Since(began))
 	if !result.reached && len(result.corridor) > 0 {
-		tile, poly := mesh.polyOfRef(result.corridor[len(result.corridor)-1])
+		tile, poly := mesh.polyOfRef(
+			result.corridor[len(result.corridor)-1])
 		if tile != nil {
 			x0, y0, x1, y1 := tile.WorldRect(poly)
 			t.Logf("partial ends at %d_%d [%.0f %.0f .. %.0f %.0f]",
@@ -545,5 +546,48 @@ func TestWaterBorderStitch(t *testing.T) {
 		t.Logf("%d_%d -> %d_%d: ext records %d (dead %d), water"+
 			" sourced links %d", a[0], a[1], b[0], b[1], total,
 			dead, waterToB)
+	}
+}
+
+// TestBayNorthShoreProbe probes candidate waypoints along the north
+// shore of the Gludio bay for the mesh binding (the intermediate
+// waypoint the segmented Gludio Gludin walk needs while the pack's
+// geodata leaves the bay water unmapped).
+func TestBayNorthShoreProbe(t *testing.T) {
+	dir := "../../../../data/navmesh"
+	mesh := NewMesh(dir)
+	if len(mesh.TileFiles()) < 100 {
+		t.Skip("the whole map pack is not present")
+	}
+	mesh.SetCacheCapacity(8)
+	candidates := [][2]float64{
+		{-70000, 160000}, {-75000, 158000}, {-65000, 162000},
+		{-60000, 155000}, {-55000, 150000}, {-70000, 155000},
+		{-80000, 160000}, {-90000, 150000}, {-95000, 145000},
+		{-45000, 148000},
+	}
+	for _, c := range candidates {
+		_, pos, ok := mesh.FindNearestPoly(Pos{X: c[0], Y: c[1],
+			Z: -4800})
+		if ok {
+			t.Logf("(%.0f, %.0f) binds at %.0f %.0f %.0f", c[0], c[1],
+				pos.X, pos.Y, pos.Z)
+		} else {
+			t.Logf("(%.0f, %.0f) does not bind", c[0], c[1])
+		}
+	}
+	// The bay itself: does the water hold mesh at all?
+	bay := [][2]float64{{-80000, 135000}, {-75000, 138000},
+		{-85000, 140000}, {-70000, 140000}}
+	for _, c := range bay {
+		_, pos, ok := mesh.FindNearestPoly(Pos{X: c[0], Y: c[1],
+			Z: -4800})
+		if ok {
+			t.Logf("bay (%.0f, %.0f) binds at z %.0f", c[0], c[1],
+				pos.Z)
+		} else {
+			t.Logf("bay (%.0f, %.0f) does NOT bind - the water hole"+
+				" is real", c[0], c[1])
+		}
 	}
 }

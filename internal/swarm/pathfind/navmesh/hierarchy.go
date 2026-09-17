@@ -617,15 +617,51 @@ type clusterBitmap = [clustersPerSide][clustersPerSide]bool
 
 // newConfinedSet marks the chain clusters.
 func newConfinedSet(clusters []clusterKey) *confinedSet {
+	// The one cluster dilation: the coarse chain samples the cluster
+	// crossings - the honest corridor between them leaves the chain's
+	// own cluster blocks where the sampled crossings sit a block off
+	// the real path (the bay detours the geodata holes force). The
+	// dilation keeps the confinement meaningful (the goal direction)
+	// while the neighbourhood absorbs the sampling slack.
 	set := &confinedSet{regions: make(map[RegionKey]*clusterBitmap)}
-	for _, key := range clusters {
-		regionKey := RegionKey{Col: key.Col, Row: key.Row}
+	add := func(col, row int16, cx, cy int32) {
+		if cx < 0 || cx >= clustersPerSide || cy < 0 ||
+			cy >= clustersPerSide {
+			return
+		}
+		regionKey := RegionKey{Col: col, Row: row}
 		bm := set.regions[regionKey]
 		if bm == nil {
 			bm = &clusterBitmap{}
 			set.regions[regionKey] = bm
 		}
-		bm[key.ID>>4][key.ID&0x0F] = true
+		bm[cx][cy] = true
+	}
+	for _, key := range clusters {
+		cx, cy := int32(key.ID>>4), int32(key.ID&0x0F)
+		for dx := int32(-1); dx <= 1; dx++ {
+			for dy := int32(-1); dy <= 1; dy++ {
+				nx, ny := cx+dx, cy+dy
+				col, row := key.Col, key.Row
+				if nx < 0 {
+					col--
+					nx += clustersPerSide
+				}
+				if nx >= clustersPerSide {
+					col++
+					nx -= clustersPerSide
+				}
+				if ny < 0 {
+					row--
+					ny += clustersPerSide
+				}
+				if ny >= clustersPerSide {
+					row++
+					ny -= clustersPerSide
+				}
+				add(col, row, nx, ny)
+			}
+		}
 	}
 
 	return set
@@ -824,7 +860,7 @@ func (m *Mesh) runHop(q *hierQuery, fromRef PolyRef, fromPos Pos,
 			return nil
 		}
 		explored += result.explored
-		if result.reached || !result.capped || retries >= 1 ||
+		if result.reached || !result.capped || retries >= 2 ||
 			budget >= maxConfinedNodes {
 			return &hopSegment{
 				corridor: result.corridor,
