@@ -16,12 +16,16 @@ func spanMax(a, b int32) int32 {
 }
 
 // rectPoly is one rectangle polygon of the built tile: the region
-// local cell bounds (half open) and the exact corner heights taken
-// from the geodata cells at the inside corners. The interior surface
-// is the bilinear interpolation of the four corners, kept within the
-// height tolerance of every covered cell by construction (the split
-// rule below) - the exact per vertex heights the Detour detail mesh
-// would carry.
+// local cell bounds (half open) and the corner heights of the
+// sheet's own vertex field. The vertex value at a grid vertex is the
+// average of the sheet's cells around it, so two rectangles of one
+// sheet read the same height at their shared edge endpoints and the
+// surfaces join seamlessly (the roof sheet seams of the inside-cell
+// corners are gone); rectangles of different sheets keep their own
+// fields, so a genuine deck or cliff edge stays a sharp step. The
+// interior surface is the bilinear interpolation of the four
+// corners, kept within the height tolerance of every covered cell by
+// construction (the split rule below).
 type rectPoly struct {
     x0, y0, x1, y1     int32
     h00, h10, h01, h11 int16
@@ -226,14 +230,17 @@ func (b *rectBuilder) markCovered(cx, cy int, x1, y1 int32) {
 
 // emitRect appends one rectangle polygon, splitting it recursively
 // when the bilinear surface of the four corner heights leaves the
-// tolerance at any covered cell.
+// tolerance at any covered cell. The corners read the sheet's vertex
+// field (vertexHeight), not the inside cells: the vertex field is
+// shared by every rectangle of the sheet, which is what makes the
+// adjacent surfaces meet.
 func (b *rectBuilder) emitRect(cx, cy int, x1, y1 int32, area uint8,
     heightTolerance float64,
 ) {
-    h00 := b.cellHeight(cx, cy)
-    h10 := b.cellHeight(int(x1)-1, cy)
-    h01 := b.cellHeight(cx, int(y1)-1)
-    h11 := b.cellHeight(int(x1)-1, int(y1)-1)
+    h00 := b.vertexHeight(cx, cy)
+    h10 := b.vertexHeight(int(x1), cy)
+    h01 := b.vertexHeight(cx, int(y1))
+    h11 := b.vertexHeight(int(x1), int(y1))
     if b.rectWithinTolerance(cx, cy, x1, y1, h00, h10, h01, h11,
         heightTolerance) {
         index := int32(len(b.polys))
@@ -283,23 +290,47 @@ func (b *rectBuilder) emitExact(cx, cy int, x1, y1 int32, area uint8) {
     index := int32(len(b.polys))
     b.polys = append(b.polys, rectPoly{
         x0: int32(cx), y0: int32(cy), x1: x1, y1: y1,
-        h00:  b.cellHeight(cx, cy),
-        h10:  b.cellHeight(int(x1)-1, cy),
-        h01:  b.cellHeight(cx, int(y1)-1),
-        h11:  b.cellHeight(int(x1)-1, int(y1)-1),
+        h00:  b.vertexHeight(cx, cy),
+        h10:  b.vertexHeight(int(x1), cy),
+        h01:  b.vertexHeight(cx, int(y1)),
+        h11:  b.vertexHeight(int(x1), int(y1)),
         area: area,
     })
     b.bindLayers(cx, cy, x1, y1, index)
 }
 
-// cellHeight returns the layer height of the current sheet's cell.
-func (b *rectBuilder) cellHeight(cx, cy int) int16 {
-    j := b.grid[cx*regionCellsSide+cy]
-    if j < 0 {
+// vertexHeight returns the sheet's surface height at the grid vertex
+// (vx, vy): the average of the heights of the sheet's cells around
+// the vertex (the up to four cells vx-1..vx, vy-1..vy; a vertex at
+// the region border averages the cells that exist). Only the current
+// sheet's cells take part - a vertex shared with another sheet (a
+// deck edge, a cliff) keeps this sheet's own level, which is what
+// keeps genuine steps sharp while the surfaces of one sheet join.
+func (b *rectBuilder) vertexHeight(vx, vy int) int16 {
+    sum, count := 0, 0
+    for dx := -1; dx <= 0; dx++ {
+        for dy := -1; dy <= 0; dy++ {
+            x, y := vx+dx, vy+dy
+            if x < 0 || y < 0 ||
+                x >= regionCellsSide || y >= regionCellsSide {
+                continue
+            }
+            j := b.grid[x*regionCellsSide+y]
+            if j < 0 {
+                continue
+            }
+            sum += int(b.layers[j].h)
+            count++
+        }
+    }
+    if count == 0 {
+        // Unreachable for a rectangle corner (the corner cell of the
+        // rectangle is always a sheet member); the zero keeps the
+        // compiler honest.
         return 0
     }
 
-    return b.layers[j].h
+    return int16(math.Round(float64(sum) / float64(count)))
 }
 
 // bindLayers maps every covered layer instance to the polygon index.

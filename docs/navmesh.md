@@ -35,12 +35,18 @@ bounding volume tree - every section 4 byte aligned, little endian.
   (`X0 <= cx < X1`, `Y0 <= cy < Y1`, half open). The world rectangle
   spans the grid vertices `X0*16 .. X1*16` anchored at the region
   origin `((col-20)*32768, (row-18)*32768)`.
-- **The corner heights are exact**: `H00` is the geodata height of
-  the cell `(X0, Y0)`, `H10` of `(X1-1, Y0)` and so on. The interior
-  height is the bilinear interpolation of the four - the build splits
-  every rectangle until the interpolated surface stays within 24
-  units of every covered cell height, so no detail mesh exists or is
-  needed.
+- **The corner heights come from the sheet's own vertex field**: the
+  value at a grid vertex is the average of the sheet's cells around
+  it, so two rectangles of one sheet read the same height at their
+  shared edge endpoints and the surfaces join seamlessly (the
+  inside-cell corners of the first rounds disagreed by the full 8
+  unit quantization step on every slope adjacency - the shingled
+  "roof sheets" of the owner report). A vertex shared with another
+  sheet (a deck edge, a cliff) keeps the sheet's own level, so
+  genuine steps stay sharp. The interior height is the bilinear
+  interpolation of the four - the build splits every rectangle until
+  the interpolated surface stays within 24 units of every covered
+  cell height, so no detail mesh exists or is needed.
 - **The links are Detour-style chains** (`FirstLink` into a flat
   store, `Next` splicing): every link leaves through one rectangle
   side and carries `T0..T1` - the **inclusive cell range along the
@@ -349,11 +355,14 @@ The endpoints behind the page (the mode of `GET /api/config` is
   carry the world span of every connection with the area class of
   the pair (the edge connections overlay); the walls carry the
   vertical filler quads between the bilinear surfaces of adjacent
-  rectangles - the polygon corners come from each rectangle's own
-  inside cells, so neighbors disagree about the height of a shared
-  edge and the disagreement would render as see-through black
-  wedges (the owner's black-triangles report: 536 724 of the 604 191
-  adjacency pairs of 21_19 step). The filler is height capped: the
+  rectangles. Since the vertex corner field landed, the rectangles of
+  one sheet agree about every shared edge and the filler only closes
+  the steps between different sheets (the genuine terraces); before
+  it, the corners came from each rectangle's own inside cells and
+  every geodata step rendered as a see-through black wedge (the
+  owner's black-triangles report: 536 724 of the 604 191 adjacency
+  pairs of 21_19 stepped) and later as the shingled roof sheets of
+  the slopes. The filler is height capped: the
   honest crack scale is the 40 unit climb plus the 24 unit bilinear
   corner tolerance, and a wall may never close more than 80 units -
   a taller step between two surfaces is not a crack but the open air
