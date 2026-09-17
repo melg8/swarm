@@ -421,6 +421,27 @@ comparison. The open spans of the mesh are whole geodata cells
 (16 units), so every span holds a crossing a 7.5 capsule clears and
 the pass never dead ends.
 
+## The wall oracle (the LegGuard seam)
+
+The mesh wall spans are the side level approximation of the walls:
+the grid movement validation sees the per cell walls (the paired
+NSWE walls and the diagonal anti corner cut) that a rectangle side
+lumps together, and a funnel pivot one radius off a mesh span end
+can still sit a few units off a grid wall on the staircase terrain.
+`Filter.Guard` arms the wall oracle (the `LegGuard` interface - a
+`LegClear(ax, ay, az, bx, by, bz, radius)` answer for one straight
+leg): the shortcut pass then asks the guard about every chord before
+the mesh spans, and the grid capsule of the caller
+(`pathfind.Capsule.LegClear` - the line of sight the movement channel
+applies plus the 4 unit clearance sampling of the bend pass) is the
+authority. The composition closes at the caller: the walker answer
+runs the capsule push and bend pass (`ApplyPath`) and folds into the
+longest grid clear legs (`ShortenPath`) - every leg the bot consumes
+answers the server movement rules with the capsule clearance. The
+owner repro route (21_19 swim) walks 14 waypoints of the legacy 148,
+the path length drops 4947 to 4852, and the raw variant of the
+viewer toggle keeps the legacy pipeline as the before picture.
+
 Three.js itself is vendored (`web/vendor/three.module.min.js`, the
 r160 module build, MIT) so the viewer works offline like the rest of
 the interface; the page boots through the dynamic import of

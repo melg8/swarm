@@ -232,3 +232,54 @@ func TestSmoothPortalIndexChain(t *testing.T) {
     require.Equal(t, int32(len(route.Corridor)-1),
         wps[len(wps)-1].portal)
 }
+
+// guardStub is the scripted wall oracle: every chord whose id sits in
+// the refused set answers false, the rest true.
+type guardStub struct {
+    refused map[[2]int]bool
+    asked   int
+}
+
+func (g *guardStub) LegClear(ax, ay, _ float64,
+    _, _, _, _ float64,
+) bool {
+    g.asked++
+
+    return !g.refused[[2]int{int(ax), int(ay)}]
+}
+
+// TestSmoothGuardRefusesChord pins the wall oracle of the shortcut
+// pass: the guard the filter arms answers every chord before the
+// mesh wall spans, a refused chord keeps the funnel pivots and an
+// allowing guard merges them - the corridor portal crossings stay
+// the hard rule under both.
+func TestSmoothGuardRefusesChord(t *testing.T) {
+    mesh := NewMesh(writeTiles(t, smoothTWorld()))
+    start := worldPos(2, 13.5, 0)
+    end := worldPos(30, 2, 0)
+
+    // The allowing guard: the merge of the open boundary chord goes
+    // through (the same answer the mesh spans give).
+    allowing := &guardStub{}
+    filter := DefaultFilter()
+    filter.WaypointClearance = 7.5
+    filter.Smooth = true
+    filter.Guard = allowing
+    route, err := mesh.Route(start, end, filter)
+    require.NoError(t, err)
+    require.True(t, route.Found)
+    require.Len(t, route.Waypoints, 2)
+    require.Positive(t, allowing.asked, "the guard answers chords")
+
+    // The refusing guard: the chord from the start is refused, the
+    // funnel pivot survives.
+    refusing := &guardStub{refused: map[[2]int]bool{
+        {int(start.X), int(start.Y)}: true,
+    }}
+    filter.Guard = refusing
+    route, err = mesh.Route(start, end, filter)
+    require.NoError(t, err)
+    require.True(t, route.Found)
+    require.Len(t, route.Waypoints, 3,
+        "the refused chord keeps the funnel pivots")
+}

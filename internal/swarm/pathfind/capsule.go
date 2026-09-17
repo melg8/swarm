@@ -218,6 +218,82 @@ func segmentDistance(x, y, ax, ay, bx, by float64,
     return math.Hypot(x-px, y-py), px, py
 }
 
+// LegClear answers whether the straight leg walks the server accurate
+// grid safely: the line of sight the movement channel applies (the
+// supercover raster with the strict symmetric height rule) passes end
+// to end and every sampled point of the leg keeps the radius from the
+// nearest closed wall edge (the 4 unit sample of the bend pass - the
+// wall field changes at the 16 unit cell granularity, a 4 unit sample
+// cannot step over a tight spot). The mesh wall spans of the shortcut
+// pass are the side level approximation; this oracle is the authority
+// the grid movement validation enforces.
+func (c *Capsule) LegClear(ax, ay, az, bx, by, bz, radius float64) bool {
+    if c == nil || c.engine == nil {
+        return true
+    }
+    a := Vec3{X: ax, Y: ay, Z: az}
+    b := Vec3{X: bx, Y: by, Z: bz}
+    if !c.legWalkable(a, b) {
+        return false
+    }
+    if radius <= 0 {
+        return true
+    }
+    length := math.Hypot(b.X-a.X, b.Y-a.Y)
+    samples := int(length/capsuleSampleStep) + 1
+    if samples < 2 {
+        samples = 2
+    }
+    for i := 1; i < samples; i++ {
+        sample := legPoint(a, b, float64(i)/float64(samples))
+        if c.Clearance(sample.X, sample.Y, int16(sample.Z)) < radius {
+            return false
+        }
+    }
+
+    return true
+}
+
+// ShortenPath folds the waypoint path into the longest legs the grid
+// wall oracle allows (greedy farthest visible over the ordered
+// points): every surviving leg answers LegClear - the server walk
+// rules end to end and the capsule radius off every sampled wall.
+// The first and the last waypoints never move. The scan window caps
+// the merge horizon per anchor: the wall bends chain every handful
+// of points, a longer chord beyond the window is rare enough to
+// leave unexplored.
+func (c *Capsule) ShortenPath(waypoints []Vec3, radius float64,
+) []Vec3 {
+    if c == nil || c.engine == nil || len(waypoints) < 3 {
+        return waypoints
+    }
+    const window = 32
+    out := make([]Vec3, 0, len(waypoints))
+    out = append(out, waypoints[0])
+    anchor := 0
+    for anchor < len(waypoints)-1 {
+        far := anchor + 1
+        if last := len(waypoints) - 1; far+window < last {
+            far += window
+        } else {
+            far = last
+        }
+        chosen := anchor + 1
+        for k := far; k > anchor+1; k-- {
+            a, b := waypoints[anchor], waypoints[k]
+            if c.LegClear(a.X, a.Y, a.Z, b.X, b.Y, b.Z, radius) {
+                chosen = k
+
+                break
+            }
+        }
+        out = append(out, waypoints[chosen])
+        anchor = chosen
+    }
+
+    return out
+}
+
 // ApplyPath returns the waypoint path with the capsule clearance
 // enforced: every interior waypoint clears the walls by the radius
 // and every leg passes no closer than the radius to a wall edge. The

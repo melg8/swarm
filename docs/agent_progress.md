@@ -582,3 +582,25 @@ over the Dion hunting grounds.
   round binds the shortcut pass to the grid wall oracle (the
   LegGuard seam) so the merged chords clear the server accurate
   raster directly.
+
+- 2026-09-17: the wall oracle round: the grid per cell walls (the
+  diagonal anti corner cut) are finer than the mesh side level link
+  spans - the funnel pivots one radius off a mesh span end sit up to
+  6 units off a real grid wall on the staircase (the owner stuck at
+  wp 25), and the capsule pass re fragmentation (129 wps, 79 tiny
+  legs) defeated the mesh smoothing end to end. Filter.Guard arms
+  the LegGuard seam: the shortcut pass answers every chord to the
+  grid capsule (pathfind.Capsule.LegClear - the movement line of
+  sight plus the 4 unit clearance sampling), and the walker answer
+  composes ApplyPath with the new ShortenPath fold (the greedy
+  farthest visible over the post pass points, every surviving leg
+  LegClear). The owner repro walks 14 waypoints of the legacy 148
+  (path 4947 -> 4852, max leg 1070), the raw toggle variant keeps
+  the legacy pipeline as the before picture. Tests: the guard
+  refusal keeps the pivots, the guard merge folds (navmesh), the
+  LegClear corridor center through wall answers, the ShortenPath
+  open collapse and the sealed detour keep (pathfind). Visual
+  verification on 127.0.0.1:8082: the staircase closeup draws the
+  granular raw dots vs the clean smoothed line, the toggle and the
+  path= link parameter restore both ways, screenshots in the agent
+  download archive.

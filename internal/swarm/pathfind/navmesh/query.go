@@ -15,6 +15,18 @@ type Pos struct {
     X, Y, Z float64
 }
 
+// LegGuard is the wall oracle of the shortcut pass: the server
+// accurate wall question for one straight leg. The mesh wall spans
+// are the side level approximation - the grid movement validation
+// sees the per cell walls (the paired NSWE walls and the diagonal
+// anti corner cut) the rectangle sides lump together. A guard armed
+// on the filter (the grid capsule of the caller) answers every
+// shortcut chord against the authoritative raster; without one the
+// pass falls back to the mesh wall spans.
+type LegGuard interface {
+    LegClear(ax, ay, az, bx, by, bz, radius float64) bool
+}
+
 // Filter prices the areas of a search.
 type Filter struct {
     // WaterCost multiplies the step cost of the water polygons (the
@@ -45,6 +57,11 @@ type Filter struct {
     // polygons. It needs the pivot clearance armed - a zero
     // WaypointClearance keeps the raw funnel answer.
     Smooth bool
+    // Guard is the optional wall oracle of the shortcut pass (see
+    // LegGuard): when armed, every merged chord answers to it instead
+    // of the mesh wall spans - the grid raster is the authority the
+    // side level spans approximate.
+    Guard LegGuard
 }
 
 // DefaultFilter is the swim allowing search with the 3x water cost.
@@ -114,8 +131,7 @@ func (m *Mesh) answerWaypoints(route *Route, corridor []PolyRef,
         filter.WaypointClearance)
     if filter.Smooth && filter.WaypointClearance > 0 {
         route.RawWaypoints = funnelPositions(wps)
-        route.Waypoints = m.smoothPath(corridor, wps,
-            filter.WaypointClearance)
+        route.Waypoints = m.smoothPath(corridor, wps, filter)
 
         return
     }

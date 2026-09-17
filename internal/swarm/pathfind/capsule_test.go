@@ -268,3 +268,61 @@ func TestEngineCapsuleClearanceIntegration(t *testing.T) {
         pathMinClearance(NewCapsule(engine), cleared.Waypoints),
         DefaultCollisionRadius-1e-6)
 }
+
+// TestCapsuleLegClear pins the wall oracle of the mesh shortcut pass:
+// a leg down the corridor center clears the radius, a leg through the
+// corridor wall refuses, and the refused answer matches the sampled
+// clearance the bend pass pushes away.
+func TestCapsuleLegClear(t *testing.T) {
+    engine, world := capsuleWallWorld(t)
+    capsule := NewCapsule(engine)
+
+    // The corridor center line runs between the wall rows: every
+    // sample keeps 8 or more units off the walls.
+    require.True(t, capsule.LegClear(
+        world(6, 10.5).X, world(6, 10.5).Y, 0,
+        world(19, 11.5).X, world(19, 11.5).Y, 0, 7.5))
+
+    // The leg through the sealed end wall crosses closed cells: the
+    // walk rules refuse it.
+    require.False(t, capsule.LegClear(
+        world(3.5, 10.5).X, world(3.5, 10.5).Y, 0,
+        world(21.5, 10.5).X, world(21.5, 10.5).Y, 0, 7.5))
+
+    // A zero radius keeps the walk rules answer only.
+    require.False(t, capsule.LegClear(
+        world(3.5, 10.5).X, world(3.5, 10.5).Y, 0,
+        world(21.5, 10.5).X, world(21.5, 10.5).Y, 0, 0))
+}
+
+// TestCapsuleShortenPath pins the fold of the wall oracle: a path
+// whose redundant middle points ride the open corridor collapses to
+// the long clear legs, a path whose middle point is the only way
+// around the corridor seal keeps it.
+func TestCapsuleShortenPath(t *testing.T) {
+    engine, world := capsuleWallWorld(t)
+    capsule := NewCapsule(engine)
+
+    // The open corridor: every intermediate point a straight clear
+    // chord skips, the fold drops.
+    path := []Vec3{
+        world(5, 10.5), world(8, 10.5), world(11, 11),
+        world(14, 11.5), world(19, 11.5),
+    }
+    out := capsule.ShortenPath(path, 7.5)
+    require.Equal(t, []Vec3{path[0], path[len(path)-1]}, out)
+
+    // The sealed corridor: the leg across the seal refuses, the
+    // detour through the only opening keeps its points.
+    sealed := []Vec3{
+        world(2, 10.5), world(2.5, 12.5), world(5, 12.5),
+        world(7, 10.5), world(10.5, 10.5),
+    }
+    out = capsule.ShortenPath(sealed, 7.5)
+    require.Equal(t, sealed, out,
+        "no chord of the detour may cross the sealed end")
+
+    // A degenerate path passes through unchanged.
+    two := []Vec3{world(5, 10.5), world(19, 11.5)}
+    require.Equal(t, two, capsule.ShortenPath(two, 7.5))
+}

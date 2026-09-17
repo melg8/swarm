@@ -70,19 +70,27 @@ func NewNavmeshNavigator( //nolint:ireturn
 
 // clearedFilter arms the funnel pivot clearance of the mesh search
 // from the engine's capsule radius and runs the shortcut pass over
-// the funnel answer: the pivots keep the turns off the wall corners,
-// the merged legs keep the capsule away from every wall the corridor
-// crosses - one radius, both contracts.
+// the funnel answer with the grid capsule as the wall oracle: the
+// pivots keep the turns off the wall corners, the merged legs answer
+// to the server accurate raster the movement validation enforces -
+// one radius, both engines.
 func (n navmeshNavigator) clearedFilter(filter navmesh.Filter) navmesh.Filter {
     filter.WaypointClearance = n.clearance
     filter.Smooth = n.clearance > 0
+    if n.capsule != nil {
+        filter.Guard = n.capsule
+    }
 
     return filter
 }
 
 // clearedWaypoints runs the mesh funnel waypoints through the capsule
 // clearance post pass when the engine arms it (the legs of the funnel
-// answer can still graze a wall the pivots already avoid).
+// answer can still graze a wall the pivots already avoid) and folds
+// the result into the longest grid clear legs (the wall oracle of the
+// shortcut pass, applied after the pushes and bends: every leg the
+// walker consumes answers the server movement rules with the capsule
+// clearance).
 func (n navmeshNavigator) clearedWaypoints(
     waypoints []pathfind.Vec3,
 ) []pathfind.Vec3 {
@@ -90,7 +98,8 @@ func (n navmeshNavigator) clearedWaypoints(
         return waypoints
     }
 
-    return n.capsule.ApplyPath(waypoints, n.clearance)
+    return n.capsule.ShortenPath(
+        n.capsule.ApplyPath(waypoints, n.clearance), n.clearance)
 }
 
 // FindPathApproach plans the walk through the mesh corridor search

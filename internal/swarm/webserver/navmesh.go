@@ -295,6 +295,9 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     }
     filter.WaypointClearance = clearance
     filter.Smooth = clearance > 0
+    if s.navmeshCapsule != nil {
+        filter.Guard = s.navmeshCapsule
+    }
 
     start := navmesh.Pos{X: request.Start.X, Y: request.Start.Y,
         Z: request.Start.Z}
@@ -326,19 +329,51 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         response.Partial = route.Partial
         response.Explored = route.Explored
         response.Corridor = len(route.Corridor)
+        // The smoothed answer walks the full pipeline: the pushes and
+        // the bends of the capsule pass, then the fold into the
+        // longest grid clear legs. The raw funnel answer keeps the
+        // legacy post pass only - it is the before picture of the
+        // comparison toggle.
         response.Waypoints = toNavmeshPoints(
             s.clearedWaypoints(route.Waypoints, clearance))
         response.RawWaypoints = toNavmeshPoints(
-            s.clearedWaypoints(route.RawWaypoints, clearance))
+            s.legacyWaypoints(route.RawWaypoints, clearance))
     }
     writeJSON(w, s.logger, response)
 }
 
 // clearedWaypoints runs the answer waypoints through the capsule
-// clearance post pass when the viewer engine arms it: the funnel
+// clearance post pass when the viewer engine arms it (the funnel
 // pivot clearance covers the turns, the smoothing covers the merged
-// legs, the post pass covers whatever still grazes a wall.
+// legs, the post pass covers whatever still grazes a wall) and folds
+// the result into the longest grid clear legs - the walker consumes
+// legs that answer the server movement rules with the capsule
+// clearance.
 func (s *Server) clearedWaypoints(waypoints []navmesh.Pos,
+    clearance float64,
+) []navmesh.Pos {
+    if s.navmeshCapsule == nil || len(waypoints) == 0 {
+        return waypoints
+    }
+    vecs := make([]pathfind.Vec3, len(waypoints))
+    for i, wp := range waypoints {
+        vecs[i] = pathfind.Vec3{X: wp.X, Y: wp.Y, Z: wp.Z}
+    }
+    vecs = s.navmeshCapsule.ApplyPath(vecs, clearance)
+    vecs = s.navmeshCapsule.ShortenPath(vecs, clearance)
+    positions := make([]navmesh.Pos, len(vecs))
+    for i, vec := range vecs {
+        positions[i] = navmesh.Pos{X: vec.X, Y: vec.Y, Z: vec.Z}
+    }
+
+    return positions
+}
+
+// legacyWaypoints runs the raw funnel answer through the capsule
+// push and bend pass only - the pre smoothing pipeline the owner
+// compares against (the granular pivots and the anchor chains stay
+// visible in the raw variant of the route toggle).
+func (s *Server) legacyWaypoints(waypoints []navmesh.Pos,
     clearance float64,
 ) []navmesh.Pos {
     if s.navmeshCapsule == nil || len(waypoints) == 0 {

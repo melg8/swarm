@@ -53,8 +53,9 @@ const smoothScanWindow = 256
 // positions - the first, the last and every pivot no safe chord
 // skips.
 func (m *Mesh) smoothPath(corridor []PolyRef, wps []funnelWp,
-    clearance float64,
+    filter Filter,
 ) []Pos {
+    clearance := filter.WaypointClearance
     if len(wps) == 0 {
         return nil
     }
@@ -75,7 +76,7 @@ func (m *Mesh) smoothPath(corridor []PolyRef, wps []funnelWp,
         }
         chosen := anchor + 1
         for k := far; k > anchor+1; k-- {
-            if m.chordClear(corridor, wps[anchor], wps[k], clearance,
+            if m.chordClear(corridor, wps[anchor], wps[k], filter,
                 walls) {
                 chosen = k
 
@@ -91,11 +92,13 @@ func (m *Mesh) smoothPath(corridor []PolyRef, wps []funnelWp,
 
 // chordClear answers whether the straight chord from the waypoint
 // "from" to the waypoint "to" walks the corridor safely: it crosses
-// every intermediate portal inside the open span and keeps the
-// clearance from the wall edges of every polygon it passes.
+// every intermediate portal inside the open span, and the walls keep
+// the clearance - the armed guard (the server accurate raster)
+// answers the whole chord, the mesh wall spans answer per polygon.
 func (m *Mesh) chordClear(corridor []PolyRef, from, to funnelWp,
-    clearance float64, walls map[PolyRef]*[4][]wallSpan,
+    filter Filter, walls map[PolyRef]*[4][]wallSpan,
 ) bool {
+    clearance := filter.WaypointClearance
     start := int(from.portal) + 1
     if start < 0 {
         start = 0
@@ -105,6 +108,11 @@ func (m *Mesh) chordClear(corridor []PolyRef, from, to funnelWp,
         end = len(corridor) - 1
     }
     if start > end {
+        return false
+    }
+    if filter.Guard != nil && !filter.Guard.LegClear(
+        from.pos.X, from.pos.Y, from.pos.Z,
+        to.pos.X, to.pos.Y, to.pos.Z, clearance) {
         return false
     }
 
@@ -120,17 +128,22 @@ func (m *Mesh) chordClear(corridor []PolyRef, from, to funnelWp,
         if !crossed {
             return false
         }
-        spans := wallSpansOf(m, corridor[q], walls)
-        if spans == nil {
-            return false
+        if filter.Guard == nil {
+            spans := wallSpansOf(m, corridor[q], walls)
+            if spans == nil {
+                return false
+            }
+            // The pass is 2D: the crossing height rides on the chord
+            // endpoints, the exit carries none.
+            exit := Pos{X: x, Y: y, Z: 0}
+            if !polyWallClear(spans, current, exit, clearance) {
+                return false
+            }
         }
-        // The pass is 2D: the crossing height rides on the chord
-        // endpoints, the exit carries none.
-        exit := Pos{X: x, Y: y, Z: 0}
-        if !polyWallClear(spans, current, exit, clearance) {
-            return false
-        }
-        current = exit
+        current = Pos{X: x, Y: y, Z: current.Z}
+    }
+    if filter.Guard != nil {
+        return true
     }
     spans := wallSpansOf(m, corridor[end], walls)
 
