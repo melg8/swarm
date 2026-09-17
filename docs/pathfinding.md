@@ -108,6 +108,45 @@ start already on dry ground answers Found=false.
   diagonals - a supercover-legal leg can still be refused by the
   server, so a planned leg must survive the server rules themselves.
 
+## Capsule clearance
+
+The server never checks the character capsule against the geodata: the
+Mobius movement validation is cell level (the paired NSWE walls plus
+the anti corner cut), so a plan that hugs the walls is accepted by the
+server even while the character clips every wall edge and corner with
+its collision cylinder and sticks (the owner report: the path points
+"too close to the wall edges and corners"). The C1 player capsule is
+the elven fighter template radius 7.5
+(`DefaultCollisionRadius`), the geodata cell is 16 units wide - a cell
+center waypoint always clears its own cell walls by 8 units, a funnel
+span end never does.
+
+The clearance machinery lives in `capsule.go` and serves both engines:
+
+- `Engine.SetCapsuleClearance(radius)` arms the post pass on the grid
+  engine: every search runs its smoothed waypoints through
+  `Capsule.ApplyPath` - interior waypoints whose clearance falls below
+  the radius are pushed away from the nearest wall (damped projection,
+  every move validated by the engine's own line of sight), every leg
+  is sampled and bent around the walls through pushed-in anchor
+  chains. The first and the last waypoints never move, and every
+  adjustment falls back to the original geometry when the walk rules
+  refuse it - the pass can only add clearance, never break a plan.
+  The default is disabled (the raw smoothing the tests pin); the
+  production wiring arms it with the template radius.
+- The mesh funnel pulls its pivots inward from the portal span ends
+  by the same radius (`Filter.WaypointClearance`): the span end is
+  where the open span meets the wall, the exact Detour pivot is
+  exactly the point a capsule clips. A span narrower than twice the
+  radius pivots at its middle - the deepest point of a narrow
+  doorway. The hunt hybrid and the viewer arm it from the engine's
+  armed radius and run the mesh answers through `ApplyPath` too.
+
+The clearance of a point is the distance to the nearest closed wall
+edge of the walkable layer nearest its reference z, exact within one
+cell (the 3x3 cell neighborhood holds every wall edge closer than 16
+units; a radius below 16 never needs more).
+
 ## Pathfind test UI
 
 `go run ./cmd/swarm -pathfind-test` serves the map without any bot

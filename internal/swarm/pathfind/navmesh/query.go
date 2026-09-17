@@ -29,6 +29,14 @@ type Filter struct {
     // holds the start (the way-out rule of the grid engine, priced
     // at the avoidEscapeMultiplier). A nil slice bans nothing.
     Avoid []AvoidCircle
+    // WaypointClearance pulls the funnel pivots inward from the
+    // portal span ends by this radius before the string pulling: the
+    // span ends sit on the wall boundary - the exact Detour pivot is
+    // where a character capsule clips the corner - and the turn
+    // happens a capsule radius away from it instead. A span narrower
+    // than twice the radius pivots at its middle (the deepest point
+    // of a narrow doorway). Zero keeps the exact pivots.
+    WaypointClearance float64
 }
 
 // DefaultFilter is the swim allowing search with the 3x water cost.
@@ -116,7 +124,8 @@ func (m *Mesh) RouteApproach(
 
     if startRef == endRef {
         route.Corridor = []PolyRef{startRef}
-        route.Waypoints = m.straightPath(route.Corridor, startPos, endPos)
+        route.Waypoints = m.straightPath(route.Corridor, startPos,
+            endPos, filter.WaypointClearance)
         route.Found = true
 
         return route, nil
@@ -132,14 +141,14 @@ func (m *Mesh) RouteApproach(
     case result.reached:
         route.Found = true
         route.Waypoints = m.straightPath(result.corridor, startPos,
-            endPos)
+            endPos, filter.WaypointClearance)
     case result.partial && len(result.corridor) > 1:
         route.Partial = true
         // The partial answer funnels toward the original end: the
         // projection onto the last corridor polygon is the closest
         // reachable point of it (the dry search contract).
         route.Waypoints = m.straightPath(result.corridor, startPos,
-            endPos)
+            endPos, filter.WaypointClearance)
     default:
         route.Corridor = nil
     }
@@ -205,7 +214,8 @@ func (m *Mesh) WaterEscape(start Pos) (*Route, error) {
     route.Found = true
     route.Corridor = result.corridor
     // The walk ends at the crossing into the first dry polygon.
-    route.Waypoints = m.straightPath(result.corridor, startPos, result.end)
+    route.Waypoints = m.straightPath(result.corridor, startPos,
+        result.end, 0)
 
     return route, nil
 }

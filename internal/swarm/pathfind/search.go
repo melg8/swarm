@@ -294,6 +294,10 @@ func (s *search) run(start, end Vec3, approachRadius float64) (*Result, error) {
     result.Found = true
     result.RawPath = nodesToWorld(raw)
     result.Waypoints = nodesToWorld(smooth)
+    if s.engine.capsuleRadius > 0 {
+        result.Waypoints = NewCapsule(s.engine).ApplyPath(result.Waypoints,
+            s.engine.capsuleRadius)
+    }
     result.Length = pathLength(result.Waypoints)
 
     return result, nil
@@ -499,6 +503,10 @@ func (s *search) runEscape(start Vec3) (*Result, error) {
     result.Found = true
     result.RawPath = nodesToWorld(raw)
     result.Waypoints = nodesToWorld(s.smoothPath(raw))
+    if s.engine.capsuleRadius > 0 {
+        result.Waypoints = NewCapsule(s.engine).ApplyPath(result.Waypoints,
+            s.engine.capsuleRadius)
+    }
     result.Length = pathLength(result.Waypoints)
 
     return result, nil

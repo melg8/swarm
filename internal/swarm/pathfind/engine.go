@@ -54,6 +54,10 @@ type Engine struct {
     dir      string
     capacity int
     maxPass  uint16
+    // capsuleRadius arms the capsule clearance post-pass of the
+    // smoothed waypoints (capsule.go); zero (the default) keeps the
+    // raw smoothing. Set once at construction time (SetCapsuleClearance).
+    capsuleRadius float64
 
     mu       sync.Mutex
     cache    map[RegionKey]*cacheEntry

@@ -17,6 +17,9 @@ const funnelEpsilon = 1e-4
 // appends the funnel apex as a turning point. The waypoints never
 // leave the corridor polygons and only cross shared edges inside
 // their open portal spans - the NSWE wall fidelity of the mesh.
+// The clearance radius pulls every pivot inward from the span ends
+// (offsetPortal) so a turning waypoint keeps the character capsule
+// away from the walls the span end sits on.
 //
 // The corridor must be a connected polygon chain (the A* answer). The
 // start and end positions snap onto the corridor surface like
@@ -24,6 +27,7 @@ const funnelEpsilon = 1e-4
 // corridor projects onto its last polygon, which is exactly the
 // closest-reachable-point semantics of the dry searches.
 func (m *Mesh) straightPath(corridor []PolyRef, startPos, endPos Pos,
+    clearance float64,
 ) []Pos {
     if len(corridor) == 0 {
         return nil
@@ -39,15 +43,16 @@ func (m *Mesh) straightPath(corridor []PolyRef, startPos, endPos Pos,
     if lastTile == nil {
         return nil
     }
-    ex, ey, ez := lastTile.ClosestPoint(lastPoly, endPos.X, endPos.Y,
-        endPos.Z)
+    ex, ey, ez := lastTile.ClosestPoint(lastPoly, endPos.X,
+        endPos.Y, endPos.Z)
     closestEnd := Pos{X: ex, Y: ey, Z: ez}
 
     waypoints := make([]Pos, 0, len(corridor)+1)
     waypoints = appendWaypoint(waypoints, closestStart)
 
     if len(corridor) > 1 {
-        m.runFunnel(corridor, closestStart, closestEnd, &waypoints)
+        m.runFunnel(corridor, closestStart, closestEnd, clearance,
+            &waypoints)
     }
 
     waypoints = appendWaypoint(waypoints, closestEnd)
@@ -64,7 +69,7 @@ func (m *Mesh) straightPath(corridor []PolyRef, startPos, endPos Pos,
 // which is the negative of the Detour dtTriArea2D - every comparison
 // of the upstream algorithm flips with it.
 func (m *Mesh) runFunnel(corridor []PolyRef, closestStart, closestEnd Pos,
-    waypoints *[]Pos,
+    clearance float64, waypoints *[]Pos,
 ) {
     cone := funnelCone{
         apex:       closestStart,
@@ -77,7 +82,8 @@ func (m *Mesh) runFunnel(corridor []PolyRef, closestStart, closestEnd Pos,
 
     i := 0
     for i < len(corridor) {
-        left, right, ok := m.corridorPortal(corridor, i, closestEnd)
+        left, right, ok := m.corridorPortal(corridor, i, closestEnd,
+            clearance)
         if !ok {
             // A broken chain ends the walk at the last connected
             // polygon: the corridor is inconsistent (should not
@@ -108,8 +114,10 @@ func (m *Mesh) runFunnel(corridor []PolyRef, closestStart, closestEnd Pos,
 
 // corridorPortal returns the left and right portal points of the
 // corridor transition at index i (the shared edge between the
-// polygons i and i+1, or the end position at the corridor end).
+// polygons i and i+1, or the end position at the corridor end),
+// pulled inward by the clearance radius (offsetPortal).
 func (m *Mesh) corridorPortal(corridor []PolyRef, i int, closestEnd Pos,
+    clearance float64,
 ) (Pos, Pos, bool) {
     if i+1 >= len(corridor) {
         return closestEnd, closestEnd, true
@@ -123,6 +131,7 @@ func (m *Mesh) corridorPortal(corridor []PolyRef, i int, closestEnd Pos,
         return Pos{}, Pos{}, false
     }
     left, right := m.portalLeftRight(tile, poly, link, nextTile, nextPoly)
+    left, right = offsetPortal(left, right, clearance)
 
     return left, right, true
 }
@@ -238,6 +247,43 @@ func rectCenter(tile *Tile, poly *Poly) (float64, float64) {
     x0, y0, x1, y1 := tile.WorldRect(poly)
 
     return (x0 + x1) * 0.5, (y0 + y1) * 0.5
+}
+
+// offsetPortal pulls the portal endpoints inward along the shared
+// edge by the clearance radius: the exact Detour pivot is the span
+// end - the point where the open span meets the wall - and a
+// character capsule turning exactly there clips the wall corner. A
+// span narrower than twice the radius pivots at its middle: the
+// deepest point of a narrow doorway is the best the capsule gets.
+func offsetPortal(left, right Pos, radius float64) (Pos, Pos) {
+    if radius <= 0 {
+        return left, right
+    }
+    dx, dy := right.X-left.X, right.Y-left.Y
+    length := math.Hypot(dx, dy)
+    if length < 1e-6 {
+        return left, right
+    }
+    if length <= 2*radius {
+        mid := Pos{
+            X: (left.X + right.X) / 2,
+            Y: (left.Y + right.Y) / 2,
+            Z: (left.Z + right.Z) / 2,
+        }
+
+        return mid, mid
+    }
+    ux, uy := dx/length, dy/length
+    t := radius / length
+    pulled := func(from Pos, sign float64) Pos {
+        return Pos{
+            X: from.X + sign*ux*radius,
+            Y: from.Y + sign*uy*radius,
+            Z: from.Z + sign*(right.Z-left.Z)*t,
+        }
+    }
+
+    return pulled(left, 1), pulled(right, -1)
 }
 
 // appendWaypoint appends a funnel corner unless it duplicates the
