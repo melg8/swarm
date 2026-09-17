@@ -257,11 +257,13 @@ func (c *Capsule) LegClear(ax, ay, az, bx, by, bz, radius float64) bool {
 // ShortenPath folds the waypoint path into the longest legs the grid
 // wall oracle allows (greedy farthest visible over the ordered
 // points): every surviving leg answers LegClear - the server walk
-// rules end to end and the capsule radius off every sampled wall.
-// The first and the last waypoints never move. The scan window caps
-// the merge horizon per anchor: the wall bends chain every handful
-// of points, a longer chord beyond the window is rare enough to
-// leave unexplored.
+// rules end to end and the capsule radius off every sampled wall -
+// and the server move clamps (the 9900 unit packet refusal is the
+// walker's own maxMoveLeg concern, the water clamp of the swimming
+// moves splits here). The first and the last waypoints never move.
+// The scan window caps the merge horizon per anchor: the wall bends
+// chain every handful of points, a longer chord beyond the window is
+// rare enough to leave unexplored.
 func (c *Capsule) ShortenPath(waypoints []Vec3, radius float64,
 ) []Vec3 {
     if c == nil || c.engine == nil || len(waypoints) < 3 {
@@ -270,28 +272,75 @@ func (c *Capsule) ShortenPath(waypoints []Vec3, radius float64,
     const window = 32
     out := make([]Vec3, 0, len(waypoints))
     out = append(out, waypoints[0])
-    anchor := 0
-    for anchor < len(waypoints)-1 {
-        far := anchor + 1
+    anchor := waypoints[0]
+    index := 0
+    for index < len(waypoints)-1 {
+        far := index + 1
         if last := len(waypoints) - 1; far+window < last {
             far += window
         } else {
             far = last
         }
-        chosen := anchor + 1
-        for k := far; k > anchor+1; k-- {
-            a, b := waypoints[anchor], waypoints[k]
-            if c.LegClear(a.X, a.Y, a.Z, b.X, b.Y, b.Z, radius) {
+        chosen := index + 1
+        for k := far; k > index+1; k-- {
+            if c.LegClear(anchor.X, anchor.Y, anchor.Z,
+                waypoints[k].X, waypoints[k].Y, waypoints[k].Z,
+                radius) {
                 chosen = k
 
                 break
             }
         }
-        out = append(out, waypoints[chosen])
-        anchor = chosen
+        target := waypoints[chosen]
+        if limit, capped := c.legLimit(anchor); capped {
+            leg := math.Hypot(target.X-anchor.X, target.Y-anchor.Y)
+            if leg > limit {
+                // The server would truncate this move on its own:
+                // the fold cuts it at the same distance first, so
+                // the waypoint the walker aims at is the waypoint
+                // the character actually reaches.
+                split := c.snapZ(
+                    legPoint(anchor, target, limit/leg), anchor.Z)
+                out = append(out, split)
+                anchor = split
+                // The index holds: the fold resumes from the split
+                // point over the same horizon and re-answers the
+                // remainder of the capped chord.
+                continue
+            }
+        }
+        out = append(out, target)
+        anchor = target
+        index = chosen
     }
 
     return out
+}
+
+// waterMoveLeg mirrors the server clamp of the water moves: the
+// moveToLocation of the game server scales the destination of every
+// swimming move request onto the 700 unit sphere around the current
+// position (Creature.moveToLocation - the isInWater divider), and a
+// target beyond it never answers. The smoothing over open water
+// merges the funnel pinholes into legs several times the clamp - the
+// server would stop the character short of every such waypoint and
+// the follower would never see the arrival (the path "is not
+// passed", the owner report). The fold splits the water anchored
+// legs at the clamp instead.
+const waterMoveLeg = 700.0
+
+// legLimit answers the server move clamp of a walk that leaves the
+// point. A water anchored leg truncates at the water move limit: the
+// character issues the click from the water, the server clamps the
+// destination. A dry leg answers no cap - the land moves run the
+// server's own getValidLocation truncation and pathfinding instead,
+// nothing the planner has to pre-split.
+func (c *Capsule) legLimit(from Vec3) (float64, bool) {
+    if c.engine.OverWater(from.X, from.Y, int16(from.Z)) {
+        return waterMoveLeg, true
+    }
+
+    return 0, false
 }
 
 // ApplyPath returns the waypoint path with the capsule clearance

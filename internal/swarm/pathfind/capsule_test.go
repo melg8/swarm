@@ -326,3 +326,75 @@ func TestCapsuleShortenPath(t *testing.T) {
     two := []Vec3{world(5, 10.5), world(19, 11.5)}
     require.Equal(t, two, capsule.ShortenPath(two, 7.5))
 }
+
+// TestCapsuleShortenPathCapsWaterLegs pins the server water move
+// clamp of the fold: the moveToLocation of the game server truncates
+// every swimming move request to waterMoveLeg from the current
+// position (Creature.moveToLocation, the isInWater divider), so a
+// smoothed leg that leaves the water longer than the clamp never
+// reaches its waypoint - the fold splits it at the clamp instead and
+// every leg the walker issues from the water lands on its target.
+func TestCapsuleShortenPathCapsWaterLegs(t *testing.T) {
+    // The open underwater plane: no walls, the only constraint the
+    // fold answers is the water clamp.
+    spec := &regionSpec{}
+    spec.setFlat(shoreBed)
+    engine := newTestEngine(t, spec)
+    capsule := NewCapsule(engine)
+
+    start := worldOf(100, 300, shoreBed)
+    mid := worldOf(260, 300, shoreBed)
+    end := worldOf(500, 300, shoreBed)
+    require.True(t, engine.OverWater(start.X, start.Y, shoreBed),
+        "the test world must read the start as water")
+    out := capsule.ShortenPath(
+        []Vec3{start, mid, end}, DefaultCollisionRadius)
+
+    require.Equal(t, start, out[0], "the first waypoint never moves")
+    require.Equal(t, end, out[len(out)-1],
+        "the last waypoint never moves")
+    for i := 1; i < len(out); i++ {
+        leg := math.Hypot(out[i].X-out[i-1].X, out[i].Y-out[i-1].Y)
+        require.LessOrEqual(t, leg, waterMoveLeg,
+            "the water leg %d must fit the server move clamp", i-1)
+    }
+    // The split keeps the route geometry: the path still advances
+    // monotonically along the original line.
+    for i := 1; i < len(out); i++ {
+        require.Greater(t, out[i].X, out[i-1].X,
+            "the split path must advance east", i)
+    }
+    // The full length survives the splits (plus the snap slack).
+    straight := math.Hypot(end.X-start.X, end.Y-start.Y)
+    walked := 0.0
+    for i := 1; i < len(out); i++ {
+        walked += math.Hypot(out[i].X-out[i-1].X,
+            out[i].Y-out[i-1].Y)
+    }
+    require.InDelta(t, straight, walked, cellSize,
+        "the split must not shorten the walk")
+}
+
+// TestCapsuleShortenPathKeepsDryLegs pins the flip side: a dry
+// anchored chord has no server clamp (the land moves run the
+// server's own truncation and pathfinding), so the fold keeps the
+// long clear legs the water would split.
+func TestCapsuleShortenPathKeepsDryLegs(t *testing.T) {
+    spec := &regionSpec{}
+    spec.setFlat(0)
+    engine := newTestEngine(t, spec)
+    capsule := NewCapsule(engine)
+
+    start := worldOf(100, 300, 0)
+    mid := worldOf(260, 300, 0)
+    end := worldOf(500, 300, 0)
+    require.False(t, engine.OverWater(start.X, start.Y, 0),
+        "the test world must read the start as dry land")
+    out := capsule.ShortenPath(
+        []Vec3{start, mid, end}, DefaultCollisionRadius)
+    require.Equal(t, []Vec3{start, end}, out,
+        "the dry chord merges into one leg whatever its length")
+    leg := math.Hypot(end.X-start.X, end.Y-start.Y)
+    require.Greater(t, leg, waterMoveLeg,
+        "the test chord must exceed the water clamp to pin the flip")
+}
