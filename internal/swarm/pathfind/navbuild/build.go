@@ -19,22 +19,21 @@ import (
 // noise (the measured region noise sits at 16/24/32 unit deltas -
 // both-open pairs of the same surface; the elven region of the
 // research round showed none of it, the 22_xx column shows 54k pairs
-// per region), the 4 layer island filter and the 24 unit bilinear
-// height tolerance of the rectangle corner surfaces.
+// per region) and the 4 layer island filter. The rectangle polygons
+// carry no height tunable: they merge only the cells of one exact
+// geodata height (the faithful square port of the owner directive).
 type Options struct {
-    Climb           int32
-    DedupDelta      int32
-    MinSheetLayers  int32
-    HeightTolerance float64
+    Climb          int32
+    DedupDelta     int32
+    MinSheetLayers int32
 }
 
 // DefaultOptions returns the production tunables.
 func DefaultOptions() Options {
     return Options{
-        Climb:           40,
-        DedupDelta:      32,
-        MinSheetLayers:  4,
-        HeightTolerance: 24,
+        Climb:          40,
+        DedupDelta:     32,
+        MinSheetLayers: 4,
     }
 }
 
@@ -66,9 +65,9 @@ type RegionBuild struct {
 }
 
 // BuildRegion runs the offline build of one region: the parse and
-// dedup, the sheet decomposition, the rectangle polygons with the
-// height-bounded splits, the internal links with the NSWE portal
-// spans and the bounding volume tree.
+// dedup, the sheet decomposition, the maximal same-height rectangle
+// polygons, the internal links with the NSWE portal spans and the
+// bounding volume tree.
 func BuildRegion(
     data []byte, col, row int16, opts Options,
 ) (*RegionBuild, error) {
@@ -78,7 +77,7 @@ func BuildRegion(
         return nil, err
     }
     sh := assignSheets(rl, opts.Climb, opts.MinSheetLayers)
-    rects, polyAt := buildRects(rl, sh, opts.HeightTolerance, opts.Climb)
+    rects, polyAt := buildRects(rl, sh, opts.Climb)
     acc, strips := buildInternalLinks(rl, sh, polyAt, opts.Climb)
     specs := acc.emit()
 

@@ -43,8 +43,8 @@ func TestBuildRegionSheets(t *testing.T) {
     require.Equal(t, 80, build.Stats.UnderwaterLayers)
 
     // The polygon areas: the water and the deck are single uniform
-    // rectangles, the dry sheet decomposes into the plateau and the
-    // ramp strips of the height-bounded split.
+    // rectangles, the dry sheet decomposes into the plateau rectangle
+    // and the per-height ramp rows of the exact square port.
     water, ground := 0, 0
     for i := range build.Tile.Polys {
         if build.Tile.Polys[i].Area == navmesh.AreaWater {
@@ -200,12 +200,15 @@ func TestBuildRegionIslandFilter(t *testing.T) {
     require.EqualValues(t, 0, build.Tile.Polys[0].X0)
 }
 
-// TestBuildRegionRectSplit pins the height-bounded split: a curved
-// surface splits into strips whose bilinear corner surfaces stay
-// within the tolerance.
-func TestBuildRegionRectSplit(t *testing.T) {
-    // A parabolic valley: the height curves faster than the tolerance
-    // allows over the full 40 cell span.
+// TestBuildRegionRectExactHeights pins the faithful square port on a
+// curved surface: the parabolic valley decomposes into the maximal
+// rectangles of one exact height each, every polygon flat at the
+// exact geodata height of every covered column - no bilinear
+// approximation between the mesh and the geodata numbers.
+func TestBuildRegionRectExactHeights(t *testing.T) {
+    // A parabolic valley: the height curves over the 40 cell span,
+    // the neighboring columns mostly differ (the inner three share
+    // the parabola's flat bottom).
     data := writeRegionFile(t, func(cx, cy int) []layerSpec {
         if cx >= 0 && cx < 40 && cy >= 0 && cy < 40 {
             h := int16(-3504 + ((cx-20)*(cx-20)/8)*8)
@@ -219,11 +222,20 @@ func TestBuildRegionRectSplit(t *testing.T) {
     require.NoError(t, err)
     require.Equal(t, 1, build.Stats.Sheets)
     require.Greater(t, len(build.Tile.Polys), 1,
-        "the curved surface must split")
-    // Every polygon stays within the tolerance of its cells.
+        "the curved surface must decompose into per height rectangles")
     for i := range build.Tile.Polys {
         poly := &build.Tile.Polys[i]
-        require.LessOrEqual(t, poly.X1-poly.X0, int32(40))
+        // The flat contract: all four corners carry one height.
+        require.Equal(t, poly.H00, poly.H10, "poly %d", i)
+        require.Equal(t, poly.H00, poly.H01, "poly %d", i)
+        require.Equal(t, poly.H00, poly.H11, "poly %d", i)
+        // The exact contract: the height is the parabola value of
+        // every covered column.
+        for x := poly.X0; x < poly.X1; x++ {
+            want := int16(-3504 + ((x-20)*(x-20)/8)*8)
+            require.Equal(t, want, poly.H00,
+                "poly %d column %d", i, x)
+        }
     }
 }
 

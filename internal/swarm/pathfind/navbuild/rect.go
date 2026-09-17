@@ -4,28 +4,15 @@
 
 package navbuild
 
-import "math"
-
-// spanMax returns the larger of two int32 height spans.
-func spanMax(a, b int32) int32 {
-    if a > b {
-        return a
-    }
-
-    return b
-}
-
 // rectPoly is one rectangle polygon of the built tile: the region
-// local cell bounds (half open) and the corner heights of the
-// sheet's own vertex field. The vertex value at a grid vertex is the
-// average of the sheet's cells around it, so two rectangles of one
-// sheet read the same height at their shared edge endpoints and the
-// surfaces join seamlessly (the roof sheet seams of the inside-cell
-// corners are gone); rectangles of different sheets keep their own
-// fields, so a genuine deck or cliff edge stays a sharp step. The
-// interior surface is the bilinear interpolation of the four
-// corners, kept within the height tolerance of every covered cell by
-// construction (the split rule below).
+// local cell bounds (half open) and the exact geodata height of its
+// cells. A rectangle merges only the cells of one exact height, so
+// every polygon is the flat square quad the raw l2j geodata holds -
+// the detour mesh represents the original squares as they are, the
+// visual and the actual surface alike, quantization staircase
+// included (the owner's porting directive; the bilinear vertex field
+// of the previous rounds smoothed that staircase away and the owner
+// pinned the faithful representation instead).
 type rectPoly struct {
     x0, y0, x1, y1     int32
     h00, h10, h01, h11 int16
@@ -46,10 +33,9 @@ type rectBuilder struct {
 // cellsTotal is the cell count of one region.
 const cellsTotal = regionCellsSide * regionCellsSide
 
-// buildRects decomposes every kept sheet into maximal rectangles and
-// splits them until the bilinear corner-height surface stays within
-// tolerance of every covered cell height. The answer is the polygon
-// list and the layer-instance-to-polygon map the link walk consumes.
+// buildRects decomposes every kept sheet into maximal rectangles of
+// one exact cell height. The answer is the polygon list and the
+// layer-instance-to-polygon map the link walk consumes.
 //
 // The growth respects the NSWE walls: a rectangle only spans cells
 // whose mutual steps are open (the paired walls of both sides plus
@@ -60,8 +46,13 @@ const cellsTotal = regionCellsSide * regionCellsSide
 // cell pairs (the Dion merchant quarter measured 1.24M such pairs in
 // 21_22, 1.43M in 22_22): the corridor search then tunnelled
 // straight through the buildings and the bots walked out of town.
+//
+// The growth also respects the exact height: two cells of a different
+// height never share a rectangle, so a polygon's surface is exactly
+// the height its cells carry in the geodata - the port of the l2j
+// squares changes nothing about where the ground sits.
 func buildRects(rl *regionLayers, sh *sheets,
-    heightTolerance float64, climb int32,
+    climb int32,
 ) ([]rectPoly, []int32) {
     builder := &rectBuilder{
         grid:    make([]int32, cellsTotal),
@@ -82,8 +73,7 @@ func buildRects(rl *regionLayers, sh *sheets,
         if sh.dropped[sheet] {
             continue
         }
-        builder.decomposeSheet(rl, sh, members, sheet, heightTolerance,
-            climb)
+        builder.decomposeSheet(rl, sh, members, sheet, climb)
     }
 
     return builder.polys, builder.polyAt
@@ -105,10 +95,10 @@ func sheetMembers(sh *sheets) [][]uint32 {
     return members
 }
 
-// decomposeSheet runs the maximal rectangle decomposition of one sheet
-// with the height-bounded splits.
+// decomposeSheet runs the maximal same-height rectangle decomposition
+// of one sheet.
 func (b *rectBuilder) decomposeSheet(rl *regionLayers, sh *sheets,
-    members [][]uint32, sheet int, heightTolerance float64, climb int32,
+    members [][]uint32, sheet int, climb int32,
 ) {
     for _, j := range members[sheet] {
         b.grid[rl.cellIndexOf[j]] = int32(j)
@@ -123,7 +113,7 @@ func (b *rectBuilder) decomposeSheet(rl *regionLayers, sh *sheets,
         x1 := b.extendRight(cx, cy, climb)
         y1 := b.extendDown(cx, cy, x1, climb)
         b.markCovered(cx, cy, x1, y1)
-        b.emitRect(cx, cy, x1, y1, sh.class[sheet], heightTolerance)
+        b.emitRect(cx, cy, x1, y1, sh.class[sheet])
     }
     // The working grids reset per sheet: a stacked column holds one
     // layer per sheet, the covered flag is sheet local.
@@ -135,12 +125,14 @@ func (b *rectBuilder) decomposeSheet(rl *regionLayers, sh *sheets,
 }
 
 // extendRight grows the rectangle width while the row stays in the
-// sheet, uncovered and the horizontal step into the new cell crosses
-// no wall.
+// sheet, uncovered, carries the seed cell's exact height and the
+// horizontal step into the new cell crosses no wall.
 func (b *rectBuilder) extendRight(cx, cy int, climb int32) int32 {
+    height := b.cellHeight(cx, cy)
     x1 := int32(cx + 1)
     for x1 < regionCellsSide &&
         b.free(int(x1), cy) &&
+        b.cellHeight(int(x1), cy) == height &&
         b.hStepOpen(int(x1)-1, cy, climb) {
         x1++
     }
@@ -149,17 +141,20 @@ func (b *rectBuilder) extendRight(cx, cy int, climb int32) int32 {
 }
 
 // extendDown grows the rectangle height while every cell of the next
-// row stays in the sheet, uncovered, the vertical step into it
-// crosses no wall and the row itself holds no interior wall (the
-// exact cover invariant: the emitted rectangles never overlap; the
-// wall invariant: every adjacent cell pair inside one polygon is an
-// open step, so the interior stays walkable by construction).
+// row stays in the sheet, uncovered, carries the seed cell's exact
+// height, the vertical step into it crosses no wall and the row
+// itself holds no interior wall (the exact cover invariant: the
+// emitted rectangles never overlap; the wall invariant: every
+// adjacent cell pair inside one polygon is an open step, so the
+// interior stays walkable by construction).
 func (b *rectBuilder) extendDown(cx, cy int, x1 int32, climb int32) int32 {
+    height := b.cellHeight(cx, cy)
     y1 := int32(cy + 1)
 rows:
     for y1 < regionCellsSide {
         for x := int32(cx); x < x1; x++ {
             if !b.free(int(x), int(y1)) ||
+                b.cellHeight(int(x), int(y1)) != height ||
                 !b.vStepOpen(int(x), int(y1)-1, climb) {
                 break rows
             }
@@ -228,109 +223,27 @@ func (b *rectBuilder) markCovered(cx, cy int, x1, y1 int32) {
     }
 }
 
-// emitRect appends one rectangle polygon, splitting it recursively
-// when the bilinear surface of the four corner heights leaves the
-// tolerance at any covered cell. The corners read the sheet's vertex
-// field (vertexHeight), not the inside cells: the vertex field is
-// shared by every rectangle of the sheet, which is what makes the
-// adjacent surfaces meet.
-func (b *rectBuilder) emitRect(cx, cy int, x1, y1 int32, area uint8,
-    heightTolerance float64,
-) {
-    h00 := b.vertexHeight(cx, cy)
-    h10 := b.vertexHeight(int(x1), cy)
-    h01 := b.vertexHeight(cx, int(y1))
-    h11 := b.vertexHeight(int(x1), int(y1))
-    if b.rectWithinTolerance(cx, cy, x1, y1, h00, h10, h01, h11,
-        heightTolerance) {
-        index := int32(len(b.polys))
-        b.polys = append(b.polys, rectPoly{
-            x0: int32(cx), y0: int32(cy), x1: x1, y1: y1,
-            h00: h00, h10: h10, h01: h01, h11: h11,
-            area: area,
-        })
-        b.bindLayers(cx, cy, x1, y1, index)
-
-        return
-    }
-    // Split along the axis that carries the height variation (the
-    // interpolation error shrinks with the interpolation distance);
-    // ties and flat rectangles fall back to the longer axis. A 1x1
-    // rectangle is always exact.
-    spanX := spanMax(abs16(h10-h00), abs16(h11-h01))
-    spanY := spanMax(abs16(h01-h00), abs16(h11-h10))
-    splitX := spanX > spanY ||
-        (spanX == spanY && x1-int32(cx) >= y1-int32(cy))
-    if splitX {
-        mid := (int32(cx) + x1) / 2
-        if mid == int32(cx) || mid == x1 {
-            b.emitExact(cx, cy, x1, y1, area)
-
-            return
-        }
-        b.emitRect(cx, cy, mid, y1, area, heightTolerance)
-        b.emitRect(int(mid), cy, x1, y1, area, heightTolerance)
-    } else {
-        mid := (int32(cy) + y1) / 2
-        if mid == int32(cy) || mid == y1 {
-            b.emitExact(cx, cy, x1, y1, area)
-
-            return
-        }
-        b.emitRect(cx, cy, x1, mid, area, heightTolerance)
-        b.emitRect(cx, int(mid), x1, y1, area, heightTolerance)
-    }
-}
-
-// emitExact appends a rectangle without the tolerance check (the
-// degenerate split fallback of a rectangle that cannot split further
-// but still leaves the tolerance - the honest surface of a cliff
-// staircase cell pair).
-func (b *rectBuilder) emitExact(cx, cy int, x1, y1 int32, area uint8) {
+// emitRect appends one rectangle polygon flat at the exact geodata
+// height of its cells: the growth above only ever spans cells of one
+// height, so all four corners carry that height and the polygon
+// surface is the square the raw l2j geometry holds - no vertex
+// field, no bilinear approximation, nothing between the mesh and the
+// geodata numbers.
+func (b *rectBuilder) emitRect(cx, cy int, x1, y1 int32, area uint8) {
+    height := b.cellHeight(cx, cy)
     index := int32(len(b.polys))
     b.polys = append(b.polys, rectPoly{
         x0: int32(cx), y0: int32(cy), x1: x1, y1: y1,
-        h00:  b.vertexHeight(cx, cy),
-        h10:  b.vertexHeight(int(x1), cy),
-        h01:  b.vertexHeight(cx, int(y1)),
-        h11:  b.vertexHeight(int(x1), int(y1)),
+        h00: height, h10: height, h01: height, h11: height,
         area: area,
     })
     b.bindLayers(cx, cy, x1, y1, index)
 }
 
-// vertexHeight returns the sheet's surface height at the grid vertex
-// (vx, vy): the average of the heights of the sheet's cells around
-// the vertex (the up to four cells vx-1..vx, vy-1..vy; a vertex at
-// the region border averages the cells that exist). Only the current
-// sheet's cells take part - a vertex shared with another sheet (a
-// deck edge, a cliff) keeps this sheet's own level, which is what
-// keeps genuine steps sharp while the surfaces of one sheet join.
-func (b *rectBuilder) vertexHeight(vx, vy int) int16 {
-    sum, count := 0, 0
-    for dx := -1; dx <= 0; dx++ {
-        for dy := -1; dy <= 0; dy++ {
-            x, y := vx+dx, vy+dy
-            if x < 0 || y < 0 ||
-                x >= regionCellsSide || y >= regionCellsSide {
-                continue
-            }
-            j := b.grid[x*regionCellsSide+y]
-            if j < 0 {
-                continue
-            }
-            sum += int(b.layers[j].h)
-            count++
-        }
-    }
-    if count == 0 {
-        // Unreachable for a rectangle corner (the corner cell of the
-        // rectangle is always a sheet member); the zero keeps the
-        // compiler honest.
-        return 0
-    }
-
-    return int16(math.Round(float64(sum) / float64(count)))
+// cellHeight returns the exact geodata height of the cell's layer in
+// the current sheet (the callers only ask for sheet members).
+func (b *rectBuilder) cellHeight(cx, cy int) int16 {
+    return b.layers[b.grid[cx*regionCellsSide+cy]].h
 }
 
 // bindLayers maps every covered layer instance to the polygon index.
@@ -343,32 +256,4 @@ func (b *rectBuilder) bindLayers(cx, cy int, x1, y1 int32, index int32) {
             }
         }
     }
-}
-
-// rectWithinTolerance checks the bilinear corner surface against every
-// covered cell height.
-func (b *rectBuilder) rectWithinTolerance(cx, cy int, x1, y1 int32,
-    h00, h10, h01, h11 int16, heightTolerance float64,
-) bool {
-    width := float64(x1-int32(cx)) * 16
-    height := float64(y1-int32(cy)) * 16
-    for x := int32(cx); x < x1; x++ {
-        for y := int32(cy); y < y1; y++ {
-            j := b.grid[int(x)*regionCellsSide+int(y)]
-            if j < 0 {
-                continue
-            }
-            u := (float64(x-int32(cx))*16 + 8) / width
-            v := (float64(y-int32(cy))*16 + 8) / height
-            surface := (1-u)*(1-v)*float64(h00) +
-                u*(1-v)*float64(h10) + (1-u)*v*float64(h01) +
-                u*v*float64(h11)
-            if math.Abs(float64(b.layers[j].h)-surface) >
-                heightTolerance {
-                return false
-            }
-        }
-    }
-
-    return true
 }
