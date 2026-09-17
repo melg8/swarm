@@ -264,7 +264,7 @@ function buildSurface(navmesh) {
       <div id="nmv-tiles" class="nmv-tiles"></div>
       <div class="nmv-section">geometry</div>
       <select id="nmv-geom" class="nmv-select">
-        <option value="mesh" selected>detour mesh (smoothed)</option>
+        <option value="mesh" selected>detour mesh (exact squares)</option>
         <option value="orig">original l2j cells</option>
       </select>
       <div class="nmv-section">route filter</div>
