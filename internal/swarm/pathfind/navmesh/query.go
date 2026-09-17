@@ -119,6 +119,10 @@ type Route struct {
     RawWaypoints []Pos
     Corridor     []PolyRef
     Explored     int
+    // Hierarchical reports the answer of the cluster level route
+    // (docs/navmesh.md, the hierarchy section): the coarse chain
+    // search plus the refinement hops instead of one flat search.
+    Hierarchical bool
 }
 
 // answerWaypoints fills the route waypoints from the corridor: the
@@ -190,10 +194,23 @@ func (m *Mesh) RouteApproach(
         return route, nil
     }
 
+    // The long routes go through the hierarchy: the coarse cluster
+    // chain plus the budgeted refinement hops (the flat search over a
+    // half world corridor only answers the capped partial). The
+    // answer falls back to the flat search when the hierarchy
+    // declines.
+    if hierWorthy(startRef, endRef, startPos, endPos, filter) {
+        hierarchical := m.routeHierarchical(startRef, startPos, endRef,
+            endPos, approachRadius, filter, state)
+        if hierarchical != nil {
+            return hierarchical, nil
+        }
+    }
+
     avoid := newAvoidCtx(filter.Avoid, start)
     result := m.astar(state,
         astarGoal{target: endRef, escape: false, approach: approachRadius},
-        startRef, startPos, endPos, filter, avoid)
+        startRef, startPos, endPos, filter, avoid, maxQueryNodes, nil)
     route.Explored = result.explored
     route.Corridor = result.corridor
     switch {
@@ -259,7 +276,8 @@ func (m *Mesh) WaterEscape(start Pos) (*Route, error) {
         target:   0,
         escape:   true,
         approach: 0,
-    }, startRef, startPos, start, filter, noAvoid())
+    }, startRef, startPos, start, filter, noAvoid(), maxQueryNodes,
+        nil)
 
     route := &Route{
         Found:     false,

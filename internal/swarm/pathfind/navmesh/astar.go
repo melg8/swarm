@@ -6,10 +6,12 @@ package navmesh
 
 import "math"
 
-// maxQueryNodes bounds the A* node count of one search. The corridors
-// of real routes hold hundreds of polygons; the bound exists so a
-// pathological filter (or a mesh bug) answers a partial route instead
-// of walking every polygon of every loaded region.
+// maxQueryNodes bounds the A* node count of one flat search. The
+// corridors of real routes hold hundreds of polygons; the bound exists
+// so a pathological filter (or a mesh bug) answers a partial route
+// instead of walking every polygon of every loaded region. The
+// hierarchical route passes its own budgets (the coarse level and the
+// refinement hops, see hierarchy.go).
 const maxQueryNodes = 65536
 
 // astarNode is one node of the corridor search: the polygon with its
@@ -267,7 +269,8 @@ func (g astarGoal) approachReached(tile *Tile, poly *Poly, end Pos) bool {
 // searches turn into the closest reachable dry point.
 func (m *Mesh) astar(
     state *queryState, goal astarGoal, startRef PolyRef, startPos Pos,
-    endPos Pos, filter Filter, avoid avoidCtx,
+    endPos Pos, filter Filter, avoid avoidCtx, budget int,
+    allow *confinedSet,
 ) astarResult {
     state.reset(goal.escape)
     startH := dist3(startPos, endPos)
@@ -310,12 +313,12 @@ func (m *Mesh) astar(
 
             return result
         }
-        if len(state.nodes) >= maxQueryNodes {
+        if len(state.nodes) >= budget {
             result.capped = true
 
             break
         }
-        m.expand(state, node, idx, endPos, filter, avoid)
+        m.expand(state, node, idx, endPos, filter, avoid, allow)
     }
 
     if state.best != 0 {
@@ -334,7 +337,7 @@ func (m *Mesh) astar(
 // polygons of the ban holding the start (the recovery ban rules of
 // the grid costTo - the rectangle granularity form, see avoid.go).
 func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
-    endPos Pos, filter Filter, avoid avoidCtx,
+    endPos Pos, filter Filter, avoid avoidCtx, allow *confinedSet,
 ) {
     tile := node.tile
     poly := node.poly
@@ -350,6 +353,11 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
             continue
         }
         if !filter.AllowWater && targetPoly.Area == AreaWater {
+            continue
+        }
+        if allow != nil && !allow.allows(
+            RegionKey{Col: targetTile.Col, Row: targetTile.Row},
+            targetPoly) {
             continue
         }
         ban := avoid.state(targetTile, targetPoly)

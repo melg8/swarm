@@ -5,8 +5,11 @@
 package navmesh
 
 import (
+    "bytes"
+    "compress/gzip"
     "errors"
     "fmt"
+    "io"
     "os"
     "path/filepath"
     "sort"
@@ -40,6 +43,16 @@ type Mesh struct {
     lru    []*tileEntry
     files  map[RegionKey]struct{}
     states sync.Pool
+
+    // The hierarchy layer: the abstract cluster graphs (cached
+    // forever, they are small), the coarse search state pool and the
+    // hop corridor cache (the HNA* intra-edges).
+    abstractMu sync.Mutex
+    abstracts  map[RegionKey]*regionAbstract
+    coarsePool sync.Pool
+    hierMu     sync.Mutex
+    hops       map[hopKey][]PolyRef
+    hopOrder   []hopKey
 }
 
 // tileEntry is one loaded, failed or missing tile in the cache.
@@ -90,6 +103,18 @@ func NewMesh(dir string) *Mesh {
                 escape: false,
             }
         }},
+        abstracts: make(map[RegionKey]*regionAbstract),
+        coarsePool: sync.Pool{New: func() any {
+            return &coarseState{
+                nodes: nil,
+                index: make(map[clusterKey]int32, 1024),
+                open:  nil,
+                best:  -1,
+                bestH: 0,
+            }
+        }},
+        hops:     make(map[hopKey][]PolyRef),
+        hopOrder: make([]hopKey, 0, hopCacheCapacity),
     }
     mesh.scanFiles()
 
@@ -201,6 +226,32 @@ func (m *Mesh) Tile(key RegionKey) (*Tile, error) {
             entry.err = fmt.Errorf("read navmesh tile %d_%d: %w", key.Col,
                 key.Row, err)
         } else {
+            // The tile file may be gzip compressed (the
+            // navmesh-build -compress output): the gzip magic word
+            // decides, both formats decode the same way.
+            if len(data) >= 2 && data[0] == 0x1F && data[1] == 0x8B {
+                zr, gzErr := gzip.NewReader(bytes.NewReader(data))
+                if gzErr == nil {
+                    var raw []byte
+                    raw, gzErr = io.ReadAll(zr)
+                    _ = zr.Close()
+                    if gzErr == nil {
+                        data = raw
+                    }
+                }
+                if gzErr != nil {
+                    entry.state = tileFailed
+                    entry.err = fmt.Errorf(
+                        "decompress navmesh tile %d_%d: %w", key.Col,
+                        key.Row, gzErr)
+                    m.tiles[key] = entry
+                    m.lru = append(m.lru, entry)
+                    m.touch(entry)
+                    m.evict()
+
+                    return nil, entry.err
+                }
+            }
             entry.tile, entry.err = DecodeTile(data)
             if entry.err != nil {
                 entry.state = tileFailed
@@ -284,6 +335,16 @@ func (m *Mesh) acquireState() *queryState {
 // their capacity for the next query).
 func (m *Mesh) releaseState(state *queryState) {
     m.states.Put(state)
+}
+
+// acquireCoarse takes a pooled coarse (cluster level) search state.
+func (m *Mesh) acquireCoarse() *coarseState {
+    return m.coarsePool.Get().(*coarseState)
+}
+
+// releaseCoarse returns a coarse search state to the pool.
+func (m *Mesh) releaseCoarse(state *coarseState) {
+    m.coarsePool.Put(state)
 }
 
 // resolveLink names the neighbor a link leads to: an internal link
