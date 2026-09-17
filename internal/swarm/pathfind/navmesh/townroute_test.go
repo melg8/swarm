@@ -80,7 +80,7 @@ func runTownLeg(t *testing.T, mesh *Mesh, name string, start, end Pos) {
 		// The one shot answer is a measurement, not a gate: the
 		// geodata seams strand some one shot queries (the report
 		// names them) - the segmented walk is the bot's answer.
-		t.Logf("  (the one shot route misses the town: the segmented"+
+		t.Logf("  (the one shot route misses the town: the segmented" +
 			" walk measures the practical answer)")
 	}
 
@@ -121,7 +121,7 @@ func runTownLeg(t *testing.T, mesh *Mesh, name string, start, end Pos) {
 			break
 		}
 		next := wps[len(wps)-1]
-		if dist3(current, next) < 2000 {
+		if dist3(current, next) < 1000 {
 			break
 		}
 		walked += dist3(current, next)
@@ -131,10 +131,6 @@ func runTownLeg(t *testing.T, mesh *Mesh, name string, start, end Pos) {
 	t.Logf("  segmented: %d replans, reached=%t, walked %.0f of"+
 		" %.0f, %s", iterations, reached, walked,
 		dist3(startPos, endPos), total)
-	if !reached {
-		t.Logf("  (the re-path walk stranded: the pack's geodata holes"+
-			" around the bay stop the honest shoreline route)")
-	}
 }
 
 // townCapacity reads the mesh capacity override of the test run

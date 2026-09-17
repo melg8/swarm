@@ -249,8 +249,8 @@ func TestTileBorderComps(t *testing.T) {
 	}
 	t.Logf("tile 17_22 comps: %d distinct, top:", len(main))
 	type pair struct {
-		c   uint32
-		n   int
+		c uint32
+		n int
 	}
 	var top []pair
 	for c, n := range main {

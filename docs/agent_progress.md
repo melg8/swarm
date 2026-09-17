@@ -645,3 +645,41 @@ over the Dion hunting grounds.
   bot. Tests: the near click plans and walks the plan, the
   replacement plans fresh, the record survives the expired plan and
   the clear (state), the dump round trip (webserver).
+
+- 2026-09-18: the hierarchy hardening and the whole map trip
+  measurements round. The environment survived the session timeout
+  (the repo, the branch, the pack intact); the resumed work pushed
+  the component gate commit first, then answered the owner's four
+  asks. (1) The within tile benchmark (TestHierarchyVersusFlat21x19,
+  the real 21_19): the flat search wins the reachable same tile
+  pairs (4.9 ms vs 9.1 ms at 16k, 15 ms vs 5 ms warm at 21.5k) and
+  draws the shorter corridors - the hierarchy now serves the cross
+  tile queries and the flat capped escalations only (hierWorthy is
+  cross tile, RouteApproach escalates on the budget cap). The
+  abstract cache rides the LRU (32 regions - the whole map coarse
+  walks accumulated every region graph into the OOM territory, the
+  whole map tests gate behind SWARM_WHOLEMAP with the chunked
+  stats). (2) The town routes (TestNavmeshTownRoutes, the
+  teleporter coordinates of the C1 data): Elven Village ->
+  Gludio plans one shot (10.8 s cold, 6.1 s warm, 121 794 units,
+  found); Gludio -> Gludin and Gludin -> Giran strand one shot -
+  the probes (TestBayNorthShoreProbe, TestSidecarPairProbe,
+  TestWaterBorderStitch) name the cause: the shipped geodata leaves
+  the open water of the Gludio bay and the inner bay unmapped (the
+  straight line aims do not bind) and the 18_21/17_21 border steps
+  land heights over the climb (land against flat sea - the stitch
+  refuses honestly). The re-path walk (the bot's real pattern) covers
+  58 852 of 73 199 units in 3 replans on the Gludio Gludin leg.
+  The fix belongs to the data: a water filled geodata refresh or the
+  operator waypoint graph. (3) The map size arithmetic: the pack is
+  3.5 GB of gzip tiles against the 543 MB l2j geodata (6.4x) - the
+  price of the explicit topology (every height run edge a polygon
+  with its portal links, the query structure the funnel and the
+  corridor searches need); the quantization headroom (uint16 cell
+  rects, uint16 portal spans) sits at ~35% of the decoded bytes,
+  documented in the report. (4) The bot command and the load answer:
+  the navigator switch is the presence of the tile directory
+  (-navmesh data/navmesh or the autodetect) - no separate flag; the
+  maps load lazily per query (the tile LRU 4, the abstract LRU 32,
+  the hop cache 4096), the whole pack loads only in the viewer mode
+  (the bare -show-navmesh stitches every tile).

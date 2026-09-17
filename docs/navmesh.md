@@ -210,14 +210,90 @@ priced water escape all pass on the real mesh
 
 ## The corrupt regions of the pack
 
-Seven region files of the shipped pack fail the l2j parse: `16_10`
-(invalid layer count), `17_20..17_25` (trailing bytes - the files
-are shorter or longer than the block layout consumes). The failures
-are pre-existing: the grid engine's parser (the same format code
-path via `ParseRegionData`) rejects them identically, so the current
-pathfinding never covered them either. The pack build reports them
-as FAILED and continues; a future pack refresh fixes them or not -
-the runtime treats a missing tile as a wall, never as an error.
+Seven region files of the shipped pack fail the l2j parse. The
+2026-09-18 round diagnosed and fixed six of them: `17_20..17_25`
+ship as **multi region concatenations** - the named region stream
+followed by appended neighbouring sea regions and a truncated
+fragment (the block walk of `scripts/geo_diag` proves the first
+stream parses clean). `scripts/geo_repair` truncated each file to
+its first valid region (the originals ride beside as
+`X_Y.l2j.orig`, git ignored) and the Gludin coast pack builds:
+1 517 579 polys, 1 744 external links. `16_10` stays corrupt mid
+file (invalid layer count 0 at offset 6 291 459 - the far south
+west ocean, no gameplay); the pack covers 164 of 165 regions.
+
+The pack border audit (`TestPackBorderAudit`) walks every ordered
+region pair and reports the asymmetric or all dead borders: 484
+pairs, 0 asymmetric after the repair round. The audit only counts
+the pairs WITH links - the zero link borders are the geodata seams
+and holes below.
+
+### The geodata holes and seams (the town route blocker)
+
+The 2026-09-18 town route round found the pack's geodata **leaves
+the open water unmapped** in patches: the Gludio bay and the inner
+bay between Gludio and Dion hold no layers in the shipped l2j
+files, the mesh build answers with holes, and every straight line
+aim into them fails to bind (`TestBayNorthShoreProbe` names the
+coordinates). The tile borders step where the coverage differs:
+the 18_21/17_21 border pairs land heights 291 distinct (land,
+-3700..-1200) against one flat sea level - over the 40 unit climb
+the stitch refuses them honestly (TestSidecarPairProbe). The
+consequences for the trip planning:
+
+- the one shot routes whose straight line crosses the holes strand
+  (Gludio->Gludin, Gludin->Giran, Gludio->Giran answer partial);
+- the honest shoreline detours exist on the mesh but the coarse
+  guide's sampled crossings and the confined fallback miss them
+  (the re-path walk of `TestNavmeshTownRoutes` covers 58 852 of
+  73 199 units in 3 replans before stranding);
+- the fix belongs to the data: a geodata refresh with the water
+  blocks filled (the far sea regions 17_23..17_25 prove the format
+  carries them - full flat sheets at sea level), or an operator
+  waypoint graph for the bay crossings.
+
+## The hierarchy (the HNA* port)
+
+The cluster graph of docs/pathfinding.md runs the two phase query
+(docs in code: hierarchy.go): the coarse A* over the cluster
+blocks answers the portal chain, the refinement threads the real
+mesh hop by hop through it (the hop corridors cache - the HNA*
+intra-edge answers), and the confined fallback threads the chain
+clusters on the real mesh when the sampled crossings strand.
+
+- **The coarse guide** prices the edges uniformly (no water
+  multiplier): the guide only points the direction and the uniform
+  price keeps the plain dist3 heuristic consistent - the swim
+  priced guide flooded half the map (the honest water route costs
+  3x the straight line and the plain A* cannot prune the land wave).
+- **The component gate**: the first (gated) attempt verifies the
+  cluster connectivity through the per tile link components (the
+  union find of abstract.go) - the chain cannot fake a passage
+  between two island components of one cluster. The gate rides the
+  4096 pop cap and the f spread bound; a stranded gated attempt
+  hands over to the **gate free plain HPA\*** chain whose honesty
+  the refinement hops and the confined fallback restore (the
+  measured pairs where the sampled crossings strand: the bay legs).
+- **The caches**: the tile LRU (4 tiles default), the abstract LRU
+  (32 regions - the comps array costs 4 bytes per polygon and the
+  whole pack sums into the hundreds of megabytes), the hop corridor
+  cache (4096 portal pairs). The abstract rebuilds are
+  deterministic (the edge indices stable, the dstComps and the ban
+  bookkeeping survive).
+- **The escalation**: the same tile queries stay flat (the within
+  tile measurements answer the flat search faster and with the
+  shorter corridors); a flat search that caps at maxQueryNodes
+  escalates to the hierarchy (RouteApproach).
+
+The measured answers (the sandbox, the real pack):
+
+| query | flat | hierarchical cold | warm |
+|---|---|---|---|
+| 21_19 short 1.5k | 0.85 ms, 1951 nodes | 0.97 ms | 0.97 ms |
+| 21_19 medium 16k | 4.9 ms, 8983 nodes | 9.1 ms | 4.4 ms |
+| 21_19 diagonal 21.5k | 15 ms, 19392 nodes | 1.61 s | 5.1 ms |
+| the owner diagonal 20_19..21_20 swim | caps into partial | 3.27 s, full | - |
+| Elven Village -> Gludio 93k | caps into partial | 10.8 s, full | 6.1 s |
 
 ## The tooling
 
