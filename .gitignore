@@ -37,3 +37,6 @@ logs/
 # from the tracked geodata pack - 1.9 GB for the full 165 regions,
 # rebuildable in ~4.5 minutes)
 data/navmesh/
+
+# The repair backups of the concatenated geodata files (scripts/geo_repair).
+*.l2j.orig
