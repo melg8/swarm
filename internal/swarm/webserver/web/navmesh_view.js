@@ -125,6 +125,11 @@ const viewer = {
   tiles: new Map(),
   heightScale: 1,
   filter: "swim",
+  // The geometry variant of the comparison toggle: "mesh" renders the
+  // detour navmesh tiles, "orig" renders the raw l2j geodata cells
+  // (the same NMV2 contract, the /api/navmesh/original endpoint). The
+  // route, the camera and the tile selection live above the variant.
+  variant: "mesh",
   pendingStart: null,
   path: null,
   routeStart: null,
@@ -198,6 +203,17 @@ function init(config) {
       select.value = String(view.scale);
     }
   }
+  // The geometry variant applies before the tile loads: the boot
+  // fetches the variant the link names (the original cell render
+  // pays its first render per tile - the camera and the route pair
+  // below survive the variant).
+  if (view.geom) {
+    viewer.variant = view.geom;
+    const select = document.getElementById("nmv-geom");
+    if (select) {
+      select.value = view.geom;
+    }
+  }
   if (view.cam) {
     applyCameraState(view.cam);
   } else {
@@ -246,6 +262,11 @@ function buildSurface(navmesh) {
       <label class="nmv-row"><input type="checkbox" id="nmv-all" checked>
         <span>all stitched</span></label>
       <div id="nmv-tiles" class="nmv-tiles"></div>
+      <div class="nmv-section">geometry</div>
+      <select id="nmv-geom" class="nmv-select">
+        <option value="mesh" selected>detour mesh (smoothed)</option>
+        <option value="orig">original l2j cells</option>
+      </select>
       <div class="nmv-section">route filter</div>
       <select id="nmv-filter" class="nmv-select">
         <option value="swim" selected>swim (water costs 3x)</option>
@@ -343,6 +364,9 @@ function buildSurface(navmesh) {
 
   document.getElementById("nmv-filter").addEventListener("change", (e) => {
     viewer.filter = e.target.value;
+  });
+  document.getElementById("nmv-geom").addEventListener("change", (e) => {
+    setVariant(e.target.value);
   });
   document.getElementById("nmv-height").addEventListener("change", (e) => {
     setHeightScale(Number(e.target.value));
@@ -572,11 +596,15 @@ function addTileRow(tile, checked) {
   });
   list.appendChild(row);
   viewer.tiles.set(key, {
+    // built caches the loaded geometry per variant (mesh / orig);
+    // mesh points at the ACTIVE variant's scene object, loading
+    // tracks the in flight variant fetches.
     mesh: null,
-    info: tile,
-    loading: false,
-    visible: checked,
+    built: {},
+    loading: {},
     connections: null,
+    info: tile,
+    visible: checked,
   });
 }
 
@@ -624,31 +652,86 @@ function setTileVisible(key, visible) {
   }
 }
 
-// ensureTile fetches and builds the geometry of one tile exactly
-// once; the visible flag follows the checkbox.
+// geometryUrl answers the geometry endpoint of one variant: the
+// detour mesh tiles come from /api/navmesh/geometry, the original l2j
+// cell render from /api/navmesh/original.
+function geometryUrl(variant, key) {
+  const base = variant === "orig"
+    ? "/api/navmesh/original/"
+    : "/api/navmesh/geometry/";
+
+  return base + key;
+}
+
+// setVariant switches the geometry variant of every tile (the owner
+// comparison toggle): the loaded variants swap in place, the missing
+// ones load on demand. The camera, the route overlays and the tile
+// selection live above the variant and survive every switch; the
+// first original load of a tile pays the server side region render
+// (seconds per tile), the later ones are instant.
+function setVariant(variant) {
+  if (variant !== "mesh" && variant !== "orig") {
+    return;
+  }
+  viewer.variant = variant;
+  const select = document.getElementById("nmv-geom");
+  if (select) {
+    select.value = variant;
+  }
+  for (const [key, entry] of viewer.tiles) {
+    // The old active mesh leaves the scene (both variants stay
+    // cached, a switch back is instant); an unloaded variant loads
+    // below with the status row showing the progress.
+    if (entry.mesh) {
+      viewer.scene.remove(entry.mesh);
+      entry.mesh = null;
+    }
+    entry.connections = null;
+    if (entry.visible) {
+      void ensureTile(entry.info);
+    } else {
+      const status = document.querySelector(`[data-status="${key}"]`);
+      if (status) {
+        status.textContent = "";
+      }
+    }
+  }
+  restartHoverSweep();
+}
+
+// ensureTile fetches and builds the ACTIVE variant's geometry of one
+// tile exactly once; the visible flag follows the checkbox.
 async function ensureTile(tile) {
   const key = tileKey(tile);
   const entry = viewer.tiles.get(key);
-  if (!entry || entry.mesh || entry.loading) {
+  const variant = viewer.variant;
+  if (!entry || entry.built[variant] || entry.loading[variant]) {
     return;
   }
-  entry.loading = true;
+  entry.loading[variant] = true;
   const status = document.querySelector(`[data-status="${key}"]`);
   if (status) {
-    status.textContent = "loading";
+    status.textContent = "loading" + (variant === "orig" ? " orig" : "");
   }
   try {
-    const response = await fetch("/api/navmesh/geometry/" + key);
+    const response = await fetch(geometryUrl(variant, key));
     if (!response.ok) {
       throw new Error("http " + response.status);
     }
     const buffer = await response.arrayBuffer();
-    entry.mesh = buildTileMesh(key, buffer);
-    entry.mesh.visible = entry.visible;
-    viewer.scene.add(entry.mesh);
-    if (status) {
-      const polys = entry.mesh.userData.polys;
-      status.textContent = polys.toLocaleString() + " polys";
+    const mesh = buildTileMesh(key, buffer);
+    entry.built[variant] = mesh;
+    // The variant may have switched while the fetch ran: only the
+    // active one enters the scene (the stale build stays cached).
+    if (viewer.variant === variant) {
+      entry.mesh = mesh;
+      mesh.visible = entry.visible;
+      mesh.scale.y = viewer.heightScale;
+      viewer.scene.add(mesh);
+      if (status) {
+        const polys = mesh.userData.polys;
+        status.textContent = polys.toLocaleString() + " polys";
+      }
     }
   } catch (err) {
     if (status) {
@@ -656,7 +739,7 @@ async function ensureTile(tile) {
     }
     showStatus("error", "tile " + key + " failed to load: " + err.message);
   } finally {
-    entry.loading = false;
+    entry.loading[variant] = false;
   }
 }
 
@@ -1538,6 +1621,10 @@ function showStatus(kind, text) {
 //   tiles=21_19,22_19    the visible tile selection (omitted = all)
 //   filter=swim|dry      the route filter
 //   scale=1|2|4          the height exaggeration
+//   geom=mesh|orig       the geometry variant of the comparison
+//                         toggle: the detour mesh or the original
+//                         l2j cells (the route, the camera and the
+//                         tile selection stay variant independent)
 // The world axes mapping matters: the viewer renders three y as the
 // height, so a pasted link reads the same at every height scale (the
 // restore re-applies the scale of the link itself).
@@ -1552,6 +1639,7 @@ function parseViewParams() {
     tiles: null,
     filter: null,
     scale: null,
+    geom: null,
   };
   const tiles = search.get("tiles");
   if (tiles) {
@@ -1565,6 +1653,10 @@ function parseViewParams() {
   const scale = Number(search.get("scale"));
   if (scale === 1 || scale === 2 || scale === 4) {
     view.scale = scale;
+  }
+  const geom = search.get("geom");
+  if (geom === "mesh" || geom === "orig") {
+    view.geom = geom;
   }
 
   return view;
@@ -1643,6 +1735,7 @@ function buildViewStateUrl() {
   }
   params.set("filter", viewer.filter);
   params.set("scale", String(viewer.heightScale));
+  params.set("geom", viewer.variant);
 
   return window.location.origin + window.location.pathname + "?" +
     params.toString();

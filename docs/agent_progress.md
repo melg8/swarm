@@ -471,6 +471,27 @@ over the Dion hunting grounds.
   NOT DONE YET (the interrupted session): the tile rebuild and the
   visual before/after verification of the owner's two views.
 
+- 2026-09-17: the geometry variant toggle landed in the viewer (the
+  owner comparison request, the client half): a "geometry" select
+  switches live between the detour mesh and the original l2j cells
+  render. The tile entries cache BOTH variants (built/loading per
+  variant, the active variant's scene object in mesh), so a switch
+  back is instant and a first switch loads the other variant on
+  demand (the status row shows "loading orig" while the server
+  renders the region, seconds for a real tile). The camera, the
+  route pair, the drawn route and the tile selection live ABOVE the
+  variant - they survive every switch unchanged, which is the point:
+  the same funnel waypoints draw over the raw cells. The chosen
+  variant rides the view link as geom=mesh|orig, the boot restores
+  it BEFORE the tile loads (a pasted orig link opens on the original
+  geometry) and the stale variant fetch that finishes after a fast
+  switch stays cached without entering the scene.
+  TestNavmeshViewScriptContract pins the toggle contract (the
+  select, the per variant cache, the original endpoint, the URL
+  parameter). Round etiquette: the lint --fix pass had re-tabbed the
+  geometry files - the spaces only policy returned in a follow up
+  commit (c57e3a0).
+
 - 2026-09-17: the original geometry endpoint landed (the server half
   of the owner's comparison toggle): GET
   /api/navmesh/original/{key} renders one region straight from the
