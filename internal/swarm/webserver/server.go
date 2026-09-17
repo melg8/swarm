@@ -141,6 +141,12 @@ type Server struct {
     // tiles; navmeshGeoMu guards the lazy fills.
     navmeshGeo   map[navmesh.RegionKey][]byte
     navmeshGeoMu sync.Mutex
+    // navmeshOriginal caches the encoded ORIGINAL geometry payloads
+    // (the raw l2j cell render of the comparison toggle);
+    // navmeshRegions loads and parses one raw geodata region on
+    // demand (nil when no engine backs the viewer).
+    navmeshOriginal map[navmesh.RegionKey][]byte
+    navmeshRegions  func(navmesh.RegionKey) (*pathfind.Region, error)
 }
 
 // ProxyController drives the client proxy from the web UI: which bot a
@@ -263,25 +269,27 @@ func (s *Server) handleProxySelect(w http.ResponseWriter, r *http.Request) {
 func newServer(address string, logger *log.Logger) *Server {
     mux := http.NewServeMux()
     server := &Server{
-        registry:       nil,
-        pathfinder:     nil,
-        pathfindView:   nil,
-        geodataTiles:   newGeodataTileCache(),
-        iconsDir:       atomic.Value{},
-        proxy:          nil,
-        acceptance:     nil,
-        journal:        nil,
-        logger:         logger,
-        httpServer:     nil,
-        eventsDone:     make(chan struct{}),
-        shutdown:       nil,
-        stats:          nil,
-        navmeshMesh:    nil,
-        navmeshTiles:   nil,
-        navmeshEngine:  nil,
-        navmeshCapsule: nil,
-        navmeshGeo:     nil,
-        navmeshGeoMu:   sync.Mutex{},
+        registry:        nil,
+        pathfinder:      nil,
+        pathfindView:    nil,
+        geodataTiles:    newGeodataTileCache(),
+        iconsDir:        atomic.Value{},
+        proxy:           nil,
+        acceptance:      nil,
+        journal:         nil,
+        logger:          logger,
+        httpServer:      nil,
+        eventsDone:      make(chan struct{}),
+        shutdown:        nil,
+        stats:           nil,
+        navmeshMesh:     nil,
+        navmeshTiles:    nil,
+        navmeshEngine:   nil,
+        navmeshCapsule:  nil,
+        navmeshGeo:      nil,
+        navmeshGeoMu:    sync.Mutex{},
+        navmeshOriginal: nil,
+        navmeshRegions:  nil,
     }
     //nolint:exhaustruct_v5 // the zero defaults of http.Server are intended
     server.httpServer = &http.Server{

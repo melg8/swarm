@@ -471,6 +471,28 @@ over the Dion hunting grounds.
   NOT DONE YET (the interrupted session): the tile rebuild and the
   visual before/after verification of the owner's two views.
 
+- 2026-09-17: the original geometry endpoint landed (the server half
+  of the owner's comparison toggle): GET
+  /api/navmesh/original/{key} renders one region straight from the
+  raw l2j geodata cells into the same NMV2 payload the mesh endpoint
+  serves - no sheet decomposition, no rectangle smoothing, no vertex
+  field. Every cell layer with an open wall direction draws at its
+  exact height; the only compression is the exact height merge
+  (neighboring cells of the SAME layer height become maximal
+  rectangles, pixel identical to the per cell quads): 21_19 measures
+  390 596 rectangles over 4.4M walkable layers (22.3 MB with the step
+  walls - the mesh tile scale), the worst audited region 21_22 lands
+  at 1.2M rects. The height step walls follow the mesh payload rules
+  (the MaxX/MaxY emission, the 0.5 unit floor, the 80 unit open air
+  cap) and resolve the region borders through the east and north
+  neighbor regions (the border strip pass, 2048 cells). The link
+  portal block stays empty - passability in the original render is
+  the cell geometry itself. The engine less viewer answers 501.
+  Tests: the flat region collapse (one rect, ETag 304 roundtrip),
+  the checkerboard merge (65536 rects, the water area, the ordering
+  by height), the step walls (2*255*256 records, the first record
+  content) and the real 21_19 scale pin (390 596 rects).
+
 - 2026-09-17: the viewer waypoint coordinates checkbox default off
   landed (the owner request): the state starts false and the
   checkbox ships unchecked - one click brings the coordinate wall
