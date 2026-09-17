@@ -846,19 +846,7 @@ func main() {
     // The geodata engine serves the town trips of the hunt and the
     // long manual walks of the web UI (the server side pathfinder
     // refuses far targets), so it loads in every mode.
-    var engine *pathfind.Engine
-    dir := cfg.geodataDir
-    if dir == "" {
-        dir = detectGeodataDir()
-    }
-    engine = pathfind.NewEngine(dir)
-    engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
-    // The capsule clearance keeps every planned waypoint and leg away
-    // from the walls: the server movement validation is cell level and
-    // never checks the character capsule (the elven fighter template
-    // radius 7.5), so the planner owns the clearance
-    // (docs/pathfinding.md).
-    engine.SetCapsuleClearance(pathfind.DefaultCollisionRadius)
+    engine := newBotEngine(cfg)
     stats := engine.Stats()
     if stats.HasData {
         log.Printf("Geodata ready: %d region files in %s, town trips "+
@@ -928,15 +916,7 @@ func runFleet(cfg config) {
     // The geodata engine is shared by all bots: the town trips and the
     // manual long walks of every session read through the same LRU
     // cache of parsed regions.
-    var engine *pathfind.Engine
-    dir := cfg.geodataDir
-    if dir == "" {
-        dir = detectGeodataDir()
-    }
-    engine = pathfind.NewEngine(dir)
-    engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
-    // The capsule clearance of the bot fleet (docs/pathfinding.md).
-    engine.SetCapsuleClearance(pathfind.DefaultCollisionRadius)
+    engine := newBotEngine(cfg)
     stats := engine.Stats()
     if stats.HasData {
         log.Printf("Geodata ready: %d region files in %s, town trips "+
@@ -1239,6 +1219,53 @@ func (f *navmeshShowFlag) IsBoolFlag() bool {
 // process keeps serving until it is stopped. The flag selection
 // bounds the initially visible tiles (every tile when empty), the
 // route queries always run over the full directory mesh.
+// newBotEngine builds the shared geodata engine of the bot modes:
+// the town trips, the manual long walks and the hybrid navigator of
+// every session read through one LRU cache of parsed regions, with
+// the capsule clearance armed (docs/pathfinding.md).
+func newBotEngine(cfg config) *pathfind.Engine {
+    dir := cfg.geodataDir
+    if dir == "" {
+        dir = detectGeodataDir()
+    }
+    engine := pathfind.NewEngine(dir)
+    engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+    // The capsule clearance keeps every planned waypoint and leg away
+    // from the walls: the server movement validation is cell level and
+    // never checks the character capsule (the elven fighter template
+    // radius 7.5), so the planner owns the clearance
+    // (docs/pathfinding.md).
+    engine.SetCapsuleClearance(pathfind.DefaultCollisionRadius)
+
+    return engine
+}
+
+// navmeshViewerInitial resolves and logs the initial tile selection
+// of the viewer: the flag named tiles that exist, every tile when the
+// flag named none.
+func navmeshViewerInitial(mesh *navmesh.Mesh, dir string,
+    requested []navmesh.RegionKey, tileFiles int, tileDir string,
+) []navmesh.RegionKey {
+    initial := requested
+    if len(initial) > 0 {
+        initial = intersectTiles(mesh, initial)
+        if len(initial) == 0 {
+            log.Println("Navmesh viewer: none of the requested tiles " +
+                "exist in " + dir + ", opening every tile instead")
+            initial = nil
+        }
+    }
+    if len(initial) == 0 {
+        log.Printf("Navmesh viewer: %d tiles stitched in %s",
+            tileFiles, tileDir)
+    } else {
+        log.Printf("Navmesh viewer: %d of %d tiles selected in %s",
+            len(initial), tileFiles, tileDir)
+    }
+
+    return initial
+}
+
 func runNavmeshViewer(cfg config) {
     if cfg.webAddress == "" {
         log.Println("Navmesh viewer needs the web interface, " +
@@ -1264,34 +1291,9 @@ func runNavmeshViewer(cfg config) {
 
         return
     }
-
-    // The geodata engine serves the original geometry variant and the
-    // capsule clearance of the route answers (the same armed radius
-    // the bot runs with).
-    geoDir := cfg.geodataDir
-    if geoDir == "" {
-        geoDir = detectGeodataDir()
-    }
-    engine := pathfind.NewEngine(geoDir)
-    engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
-    engine.SetCapsuleClearance(pathfind.DefaultCollisionRadius)
-
-    initial := cfg.navmeshShow.tiles
-    if len(initial) > 0 {
-        initial = intersectTiles(mesh, initial)
-        if len(initial) == 0 {
-            log.Println("Navmesh viewer: none of the requested tiles " +
-                "exist in " + dir + ", opening every tile instead")
-            initial = nil
-        }
-    }
-    if len(initial) == 0 {
-        log.Printf("Navmesh viewer: %d tiles stitched in %s",
-            stats.TileFiles, stats.Dir)
-    } else {
-        log.Printf("Navmesh viewer: %d of %d tiles selected in %s",
-            len(initial), stats.TileFiles, stats.Dir)
-    }
+    engine := newBotEngine(cfg)
+    initial := navmeshViewerInitial(mesh, dir, cfg.navmeshShow.tiles,
+        stats.TileFiles, stats.Dir)
 
     server := webserver.NewNavmeshServer(mesh, cfg.webAddress,
         log.Default(), webserver.NavmeshOptions{

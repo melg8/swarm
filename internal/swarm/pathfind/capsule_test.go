@@ -31,7 +31,7 @@ func capsuleWallWorld(t *testing.T) (*Engine, func(float64, float64) Vec3) {
         closed[key] |= dirs
     }
     // The corridor rows 10..11, the walls along both sides.
-    for x := 0; x < 32; x++ {
+    for x := range 32 {
         add(x, 9, nsweSouth)
         add(x, 10, nsweNorth)
         add(x, 11, nsweSouth)
@@ -149,7 +149,7 @@ func TestCapsuleBendsGrazingLeg(t *testing.T) {
         key := [2]int{x, y}
         closed[key] |= dirs
     }
-    for x := 0; x < 32; x++ {
+    for x := range 32 {
         add(x, 9, nsweSouth)
         add(x, 10, nsweNorth)
         add(x, 11, nsweSouth)
@@ -211,7 +211,7 @@ func TestCapsuleFallbackKeepsImpossibleWaypoint(t *testing.T) {
         key := [2]int{x, y}
         closed[key] |= dirs
     }
-    for x := 0; x < 32; x++ {
+    for x := range 32 {
         add(x, 9, nsweSouth)
         add(x, 10, nsweNorth)
         add(x, 11, nsweSouth)
@@ -257,7 +257,8 @@ func TestEngineCapsuleClearanceIntegration(t *testing.T) {
         "cell center smoothing already clears the capsule here")
 
     engine.SetCapsuleClearance(DefaultCollisionRadius)
-    require.Equal(t, DefaultCollisionRadius, engine.CapsuleRadius())
+    require.InDelta(t, DefaultCollisionRadius, engine.CapsuleRadius(),
+        1e-6)
     cleared, err := engine.FindPath(start, end, DefaultMaxPassableHeight)
     require.NoError(t, err)
     require.True(t, cleared.Found)

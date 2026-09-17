@@ -41,14 +41,24 @@ type Filter struct {
 
 // DefaultFilter is the swim allowing search with the 3x water cost.
 func DefaultFilter() Filter {
-    return Filter{WaterCost: 3, AllowWater: true, Avoid: nil}
+    return Filter{
+        WaterCost:         3,
+        AllowWater:        true,
+        Avoid:             nil,
+        WaypointClearance: 0,
+    }
 }
 
 // DryFilter walls the water polygons: a route only exists over dry
 // ground, an unreachable dry target answers the partial corridor to
 // the closest reachable dry point.
 func DryFilter() Filter {
-    return Filter{WaterCost: 3, AllowWater: false, Avoid: nil}
+    return Filter{
+        WaterCost:         3,
+        AllowWater:        false,
+        Avoid:             nil,
+        WaypointClearance: 0,
+    }
 }
 
 // escapeWaterCost prices the water polygons of the escape search (the
@@ -191,9 +201,10 @@ func (m *Mesh) WaterEscape(start Pos) (*Route, error) {
     state := m.acquireState()
     defer m.releaseState(state)
     filter := Filter{
-        WaterCost:  escapeWaterCost,
-        AllowWater: true,
-        Avoid:      nil,
+        WaterCost:         escapeWaterCost,
+        AllowWater:        true,
+        Avoid:             nil,
+        WaypointClearance: 0,
     }
     result := m.astar(state, astarGoal{
         target:   0,

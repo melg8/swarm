@@ -266,23 +266,34 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         response.Partial = route.Partial
         response.Explored = route.Explored
         response.Corridor = len(route.Corridor)
-        waypoints := route.Waypoints
-        if s.navmeshCapsule != nil && len(waypoints) > 0 {
-            // The funnel pivot clearance covers the turns; the post
-            // pass covers the legs that still graze a wall.
-            vecs := make([]pathfind.Vec3, len(waypoints))
-            for i, wp := range waypoints {
-                vecs[i] = pathfind.Vec3{X: wp.X, Y: wp.Y, Z: wp.Z}
-            }
-            vecs = s.navmeshCapsule.ApplyPath(vecs, clearance)
-            waypoints = make([]navmesh.Pos, len(vecs))
-            for i, vec := range vecs {
-                waypoints[i] = navmesh.Pos{X: vec.X, Y: vec.Y, Z: vec.Z}
-            }
-        }
-        response.Waypoints = toNavmeshPoints(waypoints)
+        response.Waypoints = toNavmeshPoints(
+            s.clearedWaypoints(route, clearance))
     }
     writeJSON(w, s.logger, response)
+}
+
+// clearedWaypoints runs the route waypoints through the capsule
+// clearance post pass when the viewer engine arms it: the funnel
+// pivot clearance covers the turns, the post pass covers the legs
+// that still graze a wall.
+func (s *Server) clearedWaypoints(route *navmesh.Route,
+    clearance float64,
+) []navmesh.Pos {
+    waypoints := route.Waypoints
+    if s.navmeshCapsule == nil || len(waypoints) == 0 {
+        return waypoints
+    }
+    vecs := make([]pathfind.Vec3, len(waypoints))
+    for i, wp := range waypoints {
+        vecs[i] = pathfind.Vec3{X: wp.X, Y: wp.Y, Z: wp.Z}
+    }
+    vecs = s.navmeshCapsule.ApplyPath(vecs, clearance)
+    positions := make([]navmesh.Pos, len(vecs))
+    for i, vec := range vecs {
+        positions[i] = navmesh.Pos{X: vec.X, Y: vec.Y, Z: vec.Z}
+    }
+
+    return positions
 }
 
 // toNavmeshPoints converts the funnel waypoints to the JSON shape.

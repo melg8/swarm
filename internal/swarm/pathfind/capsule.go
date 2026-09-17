@@ -116,7 +116,8 @@ func (c *Capsule) Clearance(x, y float64, refZ int16) float64 {
 
 // nearestWall resolves the closest wall obstacle of the point.
 func (c *Capsule) nearestWall(x, y float64, refZ int16) capsuleObstacle {
-    best := capsuleObstacle{dist: capsuleMaxDistance}
+    var best capsuleObstacle
+    best.dist = capsuleMaxDistance
     cell := WorldToCell(x, y)
     key := CellToRegion(cell)
     entry, err := c.engine.entry(key)
@@ -272,7 +273,7 @@ func (c *Capsule) pushClear(point Vec3, radius float64,
     current := point
     travel := 0.0
     damp := 1.0
-    for step := 0; step < capsuleMaxPushSteps; step++ {
+    for range capsuleMaxPushSteps {
         obstacle := c.nearestWall(current.X, current.Y, int16(point.Z))
         if obstacle.dist >= radius {
             return current, true
@@ -352,7 +353,7 @@ func (c *Capsule) bendAnchors(a, b Vec3, radius float64) []Vec3 {
     ny := (b.X - a.X) / length
     target := radius + capsulePushHeadroom
     anchors := make([]Vec3, 0, 4)
-    last := Vec3{}
+    var last Vec3
     for i := 1; i < samples; i++ {
         t := float64(i) / float64(samples)
         sample := legPoint(a, b, t)

@@ -101,7 +101,7 @@ func TestVertexCornersJoinSameSheetSurfaces(t *testing.T) {
 // survive the island filter).
 func cliffWorld(t *testing.T) *RegionBuild {
     t.Helper()
-    data := writeRegionFile(t, func(cx, cy int) []layerSpec {
+    data := writeRegionFile(t, func(cx, _ int) []layerSpec {
         if cx < 10 {
             return []layerSpec{{h: -3504, nswe: 0x0F}}
         }

@@ -80,16 +80,17 @@ type cacheEntry struct {
 // working engine without data (every cell lookup fails).
 func NewEngine(dir string) *Engine {
     engine := &Engine{
-        dir:      dir,
-        capacity: DefaultCacheCapacity,
-        maxPass:  DefaultMaxPassableHeight,
-        mu:       sync.Mutex{},
-        cache:    make(map[RegionKey]*cacheEntry),
-        lru:      make([]*cacheEntry, 0, DefaultCacheCapacity),
-        pool:     newLayerPool(),
-        files:    0,
-        center:   Vec3{X: 0, Y: 0, Z: 0},
-        hasFiles: false,
+        dir:           dir,
+        capacity:      DefaultCacheCapacity,
+        maxPass:       DefaultMaxPassableHeight,
+        capsuleRadius: 0,
+        mu:            sync.Mutex{},
+        cache:         make(map[RegionKey]*cacheEntry),
+        lru:           make([]*cacheEntry, 0, DefaultCacheCapacity),
+        pool:          newLayerPool(),
+        files:         0,
+        center:        Vec3{X: 0, Y: 0, Z: 0},
+        hasFiles:      false,
     }
     engine.scanFiles()
 
