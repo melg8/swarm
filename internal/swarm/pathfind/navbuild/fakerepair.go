@@ -106,6 +106,7 @@ func repairFakeCells(rl *regionLayers, climb int32) int {
 
     // The blend: the fake cell takes the inverse distance weighted
     // mix of the two source heights (or the single reachable source).
+    filledCount := 0
     for idx := range fake {
         if !fake[idx] {
             continue
@@ -126,6 +127,7 @@ func repairFakeCells(rl *regionLayers, climb int32) int {
             continue // no real source in the region: the cell stays
         }
         rl.layers[rl.cellOff[idx]] = cellLayer{h: h, nswe: 0x0F}
+        filledCount++
     }
 
     // The polish: the pair pull over the filled cells away from the
@@ -199,5 +201,5 @@ func repairFakeCells(rl *regionLayers, climb int32) int {
         }
     }
 
-    return fakes
+    return filledCount
 }
