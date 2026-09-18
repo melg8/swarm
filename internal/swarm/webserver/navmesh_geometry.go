@@ -8,6 +8,7 @@ import (
     "encoding/binary"
     "fmt"
     "math"
+    "sort"
 
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
@@ -304,6 +305,17 @@ func encodeNavmeshWalls(mesh *navmesh.Mesh, tile *navmesh.Tile) []byte {
         targetsY[p.Y0] = append(targetsY[p.Y0],
             geoTarget{poly: p, lo: p.X0, hi: p.X1})
     }
+    // The interval lists sort by their lower bound: the mesh
+    // rectangles tile the plane, the intervals of one column are
+    // disjoint, so the overlap window of a query edge is contiguous
+    // (the binary search of the window replaced the full column scan
+    // whose rejects dominated the encode profile).
+    for _, targets := range targetsX {
+        sortTargetsByLo(targets)
+    }
+    for _, targets := range targetsY {
+        sortTargetsByLo(targets)
+    }
     // The region border emitters close onto the border facing spans
     // of the neighbor tiles: the MinX == 0 spans of the east neighbor
     // share the y axis, the MinY == 0 spans of the north neighbor
@@ -312,31 +324,63 @@ func encodeNavmeshWalls(mesh *navmesh.Mesh, tile *navmesh.Tile) []byte {
         Col: tile.Col + 1, Row: tile.Row}, false)
     north := navmeshBorderTargets(mesh, navmesh.RegionKey{
         Col: tile.Col, Row: tile.Row + 1}, true)
+    sortTargetsByLo(east)
+    sortTargetsByLo(north)
 
     writer := make([]byte, 0, len(tile.Polys)*navmeshGeoWallStride)
     for i := range tile.Polys {
         poly := &tile.Polys[i]
         if poly.X1 < side {
-            for _, target := range targetsX[poly.X1] {
+            for _, target := range geoOverlapWindow(targetsX[poly.X1],
+                poly.Y0, poly.Y1) {
                 geoWallVertical(&writer, poly, target)
             }
         } else {
-            for _, target := range east {
+            for _, target := range geoOverlapWindow(east,
+                poly.Y0, poly.Y1) {
                 geoWallVertical(&writer, poly, target)
             }
         }
         if poly.Y1 < side {
-            for _, target := range targetsY[poly.Y1] {
+            for _, target := range geoOverlapWindow(targetsY[poly.Y1],
+                poly.X0, poly.X1) {
                 geoWallHorizontal(&writer, poly, target)
             }
         } else {
-            for _, target := range north {
+            for _, target := range geoOverlapWindow(north,
+                poly.X0, poly.X1) {
                 geoWallHorizontal(&writer, poly, target)
             }
         }
     }
 
     return writer
+}
+
+// sortTargetsByLo orders the interval targets by their lower bound
+// (the overlap window search of the walls pass).
+func sortTargetsByLo(targets []geoTarget) {
+    sort.Slice(targets, func(i, j int) bool {
+        return targets[i].lo < targets[j].lo
+    })
+}
+
+// geoOverlapWindow answers the contiguous run of targets whose
+// interval overlaps the query range: the lists are disjoint per
+// column and sorted by the lower bound, so the first hi past the
+// query start bounds the window and the walk ends at the first lo
+// past the query end (the emitted pairs match the lo >= hi reject of
+// the wall writers exactly).
+func geoOverlapWindow(targets []geoTarget, lo, hi int32) []geoTarget {
+    start := sort.Search(len(targets), func(i int) bool {
+        return targets[i].hi > lo
+    })
+    end := start
+    for end < len(targets) && targets[end].lo < hi {
+        end++
+    }
+
+    return targets[start:end]
 }
 
 // navmeshBorderTargets lists the border facing intervals of one
