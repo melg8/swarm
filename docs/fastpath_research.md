@@ -151,50 +151,61 @@ The owner question this section answers: how much time the algorithms
 of https://github.com/MacCracken/raasta (the Rust navigation engine,
 the navmesh A* of src/mesh.rs) and
 https://github.com/bnomei/condor (the Rust comparison library, the
-navmesh family: ChannelSearch, TA*, TRA*) take on our problem. The
-`cmd/navmesh-export` tool dumps the closed subgraph of the requested
+navmesh family: ChannelSearch, TA*, TRA*) take on our problem.
+`cmd/navmesh-export` dumps the closed subgraph of the requested
 regions (the polygons, the resolved links and the portal segments)
-into a flat binary; the Rust bridge (the l2bridge harness, one
-algorithm per process) loads the dump, builds each engine's native
-substrate and times the same query. The measurement machine: 2
-cores, 3 GB available RAM.
+into a flat binary; the bridge harness now ships in this repository
+(`tools/l2bridge`, a cargo project pinning raasta
+af87051a9478f48a555057ed64ce87e03a6e887e and condor
+011da4cbea32f3f49938985dc1f15a608d45a316), `tools/l2bridge/run_bench.sh`
+reproduces the whole round: the pack build, the production probe,
+the cargo build and the per engine query runs (one algorithm per
+process, the condor family under a 600 s wall clock cap). The
+measurement machine: 2 cores, ~4 GB RAM. The raasta side prices the
+water polys 3x through the NavPoly cost field (the swim filter
+semantics of the production Route, the plain find_path applies the
+poly cost).
 
 ### 7.1 The owner diagonal across the 4 tile corridor
 
 The dump of the 20_19, 20_20, 21_19, 21_20 corridor: 2,541,901
-polygons, 7,452,342 links (3,286 external targets outside the set
-skipped). The query: the owner's URL route from=12338,42444,-3640
-to=58630,91061,-3696, the swim filter semantics of the production
-Route.
+polygons, 7,452,342 links. The query: the owner's URL route
+from=12338,42444,-3640 to=58630,91061,-3696, the swim filter
+semantics of the production Route.
 
 | engine | build | query | answer |
 | --- | --- | --- | --- |
-| swarm production Route (tiles decoded, sidecars warm) | - | 36.7 ms first, 0.53 ms warm | found, 287 waypoints |
-| swarm production Route (the user visible cold: gzip decode + sidecar load + search) | - | 1.45 s | found, same corridor |
-| raasta navmesh A* | 295 ms | 129.8 ms first, 119.6 ms best | found, 1256 poly path |
-| condor ChannelSearch | ~4 s | >500 s, killed | no answer |
-| condor TAStar | ~4 s | >480 s, killed | no answer |
-| condor TRAStar (preprocess phase) | ~4 s | >560 s, killed | preprocess never finished |
+| swarm production Route (tiles decoded, sidecars warm) | - | 0.58 ms first, 0.45 ms warm | found, 287 waypoints |
+| swarm production Route (the user visible cold: zstd decode + sidecar load + search) | - | 0.58 s | found, same corridor |
+| raasta navmesh A* | 370 ms | 154 ms first, 149 ms best | found, 935 poly path |
+| condor ChannelSearch | 1.9 s | >550 s, killed | no answer |
+| condor TAStar | 2.0 s | >550 s, killed | no answer |
+| condor TRAStar (preprocess) | - | preprocess does not finish at this scale | no answer |
 
 ### 7.2 The single tile 21_19
 
-The dump of 21_19 alone: 372,846 polygons, 1,013,866 links. The
-query: an interior pair the production engine connects (36000,36000
-to 50000,50000), found route.
+The dump of 21_19 alone: 372,846 polygons, 1,013,866 links (781
+external targets outside the region skipped). The query: an interior
+pair the production engine connects (36000,36000 to 50000,50000),
+found route.
 
 | engine | build | query | answer |
 | --- | --- | --- | --- |
-| swarm Route warm (flat search, 18285 explored) | - | 9.4 ms | found, 327 corridor |
-| raasta navmesh A* | 41.4 ms | 5.9 ms first, 5.5 ms best | found, 260 poly path |
-| condor ChannelSearch | ~1 s | >500 s, killed | no answer |
-| condor TAStar | ~1 s | >420 s, killed | no answer |
+| swarm flat search warm (BenchmarkFlatFound21x19) | - | 12.1 ms | found |
+| swarm flat search, the unreachable pair (BenchmarkFlatExhaustive21x19) | - | 782 ms | no path |
+| raasta navmesh A* | 56 ms | 5.5 ms first, 4.9 ms best | found, 298 poly path |
+| condor ChannelSearch | 281 ms | 482.7 s, found | 3 point polyline, 60805 visited |
+| condor TRAStar | 247 ms + 342 ms preprocess | search >550 s, killed | no answer |
 
-The same query on an unreachable pair (the exhaustive search of the
-whole connected component): raasta 35 ms, swarm flat 494 ms - the
-raasta open list is the typed arena with the typed indices, the
-swarm flat search still pays the `map[PolyRef]uint32` node index
-per expansion. That gap is the concrete optimization target the
-section 8 names.
+The raasta flat engine beats the swarm flat search on the single
+tile (4.9 vs 12.1 ms warm) and loses to the production hierarchy on
+the cross tile route (149 ms vs 0.58 s cold / 0.58 ms warm - the
+raasta number is every query, no warm path exists). The exhaustive
+pair names the node state constant: the raasta typed arena answers
+the whole component sweep orders ahead of the boxed heap round
+(the typed arena node index of section 8 closed most of that gap;
+the 782 ms answer still carries the heap ops and the per link
+height bilinear).
 
 ### 7.3 The native suites (each engine on its own synthetic data)
 
@@ -217,14 +228,18 @@ The published suite never leaves the design scale of its library.
 1. The condor navmesh family is not a candidate at this scale: its
    per call `Vec` allocations (neighbors(), portals_from() return
    owned vectors) and the linear point location cannot carry a 2.5M
-   cell query. Five orders of magnitude behind on the single tile
-   query, and the prepared TRA* preprocess does not finish either.
+   cell query. The single tile ChannelSearch answer landed at
+   482.7 s (five orders of magnitude behind the flat searches), the
+   prepared TRA* preprocess finishes on the single tile (342 ms)
+   and its search still does not return inside 550 s, and at the
+   corridor scale neither the searches nor the preprocess finish
+   at all.
 2. The raasta navmesh A* is a well built flat engine: on the single
-   tile it beats the swarm flat search 5.5 vs 9.4 ms warm, and its
-   exhaustive behavior on the unreachable pair (35 vs 494 ms) shows
-   how much the typed arena open list buys. But it has no hierarchy:
-   on the cross tile diagonal it lands at 120..130 ms against the
-   swarm production 36.7 ms (the coarse layer + the hop refinement),
+   tile it beats the swarm flat search 4.9 vs 12.1 ms warm, and its
+   exhaustive behavior on the unreachable pair shows how much the
+   typed arena open list buys. But it has no hierarchy: on the
+   cross tile diagonal it lands at ~150 ms against the swarm
+   production 0.58 ms warm (the coarse layer + the hop refinement),
    and it would hold that per query forever - no warm path exists.
 3. The architecture verdict of sections 2 and 3 stands: the
    persistent coarse layer + the budgeted refinement hops is the

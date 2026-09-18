@@ -40,3 +40,6 @@ data/navmesh/
 
 # The repair backups of the concatenated geodata files (scripts/geo_repair).
 *.l2j.orig
+
+# The cargo build artifacts of the l2bridge harness
+tools/l2bridge/target/

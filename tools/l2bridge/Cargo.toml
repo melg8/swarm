@@ -1,0 +1,19 @@
+[package]
+name = "l2bridge"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+license = "MIT"
+description = "The external pathfinding benchmark bridge: the swarm navmesh dump read by the raasta and condor engines"
+
+[[bin]]
+name = "l2bridge"
+path = "src/main.rs"
+
+[dependencies]
+raasta = { git = "https://github.com/MacCracken/raasta", rev = "af87051a9478f48a555057ed64ce87e03a6e887e" }
+condor-pathfinding-navmesh = { git = "https://github.com/bnomei/condor", rev = "011da4cbea32f3f49938985dc1f15a608d45a316" }
+
+[profile.release]
+opt-level = 3
+debug = false
