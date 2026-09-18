@@ -40,6 +40,14 @@ const (
     // the start stay passable at the multiplier, the own ground
     // beyond keeps its wall (the sealed goal contract).
     avoidEscapeRadius = 256.0
+    // avoidGrazedMultiplier prices the steps onto a foreign banned
+    // polygon whose own portal segment stays clear of the circle: the
+    // rectangle granularity of the wall test grazes the merged mesh
+    // strips far beyond the circle, the crossing pays the squared
+    // escape price instead of the wall (the foreign ban wins the
+    // price race against the own escape ring, the world ford stays
+    // swimmable).
+    avoidGrazedMultiplier = avoidEscapeMultiplier * avoidEscapeMultiplier
 )
 
 // avoidState classifies one polygon against the avoid circles of a
@@ -161,4 +169,56 @@ func rectPointDist(x0, y0, x1, y1, px, py float64) float64 {
     dy := math.Max(math.Max(y0-py, py-y1), 0)
 
     return math.Hypot(dx, dy)
+}
+
+// foreignTouched reports whether a FOREIGN ban circle (every circle
+// but the one holding the start) touches the polygon footprint. The
+// own ban beyond the escape ring walls its ground for good (the way
+// out contract), a foreign grazed strip may open at the grazed price.
+func (a avoidCtx) foreignTouched(tile *Tile, poly *Poly) bool {
+    if !a.active || tile == nil || poly == nil {
+        return false
+    }
+    x0, y0, x1, y1 := tile.WorldRect(poly)
+    for i, area := range a.areas {
+        if i == a.escapeIdx {
+            continue
+        }
+        if circleOverlapsRect(area, x0, y0, x1, y1) {
+            return true
+        }
+    }
+
+    return false
+}
+
+// portalBanned reports whether the walkable portal segment crosses a
+// foreign ban circle (the closest point of the segment to the center
+// inside the radius). The polygon rectangle test of state walls the
+// merged mesh strips far beyond the circle - a river strip whose rect
+// grazes the town ban sealed the ford 15k units downstream - so the
+// step through a cleared portal stays legal and the segment is the
+// honest granularity of the ban.
+func (a avoidCtx) portalBanned(ax, ay, bx, by float64) bool {
+    if !a.active {
+        return false
+    }
+    dx, dy := bx-ax, by-ay
+    for i, area := range a.areas {
+        if i == a.escapeIdx {
+            continue
+        }
+        t := 0.0
+        len2 := dx*dx + dy*dy
+        if len2 > 0 {
+            t = math.Max(0, math.Min(1,
+                ((area.CenterX-ax)*dx+(area.CenterY-ay)*dy)/len2))
+        }
+        px, py := ax+dx*t, ay+dy*t
+        if math.Hypot(area.CenterX-px, area.CenterY-py) <= area.Radius {
+            return true
+        }
+    }
+
+    return false
 }

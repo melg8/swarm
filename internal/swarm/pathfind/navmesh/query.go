@@ -62,6 +62,14 @@ type Filter struct {
     // of the mesh wall spans - the grid raster is the authority the
     // side level spans approximate.
     Guard LegGuard
+    // AvoidGrazed prices the foreign banned ground whose own portal
+    // segment stays clear of the circle at avoidGrazedMultiplier
+    // instead of sealing it (the route shaping contract: the ban
+    // bends the route toward the detour, the town moat ring beats the
+    // through town walk). The zero value keeps the sealed goal of the
+    // recovery bans - the deterministic planner gives up on the
+    // banned ground (the hunt loop contract).
+    AvoidGrazed bool
 }
 
 // DefaultFilter is the swim allowing search with the 3x water cost.
@@ -208,8 +216,14 @@ func (m *Mesh) RouteApproach(
     // chain plus the budgeted refinement hops (the flat search over a
     // half world corridor only answers the capped partial). The
     // answer falls back to the flat search when the hierarchy
-    // declines.
-    if hierWorthy(startRef, endRef, startPos, endPos, filter) {
+    // declines. The avoid banned queries skip the hierarchy - the
+    // coarse graph cannot see the bans, its chain happily walks the
+    // banned ground and the refinement hops strand on the ban edge
+    // answering a partial the flat search beats (the world town ban
+    // turns the 90.5k through town answer into the 72.9k moat
+    // detour).
+    if len(filter.Avoid) == 0 && hierWorthy(startRef, endRef, startPos,
+        endPos, filter) {
         hierarchical := m.routeHierarchical(startRef, startPos, endRef,
             endPos, approachRadius, filter, state)
         if hierarchical != nil {
@@ -226,13 +240,23 @@ func (m *Mesh) RouteApproach(
     // answers those (the same tile far routes and the same tile
     // unreachable ones keep their flat partial answer, the hierarchy
     // declines or misses there too). The avoid banned queries stay
-    // flat (the coarse graph cannot see the bans).
+    // flat (the coarse graph cannot see the bans) - the capped banned
+    // query reruns with the raised budget instead: the world town ban
+    // diagonal needs ~85k nodes, the 64k budget capped at the river
+    // ford and answered a partial the rerun turns into the found
+    // detour.
     if result.capped && len(filter.Avoid) == 0 {
         hierarchical := m.routeHierarchical(startRef, startPos, endRef,
             endPos, approachRadius, filter, state)
         if hierarchical != nil && hierarchical.Found {
             return hierarchical, nil
         }
+    } else if result.capped {
+        result = m.astar(state,
+            astarGoal{target: endRef, escape: false,
+                approach: approachRadius},
+            startRef, startPos, endPos, filter, avoid, maxQueryNodes*8,
+            nil)
     }
     route.Explored = result.explored
     route.Corridor = result.corridor

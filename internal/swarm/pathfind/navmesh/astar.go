@@ -481,13 +481,26 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
             continue
         }
         ban := avoid.state(targetTile, targetPoly)
-        if ban == avoidWall {
-            // The recovery ban: the live server proved this ground
-            // unwalkable for this session, the detour around it is
-            // the only plan worth planning.
-            continue
-        }
         ax, ay, bx, by := tile.Portal(poly, link)
+        portalClear := false
+        if ban == avoidWall {
+            if avoid.portalBanned(ax, ay, bx, by) ||
+                !avoid.foreignTouched(targetTile, targetPoly) ||
+                !filter.AvoidGrazed {
+                // The recovery ban: the live server proved this ground
+                // unwalkable for this session, the detour around it is
+                // the only plan worth planning. The rectangle
+                // granularity of the wall test grazes the merged mesh
+                // strips far beyond the circle, so with AvoidGrazed the
+                // step whose own portal segment stays clear of every
+                // foreign circle survives at the grazed price below -
+                // the own ban beyond the escape ring keeps its seal
+                // (the way out contract) and the world town ban keeps
+                // the river ford 15k away crossable.
+                continue
+            }
+            portalClear = true
+        }
         midX, midY := (ax+bx)*0.5, (ay+by)*0.5
         midZ := tile.HeightAt(poly, midX, midY)
         mid := Pos{X: midX, Y: midY, Z: midZ}
@@ -497,6 +510,12 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
             // The ban that holds the start: the only honest route out
             // of it crosses its own ground - expensive, never sealed.
             g *= avoidEscapeMultiplier
+        } else if portalClear {
+            // The grazed ground of a foreign ban: pricier than the own
+            // escape ring (the foreign ban wins the tie, the toy lane
+            // contract) yet never sealed - the merged strip granularity
+            // must not wall the ford 15k units downstream.
+            g *= avoidGrazedMultiplier
         }
         h := dist3(mid, endPos)
         if state.escape {
