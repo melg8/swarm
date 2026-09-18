@@ -51,7 +51,7 @@ func buildRealRegion(t *testing.T, col, row int16) *RegionBuild {
 // TestRealRegionBuildHealth builds the real elven village region and
 // audits the mesh health: the polygon bounds stay inside the region,
 // the link chains are consistent, every internal link has its
-// symmetric counterpart and the BVTree is complete.
+// symmetric counterpart and the wire encode derives the index.
 func TestRealRegionBuildHealth(t *testing.T) {
     build := buildRealRegion(t, 21, 19)
     tile := build.Tile
@@ -94,7 +94,11 @@ func TestRealRegionBuildHealth(t *testing.T) {
     }
     require.Zero(t, oneWay, "the mesh must hold zero one-way links")
     require.Positive(t, symmetric)
-    require.Len(t, tile.BVTree, 2*len(tile.Polys)-1)
+    data, err := navmesh.EncodeTile(tile)
+    require.NoError(t, err)
+    encoded, err := navmesh.DecodeTile(data)
+    require.NoError(t, err)
+    require.NotNil(t, encoded.Grid, "the v3 encode derives the grid")
 }
 
 // TestRealRegionBridgePair runs the hard case of the research round

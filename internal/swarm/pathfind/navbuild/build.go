@@ -63,9 +63,9 @@ type BuildStats struct {
 }
 
 // RegionBuild is the phase A result of one region: the tile with the
-// polygons, the internal links and the BVTree (no external links
-// yet), plus the border strips the phase B stitching pairs against
-// the neighbours.
+// polygons, the internal links and the spatial index (no external
+// links yet), plus the border strips the phase B stitching pairs
+// against the neighbours.
 type RegionBuild struct {
     Tile   *navmesh.Tile
     Strips borderStrips
@@ -94,7 +94,6 @@ func BuildRegion(
     specs := acc.emit()
 
     tile := assembleTile(col, row, opts.Climb, rects, specs)
-    tile.BVTree = buildBVTree(tile, rects)
 
     stats := collectStats(rl, sh, acc, tile)
     stats.FakeFilled = fakeFilled

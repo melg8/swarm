@@ -29,9 +29,12 @@ proved.
 ## The tile format
 
 One tile is one region: a 40 byte header (the magic `SWN1`, the
-version, the region key, the climb, the section counts), the polygon
-section, the link section, the external link section and the
-bounding volume tree - every section 4 byte aligned, little endian.
+version, the region key, the climb, the section counts) and the
+sections - every section 4 byte aligned, little endian. The version
+3 wire is the current one (the columnar layout, the bucket grid
+index; docs/fastpath_research.md section 11), the decode reads the
+version 1 (the int32 records and the bounding volume tree) and the
+version 2 (the uint16 quantization) packs the same way.
 
 - **The polygons are rectangles in region local cell bounds**
   (`X0 <= cx < X1`, `Y0 <= cy < Y1`, half open). The world rectangle

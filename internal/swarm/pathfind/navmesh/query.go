@@ -390,13 +390,18 @@ func (m *Mesh) regionKeysOfBox(minX, minY, maxX, maxY float64,
     return keys
 }
 
-// tileQueryPolys walks the bounding volume tree of a tile and
-// appends the polygon indices whose quantized bounds overlap the
-// world query box (the dtNavMeshQuery::queryPolygonsInTile
-// traversal). An empty tree degrades to every polygon.
+// tileQueryPolys walks the spatial index of a tile and appends the
+// polygon indices whose bounds overlap the world query box (the
+// dtNavMeshQuery::queryPolygonsInTile traversal). The v3 tiles walk
+// the bucket grid, the v1/v2 tiles walk the bounding volume tree. An
+// empty index degrades to every polygon.
 func tileQueryPolys(tile *Tile, minX, minY, maxX, maxY, minZ, maxZ float64,
     out []int32,
 ) []int32 {
+    if tile.Grid != nil {
+        return tileQueryPolysGrid(tile, minX, minY, maxX, maxY, minZ,
+            maxZ, out)
+    }
     if len(tile.BVTree) == 0 {
         for i := range tile.Polys {
             out = append(out, int32(i))
@@ -450,6 +455,66 @@ func quantizeBV(world float64) uint16 {
     }
 
     return uint16(cells)
+}
+
+// tileQueryPolysGrid walks the bucket grid of a v3 tile: the buckets
+// the query footprint touches list their polygons, the height window
+// prunes the stacked surfaces the 2D grid cannot separate (the
+// caller tests the exact 3D geometry on the survivors).
+func tileQueryPolysGrid(tile *Tile, minX, minY, maxX, maxY, minZ, maxZ float64,
+    out []int32,
+) []int32 {
+    grid := tile.Grid
+    bucket := func(world, anchor float64) int {
+        cells := int(math.Floor((world - anchor) / cellSizeWorld))
+        b := cells / gridBucketCells
+        if b < 0 {
+            return 0
+        }
+        if b >= gridSide {
+            return gridSide - 1
+        }
+
+        return b
+    }
+    bx0 := bucket(minX, tile.worldMinX)
+    bx1 := bucket(maxX, tile.worldMinX)
+    by0 := bucket(minY, tile.worldMinY)
+    by1 := bucket(maxY, tile.worldMinY)
+    for by := by0; by <= by1; by++ {
+        base := by * gridSide
+        for bx := bx0; bx <= bx1; bx++ {
+            b := base + bx
+            for e := grid.Offsets[b]; e < grid.Offsets[b+1]; e++ {
+                pi := int32(grid.Entries[e])
+                poly := &tile.Polys[pi]
+                hMin, hMax := polyHeightRange(poly)
+                if float64(hMax) < minZ || float64(hMin) > maxZ {
+                    continue
+                }
+                out = append(out, pi)
+            }
+        }
+    }
+
+    return out
+}
+
+// polyHeightRange returns the min and the max corner height of a
+// polygon (the bilinear surface stays inside the corner range).
+func polyHeightRange(poly *Poly) (int16, int16) {
+    hMin := poly.H00
+    hMax := poly.H00
+    for _, h := range [4]int16{poly.H00, poly.H10, poly.H01, poly.H11} {
+        if h < hMin {
+            hMin = h
+        }
+        if h > hMax {
+            hMax = h
+        }
+    }
+
+    return hMin, hMax
 }
 
 // quantOverlap reports whether two quantized bounds overlap.

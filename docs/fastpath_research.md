@@ -330,3 +330,50 @@ a many region world pack the guard round is the bigger lever: a
 rejected sidecar cost a tile decode per coarse frontier region,
 the decode count grows with the route length instead of the tile
 count the route touches.
+
+## 11. The tile format v3: the columnar wire and the bucket grid
+
+The owner report this section answers: the pack disk mass (the ~3.5
+GB the whole world pack puts on the disk). The section split probe
+(zstd per section of the decoded tile) named the mass: on the dense
+21_20 tile the links own 39 percent of the compressed bytes and the
+BVTree 40 percent, the polygons 23. The v3 format attacks both:
+
+- **The columnar planes.** The polygon bounds, the heights, the
+  areas, the link spans and the grid entries store as homogeneous
+  planes instead of the interleaved records - the per field
+  repetition is what the entropy coder eats.
+- **The implicit link chains.** The links store in polygon order,
+  the CSR offsets replace both the poly FirstLink field and the per
+  link Next pointer. The decode rebuilds both (the in memory
+  structures stay exactly the v2 shape, the searches untouched).
+- **The packed spans** (side 2 bits, t0 12, t1 12 - one uint32
+  against the 16 byte link record of v2) and the **zigzag uvarint
+  target deltas** (the delta against the source polygon: the
+  neighbour polygons sit next to each other in the index, the delta
+  rides one byte mostly).
+- **The bucket grid replaces the BVTree**: a 64x64 uniform grid of
+  polygon ids over the region footprint (a polygon lists in every
+  bucket its rectangle touches, the per bucket deltas delta encode).
+  The nearest poly query post filters the height window the 2D grid
+  cannot see; the exact 3D test stays with the caller. The v1/v2
+  tiles keep walking their BVTree, one branch in tileQueryPolys.
+
+The same 4 region corridor pack, rebuilt end to end:
+
+| measure | v2 | v3 |
+| --- | --- | --- |
+| tiles on disk | 106 MB | 36 MB |
+| 4 tile decode (sequential, warm disk) | 840 ms | 440 ms |
+| owner diagonal cold | 575 ms | 246 ms |
+| owner diagonal warm | 0.4..0.8 ms | 0.4..0.6 ms |
+| route answer | found, 287 waypoints | found, 287 waypoints (identical corridor, 49825 explored) |
+| flat search found 21_19 | 12.1 ms | 9.7 ms |
+| flat search exhaustive 21_19 | 782 ms, 183 MB allocs | 598 ms, 118 MB allocs |
+
+The 2.9x disk cut extrapolates the owner's ~3.5 GB world pack to
+~1.2 GB; the smaller wire also decodes faster (the cold route
+halves) and the grid index shrinks the search's resident tile (the
+exhaustive allocations drop a third). The build time drops too -
+the pack build no longer constructs the bounding volume tree (the
+grid derives at serialize time).

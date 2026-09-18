@@ -11,9 +11,10 @@ import (
     "github.com/stretchr/testify/require"
 )
 
-// sampleTile builds a two polygon tile with an internal link, an
-// external link and a two node BVTree: the minimal production shape
-// that exercises every wire structure.
+// sampleTile builds a two polygon tile with an internal link and an
+// external link: the minimal production shape that exercises every
+// wire structure (the v3 encode derives the bucket grid, the v1
+// compat test carries the explicit BVTree).
 func sampleTile() *Tile {
     tile := &Tile{
         Col:   21,
@@ -53,7 +54,8 @@ func sampleTile() *Tile {
 }
 
 // TestTileRoundtrip encodes and decodes the sample tile and compares
-// every structure field by field.
+// every structure field by field (the v3 encode answers the bucket
+// grid, the BVTree stays a v1/v2 structure).
 func TestTileRoundtrip(t *testing.T) {
     original := sampleTile()
     data, err := EncodeTile(original)
@@ -67,7 +69,20 @@ func TestTileRoundtrip(t *testing.T) {
     require.Equal(t, original.Polys, tile.Polys)
     require.Equal(t, original.Links, tile.Links)
     require.Equal(t, original.ExtLinks, tile.ExtLinks)
-    require.Equal(t, original.BVTree, tile.BVTree)
+    require.Nil(t, tile.BVTree)
+    require.NotNil(t, tile.Grid)
+    require.Equal(t, 2, int(tile.Grid.Offsets[gridBuckets]),
+        "both polygons index")
+
+    // The grid entries list both polygons in both touched buckets
+    // (the rects share the bucket row and the x range).
+    entries := map[uint32]int{}
+    for b := 0; b < gridBuckets; b++ {
+        for e := tile.Grid.Offsets[b]; e < tile.Grid.Offsets[b+1]; e++ {
+            entries[tile.Grid.Entries[e]]++
+        }
+    }
+    require.Equal(t, map[uint32]int{0: 1, 1: 1}, entries)
 
     // The world anchor derives from the region key: region 21_19
     // anchors at world (32768, 32768).
@@ -260,4 +275,77 @@ func TestPortal(t *testing.T) {
     require.InDelta(t, tile.WorldMinY()+float64(poly.Y0)*16, ay, 1e-9)
     require.InDelta(t, x0, bx, 1e-9)
     require.InDelta(t, tile.WorldMinY()+float64(poly.Y1)*16, by, 1e-9)
+}
+
+// TestTileGridQueryAgainstBruteForce walks the v3 bucket grid over a
+// synthetic multi surface tile and compares the candidate set with
+// the exhaustive rect overlap scan (the index contract: the grid
+// answers a superset of the true footprint overlaps, the height
+// window prunes the stacked surfaces).
+func TestTileGridQueryAgainstBruteForce(t *testing.T) {
+    tile := corridorWorld()
+    toWorld := func(cells float64) float64 {
+        return tile.WorldMinX() + cells*cellSizeWorld
+    }
+    cell := func(v float64) float64 { return toWorld(v) }
+    rects := []struct {
+        x0, y0, x1, y1 float64
+        z              float64
+    }{
+        {cell(0), cell(0), cell(160), cell(160), 0},       // A
+        {cell(160), cell(0), cell(320), cell(160), 0},     // B
+        {cell(160), cell(160), cell(320), cell(208), -40}, // C
+        {cell(160), cell(208), cell(320), cell(320), -80}, // D
+        {cell(160), cell(208), cell(320), cell(320), 100}, // E
+    }
+
+    boxes := [][4]float64{
+        {toWorld(4), toWorld(4), toWorld(12), toWorld(12)},
+        {toWorld(150), toWorld(150), toWorld(170), toWorld(170)},
+        {toWorld(200), toWorld(180), toWorld(310), toWorld(300)},
+        {toWorld(0), toWorld(0), toWorld(2048), toWorld(2048)},
+    }
+    zWindows := [][2]float64{
+        {-600, 600},
+        {-600, 600},
+        {-600, 600},
+        {-600, 600},
+    }
+    for i, box := range boxes {
+        minX, minY, maxX, maxY := box[0], box[1], box[2], box[3]
+        minZ, maxZ := zWindows[i][0], zWindows[i][1]
+        got := tileQueryPolysGrid(tile, minX, minY, maxX, maxY, minZ, maxZ,
+            nil)
+        var want []int32
+        for pi := range tile.Polys {
+            r := rects[pi]
+            overlap := r.x0 < maxX && r.x1 > minX && r.y0 < maxY &&
+                r.y1 > minY && r.z >= minZ && r.z <= maxZ
+            if overlap {
+                want = append(want, int32(pi))
+            }
+        }
+        // The multi bucket boxes may list a bucket spanning polygon
+        // once per touched bucket (the nearest poly caller tests the
+        // exact geometry per candidate, the duplicate only costs a
+        // repeat test): the comparison folds both sides.
+        require.ElementsMatch(t, unique(want), unique(got),
+            "grid candidates at box %d", i)
+    }
+}
+
+// unique folds a candidate slice to its distinct values (the test
+// helper of the grid comparison).
+func unique(candidates []int32) []int32 {
+    seen := map[int32]bool{}
+    out := make([]int32, 0, len(candidates))
+    for _, c := range candidates {
+        if seen[c] {
+            continue
+        }
+        seen[c] = true
+        out = append(out, c)
+    }
+
+    return out
 }

@@ -68,11 +68,17 @@ const (
 // to uint16 cell units (the region fits 2048 cells per side, the
 // heights stay int16), the external link region keys to int16 and
 // keeps the link chain offsets uint32 (the dense regions carry over
-// a million links). The decode reads both versions.
+// a million links). Version 3 is the columnar layout: the polygon
+// planes, the poly ordered link chains (the implicit CSR, no Next
+// wire), the packed side and span word and the uniform bucket grid
+// instead of the bounding volume tree - the section split probe
+// named the tree and the link records the compressed mass
+// (docs/fastpath_research.md section 11). The decode reads every
+// version.
 const (
     tileMagic = 0x31574E53 // 'SWN1' little endian
 
-    tileVersion = 2
+    tileVersion = 3
 
     tileHeaderSize = 40
 
@@ -87,6 +93,12 @@ const (
     extLinkWireSize = 8
 
     bvNodeWireSize = 16
+
+    // The version 3 grid index: the bucket count per axis and the
+    // cell span of one bucket (the region is 2048 cells per side).
+    gridSide        = 64
+    gridBucketCells = regionCellsSide / gridSide
+    gridBuckets     = gridSide * gridSide
 )
 
 // ErrBadTile reports a tile file that is not a navigation mesh tile
@@ -112,12 +124,27 @@ type Tile struct {
     ExtLinks []ExtLink
     // BVTree is the quantized bounding volume tree over the polygon
     // bounds (the Detour layout: axis 0 = world x, axis 1 = height,
-    // axis 2 = world y).
+    // axis 2 = world y). The v3 tiles answer nil: the Grid replaces
+    // it.
     BVTree []BVNode
+    // Grid is the uniform bucket index of the v3 tiles (nil for the
+    // v1/v2 tiles: the BVTree serves those).
+    Grid *TileGrid
 
     // worldMinX/worldMinY are derived at decode: the world anchor of
     // the region (the min corner of cell 0 0).
     worldMinX, worldMinY float64
+}
+
+// TileGrid is the uniform spatial index of the v3 tiles: the 64x64
+// bucket grid of polygon ids over the region footprint. A polygon
+// lists in every bucket its cell rectangle touches, the entries of
+// one bucket run in increasing polygon order (the conservative 2D
+// candidate set; the query post filters the height window and the
+// caller tests the exact 3D geometry).
+type TileGrid struct {
+    Offsets []uint32
+    Entries []uint32
 }
 
 // Poly is one rectangle navigation polygon.
@@ -283,9 +310,10 @@ func (t *Tile) Portal(p *Poly, link *Link) (ax, ay, bx, by float64) {
     return ax, ay, bx, by
 }
 
-// DecodeTile parses the raw bytes of one tile file. Both wire
-// versions decode: version 1 (the int32 bounds and spans) and
-// version 2 (the uint16 quantization of the current encoder).
+// DecodeTile parses the raw bytes of one tile file. The wire
+// versions decode: version 1 (the int32 bounds and spans), version 2
+// (the uint16 quantization) and version 3 (the columnar layout with
+// the bucket grid index).
 func DecodeTile(data []byte) (*Tile, error) {
     if len(data) < tileHeaderSize {
         return nil, fmt.Errorf("%w: %d bytes is too short", ErrBadTile,
@@ -305,7 +333,7 @@ func DecodeTile(data []byte) (*Tile, error) {
     polyCount := int(binary.LittleEndian.Uint32(data[20:]))
     linkCount := int(binary.LittleEndian.Uint32(data[24:]))
     extCount := int(binary.LittleEndian.Uint32(data[28:]))
-    bvCount := int(binary.LittleEndian.Uint32(data[32:]))
+    indexCount := int(binary.LittleEndian.Uint32(data[32:]))
 
     tile := &Tile{
         Col:      int16(col),
@@ -314,7 +342,9 @@ func DecodeTile(data []byte) (*Tile, error) {
         Polys:    make([]Poly, polyCount),
         Links:    make([]Link, linkCount),
         ExtLinks: make([]ExtLink, extCount),
-        BVTree:   make([]BVNode, bvCount),
+    }
+    if version < 3 {
+        tile.BVTree = make([]BVNode, indexCount)
     }
     tile.worldMinX = (float64(col) - tileZeroCol) * tileWorldSize
     tile.worldMinY = (float64(row) - tileZeroRow) * tileWorldSize
@@ -330,7 +360,10 @@ func DecodeTile(data []byte) (*Tile, error) {
         if err := decodeExtLinksV1(data, &offset, tile); err != nil {
             return nil, err
         }
-    } else {
+        if err := decodeBVTree(data, &offset, tile); err != nil {
+            return nil, err
+        }
+    } else if version == 2 {
         if err := decodePolys(data, &offset, tile); err != nil {
             return nil, err
         }
@@ -340,9 +373,13 @@ func DecodeTile(data []byte) (*Tile, error) {
         if err := decodeExtLinks(data, &offset, tile); err != nil {
             return nil, err
         }
-    }
-    if err := decodeBVTree(data, &offset, tile); err != nil {
-        return nil, err
+        if err := decodeBVTree(data, &offset, tile); err != nil {
+            return nil, err
+        }
+    } else {
+        if err := decodeTileV3(data, &offset, tile); err != nil {
+            return nil, err
+        }
     }
     if offset != len(data) {
         return nil, fmt.Errorf("%w: %d trailing bytes", ErrBadTile,
@@ -547,10 +584,87 @@ func decodeBVTree(data []byte, offset *int, tile *Tile) error {
     return nil
 }
 
-// EncodeTile serializes a tile into the version 2 wire format (the
-// uint16 quantized bounds, spans and external region keys). The
-// derived world anchor is NOT part of the wire format - it recomputes
-// from the region key.
+// packLinkSpan folds the side and the crossing span into one word
+// (the side 2 bits, the t0 and the t1 12 bits each: the spans fit the
+// 2048 cell region side).
+func packLinkSpan(side uint8, t0, t1 int32) uint32 {
+    return uint32(side) | uint32(t0)<<2 | uint32(t1)<<14
+}
+
+// unpackLinkSpan splits the packed span word.
+func unpackLinkSpan(word uint32) (side uint8, t0, t1 int32) {
+    return uint8(word & 3), int32(word >> 2 & 0xFFF), int32(word >> 14 & 0xFFF)
+}
+
+// zigzag folds a signed delta into the uvarint range.
+func zigzag(v int64) uint64 { return uint64(v<<1) ^ uint64(v>>63) }
+
+// unzigzag unfolds the signed delta.
+func unzigzag(v uint64) int64 { return int64(v>>1) ^ -int64(v&1) }
+
+// buildGridIndex buckets the polygon rectangles into the uniform grid
+// (the encode side of the v3 spatial index). The entries of one
+// bucket run in increasing polygon order and the stream stores the
+// per bucket zigzag uvarint deltas.
+func buildGridIndex(polys []Poly) (offsets []uint32, stream []byte,
+    entries int,
+) {
+    counts := make([]uint32, gridBuckets)
+    for i := range polys {
+        poly := &polys[i]
+        bx0 := int(poly.X0) / gridBucketCells
+        bx1 := (int(poly.X1) - 1) / gridBucketCells
+        by0 := int(poly.Y0) / gridBucketCells
+        by1 := (int(poly.Y1) - 1) / gridBucketCells
+        for by := by0; by <= by1; by++ {
+            base := by * gridSide
+            for bx := bx0; bx <= bx1; bx++ {
+                counts[base+bx]++
+            }
+        }
+    }
+    offsets = make([]uint32, gridBuckets+1)
+    total := 0
+    for b := 0; b < gridBuckets; b++ {
+        offsets[b] = uint32(total)
+        total += int(counts[b])
+    }
+    offsets[gridBuckets] = uint32(total)
+    fill := make([]uint32, gridBuckets)
+    copy(fill, offsets[:gridBuckets])
+    ids := make([]uint32, total)
+    for i := range polys {
+        poly := &polys[i]
+        bx0 := int(poly.X0) / gridBucketCells
+        bx1 := (int(poly.X1) - 1) / gridBucketCells
+        by0 := int(poly.Y0) / gridBucketCells
+        by1 := (int(poly.Y1) - 1) / gridBucketCells
+        for by := by0; by <= by1; by++ {
+            base := by * gridSide
+            for bx := bx0; bx <= bx1; bx++ {
+                ids[fill[base+bx]] = uint32(i)
+                fill[base+bx]++
+            }
+        }
+    }
+    stream = make([]byte, 0, total*2)
+    for b := 0; b < gridBuckets; b++ {
+        prev := uint64(0)
+        for e := offsets[b]; e < offsets[b+1]; e++ {
+            stream = binary.AppendUvarint(stream, uint64(ids[e])-prev)
+            prev = uint64(ids[e])
+        }
+    }
+
+    return offsets, stream, total
+}
+
+// EncodeTile serializes a tile into the version 3 wire format: the
+// columnar polygon planes, the poly ordered link chains (the CSR
+// offsets, no Next on the wire), the packed span words, the zigzag
+// uvarint target deltas and the bucket grid index. The derived world
+// anchor is NOT part of the wire format - it recomputes from the
+// region key.
 func EncodeTile(tile *Tile) ([]byte, error) {
     if len(tile.Polys) == 0 {
         return nil, fmt.Errorf("%w: encode of an empty tile", ErrBadTile)
@@ -578,9 +692,42 @@ func EncodeTile(tile *Tile) ([]byte, error) {
                 i, link.T0, link.T1)
         }
     }
-    size := tileHeaderSize + len(tile.Polys)*polyWireSize +
-        len(tile.Links)*linkWireSize + len(tile.ExtLinks)*extLinkWireSize +
-        len(tile.BVTree)*bvNodeWireSize
+
+    // The link chains: the CSR offsets, the span plane and the
+    // zigzag uvarint target deltas (the delta against the source
+    // polygon keeps the neighbour targets in the one byte range).
+    offsets := make([]uint32, len(tile.Polys)+1)
+    spans := make([]uint32, 0, len(tile.Links))
+    toStream := make([]byte, 0, len(tile.Links)*2)
+    for i := range tile.Polys {
+        poly := &tile.Polys[i]
+        chain := 0
+        for li := poly.FirstLink; li >= 0; li = tile.Links[li].Next {
+            link := &tile.Links[li]
+            spans = append(spans,
+                packLinkSpan(link.Side, link.T0, link.T1))
+            toStream = binary.AppendUvarint(toStream,
+                zigzag(int64(link.To)-int64(i)))
+            chain++
+        }
+        offsets[i+1] = offsets[i] + uint32(chain)
+    }
+    if len(spans) != len(tile.Links) {
+        return nil, fmt.Errorf("%w: the link chains cover %d of %d "+
+            "links", ErrBadTile, len(spans), len(tile.Links))
+    }
+
+    gridOffsets, gridStream, gridEntries := buildGridIndex(tile.Polys)
+
+    size := tileHeaderSize +
+        8*2*len(tile.Polys) + // the bounds and the height planes
+        len(tile.Polys) + // the area plane
+        4*(len(tile.Polys)+1) + // the CSR
+        4*len(spans) +
+        len(toStream) +
+        len(tile.ExtLinks)*extLinkWireSize +
+        4*(gridBuckets+1) +
+        len(gridStream)
     data := make([]byte, size)
 
     binary.LittleEndian.PutUint32(data[0:], tileMagic)
@@ -591,54 +738,225 @@ func EncodeTile(tile *Tile) ([]byte, error) {
     binary.LittleEndian.PutUint32(data[20:], uint32(len(tile.Polys)))
     binary.LittleEndian.PutUint32(data[24:], uint32(len(tile.Links)))
     binary.LittleEndian.PutUint32(data[28:], uint32(len(tile.ExtLinks)))
-    binary.LittleEndian.PutUint32(data[32:], uint32(len(tile.BVTree)))
+    binary.LittleEndian.PutUint32(data[32:], uint32(gridEntries))
+    binary.LittleEndian.PutUint32(data[36:], uint32(len(toStream)))
 
     offset := tileHeaderSize
+    put16 := func(off int, v uint16) {
+        binary.LittleEndian.PutUint16(data[off:], v)
+    }
+    put32 := func(off int, v uint32) {
+        binary.LittleEndian.PutUint32(data[off:], v)
+    }
     for i := range tile.Polys {
-        base := offset + i*polyWireSize
         poly := &tile.Polys[i]
-        binary.LittleEndian.PutUint16(data[base:], uint16(poly.X0))
-        binary.LittleEndian.PutUint16(data[base+2:], uint16(poly.Y0))
-        binary.LittleEndian.PutUint16(data[base+4:], uint16(poly.X1))
-        binary.LittleEndian.PutUint16(data[base+6:], uint16(poly.Y1))
-        binary.LittleEndian.PutUint16(data[base+8:], uint16(poly.H00))
-        binary.LittleEndian.PutUint16(data[base+10:], uint16(poly.H10))
-        binary.LittleEndian.PutUint16(data[base+12:], uint16(poly.H01))
-        binary.LittleEndian.PutUint16(data[base+14:], uint16(poly.H11))
-        binary.LittleEndian.PutUint32(data[base+16:], uint32(poly.FirstLink))
-        data[base+20] = poly.Area
+        put16(offset+i*2, uint16(poly.X0))
+        put16(offset+(len(tile.Polys)+i)*2, uint16(poly.Y0))
+        put16(offset+(2*len(tile.Polys)+i)*2, uint16(poly.X1))
+        put16(offset+(3*len(tile.Polys)+i)*2, uint16(poly.Y1))
+        put16(offset+(4*len(tile.Polys)+i)*2, uint16(poly.H00))
+        put16(offset+(5*len(tile.Polys)+i)*2, uint16(poly.H10))
+        put16(offset+(6*len(tile.Polys)+i)*2, uint16(poly.H01))
+        put16(offset+(7*len(tile.Polys)+i)*2, uint16(poly.H11))
     }
-    offset += len(tile.Polys) * polyWireSize
-
-    for i := range tile.Links {
-        base := offset + i*linkWireSize
-        link := &tile.Links[i]
-        data[base] = link.Side
-        binary.LittleEndian.PutUint32(data[base+4:], uint32(link.To))
-        binary.LittleEndian.PutUint32(data[base+8:], uint32(link.Next))
-        binary.LittleEndian.PutUint16(data[base+12:], uint16(link.T0))
-        binary.LittleEndian.PutUint16(data[base+14:], uint16(link.T1))
+    offset += 8 * 2 * len(tile.Polys)
+    for i := range tile.Polys {
+        data[offset+i] = tile.Polys[i].Area
     }
-    offset += len(tile.Links) * linkWireSize
+    offset += len(tile.Polys)
+    for i, v := range offsets {
+        put32(offset+i*4, v)
+    }
+    offset += 4 * len(offsets)
+    for i, span := range spans {
+        put32(offset+i*4, span)
+    }
+    offset += 4 * len(spans)
+    copy(data[offset:], toStream)
+    offset += len(toStream)
 
     for i := range tile.ExtLinks {
         base := offset + i*extLinkWireSize
         ext := &tile.ExtLinks[i]
-        binary.LittleEndian.PutUint16(data[base:], uint16(ext.Col))
-        binary.LittleEndian.PutUint16(data[base+2:], uint16(ext.Row))
-        binary.LittleEndian.PutUint32(data[base+4:], ext.Poly)
+        put16(base, uint16(ext.Col))
+        put16(base+2, uint16(ext.Row))
+        put32(base+4, ext.Poly)
     }
     offset += len(tile.ExtLinks) * extLinkWireSize
 
-    for i := range tile.BVTree {
-        base := offset + i*bvNodeWireSize
-        node := &tile.BVTree[i]
-        for a := range 3 {
-            binary.LittleEndian.PutUint16(data[base+a*2:], node.BMin[a])
-            binary.LittleEndian.PutUint16(data[base+6+a*2:], node.BMax[a])
-        }
-        binary.LittleEndian.PutUint32(data[base+12:], uint32(node.I))
+    for i, v := range gridOffsets {
+        put32(offset+i*4, v)
+    }
+    offset += 4 * len(gridOffsets)
+    copy(data[offset:], gridStream)
+    offset += len(gridStream)
+
+    if offset != len(data) {
+        return nil, fmt.Errorf("%w: the v3 encode wrote %d of %d bytes",
+            ErrBadTile, offset, len(data))
     }
 
     return data, nil
+}
+
+// decodeTileV3 reads the columnar version 3 sections.
+func decodeTileV3(data []byte, offset *int, tile *Tile) error {
+    polyN := len(tile.Polys)
+    linkN := len(tile.Links)
+    gridEntries := int(binary.LittleEndian.Uint32(data[32:]))
+    toStreamSize := int(binary.LittleEndian.Uint32(data[36:]))
+
+    bounds := func(plane int) func(i int) uint16 {
+        base := *offset + plane*2*polyN
+
+        return func(i int) uint16 {
+            return binary.LittleEndian.Uint16(data[base+i*2:])
+        }
+    }
+    if *offset+8*2*polyN > len(data) {
+        return fmt.Errorf("%w: the v3 poly planes truncate", ErrBadTile)
+    }
+    x0Plane, y0Plane := bounds(0), bounds(1)
+    x1Plane, y1Plane := bounds(2), bounds(3)
+    h00Plane, h10Plane := bounds(4), bounds(5)
+    h01Plane, h11Plane := bounds(6), bounds(7)
+    for i := range tile.Polys {
+        poly := &tile.Polys[i]
+        poly.X0 = int32(x0Plane(i))
+        poly.Y0 = int32(y0Plane(i))
+        poly.X1 = int32(x1Plane(i))
+        poly.Y1 = int32(y1Plane(i))
+        poly.H00 = int16(h00Plane(i))
+        poly.H10 = int16(h10Plane(i))
+        poly.H01 = int16(h01Plane(i))
+        poly.H11 = int16(h11Plane(i))
+    }
+    *offset += 8 * 2 * polyN
+
+    if *offset+polyN > len(data) {
+        return fmt.Errorf("%w: the v3 area plane truncates", ErrBadTile)
+    }
+    for i := range tile.Polys {
+        tile.Polys[i].Area = data[*offset+i]
+    }
+    *offset += polyN
+
+    size := 4 * (polyN + 1)
+    if *offset+size > len(data) {
+        return fmt.Errorf("%w: the v3 link CSR truncates", ErrBadTile)
+    }
+    chainOffsets := make([]uint32, polyN+1)
+    for i := 0; i <= polyN; i++ {
+        chainOffsets[i] = binary.LittleEndian.Uint32(data[*offset+i*4:])
+    }
+    if polyN > 0 && chainOffsets[0] != 0 {
+        return fmt.Errorf("%w: the v3 link CSR head %d", ErrBadTile,
+            chainOffsets[0])
+    }
+    for i := 0; i < polyN; i++ {
+        if chainOffsets[i] > chainOffsets[i+1] ||
+            chainOffsets[i+1] > uint32(linkN) {
+            return fmt.Errorf("%w: the v3 link CSR step %d", ErrBadTile, i)
+        }
+    }
+    if int(chainOffsets[polyN]) != linkN {
+        return fmt.Errorf("%w: the v3 link CSR tail %d of %d",
+            ErrBadTile, chainOffsets[polyN], linkN)
+    }
+    *offset += size
+
+    size = 4 * linkN
+    if *offset+size > len(data) {
+        return fmt.Errorf("%w: the v3 span plane truncates", ErrBadTile)
+    }
+    for i := range tile.Links {
+        side, t0, t1 := unpackLinkSpan(
+            binary.LittleEndian.Uint32(data[*offset+i*4:]))
+        tile.Links[i].Side = side
+        tile.Links[i].T0 = t0
+        tile.Links[i].T1 = t1
+    }
+    *offset += size
+
+    if *offset+toStreamSize > len(data) {
+        return fmt.Errorf("%w: the v3 target stream truncates", ErrBadTile)
+    }
+    cursor := *offset
+    for i := 0; i < polyN; i++ {
+        poly := &tile.Polys[i]
+        end := chainOffsets[i+1]
+        if end > chainOffsets[i] {
+            poly.FirstLink = int32(chainOffsets[i])
+        } else {
+            // The isolated surface: the empty chain answers -1 (the
+            // wire CSR only carries the non empty chains).
+            poly.FirstLink = -1
+        }
+        for e := chainOffsets[i]; e < end; e++ {
+            zz, read := binary.Uvarint(data[cursor:])
+            if read <= 0 {
+                return fmt.Errorf("%w: the v3 target stream breaks",
+                    ErrBadTile)
+            }
+            cursor += read
+            to := unzigzag(zz) + int64(i)
+            tile.Links[e].To = int32(to)
+            if e+1 < end {
+                tile.Links[e].Next = int32(e + 1)
+            } else {
+                tile.Links[e].Next = -1
+            }
+        }
+    }
+    if cursor != *offset+toStreamSize {
+        return fmt.Errorf("%w: the v3 target stream overruns", ErrBadTile)
+    }
+    *offset += toStreamSize
+
+    if err := decodeExtLinks(data, offset, tile); err != nil {
+        return err
+    }
+
+    size = 4 * (gridBuckets + 1)
+    if *offset+size > len(data) {
+        return fmt.Errorf("%w: the v3 grid offsets truncate", ErrBadTile)
+    }
+    grid := &TileGrid{
+        Offsets: make([]uint32, gridBuckets+1),
+    }
+    for i := range grid.Offsets {
+        grid.Offsets[i] = binary.LittleEndian.Uint32(data[*offset+i*4:])
+    }
+    if int(grid.Offsets[gridBuckets]) != gridEntries {
+        return fmt.Errorf("%w: the v3 grid tail %d of %d", ErrBadTile,
+            grid.Offsets[gridBuckets], gridEntries)
+    }
+    *offset += size
+
+    grid.Entries = make([]uint32, gridEntries)
+    position := *offset
+    for b := 0; b < gridBuckets; b++ {
+        prev := uint64(0)
+        for e := grid.Offsets[b]; e < grid.Offsets[b+1]; e++ {
+            delta, read := binary.Uvarint(data[position:])
+            if read <= 0 {
+                return fmt.Errorf("%w: the v3 grid stream breaks",
+                    ErrBadTile)
+            }
+            position += read
+            prev += delta
+            grid.Entries[e] = uint32(prev)
+        }
+    }
+    if position != len(data) {
+        return fmt.Errorf("%w: the v3 grid stream overruns", ErrBadTile)
+    }
+    *offset = len(data)
+    tile.Grid = grid
+
+    if err := validatePolys(tile); err != nil {
+        return err
+    }
+
+    return validateLinks(tile)
 }
