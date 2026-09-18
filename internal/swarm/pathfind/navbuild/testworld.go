@@ -61,6 +61,14 @@ func appendBlock(t *testing.T, buffer []byte, bx, by int,
                 stack = []layerSpec{{h: -3504, nswe: 0}}
             }
             stacks[lx*8+ly] = stack
+            if len(stack) == 0 {
+                // The true void cell (zero layers): it forces the
+                // multilayer block kind, the body writes the zero
+                // layer count for it.
+                uniform = false
+
+                continue
+            }
             if lx == 0 && ly == 0 {
                 first = stack[0]
             }

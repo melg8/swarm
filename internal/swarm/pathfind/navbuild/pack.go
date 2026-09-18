@@ -233,12 +233,12 @@ func buildPackPhaseA(keys []navmesh.RegionKey, geodataDir, outDir string,
             strips[key] = &own
             log("region %d_%d: %d layers, %d sheets (%d islands,"+
                 " %d floating), %d polys (%d water), %d links,"+
-                " %d blocked pairs, %s",
+                " %d blocked pairs, %d fake filled, %s",
                 key.Col, key.Row, build.Stats.Layers, build.Stats.Sheets,
                 build.Stats.DroppedSheets, build.Stats.IslandSheets,
                 build.Stats.Polys,
                 build.Stats.WaterPolys, build.Stats.Links,
-                build.Stats.NSWEBlockedPairs,
+                build.Stats.NSWEBlockedPairs, build.Stats.FakeFilled,
                 build.Stats.BuildTime.String())
             mu.Unlock()
             counters.built.Add(1)

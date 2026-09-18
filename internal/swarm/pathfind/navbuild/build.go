@@ -28,6 +28,11 @@ type Options struct {
     MinSheetLayers int32
     // Workers caps the pack build parallelism (0: runtime.NumCPU()).
     Workers int
+    // RepairFake replaces the l2j uninitialized filler cells (one
+    // layer, height 0, fully open) with the nearest real surface
+    // blend (fakerepair.go): the bay filler turns into the sea floor
+    // water, the land gaps into the connecting ground.
+    RepairFake bool
 }
 
 // DefaultOptions returns the production tunables.
@@ -53,6 +58,7 @@ type BuildStats struct {
     WaterPolys       int
     Links            int
     NSWEBlockedPairs int
+    FakeFilled       int
     BuildTime        time.Duration
 }
 
@@ -78,6 +84,10 @@ func BuildRegion(
     if err != nil {
         return nil, err
     }
+    fakeFilled := 0
+    if opts.RepairFake {
+        fakeFilled = repairFakeCells(rl, opts.Climb)
+    }
     sh := assignSheets(rl, opts.Climb, opts.MinSheetLayers)
     rects, polyAt := buildRects(rl, sh, opts.Climb)
     acc, strips := buildInternalLinks(rl, sh, polyAt, opts.Climb)
@@ -87,6 +97,7 @@ func BuildRegion(
     tile.BVTree = buildBVTree(tile, rects)
 
     stats := collectStats(rl, sh, acc, tile)
+    stats.FakeFilled = fakeFilled
     stats.BuildTime = time.Since(started)
 
     return &RegionBuild{Tile: tile, Strips: strips, Stats: stats}, nil

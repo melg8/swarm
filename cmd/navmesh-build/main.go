@@ -47,10 +47,16 @@ func main() {
             "by the magic word; roughly half the disk)")
     workers := flag.Int("workers", 0,
         "parallel build workers (0: every core)")
+    repairFake := flag.Bool("repair-fake", false,
+        "replace the l2j uninitialized filler cells (one layer, "+
+            "height 0, fully open) with the nearest real surface blend "+
+            "(the bay filler turns into the sea floor water, the land "+
+            "gaps into the connecting ground)")
     flag.Parse()
 
     opts := navbuild.DefaultOptions()
     opts.Workers = *workers
+    opts.RepairFake = *repairFake
     if err := run(*geodataDir, *outDir, *regions, *force, *compress,
         opts); err != nil {
         fmt.Println("Error:", err)
