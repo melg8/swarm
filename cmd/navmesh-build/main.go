@@ -97,6 +97,26 @@ func run(geodataDir, outDir, regionsSpec string, force, compress bool,
         fmt.Printf("compressed %d tiles, %.1f MB saved\n",
             saved.Count, float64(saved.Bytes)/(1024*1024))
     }
+
+    // The persistent coarse layer pass (after the compression: the
+    // sidecar records the final tile stat the runtime checks). Every
+    // geodata region with a built tile gets its cluster graph
+    // sidecar; the runtime falls back to the tile scan without one.
+    allKeys, err := navbuild.RegionKeysOfDir(geodataDir)
+    if err != nil {
+        return err
+    }
+    abstracts, err := navbuild.WriteAbstractSidecars(outDir, allKeys,
+        opts.Workers,
+        func(format string, args ...any) {
+            fmt.Printf(format+"\n", args...)
+        })
+    if err != nil {
+        return err
+    }
+    fmt.Printf("wrote %d abstract sidecars (%d skipped, %d failed),"+
+        " %.1f MB\n", abstracts.Written, abstracts.Skipped,
+        abstracts.Failed, float64(abstracts.Bytes)/(1024*1024))
     fmt.Printf("built %d regions (%d skipped, %d failed), %d polys,"+
         " %d links, %d external links, %.1f MB of tiles in %s\n",
         stats.Built, stats.Skipped, stats.Failed, stats.Polys,

@@ -1,0 +1,146 @@
+# The fast pathfind research: the scales, the layers and the flow fields
+
+The owner question this doc answers: the pathfind algorithm that
+works at the whole map scale without the repeated re-paths, an order
+of magnitude faster than the current answer - the simplified maps
+with the many elements merged into one simpler surface for the
+preliminary route, the full maps for the exact route inside it, or
+the flow field alternative. The goal: the longest route plans in 10
+seconds at the worst, ideally under 1 second.
+
+## 1. The measured baseline (the corridor pack, this round)
+
+The three town legs (the teleporter arrival points, the hierarchical
+route, the corridor pack of 31 regions, the fake cell repair on):
+
+| leg | straight | cold | warm | one shot |
+| --- | --- | --- | --- | --- |
+| Elven Village -> Gludio | 92939 | 1.77 s | 545 ms | found |
+| Gludio -> Gludin | 73199 | 2.61 s | 3.4 ms | found |
+| Gludin -> Giran | 164172 | 2.16 s | 130 ms | partial (the strand, section 4) |
+
+The previous session measured the same Elven leg at 10.8 s cold on
+the full pack. The corridor pack, the uint16 tile format and the
+fake repair together bought the 6x. The warm answers are already sub
+1 second everywhere the one shot works - the remaining gap is the
+cold start and the strand.
+
+## 2. The simplified map idea: already the architecture, needs the persistence
+
+The owner proposal - the simplified map for the preliminary route,
+the full maps inside it - is the architecture the port already runs:
+the on the fly HPA* abstraction (navmesh/abstract.go) merges every
+region's polygons into the 16x16 cell cluster graph (the nodes are
+the clusters, the edges are the boundary links, the link components
+gate the fake crossings), the coarse search plans over it and the
+refinement hops re-search the real mesh inside the corridor clusters.
+
+What it lacks is persistence. The cold query pays the tile decode
+plus the cluster graph build for every region it touches; the
+abstract LRU (32 graphs) evicts them again. The fix is the
+**persistent coarse layer**:
+
+- `navmesh-build` serializes the built cluster graph of every region
+  into an `X_Y.ab` sidecar (the nodes, the edges and the run length
+  encoded components - a few hundred kilobytes per dense region,
+  against the tens of megabytes of the tile).
+- The runtime loads the `.ab` files eagerly for the whole world
+  (165 regions x the small file = the tens of megabytes of RAM) and
+  the coarse search runs over the complete world graph with zero
+  tile decodes. The tile decode stays only inside the refinement
+  hops, along the coarse corridor - the working set the LRU already
+  bounds.
+
+That removes most of the cold/warm gap and the section 1 table of
+this round already carries the measured answer: on the compressed
+corridor pack the Gludio Gludin cold start drops 9.17 s -> 5.25 s
+(-43 percent) with the sidecars, the warm answer stays 3.7 ms, the
+route answer stays identical (the same 110986 explored, the same
+corridor). The sidecar pass writes 31 sidecars of 56 MB total for
+the corridor (1.8 MB average against the 27 MB average tile). The
+remaining cold cost is the gunzip tile decode of the refinement hops
+- the price of the 2.6x disk saving.
+
+## 3. The flow field verdict: not the tool for this query shape
+
+The flow field (the Dijkstra/BFS flood from the target over every
+cell, the agents then read the field downhill) amortizes over the
+agents per target. The arithmetic at this scale:
+
+- One region grid cell stack is 2048 x 2048 = 4.2M cells; the whole
+  continent is 165 regions = 690M cells. One field build walks every
+  reachable cell - the cost of ~1000 warm A* queries spent to answer
+  ONE query.
+- The mesh A* explores 11k-43k polygons for the town legs (the
+  fraction of a percent of the 15M polygon corridor). The flow field
+  explores 100 percent by construction. It loses the single query by
+  3 to 4 orders of magnitude, exactly the opposite of the goal.
+- The amortization case (a fleet of bots walking to ONE hunt spot)
+  does not pay here either: the fleet is dozens, the field serves
+  the fleet only after the build pays for itself at thousands of
+  agents, and the LRU cached coarse graph already answers the fleet's
+  coarse guidance in milliseconds.
+
+The known implementations (the Recast/Detour crowd local steering,
+the Supreme Commander 2 style hierarchical flow fields, the Red Blob
+game demos) confirm the shape: flow fields win in the dense crowds
+to the shared target, not in the sparse agents over the continent.
+The verdict: keep HPA*, skip the flow field.
+
+## 4. The Gludin -> Giran strand: the anatomy and the plan
+
+The strand the town route measurement reports is now mapped to the
+cell (giran_strand_test.go, pocket_reach_test.go,
+eastseam_test.go):
+
+- The segmented walk advances 93044 of 164172 units through 18_22 and
+  19_22, crosses the 19_22/20_22 seam and stalls at the inner bay
+  shore cell (20_22 cell 0_1024, world (0, 147456)).
+- From the stall cell the east targets answer partial=false (the
+  confined search exhausts the pocket component, 64k explored, no
+  exit), the north detour answers partial=true (the pocket opens
+  north), the seam crossing back west works.
+- The raw geodata seam: the 19_22 east edge is the flat -3720 shelf,
+  the 20_22 west edge rides -3520..-3456 - the 200 unit step the
+  climb rule refuses. The full border scan: 1110 of 2048 cells pair
+  legally (the spans y 1282..1743 and y 0..350 are the widest), the
+  strand sits in the y 912..1281 gap.
+- The geometry is honest (the mountain ridge along the straight
+  line): the route has to detour through the crossable spans or
+  around the bay. The one shot search dies because the confined
+  allowed set (the coarse corridor plus one cluster dilation) has no
+  exit inside its budget - the coarse guide picked a corridor that
+  dead ends inside the pocket.
+
+The plan: (a) the persistent coarse layer of section 2 lets the
+coarse search see the whole world graph and pick the detour corridor
+that actually reaches Giran before any confined budget starts; (b)
+the re-path walk should re-target the last bindable waypoint toward
+the crossable spans (the practical bot answer today); (c) the
+operator waypoint graph over the towns remains the fleet grade
+fallback.
+
+## 5. The size arithmetic after the uint16 round
+
+The tile format v2 quantizes the polygon bounds and the link spans
+to uint16 (the poly wire 32 -> 24 bytes, the link 20 -> 16, the
+external link 12 -> 8). The corridor pack of 31 regions builds
+2.2 GB raw and compresses to 0.85 GB (2.6x). Against the source
+geodata of the same regions (~130 MB) the mesh stays 6.5x: the
+links (33.7M over the corridor) and the repaired fake surface (the
+bay areas became walkable geometry) own the mass. The next size
+lever is the link delta encoding if the disk mass ever matters more
+than the decode speed.
+
+## 6. The recommendation
+
+1. Implement the persistent coarse layer (section 2) - the biggest
+   remaining lever, it serves the cold start, the fleet queries and
+   the Giran detour at once.
+2. Keep the hierarchical A* and the LRU; skip the flow fields
+   (section 3).
+3. Land the fake cell repair as the default for the pack builds (the
+   bay legs already answer one shot with it; the flag flip is the
+   release decision).
+4. The Giran leg rides the re-targeted re-path until (1) lands, then
+   re-measure (section 4).
