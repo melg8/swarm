@@ -140,7 +140,7 @@ func NewMesh(dir string) *Mesh {
             return &coarseState{
                 nodes:   nil,
                 index:   make(map[coarseNodeKey]int32, 1024),
-                settled: make(map[coarseCompKey]bool, 1024),
+                settled: make(map[coarseCompKey]float64, 1024),
                 open:    nil,
                 best:    -1,
                 bestH:   0,

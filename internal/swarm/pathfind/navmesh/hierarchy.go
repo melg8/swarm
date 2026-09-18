@@ -102,7 +102,7 @@ type coarseCompKey struct {
 type coarseState struct {
     nodes   []coarseNode
     index   map[coarseNodeKey]int32
-    settled map[coarseCompKey]bool
+    settled map[coarseCompKey]float64
     open    []int32
     best    int32
     bestH   float64
@@ -213,6 +213,12 @@ type coarseResult struct {
     // gaveUp reports the gated guide budget stop (the gate free
     // retry takes over).
     gaveUp bool
+    // estimate is the geometric length of the chain walk (the start,
+    // the portal midpoints and the end in sequence): the honest
+    // refinement stays near it, the chain the straight line portal
+    // pricing lied about refines far past it (the flat contest asks
+    // for the exact search then).
+    estimate float64
 }
 
 // hierQuery carries one hierarchical route query.
@@ -337,7 +343,7 @@ func (m *Mesh) routeHierarchical(
             return nil
         }
         if m.refineChain(&query, chain, route) {
-            return route
+            return m.contestFlat(&query, chain, route)
         }
         // A hop failed: its exit edge is banned, the replan walks a
         // different portal chain.
@@ -356,7 +362,7 @@ func (m *Mesh) routeHierarchical(
                 return nil
             }
             if m.refineChain(&query, chain, route) {
-                return route
+                return m.contestFlat(&query, chain, route)
             }
         }
     }
@@ -466,16 +472,26 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
                 }
             }
             // The settled component merge: another crossing into this
-            // cluster already expanded the same component - the chain
-            // through this node would duplicate that work.
+            // cluster already expanded the same component. The merge
+            // keeps the best settled g, not the first pop: the
+            // crossings of one cluster carry different entry
+            // heuristics and the f order pops the far entry first -
+            // the first pop need not hold the cheapest g (the harbor
+            // query answered through the expensive entry while the
+            // cheap one stood beside it unexpanded, the walk plan
+            // carried the hook in). A strictly cheaper entry re-arms
+            // the component and expands again, the costlier one
+            // skips as duplicated work.
             compKey := coarseCompKey{key: node.key, comp: node.entryComp}
-            if q.coarse.settled[compKey] {
+            if best, ok := q.coarse.settled[compKey]; ok &&
+                node.g >= best {
                 continue
             }
-            q.coarse.settled[compKey] = true
+            q.coarse.settled[compKey] = node.g
             if node.key == goalKey && node.entryComp == goalComp {
                 result.reached = true
                 result.edges, result.clusters = coarseChainWalk(q.coarse, idx)
+                result.estimate = chainEstimate(m, q, result.edges)
 
                 return result
             }
@@ -485,6 +501,7 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
             // on the real mesh.
             result.reached = true
             result.edges, result.clusters = coarseChainWalk(q.coarse, idx)
+            result.estimate = chainEstimate(m, q, result.edges)
 
             return result
         }
@@ -504,6 +521,7 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
     if q.coarse.best >= 0 {
         result.edges, result.clusters = coarseChainWalk(q.coarse,
             q.coarse.best)
+        result.estimate = chainEstimate(m, q, result.edges)
     }
 
     return result
@@ -551,9 +569,6 @@ func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos,
         // until the search actually settles the cluster).
         nodeKey := coarseNodeKey{key: edge.to, edge: ref}
         existing, seen := q.coarse.index[nodeKey]
-        if seen && q.coarse.nodes[existing].closed {
-            continue
-        }
         cost := dist3(node.pos, edge.mid)
         if edge.dstArea == AreaWater {
             // The priced guide: the water crossing pays the swim rate
@@ -563,6 +578,29 @@ func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos,
         }
         g := node.g + cost
         h := dist3(edge.mid, endPos)
+        if seen {
+            known := &q.coarse.nodes[existing]
+            if known.closed {
+                // The re-armed component expansion is the second
+                // improvement source beside the ordinary edge
+                // relaxations: the closed state re-opens when the new
+                // g is strictly cheaper (the label correcting the
+                // merged g race asks for), the equal or costlier one
+                // stays folded.
+                if known.g <= g {
+                    continue
+                }
+                known.closed = false
+                known.g = g
+                known.f = g + h
+                known.parent = idx
+                known.edgeRef = ref
+                known.pos = edge.mid
+                q.coarse.push(existing)
+
+                continue
+            }
+        }
         if !seen {
             created := int32(len(q.coarse.nodes))
             q.coarse.nodes = append(q.coarse.nodes, coarseNode{
@@ -1080,6 +1118,150 @@ func (m *Mesh) storeHop(key hopKey, corridor []PolyRef) {
     copy(stored, corridor)
     m.hops[key] = stored
     m.hopOrder = append(m.hopOrder, key)
+}
+
+// chainEstimate sums the geometric walk of the chain: the start, the
+// portal midpoints and the end in sequence. The refinement funnels
+// through the corridor the chain names, so its honest answer stays
+// near this sum; the portals straight line pricing cannot see the
+// terrain detours inside the clusters and underprices the lying
+// chains (the river valley crossing the shore walk beats).
+func chainEstimate(m *Mesh, q *hierQuery, edges []abstractEdgeRef) float64 {
+    prev := q.startPos
+    sum := 0.0
+    for _, ref := range edges {
+        edge, ok := m.hierEdge(ref)
+        if !ok {
+            return 0
+        }
+        sum += dist3(prev, edge.mid)
+        prev = edge.mid
+    }
+    sum += dist3(prev, q.endPos)
+
+    return sum
+}
+
+// routeLengthOf sums the waypoint walk length of a route.
+func routeLengthOf(route *Route) float64 {
+    sum := 0.0
+    for i := 1; i < len(route.Waypoints); i++ {
+        sum += dist3(route.Waypoints[i-1], route.Waypoints[i])
+    }
+
+    return sum
+}
+
+// contestFlat hands the refined answer to the exact competitors when
+// the refinement outran its own chain estimate: the chain the portal
+// straight lines underpriced threaded the expensive ground and the
+// budgeted flat search answers the honest optimum within its node
+// budget. The capped flat search hands the contest to the confined
+// search over the chain clusters (the same set the refinement
+// threads, priced by the same filter, free to pick the crossings the
+// representative hops missed). A competitor serves only when it
+// reached and prices cheaper under the filter model - the capped,
+// unreachable or costlier search keeps the hierarchical answer (the
+// hierarchy exists for the corridors the flat budget cannot finish).
+func (m *Mesh) contestFlat(q *hierQuery, chain coarseResult,
+    route *Route,
+) *Route {
+    if !route.Found || len(route.Corridor) == 0 {
+        return route
+    }
+    length := routeLengthOf(route)
+    result := m.astar(q.state,
+        astarGoal{target: q.endRef, escape: false, approach: q.approach},
+        q.startRef, q.startPos, q.endPos, q.filter, noAvoid(),
+        maxQueryNodes, nil)
+    if result.reached && len(result.corridor) > 0 {
+        flat := &Route{
+            Found:        true,
+            Partial:      false,
+            Waypoints:    nil,
+            RawWaypoints: nil,
+            Corridor:     result.corridor,
+            Explored:     result.explored,
+            Hierarchical: false,
+        }
+        m.answerWaypoints(flat, result.corridor, q.startPos, q.endPos,
+            q.filter)
+        if routeLengthOf(flat) < length {
+            return flat
+        }
+
+        return route
+    }
+    // The exact budget cannot finish the corridor: the confined
+    // search threads the chain clusters with the full polygon
+    // freedom (the zone aware pricing included) and answers the set
+    // optimum when its budget holds.
+    confined := &Route{
+        Found:        false,
+        Partial:      false,
+        Waypoints:    nil,
+        RawWaypoints: nil,
+        Corridor:     nil,
+        Explored:     0,
+    }
+    if !m.confinedRoute(q, chain.clusters, confined) || !confined.Found {
+        return route
+    }
+    if corridorCostOf(m, confined.Corridor, q) <
+        corridorCostOf(m, route.Corridor, q) {
+        confined.Hierarchical = true
+        route.Explored += confined.Explored
+
+        return confined
+    }
+
+    return route
+}
+
+// corridorCostOf prices the corridor under the search filter: every
+// polygon pays its polyCost weighted by the share of the center walk
+// (the centers of the corridor chain sum to the path length, the
+// boundary polygons carry the half weights). The relative answer
+// ranks two corridors of one query honestly; the absolute number is
+// the approximation the funnel waypoints refine.
+func corridorCostOf(m *Mesh, corridor []PolyRef, q *hierQuery) float64 {
+    if len(corridor) == 0 {
+        return math.MaxFloat64
+    }
+    centers := make([]Pos, len(corridor))
+    for i, ref := range corridor {
+        tile, poly := m.polyOfRef(ref)
+        if tile == nil || poly == nil {
+            return math.MaxFloat64
+        }
+        x0, y0, x1, y1 := tile.WorldRect(poly)
+        centers[i] = Pos{X: (x0 + x1) * 0.5, Y: (y0 + y1) * 0.5,
+            Z: tile.HeightAt(poly, centers[i].X, centers[i].Y)}
+    }
+    sum := 0.0
+    for i, ref := range corridor {
+        tile, poly := m.polyOfRef(ref)
+        if tile == nil || poly == nil {
+            return math.MaxFloat64
+        }
+        back, ahead := 0.0, 0.0
+        if i > 0 {
+            back = dist3(centers[i-1], centers[i])
+        }
+        if i+1 < len(corridor) {
+            ahead = dist3(centers[i], centers[i+1])
+        }
+        weight := back + ahead
+        if i == 0 {
+            weight = ahead
+        }
+        if i+1 == len(corridor) {
+            weight = back
+        }
+        sum += polyCost(tile, poly, q.zones, q.filter) * weight * 0.5
+    }
+
+    return sum
 }
 
 // dist2D is the horizontal distance between two positions.

@@ -95,12 +95,15 @@ func profileWorldRoute(t *testing.T, mesh *Mesh, start, end Pos,
 }
 
 // TestWorldTownAvoidRoute pins the town bypass of the world pack: the
-// diagonal across the walled island town answers the hierarchical
-// through town walk (90.5k units), the avoid circle over the island
-// frees the flat search and the answer takes the moat detour - 66.4k
-// units, a quarter shorter, found under the raised budget the capped
-// banned query rerun owns. The regression keeps the avoid mechanism
-// honest on the real pack (the synthetic avoid tests stay toy sized).
+// diagonal across the walled island town answers the honest through
+// town walk (the flat contest of the hierarchical query brought the
+// once broken 90.5k answer to the 65.9k optimum), the avoid circle
+// over the island bans the town and the answer takes the moat detour
+// - 66.6k units, found under the raised budget the capped banned
+// query rerun owns. The regression keeps the avoid mechanism honest
+// on the real pack (the synthetic avoid tests stay toy sized): the
+// banned answer stays within the detour margin of the free optimum
+// (the ban costs the walk the moat, not a search failure).
 func TestWorldTownAvoidRoute(t *testing.T) {
         mesh := NewMesh(worldPackDir(t))
         start := Pos{X: 55040, Y: 40146, Z: -3722}
@@ -134,8 +137,9 @@ func TestWorldTownAvoidRoute(t *testing.T) {
                 t.Fatalf("the avoid route lost the destination"+
                         " (partial endpoint %.0f, %.0f)", around.lastX, around.lastY)
         }
-        if around.length >= straight.length {
-                t.Fatalf("the ban must free the shorter moat detour:"+
-                        " %.0f not below %.0f", around.length, straight.length)
+        if around.length >= straight.length*1.02 {
+                t.Fatalf("the ban must not price the moat detour past the"+
+                        " honest margin: %.0f over %.0f",
+                        around.length, straight.length)
         }
 }
