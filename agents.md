@@ -9,6 +9,16 @@
 
 ## Long running subprocesses (servers, builds)
 
+- UPDATE 2026-09-18: the recipe below no longer survives the reaper.
+  A setsid detached viewer (own session, PID=PGID=SID) died within
+  ~20 seconds, every restart the same; `unshare --fork --mount-proc`
+  answers "Operation not permitted". The practical use of a detached
+  server now: the ~15-20 second survival window after start - enough
+  to curl the endpoints (config, geometry, a POST route) while the
+  process lives, not enough for anything longer. Long running servers
+  stay the owner's job (they run them on their own machine); inside
+  the agent session plan endpoint checks inside the window and expect
+  the death.
 - The sandbox kills the subprocesses of the agent session unless they detach.
   A detached process survives the session end (verified: the navmesh viewer
   of a previous session kept serving port 8082 across sessions).
