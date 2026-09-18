@@ -147,11 +147,12 @@ func TestNavmeshNavigatorServesMeshRoutes(t *testing.T) {
     require.Greater(t, escape.Waypoints[len(escape.Waypoints)-1].Z, -80.0)
 }
 
-// TestNavmeshNavigatorFallsBackToEngine pins the fallback rule: a
+// TestNavmeshNavigatorMissingTileErrors pins the mesh only rule: a
 // query the mesh cannot serve (no tile under the endpoints at all)
-// hands the question to the grid engine - here one without geodata,
-// so the honest answer is the engine error, never a silent miss.
-func TestNavmeshNavigatorFallsBackToEngine(t *testing.T) {
+// answers the honest mesh error - the grid engine is never asked for
+// a route (the owner directive: the walk plan must be the mesh
+// answer), its validation seam stays on the engine.
+func TestNavmeshNavigatorMissingTileErrors(t *testing.T) {
     mesh := navmesh.NewMesh(t.TempDir())
     engine := pathfind.NewEngine(t.TempDir())
     navigator := NewNavmeshNavigator(engine, mesh)
@@ -168,9 +169,9 @@ func TestNavmeshNavigatorFallsBackToEngine(t *testing.T) {
 
 // TestNavmeshNavigatorBansReachMesh pins the recovery ban flow: the
 // frozen corridor bans of the hunt loop wall the mesh corridor search
-// (the only lane banned -> no mesh route -> the engine fallback
-// surfaces), so the deterministic mesh planner detours instead of
-// reproducing the frozen corridor.
+// (the only lane banned -> the closest-reachable partial corridor),
+// so the deterministic mesh planner walks toward the ban border
+// instead of reproducing the frozen corridor.
 func TestNavmeshNavigatorBansReachMesh(t *testing.T) {
     // The two-lane world: mainland M, north lane N, south lane S, far
     // mainland E.
@@ -210,19 +211,29 @@ func TestNavmeshNavigatorBansReachMesh(t *testing.T) {
     require.True(t, result.Found)
 
     // A ban covering BOTH lanes (the whole east border of the
-    // mainland) seals the mesh: the fallback engine has no geodata
-    // and answers the honest error - without the ban reaching the
-    // mesh search the mesh would have served the route and no error
-    // could surface.
+    // mainland) seals the mesh: the answer is the closest-reachable
+    // partial toward the ban border (the walk-what-you-can contract),
+    // never a route through the frozen corridor.
     ban := pathfind.AvoidArea{
         Center: pathfind.Vec3{
             X: 32768 + 160*16, Y: 32768 + 160*16, Z: 0,
         },
         Radius: 600,
     }
-    _, err = navigator.FindPathApproachDryAvoiding(start, end, 150,
+    result, err = navigator.FindPathApproachDryAvoiding(start, end, 150,
         []pathfind.AvoidArea{ban})
-    require.Error(t, err)
+    require.NoError(t, err)
+    require.NotNil(t, result)
+    // The seal answer is the honest not found (the ban rect grazes
+    // the merged mainland strip, the reachable region stays empty),
+    // never a route through the frozen corridor: whatever waypoints
+    // surface (a partial corridor on a mesh with finer polys) stay
+    // west of the ban center.
+    require.False(t, result.Found)
+    for i, wp := range result.Waypoints {
+        require.Less(t, wp.X, float64(32768+160*16-300),
+            "partial waypoint %d must stay west of the ban", i)
+    }
 }
 
 // realNavmeshNavigator builds the hybrid over the real elven village
@@ -378,11 +389,11 @@ func shoreWorldMesh(t *testing.T) *navmesh.Mesh {
 // TestNavmeshNavigatorPartialServesClosestReachable pins the partial
 // round of the dry avoiding form: the destination sits on the water
 // polygon the dry filter walls, so the mesh answers the
-// closest-reachable corridor and the engine - over the same synthetic
-// world - confirms the destination unreachable with its own clean not
-// found; the hybrid then serves the partial waypoints through
-// Result.Partial instead of the bare abort (the walk toward the shore
-// the town legs can make).
+// closest-reachable corridor and the hybrid serves the partial
+// waypoints through Result.Partial instead of the bare abort (the
+// walk toward the shore the town legs can make). The engine run in
+// the premise is the documentary cross check of the same world - the
+// navigator itself never consults it.
 func TestNavmeshNavigatorPartialServesClosestReachable(t *testing.T) {
     mesh := shoreWorldMesh(t)
     geodataDir := t.TempDir()
@@ -406,8 +417,8 @@ func TestNavmeshNavigatorPartialServesClosestReachable(t *testing.T) {
     require.NotNil(t, engineResult)
     require.False(t, engineResult.Found)
 
-    // The hybrid serves the mesh partial corridor after that
-    // confirmation: the walk ends at the closest reachable dry point.
+    // The hybrid serves the mesh partial corridor: the walk ends at
+    // the closest reachable dry point.
     result, err := navigator.FindPathApproachDryAvoiding(
         start, end, 150, nil)
     require.NoError(t, err)
@@ -428,13 +439,13 @@ func TestNavmeshNavigatorPartialServesClosestReachable(t *testing.T) {
     require.Greater(t, result.Length, 3000.0)
 }
 
-// TestNavmeshNavigatorPartialDefersToEngineRoute pins the
-// can-only-add rule of the partial round: a mesh that models less
-// ground than the engine (the C-D link missing - the corridor ends at
-// C) answers a partial, but the engine holds the full route, and the
-// engine route WINS - the hybrid never trades a found route for a
-// partial walk.
-func TestNavmeshNavigatorPartialDefersToEngineRoute(t *testing.T) {
+// TestNavmeshNavigatorPartialOwnsThePlan pins the mesh only rule of
+// the partial round: a mesh that models less ground than the engine
+// (the C-D link missing - the corridor ends at C) answers the partial
+// and the partial WINS - the grid engine that could plan the full
+// route over its own world view is never asked (the owner directive:
+// the walk plan must be the mesh answer).
+func TestNavmeshNavigatorPartialOwnsThePlan(t *testing.T) {
     // The broken-chain world: A-B-C linked, D isolated (no C-D link).
     tile := huntTile(t, 21, 19, []nmRect{
         {x0: 0, y0: 0, x1: 160, y1: 320, h: -3770, area: navmesh.AreaGround},
@@ -470,21 +481,20 @@ func TestNavmeshNavigatorPartialDefersToEngineRoute(t *testing.T) {
         start, end, 150, nil)
     require.NoError(t, err)
     require.NotNil(t, result)
-    require.True(t, result.Found)
-    require.False(t, result.Partial)
+    require.False(t, result.Found)
+    require.True(t, result.Partial)
     require.NotEmpty(t, result.Waypoints)
-    // The engine route crosses into D - the mesh chain would have
-    // ended at the C border (world 32768 + 480*16).
+    // The mesh chain ends at the C border (world 32768 + 480*16):
+    // the walk-what-you-can answer of the only planner there is.
     last := result.Waypoints[len(result.Waypoints)-1]
-    require.Greater(t, last.X, 32768+480*16.0)
+    require.InDelta(t, 32768+480*16.0, last.X, 16.0)
 }
 
-// TestNavmeshNavigatorPartialNeedsEngineVerdict pins the confirmation
-// rule: the mesh partial alone never serves - an engine that cannot
-// even answer (no geodata under the endpoints) surfaces its error,
-// the hybrid never invents a walk out of a mesh corridor without the
-// engine verdict.
-func TestNavmeshNavigatorPartialNeedsEngineVerdict(t *testing.T) {
+// TestNavmeshNavigatorPartialServesWithoutEngineVerdict pins the
+// mesh only rule: the mesh partial serves on its own - an engine
+// that cannot even answer (no geodata under the endpoints) is never
+// consulted, the walk-what-you-corridor of the mesh is the plan.
+func TestNavmeshNavigatorPartialServesWithoutEngineVerdict(t *testing.T) {
     mesh := shoreWorldMesh(t)
     engine := pathfind.NewEngine(t.TempDir())
     navigator := NewNavmeshNavigator(engine, mesh)
@@ -495,18 +505,20 @@ func TestNavmeshNavigatorPartialNeedsEngineVerdict(t *testing.T) {
     end := pathfind.Vec3{
         X: huntWorldOf(400), Y: huntWorldOf(160), Z: -3800,
     }
-    _, err := navigator.FindPathApproachDryAvoiding(start, end, 150, nil)
-    require.Error(t, err,
-        "the engine without geodata answers the honest error, the "+
-            "mesh partial never serves without the engine verdict")
+    result, err := navigator.FindPathApproachDryAvoiding(start, end, 150,
+        nil)
+    require.NoError(t, err)
+    require.NotNil(t, result)
+    require.False(t, result.Found)
+    require.True(t, result.Partial)
+    require.NotEmpty(t, result.Waypoints)
 }
 
 // TestNavmeshNavigatorHardPairPartial pins the partial round on the
 // REAL elven village pair: the village deck to the water under the
 // bridge - the motivating stacked-layer walk of the whole port -
 // planned DRY answers the mesh partial corridor to the closest
-// reachable dry point once the engine confirms the water destination
-// unreachable without a swim. The walk the town legs then make ends
+// reachable dry point. The walk the town legs then make ends
 // on the shore instead of aborting on the deck.
 func TestNavmeshNavigatorHardPairPartial(t *testing.T) {
     navigator, _ := realNavmeshNavigator(t)
@@ -530,11 +542,4 @@ func TestNavmeshNavigatorHardPairPartial(t *testing.T) {
     // The walk leaves the deck toward the water - the closest
     // reachable point of the dry corridor.
     require.Greater(t, result.Length, 300.0)
-    // The engine confirmation is already proven BY the partial
-    // serving: Result.Partial only surfaces after the engine answered
-    // its own not found for the same query (the hybrid runs the
-    // engine internally before serving the mesh corridor) - the
-    // production profile of an unreachable dry destination stays the
-    // mesh milliseconds plus the one engine flood the round one
-    // fallback already paid.
 }

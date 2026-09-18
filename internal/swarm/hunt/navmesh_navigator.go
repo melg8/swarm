@@ -5,27 +5,25 @@
 package hunt
 
 // The live integration of the navmesh runtime (docs/navmesh.md): the
-// long route queries of the Navigator seam serve from the prebuilt
-// tile mesh through the Detour-style corridor search - the stacked
-// deck disambiguation, the water pricing, the funnel string pulling
-// and the recovery ban walls - while the grid engine stays the click
+// route planning serves from the prebuilt tile mesh through the
+// Detour-style corridor search - the stacked deck disambiguation, the
+// C1 water zone pricing, the funnel string pulling and the recovery
+// ban walls - and the mesh is the SOLE route planner (the owner
+// directive: the served walk plan must be the mesh answer, never a
+// grid plan the funnel pass folds or a fallback route the grid engine
+// answers over its own world view). The grid engine stays the click
 // validation and local walk layer it already is (ValidateClick, the
-// sight lines, the water rasters, the deck heights). The fallback
-// rule keeps the grid engine the authority on every answer the mesh
-// cannot serve: a missing tile, a destination on ground the sheet
-// decomposition dropped, a sealed goal - the hybrid can only ADD
-// routes (the milliseconds of the mesh corridor instead of the
-// seconds of the grid flood), never lose them.
+// sight lines, the water rasters, the deck heights) and its capsule
+// radius arms the mesh funnel clearance, but no route query of this
+// navigator ever asks the grid engine for a path.
 //
-// The partial round extends the avoiding forms: when the mesh
-// answers a closest-reachable corridor (the destination unreachable
-// under the filter) and the engine CONFIRMS the destination with its
-// own not found, the hybrid serves the mesh partial waypoints through
-// Result.Partial - the walk toward the closest reachable point instead
-// of the bare abort at the start position. The engine still runs
-// first on every mesh partial, so a full route the mesh missed keeps
-// winning (the can-only-add rule holds), and an engine error still
-// surfaces as the honest verdict.
+// The partial round: when the mesh answers a closest-reachable
+// corridor (the destination unreachable under the filter) the hybrid
+// serves the mesh partial waypoints through Result.Partial - the walk
+// toward the closest reachable point instead of the bare abort at the
+// start position. A destination on ground the sheet decomposition
+// dropped answers the honest not found (the manual walk falls back to
+// the direct server routed walk, the town legs keep their recovery).
 
 import (
     "math"
@@ -35,12 +33,15 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// navmeshNavigator is the hybrid navigator of the live integration
-// round: the route planning on the mesh, the validation on the grid
-// engine. The capsule clearance of the engine (SetCapsuleClearance)
-// governs the mesh answers too: the funnel pivots pull inward from
-// the portal span ends and the served waypoints run through the
-// clearance post pass - one radius, both engines.
+// navmeshNavigator is the mesh navigator of the live integration: the
+// route planning on the mesh, the validation on the grid engine. The
+// capsule clearance of the engine (SetCapsuleClearance) governs the
+// mesh answers too: the funnel pivots pull inward from the portal
+// span ends and the shortcut pass answers to the grid capsule - one
+// radius, both surfaces. The merged chords never leave the corridor
+// geometry (the portal spans and the wall edges of the polygons the
+// corridor walks), so the grid oracle can only keep more funnel
+// waypoints, never fold the route across a wall the mesh detours.
 type navmeshNavigator struct {
     engine    *pathfind.Engine
     mesh      *navmesh.Mesh
@@ -69,14 +70,16 @@ func NewNavmeshNavigator( //nolint:ireturn
 }
 
 // clearedFilter arms the funnel pivot clearance of the mesh search
-// from the engine's capsule radius and runs the shortcut pass over
-// the funnel answer with the grid capsule as the wall oracle: the
-// pivots keep the turns off the wall corners, the merged legs answer
-// to the server accurate raster the movement validation enforces -
-// one radius, both engines.
+// from the engine's capsule radius, the shortcut pass over the funnel
+// answer with the grid capsule as the extra wall oracle, and the C1
+// water zone pricing (the same swim pricing the viewer's swim filter
+// serves: the water polygons a C1 WaterZone cuboid covers swim at the
+// run/swim speed ratio of the player templates, the river beds the
+// zone data omits walk at the plain land rate).
 func (n navmeshNavigator) clearedFilter(filter navmesh.Filter) navmesh.Filter {
     filter.WaypointClearance = n.clearance
     filter.Smooth = n.clearance > 0
+    filter.WaterZones = navmesh.C1WaterZones()
     if n.capsule != nil {
         filter.Guard = n.capsule
     }
@@ -84,126 +87,72 @@ func (n navmeshNavigator) clearedFilter(filter navmesh.Filter) navmesh.Filter {
     return filter
 }
 
-// clearedWaypoints runs the mesh funnel waypoints through the capsule
-// clearance post pass when the engine arms it (the legs of the funnel
-// answer can still graze a wall the pivots already avoid) and folds
-// the result into the longest grid clear legs (the wall oracle of the
-// shortcut pass, applied after the pushes and bends: every leg the
-// walker consumes answers the server movement rules with the capsule
-// clearance).
-func (n navmeshNavigator) clearedWaypoints(
-    waypoints []pathfind.Vec3,
-) []pathfind.Vec3 {
-    if n.capsule == nil || len(waypoints) == 0 {
-        return waypoints
-    }
-
-    return n.capsule.ShortenPath(
-        n.capsule.ApplyPath(waypoints, n.clearance), n.clearance)
-}
-
 // FindPathApproach plans the walk through the mesh corridor search
-// (the approach radius goal, the swim pricing), falling back to the
-// grid engine when the mesh holds no full corridor for the query.
+// only (the approach radius goal, the swim pricing): the mesh answer
+// is the walk plan.
 func (n navmeshNavigator) FindPathApproach(
     start, end pathfind.Vec3, approachRadius float64,
 ) (*pathfind.Result, error) {
-    if result := n.meshRoute(start, end, approachRadius,
-        n.clearedFilter(navmesh.DefaultFilter())); result != nil {
-        return result, nil
-    }
-
-    return n.engine.FindPathApproach(
-        start, end, approachRadius, n.engine.MaxPassableHeight())
+    return n.meshQuery(start, end, approachRadius,
+        n.clearedFilter(navmesh.DefaultFilter()))
 }
 
 // FindPathApproachAvoiding plans the water permitting walk around the
 // avoid areas through the mesh corridor search (the ban walls with
 // the escape ring of the own ban). The mesh partial corridors surface
-// through Result.Partial once the engine confirms the destination
-// unreachable: the waypoints then end at the closest reachable point
-// around the bans (the walk-what-you-can contract of the zone return
-// fallback), while a full engine route the mesh missed still wins.
+// through Result.Partial: the waypoints end at the closest reachable
+// point around the bans (the walk-what-you-can contract of the zone
+// return fallback).
 func (n navmeshNavigator) FindPathApproachAvoiding(
     start, end pathfind.Vec3, approachRadius float64,
     avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
-    began := time.Now()
     filter := n.clearedFilter(navmesh.DefaultFilter())
     filter.Avoid = avoidCircles(avoid)
-    route, meshErr := n.mesh.RouteApproach(
-        meshPos(start), meshPos(end), approachRadius, filter)
-    if result := n.meshResult(route, meshErr, began); result != nil {
-        return result, nil
-    }
-    engineResult, engineErr := n.engine.FindPathApproachAvoiding(
-        start, end, approachRadius, n.engine.MaxPassableHeight(), avoid)
-    if partial := n.meshPartial(
-        route, meshErr, engineResult, engineErr, began,
-    ); partial != nil {
-        return partial, nil
-    }
 
-    return engineResult, engineErr
+    return n.meshQuery(start, end, approachRadius, filter)
 }
 
 // FindPathApproachDryAvoiding plans the water walled walk around the
-// avoid areas through the mesh corridor search, falling back to the
-// grid engine: a dry target the mesh cannot reach answers the engine
-// verdict (the engine full route wins), and when the engine also
-// confirms the target unreachable the mesh partial corridor surfaces
-// through Result.Partial - the waypoints end at the closest reachable
-// dry point, the walk the town legs make instead of aborting at the
-// start position.
+// avoid areas through the mesh corridor search: a dry target the mesh
+// cannot reach answers the closest-reachable dry partial (the
+// waypoints end at the closest reachable dry point, the walk the town
+// legs make) or the bare not found.
 func (n navmeshNavigator) FindPathApproachDryAvoiding(
     start, end pathfind.Vec3, approachRadius float64,
     avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
-    began := time.Now()
     filter := n.clearedFilter(navmesh.DryFilter())
     filter.Avoid = avoidCircles(avoid)
-    route, meshErr := n.mesh.RouteApproach(
-        meshPos(start), meshPos(end), approachRadius, filter)
-    if result := n.meshResult(route, meshErr, began); result != nil {
-        return result, nil
-    }
-    engineResult, engineErr := n.engine.FindPathApproachDryAvoiding(
-        start, end, approachRadius, n.engine.MaxPassableHeight(), avoid)
-    if partial := n.meshPartial(
-        route, meshErr, engineResult, engineErr, began,
-    ); partial != nil {
-        return partial, nil
-    }
 
-    return engineResult, engineErr
+    return n.meshQuery(start, end, approachRadius, filter)
 }
 
 // FindPath plans the exact destination walk through the mesh corridor
-// search, falling back to the grid engine.
+// search.
 func (n navmeshNavigator) FindPath(
     start, end pathfind.Vec3,
 ) (*pathfind.Result, error) {
-    if result := n.meshRoute(start, end, 0,
-        n.clearedFilter(navmesh.DefaultFilter())); result != nil {
-        return result, nil
-    }
-
-    return n.engine.FindPath(start, end, n.engine.MaxPassableHeight())
+    return n.meshQuery(start, end, 0,
+        n.clearedFilter(navmesh.DefaultFilter()))
 }
 
 // FindWaterEscape plans the way out of the water through the mesh
-// escape search (the 8x priced flood to the first dry polygon),
-// falling back to the grid engine.
+// escape search (the 8x priced flood to the first dry polygon).
 func (n navmeshNavigator) FindWaterEscape(
     start pathfind.Vec3,
 ) (*pathfind.Result, error) {
     began := time.Now()
     route, err := n.mesh.WaterEscape(meshPos(start))
-    if result := n.meshResult(route, err, began); result != nil {
+    if err != nil {
+        return nil, err
+    }
+    if result := n.meshResult(route, began); result != nil {
         return result, nil
     }
 
-    return n.engine.FindWaterEscape(start)
+    return &pathfind.Result{Found: false,
+        Duration: time.Since(began)}, nil
 }
 
 // ClosestHeight resolves the destination deck height with the grid
@@ -243,32 +192,49 @@ func (n navmeshNavigator) ValidateClick(
     return n.engine.ValidateClick(from, to)
 }
 
-// meshRoute answers the route query through the mesh when it holds a
-// FULL corridor, nil otherwise: no mesh under an endpoint, no
-// corridor under the filter, or a partial (closest-reachable) answer
-// - all of them hand the question back to the grid engine, which
-// stays the authority on reachability (the strict forms never
-// surface a partial; the avoiding forms confirm one through
-// meshPartial after their engine run).
-func (n navmeshNavigator) meshRoute(
+// meshQuery runs one mesh RouteApproach under the filter and maps
+// every answer onto the Navigator contract: the full corridor found,
+// the closest-reachable partial (Found=false, Partial=true, the
+// waypoints end where the filter lets the corridor continue), the
+// bare not found, the honest error (no tile under an endpoint). No
+// answer ever consults the grid engine.
+func (n navmeshNavigator) meshQuery(
     start, end pathfind.Vec3, approachRadius float64,
     filter navmesh.Filter,
-) *pathfind.Result {
+) (*pathfind.Result, error) {
     began := time.Now()
     route, err := n.mesh.RouteApproach(meshPos(start), meshPos(end),
         approachRadius, filter)
+    if err != nil {
+        return nil, err
+    }
+    if result := n.meshResult(route, began); result != nil {
+        return result, nil
+    }
+    if route != nil && route.Partial && len(route.Waypoints) > 0 {
+        waypoints, length := n.meshWaypoints(route)
 
-    return n.meshResult(route, err, began)
+        return &pathfind.Result{
+            Found:     false,
+            Partial:   true,
+            Waypoints: waypoints,
+            Duration:  time.Since(began),
+            Explored:  route.Explored,
+            Length:    length,
+        }, nil
+    }
+
+    return &pathfind.Result{Found: false,
+        Duration: time.Since(began)}, nil
 }
 
-// meshResult maps one mesh route answer onto the pathfind result of
-// the Navigator contract, nil when the answer is not a full found
-// route (the fallback marker).
+// meshResult maps one full mesh route answer onto the pathfind result
+// of the Navigator contract, nil when the answer is not a full found
+// route.
 func (n navmeshNavigator) meshResult(
-    route *navmesh.Route, err error, began time.Time,
+    route *navmesh.Route, began time.Time,
 ) *pathfind.Result {
-    if err != nil || route == nil || !route.Found ||
-        len(route.Waypoints) == 0 {
+    if route == nil || !route.Found || len(route.Waypoints) == 0 {
         return nil
     }
     waypoints, length := n.meshWaypoints(route)
@@ -286,45 +252,11 @@ func (n navmeshNavigator) meshResult(
     }
 }
 
-// meshPartial maps the confirmed mesh partial onto the pathfind
-// result of the Navigator contract, nil unless BOTH engines agree
-// the destination is unreachable: the mesh holds a closest-reachable
-// corridor (route.Partial with funnel waypoints) AND the engine run
-// after it answered a clean not found (no error, no route - an
-// aborted or exhausted engine search still counts, its verdict is
-// the best available one and the partial walk stays genuinely
-// walkable under the filter). The served answer carries Found=false
-// with Partial set: the consumers that understand it walk toward the
-// closest reachable point, the strict ones keep treating it as the
-// not found they already handle.
-func (n navmeshNavigator) meshPartial(
-    route *navmesh.Route, meshErr error,
-    engineResult *pathfind.Result, engineErr error, began time.Time,
-) *pathfind.Result {
-    if meshErr != nil || route == nil || !route.Partial ||
-        len(route.Waypoints) == 0 ||
-        engineErr != nil || engineResult == nil || engineResult.Found ||
-        len(engineResult.Waypoints) > 0 {
-        return nil
-    }
-    waypoints, length := n.meshWaypoints(route)
-
-    return &pathfind.Result{
-        Found:     false,
-        Partial:   true,
-        Aborted:   engineResult.Aborted,
-        Waypoints: waypoints,
-        RawPath:   nil,
-        Duration:  time.Since(began),
-        Explored:  route.Explored + engineResult.Explored,
-        OpenLeft:  engineResult.OpenLeft,
-        Length:    length,
-    }
-}
-
 // meshWaypoints converts the funnel waypoints of a mesh route into
-// the pathfind vectors together with the walked length, and runs them
-// through the capsule clearance post pass when the engine arms it.
+// the pathfind vectors together with the walked length. The funnel
+// answer serves as the mesh search produced it: the pivot clearance
+// and the shortcut pass inside the search already own the wall
+// avoidance, no post pass folds the route across the corridor.
 func (n navmeshNavigator) meshWaypoints(
     route *navmesh.Route,
 ) ([]pathfind.Vec3, float64) {
@@ -339,25 +271,8 @@ func (n navmeshNavigator) meshWaypoints(
             length += math.Sqrt(dx*dx + dy*dy + dz*dz)
         }
     }
-    waypoints = n.clearedWaypoints(waypoints)
-    if n.capsule != nil {
-        length = pathLengthOf(waypoints)
-    }
 
     return waypoints, length
-}
-
-// pathLengthOf sums the 3D segment lengths of the waypoints.
-func pathLengthOf(waypoints []pathfind.Vec3) float64 {
-    length := 0.0
-    for i := 1; i < len(waypoints); i++ {
-        dx := waypoints[i].X - waypoints[i-1].X
-        dy := waypoints[i].Y - waypoints[i-1].Y
-        dz := waypoints[i].Z - waypoints[i-1].Z
-        length += math.Sqrt(dx*dx + dy*dy + dz*dz)
-    }
-
-    return length
 }
 
 // meshPos converts a pathfind vector into the mesh position.

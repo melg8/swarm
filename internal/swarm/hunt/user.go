@@ -391,10 +391,12 @@ func (l *Loop) tickUserMove(now time.Time) {
     }
 }
 
-// planUserWalk computes the geodata path of one long manual move. The
-// search runs once per move (a failed or missing path leaves the
-// direct server routed walk). The result becomes the leg plan the
-// follower walks one server accepted leg at a time.
+// planUserWalk computes the mesh path of one long manual move. The
+// search runs once per move (a missing tile or a bare not found
+// leaves the direct server routed walk). The result becomes the leg
+// plan the follower walks one server accepted leg at a time; a
+// partial corridor (the destination unreachable under the filter)
+// walks the closest reachable point instead.
 func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     from := pathfind.Vec3{
         X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
@@ -408,11 +410,16 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
 
         return
     }
-    if result == nil || !result.Found || len(result.Waypoints) == 0 {
-        l.logf("Hunt: no geodata path to %d %d, "+
+    if result == nil || len(result.Waypoints) == 0 ||
+        (!result.Found && !result.Partial) {
+        l.logf("Hunt: no mesh path to %d %d, "+
             "walking by server routing", l.userX, l.userY)
 
         return
+    }
+    if !result.Found {
+        l.logf("Hunt: mesh route to %d %d is partial, "+
+            "walking the closest reachable corridor", l.userX, l.userY)
     }
     l.userWaypoints = result.Waypoints
     l.userWpIndex = 0
