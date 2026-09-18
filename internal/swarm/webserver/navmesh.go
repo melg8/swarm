@@ -288,6 +288,12 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     filter, filterName := navmesh.DryFilter(), "dry"
     if request.Filter != "dry" {
         filter, filterName = navmesh.DefaultFilter(), "swim"
+        // The swim pricing follows the server water zone data: the
+        // water polygons a C1 WaterZone cuboid covers swim at the
+        // run/swim speed ratio, the river beds the zone data omits
+        // walk at the plain land rate (the zone data, not the depth,
+        // prices the swim).
+        filter.WaterZones = navmesh.C1WaterZones()
     }
     clearance := 0.0
     if s.navmeshEngine != nil {

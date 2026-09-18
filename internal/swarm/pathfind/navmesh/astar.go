@@ -48,6 +48,84 @@ type queryState struct {
     best   uint32
     bestH  float64
     escape bool
+    // zones is the bucket index of the filter water zone cuboids,
+    // built once per search for the zone-aware swim pricing (nil
+    // without the zone table).
+    zones *zoneIndex
+}
+
+// zoneCellShift is the bucket grid side of the water zone index: the
+// world splits into 16384 unit cells (a C1 region spans two), every
+// cuboid lands in the few cells its box overlaps.
+const zoneCellShift = 14
+
+// zoneIndex buckets the water zone cuboids by their x/y footprint:
+// the per search build costs one pass over the table, the per
+// polygon coverage test reads one bucket - a handful of boxes where
+// the whole table carries hundreds.
+type zoneIndex struct {
+    cells map[uint64][]WaterZone
+}
+
+// newZoneIndex builds the bucket grid of the water zone cuboids.
+func newZoneIndex(boxes []WaterZone) *zoneIndex {
+    idx := &zoneIndex{cells: make(map[uint64][]WaterZone)}
+    for _, box := range boxes {
+        x0 := int64(box.MinX) >> zoneCellShift
+        x1 := int64(box.MaxX) >> zoneCellShift
+        y0 := int64(box.MinY) >> zoneCellShift
+        y1 := int64(box.MaxY) >> zoneCellShift
+        for x := x0; x <= x1; x++ {
+            for y := y0; y <= y1; y++ {
+                key := uint64(uint64(x)<<32) | uint64(uint32(y))
+                idx.cells[key] = append(idx.cells[key], box)
+            }
+        }
+    }
+
+    return idx
+}
+
+// covered reports whether the server prices the swim at a world
+// point whose bed height is z: the x/y point falls inside a zone box
+// whose water surface reaches above the bed (the ZoneCuboid x/y test
+// of the server, the surface test instead of the exact feet z - a
+// swimming character floats near the surface inside the box, the
+// zone data minZ never splits a water body the surface covers).
+func (idx *zoneIndex) covered(x, y, z float64) bool {
+    key := uint64(uint64(int64(x)>>zoneCellShift)<<32) |
+        uint64(uint32(int64(y)>>zoneCellShift))
+    for _, box := range idx.cells[key] {
+        if x >= box.MinX && x <= box.MaxX && y >= box.MinY &&
+            y <= box.MaxY && z <= box.MaxZ {
+            return true
+        }
+    }
+
+    return false
+}
+
+// polyCost prices one polygon of the search: the land rate for the
+// ground, the swim price for the water polygons the armed zone data
+// covers, the plain land rate for the water polygons it omits (the
+// server walks such beds at the run speed - the authored zone data,
+// not the depth, prices the swim).
+func polyCost(
+    tile *Tile, poly *Poly, zones *zoneIndex, filter Filter,
+) float64 {
+    if poly.Area != AreaWater {
+        return 1
+    }
+    if zones == nil {
+        return filter.WaterCost
+    }
+    x0, y0, x1, y1 := tile.WorldRect(poly)
+    cx, cy := (x0+x1)*0.5, (y0+y1)*0.5
+    if zones.covered(cx, cy, tile.HeightAt(poly, cx, cy)) {
+        return filter.WaterCost
+    }
+
+    return 1
 }
 
 // refIndex is the open addressing reference-to-node table the flat
@@ -178,6 +256,7 @@ func (s *queryState) reset(escape bool) {
     s.best = 0
     s.bestH = math.MaxFloat64
     s.escape = escape
+    s.zones = nil
 }
 
 // create appends a fresh node for a reference (the caller guarantees
@@ -393,6 +472,9 @@ func (m *Mesh) astar(
     allow *confinedSet,
 ) astarResult {
     state.reset(goal.escape)
+    if len(filter.WaterZones) > 0 {
+        state.zones = newZoneIndex(filter.WaterZones)
+    }
     startH := dist3(startPos, endPos)
     if goal.escape {
         startH = 0
@@ -464,7 +546,7 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
     if tile == nil || poly == nil {
         return
     }
-    areaCost := [2]float64{1, filter.WaterCost}
+    fromCost := polyCost(tile, poly, state.zones, filter)
     for li := poly.FirstLink; li >= 0 && int(li) < len(tile.Links); {
         link := &tile.Links[li]
         li = link.Next
@@ -504,8 +586,8 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
         midX, midY := (ax+bx)*0.5, (ay+by)*0.5
         midZ := tile.HeightAt(poly, midX, midY)
         mid := Pos{X: midX, Y: midY, Z: midZ}
-        g := node.g + dist3(node.pos, mid)*
-            (areaCost[poly.Area]+areaCost[targetPoly.Area])*0.5
+        targetCost := polyCost(targetTile, targetPoly, state.zones, filter)
+        g := node.g + dist3(node.pos, mid)*(fromCost+targetCost)*0.5
         if ban == avoidEscape {
             // The ban that holds the start: the only honest route out
             // of it crosses its own ground - expensive, never sealed.

@@ -34,9 +34,12 @@ const (
     // as underwater.
     waterLevel = int16(-3780)
     // waterCostMultiplier scales the step cost of every move landing
-    // on an underwater cell: swimming is several times slower than
-    // running and burns the breath meter.
-    waterCostMultiplier = float32(3)
+    // on an underwater cell: the measured run/swim speed ratio of the
+    // C1 server (the player templates carry the run speeds 115..125
+    // against the swim 50 of every class, the HumanFighter the bots
+    // walk prices the swim at 115/50 = 2.3) - swimming burns the
+    // breath meter on top.
+    waterCostMultiplier = float32(2.3)
     // avoidEscapeMultiplier scales the step cost of every move landing
     // on an escape cell of the avoid area that holds the search
     // start: the walker stands inside its own ban (the widening of

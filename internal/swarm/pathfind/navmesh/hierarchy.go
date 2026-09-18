@@ -38,15 +38,18 @@ const maxCoarseAttempts = 3
 // component chain strands) to the gate free retry fast.
 const gatedCoarsePops = 4096
 
-// The coarse guide prices the cluster edges uniformly (the plain 3D
-// distance, no area multipliers): the refinement hops run the real
-// priced searches, the guide only has to point the direction - and a
-// uniform guide keeps the plain dist3 heuristic consistent, which the
-// swim pricing (3x on the real edges) breaks (the honest water route
-// costs 3x the straight line and the plain A* answers by flooding
-// every land cluster the underpriced heuristic cannot prune - the
-// half map wave the town route measurements drowned in).
-const coarseGuideUniform = true
+// The coarse guide prices the cluster edges by the same swim model
+// the refinement runs (the zone aware water multiplier of the edge
+// destination area, see hierQuery.waterMultiplier): the chain must
+// follow the cheap ground - the uniform distance guide locked the
+// corridor to the shortest distance chain and the priced refinement
+// could not escape it (the through town walk the ban answer beat by
+// a quarter, the bay crossings the shore detour undercuts). The
+// plain dist3 heuristic stays admissible - every multiplier costs at
+// least the land rate, so the honest chain cost only exceeds the
+// straight line - the priced guide explores the cluster frontier
+// wider (the underpriced water heuristic cannot prune the land side
+// as hard), the maxCoarseNodes bound carries that.
 
 // maxConfinedNodes bounds the corridor confined fallback search: the
 // allowed set keeps the exploration inside the coarse chain clusters,
@@ -223,6 +226,26 @@ type hierQuery struct {
     state    *queryState
     coarse   *coarseState
     bans     map[abstractEdgeRef]bool
+    // zones is the bucket index of the filter water zone cuboids,
+    // built once per hierarchical query for the priced guide (nil
+    // without the zone table).
+    zones *zoneIndex
+}
+
+// waterMultiplier prices one coarse guide edge landing at pos: the
+// zone aware swim rate the filter arms - the zoned water crossings
+// pay the run/swim ratio, the un-zoned river beds walk at the plain
+// land rate, the ground always does (the same model the fine search
+// prices the corridor with, see polyCost).
+func (q *hierQuery) waterMultiplier(at Pos) float64 {
+    if q.zones == nil {
+        return q.filter.WaterCost
+    }
+    if q.zones.covered(at.X, at.Y, at.Z) {
+        return q.filter.WaterCost
+    }
+
+    return 1
 }
 
 // hierWorthy reports whether the route goes through the hierarchy:
@@ -280,6 +303,9 @@ func (m *Mesh) routeHierarchical(
         state:    state,
         coarse:   coarse,
         bans:     make(map[abstractEdgeRef]bool),
+    }
+    if len(filter.WaterZones) > 0 {
+        query.zones = newZoneIndex(filter.WaterZones)
     }
 
     route := &Route{
@@ -529,6 +555,12 @@ func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos,
             continue
         }
         cost := dist3(node.pos, edge.mid)
+        if edge.dstArea == AreaWater {
+            // The priced guide: the water crossing pays the swim rate
+            // the zone data arms (the honest chain cost, the land
+            // chains the shore detours win on).
+            cost *= q.waterMultiplier(edge.mid)
+        }
         g := node.g + cost
         h := dist3(edge.mid, endPos)
         if !seen {

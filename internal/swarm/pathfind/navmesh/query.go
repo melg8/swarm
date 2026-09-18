@@ -27,11 +27,43 @@ type LegGuard interface {
     LegClear(ax, ay, az, bx, by, bz, radius float64) bool
 }
 
+// WaterZone is one server water zone cuboid (the ZoneCuboid of the
+// C1 water.xml data): the x/y box and the water surface the server
+// tests the swim state against. The server switches the movement to
+// the swim speeds inside these cuboids only (the CreatureStat
+// getMoveSpeed water branch reads the ZoneId.WATER flag the
+// WaterZone onEnter sets, the ZoneCuboid.isInsideZone tests the
+// position against the box) - the swim state of a position is the
+// authored zone data, not the water depth.
+type WaterZone struct {
+    MinX, MaxX float64
+    MinY, MaxY float64
+    // MinZ is the box bottom of the zone data (kept for the honest
+    // table; the coverage test prices by the surface).
+    MinZ float64
+    // MaxZ is the water surface of the zone (the zone data maxZ); a
+    // bed at or below it lies under the zone water body.
+    MaxZ float64
+}
+
 // Filter prices the areas of a search.
 type Filter struct {
     // WaterCost multiplies the step cost of the water polygons (the
-    // swim pricing - the grid engine waterCostMultiplier of 3).
+    // swim pricing - the measured run/swim speed ratio: the C1
+    // templates carry the run speeds 115..125 against the swim 50 of
+    // every class, the HumanFighter the bots walk prices the swim at
+    // 115/50 = 2.3).
     WaterCost float64
+    // WaterZones carries the server water zone cuboids of the world
+    // (the C1WaterZones table the webserver route arms): a water
+    // polygon whose center a cuboid covers keeps the WaterCost swim
+    // price, the water polygons no cuboid covers price at the land
+    // rate - the server walks such beds at the plain run speed, the
+    // river segments the zone data omits cross for free (the zone
+    // data, not the depth, prices the swim). A nil slice prices
+    // every water polygon at the WaterCost (the toy worlds and the
+    // searches without the zone table).
+    WaterZones []WaterZone
     // AllowWater keeps the water polygons walkable; a false value
     // walls them (the dry searches of the hunt loop).
     AllowWater bool
@@ -72,10 +104,12 @@ type Filter struct {
     AvoidGrazed bool
 }
 
-// DefaultFilter is the swim allowing search with the 3x water cost.
+// DefaultFilter is the swim allowing search with the measured swim
+// pricing (the run/swim speed ratio 2.3 of the HumanFighter
+// templates, the swim 50 of every class against the run 115..125).
 func DefaultFilter() Filter {
     return Filter{
-        WaterCost:         3,
+        WaterCost:         2.3,
         AllowWater:        true,
         Avoid:             nil,
         WaypointClearance: 0,
@@ -88,7 +122,7 @@ func DefaultFilter() Filter {
 // the closest reachable dry point.
 func DryFilter() Filter {
     return Filter{
-        WaterCost:         3,
+        WaterCost:         2.3,
         AllowWater:        false,
         Avoid:             nil,
         WaypointClearance: 0,
