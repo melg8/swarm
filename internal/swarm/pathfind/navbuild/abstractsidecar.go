@@ -118,6 +118,11 @@ func writeAbstractSidecar(outDir string, key navmesh.RegionKey,
     abstract := navmesh.BuildAbstract(tile)
     abstract.TileSize = info.Size()
     abstract.TileModTime = info.ModTime()
+    // The v2 checksum guard: the head and the tail CRC32 of the
+    // on disk tile bytes (the deployment copies that lose the
+    // mtimes keep serving the sidecar).
+    abstract.TileChecksums = true
+    abstract.TileHeadCRC, abstract.TileTailCRC = navmesh.TileChecksumsOf(data)
     encoded, err := navmesh.EncodeAbstract(abstract)
     if err != nil {
         return 0, fmt.Errorf("encode the abstract: %w", err)

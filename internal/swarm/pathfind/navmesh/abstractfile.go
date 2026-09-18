@@ -18,16 +18,23 @@ import (
 // tile, so the coarse search starts warm and the tile decodes stay
 // inside the refinement hops.
 //
-// The wire: a 40 byte header, the node records (the inline edge
+// The wire: a 56 byte header, the node records (the inline edge
 // index lists), the edge records and the run length encoded link
 // components. The derived structures (the cluster index map and the
 // per node class dedupe) rebuild at the decode - the edge dedupe of
 // the build keeps one edge per class, so the first class mapping per
 // stored edge reconstructs the map exactly.
+//
+// Version 2 adds the tile checksum guard (the head and the tail
+// CRC32 of the tile file bytes in the header bytes 48..56): the
+// deployment copies that lose the file mtimes (a plain cp or an
+// archive extraction) keep serving the sidecars, the mtime only
+// packs stay on the version 1 guard.
 
 const (
     abstractMagic        = 0x31424153 // 'SAB1' little endian
-    abstractVersion      = 1
+    abstractVersion      = 2
+    abstractVersionV1    = 1 // the mtime only guard (the legacy sidecars)
     abstractHeaderSize   = 56
     abstractEdgeWireSize = 64
 )
@@ -53,7 +60,11 @@ func EncodeAbstract(abstract *regionAbstract) ([]byte, error) {
         binary.LittleEndian.PutUint16(data[off:], v)
     }
     put32(0, abstractMagic)
-    put32(4, abstractVersion)
+    if abstract.TileChecksums {
+        put32(4, abstractVersion)
+    } else {
+        put32(4, abstractVersionV1)
+    }
     put32(8, uint32(int32(abstract.key.Col)))
     put32(12, uint32(int32(abstract.key.Row)))
     put32(16, uint32(abstract.polys))
@@ -63,6 +74,10 @@ func EncodeAbstract(abstract *regionAbstract) ([]byte, error) {
     binary.LittleEndian.PutUint64(data[32:], uint64(abstract.TileSize))
     binary.LittleEndian.PutUint64(data[40:],
         uint64(abstract.TileModTime.UnixNano()))
+    if abstract.TileChecksums {
+        put32(48, abstract.TileHeadCRC)
+        put32(52, abstract.TileTailCRC)
+    }
 
     offset := abstractHeaderSize
     for i := range abstract.nodes {
@@ -115,10 +130,11 @@ func DecodeAbstract(data []byte) (*regionAbstract, error) {
             magic)
     }
     if version := binary.LittleEndian.Uint32(data[4:]); version !=
-        abstractVersion {
+        abstractVersion && version != abstractVersionV1 {
         return nil, fmt.Errorf("%w: the abstract version %d", ErrBadTile,
             version)
     }
+    checksums := binary.LittleEndian.Uint32(data[4:]) == abstractVersion
     u32 := func(off int) uint32 { return binary.LittleEndian.Uint32(data[off:]) }
     col := int16(u32(8))
     row := int16(u32(12))
@@ -137,8 +153,11 @@ func DecodeAbstract(data []byte) (*regionAbstract, error) {
         comps: make([]uint32, polys),
         polys: polys,
 
-        TileSize:    tileSize,
-        TileModTime: tileModTime,
+        TileSize:      tileSize,
+        TileModTime:   tileModTime,
+        TileChecksums: checksums,
+        TileHeadCRC:   binary.LittleEndian.Uint32(data[48:]),
+        TileTailCRC:   binary.LittleEndian.Uint32(data[52:]),
     }
 
     offset := abstractHeaderSize

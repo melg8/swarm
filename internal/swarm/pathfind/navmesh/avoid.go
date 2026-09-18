@@ -23,23 +23,23 @@ import "math"
 // server refused to walk although the geodata pack modeled it as
 // open). A local leaf-package type, kept beside Pos.
 type AvoidCircle struct {
-	CenterX float64
-	CenterY float64
-	Radius  float64
+    CenterX float64
+    CenterY float64
+    Radius  float64
 }
 
 // Avoid search constants, mirroring the grid engine (search.go: the
 // avoidEscapeMultiplier and avoidEscapeRadius of the cell search).
 const (
-	// avoidEscapeMultiplier prices the escape polygons of the ban
-	// that holds the search start: the only honest route out of the
-	// own ban crosses its own ground, expensively.
-	avoidEscapeMultiplier = 6.0
-	// avoidEscapeRadius bounds the escape polygons of the own ban:
-	// the polygons whose footprint reaches within this distance of
-	// the start stay passable at the multiplier, the own ground
-	// beyond keeps its wall (the sealed goal contract).
-	avoidEscapeRadius = 256.0
+    // avoidEscapeMultiplier prices the escape polygons of the ban
+    // that holds the search start: the only honest route out of the
+    // own ban crosses its own ground, expensively.
+    avoidEscapeMultiplier = 6.0
+    // avoidEscapeRadius bounds the escape polygons of the own ban:
+    // the polygons whose footprint reaches within this distance of
+    // the start stay passable at the multiplier, the own ground
+    // beyond keeps its wall (the sealed goal contract).
+    avoidEscapeRadius = 256.0
 )
 
 // avoidState classifies one polygon against the avoid circles of a
@@ -47,9 +47,9 @@ const (
 type avoidState uint8
 
 const (
-	avoidFree   avoidState = iota // no circle touches the footprint
-	avoidWall                     // a wall under the ban rules below
-	avoidEscape                   // own ban near the start: priced
+    avoidFree   avoidState = iota // no circle touches the footprint
+    avoidWall                     // a wall under the ban rules below
+    avoidEscape                   // own ban near the start: priced
 )
 
 // avoidCtx is the per-search avoid context, derived once from the
@@ -57,10 +57,10 @@ const (
 // ban holding the start (the way-out rule) and the start itself for
 // the escape ring test.
 type avoidCtx struct {
-	areas     []AvoidCircle
-	escapeIdx int
-	start     Pos
-	active    bool
+    areas     []AvoidCircle
+    escapeIdx int
+    start     Pos
+    active    bool
 }
 
 // newAvoidCtx derives the avoid context. The escape index is the
@@ -68,36 +68,36 @@ type avoidCtx struct {
 // inside a ban must be able to plan its way OUT of it, exactly like
 // the grid startAvoidIndex rule.
 func newAvoidCtx(areas []AvoidCircle, start Pos) avoidCtx {
-	ctx := avoidCtx{
-		areas:     areas,
-		escapeIdx: -1,
-		start:     start,
-		active:    len(areas) > 0,
-	}
-	if !ctx.active {
-		return ctx
-	}
-	for i, area := range areas {
-		if math.Hypot(start.X-area.CenterX, start.Y-area.CenterY) <=
-			area.Radius {
-			ctx.escapeIdx = i
+    ctx := avoidCtx{
+        areas:     areas,
+        escapeIdx: -1,
+        start:     start,
+        active:    len(areas) > 0,
+    }
+    if !ctx.active {
+        return ctx
+    }
+    for i, area := range areas {
+        if math.Hypot(start.X-area.CenterX, start.Y-area.CenterY) <=
+            area.Radius {
+            ctx.escapeIdx = i
 
-			break
-		}
-	}
+            break
+        }
+    }
 
-	return ctx
+    return ctx
 }
 
 // noAvoid is the avoid context of the searches without bans (the
 // water escape).
 func noAvoid() avoidCtx {
-	return avoidCtx{
-		areas:     nil,
-		escapeIdx: -1,
-		start:     Pos{X: 0, Y: 0, Z: 0},
-		active:    false,
-	}
+    return avoidCtx{
+        areas:     nil,
+        escapeIdx: -1,
+        start:     Pos{X: 0, Y: 0, Z: 0},
+        active:    false,
+    }
 }
 
 // state classifies one polygon of one tile against the circles of
@@ -116,49 +116,49 @@ func noAvoid() avoidCtx {
 // grid start cell is likewise passable by construction), the walls
 // gate only the steps ONTO polygons.
 func (a avoidCtx) state(tile *Tile, poly *Poly) avoidState {
-	if !a.active || tile == nil || poly == nil {
-		return avoidFree
-	}
-	x0, y0, x1, y1 := tile.WorldRect(poly)
-	own := false
-	for i, area := range a.areas {
-		if !circleOverlapsRect(area, x0, y0, x1, y1) {
-			continue
-		}
-		if i != a.escapeIdx {
-			return avoidWall
-		}
-		own = true
-	}
-	if !own {
-		return avoidFree
-	}
-	if rectPointDist(x0, y0, x1, y1, a.start.X, a.start.Y) <=
-		avoidEscapeRadius {
-		return avoidEscape
-	}
+    if !a.active || tile == nil || poly == nil {
+        return avoidFree
+    }
+    x0, y0, x1, y1 := tile.WorldRect(poly)
+    own := false
+    for i, area := range a.areas {
+        if !circleOverlapsRect(area, x0, y0, x1, y1) {
+            continue
+        }
+        if i != a.escapeIdx {
+            return avoidWall
+        }
+        own = true
+    }
+    if !own {
+        return avoidFree
+    }
+    if rectPointDist(x0, y0, x1, y1, a.start.X, a.start.Y) <=
+        avoidEscapeRadius {
+        return avoidEscape
+    }
 
-	return avoidWall
+    return avoidWall
 }
 
 // circleOverlapsRect reports whether a circle and an axis aligned
 // rectangle share any point (the standard clamp test).
 func circleOverlapsRect(
-	c AvoidCircle, x0, y0, x1, y1 float64,
+    c AvoidCircle, x0, y0, x1, y1 float64,
 ) bool {
-	px := math.Max(x0, math.Min(x1, c.CenterX))
-	py := math.Max(y0, math.Min(y1, c.CenterY))
-	dx := c.CenterX - px
-	dy := c.CenterY - py
+    px := math.Max(x0, math.Min(x1, c.CenterX))
+    py := math.Max(y0, math.Min(y1, c.CenterY))
+    dx := c.CenterX - px
+    dy := c.CenterY - py
 
-	return dx*dx+dy*dy <= c.Radius*c.Radius
+    return dx*dx+dy*dy <= c.Radius*c.Radius
 }
 
 // rectPointDist returns the planar distance from a point to an axis
 // aligned rectangle (zero inside).
 func rectPointDist(x0, y0, x1, y1, px, py float64) float64 {
-	dx := math.Max(math.Max(x0-px, px-x1), 0)
-	dy := math.Max(math.Max(y0-py, py-y1), 0)
+    dx := math.Max(math.Max(x0-px, px-x1), 0)
+    dy := math.Max(math.Max(y0-py, py-y1), 0)
 
-	return math.Hypot(dx, dy)
+    return math.Hypot(dx, dy)
 }

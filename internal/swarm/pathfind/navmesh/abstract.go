@@ -6,6 +6,8 @@ package navmesh
 
 import (
     "fmt"
+    "hash/crc32"
+    "io"
     "math"
     "os"
     "path/filepath"
@@ -170,9 +172,14 @@ type regionAbstract struct {
     polys int
     // TileSize/TileModTime are the tile file stat the sidecar was
     // built against (the staleness guard of the sidecar load; the
-    // in memory rebuild leaves them zero).
-    TileSize    int64
-    TileModTime time.Time
+    // in memory rebuild leaves them zero). The v2 sidecars also
+    // carry the head and the tail CRC32 of the tile file bytes
+    // (TileChecksums): the mtime loss tolerant guard.
+    TileSize      int64
+    TileModTime   time.Time
+    TileChecksums bool
+    TileHeadCRC   uint32
+    TileTailCRC   uint32
 }
 
 // BuildAbstract scans one decoded tile into its cluster graph (the
@@ -249,6 +256,12 @@ func (m *Mesh) cacheAbstract(key RegionKey, abstract *regionAbstract) {
 // absent, stale or unreadable and the caller decodes and rebuilds).
 // The sidecar carries the tile file size and mtime it was built
 // against; the mismatch rejects it, so a stale sidecar never serves.
+// The v2 sidecars carry the tile head and tail checksums instead:
+// the deployment copies that lose the file mtimes keep serving (the
+// same size and the same end checksums mean the same tile file). A
+// tile rewrite that changes the content almost surely changes the
+// header counts or the tail tree, so a rebuilt tile never passes a
+// stale sidecar.
 func (m *Mesh) abstractSidecarOf(key RegionKey) *regionAbstract {
     sidecarPath := filepath.Join(m.dir,
         fmt.Sprintf("%d_%d%s", key.Col, key.Row, abstractFileExt))
@@ -266,12 +279,80 @@ func (m *Mesh) abstractSidecarOf(key RegionKey) *regionAbstract {
     if err != nil {
         return nil
     }
-    if info.Size() != abstract.TileSize ||
-        !info.ModTime().Equal(abstract.TileModTime) {
+    if info.Size() != abstract.TileSize {
+        return nil
+    }
+    if abstract.TileChecksums {
+        if tileChecksumsMatch(tilePath, abstract) {
+            return abstract
+        }
+
+        return nil
+    }
+    if !info.ModTime().Equal(abstract.TileModTime) {
         return nil
     }
 
     return abstract
+}
+
+// tileChecksumWindow is the byte count of each file end the sidecar
+// checksum covers.
+const tileChecksumWindow = 512
+
+// TileChecksumsOf computes the tile head and tail CRC32 over the
+// byte windows the sidecar guard checks (the shared definition the
+// pack build and the runtime probe compile against).
+func TileChecksumsOf(data []byte) (head, tail uint32) {
+    headEnd := tileChecksumWindow
+    if len(data) < headEnd {
+        headEnd = len(data)
+    }
+    head = crc32.ChecksumIEEE(data[:headEnd])
+    tailStart := len(data) - tileChecksumWindow
+    if tailStart < 0 {
+        tailStart = 0
+    }
+
+    return head, crc32.ChecksumIEEE(data[tailStart:])
+}
+
+// tileChecksumsMatch reads the two file ends and compares them with
+// the sidecar recorded checksums (the ~1 KB read against a multi
+// megabyte decode of a wrongly rejected sidecar).
+func tileChecksumsMatch(path string, abstract *regionAbstract) bool {
+    file, err := os.Open(path) //nolint:gosec // the fixed dir
+    if err != nil {
+        return false
+    }
+    defer file.Close()
+
+    head := make([]byte, tileChecksumWindow)
+    headN, err := io.ReadFull(file, head)
+    if err != nil && err != io.ErrUnexpectedEOF {
+        return false
+    }
+    if crc32.ChecksumIEEE(head[:headN]) != abstract.TileHeadCRC {
+        return false
+    }
+    info, err := file.Stat()
+    if err != nil {
+        return false
+    }
+    tailStart := info.Size() - tileChecksumWindow
+    if tailStart < 0 {
+        tailStart = 0
+    }
+    if _, err := file.Seek(tailStart, io.SeekStart); err != nil {
+        return false
+    }
+    tail := make([]byte, tileChecksumWindow)
+    tailN, err := io.ReadFull(file, tail)
+    if err != nil && err != io.ErrUnexpectedEOF {
+        return false
+    }
+
+    return crc32.ChecksumIEEE(tail[:tailN]) == abstract.TileTailCRC
 }
 
 // touchAbstract moves a region to the back of the abstract LRU.

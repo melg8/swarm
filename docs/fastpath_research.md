@@ -290,3 +290,43 @@ untouched (0.5 ms). The remaining cold cost splits between the
 zstd decode itself, the tile parse and the coarse sidecar loads;
 the next lever would be the parallel decode of the corridor tiles
 per hop, not worth it while the answer stays under a second.
+
+## 10. The parallel cold path and the mtime loss guard
+
+The cold route cost decomposed on the 4 tile corridor (the
+TestColdProbe diagnostic, the mtime stripped pack copy): the 4 tile
+decodes 840 ms sequential, the 4 sidecar loads 1.43 s (!), the
+searches ~30 ms. Two rounds answer the decomposition.
+
+**The sidecar staleness guard was a deployment trap.** The v1
+sidecar records the tile file size and mtime it was built against;
+a pack copied without preserving the mtimes (a plain `cp -r`, an
+archive extraction, some sync tools) rejected every sidecar and the
+coarse search fell back to the tile decode per frontier region -
+the silent multi second degradation on exactly the machines the
+route is already cold on. The v2 sidecar adds the head and the tail
+CRC32 of the tile file bytes (the 56 byte header had the room):
+the runtime guard reads ~1 KB and accepts a same size same checksum
+tile regardless of the mtime. A rebuilt tile almost surely changes
+the header counts or the tail tree, so a stale sidecar never
+serves; the legacy v1 sidecars keep the mtime only guard. The
+measured sidecar load after the fix: 1.43 s -> 10.5 ms per 4
+regions.
+
+**The cold loads run in parallel now.** The Tile decode moved
+outside the mesh lock behind a per key singleflight (the
+concurrent callers of one region share one decode, the different
+regions decode side by side), and the route path prefetches: the
+endpoint tiles before the nearest poly resolution, the line
+corridor region abstracts (capped at 24, the abstract LRU stays
+the RAM bound) before the coarse search, the first chain regions
+before the hop refinement plus a rolling two cluster look ahead
+during the hops (the LRU window the walk keeps live).
+
+The owner diagonal, the mtime stripped copy, this machine: cold
+1.48 s -> 0.45 s, the warm answers unchanged (0.4..0.6 ms), the
+route answer identical (found, 287 waypoints, 49825 explored). On
+a many region world pack the guard round is the bigger lever: a
+rejected sidecar cost a tile decode per coarse frontier region,
+the decode count grows with the route length instead of the tile
+count the route touches.

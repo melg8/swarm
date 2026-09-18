@@ -12,6 +12,7 @@ import (
     "io"
     "os"
     "path/filepath"
+    "runtime"
     "sort"
     "strconv"
     "strings"
@@ -30,6 +31,11 @@ import (
 // the dense whole map pack).
 const DefaultMeshCapacity = 4
 
+// maxPrefetchWorkers caps the parallel tile decode pool of the
+// prefetch (the decode is the disk plus the zstd pipeline, more
+// workers than cores stop paying past the first few).
+const maxPrefetchWorkers = 4
+
 // tileFileExt is the tile file extension under the mesh directory.
 const tileFileExt = ".nm"
 
@@ -47,11 +53,12 @@ type Mesh struct {
     dir      string
     capacity int
 
-    mu     sync.Mutex
-    tiles  map[RegionKey]*tileEntry
-    lru    []*tileEntry
-    files  map[RegionKey]struct{}
-    states sync.Pool
+    mu       sync.Mutex
+    tiles    map[RegionKey]*tileEntry
+    lru      []*tileEntry
+    files    map[RegionKey]struct{}
+    inflight map[RegionKey]*tileCall
+    states   sync.Pool
 
     // The hierarchy layer: the abstract cluster graphs (LRU bounded,
     // the rebuilds are deterministic), the coarse search state pool
@@ -73,6 +80,14 @@ type tileEntry struct {
     tile  *Tile
     err   error
     state tileState
+}
+
+// tileCall is the in flight decode of one tile (the singleflight
+// record: the concurrent Tile callers of one key share one decode
+// and the parallel prefetch never duplicates the work).
+type tileCall struct {
+    done  chan struct{}
+    entry *tileEntry
 }
 
 type tileState uint8
@@ -105,6 +120,7 @@ func NewMesh(dir string) *Mesh {
         tiles:    make(map[RegionKey]*tileEntry),
         lru:      make([]*tileEntry, 0, DefaultMeshCapacity),
         files:    make(map[RegionKey]struct{}),
+        inflight: make(map[RegionKey]*tileCall),
         states: sync.Pool{New: func() any {
             state := &queryState{
                 nodes:  nil,
@@ -224,95 +240,46 @@ func (m *Mesh) scanFiles() {
 
 // Tile returns the loaded tile of a region, loading it on demand. A
 // missing tile file is a cached miss (not an error): the link
-// resolution treats it as a wall.
+// resolution treats it as a wall. The decode runs outside the mesh
+// lock behind a per key singleflight: the concurrent callers of one
+// region share one decode, the different regions decode in parallel
+// (the prefetch pool of the cold route).
 func (m *Mesh) Tile(key RegionKey) (*Tile, error) {
     m.mu.Lock()
-    defer m.mu.Unlock()
-
     if entry, ok := m.tiles[key]; ok {
         m.touch(entry)
         m.evict()
+        m.mu.Unlock()
 
-        switch entry.state {
-        case tileLoaded:
-            return entry.tile, nil
-        case tileFailed:
-            return nil, entry.err
-        default:
-            return nil, ErrTileAbsent
-        }
+        return entryAnswer(entry)
     }
-    entry := &tileEntry{key: key, tile: nil, err: nil, state: tileLoaded}
-    if _, ok := m.files[key]; !ok {
-        entry.state = tileMissing
-    } else {
-        data, err := os.ReadFile(filepath.Join(
-            m.dir, fmt.Sprintf("%d_%d%s", key.Col, key.Row, tileFileExt)))
-        if err != nil {
-            entry.state = tileFailed
-            entry.err = fmt.Errorf("read navmesh tile %d_%d: %w", key.Col,
-                key.Row, err)
-        } else {
-            // The tile file may be compressed (the navmesh-build
-            // -compress output): the magic word decides - the zstd
-            // frame is the current format, the gzip frame the
-            // legacy packs carry, both decode to the same tile
-            // bytes.
-            if len(data) >= 4 && data[0] == 0x28 && data[1] == 0xB5 &&
-                data[2] == 0x2F && data[3] == 0xFD {
-                raw, zsErr := decodeTileZstd(data)
-                if zsErr == nil {
-                    data = raw
-                } else {
-                    entry.state = tileFailed
-                    entry.err = fmt.Errorf(
-                        "decompress navmesh tile %d_%d: %w", key.Col,
-                        key.Row, zsErr)
-                    m.tiles[key] = entry
-                    m.lru = append(m.lru, entry)
-                    m.touch(entry)
-                    m.evict()
+    if call, ok := m.inflight[key]; ok {
+        m.mu.Unlock()
+        <-call.done
 
-                    return nil, entry.err
-                }
-            } else if len(data) >= 2 && data[0] == 0x1F && data[1] == 0x8B {
-                zr, gzErr := gzip.NewReader(bytes.NewReader(data))
-                if gzErr == nil {
-                    var raw []byte
-                    raw, gzErr = io.ReadAll(zr)
-                    _ = zr.Close()
-                    if gzErr == nil {
-                        data = raw
-                    }
-                }
-                if gzErr != nil {
-                    entry.state = tileFailed
-                    entry.err = fmt.Errorf(
-                        "decompress navmesh tile %d_%d: %w", key.Col,
-                        key.Row, gzErr)
-                    m.tiles[key] = entry
-                    m.lru = append(m.lru, entry)
-                    m.touch(entry)
-                    m.evict()
-
-                    return nil, entry.err
-                }
-            }
-            entry.tile, entry.err = DecodeTile(data)
-            if entry.err != nil {
-                entry.state = tileFailed
-                entry.err = fmt.Errorf("decode navmesh tile %d_%d: %w",
-                    key.Col, key.Row, entry.err)
-            } else {
-                entry.state = tileLoaded
-            }
-        }
+        return entryAnswer(call.entry)
     }
+    call := &tileCall{done: make(chan struct{})}
+    m.inflight[key] = call
+    m.mu.Unlock()
+
+    entry := m.decodeTileEntry(key)
+
+    m.mu.Lock()
+    delete(m.inflight, key)
     m.tiles[key] = entry
     m.lru = append(m.lru, entry)
     m.touch(entry)
     m.evict()
+    m.mu.Unlock()
+    call.entry = entry
+    close(call.done)
 
+    return entryAnswer(entry)
+}
+
+// entryAnswer unwraps a tile cache entry into the Tile contract.
+func entryAnswer(entry *tileEntry) (*Tile, error) {
     switch entry.state {
     case tileLoaded:
         return entry.tile, nil
@@ -321,6 +288,154 @@ func (m *Mesh) Tile(key RegionKey) (*Tile, error) {
     default:
         return nil, ErrTileAbsent
     }
+}
+
+// decodeTileEntry reads and parses one tile file without holding the
+// mesh lock (the read and the zstd pipeline own the cold cost, the
+// parallel decode pool runs this concurrently).
+func (m *Mesh) decodeTileEntry(key RegionKey) *tileEntry {
+    entry := &tileEntry{key: key, tile: nil, err: nil, state: tileLoaded}
+    if _, ok := m.files[key]; !ok {
+        entry.state = tileMissing
+
+        return entry
+    }
+    data, err := os.ReadFile(filepath.Join(
+        m.dir, fmt.Sprintf("%d_%d%s", key.Col, key.Row, tileFileExt)))
+    if err != nil {
+        entry.state = tileFailed
+        entry.err = fmt.Errorf("read navmesh tile %d_%d: %w", key.Col,
+            key.Row, err)
+
+        return entry
+    }
+    // The tile file may be compressed (the navmesh-build
+    // -compress output): the magic word decides - the zstd
+    // frame is the current format, the gzip frame the
+    // legacy packs carry, both decode to the same tile
+    // bytes.
+    if len(data) >= 4 && data[0] == 0x28 && data[1] == 0xB5 &&
+        data[2] == 0x2F && data[3] == 0xFD {
+        raw, zsErr := decodeTileZstd(data)
+        if zsErr == nil {
+            data = raw
+        } else {
+            entry.state = tileFailed
+            entry.err = fmt.Errorf(
+                "decompress navmesh tile %d_%d: %w", key.Col,
+                key.Row, zsErr)
+
+            return entry
+        }
+    } else if len(data) >= 2 && data[0] == 0x1F && data[1] == 0x8B {
+        zr, gzErr := gzip.NewReader(bytes.NewReader(data))
+        if gzErr == nil {
+            var raw []byte
+            raw, gzErr = io.ReadAll(zr)
+            _ = zr.Close()
+            if gzErr == nil {
+                data = raw
+            }
+        }
+        if gzErr != nil {
+            entry.state = tileFailed
+            entry.err = fmt.Errorf(
+                "decompress navmesh tile %d_%d: %w", key.Col,
+                key.Row, gzErr)
+
+            return entry
+        }
+    }
+    entry.tile, entry.err = DecodeTile(data)
+    if entry.err != nil {
+        entry.state = tileFailed
+        entry.err = fmt.Errorf("decode navmesh tile %d_%d: %w",
+            key.Col, key.Row, entry.err)
+    } else {
+        entry.state = tileLoaded
+    }
+
+    return entry
+}
+
+// prefetchAhead fires one background tile load (the rolling look
+// ahead of the hop refinement: the tile two clusters ahead decodes
+// while the current hop searches; the singleflight merges the call
+// with the on demand decodes the hop itself triggers).
+func (m *Mesh) prefetchAhead(key RegionKey) {
+    m.mu.Lock()
+    _, cached := m.tiles[key]
+    m.mu.Unlock()
+    if cached {
+        return
+    }
+    go func() { _, _ = m.Tile(key) }()
+}
+
+// PrefetchTiles loads the requested tiles into the cache with a
+// bounded parallel decode pool. The cold route answer uses it twice:
+// the endpoint tiles before the nearest poly resolution and the
+// coarse chain regions before the hop refinement - the sequential
+// hop stall decodes become one parallel load (the per key
+// singleflight keeps the duplicate callers free).
+func (m *Mesh) PrefetchTiles(keys []RegionKey) {
+    workers := runtime.NumCPU()
+    if workers > maxPrefetchWorkers {
+        workers = maxPrefetchWorkers
+    }
+    if workers < 2 {
+        workers = 2
+    }
+    sem := make(chan struct{}, workers)
+    var wg sync.WaitGroup
+    for _, key := range keys {
+        m.mu.Lock()
+        _, cached := m.tiles[key]
+        m.mu.Unlock()
+        if cached {
+            continue
+        }
+        wg.Add(1)
+        sem <- struct{}{}
+        go func(key RegionKey) {
+            defer wg.Done()
+            _, _ = m.Tile(key)
+            <-sem
+        }(key)
+    }
+    wg.Wait()
+}
+
+// PrefetchAbstracts loads the region cluster graphs into the abstract
+// cache with a bounded parallel pool (the coarse search loads them
+// lazily per settled node; the line corridor prefetch serves the
+// common frontier from the cache).
+func (m *Mesh) PrefetchAbstracts(keys []RegionKey) {
+    workers := runtime.NumCPU()
+    if workers > maxPrefetchWorkers {
+        workers = maxPrefetchWorkers
+    }
+    if workers < 2 {
+        workers = 2
+    }
+    sem := make(chan struct{}, workers)
+    var wg sync.WaitGroup
+    for _, key := range keys {
+        m.abstractMu.Lock()
+        _, cached := m.abstracts[key]
+        m.abstractMu.Unlock()
+        if cached {
+            continue
+        }
+        wg.Add(1)
+        sem <- struct{}{}
+        go func(key RegionKey) {
+            defer wg.Done()
+            _ = m.abstractOf(key)
+            <-sem
+        }(key)
+    }
+    wg.Wait()
 }
 
 // evict drops the least recently used entries beyond the capacity.
