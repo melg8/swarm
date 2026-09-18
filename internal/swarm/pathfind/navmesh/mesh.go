@@ -106,14 +106,16 @@ func NewMesh(dir string) *Mesh {
         lru:      make([]*tileEntry, 0, DefaultMeshCapacity),
         files:    make(map[RegionKey]struct{}),
         states: sync.Pool{New: func() any {
-            return &queryState{
+            state := &queryState{
                 nodes:  nil,
-                index:  make(map[PolyRef]uint32, 1024),
                 open:   nil,
                 best:   0,
                 bestH:  0,
                 escape: false,
             }
+            state.index.init(0)
+
+            return state
         }},
         abstracts:        make(map[RegionKey]*regionAbstract),
         abstractOrder:    make([]RegionKey, 0, abstractCacheCapacity),
