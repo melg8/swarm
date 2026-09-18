@@ -16,6 +16,8 @@
 //
 // The build is idempotent: a region whose tile file already carries a
 // newer mtime than the region file is skipped unless -force is set.
+// The pack phases run in parallel (one region in flight per worker,
+// -workers caps the pool, default: every core).
 package main
 
 import (
@@ -43,10 +45,14 @@ func main() {
     compress := flag.Bool("compress", true,
         "gzip the tile files in place (the runtime detects the format "+
             "by the magic word; roughly half the disk)")
+    workers := flag.Int("workers", 0,
+        "parallel build workers (0: every core)")
     flag.Parse()
 
-    if err := run(*geodataDir, *outDir, *regions, *force,
-        *compress); err != nil {
+    opts := navbuild.DefaultOptions()
+    opts.Workers = *workers
+    if err := run(*geodataDir, *outDir, *regions, *force, *compress,
+        opts); err != nil {
         fmt.Println("Error:", err)
         os.Exit(1)
     }
@@ -54,6 +60,7 @@ func main() {
 
 // run executes the build over the requested regions.
 func run(geodataDir, outDir, regionsSpec string, force, compress bool,
+    opts navbuild.Options,
 ) error {
     keys, err := regionKeys(geodataDir, regionsSpec)
     if err != nil {
@@ -67,8 +74,8 @@ func run(geodataDir, outDir, regionsSpec string, force, compress bool,
     }
 
     started := time.Now()
-    stats, err := navbuild.BuildPack(geodataDir, outDir, keys,
-        navbuild.DefaultOptions(), force,
+    stats, err := navbuild.BuildPack(geodataDir, outDir, keys, opts,
+        force,
         func(format string, args ...any) {
             fmt.Printf(format+"\n", args...)
         })

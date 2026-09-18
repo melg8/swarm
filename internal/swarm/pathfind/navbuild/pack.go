@@ -5,12 +5,16 @@
 package navbuild
 
 import (
+    "context"
     "fmt"
     "os"
     "path/filepath"
+    "runtime"
     "sort"
     "strconv"
     "strings"
+    "sync"
+    "sync/atomic"
 
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
@@ -34,6 +38,12 @@ type PackStats struct {
 // neighbours exist and appends the external links. A region whose
 // tile file is newer than its region file is skipped unless force is
 // set. The log callback reports one line per region (nil mutes).
+//
+// The phases run in a worker pool (opts.Workers goroutines at most,
+// one region in flight per worker): the region builds and the tile
+// stitches are file disjoint, so the pack scales over the cores
+// without locking (the strips map freezes after phase A and phase B
+// reads it concurrently). Workers <= 0 answers runtime.NumCPU().
 func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
     opts Options, force bool, log func(format string, args ...any),
 ) (PackStats, error) {
@@ -49,8 +59,9 @@ func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
     if log == nil {
         log = func(string, ...any) {}
     }
-    strips, err := buildPackPhaseA(keys, geodataDir, outDir, opts, force,
-        &stats, log)
+    counters := packCounters{}
+    strips, err := buildPackPhaseA(keys, geodataDir, outDir, opts,
+        force, &counters, log)
     if err != nil {
         return stats, err
     }
@@ -79,100 +90,230 @@ func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
 
         return order[i].Row < order[j].Row
     })
-    for _, key := range order {
-        own, ok := strips[key]
-        if !ok {
-            loaded, loadedOK := readStripsSidecar(outDir, key)
-            if !loadedOK {
-                // No in-pass strip and no sidecar: the tile of an
-                // older build cannot pair against anything new.
-                continue
-            }
-            own = &loaded
-        }
-        var neighbors [4]*borderStrips
-        for side, delta := range [4][2]int16{{-1, 0}, {1, 0}, {0, -1},
-            {0, 1}} {
-            neighbor := navmesh.RegionKey{
-                Col: key.Col + delta[0], Row: key.Row + delta[1],
-            }
-            if strip, ok := strips[neighbor]; ok {
-                neighbors[side] = strip
-
-                continue
-            }
-            if _, err := os.Stat(tilePathOf(outDir, neighbor)); err != nil {
-                continue
-            }
-            loaded, loadedOK := readStripsSidecar(outDir, neighbor)
-            if loadedOK {
-                neighbors[side] = &loaded
-            }
-        }
-        if neighbors[0] == nil && neighbors[1] == nil &&
-            neighbors[2] == nil && neighbors[3] == nil {
-            continue
-        }
-        added, err := stitchPackTile(outDir, key, own, neighbors, opts)
-        if err != nil {
-            return stats, fmt.Errorf("stitch %d_%d: %w", key.Col,
-                key.Row, err)
-        }
-        stats.Stitched += added
+    if err := stitchPackPhaseB(order, outDir, strips, opts, &counters); err != nil {
+        return stats, err
     }
+
+    stats.Built = int(counters.built.Load())
+    stats.Skipped = int(counters.skipped.Load())
+    stats.Failed = int(counters.failed.Load())
+    stats.Polys = int(counters.polys.Load())
+    stats.Links = int(counters.links.Load())
+    stats.Stitched = int(counters.stitched.Load())
+    stats.TileBytes = counters.tileBytes.Load()
 
     return stats, nil
 }
 
+// packCounters is the atomic stats accumulator of the parallel pack
+// phases (the workers never touch the exported PackStats directly).
+type packCounters struct {
+    built     atomic.Int64
+    skipped   atomic.Int64
+    failed    atomic.Int64
+    polys     atomic.Int64
+    links     atomic.Int64
+    stitched  atomic.Int64
+    tileBytes atomic.Int64
+}
+
+// packWorkers resolves the worker count of the parallel phases.
+func packWorkers(opts Options, jobs int) int {
+    workers := opts.Workers
+    if workers <= 0 {
+        workers = runtime.NumCPU()
+    }
+    if workers > jobs {
+        workers = jobs
+    }
+
+    return workers
+}
+
+// runPool feeds the keys through the worker pool: one work unit per
+// key, the first hard error cancels the feed (the in flight units
+// drain). The work callback answers one error at most.
+func runPool(ctx context.Context, keys []navmesh.RegionKey,
+    workers int, work func(context.Context, navmesh.RegionKey) error,
+) error {
+    jobs := make(chan navmesh.RegionKey)
+    feedCtx, cancelFeed := context.WithCancel(ctx)
+    defer cancelFeed()
+    go func() {
+        defer close(jobs)
+        for _, key := range keys {
+            select {
+            case jobs <- key:
+            case <-feedCtx.Done():
+                return
+            }
+        }
+    }()
+    var (
+        wg       sync.WaitGroup
+        firstErr error
+        errMu    sync.Mutex
+    )
+    for range workers {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            for {
+                select {
+                case <-ctx.Done():
+                    return
+                case key, ok := <-jobs:
+                    if !ok {
+                        return
+                    }
+                    if err := work(ctx, key); err != nil {
+                        errMu.Lock()
+                        if firstErr == nil {
+                            firstErr = err
+                        }
+                        errMu.Unlock()
+                        cancelFeed()
+
+                        return
+                    }
+                }
+            }
+        }()
+    }
+    wg.Wait()
+
+    return firstErr
+}
+
 // buildPackPhaseA builds every requested region, writes the tiles
-// and retains the border strips for the phase B stitching. The stats
-// mutate in place; the answer is the strips map.
+// and retains the border strips for the phase B stitching. The region
+// builds run through the worker pool (one region in flight per
+// worker); the strips map mutates under the log mutex and freezes
+// once the phase answers. The counters accumulate atomically; the
+// answer is the strips map.
 func buildPackPhaseA(keys []navmesh.RegionKey, geodataDir, outDir string,
-    opts Options, force bool, stats *PackStats,
+    opts Options, force bool, counters *packCounters,
     log func(format string, args ...any),
 ) (map[navmesh.RegionKey]*borderStrips, error) {
-    strips := make(map[navmesh.RegionKey]*borderStrips, len(keys))
-    for _, key := range keys {
-        build, err := buildPackRegion(geodataDir, outDir, key, opts,
-            force)
-        if err != nil {
-            log("region %d_%d FAILED: %v", key.Col, key.Row, err)
-            stats.Failed++
+    var (
+        mu          sync.Mutex // guards the strips map and the log lines
+        strips      = make(map[navmesh.RegionKey]*borderStrips, len(keys))
+        ctx, cancel = context.WithCancel(context.Background())
+    )
+    defer cancel()
+    err := runPool(ctx, keys, packWorkers(opts, len(keys)),
+        func(_ context.Context, key navmesh.RegionKey) error {
+            build, err := buildPackRegion(geodataDir, outDir, key,
+                opts, force)
+            if err != nil {
+                mu.Lock()
+                log("region %d_%d FAILED: %v", key.Col, key.Row, err)
+                mu.Unlock()
+                counters.failed.Add(1)
 
-            continue
-        }
-        if build == nil {
-            stats.Skipped++
+                return nil
+            }
+            if build == nil {
+                counters.skipped.Add(1)
 
-            continue
-        }
-        // The strips copy breaks the reference to the RegionBuild -
-        // addressing the field of the build would pin the whole tile
-        // (hundreds of megabytes per dense region) for the phase B.
-        own := build.Strips
-        strips[key] = &own
-        if err := writeStripsSidecar(outDir, key, own); err != nil {
-            return nil, fmt.Errorf("sidecar %d_%d: %w", key.Col,
-                key.Row, err)
-        }
-        stats.Built++
-        stats.Polys += build.Stats.Polys
-        stats.Links += build.Stats.Links
-        if info, err := os.Stat(tilePathOf(outDir, key)); err == nil {
-            stats.TileBytes += info.Size()
-        }
-        log("region %d_%d: %d layers, %d sheets (%d islands,"+
-            " %d floating), %d polys (%d water), %d links,"+
-            " %d blocked pairs, %s",
-            key.Col, key.Row, build.Stats.Layers, build.Stats.Sheets,
-            build.Stats.DroppedSheets, build.Stats.IslandSheets,
-            build.Stats.Polys,
-            build.Stats.WaterPolys, build.Stats.Links,
-            build.Stats.NSWEBlockedPairs,
-            build.Stats.BuildTime.String())
+                return nil
+            }
+            // The strips copy breaks the reference to the RegionBuild
+            // - addressing the field of the build would pin the whole
+            // tile (hundreds of megabytes per dense region) for the
+            // phase B.
+            own := build.Strips
+            if err := writeStripsSidecar(outDir, key, own); err != nil {
+                cancel()
+
+                return fmt.Errorf("sidecar %d_%d: %w", key.Col,
+                    key.Row, err)
+            }
+            mu.Lock()
+            strips[key] = &own
+            log("region %d_%d: %d layers, %d sheets (%d islands,"+
+                " %d floating), %d polys (%d water), %d links,"+
+                " %d blocked pairs, %s",
+                key.Col, key.Row, build.Stats.Layers, build.Stats.Sheets,
+                build.Stats.DroppedSheets, build.Stats.IslandSheets,
+                build.Stats.Polys,
+                build.Stats.WaterPolys, build.Stats.Links,
+                build.Stats.NSWEBlockedPairs,
+                build.Stats.BuildTime.String())
+            mu.Unlock()
+            counters.built.Add(1)
+            counters.polys.Add(int64(build.Stats.Polys))
+            counters.links.Add(int64(build.Stats.Links))
+            if info, err := os.Stat(tilePathOf(outDir, key)); err == nil {
+                counters.tileBytes.Add(info.Size())
+            }
+
+            return nil
+        })
+    if err != nil {
+        return nil, err
     }
 
     return strips, nil
+}
+
+// stitchPackPhaseB stitches the ordered region keys through the
+// worker pool: the strips map is frozen (concurrent reads are safe)
+// and the tile rewrites are file disjoint per key.
+func stitchPackPhaseB(order []navmesh.RegionKey, outDir string,
+    strips map[navmesh.RegionKey]*borderStrips, opts Options,
+    counters *packCounters,
+) error {
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+
+    return runPool(ctx, order, packWorkers(opts, len(order)),
+        func(_ context.Context, key navmesh.RegionKey) error {
+            own, ok := strips[key]
+            if !ok {
+                loaded, loadedOK := readStripsSidecar(outDir, key)
+                if !loadedOK {
+                    // No in-pass strip and no sidecar: the tile of an
+                    // older build cannot pair against anything new.
+                    return nil
+                }
+                own = &loaded
+            }
+            var neighbors [4]*borderStrips
+            for side, delta := range [4][2]int16{{-1, 0}, {1, 0},
+                {0, -1}, {0, 1}} {
+                neighbor := navmesh.RegionKey{
+                    Col: key.Col + delta[0], Row: key.Row + delta[1],
+                }
+                if strip, ok := strips[neighbor]; ok {
+                    neighbors[side] = strip
+
+                    continue
+                }
+                if _, err := os.Stat(tilePathOf(outDir, neighbor)); err != nil {
+                    continue
+                }
+                loaded, loadedOK := readStripsSidecar(outDir, neighbor)
+                if loadedOK {
+                    neighbors[side] = &loaded
+                }
+            }
+            if neighbors[0] == nil && neighbors[1] == nil &&
+                neighbors[2] == nil && neighbors[3] == nil {
+                return nil
+            }
+            added, err := stitchPackTile(outDir, key, own, neighbors,
+                opts)
+            if err != nil {
+                cancel()
+
+                return fmt.Errorf("stitch %d_%d: %w", key.Col,
+                    key.Row, err)
+            }
+            counters.stitched.Add(int64(added))
+
+            return nil
+        })
 }
 
 // buildPackRegion builds one region and writes its tile unless the

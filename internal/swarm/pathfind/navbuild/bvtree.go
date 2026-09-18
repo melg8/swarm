@@ -33,6 +33,9 @@ type bvItem struct {
 // index. The tree holds exactly 2N-1 nodes for N polygons.
 func buildBVTree(tile *navmesh.Tile, polys []rectPoly,
 ) []navmesh.BVNode {
+    if len(polys) == 0 {
+        return nil
+    }
     items := make([]bvItem, len(polys))
     for i, poly := range polys {
         items[i] = bvItemOf(tile, i, &poly)
@@ -93,6 +96,9 @@ func subdivide(items []bvItem, imin, imax int, cursor *int,
     nodes []navmesh.BVNode,
 ) {
     inum := imax - imin
+    if inum <= 0 {
+        return
+    }
     node := &nodes[*cursor]
     *cursor++
     if inum == 1 {

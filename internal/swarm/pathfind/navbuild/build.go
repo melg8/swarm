@@ -26,6 +26,8 @@ type Options struct {
     Climb          int32
     DedupDelta     int32
     MinSheetLayers int32
+    // Workers caps the pack build parallelism (0: runtime.NumCPU()).
+    Workers int
 }
 
 // DefaultOptions returns the production tunables.
