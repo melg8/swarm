@@ -351,6 +351,14 @@ function buildSurface(navmesh) {
       <div class="nmv-timer" id="nmv-timer"></div>
       <div class="nmv-timer-sub" id="nmv-timer-sub"></div>
       <div class="nmv-stats" id="nmv-stats"></div>
+      <div class="nmv-section">walk plan points</div>
+      <input type="text" id="nmv-from-input" class="nmv-link"
+        placeholder="from: 45956 49341 -3051"
+        title="the walk plan start: paste the line, the last three numbers bind">
+      <input type="text" id="nmv-to-input" class="nmv-link"
+        placeholder="to: 47595 51569 -2992"
+        title="the walk plan destination: paste the line, the last three numbers bind">
+      <button id="nmv-apply" class="btn nmv-copy">route the pair</button>
     </div>
     <div class="nmv-hint">wasd + q/e flies &middot; shift boosts &middot;
       drag looks &middot; wheel retunes the speed &middot; double click:
@@ -423,6 +431,15 @@ function buildSurface(navmesh) {
   });
   document.getElementById("nmv-clear").addEventListener("click", clearRoute);
   document.getElementById("nmv-copy").addEventListener("click", copyViewState);
+  document.getElementById("nmv-apply").addEventListener(
+    "click", applyCoordInputs);
+  for (const id of ["nmv-from-input", "nmv-to-input"]) {
+    document.getElementById(id).addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        applyCoordInputs();
+      }
+    });
+  }
   document.getElementById("nmv-waypoint-coords").addEventListener(
     "change", (e) => {
       viewer.showWaypointCoords = e.target.checked;
@@ -1468,6 +1485,67 @@ function onDoubleClick(event) {
   void requestRoute(start, world);
 }
 
+// parseCoordLine reads one pasted line of the walk plan log: the
+// last three numbers of the line bind (the "wp 1: 46872 50752 -3000
+// <-- TARGET" prefixes and markers fall away, the bare "45956 49341
+// -3051" triple passes through).
+function parseCoordLine(text) {
+  const numbers = (text || "").match(/-?\d+(?:\.\d+)?/g);
+  if (!numbers || numbers.length < 3) {
+    return null;
+  }
+  const triple = numbers.slice(-3).map(Number);
+  if (triple.some((n) => !Number.isFinite(n))) {
+    return null;
+  }
+
+  return { x: triple[0], y: triple[1], z: triple[2] };
+}
+
+// syncCoordInputs mirrors the live route pair into the inputs (the
+// double click search and the clear fill them too - the pair stays
+// copyable from either side).
+function syncCoordInputs() {
+  const row = (p) => Math.round(p.x) + " " + Math.round(p.y) + " " +
+    Math.round(p.z);
+  document.getElementById("nmv-from-input").value =
+    viewer.routeStart ? row(viewer.routeStart) : "";
+  document.getElementById("nmv-to-input").value =
+    viewer.routeEnd ? row(viewer.routeEnd) : "";
+}
+
+// applyCoordInputs routes the pasted walk plan pair: the from line is
+// required, the missing to line arms the start marker (the second
+// double click finishes the pair), the complete pair asks the server
+// right away.
+function applyCoordInputs() {
+  const start = parseCoordLine(
+    document.getElementById("nmv-from-input").value);
+  if (!start) {
+    showStatus("error",
+      "the from line needs three numbers: x y z");
+
+    return;
+  }
+  const end = parseCoordLine(
+    document.getElementById("nmv-to-input").value);
+  if (!end) {
+    viewer.pendingStart = start;
+    viewer.routeStart = start;
+    viewer.routeEnd = null;
+    clearRouteOverlays();
+    drawStartMarker(start);
+    showStatus("start set", "the to line or the second double click " +
+      "finishes the pair");
+
+    return;
+  }
+  viewer.pendingStart = null;
+  drawStartMarker(start);
+  drawEndMarker(end);
+  void requestRoute(start, end);
+}
+
 // requestRoute posts the two clicked points and renders the answer.
 async function requestRoute(start, end) {
   showStatus("searching", "corridor search running");
@@ -1476,6 +1554,7 @@ async function requestRoute(start, end) {
   document.getElementById("nmv-stats").innerHTML = "";
   viewer.routeStart = start;
   viewer.routeEnd = end;
+  syncCoordInputs();
   try {
     const response = await fetch("/api/navmesh/path", {
       method: "POST",
@@ -1776,6 +1855,7 @@ function clearRoute() {
   viewer.path = null;
   viewer.routeStart = null;
   viewer.routeEnd = null;
+  syncCoordInputs();
   clearRouteOverlays();
   showStatus("idle", "double click the mesh");
   document.getElementById("nmv-timer").textContent = "";
