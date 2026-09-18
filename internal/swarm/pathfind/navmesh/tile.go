@@ -80,6 +80,11 @@ const (
 
     tileVersion = 3
 
+    // TileWireVersionCurrent is the wire version EncodeTile writes
+    // (the pack upgrade pass compares the decoded header version
+    // against it).
+    TileWireVersionCurrent = tileVersion
+
     tileHeaderSize = 40
 
     // The version 1 wire sizes (the int32 bounds and spans).

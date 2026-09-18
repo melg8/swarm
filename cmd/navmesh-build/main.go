@@ -118,10 +118,11 @@ func run(geodataDir, outDir, regionsSpec string, force, compress bool,
     fmt.Printf("wrote %d abstract sidecars (%d skipped, %d failed),"+
         " %.1f MB\n", abstracts.Written, abstracts.Skipped,
         abstracts.Failed, float64(abstracts.Bytes)/(1024*1024))
-    fmt.Printf("built %d regions (%d skipped, %d failed), %d polys,"+
-        " %d links, %d external links, %.1f MB of tiles in %s\n",
-        stats.Built, stats.Skipped, stats.Failed, stats.Polys,
-        stats.Links, stats.Stitched,
+    fmt.Printf("built %d regions (%d skipped, %d upgraded, %d failed),"+
+        " %d polys, %d links, %d external links, %.1f MB of tiles in"+
+        " %s\n",
+        stats.Built, stats.Skipped, stats.Upgraded, stats.Failed,
+        stats.Polys, stats.Links, stats.Stitched,
         float64(stats.TileBytes)/(1024*1024),
         time.Since(started).Round(time.Millisecond))
 

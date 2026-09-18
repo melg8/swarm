@@ -19,10 +19,14 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// PackStats summarizes a pack build.
+// PackStats summarizes a pack build. Upgraded counts the fresh
+// tiles the pass rewrote from the legacy wire (the gzip wrapped or
+// the pre v3 shapes) into the current v3 zstd shape - the mtime
+// freshness skip would otherwise keep them legacy forever.
 type PackStats struct {
     Built     int
     Skipped   int
+    Upgraded  int
     Failed    int
     Polys     int
     Links     int
@@ -96,6 +100,7 @@ func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
 
     stats.Built = int(counters.built.Load())
     stats.Skipped = int(counters.skipped.Load())
+    stats.Upgraded = int(counters.upgraded.Load())
     stats.Failed = int(counters.failed.Load())
     stats.Polys = int(counters.polys.Load())
     stats.Links = int(counters.links.Load())
@@ -110,6 +115,7 @@ func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
 type packCounters struct {
     built     atomic.Int64
     skipped   atomic.Int64
+    upgraded  atomic.Int64
     failed    atomic.Int64
     polys     atomic.Int64
     links     atomic.Int64
@@ -203,8 +209,8 @@ func buildPackPhaseA(keys []navmesh.RegionKey, geodataDir, outDir string,
     defer cancel()
     err := runPool(ctx, keys, packWorkers(opts, len(keys)),
         func(_ context.Context, key navmesh.RegionKey) error {
-            build, err := buildPackRegion(geodataDir, outDir, key,
-                opts, force)
+            build, upgrade, err := buildPackRegion(geodataDir, outDir,
+                key, opts, force)
             if err != nil {
                 mu.Lock()
                 log("region %d_%d FAILED: %v", key.Col, key.Row, err)
@@ -214,6 +220,23 @@ func buildPackPhaseA(keys []navmesh.RegionKey, geodataDir, outDir string,
                 return nil
             }
             if build == nil {
+                if upgrade.err != nil {
+                    mu.Lock()
+                    log("region %d_%d: legacy tile kept (%v)",
+                        key.Col, key.Row, upgrade.err)
+                    mu.Unlock()
+                } else if upgrade.upgraded {
+                    mu.Lock()
+                    log("region %d_%d: legacy tile upgraded to v3,"+
+                        " %.1f MB -> %.1f MB", key.Col, key.Row,
+                        float64(upgrade.fromBytes)/(1024*1024),
+                        float64(upgrade.toBytes)/(1024*1024))
+                    mu.Unlock()
+                    counters.upgraded.Add(1)
+                    counters.tileBytes.Add(upgrade.toBytes)
+
+                    return nil
+                }
                 counters.skipped.Add(1)
 
                 return nil
@@ -317,40 +340,47 @@ func stitchPackPhaseB(order []navmesh.RegionKey, outDir string,
 }
 
 // buildPackRegion builds one region and writes its tile unless the
-// tile is already fresh (a nil build answers the skip).
+// tile is already fresh (a nil build answers the skip; the fresh
+// tile of the legacy wire upgrades in place, the upgrade report
+// rides beside the nil build).
 func buildPackRegion(geodataDir, outDir string, key navmesh.RegionKey,
     opts Options, force bool,
-) (*RegionBuild, error) {
+) (*RegionBuild, tileUpgrade, error) {
     regionPath := filepath.Join(geodataDir,
         fmt.Sprintf("%d_%d.l2j", key.Col, key.Row))
     tilePath := tilePathOf(outDir, key)
     regionInfo, err := os.Stat(regionPath)
     if err != nil {
-        return nil, fmt.Errorf("stat the region: %w", err)
+        return nil, tileUpgrade{}, fmt.Errorf("stat the region: %w", err)
     }
     if !force {
         if tileInfo, statErr := os.Stat(tilePath); statErr == nil &&
             tileInfo.ModTime().After(regionInfo.ModTime()) {
-            return nil, nil
+            up, err := upgradeLegacyTile(tilePath)
+            if err != nil {
+                up.err = err
+            }
+
+            return nil, up, nil
         }
     }
     data, err := os.ReadFile(regionPath) //nolint:gosec // a fixed arg
     if err != nil {
-        return nil, fmt.Errorf("read the region: %w", err)
+        return nil, tileUpgrade{}, fmt.Errorf("read the region: %w", err)
     }
     build, err := BuildRegion(data, key.Col, key.Row, opts)
     if err != nil {
-        return nil, fmt.Errorf("build: %w", err)
+        return nil, tileUpgrade{}, fmt.Errorf("build: %w", err)
     }
     encoded, err := navmesh.EncodeTile(build.Tile)
     if err != nil {
-        return nil, fmt.Errorf("encode: %w", err)
+        return nil, tileUpgrade{}, fmt.Errorf("encode: %w", err)
     }
     if err := os.WriteFile(tilePath, encoded, 0o600); err != nil {
-        return nil, fmt.Errorf("write the tile: %w", err)
+        return nil, tileUpgrade{}, fmt.Errorf("write the tile: %w", err)
     }
 
-    return build, nil
+    return build, tileUpgrade{}, nil
 }
 
 // stitchPackTile decodes one written tile, appends the external links
