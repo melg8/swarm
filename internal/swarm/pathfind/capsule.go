@@ -231,27 +231,10 @@ func (c *Capsule) LegClear(ax, ay, az, bx, by, bz, radius float64) bool {
     if c == nil || c.engine == nil {
         return true
     }
-    a := Vec3{X: ax, Y: ay, Z: az}
-    b := Vec3{X: bx, Y: by, Z: bz}
-    if !c.legWalkable(a, b) {
-        return false
-    }
-    if radius <= 0 {
-        return true
-    }
-    length := math.Hypot(b.X-a.X, b.Y-a.Y)
-    samples := int(length/capsuleSampleStep) + 1
-    if samples < 2 {
-        samples = 2
-    }
-    for i := 1; i < samples; i++ {
-        sample := legPoint(a, b, float64(i)/float64(samples))
-        if c.Clearance(sample.X, sample.Y, int16(sample.Z)) < radius {
-            return false
-        }
-    }
 
-    return true
+    return c.engine.legClearCells(Vec3{X: ax, Y: ay, Z: az},
+        Vec3{X: bx, Y: by, Z: bz}, radius,
+        c.engine.MaxPassableHeight())
 }
 
 // ShortenPath folds the waypoint path into the longest legs the grid

@@ -12,6 +12,7 @@ import (
     "strconv"
     "strings"
     "sync"
+    "sync/atomic"
     "time"
 )
 
@@ -59,13 +60,24 @@ type Engine struct {
     // raw smoothing. Set once at construction time (SetCapsuleClearance).
     capsuleRadius float64
 
-    mu       sync.Mutex
-    cache    map[RegionKey]*cacheEntry
-    lru      []*cacheEntry
+    mu    sync.RWMutex
+    cache map[RegionKey]*cacheEntry
+    lru   []*cacheEntry
+    // last is the single region fast path of entry: the region
+    // queries are highly local (the walks, the click lines probe the
+    // same region thousands of cells in a row), one pointer and key
+    // check replaces the lock and the map hash on nearly every call.
+    last     atomic.Pointer[regionSlotEntry]
     pool     *layerPool
     files    int
     center   Vec3
     hasFiles bool
+}
+
+// regionSlotEntry is the published pair of the entry fast path.
+type regionSlotEntry struct {
+    key   RegionKey
+    entry *cacheEntry
 }
 
 // cacheEntry is one loaded or failed region in the cache.
@@ -84,7 +96,7 @@ func NewEngine(dir string) *Engine {
         capacity:      DefaultCacheCapacity,
         maxPass:       DefaultMaxPassableHeight,
         capsuleRadius: 0,
-        mu:            sync.Mutex{},
+        mu:            sync.RWMutex{},
         cache:         make(map[RegionKey]*cacheEntry),
         lru:           make([]*cacheEntry, 0, DefaultCacheCapacity),
         pool:          newLayerPool(),
@@ -178,16 +190,33 @@ func parseRegionFileName(name string) (int, int, bool) {
 }
 
 // entry returns the cache entry of a region, loading it on demand and
-// evicting the least recently used entry when the cache is full.
+// evicting the least recently inserted entry when the cache is full.
+// The hit path shares the read lock (the parallel guard probes of the
+// smooth pass hit the same four region keys millions of times - the
+// exclusive lock was the serialization point), the parse path takes
+// the exclusive lock and re-checks. The eviction order is the insert
+// order: the parsed regions are immutable, the read path cannot
+// refresh the queue without dropping back to an exclusive lock, and
+// the working set of one route fits the capacity anyway.
 func (e *Engine) entry(key RegionKey) (*cacheEntry, error) {
+    if slot := e.last.Load(); slot != nil && slot.key == key {
+        return slot.entry, slot.entry.err
+    }
+    e.mu.RLock()
+    if entry, ok := e.cache[key]; ok {
+        e.mu.RUnlock()
+        e.last.Store(&regionSlotEntry{key: key, entry: entry})
+
+        // Failed entries stay cached: every hit must repeat the error,
+        // otherwise a missing region would surface as a nil region.
+        return entry, entry.err
+    }
+    e.mu.RUnlock()
+
     e.mu.Lock()
     defer e.mu.Unlock()
 
     if entry, ok := e.cache[key]; ok {
-        e.touch(entry)
-
-        // Failed entries stay cached: every hit must repeat the error,
-        // otherwise a missing region would surface as a nil region.
         return entry, entry.err
     }
 
@@ -208,21 +237,9 @@ func (e *Engine) entry(key RegionKey) (*cacheEntry, error) {
         e.lru = e.lru[1:]
         delete(e.cache, oldest.key)
     }
-    e.touch(entry)
+    e.last.Store(&regionSlotEntry{key: key, entry: entry})
 
     return entry, entry.err
-}
-
-// touch moves an entry to the back of the LRU queue.
-func (e *Engine) touch(entry *cacheEntry) {
-    for i, candidate := range e.lru {
-        if candidate == entry {
-            e.lru = append(e.lru[:i], e.lru[i+1:]...)
-            e.lru = append(e.lru, entry)
-
-            return
-        }
-    }
 }
 
 // Result of a path search: the smoothed waypoints the walker follows,
@@ -474,15 +491,5 @@ func (e *Engine) ClosestHeight(
 func (e *Engine) LineOfSight(
     start, end Vec3, maxPassableHeight uint16,
 ) (bool, error) {
-    search := newSearch(e, maxPassableHeight)
-    from, err := search.nodeAtWorld(start)
-    if err != nil {
-        return false, err
-    }
-    to, err := search.nodeAtWorld(end)
-    if err != nil {
-        return false, err
-    }
-
-    return search.lineOfSight(from, to), nil
+    return e.lineOfSightCells(start, end, maxPassableHeight)
 }

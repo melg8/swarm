@@ -59,6 +59,11 @@ type layerPool struct {
     mu     sync.RWMutex
     ids    map[layerKey]uint16
     layers []Layer
+    // table is the fixed size lookup array of get: the intern writes
+    // the slot once under the lock, the readers index it lock free
+    // (the ids are stable, the entries are immutable after the
+    // publish, see get).
+    table [poolLayerCapacity]Layer
 }
 
 // layerKey is the deduplication key of a layer.
@@ -84,17 +89,31 @@ func (p *layerPool) intern(layer Layer) uint16 {
     if id, ok := p.ids[key]; ok {
         return id
     }
+    if len(p.layers) >= poolLayerCapacity {
+        panic("layer pool overflow: more than 65536 distinct layers " +
+            "in one engine")
+    }
     id := uint16(len(p.layers))
     p.layers = append(p.layers, layer)
+    p.table[id] = layer
     p.ids[key] = id
 
     return id
 }
 
-// get returns the layer of a pool id.
-func (p *layerPool) get(id uint16) Layer {
-    p.mu.RLock()
-    defer p.mu.RUnlock()
+// poolLayerCapacity is the fixed table size of the pool: the ids ride
+// the uint16 references of the region cells, so the table never grows
+// past 65536 entries (the same bound the uint16 cast of the append
+// form carried implicitly).
+const poolLayerCapacity = 1 << 16
 
-    return p.layers[id]
+// get returns the layer of a pool id. The table is a fixed array the
+// intern fills once: every id the callers hold was interned before
+// its region published (the parse happens under the engine cache
+// lock), the entry never changes afterwards and the concurrent
+// interns write other slots - the plain index answers without any
+// synchronization (the old RWMutex read was the profile cost of the
+// guard probes: two atomic RMW per layer lookup, millions per route).
+func (p *layerPool) get(id uint16) Layer {
+    return p.table[id]
 }

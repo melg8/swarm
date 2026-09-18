@@ -7,6 +7,7 @@ package navmesh
 import (
     "math"
     "sort"
+    "sync"
 )
 
 // The shortcut pass of the route answer (the smoothing): the funnel
@@ -48,6 +49,13 @@ const smoothEpsilon = 1e-6
 // budget of the caller).
 const smoothScanWindow = 256
 
+// smoothParallelBatch is the candidate probe width of the guarded
+// greedy scan: the batch runs the chord answers in parallel and picks
+// the farthest clear one - the same winner the sequential far to near
+// scan picks (the first clear from the far end is the farthest clear),
+// the wall clock folds by the core count instead.
+const smoothParallelBatch = 16
+
 // smoothPath merges the funnel waypoints into the longest safe chords
 // (greedy farthest visible): the answer holds a subset of the input
 // positions - the first, the last and every pivot no safe chord
@@ -74,20 +82,59 @@ func (m *Mesh) smoothPath(corridor []PolyRef, wps []funnelWp,
         } else {
             far = last
         }
-        chosen := anchor + 1
-        for k := far; k > anchor+1; k-- {
-            if m.chordClear(corridor, wps[anchor], wps[k], filter,
-                walls) {
-                chosen = k
-
-                break
-            }
-        }
+        chosen := m.farthestClearChord(corridor, wps, anchor, far,
+            filter, walls)
         merged = append(merged, wps[chosen].pos)
         anchor = chosen
     }
 
     return merged
+}
+
+// farthestClearChord answers the farthest waypoint the anchor merges
+// into: the guarded form probes the candidates in parallel batches
+// (the guard oracle is read only over the engine and the mesh), the
+// mesh span form walks the sequential far to near scan (the wall span
+// map is the shared per pass state). Both pick the first clear
+// candidate from the far end.
+func (m *Mesh) farthestClearChord(corridor []PolyRef, wps []funnelWp,
+    anchor, far int, filter Filter, walls map[PolyRef]*[4][]wallSpan,
+) int {
+    if filter.Guard == nil || far-anchor < 2 {
+        for k := far; k > anchor+1; k-- {
+            if m.chordClear(corridor, wps[anchor], wps[k], filter,
+                walls) {
+                return k
+            }
+        }
+
+        return anchor + 1
+    }
+    for k := far; k > anchor+1; {
+        lo := k - smoothParallelBatch + 1
+        if lo < anchor+2 {
+            lo = anchor + 2
+        }
+        answers := make([]bool, k-lo+1)
+        var wg sync.WaitGroup
+        for c := lo; c <= k; c++ {
+            wg.Add(1)
+            go func(c int) {
+                defer wg.Done()
+                answers[c-lo] = m.chordClear(corridor, wps[anchor],
+                    wps[c], filter, walls)
+            }(c)
+        }
+        wg.Wait()
+        for c := k; c >= lo; c-- {
+            if answers[c-lo] {
+                return c
+            }
+        }
+        k = lo - 1
+    }
+
+    return anchor + 1
 }
 
 // chordClear answers whether the straight chord from the waypoint
