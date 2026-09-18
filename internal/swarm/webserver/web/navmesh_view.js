@@ -115,6 +115,21 @@ const CONNECTION_LIFT = 10;
 // already keeps the steep faces out of the black.
 const WALL_SHADE = 0.88;
 
+// The camera residency of the stitched world: the bare
+// -show-navmesh boot and the "all" box cannot hold every tile build
+// of a 164 tile world - the surface, wall and connection buffers
+// were the gigabyte scale memory wall of the full map (the browser
+// plus the swarm server hit the system limit). The manager keeps the
+// RESIDENCY_CAP tiles nearest the camera loaded, disposes the rest
+// and re-ranks on a throttled tick of the render loop; the tile row
+// checkboxes stay the mask (an unchecked row never loads, a checked
+// far row reads "far"), the route overlays are independent of the
+// tile builds - a path may leave the resident tiles and still draws.
+const RESIDENCY_CAP = 8;
+// Selections this small keep the classic load everything behavior.
+const RESIDENCY_MIN_TILES = 12;
+const RESIDENCY_TICK_MS = 600;
+
 // The Viewer bundles the three.js state behind one object so the init
 // stays a single closure.
 const viewer = {
@@ -148,6 +163,10 @@ const viewer = {
   // brings them back).
   showWaypointCoords: false,
   showEdges: false,
+  // The camera residency flag: the boot arms it for the whole world
+  // selections (the classic small selections load everything).
+  autoResidency: false,
+  residencyTick: 0,
   hover: {
     pointer: new THREE.Vector2(),
     hasPointer: false,
@@ -231,8 +250,17 @@ function init(config) {
   } else {
     frameInitialTiles(initial);
   }
-  for (const tile of initial) {
-    void ensureTile(tile);
+  // The whole world selections arm the camera residency: the boot
+  // loads only the RESIDENCY_CAP tiles nearest the camera, the far
+  // ones stay disposed until the camera flies to them (the buffers
+  // of the full stitched world were the memory wall).
+  viewer.autoResidency = initial.length >= RESIDENCY_MIN_TILES;
+  if (viewer.autoResidency) {
+    updateResidency();
+  } else {
+    for (const tile of initial) {
+      void ensureTile(tile);
+    }
   }
   if (view.from && view.to) {
     viewer.routeStart = view.from;
@@ -424,6 +452,7 @@ function renderLoop() {
   if (viewer.rig) {
     viewer.rig.update();
   }
+  scheduleResidency();
   hoverStep();
   if (viewer.renderer) {
     viewer.renderer.render(viewer.scene, viewer.camera);
@@ -655,8 +684,38 @@ function setAllTiles(visible) {
   }
 }
 
+// disposeTileGeometry frees every built variant of one tile: the
+// scene object leaves, the geometries and materials of the draw call
+// tree (the surface and wall quads, the region outline, the edge
+// overlay) dispose, the built cache clears. The visible=false flag
+// of the old code kept every build resident - the buffers were the
+// memory wall of the full map.
+function disposeTileGeometry(entry) {
+  if (entry.mesh) {
+    viewer.scene.remove(entry.mesh);
+    entry.mesh = null;
+  }
+  for (const variant of Object.keys(entry.built)) {
+    const mesh = entry.built[variant];
+    if (mesh) {
+      mesh.traverse((node) => {
+        if (node.geometry) {
+          node.geometry.dispose();
+        }
+        if (Array.isArray(node.material)) {
+          node.material.forEach((m) => m.dispose());
+        } else if (node.material) {
+          node.material.dispose();
+        }
+      });
+    }
+    delete entry.built[variant];
+  }
+  entry.connections = null;
+}
+
 // setTileVisible shows or hides one tile, loading its geometry on
-// the first show.
+// the first show and freeing it on every hide.
 function setTileVisible(key, visible) {
   const entry = viewer.tiles.get(key);
   if (!entry) {
@@ -664,11 +723,103 @@ function setTileVisible(key, visible) {
   }
   entry.visible = visible;
   if (visible) {
-    void ensureTile(entry.info);
+    if (autoResidencyActive()) {
+      // The residency manager decides: the checkbox stays the mask,
+      // the nearest cap tiles load, the far ones stay disposed.
+      updateResidency();
+    } else {
+      void ensureTile(entry.info);
+    }
+    return;
   }
-  if (entry.mesh) {
-    entry.mesh.visible = visible;
+  disposeTileGeometry(entry);
+  const status = document.querySelector(`[data-status="${key}"]`);
+  if (status) {
+    status.textContent = "";
   }
+}
+
+// autoResidencyActive reports whether the camera manages the loads:
+// armed at boot for the whole world selections, the small manual
+// selections keep the classic load everything behavior.
+function autoResidencyActive() {
+  if (!viewer.autoResidency) {
+    return false;
+  }
+  let checked = 0;
+  for (const entry of viewer.tiles.values()) {
+    if (entry.visible) {
+      checked++;
+      if (checked > RESIDENCY_CAP) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// updateResidency re-ranks the checked tiles by the camera distance
+// (the flat world distance from the camera to the tile rectangle)
+// and swaps the residency: the nearest cap load, the loaded rest
+// dispose. The small selections fall through to the classic ensure
+// of the visible tiles.
+function updateResidency() {
+  if (!autoResidencyActive()) {
+    for (const entry of viewer.tiles.values()) {
+      if (entry.visible && !entry.mesh &&
+          !entry.built[viewer.variant] && !entry.loading[viewer.variant]) {
+        void ensureTile(entry.info);
+      }
+    }
+
+    return;
+  }
+  const cx = viewer.camera.position.x;
+  const cy = viewer.camera.position.z;
+  const ranked = [];
+  for (const entry of viewer.tiles.values()) {
+    if (!entry.visible) {
+      if (entry.mesh || Object.keys(entry.built).length > 0) {
+        disposeTileGeometry(entry);
+      }
+      continue;
+    }
+    const tile = entry.info;
+    const dx = Math.max(tile.minX - cx, 0, cx - tile.maxX);
+    const dy = Math.max(tile.minY - cy, 0, cy - tile.maxY);
+    ranked.push([dx * dx + dy * dy, entry]);
+  }
+  ranked.sort((a, b) => a[0] - b[0]);
+  for (let i = 0; i < ranked.length; i++) {
+    const entry = ranked[i][1];
+    const status = document.querySelector(
+      `[data-status="${tileKey(entry.info)}"]`);
+    if (i < RESIDENCY_CAP) {
+      if (!entry.built[viewer.variant] && !entry.loading[viewer.variant]) {
+        void ensureTile(entry.info);
+      }
+      continue;
+    }
+    if (entry.mesh || Object.keys(entry.built).length > 0) {
+      disposeTileGeometry(entry);
+    }
+    if (status && status.textContent !== "failed") {
+      status.textContent = "far";
+    }
+  }
+}
+
+// scheduleResidency throttles the residency ticks off the render
+// loop (the fly rig moves the camera every frame, the re-rank costs
+// one sort of the tile list - 1.6 ticks a second carry it).
+function scheduleResidency() {
+  const now = performance.now();
+  if (now - viewer.residencyTick < RESIDENCY_TICK_MS) {
+    return;
+  }
+  viewer.residencyTick = now;
+  updateResidency();
 }
 
 // geometryUrl answers the geometry endpoint of one variant: the
@@ -698,15 +849,15 @@ function setVariant(variant) {
     select.value = variant;
   }
   for (const [key, entry] of viewer.tiles) {
-    // The old active mesh leaves the scene (both variants stay
-    // cached, a switch back is instant); an unloaded variant loads
-    // below with the status row showing the progress.
-    if (entry.mesh) {
-      viewer.scene.remove(entry.mesh);
-      entry.mesh = null;
-    }
-    entry.connections = null;
+    // The old active build frees entirely (the variant switch no
+    // longer caches both builds - the memory wall of the full map
+    // carries both, the switch back refetches); an unloaded variant
+    // loads below with the status row showing the progress.
+    disposeTileGeometry(entry);
     if (entry.visible) {
+      if (autoResidencyActive()) {
+        continue;
+      }
       void ensureTile(entry.info);
     } else {
       const status = document.querySelector(`[data-status="${key}"]`);
@@ -714,6 +865,9 @@ function setVariant(variant) {
         status.textContent = "";
       }
     }
+  }
+  if (autoResidencyActive()) {
+    updateResidency();
   }
   restartHoverSweep();
 }
