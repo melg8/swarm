@@ -246,3 +246,32 @@ the 3..5x on the flat search constant, which moves the refinement
 hops and the confined searches of the hierarchy with it. The warm
 hierarchy answers do not wait for this (they are already 0.5 ms),
 the cold corridor answer does.
+
+## 9. The zstd tile round: the cold path the profile named
+
+The section 8 profile put the flate decoder next to the search on
+the cold queries: the huffman stages own a third of the first route
+samples. The tile compression moves to zstd (the klauspost pure Go
+implementation): the pack build writes zstd frames, the runtime
+loader picks the format by the magic word (the legacy gzip packs
+stay readable forever, the zstd round adds no migration step).
+
+The same 31 region corridor pack, rebuilt end to end (the tiles and
+the sidecars, the fake repair on, 2 workers, 2m35s):
+
+| measure | gzip (BestCompression) | zstd (SpeedDefault) |
+| --- | --- | --- |
+| tile bytes on disk | 0.84 GB | 0.85 GB |
+| owner diagonal cold (4 tiles decoded) | 1.45 s | 0.55 s |
+| single tile cold (21_19) | 324 ms | 156 ms |
+| warm answers | unchanged | unchanged |
+
+The ratio is a wash (the link tables are the incompressible mass),
+the decode is 2.5x faster, and that is the trade the cold queries
+want. The user visible answer of the owner diagonal lands at
+~0.6 s on this 2 core sandbox - an order of magnitude under the
+>10 s report that opened this research, with the warm steady state
+untouched (0.5 ms). The remaining cold cost splits between the
+zstd decode itself, the tile parse and the coarse sidecar loads;
+the next lever would be the parallel decode of the corridor tiles
+per hop, not worth it while the answer stays under a second.

@@ -253,10 +253,29 @@ func (m *Mesh) Tile(key RegionKey) (*Tile, error) {
             entry.err = fmt.Errorf("read navmesh tile %d_%d: %w", key.Col,
                 key.Row, err)
         } else {
-            // The tile file may be gzip compressed (the
-            // navmesh-build -compress output): the gzip magic word
-            // decides, both formats decode the same way.
-            if len(data) >= 2 && data[0] == 0x1F && data[1] == 0x8B {
+            // The tile file may be compressed (the navmesh-build
+            // -compress output): the magic word decides - the zstd
+            // frame is the current format, the gzip frame the
+            // legacy packs carry, both decode to the same tile
+            // bytes.
+            if len(data) >= 4 && data[0] == 0x28 && data[1] == 0xB5 &&
+                data[2] == 0x2F && data[3] == 0xFD {
+                raw, zsErr := decodeTileZstd(data)
+                if zsErr == nil {
+                    data = raw
+                } else {
+                    entry.state = tileFailed
+                    entry.err = fmt.Errorf(
+                        "decompress navmesh tile %d_%d: %w", key.Col,
+                        key.Row, zsErr)
+                    m.tiles[key] = entry
+                    m.lru = append(m.lru, entry)
+                    m.touch(entry)
+                    m.evict()
+
+                    return nil, entry.err
+                }
+            } else if len(data) >= 2 && data[0] == 0x1F && data[1] == 0x8B {
                 zr, gzErr := gzip.NewReader(bytes.NewReader(data))
                 if gzErr == nil {
                     var raw []byte

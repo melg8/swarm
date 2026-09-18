@@ -43,8 +43,9 @@ func main() {
     force := flag.Bool("force", false,
         "rebuild the regions whose tile file is already fresh")
     compress := flag.Bool("compress", true,
-        "gzip the tile files in place (the runtime detects the format "+
-            "by the magic word; roughly half the disk)")
+        "zstd the tile files in place (the runtime detects the format "+
+            "by the magic word, the legacy gzip packs stay readable; "+
+            "roughly half the disk)")
     workers := flag.Int("workers", 0,
         "parallel build workers (0: every core)")
     repairFake := flag.Bool("repair-fake", false,
