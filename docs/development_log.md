@@ -7148,3 +7148,81 @@ Verification: go test -count=1 ./... every package ok zero failures
 on the merged tree, the gofmt-spaces gate silent, the live
 acceptance church-entry PASS and railing-pocket PASS back to back
 against the deployed stack, the mobius server untouched.
+
+## Round 95: the mobius upstream archaeology - the owner's server skew was the pre August 2026 movement engine (2026-09-20)
+
+Scope: the owner found the source of the church walk failure - the
+deployment ran an older Mobius C1 build (up to about a month behind
+the sandbox's) and updating the server alone made the building entry
+work even without the swarm side changes; the task: name the exact
+upstream commits that flip the "characters cannot walk into
+buildings" behavior.
+
+Method: the sandbox checkout (L2J_Mobius_C1_HarbingersOfWar at
+995b830a, 2026-09-19) is a depth 1 clone and gitlab.com answers 403
+from the sandbox egress, the GitHub mirrors of the C1 repo do not
+exist (the repository search comes back empty), so the history came
+through the GitLab REST API behind the r.jina.ai reader proxy (the
+project path needs the double encoded separator - jina decodes one
+level, %252F survives as %2F): 102 commits since July 1st, the path
+filtered commit lists and the raw file snapshots of the release
+commit's parent f1e84274 (2026-08-12) diffed against the local
+master copies.
+
+Findings:
+- the geodata binaries (dist/game/data/geodata) are untouched since
+  the December 11th 2025 release; Doors.xml content is byte
+  identical between the August 15th release commit and today's
+  master (its path query hit is the .gitattributes normalization,
+  not a content change) - the fix is pure code, not data.
+- the whole movement stack - the geoengine directory, MoveToLocation,
+  ValidatePosition, Creature - was touched by exactly one commit in
+  the window: 55787efe "Release: August 15th 2026" (the geoengine
+  directory's full public history is just the two release commits,
+  the engine work ships inside the release squashes; the single
+  breaking commit, if one exists between the December 2025 and the
+  August 2026 releases, is not reconstructable from the public
+  history).
+- the 55787efe movement content, diffed against its parent:
+  GeoEngine gains the single cell layer gap fallback -
+  PATH_CONTINUITY_TOLERANCE = 16 and hasNeighbourLayerNear(): the
+  walk line validation (getValidLocation and hasPath both) used to
+  refuse the step the moment the next cell's nearest geo layer sat
+  more than HEIGHT_INCREASE_LIMIT (40) above the source z - the
+  building thresholds and doorways of the multi layer geodata have
+  exactly such cells (the nearest layer belongs to the lintel or the
+  upper floor, not the floor), so the old engine sealed every
+  entrance and the character stopped at the door frame with the re
+  clicks bouncing ActionFailed; the new engine first asks whether any
+  4 way neighbour of the gap cell has a layer within 16 units of the
+  source z and accepts the step as a continuous surface - the
+  character walks through the doorway. canSeeTarget gets the
+  from/to swap fix. NodeBuffer is a complete A* rewrite (the object
+  GeoNode PriorityQueue HashSet ReentrantLock design becomes
+  primitive parallel arrays with an indexed binary min-heap, the
+  octile heuristic, Z_TOLERANCE 64, Z_STEP_LIMIT 16, per thread
+  ThreadLocal buffers without locks) and PathFinding pools the
+  buffers per thread - the pathfinder finds the routes through the
+  door cells the old node expansion rejected; MoveToLocation syncs
+  the origin within 1000 units, ValidatePosition broadcasts the
+  cursor key movement sync.
+- why the two environments disagreed: the sandbox deploys from git
+  master (September 19th, post rewrite) so the GEOPROBE rounds saw
+  the server accept every porch click and confirm the arrival; the
+  owner's build predates the August 15th release commit so its
+  getValidLocation/hasPath sealed the threshold cells - the exact
+  "the server refused a request" signature of the a1fc212 dump and
+  the concrete identity behind Round 94's "the owner deployment's
+  server class" conclusion. Updating to anything at or past
+  55787efe restores the entry with no swarm change at all; the
+  Round 94 refusal ladder stays as the recovery for the deployments
+  that cannot update.
+
+Verification: the pre release file snapshots
+(scripts/pre_release_geoengine, scripts/pre_release_movement in the
+sandbox workspace) diff cleanly against the local master copies
+(the geoengine copies carry no local modifications - the GEOPROBE
+probes live only in the packet and actor layer), the Doors.xml
+copies are md5 identical, the geodata and geoengine path queries
+bound the change window to the single release commit; the swarm
+tree itself is untouched by this round (docs only).

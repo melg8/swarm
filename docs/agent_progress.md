@@ -1446,3 +1446,30 @@ a38b90a (test gate: the unit test account ladder renames to unittest1 - the test
   the bottleneck aware funnel stays open as the follow up; the
   follower ladder owns every deployment whose walk disagrees with
   the pack. Round 94 of docs/development_log.md.
+
+### Progress (2026-09-20, the mobius upstream archaeology round)
+
+- the owner found the church walk failure source: the deployment ran
+  an older Mobius C1 build and updating the server alone fixed the
+  building entry even without the swarm changes. The round names the
+  commit: 55787efe "Release: August 15th 2026" (the parent
+  f1e84274, 2026-08-12, is the last old-engine state).
+- the method: gitlab.com is blocked from the sandbox and the C1 repo
+  has no GitHub mirror, the history came through the GitLab REST API
+  behind the jina reader proxy (double encoded project path), 102
+  commits since July 1st plus the path filtered lists and the raw
+  parent-commit file snapshots diffed against the local master.
+- the mechanism: the release commit rewrites the movement engine -
+  the GeoEngine single cell layer gap fallback (hasNeighbourLayerNear,
+  PATH_CONTINUITY_TOLERANCE 16: a threshold cell whose nearest layer
+  sits above HEIGHT_INCREASE_LIMIT 40 no longer seals the entrance
+  when a neighbour carries a layer within 16 units of the source z),
+  the NodeBuffer A* rewrite (primitive arrays, binary min-heap,
+  Z_TOLERANCE 64) and the PathFinding thread local buffers. The
+  geodata binaries and the Doors.xml content are unchanged - pure
+  code fix.
+- the reconciliation: the sandbox (September master, post rewrite)
+  never saw refusals while the owner's pre August build sealed the
+  door frames - the concrete identity of Round 94's "server class";
+  the refusal ladder stays as the recovery for deployments that
+  cannot update. Round 95 of docs/development_log.md.
