@@ -242,7 +242,8 @@ func auditRemaining(
         }
         audit.Spots = append(audit.Spots, record)
         done[cell.ID] = true
-        if err := writeAudit(cfg.Output, cfg.Account, cfg.Wait, audit); err != nil {
+        if err := writeAudit(cfg.Output, cfg.Account, cfg.Wait,
+            audit); err != nil {
             logger.Printf("hunt audit: evidence write failed: %v", err)
 
             return

@@ -490,7 +490,7 @@ func (s *Server) listenFamily(
     login bool, addrs []string, serve func(net.Listener),
 ) error {
     for i, addr := range addrs {
-        //nolint:exhaustruct_v5 // the zero fields of ListenConfig are the defaults
+        //nolint:exhaustruct_v5 // zero fields are the defaults
         listener, err := (&net.ListenConfig{}).Listen(
             context.Background(), "tcp", addr)
         if err != nil {
@@ -528,11 +528,13 @@ func (s *Server) logBindHint(login bool, addr string) {
     }
     s.logger.Printf(
         "hint: classic C1 clients hardcode the login port 2106, so a client "+
-            "whose l2.ini ServerAddr matches %s dials this address. The port is "+
+            "whose l2.ini ServerAddr matches %s dials this address. "+
+            "The port is "+
             "normally owned by the real Mobius login server: either point the "+
             "client elsewhere (set ServerAddr=127.0.0.2 in l2.ini, the proxy "+
             "answers 127.0.0.2:2106 too) or free 127.0.0.1:2106 for the proxy "+
-            "(set LoginserverHostname=127.0.0.3 in the Mobius login Server.ini "+
+            "(set LoginserverHostname=127.0.0.3 in the Mobius login "+
+            "Server.ini "+
             "and run swarm with -login 127.0.0.3:2106). A bind rejected with "+
             "access permissions on Windows also means the port is reserved "+
             "(Hyper-V/WinNAT: 'netsh interface ipv4 show excludedportrange "+
@@ -554,7 +556,8 @@ func (s *Server) serveGameListener(listener net.Listener) {
 func (s *Server) Shutdown(_ context.Context) error {
     s.stopOnce.Do(func() { close(s.done) })
     for _, listener := range append(s.loginListeners, s.gameListeners...) {
-        if err := listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+        if err := listener.Close(); err != nil &&
+            !errors.Is(err, net.ErrClosed) {
             s.logger.Printf("Proxy listener close failed: %v", err)
         }
     }

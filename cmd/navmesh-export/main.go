@@ -75,7 +75,7 @@ func main() {
     }
 
     if *probe {
-        runProbe(*dir, keys, start, end)
+        runProbe(*dir, start, end)
     }
 
     if err := runDump(*dir, keys, start, end, *out); err != nil {
@@ -89,7 +89,7 @@ func main() {
 // second reuses the decoded tiles and the loaded abstracts (the
 // warm path), the third pins the steady state. The decode share of
 // the cold answer falls out of the difference between the first two.
-func runProbe(dir string, keys []navmesh.RegionKey, start, end navmesh.Pos) {
+func runProbe(dir string, start, end navmesh.Pos) {
     mesh := navmesh.NewMesh(dir)
     for round := 1; round <= 3; round++ {
         roundStart := time.Now()

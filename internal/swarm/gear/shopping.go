@@ -1304,9 +1304,11 @@ func affectedSlots(virtual [slotCount]ScoredItem, bodyPart string) slotBuf {
         return slotBuf{data: [2]Slot{SlotRHand, SlotLHand}, n: 2}
     case bodyPart == partOnepiece:
         return slotBuf{data: [2]Slot{SlotChest, SlotLegs}, n: 2}
-    case bodyPart == partLhand && virtual[SlotRHand].Stats.BodyPart == partLrhand:
+    case bodyPart == partLhand &&
+        virtual[SlotRHand].Stats.BodyPart == partLrhand:
         return slotBuf{data: [2]Slot{SlotLHand, SlotRHand}, n: 2}
-    case bodyPart == partLegs && virtual[SlotChest].Stats.BodyPart == partOnepiece:
+    case bodyPart == partLegs &&
+        virtual[SlotChest].Stats.BodyPart == partOnepiece:
         return slotBuf{data: [2]Slot{SlotLegs, SlotChest}, n: 2}
     case bodyPart == partEars || bodyPart == partFingers:
         slots := SlotsForBodyPart(bodyPart)

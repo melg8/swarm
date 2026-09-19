@@ -87,6 +87,7 @@ func TestWholeMapHopTrace(t *testing.T) {
             t.Logf("hop %d (%d_%d #%d): no target poly (region %d_%d)",
                 i, exitRef.Region.Col, exitRef.Region.Row, exitRef.Index,
                 exitEdge.to.Col, exitEdge.to.Row)
+
             break
         }
         segment := mesh.runHop(&query, currentRef, currentPos, goalRef,
@@ -121,6 +122,7 @@ func TestWholeMapHopTrace(t *testing.T) {
                 exitEdge.mid.X, exitEdge.mid.Y,
                 exitEdge.to.Col, exitEdge.to.Row, exitEdge.to.ID,
                 explored, partial)
+
             break
         }
         tc, tr := TileOf(goalRef)
@@ -132,30 +134,6 @@ func TestWholeMapHopTrace(t *testing.T) {
         currentPos = exitEdge.mid
         prevEdge = exitRef
         _ = prevEdge
-    }
-}
-
-// runHopBudget is the runHop variant with an explicit budget: the
-// diagnostic rounds need the region scale searches the hop budget
-// caps.
-func (m *Mesh) runHopBudget(q *hierQuery, fromRef PolyRef, fromPos Pos,
-    toRef PolyRef, toPos Pos, last bool, budget int,
-) *hopSegment {
-    goal := astarGoal{target: toRef, escape: false, approach: 0}
-    if last {
-        goal.approach = q.approach
-    }
-    result := m.astar(q.state, goal, fromRef, fromPos, toPos, q.filter,
-        noAvoid(), budget, nil)
-    if result.corridor == nil {
-        return nil
-    }
-
-    return &hopSegment{
-        corridor: result.corridor,
-        explored: result.explored,
-        reached:  result.reached,
-        partial:  result.partial,
     }
 }
 
@@ -211,6 +189,7 @@ func (m *Mesh) sameTileComponent(a, b PolyRef) (bool, [2]int) {
 // box of the link component holding a polygon - the shape answer that
 // names the disconnect (an island, a pocket sea, a void cut).
 func (m *Mesh) logComponentShape(t *testing.T, ref PolyRef) {
+    t.Helper()
     c, r := TileOf(ref)
     tile, err := m.Tile(RegionKey{Col: c, Row: r})
     if err != nil || tile == nil {

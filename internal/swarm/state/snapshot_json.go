@@ -463,7 +463,8 @@ func appendChatEventJSON(dst []byte, line ChatEvent) []byte {
 // and the destination (the Snapshot and the live state encoders share
 // the exact field order).
 func appendWalkPlanFieldsJSON(
-    dst []byte, points []WalkPoint, origin *WalkPoint, index int, dest *WalkPoint,
+    dst []byte, points []WalkPoint, origin *WalkPoint, index int,
+    dest *WalkPoint,
 ) []byte {
     dst = appendWalkPathJSON(dst, points)
     dst = append(dst, `,"walkOrigin":`...)

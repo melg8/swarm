@@ -72,9 +72,11 @@ func losWorld(t *testing.T) (*Engine, func(float64, float64) Vec3) {
 // node oracle to agree everywhere.
 func TestLineOfSightFastMatchesNodes(t *testing.T) {
     engine, world := losWorld(t)
+    //nolint:gosec // the fixed seed makes the leg walk deterministic:
+    // the weak generator is the point, no secret is involved.
     rng := rand.New(rand.NewSource(20260918))
     checked := 0
-    for i := 0; i < 3000; i++ {
+    for range 3000 {
         ax := rng.Float64() * 2048
         ay := rng.Float64() * 2048
         bx := rng.Float64() * 2048

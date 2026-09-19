@@ -515,7 +515,8 @@ func (a *botAgg) pushLevel(r record) {
     if n := len(a.levels); n > 0 && a.levels[n-1].lv >= r.Lv {
         return
     }
-    a.levels = appendCapped(a.levels, levelMark{t: r.T, lv: r.Lv}, maxLevelMarks)
+    a.levels = appendCapped(a.levels,
+        levelMark{t: r.T, lv: r.Lv}, maxLevelMarks)
 }
 
 // openTrip remembers the running trip bracket.
@@ -536,7 +537,8 @@ func (a *botAgg) closeTrip(r record) {
     a.tripSec += dur
     a.tripReason[r.R]++
     if dur > a.tripMax.dur {
-        a.tripMax = tripMark{t: a.tripOpen.t, reason: a.tripOpen.reason, dur: dur}
+        a.tripMax = tripMark{
+            t: a.tripOpen.t, reason: a.tripOpen.reason, dur: dur}
     }
     a.tripOpen = nil
 }

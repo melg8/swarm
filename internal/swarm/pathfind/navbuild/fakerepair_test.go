@@ -15,7 +15,7 @@ import (
 // the middle columns the l2j uninitialized filler (1 layer, height 0,
 // fully open). The stripe width rides the parameter.
 func fakeSplitWorld(stripe int) func(cx, cy int) []layerSpec {
-    return func(cx, cy int) []layerSpec {
+    return func(cx, _ int) []layerSpec {
         if cx >= 1000 && cx < 1000+stripe {
             return []layerSpec{{h: 0, nswe: 0x0F}}
         }

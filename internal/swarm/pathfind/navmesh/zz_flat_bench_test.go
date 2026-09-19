@@ -27,7 +27,7 @@ func BenchmarkFlatFound21x19(b *testing.B) {
     start := Pos{X: 36000, Y: 36000, Z: -3696}
     end := Pos{X: 50000, Y: 50000, Z: -3696}
     b.ResetTimer()
-    for i := 0; i < b.N; i++ {
+    for range b.N {
         route, err := mesh.Route(start, end, DefaultFilter())
         if err != nil || !route.Found {
             b.Fatal("the found bench pair must answer found")
@@ -44,7 +44,7 @@ func BenchmarkFlatExhaustive21x19(b *testing.B) {
     start := Pos{X: 34000, Y: 34000, Z: -3696}
     end := Pos{X: 64000, Y: 64000, Z: -3696}
     b.ResetTimer()
-    for i := 0; i < b.N; i++ {
+    for range b.N {
         route, err := mesh.Route(start, end, DefaultFilter())
         if err != nil || route.Found || !route.Partial {
             b.Fatal("the exhaustive bench pair must answer the partial")

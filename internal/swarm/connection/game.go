@@ -312,7 +312,8 @@ func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
     client.logger.Printf("Sent protocol version %d",
         togameserver.C1ProtocolVersion)
 
-    if err := conn.SetReadDeadline(time.Now().Add(gameHandshakeWait)); err != nil {
+    if err := conn.SetReadDeadline(
+        time.Now().Add(gameHandshakeWait)); err != nil {
         return nil, fmt.Errorf("failed to set read deadline: %w", err)
     }
     payload, err := readWirePacket(conn, client.readBuf)
@@ -412,7 +413,8 @@ func (gc *GameClient) AttackTarget(objectID int32) error {
     }
     x, y, z, ok := gc.tracker.ObjectPosition(objectID)
     if !ok {
-        return fmt.Errorf("failed to attack target %d: object unknown", objectID)
+        return fmt.Errorf("failed to attack target %d: object unknown",
+            objectID)
     }
     if err := gc.sendAttackRequest(objectID, x, y, z); err != nil {
         return fmt.Errorf("failed to attack: %w", err)
@@ -1089,7 +1091,8 @@ func (gc *GameClient) handleCharCreateFail(
     payload []byte,
 ) (bool, *fromgameserver.CharSelectInfoPacket, error) {
     fail := fromgameserver.NewCharCreateFailPacket()
-    if err := fromgameserver.ParseCharCreateFailPacket(fail, payload); err != nil {
+    if err := fromgameserver.ParseCharCreateFailPacket(fail,
+        payload); err != nil {
         return false, nil, err
     }
 
@@ -1111,7 +1114,8 @@ func (gc *GameClient) handleUpdatedCharList(
         return true, updated, nil
     }
 
-    return false, nil, errors.New("created character missing in the updated list")
+    return false, nil, errors.New(
+        "created character missing in the updated list")
 }
 
 // EnterWorld selects the character slot and requests world entry.
@@ -1170,7 +1174,8 @@ func (gc *GameClient) EnterWorld(slot int32) error {
 func (gc *GameClient) awaitCharSelected(
     selected *fromgameserver.CharSelectedPacket,
 ) (bool, error) {
-    if err := gc.conn.SetReadDeadline(time.Now().Add(charSelectWait)); err != nil {
+    if err := gc.conn.SetReadDeadline(
+        time.Now().Add(charSelectWait)); err != nil {
         return false, fmt.Errorf(
             "failed to set the char select deadline: %w", err)
     }
@@ -1198,7 +1203,8 @@ func (gc *GameClient) awaitCharSelected(
             }
             gc.trackerApplySelection(selected)
 
-            if resetErr := gc.conn.SetReadDeadline(time.Time{}); resetErr != nil {
+            if resetErr := gc.conn.SetReadDeadline(
+                time.Time{}); resetErr != nil {
                 gc.logger.Printf(
                     "Failed to reset the char select deadline: %v",
                     resetErr)
@@ -1206,7 +1212,8 @@ func (gc *GameClient) awaitCharSelected(
 
             return true, nil
         }
-        gc.logger.Printf("Ignoring packet id 0x%02x while entering world", payload[0])
+        gc.logger.Printf("Ignoring packet id 0x%02x while entering world",
+            payload[0])
     }
 }
 
@@ -1317,7 +1324,8 @@ func (gc *GameClient) runLoop(
 
             return nil
         case <-pingTicker.C:
-            if err := gc.sendPacket(&togameserver.RequestNetPing{}); err != nil {
+            if err := gc.sendPacket(
+                &togameserver.RequestNetPing{}); err != nil {
                 return fmt.Errorf("failed to send net ping: %w", err)
             }
         case <-validateTicker.C:

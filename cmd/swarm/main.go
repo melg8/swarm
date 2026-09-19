@@ -174,6 +174,7 @@ type config struct {
     auditFresh bool
 }
 
+//nolint:funlen // the flag surface is one linear block by design
 func parseFlags() config {
     cfg := config{
         loginAddress:     "",
@@ -233,7 +234,8 @@ func parseFlags() config {
     flag.BoolVar(&cfg.testFightUIV1, "test-fight-ui-v1", false,
         "combat animation variant showcase UI (v1 idea set) instead of the "+
             "bot: no game connection, a looping hero versus enemy demo fight "+
-            "plays every damage visualization idea side by side for picking one")
+            "plays every damage visualization idea side by side "+
+            "for picking one")
     flag.StringVar(&cfg.geodataDir, "geodata", "",
         "geodata directory with X_Y.l2j region files for the pathfind "+
             "test (auto detected when empty)")
@@ -459,7 +461,8 @@ func runBot( //nolint:funlen // linear session script
     // happen before the session starts reading so nothing is missed.
     var sessionRecorder *proxy.Recorder
     if proxyServer != nil {
-        sessionRecorder = proxyServer.RegisterSession(cfg.account, game, tracker)
+        sessionRecorder = proxyServer.RegisterSession(
+            cfg.account, game, tracker)
         game.SetTap(sessionRecorder.Record)
         defer proxyServer.UnregisterSession(cfg.account, sessionRecorder)
     }
@@ -656,7 +659,8 @@ func runSessionQueryCLI(cfg config) {
     if explicitAccount() {
         filter.Bot = cfg.account
     }
-    if err := session.RunQuery(cfg.sessionQuery, filter, os.Stdout); err != nil {
+    if err := session.RunQuery(cfg.sessionQuery, filter,
+        os.Stdout); err != nil {
         log.Fatalf("Session query: %v", err)
     }
 }
@@ -665,7 +669,8 @@ func runSessionQueryCLI(cfg config) {
 // findings: the first tool of every post-mortem, it names the windows
 // the drill-down should isolate.
 func runSessionAnomaliesCLI(cfg config) {
-    if err := session.RunAnomalies(cfg.sessionAnomalies, os.Stdout); err != nil {
+    if err := session.RunAnomalies(cfg.sessionAnomalies,
+        os.Stdout); err != nil {
         log.Fatalf("Session anomalies: %v", err)
     }
 }
@@ -706,7 +711,8 @@ func startMemoryWatch(ctx context.Context) {
 // its own. The geodata engine and the navmesh mesh survive the
 // reconnects.
 func runBotForever(
-    ctx context.Context, cfg config, tracker *state.Bot, engine *pathfind.Engine,
+    ctx context.Context, cfg config, tracker *state.Bot,
+    engine *pathfind.Engine,
     mesh *navmesh.Mesh, proxyServer *proxy.Server, journal *session.Journal,
 ) {
     delay := reconnectMinDelay
@@ -760,6 +766,7 @@ func runBotForever(
     }
 }
 
+//nolint:cyclop,funlen // one flat mode switch by design
 func main() {
     cfg := parseFlags()
     log.SetOutput(os.Stdout)
@@ -889,6 +896,8 @@ func main() {
 // connecting C1 client attaches to) and one geodata engine. The process
 // stays alive until every bot supervisor returns (SIGINT/SIGTERM stops
 // them all through the shared context).
+//
+//nolint:funlen // the fleet start walks the phases in order
 func runFleet(cfg config) {
     log.Printf("Starting swarm fleet of %d bots", cfg.bots)
     log.Printf("Build: %s", version.Identity())

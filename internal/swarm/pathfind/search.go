@@ -739,7 +739,8 @@ func (s *search) wallsOpen(from, to *node) bool {
 func (s *search) diagonalFlanksOpen(from, to *node) bool {
     south := to.coords.Y > from.coords.Y
     east := to.coords.X > from.coords.X
-    vertical := s.node(Point{X: from.coords.X, Y: to.coords.Y}, from.layer.Height)
+    vertical := s.node(
+        Point{X: from.coords.X, Y: to.coords.Y}, from.layer.Height)
     if vertical != nil {
         if east && !vertical.layer.IsEastOpen() {
             return false

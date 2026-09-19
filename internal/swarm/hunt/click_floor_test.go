@@ -36,7 +36,7 @@ func TestExtendShortClickCandidatesMarchForward(t *testing.T) {
     // The character stands between the first bend and the far leg.
     candidates, count := extendShortClickCandidates(1010, 1100, waypoints, 1, 0)
     require.Positive(t, count, "the march must collect the far samples")
-    for c := 0; c < count; c++ {
+    for c := range count {
         sample := candidates[c]
         // The march walks the segment from wp1 (1020 1000) toward
         // wp2 (1020 1200): every collected sample must sit past the

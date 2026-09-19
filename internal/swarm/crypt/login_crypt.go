@@ -88,7 +88,8 @@ func (lc *LoginCrypt) Seal(dst []byte, content []byte) ([]byte, error) {
     filler := fillerSize(len(content))
     size := len(content) + filler + loginChecksumSize + loginHeaderSize
     if size > loginMaxPacket {
-        return nil, fmt.Errorf("packet size %d exceeds %d", size, loginMaxPacket)
+        return nil, fmt.Errorf("packet size %d exceeds %d",
+            size, loginMaxPacket)
     }
 
     out := dst[:0]
@@ -141,9 +142,11 @@ func (lc *LoginCrypt) Open(payload []byte) ([]byte, error) {
     if err != nil {
         return nil, fmt.Errorf("failed to verify login checksum: %w", err)
     }
-    actual := binary.LittleEndian.Uint32(payload[len(payload)-loginChecksumSize:])
+    actual := binary.LittleEndian.Uint32(
+        payload[len(payload)-loginChecksumSize:])
     if expected != actual {
-        return nil, fmt.Errorf("login packet checksum mismatch: got %08x, want %08x",
+        return nil, fmt.Errorf(
+            "login packet checksum mismatch: got %08x, want %08x",
             expected, actual)
     }
 

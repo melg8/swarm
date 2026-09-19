@@ -185,7 +185,7 @@ func (s *anomalyScan) visit(r record) error {
 }
 
 // apply folds one record of one bot.
-func (a *anomalyBot) apply(r record) { //nolint:cyclop // flat record dispatch
+func (a *anomalyBot) apply(r record) {
     switch r.E {
     case kindStory:
         a.applyStory(r)
@@ -196,7 +196,8 @@ func (a *anomalyBot) apply(r record) { //nolint:cyclop // flat record dispatch
     case kindDeath:
         a.deaths = append(a.deaths, deathMark{t: r.T, lv: r.Lv, x: r.X, y: r.Y})
     case kindStall:
-        a.stalls = append(a.stalls, stallMark{t: r.T, sec: r.Dur, x: r.X, y: r.Y})
+        a.stalls = append(a.stalls,
+            stallMark{t: r.T, sec: r.Dur, x: r.X, y: r.Y})
     case kindTripEnd:
         a.applyTripEnd(r)
     case kindConnect:
@@ -303,7 +304,8 @@ func (a *anomalyBot) clusters() []logoutCluster {
 
             continue
         }
-        clusters = append(clusters, logoutCluster{first: at, last: at, count: 1})
+        clusters = append(clusters,
+            logoutCluster{first: at, last: at, count: 1})
     }
 
     return clusters
@@ -745,7 +747,8 @@ func (r *anomalyRender) gapFindings(a *anomalyBot) []finding {
             score:    float64(muted) / 10,
             title:    "story flood mute",
             details: []string{
-                fmt.Sprintf("%s: %d story lines over the per-minute cap were muted",
+                fmt.Sprintf("%s: %d story lines over the "+
+                    "per-minute cap were muted",
                     a.id, muted),
             },
             drill: "",

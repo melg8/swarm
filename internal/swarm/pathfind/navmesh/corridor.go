@@ -32,6 +32,8 @@ const smoothScanWindow = 256
 // capped at the slack over the free chain. The avoid queries keep
 // the bare chain (the bans wall the search, the region must not
 // reopen the banned ground the chain already avoided).
+//
+//nolint:cyclop,gocognit,funlen // the portal and wall checks
 func (m *Mesh) corridorRegion(corridor []PolyRef, filter Filter,
 ) map[PolyRef]struct{} {
     region := make(map[PolyRef]struct{}, len(corridor)*2)
@@ -115,6 +117,8 @@ func (m *Mesh) corridorRegion(corridor []PolyRef, filter Filter,
 // for the wall clearance check of the caller. The walk crosses only
 // the links of the polygon it leaves, so the stacked layers stay on
 // the connected surface.
+//
+//nolint:cyclop,gocognit,funlen // the wall and guard branches
 func (m *Mesh) regionChord(startRef PolyRef, a, b Pos,
     region map[PolyRef]struct{}, visited *[]PolyRef,
 ) bool {
@@ -122,7 +126,7 @@ func (m *Mesh) regionChord(startRef PolyRef, a, b Pos,
     cx, cy := a.X, a.Y
     *visited = (*visited)[:0]
     const eps = 1e-9
-    for step := 0; step < 1024; step++ {
+    for range 1024 {
         if _, ok := region[current]; !ok {
             return false
         }
@@ -288,10 +292,6 @@ func (m *Mesh) chordWalksRegion(corridor []PolyRef, from, to funnelWp,
     start := int(from.portal)
     if start < 0 {
         start = 0
-    }
-    end := int(to.portal)
-    if end < 0 || end > len(corridor)-1 {
-        end = len(corridor) - 1
     }
     if !m.regionChord(corridor[start], from.pos, to.pos, region,
         visited) {

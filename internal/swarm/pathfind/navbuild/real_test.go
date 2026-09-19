@@ -31,8 +31,9 @@ func realRegionData(t *testing.T, col, row int16) []byte {
 }
 
 // buildRealRegion builds one real region and returns the build.
-func buildRealRegion(t *testing.T, col, row int16) *RegionBuild {
+func buildRealRegion(t *testing.T) *RegionBuild {
     t.Helper()
+    col, row := int16(21), int16(19)
     started := time.Now()
     build, err := BuildRegion(realRegionData(t, col, row), col, row,
         DefaultOptions())
@@ -53,7 +54,7 @@ func buildRealRegion(t *testing.T, col, row int16) *RegionBuild {
 // the link chains are consistent, every internal link has its
 // symmetric counterpart and the wire encode derives the index.
 func TestRealRegionBuildHealth(t *testing.T) {
-    build := buildRealRegion(t, 21, 19)
+    build := buildRealRegion(t)
     tile := build.Tile
 
     for i := range tile.Polys {
@@ -106,7 +107,7 @@ func TestRealRegionBuildHealth(t *testing.T) {
 // water under the bridge - the same x/y over a walkable deck column
 // but the z hundreds of units below it.
 func TestRealRegionBridgePair(t *testing.T) {
-    build := buildRealRegion(t, 21, 19)
+    build := buildRealRegion(t)
     mesh := writeAndLoad(t, build.Tile)
     village := navmesh.Pos{X: 45768, Y: 49848, Z: -3056}
     under := navmesh.Pos{X: 44920, Y: 50792, Z: -3928}
@@ -167,7 +168,7 @@ func TestRealRegionBridgePair(t *testing.T) {
 // the partial closest-reachable corridor (the Detour behavior), the
 // split between them is the report number.
 func TestRealRegionPairReplay(t *testing.T) {
-    build := buildRealRegion(t, 21, 19)
+    build := buildRealRegion(t)
     mesh := writeAndLoad(t, build.Tile)
     pairs := loadRealPairs(t)
     require.NotEmpty(t, pairs)

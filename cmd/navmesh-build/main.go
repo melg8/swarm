@@ -152,7 +152,9 @@ func regionKeys(geodataDir, regionsSpec string,
         if err != nil || row < -32768 || row > 32767 {
             return nil, fmt.Errorf("bad region row %q: %w", rowText, err)
         }
-        keys = append(keys, navmesh.RegionKey{ //nolint:gosec // guarded
+        keys = append(keys, navmesh.RegionKey{
+            //nolint:gosec // the bounds above pin col and row into
+            // the int16 range before the conversion.
             Col: int16(col), Row: int16(row)})
     }
 

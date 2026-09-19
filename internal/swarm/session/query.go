@@ -172,7 +172,8 @@ func (m *queryMatcher) matchRecord(r record) bool {
     if !m.to.IsZero() && r.T > m.to.Unix() {
         return false
     }
-    if m.match != nil && !m.match.MatchString(r.M) && !m.match.MatchString(r.R) {
+    if m.match != nil && !m.match.MatchString(r.M) &&
+        !m.match.MatchString(r.R) {
         return false
     }
 
@@ -305,6 +306,8 @@ func (r *queryRun) printRecord(rec record, context bool) {
 
 // formatQueryRecord renders one record as a compact single line: the
 // clock time, the bot, the kind and the payload the kind carries.
+//
+//nolint:cyclop // the record formatter branches per field kind
 func formatQueryRecord(r record) string {
     timeText := time.Unix(r.T, 0).UTC().Format("15:04:05")
     bot := r.B
@@ -319,13 +322,15 @@ func formatQueryRecord(r record) string {
         fmt.Fprintf(&payload, "emergency logout: %s (login cooldown %s)",
             r.R, durText(r.Ti))
     case kindSample:
-        fmt.Fprintf(&payload, "lv %d xp %d adena %d hp %.0f%% at %d %d phase %s",
+        fmt.Fprintf(&payload,
+            "lv %d xp %d adena %d hp %.0f%% at %d %d phase %s",
             r.Lv, r.Xp, r.Ad, r.Hp, r.X, r.Y, r.Ph)
     case kindKill:
         fmt.Fprintf(&payload, "%s (lvl %d) in %s, hp left %.0f%% at %d %d",
             r.Mob, r.Lvl, durText(r.Dur), r.Hp, r.X, r.Y)
     case kindDeath:
-        fmt.Fprintf(&payload, "died at level %d, position %d %d", r.Lv, r.X, r.Y)
+        fmt.Fprintf(&payload, "died at level %d, position %d %d",
+            r.Lv, r.X, r.Y)
     case kindLevel:
         fmt.Fprintf(&payload, "level %d, xp %d", r.Lv, r.Xp)
     case kindTripStart:

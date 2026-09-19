@@ -150,7 +150,8 @@ func parseGeodataTileRequest(
 
         return 0, 0, 0, 0, "", false
     }
-    colText, rowText, found := strings.Cut(strings.TrimSuffix(name, ".png"), "_")
+    colText, rowText, found := strings.Cut(
+        strings.TrimSuffix(name, ".png"), "_")
     if !found {
         http.Error(w, "invalid tile name", http.StatusBadRequest)
 

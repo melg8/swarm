@@ -34,12 +34,14 @@ func TestRealRegionWalkableCoverage(t *testing.T) {
         cellIdx := rl.cellIndexOf[j]
         if layer.nswe == 0 {
             blocked++
+
             continue
         }
         walkable++
         sheet := sh.sheetOf[j]
         if sheet < 0 || sh.dropped[sheet] {
             dropped++
+
             continue
         }
         if polyAt[j] >= 0 && polyAt[j] < int32(len(rects)) {
@@ -62,6 +64,7 @@ func TestRealRegionWalkableCoverage(t *testing.T) {
             t.Logf("hole at cell (%d, %d): %d layer(s), nswe=%02b,"+
                 " sheet=%d",
                 cx, cy, n, rl.layers[off].nswe, sh.sheetOf[off])
+
             break
         }
     }

@@ -42,13 +42,12 @@ type nmLink struct {
 // discipline the navmesh package's own tests use, built here from the
 // exported tile API (the hunt package cannot reach the package
 // private fixtures).
-func huntTile(
-    t *testing.T, col, row int16, rects []nmRect, links []nmLink,
+func huntTile(t *testing.T, rects []nmRect, links []nmLink,
 ) *navmesh.Tile {
     t.Helper()
     tile := &navmesh.Tile{
-        Col:      col,
-        Row:      row,
+        Col:      21,
+        Row:      19,
         Climb:    40,
         Polys:    make([]navmesh.Poly, len(rects)),
         Links:    make([]navmesh.Link, len(links)),
@@ -94,7 +93,7 @@ func huntTile(
 func TestNavmeshNavigatorServesMeshRoutes(t *testing.T) {
     // The corridor world: mainland A, deck B east, ramp C north of B,
     // water D north of the ramp.
-    tile := huntTile(t, 21, 19, []nmRect{
+    tile := huntTile(t, []nmRect{
         {x0: 0, y0: 0, x1: 160, y1: 160, h: 0, area: navmesh.AreaGround},
         {x0: 160, y0: 0, x1: 320, y1: 160, h: 0, area: navmesh.AreaGround},
         {x0: 160, y0: 160, x1: 320, y1: 208, h: -40, area: navmesh.AreaGround},
@@ -175,7 +174,7 @@ func TestNavmeshNavigatorMissingTileErrors(t *testing.T) {
 func TestNavmeshNavigatorBansReachMesh(t *testing.T) {
     // The two-lane world: mainland M, north lane N, south lane S, far
     // mainland E.
-    tile := huntTile(t, 21, 19, []nmRect{
+    tile := huntTile(t, []nmRect{
         {x0: 0, y0: 0, x1: 160, y1: 320, h: 0, area: navmesh.AreaGround},
         {x0: 160, y0: 0, x1: 320, y1: 160, h: 0, area: navmesh.AreaGround},
         {x0: 160, y0: 160, x1: 320, y1: 320, h: 0, area: navmesh.AreaGround},
@@ -361,7 +360,7 @@ func huntWorldOf(localCell int) float64 {
 func shoreWorldTile(t *testing.T) *navmesh.Tile {
     t.Helper()
 
-    return huntTile(t, 21, 19, []nmRect{
+    return huntTile(t, []nmRect{
         {x0: 0, y0: 0, x1: 160, y1: 320, h: -3770, area: navmesh.AreaGround},
         {x0: 160, y0: 0, x1: 320, y1: 320, h: -3770, area: navmesh.AreaGround},
         {x0: 320, y0: 0, x1: 480, y1: 320, h: -3800, area: navmesh.AreaWater},
@@ -447,7 +446,7 @@ func TestNavmeshNavigatorPartialServesClosestReachable(t *testing.T) {
 // the walk plan must be the mesh answer).
 func TestNavmeshNavigatorPartialOwnsThePlan(t *testing.T) {
     // The broken-chain world: A-B-C linked, D isolated (no C-D link).
-    tile := huntTile(t, 21, 19, []nmRect{
+    tile := huntTile(t, []nmRect{
         {x0: 0, y0: 0, x1: 160, y1: 320, h: -3770, area: navmesh.AreaGround},
         {x0: 160, y0: 0, x1: 320, y1: 320, h: -3770, area: navmesh.AreaGround},
         {x0: 320, y0: 0, x1: 480, y1: 320, h: -3770, area: navmesh.AreaGround},

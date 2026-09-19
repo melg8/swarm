@@ -193,7 +193,8 @@ func writeReportMobs(b *strings.Builder, a *botAgg) {
         if mob.hpHits > 0 {
             hp = mob.hpBelow / float64(mob.hpHits)
         }
-        fmt.Fprintf(b, "  %-24s %4d kills, avg %.1fs, max %.0fs, hp left %.0f%%\n",
+        fmt.Fprintf(b,
+            "  %-24s %4d kills, avg %.1fs, max %.0fs, hp left %.0f%%\n",
             name, mob.count, avg, mob.durMax, hp)
     }
 }
@@ -221,7 +222,8 @@ func writeReportDowntime(b *strings.Builder, a *botAgg) {
     b.WriteString("== downtime ==\n")
     hours := timeSpanHours(a.first, a.last)
     fmt.Fprintf(b, "  town trips: %d (%s total, avg %s, longest %s: %q)\n",
-        a.trips, durText(a.tripSec), durText(a.tripSec/max(float64(a.trips), 1)),
+        a.trips, durText(a.tripSec),
+        durText(a.tripSec/max(float64(a.trips), 1)),
         durText(a.tripMax.dur), a.tripMax.reason)
     if len(a.tripReason) > 0 {
         reasons := make([]string, 0, len(a.tripReason))

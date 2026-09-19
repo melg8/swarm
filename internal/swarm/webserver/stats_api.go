@@ -315,7 +315,7 @@ func (c *statsCollector) fleetView(
         fleet.HitRate = float64(swingsLanded) / float64(swingsMade)
     }
 
-    return statsResponse{ //nolint:exhaustruct_v5 // process filled by the caller
+    return statsResponse{ //nolint:exhaustruct_v5 // filled by caller
         NowMs:           now.UnixMilli(),
         SamplePeriodSec: int(statsSamplePeriod / time.Second),
         CollectionSec:   collection,
@@ -334,7 +334,7 @@ func (c *statsCollector) botView(
     defer c.mu.Unlock()
     series, ok := c.bots[read.info.ID]
     if !ok || series.ring.count == 0 {
-        return botStatsResponse{}, false //nolint:exhaustruct_v5 // the empty miss
+        return botStatsResponse{}, false //nolint:exhaustruct_v5 // miss
     }
 
     view := botViewFrom(read, series, now)

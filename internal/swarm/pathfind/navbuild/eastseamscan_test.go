@@ -15,8 +15,8 @@ import (
 // bridge. The answer tells whether the Giran route has a legal border
 // crossing at all.
 func TestEastSeamScan(t *testing.T) {
-    west := loadRegionForDump(t, "../../../../data/geodata", 19, 22)
-    east := loadRegionForDump(t, "../../../../data/geodata", 20, 22)
+    west := loadRegionForDump(t, 19)
+    east := loadRegionForDump(t, 20)
     climb := DefaultOptions().Climb
 
     firstLayerHeight := func(rl *regionLayers, x, y int) (int16, uint8,
@@ -46,12 +46,12 @@ func TestEastSeamScan(t *testing.T) {
             if !wok {
                 continue
             }
-            for ex := 0; ex < 4; ex++ {
+            for ex := range 4 {
                 eh, enswe, eok := firstLayerHeight(east, ex, y)
                 if !eok {
                     continue
                 }
-                if eh-eh == 0 && wh <= waterLevel && eh <= waterLevel {
+                if wh <= waterLevel && eh <= waterLevel {
                     crossable = true // water to water
 
                     break

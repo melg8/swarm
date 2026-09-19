@@ -77,7 +77,7 @@ func TestTileRoundtrip(t *testing.T) {
     // The grid entries list both polygons in both touched buckets
     // (the rects share the bucket row and the x range).
     entries := map[uint32]int{}
-    for b := 0; b < gridBuckets; b++ {
+    for b := range gridBuckets {
         for e := tile.Grid.Offsets[b]; e < tile.Grid.Offsets[b+1]; e++ {
             entries[tile.Grid.Entries[e]]++
         }

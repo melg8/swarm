@@ -147,7 +147,8 @@ func (p *InitPacket) WriteTo(dest []byte) (int, error) {
 func (p *InitPacket) ToString() string {
     result := "\nInitPacket:" +
         "\n  SessionID: " + helpers.HexStringFromInt32(p.SessionID) +
-        "\n  ProtocolVersion: " + helpers.HexStringFromInt32(p.ProtocolVersion) +
+        "\n  ProtocolVersion: " +
+        helpers.HexStringFromInt32(p.ProtocolVersion) +
         "\n  RsaPublicKey: \n" +
         helpers.HexViewFromWithLineSplit(p.RsaPublicKey, 16, "    ") +
         "\n  GameGuard1: " + helpers.HexStringFromInt32(p.GameGuard1) +

@@ -2,6 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
+// the wire-format convention: every builder documents its own
+// opcode, field order and error text, sharing a helper would hide
+// the per packet layout the wire format pins.
+//
+//nolint:dupl // the packet file mirrors ValidatePositionPacket by
 package togameserver
 
 import (
@@ -37,6 +42,12 @@ func NewAttackRequestPacket() *AttackRequestPacket {
 }
 
 // ToBytes serializes the packet.
+//
+// field (the packet convention); sharing a helper with
+// ValidatePositionPacket would hide the per packet layout the
+// wire format documents.
+//
+//nolint:dupl // the builder mirrors its own wire spec field by
 func (p *AttackRequestPacket) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(attackRequestPacketID); err != nil {
         return fmt.Errorf("failed to write attack request id: %w", err)

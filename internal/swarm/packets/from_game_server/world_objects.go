@@ -59,7 +59,8 @@ func ParseMoveToLocationPacket(p *MoveToLocationPacket, data []byte) error {
         return err
     }
     if err := readInt32Fields(reader,
-        &p.ObjectID, &p.DestX, &p.DestY, &p.DestZ, &p.X, &p.Y, &p.Z); err != nil {
+        &p.ObjectID, &p.DestX, &p.DestY, &p.DestZ,
+        &p.X, &p.Y, &p.Z); err != nil {
         return fmt.Errorf("failed to read movement: %w", err)
     }
 

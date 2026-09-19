@@ -59,6 +59,7 @@ func TestNavmeshTownRoutes(t *testing.T) {
 // runTownLeg measures one leg: the coarse chain phase, the hop
 // refinement phase and the production Route answer (cold and warm).
 func runTownLeg(t *testing.T, mesh *Mesh, name string, start, end Pos) {
+    t.Helper()
     startRef, startPos, ok := mesh.FindNearestPoly(start)
     require.True(t, ok, "%s: the start must bind", name)
     endRef, endPos, ok := mesh.FindNearestPoly(end)

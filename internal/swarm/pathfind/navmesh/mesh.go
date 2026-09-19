@@ -71,7 +71,6 @@ type Mesh struct {
     hierMu           sync.Mutex
     hops             map[hopKey][]PolyRef
     hopOrder         []hopKey
-    dstComps         map[abstractEdgeRef]uint32
 }
 
 // tileEntry is one loaded, failed or missing tile in the cache.
@@ -233,7 +232,9 @@ func (m *Mesh) scanFiles() {
             continue
         }
         // The bounds checks above pin the int16 conversion range.
-        key := RegionKey{Col: int16(col), Row: int16(row)} //nolint:gosec // guarded
+        //nolint:gosec // the callers pin col and row into the
+        // int16 range before the conversion.
+        key := RegionKey{Col: int16(col), Row: int16(row)}
         m.files[key] = struct{}{}
     }
 }
@@ -293,6 +294,8 @@ func entryAnswer(entry *tileEntry) (*Tile, error) {
 // decodeTileEntry reads and parses one tile file without holding the
 // mesh lock (the read and the zstd pipeline own the cold cost, the
 // parallel decode pool runs this concurrently).
+//
+//nolint:cyclop // the tile entry decode branches per entry kind
 func (m *Mesh) decodeTileEntry(key RegionKey) *tileEntry {
     entry := &tileEntry{key: key, tile: nil, err: nil, state: tileLoaded}
     if _, ok := m.files[key]; !ok {

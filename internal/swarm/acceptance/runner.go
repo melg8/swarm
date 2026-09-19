@@ -233,19 +233,20 @@ func (m *Manager) runSession(
 // runBotForever supervisor does: a lost session (the emergency logout
 // of the hunt loop, a server kick, a transport error) reconnects
 // after the tracker login cooldown with a growing backoff, and the
-// run context ends the loop. The return mirrors a single session: nil
-// means the run context ended while the session was healthy.
+// run context ends the loop. The supervisor answers when the run
+// context ended: the loop itself never gives up (every session loss
+// is a reconnect), so there is no error to report.
 func (m *Manager) runSessionSupervised(
     ctx context.Context, account string, password string, char string,
-    autonomous bool, registrar *proxy.Server, logLine func(string),
-) error {
+    registrar *proxy.Server, logLine func(string),
+) {
     delay := sessionReconnectMinDelay
     for {
         started := time.Now()
-        err := m.runSession(ctx, account, password, char, autonomous,
+        err := m.runSession(ctx, account, password, char, true,
             registrar, logLine)
         if ctx.Err() != nil {
-            return nil
+            return
         }
         if err != nil {
             logLine("acceptance: session lost, reconnecting: " + err.Error())
@@ -262,7 +263,7 @@ func (m *Manager) runSessionSupervised(
         logLine("acceptance: reconnecting in " + delay.String())
         select {
         case <-ctx.Done():
-            return nil
+            return
         case <-time.After(delay):
         }
         delay = min(delay*2, sessionReconnectMaxDelay)

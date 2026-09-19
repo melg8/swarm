@@ -314,7 +314,8 @@ func (gc *gameConn) sendRawKeyPacket(
         return
     }
     if err := writeWirePacket(gc.conn, writer.Bytes()); err != nil {
-        gc.server.logger.Printf("game#%d: key packet write failed: %v", gc.id, err)
+        gc.server.logger.Printf("game#%d: key packet write failed: %v",
+            gc.id, err)
     }
 }
 
@@ -341,7 +342,8 @@ func (gc *gameConn) handleClientPacket(payload []byte) error {
             return gc.handleCharacterCreate()
         case gameOpNewCharacter, gameOpCharacterDelete:
             gc.server.logger.Printf(
-                "game#%d: character management packet 0x%02x ignored by the emulation",
+                "game#%d: character management packet 0x%02x "+
+                    "ignored by the emulation",
                 gc.id, opcode)
 
             return nil
@@ -385,7 +387,8 @@ func (gc *gameConn) handleAuthLogin(payload []byte) error {
         login = authLoginFallbackAccount
     }
     gc.server.logger.Printf(
-        "game#%d: auth login for account %q (any pair is accepted)", gc.id, login)
+        "game#%d: auth login for account %q (any pair is accepted)",
+        gc.id, login)
 
     gc.session = gc.server.resolveSession()
     if gc.session == nil {
@@ -650,12 +653,14 @@ func (gc *gameConn) transitToServer(payload []byte) error {
     }
     if gc.isHolding() {
         gc.server.logger.Printf(
-            "game#%d: client packet 0x%02x swallowed while held for the bot relogin",
+            "game#%d: client packet 0x%02x swallowed while held "+
+                "for the bot relogin",
             gc.id, payload[0])
 
         return nil
     }
-    if payload[0] == clientOpValidatePosition && gc.clientViewDiverged(payload) {
+    if payload[0] == clientOpValidatePosition &&
+        gc.clientViewDiverged(payload) {
         // The client reports a place the bot's world contradicts: the
         // report never reaches the server (the Mobius out of sync
         // branch would snap the server side character to the client's
@@ -766,7 +771,8 @@ func (gc *gameConn) correctClientView(payload []byte) {
     if gc.viewLogAt.IsZero() || time.Since(gc.viewLogAt) > validateLogPeriod {
         gc.viewLogAt = time.Now()
         gc.server.logger.Printf(
-            "game#%d: client position report %d %d is stale against the bot at "+
+            "game#%d: client position report %d %d is stale "+
+                "against the bot at "+
                 "%d %d, correcting the client view",
             gc.id, reportX, reportY, self.X, self.Y)
     }
@@ -927,8 +933,8 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
         replayBytes += len(entries[i].payload)
     }
     gc.server.logger.Printf(
-        "game#%d: replaying %d recorded packets (%d bytes) with the live self state "+
-            "(self id %d), then live",
+        "game#%d: replaying %d recorded packets (%d bytes) with "+
+            "the live self state (self id %d), then live",
         gc.id, len(entries), replayBytes, selfID)
 
     gc.replayHistory(entries, selfID, lastSelfMoveSeq, session)

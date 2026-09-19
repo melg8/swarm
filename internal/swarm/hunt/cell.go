@@ -99,16 +99,6 @@ type Cell struct {
     Neighbors []int32
 }
 
-// patrolZone returns the movement leash of the cell in the tracker
-// zone form: the patrol square inscribed in the polygon. The
-// movement machinery (the patrol walk, the zone return, the flee
-// steps, the in-zone checks) stays square-based; every point of the
-// square is inside the polygon, so the square leash never leaves the
-// cell.
-func (c Cell) patrolZone() *state.Zone {
-    return &state.Zone{CX: c.FocusX, CY: c.FocusY, Half: c.PatrolHalf}
-}
-
 // targetZone builds the target leash of the cell: the exact convex
 // polygon. The engage, the far target search and the emptiness
 // reading fence on the whole cell (not the patrol square), so the

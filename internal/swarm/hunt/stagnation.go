@@ -239,7 +239,8 @@ func (l *Loop) stagnationHardRecover(reason string, now time.Time) {
     if l.logoutDone || l.phase == phaseDelevel {
         return
     }
-    if !l.stagHardAt.IsZero() && now.Sub(l.stagHardAt) < stagnationHardCooldown {
+    if !l.stagHardAt.IsZero() &&
+        now.Sub(l.stagHardAt) < stagnationHardCooldown {
         // The recovery is on cooldown: the stall line above stays the
         // only output of this window (the previous rebuild either
         // fixed the loop or the next window retries).

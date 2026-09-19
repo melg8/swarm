@@ -106,6 +106,8 @@ const fullDressTimeout = 5 * time.Minute
 // in-process mirrors of the two existing e2e harnesses
 // (tools/mobius_e2e.sh and tools/proxy_e2e.sh) so the whole
 // acceptance suite runs from one place.
+//
+//nolint:funlen // the scenario registry is one linear table by design
 func Definitions() []TestDef {
     return []TestDef{
         {

@@ -101,9 +101,11 @@ func writeAbstractSidecar(outDir string, key navmesh.RegionKey,
     tilePath := tilePathOf(outDir, key)
     info, err := os.Stat(tilePath)
     if err != nil {
-        return 0, nil // no tile: no sidecar (the absent region)
+        //nolint:nilerr // any stat failure reads as the absent region:
+        // no tile, no sidecar (the pack keeps the walk honest).
+        return 0, nil
     }
-    data, err := os.ReadFile(tilePath) //nolint:gosec // the fixed dir
+    data, err := os.ReadFile(tilePath)
     if err != nil {
         return 0, fmt.Errorf("read the tile: %w", err)
     }
@@ -130,6 +132,8 @@ func writeAbstractSidecar(outDir string, key navmesh.RegionKey,
     sidecarPath := filepath.Join(outDir,
         fmt.Sprintf("%d_%d.ab", key.Col, key.Row))
     tmp := sidecarPath + ".tmp"
+    //nolint:gosec // the path is the tool's own outDir plus the
+    // region key, the caller owns the directory.
     if err := os.WriteFile(tmp, encoded, 0o600); err != nil {
         return 0, fmt.Errorf("write the sidecar: %w", err)
     }

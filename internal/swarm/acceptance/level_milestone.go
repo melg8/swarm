@@ -200,9 +200,9 @@ func levelMilestoneScenario(ctx context.Context, m *Manager, t *Test) error {
     defer cancelSession()
     sessionDone := make(chan error, 1)
     go func() {
-        sessionDone <- m.runSessionSupervised(sessionCtx, milestoneAccount,
-            milestonePassword, milestoneAccount, true, m.proxy,
-            test.appendLog)
+        m.runSessionSupervised(sessionCtx, milestoneAccount,
+            milestonePassword, milestoneAccount, m.proxy, test.appendLog)
+        sessionDone <- nil
     }()
 
     tracker := m.tracker(test)

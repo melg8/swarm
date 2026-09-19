@@ -26,7 +26,7 @@ func clusterSplitWorld() *Tile {
         {poly: 1, side: SideMinX, to: 0, t0: 0, t1: 159},
     }
 
-    return assembleTile(21, 19, rects, links, nil)
+    return assembleTile(21, rects, links, nil)
 }
 
 // TestAbstractSidecarRoundtrip builds the abstract of the cluster

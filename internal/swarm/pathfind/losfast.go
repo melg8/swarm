@@ -62,6 +62,8 @@ func (e *Engine) cellLayerAt(slot *regionSlot, p Point,
 // reverse direction and the anti corner cut flanks of a diagonal step
 // (a flank cell without geodata counts as open, the server reads no
 // wall from a region it has no data for).
+//
+//nolint:cyclop // the wall walk is one branch matrix over the four cell sides
 func (e *Engine) wallsOpenCells(slot *regionSlot, from,
     to cellState,
 ) bool {
@@ -139,7 +141,7 @@ func (e *Engine) canStepCells(slot *regionSlot, from, to cellState,
         return false
     }
 
-    return int(heightDelta(from.layer.Height, to.layer.Height)) <=
+    return heightDelta(from.layer.Height, to.layer.Height) <=
         maxPassableHeight
 }
 
@@ -269,6 +271,8 @@ func (e *Engine) walkSupercover(a, b Vec3, maxPassableHeight int,
 // hold the capsule clearance over its portion of the line. A cell
 // without geodata truncates the walk (the straightPath break - the
 // server click validation answers the gap).
+//
+//nolint:cyclop,gocognit,funlen // one branch matrix over the four sides
 func (e *Engine) walkSupercoverCells(slot regionSlot, from,
     to cellState, a, b Vec3, maxPassableHeight int,
     radius float64, scratch []Layer,
@@ -309,6 +313,7 @@ func (e *Engine) walkSupercoverCells(slot regionSlot, from,
         nextLayer, ok := e.cellLayerAt(&slot, nextP, from.layer.Height)
         if !ok {
             truncated = true
+
             break
         }
         next := cellState{p: nextP, layer: nextLayer}
@@ -372,6 +377,8 @@ const capsuleClearanceTrim = 4.0
 // against the portion's middle height - the nearestWall layer choice
 // per neighbor cell). The portion is clipped to the trim window
 // first; a portion fully inside the trim window answers clear.
+//
+//nolint:cyclop // the per portion clearance repeats the wall walk branches
 func portionClear(e *Engine, slot *regionSlot, cell cellState,
     a, b Vec3, tLo, tHi, trimStart, trimEnd, radius float64,
     scratch []Layer,

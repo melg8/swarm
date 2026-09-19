@@ -81,13 +81,13 @@ func navmeshGet(t *testing.T, server *Server, path string) *httptest.ResponseRec
     return recorder
 }
 
-// navmeshPost exercises one handler with a JSON body.
-func navmeshPost(t *testing.T, server *Server, path, body string,
+// navmeshPost exercises the route handler with a JSON body.
+func navmeshPost(t *testing.T, server *Server, body string,
 ) *httptest.ResponseRecorder {
     t.Helper()
     recorder := httptest.NewRecorder()
     server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
-        http.MethodPost, path, strings.NewReader(body)))
+        http.MethodPost, "/api/navmesh/path", strings.NewReader(body)))
 
     return recorder
 }
@@ -269,7 +269,7 @@ func TestNavmeshPathEndpoint(t *testing.T) {
     server := newNavmeshTestServer(t, nil)
 
     t.Run("the swim route reaches the water polygon", func(t *testing.T) {
-        recorder := navmeshPost(t, server, "/api/navmesh/path",
+        recorder := navmeshPost(t, server,
             `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-48},`+
                 `"filter":"swim"}`)
 
@@ -293,7 +293,7 @@ func TestNavmeshPathEndpoint(t *testing.T) {
     })
 
     t.Run("the dry filter answers the partial corridor", func(t *testing.T) {
-        recorder := navmeshPost(t, server, "/api/navmesh/path",
+        recorder := navmeshPost(t, server,
             `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-48},`+
                 `"filter":"dry"}`)
 
@@ -314,7 +314,7 @@ func TestNavmeshPathEndpoint(t *testing.T) {
     })
 
     t.Run("a bad body answers 400", func(t *testing.T) {
-        recorder := navmeshPost(t, server, "/api/navmesh/path", "{")
+        recorder := navmeshPost(t, server, "{")
         require.Equal(t, http.StatusBadRequest, recorder.Code)
     })
 }
@@ -518,7 +518,7 @@ func TestNavmeshPathWithEngine(t *testing.T) {
 
     server := NewNavmeshServer(navmesh.NewMesh(tileDir), "127.0.0.1:0",
         log.New(io.Discard, "", 0), NavmeshOptions{Engine: engine})
-    recorder := navmeshPost(t, server, "/api/navmesh/path",
+    recorder := navmeshPost(t, server,
         `{"start":{"x":8,"y":8,"z":0},"end":{"x":24,"y":8,"z":0},`+
             `"filter":"swim"}`)
 

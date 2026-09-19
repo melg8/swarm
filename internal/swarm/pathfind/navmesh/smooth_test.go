@@ -32,7 +32,7 @@ func smoothCornerWorld() *Tile {
         {poly: 1, side: SideMinY, to: 0, t0: 0, t1: 1},
     }
 
-    return assembleTile(21, 19, rects, links, nil)
+    return assembleTile(21, rects, links, nil)
 }
 
 // TestSmoothKeepsCornerUnderCapsule pins the wall rule of the
@@ -92,7 +92,7 @@ func smoothTWorld() *Tile {
         {poly: 2, side: SideMinY, to: 1, t0: 16, t1: 31},
     }
 
-    return assembleTile(21, 19, rects, links, nil)
+    return assembleTile(21, rects, links, nil)
 }
 
 // TestFunnelWalksOpenSpanEndStraight pins the open span end contract
@@ -144,7 +144,7 @@ func TestSmoothMergesGranularStairPivots(t *testing.T) {
         {poly: 2, side: SideMaxY, to: 3, t0: 0, t1: 15},
         {poly: 3, side: SideMinY, to: 2, t0: 0, t1: 15},
     }
-    mesh := NewMesh(writeTiles(t, assembleTile(21, 19, rects, links,
+    mesh := NewMesh(writeTiles(t, assembleTile(21, rects, links,
         nil)))
     filter := DefaultFilter()
     filter.WaypointClearance = 7.5
@@ -191,7 +191,7 @@ func TestSmoothRespectsPortalSpans(t *testing.T) {
         {poly: 1, side: SideMaxX, to: 2, t0: 12, t1: 15},
         {poly: 2, side: SideMinX, to: 1, t0: 12, t1: 15},
     }
-    mesh := NewMesh(writeTiles(t, assembleTile(21, 19, rects, links,
+    mesh := NewMesh(writeTiles(t, assembleTile(21, rects, links,
         nil)))
     filter := DefaultFilter()
     filter.WaypointClearance = 7.5

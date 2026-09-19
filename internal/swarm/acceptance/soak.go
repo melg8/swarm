@@ -162,9 +162,9 @@ func soakSetup(
     sessionCtx, cancelSession := context.WithCancel(ctx)
     sessionDone := make(chan error, 1)
     go func() {
-        sessionDone <- m.runSessionSupervised(sessionCtx, soakAccount,
-            soakPassword, soakAccount, true, m.proxy,
-            test.appendLog)
+        m.runSessionSupervised(sessionCtx, soakAccount, soakPassword,
+            soakAccount, m.proxy, test.appendLog)
+        sessionDone <- nil
     }()
     tracker := m.tracker(test)
     if err := waitOnline(ctx, tracker, test); err != nil {

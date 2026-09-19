@@ -1246,6 +1246,8 @@ func (l *Loop) walkTownWaypoints() bool {
 // refuses to move to ends the trip with its cooldown instead of
 // grinding refused clicks forever. It reports whether the leg
 // arrived at its destination.
+//
+//nolint:cyclop,funlen // the refusal branches read best side by side
 func (l *Loop) walkDirectLeg(
     now time.Time, selfX, selfY, selfZ int32,
 ) bool {
@@ -1874,6 +1876,8 @@ func (l *Loop) followWaypoints(
 // after the steering so the line they verify is the one actually
 // being sent. Without a navigator both guards stay off (the walk was
 // planned elsewhere, the follower only walks it).
+//
+//nolint:cyclop // the branches mirror the server click checks per waypoint kind
 func (l *Loop) clickWaypoint(
     selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
 ) {
@@ -1966,7 +1970,8 @@ func (l *Loop) clickWaypoint(
         return
     }
     l.moveAt = now
-    if err := l.game.WalkTo(int32(moveX), int32(moveY), int32(moveZ)); err != nil {
+    if err := l.game.WalkTo(int32(moveX), int32(moveY),
+        int32(moveZ)); err != nil {
         l.logf("Hunt: town walk request failed: %v", err)
     }
 }
@@ -2681,7 +2686,8 @@ func (l *Loop) stuckProgressed(selfX int32, selfY int32) bool {
         return true
     }
 
-    return l.stuckWaypointDistance(selfX, selfY) < l.stuckBest-stuckProgressUnits
+    return l.stuckWaypointDistance(selfX, selfY) <
+        l.stuckBest-stuckProgressUnits
 }
 
 // stuckWaterEscape re-plans the water escape itself when the character
@@ -2744,6 +2750,8 @@ func (l *Loop) currentWaypoint() (pathfind.Vec3, bool) {
 // re-path budget on the recovery). The fast timeout flag arms after
 // the first skip so subsequent stuck detections fire on the shorter
 // window.
+//
+//nolint:funlen // the town walk repeats the stuck checks per leg
 func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
     // The online refusal answer separates the server side refusal
     // from the corridor freeze: an ActionFailed that answered the

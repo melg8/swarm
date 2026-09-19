@@ -162,12 +162,13 @@ func TestStuckSkipWaypointStillArmsFastWindow(t *testing.T) {
             {X: 42664, Y: 51336, Z: -2992},
             {X: 36000, Y: 46765, Z: -3712},
         },
-        sightFunc: func(from, to pathfind.Vec3) (bool, error) {
+        sightFunc: func(_, to pathfind.Vec3) (bool, error) {
             // The line to wp1 is blocked (the wall), the line to
             // wp2 is clear (the skip target).
             if int32(to.X) == 43512 && int32(to.Y) == 50504 {
                 return false, nil
             }
+
             return true, nil
         },
     })

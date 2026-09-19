@@ -234,7 +234,8 @@ func (l *Loop) maybeDestroyReplacedStarters() {
         if err := l.game.DestroyItem(drop.Item.ObjectID,
             drop.Item.Count); err != nil {
             l.logf("Hunt: starter destroy failed: %v", err)
-            manager.starterRetryAt[drop.Item.ObjectID] = now.Add(starterRetryDelay)
+            manager.starterRetryAt[drop.Item.ObjectID] =
+                now.Add(starterRetryDelay)
 
             return
         }

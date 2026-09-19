@@ -353,7 +353,8 @@ func bookPurchase(itemID int32) (gear.Purchase, bool) {
                     price := npcdata.ItemPrice(itemID)
                     price += price * int64(shopTaxPercent(shop)) / 100
 
-                    return gear.Purchase{ //nolint:exhaustruct_v5 // gear fields stay zero
+                    //nolint:exhaustruct_v5 // gear fields stay zero
+                    return gear.Purchase{
                         ItemID:             itemID,
                         ListID:             listID,
                         MerchantTemplateID: shop.MerchantTemplateID,

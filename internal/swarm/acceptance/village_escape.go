@@ -186,8 +186,9 @@ func launchEscapeSession(
     sessionCtx, cancelSession := context.WithCancel(ctx)
     sessionDone := make(chan error, 1)
     go func() {
-        sessionDone <- m.runSessionSupervised(sessionCtx, escapeAccount,
-            escapePassword, escapeAccount, true, m.proxy, test.appendLog)
+        m.runSessionSupervised(sessionCtx, escapeAccount, escapePassword,
+            escapeAccount, m.proxy, test.appendLog)
+        sessionDone <- nil
     }()
 
     tracker := m.tracker(test)

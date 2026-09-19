@@ -445,7 +445,7 @@ func polyCornerWalled(tile *Tile, poly *Poly, edgeSide uint8,
 func mapCellAcrossTiles(fromTile, toTile *Tile, side uint8,
     cell int32,
 ) int32 {
-    world, origin := 0.0, 0.0
+    var world, origin float64
     if side == SideMinX || side == SideMaxX {
         world = fromTile.worldMinY + float64(cell)*cellSizeWorld
         origin = toTile.worldMinY

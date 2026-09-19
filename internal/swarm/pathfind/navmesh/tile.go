@@ -281,7 +281,7 @@ func (t *Tile) HeightAt(p *Poly, worldX, worldY float64) float64 {
 // boundary point with the interpolated edge height. This is the
 // closestPointOnPoly of the Detour query model - the heights are the
 // exact bilinear surface of the four geodata corner cells.
-func (t *Tile) ClosestPoint(p *Poly, x, y, z float64) (cx, cy, cz float64) {
+func (t *Tile) ClosestPoint(p *Poly, x, y, _ float64) (cx, cy, cz float64) {
     x0, y0, x1, y1 := t.WorldRect(p)
     px := math.Max(x0, math.Min(x1, x))
     py := math.Max(y0, math.Min(y1, y))
@@ -319,6 +319,8 @@ func (t *Tile) Portal(p *Poly, link *Link) (ax, ay, bx, by float64) {
 // versions decode: version 1 (the int32 bounds and spans), version 2
 // (the uint16 quantization) and version 3 (the columnar layout with
 // the bucket grid index).
+//
+//nolint:cyclop,funlen // the wire sections read side by side
 func DecodeTile(data []byte) (*Tile, error) {
     if len(data) < tileHeaderSize {
         return nil, fmt.Errorf("%w: %d bytes is too short", ErrBadTile,
@@ -355,7 +357,8 @@ func DecodeTile(data []byte) (*Tile, error) {
     tile.worldMinY = (float64(row) - tileZeroRow) * tileWorldSize
 
     offset := tileHeaderSize
-    if version == 1 {
+    switch version {
+    case 1:
         if err := decodePolysV1(data, &offset, tile); err != nil {
             return nil, err
         }
@@ -368,7 +371,7 @@ func DecodeTile(data []byte) (*Tile, error) {
         if err := decodeBVTree(data, &offset, tile); err != nil {
             return nil, err
         }
-    } else if version == 2 {
+    case 2:
         if err := decodePolys(data, &offset, tile); err != nil {
             return nil, err
         }
@@ -381,7 +384,7 @@ func DecodeTile(data []byte) (*Tile, error) {
         if err := decodeBVTree(data, &offset, tile); err != nil {
             return nil, err
         }
-    } else {
+    default:
         if err := decodeTileV3(data, &offset, tile); err != nil {
             return nil, err
         }
@@ -396,6 +399,11 @@ func DecodeTile(data []byte) (*Tile, error) {
 
 // decodePolysV1 reads the version 1 polygon section (the int32
 // bounds).
+//
+// two wire layouts differ in the bounds width and the version
+// pairs stay readable side by side.
+//
+//nolint:dupl // the v1 body mirrors decodePolys on purpose: the
 func decodePolysV1(data []byte, offset *int, tile *Tile) error {
     size := len(tile.Polys) * polyWireSizeV1
     if *offset+size > len(data) {
@@ -422,6 +430,11 @@ func decodePolysV1(data []byte, offset *int, tile *Tile) error {
 
 // decodePolys reads the version 2 polygon section (the uint16
 // quantized bounds).
+//
+// two wire layouts differ in the bounds width and the version
+// pairs stay readable side by side.
+//
+//nolint:dupl // the v2 body mirrors decodePolysV1 on purpose: the
 func decodePolys(data []byte, offset *int, tile *Tile) error {
     size := len(tile.Polys) * polyWireSize
     if *offset+size > len(data) {
@@ -464,6 +477,11 @@ func validatePolys(tile *Tile) error {
 
 // decodeLinksV1 reads the version 1 link section (the int32 spans)
 // and validates the chains.
+//
+// two wire layouts differ in the span width and the version pairs
+// stay readable side by side.
+//
+//nolint:dupl // the v1 body mirrors decodeLinks on purpose: the
 func decodeLinksV1(data []byte, offset *int, tile *Tile) error {
     size := len(tile.Links) * linkWireSizeV1
     if *offset+size > len(data) {
@@ -485,6 +503,11 @@ func decodeLinksV1(data []byte, offset *int, tile *Tile) error {
 
 // decodeLinks reads the version 2 link section (the uint16 spans)
 // and validates the chains.
+//
+// two wire layouts differ in the span width and the version pairs
+// stay readable side by side.
+//
+//nolint:dupl // the v2 body mirrors decodeLinksV1 on purpose: the
 func decodeLinks(data []byte, offset *int, tile *Tile) error {
     size := len(tile.Links) * linkWireSize
     if *offset+size > len(data) {
@@ -630,7 +653,7 @@ func buildGridIndex(polys []Poly) (offsets []uint32, stream []byte,
     }
     offsets = make([]uint32, gridBuckets+1)
     total := 0
-    for b := 0; b < gridBuckets; b++ {
+    for b := range gridBuckets {
         offsets[b] = uint32(total)
         total += int(counts[b])
     }
@@ -653,7 +676,7 @@ func buildGridIndex(polys []Poly) (offsets []uint32, stream []byte,
         }
     }
     stream = make([]byte, 0, total*2)
-    for b := 0; b < gridBuckets; b++ {
+    for b := range gridBuckets {
         prev := uint64(0)
         for e := offsets[b]; e < offsets[b+1]; e++ {
             stream = binary.AppendUvarint(stream, uint64(ids[e])-prev)
@@ -670,6 +693,8 @@ func buildGridIndex(polys []Poly) (offsets []uint32, stream []byte,
 // uvarint target deltas and the bucket grid index. The derived world
 // anchor is NOT part of the wire format - it recomputes from the
 // region key.
+//
+//nolint:cyclop,funlen // the encoder walks the sections in wire order
 func EncodeTile(tile *Tile) ([]byte, error) {
     if len(tile.Polys) == 0 {
         return nil, fmt.Errorf("%w: encode of an empty tile", ErrBadTile)
@@ -805,6 +830,8 @@ func EncodeTile(tile *Tile) ([]byte, error) {
 }
 
 // decodeTileV3 reads the columnar version 3 sections.
+//
+//nolint:cyclop,gocognit,funlen // the per section bounds read side by side
 func decodeTileV3(data []byte, offset *int, tile *Tile) error {
     polyN := len(tile.Polys)
     linkN := len(tile.Links)
@@ -858,7 +885,7 @@ func decodeTileV3(data []byte, offset *int, tile *Tile) error {
         return fmt.Errorf("%w: the v3 link CSR head %d", ErrBadTile,
             chainOffsets[0])
     }
-    for i := 0; i < polyN; i++ {
+    for i := range polyN {
         if chainOffsets[i] > chainOffsets[i+1] ||
             chainOffsets[i+1] > uint32(linkN) {
             return fmt.Errorf("%w: the v3 link CSR step %d", ErrBadTile, i)
@@ -887,7 +914,7 @@ func decodeTileV3(data []byte, offset *int, tile *Tile) error {
         return fmt.Errorf("%w: the v3 target stream truncates", ErrBadTile)
     }
     cursor := *offset
-    for i := 0; i < polyN; i++ {
+    for i := range polyN {
         poly := &tile.Polys[i]
         end := chainOffsets[i+1]
         if end > chainOffsets[i] {
@@ -940,7 +967,7 @@ func decodeTileV3(data []byte, offset *int, tile *Tile) error {
 
     grid.Entries = make([]uint32, gridEntries)
     position := *offset
-    for b := 0; b < gridBuckets; b++ {
+    for b := range gridBuckets {
         prev := uint64(0)
         for e := grid.Offsets[b]; e < grid.Offsets[b+1]; e++ {
             delta, read := binary.Uvarint(data[position:])

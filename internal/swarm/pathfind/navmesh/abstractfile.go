@@ -40,6 +40,8 @@ const (
 )
 
 // EncodeAbstract serializes a region cluster graph.
+//
+//nolint:funlen // the encoder walks the abstract sections in wire order
 func EncodeAbstract(abstract *regionAbstract) ([]byte, error) {
     if abstract == nil || len(abstract.nodes) == 0 {
         return nil, fmt.Errorf("%w: the empty abstract", ErrBadTile)
@@ -93,18 +95,21 @@ func EncodeAbstract(abstract *regionAbstract) ([]byte, error) {
     for i := range abstract.edges {
         edge := &abstract.edges[i]
         base := offset + i*abstractEdgeWireSize
-        put16(base, uint16(int16(edge.to.Col)))
-        put16(base+2, uint16(int16(edge.to.Row)))
+        put16(base, uint16(edge.to.Col))
+        put16(base+2, uint16(edge.to.Row))
         data[base+4] = byte(edge.to.ID)
         binary.LittleEndian.PutUint64(data[base+8:], uint64(edge.toRef))
         put32(base+16, uint32(edge.link))
-        binary.LittleEndian.PutUint64(data[base+20:], math.Float64bits(edge.mid.X))
-        binary.LittleEndian.PutUint64(data[base+28:], math.Float64bits(edge.mid.Y))
-        binary.LittleEndian.PutUint64(data[base+36:], math.Float64bits(edge.mid.Z))
+        binary.LittleEndian.PutUint64(data[base+20:],
+            math.Float64bits(edge.mid.X))
+        binary.LittleEndian.PutUint64(data[base+28:],
+            math.Float64bits(edge.mid.Y))
+        binary.LittleEndian.PutUint64(data[base+36:],
+            math.Float64bits(edge.mid.Z))
         put32(base+44, edge.srcComp)
         put32(base+48, edge.dstComp)
-        put16(base+52, uint16(int16(edge.extCol)))
-        put16(base+54, uint16(int16(edge.extRow)))
+        put16(base+52, uint16(edge.extCol))
+        put16(base+54, uint16(edge.extRow))
         put32(base+56, edge.extPoly)
         data[base+60] = edge.srcArea
         data[base+61] = edge.dstArea
@@ -120,6 +125,10 @@ func EncodeAbstract(abstract *regionAbstract) ([]byte, error) {
 }
 
 // DecodeAbstract parses one abstract sidecar.
+//
+// forwards opaquely (query, diff) behind the export.
+//
+//nolint:cyclop,gocognit,funlen,revive // wire order walk; the graph
 func DecodeAbstract(data []byte) (*regionAbstract, error) {
     if len(data) < abstractHeaderSize {
         return nil, fmt.Errorf("%w: the abstract %d bytes is too short",
@@ -135,7 +144,9 @@ func DecodeAbstract(data []byte) (*regionAbstract, error) {
             version)
     }
     checksums := binary.LittleEndian.Uint32(data[4:]) == abstractVersion
-    u32 := func(off int) uint32 { return binary.LittleEndian.Uint32(data[off:]) }
+    u32 := func(off int) uint32 {
+        return binary.LittleEndian.Uint32(data[off:])
+    }
     col := int16(u32(8))
     row := int16(u32(12))
     polys := int(u32(16))
@@ -161,7 +172,7 @@ func DecodeAbstract(data []byte) (*regionAbstract, error) {
     }
 
     offset := abstractHeaderSize
-    for i := 0; i < nodeCount; i++ {
+    for range nodeCount {
         if offset+8 > len(data) {
             return nil, fmt.Errorf("%w: the abstract nodes truncate",
                 ErrBadTile)
@@ -178,7 +189,7 @@ func DecodeAbstract(data []byte) (*regionAbstract, error) {
             edges:   make([]int32, 0, edgeN),
             classes: make(map[abstractClassKey]int32, edgeN),
         }
-        for j := 0; j < edgeN; j++ {
+        for range edgeN {
             idx := int32(binary.LittleEndian.Uint32(data[offset:]))
             offset += 4
             if idx < 0 || int(idx) >= edgeCount {
@@ -194,7 +205,7 @@ func DecodeAbstract(data []byte) (*regionAbstract, error) {
         return nil, fmt.Errorf("%w: the abstract edges truncate",
             ErrBadTile)
     }
-    for i := 0; i < edgeCount; i++ {
+    for i := range edgeCount {
         base := offset + i*abstractEdgeWireSize
         edge := abstractEdge{
             to: clusterKey{
@@ -230,11 +241,11 @@ func DecodeAbstract(data []byte) (*regionAbstract, error) {
             ErrBadTile)
     }
     cursor := 0
-    for i := 0; i < runCount; i++ {
+    for i := range runCount {
         base := offset + i*8
         value := binary.LittleEndian.Uint32(data[base:])
         count := int(binary.LittleEndian.Uint32(data[base+4:]))
-        for j := 0; j < count; j++ {
+        for range count {
             if cursor >= polys {
                 return nil, fmt.Errorf(
                     "%w: the abstract components overflow", ErrBadTile)

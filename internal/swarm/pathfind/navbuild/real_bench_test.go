@@ -48,7 +48,7 @@ func realBenchMesh(b *testing.B) (*RegionBuild, *navmesh.Mesh) {
 // BenchmarkRealBuildRegion measures the offline build of the real
 // region (the C++ experiment needed 5.1 s for the same region).
 func BenchmarkRealBuildRegion(b *testing.B) {
-    data, err := os.ReadFile(regionFileReal) //nolint:gosec // a const
+    data, err := os.ReadFile(regionFileReal)
     if err != nil {
         b.Skip("the geodata pack is not present")
     }

@@ -778,11 +778,12 @@ Enforced by `.golangci-lint` config (strict, most linters enabled):
   non-Go text files are widened by `tools/normalize_whitespace.sh`
   (leading tabs of scripts and data, every tab of go.mod and the
   markdown). Do **not** run the stock `gofmt`, `gofumpt`, `goimports`
-  or `golangci-lint fmt` on this tree - they all re-tab it (the
-  `formatters` set of the lint gate keeps only `gci` import grouping
-  for exactly that reason). `go mod tidy` re-tabs go.mod, so an
-  extra `task fmt` belongs after it. `task fmt:check` (part of
-  `task check:all`) fails on any tab left in a tracked text file.
+  or `golangci-lint fmt` on this tree - they all re-tab it (gci is
+  disabled too: its canonical form is tab-indented and it flags every
+  fresh spaces-only file; import grouping stays with `gofmt-spaces`
+  and review). `go mod tidy` re-tabs go.mod, so an extra `task fmt`
+  belongs after it. `task fmt:check` (part of `task check:all`) fails
+  on any tab left in a tracked text file.
 - Line length limit is 80 characters (`lll`).
 - Comments must end with a period (`godot`). Comments and identifiers
   are in English.
@@ -792,11 +793,19 @@ Enforced by `.golangci-lint` config (strict, most linters enabled):
   file (including shell scripts in `tools/`, which use `#` comments).
 - Imports grouped by `gci` (the only formatter the lint gate runs;
   the whitespace itself belongs to `gofmt-spaces`, see above).
-- Function length and cyclomatic complexity are limited (`funlen`,
-  `cyclop`, `gocyclo`). Split long functions instead of disabling
-  linters.
-- Initialize all struct fields when constructing (`exhaustruct`);
-  prefer `NewXxx()` constructors for parsed packet structs.
+- Function length and complexity are limited (`funlen` 65 lines /
+  45 statements, `cyclop` 15, `gocognit` 25, `maintidx` 20). The
+  genuinely tangled functions (the wire parsers, the hunt loop
+  decision trees) carry a single `//nolint:<linters> // short note`
+  directive directly above the `func` line with the refactor reason -
+  one line, comma joined linters, the note stays inside the 80
+  columns. Split the function when the note stops being true.
+- Constructing a struct: the zero-value-intended partial inits
+  belong to the `ignore-patterns` list of `exhaustruct_v5` in
+  `.golangci.yml` (the empty answers, the option aggregates, the
+  internal build state - each group carries its reason); a site that
+  needs a non zero start sets it explicitly. `nilnil` stays on: do
+  not return `nil` error together with a `nil` value.
   A gofmt-spaces note: it is a gofmt clone, so the gofumpt extras
   (empty line trimming, the stricter idiom rules) are not enforced
   anymore - do not rely on them appearing automatically.
@@ -807,6 +816,39 @@ Enforced by `.golangci-lint` config (strict, most linters enabled):
 - Check every returned error (`errcheck`); tests are linted too.
 - Avoid repeated string literals, extract constants (`goconst`).
 - Do not shadow predeclared identifiers (`predeclared`).
+
+## Tree cleanliness discipline (keep the gate green)
+
+The full uncapped lint is **zero findings** since 2026-09-19 (the
+~200 finding debt of the ungated parallel week is paid; see
+`docs/agent_progress.md`). The gate only stays cheap if every
+commit keeps it at zero:
+
+- `run.max-issues-per-linter` and `run.max-same-issues` are `0` in
+  `.golangci.yml`: nothing hides behind the default caps (the caps
+  previously masked the tail of the debt behind 3-identical-issue
+  rounds). Expect the FULL list from every lint run.
+- `task verify` (build, vet, full `lint`, test, `fmt:check`) and
+  `task prepush` run before every push; CI (`.github/workflows/
+  ci.yml`, mirrored in `docs/ci_workflow.yml` for the token without
+  the workflow scope) runs the same order plus the race slice.
+- Before committing files another agent may have touched in
+  parallel: run `task fmt` first (the parallel commits landed tab
+  formatted ten times), then `golangci-lint run ./...` - a red
+  result is fixed in the same commit, never passed on.
+- Suppression policy: a `//nolint` directive needs an inline reason,
+  stays on one line of at most 80 columns, and sits directly above
+  the line or declaration it silences (a wrapped prose continuation
+  after the directive is fine, a second stacked directive is not -
+  merge into `//nolint:a,b // reason`). `nolintlint` reports any
+  directive that stopped matching, so stale suppressions surface on
+  the next run and must be removed in the same pass.
+- Linter relief for whole paths (the analysis drivers, the C1 water
+  zone data table, the test scenario scripts) lives in the
+  `exclusions` rules of `.golangci.yml` with the documented reason,
+  not in scattered directives.
+- Dead code (`unused`) is deleted, not suppressed: an unused
+  constant, field, function or test helper is a removal commit.
 
 ## Logging conventions
 

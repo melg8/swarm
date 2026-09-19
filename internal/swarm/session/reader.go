@@ -46,7 +46,9 @@ func ParseJournalFile(path string) (*JournalFile, error) {
 // the first record (a session crossing midnight binds 01:30 to the
 // morning after the 22:51 start), a full RFC3339 timestamp passes
 // through. Empty bounds keep the window open on that side.
-func ParseJournalFileWindow(path string, from string, to string) (*JournalFile, error) {
+func ParseJournalFileWindow(
+    path string, from string, to string,
+) (*JournalFile, error) {
     parsed, err := parseJournalWindow(path, from, to)
     if err != nil {
         return nil, err
@@ -111,7 +113,9 @@ func hasGzipExt(path string) bool {
 // journal, so the offline report and the live report agree by
 // construction. The bare clock bounds resolve against the first record
 // date exactly like the query filters.
-func parseJournalWindow(path string, fromArg string, toArg string) (*JournalFile, error) {
+func parseJournalWindow(
+    path string, fromArg string, toArg string,
+) (*JournalFile, error) {
     parsed := &JournalFile{
         Path:   path,
         Build:  "",
@@ -131,7 +135,8 @@ func parseJournalWindow(path string, fromArg string, toArg string) (*JournalFile
             }
             from, to = resolved[0], resolved[1]
         }
-        if r.E == kindBuild || r.E == kindShutdown || insideWindow(r.T, from, to) {
+        if r.E == kindBuild || r.E == kindShutdown ||
+            insideWindow(r.T, from, to) {
             parsed.fold(r)
         }
 

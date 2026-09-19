@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT
 #
-# prepush.sh is the fast pre-push gate: build, vet, lint --new,
+# prepush.sh is the fast pre-push gate: build, vet, lint,
 # the whitespace check and the tests of the packages the unpushed
 # diff touches. It protects the shared feature branch from a red
 # push - the rebase-before-push rule protects the history, this
@@ -41,7 +41,7 @@ go build ./...
 step "vet"
 go vet ./...
 
-step "lint --new (the existing debt stays with task lint)"
+step "lint (the existing debt stays with task lint)"
 golangci-lint run --new
 
 step "whitespace (gofmt-spaces + no tabs)"

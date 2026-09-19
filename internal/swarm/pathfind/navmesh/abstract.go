@@ -5,6 +5,7 @@
 package navmesh
 
 import (
+    "errors"
     "fmt"
     "hash/crc32"
     "io"
@@ -186,6 +187,11 @@ type regionAbstract struct {
 // exported path of the pack sidecar pass and the tests). The answer
 // shares the buildAbstract semantics: one deterministic pass over the
 // link chains.
+//
+// sidecar pass and the tests forward the answer opaquely (encode,
+// diff), the exported shape keeps the call sites uniform.
+//
+//nolint:revive // the graph type stays internal by design; the
 func BuildAbstract(tile *Tile) *regionAbstract {
     return buildAbstract(tile)
 }
@@ -197,8 +203,7 @@ func BuildAbstract(tile *Tile) *regionAbstract {
 // the running queries (the current coarse frontier and the hop
 // refinement tiles) and rebuilds the evicted ones on demand (one
 // deterministic pass over the immutable tile, the edge indices stay
-// stable across the rebuilds - the dstComps and the ban bookkeeping
-// survive).
+// stable across the rebuilds - the ban bookkeeping survives).
 const abstractCacheCapacity = 32
 
 // abstractOf returns the cached cluster graph of a region, building it
@@ -321,7 +326,7 @@ func TileChecksumsOf(data []byte) (head, tail uint32) {
 // the sidecar recorded checksums (the ~1 KB read against a multi
 // megabyte decode of a wrongly rejected sidecar).
 func tileChecksumsMatch(path string, abstract *regionAbstract) bool {
-    file, err := os.Open(path) //nolint:gosec // the fixed dir
+    file, err := os.Open(path)
     if err != nil {
         return false
     }
@@ -329,7 +334,7 @@ func tileChecksumsMatch(path string, abstract *regionAbstract) bool {
 
     head := make([]byte, tileChecksumWindow)
     headN, err := io.ReadFull(file, head)
-    if err != nil && err != io.ErrUnexpectedEOF {
+    if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
         return false
     }
     if crc32.ChecksumIEEE(head[:headN]) != abstract.TileHeadCRC {
@@ -348,7 +353,7 @@ func tileChecksumsMatch(path string, abstract *regionAbstract) bool {
     }
     tail := make([]byte, tileChecksumWindow)
     tailN, err := io.ReadFull(file, tail)
-    if err != nil && err != io.ErrUnexpectedEOF {
+    if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
         return false
     }
 
@@ -401,7 +406,7 @@ func buildAbstract(tile *Tile) *regionAbstract {
             li = link.Next
             sourceID := clusterOfEdgeSource(tile, poly, link)
             edge, ok := abstractEdgeOf(tile, abstract.comps, int32(pi),
-                int32(current), link)
+                current, link)
             if !ok {
                 continue
             }
@@ -452,8 +457,7 @@ func linkComponents(tile *Tile) []uint32 {
     for i := range parent {
         parent[i] = uint32(i)
     }
-    var find func(uint32) uint32
-    find = func(x uint32) uint32 {
+    find := func(x uint32) uint32 {
         for parent[x] != x {
             parent[x] = parent[parent[x]]
             x = parent[x]

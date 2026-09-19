@@ -970,3 +970,34 @@ Commits as melg8. Rebase before every push.
   discard, the manual walk and the quest segment; the existing suites
   stay byte identical green (26 packages ok, lint --new clean).
 
+### Progress (2026-09-19, lint debt clearance round)
+
+- The full lint debt (~200 tracked findings from the ungated parallel
+  week, plus the tail the default `max-same-issues: 3` cap kept
+  hidden) is paid: `golangci-lint run ./...` answers **0 issues** with
+  `max-issues-per-linter: 0` and `max-same-issues: 0` now pinned in
+  `.golangci.yml` so the gate always sees the complete list.
+- Real code fixes: the `eh-eh` tautology and the dead `end` clamp in
+  the seam scan and the region chord, the unused `autonomous` param
+  and the always-nil error of `runSessionSupervised` (six call sites
+  simplified), five dead declarations deleted (soakMaxLevel,
+  zoneOverrideSlack, patrolZone, dstComps, runHopBudget), five
+  always-constant test helper params folded, the G109 bounds guard
+  now sits next to the conversion, errorlint switched to errors.Is,
+  the union-find `var find` pairs merged, the concat loops rebuilt on
+  strings.Builder, the v1/v2 wire twins and the packet clone carry
+  documented dupl relief, the water zone table and the two replay
+  probes got the analysis-driver exclusion, `tools/prepush.sh` and
+  the CI lint step now run the full uncapped lint.
+- The suppression policy is uniform: every complexity finding carries
+  one `//nolint:a,b // note` above the func (36 sites), the
+  deliberate partial inits live in the `exhaustruct_v5`
+  `ignore-patterns` list with per-group reasons, stale directives
+  removed (nolintlint is the auditor).
+- AGENTS.md gains the "Tree cleanliness discipline" section (caps off,
+  fmt before commit, suppression policy, relief lives in config,
+  dead code is deleted) and the Code conventions section now matches
+  the real config.
+- CI workflow copied to `.github/workflows/ci.yml` (lint step flipped
+  from `--new` to the full run); the push needs the workflow-scoped
+  token, otherwise the owner copy stays the fallback.

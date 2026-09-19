@@ -22,7 +22,7 @@ import (
 // through its canopy polygons and the floating village curtained
 // down to the lake through the height step walls.
 func TestRealRegionFloatingIslands(t *testing.T) {
-    build := buildRealRegion(t, 21, 19)
+    build := buildRealRegion(t)
     tile := build.Tile
 
     // The floating drop is substantial: the elven forest canopy

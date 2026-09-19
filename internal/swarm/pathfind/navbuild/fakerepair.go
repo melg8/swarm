@@ -38,6 +38,8 @@ func fakeLayer(rl *regionLayers, idx int) bool {
 // surface of the nearest real neighbours (the class doc carries the
 // rule). The pass mutates the layer pool in place and answers the
 // filled cell count.
+//
+//nolint:cyclop,gocognit,funlen,maintidx // one repair walk per stack
 func repairFakeCells(rl *regionLayers, climb int32) int {
     const side = regionCellsSide
     cells := side * side

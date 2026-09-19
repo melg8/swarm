@@ -28,7 +28,7 @@ func TestBayAreaMap(t *testing.T) {
             continue
         }
         path := fmt.Sprintf("%s/%d_%d.l2j", geodataDir, col, row)
-        data, err := os.ReadFile(path) //nolint:gosec // the fixed dir
+        data, err := os.ReadFile(path)
         if err != nil {
             t.Logf("%d_%d: unreadable", col, row)
 

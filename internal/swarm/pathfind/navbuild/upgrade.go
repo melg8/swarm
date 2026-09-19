@@ -47,7 +47,7 @@ type tileUpgrade struct {
 // behind, and the caller logs the failure without failing the pack.
 func upgradeLegacyTile(tilePath string) (tileUpgrade, error) {
     up := tileUpgrade{}
-    data, err := os.ReadFile(tilePath) //nolint:gosec // the fixed dir
+    data, err := os.ReadFile(tilePath)
     if err != nil {
         return up, fmt.Errorf("read the tile: %w", err)
     }
@@ -77,6 +77,8 @@ func upgradeLegacyTile(tilePath string) (tileUpgrade, error) {
         return up, fmt.Errorf("zstd: %w", err)
     }
     tmp := tilePath + ".tmp"
+    //nolint:gosec // the path is the pack outDir plus the region
+    // key, the upgrade pass owns the directory.
     if err := os.WriteFile(tmp, packed, 0o600); err != nil {
         return up, fmt.Errorf("write the tile: %w", err)
     }

@@ -209,6 +209,8 @@ func (m *Mesh) Route(start, end Pos, filter Filter) (*Route, error) {
 // A missing mesh under either endpoint answers NoNavmeshError; an
 // unreachable destination answers Found=false with Partial set when
 // a closest-reachable corridor exists.
+//
+//nolint:cyclop,funlen // the approach branches read side by side
 func (m *Mesh) RouteApproach(
     start, end Pos, approachRadius float64, filter Filter,
 ) (*Route, error) {

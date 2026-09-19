@@ -77,7 +77,7 @@ func newZoneIndex(boxes []WaterZone) *zoneIndex {
         y1 := int64(box.MaxY) >> zoneCellShift
         for x := x0; x <= x1; x++ {
             for y := y0; y <= y1; y++ {
-                key := uint64(uint64(x)<<32) | uint64(uint32(y))
+                key := uint64(x)<<32 | uint64(uint32(y))
                 idx.cells[key] = append(idx.cells[key], box)
             }
         }
@@ -93,7 +93,7 @@ func newZoneIndex(boxes []WaterZone) *zoneIndex {
 // swimming character floats near the surface inside the box, the
 // zone data minZ never splits a water body the surface covers).
 func (idx *zoneIndex) covered(x, y, z float64) bool {
-    key := uint64(uint64(int64(x)>>zoneCellShift)<<32) |
+    key := uint64(int64(x)>>zoneCellShift)<<32 |
         uint64(uint32(int64(y)>>zoneCellShift))
     for _, box := range idx.cells[key] {
         if x >= box.MinX && x <= box.MaxX && y >= box.MinY &&
@@ -538,6 +538,8 @@ func (m *Mesh) astar(
 // context walls the links onto banned polygons and prices the escape
 // polygons of the ban holding the start (the recovery ban rules of
 // the grid costTo - the rectangle granularity form, see avoid.go).
+//
+//nolint:cyclop // the astar expansion dispatches per neighbor kind
 func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
     endPos Pos, filter Filter, avoid avoidCtx, allow *confinedSet,
 ) {

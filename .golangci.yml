@@ -8,6 +8,11 @@ version: "2"
 
 run:
   tests: true
+  # Show every finding (the defaults cap the identical ones at 3 and
+  # each linter at 50): the caps hide the tail of a debt cleanup
+  # behind artificial round limits, the gate must see the full list.
+  max-issues-per-linter: 0
+  max-same-issues: 0
 
 linters:
   enable:
@@ -115,13 +120,51 @@ linters:
       # The v5 linter matches types by a regexp over the full type
       # path (package.Type); the v1 'exclude' field is replaced by
       # 'ignore-patterns' (and 'enforce-patterns' for opt-in mode).
-      # The ignore-patterns list below stays empty: net.Dialer
-      # carries deprecated fields and is the only production case that
-      # needs relief, handled by a local //nolint:exhaustruct_v5
-      # directive with the documented reason (staticcheck SA1019).
-      # Adding a global ignore for it would mask a real miss in any
-      # other package that aliased net.Dialer.
-      ignore-patterns: []
+      # The list below carries the deliberate partial inits of the
+      # codebase: the empty answers where the zero value IS the
+      # documented "nothing" (the not found Result, the zero Pos),
+      # the option and stat aggregates where the zero value is the
+      # default, and the internal build/query state whose
+      # constructors fill the fields the pass needs and leave the
+      # rest at their documented zero values. A site that needs a
+      # non zero start sets it explicitly next to the literal. The
+      # production case that predates the list: net.Dialer carries
+      # deprecated fields, handled by a local //nolint:exhaustruct_v5
+      # directive with the documented reason (staticcheck SA1019) -
+      # a global ignore for it would mask a real miss in any other
+      # package that aliased net.Dialer.
+      ignore-patterns:
+        # The empty answers.
+        - .*pathfind\.Result$
+        - .*navmesh\.Pos$
+        - .*navmesh\.Filter$
+        - .*navmesh\.Route$
+        - .*navmesh\.TileGrid$
+        - .*state\.Snapshot$
+        - .*acceptance\.characterReset$
+        - .*acceptance\.fullDressWatch$
+        # The option and stat aggregates.
+        - .*navbuild\.Options$
+        - .*navbuild\.BuildStats$
+        - .*navbuild\.PackStats$
+        - .*navbuild\.packCounters$
+        - .*navbuild\.tileUpgrade$
+        # The internal build and query state.
+        - .*navbuild\.sheets$
+        - .*pathfind\.Engine$
+        - .*pathfind\.layerPool$
+        - .*hunt\.Loop$
+        - .*connection\.GameClient$
+        - .*navmesh\.Mesh$
+        - .*navmesh\.Tile$
+        - .*navmesh\.regionAbstract$
+        - .*navmesh\.abstractEdge$
+        - .*navmesh\.abstractEdgeRef$
+        - .*navmesh\.coarseNode$
+        - .*navmesh\.coarseResult$
+        - .*navmesh\.hierQuery$
+        - .*navmesh\.queryState$
+        - .*navmesh\.tileCall$
     exhaustive:
       # A switch with a default case explicitly handles the remaining
       # values; demanding every enum member listed there too would only
@@ -151,14 +194,15 @@ linters:
           - funlen
           - gocognit
           - maintidx
-      - path: (cmd/navmesh-export|scripts/(geo_diag|geo_repair|tailcheck))\.go$|^(cmd/navmesh-export|scripts/(geo_diag|geo_repair|tailcheck))/
+      - path: (cmd/navmesh-export|tools/repro_gamepath|tools/repro_rawpath|scripts/(geo_diag|geo_repair|tailcheck))\.go$|^(cmd/navmesh-export|tools/repro_gamepath|tools/repro_rawpath|scripts/(geo_diag|geo_repair|tailcheck))/
         linters:
-          # The navmesh export driver and the geodata scratch tools
-          # share the analysis-driver nature: they print by design,
-          # take raw paths from argv (the taint check of a local
-          # scratch tool flags the ordinary flag machinery), and the
-          # long data tables exceed the line budget. Relief matches
-          # the geotest/navanalyze/navmesh-build rule above plus the
+          # The navmesh export driver, the gamepath and rawpath
+          # replay probes and the geodata scratch tools share the
+          # analysis-driver nature: they print by design, take raw
+          # paths from argv (the taint check of a local scratch tool
+          # flags the ordinary flag machinery), and the long data
+          # tables exceed the line budget. Relief matches the
+          # geotest/navanalyze/navmesh-build rule above plus the
           # gosec paths and the layout linters their one-shot bodies
           # trip.
           - forbidigo
@@ -170,6 +214,15 @@ linters:
           - lll
           - nlreturn
           - intrange
+      - path: internal/swarm/pathfind/navmesh/c1_waterzones\.go
+        linters:
+          # The C1 water zone table is one zone per line by design:
+          # every entry is the six world bounds plus the source
+          # comment, and the column layout is the readable form of
+          # the dataset (wrapping each zone over two lines would
+          # double the table height and hide the overlaps the
+          # queries reason about).
+          - lll
       - path: _test\.go
         linters:
           - errcheck
@@ -180,8 +233,11 @@ linters:
           # are linear scenario scripts (long fixture tables, long
           # expected vectors, extra blank identifiers in helper calls,
           # growing scenario bodies) where the style limits of the
-          # production code do not aid the reader. The production rules
-          # stay strict.
+          # production code do not aid the reader. cyclop joins for
+          # the same reason: a test that walks every seam column pair
+          # is one long decision script, not a tangled function. The
+          # production rules stay strict.
+          - cyclop
           - dogsled
           - exhaustruct_v5
           - funlen

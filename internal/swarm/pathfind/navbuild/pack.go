@@ -94,7 +94,8 @@ func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
 
         return order[i].Row < order[j].Row
     })
-    if err := stitchPackPhaseB(order, outDir, strips, opts, &counters); err != nil {
+    if err := stitchPackPhaseB(order, outDir, strips, opts,
+        &counters); err != nil {
         return stats, err
     }
 
@@ -139,6 +140,8 @@ func packWorkers(opts Options, jobs int) int {
 // runPool feeds the keys through the worker pool: one work unit per
 // key, the first hard error cancels the feed (the in flight units
 // drain). The work callback answers one error at most.
+//
+//nolint:gocognit // the pool runner interleaves the worker and retry paths
 func runPool(ctx context.Context, keys []navmesh.RegionKey,
     workers int, work func(context.Context, navmesh.RegionKey) error,
 ) error {
@@ -197,6 +200,8 @@ func runPool(ctx context.Context, keys []navmesh.RegionKey,
 // worker); the strips map mutates under the log mutex and freezes
 // once the phase answers. The counters accumulate atomically; the
 // answer is the strips map.
+//
+//nolint:funlen // the pack phase walks the tiles in order
 func buildPackPhaseA(keys []navmesh.RegionKey, geodataDir, outDir string,
     opts Options, force bool, counters *packCounters,
     log func(format string, args ...any),
@@ -364,7 +369,7 @@ func buildPackRegion(geodataDir, outDir string, key navmesh.RegionKey,
             return nil, up, nil
         }
     }
-    data, err := os.ReadFile(regionPath) //nolint:gosec // a fixed arg
+    data, err := os.ReadFile(regionPath)
     if err != nil {
         return nil, tileUpgrade{}, fmt.Errorf("read the region: %w", err)
     }
@@ -376,6 +381,8 @@ func buildPackRegion(geodataDir, outDir string, key navmesh.RegionKey,
     if err != nil {
         return nil, tileUpgrade{}, fmt.Errorf("encode: %w", err)
     }
+    //nolint:gosec // the path is the pack outDir plus the region
+    // key, the pack pass owns the directory.
     if err := os.WriteFile(tilePath, encoded, 0o600); err != nil {
         return nil, tileUpgrade{}, fmt.Errorf("write the tile: %w", err)
     }
@@ -389,7 +396,7 @@ func stitchPackTile(outDir string, key navmesh.RegionKey,
     own *borderStrips, neighbors [4]*borderStrips, opts Options,
 ) (int, error) {
     tilePath := tilePathOf(outDir, key)
-    data, err := os.ReadFile(tilePath) //nolint:gosec // a fixed arg
+    data, err := os.ReadFile(tilePath)
     if err != nil {
         return 0, fmt.Errorf("read the tile: %w", err)
     }

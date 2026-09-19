@@ -128,11 +128,6 @@ const zoneEmptyCooldown = 40 * time.Second
 // an easier ground) until the next level change re-opens it.
 const zoneDeathLimit = 3
 
-// zoneOverrideSlack is the level slack a manual zone selection keeps
-// its override: the automatic picker resumes once the character
-// outgrows the band.
-const zoneOverrideSlack = 3
-
 // zoneDistance measures the anchor distance between a zone center and
 // a world position.
 func zoneDistance(zone HuntingZone, x int32, y int32) float64 {
@@ -777,7 +772,8 @@ func (l *Loop) publishZoneView() {
     }
     views := make([]state.ZoneView, 0, len(l.zones))
     for _, zone := range l.zones {
-        views = append(views, state.ZoneView{ //nolint:exhaustruct_v5 // legacy zone
+        //nolint:exhaustruct_v5 // the legacy zone view stays partial
+        views = append(views, state.ZoneView{
             ID:       zone.ID,
             Name:     zone.Name,
             Region:   zone.Region,

@@ -34,12 +34,12 @@ type linkSpec struct {
 // assembleTile builds an in-memory tile from rectangle and link specs:
 // the polygon heights are uniform per rectangle and the link chains
 // follow the spec order per polygon.
-func assembleTile(col, row int16, rects []rectSpec, links []linkSpec,
+func assembleTile(col int16, rects []rectSpec, links []linkSpec,
     ext []ExtLink,
 ) *Tile {
     tile := &Tile{
         Col:      col,
-        Row:      row,
+        Row:      19,
         Climb:    40,
         Polys:    make([]Poly, len(rects)),
         Links:    make([]Link, len(links)),
@@ -109,7 +109,7 @@ func corridorWorld() *Tile {
         {poly: 3, side: SideMinY, to: 2, t0: 160, t1: 319},
     }
 
-    return assembleTile(21, 19, rects, links, nil)
+    return assembleTile(21, rects, links, nil)
 }
 
 // writeTiles writes tiles as X_Y.nm files into a fresh directory.
@@ -343,12 +343,12 @@ func TestMeshLazyLoadAndLRU(t *testing.T) {
 // the region border: 21_19 ends at cell x 2048 (the world line 65536)
 // where 22_19 begins, linked through external links.
 func borderTiles() (*Tile, *Tile) {
-    west := assembleTile(21, 19,
+    west := assembleTile(21,
         []rectSpec{{x0: 1900, y0: 0, x1: 2048, y1: 100, h: 0,
             area: AreaGround}},
         []linkSpec{{poly: 0, side: SideMaxX, to: -1, t0: 0, t1: 99}},
         []ExtLink{{Col: 22, Row: 19, Poly: 0}})
-    east := assembleTile(22, 19,
+    east := assembleTile(22,
         []rectSpec{{x0: 0, y0: 0, x1: 100, y1: 100, h: 0,
             area: AreaGround}},
         []linkSpec{{poly: 0, side: SideMinX, to: -1, t0: 0, t1: 99}},

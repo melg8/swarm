@@ -280,6 +280,8 @@ func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
 // back to the raw direct click of the legacy walk (the server stops
 // a walled click, the stuck detector re-plans). The walk stands on
 // itself: it re-plans on a stuck segment until the timeout.
+//
+//nolint:gocognit // the quest leg branches read best side by side
 func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
     deadline := time.Now().Add(timeout)
     for {
@@ -433,6 +435,8 @@ func (l *Loop) followPlannedSegment(
 // trips) or the walk stalls. False when the waypoint needs a re-plan
 // (the follower returns, the caller plans a fresh segment); true
 // when the waypoint was reached or the segment ran out of budget.
+//
+//nolint:cyclop,gocognit // the refusal and stuck branches read side by side
 func (l *Loop) followWaypoint(
     waypoints []pathfind.Vec3, index int, frameOffset float64,
     deadline time.Time,
@@ -842,6 +846,8 @@ func (l *Loop) retreatAndRest(ctx context.Context, stage QuestStage) error {
 // the fights parks the character sitting until the regeneration
 // covers the next fight (the manual trip has no rest phase of the
 // hunt loop).
+//
+//nolint:cyclop,gocognit // the hunt and quest checks read side by side
 func (l *Loop) farmQuestStage(
     ctx context.Context, stage QuestStage,
 ) error {
@@ -863,7 +869,8 @@ func (l *Loop) farmQuestStage(
         if err := ctx.Err(); err != nil {
             return err
         }
-        if total := questItemCount(l.tracker, kill.ItemIDs); total >= kill.Target {
+        if total := questItemCount(l.tracker,
+            kill.ItemIDs); total >= kill.Target {
             l.logf("quest: the kill stage counters filled (%d)", total)
 
             return nil

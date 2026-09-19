@@ -262,7 +262,7 @@ func (q *hierQuery) waterMultiplier(at Pos) float64 {
 // stay flat and the budget cap escalates them (RouteApproach) - the
 // within tile measurements answer the flat search faster and with
 // the shorter corridors when the target fits the budget.
-func hierWorthy(startRef, endRef PolyRef, startPos, endPos Pos,
+func hierWorthy(startRef, endRef PolyRef, _, _ Pos,
     filter Filter,
 ) bool {
     if len(filter.Avoid) > 0 {
@@ -279,6 +279,8 @@ func hierWorthy(startRef, endRef PolyRef, startPos, endPos Pos,
 // answer is nil when the hierarchy declines (an abstract graph could
 // not build, or not even the first hop produced a corridor) - the
 // caller falls back to the flat search.
+//
+//nolint:funlen // the hierarchical route walks the phases in order
 func (m *Mesh) routeHierarchical(
     startRef PolyRef, startPos Pos, endRef PolyRef, endPos Pos,
     approach float64, filter Filter, state *queryState,
@@ -393,6 +395,8 @@ func (m *Mesh) routeHierarchical(
 // pairs strands the honest search into a whole map flood - the gate
 // free retry chains the crossings and the confined refinement
 // restores the connectivity on the real mesh).
+//
+//nolint:cyclop,gocognit,funlen // the edge and gate checks read side by side
 func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
     endPos Pos, gated bool,
 ) coarseResult {
@@ -531,8 +535,10 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
 // The gated pass verifies the cluster connectivity through the link
 // components; the gate free pass chains the sampled crossings and
 // lets the refinement hops verify them on the real mesh.
+//
+//nolint:cyclop,gocognit,funlen // the edge branches read side by side
 func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos,
-    gated bool,
+    _ bool,
 ) {
     node := &q.coarse.nodes[idx]
     abstract := m.abstractOf(RegionKey{Col: node.key.Col,
@@ -694,6 +700,8 @@ type confinedSet struct {
 type clusterBitmap = [clustersPerSide][clustersPerSide]bool
 
 // newConfinedSet marks the chain clusters.
+//
+//nolint:gocognit // the confined set walk branches per region boundary case
 func newConfinedSet(clusters []clusterKey) *confinedSet {
     // The one cluster dilation: the coarse chain samples the cluster
     // crossings - the honest corridor between them leaves the chain's
@@ -874,6 +882,8 @@ func chainRegionKeys(chain coarseResult, bound int) []RegionKey {
 // the stitched refinement corridors. The answer reports whether the
 // route is finished (found or the final partial); a false answer
 // bans the failed hop exit and asks for the replan.
+//
+//nolint:cyclop // the refinement walks the chain branch by branch
 func (m *Mesh) refineChain(q *hierQuery, chain coarseResult,
     route *Route,
 ) bool {

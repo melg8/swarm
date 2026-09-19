@@ -150,6 +150,8 @@ func CompressTileDir(outDir string) (CompressStats, error) {
             return stats, fmt.Errorf("zstd %s: %w", name, err)
         }
         tmp := path + ".zs.tmp"
+        //nolint:gosec // the path is the data dir the operator passed
+        // to the compress pass, the walk owns the tree.
         if err := os.WriteFile(tmp, compressed, 0o600); err != nil {
             return stats, fmt.Errorf("write %s: %w", tmp, err)
         }

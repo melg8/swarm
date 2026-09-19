@@ -93,7 +93,7 @@ func strconvFormat(v int32) string {
         v = -v
     }
     for v > 0 {
-        digits = string(rune('0'+v%10)) + digits
+        digits = string('0'+v%10) + digits
         v /= 10
     }
     if neg {

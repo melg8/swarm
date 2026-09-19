@@ -371,7 +371,8 @@ func (c *relayLoginClient) readInit() (*fromauthserver.InitPacket, error) {
             len(payload))
     }
     initPacket := fromauthserver.NewInitPacket()
-    if err := fromauthserver.ParseInitPacket(initPacket, payload[1:]); err != nil {
+    if err := fromauthserver.ParseInitPacket(initPacket,
+        payload[1:]); err != nil {
         return nil, fmt.Errorf("parse: %w", err)
     }
     if len(initPacket.RsaPublicKey) != 128 {

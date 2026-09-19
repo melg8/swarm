@@ -117,7 +117,8 @@ func (l *Loop) steerClearOfAggro(
         }
         cx := float64(fromX) + legX*t
         cy := float64(fromY) + legY*t
-        dz := float64(threat.Z) - (float64(fromZ) + (float64(toZ)-float64(fromZ))*t)
+        dz := float64(threat.Z) -
+            (float64(fromZ) + (float64(toZ)-float64(fromZ))*t)
         clear2 := math.Hypot(threat.X-cx, threat.Y-cy)
         clear3 := math.Hypot(clear2, dz)
         needed := threat.AggroRange + avoidClearance
@@ -305,7 +306,8 @@ func (l *Loop) avoidImpendingAdd(now time.Time) bool {
             continue
         }
         dist := math.Hypot(threat.X-float64(selfX), threat.Y-float64(selfY))
-        if pen := threat.AggroRange + combatAvoidWarning - dist; pen > worstPen {
+        pen := threat.AggroRange + combatAvoidWarning - dist
+        if pen > worstPen {
             worst, worstPen = i, pen
         }
     }

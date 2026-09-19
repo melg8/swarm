@@ -59,9 +59,9 @@ func TestSidecarPairProbe(t *testing.T) {
     t.Logf("nb heights: %d distinct", len(nbH))
     t.Logf("nb nswe: %v", nbN)
 
-    climb := int32(DefaultOptions().Climb)
+    climb := DefaultOptions().Climb
     paired, heightSkip, nsweSkip := 0, 0, 0
-    for pos := 0; pos < regionCellsSide; pos++ {
+    for pos := range regionCellsSide {
         for i := west.offsets[pos]; i < west.offsets[pos+1]; i++ {
             a := west.entries[i]
             for j := east.offsets[pos]; j < east.offsets[pos+1]; j++ {

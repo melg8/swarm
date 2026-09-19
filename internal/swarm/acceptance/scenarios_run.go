@@ -36,8 +36,9 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
     defer cancelSession()
     sessionDone := make(chan error, 1)
     go func() {
-        sessionDone <- m.runSessionSupervised(sessionCtx, farmAccount,
-            farmPassword, farmAccount, true, m.proxy, test.appendLog)
+        m.runSessionSupervised(sessionCtx, farmAccount, farmPassword,
+            farmAccount, m.proxy, test.appendLog)
+        sessionDone <- nil
     }()
 
     tracker := m.tracker(test)
@@ -91,8 +92,6 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
 // the entrance forever; the frozen corridor ban, the detour re-plan
 // and the direct server routed walk own the recovery, the offline
 // reproduction lives in hunt/building_entry_test.go.
-//
-//nolint:dupl // mirrors zoneReturnScenario with the dump hall state and checks
 func buildingEntryScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(buildingEntryChecks())
@@ -102,7 +101,8 @@ func buildingEntryScenario(ctx context.Context, m *Manager, t *Test) error {
         return fmt.Errorf("ensure character: %w", err)
     }
     time.Sleep(ensurePause)
-    if err := m.injectReset(buildingEntryReset(entryAccount), test); err != nil {
+    if err := m.injectReset(buildingEntryReset(entryAccount),
+        test); err != nil {
         return fmt.Errorf("inject start state: %w", err)
     }
     time.Sleep(ensurePause)
@@ -111,8 +111,9 @@ func buildingEntryScenario(ctx context.Context, m *Manager, t *Test) error {
     defer cancelSession()
     sessionDone := make(chan error, 1)
     go func() {
-        sessionDone <- m.runSessionSupervised(sessionCtx, entryAccount,
-            entryPassword, entryAccount, true, m.proxy, test.appendLog)
+        m.runSessionSupervised(sessionCtx, entryAccount, entryPassword,
+            entryAccount, m.proxy, test.appendLog)
+        sessionDone <- nil
     }()
 
     tracker := m.tracker(test)
@@ -199,8 +200,9 @@ func runSupervisedScenario(
     defer cancelSession()
     sessionDone := make(chan error, 1)
     go func() {
-        sessionDone <- m.runSessionSupervised(sessionCtx, reset.Account,
-            reset.Account, reset.Char, true, m.proxy, test.appendLog)
+        m.runSessionSupervised(sessionCtx, reset.Account, reset.Account,
+            reset.Char, m.proxy, test.appendLog)
+        sessionDone <- nil
     }()
 
     tracker := m.tracker(test)

@@ -125,7 +125,8 @@ func (gc *gameConn) holdForRelogin(old *botSession) *botSession {
     defer gc.setHolding(false)
 
     gc.server.logger.Printf(
-        "game#%d: the bot session %q ended, holding the client for its relogin "+
+        "game#%d: the bot session %q ended, holding the client "+
+            "for its relogin "+
             "(up to %s)",
         gc.id, old.id, timeout)
 
@@ -135,7 +136,8 @@ func (gc *gameConn) holdForRelogin(old *botSession) *botSession {
             next != old && next.recorder != old.recorder &&
             switchReady(next) {
             gc.server.logger.Printf(
-                "game#%d: bot %q is back online, restarting the held client onto it",
+                "game#%d: bot %q is back online, restarting the "+
+                    "held client onto it",
                 gc.id, next.id)
 
             return next
@@ -147,7 +149,8 @@ func (gc *gameConn) holdForRelogin(old *botSession) *botSession {
         }
         if time.Now().After(deadline) {
             gc.shutdown(fmt.Sprintf(
-                "the bot %q did not return within %s, releasing the held client",
+                "the bot %q did not return within %s, "+
+                    "releasing the held client",
                 old.id, timeout))
 
             return nil

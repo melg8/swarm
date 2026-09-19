@@ -128,7 +128,7 @@ func (lc *loginConn) run() error {
 // modulus and the four GameGuard constants).
 func (lc *loginConn) sendInit() error {
     initPacket := &fromauthserver.InitPacket{
-        SessionID:       rand.Int32(), //nolint:gosec // a session id, not a secret
+        SessionID:       rand.Int32(), //nolint:gosec // not a secret
         ProtocolVersion: loginProtocolRevision,
         RsaPublicKey:    lc.server.rsaModulusBytes(),
         GameGuard1:      loginGG1,

@@ -123,13 +123,14 @@ func assignSheets(rl *regionLayers, climb int32, minLayers int32,
 // character can never stand on. Keeping them renders the mother tree
 // as a walkable ramp fused into the ground and curtains the floating
 // village down to the lake.
+//
+//nolint:cyclop,gocognit,funlen // the union find pass reads side by side
 func (s *sheets) dropIslandComponents(rl *regionLayers, climb int32) {
     parent := make([]int32, s.count)
     for i := range parent {
         parent[i] = int32(i)
     }
-    var find func(int32) int32
-    find = func(x int32) int32 {
+    find := func(x int32) int32 {
         for parent[x] != x {
             parent[x] = parent[parent[x]]
             x = parent[x]

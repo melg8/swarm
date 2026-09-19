@@ -124,7 +124,7 @@ func TestWholeMapHierarchyStats(t *testing.T) {
             debug.FreeOSMemory()
         }
     }
-    require.True(t, bestDist > 0, "the pack must hold a routable target")
+    require.Positive(t, bestDist, "the pack must hold a routable target")
     t.Logf("whole map target: %d_%d at %.0f %.0f %.0f (%.0f units out)",
         targetKey.Col, targetKey.Row, target.X, target.Y, target.Z,
         bestDist)

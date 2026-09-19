@@ -8,6 +8,7 @@ import (
     "fmt"
     "math"
     "os"
+    "strings"
     "testing"
 )
 
@@ -35,7 +36,7 @@ func TestBayCellDump(t *testing.T) {
         localX := int((p[0] - (float64(col)-20)*32768) / 16)
         localY := int((p[1] - (float64(row)-18)*32768) / 16)
         path := fmt.Sprintf("%s/%d_%d.l2j", geodataDir, col, row)
-        data, err := os.ReadFile(path) //nolint:gosec // the fixed dir
+        data, err := os.ReadFile(path)
         if err != nil {
             t.Logf("(%0.f, %0.f) region %d_%d: unreadable %v", p[0],
                 p[1], col, row, err)
@@ -66,7 +67,7 @@ func TestBayCellDump(t *testing.T) {
     harbor[1] = (122779 - 98304) / 16    // region 19_21 local y
     col, row := int16(19), int16(21)
     data, err := os.ReadFile(fmt.Sprintf("%s/%d_%d.l2j", geodataDir,
-        col, row)) //nolint:gosec // the fixed dir
+        col, row))
     if err == nil {
         rl, err := extractRegion(data, col, row,
             DefaultOptions().DedupDelta)
@@ -98,18 +99,18 @@ func dumpCell(t *testing.T, rl *regionLayers, cx, cy int, tag string) {
         if cnt == 0 {
             return "void"
         }
-        text := ""
+        var text strings.Builder
         for li := off; li < off+cnt; li++ {
             layer := rl.layers[li]
             area := "dry"
             if layer.h <= waterLevel {
                 area = "WATER"
             }
-            text += fmt.Sprintf("[h %d nswe %02x %s]", layer.h, layer.nswe,
+            fmt.Fprintf(&text, "[h %d nswe %02x %s]", layer.h, layer.nswe,
                 area)
         }
 
-        return text
+        return text.String()
     }
     t.Logf("%s cell (%d %d): %s | west: %s | east: %s | south: %s"+
         " | north: %s", tag, cx, cy, describe(cx, cy),

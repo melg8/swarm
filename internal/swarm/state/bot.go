@@ -579,7 +579,7 @@ func NewBot(id string) *Bot {
         started:            time.Now(),
         sessionAt:          time.Now(),
         updated:            time.Time{},
-        hunt:               HuntDiagnostics{}, //nolint:exhaustruct_v5 // zero view
+        hunt:               HuntDiagnostics{}, //nolint:exhaustruct_v5 // zero
         huntPublishedAt:    time.Time{},
         huntLastAction:     "",
         huntLastActionAt:   time.Time{},
@@ -1258,7 +1258,8 @@ const dangerSpotCap = 8
 func (b *Bot) NoteDangerSpot(x int32, y int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
-    b.dangerSpots = append(b.dangerSpots, DangerSpot{X: x, Y: y, At: time.Now()})
+    b.dangerSpots = append(b.dangerSpots,
+        DangerSpot{X: x, Y: y, At: time.Now()})
     if len(b.dangerSpots) > dangerSpotCap {
         b.dangerSpots = append(b.dangerSpots[:0], b.dangerSpots[1:]...)
     }
@@ -1849,7 +1850,8 @@ func (b *Bot) recordSwingEventsLocked(a Attack, now time.Time) {
             b.char.LastLandedHitAt = now
             b.char.LastLandedHitTarget = a.TargetIDs[i]
         }
-        //nolint:exhaustruct_v5 // the ring assigns Seq, a swing carries no amount
+        //nolint:exhaustruct_v5 // the ring assigns Seq, a swing
+        // carries no amount
         b.recordCombatEventLocked(CombatEvent{
             Kind:       CombatEventAttack,
             AttackerID: a.AttackerID,

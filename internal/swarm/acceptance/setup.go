@@ -350,6 +350,8 @@ func waitCharacterOffline(db *DB, charID int64, log func(string)) {
 // the inventory, the learned skills, the saved effects, the shortcuts
 // and the reuse stamps, injects the adena stack and rewrites the
 // vitals, the level, the experience, the SP and the spawn position.
+//
+//nolint:funlen // the reset walks the inventory steps in order
 func resetCharacter(db *DB, reset characterReset, log func(string)) error {
     charID, err := characterID(db, reset)
     if err != nil {

@@ -518,6 +518,8 @@ func (m *Manager) execute(
 // them one after another (each waits for the previous to finish),
 // parallel starts them all at once - every test on its own temp
 // account, so the bots never collide.
+//
+//nolint:gocognit // the launcher interleaves the account and client phases
 func (m *Manager) StartAll(mode string) error {
     switch mode {
     case ModeSequential, ModeParallel:

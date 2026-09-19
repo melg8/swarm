@@ -7,6 +7,7 @@ package navbuild
 import (
     "fmt"
     "os"
+    "strings"
     "testing"
 )
 
@@ -19,37 +20,39 @@ func TestEastSeamDump(t *testing.T) {
     if _, err := os.Stat(geodataDir); err != nil {
         t.Skipf("the geodata pack is not present: %v", err)
     }
-    west := loadRegionForDump(t, geodataDir, 19, 22)
-    east := loadRegionForDump(t, geodataDir, 20, 22)
+    west := loadRegionForDump(t, 19)
+    east := loadRegionForDump(t, 20)
     if west == nil || east == nil {
         t.Fatal("the seam regions fail to load")
     }
     t.Logf("the 19_22 east edge (x 2032..2047) and the 20_22 west" +
         " edge (x 0..15) around y 1024:")
     for y := 1016; y <= 1032; y++ {
-        westText, eastText := "", ""
+        westParts := make([]string, 0, 8)
         for x := 2040; x < 2048; x++ {
-            westText += " " + layerText(west, x, y)
+            westParts = append(westParts, " "+layerText(west, x, y))
         }
-        for x := 0; x < 8; x++ {
-            eastText += " " + layerText(east, x, y)
+        eastParts := make([]string, 0, 8)
+        for x := range 8 {
+            eastParts = append(eastParts, " "+layerText(east, x, y))
         }
-        t.Logf("y %4d | west:%s | east:%s", y, westText, eastText)
+        t.Logf("y %4d | west:%s | east:%s", y,
+            strings.Join(westParts, ""), strings.Join(eastParts, ""))
     }
 }
 
 // loadRegionForDump parses one region file for the dump probes.
-func loadRegionForDump(t *testing.T, geodataDir string, col, row int16,
+func loadRegionForDump(t *testing.T, col int16,
 ) *regionLayers {
     t.Helper()
-    path := fmt.Sprintf("%s/%d_%d.l2j", geodataDir, col, row)
-    data, err := os.ReadFile(path) //nolint:gosec // the fixed dir
+    path := fmt.Sprintf("../../../../data/geodata/%d_%d.l2j", col, 22)
+    data, err := os.ReadFile(path)
     if err != nil {
-        t.Fatalf("region %d_%d: %v", col, row, err)
+        t.Fatalf("region %d_22: %v", col, err)
     }
-    rl, err := extractRegion(data, col, row, DefaultOptions().DedupDelta)
+    rl, err := extractRegion(data, col, 22, DefaultOptions().DedupDelta)
     if err != nil {
-        t.Fatalf("region %d_%d: %v", col, row, err)
+        t.Fatalf("region %d_22: %v", col, err)
     }
 
     return rl
@@ -62,11 +65,11 @@ func layerText(rl *regionLayers, x, y int) string {
     if cnt == 0 {
         return "void"
     }
-    text := ""
+    var text strings.Builder
     for li := off; li < off+cnt; li++ {
         layer := rl.layers[li]
-        text += fmt.Sprintf("%d/%02x", layer.h, layer.nswe)
+        fmt.Fprintf(&text, "%d/%02x", layer.h, layer.nswe)
     }
 
-    return text
+    return text.String()
 }

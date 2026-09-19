@@ -272,6 +272,8 @@ func (s *Server) handleNavmeshOriginal(w http.ResponseWriter,
 
 // handleNavmeshPath runs one corridor search of the mesh between the
 // two double clicked points and measures the construction time.
+//
+//nolint:funlen // the handler mirrors the request validation steps in order
 func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     body, err := io.ReadAll(io.LimitReader(r.Body, navmeshPathBodyLimit))
     if err != nil {
@@ -319,21 +321,23 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         s.logger.Printf("Navmesh route (%s): failed in %.1f ms: %v",
             filterName, float64(duration.Nanoseconds())/1e6, err)
-    } else if route == nil {
-        s.logger.Printf("Navmesh route (%s): no path in %.1f ms",
-            filterName, float64(duration.Nanoseconds())/1e6)
     } else {
-        status := "no path"
-        switch {
-        case route.Found:
-            status = "found"
-        case route.Partial:
-            status = "partial"
+        if route == nil {
+            s.logger.Printf("Navmesh route (%s): no path in %.1f ms",
+                filterName, float64(duration.Nanoseconds())/1e6)
+        } else {
+            status := "no path"
+            switch {
+            case route.Found:
+                status = "found"
+            case route.Partial:
+                status = "partial"
+            }
+            s.logger.Printf("Navmesh route (%s): %s in %.1f ms - "+
+                "%d waypoints, %d regions", filterName, status,
+                float64(duration.Nanoseconds())/1e6,
+                len(route.Waypoints), len(route.Corridor))
         }
-        s.logger.Printf("Navmesh route (%s): %s in %.1f ms - "+
-            "%d waypoints, %d regions", filterName, status,
-            float64(duration.Nanoseconds())/1e6,
-            len(route.Waypoints), len(route.Corridor))
     }
 
     response := navmeshPathResponse{

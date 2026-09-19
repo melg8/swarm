@@ -63,7 +63,8 @@ func (gc *GameClient) applyUserInfo(payload []byte) {
 
 // applyNpcInfo parses NpcInfo and upserts the npc object.
 func (gc *GameClient) applyNpcInfo(payload []byte) {
-    if err := fromgameserver.ParseNpcInfoPacket(&gc.npcInfo, payload); err != nil {
+    if err := fromgameserver.ParseNpcInfoPacket(&gc.npcInfo,
+        payload); err != nil {
         gc.logger.Printf("Failed to parse npc info: %v", err)
 
         return
@@ -246,7 +247,8 @@ func (gc *GameClient) applyStatusUpdate(payload []byte) {
 
 // applyAttack parses Attack and updates the combat state.
 func (gc *GameClient) applyAttack(payload []byte) {
-    if err := fromgameserver.ParseAttackPacket(&gc.attack, payload); err != nil {
+    if err := fromgameserver.ParseAttackPacket(&gc.attack,
+        payload); err != nil {
         gc.logger.Printf("Failed to parse attack: %v", err)
 
         return
@@ -351,7 +353,8 @@ func (gc *GameClient) applySpawnItem(payload []byte) {
 
 // applyGetItem parses GetItem and removes the picked up ground item.
 func (gc *GameClient) applyGetItem(payload []byte) {
-    if err := fromgameserver.ParseGetItemPacket(&gc.getItem, payload); err != nil {
+    if err := fromgameserver.ParseGetItemPacket(&gc.getItem,
+        payload); err != nil {
         gc.logger.Printf("Failed to parse get item: %v", err)
 
         return
@@ -454,7 +457,8 @@ func (gc *GameClient) applyTeleport(payload []byte) {
         // character AI silently ignores every move request (the village
         // revive left the bot stuck).
         if gc.tracker.SelfObjectID() == tele.ObjectID {
-            if err := gc.sendPacket(togameserver.NewAppearingPacket()); err != nil {
+            if err := gc.sendPacket(
+                togameserver.NewAppearingPacket()); err != nil {
                 gc.logger.Printf("Failed to send appearing: %v", err)
             }
         }

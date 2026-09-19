@@ -101,7 +101,7 @@ func evaluateLesson(tracker *state.Bot) (detail string, done bool) {
 func farmChecks() []Check {
     return []Check{
         {
-            ID: checkOnline, Label: "entered the world", Done: false,
+            ID: checkOnline, Label: labelEnteredWorld, Done: false,
             Detail: "",
         },
         {
@@ -131,7 +131,7 @@ func farmChecks() []Check {
 func lifetimeChecks() []Check {
     return []Check{
         {
-            ID: checkOnline, Label: "entered the world", Done: false,
+            ID: checkOnline, Label: labelEnteredWorld, Done: false,
             Detail: "",
         },
         {
@@ -150,7 +150,7 @@ func lifetimeChecks() []Check {
 func zoneReturnChecks() []Check {
     return []Check{
         {
-            ID: checkOnline, Label: "entered the world", Done: false,
+            ID: checkOnline, Label: labelEnteredWorld, Done: false,
             Detail: "",
         },
         {
@@ -184,7 +184,7 @@ var fullDressSlots = [...]int{
 func fullDressChecks() []Check {
     return []Check{
         {
-            ID: checkOnline, Label: "entered the world", Done: false,
+            ID: checkOnline, Label: labelEnteredWorld, Done: false,
             Detail: "",
         },
         {
@@ -252,7 +252,7 @@ func (w *fullDressWatch) evaluate(tracker *state.Bot, test *Test) {
 func gearGapChecks() []Check {
     return []Check{
         {
-            ID: checkOnline, Label: "entered the world", Done: false,
+            ID: checkOnline, Label: labelEnteredWorld, Done: false,
             Detail: "",
         },
         {

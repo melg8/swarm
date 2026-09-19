@@ -141,8 +141,9 @@ func classTransferChecks() []Check {
             Done: false, Detail: "",
         },
         {
-            ID: checkQuestAccepted, Label: "the quest journal reports Q00406 cond 1",
-            Done: false, Detail: "",
+            ID:    checkQuestAccepted,
+            Label: "the quest journal reports Q00406 cond 1",
+            Done:  false, Detail: "",
         },
         {
             ID: checkTopazCleared,

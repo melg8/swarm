@@ -42,7 +42,7 @@ func avoidWorld() *Tile {
         {poly: 3, side: SideMinX, to: 2, t0: 160, t1: 319},
     }
 
-    return assembleTile(21, 19, rects, links, nil)
+    return assembleTile(21, rects, links, nil)
 }
 
 // TestRouteApproachRadiusEndsEarly pins the approach goal of the

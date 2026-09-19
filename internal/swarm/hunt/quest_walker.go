@@ -111,7 +111,8 @@ func (l *Loop) DriveDialog(npcObjID int32, steps []DialogStep) error {
         }
         if !l.tracker.IsDialogCommand(link.Command) {
             return fmt.Errorf(
-                "dialog: step %d: the %q link command %q failed the open page validation",
+                "dialog: step %d: the %q link command %q failed "+
+                    "the open page validation",
                 i+1, steps[i].LinkText, link.Command)
         }
         // The bypass flood protector pace: a bypass riding the

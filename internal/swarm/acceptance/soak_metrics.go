@@ -155,9 +155,6 @@ var soakExperienceTable = [...]int64{
     2099275834, 4200000000, 6300000000,
 }
 
-// soakMaxLevel is the highest level the local table knows about.
-const soakMaxLevel = 81
-
 // cumulativeSoakXP returns the total experience a character has
 // accumulated. The tracker exp is already the cumulative total: the
 // Mobius PlayerStat keeps one running number (PlayableStat.addExp

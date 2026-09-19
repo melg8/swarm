@@ -93,12 +93,14 @@ func (lc *LoginClient) readInitPacket() (*fromauthserver.InitPacket, error) {
         return nil, errors.New("empty init packet")
     }
     if payload[0] != initPacketID {
-        return nil, fmt.Errorf("unexpected packet id 0x%02x while waiting for init",
+        return nil, fmt.Errorf(
+            "unexpected packet id 0x%02x while waiting for init",
             payload[0])
     }
 
     initPacket := fromauthserver.NewInitPacket()
-    if err := fromauthserver.ParseInitPacket(initPacket, payload[1:]); err != nil {
+    if err := fromauthserver.ParseInitPacket(initPacket,
+        payload[1:]); err != nil {
         return nil, fmt.Errorf("failed to parse init packet: %w", err)
     }
 
@@ -168,7 +170,8 @@ func (lc *LoginClient) authAccount(account, password string) error {
     if err != nil {
         return fmt.Errorf("failed to auth: %w", err)
     }
-    if err := fromauthserver.ParseLoginOkPacket(&lc.loginOK, content); err != nil {
+    if err := fromauthserver.ParseLoginOkPacket(&lc.loginOK,
+        content); err != nil {
         return fmt.Errorf("failed to parse login ok: %w", err)
     }
     log.Println("Authenticated on login server")
@@ -196,7 +199,8 @@ func (lc *LoginClient) requestServerList() (
         &lc.serverIDs, content); err != nil {
         return nil, fmt.Errorf("failed to parse server list: %w", err)
     }
-    log.Printf("Received server list with %d servers", len(lc.serverIDs.Servers))
+    log.Printf("Received server list with %d servers",
+        len(lc.serverIDs.Servers))
 
     server := lc.serverIDs.FirstAvailableServer()
     if server == nil {
@@ -224,7 +228,8 @@ func (lc *LoginClient) requestServerLogin(
     if err != nil {
         return fmt.Errorf("failed to login on game server: %w", err)
     }
-    if err := fromauthserver.ParsePlayOkPacket(&lc.playOK, content); err != nil {
+    if err := fromauthserver.ParsePlayOkPacket(&lc.playOK,
+        content); err != nil {
         return fmt.Errorf("failed to parse play ok: %w", err)
     }
 
