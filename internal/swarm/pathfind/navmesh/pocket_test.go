@@ -114,13 +114,17 @@ func TestPocketEscapePrefersTheDryGround(t *testing.T) {
         "the exit stays on the dry deck, never the bed below")
 }
 
-// TestPocketEscapeSparesTheWideComponent pins the flood bound: a
-// start whose link component is honest ground (a wide isolated area
-// - the whole sealed yard case) keeps the plain answers, the escape
-// never fabricates an exit route for it even when other ground lies
-// next door (the escape exists for the stranded spot, not for the
-// sealed area the walk-what-you-can partial already serves).
-func TestPocketEscapeSparesTheWideComponent(t *testing.T) {
+// TestPocketEscapeServesTheWideTerrace pins the terrace class of the
+// stranded components (the 2026-09-20 stuck point reports): a wide
+// sealed yard whose link component fits the pocket box (640 units -
+// the measured terraces run 592..752) with connected ground next door
+// answers the walk out of it. The pre terrace answer kept the plain
+// not found for every component past the old 320 side - the walk
+// what you can partial does NOT serve the wide strands (the astar
+// partial walks the character to the component's inner boundary and
+// strands it there, the next cycle replans the same partial), so the
+// escape is the only answer that walks it out.
+func TestPocketEscapeServesTheWideTerrace(t *testing.T) {
     rects := []rectSpec{
         {x0: 0, y0: 0, x1: 40, y1: 40, h: 0, area: AreaGround}, // wide yard
         {x0: 41, y0: 0, x1: 42, y1: 1, h: 0, area: AreaGround}, // neighbor
@@ -137,10 +141,87 @@ func TestPocketEscapeSparesTheWideComponent(t *testing.T) {
     route, err := mesh.Route(start, dest, DefaultFilter())
     require.NoError(t, err)
     require.NotNil(t, route)
+    require.False(t, route.Found,
+        "the destination itself stays unreachable from the yard")
+    require.True(t, route.Partial,
+        "the escape must answer the walk out of the wide strand")
+    require.True(t, route.PocketEscape)
+    require.Len(t, route.Waypoints, 1,
+        "the plan is the single exit aim, never the standing point")
+    exit := route.Waypoints[0]
+    require.False(t, exit.X >= 32768 && exit.X < 32768+640 &&
+        exit.Y >= 32768 && exit.Y < 32768+640,
+        "the exit must leave the yard box, got %v", exit)
+    require.GreaterOrEqual(t, math.Hypot(exit.X-start.X, exit.Y-start.Y),
+        48.0, "the exit aim must stand far enough for the walk clicks")
+}
+
+// TestPocketEscapeSparesTheWideComponent pins the flood bound: a
+// start whose link component outgrows the pocket box (a 2240 unit
+// sealed area - the honest ground scale, the mainland and the big
+// islands live past the bound) keeps the plain answers, the escape
+// never fabricates an exit route for it.
+func TestPocketEscapeSparesTheWideComponent(t *testing.T) {
+    rects := []rectSpec{
+        {x0: 0, y0: 0, x1: 140, y1: 140, h: 0, area: AreaGround}, // huge yard
+        {x0: 141, y0: 0, x1: 142, y1: 1, h: 0, area: AreaGround}, // neighbor
+        {x0: 142, y0: 0, x1: 143, y1: 1, h: 0, area: AreaGround}, // pair
+    }
+    links := []linkSpec{
+        {poly: 1, side: SideMaxX, to: 2, t0: 0, t1: 0},
+        {poly: 2, side: SideMinX, to: 1, t0: 0, t1: 0},
+    }
+    mesh := NewMesh(writeTiles(t, assembleTile(21, rects, links, nil)))
+    start := worldPos(70, 70, 0)
+    dest := worldPos(141.5, 0.5, 0)
+
+    route, err := mesh.Route(start, dest, DefaultFilter())
+    require.NoError(t, err)
+    require.NotNil(t, route)
     require.False(t, route.Found)
     require.False(t, route.Partial,
         "the wide component keeps the plain not found")
     require.Empty(t, route.Waypoints)
+}
+
+// TestPocketEscapeSparesTheVerticalStack pins the horizontal
+// displacement floor of the exit scan (the 2026-09-20 stuck point
+// report): a stranded spot stacked OVER the connected deck (the
+// terrace cell 32 units above the surrounding ground) must not exit
+// through the ground directly under the standing point - the deck
+// under the start and the diagonal neighbors sharing its corner
+// answer the closest 3D points of the whole scan, but the character
+// cannot walk straight down onto them and the boundary they form
+// carries no horizontal displacement (the aim march degenerates into
+// the standing cell - the follower would click its own position and
+// the bot would stand frozen with a plan in hand). The exit must land
+// on the horizontally displaced deck the walk can reach.
+func TestPocketEscapeSparesTheVerticalStack(t *testing.T) {
+    rects := []rectSpec{
+        {x0: 0, y0: 0, x1: 30, y1: 30, h: 0, area: AreaGround},     // deck
+        {x0: 30, y0: 30, x1: 31, y1: 31, h: -32, area: AreaGround}, // spot
+        {x0: 40, y0: 0, x1: 50, y1: 10, h: 0, area: AreaGround},    // mainland
+    }
+    links := []linkSpec{
+        {poly: 0, side: SideMaxX, to: 2, t0: 0, t1: 159},
+        {poly: 2, side: SideMinX, to: 0, t0: 0, t1: 159},
+    }
+    mesh := NewMesh(writeTiles(t, assembleTile(21, rects, links, nil)))
+    start := worldPos(30.5, 30.5, -32)
+    dest := worldPos(5, 5, 0)
+
+    route, err := mesh.Route(start, dest, DefaultFilter())
+    require.NoError(t, err)
+    require.NotNil(t, route)
+    require.False(t, route.Found)
+    require.True(t, route.Partial,
+        "the spot is a stranded one poly component, the escape answers")
+    require.Len(t, route.Waypoints, 1)
+    exit := route.Waypoints[0]
+    horizontal := math.Hypot(exit.X-start.X, exit.Y-start.Y)
+    require.GreaterOrEqual(t, horizontal, 48.0,
+        "the exit must stand horizontally displaced from the standing "+
+            "point, got %v", exit)
 }
 
 // navmeshDataDir finds the navmesh tile directory the way the bot
@@ -223,4 +304,72 @@ func meshTileOf(t *testing.T, mesh *Mesh, ref PolyRef) *Tile {
     require.NoError(t, err)
 
     return tile
+}
+
+// stuckTerraces are the 2026-09-20 stuck point report: the bot
+// positions the owner found the fleet frozen on - the elven village
+// terrace spots whose link components measure 52 and 29 polygons (the
+// 640x752 and the 592x432 boxes) and whose every link direction is
+// walled while the diagonal squeezes the server movement allows carry
+// the only way out. The components outgrew the old 320 pocket side,
+// so the escape declined and every route attempt answered the bare
+// not found (or the inner boundary partial) - the bots stood frozen.
+func TestReproStuckTerraces43632And41920(t *testing.T) {
+    dir := navmeshDataDir()
+    if dir == "" {
+        t.Skip("no local navmesh tiles, the dump reproduction needs them")
+    }
+    mesh := NewMesh(dir)
+    starts := []Pos{
+        {X: 43632, Y: 50560, Z: -2960},
+        {X: 41920, Y: 52128, Z: -3000},
+    }
+    dests := []Pos{
+        {X: 43032, Y: 50408, Z: -2992}, // the village plaza
+        {X: 25500, Y: 51095, Z: -3408}, // the hunting zone center
+        {X: 45478, Y: 49730, Z: -3056}, // the village center
+    }
+    for _, start := range starts {
+        ref, _, ok := mesh.FindNearestPoly(start)
+        require.True(t, ok)
+        _, poly := mesh.polyOfRef(ref)
+        require.GreaterOrEqual(t, poly.FirstLink, int32(0),
+            "the terrace precondition: the standing polygon carries "+
+                "links (the component is the terrace, not a one cell "+
+                "island)")
+        component := mesh.floodPocketComponent(ref)
+        require.NotNil(t, component,
+            "the terrace precondition: the component fits the pocket "+
+                "box (the strand the escape serves)")
+        side := math.Max(component.maxX-component.minX,
+            component.maxY-component.minY)
+        require.Greater(t, side, 320.0,
+            "the terrace precondition: the component outgrows the old "+
+                "pocket side (the class the old bound refused)")
+        require.LessOrEqual(t, side, pocketMaxSide,
+            "the terrace precondition: the component fits the bound")
+
+        x0, y0, x1, y1 := meshTileOf(t, mesh, ref).WorldRect(poly)
+        for _, dest := range dests {
+            route, err := mesh.Route(start, dest, DefaultFilter())
+            require.NoError(t, err)
+            require.NotNil(t, route)
+            require.False(t, route.Found,
+                "the destination itself stays unreachable from the "+
+                    "terrace")
+            require.True(t, route.Partial,
+                "the escape must answer the walk out toward %v", dest)
+            require.True(t, route.PocketEscape)
+            require.Len(t, route.Waypoints, 1)
+            exit := route.Waypoints[0]
+            inStart := exit.X >= x0 && exit.X < x1 && exit.Y >= y0 &&
+                exit.Y < y1
+            require.False(t, inStart,
+                "the exit must leave the standing cell, got %v", exit)
+            horizontal := math.Hypot(exit.X-start.X, exit.Y-start.Y)
+            require.GreaterOrEqual(t, horizontal, 48.0,
+                "the exit must stand horizontally displaced far enough "+
+                    "for the walk clicks, got %v", exit)
+        }
+    }
 }

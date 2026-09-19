@@ -7344,3 +7344,132 @@ scenario against the deployed stack stays for the next session
 with the stack up (the sandbox stack was down at the round time;
 the scenario contract is exercised by the unit ladder and the
 acceptance suite sanity tests in the meantime).
+
+## Round 97: the stuck terrace round - the pocket escape serves the wide strands and the exit never aims at the standing point (2026-09-20)
+
+Scope: the owner report "Найдены точки из которых боты не выходят
+никуда и просто стоят зависшие, найди, воспроизведи и исправь
+системную проблему" with two positions: x 43632, y 50560, z -2960
+(heading 21963) and x 41920, y 52128, z -3000 (heading 26712). Find
+the systemic problem behind the frozen fleet, reproduce it, fix it.
+
+### The reproduction and the mechanism audit
+
+Both positions reproduce on the real pack and the real mesh tiles
+(the scratch probe rode cmd/stuckprobe through the whole round):
+the GRID engine plans out of both cells fine (the routes to the
+village plaza, the village center and the hunting zone center all
+answer found), while the MESH answers the bare not found for every
+destination from both starts (one destination pair carried the
+astar partial - the corridor that walks INSIDE the component and
+stops at its inner boundary). The FindNearestPoly resolution and
+the link component flood name the class:
+
+- 43632 50560 -2960: tile 21_19, a one cell polygon at -2960 (the
+  surrounding deck sits at -2992, the spot 32 units above it) whose
+  link component measures 52 polygons in the 640x752 box.
+- 41920 52128 -3000: tile 21_19, a spot 24 units above the
+  surrounding ground (-3024) whose link component measures 29
+  polygons in the 592x432 box.
+
+The components are isolated in the strict edge only link graph (the
+flood never leaves them) while the grid's exit routes name the way
+out: the first grid step out of each spot is a DIAGONAL squeeze
+(43632 50560 -> 43640 50568, the 8+8 unit anti corner cut diagonal
+the mesh links do not carry; the second spot exits the same way
+down a 32 unit step to -3032). The same sealing geometry as the
+railing pocket of Round 92 - every link direction walled, the
+diagonal squeezes the only way out - at the terrace scale.
+
+Why the bots froze instead of walking: the pocket escape of Round
+92 declined for both starts because its flood bound (pocketMaxSide
+320) refused the components at the first polygon that stretched the
+box past 320. The route answers then fell to the plain search
+verdicts - the bare not found (the hold keeps the bot in place) or
+the astar partial whose corridor ends at the component's inner
+boundary (the walk follows it, arrives, the next cycle replans the
+same partial - the boundary loop). Both verdicts strand the
+character; the walk-what-you-can partial the 320 bound's rationale
+relied on does NOT serve the wide strands.
+
+### The fix, layer one: the stranded spot bound follows the measured world
+
+pocketMaxSide 320 -> 2048 (navmesh/pocket.go). The bound is the
+world extent the sealing geometry actually produces, not a sample
+tuning: the railing pockets measure one to a few cells (16..320),
+the reported terraces measure 640x752 and 592x432, the piers run
+long and thin - the 2048 side carries the whole measured class with
+margin. The mainland flood still aborts the moment the box would
+stretch past the side (the flood cost stays a fraction of the astar
+budget the failed corridor search just spent), and the honest ground
+(the mainland, the big islands) keeps the plain answers. The
+classification of a start stays with the exit scan, not with the
+size gate: the scan decides whether a connected exit exists, the
+bound only decides how far the flood looks before giving up.
+
+### The fix, layer two: the exit never aims at the standing point
+
+The live probe of the widened escape exposed the second layer
+before it could freeze anyone: the escape answered pocket=true with
+the single waypoint EQUAL TO THE STANDING POSITION (43632 50560
+-2992 from the start 43632 50560 -2960). The boundary scan picks
+the closest 3D point of the connected ground - and for a spot
+stacked ABOVE its ground the closest point is the ground directly
+UNDER the standing cell (the deck 32 units under measures 32 while
+the honest edge next door measures 36), or the diagonal neighbors
+sharing the start footprint's corner (2D distance zero). A boundary
+with no horizontal displacement collapses the exit direction to
+zero - the aim march degenerates into the standing cell and the
+follower would click its own position forever: the freeze would
+have moved from the route graph into the plan itself.
+
+The fix: the exit boundary must carry a horizontal displacement
+from the standing point (pocketExitHorizontalFloorSq, one unit -
+the float noise floor): the candidates directly under the start
+(the stacked layers, the corner sharing diagonals) leave the scan,
+the honest edge next door wins. The final answer is checked against
+the start polygon's world rect - an aim collapsed back into the
+start footprint (a snap window pull) answers the honest no exit
+instead of the frozen plan. The probe after the fix: the first spot
+aims 276 units out (43412 50340 -2992), the second 311 units out
+(42140 51908 -3016) - both past the follower's arrival slack, both
+on real surfaces.
+
+### The reproductions at the three levels
+
+- pathfind/navmesh/pocket_test.go: TestPocketEscapeServesTheWide
+  Terrace (the 640 unit sealed yard with connected ground next door
+  answers the walk out - the contract the old spares test pinned is
+  deliberately reversed: the partial does not serve the wide
+  strands), TestPocketEscapeSparesTheWideComponent (the 2240 unit
+  sealed area keeps the plain not found - the flood bound), Test
+  PocketEscapeSparesTheVerticalStack (the spot stacked over the
+  deck must not exit through the ground under it - the horizontal
+  displacement floor), TestReproStuckTerraces43632And41920 (the
+  live pack: both spots, the component preconditions - the flood
+  fits the bound and outgrows the old 320 side - and the walk out
+  answers for every destination).
+- hunt/stuck_terrace_repro_test.go: the end to end loop on the real
+  pack, the real mesh and the honest server model (no refusals -
+  the freeze lived in the route graph): the bot plans the walk
+  home, the escape rides the walk-what-you-can partial contract
+  (the "walking the closest reachable point" event), the follower
+  clicks deliver it and the character leaves both reported spots.
+  Red on the pre fix tree (the return held forever), green on the
+  fixed one.
+- acceptance/stuck_points.go: the webui scenarios "stuck-point
+  -43632" (temp15) and "stuck-point-41920" (temp16) - the temp
+  ladder grows to temp16, the check is the escape ring (256+ units
+  from the reported spot within the two minute window, the escape
+  aims measure 276 and 311).
+
+Verification: go test -count=1 ./... 28 packages ok zero failures,
+the pathfind ladder re-run green (125.9s the grid engine package,
+7.5s the mesh), golangci-lint run ./... 0 issues, the gofmt-spaces
+gate clean; the LIVE acceptance runs of both stuck point scenarios
+against the deployed stack answered PASS within the round (the
+first spot: the escape plan, the refused click varied aim ladder on
+the terrace edge, the farm reached inside the window; the second
+spot: the escape plan walked out clean in ~4 seconds, the farm
+reached without a single refusal - the horizontal displacement
+floor delivering the honest aim).

@@ -136,11 +136,11 @@ func evaluateRailingPocket(
     tracker *state.Bot, test *Test,
 ) (bool, string) {
     if tracker.Status() != state.StatusOnline {
-        return false, "offline"
+        return false, detailOffline
     }
     x, y, _, ok := tracker.SelfPosition()
     if !ok {
-        return false, "the position is unknown"
+        return false, detailNoPosition
     }
     dist := math.Hypot(
         float64(x-railingPocketSpawnX),

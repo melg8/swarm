@@ -189,10 +189,10 @@ linters:
       - legacy
       - std-error-handling
     rules:
-      - path: cmd/(geotest|navanalyze|navmesh-build)/
+      - path: cmd/(geotest|navanalyze|navmesh-build|stuckprobe)/
         linters:
-          # The geotest, navanalyze and navmesh-build CLI tools print
-          # their findings to stdout by design.
+          # The geotest, navanalyze, navmesh-build and stuckprobe CLI
+          # tools print their findings to stdout by design.
           - forbidigo
           # The analysis drivers are linear scratch benches over the
           # shipped artifacts: the whole body IS the scenario.

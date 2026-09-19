@@ -250,6 +250,67 @@ func Definitions() []TestDef {
             Scenario: railingPocketScenario,
         },
         {
+            ID:      "stuck-point-43632",
+            Title:   "stuck point 43632 · the frozen terrace spot",
+            Account: stuckAccountA,
+            Timeout: stuckPointTimeout,
+            Description: "Start: the elven fighter temp15 wakes at the " +
+                "first stuck position of the 2026-09-20 fleet freeze " +
+                "report (43632 50560 -2960, heading 21963 - the elven " +
+                "village terrace spot) as a level 15 fighter with the " +
+                "standard dump outfit. The spot stands on a link " +
+                "component the strict edge only mesh link graph " +
+                "cannot leave (52 polygons, the 640x752 box) while " +
+                "the grid engine plans out of the very same cell " +
+                "through the diagonal squeezes the server movement " +
+                "channels allow. The component outgrew the old 320 " +
+                "pocket side, so the escape declined and the bots " +
+                "stood frozen there (the bare not found, or the " +
+                "partial that walks to the component's inner " +
+                "boundary and strands it). Flow: the walk plans the " +
+                "widened mesh pocket escape (the closest reachable " +
+                "route out of the stranded component, the exit aim " +
+                "horizontally displaced from the standing point), " +
+                "the follower clicks at the refined exit aim and the " +
+                "followup plan cycles route from the connected " +
+                "ground. Pass: the character stands 256+ units from " +
+                "the reported spot within two minutes of the world " +
+                "entry (the mesh level reproduction lives in " +
+                "pathfind/navmesh/pocket_test.go, the loop level one " +
+                "in hunt/stuck_terrace_repro_test.go).",
+            Scenario: stuckPointAScenario,
+        },
+        {
+            ID:      "stuck-point-41920",
+            Title:   "stuck point 41920 · the frozen terrace spot",
+            Account: stuckAccountB,
+            Timeout: stuckPointTimeout,
+            Description: "Start: the elven fighter temp16 wakes at the " +
+                "second stuck position of the 2026-09-20 fleet " +
+                "freeze report (41920 52128 -3000, heading 26712 - " +
+                "the elven village terrace spot by the north dock " +
+                "walk) as a level 15 fighter with the standard dump " +
+                "outfit. The spot stands on a link component the " +
+                "strict edge only mesh link graph cannot leave (29 " +
+                "polygons, the 592x432 box) while the grid engine " +
+                "plans out of the very same cell through the " +
+                "diagonal squeezes the server movement channels " +
+                "allow (the spot also sits 24 units above the " +
+                "surrounding ground - the layers stacked directly " +
+                "under it answered the closest 3D exit candidates " +
+                "and the escape aim degenerated into the standing " +
+                "cell before the horizontal displacement floor). " +
+                "Flow: the walk plans the widened mesh pocket " +
+                "escape, the follower clicks at the refined exit " +
+                "aim and the followup plan cycles route from the " +
+                "connected ground. Pass: the character stands 256+ " +
+                "units from the reported spot within two minutes of " +
+                "the world entry (the mesh level reproduction lives " +
+                "in pathfind/navmesh/pocket_test.go, the loop level " +
+                "one in hunt/stuck_terrace_repro_test.go).",
+            Scenario: stuckPointBScenario,
+        },
+        {
             ID:      classTransferScenarioID,
             Title:   "class transfer · the M2 accept stage",
             Account: classTransferAccount,

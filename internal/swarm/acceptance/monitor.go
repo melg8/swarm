@@ -47,6 +47,19 @@ const checkEscape = "escape"
 // spawn cell (the walk out of the linkless deck cell happened).
 const checkPocketEscape = "pocket-escape"
 
+// checkStuckEscape is the single check of the stuck point scenarios:
+// the character stands beyond the escape radius from the reported
+// terrace spot (the walk out of the stranded link component
+// happened).
+const checkStuckEscape = "stuck-escape"
+
+// The tracker readiness detail strings the scenario evaluators
+// repeat (the goconst honest names).
+const (
+    detailOffline    = "offline"
+    detailNoPosition = "the position is unknown"
+)
+
 // The full dress condition ids.
 const (
     checkDress = "dress"

@@ -1515,3 +1515,32 @@ a38b90a (test gate: the unit test account ladder renames to unittest1 - the test
   delevel acceptance run stays for the next session with the stack
   up (the full cycle needs the guards, the stack was down at the
   round time). Round 96 of docs/development_log.md.
+
+- 2026-09-20, Round 97, the stuck terrace round: the owner report
+  named two fleet freeze positions (43632 50560 -2960 heading 21963,
+  41920 52128 -3000 heading 26712). The audit: both spots stand on
+  link components the strict edge only mesh link graph cannot leave
+  (52 and 29 polygons, the 640x752 and the 592x432 boxes) - the
+  railing pocket class of Round 92 at the terrace scale, the grid
+  engine plans out through the diagonal squeezes the mesh links do
+  not carry. The 320 pocket side refused both components, so the
+  route answers were the bare not found or the inner boundary
+  partial - the freeze. The fix: pocketMaxSide 320 -> 2048 (the
+  measured world extent of the sealing geometry: pockets 16..320,
+  terraces ~600..760, piers long thin; the mainland still aborts the
+  flood past the bound) and the horizontal displacement floor of the
+  exit scan (pocketExitHorizontalFloorSq - the ground directly under
+  a spot stacked above its deck and the corner sharing diagonals
+  answered the closest 3D candidates and degenerated the aim into
+  the standing cell; the widened probe caught it before it froze
+  anyone). Reproductions: TestPocketEscapeServesTheWideTerrace /
+  SparesTheWideComponent (the 2240 bound) / SparesTheVerticalStack +
+  TestReproStuckTerraces43632And41920 on the live pack, the loop
+  level hunt/stuck_terrace_repro_test.go (red pre fix, green post),
+  the webui scenarios stuck-point-43632 (temp15) and stuck-point
+  -41920 (temp16) - both answered LIVE PASS against the deployed
+  stack within the round (the first spot rode the varied aim ladder
+  over the refused terrace edge clicks, the second walked out clean
+  in ~4 seconds). Verification: go test ./... 28 packages ok,
+  golangci-lint 0 issues, gofmt-spaces clean. Round 97 of
+  docs/development_log.md.

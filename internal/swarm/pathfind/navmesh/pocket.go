@@ -24,25 +24,43 @@ import "math"
 //
 // The escape restores the class invariant instead of patching one
 // cell: when the corridor search cannot leave the start's link
-// component AND that component is a small spot (the flood stays
-// inside the pocket box), the search answers the closest reachable
-// route OUT of the spot - the nearest connected ground of another
-// component, water priced like every escape (the bed under a deck
-// must never win the exit), the bot's own bans priced like the
-// foreign ground they name. The walk-what-you-can partial contract
-// serves the answer end to end: the follower clicks at the exit aim,
-// the click validation judges every step honestly (the permissive
-// transport that got the character into the pocket delivers it back
-// out), and the next plan cycle routes from connected ground.
+// component AND that component is a stranded spot (the flood stays
+// inside the component box, see pocketMaxSide), the search answers
+// the closest reachable route OUT of the spot - the nearest connected
+// ground of another component, water priced like every escape (the
+// bed under a deck must never win the exit), the bot's own bans
+// priced like the foreign ground they name. The walk-what-you-can
+// partial contract serves the answer end to end: the follower clicks
+// at the exit aim, the click validation judges every step honestly
+// (the permissive transport that got the character into the pocket
+// delivers it back out), and the next plan cycle routes from
+// connected ground.
+//
+// The stranded spots the world actually carries reach far past the
+// one cell island: the 2026-09-20 stuck point reports stranded the
+// bots on the elven village terraces whose isolated link components
+// measure 52 and 29 polygons (the 640x752 and the 592x432 boxes) -
+// the same sealing geometry (every link direction walled, the
+// diagonal squeezes the only way out) at the terrace scale. The
+// walk-what-you-can partial does NOT serve them: the astar partial
+// walks the character to the component's inner boundary and strands
+// it there (the next cycle replans the same partial), the bare not
+// found strands it in place - the escape is the only answer that
+// walks it out.
 
 const (
     // pocketMaxSide bounds the link component the escape serves: a
-    // component whose bounding box fits the side is a stranded spot
-    // (the railing pockets measure one to a few cells, 16..320 units);
-    // a wider one is honest ground - a sealed yard or an island the
-    // walk-what-you-can partial already serves - and keeps the plain
-    // answers.
-    pocketMaxSide = 320.0
+    // component whose bounding box fits the side is a stranded spot;
+    // a wider one is honest ground (the mainland, the big islands)
+    // and keeps the plain answers. The bound is the world extent the
+    // sealing geometry actually produces, not a sample tuning: the
+    // railing pockets measure one to a few cells (16..320 units), the
+    // reported terraces measure 640x752 and 592x432, the piers run
+    // long and thin - the 2048 side carries the whole measured class
+    // with margin while the mainland flood aborts the moment the box
+    // would stretch past it (the flood cost stays a fraction of the
+    // astar budget the failed corridor search just spent).
+    pocketMaxSide = 2048.0
     // pocketExitRadius bounds the world ring the exit search scans
     // around the pocket box: a pocket is by construction adjacent to
     // the ground it cannot link (the diagonal or one sided neighbor
@@ -65,6 +83,16 @@ const (
     // units apart, the region cliffs measure under a thousand - the
     // window keeps the absurd stacks out of the scan.
     pocketExitZWindow = 1024.0
+    // pocketExitHorizontalFloorSq is the squared horizontal
+    // displacement the exit boundary must carry from the standing
+    // point: the ground directly under it (the layers stacked in the
+    // start footprint, the diagonal neighbors sharing its corner -
+    // the closest 3D points of the whole scan) is not a walkable
+    // exit, and a boundary with no horizontal displacement collapses
+    // the exit direction to zero (the aim degenerates into the
+    // standing cell the follower would click forever). One unit -
+    // the float noise floor of the closest point math.
+    pocketExitHorizontalFloorSq = 1.0
     // pocketExitMarchSteps carry the exit aim past the pocket boundary
     // into the connected ground (see the var definition below).
 )
@@ -83,11 +111,18 @@ const (
 var pocketExitMarchSteps = [3]float64{288.0, 256.0, 224.0}
 
 // pocketComponent is the flooded link component of a pocket start:
-// the seen polygons and their bounding box in world units.
+// the seen polygons, their bounding box in world units and the start
+// polygon's own world rect (the vertical stack guard of the boundary
+// scan).
 type pocketComponent struct {
     seen       map[PolyRef]struct{}
     minX, minY float64
     maxX, maxY float64
+    // sx0..sy1 is the start polygon's world rect: the final aim
+    // guard of pocketEscape checks the answer against it (an aim
+    // collapsed back into the start footprint is the frozen plan -
+    // the honest no exit answer keeps the plain search verdict).
+    sx0, sy0, sx1, sy1 float64
 }
 
 // pocketEscape answers the walk out of a stranded start, nil when the
@@ -112,6 +147,15 @@ func (m *Mesh) pocketEscape(
     if !ok {
         return nil
     }
+    if exit.X < component.sx1 && exit.X > component.sx0 &&
+        exit.Y < component.sy1 && exit.Y > component.sy0 {
+        // The aim collapsed back into the start footprint (the
+        // boundary under the standing cell, the snap window pulling
+        // the march home): the plan would click the character's own
+        // position and never move - the honest no exit answer keeps
+        // the plain search verdict instead of the frozen plan.
+        return nil
+    }
 
     return &Route{
         Found:        false,
@@ -127,7 +171,7 @@ func (m *Mesh) pocketEscape(
 // returns it with its bounding box, nil when the component outgrows
 // the pocket box (the honest ground case): the flood aborts the
 // moment a polygon would stretch the box past pocketMaxSide, so the
-// cost stays bounded by the polygons of a pocket sized area.
+// cost stays bounded by the polygons of a stranded spot sized area.
 func (m *Mesh) floodPocketComponent(startRef PolyRef) *pocketComponent {
     col, row := TileOf(startRef)
     tile, err := m.Tile(RegionKey{Col: col, Row: row})
@@ -145,6 +189,10 @@ func (m *Mesh) floodPocketComponent(startRef PolyRef) *pocketComponent {
         minY: y0,
         maxX: x1,
         maxY: y1,
+        sx0:  x0,
+        sy0:  y0,
+        sx1:  x1,
+        sy1:  y1,
     }
     frontier := []PolyRef{startRef}
     for len(frontier) > 0 {
@@ -230,8 +278,8 @@ func (m *Mesh) pocketExit(
 // pocketBoundary scans the world ring around the pocket box for the
 // closest point of the connected ground outside the component (the
 // tile spatial index answers each tile of the ring), never another
-// linkless island, the water and the banned ground priced so the
-// honest dry exit wins.
+// linkless island, never the vertical stack in the start footprint,
+// the water and the banned ground priced so the honest dry exit wins.
 func (m *Mesh) pocketBoundary(
     component *pocketComponent, startPos Pos, avoid avoidCtx,
 ) (Pos, bool) {
@@ -268,6 +316,19 @@ func (m *Mesh) pocketBoundary(
                 startPos.Z)
             dx := startPos.X - cx
             dy := startPos.Y - cy
+            if dx*dx+dy*dy < pocketExitHorizontalFloorSq {
+                // The ground directly under the standing point: the
+                // layers stacked in the start footprint and the
+                // diagonal neighbors sharing its corner answer the
+                // closest 3D points of the whole scan (the deck 32
+                // units under a terrace spot measures 32 while the
+                // honest edge next door measures 36) - but the
+                // character cannot walk straight down onto them and
+                // the boundary they form carries no horizontal
+                // displacement (the aim march would degenerate into
+                // the standing cell).
+                continue
+            }
             dz := startPos.Z - cz
             dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
             if poly.Area == AreaWater {
