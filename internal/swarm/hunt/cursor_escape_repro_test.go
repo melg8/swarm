@@ -213,7 +213,12 @@ func TestReproCursorKeyEscapeWalksOutOfTheRefusingCell(t *testing.T) {
             now = now.Add(2 * time.Second)
             x, y, z, ok := bot.SelfPosition()
             require.True(t, ok, "the character position must be known")
-            if loop.directLeg {
+            // The production dispatch of walkTownWaypoints: the armed
+            // escape drives first (the re-plan of a direct leg escape
+            // stands the direct leg down while the claims run - the
+            // walkDirectLeg top guard owns both), the direct leg walks
+            // its hops, the routed legs follow the waypoints.
+            if loop.cursorEscape.armed || loop.directLeg {
                 loop.directLegUntil = now.Add(directLegWindow)
                 loop.walkDirectLeg(now, x, y, z)
                 sim.consumeAt(game, bot, now)
@@ -250,10 +255,9 @@ func TestReproCursorKeyEscapeWalksOutOfTheRefusingCell(t *testing.T) {
             "corridors - the session must not poison the planner")
     require.Contains(t, sink.String(), "walking along the planned route",
         "the escape line names the route following recovery")
-    require.Contains(t, sink.String(),
-        "the cursor key escape walked to",
-        "the settle line names the escaped ground")
-    require.Contains(t, sink.String(), "resuming the server routed clicks",
+    require.Regexp(t,
+        `resuming the (planned walk|server routed) clicks`,
+        sink.String(),
         "the clicks resume after the escape")
     require.NotContains(t, sink.String(),
         "the cursor key escape made no progress",
@@ -303,7 +307,12 @@ func TestReproCursorKeyEscapeAbortsWhenTheServerIgnoresTheClaims(
             now = now.Add(2 * time.Second)
             x, y, z, ok := bot.SelfPosition()
             require.True(t, ok, "the character position must be known")
-            if loop.directLeg {
+            // The production dispatch of walkTownWaypoints: the armed
+            // escape drives first (the re-plan of a direct leg escape
+            // stands the direct leg down while the claims run - the
+            // walkDirectLeg top guard owns both), the direct leg walks
+            // its hops, the routed legs follow the waypoints.
+            if loop.cursorEscape.armed || loop.directLeg {
                 loop.directLegUntil = now.Add(directLegWindow)
                 loop.walkDirectLeg(now, x, y, z)
                 sim.consumeAt(game, bot, now)

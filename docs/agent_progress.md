@@ -1054,3 +1054,25 @@ its `search` line for the paste-a-dump flow.
   webserver handler pins, the hunt stamps, the HUD harness, the
   dump round trip) and the docs (webui.md, navmesh.md, this file,
   the development log round).
+
+- 2026-09-19: the escape walks the route, not the chord (the 14:46
+  dump round). The WHY: the 14:46 dump proved the cursor key escape of
+  a DIRECT leg marched the straight chord to the far zone target -
+  armDirectLeg replaces the waypoints with the single destination
+  spec, the route following ladder over it interpolates the chord
+  (both escape aims of the dump sat on it byte for byte), the claims
+  dragged the character through the village geometry and the water
+  guard stranded it. The HOW: replanDirectEscapeRoute runs the leg
+  start search for the phase (the session bans respected) before the
+  claims build, installs the fresh route as the leg plan and stands
+  the direct leg down - the WASD escape walks along the planner's
+  bends and the settle returns the walk to the normal routed clicks
+  on the same plan (the owner contract: WASD along the route, the
+  normal mode at the point); the planless fallback keeps the pocket
+  contract toward the validated hop aim. The existing repro drivers
+  now mirror the production dispatch (the armed escape drives before
+  the direct leg check). Tests:
+  `hunt/cursor_escape_direct_leg_repro_test.go` (the dump repro on
+  the real pack, the planless fallback unit pin, the village escape
+  end to end over the refusal pocket), the hunt suite green, 28
+  packages ok, lint --new clean.

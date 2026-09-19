@@ -1,37 +1,37 @@
-ok  	github.com/melg8/swarm/cmd/benchdiff	0.004s	coverage: 60.7% of statements
-	github.com/melg8/swarm/cmd/geotest		coverage: 0.0% of statements
-ok  	github.com/melg8/swarm/cmd/gofmt-spaces	0.003s	coverage: 34.5% of statements
-	github.com/melg8/swarm/cmd/navanalyze		coverage: 0.0% of statements
-	github.com/melg8/swarm/cmd/navmesh-build		coverage: 0.0% of statements
-	github.com/melg8/swarm/cmd/navmesh-export		coverage: 0.0% of statements
-ok  	github.com/melg8/swarm/cmd/swarm	0.006s	coverage: 7.4% of statements
-ok  	github.com/melg8/swarm/internal/logfmt	0.198s	coverage: 87.8% of statements
-ok  	github.com/melg8/swarm/internal/swarm/acceptance	8.800s	coverage: 33.1% of statements
-ok  	github.com/melg8/swarm/internal/swarm/connection	31.641s	coverage: 76.3% of statements
-ok  	github.com/melg8/swarm/internal/swarm/crypt	0.004s	coverage: 93.8% of statements
-ok  	github.com/melg8/swarm/internal/swarm/fleete2e	0.004s	coverage: [no statements]
-ok  	github.com/melg8/swarm/internal/swarm/gear	0.025s	coverage: 90.6% of statements
-ok  	github.com/melg8/swarm/internal/swarm/helpers	0.002s	coverage: 100.0% of statements
-ok  	github.com/melg8/swarm/internal/swarm/hunt	77.639s	coverage: 84.9% of statements
-ok  	github.com/melg8/swarm/internal/swarm/huntaudit	0.010s	coverage: 19.1% of statements
-ok  	github.com/melg8/swarm/internal/swarm/memwatch	0.049s	coverage: 100.0% of statements
-ok  	github.com/melg8/swarm/internal/swarm/npcdata	0.021s	coverage: 85.6% of statements
-ok  	github.com/melg8/swarm/internal/swarm/packets/from_auth_server	0.003s	coverage: 80.8% of statements
-ok  	github.com/melg8/swarm/internal/swarm/packets/from_game_server	0.006s	coverage: 93.2% of statements
-ok  	github.com/melg8/swarm/internal/swarm/packets/packet	0.003s	coverage: 100.0% of statements
-ok  	github.com/melg8/swarm/internal/swarm/packets/to_auth_server	0.003s	coverage: 78.1% of statements
-ok  	github.com/melg8/swarm/internal/swarm/packets/to_game_server	0.003s	coverage: 65.3% of statements
-ok  	github.com/melg8/swarm/internal/swarm/pathfind	140.229s	coverage: 92.5% of statements
-ok  	github.com/melg8/swarm/internal/swarm/pathfind/navbuild	76.987s	coverage: 70.2% of statements
-ok  	github.com/melg8/swarm/internal/swarm/pathfind/navmesh	0.046s	coverage: 71.7% of statements
-ok  	github.com/melg8/swarm/internal/swarm/pathfind/navmesh/prototype	0.066s	coverage: 90.8% of statements
-ok  	github.com/melg8/swarm/internal/swarm/proxy	5.888s	coverage: 82.5% of statements
-ok  	github.com/melg8/swarm/internal/swarm/session	0.028s	coverage: 81.5% of statements
-ok  	github.com/melg8/swarm/internal/swarm/state	0.079s	coverage: 87.8% of statements
-ok  	github.com/melg8/swarm/internal/swarm/webserver	8.061s	coverage: 86.2% of statements
-ok  	github.com/melg8/swarm/internal/version	0.005s	coverage: 78.3% of statements
-	github.com/melg8/swarm/scripts/geo_diag		coverage: 0.0% of statements
-	github.com/melg8/swarm/scripts/geo_repair		coverage: 0.0% of statements
-	github.com/melg8/swarm/scripts/tailcheck		coverage: 0.0% of statements
-	github.com/melg8/swarm/tools/repro_gamepath		coverage: 0.0% of statements
-	github.com/melg8/swarm/tools/repro_rawpath		coverage: 0.0% of statements
+ok      github.com/melg8/swarm/cmd/benchdiff    0.004s    coverage: 60.7% of statements
+    github.com/melg8/swarm/cmd/geotest        coverage: 0.0% of statements
+ok      github.com/melg8/swarm/cmd/gofmt-spaces    0.003s    coverage: 34.5% of statements
+    github.com/melg8/swarm/cmd/navanalyze        coverage: 0.0% of statements
+    github.com/melg8/swarm/cmd/navmesh-build        coverage: 0.0% of statements
+    github.com/melg8/swarm/cmd/navmesh-export        coverage: 0.0% of statements
+ok      github.com/melg8/swarm/cmd/swarm    0.006s    coverage: 7.4% of statements
+ok      github.com/melg8/swarm/internal/logfmt    0.198s    coverage: 87.8% of statements
+ok      github.com/melg8/swarm/internal/swarm/acceptance    8.800s    coverage: 33.1% of statements
+ok      github.com/melg8/swarm/internal/swarm/connection    31.641s    coverage: 76.3% of statements
+ok      github.com/melg8/swarm/internal/swarm/crypt    0.004s    coverage: 93.8% of statements
+ok      github.com/melg8/swarm/internal/swarm/fleete2e    0.004s    coverage: [no statements]
+ok      github.com/melg8/swarm/internal/swarm/gear    0.025s    coverage: 90.6% of statements
+ok      github.com/melg8/swarm/internal/swarm/helpers    0.002s    coverage: 100.0% of statements
+ok      github.com/melg8/swarm/internal/swarm/hunt    77.639s    coverage: 84.9% of statements
+ok      github.com/melg8/swarm/internal/swarm/huntaudit    0.010s    coverage: 19.1% of statements
+ok      github.com/melg8/swarm/internal/swarm/memwatch    0.049s    coverage: 100.0% of statements
+ok      github.com/melg8/swarm/internal/swarm/npcdata    0.021s    coverage: 85.6% of statements
+ok      github.com/melg8/swarm/internal/swarm/packets/from_auth_server    0.003s    coverage: 80.8% of statements
+ok      github.com/melg8/swarm/internal/swarm/packets/from_game_server    0.006s    coverage: 93.2% of statements
+ok      github.com/melg8/swarm/internal/swarm/packets/packet    0.003s    coverage: 100.0% of statements
+ok      github.com/melg8/swarm/internal/swarm/packets/to_auth_server    0.003s    coverage: 78.1% of statements
+ok      github.com/melg8/swarm/internal/swarm/packets/to_game_server    0.003s    coverage: 65.3% of statements
+ok      github.com/melg8/swarm/internal/swarm/pathfind    140.229s    coverage: 92.5% of statements
+ok      github.com/melg8/swarm/internal/swarm/pathfind/navbuild    76.987s    coverage: 70.2% of statements
+ok      github.com/melg8/swarm/internal/swarm/pathfind/navmesh    0.046s    coverage: 71.7% of statements
+ok      github.com/melg8/swarm/internal/swarm/pathfind/navmesh/prototype    0.066s    coverage: 90.8% of statements
+ok      github.com/melg8/swarm/internal/swarm/proxy    5.888s    coverage: 82.5% of statements
+ok      github.com/melg8/swarm/internal/swarm/session    0.028s    coverage: 81.5% of statements
+ok      github.com/melg8/swarm/internal/swarm/state    0.079s    coverage: 87.8% of statements
+ok      github.com/melg8/swarm/internal/swarm/webserver    8.061s    coverage: 86.2% of statements
+ok      github.com/melg8/swarm/internal/version    0.005s    coverage: 78.3% of statements
+    github.com/melg8/swarm/scripts/geo_diag        coverage: 0.0% of statements
+    github.com/melg8/swarm/scripts/geo_repair        coverage: 0.0% of statements
+    github.com/melg8/swarm/scripts/tailcheck        coverage: 0.0% of statements
+    github.com/melg8/swarm/tools/repro_gamepath        coverage: 0.0% of statements
+    github.com/melg8/swarm/tools/repro_rawpath        coverage: 0.0% of statements

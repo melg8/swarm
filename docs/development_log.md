@@ -6258,3 +6258,95 @@ link serializes it, the viewer honors it.
 - The dump search line prints the ban circles rounded to whole
   units (`%.0f`): the mesh bans live on the world plane at whole
   cell granularities, the sub unit precision carries no surface.
+## Round 88: the escape walks the route, not the chord - the degenerate direct leg plan gets re-planned before the claims run (2026-09-19)
+
+Scope: the owner directive of the 2026-09-19 14:46 dump ("перепроверь
+еще раз, сейчас 2 маршрута было отклонено, и wasd пошел на прямую к
+зоне ... чтобы включалось wasd ВДОЛЬ маршрута, если не двигается к
+текущей точке - переключение на wasd режим, в момент достижения точки
+- возврат в обычный режим"). The mobius server stays untouched (the
+server integrity rules): the fix lives in the cursor key escape of the
+hunt walk layer.
+
+### The dump's numbers pin the chord march
+
+The 14:46:11 dump (build 0331dd1, bot temp10, phase townReturn): the
+last walk plan held a SINGLE waypoint - the zone center 28500 54560
+-3264, the direct leg the frozen leg escalation armed at 14:45:13
+("the detour route froze as well, walking to 28500 54560 by the server
+routing"). The escape's aims of the two refused routes sit EXACTLY on
+the straight chord from the plan origin 45768 49848 to that zone
+center: 43267 50530 is the chord point at t = 0.14489 (the stride
+18 x 144 units from the origin, 2593 of the 17899 unit chord) and
+42711 50682 is the chord point at t = 0.17703 (the stride 22 x 144).
+The route following ladder of the escape (cursorEscapeRouteSteps,
+round 79) marched the "planned route" it names - but the plan it was
+handed IS the chord: armDirectLeg replaces the waypoints with the
+single destination spec, so the ladder over it interpolates the
+straight line to the far zone target and the claims drag the
+character through the village geometry the planner would route
+around. The second escape's chord died on the water guard four strides
+in (the village water the chord crosses) and the character stranded at
+42850 50644, moving no - the walk plan's own single waypoint was the
+trap.
+
+### The fix: the escape re-plans the degenerate leg before the claims run
+
+- `replanDirectEscapeRoute` (hunt/town.go): when the escape arms on a
+  direct leg, the re-plan runs the same search the leg start runs for
+  the phase (startZoneReturnOrWalkLeg - the dry search with the
+  session's frozen corridor bans, the non-dry fallback of the zone
+  return), installs the fresh route as the leg plan and stands the
+  direct leg down. The claims then follow the planner's bends, and the
+  settle returns the walk to the normal routed clicks ON THE SAME
+  PLAN - the owner's contract verbatim: WASD along the route, the
+  normal mode at the point.
+- The planless fallback keeps its pocket contract: when the re-plan
+  finds no route, the single far waypoint plan is still no route - the
+  escape drops the route ladder (the new directLeg check in
+  beginCursorKeyEscape) and walks the straight ladder toward the
+  VALIDATED HOP AIM (under directHopMax), never a march toward the far
+  target. The attempt budget check stays first: a spent escape never
+  re-plans.
+- The frame transport rides the fresh plan: startWalkLegSearch
+  re-measures the vintage shift on the standing cell (the round 86
+  calibration), the direct leg's zero offset dies with the degenerate
+  plan.
+
+### The driver corrections of the existing repros
+
+The two cursor escape repros and the refusal signal repros drove
+walkDirectLeg/followWaypoints directly with an INCOMPLETE emulation of
+the production dispatch: walkTownWaypoints drives the armed escape
+before the direct leg check, the test drivers checked only directLeg -
+so an escape that armed before a direct leg (or after the re-plan stood
+it down) froze armed and undriven in the tests. The drivers now mirror
+the production dispatch (the armed escape drives first), and the
+settle-form assertion of the plaza repro reads both honest forms (the
+planned walk clicks / the server routed clicks) - the contract is the
+resumed clicks, not the mode name. The zoneFails equality of the
+corridor ban repro became the hold-state contract (GreaterOrEqual the
+budget) - the exact count rode the abort cadence the broken emulation
+froze.
+
+### The pins
+
+- `cursor_escape_direct_leg_repro_test.go` reproduces the dump on the
+  real pack: TestReproDirectLegEscapeWalksTheRouteNotTheChord arms the
+  direct leg on the dump's plan origin, refuses the hop, and pins the
+  contract - the escape re-plans the degenerate plan into a real
+  route (more than one waypoint), the leg returns to the routed mode,
+  the re-planned route still leads to the destination, every claim
+  stays in the corridor of the fresh plan's polyline, the water guard
+  holds for every claim. The unit pin
+  TestCursorEscapeDirectLegWithoutRouteWalksTheHopAim proves the
+  planless fallback ends at the hop aim (the pre-fix ladder marched
+  the chord to 43267 - the dump's own aim - the repro regenerates it
+  byte for byte). TestReproRefusedTownWalkReachesTheZoneOnTheRouteClaims
+  walks the village escape end to end over the refusal pocket: the
+  escape cycles normal mode - WASD along the route - normal mode,
+  every armed escape holds a real route, the walk reaches the zone
+  and the clicks resume from the escaped ground.
+- The full hunt suite stays green (70 s), `go test ./...` answers
+  28 packages ok, `golangci-lint run --new` clean, the whitespace
+  gate green.

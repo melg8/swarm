@@ -1462,6 +1462,33 @@ func zeroCursorEscape() cursorEscapeState {
     }
 }
 
+// replanDirectEscapeRoute gives the escape of a direct leg a real
+// route to walk: the direct leg's waypoint plan is the single
+// destination spec (armDirectLeg), and the route ladder over it is
+// the straight chord to the far target - the walk the user forbade
+// (the 2026-09-19 14:46 dump: "wasd пошел на прямую к зоне", both
+// escape aims of the refused walk sat on the chord through the
+// village, the second died on the water guard four strides in). The
+// re-plan runs the same search the leg start runs for the phase (the
+// session's frozen corridor bans respected), installs the fresh route
+// as the leg plan and stands the direct leg down: the escape claims
+// walk along the planner's bends, and the settle returns the walk to
+// the normal routed clicks on the same plan - the WASD along the
+// route, the normal mode at the point. It reports whether a fresh
+// route was installed.
+func (l *Loop) replanDirectEscapeRoute() bool {
+    if !l.directLeg || l.navigator == nil {
+        return false
+    }
+    if !l.startZoneReturnOrWalkLeg() {
+        return false
+    }
+    l.logf("Hunt: the routed walk escape re-plans the town route, " +
+        "the claims follow it")
+
+    return true
+}
+
 // beginCursorKeyEscape arms the cursor key escape of a click
 // refusing cell: the routed walk clicks bounced with ActionFailed
 // while the character stood still, and the 2026-09-14 15:10 report
@@ -1487,8 +1514,26 @@ func (l *Loop) beginCursorKeyEscape(
     if l.cursorEscapes >= cursorEscapeAttemptsMax {
         return false
     }
+    // The direct leg's single waypoint plan is the destination spec,
+    // not a route: the route ladder over it interpolates the straight
+    // chord to the far target and the claims drag the character
+    // through the geometry the planner would route around (the
+    // 2026-09-19 14:46 dump - the repro of this round). Give the
+    // escape a real route first: the re-plan installs the fresh plan
+    // and returns the walk to the routed mode, the claims follow the
+    // planner's bends and the normal clicks resume on the same plan
+    // when the point is reached.
+    l.replanDirectEscapeRoute()
     steps := l.cursorEscapeRouteSteps(selfX, selfY, selfZ)
     form := "along the planned route"
+    if l.directLeg {
+        // The re-plan found no route (the planner owns no path from
+        // the standing cell): the single far waypoint plan is still
+        // no route - the planless straight ladder toward the
+        // validated hop aim owns the escape, pocket sized, never a
+        // march toward the far target.
+        steps = nil
+    }
     if len(steps) == 0 {
         steps = l.cursorEscapeSteps(selfX, selfY, selfZ,
             aimX, aimY, aimZ)
