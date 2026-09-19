@@ -767,3 +767,18 @@ atomic commit):
   repro_hud harness pins the URL structure (the pair, the camera
   orientation, the tiles, the defaults, the bare snapshot without a
   plan).
+- the webui cursor surface: the walk plan coordinate labels draw on
+  hover only now (the constant per waypoint (x, y) labels littered
+  every planned walk), the hovered waypoint prints its full x y z
+  triple in the dump walk line format; the status bar gains the
+  cursor chip (the world point under the mouse, the full triple while
+  a waypoint is held) and the ctrl+c (meta+c) of the map copies the
+  chip values (the selection aware fall through keeps the browser
+  copy intact when the pointer is off the map or a text selection is
+  active); the viewer coordinate inputs accept the bare x y pair now
+  (the z inherits from the other line) and keep the wp prefixed dump
+  lines parsed (the first three numbers after the wp marker bind -
+  the new timing suffix carries numbers of its own, the last three
+  contract broke for the dump walk lines). The repro_map_render
+  harness drives the whole surface (the label absence, the hover
+  label, the chip, the copy shortcut, the flash, the leave reset).

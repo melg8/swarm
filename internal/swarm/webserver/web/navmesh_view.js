@@ -354,10 +354,10 @@ function buildSurface(navmesh) {
       <div class="nmv-section">walk plan points</div>
       <input type="text" id="nmv-from-input" class="nmv-link"
         placeholder="from: 45956 49341 -3051"
-        title="the walk plan start: paste the line, the last three numbers bind">
+        title="the walk plan start: paste the line, the last three numbers bind (a bare x y pair takes the z of the other line)">
       <input type="text" id="nmv-to-input" class="nmv-link"
         placeholder="to: 47595 51569 -2992"
-        title="the walk plan destination: paste the line, the last three numbers bind">
+        title="the walk plan destination: paste the line, the last three numbers bind (a bare x y pair takes the z of the other line)">
       <button id="nmv-apply" class="btn nmv-copy">route the pair</button>
     </div>
     <div class="nmv-hint">wasd + q/e flies &middot; shift boosts &middot;
@@ -1485,14 +1485,39 @@ function onDoubleClick(event) {
   void requestRoute(start, world);
 }
 
-// parseCoordLine reads one pasted line of the walk plan log: the
-// last three numbers of the line bind (the "wp 1: 46872 50752 -3000
-// <-- TARGET" prefixes and markers fall away, the bare "45956 49341
-// -3051" triple passes through).
+// parseCoordLine reads one pasted line of the walk plan log. The wp
+// prefixed dump lines ("wp 2: 45257 49353 -3059 (passed, t+12.4s,
+// leg 5.2s)  <-- TARGET (walking 45.2s)") bind the first three
+// numbers after the wp marker - the per waypoint timing of the dump
+// carries numbers of its own, so the last three of the line no
+// longer are the coordinates. Every other line keeps the legacy
+// contract: the last three numbers bind (the bare "45956 49341
+// -3051" triple passes through, the prefixes and markers fall away).
+// A bare "x y" pair (the map footer cursor copy of the bot webui)
+// passes through with a null z - the apply pass inherits the height
+// from the other line (the map knows no terrain height under the
+// cursor, the route search snaps to the mesh anyway).
 function parseCoordLine(text) {
-  const numbers = (text || "").match(/-?\d+(?:\.\d+)?/g);
-  if (!numbers || numbers.length < 3) {
+  const line = text || "";
+  const wpMatch = line.match(
+    /wp\s*-?\d+:\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/);
+  if (wpMatch) {
+    const coords = wpMatch.slice(1).map(Number);
+    if (coords.every((n) => Number.isFinite(n))) {
+      return { x: coords[0], y: coords[1], z: coords[2] };
+    }
+  }
+  const numbers = line.match(/-?\d+(?:\.\d+)?/g);
+  if (!numbers || numbers.length < 2) {
     return null;
+  }
+  if (numbers.length === 2) {
+    const pair = numbers.map(Number);
+    if (pair.some((n) => !Number.isFinite(n))) {
+      return null;
+    }
+
+    return { x: pair[0], y: pair[1], z: null };
   }
   const triple = numbers.slice(-3).map(Number);
   if (triple.some((n) => !Number.isFinite(n))) {
@@ -1517,18 +1542,26 @@ function syncCoordInputs() {
 // applyCoordInputs routes the pasted walk plan pair: the from line is
 // required, the missing to line arms the start marker (the second
 // double click finishes the pair), the complete pair asks the server
-// right away.
+// right away. A line without its own height (the bare x y pair of the
+// map cursor copy) inherits the z of the other line - 0 when neither
+// carries one.
 function applyCoordInputs() {
-  const start = parseCoordLine(
-    document.getElementById("nmv-from-input").value);
+  const fromText = document.getElementById("nmv-from-input").value;
+  const toText = document.getElementById("nmv-to-input").value;
+  const start = parseCoordLine(fromText);
   if (!start) {
     showStatus("error",
-      "the from line needs three numbers: x y z");
+      "the from line needs numbers: x y z (a bare x y pair " +
+      "takes the z of the other line)");
 
     return;
   }
-  const end = parseCoordLine(
-    document.getElementById("nmv-to-input").value);
+  const end = parseCoordLine(toText);
+  const startZ = start.z === null
+    ? (end && end.z !== null ? end.z : 0) : start.z;
+  const endZ = end && end.z === null ? startZ : (end ? end.z : 0);
+  start.z = startZ;
+  if (end) { end.z = endZ; }
   if (!end) {
     viewer.pendingStart = start;
     viewer.routeStart = start;

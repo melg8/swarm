@@ -220,8 +220,17 @@ function loadMapJs(mapFile) {
     // without real time passing.
     const timers = [];
     let timerSeq = 0;
+    // The clipboard fallback of app.js (legacyCopyText) the map copy
+    // shortcut rides: a recording stub - the navigator clipboard API
+    // never exists in the sandbox, so onKeyCopy always lands here.
+    const copies = [];
     const sandbox = {
         Math, JSON,
+        legacyCopyText: (text) => {
+            copies.push(text);
+
+            return true;
+        },
         Date: { now: () => 0 },
         performance: { now: () => clockNow },
         requestAnimationFrame: () => 0,
@@ -276,7 +285,7 @@ function loadMapJs(mapFile) {
     vm.runInContext("globalThis.__MapView = MapView;", sandbox);
 
     return {
-        MapView: sandbox.__MapView, record, elements,
+        MapView: sandbox.__MapView, record, elements, copies,
         advanceClock: (ms) => { clockNow += ms; },
         runTimers: () => {
             const due = timers.splice(0, timers.length);
@@ -1163,6 +1172,125 @@ function runScenarioTileLoadStorm(mapFile) {
     return results;
 }
 
+// runScenarioWalkCursor drives the walk plan cursor surface: the
+// published walk plan draws its waypoint dots without any constant
+// coordinate label (the littered labels are gone), a mousemove onto a
+// waypoint draws the x y z label next to it and upgrades the footer
+// cursor chip, the ctrl+c copies the coordinates the chip shows (the
+// full triple on the waypoint, the bare pair elsewhere), the copied
+// flag flashes into the chip, and leaving the map clears the chip.
+function runScenarioWalkCursor(mapFile) {
+    const { MapView, record, elements, copies, fireCanvas, fireWindow,
+        runTimers } = loadMapJs(mapFile);
+    MapView.init();
+    elements.get("show-dest").checked = true;
+    const snap = buildSnapshot(0, false);
+    snap.walkOrigin = { x: WORLD.self.x, y: WORLD.self.y, z: -3500 };
+    snap.walkPath = [
+        { x: WORLD.self.x + 600, y: WORLD.self.y, z: -3510 },
+        { x: WORLD.self.x, y: WORLD.self.y + 1200, z: -3520 }
+    ];
+    snap.walkDest = snap.walkPath[1];
+    MapView.update(snap);
+    MapView.draw();
+
+    const results = [];
+    const coordLabels = (texts) => texts.filter(
+        (t) => /^-?\d+ -?\d+( -?\d+)?$/.test(t.text));
+    check(results, "the walk plan draws no constant coordinate labels",
+        coordLabels(record.texts).length === 0,
+        JSON.stringify(coordLabels(record.texts).map((t) => t.text)));
+
+    // Hover the first waypoint (screen (472, 300)): the full triple
+    // label draws and the footer chip carries the same values.
+    const wp0 = worldToScreen(WORLD.self.x + 600, WORLD.self.y);
+    fireCanvas("mousemove", { clientX: wp0.x, clientY: wp0.y });
+    check(results, "the hovered waypoint draws its x y z label",
+        coordLabels(record.texts).some(
+            (t) => t.text === "45600 50000 -3510"),
+        JSON.stringify(coordLabels(record.texts).map((t) => t.text)));
+    check(results, "the footer chip carries the hovered triple",
+        elements.get("foot-cursor").textContent ===
+            "cursor: 45600 50000 -3510",
+        JSON.stringify(elements.get("foot-cursor").textContent));
+
+    // The ctrl+c over the waypoint copies the triple, marks the event
+    // handled and flashes the chip.
+    let prevented = false;
+    const keyEvent = {
+        ctrlKey: true, key: "c", code: "KeyC",
+        preventDefault: () => { prevented = true; }
+    };
+    fireWindow("keydown", keyEvent);
+    check(results, "the ctrl+c over a waypoint copies the triple",
+        copies.length === 1 && copies[0] === "45600 50000 -3510",
+        JSON.stringify(copies));
+    check(results, "the handled copy marks the event default",
+        prevented === true, "preventDefault missing");
+    check(results, "the copied flag flashes into the chip",
+        elements.get("foot-cursor").textContent ===
+            "copied: 45600 50000 -3510",
+        JSON.stringify(elements.get("foot-cursor").textContent));
+    runTimers();
+    check(results, "the chip restores after the flash",
+        elements.get("foot-cursor").textContent ===
+            "cursor: 45600 50000 -3510",
+        JSON.stringify(elements.get("foot-cursor").textContent));
+
+    // Away from the waypoints the chip reads the bare world pair (the
+    // screen (10, 10) maps to (41750, 47583)) and the copy takes it.
+    record.texts.length = 0;
+    copies.length = 0;
+    prevented = false;
+    fireCanvas("mousemove", { clientX: 10, clientY: 10 });
+    check(results, "the chip carries the world pair off the waypoints",
+        elements.get("foot-cursor").textContent ===
+            "cursor: 41750 47583",
+        JSON.stringify(elements.get("foot-cursor").textContent));
+    check(results, "the waypoint label hides off the waypoint",
+        coordLabels(record.texts).length === 0,
+        JSON.stringify(coordLabels(record.texts).map((t) => t.text)));
+    fireWindow("keydown", {
+        ctrlKey: true, key: "c", code: "KeyC",
+        preventDefault: () => { prevented = true; }
+    });
+    check(results, "the ctrl+c off the waypoints copies the pair",
+        copies.length === 1 && copies[0] === "41750 47583",
+        JSON.stringify(copies));
+    check(results, "the handled pair copy marks the event default",
+        prevented === true, "preventDefault missing");
+
+    // A keydown without the ctrl modifier never touches the clipboard
+    // nor the event default.
+    copies.length = 0;
+    prevented = false;
+    fireWindow("keydown", {
+        ctrlKey: false, key: "c", code: "KeyC",
+        preventDefault: () => { prevented = true; }
+    });
+    check(results, "the bare c key ignores the copy",
+        copies.length === 0 && prevented === false,
+        JSON.stringify(copies));
+
+    // Leaving the map clears the pointer state: the chip falls back
+    // to the em dash and the shortcut falls through untouched.
+    fireCanvas("mouseleave", {});
+    check(results, "leaving the map clears the chip",
+        elements.get("foot-cursor").textContent === "cursor: —",
+        JSON.stringify(elements.get("foot-cursor").textContent));
+    copies.length = 0;
+    prevented = false;
+    fireWindow("keydown", {
+        ctrlKey: true, key: "c", code: "KeyC",
+        preventDefault: () => { prevented = true; }
+    });
+    check(results, "the ctrl+c off the map falls through",
+        copies.length === 0 && prevented === false,
+        JSON.stringify(copies));
+
+    return results;
+}
+
 function main() {
     const args = process.argv.slice(2);
     const verbose = args.includes("--verbose");
@@ -1182,6 +1310,7 @@ function main() {
         ["stable draw order", runScenarioStableOrder(mapFile)],
         ["resting marker", runScenarioRestMarker(mapFile)],
         ["hunting zone", runScenarioHuntingZone(mapFile)],
+        ["walk cursor", runScenarioWalkCursor(mapFile)],
         ["hunt zones view", runScenarioHuntZonesView(mapFile)],
         ["hunt layer cache", runScenarioHuntLayerCache(mapFile)],
         ["fps meter", runScenarioFpsMeter(mapFile)],

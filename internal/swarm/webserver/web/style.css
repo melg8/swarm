@@ -803,6 +803,16 @@ body.mode-pathfind .bot-status { display: none; }
   margin-left: auto;
 }
 
+/* The cursor coordinate item of the status bar: the world point under
+   the mouse (the hovered walk plan waypoint upgrades it to the x y z
+   triple). The tabular figures keep the readout steady while the
+   mouse moves, the monospace stack matches the coordinate labels of
+   the map canvas. */
+.foot-cursor {
+  font-family: Consolas, "Liberation Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
 .map-rose {
   position: absolute;
   bottom: 10px;

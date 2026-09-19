@@ -47,6 +47,19 @@ const MapView = {
   // otherwise, the far zoom showed a smeared blob of labels.
   hoverZone: null,
 
+  // The walk plan waypoint under the map cursor (the index into the
+  // published walkPath, -1 when none): the coordinate label of a
+  // waypoint draws on hover only - the constant per waypoint labels
+  // littered the map on every planned walk, the footer cursor chip
+  // and the ctrl+c copy carry the values instead.
+  hoverWp: -1,
+
+  // The world point the map cursor holds: the footer chip readout
+  // and the ctrl+c copy source. Null while the pointer is off the
+  // map (the chip reads the em dash then, the copy falls through to
+  // the browser default).
+  cursorWorld: null,
+
   // The fleet wide kill marks of /api/fleet/kills (every recent kill
   // of every bot): drawn as the crosses of the whole deployment so
   // they survive the bot switches of the view (the per zone kill
@@ -251,7 +264,7 @@ const MapView = {
       }
     });
     this.canvas.addEventListener("mousemove", (e) => this.onHover(e));
-    this.canvas.addEventListener("mouseleave", () => this.hideTooltip());
+    this.canvas.addEventListener("mouseleave", () => this.onMapLeave());
     this.canvas.addEventListener("dblclick", (e) => this.onDoubleClick(e));
     this.canvas.addEventListener("dragover", (e) => this.onMapDragOver(e));
     this.canvas.addEventListener("drop", (e) => this.onMapDrop(e));
@@ -276,6 +289,11 @@ const MapView = {
     if (typeof setInterval === "function") {
       setInterval(() => this.markFpsIdle(), 1200);
     }
+    // The ctrl+c copy of the map cursor coordinates (onKeyCopy): the
+    // window level listener reads the pointer state this hover
+    // handlers keep, a shortcut pressed with the pointer elsewhere
+    // falls through to the browser default untouched.
+    window.addEventListener("keydown", (e) => this.onKeyCopy(e));
   },
 
   // Canvas colors: the UI chrome (grid, text) follows the active theme
@@ -3043,7 +3061,16 @@ const MapView = {
     const zone = this.zoneAt(event.clientX, event.clientY);
     const mx = event.clientX - this.view.left;
     const my = event.clientY - this.view.top;
-    if (best !== this.hover || zone !== this.hoverZone) {
+    // The cursor coordinate readout: the world point under the mouse
+    // rides the footer chip, the hovered walk plan waypoint upgrades
+    // it to the full triple and draws the label on the map.
+    const world = this.screenToWorld(mx, my);
+    const wp = this.walkWaypointAt(mx, my);
+    const wpChanged = wp !== this.hoverWp;
+    this.hoverWp = wp;
+    this.cursorWorld = world;
+    this.updateCursorChip();
+    if (best !== this.hover || zone !== this.hoverZone || wpChanged) {
       this.hover = best;
       this.hoverZone = zone;
       if (best) {
@@ -3051,9 +3078,117 @@ const MapView = {
       } else {
         this.hideTooltip();
       }
-      // The zone hover repaints the highlight and the name label.
+      // The zone hover repaints the highlight and the name label, the
+      // waypoint hover the coordinate label.
       this.draw();
     }
+  },
+
+  // onMapLeave clears the hover state the mouse left behind: the
+  // tooltip, the waypoint label (a repaint only when one showed) and
+  // the footer cursor chip fall back to the em dash.
+  onMapLeave() {
+    this.hideTooltip();
+    this.cursorWorld = null;
+    const hadWaypoint = this.hoverWp >= 0;
+    this.hoverWp = -1;
+    this.setChipText("foot-cursor", "cursor: —");
+    if (hadWaypoint) { this.draw(); }
+  },
+
+  // walkWaypointAt hit tests the published walk plan waypoints at one
+  // viewport point: the closest waypoint within the label pick radius
+  // wins (-1 when the paths toggle is off or nothing sits close).
+  walkWaypointAt(mx, my) {
+    if (!this.lastSnap || !this.lastSnap.walkPath ||
+        !this.lastSnap.walkPath.length) {
+      return -1;
+    }
+    const paths = document.getElementById("show-dest");
+    if (paths && !paths.checked) { return -1; }
+    let best = -1;
+    let bestDist = 12;
+    const plan = this.lastSnap.walkPath;
+    for (let i = 0; i < plan.length; i++) {
+      const p = this.worldToScreen(plan[i].x, plan[i].y);
+      const dist = Math.hypot(p.x - mx, p.y - my);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = i;
+      }
+    }
+
+    return best;
+  },
+
+  // cursorCoordsText renders the coordinate text the cursor chip
+  // shows and the ctrl+c copy takes: the world point of the mouse,
+  // upgraded to the full x y z triple while the pointer holds a walk
+  // plan waypoint (the dump walk line format, paste ready).
+  cursorCoordsText() {
+    if (!this.cursorWorld) { return null; }
+    const plan = this.lastSnap && this.lastSnap.walkPath;
+    if (this.hoverWp >= 0 && plan && plan[this.hoverWp]) {
+      const wp = plan[this.hoverWp];
+
+      return Math.round(wp.x) + " " + Math.round(wp.y) + " " +
+        Math.round(wp.z);
+    }
+
+    return Math.round(this.cursorWorld.x) + " " +
+      Math.round(this.cursorWorld.y);
+  },
+
+  // updateCursorChip writes the footer cursor chip (the deduped
+  // setChipText keeps the per mousemove cost at a string compare).
+  updateCursorChip() {
+    const text = this.cursorCoordsText();
+    this.setChipText("foot-cursor",
+      text === null ? "cursor: —" : "cursor: " + text);
+  },
+
+  // onKeyCopy serves the ctrl+c (and the meta+c) of the map: with the
+  // pointer over the world view and no text selection fighting for
+  // the clipboard, the shortcut copies the coordinates the cursor
+  // chip shows - the full triple on a hovered walk plan waypoint, the
+  // bare x y of the world point otherwise. A copy the map does not
+  // take (the pointer elsewhere, a selection active) never calls
+  // preventDefault, the browser default survives untouched.
+  onKeyCopy(event) {
+    if (!this.cursorWorld ||
+        !(event.ctrlKey || event.metaKey) ||
+        (event.key !== "c" && event.key !== "C" &&
+          event.code !== "KeyC")) {
+      return;
+    }
+    const selection = typeof window.getSelection === "function"
+      ? window.getSelection() : null;
+    if (selection && !selection.isCollapsed) { return; }
+    const text = this.cursorCoordsText();
+    if (!text) { return; }
+    event.preventDefault();
+    if (typeof navigator !== "undefined" && navigator.clipboard &&
+        window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => {
+        this.flashCursorCopied(text);
+      }, () => {
+        if (legacyCopyText(text)) { this.flashCursorCopied(text); }
+      });
+
+      return;
+    }
+    if (legacyCopyText(text)) { this.flashCursorCopied(text); }
+  },
+
+  // flashCursorCopied marks the cursor chip with the copy answer for
+  // a moment - the shortcut gives its feedback right where the
+  // coordinates live.
+  flashCursorCopied(text) {
+    this.setChipText("foot-cursor", "copied: " + text);
+    if (typeof setTimeout !== "function") { return; }
+    setTimeout(() => {
+      this.updateCursorChip();
+    }, 1200);
   },
 
   // objectAt hit tests the world objects at one client point: the
@@ -3201,55 +3336,36 @@ const MapView = {
         ctx.lineTo(q.x, q.y);
       }
       ctx.stroke();
-      // The waypoint dots and the coordinate labels: a filled magenta
-      // disc with a white outline at every waypoint, plus a text
-      // label "(x, y)" near the disc. The label is skipped when the
-      // waypoint lies within the character label exclusion zone
-      // (labelSkipPx) so it never overlaps the bot name drawn by
-      // drawLabels at the character position. The remaining labels
-      // alternate above-right and below-right offsets so adjacent
-      // waypoints do not stack on top of each other either. The text
-      // has a thick dark stroke and a bright fill so it reads over
-      // any map background.
-      const c0 = this.lastSnap.character;
-      const rt0 = this.runtime.get("self");
-      const selfScreen = this.worldToScreen(
-        rt0 ? rt0.drawX : (c0 && c0.x) || 0,
-        rt0 ? rt0.drawY : (c0 && c0.y) || 0);
-      const labelSkipPx = 30;
-      const labelSkip2 = labelSkipPx * labelSkipPx;
+      // The waypoint dots: a filled magenta disc with a white outline
+      // at every waypoint. The coordinate labels draw on hover only
+      // (the constant labels littered every planned walk) - the
+      // hovered waypoint prints its full x y z triple in the dump walk
+      // line format, paste ready; the footer cursor chip and the
+      // ctrl+c copy carry the same values.
       ctx.setLineDash([]);
       ctx.lineWidth = 2;
       ctx.font = "11px Consolas, \"Liberation Mono\", monospace";
       ctx.textBaseline = "middle";
       ctx.textAlign = "left";
-      let labelIndex = 0;
-      for (const wp of plan) {
+      for (let i = 0; i < plan.length; i++) {
+        const wp = plan[i];
         const q = this.worldToScreen(wp.x, wp.y);
-        const dx = q.x - selfScreen.x;
-        const dy = q.y - selfScreen.y;
-        const nearSelf = (dx * dx + dy * dy) <= labelSkip2;
         ctx.beginPath();
         ctx.fillStyle = this.mapColors.userPath;
         ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
         ctx.arc(q.x, q.y, 3.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
-        if (nearSelf) { continue; }
-        const label = "(" + Math.round(wp.x) + ", " + Math.round(wp.y) + ")";
-        // Alternate the label position above and below the disc so
-        // neighboring waypoint labels do not stack on each other.
-        const above = (labelIndex % 2) === 0;
-        const tx = q.x + 8;
-        const ty = above ? q.y - 11 : q.y + 11;
-        labelIndex++;
+        if (i !== this.hoverWp) { continue; }
+        const label = Math.round(wp.x) + " " + Math.round(wp.y) + " " +
+          Math.round(wp.z);
         ctx.save();
         ctx.globalAlpha = 1;
         ctx.lineWidth = 3.5;
         ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
-        ctx.strokeText(label, tx, ty);
+        ctx.strokeText(label, q.x + 8, q.y - 11);
         ctx.fillStyle = this.mapColors.userPath;
-        ctx.fillText(label, tx, ty);
+        ctx.fillText(label, q.x + 8, q.y - 11);
         ctx.restore();
       }
       if (target && plan.length > 1) {
