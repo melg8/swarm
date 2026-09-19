@@ -26,6 +26,8 @@ const (
     gearPassword   = "temp5"
     entryAccount   = "temp6"
     entryPassword  = "temp6"
+    dressAccount   = "temp11"
+    dressPassword  = "temp11"
     escapeAccount  = "temp10"
     escapePassword = "temp10"
 )
@@ -90,14 +92,48 @@ const (
 // graceful shutdown around it.
 const villageEscapeTimeout = 5 * time.Minute
 
-// Definitions returns the acceptance scenario list: the village
-// escape of the refused-click dump first (the newest stuck report
-// owns the head of the list the web UI serves), then the farm
-// readiness round of the user, plus the in-process mirrors of the two
-// existing e2e harnesses (tools/mobius_e2e.sh and tools/proxy_e2e.sh)
-// so the whole acceptance suite runs from one place.
+// fullDressTimeout bounds the world entry burst scenario: the run is
+// the character injection, the login handshake, one burst of the auto
+// equipment and the graceful shutdown - the dress itself lands within
+// the ten second window of the world entry, the budget keeps the
+// session prologue comfortable.
+const fullDressTimeout = 5 * time.Minute
+
+// Definitions returns the acceptance scenario list: the world entry
+// burst round of the auto equipment first (the newest round owns the
+// head of the list the web UI serves), then the village escape of the
+// refused-click dump, the farm readiness round of the user, plus the
+// in-process mirrors of the two existing e2e harnesses
+// (tools/mobius_e2e.sh and tools/proxy_e2e.sh) so the whole
+// acceptance suite runs from one place.
 func Definitions() []TestDef {
     return []TestDef{
+        {
+            ID:      "full-dress",
+            Title:   "full dress · the world entry burst",
+            Account: dressAccount,
+            Timeout: fullDressTimeout,
+            Description: "Start: the elven fighter temp11 spawns at " +
+                "the character creation point of the elven village " +
+                "as level 15 with an empty paperdoll and the complete " +
+                "outfit in the bag - the Brandish two hander, the " +
+                "wooden breastplate, the bone gaiters, the leather " +
+                "helmet, the gloves, the apprentice's shoes, both " +
+                "earrings, both anguish rings and the necklace " +
+                "(eleven wearable pieces, nothing worn). Flow: the " +
+                "world entry arms the auto equipment and the burst " +
+                "planner sends every independent use item request in " +
+                "one tick - the deployed build disables the UseItem " +
+                "flood protector (FloodProtectorUseItemInterval = 0) " +
+                "and the independent slots never share server state, " +
+                "the pair swaps and the displaced pieces wait for " +
+                "their confirmations. Pass: every injected piece " +
+                "sits on its paperdoll slot within the ten second " +
+                "window of the world entry (the retired fixed pause " +
+                "between the requests needed over twenty seconds " +
+                "for the same bag).",
+            Scenario: fullDressScenario,
+        },
         {
             ID:      "village-escape",
             Title:   "village escape · the refused-click dump cell",

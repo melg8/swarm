@@ -42,6 +42,12 @@ const (
 // The village escape condition id.
 const checkEscape = "escape"
 
+// The full dress condition ids.
+const (
+    checkDress = "dress"
+    checkFast  = "fast"
+)
+
 // The teacher hall geometry of the building entry scenario: the class
 // master Ellenia of the elven fighters stands inside the trainer hall
 // (ElvenVillageNPCs.xml), the interaction ring the scenario accepts
@@ -152,6 +158,93 @@ func zoneReturnChecks() []Check {
             Done: false, Detail: "",
         },
     }
+}
+
+// fullDressWindow bounds the world entry dress of the burst scenario:
+// the burst lands the whole bag within the first ticks of the world
+// entry (the honest runs dress inside the two second monitor period),
+// while the retired fixed pause between the use item requests needed
+// over twenty seconds for the same eleven pieces - the window fails
+// that pacing and passes every honest burst with room for the monitor
+// poll granularity and a slow server flush.
+const fullDressWindow = 10 * time.Second
+
+// fullDressSlots are the eleven paperdoll slots the injected outfit
+// covers: the weapon, the five armor pieces and the five jewels.
+var fullDressSlots = [...]int{
+    state.PaperdollRHand, state.PaperdollChest, state.PaperdollLegs,
+    state.PaperdollHead, state.PaperdollGloves, state.PaperdollFeet,
+    state.PaperdollLEar, state.PaperdollREar, state.PaperdollNeck,
+    state.PaperdollLFinger, state.PaperdollRFinger,
+}
+
+// fullDressChecks is the check list of the world entry burst
+// scenario: the world entry, the whole outfit worn and the burst
+// window held.
+func fullDressChecks() []Check {
+    return []Check{
+        {
+            ID: checkOnline, Label: "entered the world", Done: false,
+            Detail: "",
+        },
+        {
+            ID: checkDress, Label: "wears the whole injected outfit",
+            Done: false, Detail: "",
+        },
+        {
+            ID: checkFast, Label: "dressed within the world entry window",
+            Done: false, Detail: "",
+        },
+    }
+}
+
+// evaluateFullDress counts the dressed slots of the paperdoll against
+// the eleven slots the injected outfit covers.
+func evaluateFullDress(tracker *state.Bot) (filled int, total int) {
+    doll := tracker.PaperdollSlotObjectIDs()
+    total = len(fullDressSlots)
+    for _, index := range fullDressSlots {
+        if doll[index] != 0 {
+            filled++
+        }
+    }
+
+    return filled, total
+}
+
+// fullDressWatch tracks the world entry moment and the first fully
+// dressed observation of the burst scenario: the watch holds the
+// timing state between the monitor polls (the online moment anchors
+// the window, the first full paperdoll observation latches the dress
+// and the fast checks together).
+type fullDressWatch struct {
+    onlineAt  time.Time
+    dressedAt time.Time
+}
+
+// evaluate rewrites the check list of the burst scenario from the
+// live tracker state: the dress check holds once every slot is
+// filled, the fast check latches with it and compares the elapsed
+// time against the world entry window.
+func (w *fullDressWatch) evaluate(tracker *state.Bot, test *Test) {
+    if tracker.Status() != state.StatusOnline {
+        return
+    }
+    if w.onlineAt.IsZero() {
+        w.onlineAt = time.Now()
+    }
+    filled, total := evaluateFullDress(tracker)
+    test.updateCheck(checkDress, filled == total,
+        itoa(filled)+" of "+itoa(total)+" slots dressed")
+    if filled != total {
+        return
+    }
+    if w.dressedAt.IsZero() {
+        w.dressedAt = time.Now()
+    }
+    elapsed := w.dressedAt.Sub(w.onlineAt)
+    test.updateCheck(checkFast, elapsed <= fullDressWindow,
+        "the bag dressed in "+elapsed.Round(time.Millisecond).String())
 }
 
 // gearGapChecks is the check list of the pantsless dump scenario: the

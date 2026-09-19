@@ -34,7 +34,8 @@ import (
     "time"
 
     "github.com/melg8/swarm/internal/swarm/npcdata"
-    "github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/gear"
+        "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // The timing and geometry constants of the luring.
@@ -235,15 +236,23 @@ func (l *Loop) lureArmTick(lure *lureState, now time.Time) bool {
     if !lure.armAt.IsZero() && now.Sub(lure.armAt) < lureArmPeriod {
         return true
     }
-    if !l.inventoryGateOpen() || len(l.userDeferred) > 0 {
-        // The manual command queue or an in flight confirmation owns
-        // the item action budget right now.
+    if len(l.userDeferred) > 0 {
+        // The manual command queue owns the item action budget right
+        // now.
         return true
     }
     kind, weaponOK := l.tracker.SelfWeaponKind()
     bowWorn := weaponOK && kind == weaponTypeBow
     if !bowWorn {
         if !lure.armedBow {
+            if !l.inventoryItemAllowed(lure.bowObjID,
+                gear.ServerWriteSlots(l.equipment(), lure.bowObjID)) {
+                // The bow equip request is in flight: the confirmation
+                // gate holds the arm until the paperdoll answers.
+                lure.armAt = now
+
+                return true
+            }
             l.markInventoryAction(lure.bowObjID)
             if err := l.game.UseItem(lure.bowObjID); err != nil {
                 l.logf("Hunt: lure bow equip failed: %v", err)
@@ -264,6 +273,14 @@ func (l *Loop) lureArmTick(lure *lureState, now time.Time) bool {
         return true
     }
     if !lure.armedArrow {
+        if !l.inventoryItemAllowed(lure.arrowObjID,
+            gear.ServerWriteSlots(l.equipment(), lure.arrowObjID)) {
+            // The quiver request races an in flight write set (the
+            // bow freeing the left hand): hold until it confirms.
+            lure.armAt = now
+
+            return true
+        }
         l.markInventoryAction(lure.arrowObjID)
         if err := l.game.UseItem(lure.arrowObjID); err != nil {
             l.logf("Hunt: lure quiver equip failed: %v", err)

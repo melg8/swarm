@@ -541,17 +541,17 @@ func TestUserMoveReplaceDropsThePlannedPath(t *testing.T) {
 
 // TestUserSwapWaitsForServerConfirmation pins the inventory pacing: the
 // Mobius packet executor runs every client packet as its own thread pool
-// task, so the unequip and the equip of one swap must never share a
-// burst - the second command defers until the tracker observed the
-// effect of the first (the equipped flag flipped) and retries then, with
-// the pair order intact.
+// task, so the unequip and the equip of one same slot swap must never
+// share a burst - the second command defers until the tracker observed
+// the effect of the first (the equipped flag flipped) and retries then,
+// with the pair order intact.
 func TestUserSwapWaitsForServerConfirmation(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     bot.ApplyItemList([]state.InventoryItem{
         {ObjectID: 555, ItemID: 1146, Count: 1, Equipped: true},
-        {ObjectID: 556, ItemID: 1147, Count: 1},
+        {ObjectID: 556, ItemID: 21, Count: 1},
     })
 
     pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 555})
@@ -559,9 +559,9 @@ func TestUserSwapWaitsForServerConfirmation(t *testing.T) {
     loop.tick()
 
     require.Equal(t, []int32{555}, game.uses,
-        "the first useItem of the burst must go out")
+        "the first useItem of the swap must go out")
     require.Len(t, loop.userDeferred, 1,
-        "the second useItem must defer behind the unconfirmed one")
+        "the chest refill must defer behind the unconfirmed unequip")
     require.Equal(t, int32(556), loop.userDeferred[0].ObjectID)
 
     // The server applies the first request: the paperdoll update flips
@@ -578,27 +578,31 @@ func TestUserSwapWaitsForServerConfirmation(t *testing.T) {
 // TestUserSwapFallbackTimeout pins the rescue path of the gate: a
 // request the server refuses (the inventory never changes) must not
 // block the queue forever - after inventoryConfirmTimeout the next
-// command fires anyway.
+// command fires anyway. The two chest pieces race on the same
+// paperdoll slot, so the second one defers behind the first.
 func TestUserSwapFallbackTimeout(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     bot.ApplyItemList([]state.InventoryItem{
         {ObjectID: 555, ItemID: 1146, Count: 1, Equipped: true},
-        {ObjectID: 556, ItemID: 1147, Count: 1},
+        {ObjectID: 556, ItemID: 1146, Count: 1},
     })
 
-    pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 555})
     pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 556})
+    pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 555})
     loop.tick()
     require.Len(t, loop.userDeferred, 1,
-        "the second useItem defers while the first is unconfirmed")
+        "the chest swap defers while the equip is unconfirmed")
 
     // Nothing confirms the request (a refused item), the fallback
     // timeout opens the gate.
-    loop.userPendingAt = time.Now().Add(-2 * inventoryConfirmTimeout)
+    for id, pending := range loop.pendingActions {
+        pending.at = time.Now().Add(-2 * inventoryConfirmTimeout)
+        loop.pendingActions[id] = pending
+    }
     loop.tick()
-    require.Equal(t, []int32{555, 556}, game.uses,
+    require.Equal(t, []int32{556, 555}, game.uses,
         "the timeout must release the deferred command")
     require.Empty(t, loop.userDeferred)
 }

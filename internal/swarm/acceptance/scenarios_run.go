@@ -241,6 +241,26 @@ func runSupervisedScenario(
     }
 }
 
+// fullDressScenario runs the world entry burst round: the temp
+// character wakes at the creation spawn point with the complete
+// outfit in the bag and nothing worn, and the auto equipment must
+// dress the whole set within the world entry window - the burst
+// planner sends every independent use item request in one tick, the
+// confirmation gate holds back only the steps that share server
+// state. The retired fixed pause between the requests needed over
+// twenty seconds for the same bag; the window of the fast check
+// fails that pacing.
+func fullDressScenario(ctx context.Context, m *Manager, t *Test) error {
+    t.setChecks(fullDressChecks())
+    watch := &fullDressWatch{}
+
+    return runSupervisedScenario(ctx, m, t, fullDressReset(dressAccount),
+        watch.evaluate,
+        "acceptance: the bot is in the world with an empty paperdoll, "+
+            "watching the dress burst",
+        "acceptance: the whole outfit is on, stopping the bot")
+}
+
 // zoneReturnScenario runs the stuck cell round: the temp character
 // wakes at the reported freeze position with the reported item set
 // and must walk to its selected hunting zone on its own - the freeze

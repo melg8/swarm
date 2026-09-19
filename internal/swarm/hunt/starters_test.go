@@ -37,7 +37,7 @@ func TestAutoDestroyReplacedStarterItems(t *testing.T) {
 
     require.Equal(t, [][2]int32{{900, 1}}, game.destroys,
         "the replaced starter sword must be destroyed on the next tick")
-    require.Equal(t, int32(900), loop.userPendingItem,
+    require.Contains(t, loop.pendingActions, int32(900),
         "the destroy must arm the shared confirmation gate")
 
     // The server destroys it: the item vanishes and the gate opens.
@@ -46,7 +46,7 @@ func TestAutoDestroyReplacedStarterItems(t *testing.T) {
     })
     loop.tick()
 
-    require.True(t, loop.inventoryGateOpen(),
+    require.True(t, loop.inventoryItemAllowed(900, nil),
         "the vanished item must confirm the destroy")
     require.Len(t, game.destroys, 1,
         "the confirmed destroy must not repeat")
@@ -115,7 +115,7 @@ func TestAutoDestroyPacesAndRetriesFailedRequests(t *testing.T) {
     // The pacing and the gate allow an action again, but the retry
     // window is not over: no re-send.
     game.lastError = nil
-    loop.userPendingAt = time.Time{}
+    delete(loop.pendingActions, 900)
     loop.equip.lastActionAt = time.Now().Add(-equipActionPeriod)
     loop.tick()
 

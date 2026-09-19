@@ -277,6 +277,48 @@ func buildingEntryReset(account string) characterReset {
     }
 }
 
+// fullDressItems is the complete outfit of the world entry burst
+// scenario: eleven wearable pieces covering every slot the bot wears
+// (the weapon, the armor, the jewels), all injected into the bag -
+// the paperdoll starts empty and the burst planner dresses the whole
+// set in one tick. The rings ride as two separate stacks: the C1 item
+// data marks the jewelry non stackable, one row per finger.
+var fullDressItems = []ResetItem{
+    {ItemID: 1333, Count: 1}, // Brandish (the two hand sword)
+    {ItemID: 23, Count: 1},   // Wooden Breastplate
+    {ItemID: 31, Count: 1},   // Bone Gaiters
+    {ItemID: 44, Count: 1},   // Leather Helmet
+    {ItemID: 50, Count: 1},   // Leather Gloves
+    {ItemID: 1121, Count: 1}, // Apprentice's Shoes
+    {ItemID: 114, Count: 1},  // Earring of Strength
+    {ItemID: 115, Count: 1},  // Earring of Wisdom
+    {ItemID: 876, Count: 1},  // Ring of Anguish (the right finger)
+    {ItemID: 876, Count: 1},  // Ring of Anguish (the left finger)
+    {ItemID: 907, Count: 1},  // Necklace of Anguish
+}
+
+// fullDressReset returns the start state of the world entry burst
+// scenario: the creation spawn point, the level 15 vitals, a bare
+// wallet (no lessons wait on this run) and the whole outfit in the
+// bag with nothing worn.
+func fullDressReset(account string) characterReset {
+    return characterReset{
+        Account: account,
+        Char:    account,
+        Level:   15,
+        Exp:     level15Exp,
+        SP:      0,
+        Adena:   20000,
+        Items:   fullDressItems,
+        X:       elvenSpawnX,
+        Y:       elvenSpawnY,
+        Z:       elvenSpawnZ,
+        MaxHP:   level15HP,
+        MaxMP:   level15MP,
+        MaxCP:   level15CP,
+    }
+}
+
 // waitCharacterOffline polls the characters row until the server
 // flushed the session state (the online flag drops with the store on
 // logout). The timeout case continues with a warning instead of

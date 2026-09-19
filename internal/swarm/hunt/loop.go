@@ -788,13 +788,13 @@ type Loop struct {
     // zones.go): the template id to priority map built from the mob
     // list of the active ground, nil for zones without mob data.
     zoneMobPriority map[int32]int32
-    // The pending server confirmation of the last inventory
-    // action (see markInventoryAction and gateInventoryCommand).
-    userPendingItem  int32
-    userPendingEquip bool
-    userPendingCount int32
-    userPendingAt    time.Time
-    userDeferred     []state.Command
+    // The pending server confirmations of the in flight inventory
+    // actions, keyed by object id (see markInventoryAction,
+    // inventoryItemAllowed and gateInventoryCommand): the burst plan
+    // of the auto equipment and the manual commands share the map,
+    // each action holds only its own item and write set back.
+    pendingActions map[int32]pendingInventory
+    userDeferred   []state.Command
     userLastDist     float64
     userDistAt       time.Time
     engLastDist      float64
@@ -995,10 +995,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         userWpIndex:       0,
         userPathTried:     false,
         userRedirect:      false,
-        userPendingItem:   0,
-        userPendingEquip:  false,
-        userPendingCount:  0,
-        userPendingAt:     time.Time{},
+        pendingActions:    make(map[int32]pendingInventory),
         userDeferred:      nil,
         userLastDist:      0,
         userDistAt:        time.Time{},

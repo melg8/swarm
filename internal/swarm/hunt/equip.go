@@ -10,20 +10,26 @@ import (
     "github.com/melg8/swarm/internal/swarm/gear"
 )
 
-// Auto equipment of the hunt loop: the gear planner of the gear
-// package computes the next strictly improving use item action from
-// the tracked inventory and paperdoll and the confirmation gate paces
-// the requests. The gate is shared with the manual inventory commands
-// (markInventoryAction): the next request - manual or automatic -
-// only goes out after the inventory update confirmed the previous one
-// flipped the equipped flag, so a lost answer can never toggle an
-// item back off and the two sources never race on the same item. The
-// deployed build disables the UseItem flood protector
-// (FloodProtectorUseItemInterval = 0, the retail matching config), so
-// the confirmation is the only pacer the server really enforces: a
-// character that enters the world with the gear in the inventory
-// wears the whole bag within one tick per piece instead of one fixed
-// pause per piece.
+// Auto equipment of the hunt loop: the burst planner of the gear
+// package (gear.BurstUpgrade) computes every strictly improving use
+// item action the paperdoll still needs and that cannot race another
+// request of the same burst on the server, and the per item
+// confirmation gate (markInventoryAction, inventoryItemAllowed)
+// paces only the requests that actually share state. The gate is
+// shared with the manual inventory commands: a request never goes
+// out while an in flight one targets the same item (a second request
+// would toggle the first one's effect back) or writes a paperdoll
+// slot the in flight one writes too (the Mobius packet executor runs
+// every client packet as its own thread pool task, so same slot
+// requests can interleave on the server and cancel each other).
+// The deployed build disables the UseItem flood protector
+// (FloodProtectorUseItemInterval = 0, the retail matching config) and
+// gives no same client ordering guarantee, so the limit of the
+// sequential equip acceleration is exactly this write set model: the
+// independent equips - the whole starting bag on an empty paperdoll -
+// go out in one tick, the dependent steps (the pair swap refill, the
+// one-piece drop follow up) ride the next tick after their
+// prerequisite confirmed.
 type equipManager struct {
     // profile scores the gear for the combat class of the character.
     profile gear.Profile
@@ -62,8 +68,9 @@ type equipManager struct {
 // the deployed build disables the UseItem flood protector
 // (FloodProtectorUseItemInterval = 0) and the UseItem request never
 // touches the one second PlayerActionFloodProtector of the attack and
-// select packets, so the shared confirmation gate alone paces them at
-// the speed the server actually applies the flips.
+// select packets, so the write set gate of the burst plan alone paces
+// them at the speed the server actually applies the flips (see
+// gear.BurstUpgrade).
 const equipActionPeriod = 2 * time.Second
 
 // starterRetryDelay spaces the destroy retries of one starter item:
@@ -118,25 +125,27 @@ func (l *Loop) equipment() gear.Equipment {
         l.tracker.PaperdollSlotObjectIDs())
 }
 
-// maybeEquipGear executes the next auto equipment action. It defers
-// to the manual inventory command queue (in flight or deferred
-// commands own the item action budget) and arms the shared
-// confirmation gate for the flip of the equipped flag: the next
-// request goes out as soon as the tracker observed the effect of the
-// previous one, at most one request per tick. The deployed build
-// disables the UseItem flood protector, so no fixed pause limits the
-// chain and a full starting outfit lands within a few ticks of the
-// world entry. Called on every tick of the autonomous hunting phases;
-// after every inventory changing event (loot, buy, sell) the next
-// call re-plans and keeps the paperdoll up to date while the bot
-// works.
+// maybeEquipGear executes the auto equipment burst: every
+// independent upgrade the burst planner offers goes out in this tick
+// (the whole starting bag on an empty paperdoll dresses in one
+// burst), the steps that would race an in flight request wait for its
+// confirmation behind the per item gate. It defers to the manual
+// inventory command queue (in flight or deferred commands own the
+// item action budget) and arms the confirmation gate for every
+// request it sends. The deployed build disables the UseItem flood
+// protector, so no fixed pause limits the chain and a full starting
+// outfit lands within one tick of the world entry. Called on every
+// tick of the autonomous hunting phases; after every inventory
+// changing event (loot, buy, sell) the next call re-plans and keeps
+// the paperdoll up to date while the bot works.
 func (l *Loop) maybeEquipGear() {
     manager := l.equip
     if manager == nil || l.game == nil {
         return
     }
     now := time.Now()
-    if !l.inventoryGateOpen() || len(l.userDeferred) > 0 {
+    l.prunePendingActions(now)
+    if len(l.userDeferred) > 0 {
         return
     }
     if l.replacementSellingActive() {
@@ -158,20 +167,26 @@ func (l *Loop) maybeEquipGear() {
     if manager.equipScanNone && version == manager.equipScanVersion {
         return
     }
-    action, ok := gear.NextUpgrade(manager.profile, l.equipment())
+    planned := gear.BurstUpgrade(manager.profile, l.equipment())
     manager.equipScanVersion = version
-    manager.equipScanNone = !ok
-    if !ok {
-        return
-    }
-    l.markInventoryAction(action.ObjectID)
-    if err := l.game.UseItem(action.ObjectID); err != nil {
-        l.logf("Hunt: gear equip failed: %v", err)
+    manager.equipScanNone = len(planned) == 0
+    for _, action := range planned {
+        if !l.inventoryItemAllowed(action.ObjectID, action.Slots) {
+            // The step races an in flight request (its own item or
+            // write set): it rides the next tick after the
+            // confirmation. The scan stays armed (equipScanNone is
+            // false for a non empty plan) so the tick re-plans.
+            continue
+        }
+        l.markInventoryAction(action.ObjectID)
+        if err := l.game.UseItem(action.ObjectID); err != nil {
+            l.logf("Hunt: gear equip failed: %v", err)
 
-        return
+            return
+        }
+        manager.lastActionAt = now
+        l.logf("Hunt: gear: %s", action.Reason)
     }
-    manager.lastActionAt = now
-    l.logf("Hunt: gear: %s", action.Reason)
 }
 
 // maybeDestroyReplacedStarters destroys the starter kit items a
@@ -191,7 +206,7 @@ func (l *Loop) maybeDestroyReplacedStarters() {
         return
     }
     now := time.Now()
-    if !l.inventoryGateOpen() || len(l.userDeferred) > 0 {
+    if len(l.userDeferred) > 0 {
         return
     }
     if now.Sub(manager.lastActionAt) < equipActionPeriod {
@@ -209,6 +224,10 @@ func (l *Loop) maybeDestroyReplacedStarters() {
     for _, drop := range replaced {
         if until, ok := manager.starterRetryAt[drop.Item.ObjectID]; ok &&
             now.Before(until) {
+            continue
+        }
+        if !l.inventoryItemAllowed(drop.Item.ObjectID,
+            gear.ServerWriteSlots(l.equipment(), drop.Item.ObjectID)) {
             continue
         }
         l.markInventoryAction(drop.Item.ObjectID)

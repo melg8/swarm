@@ -41,23 +41,24 @@ func newVillageEscapeBot() *state.Bot {
     return bot
 }
 
-// TestVillageEscapeLeadsTheWebUIList pins the head of the scenario
-// list: the user contract of the 2026-09-14 report - the acceptance
-// test of the refused-click dump shows FIRST in the list the web UI
-// serves, ahead of every other scenario.
+// TestVillageEscapeLeadsTheWebUIList pins the second slot of the
+// scenario list: the user contract of the 2026-09-14 report - the
+// acceptance test of the refused-click dump shows right behind the
+// newest round (the world entry burst owns the head now, the newest
+// round always does) and ahead of every older scenario.
 func TestVillageEscapeLeadsTheWebUIList(t *testing.T) {
     defs := Definitions()
     require.NotEmpty(t, defs)
-    require.Equal(t, "village-escape", defs[0].ID,
-        "the village escape scenario owns the first list slot")
-    require.Equal(t, escapeAccount, defs[0].Account)
-    require.Equal(t, villageEscapeTimeout, defs[0].Timeout)
-    require.NotNil(t, defs[0].Scenario)
+    require.Equal(t, "village-escape", defs[1].ID,
+        "the village escape scenario owns the second list slot")
+    require.Equal(t, escapeAccount, defs[1].Account)
+    require.Equal(t, villageEscapeTimeout, defs[1].Timeout)
+    require.NotNil(t, defs[1].Scenario)
     for _, needle := range []string{
         "45768 49848 -3056", "level 15", "Brandish",
         "1312 adena", "two minutes", "3000+ units",
     } {
-        require.Contains(t, defs[0].Description, needle)
+        require.Contains(t, defs[1].Description, needle)
     }
 }
 

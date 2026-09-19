@@ -8,6 +8,7 @@ import (
     "math"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/gear"
     "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
 )
@@ -94,22 +95,24 @@ func (l *Loop) flushDeferredCommands() {
 }
 
 // gateInventoryCommand defers one command when it is an inventory
-// action that would race the previous one on the server: the Mobius
+// action that would race an in flight one on the server: the Mobius
 // packet executor runs every client packet as its own thread pool
-// task, so the unequip and the equip of one swap cancel each other
-// when they land in the same burst. The gate holds the newcomer
-// until the tracker observed the effect of the previous action, so
-// the pair continues as fast as the server actually processes it -
-// not on a fixed pause. The deferred list preserves the pair order
-// of a swap (the older command was already sent, this one waits for
-// its server game tick).
+// task, so two requests racing on the same item or the same paperdoll
+// slots can interleave their reads and writes and cancel each other.
+// The gate holds the newcomer until the tracker observed the effect
+// of the racing action (or its confirmation window expired), so the
+// pair continues as fast as the server actually processes it - not
+// on a fixed pause. The deferred list preserves the pair order of a
+// swap (the older command was already sent, this one waits for its
+// server game tick).
 func (l *Loop) gateInventoryCommand(cmd state.Command) bool {
     switch cmd.Kind {
     case state.CommandUseItem, state.CommandDrop, state.CommandDestroy:
     default:
         return false
     }
-    if l.inventoryGateOpen() {
+    if l.inventoryItemAllowed(cmd.ObjectID,
+        gear.ServerWriteSlots(l.equipment(), cmd.ObjectID)) {
         return false
     }
     l.userDeferred = append(l.userDeferred, cmd)
@@ -119,34 +122,78 @@ func (l *Loop) gateInventoryCommand(cmd state.Command) bool {
     return true
 }
 
-// inventoryGateOpen reports whether the previous inventory action is
-// confirmed: its effect showed up in the tracked inventory, or the
-// action is old enough that a refused request must not block the
-// queue forever.
-func (l *Loop) inventoryGateOpen() bool {
-    if l.userPendingAt.IsZero() {
-        return true
-    }
-    if time.Since(l.userPendingAt) >= inventoryConfirmTimeout {
-        return true
+// pendingInventory is one in flight inventory action waiting for its
+// server confirmation: the item state as it was when the request left
+// and the paperdoll slots the server write set of the request touches
+// (the equip landing plus the pieces it displaces, see
+// gear.ServerWriteSlots).
+type pendingInventory struct {
+    equip bool
+    count int32
+    at    time.Time
+    slots []gear.Slot
+}
+
+// inventoryItemAllowed reports whether a new inventory action on the
+// item may go out: no in flight action exists for the same item (a
+// second request would toggle the first one's effect back) and no in
+// flight action writes a paperdoll slot the new request touches (the
+// concurrent packet tasks of the Mobius executor would race on the
+// slot). The confirmed and expired pendings prune on the check: the
+// confirmation releases the item at the speed the server actually
+// applies the flips, the timeout only rescues a refused request from
+// blocking the queue forever.
+func (l *Loop) inventoryItemAllowed(objectID int32, slots []gear.Slot) bool {
+    now := time.Now()
+    for pendingID, pending := range l.pendingActions {
+        if l.pendingInventoryConfirmed(pendingID, pending) ||
+            now.Sub(pending.at) >= inventoryConfirmTimeout {
+            delete(l.pendingActions, pendingID)
+
+            continue
+        }
+        if pendingID == objectID {
+            return false
+        }
+        for _, pendingSlot := range pending.slots {
+            for _, slot := range slots {
+                if pendingSlot == slot {
+                    return false
+                }
+            }
+        }
     }
 
-    return l.pendingInventoryConfirmed()
+    return true
+}
+
+// prunePendingActions drops the in flight actions the tracker already
+// confirmed or whose confirmation window expired: the map holds only
+// the requests that still gate the new ones.
+func (l *Loop) prunePendingActions(now time.Time) {
+    for pendingID, pending := range l.pendingActions {
+        if l.pendingInventoryConfirmed(pendingID, pending) ||
+            now.Sub(pending.at) >= inventoryConfirmTimeout {
+            delete(l.pendingActions, pendingID)
+        }
+    }
 }
 
 // pendingInventoryConfirmed checks the tracked inventory for the
-// effect of the previous action: any change of the equipped flag,
+// effect of one in flight action: any change of the equipped flag,
 // the stack count or the existence of the item means the server
 // processed the request.
-func (l *Loop) pendingInventoryConfirmed() bool {
-    item, ok := l.tracker.InventoryItemState(l.userPendingItem)
+func (l *Loop) pendingInventoryConfirmed(
+    objectID int32, pending pendingInventory,
+) bool {
+    item, ok := l.tracker.InventoryItemState(objectID)
     if !ok {
         // Vanished: consumed by the request.
         return true
     }
 
-    return item.Equipped != l.userPendingEquip ||
-        item.Count != l.userPendingCount
+    return item.Equipped != pending.equip ||
+        item.Count != pending.count
 }
 
 // applyUserCommand turns one queued web command into world action.
@@ -168,22 +215,25 @@ func (l *Loop) applyUserCommand(cmd state.Command) {
     }
 }
 
-// markInventoryAction records the pending confirmation of one
-// inventory action: the item state as it was when the request left.
-// The gate watches the tracker for the actual server effect (see
-// pendingInventoryConfirmed).
+// markInventoryAction records one in flight inventory action: the
+// item state as it was when the request left plus the paperdoll slots
+// the server write set of the request touches (see
+// gear.ServerWriteSlots). The gate watches the tracker for the actual
+// server effect per item (see pendingInventoryConfirmed) and holds
+// back only the requests that would race the write set.
 func (l *Loop) markInventoryAction(objectID int32) {
     item, ok := l.tracker.InventoryItemState(objectID)
-    l.userPendingItem = objectID
-    l.userPendingEquip = item.Equipped
-    l.userPendingCount = item.Count
-    l.userPendingAt = time.Now()
-    if !ok {
-        // Unknown item (the request may remove it entirely): the
-        // vanishing itself is the confirmation.
-        l.userPendingEquip = false
-        l.userPendingCount = 0
+    pending := pendingInventory{
+        equip: false,
+        count: 0,
+        at:    time.Now(),
+        slots: gear.ServerWriteSlots(l.equipment(), objectID),
     }
+    if ok {
+        pending.equip = item.Equipped
+        pending.count = item.Count
+    }
+    l.pendingActions[objectID] = pending
 }
 
 // userUseItem executes the equip/unequip toggle of one item right

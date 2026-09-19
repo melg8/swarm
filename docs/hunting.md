@@ -396,19 +396,45 @@ consumes.
 
 The melee fighter profile scores every equippable item (weapon = pAtk x
 attack speed, armor = pDef, jewel = mDef, shield = expected block
-value; bows score zero for melee), `NextUpgrade` plans the next
-strictly improving use item request against the tracked paperdoll
-(empty slot fills, strict slot swaps, the pair swap through freeing the
-weaker jewel, the two hand weapon and one-piece family guards) and the
-hunt loop executes one action per tick behind the shared confirmation
-gate of the manual inventory commands: the deployed build disables the
-UseItem flood protector (`FloodProtectorUseItemInterval = 0`, the
-retail matching config) and the UseItem request never touches the one
-second PlayerActionFloodProtector of the attack and select packets, so
-the server confirmation is the only pacer - a character that enters
-the world with the gear in the inventory wears the whole bag within
-one tick per piece, and the paperdoll stays optimal after every loot,
-buy and death event.
+value; bows score zero for melee), `NextUpgrade` plans the strictly
+improving use item requests against the tracked paperdoll (empty slot
+fills, strict slot swaps, the pair swap through freeing the weaker
+jewel, the two hand weapon and one-piece family guards) and
+`BurstUpgrade` turns them into the burst the loop sends per tick. The
+acceleration limit of the sequential equip chain on this server build
+is pinned by two source facts (both verified in the deployed Mobius
+C1 module):
+
+- the UseItem flood protector is disabled
+  (`FloodProtectorUseItemInterval = 0`, the retail matching config)
+  and the UseItem request never touches the one second
+  PlayerActionFloodProtector of the attack and select packets, so no
+  server side rate limit sits between the requests;
+- the packet executor is one shared ThreadPoolExecutor
+  (`commons/network/packet/PacketExecutor.java`): every received
+  packet becomes its own pool task, so two packets of the SAME client
+  may run concurrently and in either order - the server gives no same
+  client ordering guarantee.
+
+The second fact is the binding one: requests whose server write sets
+overlap (the same item - a second request would toggle the first one's
+effect back; the same paperdoll slot - the pair swap refill, the
+one-piece drop follow up, the shield slot behind a two hand weapon)
+can interleave on the server and cancel each other, while requests on
+independent slots never touch the same state. `BurstUpgrade` plans on
+a simulated copy of the equipment with the server write semantics
+(`equipWriteSlots`: the landing slot plus the pieces the server
+displaces) and returns the maximum independent prefix of the chain -
+the whole starting bag on an empty paperdoll dresses in ONE tick, the
+dependent steps ride the next tick after their prerequisite confirmed.
+The per item confirmation gate (`markInventoryAction`,
+`inventoryItemAllowed`) is shared with the manual inventory commands
+and paces only the requests that actually race; a character that
+enters the world with the gear in the inventory wears the whole bag
+within one tick, and the paperdoll stays optimal after every loot,
+buy and death event. The acceptance suite pins the burst end to end
+(the `full-dress` scenario dresses eleven injected pieces within ten
+seconds of the world entry from the web UI).
 `gear.TotalGearPoints` summarizes the equipped gear for the zone gates
 (weapon damage per hit plus defenses).
 

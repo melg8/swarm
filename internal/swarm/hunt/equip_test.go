@@ -32,7 +32,7 @@ func TestAutoEquipEquipsLootedGear(t *testing.T) {
 
     require.Equal(t, []int32{555}, game.uses,
         "the looted sword must be equipped on the next tick")
-    require.Equal(t, int32(555), loop.userPendingItem,
+    require.Contains(t, loop.pendingActions, int32(555),
         "the equip must arm the shared confirmation gate")
 
     // The server applies it: the equipped flag flips and the gate
@@ -45,8 +45,10 @@ func TestAutoEquipEquipsLootedGear(t *testing.T) {
     })
     bot.ApplyPaperdoll(paperdollWith(state.PaperdollRHand, 555))
     loop.tick()
-    require.True(t, loop.inventoryGateOpen(),
-        "the confirmed equip must open the gate")
+    require.True(t, loop.inventoryItemAllowed(555, nil),
+        "the confirmed equip must release its own item")
+    require.Empty(t, loop.pendingActions,
+        "the confirmed pending must prune away")
 
     // A second identical sword brings no gain: nothing more equips.
     bot.ApplyInventoryUpdate([]state.InventoryItem{
@@ -60,134 +62,118 @@ func TestAutoEquipEquipsLootedGear(t *testing.T) {
         "an equal sword must not toggle the weapon off")
 }
 
-// TestAutoEquipDefersToManualCommands pins the shared budget: while a
-// manual inventory command is unconfirmed or deferred, the auto
-// equipment holds its requests.
-func TestAutoEquipDefersToManualCommands(t *testing.T) {
+// TestAutoEquipRacesOnlyOnSharedState pins the gate granularity: the
+// manual inventory command and the auto equipment ride the same tick
+// when their write sets are disjoint (different items, different
+// paperdoll slots), while a request on an item that is already in
+// flight defers - the Mobius packet executor runs the client packets
+// as concurrent thread pool tasks, so only the shared state races.
+func TestAutoEquipRacesOnlyOnSharedState(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     loop := NewLoop(game, bot)
 
+    // The cloth cap (head, item 41) and the short sword (right hand)
+    // in the bag: the manual command on the cap and the auto equip of
+    // the sword touch disjoint slots and ride together.
     bot.ApplyItemList([]state.InventoryItem{
         {ObjectID: 555, ItemID: shortSwordItemID, Count: 1},
         {ObjectID: 556, ItemID: 41, Count: 1},
     })
     pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 556})
-    pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 555})
-    loop.tick()
-
-    require.Equal(t, []int32{556}, game.uses,
-        "the manual command owns the action budget first")
-    require.Len(t, loop.userDeferred, 1,
-        "the second manual command defers behind the confirmation")
-
-    // The manual chain is still in flight: the auto equipment must
-    // not toggle anything meanwhile.
-    bot.ApplyInventoryUpdate([]state.InventoryItem{
-        {ObjectID: 556, ItemID: 41, Count: 1, Equipped: true, Change: 2},
-    })
     loop.tick()
     require.Equal(t, []int32{556, 555}, game.uses,
-        "the deferred manual command flushes after the confirmation")
-}
+        "the manual head equip and the auto sword equip ride one tick")
 
-// TestAutoEquipBurstsOnConfirmation pins the burst pacing: the
-// confirmation is the only pacer between the auto equips (the
-// deployed build disables the UseItem flood protector,
-// FloodProtectorUseItemInterval = 0) - an unconfirmed equip holds the
-// next request and its flip releases the next equip on the very next
-// tick, no fixed pause is waited out in between.
-func TestAutoEquipBurstsOnConfirmation(t *testing.T) {
-    bot := newTestBot()
-    game := &fakeGame{}
-    loop := NewLoop(game, bot)
-
-    bot.ApplyItemList([]state.InventoryItem{
-        {ObjectID: 555, ItemID: shortSwordItemID, Count: 1},
-        {ObjectID: 556, ItemID: 41, Count: 1},
-    })
+    // A manual command on the sword while its auto equip is still
+    // unconfirmed would toggle the same item: it defers.
+    pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 555})
     loop.tick()
-    require.Equal(t, []int32{555}, game.uses)
+    require.Equal(t, []int32{556, 555}, game.uses,
+        "the in flight sword holds the manual toggle back")
+    require.Len(t, loop.userDeferred, 1,
+        "the racing manual command waits in the deferred queue")
 
-    // The first equip is still in flight: extra ticks send nothing.
-    loop.tick()
-    loop.tick()
-    require.Equal(t, []int32{555}, game.uses,
-        "an unconfirmed equip holds the next request")
-
-    // The server applies the flip: the very next tick equips the
-    // second piece without any pacing pause.
+    // The server applies both equips: the deferred command flushes on
+    // the next tick (the user asked for the toggle, the loop delivers
+    // it once the first request confirmed).
     bot.ApplyInventoryUpdate([]state.InventoryItem{
         {
             ObjectID: 555, ItemID: shortSwordItemID, Count: 1,
             Equipped: true, Change: 2,
         },
+        {ObjectID: 556, ItemID: 41, Count: 1, Equipped: true, Change: 2},
     })
-    bot.ApplyPaperdoll(paperdollWith(state.PaperdollRHand, 555))
+    bot.ApplyPaperdoll(paperdollPair(state.PaperdollRHand, 555,
+        state.PaperdollHead, 556))
     loop.tick()
-    require.Equal(t, []int32{555, 556}, game.uses,
-        "the confirmation releases the next equip immediately")
+    require.Equal(t, []int32{556, 555, 555}, game.uses,
+        "the confirmed flip releases the deferred manual toggle")
 }
 
-// TestAutoEquipDressesTheWholeBagInABurst pins the world entry dress:
-// a character holding its whole outfit in the inventory wears
-// everything at the server confirmation pace - one tick per piece,
-// no tick ever stalls the chain, no fixed pause sits between the
-// pieces.
-func TestAutoEquipDressesTheWholeBagInABurst(t *testing.T) {
+// TestAutoEquipBurstsTheWholeBagInOneTick pins the acceleration limit
+// of the sequential equip chain: the deployed build disables the
+// UseItem flood protector (FloodProtectorUseItemInterval = 0) and the
+// independent equips never share server state, so the whole starting
+// outfit goes out in ONE tick - one request per piece, no pacing
+// pause between them, and not a single re-request while the flips are
+// still in flight.
+func TestAutoEquipBurstsTheWholeBagInOneTick(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     loop := NewLoop(game, bot)
 
     // The outfit of four distinct slots: the Short Sword (right
     // hand), the Wooden Breastplate (chest), the Cloth Cap (head) and
-    // the Leather Shoes (feet). The planner picks the pieces by their
-    // score, the test follows the actual order.
-    outfit := []state.InventoryItem{
+    // the Leather Shoes (feet).
+    bot.ApplyItemList([]state.InventoryItem{
         {ObjectID: 555, ItemID: shortSwordItemID, Count: 1},
         {ObjectID: 556, ItemID: 23, Count: 1},
         {ObjectID: 557, ItemID: 41, Count: 1},
         {ObjectID: 558, ItemID: 37, Count: 1},
-    }
-    bot.ApplyItemList(outfit)
+    })
 
-    dollSlot := map[int32]int{
-        1:  state.PaperdollRHand,
-        23: state.PaperdollChest,
-        41: state.PaperdollHead,
-        37: state.PaperdollFeet,
-    }
-    pending := map[int32]int32{555: 1, 556: 23, 557: 41, 558: 37}
-    var doll [state.PaperdollSlots]int32
-    for i := range outfit {
-        loop.tick()
-        require.Len(t, game.uses, i+1,
-            "tick %d: the dress continues without a pacing pause", i)
-        used := game.uses[i]
-        itemID, ok := pending[used]
-        require.True(t, ok,
-            "the tick must equip one of the pending pieces")
-        delete(pending, used)
-
-        // The server applies the equip: the flip lands in the
-        // tracker and the paperdoll shows the piece worn.
-        bot.ApplyInventoryUpdate([]state.InventoryItem{
-            {
-                ObjectID: used, ItemID: itemID, Count: 1,
-                Equipped: true, Change: 2,
-            },
-        })
-        doll[dollSlot[itemID]] = used
-        bot.ApplyPaperdoll(doll)
-    }
+    // One tick dresses the whole bag: four requests, one per piece.
     loop.tick()
-    require.Len(t, game.uses, len(outfit),
+    require.Len(t, game.uses, 4,
+        "the whole bag rides one burst - the server paces nothing")
+    require.ElementsMatch(t, []int32{555, 556, 557, 558}, game.uses)
+
+    // The flips are still in flight: the next ticks never re-request
+    // a piece (a second request would toggle it back off).
+    loop.tick()
+    loop.tick()
+    require.Len(t, game.uses, 4,
+        "no piece is requested twice while unconfirmed")
+
+    // The server applies everything: the next tick plans nothing.
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {
+            ObjectID: 555, ItemID: shortSwordItemID, Count: 1,
+            Equipped: true, Change: 2,
+        },
+        {ObjectID: 556, ItemID: 23, Count: 1, Equipped: true, Change: 2},
+        {ObjectID: 557, ItemID: 41, Count: 1, Equipped: true, Change: 2},
+        {ObjectID: 558, ItemID: 37, Count: 1, Equipped: true, Change: 2},
+    })
+    bot.ApplyPaperdoll(paperdollMulti(map[int]int32{
+        state.PaperdollRHand: 555,
+        state.PaperdollChest: 556,
+        state.PaperdollHead:  557,
+        state.PaperdollFeet:  558,
+    }))
+    loop.tick()
+    require.Len(t, game.uses, 4,
         "the dressed character has nothing left to equip")
+    require.Empty(t, loop.pendingActions,
+        "the confirmed pendings pruned away")
 }
 
 // TestAutoEquipPairSwapTwoSteps verifies the two step pair swap: the
 // unequip of the weaker jewel goes out first and the better jewel
-// equips into the freed slot after the confirmation.
+// equips into the freed slot after the confirmation - the two steps
+// never ride one burst (the concurrent packet tasks would race on the
+// freed slot).
 func TestAutoEquipPairSwapTwoSteps(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
@@ -215,6 +201,53 @@ func TestAutoEquipPairSwapTwoSteps(t *testing.T) {
     loop.tick()
     require.Equal(t, []int32{555, 556}, game.uses,
         "the better earring equips into the freed slot")
+}
+
+// TestAutoEquipSwapRefillWaitsForTheFlip pins the burst cut on the
+// live loop: while the freeing unequip of a pair swap is still in
+// flight, the refill into the freed slot holds back - the flip
+// releases it on the very next tick.
+func TestAutoEquipSwapRefillWaitsForTheFlip(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+
+    bot.ApplyItemList([]state.InventoryItem{
+        {ObjectID: 555, ItemID: 112, Count: 1, Equipped: true},
+        {ObjectID: 700, ItemID: 113, Count: 1, Equipped: true},
+        {ObjectID: 556, ItemID: 113, Count: 1},
+    })
+    bot.ApplyPaperdoll(paperdollPair(state.PaperdollREar, 555,
+        state.PaperdollLEar, 700))
+    loop.tick()
+    require.Equal(t, []int32{555}, game.uses,
+        "the freeing unequip rides the first tick")
+
+    // The unequip is unconfirmed: the refill does not race it.
+    loop.tick()
+    loop.tick()
+    require.Equal(t, []int32{555}, game.uses,
+        "the refill waits while the unequip is in flight")
+
+    // The flip lands: the refill goes out immediately.
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 555, ItemID: 112, Count: 1, Equipped: false, Change: 2},
+    })
+    bot.ApplyPaperdoll(paperdollPair(state.PaperdollLEar, 700,
+        state.PaperdollREar, 0))
+    loop.tick()
+    require.Equal(t, []int32{555, 556}, game.uses,
+        "the confirmed unequip releases the refill")
+}
+
+// paperdollMulti builds a paperdoll block with several occupied slots.
+func paperdollMulti(filled map[int]int32) [state.PaperdollSlots]int32 {
+    var ids [state.PaperdollSlots]int32
+    for index, objectID := range filled {
+        ids[index] = objectID
+    }
+
+    return ids
 }
 
 // paperdollWith builds a paperdoll block with one occupied slot.
