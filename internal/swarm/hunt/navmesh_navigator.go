@@ -197,6 +197,15 @@ func (n navmeshNavigator) meshQuery(
     }
     if route != nil && route.Partial && len(route.Waypoints) > 0 {
         waypoints, length := n.meshWaypoints(route)
+        if route.PocketEscape {
+            // The stranded start answer: the mesh named the exit
+            // ground, the click validation port names the
+            // deliverable direction to walk out with (the grid is
+            // the click transport layer of this navigator - see the
+            // package comment). The mesh aim stands when nothing
+            // validates: the refusal ladder owns the honesty then.
+            waypoints[0] = n.refinePocketExit(start, waypoints[0])
+        }
 
         return &pathfind.Result{
             Found:     false,
@@ -262,6 +271,63 @@ func (n navmeshNavigator) meshWaypoints(
 // meshPos converts a pathfind vector into the mesh position.
 func meshPos(v pathfind.Vec3) navmesh.Pos {
     return navmesh.Pos{X: v.X, Y: v.Y, Z: v.Z}
+}
+
+// pocketExitSweepDeg is the direction sweep of the pocket exit
+// refinement: the mesh aim first, then the circle around the standing
+// point in 30 degree steps - the strict link graph cannot know which
+// direction the permissive click transport walks out through (the
+// diagonal squeezes and the one sided wall pairs the server accepts),
+// the transport oracle answers it directly. Ordered by the angular
+// distance from the mesh aim so the mesh answer wins every tie.
+var pocketExitSweepDeg = [12]float64{
+    0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180,
+}
+
+// pocketExitAimDist is the transport distance of the pocket exit aim:
+// beyond the wide final arrival slack (waypointArriveDist) so the
+// follower serves the exit with a real click instead of "arriving"
+// without moving, and comfortably over the server rescue click floor.
+const pocketExitAimDist = 224.0
+
+// refinePocketExit turns the mesh exit aim of a pocket escape into
+// the aim the walk clicks can actually deliver: the mesh exit ground
+// seeds the direction, the sweep rotates it around the standing point
+// and the click validation port (the same oracle every follower click
+// passes) picks the first direction whose line the server transport
+// walks. The aim height rides the grid surface (ClosestHeight) so the
+// candidate lands on real ground; a direction over a hole, a drop or
+// a wall refuses and the sweep moves on. The aim distance is the
+// transport distance regardless of the seed's - the mesh seed names
+// the ground, never the walkable distance. The mesh aim stands when
+// nothing validates - the honesty of the plan stays the mesh's, the
+// ladder owns the rest.
+func (n navmeshNavigator) refinePocketExit(
+    start, aim pathfind.Vec3,
+) pathfind.Vec3 {
+    if n.engine == nil {
+        return aim
+    }
+    dist := math.Hypot(aim.X-start.X, aim.Y-start.Y)
+    if dist < pocketExitAimDist {
+        dist = pocketExitAimDist
+    }
+    base := math.Atan2(aim.Y-start.Y, aim.X-start.X)
+    for _, delta := range pocketExitSweepDeg {
+        rad := base + delta*math.Pi/180
+        cx := start.X + math.Cos(rad)*dist
+        cy := start.Y + math.Sin(rad)*dist
+        z, err := n.engine.ClosestHeight(cx, cy, int16(start.Z))
+        if err != nil {
+            continue
+        }
+        candidate := pathfind.Vec3{X: cx, Y: cy, Z: float64(z)}
+        if _, ok := n.engine.ValidateClick(start, candidate); ok {
+            return candidate
+        }
+    }
+
+    return aim
 }
 
 // avoidCircles converts the avoid areas of the Navigator contract

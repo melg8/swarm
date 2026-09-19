@@ -73,7 +73,8 @@ func TestDefinitionsUseTempAccounts(t *testing.T) {
         switch def.Account {
         case farmAccount, lifeAccount, relayAccount, returnAccount,
             entryAccount, gearAccount, soakAccount, milestoneAccount,
-            classTransferAccount, escapeAccount, dressAccount:
+            classTransferAccount, escapeAccount, dressAccount,
+            pocketAccount:
         default:
             t.Fatalf("scenario %s owns the unexpected account %s",
                 def.ID, def.Account)

@@ -158,6 +158,13 @@ type Route struct {
     // (docs/navmesh.md, the hierarchy section): the coarse chain
     // search plus the refinement hops instead of one flat search.
     Hierarchical bool
+    // PocketEscape reports the stranded start answer (pocket.go): the
+    // start polygon is a linkless island the corridor search cannot
+    // leave, the single waypoint is the walk out of it toward the
+    // nearest connected ground. The composition layer refines the
+    // aim through its click validation port - the mesh names the
+    // ground, the transport oracle names the deliverable direction.
+    PocketEscape bool
 }
 
 // answerWaypoints fills the route waypoints from the corridor: the
@@ -288,6 +295,20 @@ func (m *Mesh) RouteApproach(
                 approach: approachRadius},
             startRef, startPos, endPos, filter, avoid, maxQueryNodes*8,
             nil)
+    }
+    // The pocket escape: a start the corridor search cannot leave (a
+    // linkless island the strict edge-only link graph cannot connect
+    // while the server movement channels walk its diagonal squeeze)
+    // answers the closest reachable route OUT of the spot instead of
+    // the bare not found - the walk-what-you-can partial contract
+    // serves it and the next plan cycle routes from connected ground
+    // (see pocket.go).
+    if !result.reached {
+        if escape := m.pocketEscape(startRef, startPos, avoid); escape != nil {
+            escape.Explored += result.explored
+
+            return escape, nil
+        }
     }
     route.Explored = result.explored
     route.Corridor = result.corridor

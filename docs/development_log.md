@@ -6755,3 +6755,131 @@ harness of the round 89):
 - The hunt suite green (60 s), `go test ./...` answers every
   package ok, golangci-lint 0 issues, the whitespace gate green.
 - The mobius server stays untouched, it is the source of truth.
+
+## Round 92: the pocket escape - the mesh island cell answers the walk out (2026-09-19)
+
+Scope: the owner report: "Из точки 43736 47048 -2992 - не удается
+построить маршрут никуда, хотя эта точка сама по себе - просто близко
+к перилам" - the demand: a unit test and a webui runnable acceptance
+test reproducing the problem, a SYSTEMIC fix (never ad hoc) that
+makes the situation impossible, and the explanation of why it
+happens. The mobius server stays untouched (the server integrity
+rules).
+
+### Why it happens: the strict link graph loses the diagonal squeeze
+
+The cell 43736 47048 -2992 stands on the elven village deck just off
+the railings. The geodata around it (region 21_19, cells probed with
+the layer stack dump): every axis neighbor of the cell carries a
+railing wall bit facing the cell - the north and west walls sit in
+the cell's own NSWE (n5: north and west closed), the east and south
+walls sit in the NEIGHBOR cells' NSWE (the east neighbor n13 has its
+west bit closed, the south neighbor n7 has its north bit closed).
+The layer sandwich stands under all of it: the -3928 water bed
+polygons run beneath the whole deck block.
+
+The mesh link builder (navbuild/link.go) connects polygons across
+shared EDGES only, and only when BOTH cells carry the wall bits open
+(the nsweOpen pair rule - the strict form the server PATHFINDER
+applies). Every axis pair of the pocket cell fails that rule on one
+side: the builder emits the standing polygon with zero links - a
+one polygon island (probed: ref 5911056115351877, tile 21_19 idx
+49476, FirstLink -1, the link flood component size 1). The corridor
+A* explores one node, the answer is the bare not found for EVERY
+destination, no partial corridor exists (the corridor length 1 fails
+the partial gate in RouteApproach).
+
+The server itself disagrees - and so does the bot's own grid engine,
+which mirrors the server movement channels: the diagonal step to the
+southeast neighbor passes the anti corner cut rule
+(GeoEngine.checkNearestNsweAntiCornerCut the search.go
+diagonalFlanksOpen mirrors - the flank cells are open ALONG the
+crossing direction), and the server click transport
+(MoveToLocation validation) even accepts one sided wall pairs the
+link builder refuses (probed live: the east, the south and the
+southeast clicks all validate from the pocket cell, the strict
+LineOfSight refuses the same lines). The bot got INTO the cell
+through that permissive transport (a plan click or a server side
+displacement), and the strict route graph could not get it OUT:
+every plan attempt answered not found, the zone return held
+(holdZoneReturn), the webui showed a standing hunter.
+
+The class: any walkable cell whose axis neighbors are all walled but
+which touches open ground across a corner is a mesh island. The
+railing geometry produces them wherever fence segments meet.
+
+### The fix: the pocket escape in the mesh, refined by the transport oracle
+
+The fix restores the class invariant at the planner and keeps each
+layer in its own competence: the mesh names the GROUND, the
+composition layer names the DELIVERABLE direction.
+
+1. The mesh pocket escape (pathfind/navmesh/pocket.go, hooked in
+   RouteApproach after the capped escalation): when the search did
+   not reach its destination, the start's link component floods
+   (floodPocketComponent - bounded by construction, the flood aborts
+   the moment the component bounding box would stretch past
+   pocketMaxSide 320 units, so a sealed yard or an island never
+   triggers it - pinned by TestPocketEscapeSparesTheWideComponent).
+   A pocket sized component answers the walk out: the closest
+   connected ground outside the component (pocketBoundary - the tile
+   spatial index ring scan, never another linkless island, the water
+   priced 8x like every escape so the deck bed under the pocket
+   never wins, the foreign recovery bans priced 4x), carried deep
+   into that ground along the horizontal exit direction
+   (pocketAim - the march depths keep the snapped aim beyond the
+   wide final arrival slack of the walk follower, an aim closer than
+   that "arrives" without a single click) and snapped onto the real
+   surface. The Route carries PocketEscape - the single waypoint
+   partial the walk-what-you-can contract serves end to end
+   (startWalkLegSearch arms it, the follower clicks it).
+
+2. The transport refinement (hunt/navmesh_navigator.go
+   refinePocketExit): the strict link graph cannot know which
+   direction the permissive click transport walks out through, so
+   the navigator sweeps the mesh aim direction around the standing
+   point in 30 degree steps at the transport distance (224 units -
+   beyond waypointArriveDist 150 so the follower serves the exit
+   with a real click) and the click validation port (ValidateClick -
+   the same oracle every follower click passes) picks the first
+   direction whose line the server transport walks; the aim height
+   rides the grid surface (ClosestHeight). The mesh aim stands when
+   nothing validates - the honesty of the plan stays the mesh's, the
+   refusal ladder owns the rest.
+
+The next plan cycle routes from the exit ground the arrival lands on
+- the bot walks out of the pocket and continues the trip it was on.
+
+### Reproductions (written red first, all green on the fix)
+
+- pathfind/navmesh/pocket_test.go: the synthetic railing pocket
+  (TestRouteEscapesTheAxisWalledPocket - the single walled cell
+  touching the mainland at the corner answers the partial walk out
+  with the exit on the connected ground; pre fix: the bare not
+  found), the water pricing pin (TestPocketEscapePrefersTheDryGround
+  - the stacked bed never wins the exit), the wide component pin
+  (TestPocketEscapeSparesTheWideComponent) and the live pack
+  reproduction (TestReproRailingPocket43736 - the real tiles: the
+  standing polygon is a linkless island, every destination from the
+  hunting zone to the village plaza answers the escape walk out).
+- hunt/railing_pocket_repro_test.go
+  (TestReproRailingPocketWalksOut): the end to end loop on the real
+  pack and the real mesh - the bot plans the escape, the follower
+  clicks deliver it and the followup plan cycles carry the walk to
+  the hunting zone (the character leaves the pocket cell; pre fix
+  the return held forever with zero walk requests). The escape rides
+  the partial contract log line (pinned).
+- acceptance/railing_pocket.go + the "railing-pocket" entry in
+  Definitions(): the webui runnable acceptance scenario - the temp12
+  character wakes at the reported cell, the check holds when it
+  stands 256+ units out within the two minute window (the same
+  window the village escape contract uses); the acceptance page
+  lists it with the run button like every scenario.
+
+### Verification
+
+- The full `go test -count=1 ./...` answers every package ok (the
+  whole map suites included - the escape never fires for connected
+  starts, the flood bound aborts on the first out of box poly).
+- golangci-lint 0 issues, the whitespace gate green.
+- The mobius server stays untouched, it is the source of truth.

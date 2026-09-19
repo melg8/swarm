@@ -1300,3 +1300,31 @@ facing a direction it never walked during the wasd walk.
   tools/mobius_e2e.sh E2E_OK, `go test ./...` every package ok,
   golangci-lint 0 issues, the whitespace gate green. The mobius
   server stays untouched.
+
+## Railing pocket round (2026-09-19, Round 92)
+
+- The owner report: from 43736 47048 -2992 no route can be built
+  anywhere although the cell itself is honest ground (just off the
+  village railings); the demand: a unit test + a webui runnable
+  acceptance test + a systemic fix + the why.
+- Root cause: the mesh link builder connects shared EDGES with both
+  side wall bits open; every axis neighbor of the cell carries a
+  railing wall bit, the cell is a linkless one polygon island (the
+  link flood component size 1), the corridor search answers the bare
+  not found for every destination while the grid engine plans out of
+  the same cell (the diagonal squeeze passes the server anti corner
+  cut rule and the click transport even accepts one sided wall
+  pairs).
+- Fix: the mesh pocket escape (navmesh/pocket.go - the bounded
+  component flood, the priced boundary scan, the deep exit aim) + the
+  navigator transport refinement (the 30 degree ValidateClick sweep
+  at 224 units, the grid surface height) + the Route.PocketEscape
+  flag; the walk-what-you-can partial contract serves the answer end
+  to end, the next plan cycle routes from the exit ground.
+- Reproductions: navmesh/pocket_test.go (the synthetic pocket, the
+  water pricing, the wide component pin, the live pack repro),
+  hunt/railing_pocket_repro_test.go (the end to end walk out to the
+  hunting zone) and the acceptance "railing-pocket" scenario (temp12,
+  the webui run button, the 256 unit / two minute contract).
+- Gates: `go test -count=1 ./...` every package ok, golangci-lint 0
+  issues, the whitespace gate green. The mobius server untouched.

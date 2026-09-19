@@ -607,6 +607,22 @@ engine answered.
   freeze reports the grid bans come from - one report, two engines,
   the same detour.
 
+- **The pocket escape answers the walk out of a stranded start (the
+  railing pocket round)**: a start whose link component is a small
+  isolated spot (the railing geometry walls every axis neighbor -
+  the edge-only link graph holds the cell as a linkless one polygon
+  island while the server movement channels walk its diagonal
+  squeeze) answers a single waypoint Partial with the
+  `Route.PocketEscape` flag: the closest connected ground outside
+  the component (water priced 8x, foreign bans 4x), carried deep
+  into that ground past the wide arrival slack of the walk follower
+  and snapped onto the real surface. The navigator refines the
+  direction through its click validation port (the 30 degree sweep
+  at the transport distance - the grid names the deliverable
+  direction the strict link graph cannot know). The flood is bounded
+  by the component bounding box (pocketMaxSide), so wide honest
+  ground - sealed yards, whole islands - keeps the plain answers.
+
 The runtime wiring (cmd/swarm/main.go): the `-navmesh` flag names the
 tile directory explicitly, the empty value autodetects
 `data/navmesh` (the documented output of the build command); a

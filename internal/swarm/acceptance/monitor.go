@@ -42,6 +42,11 @@ const (
 // The village escape condition id.
 const checkEscape = "escape"
 
+// checkPocketEscape is the single check of the railing pocket
+// scenario: the character stands beyond the pocket radius from the
+// spawn cell (the walk out of the linkless deck cell happened).
+const checkPocketEscape = "pocket-escape"
+
 // The full dress condition ids.
 const (
     checkDress = "dress"

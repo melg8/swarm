@@ -30,6 +30,8 @@ const (
     dressPassword  = "temp11"
     escapeAccount  = "temp10"
     escapePassword = "temp10"
+    pocketAccount  = "temp12"
+    pocketPassword = "temp12"
 )
 
 // Scenario timeouts: the farm readiness runs the one town visit
@@ -163,6 +165,37 @@ func Definitions() []TestDef {
                 "hunt/corridor_widen_repro_test.go and " +
                 "hunt/refusal_signal_repro_test.go).",
             Scenario: villageEscapeScenario,
+        },
+        {
+            ID:      "railing-pocket",
+            Title:   "railing pocket · the mesh island cell",
+            Account: pocketAccount,
+            Timeout: railingPocketTimeout,
+            Description: "Start: the elven fighter temp12 wakes at the " +
+                "reported route cell of the 2026-09-19 report (43736 " +
+                "47048 -2992, the elven village deck cell just off the " +
+                "railings) as a level 15 fighter with the standard " +
+                "dump outfit. The cell itself is honest ground - the " +
+                "server walks clicks in and out of it and the grid " +
+                "engine plans out of it - but every axis neighbor " +
+                "carries a railing wall bit, so the mesh link graph " +
+                "(edge-only connections) holds it as a linkless one " +
+                "polygon island whose only way out is the diagonal " +
+                "squeeze the server's anti corner cut rule allows. " +
+                "Before the pocket escape every plan attempt from " +
+                "this cell answered the bare not found and the bot " +
+                "stood there forever. Flow: the walk plans the mesh " +
+                "pocket escape (the closest reachable route out of " +
+                "the stranded component), the follower clicks at the " +
+                "refined exit aim and the followup plan cycles route " +
+                "from the connected deck. Pass: the character stands " +
+                "256+ units from the pocket cell within two minutes " +
+                "of the world entry - on connected ground the " +
+                "planner routes from (the loop level reproduction " +
+                "lives in hunt/railing_pocket_repro_test.go, the " +
+                "mesh level one in " +
+                "pathfind/navmesh/pocket_test.go).",
+            Scenario: railingPocketScenario,
         },
         {
             ID:      classTransferScenarioID,
