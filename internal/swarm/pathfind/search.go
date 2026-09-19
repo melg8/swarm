@@ -30,9 +30,9 @@ const (
 // they exist (the elven village town trips crossed the whole lake
 // under the floating island before this cost existed).
 const (
-    // waterLevel is the water surface height; layers below it count
+    // WaterLevel is the water surface height; layers below it count
     // as underwater.
-    waterLevel = int16(-3780)
+    WaterLevel = int16(-3780)
     // waterCostMultiplier scales the step cost of every move landing
     // on an underwater cell: the measured run/swim speed ratio of the
     // C1 server (the player templates carry the run speeds 115..125
@@ -106,13 +106,6 @@ type search struct {
     // this 3D distance of targetWorld. Zero keeps the plain cell
     // arrival semantics (any layer of the target cell).
     approachRadius float64
-    // dry blocks every step onto an underwater cell: the shore
-    // walks of the hunt loop (the town trips, the deleveling, the
-    // zone returns) must never plan a swim - the click guard of the
-    // walker refuses wet legs, so a wet plan burns the re-path
-    // budget on identical refused routes and aborts (the delevel
-    // water loop of the 2026-09-10 state dump).
-    dry bool
     // avoid holds the world patches this search must route around
     // (the frozen-cell ban of the hunt loop recovery): a step onto a
     // banned cell costs impassable, so the A* detours around the
@@ -161,7 +154,6 @@ func newSearch(engine *Engine, maxPassableHeight uint16) *search {
         targetKey:         nodeKey{p: Point{X: 0, Y: 0}, h: 0},
         targetWorld:       Vec3{X: 0, Y: 0, Z: 0},
         approachRadius:    0,
-        dry:               false,
         avoid:             nil,
         escapeIdx:         -1,
         startWorld:        Vec3{X: 0, Y: 0, Z: 0},
@@ -406,7 +398,7 @@ func (s *search) directLineDry(direct []*node) bool {
         if !s.canStep(direct[i], direct[i+1]) {
             return false
         }
-        if direct[i+1].layer.Height < waterLevel {
+        if direct[i+1].layer.Height < WaterLevel {
             return false
         }
     }
@@ -415,12 +407,12 @@ func (s *search) directLineDry(direct []*node) bool {
 }
 
 // dryLine reports whether the whole raster line between two nodes
-// stays above the water level - the strict form the click guard uses:
-// a line that touches a lake or sea bed anywhere is wet, whatever
-// its endpoints stand on.
+// stays above the water level - the strict form the WaterCrossed
+// raster of the engine serves: a line that touches a lake or sea bed
+// anywhere is wet, whatever its endpoints stand on.
 func (s *search) dryLine(from, to *node) bool {
     for _, step := range s.straightPath(from, to) {
-        if step.layer.Height < waterLevel {
+        if step.layer.Height < WaterLevel {
             return false
         }
     }
@@ -434,13 +426,14 @@ func (s *search) dryLine(from, to *node) bool {
 // blind - it only asks the line of sight - and the line of sight
 // happily crosses a lake bed whose shores step within the passable
 // height, so without this rule the smoothed path fords bays the cost
-// aware search routed around and hands the walker water crossing
-// legs (the elven village lake sent the town trips swimming). A leg
-// that starts or ends in the water is exempt: it belongs to the swim
-// escape of a character that already stands in a lake, and the water
-// is the only surface such a walk can use.
+// aware search priced out and hands the walker water crossing legs
+// the plan never priced (the elven village lake sent the town trips
+// swimming). A leg that starts or ends in the water is exempt: it
+// belongs to a crossing the search itself priced (or the swim escape
+// of a character that already stands in a lake), and the water is the
+// only surface such a walk can use.
 func (s *search) legDry(from, to *node) bool {
-    if from.layer.Height < waterLevel || to.layer.Height < waterLevel {
+    if from.layer.Height < WaterLevel || to.layer.Height < WaterLevel {
         return true
     }
 
@@ -493,7 +486,7 @@ func (s *search) runEscape(start Vec3) (*Result, error) {
         OpenLeft:  0,
         Length:    0,
     }
-    if from.layer.Height >= waterLevel {
+    if from.layer.Height >= WaterLevel {
         return result, nil
     }
     raw := s.escape(from)
@@ -527,7 +520,7 @@ func (s *search) escape(from *node) []*node {
     for len(queue) > 0 {
         current := queue[0]
         queue = queue[1:]
-        if current.layer.Height >= waterLevel {
+        if current.layer.Height >= WaterLevel {
             return s.reconstruct(current)
         }
         if s.explored >= MaxSearchExpansions {
@@ -591,15 +584,12 @@ func (s *search) costTo(current, next *node, ring []*node) float32 {
         current.coords.Y != next.coords.Y {
         cost = diagonalScore
     }
-    if next.layer.Height < waterLevel {
-        if s.dry {
-            // The dry searches treat the water as a wall: a
-            // shore walk with a wet leg is a plan the click
-            // guard refuses before it is ever sent.
-            return impassableScore
-        }
+    if next.layer.Height < WaterLevel {
         // The step lands underwater: swimming costs several land
-        // steps, so bridges and shores beat water crossings.
+        // steps (the run/swim speed ratio), so bridges and shores
+        // beat water crossings unless the water cut is the genuinely
+        // faster walk - the plan may swim, the slowdown priced (the
+        // 2026-09-19 round retired the walled form of the water).
         cost *= waterCostMultiplier
     }
     if escape {

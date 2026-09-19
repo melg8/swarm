@@ -70,6 +70,7 @@ func ApplyDump(bot *state.Bot, snap state.Snapshot) {
             Points: snap.WalkPath,
             Index:  snap.WalkIndex,
             Dest:   snap.WalkDest,
+            Search: snap.WalkSearch,
         })
     } else if len(snap.LastWalkPath) > 0 {
         // The dump carried only the last plan (the walk ended before
@@ -80,6 +81,7 @@ func ApplyDump(bot *state.Bot, snap state.Snapshot) {
             Points: snap.LastWalkPath,
             Index:  snap.LastWalkIndex,
             Dest:   snap.LastWalkDest,
+            Search: snap.LastWalkSearch,
         })
     }
     for _, ev := range snap.Events {
@@ -680,17 +682,16 @@ func (p *dumpParser) parseWalkPlan(header string, last bool) error {
 }
 
 // parseWalkPlanSearch reads the search word of the walk plan header
-// ("N waypoints, dry, aiming..." vs "N waypoints, aiming..."): the
-// mesh filter the plan answers, nil for the direct legs no mesh
-// search produced (the header names no word).
+// ("N waypoints, mesh, aiming..." vs "N waypoints, aiming..."): the
+// marker of a plan some mesh search produced, nil for the direct legs
+// no mesh search produced (the header names no word). The approach
+// radius and the ban circles ride the "search ..." line (see
+// parseWalkSearchLine).
 func parseWalkPlanSearch(header string) *state.WalkSearch {
     middle := takeBefore(takeAfter(header, "waypoints"),
         "aiming at wp")
-    switch {
-    case strings.Contains(middle, "dry"):
-        return &state.WalkSearch{Dry: true}
-    case strings.Contains(middle, "swim"):
-        return &state.WalkSearch{Dry: false}
+    if strings.Contains(middle, "mesh") {
+        return &state.WalkSearch{Approach: 0, Avoid: nil}
     }
 
     return nil

@@ -1387,24 +1387,22 @@ type WalkPlan struct {
     // itself carries it.
     Dest *WalkPoint `json:"dest"`
     // Search carries the mesh search contract the plan answers (the
-    // repro contract of the 3D pathfind link): the filter, the
-    // approach radius and the ban circles the search ran with. Nil
-    // for the plans no mesh search produced (the direct server
-    // routed legs) - the link then keeps the viewer defaults.
+    // repro contract of the 3D pathfind link): the approach radius
+    // and the ban circles the search ran with. Nil for the plans no
+    // mesh search produced (the direct server routed legs) - the
+    // link then keeps the viewer defaults.
     Search *WalkSearch `json:"search,omitempty"`
 }
 
 // WalkSearch is the mesh search contract behind a walk plan: the
 // exact parameters a replay of the search needs (the 2026-09-19
 // route mismatch round: the web viewer rebuilt the bot's walk with
-// the swim filter, the exact destination and no bans, and folded
-// the answer with a water blind grid pass - the drawn route had
-// nothing in common with the walk the bot follows).
+// the exact destination and no bans, and folded the answer with a
+// water blind grid pass - the drawn route had nothing in common with
+// the walk the bot follows). The water pricing needs no contract
+// word: every search of this round prices the water at the swim
+// rate, there is no walled form to name.
 type WalkSearch struct {
-    // Dry walls the water polygons off (the zone return dry leg);
-    // false prices the water at the swim rate instead (the manual
-    // walks, the mesh default).
-    Dry bool `json:"dry"`
     // Approach is the approach radius of the search: the search
     // succeeds on the first polygon whose surface sits within the
     // radius of the destination (the trip searches plan with 200),
@@ -1575,8 +1573,7 @@ func walkPlansEqual(a, b WalkPlan) bool {
 // walkSearchesEqual compares two search contracts field by field,
 // the ban circles element wise.
 func walkSearchesEqual(a, b WalkSearch) bool {
-    if a.Dry != b.Dry || a.Approach != b.Approach ||
-        len(a.Avoid) != len(b.Avoid) {
+    if a.Approach != b.Approach || len(a.Avoid) != len(b.Avoid) {
         return false
     }
     for i := range a.Avoid {

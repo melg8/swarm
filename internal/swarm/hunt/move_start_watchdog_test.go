@@ -62,7 +62,7 @@ func TestMoveStartWatchdogForcesTheRecovery(t *testing.T) {
     now := time.Now()
     _, _, selfZ, _ := bot.SelfPosition()
     _ = loop.followWaypoints(
-        reproFastStuckX, reproFastStuckY, selfZ, now, true)
+        reproFastStuckX, reproFastStuckY, selfZ, now)
     require.False(t, loop.moveAt.IsZero(),
         "the first click went out")
 
@@ -71,7 +71,7 @@ func TestMoveStartWatchdogForcesTheRecovery(t *testing.T) {
     // fires without waiting the full stuckTimeout.
     now = now.Add(moveStartWindow + time.Second)
     _ = loop.followWaypoints(
-        reproFastStuckX, reproFastStuckY, selfZ, now, true)
+        reproFastStuckX, reproFastStuckY, selfZ, now)
     require.Equal(t, 1, loop.rePaths,
         "the watchdog forced the re-path on the first dead click")
     require.Less(t, moveStartWindow+time.Second, stuckTimeout,
@@ -108,7 +108,7 @@ func TestPocketRefusalArmsTheCursorEscapeAtOnce(t *testing.T) {
     now := time.Now()
     _, _, selfZ, _ := bot.SelfPosition()
     _ = loop.followWaypoints(
-        reproFastStuckX, reproFastStuckY, selfZ, now, true)
+        reproFastStuckX, reproFastStuckY, selfZ, now)
     bot.ApplyActionFailed(now.Add(time.Millisecond))
     require.NotEmpty(t, game.walks, "the click went out")
 
@@ -118,7 +118,7 @@ func TestPocketRefusalArmsTheCursorEscapeAtOnce(t *testing.T) {
     now = now.Add(moveStartWindow + time.Second)
     for i := range refusalVariantsMax {
         _ = loop.followWaypoints(
-            reproFastStuckX, reproFastStuckY, selfZ, now, true)
+            reproFastStuckX, reproFastStuckY, selfZ, now)
         bot.ApplyActionFailed(now.Add(time.Millisecond))
         now = now.Add(moveStartWindow + time.Second)
         require.Len(t, game.walks, i+2,
@@ -126,7 +126,7 @@ func TestPocketRefusalArmsTheCursorEscapeAtOnce(t *testing.T) {
             i+1)
     }
     _ = loop.followWaypoints(
-        reproFastStuckX, reproFastStuckY, selfZ, now, true)
+        reproFastStuckX, reproFastStuckY, selfZ, now)
     require.Equal(t, 1, loop.cursorEscapes,
         "the refusing pocket armed the cursor key escape once the "+
             "varied aims proved useless")

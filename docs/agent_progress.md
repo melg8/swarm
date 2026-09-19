@@ -1224,3 +1224,46 @@ three independent defects, all fixed in one round:
 - Final verification after the fixes: `go test -count=1 ./...`
   answers 28 packages ok, zero failures, the whitespace gate and
   the uncapped lint green.
+
+## Active task: the priced water - the walled form retires, the bot plans through the water objects (2026-09-19)
+
+Started: 2026-09-19. Branch: `feature/new-pathfind-alternative`.
+Commits as melg8. Other agents may push to the same branch
+concurrently - rebase before every push.
+
+### Goal
+
+The owner directive ("в коде кажется остались устаревшие способы - не
+должно сохраняться filter=swim - бот должен рассчитывать путь и через
+водные объекты, просто с корректными замедлениями - в воде плыть
+медленней чем бежать"): the dry/swim filter dichotomy is the
+outdated way. One search remains - the water is a price (the
+run/swim ratio 2.3), never a wall - and the walker walks the wet
+legs the plan carries.
+### The round (the full analysis is Round 90 of the development log)
+- `navmesh`: `AllowWater`, `DryFilter`, `RouteDry` deleted;
+  `DefaultFilter` is the one priced search (the escape keeps its 8x
+  water price).
+- The grid engine: `search.dry`, `FindPathApproachDry(+-Avoiding)`,
+  `DryLine` deleted; the pricing, the direct line dry gate and the
+  `legDry` smoothing stay (they ARE the pricing honesty).
+- The hunt loop: one priced search everywhere (`startWalkLegSearch`
+  without the non-dry switch, the shop escalation and the zone
+  return fallback ladder deleted); the click water guard retired
+  (`clickWouldEnterWater`, `shortenWetHop`, the wet variant skip,
+  the extension water gate); the escape gate reads the plan's intent
+  (the aim waypoint below `pathfind.WaterLevel` and ahead of the
+  character keeps the swim walking).
+- The web: the viewer filter select, the `filter` URL param, the
+  POST field and the response word gone; the links carry
+  `approach`/`avoid`/`fold=0` only; the dump header names `mesh`;
+  `ApplyDump` restores the search contract into the replayed plan.
+- The state wire: `WalkSearch.Dry` deleted
+  (`{"approach":...,"avoid":[...]}`).
+
+### Progress
+- Round 90 lands as one commit: the two engines, the hunt loop, the
+  webserver handler, the viewer and the HUD, the dump writer and
+  parser, the state wire, the pricing pins (the wide band swims, the
+  narrow band detours - whole flat block worlds, the per cell setCell
+  pillar artifact documented), the escape gate pin, the docs rounds.

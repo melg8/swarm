@@ -144,15 +144,6 @@ func TestRealRegionBridgePair(t *testing.T) {
         len(route.Corridor), len(route.Waypoints),
         time.Since(started).Microseconds(), route.Explored)
 
-    // The dry filter: the honest partial with the closest dry point.
-    dry, err := mesh.RouteDry(village, under)
-    require.NoError(t, err)
-    require.False(t, dry.Found)
-    require.True(t, dry.Partial)
-    last := dry.Waypoints[len(dry.Waypoints)-1]
-    require.GreaterOrEqual(t, last.Z, float64(-3780),
-        "the dry partial must end on dry ground")
-
     // The reverse escape: from the water back onto the dry ground.
     escape, err := mesh.WaterEscape(under)
     require.NoError(t, err)

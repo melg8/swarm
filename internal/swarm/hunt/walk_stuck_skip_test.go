@@ -201,7 +201,7 @@ func TestWalkStuckAbortsAfterMaxRePaths(t *testing.T) {
 
             continue
         }
-        if loop.followWaypoints(x, y, z, now, true) {
+        if loop.followWaypoints(x, y, z, now) {
             break
         }
     }

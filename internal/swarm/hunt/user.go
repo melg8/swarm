@@ -475,11 +475,11 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     }
     l.userWaypoints = result.Waypoints
     l.userWpIndex = 0
-    // The manual plan publishes its search contract (the swim filter
-    // with the user approach radius, no bans): the 3D pathfind link
-    // rebuilds the very search instead of a lookalike.
-    l.userSearch = &state.WalkSearch{Dry: false,
-        Approach: userApproachRadius}
+    // The manual plan publishes its search contract (the user
+    // approach radius, no bans): the 3D pathfind link rebuilds the
+    // very search instead of a lookalike.
+    l.userSearch = &state.WalkSearch{Approach: userApproachRadius,
+        Avoid: nil}
     // The manual walk plan opens with the same frame measurement as
     // every fresh plan (see click_frame.go): the route's first
     // waypoint is the character's own cell resolved on the pack, its

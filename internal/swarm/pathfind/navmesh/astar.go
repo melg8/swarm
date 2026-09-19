@@ -538,8 +538,6 @@ func (m *Mesh) astar(
 // context walls the links onto banned polygons and prices the escape
 // polygons of the ban holding the start (the recovery ban rules of
 // the grid costTo - the rectangle granularity form, see avoid.go).
-//
-//nolint:cyclop // the astar expansion dispatches per neighbor kind
 func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
     endPos Pos, filter Filter, avoid avoidCtx, allow *confinedSet,
 ) {
@@ -554,9 +552,6 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
         li = link.Next
         targetRef, targetTile, targetPoly := m.linkTarget(tile, link)
         if targetTile == nil {
-            continue
-        }
-        if !filter.AllowWater && targetPoly.Area == AreaWater {
             continue
         }
         if allow != nil && !allow.allows(

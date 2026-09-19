@@ -194,7 +194,7 @@ func TestReproRound58ReturnLegResetsFrozenRepath(t *testing.T) {
     // of aborting: the inherited frozen cell is gone.
     selfX, selfY, selfZ, ok := bot.SelfPosition()
     require.True(t, ok)
-    require.False(t, loop.followWaypoints(selfX, selfY, selfZ, time.Now(), true),
+    require.False(t, loop.followWaypoints(selfX, selfY, selfZ, time.Now()),
         "the leg is not finished after one refused click")
     require.Equal(t, 1, loop.rePaths,
         "the refused click spent one ordinary re-path")

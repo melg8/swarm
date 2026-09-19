@@ -380,12 +380,12 @@ func (l *Loop) followPlannedSegment(
     dest := pathfind.Vec3{
         X: float64(segX), Y: float64(segY), Z: float64(selfZ),
     }
-    result, err := l.navigator.FindPathApproachDryAvoiding(
+    result, err := l.navigator.FindPathApproachAvoiding(
         from, dest, questArriveRadius, l.frozenAreas)
     if err != nil || result == nil || len(result.Waypoints) == 0 {
         return false
     }
-    // The partial round (docs/navmesh.md): a segment the dry search
+    // The partial round (docs/navmesh.md): a segment the search
     // cannot complete still walks its closest reachable waypoints -
     // the loop re-plans from wherever the corridor ends, so the
     // quest route keeps making ground instead of dropping to the
@@ -401,7 +401,7 @@ func (l *Loop) followPlannedSegment(
     frameOffset := measureFrameOffset(selfZ, waypoints[0].Z)
     if partial {
         l.logf("quest: walking a partial segment toward (%d, %d), "+
-            "the closest reachable dry point is %d waypoints ahead",
+            "the closest reachable point is %d waypoints ahead",
             segX, segY, len(waypoints))
     } else {
         l.logf("quest: walking a planned segment to (%d, %d) through "+

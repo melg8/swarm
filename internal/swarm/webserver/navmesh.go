@@ -123,9 +123,8 @@ type navmeshPoint struct {
 
 // navmeshPathRequest is the body of POST /api/navmesh/path.
 type navmeshPathRequest struct {
-    Start  navmeshPoint `json:"start"`
-    End    navmeshPoint `json:"end"`
-    Filter string       `json:"filter"`
+    Start navmeshPoint `json:"start"`
+    End   navmeshPoint `json:"end"`
     // Approach is the approach radius of the search (the plan repro
     // contract): a positive value succeeds on the first polygon whose
     // surface sits within the radius of the end (the bot trip
@@ -169,7 +168,6 @@ type navmeshPathResponse struct {
     DurationMs   float64        `json:"durationMs"`
     Explored     int            `json:"explored"`
     Corridor     int            `json:"corridor"`
-    Filter       string         `json:"filter"`
 }
 
 // handleNavmeshConfig answers the mode and the tile listing of the
@@ -295,17 +293,13 @@ func (s *Server) handleNavmeshOriginal(w http.ResponseWriter,
     _, _ = w.Write(payload)
 }
 
-// filterNameDry is the wire word the dump header and the pathfind
-// link carry for the dry (water sealed) mesh search.
-const filterNameDry = "dry"
-
 // handleNavmeshPath runs one corridor search of the mesh between the
 // two double clicked points (the exact destination, the fold pipeline)
 // or one plan repro search of a pathfind link (the approach radius,
 // the ban circles, the raw answer), and measures the construction
 // time.
 //
-//nolint:funlen,cyclop // the handler mirrors the validation steps in order
+//nolint:funlen // the handler mirrors the validation steps in order
 func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     body, err := io.ReadAll(io.LimitReader(r.Body, navmeshPathBodyLimit))
     if err != nil {
@@ -319,16 +313,16 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
 
         return
     }
-    filter, filterName := navmesh.DryFilter(), filterNameDry
-    if request.Filter != filterNameDry {
-        filter, filterName = navmesh.DefaultFilter(), "swim"
-        // The swim pricing follows the server water zone data: the
-        // water polygons a C1 WaterZone cuboid covers swim at the
-        // run/swim speed ratio, the river beds the zone data omits
-        // walk at the plain land rate (the zone data, not the depth,
-        // prices the swim).
-        filter.WaterZones = navmesh.C1WaterZones()
-    }
+    // The priced search: the water polygons stay walkable at the
+    // swim rate (the run/swim speed ratio - swimming is slower than
+    // running), so a crossing competes with the land detours on the
+    // honest travel time. The pricing follows the server water zone
+    // data: the water polygons a C1 WaterZone cuboid covers swim at
+    // the ratio, the river beds the zone data omits walk at the
+    // plain land rate (the zone data, not the depth, prices the
+    // swim).
+    filter := navmesh.DefaultFilter()
+    filter.WaterZones = navmesh.C1WaterZones()
     clearance := 0.0
     if s.navmeshEngine != nil {
         clearance = s.navmeshEngine.CapsuleRadius()
@@ -364,12 +358,12 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     // in the duration field): the cold request pays the tile decode,
     // the repeat answers from the resident mesh.
     if err != nil {
-        s.logger.Printf("Navmesh route (%s): failed in %.1f ms: %v",
-            filterName, float64(duration.Nanoseconds())/1e6, err)
+        s.logger.Printf("Navmesh route: failed in %.1f ms: %v",
+            float64(duration.Nanoseconds())/1e6, err)
     } else {
         if route == nil {
-            s.logger.Printf("Navmesh route (%s): no path in %.1f ms",
-                filterName, float64(duration.Nanoseconds())/1e6)
+            s.logger.Printf("Navmesh route: no path in %.1f ms",
+                float64(duration.Nanoseconds())/1e6)
         } else {
             status := "no path"
             switch {
@@ -378,8 +372,8 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
             case route.Partial:
                 status = "partial"
             }
-            s.logger.Printf("Navmesh route (%s): %s in %.1f ms - "+
-                "%d waypoints, %d regions", filterName, status,
+            s.logger.Printf("Navmesh route: %s in %.1f ms - "+
+                "%d waypoints, %d regions", status,
                 float64(duration.Nanoseconds())/1e6,
                 len(route.Waypoints), len(route.Corridor))
         }
@@ -394,7 +388,6 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         DurationMs:   float64(duration.Nanoseconds()) / 1e6,
         Explored:     0,
         Corridor:     0,
-        Filter:       filterName,
     }
     if err != nil {
         response.Error = err.Error()

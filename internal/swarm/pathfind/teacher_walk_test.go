@@ -52,7 +52,7 @@ var teacherPlaza = Vec3{X: 45992, Y: 52040, Z: -2792}
 func TestTeacherRouteMatchesTheDumpPlan(t *testing.T) {
     engine := townTestEngine(t)
 
-    result, err := engine.FindPathApproachDry(
+    result, err := engine.FindPathApproach(
         teacherShopStart, teacherSpawn, 200, DefaultMaxPassableHeight)
     require.NoError(t, err)
     require.True(t, result.Found, "the dry route to the teacher exists")
@@ -151,7 +151,7 @@ func TestTeacherCornerWallBlocksTheStraightClick(t *testing.T) {
 func TestTeacherReplanFromTheStuckCorner(t *testing.T) {
     engine := townTestEngine(t)
 
-    result, err := engine.FindPathApproachDry(
+    result, err := engine.FindPathApproach(
         teacherStuck, teacherSpawn, 200, DefaultMaxPassableHeight)
     require.NoError(t, err)
     require.True(t, result.Found,

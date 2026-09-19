@@ -103,7 +103,7 @@ func TestStuckRepathArmsFastWindow(t *testing.T) {
     now := time.Now()
     _, _, selfZ, _ := bot.SelfPosition()
     _ = loop.followWaypoints(
-        reproFastStuckX, reproFastStuckY, selfZ, now, true)
+        reproFastStuckX, reproFastStuckY, selfZ, now)
     require.False(t, loop.stuckFast,
         "the first click did not arm the fast stuck window")
     require.False(t, loop.stuckAt.IsZero(),
@@ -118,7 +118,7 @@ func TestStuckRepathArmsFastWindow(t *testing.T) {
     now = now.Add(stuckTimeout + time.Second)
     loop.moveAt = time.Time{}
     _ = loop.followWaypoints(
-        reproFastStuckX, reproFastStuckY, selfZ, now, true)
+        reproFastStuckX, reproFastStuckY, selfZ, now)
     require.Equal(t, 1, loop.rePaths,
         "the first stuck fired the re-path (1 of 3)")
     // The fix: the re-path arm sets stuckFast, the same way the
@@ -135,7 +135,7 @@ func TestStuckRepathArmsFastWindow(t *testing.T) {
     now = now.Add(stuckFastTimeout + time.Second)
     loop.moveAt = time.Time{}
     _ = loop.followWaypoints(
-        reproFastStuckX, reproFastStuckY, selfZ, now, true)
+        reproFastStuckX, reproFastStuckY, selfZ, now)
     // The detection fired on the fast window, 4s after the first
     // re-path, NOT 15s.
     detectionGap := now.Sub(fastAt)
@@ -186,7 +186,7 @@ func TestStuckSkipWaypointStillArmsFastWindow(t *testing.T) {
     now := time.Now()
     _, _, selfZ, _ := bot.SelfPosition()
     _ = loop.followWaypoints(
-        reproFastStuckX, reproFastStuckY, selfZ, now, true)
+        reproFastStuckX, reproFastStuckY, selfZ, now)
 
     // Advance past the full stuckTimeout: the first stuck detection
     // finds wp2 as a clear successor (nextClearWaypoint jumps the
@@ -194,7 +194,7 @@ func TestStuckSkipWaypointStillArmsFastWindow(t *testing.T) {
     now = now.Add(stuckTimeout + time.Second)
     loop.moveAt = time.Time{}
     _ = loop.followWaypoints(
-        reproFastStuckX, reproFastStuckY, selfZ, now, true)
+        reproFastStuckX, reproFastStuckY, selfZ, now)
     require.Equal(t, 1, loop.wpIndex,
         "the skip jumped the cursor onto wp2")
     require.True(t, loop.stuckFast,
@@ -204,7 +204,7 @@ func TestStuckSkipWaypointStillArmsFastWindow(t *testing.T) {
     now = now.Add(stuckFastTimeout + time.Second)
     loop.moveAt = time.Time{}
     _ = loop.followWaypoints(
-        reproFastStuckX, reproFastStuckY, selfZ, now, true)
+        reproFastStuckX, reproFastStuckY, selfZ, now)
     require.Equal(t, 2, loop.wpIndex,
         "the fast window fired the next detection")
 }
@@ -252,7 +252,7 @@ func TestStuckRepathRebaselinesStuckWindow(t *testing.T) {
     _, _, selfZ, _ := bot.SelfPosition()
     rePathAt := time.Now()
     _ = loop.followWaypoints(
-        reproFastStuckX, reproFastStuckY, selfZ, rePathAt, true)
+        reproFastStuckX, reproFastStuckY, selfZ, rePathAt)
     require.Equal(t, 1, loop.rePaths,
         "the first stuck fired the re-path")
 

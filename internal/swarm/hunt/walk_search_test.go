@@ -6,11 +6,10 @@ package hunt
 
 // The repro contract of the 3D pathfind link (the 2026-09-19 route
 // mismatch round): every published walk plan carries the mesh search
-// contract it answered - the filter, the approach radius and the ban
-// circles - so the viewer rebuilds the very search the bot walks
-// instead of a lookalike (the dry zone return rebuilt with the swim
-// filter and folded into a straight water blind chord drew a route
-// the bot never walked).
+// contract it answered - the approach radius and the ban circles - so
+// the viewer rebuilds the very search the bot walks instead of a
+// lookalike. The water pricing needs no contract word: every search
+// prices the water at the swim rate, there is no walled form to name.
 
 import (
     "testing"
@@ -20,11 +19,11 @@ import (
     "github.com/stretchr/testify/require"
 )
 
-// TestZoneReturnPlanCarriesDrySearchContract pins the zone return
-// stamp: the planned return leg publishes the dry filter with the
-// trip approach radius - the viewer replay of the link rebuilds the
-// dry approach search, not the swim exact lookalike.
-func TestZoneReturnPlanCarriesDrySearchContract(t *testing.T) {
+// TestZoneReturnPlanCarriesSearchContract pins the zone return stamp:
+// the planned return leg publishes the search contract with the trip
+// approach radius - the viewer replay of the link rebuilds the priced
+// approach search, not the exact destination lookalike.
+func TestZoneReturnPlanCarriesSearchContract(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     game.noTargets = true
@@ -46,18 +45,16 @@ func TestZoneReturnPlanCarriesDrySearchContract(t *testing.T) {
     require.NotNil(t, plan)
     require.NotNil(t, plan.Search,
         "the mesh plan publishes its search contract")
-    require.True(t, plan.Search.Dry,
-        "the zone return plans the dry search first")
     require.InDelta(t, tripApproachRadius, plan.Search.Approach, 0.01)
     require.Empty(t, plan.Search.Avoid,
         "the clean session carries no ban circles")
 }
 
-// TestManualMeshPlanCarriesSwimSearchContract pins the manual move
-// stamp: the mesh planned user walk publishes the swim filter with
-// the user approach radius, so the link rebuilds the manual walk the
+// TestManualMeshPlanCarriesSearchContract pins the manual move stamp:
+// the mesh planned user walk publishes the search contract with the
+// user approach radius, so the link rebuilds the manual walk the
 // follower walks.
-func TestManualMeshPlanCarriesSwimSearchContract(t *testing.T) {
+func TestManualMeshPlanCarriesSearchContract(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     game.noTargets = true
@@ -78,7 +75,5 @@ func TestManualMeshPlanCarriesSwimSearchContract(t *testing.T) {
     plan := loop.activeWalkPlan()
     require.NotNil(t, plan)
     require.NotNil(t, plan.Search)
-    require.False(t, plan.Search.Dry,
-        "the manual walk plans the swim search")
     require.InDelta(t, userApproachRadius, plan.Search.Approach, 0.01)
 }

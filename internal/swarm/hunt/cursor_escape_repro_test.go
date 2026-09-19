@@ -204,7 +204,7 @@ func driveTownWalkTick(
 
         return false
     }
-    finished := loop.followWaypoints(x, y, z, now, true)
+    finished := loop.followWaypoints(x, y, z, now)
     if finished && endOnFinish {
         loop.endTownTrip("back at the farm spot")
     }

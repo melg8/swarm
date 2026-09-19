@@ -302,7 +302,7 @@ func TestReproCorridorWidenEscapesTheWalledApproach(t *testing.T) {
 
                 continue
             }
-            if loop.followWaypoints(x, y, z, now, true) {
+            if loop.followWaypoints(x, y, z, now) {
                 loop.endTownTrip("back at the farm spot")
 
                 break

@@ -48,66 +48,14 @@ func TestDelevelWaterAbortArmsCooldown(t *testing.T) {
     }
 }
 
-// TestDelevelWetBudgetAbortsIntoCooldown pins the composition with
-// the pure water raster of the click guard: wet click lines on a
-// planned delevel walk exhaust the budget and the deleveling aborts
-// into its cooldown - the guard fires on REAL water only (the plaza
-// height steps of the village ramps walk fine under the server
-// routing, the old line of sight half of the dry check misread them
-// as water), so a refused delevel click means a genuine lake and the
-// abort with the armed cooldown beats both the swim and the old
-// refuse-and-restart cycle.
-func TestDelevelWetBudgetAbortsIntoCooldown(t *testing.T) {
-    loop, game, _, nav := newDelevelLoop(11)
-    spawnZoneMobs(loop.tracker)
-    nav.wetLine = true
-
-    // The trigger tick burns the first re-path, three more exhaust
-    // the budget of 3 and abort the deleveling.
-    for range 4 {
-        loop.tick()
-    }
-    require.NotEqual(t, phaseDelevel, loop.phase,
-        "the exhausted wet budget aborts the deleveling")
-    require.False(t, loop.delevelCooldownOver(),
-        "the abort arms the delevel cooldown")
-    require.Empty(t, game.walks,
-        "no wet click line ever reached the server")
-
-    // The cooldown holds: no tick restarts the deleveling while it
-    // runs (the old loop re-entered the delevel phase every 1.3 s).
-    for range 8 {
-        loop.tick()
-        require.NotEqual(t, phaseDelevel, loop.phase,
-            "the deleveling must stay down while the cooldown runs")
-    }
-}
-
-// TestDelevelWetClicksNeverWalk pins the walk side of the same scene:
-// while the delevel walk fights the wet lines, not a single move
-// request goes to the server - the refused clicks re-path instead.
-func TestDelevelWetClicksNeverWalk(t *testing.T) {
-    loop, game, _, nav := newDelevelLoop(11)
-    spawnZoneMobs(loop.tracker)
-    nav.wetLine = true
-
-    for range 3 {
-        loop.tick()
-    }
-    require.Empty(t, game.walks,
-        "the wet click lines must never reach the server")
-    require.Equal(t, 3, loop.rePaths,
-        "every refused click counts against the re-path budget")
-}
-
 // TestDelevelDryMissAborts pins the planner side of the same scene: a
-// guard the dry search cannot reach aborts the deleveling at the
+// guard the search cannot reach aborts the deleveling at the
 // planning tick - the cooldown arms and the walk home starts, the
 // loop never enters the refuse-and-restart cycle.
 func TestDelevelDryMissAborts(t *testing.T) {
     loop, game, _, nav := newDelevelLoop(11)
     spawnZoneMobs(loop.tracker)
-    nav.dryMiss = true
+    nav.miss = true
 
     loop.tick()
     require.NotEqual(t, phaseDelevel, loop.phase,

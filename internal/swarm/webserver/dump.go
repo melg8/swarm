@@ -407,22 +407,19 @@ func writeDumpWalkPlan(b *strings.Builder, snap state.Snapshot) {
 
 // writeWalkPlanSection prints one walk plan section under the given
 // header prefix: the waypoint count with the search word of the mesh
-// contract the plan answers (dry walls the water, swim prices it -
-// the repro word the pathfind link replays the search with; no word
-// for the direct legs no mesh search produced), the follower cursor,
-// the planning origin, the walk zero point (the started line the
-// timing suffixes read against), every waypoint with the aimed one
-// emphasized and the final destination. The timing suffixes print
-// from the observed arrival times (the walkWpAt record): a passed
-// waypoint carries its moment on the walk timeline (t+) and the leg
-// duration from the previous waypoint (or the start), the aimed one
-// carries the time the walk already spends on it - the stuck leg
-// number. The last walk plan reads the same suffixes against the
-// moment the plan ended (the finished walk keeps the leg durations,
-// an unfinished one shows how long the follower sat on the waypoint
-// it never confirmed).
-//
-//nolint:cyclop // the section mirrors the plan states in order
+// contract the plan answers (a plan some mesh search produced names
+// the word, the direct legs no mesh search produced name nothing),
+// the follower cursor, the planning origin, the walk zero point (the
+// started line the timing suffixes read against), every waypoint with
+// the aimed one emphasized and the final destination. The timing
+// suffixes print from the observed arrival times (the walkWpAt
+// record): a passed waypoint carries its moment on the walk timeline
+// (t+) and the leg duration from the previous waypoint (or the
+// start), the aimed one carries the time the walk already spends on
+// it - the stuck leg number. The last walk plan reads the same
+// suffixes against the moment the plan ended (the finished walk keeps
+// the leg durations, an unfinished one shows how long the follower
+// sat on the waypoint it never confirmed).
 func writeWalkPlanSection(
     b *strings.Builder, headerPrefix string,
     path []state.WalkPoint, origin *state.WalkPoint, index int,
@@ -435,16 +432,12 @@ func writeWalkPlanSection(
         target = len(path) - 1
     }
     if search != nil {
-        filterWord := "swim"
-        if search.Dry {
-            filterWord = filterNameDry
-        }
-        fmt.Fprintf(b, "%s%d waypoints, %s, aiming at wp %d):\n",
-            headerPrefix, len(path), filterWord, target)
-        // The full search contract rides its own line: the filter
-        // word alone rebuilds a lookalike, the approach radius and
-        // the ban circles rebuild the very search (the paste a dump
-        // into the HUD flow restores the plan through the parser).
+        fmt.Fprintf(b, "%s%d waypoints, mesh, aiming at wp %d):\n",
+            headerPrefix, len(path), target)
+        // The full search contract rides its own line: the mesh word
+        // alone rebuilds a lookalike, the approach radius and the
+        // ban circles rebuild the very search (the paste a dump into
+        // the HUD flow restores the plan through the parser).
         fmt.Fprintf(b, "  search approach %.0f", search.Approach)
         if len(search.Avoid) > 0 {
             circles := make([]string, len(search.Avoid))

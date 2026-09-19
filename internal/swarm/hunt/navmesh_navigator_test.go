@@ -203,7 +203,7 @@ func TestNavmeshNavigatorBansReachMesh(t *testing.T) {
     end := pathfind.Vec3{X: 32768 + 400*16, Y: 32768 + 160*16, Z: 0}
 
     // Without the ban the mesh serves the east walk.
-    result, err := navigator.FindPathApproachDryAvoiding(start, end, 150,
+    result, err := navigator.FindPathApproachAvoiding(start, end, 150,
         nil)
     require.NoError(t, err)
     require.NotNil(t, result)
@@ -219,7 +219,7 @@ func TestNavmeshNavigatorBansReachMesh(t *testing.T) {
         },
         Radius: 600,
     }
-    result, err = navigator.FindPathApproachDryAvoiding(start, end, 150,
+    result, err = navigator.FindPathApproachAvoiding(start, end, 150,
         []pathfind.AvoidArea{ban})
     require.NoError(t, err)
     require.NotNil(t, result)
@@ -385,15 +385,15 @@ func shoreWorldMesh(t *testing.T) *navmesh.Mesh {
     return navmesh.NewMesh(dir)
 }
 
-// TestNavmeshNavigatorPartialServesClosestReachable pins the partial
-// round of the dry avoiding form: the destination sits on the water
-// polygon the dry filter walls, so the mesh answers the
-// closest-reachable corridor and the hybrid serves the partial
-// waypoints through Result.Partial instead of the bare abort (the
-// walk toward the shore the town legs can make). The engine run in
-// the premise is the documentary cross check of the same world - the
-// navigator itself never consults it.
-func TestNavmeshNavigatorPartialServesClosestReachable(t *testing.T) {
+// TestNavmeshNavigatorPricedSearchSwimsToWaterTargets pins the priced
+// round: the destination sits on the water polygon the search PRICES
+// (the swim rate, no walled form anywhere anymore), so the mesh
+// answers the full corridor through the water and the hybrid serves
+// the found waypoints - the plan may swim, the slowdown priced. The
+// engine run in the premise is the documentary cross check of the
+// same world - both engines agree on the priced answer, and the
+// navigator itself never consults the engine.
+func TestNavmeshNavigatorPricedSearchSwimsToWaterTargets(t *testing.T) {
     mesh := shoreWorldMesh(t)
     geodataDir := t.TempDir()
     huntFlatRegion(t, geodataDir, 40, -3770, -3800)
@@ -408,33 +408,31 @@ func TestNavmeshNavigatorPartialServesClosestReachable(t *testing.T) {
         X: huntWorldOf(400), Y: huntWorldOf(160), Z: -3800,
     }
 
-    // The premise: the engine over the same world answers the clean
-    // not found for the swim-only destination.
-    engineResult, err := engine.FindPathApproachDryAvoiding(
+    // The premise: the engine over the same world prices the water
+    // too - the swim-only destination is reached through it.
+    engineResult, err := engine.FindPathApproachAvoiding(
         start, end, 150, engine.MaxPassableHeight(), nil)
     require.NoError(t, err)
     require.NotNil(t, engineResult)
-    require.False(t, engineResult.Found)
+    require.True(t, engineResult.Found)
 
-    // The hybrid serves the mesh partial corridor: the walk ends at
-    // the closest reachable dry point.
-    result, err := navigator.FindPathApproachDryAvoiding(
+    // The hybrid serves the mesh corridor through the water band: the
+    // walk ends on the destination polygon, the wet legs priced at
+    // the swim rate.
+    result, err := navigator.FindPathApproachAvoiding(
         start, end, 150, nil)
     require.NoError(t, err)
     require.NotNil(t, result)
-    require.False(t, result.Found)
-    require.True(t, result.Partial)
+    require.True(t, result.Found)
+    require.False(t, result.Partial)
     require.NotEmpty(t, result.Waypoints)
     require.GreaterOrEqual(t, len(result.Waypoints), 2)
-    // The corridor stays dry: every waypoint stands above the water
-    // level, the last one is the shore border of the band B.
-    for i, wp := range result.Waypoints {
-        require.GreaterOrEqual(t, wp.Z, -3780.0,
-            "partial waypoint %d must stay dry", i)
-    }
+    // The corridor crosses the water band: the last waypoint stands
+    // on the bed under the C1 water level.
     last := result.Waypoints[len(result.Waypoints)-1]
-    require.InDelta(t, huntWorldOf(320), last.X, 1.0)
-    require.InDelta(t, huntWorldOf(160), last.Y, 64.0)
+    require.InDelta(t, huntWorldOf(400), last.X, 64.0)
+    require.Less(t, last.Z, -3780.0,
+        "the destination waypoint stands on the water bed")
     require.Greater(t, result.Length, 3000.0)
 }
 
@@ -476,7 +474,7 @@ func TestNavmeshNavigatorPartialOwnsThePlan(t *testing.T) {
     end := pathfind.Vec3{
         X: huntWorldOf(560), Y: huntWorldOf(160), Z: -3770,
     }
-    result, err := navigator.FindPathApproachDryAvoiding(
+    result, err := navigator.FindPathApproachAvoiding(
         start, end, 150, nil)
     require.NoError(t, err)
     require.NotNil(t, result)
@@ -489,11 +487,11 @@ func TestNavmeshNavigatorPartialOwnsThePlan(t *testing.T) {
     require.InDelta(t, 32768+480*16.0, last.X, 16.0)
 }
 
-// TestNavmeshNavigatorPartialServesWithoutEngineVerdict pins the
-// mesh only rule: the mesh partial serves on its own - an engine
-// that cannot even answer (no geodata under the endpoints) is never
-// consulted, the walk-what-you-corridor of the mesh is the plan.
-func TestNavmeshNavigatorPartialServesWithoutEngineVerdict(t *testing.T) {
+// TestNavmeshNavigatorPricedSearchServesWithoutEngineVerdict pins the
+// mesh only rule: the priced mesh answer serves on its own - an
+// engine that cannot even answer (no geodata under the endpoints) is
+// never consulted, the corridor the mesh prices is the plan.
+func TestNavmeshNavigatorPricedSearchServesWithoutEngineVerdict(t *testing.T) {
     mesh := shoreWorldMesh(t)
     engine := pathfind.NewEngine(t.TempDir())
     navigator := NewNavmeshNavigator(engine, mesh)
@@ -504,41 +502,10 @@ func TestNavmeshNavigatorPartialServesWithoutEngineVerdict(t *testing.T) {
     end := pathfind.Vec3{
         X: huntWorldOf(400), Y: huntWorldOf(160), Z: -3800,
     }
-    result, err := navigator.FindPathApproachDryAvoiding(start, end, 150,
+    result, err := navigator.FindPathApproachAvoiding(start, end, 150,
         nil)
     require.NoError(t, err)
     require.NotNil(t, result)
-    require.False(t, result.Found)
-    require.True(t, result.Partial)
+    require.True(t, result.Found)
     require.NotEmpty(t, result.Waypoints)
-}
-
-// TestNavmeshNavigatorHardPairPartial pins the partial round on the
-// REAL elven village pair: the village deck to the water under the
-// bridge - the motivating stacked-layer walk of the whole port -
-// planned DRY answers the mesh partial corridor to the closest
-// reachable dry point. The walk the town legs then make ends
-// on the shore instead of aborting on the deck.
-func TestNavmeshNavigatorHardPairPartial(t *testing.T) {
-    navigator, _ := realNavmeshNavigator(t)
-
-    village := pathfind.Vec3{X: 45768, Y: 49848, Z: -3056}
-    water := pathfind.Vec3{X: 44920, Y: 50792, Z: -3928}
-    result, err := navigator.FindPathApproachDryAvoiding(
-        village, water, 150, nil)
-    require.NoError(t, err)
-    require.NotNil(t, result)
-    require.False(t, result.Found)
-    require.True(t, result.Partial)
-    require.NotEmpty(t, result.Waypoints)
-    // Every waypoint of the partial walk stays dry: the corridor
-    // walls the water polygons, the funnel never dips below the
-    // C1 water level.
-    for i, wp := range result.Waypoints {
-        require.GreaterOrEqual(t, wp.Z, -3780.0,
-            "partial waypoint %d must stay dry", i)
-    }
-    // The walk leaves the deck toward the water - the closest
-    // reachable point of the dry corridor.
-    require.Greater(t, result.Length, 300.0)
 }

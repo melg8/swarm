@@ -154,7 +154,7 @@ func driveSpawnWalk(
     require.True(t, ok, "the character position must be known")
     if loop.cursorEscape.armed {
         loop.driveCursorKeyEscape(now, x, y)
-    } else if loop.followWaypoints(x, y, z, now, true) {
+    } else if loop.followWaypoints(x, y, z, now) {
         loop.endTownTrip("back at the farm spot")
     }
     sim.consumeAt(game, bot, now)

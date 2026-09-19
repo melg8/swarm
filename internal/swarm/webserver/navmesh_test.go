@@ -262,16 +262,15 @@ func TestNavmeshGeometryEndpoint(t *testing.T) {
 }
 
 // TestNavmeshPathEndpoint pins the route search of the viewer: the
-// swim filter walks into the water polygon and answers found, the
-// dry filter walls it and answers the partial corridor, and both
-// carry the measured construction time.
+// priced search walks into the water polygon and answers found (the
+// water is walkable at the swim rate, no walled form exists anymore)
+// and carries the measured construction time.
 func TestNavmeshPathEndpoint(t *testing.T) {
     server := newNavmeshTestServer(t, nil)
 
-    t.Run("the swim route reaches the water polygon", func(t *testing.T) {
+    t.Run("the priced route reaches the water polygon", func(t *testing.T) {
         recorder := navmeshPost(t, server,
-            `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-48},`+
-                `"filter":"swim"}`)
+            `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-48}}`)
 
         require.Equal(t, http.StatusOK, recorder.Code)
 
@@ -279,7 +278,6 @@ func TestNavmeshPathEndpoint(t *testing.T) {
         require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
         require.True(t, response.Found)
         require.False(t, response.Partial)
-        require.Equal(t, "swim", response.Filter)
         require.NotEmpty(t, response.Waypoints)
         require.InDelta(t, 8, response.Waypoints[0].X, 0.01)
         require.InDelta(t, 8, response.Waypoints[0].Y, 0.01)
@@ -290,27 +288,6 @@ func TestNavmeshPathEndpoint(t *testing.T) {
         require.Greater(t, response.DurationMs, float64(0))
         require.GreaterOrEqual(t, response.Explored, 1)
         require.GreaterOrEqual(t, response.Corridor, 2)
-    })
-
-    t.Run("the dry filter answers the partial corridor", func(t *testing.T) {
-        recorder := navmeshPost(t, server,
-            `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-48},`+
-                `"filter":"dry"}`)
-
-        require.Equal(t, http.StatusOK, recorder.Code)
-
-        var response navmeshPathResponse
-        require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-        require.False(t, response.Found)
-        require.True(t, response.Partial)
-        require.Equal(t, "dry", response.Filter)
-        require.NotEmpty(t, response.Waypoints)
-        // The partial corridor ends on the last dry polygon (the
-        // ground strip x 16..32), never inside the water.
-        last := response.Waypoints[len(response.Waypoints)-1]
-        require.InDelta(t, 32, last.X, 0.01)
-        require.InDelta(t, 8, last.Y, 0.01)
-        require.InDelta(t, 0, last.Z, 0.01)
     })
 
     t.Run("a bad body answers 400", func(t *testing.T) {
@@ -330,7 +307,7 @@ func TestNavmeshPathApproach(t *testing.T) {
     server := newNavmeshTestServer(t, nil)
     recorder := navmeshPost(t, server,
         `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-48},`+
-            `"filter":"swim","approach":50}`)
+            `"approach":50}`)
 
     require.Equal(t, http.StatusOK, recorder.Code)
 
@@ -359,7 +336,7 @@ func TestNavmeshPathAvoid(t *testing.T) {
     t.Run("the ban holding the start keeps the way out", func(t *testing.T) {
         recorder := navmeshPost(t, server,
             `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-48},`+
-                `"filter":"swim","avoid":[{"x":8,"y":8,"r":6}]}`)
+                `"avoid":[{"x":8,"y":8,"r":6}]}`)
 
         require.Equal(t, http.StatusOK, recorder.Code)
 
@@ -374,7 +351,7 @@ func TestNavmeshPathAvoid(t *testing.T) {
     t.Run("the ban over the destination seals the goal", func(t *testing.T) {
         recorder := navmeshPost(t, server,
             `{"start":{"x":8,"y":8,"z":0},"end":{"x":24,"y":8,"z":0},`+
-                `"filter":"swim","avoid":[{"x":24,"y":8,"r":6}]}`)
+                `"avoid":[{"x":24,"y":8,"r":6}]}`)
 
         require.Equal(t, http.StatusOK, recorder.Code)
 
@@ -411,8 +388,8 @@ func TestNavmeshPathFoldSwitch(t *testing.T) {
     const clearance = pathfind.DefaultCollisionRadius
 
     // The direct mesh answer of the same contract the handler arms:
-    // the swim filter with the zone table, the clearance pivots, the
-    // shortcut pass and the capsule guard.
+    // the priced filter with the zone table, the clearance pivots,
+    // the shortcut pass and the capsule guard.
     mesh := navmesh.NewMesh(tileDir)
     filter := navmesh.DefaultFilter()
     filter.WaterZones = navmesh.C1WaterZones()
@@ -451,13 +428,13 @@ func TestNavmeshPathFoldSwitch(t *testing.T) {
     }
 
     unfolded := post(`{"start":{"x":8,"y":8,"z":0},` +
-        `"end":{"x":24,"y":8,"z":0},"filter":"swim","fold":false}`)
+        `"end":{"x":24,"y":8,"z":0},"fold":false}`)
     require.True(t, unfolded.Found)
     requireWaypoints(unfolded.Waypoints, route.Waypoints,
         "the plan repro answer IS the mesh search answer")
 
     folded := post(`{"start":{"x":8,"y":8,"z":0},` +
-        `"end":{"x":24,"y":8,"z":0},"filter":"swim"}`)
+        `"end":{"x":24,"y":8,"z":0}}`)
     require.True(t, folded.Found)
     vecs := make([]pathfind.Vec3, len(route.Waypoints))
     for i, wp := range route.Waypoints {
@@ -589,18 +566,18 @@ func TestNavmeshViewScriptContract(t *testing.T) {
     }
 
     // The view state link: the boot parses the camera pose, the route
-    // pair, the tile selection, the filter and the scale; the copy
+    // pair, the tile selection and the scale; the copy
     // button builds the URL back. The plan repro contract (the
     // approach radius, the ban circles, the fold switch) rides the
     // same channel - the pathfind link of the HUD arms it.
     for _, part := range []string{
         `search.get("cam")`, `search.get("from")`, `search.get("to")`,
-        `search.get("tiles")`, `search.get("filter")`,
+        `search.get("tiles")`,
         `search.get("scale")`,
         `search.get("approach")`, `search.get("avoid")`,
         `search.get("fold")`,
         `params.set("cam"`, `params.set("from"`, `params.set("to"`,
-        `params.set("tiles"`, `params.set("filter"`, `params.set("scale"`,
+        `params.set("tiles"`, `params.set("scale"`,
         `params.set("approach"`, `params.set("avoid"`,
         `params.set("fold"`,
         `copyViewState)`, `id="nmv-copy"`, `id="nmv-link"`,
@@ -679,8 +656,7 @@ func TestNavmeshPathWithEngine(t *testing.T) {
     server := NewNavmeshServer(navmesh.NewMesh(tileDir), "127.0.0.1:0",
         log.New(io.Discard, "", 0), NavmeshOptions{Engine: engine})
     recorder := navmeshPost(t, server,
-        `{"start":{"x":8,"y":8,"z":0},"end":{"x":24,"y":8,"z":0},`+
-            `"filter":"swim"}`)
+        `{"start":{"x":8,"y":8,"z":0},"end":{"x":24,"y":8,"z":0}}`)
 
     require.Equal(t, http.StatusOK, recorder.Code)
 

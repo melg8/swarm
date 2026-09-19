@@ -51,7 +51,7 @@ func newClickGuardLoop(
 
 // follow drives one follower pass with the character position.
 func follow(loop *Loop) {
-    loop.followWaypoints(1000, 1000, 0, time.Now(), false)
+    loop.followWaypoints(1000, 1000, 0, time.Now())
 }
 
 // TestFollowerSendsValidatedClick pins the default path: the

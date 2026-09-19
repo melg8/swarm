@@ -182,23 +182,24 @@ func TestRouteCorridorAndFunnel(t *testing.T) {
     require.InDelta(t, -80, last.Z, 1e-6)
 }
 
-// TestRouteDryPartial pins the dry search contract: a swim-only
-// target answers the partial corridor to the closest dry point - the
-// ramp boundary under the water edge.
-func TestRouteDryPartial(t *testing.T) {
+// TestRoutePricedCrossesTheWater pins the priced contract: a
+// swim-only target answers the full found route through the water
+// polygons (the swim rate prices the crossing, no walled form exists
+// anymore) - the corridor walks the same ramp the escape later
+// climbs back.
+func TestRoutePricedCrossesTheWater(t *testing.T) {
     mesh := NewMesh(writeTiles(t, corridorWorld()))
-    route, err := mesh.RouteDry(worldPos(88, 88, 0), worldPos(240, 264,
-        -80))
+    route, err := mesh.Route(worldPos(88, 88, 0), worldPos(240, 264,
+        -80), DefaultFilter())
     require.NoError(t, err)
-    require.False(t, route.Found)
-    require.True(t, route.Partial)
-    require.Len(t, route.Corridor, 3)
+    require.True(t, route.Found)
+    require.False(t, route.Partial)
+    require.Len(t, route.Corridor, 4)
 
     last := route.Waypoints[len(route.Waypoints)-1]
-    require.InDelta(t, -40, last.Z, 1e-6)
-    // The closest dry point stands on the ramp boundary toward the
-    // target: the y of the water edge clamped onto the ramp.
-    require.InDelta(t, 32768+208*16, last.Y, 1e-6)
+    require.InDelta(t, -80, last.Z, 1e-6)
+    require.InDelta(t, 32768+240*16, last.X, 1e-6)
+    require.InDelta(t, 32768+264*16, last.Y, 1e-6)
 }
 
 // TestWaterEscape pins the escape contract: the way out of the water

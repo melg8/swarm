@@ -47,7 +47,7 @@ SPDX-License-Identifier: MIT
 // default XYZ order once left a z angle behind that read as a rolled
 // horizon. The feedback channel: the copy button freezes
 // the whole view state - the camera pose, the route pair, the tile
-// selection, the filter and the height scale - into one URL the
+// selection and the height scale - into one URL the
 // owner pastes back; the viewer boots from those query parameters
 // and re-runs the route automatically, so a pasted link reproduces
 // the exact view and its answer anywhere the viewer runs.
@@ -139,7 +139,6 @@ const viewer = {
   rig: null,
   tiles: new Map(),
   heightScale: 1,
-  filter: "swim",
   // The geometry variant of the comparison toggle: "mesh" renders the
   // detour navmesh tiles, "orig" renders the raw l2j geodata cells
   // (the same NMV2 contract, the /api/navmesh/original endpoint). The
@@ -192,7 +191,7 @@ const viewer = {
 // of the initial selection and wires the double click search. The
 // view state link of the copy button overrides the boot: its query
 // parameters restore the camera pose, the tile selection, the
-// filter, the height scale and the route pair - and the route runs
+// height scale and the route pair - and the route runs
 // again on its own, so the pasted link answers itself.
 function init(config) {
   const navmesh = config.navmesh;
@@ -221,13 +220,6 @@ function init(config) {
     addTileRow(tile, initialKeys.has(tileKey(tile)));
   }
   syncAllBox();
-  if (view.filter) {
-    viewer.filter = view.filter;
-    const select = document.getElementById("nmv-filter");
-    if (select) {
-      select.value = view.filter;
-    }
-  }
   if (view.scale) {
     setHeightScale(view.scale);
     const select = document.getElementById("nmv-height");
@@ -260,7 +252,7 @@ function init(config) {
   }
   // The search contract applies before the route run: the boot route
   // of a plan repro link must rebuild the very search the link
-  // freezes (the filter, the approach radius, the bans, the fold
+  // freezes (the approach radius, the bans, the fold
   // switch), not the double click defaults.
   if (view.approach) {
     viewer.approach = view.approach;
@@ -327,11 +319,6 @@ function buildSurface(navmesh) {
       <select id="nmv-geom" class="nmv-select">
         <option value="mesh" selected>detour mesh (exact squares)</option>
         <option value="orig">original l2j cells</option>
-      </select>
-      <div class="nmv-section">route filter</div>
-      <select id="nmv-filter" class="nmv-select">
-        <option value="swim" selected>swim (water costs 3x)</option>
-        <option value="dry">dry (water is a wall)</option>
       </select>
       <div class="nmv-section">height scale</div>
       <select id="nmv-height" class="nmv-select">
@@ -435,9 +422,6 @@ function buildSurface(navmesh) {
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerleave", onPointerLeave);
 
-  document.getElementById("nmv-filter").addEventListener("change", (e) => {
-    viewer.filter = e.target.value;
-  });
   document.getElementById("nmv-geom").addEventListener("change", (e) => {
     setVariant(e.target.value);
   });
@@ -1616,7 +1600,6 @@ async function requestRoute(start, end) {
       body: JSON.stringify({
         start: { x: start.x, y: start.y, z: start.z },
         end: { x: end.x, y: end.y, z: end.z },
-        filter: viewer.filter,
         approach: viewer.approach,
         avoid: viewer.avoid,
         fold: viewer.fold,
@@ -1648,7 +1631,7 @@ function renderRouteAnswer(answer) {
   } else if (answer.partial) {
     showStatus("partial", "destination unreachable - closest reachable corridor");
   } else {
-    showStatus("not found", "no route under the filter");
+    showStatus("not found", "no route under the priced search");
   }
   const timer = document.getElementById("nmv-timer");
   const timerSub = document.getElementById("nmv-timer-sub");
@@ -1673,8 +1656,7 @@ function renderRouteAnswer(answer) {
     ["corridor polys", String(answer.corridor)],
     ["explored polys", String(answer.explored)],
     ["path length", Math.round(routeLength(waypoints)).toLocaleString() +
-      " units"],
-    ["filter", answer.filter]);
+      " units"]);
   if (raw.length > 0) {
     rows.push(["raw funnel steps", String(raw.length)]);
   }
@@ -1958,7 +1940,6 @@ function showStatus(kind, text) {
 //   from=x,y,z           the route start (world axes)
 //   to=x,y,z             the route destination
 //   tiles=21_19,22_19    the visible tile selection (omitted = all)
-//   filter=swim|dry      the route filter
 //   scale=1|2|4          the height exaggeration
 //   geom=mesh|orig       the geometry variant of the comparison
 //                         toggle: the detour mesh or the original
@@ -1989,7 +1970,6 @@ function parseViewParams() {
     from: parsePointParam(search.get("from")),
     to: parsePointParam(search.get("to")),
     tiles: null,
-    filter: null,
     scale: null,
     geom: null,
     path: null,
@@ -2001,10 +1981,6 @@ function parseViewParams() {
   if (tiles) {
     view.tiles = tiles.split(",")
       .map((key) => key.trim()).filter((key) => key !== "");
-  }
-  const filter = search.get("filter");
-  if (filter === "swim" || filter === "dry") {
-    view.filter = filter;
   }
   const scale = Number(search.get("scale"));
   if (scale === 1 || scale === 2 || scale === 4) {
@@ -2094,8 +2070,8 @@ function applyCameraState(cam) {
 }
 
 // buildViewStateUrl freezes the current view into the link: the
-// camera pose, the armed or answered route pair, the visible tiles,
-// the filter and the height scale.
+// camera pose, the armed or answered route pair, the visible tiles
+// and the height scale.
 function buildViewStateUrl() {
   const params = new URLSearchParams();
   if (viewer.rig && viewer.camera) {
@@ -2123,7 +2099,6 @@ function buildViewStateUrl() {
   if (visible.length > 0 && visible.length < viewer.tiles.size) {
     params.set("tiles", visible.join(","));
   }
-  params.set("filter", viewer.filter);
   params.set("scale", String(viewer.heightScale));
   params.set("geom", viewer.variant);
   params.set("path", viewer.pathVariant);

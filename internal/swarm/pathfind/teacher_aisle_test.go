@@ -56,7 +56,7 @@ func TestElleniaReachableFromEveryVillageApproach(t *testing.T) {
 
     for _, approach := range elleniaApproaches {
         t.Run(approach.name, func(t *testing.T) {
-            result, err := engine.FindPathApproachDry(
+            result, err := engine.FindPathApproach(
                 approach.pos, elleniaSpawn, 200, DefaultMaxPassableHeight)
             require.NoError(t, err)
             require.True(t, result.Found,
@@ -90,7 +90,7 @@ func TestElleniaReachableFromEveryVillageApproach(t *testing.T) {
 func TestElleniaAisleRouteMatchesTheDumpPlan(t *testing.T) {
     engine := townTestEngine(t)
 
-    result, err := engine.FindPathApproachDry(
+    result, err := engine.FindPathApproach(
         elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight)
     require.NoError(t, err)
     require.True(t, result.Found)
@@ -165,7 +165,7 @@ func TestAvoidingSearchDetoursAroundTheFrozenAisle(t *testing.T) {
         Center: Vec3{X: 44728, Y: 52040, Z: -2792},
         Radius: 48.0,
     }}
-    result, err := engine.FindPathApproachDryAvoiding(
+    result, err := engine.FindPathApproachAvoiding(
         elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight, ban)
     require.NoError(t, err)
     require.True(t, result.Found,
@@ -210,12 +210,12 @@ func TestAvoidingSearchDetoursAroundTheFrozenAisle(t *testing.T) {
 func TestAvoidingSearchStillAnswersTheUnbannedRoute(t *testing.T) {
     engine := townTestEngine(t)
 
-    plain, err := engine.FindPathApproachDry(
+    plain, err := engine.FindPathApproach(
         elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight)
     require.NoError(t, err)
     require.True(t, plain.Found)
 
-    avoiding, err := engine.FindPathApproachDryAvoiding(
+    avoiding, err := engine.FindPathApproachAvoiding(
         elleniaApproaches[0].pos, elleniaSpawn, 200, DefaultMaxPassableHeight, nil)
     require.NoError(t, err)
     require.True(t, avoiding.Found)
@@ -238,7 +238,7 @@ func TestAvoidingSearchRefusesGoalsInsideTheBan(t *testing.T) {
         Center: Vec3{X: 44728, Y: 52040, Z: -2792},
         Radius: 400.0,
     }}
-    result, err := engine.FindPathApproachDryAvoiding(
+    result, err := engine.FindPathApproachAvoiding(
         elleniaApproaches[0].pos, elleniaSpawn, 150, DefaultMaxPassableHeight, ban)
     require.NoError(t, err)
     require.False(t, result.Found,
@@ -281,7 +281,7 @@ func TestAvoidingSearchEscapesTheOwnBanFromDeepInside(t *testing.T) {
         {Center: escapeRingBanCenter, Radius: 192.0},
         {Center: Vec3{X: 43512, Y: 50504, Z: -2992}, Radius: 192.0},
     }
-    result, err := engine.FindPathApproachDryAvoiding(
+    result, err := engine.FindPathApproachAvoiding(
         escapeRingStart, escapeRingZone, 200, DefaultMaxPassableHeight, bans)
     require.NoError(t, err)
     require.True(t, result.Found,

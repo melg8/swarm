@@ -165,7 +165,7 @@ func TestFollowerHoldsBackwardClickWhenArmed(t *testing.T) {
     moveSelfTo(bot, 1200, 1000, 0)
     loop.tracker = bot
 
-    loop.followWaypoints(1200, 1000, 0, time.Now(), false)
+    loop.followWaypoints(1200, 1000, 0, time.Now())
 
     require.Empty(t, game.walks,
         "the armed follower holds the backward click")

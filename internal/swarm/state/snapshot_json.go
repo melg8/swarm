@@ -484,9 +484,7 @@ func appendWalkSearchJSON(dst []byte, search *WalkSearch) []byte {
     if search == nil {
         return append(dst, `null`...)
     }
-    dst = append(dst, `{"dry":`...)
-    dst = strconv.AppendBool(dst, search.Dry)
-    dst = append(dst, `,"approach":`...)
+    dst = append(dst, `{"approach":`...)
     dst = appendJSONFloat(dst, search.Approach)
     dst = append(dst, `,"avoid":`...)
     if search.Avoid == nil {

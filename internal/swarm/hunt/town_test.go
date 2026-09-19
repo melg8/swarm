@@ -72,14 +72,14 @@ type fakeNavigator struct {
     // approachEnds records the destinations the approach searches
     // received (the zone return goal checks live here).
     approachEnds []pathfind.Vec3
-    // dryMiss makes the dry approach searches answer not found: the
-    // walk would need a swim (the water loop regression tests).
-    dryMiss bool
-    // partialRoute makes the dry approach searches answer the partial
-    // closest-reachable corridor (Found=false with Partial set and
-    // these waypoints - the navmesh hybrid partial round): the leg
-    // planners accept it and walk toward the closest reachable point
-    // instead of aborting.
+    // miss makes the leg planner searches answer not found: the
+    // destination no route reaches (the abort pins).
+    miss bool
+    // partialRoute makes the leg planner searches answer the
+    // partial closest-reachable corridor (Found=false with Partial
+    // set and these waypoints - the navmesh hybrid partial round):
+    // the leg planners accept it and walk toward the closest
+    // reachable point instead of aborting.
     partialRoute []pathfind.Vec3
 }
 
@@ -137,13 +137,15 @@ func (f *fakeNavigator) FindPathApproach(
     return f.result(start, end)
 }
 
-// FindPathApproachAvoiding plans the water permitting approach search
-// around the avoid areas: it records the ban the loop passed and
-// answers the configured avoiding route (nil: the plain result - the
-// ban made no difference to the fake planner).
+// FindPathApproachAvoiding plans the approach search around the avoid
+// areas: it records the ban the loop passed and answers the configured
+// avoiding route, the partial corridor or the bare miss (nil avoid
+// route and partial route: the plain result - the ban made no
+// difference to the fake planner).
 func (f *fakeNavigator) FindPathApproachAvoiding(
     start, end pathfind.Vec3, _ float64, avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
+    f.approachEnds = append(f.approachEnds, end)
     f.avoiding = append(f.avoiding, avoid)
     if f.avoidRoute != nil {
         f.calls++
@@ -160,18 +162,6 @@ func (f *fakeNavigator) FindPathApproachAvoiding(
             Length:    0,
         }, nil
     }
-
-    return f.result(start, end)
-}
-
-// FindPathApproachDry plans the water walled approach search: it
-// shares the routes of the ordinary search unless dryMiss is armed -
-// the swim only destination answers not found - or partialRoute is
-// armed - the closest reachable corridor of the partial round.
-func (f *fakeNavigator) FindPathApproachDry(
-    start, end pathfind.Vec3, _ float64,
-) (*pathfind.Result, error) {
-    f.approachEnds = append(f.approachEnds, end)
     if f.partialRoute != nil {
         f.calls++
         f.callsAt = append(f.callsAt, time.Now())
@@ -188,7 +178,7 @@ func (f *fakeNavigator) FindPathApproachDry(
             Length:    0,
         }, nil
     }
-    if f.dryMiss {
+    if f.miss {
         f.calls++
 
         return &pathfind.Result{
@@ -204,33 +194,6 @@ func (f *fakeNavigator) FindPathApproachDry(
     }
 
     return f.result(start, end)
-}
-
-// FindPathApproachDryAvoiding plans the water walled approach search
-// around the avoid areas: the frozen leg recovery tests record the ban
-// the loop passed and answer the configured avoiding route (nil: the
-// plain result - the ban made no difference to the fake planner).
-func (f *fakeNavigator) FindPathApproachDryAvoiding(
-    start, end pathfind.Vec3, _ float64, avoid []pathfind.AvoidArea,
-) (*pathfind.Result, error) {
-    f.avoiding = append(f.avoiding, avoid)
-    if f.avoidRoute != nil {
-        f.calls++
-        f.callsAt = append(f.callsAt, time.Now())
-
-        return &pathfind.Result{
-            Found:     true,
-            Aborted:   false,
-            Waypoints: f.avoidRoute,
-            RawPath:   f.avoidRoute,
-            Duration:  0,
-            Explored:  0,
-            OpenLeft:  0,
-            Length:    0,
-        }, nil
-    }
-
-    return f.FindPathApproachDry(start, end, 0)
 }
 
 // FindPath plans the plain search.
@@ -465,9 +428,8 @@ func TestTripNeedsNavigator(t *testing.T) {
 
 // TestTripNoPathArmsCooldown verifies that a broken path search (a
 // hard error, e.g. no geodata) does not retry every tick. The trip
-// start runs the dry search and the non-dry fallback (both fail the
-// same way on a hard error), so one tick costs two searches and the
-// cooldown arms afterwards.
+// start runs the priced search once (a hard error fails it at once),
+// so one tick costs one search and the cooldown arms afterwards.
 func TestTripNoPathArmsCooldown(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     nav.fail = true
@@ -476,40 +438,36 @@ func TestTripNoPathArmsCooldown(t *testing.T) {
     loop.tick()
     require.Equal(t, phaseEngage, loop.phase, "no trip without a path")
     require.False(t, loop.tripCooldownOver(), "the cooldown is armed")
-    require.Equal(t, 2, nav.calls)
+    require.Equal(t, 1, nav.calls)
     loop.tick()
-    require.Equal(t, 2, nav.calls, "no retry while the cooldown runs")
+    require.Equal(t, 1, nav.calls, "no retry while the cooldown runs")
 
     loop.tripEndedAt = time.Now().Add(-tripCooldown - time.Second)
     loop.tick()
-    require.Equal(t, 4, nav.calls, "a new trip starts after the cooldown")
+    require.Equal(t, 2, nav.calls, "a new trip starts after the cooldown")
 }
 
-// TestTripDryMissArmsCooldown verifies the not found handling of the
-// dry planning: the approach search reports no dry route (the walk
-// would need a swim), the non-dry fallback runs (the same escalation
-// the zone return takes - a shop across the water stays reachable
-// through its shore legs), and only when both refuse does the trip
-// abort at once with the trigger cooldown armed - the old fallback
-// that never ran planned nothing while the click guard would have
-// refused a swim leg by leg until the budget exhausted (the town trip
-// variant of the delevel water loop).
-func TestTripDryMissArmsCooldown(t *testing.T) {
+// TestTripNoRouteArmsCooldown verifies the not found handling of the
+// priced planning: the approach search reports no route at all (no
+// corridor exists toward the destination), the trip aborts at once
+// with the trigger cooldown armed - a re-plan of the identical
+// deterministic search would answer the identical nothing.
+func TestTripNoRouteArmsCooldown(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     nav.found = false
     fillInventory(bot)
 
     loop.tick()
     require.Equal(t, phaseEngage, loop.phase,
-        "no trip without a dry path")
+        "no trip without a path")
     require.False(t, loop.tripCooldownOver(), "the cooldown is armed")
-    require.Equal(t, 2, nav.calls, "the dry search and the fallback ran")
+    require.Equal(t, 1, nav.calls, "the priced search ran once")
     loop.tick()
-    require.Equal(t, 2, nav.calls, "no retry while the cooldown runs")
+    require.Equal(t, 1, nav.calls, "no retry while the cooldown runs")
 
     loop.tripEndedAt = time.Now().Add(-tripCooldown - time.Second)
     loop.tick()
-    require.Equal(t, 4, nav.calls, "a new trip starts after the cooldown")
+    require.Equal(t, 2, nav.calls, "a new trip starts after the cooldown")
 }
 
 // TestTripFullFlow walks the whole trip: farm to shop, the merchant

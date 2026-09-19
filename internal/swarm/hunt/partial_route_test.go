@@ -123,7 +123,7 @@ func (g *movingQuestGame) WalkTo(x int32, y int32, z int32) error {
 // verdict itself.
 func TestTownLegDryMissStillAborts(t *testing.T) {
     loop, _, _, nav := newDelevelLoop(11)
-    nav.dryMiss = true
+    nav.miss = true
     loop.phase = phaseTownWalk
     loop.tripStart = time.Now()
 

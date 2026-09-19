@@ -536,7 +536,7 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
 // components; the gate free pass chains the sampled crossings and
 // lets the refinement hops verify them on the real mesh.
 //
-//nolint:cyclop,gocognit,funlen // the edge branches read side by side
+//nolint:funlen // the edge branches read side by side
 func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos,
     _ bool,
 ) {
@@ -561,13 +561,6 @@ func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos,
             // and this crossing live in different link components of
             // the cluster - no polygon path connects them, chaining
             // the edge would fake the connectivity.
-            continue
-        }
-        if !q.filter.AllowWater && (edge.srcArea == AreaWater ||
-            edge.dstArea == AreaWater) {
-            // The dry search never enters the water polygons (the
-            // unknown external target area is ground priced, the
-            // refinement hop decides it for real).
             continue
         }
         // The node identity rides the crossing (the component gate
@@ -981,10 +974,9 @@ func (m *Mesh) hopCorridor(q *hierQuery, fromRef PolyRef, fromPos Pos,
     entry, exit abstractEdgeRef, toRef PolyRef, toPos Pos,
     cacheable, last bool,
 ) *hopSegment {
-    dry := !q.filter.AllowWater
     var key hopKey
     if cacheable {
-        key = hopKey{from: entry, to: exit, dry: dry}
+        key = hopKey{from: entry, to: exit}
         if cached, ok := m.cachedHop(key); ok {
             return &hopSegment{
                 corridor: cached,
@@ -1089,12 +1081,11 @@ func (m *Mesh) resolveEdgeTarget(ref abstractEdgeRef,
 }
 
 // hopKey names one cached refinement corridor: the entry edge (its
-// target polygon and midpoint start the hop), the exit edge (its
-// target polygon and midpoint end it) and the water class.
+// target polygon and midpoint start the hop) and the exit edge (its
+// target polygon and midpoint end it).
 type hopKey struct {
     from abstractEdgeRef
     to   abstractEdgeRef
-    dry  bool
 }
 
 // cachedHop answers the cached corridor of a hop key.

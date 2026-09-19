@@ -72,10 +72,9 @@ func NewNavmeshNavigator( //nolint:ireturn
 // clearedFilter arms the funnel pivot clearance of the mesh search
 // from the engine's capsule radius, the shortcut pass over the funnel
 // answer with the grid capsule as the extra wall oracle, and the C1
-// water zone pricing (the same swim pricing the viewer's swim filter
-// serves: the water polygons a C1 WaterZone cuboid covers swim at the
-// run/swim speed ratio of the player templates, the river beds the
-// zone data omits walk at the plain land rate).
+// water zone pricing (the water polygons a C1 WaterZone cuboid covers
+// swim at the run/swim speed ratio of the player templates, the river
+// beds the zone data omits walk at the plain land rate).
 func (n navmeshNavigator) clearedFilter(filter navmesh.Filter) navmesh.Filter {
     filter.WaypointClearance = n.clearance
     filter.Smooth = n.clearance > 0
@@ -97,32 +96,17 @@ func (n navmeshNavigator) FindPathApproach(
         n.clearedFilter(navmesh.DefaultFilter()))
 }
 
-// FindPathApproachAvoiding plans the water permitting walk around the
-// avoid areas through the mesh corridor search (the ban walls with
-// the escape ring of the own ban). The mesh partial corridors surface
-// through Result.Partial: the waypoints end at the closest reachable
-// point around the bans (the walk-what-you-can contract of the zone
-// return fallback).
+// FindPathApproachAvoiding plans the walk around the avoid areas
+// through the mesh corridor search (the ban walls with the escape
+// ring of the own ban). The mesh partial corridors surface through
+// Result.Partial: the waypoints end at the closest reachable point
+// around the bans (the walk-what-you-can contract of the zone
+// return).
 func (n navmeshNavigator) FindPathApproachAvoiding(
     start, end pathfind.Vec3, approachRadius float64,
     avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
     filter := n.clearedFilter(navmesh.DefaultFilter())
-    filter.Avoid = avoidCircles(avoid)
-
-    return n.meshQuery(start, end, approachRadius, filter)
-}
-
-// FindPathApproachDryAvoiding plans the water walled walk around the
-// avoid areas through the mesh corridor search: a dry target the mesh
-// cannot reach answers the closest-reachable dry partial (the
-// waypoints end at the closest reachable dry point, the walk the town
-// legs make) or the bare not found.
-func (n navmeshNavigator) FindPathApproachDryAvoiding(
-    start, end pathfind.Vec3, approachRadius float64,
-    avoid []pathfind.AvoidArea,
-) (*pathfind.Result, error) {
-    filter := n.clearedFilter(navmesh.DryFilter())
     filter.Avoid = avoidCircles(avoid)
 
     return n.meshQuery(start, end, approachRadius, filter)

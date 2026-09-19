@@ -178,7 +178,7 @@ func TestReproRound57ShortClickFreezeWalksThePlan(t *testing.T) {
         selfX, selfY, selfZ, ok := bot.SelfPosition()
         require.True(t, ok, "the character position must be known")
         clicksBefore := len(game.walks)
-        done := loop.followWaypoints(selfX, selfY, selfZ, now, true)
+        done := loop.followWaypoints(selfX, selfY, selfZ, now)
         sim.consume(game, bot)
         if loop.extendArmed && len(game.walks) > clicksBefore {
             // Every click of the armed recovery rides over the rescue
@@ -271,7 +271,7 @@ func TestRound57ZoneReturnFromEveryVillageStart(t *testing.T) {
                 loop.moveAt = time.Time{}
                 selfX, selfY, selfZ, ok := bot.SelfPosition()
                 require.True(t, ok)
-                done := loop.followWaypoints(selfX, selfY, selfZ, now, true)
+                done := loop.followWaypoints(selfX, selfY, selfZ, now)
                 sim.consume(game, bot)
                 if done {
                     arrived = true
@@ -327,7 +327,7 @@ func TestReproRound57FrozenServerEscalatesFast(t *testing.T) {
         loop.moveAt = time.Time{}
         selfX, selfY, selfZ, ok := bot.SelfPosition()
         require.True(t, ok)
-        done := loop.followWaypoints(selfX, selfY, selfZ, now, true)
+        done := loop.followWaypoints(selfX, selfY, selfZ, now)
         sim.consume(game, bot)
         if done || loop.phase != phaseTownReturn {
             aborted = true

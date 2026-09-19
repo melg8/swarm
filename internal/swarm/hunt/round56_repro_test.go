@@ -89,7 +89,7 @@ func tickUntilArrived(
         if !ok {
             return false
         }
-        done := loop.followWaypoints(selfX, selfY, selfZ, time.Now(), true)
+        done := loop.followWaypoints(selfX, selfY, selfZ, time.Now())
         sim.consume(game, bot)
         if done {
             return true
@@ -165,7 +165,7 @@ func TestReproRound56StuckSkipNeverCreepsIntoThePocket(t *testing.T) {
     loop.moveAt = time.Time{}
     selfX, selfY, selfZ, ok := bot.SelfPosition()
     require.True(t, ok)
-    done := loop.followWaypoints(selfX, selfY, selfZ, time.Now(), true)
+    done := loop.followWaypoints(selfX, selfY, selfZ, time.Now())
     require.False(t, done)
     sim.frozen = true
     sim.consume(game, bot)
@@ -181,7 +181,7 @@ func TestReproRound56StuckSkipNeverCreepsIntoThePocket(t *testing.T) {
     selfX, selfY, selfZ, ok = bot.SelfPosition()
     require.True(t, ok)
     require.False(t, loop.followWaypoints(selfX, selfY, selfZ,
-        time.Now(), true))
+        time.Now()))
     require.Equal(t, 1, loop.rePaths,
         "exactly one recovery re-path must fire")
     require.LessOrEqual(t, selfX, reproRound56X,

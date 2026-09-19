@@ -10,17 +10,15 @@ import (
     "github.com/stretchr/testify/require"
 )
 
-// The water regression of 2026-09-10: the town trip to the trader
-// Ariel entered the elven village lake, the character swam below the
-// plateau and stood paralyzed under the village cliff (the water zone
-// of the C1 server covers everything below -3780; a swimming
-// character whose z floats above that bound loses the swim move
-// semantics while the geodata still resolves it onto the lake bed,
-// and every click toward the village deck returns the character's own
-// position). The tests here pin the three defenses: the smoothed
-// routes never ford water between dry points, the escape search
-// finds the nearest shore for a position standing in a lake, and the
-// click lines of the walker verify dry before they are sent.
+// The water round of 2026-09-10 and the priced round of 2026-09-19:
+// the town trip to the trader Ariel once entered the elven village
+// lake and stood paralyzed under the plateau cliff (the water zone of
+// the C1 server covers everything below -3780). The defenses of this
+// round: the smoothing keeps the legs the search priced (a chord over
+// water between dry points never folds), the escape search finds the
+// nearest shore for a position standing in a lake, and the plans
+// price every crossing at the swim rate - the water is walkable, the
+// slowdown honest.
 
 // shoreLand is the dry test land height (above the C1 water surface).
 const shoreLand = int16(-3770)
@@ -31,42 +29,46 @@ const shoreLand = int16(-3770)
 // elven lake the string pulling used to cut through.
 const shoreBed = int16(-3800)
 
-// TestSmoothedLegsStayDry pins the water awareness of the smoothing:
-// a shallow channel (the bed within the passable step of its shores)
-// splits two dry points, the cost aware search detours around it and
-// the smoothing must not collapse the detour back into the straight
-// water crossing - every leg of the smoothed route has to stay dry
-// and walkable, the invariant the town walker's click guard relies on.
-func TestSmoothedLegsStayDry(t *testing.T) {
+// TestPricedRouteKeepsTheShorePivots pins the water awareness of the
+// smoothing under the priced search: a narrow underwater band (whole
+// flat blocks, so the water is actually swimmable) splits two dry
+// points inside its y range, the priced search detours it (the 2.3x
+// swim rate makes the crossing the slower walk) and the smoothing
+// must not collapse the detour back into the straight water crossing
+// - every leg of the smoothed route stays dry and walkable.
+func TestPricedRouteKeepsTheShorePivots(t *testing.T) {
     spec := &regionSpec{}
     spec.setFlat(shoreLand)
-    // The channel strip: underwater, the shores of every cell open.
-    for x := 300; x <= 500; x++ {
-        for y := 500; y <= 900; y++ {
-            spec.setCell(x, y, Layer{Height: shoreBed, NSWE: nsweAll})
-        }
+    // The narrow band: block columns 38..43 (cells 304..351), block
+    // row 88 (cells 704..711).
+    waterBlock := blockSpec{
+        kind:  blockFlat,
+        cells: [cellsPerBlock]Layer{{Height: shoreBed, NSWE: nsweAll}},
+    }
+    for bx := 38; bx <= 43; bx++ {
+        spec.blocks[bx][88] = waterBlock
     }
     engine := newTestEngine(t, spec)
 
-    start := worldOf(200, 700, shoreLand)
-    end := worldOf(600, 700, shoreLand)
+    start := worldOf(200, 707, shoreLand)
+    end := worldOf(600, 707, shoreLand)
     result, err := engine.FindPath(
         start, end, DefaultMaxPassableHeight)
     require.NoError(t, err)
-    require.True(t, result.Found, "the detour around the channel exists")
+    require.True(t, result.Found, "the detour around the band exists")
     require.GreaterOrEqual(t, len(result.Waypoints), 3,
-        "the route must keep the shore corners the search paid for")
+        "the route must keep the shore pivots the search paid for")
     for i, wp := range result.Waypoints {
-        require.GreaterOrEqual(t, wp.Z, float64(waterLevel),
+        require.GreaterOrEqual(t, wp.Z, float64(WaterLevel),
             "waypoint %d must stay dry", i)
     }
     // Every smoothed leg is a clean dry walk: the follower may click
     // straight along each leg without entering the water.
     for i := 1; i < len(result.Waypoints); i++ {
-        dry, err := engine.DryLine(
+        crossed, err := engine.WaterCrossed(
             result.Waypoints[i-1], result.Waypoints[i])
         require.NoError(t, err)
-        require.True(t, dry, "the leg %d must stay dry", i-1)
+        require.False(t, crossed, "the leg %d must stay dry", i-1)
     }
 }
 
@@ -95,7 +97,7 @@ func TestFindWaterEscape(t *testing.T) {
     require.True(t, result.Found, "the ramp connects the lake to the land")
     require.NotEmpty(t, result.Waypoints)
     last := result.Waypoints[len(result.Waypoints)-1]
-    require.GreaterOrEqual(t, last.Z, float64(waterLevel),
+    require.GreaterOrEqual(t, last.Z, float64(WaterLevel),
         "the escape must end on dry ground")
     // The raw path walks the ramp gradually: every step stays within
     // the passable height (the escape shares the canStep rules).
@@ -140,40 +142,47 @@ func TestFindWaterEscapeDryStart(t *testing.T) {
     require.False(t, result.Found)
 }
 
-// TestDryLine verifies the click guard query: a line crossing the
-// water is wet whatever it endpoints stand on, a dry line over open
-// land passes, and a walled line fails the walkability half.
-func TestDryLine(t *testing.T) {
-    spec := &regionSpec{}
-    spec.setFlat(shoreLand)
+// TestWaterCrossedSplitsWaterFromHeightSteps pins the water-only
+// raster of the engine: a line across a real channel trips it, a line
+// that merely climbs a tall dry step (the village deck ramps) does
+// not - terrain is not water, whatever the walkability of the line.
+func TestWaterCrossedSplitsWaterFromHeightSteps(t *testing.T) {
+    // The channel engine of the smoothing test: water between the
+    // dry shores.
+    channel := &regionSpec{}
+    channel.setFlat(shoreLand)
     for x := 300; x <= 500; x++ {
         for y := 500; y <= 900; y++ {
-            spec.setCell(x, y, Layer{Height: shoreBed, NSWE: nsweAll})
+            channel.setCell(x, y, Layer{Height: shoreBed, NSWE: nsweAll})
         }
     }
-    // A wall strip on the open land south of the channel.
-    for y := 700; y <= 900; y++ {
-        spec.setCell(550, y, Layer{Height: shoreLand, NSWE: 0})
+    channelEngine := newTestEngine(t, channel)
+
+    across := worldOf(200, 700, shoreLand)
+    beyond := worldOf(600, 700, shoreLand)
+    crossed, err := channelEngine.WaterCrossed(across, beyond)
+    require.NoError(t, err)
+    require.True(t, crossed,
+        "the line across the channel crosses water")
+
+    // The ramp engine: a dry step too tall for the line of sight
+    // (the deck ramps of the elven village, ~190 units against the
+    // passable 30), no water anywhere.
+    ramp := &regionSpec{}
+    ramp.setFlat(shoreLand)
+    for x := 400; x <= 600; x++ {
+        for y := 500; y <= 900; y++ {
+            ramp.setCell(x, y, Layer{Height: shoreLand + 190, NSWE: nsweAll})
+        }
     }
-    engine := newTestEngine(t, spec)
+    rampEngine := newTestEngine(t, ramp)
 
-    // A dry open line passes.
-    dry, err := engine.DryLine(
-        worldOf(100, 700, shoreLand), worldOf(290, 700, shoreLand))
+    below := worldOf(200, 700, shoreLand)
+    above := worldOf(700, 700, shoreLand+190)
+    crossed, err = rampEngine.WaterCrossed(below, above)
     require.NoError(t, err)
-    require.True(t, dry)
-
-    // The line across the channel enters the water.
-    wet, err := engine.DryLine(
-        worldOf(200, 700, shoreLand), worldOf(600, 700, shoreLand))
-    require.NoError(t, err)
-    require.False(t, wet, "the line crossing the channel is wet")
-
-    // The walled line is not a clean walk either.
-    blocked, err := engine.DryLine(
-        worldOf(540, 700, shoreLand), worldOf(560, 700, shoreLand))
-    require.NoError(t, err)
-    require.False(t, blocked, "the walled line is not walkable")
+    require.False(t, crossed,
+        "the tall dry step is terrain, not water")
 }
 
 // TestOverWater verifies the over water query: the layer closest to
@@ -225,77 +234,18 @@ func TestElvenLakeStuckEscape(t *testing.T) {
     require.True(t, escape.Found, "the elven lake has walkable shores")
     require.NotEmpty(t, escape.Waypoints)
     last := escape.Waypoints[len(escape.Waypoints)-1]
-    require.GreaterOrEqual(t, last.Z, float64(waterLevel),
+    require.GreaterOrEqual(t, last.Z, float64(WaterLevel),
         "the escape ends on dry ground, not in the lake")
     require.False(t, engine.OverWater(last.X, last.Y, int16(last.Z)),
         "the escape target itself is ashore")
 
-    // The town trip from the hunting spot to the trader Ariel plans
-    // dry legs only (the follower clicks along them unchecked by the
-    // server's own water blind routing).
+    // The town trip from the hunting spot to the trader Ariel prices
+    // every crossing at the swim rate: the lake legs the plan carries
+    // (if any) are the faster walk, the rest stays ashore.
     spot := Vec3{X: 53504, Y: 45249, Z: -3520}
     ariel := Vec3{X: 44683, Y: 46952, Z: -2981}
     route, err := engine.FindPathApproach(
         spot, ariel, 200, DefaultMaxPassableHeight)
     require.NoError(t, err)
     require.True(t, route.Found)
-    for i := 1; i < len(route.Waypoints); i++ {
-        dry, err := engine.DryLine(
-            route.Waypoints[i-1], route.Waypoints[i])
-        require.NoError(t, err)
-        require.True(t, dry,
-            "the town route leg %d from %.0f %.0f must stay dry",
-            i-1, route.Waypoints[i-1].X, route.Waypoints[i-1].Y)
-    }
-}
-
-// TestWaterCrossedSplitsWaterFromHeightSteps pins the water-only
-// raster the town walker's click guard reads: a line across a real
-// channel trips it, a line that merely climbs a tall dry step (the
-// village deck ramps) does not. The guard's old DryLine answer
-// conflated the two - the line of sight gate fails on the height
-// step, the guard read it as water and aborted the teacher legs of
-// the learning trips although the server routing walks those ramps
-// fine.
-func TestWaterCrossedSplitsWaterFromHeightSteps(t *testing.T) {
-    // The channel engine of the smoothing test: water between the
-    // dry shores.
-    channel := &regionSpec{}
-    channel.setFlat(shoreLand)
-    for x := 300; x <= 500; x++ {
-        for y := 500; y <= 900; y++ {
-            channel.setCell(x, y, Layer{Height: shoreBed, NSWE: nsweAll})
-        }
-    }
-    channelEngine := newTestEngine(t, channel)
-
-    across := worldOf(200, 700, shoreLand)
-    beyond := worldOf(600, 700, shoreLand)
-    crossed, err := channelEngine.WaterCrossed(across, beyond)
-    require.NoError(t, err)
-    require.True(t, crossed,
-        "the line across the channel crosses water")
-
-    // The ramp engine: a dry step too tall for the line of sight
-    // (the deck ramps of the elven village, ~190 units against the
-    // passable 30), no water anywhere.
-    ramp := &regionSpec{}
-    ramp.setFlat(shoreLand)
-    for x := 400; x <= 600; x++ {
-        for y := 500; y <= 900; y++ {
-            ramp.setCell(x, y, Layer{Height: shoreLand + 190, NSWE: nsweAll})
-        }
-    }
-    rampEngine := newTestEngine(t, ramp)
-
-    below := worldOf(200, 700, shoreLand)
-    above := worldOf(700, 700, shoreLand+190)
-    dry, err := rampEngine.DryLine(below, above)
-    require.NoError(t, err)
-    require.False(t, dry,
-        "the tall dry step breaks the walkable line answer")
-    crossed, err = rampEngine.WaterCrossed(below, above)
-    require.NoError(t, err)
-    require.False(t, crossed,
-        "the tall dry step is terrain, not water")
 }

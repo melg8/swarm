@@ -176,7 +176,6 @@ func goldenSnapshot() Snapshot {
         WalkIndex:  0,
         WalkDest:   &WalkPoint{X: 45110, Y: 50110, Z: -3500},
         WalkSearch: &WalkSearch{
-            Dry:      true,
             Approach: 200,
             Avoid: []WalkAvoidCircle{
                 {X: 43000, Y: 42000, R: 300},
@@ -387,14 +386,14 @@ func TestSnapshotJSONRoundTrip(t *testing.T) {
 
 // TestSnapshotJSONWalkSearchField pins the wire encoding of the walk
 // plan search contract (the repro contract of the 3D pathfind link):
-// the populated view rides as the dry/approach/avoid object, the nil
+// the populated view rides as the approach/avoid object, the nil
 // contract of the direct legs stays null.
 func TestSnapshotJSONWalkSearchField(t *testing.T) {
     snapshot := goldenSnapshot()
     data, err := json.Marshal(snapshot)
     require.NoError(t, err)
     require.Contains(t, string(data),
-        `"walkSearch":{"dry":true,"approach":200,`+
+        `"walkSearch":{"approach":200,`+
             `"avoid":[{"x":43000,"y":42000,"r":300}]}`)
 
     snapshot.WalkSearch = nil

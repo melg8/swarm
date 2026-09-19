@@ -84,9 +84,6 @@ func (m *Mesh) corridorRegion(corridor []PolyRef, filter Filter,
             if targetTile == nil {
                 continue
             }
-            if !filter.AllowWater && targetPoly.Area == AreaWater {
-                continue
-            }
             if _, seen := region[targetRef]; seen {
                 continue
             }

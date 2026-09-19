@@ -236,10 +236,10 @@ func TestParseDumpNoHuntingZone(t *testing.T) {
 }
 
 // TestParseDumpWalkPlanSearch pins the search word of the walk plan
-// header through the whole dump round trip: the dry zone return plans
-// print "dry", the swim plans print "swim", the direct legs (no mesh
-// search) keep the bare header and parse back to a nil contract - the
-// pathfind link replays the very search the plan answers.
+// header through the whole dump round trip: the mesh plans print
+// "mesh", the direct legs (no mesh search) keep the bare header and
+// parse back to a nil contract - the pathfind link replays the very
+// search the plan answers.
 func TestParseDumpWalkPlanSearch(t *testing.T) {
     build := func(search *state.WalkSearch) string {
         bot := state.NewBot("test1")
@@ -257,35 +257,32 @@ func TestParseDumpWalkPlanSearch(t *testing.T) {
         return BuildStateDump(bot)
     }
 
-    dry := build(&state.WalkSearch{
-        Dry:      true,
+    mesh := build(&state.WalkSearch{
         Approach: 200,
         Avoid:    []state.WalkAvoidCircle{{X: 43000, Y: 42000, R: 300}},
     })
-    require.Contains(t, dry,
-        "walk plan (1 waypoints, dry, aiming at wp 0):")
+    require.Contains(t, mesh,
+        "walk plan (1 waypoints, mesh, aiming at wp 0):")
 
-    swim := build(&state.WalkSearch{Dry: false, Approach: 150})
-    require.Contains(t, swim,
-        "walk plan (1 waypoints, swim, aiming at wp 0):")
+    bare := build(&state.WalkSearch{Approach: 150})
+    require.Contains(t, bare,
+        "walk plan (1 waypoints, mesh, aiming at wp 0):")
 
     direct := build(nil)
     require.Contains(t, direct,
         "walk plan (1 waypoints, aiming at wp 0):")
 
-    snap, err := ParseDump(dry)
+    snap, err := ParseDump(mesh)
     require.NoError(t, err)
     require.NotNil(t, snap.WalkSearch)
-    require.True(t, snap.WalkSearch.Dry)
     require.InDelta(t, 200, snap.WalkSearch.Approach, 0.01)
     require.Len(t, snap.WalkSearch.Avoid, 1)
     require.InDelta(t, 43000, snap.WalkSearch.Avoid[0].X, 0.01)
     require.InDelta(t, 300, snap.WalkSearch.Avoid[0].R, 0.01)
 
-    snap, err = ParseDump(swim)
+    snap, err = ParseDump(bare)
     require.NoError(t, err)
     require.NotNil(t, snap.WalkSearch)
-    require.False(t, snap.WalkSearch.Dry)
     require.InDelta(t, 150, snap.WalkSearch.Approach, 0.01)
     require.Empty(t, snap.WalkSearch.Avoid)
 

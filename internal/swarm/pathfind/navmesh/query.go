@@ -46,7 +46,13 @@ type WaterZone struct {
     MaxZ float64
 }
 
-// Filter prices the areas of a search.
+// Filter prices the areas of a search. The water polygons stay
+// walkable under every filter of this round: a crossing pays the
+// WaterCost swim rate (swimming is slower than running), so the land
+// detours win whenever they are the faster walk and the short water
+// cuts win whenever they are - the plan may swim, the slowdown
+// priced (the 2026-09-19 round: the walled form of the water was the
+// outdated way the owner retired).
 type Filter struct {
     // WaterCost multiplies the step cost of the water polygons (the
     // swim pricing - the measured run/swim speed ratio: the C1
@@ -64,9 +70,6 @@ type Filter struct {
     // every water polygon at the WaterCost (the toy worlds and the
     // searches without the zone table).
     WaterZones []WaterZone
-    // AllowWater keeps the water polygons walkable; a false value
-    // walls them (the dry searches of the hunt loop).
-    AllowWater bool
     // Avoid carries the recovery bans of the hunt loop (see
     // AvoidCircle): every polygon whose footprint a ban touches
     // walls the search - except the escape polygons of the ban that
@@ -106,26 +109,14 @@ type Filter struct {
     AvoidGrazed bool
 }
 
-// DefaultFilter is the swim allowing search with the measured swim
-// pricing (the run/swim speed ratio 2.3 of the HumanFighter
-// templates, the swim 50 of every class against the run 115..125).
+// DefaultFilter is the priced search: the water polygons stay
+// walkable at the measured swim rate (the run/swim speed ratio 2.3
+// of the HumanFighter templates, the swim 50 of every class against
+// the run 115..125), so a crossing competes with the land detours on
+// the honest travel time and the faster walk wins.
 func DefaultFilter() Filter {
     return Filter{
         WaterCost:         2.3,
-        AllowWater:        true,
-        Avoid:             nil,
-        WaypointClearance: 0,
-        Smooth:            false,
-    }
-}
-
-// DryFilter walls the water polygons: a route only exists over dry
-// ground, an unreachable dry target answers the partial corridor to
-// the closest reachable dry point.
-func DryFilter() Filter {
-    return Filter{
-        WaterCost:         2.3,
-        AllowWater:        false,
         Avoid:             nil,
         WaypointClearance: 0,
         Smooth:            false,
@@ -319,14 +310,6 @@ func (m *Mesh) RouteApproach(
     return route, nil
 }
 
-// RouteDry searches the dry route from start to end: the water
-// polygons are walls, so a target only swimming reaches answers the
-// partial corridor to the closest dry point (the FindPathApproachDry
-// contract of the grid engine).
-func (m *Mesh) RouteDry(start, end Pos) (*Route, error) {
-    return m.Route(start, end, DryFilter())
-}
-
 // WaterEscape plans the way out of the water for a position standing
 // on a water polygon: the cheapest corridor to the first dry polygon
 // with the water priced 8x (the FindWaterEscape contract of the grid
@@ -355,7 +338,6 @@ func (m *Mesh) WaterEscape(start Pos) (*Route, error) {
     defer m.releaseState(state)
     filter := Filter{
         WaterCost:         escapeWaterCost,
-        AllowWater:        true,
         Avoid:             nil,
         WaypointClearance: 0,
     }

@@ -95,7 +95,7 @@ func TestDryPathFromStuckSpotToHerbielFound(t *testing.T) {
     engine := stuckSpotEngine(t)
     from := Vec3{X: 44440, Y: 52552, Z: -2832}
     herbiel := Vec3{X: 42766, Y: 50037, Z: -2984}
-    result, err := engine.FindPathApproachDry(
+    result, err := engine.FindPathApproach(
         from, herbiel, 200, DefaultMaxPassableHeight)
     require.NoError(t, err)
     require.NotNil(t, result)
@@ -116,7 +116,7 @@ func TestDryPathFromStuckSpotToCobendellFound(t *testing.T) {
     engine := stuckSpotEngine(t)
     from := Vec3{X: 44440, Y: 52552, Z: -2832}
     cobendell := Vec3{X: 44823, Y: 52414, Z: -2792}
-    result, err := engine.FindPathApproachDry(
+    result, err := engine.FindPathApproach(
         from, cobendell, 200, DefaultMaxPassableHeight)
     require.NoError(t, err)
     require.NotNil(t, result)

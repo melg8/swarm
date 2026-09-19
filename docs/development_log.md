@@ -6494,3 +6494,118 @@ TestShortenWetHopHalvesToTheDryPrefix) retires with the machinery.
   ok, golangci-lint answers no new findings over the previous round
   (the 5 residual ones are the lint version drift that already shows
   on the base commit), the whitespace gate green.
+
+## Round 90: the priced water - the walled form retires, every search swims at the honest rate (2026-09-19)
+
+The owner directive: "в коде кажется остались устаревшие способы - не
+должно сохраняться filter=swim - бот должен рассчитывать путь и через
+водные объекты, просто с корректными замедлениями - в воде плыть
+медленней чем бежать". The dry/swim dichotomy was the outdated way:
+the walled form of the water (the dry searches, the `filter=dry`
+links, the wet click guard) and the named swim form (`filter=swim`)
+both go. One search remains, and the water is a price, never a wall:
+every crossing pays the run/swim speed ratio (2.3 - the C1 templates
+carry the run 115..125 against the swim 50 of every class), so the
+land detours win whenever they are the faster walk and the short
+water cuts win whenever they are. The plan may swim, the slowdown
+priced - and the walker walks the wet legs the plan carries.
+
+### The retirement
+
+- `navmesh`: the `AllowWater` field, the `DryFilter` constructor and
+  the `RouteDry` query are deleted (the astar expansion gate, the
+  hierarchy coarse gate, the confined corridor gate and the hop cache
+  dry dimension with them). `DefaultFilter` is THE filter: the priced
+  search. The escape search keeps its 8x water price (the way out of
+  the water is a different question than the walk through it).
+- The grid engine: the `search.dry` wall branch is deleted (the
+  `waterCostMultiplier` pricing stays), `FindPathApproachDry` /
+  `FindPathApproachDryAvoiding` and `DryLine` are deleted. The direct
+  line shortcut keeps its dry raster gate (a water chord must defer
+  to the priced A*, the 2026-09-10 bridge lesson) and the smoothing
+  keeps `legDry` (a chord over water between dry points must not fold
+  the priced detour away).
+- The hunt loop plans through ONE search everywhere:
+  `startWalkLegSearch(dest)` - the zone return, the town trips and
+  the quest segments all navigate with the priced approach avoiding
+  search; the shop trip's non-dry escalation and the zone return's
+  dry-then-non-dry fallback ladder are deleted (one deterministic
+  search cannot answer differently on its second identical run).
+- The click water guard retires: `clickWouldEnterWater`, the wet hop
+  shortening of the direct leg, the wet refusal variant skip and the
+  short click extension's water gate are deleted - the guard's
+  refuse-and-re-path cycle was the very mechanism that burned the
+  re-path budget on the 2026-09-10 dump. The plan is the water
+  authority now; the cursor key escape claims keep their dry strides
+  (the claims stream positions the server follows without any click
+  validation, so a claim never names a wet cell).
+- The water escape gate learns the plan's intent: a character floating
+  over a lake bed keeps following the plan when the AIMED waypoint
+  stands on a bed below the C1 water level (`pathfind.WaterLevel`,
+  now exported) and lies ahead of the character - the crossing the
+  search priced IS the walk. Every other over-water state (a server
+  push, a click drift, a leg planned from a wet standing cell whose
+  aim is the own wet cell) arms the shore escape exactly like the
+  2026-09-10 round designed.
+- The web: the viewer's route filter select, the `filter` URL
+  parameter, the POST body field and the response word are gone; the
+  HUD pathfind link carries no filter anymore (the repro contract
+  keeps `approach`, `avoid`, `fold=0`); the state dump names the word
+  `mesh` in the walk plan header instead of dry/swim and the parser
+  restores the contract from the `search` line alone; `ApplyDump`
+  restores the search contract into the replayed plan (the paste a
+  dump flow now rebuilds the exact search).
+- The state wire: `WalkSearch.Dry` is deleted (the `walkSearch` JSON
+  object is `{"approach":...,"avoid":[...]}`) - a wire change, the
+  older dumps parse fine (the header word maps to the empty contract
+  plus the search line).
+
+### The pricing pins
+
+- `TestPricedApproachSwimsAWideBand`: a 48 cell water band 448 cells
+  tall - the swim at 2.3x beats the land detour around its far edge,
+  the found route crosses the water (the wet legs on the
+  `WaterCrossed` raster: the smoothing folds the swim into one chord
+  whose endpoints stand dry, so the crossing shows on the legs, not
+  the waypoint heights).
+- `TestPricedApproachDetoursANarrowBand` +
+  `TestPricedRouteKeepsTheShorePivots`: an 8 cell band - the 2.3x
+  crossing loses to the cheap shore excursion, the answer stays dry
+  waypoint by waypoint and leg by leg, and the smoothing keeps the
+  shore pivots (the funnel never folds back into the water chord).
+- Both worlds build the water from WHOLE flat blocks: the per cell
+  `setCell` raises the untouched cells of every touched 8x8 block to
+  height 0 - the pillar maze walls the water off and the pricing
+  never decides. The old synthetic channel worlds passed their dry
+  pins through exactly that artifact; the honest pricing pins need
+  the honest water body.
+- `TestTripPlannedSwimKeepsFollowingThePlan` (the escape gate), 
+  `TestTripWetClickWalksThePlan` (the wet click goes out, no re-path
+  burns), `TestZoneReturnPlansThroughThePricedSearch` +
+  `TestStartZoneReturnLegRunsOnePricedSearch` (one search per
+  planning attempt), `TestTripNoRouteArmsCooldown` (the abort pins).
+
+### Verification
+
+- The full `go test ./...` answers green (every package), the
+  uncapped `golangci-lint run ./...` answers 0 issues, the tree is
+  gofmt-spaces clean, the `tools/repro_hud.js` harness passes with
+  the filter-free link pins.
+
+### Residual
+
+- The fold oracle stays water blind (the Round 87 open cure): the
+  double click fold may draw a chord over a lake the priced corridor
+  detours - the plan repro links arm `fold=0` and rebuild the very
+  search. A water aware corridor bound fold oracle is still the
+  deeper cure.
+- A leg planned FROM a wet standing cell always escapes to the shore
+  first (its aim is the own wet cell): the plan's own shore route and
+  the escape search answer the same shore-first walk, the escape is
+  the deterministic one - the priced crossing from open water is
+  rare and the recovery is honest.
+- The C1 water zone table prices only the cuboid-covered beds (the
+  zone data, not the depth, prices the swim): the river segments the
+  zone data omits still cross at the land rate - unchanged from the
+  zone pricing round, the server itself walks those beds at the run
+  speed.

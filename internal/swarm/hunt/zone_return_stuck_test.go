@@ -105,20 +105,18 @@ func TestTownTripWeaponRunStartsOutsideTheZone(t *testing.T) {
         "the weapon run starts even outside the zone")
 }
 
-// TestZoneReturnNonDryFallback pins fix #2: when the dry search fails
-// for the zone return, the non-dry search runs as a fallback. The
-// 2026-09-11 06:00 dump showed the dry search failing from 43000
-// 50184 to the zone center; the non-dry fallback gives the bot a
-// route (the click guard refuses water legs and re-paths).
-func TestZoneReturnNonDryFallback(t *testing.T) {
+// TestZoneReturnPlansThroughThePricedSearch pins the zone return
+// planning: the priced approach search runs once and the walk arms on
+// its answer - no walled form of the water exists anymore, the search
+// either finds the walk or the zone return falls back to the direct
+// walks.
+func TestZoneReturnPlansThroughThePricedSearch(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     // The bot stands outside the zone.
     moveSelfTo(bot, 43000, 50184, -2992)
     loop.zoneCX = 38553
     loop.zoneCY = 50080
     loop.zoneHalf = 1448
-    // The dry search fails, the non-dry search succeeds.
-    nav.dryMiss = true
     nav.found = true
 
     loop.tick()
@@ -126,24 +124,24 @@ func TestZoneReturnNonDryFallback(t *testing.T) {
     require.True(t, loop.zoneReturn,
         "the zone return is armed")
     require.Equal(t, phaseTownReturn, loop.phase,
-        "the zone return is walking (the non-dry fallback found a path)")
-    require.Greater(t, nav.calls, 1,
-        "both the dry and the non-dry search ran")
+        "the zone return is walking (the priced search found a path)")
+    require.Equal(t, 1, nav.calls,
+        "the priced search runs exactly once")
 }
 
 // TestZoneReturnDryFailureHoldsTheReturn pins the no-route rule: when
-// both the dry and the non-dry searches fail, the zone return HOLDS
-// instead of marching the direct legs toward the zone center (the
-// owner rule of the 2026-09-19 round: НИКОГДА не идти напрямую - the
-// paced log names the standing return).
+// the priced search fails, the zone return HOLDS instead of marching
+// the direct legs toward the zone center (the owner rule of the
+// 2026-09-19 round: НИКОГДА не идти напрямую - the paced log names the
+// standing return).
 func TestZoneReturnDryFailureHoldsTheReturn(t *testing.T) {
     loop, game, bot, nav := newTripLoop()
     moveSelfTo(bot, 43000, 50184, -2992)
     loop.zoneCX = 38553
     loop.zoneCY = 50080
     loop.zoneHalf = 1448
-    // Both searches fail.
-    nav.dryMiss = true
+    // The search misses.
+    nav.miss = true
     nav.found = false
 
     loop.tick()
@@ -156,13 +154,13 @@ func TestZoneReturnDryFailureHoldsTheReturn(t *testing.T) {
         "no direct walk toward the zone center ever goes out")
 }
 
-// TestStartZoneReturnLegTriesDryThenNonDry pins the search order of
-// the zone return leg: the dry search runs first, and only when it
-// fails does the non-dry search run.
-func TestStartZoneReturnLegTriesDryThenNonDry(t *testing.T) {
+// TestStartZoneReturnLegRunsOnePricedSearch pins the search count of
+// the zone return leg: one priced search per planning attempt - the
+// dry then non-dry escalation of the old rounds is retired with the
+// walled water form.
+func TestStartZoneReturnLegRunsOnePricedSearch(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     moveSelfTo(bot, 43000, 50184, -2992)
-    nav.dryMiss = true
     nav.found = true
     nav.route = []pathfind.Vec3{
         {X: 43000, Y: 50184, Z: -2992},
@@ -173,9 +171,9 @@ func TestStartZoneReturnLegTriesDryThenNonDry(t *testing.T) {
     dest := pathfind.Vec3{X: 38553, Y: 50080, Z: -3512}
     ok := loop.startZoneReturnLeg(dest)
 
-    require.True(t, ok, "the zone return leg was planned (non-dry fallback)")
-    require.Equal(t, 2, nav.calls,
-        "the dry search ran once (missed), the non-dry search ran once (found)")
+    require.True(t, ok, "the zone return leg was planned")
+    require.Equal(t, 1, nav.calls,
+        "the priced search runs once per planning attempt")
     require.NotEmpty(t, loop.waypoints,
-        "the waypoints are armed from the non-dry search")
+        "the waypoints are armed from the search")
 }

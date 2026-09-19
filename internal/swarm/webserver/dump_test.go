@@ -80,24 +80,24 @@ func TestBotDumpEndpoint(t *testing.T) {
 
 // TestWalkPlanSectionSearchWord pins the search word of the walk
 // plan header (the repro contract of the 3D pathfind link): a mesh
-// plan names its filter (dry walls the water, swim prices it) so the
-// report names the search the link replays, the direct legs (no mesh
-// search) keep the bare header.
+// plan names the word (the priced search needs no filter name) so
+// the report names the search the link replays, the direct legs (no
+// mesh search) keep the bare header.
 func TestWalkPlanSectionSearchWord(t *testing.T) {
     paths := []state.WalkPoint{{X: 1, Y: 2, Z: 3}}
 
     var b strings.Builder
     writeWalkPlanSection(&b, "walk plan (", paths, nil, 0, nil,
-        &state.WalkSearch{Dry: true}, time.Time{}, time.Time{}, nil)
+        &state.WalkSearch{}, time.Time{}, time.Time{}, nil)
     require.Contains(t, b.String(),
-        "walk plan (1 waypoints, dry, aiming at wp 0):")
+        "walk plan (1 waypoints, mesh, aiming at wp 0):")
 
     b.Reset()
     writeWalkPlanSection(&b, "walk plan (", paths, nil, 0, nil,
-        &state.WalkSearch{Dry: false, Approach: 150},
+        &state.WalkSearch{Approach: 150},
         time.Time{}, time.Time{}, nil)
     require.Contains(t, b.String(),
-        "walk plan (1 waypoints, swim, aiming at wp 0):")
+        "walk plan (1 waypoints, mesh, aiming at wp 0):")
 
     b.Reset()
     writeWalkPlanSection(&b, "walk plan (", paths, nil, 0, nil,

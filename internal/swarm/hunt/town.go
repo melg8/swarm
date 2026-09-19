@@ -359,23 +359,11 @@ type Navigator interface {
     FindPathApproach(start, end pathfind.Vec3, approachRadius float64) (
         *pathfind.Result, error,
     )
-    // FindPathApproachAvoiding plans the water permitting walk
-    // around the given avoid areas: the zone return fallback - the
-    // dry search may fail under the accumulated bans while a wet
-    // detour around them still exists, and a fallback that ignored
-    // the bans reproduced the very corridor they exist to detour.
+    // FindPathApproachAvoiding plans the walk around the given avoid
+    // areas: the zone return and the quest segments navigate with it
+    // - a fallback that ignored the bans reproduced the very corridor
+    // they exist to detour.
     FindPathApproachAvoiding(
-        start, end pathfind.Vec3, approachRadius float64,
-        avoid []pathfind.AvoidArea,
-    ) (*pathfind.Result, error)
-    // FindPathApproachDryAvoiding plans the water walled walk around
-    // the given avoid areas: every waypoint of a found route stands
-    // above the water level and outside the banned ground, a target
-    // only swimming (or only reachable through the ban) reaches
-    // answers not found. The town legs navigate with it - a planned
-    // swim is a plan the click guard refuses leg by leg, and the
-    // session's frozen corridors must not be re-planned into.
-    FindPathApproachDryAvoiding(
         start, end pathfind.Vec3, approachRadius float64,
         avoid []pathfind.AvoidArea,
     ) (*pathfind.Result, error)
@@ -398,8 +386,9 @@ type Navigator interface {
     // WaterCrossed reports whether the straight line between two
     // world positions crosses cells whose geodata surface lies below
     // the water level (the pure water raster - a height step of the
-    // terrain is not water and never trips it). The town walker checks
-    // every click target with it before sending the move request.
+    // terrain is not water and never trips it). The cursor key escape
+    // claims check their strides with it: a claim never names a wet
+    // cell.
     WaterCrossed(start, end pathfind.Vec3) (bool, error)
     // FindWaterEscape plans the walk out of the water to the nearest
     // shore: a character standing over a lake bed cannot reach decks
@@ -437,24 +426,13 @@ func (e engineNavigator) FindPathApproach(
         start, end, approachRadius, e.engine.MaxPassableHeight())
 }
 
-// FindPathApproachAvoiding searches the water permitting path around
-// the avoid areas with the engine settings and the approach radius
-// goal.
+// FindPathApproachAvoiding searches the path around the avoid areas
+// with the engine settings and the approach radius goal.
 func (e engineNavigator) FindPathApproachAvoiding(
     start, end pathfind.Vec3, approachRadius float64,
     avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
     return e.engine.FindPathApproachAvoiding(
-        start, end, approachRadius, e.engine.MaxPassableHeight(), avoid)
-}
-
-// FindPathApproachDryAvoiding searches the water walled path around the
-// avoid areas with the engine settings and the approach radius goal.
-func (e engineNavigator) FindPathApproachDryAvoiding(
-    start, end pathfind.Vec3, approachRadius float64,
-    avoid []pathfind.AvoidArea,
-) (*pathfind.Result, error) {
-    return e.engine.FindPathApproachDryAvoiding(
         start, end, approachRadius, e.engine.MaxPassableHeight(), avoid)
 }
 
@@ -754,17 +732,7 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
         merchant.Name)
     l.legRadius = tripApproachRadius
     if !l.startWalkLeg(townNpcPosition(merchant)) {
-        // The dry search walls the water off and the shop sits
-        // across it on this deployment (the observed six hour
-        // run: 47 trips aborted on "no walkable path to the
-        // shop" while the shopping plan starved); the non-dry
-        // fallback routes through it and the click guard of the
-        // follower walks the shore legs - the same escalation
-        // the zone return runs when its dry search fails for
-        // unknown reasons.
-        if !l.startWalkLegSearch(townNpcPosition(merchant), true) {
-            l.abortTownTrip("no walkable path to the shop")
-        }
+        l.abortTownTrip("no walkable path to the shop")
     }
 }
 
@@ -907,52 +875,42 @@ func (l *Loop) interruptTripForAttacker(now time.Time) bool {
 }
 
 // startWalkLeg plans the walk to the destination and arms the waypoint
-// follower. The search is dry (the water walled off): a planned swim
-// is a plan the click guard refuses leg by leg - the walker would burn
-// its re-path budget re-planning the identical wet route and abort,
-// the delevel water loop of the 2026-09-10 state dump. The search goal
-// is the approach radius of the destination (the merchant interaction
-// distance): a destination behind a counter or on a floor layer the
-// geodata does not model is still reached on the surrounding deck. A
-// destination the dry geodata cannot reach reports false - the callers
-// abort the trip and arm their cooldowns instead of walking into the
-// water. The planning position publishes as the leg origin of the
-// walk plan view - the dump shows the whole walk from it. It reports
-// whether the leg was planned.
+// follower. The search prices the water at the swim rate (swimming is
+// slower than running): the plan crosses a lake only when the crossing
+// is the genuinely faster walk, and the follower walks the wet legs it
+// planned - the walker and the planner share one water policy. The
+// search goal is the approach radius of the destination (the merchant
+// interaction distance): a destination behind a counter or on a floor
+// layer the geodata does not model is still reached on the surrounding
+// deck. A destination no route reaches reports false - the callers
+// abort the trip and arm their cooldowns. The planning position
+// publishes as the leg origin of the walk plan view - the dump shows
+// the whole walk from it. It reports whether the leg was planned.
 func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
-    return l.startWalkLegSearch(dest, false)
+    return l.startWalkLegSearch(dest)
 }
 
-// startZoneReturnLeg plans the zone return walk with a non-dry
-// fallback: the dry search (water walled off) runs first, and when it
-// fails the non-dry search (water allowed, with a cost penalty) runs
-// as a fallback. The zone return must bring the bot home even when
-// the dry search fails for unknown reasons (the 2026-09-11 06:00
-// dump: the dry search reported "no dry path" from 43000 50184 to
-// both the zone center and Herbiel 276 units away, while the offline
-// probe against the same geodata found both paths - the runtime
-// difference is unresolved, but the non-dry fallback gives the bot a
-// route). The click guard of the town walk follower refuses water
-// legs and re-paths around the shore, so a non-dry plan with water
-// legs is still safe to walk - the bot follows the dry parts and
-// re-plans at the waterline. It reports whether the leg was planned.
+// startZoneReturnLeg plans the zone return walk through the priced
+// approach search: the water crossings compete with the land detours
+// on the honest travel time, the session's frozen corridors stay
+// banned. The zone return must bring the bot home whenever any route
+// exists (the 2026-09-11 06:00 dump: the search reported no route
+// from 43000 50184 to both the zone center and Herbiel 276 units
+// away, while the offline probe against the same geodata found both
+// paths - the runtime difference is unresolved, the priced search
+// with its partial corridor answer gives the bot the walkable route
+// toward home in every case the corridor exists). It reports whether
+// the leg was planned.
 func (l *Loop) startZoneReturnLeg(dest pathfind.Vec3) bool {
-    if l.startWalkLegSearch(dest, false) {
-        return true
-    }
-    l.logger.Printf("Hunt: no dry zone return path to %d %d, "+
-        "trying the non-dry search", int(dest.X), int(dest.Y))
-
-    return l.startWalkLegSearch(dest, true)
+    return l.startWalkLegSearch(dest)
 }
 
 // legSearchView freezes one mesh search contract into the walk plan
-// view: the filter (dry walls the water, swim prices it), the
-// approach radius and the ban circles the search ran with.
+// view: the approach radius and the ban circles the search ran with.
 func legSearchView(
-    dry bool, approach float64, avoid []pathfind.AvoidArea,
+    approach float64, avoid []pathfind.AvoidArea,
 ) *state.WalkSearch {
-    search := &state.WalkSearch{Dry: dry, Approach: approach}
+    search := &state.WalkSearch{Approach: approach, Avoid: nil}
     if len(avoid) == 0 {
         return search
     }
@@ -968,18 +926,17 @@ func legSearchView(
     return search
 }
 
-// startWalkLegSearch plans the walk to the destination through either
-// the dry or the non-dry approach search and arms the waypoint
-// follower. The dry switch walls the water off (the town trips refuse
-// a planned swim); the non-dry switch allows water crossings (the
-// zone return fallback). The dry search routes around the frozen
-// areas of the session - ground the live server refused to walk
-// although the geodata pack modeled it as open - so the deterministic
-// planner detours instead of reproducing the frozen corridor. It
-// reports whether the leg was planned.
-//
-//nolint:funlen // the contract stamps and the plumbing ride one body
-func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
+// startWalkLegSearch plans the walk to the destination through the
+// priced approach search and arms the waypoint follower. The water
+// crossings pay the swim rate (swimming is slower than running), so
+// the plan prefers the land detours whenever they are the faster walk
+// and swims whenever the water cut wins - the follower walks the wet
+// legs the plan carries. The search routes around the frozen areas of
+// the session - ground the live server refused to walk although the
+// geodata pack modeled it as open - so the deterministic planner
+// detours instead of reproducing the frozen corridor. It reports
+// whether the leg was planned.
+func (l *Loop) startWalkLegSearch(dest pathfind.Vec3) bool {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
         return false
@@ -993,28 +950,16 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
     if radius <= 0 {
         radius = tripApproachRadius
     }
-    var result *pathfind.Result
-    var err error
-    if nonDry {
-        result, err = l.navigator.FindPathApproachAvoiding(
-            from, dest, radius, l.frozenAreas)
-    } else {
-        result, err = l.navigator.FindPathApproachDryAvoiding(
-            from, dest, radius, l.frozenAreas)
-    }
+    result, err := l.navigator.FindPathApproachAvoiding(
+        from, dest, radius, l.frozenAreas)
     if err != nil {
         l.logf("Hunt: town trip path search failed: %v", err)
 
         return false
     }
     if result == nil || len(result.Waypoints) == 0 {
-        if !nonDry {
-            l.logf("Hunt: no dry path to %d %d, the walk would "+
-                "swim", int(dest.X), int(dest.Y))
-        } else {
-            l.logf("Hunt: no path to %d %d at all",
-                int(dest.X), int(dest.Y))
-        }
+        l.logf("Hunt: no path to %d %d at all",
+            int(dest.X), int(dest.Y))
 
         return false
     }
@@ -1026,13 +971,8 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
         // at the start position, so the trip continues from wherever
         // the ground ends (the shore of a swim-only destination, the
         // border of the sealed corridor).
-        if !nonDry {
-            l.logf("Hunt: no dry route to %d %d, walking the "+
-                "closest reachable point", int(dest.X), int(dest.Y))
-        } else {
-            l.logf("Hunt: no route to %d %d, walking the closest "+
-                "reachable point", int(dest.X), int(dest.Y))
-        }
+        l.logf("Hunt: no route to %d %d, walking the closest "+
+            "reachable point", int(dest.X), int(dest.Y))
     }
     l.waypoints = result.Waypoints
     l.wpIndex = 0
@@ -1040,13 +980,11 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
     l.legStart = from
     l.waterEscape = false
     // The plan view carries the search contract the leg answers (the
-    // repro contract of the 3D pathfind link): the filter, the
-    // approach radius and the ban circles of this very search, so a
-    // viewer replay rebuilds the walk the bot follows instead of a
-    // lookalike (the 2026-09-19 route mismatch: the swim filter plus
-    // the water blind fold drew a straight chord over the lake the
-    // dry return detours).
-    l.legSearch = legSearchView(!nonDry, radius, l.frozenAreas)
+    // repro contract of the 3D pathfind link): the approach radius
+    // and the ban circles of this very search, so a viewer replay
+    // rebuilds the walk the bot follows instead of a lookalike (the
+    // 2026-09-19 route mismatch).
+    l.legSearch = legSearchView(radius, l.frozenAreas)
     // The fresh plan opens with a fresh frame measurement: the plan's
     // first waypoint IS the character's own cell resolved on the pack,
     // so the difference of the two z values is the vintage shift of
@@ -1214,6 +1152,26 @@ func (l *Loop) walkTownWaypoints() bool {
     if l.navigator != nil {
         if l.navigator.OverWater(
             float64(selfX), float64(selfY), int16(selfZ)) {
+            // The character floats over a lake or sea bed. When the
+            // plan itself crosses the water here - the aimed waypoint
+            // stands on a bed below the C1 water surface, ahead of
+            // the character - the swim IS the walk, keep following
+            // it. The escape arms for the off-plan swims (a server
+            // push, a click drift), for a leg planned from a wet
+            // standing cell (the aim is the own wet cell, the plan
+            // goes ashore first) and for the escape walk itself:
+            // the shore walk recovers everything the plan does not
+            // price (the 2026-09-10 paralysis: clicking toward decks
+            // the water has no walkable connection to).
+            aim := l.waypoints[l.wpIndex:]
+            if !l.waterEscape && len(aim) > 0 &&
+                aim[0].Z < float64(pathfind.WaterLevel) &&
+                waypointDistance(aim[0], selfX, selfY, selfZ) >
+                    waypointPassDist {
+                return l.followWaypoints(selfX, selfY, selfZ,
+                    time.Now())
+            }
+
             return l.walkWaterEscape(selfX, selfY, selfZ)
         }
         if l.waterEscape {
@@ -1236,7 +1194,7 @@ func (l *Loop) walkTownWaypoints() bool {
         }
     }
 
-    return l.followWaypoints(selfX, selfY, selfZ, time.Now(), true)
+    return l.followWaypoints(selfX, selfY, selfZ, time.Now())
 }
 
 // cursorEscapeState carries the armed cursor key escape: the origin
@@ -1613,13 +1571,12 @@ func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
 // followWaypoints is the shared waypoint follower core of the town
 // legs and the water escapes: the waypoint arrival (tight for the
 // intermediate turns, wide for the final goal), the passed waypoint
-// skipping, the stuck tracking and the click pace. The waterGuard
-// switch tells whether the click lines must verify dry before they
-// are sent (the town legs: the character is ashore and must stay so)
-// or not (the water escape: its legs intentionally cross the water
-// back to the shore).
+// skipping, the stuck tracking and the click pace. The planned water
+// legs walk like the dry ones: the plan prices the crossings (the
+// swim rate), the follower follows it - the escape machinery owns
+// the off-plan swims instead of a click guard (see walkTownWaypoints).
 func (l *Loop) followWaypoints(
-    selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
+    selfX, selfY, selfZ int32, now time.Time,
 ) bool {
     l.advanceWaypoints(selfX, selfY, selfZ)
     if l.wpIndex >= len(l.waypoints) {
@@ -1654,24 +1611,22 @@ func (l *Loop) followWaypoints(
     if !l.moveAt.IsZero() && now.Sub(l.moveAt) < walkRequestPeriod {
         return false
     }
-    l.clickWaypoint(selfX, selfY, selfZ, now, waterGuard)
+    l.clickWaypoint(selfX, selfY, selfZ, now)
 
     return false
 }
 
 // clickWaypoint aims the current waypoint, bends the click around the
-// idle aggressive camps, guards the line against water and the server
-// refusal and sends it. The leg splitting caps the click at the
+// idle aggressive camps, guards the line against the server refusal
+// and sends it. The leg splitting caps the click at the
 // server move request limit; the short click extension re-aims the
 // clicks under the server rescue floor at the plan polyline (see
-// minWalkClick); the water guard and the server click validation run
-// after the steering so the line they verify is the one actually
-// being sent. Without a navigator both guards stay off (the walk was
+// minWalkClick); the server click validation runs after the steering
+// so the line it verifies is the one actually
+// being sent. Without a navigator the guard stays off (the walk was
 // planned elsewhere, the follower only walks it).
-//
-//nolint:cyclop // the branches mirror the server click checks per waypoint kind
 func (l *Loop) clickWaypoint(
-    selfX, selfY, selfZ int32, now time.Time, waterGuard bool,
+    selfX, selfY, selfZ int32, now time.Time,
 ) {
     wp := l.waypoints[l.wpIndex]
     dx := wp.X - float64(selfX)
@@ -1702,7 +1657,7 @@ func (l *Loop) clickWaypoint(
             l.waypoints, l.wpIndex, selfX, selfY)
         if behind || dist < minWalkClick {
             extX, extY, extZ, ok := l.extendShortClick(
-                selfX, selfY, selfZ, waterGuard,
+                selfX, selfY, selfZ,
                 moveX, moveY, moveZ)
             if ok {
                 moveX, moveY, moveZ = extX, extY, extZ
@@ -1749,10 +1704,6 @@ func (l *Loop) clickWaypoint(
         selfX, selfY, selfZ, moveXI, moveYI, moveZI,
         int32(l.legDest.X), int32(l.legDest.Y), now); dodged {
         moveX, moveY = float64(ax), float64(ay)
-    }
-    if waterGuard && l.navigator != nil && l.clickWouldEnterWater(
-        selfX, selfY, selfZ, moveX, moveY, moveZ) {
-        return
     }
     // The server click validation runs last: the server refuses
     // whole lines its Bresenham raster walks into walled corners -
@@ -1814,8 +1765,7 @@ func waypointBehindRoute(
 // collapse hands the click to the server pathfinder instead of
 // silently canceling it (see the minWalkClick contract). The candidates
 // try in forward order and the first the local rules bless wins - the
-// water crossing check of the guard (the town legs must stay dry) and
-// the server click validation port both run on the chord, and a route
+// server click validation port runs on the chord, and a route
 // cell that walls one chord (the 2026-09-11 11:34 reproduction: the
 // terrace hillside step refused every chord crossing it) only skips
 // that sample, the next one further along the route still carries the
@@ -1823,7 +1773,7 @@ func waypointBehindRoute(
 // refusal machinery of clickServerValidated answers it exactly like
 // today.
 func (l *Loop) extendShortClick(
-    selfX, selfY, selfZ int32, waterGuard bool,
+    selfX, selfY, selfZ int32,
     primX, primY, primZ float64,
 ) (float64, float64, float64, bool) {
     if l.navigator == nil {
@@ -1836,12 +1786,6 @@ func (l *Loop) extendShortClick(
         selfX, selfY, l.waypoints, l.wpIndex, l.legFrameOffset)
     for c := range count {
         sample := candidates[c]
-        if waterGuard {
-            if crossed, err := l.navigator.WaterCrossed(
-                from, sample); err == nil && crossed {
-                continue
-            }
-        }
         if _, ok := l.navigator.ValidateClick(from, sample); !ok {
             continue
         }
@@ -2045,61 +1989,10 @@ func (l *Loop) clickEscapeHop(
     return false
 }
 
-// clickWouldEnterWater verifies the straight line of a ground click
-// before it is sent and re-paths the walk around the shore when the
-// line would enter the water: the server walks characters into lakes
-// (its own routing has no water cost at all, its move validation
-// accepts the gradual underwater beds, and once the character swims
-// its move requests skip the geodata checks entirely - the reported
-// trip swam below the elven village plateau this way and stood
-// paralyzed under its cliff). It reports whether the click was
-// refused and the walk re-planned.
-func (l *Loop) clickWouldEnterWater(
-    selfX, selfY, selfZ int32, moveX, moveY, moveZ float64,
-) bool {
-    crossed, err := l.navigator.WaterCrossed(
-        pathfind.Vec3{
-            X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-        },
-        pathfind.Vec3{X: moveX, Y: moveY, Z: moveZ},
-    )
-    if err != nil || !crossed {
-        // A line the geodata cannot verify stays on the old behavior:
-        // the walk was planned over the same data, the drift the
-        // guard exists for shows up as a wet line, not an error. The
-        // check itself is water only: a click over a height step of
-        // the terrain (the village deck ramps, the plaza above the
-        // shops) is a normal walk the server routing handles - the
-        // teacher legs of the learning trips died on the line of sight
-        // half of the old dry check, which read those ramps as water
-        // and aborted every trip that carried them.
-        return false
-    }
-    l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
-    l.stuckFast = false
-    l.rePaths++
-    if l.rePaths > maxRePaths {
-        l.abortTownTrip("the walk would cross water")
-
-        return true
-    }
-    l.logger.Printf("Hunt: the walk would enter water at %d %d, "+
-        "re-pathing around the shore (%d of %d)",
-        selfX, selfY, l.rePaths, maxRePaths)
-    if !l.startWalkLeg(l.legDest) {
-        l.abortTownTrip("re-path failed")
-
-        return true
-    }
-
-    return true
-}
-
 // walkWaterEscape drives the shore recovery while the character
 // stands over water: the first entry plans the nearest shore walk
 // (the water escape search of the navigator), the following ticks
-// walk it with the plain waypoint follower (no click guard - the
-// escape legs cross the water by design), and an escape whose
+// walk it with the plain waypoint follower, and an escape whose
 // waypoints are walked out while the character still stands wet
 // re-plans from the current position: the arrival slack may have
 // stopped the character a wet cell short of the waterline. It never
@@ -2116,7 +2009,7 @@ func (l *Loop) walkWaterEscape(
 
         return false
     }
-    if !l.followWaypoints(selfX, selfY, selfZ, time.Now(), false) {
+    if !l.followWaypoints(selfX, selfY, selfZ, time.Now()) {
         return false
     }
     l.rePaths++
@@ -2285,10 +2178,6 @@ func (l *Loop) sendVariedAim(
             X: variant[0], Y: variant[1], Z: variant[2],
         }
         if _, ok := l.navigator.ValidateClick(from, to); !ok {
-            continue
-        }
-        crossed, err := l.navigator.WaterCrossed(from, to)
-        if err == nil && crossed {
             continue
         }
         l.refusalVariants++

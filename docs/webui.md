@@ -478,23 +478,24 @@ grow by the 2 s window, so the payload stays small.
 - Pathfind link repro contract: a walk plan that answers a mesh
   search carries that search's contract
   (`state.WalkPlan.Search` -> the `walkSearch` snapshot field: the
-  filter, the approach radius, the ban circles), and the link
-  replays it - `filter=dry|swim` off the plan's own search instead
-  of the hardcoded swim default, `approach=200` for the trip
-  searches, `avoid=x,y,r;...` for the frozen area bans and `fold=0`
+  approach radius, the ban circles), and the link replays it -
+  `approach=200` for the trip searches, `avoid=x,y,r;...` for the
+  frozen area bans and `fold=0`
   (the plan repro mode: the viewer serves the search answer as the
   bot publishes it, skipping the capsule post pass whose grid
   oracle is water blind and folds the route the bot never walks -
-  the 2026-09-19 mismatch report: a dry zone return rebuilt with
-  the swim filter and the fold drew a straight chord over the lake
-  the bot detours). A plan from no mesh search (the direct legs)
+  the 2026-09-19 mismatch report). No filter parameter exists: the
+  priced round of 2026-09-19 retired the walled form of the water,
+  every search prices the crossings at the swim rate (swimming is
+  slower than running) and the plan may swim. A plan from no mesh
+  search (the direct legs)
   keeps the viewer defaults. The viewer POST body carries the same
   fields (`approach`, `avoid`, `fold`) and the shared view links
   round-trip them (`parseViewParams` / `buildViewStateUrl` in
   navmesh_view.js), so a double click experiment under a pasted
   repro link answers under the plan's own conditions. The state
-  dump names the filter word in the walk plan header
-  (`17 waypoints, dry, aiming at wp 1`) and prints the full
+  dump names the mesh word in the walk plan header
+  (`17 waypoints, mesh, aiming at wp 1`) and prints the full
   contract on its `search approach 200 avoid ...` line, so a pasted
   dump restores the repro contract through the dump parser too.
 - Bot status banner: a compact chip pinned to the top center of the

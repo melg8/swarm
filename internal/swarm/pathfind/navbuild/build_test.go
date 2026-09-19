@@ -113,7 +113,7 @@ func TestBuildRegionLinkPortals(t *testing.T) {
 }
 
 // TestBuildRegionQueries runs the runtime queries over the built
-// tile: the full swim route, the dry partial, the water escape and
+// tile: the full priced swim route, the water escape and
 // the stacked disambiguation - the miniatures of the hard bridge
 // case.
 func TestBuildRegionQueries(t *testing.T) {
@@ -135,15 +135,6 @@ func TestBuildRegionQueries(t *testing.T) {
         }
     }
     require.True(t, wet, "the swim route must reach the water")
-
-    // The dry route answers the partial corridor up the shore.
-    dry, err := mesh.RouteDry(worldPos(5, 5, -3504), worldPos(15, 18,
-        -3784))
-    require.NoError(t, err)
-    require.False(t, dry.Found)
-    require.True(t, dry.Partial)
-    last := dry.Waypoints[len(dry.Waypoints)-1]
-    require.InDelta(t, -3744, last.Z, 1e-6)
 
     // The escape from the water climbs the shore.
     escape, err := mesh.WaterEscape(worldPos(15, 18, -3784))

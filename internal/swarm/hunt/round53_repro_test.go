@@ -85,7 +85,7 @@ func TestReproRound53ZoneReturnWalksThePlan(t *testing.T) {
         loop.moveAt = time.Time{}
         selfX, selfY, selfZ, ok := bot.SelfPosition()
         require.True(t, ok, "the character position must be known")
-        done := loop.followWaypoints(selfX, selfY, selfZ, time.Now(), true)
+        done := loop.followWaypoints(selfX, selfY, selfZ, time.Now())
         sim.consume(game, bot)
         if done {
             break

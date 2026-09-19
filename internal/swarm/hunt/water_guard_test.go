@@ -140,36 +140,55 @@ func TestTripWaterEscapeStuckReplans(t *testing.T) {
         "the escape exhausts its budget and aborts the trip")
 }
 
-// TestTripWetClickRepatsAroundShore pins the click water guard: a dry
-// character whose straight click line would cross water never sends
-// the click - the walk re-paths around the shore instead, and a walk
-// whose every re-path stays wet aborts the trip. The guard checks
-// WATER ONLY (navigator.WaterCrossed): a click line that crosses a
-// height step of the terrain - the village deck ramps, the plaza
-// above the shops - routes fine through the server pathfinder, the
-// teacher legs of the learning trips died on the line of sight half
-// of the old DryLine answer, which read those ramps as water and
-// aborted every trip that carried them.
-func TestTripWetClickRepatsAroundShore(t *testing.T) {
+// TestTripWetClickWalksThePlan pins the priced water round: the plan
+// prices every crossing at the swim rate, so the follower walks the
+// wet legs it planned - a click line that crosses water goes out
+// unchanged (the guard that refused wet clicks and re-planned around
+// the shore was the outdated way this round retired), and the escape
+// machinery owns the off-plan swims instead.
+func TestTripWetClickWalksThePlan(t *testing.T) {
     loop, game, bot, nav := newTripLoop()
     fillInventory(bot)
     nav.wetLine = true
 
     loop.tick()
-    require.Empty(t, game.walks,
-        "the wet click must never be sent to the server")
-    require.Equal(t, 1, loop.rePaths,
-        "the refused click counts as a re-path")
-    require.Len(t, nav.approachEnds, 2,
-        "the trip planned its leg and re-planned around the shore")
+    require.NotEmpty(t, game.walks,
+        "the planned wet click is sent to the server")
+    require.Zero(t, loop.rePaths,
+        "a wet click is not a refusal, no re-path burns")
+    require.Equal(t, phaseTownWalk, loop.phase,
+        "the trip keeps walking its priced plan")
+}
 
-    // The second wet click re-paths again, the third and fourth
-    // exhaust the budget and abort the trip (the walk cannot cross
-    // the water and no shore route exists).
-    loop.tick()
-    loop.tick()
-    loop.tick()
-    require.Empty(t, game.walks)
-    require.Equal(t, phaseEngage, loop.phase,
-        "the trip must abort when every dry re-path crosses water")
+// TestTripPlannedSwimKeepsFollowingThePlan pins the escape gate of
+// the priced water round: a character floating over a lake bed whose
+// aimed waypoint stands on the bed ahead (the crossing the search
+// priced) keeps following the plan - the water escape does not arm,
+// the click walks the wet waypoint.
+func TestTripPlannedSwimKeepsFollowingThePlan(t *testing.T) {
+    loop, game, _, nav := newTripLoop()
+    nav.overWater = true
+    loop.phase = phaseTownWalk
+    loop.tripStart = time.Now()
+    loop.legDest = pathfind.Vec3{X: 45200, Y: 50200, Z: -3539}
+    loop.legStart = pathfind.Vec3{X: 45000, Y: 50000, Z: -3800}
+    // The plan crosses the lake: the aimed waypoint stands on the bed
+    // ahead of the character.
+    loop.waypoints = []pathfind.Vec3{
+        {X: 44900, Y: 49900, Z: -3539},
+        {X: 45050, Y: 50050, Z: -3850},
+        {X: 45200, Y: 50200, Z: -3539},
+    }
+    loop.wpIndex = 1
+
+    require.False(t, loop.walkTownWaypoints(),
+        "the planned swim keeps walking")
+    require.False(t, loop.waterEscape,
+        "the escape must not arm for a priced crossing")
+    require.Zero(t, nav.escapeCalls,
+        "no shore search runs for a priced crossing")
+    require.Len(t, game.walks, 1,
+        "the walk click goes to the wet waypoint")
+    require.Equal(t, [3]int32{45050, 50050, -3850}, game.walks[0],
+        "the click aims the bed waypoint the plan prices")
 }

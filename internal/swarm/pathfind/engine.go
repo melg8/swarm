@@ -306,43 +306,24 @@ func (e *Engine) FindPathApproach(
     return search.run(start, end, approachRadius)
 }
 
-// FindPathApproachAvoiding is the water permitting form of
-// FindPathApproachDryAvoiding: the search routes around the avoid
-// areas exactly like the dry form (a foreign ban is a wall, the ban
-// holding the start is the expensive way out) but a wet route stays
-// a legal answer. The zone return fallback navigates with it: the
-// dry search failing under the accumulated bans must hand the bot a
-// route that still respects them - the ban-less fallback reproduced
-// the very corridor the bans exist to detour (the 2026-09-14 08:42
-// dump: the widened bans made every dry search fail, the fallback
-// re-planned the frozen corridor route and the bot cycled through it
-// for the rest of the session).
+// FindPathApproachAvoiding plans the walk around the avoid areas of
+// the caller: the search treats every cell inside an area as
+// impassable, so the A* detours around the patch (the start cell
+// itself stays allowed wherever it sits - the walker standing inside
+// a patch must be able to plan its way OUT of it, the escape ring
+// cells cost avoidEscapeMultiplier instead). The zone return and the
+// quest segments navigate with it: the search around the accumulated
+// bans must hand the bot a route that still respects them - the
+// ban-less fallback reproduced the very corridor the bans exist to
+// detour (the 2026-09-14 08:42 dump: the widened bans made every
+// search fail, the fallback re-planned the frozen corridor route and
+// the bot cycled through it for the rest of the session).
 func (e *Engine) FindPathApproachAvoiding(
     start, end Vec3, approachRadius float64, maxPassableHeight uint16,
     avoid []AvoidArea,
 ) (*Result, error) {
     search := newSearch(e, maxPassableHeight)
     search.avoid = avoid
-
-    return search.run(start, end, approachRadius)
-}
-
-// FindPathApproachDry is the water walled form of FindPathApproach:
-// every step of the search onto an underwater cell costs impassable,
-// so the waypoints of a found route all stand above the water level (a
-// start below it exits to the shore first). The shore walks of the
-// hunt loop navigate with it: a planned swim is a plan the click guard
-// refuses leg by leg, and the walker burned its whole re-path budget
-// re-planning the identical wet route before it aborted (the delevel
-// water loop of the 2026-09-10 state dump, stuck at the elven village
-// shore). A target only swimming reaches answers Found=false: the
-// caller aborts the leg and arms its cooldown instead of walking into
-// the water.
-func (e *Engine) FindPathApproachDry(
-    start, end Vec3, approachRadius float64, maxPassableHeight uint16,
-) (*Result, error) {
-    search := newSearch(e, maxPassableHeight)
-    search.dry = true
 
     return search.run(start, end, approachRadius)
 }
@@ -357,25 +338,6 @@ func (e *Engine) FindPathApproachDry(
 type AvoidArea struct {
     Center Vec3
     Radius float64
-}
-
-// FindPathApproachDryAvoiding is FindPathApproachDry with the avoid
-// areas of the caller: the search treats every cell inside an area as
-// impassable, the direct line shortcut refuses lines crossing one and
-// the smoothing keeps its collapsed legs outside them, so the returned
-// route detours around the banned ground. The start cell itself stays
-// allowed wherever it sits - the walker standing inside a patch must
-// be able to plan its way OUT of it. A route that only exists through
-// the banned ground answers Found=false.
-func (e *Engine) FindPathApproachDryAvoiding(
-    start, end Vec3, approachRadius float64, maxPassableHeight uint16,
-    avoid []AvoidArea,
-) (*Result, error) {
-    search := newSearch(e, maxPassableHeight)
-    search.dry = true
-    search.avoid = avoid
-
-    return search.run(start, end, approachRadius)
 }
 
 // FindWaterEscape plans the way out of the water for a position whose
@@ -394,37 +356,13 @@ func (e *Engine) FindWaterEscape(start Vec3) (*Result, error) {
     return search.runEscape(start)
 }
 
-// DryLine reports whether the straight segment between two world
-// positions is a clean dry walk: walkable by the surface rules (the
-// same raster the line of sight uses) and never dipping under the
-// water level anywhere along the line. The town walker checks every
-// click target with it before sending the move request: the server
-// moves characters into water without any hesitation (its own
-// pathfinding carries no water cost, and swimming move requests skip
-// the geodata validation entirely), so keeping the character ashore
-// is the walker's own job.
-func (e *Engine) DryLine(start, end Vec3) (bool, error) {
-    search := newSearch(e, e.maxPass)
-    from, err := search.nodeAtWorld(start)
-    if err != nil {
-        return false, err
-    }
-    to, err := search.nodeAtWorld(end)
-    if err != nil {
-        return false, err
-    }
-
-    return search.lineOfSight(from, to) && search.dryLine(from, to), nil
-}
-
 // WaterCrossed reports whether the straight line between two world
 // positions crosses cells whose resolved surface lies below the
-// water level: the pure water raster of DryLine without its line of
-// sight gate. The water guard of the town trips needs exactly this -
-// the sight gate exists to validate a walkable leg (the height steps
-// of the smoothing), but a click line that merely crosses a height
-// step (the village deck ramps, the plaza over the shops) routes
-// fine through the server pathfinder and must not read as water.
+// water level. The cursor key escape claims need exactly this - a
+// claim never names a wet cell (the claims stream the positions the
+// server follows without any click validation, so they stay on the
+// verified ground), while the planned clicks may swim whenever the
+// plan prices the crossing as the faster walk.
 func (e *Engine) WaterCrossed(start, end Vec3) (bool, error) {
     search := newSearch(e, e.maxPass)
     from, err := search.nodeAtWorld(start)
@@ -456,7 +394,7 @@ func (e *Engine) OverWater(x, y float64, refZ int16) bool {
         return false
     }
 
-    return layer.Height < waterLevel
+    return layer.Height < WaterLevel
 }
 
 // ClosestHeight resolves the height of the geodata layer at the world

@@ -73,10 +73,14 @@ version 2 (the uint16 quantization) packs the same way.
 
 The water semantics follow the grid engine: the polygons of the
 sheets below the C1 water level (-3780) carry the water area; the
-swim pricing is a 3x area cost (the `waterCostMultiplier`), the dry
-searches exclude them and the escape prices them 8x. H-001 (the
-breath gauge question) stays a hypothesis either way - the registry
-entry is unchanged.
+swim pricing is the measured run/swim speed ratio (2.3 - the
+`waterCostMultiplier`, the grid name of the mesh `WaterCost`), the
+escape prices them 8x. The priced round of 2026-09-19 retired the
+walled form: no dry filter exists anymore, every search prices the
+water and the plan may swim (the owner directive - the bot plans
+through the water objects with the correct slowdowns, swimming is
+slower than running). H-001 (the breath gauge question) stays a
+hypothesis either way - the registry entry is unchanged.
 
 ## The build pipeline
 
@@ -204,10 +208,10 @@ bot budget comfortably; the Detour-parity optimization (the flat
 tile array, the per-tile poly index) is future headroom, not a
 blocker.
 
-The `Route`/`RouteDry`/`WaterEscape` contracts mirror the grid
-engine's `FindPathApproach` family: the stacked-layer
+The `Route`/`WaterEscape` contracts mirror the grid engine's
+`FindPathApproach` family: the stacked-layer
 disambiguation test (the same x/y, the deck vs the water under it),
-the dry partial with the closest reachable dry point, and the
+the priced swim route to a water target, and the
 priced water escape all pass on the real mesh
 (`navbuild/real_test.go`).
 
@@ -408,12 +412,12 @@ the agent session (the owner request: reproduce the exact view
 locally and let the route answer itself). The `copy view link`
 button freezes the whole view state into one URL - the camera pose
 (world x, y, height, yaw, pitch), the armed or answered route pair,
-the visible tile selection, the route filter and the height scale -
+the visible tile selection and the height scale -
 and copies it to the clipboard (the link field itself always holds
 the URL for manual selection where the clipboard API is
 unavailable). A paste of that URL boots the viewer into the exact
-view: the query parameters restore the camera, the tiles, the filter
-and the scale, and the route pair re-runs automatically - the result
+view: the query parameters restore the camera, the tiles and the
+scale, and the route pair re-runs automatically - the result
 panel, the polyline and the markers rebuild on their own. The
 parameters live in `navmesh_view.js` (`parseViewParams` is the boot
 half, `buildViewStateUrl` the copy half) and
@@ -440,10 +444,10 @@ fold on).
 The flag selection bounds the initially VISIBLE tiles only: the
 route queries always run over the full directory mesh, so a path may
 leave the visible tiles (the checkbox list loads more tiles on
-demand, the polyline draws wherever it walks). The swim/dry filter
-select mirrors the hunt loop's two search profiles (water priced 3x
-versus walled), and the `tiles=` parameter of a shared link
-overrides the flag selection the same way.
+demand, the polyline draws wherever it walks). The priced round of
+2026-09-19 removed the route filter select: one search exists, the
+water priced at the swim rate, and the `tiles=` parameter of a
+shared link overrides the flag selection the same way.
 
 The endpoints behind the page (the mode of `GET /api/config` is
 `navmesh`):
@@ -488,9 +492,11 @@ The endpoints behind the page (the mode of `GET /api/config` is
   consecutive corners and the viewer tessellates. The payload is
   immutable per tile, so an ETag revalidates for free and the
   server caches the encoded bytes;
-- `POST /api/navmesh/path` - `{start, end, filter}` positions and
-  the reply `{found, partial, waypoints, durationMs, explored,
-  corridor, filter}` of the measured `Route` call. When the capsule
+- `POST /api/navmesh/path` - `{start, end, approach, avoid, fold}`
+  (the approach radius, the ban circles and the fold switch of the
+  plan repro contract) and the reply `{found, partial, waypoints,
+  durationMs, explored, corridor}` of the measured `Route` call.
+  When the capsule
   clearance arms the shortcut pass the reply carries the two variants
   of the walk: `waypoints` is the smoothed answer (the merged chords)
   and `rawWaypoints` is the raw funnel answer it merged - the viewer
