@@ -61,11 +61,11 @@ type sessionRecord struct {
 // name, the mob level, the fight duration from the engage stamp and
 // the health percent land in the journal file.
 func TestLoopJournalKill(t *testing.T) {
-    bot := state.NewBot("test1")
-    bot.SetCharacter("test1", 7, 18, 45000, 50000, -3500, 80, 40)
-    bot.SetOnline("test1")
+    bot := state.NewBot("unittest1")
+    bot.SetCharacter("unittest1", 7, 18, 45000, 50000, -3500, 80, 40)
+    bot.SetOnline("unittest1")
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 5, Race: 1, ClassID: 18,
+        Name: "unittest1", Level: 5, Race: 1, ClassID: 18,
         X: 45000, Y: 50000, Z: -3500,
         Exp: 2500, MaxHP: 100, CurHP: 87, MaxMP: 50, CurMP: 40,
         CurrentLoad: 10, MaxLoad: 100,
@@ -88,7 +88,7 @@ func TestLoopJournalKill(t *testing.T) {
     records := journalRecords(t, journal.Path())
     require.Len(t, records, 1)
     require.Equal(t, "kill", records[0].E)
-    require.Equal(t, "test1", records[0].B)
+    require.Equal(t, "unittest1", records[0].B)
     require.Equal(t, "Keltir", records[0].Mob)
     require.InDelta(t, 8.0, records[0].Dur, 1.5)
     require.InDelta(t, 87.0, records[0].Hp, 0.001)
@@ -96,8 +96,8 @@ func TestLoopJournalKill(t *testing.T) {
 
 // TestLoopJournalDeath verifies the death emission.
 func TestLoopJournalDeath(t *testing.T) {
-    bot := state.NewBot("test1")
-    bot.SetCharacter("test1", 7, 18, 45000, 50000, -3500, 80, 40)
+    bot := state.NewBot("unittest1")
+    bot.SetCharacter("unittest1", 7, 18, 45000, 50000, -3500, 80, 40)
     loop := NewLoop(&fakeGame{}, bot)
     journal, err := session.NewJournal(t.TempDir(), nil)
     require.NoError(t, err)
@@ -118,8 +118,8 @@ func TestLoopJournalDeath(t *testing.T) {
 // TestLoopJournalNil verifies the loop runs without a journal: no
 // emission path panics (the default of every existing test).
 func TestLoopJournalNil(t *testing.T) {
-    bot := state.NewBot("test1")
-    bot.SetCharacter("test1", 7, 18, 45000, 50000, -3500, 80, 40)
+    bot := state.NewBot("unittest1")
+    bot.SetCharacter("unittest1", 7, 18, 45000, 50000, -3500, 80, 40)
     loop := NewLoop(&fakeGame{}, bot)
     require.Nil(t, loop.journal)
     require.NotPanics(t, func() {
@@ -134,11 +134,11 @@ func TestLoopJournalNil(t *testing.T) {
 // observed six hour run credited one lieutenant spawn with a 4369
 // second fight accumulated over 188 kills of the same id).
 func TestLoopJournalKillResetsFightClock(t *testing.T) {
-    bot := state.NewBot("test1")
-    bot.SetCharacter("test1", 7, 18, 45000, 50000, -3500, 80, 40)
-    bot.SetOnline("test1")
+    bot := state.NewBot("unittest1")
+    bot.SetCharacter("unittest1", 7, 18, 45000, 50000, -3500, 80, 40)
+    bot.SetOnline("unittest1")
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 5, Race: 1, ClassID: 18,
+        Name: "unittest1", Level: 5, Race: 1, ClassID: 18,
         X: 45000, Y: 50000, Z: -3500,
         Exp: 2500, MaxHP: 100, CurHP: 87, MaxMP: 50, CurMP: 40,
         CurrentLoad: 10, MaxLoad: 100,

@@ -32,7 +32,7 @@ func TestAuthLoginToBytes(t *testing.T) {
     t.Run("valid keys", func(t *testing.T) {
         writer := packet.NewWriter()
         auth := &AuthLogin{
-            Login:      "test1",
+            Login:      "unittest1",
             PlayOkID1:  0x11223344,
             PlayOkID2:  0x55667788,
             LoginOkID1: -0x66554434,
@@ -42,7 +42,7 @@ func TestAuthLoginToBytes(t *testing.T) {
         require.NoError(t, err)
 
         expected := []byte{0x08}
-        expected = append(expected, utf16("test1")...)
+        expected = append(expected, utf16("unittest1")...)
         expected = append(expected,
             0x88, 0x77, 0x66, 0x55, // playOkID2 first
             0x44, 0x33, 0x22, 0x11, // playOkID1
@@ -70,12 +70,12 @@ func TestAuthLoginToBytes(t *testing.T) {
 func TestCharacterCreateToBytes(t *testing.T) {
     t.Run("elven fighter", func(t *testing.T) {
         writer := packet.NewWriter()
-        create := elvenFighterCreate("test1")
+        create := elvenFighterCreate("unittest1")
         err := create.ToBytes(writer)
         require.NoError(t, err)
 
         expected := []byte{0x0B}
-        expected = append(expected, utf16("test1")...)
+        expected = append(expected, utf16("unittest1")...)
         for _, value := range []int32{1, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0, 0} {
             expected = append(expected, byte(value), 0, 0, 0)
         }

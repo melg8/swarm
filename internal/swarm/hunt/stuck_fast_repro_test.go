@@ -13,7 +13,7 @@ import (
 )
 
 // The reproduction of the 2026-09-14 08:13 state dump (build c7a0855,
-// bot test3, phase townReturn, uptime 19s): the level 15 character
+// bot unittest3, phase townReturn, uptime 19s): the level 15 character
 // stood at x 45768 y 49848 z -3056 (the Elven Village south terrace
 // deck) in the townReturn phase, the pathfound zone return held the
 // 6 waypoint route to the Kaboo Orc Fighter SW-7 cell (dest 36000
@@ -43,7 +43,7 @@ import (
 
 const (
     // reproFastStuckX/Y/Z is the reported stuck position (the dump
-    // of 2026-09-14 08:13:08, the character test3 on the Elven
+    // of 2026-09-14 08:13:08, the character unittest3 on the Elven
     // Village south terrace deck).
     reproFastStuckX = int32(45768)
     reproFastStuckY = int32(49848)

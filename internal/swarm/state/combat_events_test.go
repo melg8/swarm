@@ -15,7 +15,7 @@ import (
 // the character as its target counts, everything else does not.
 func TestSelfAttackerCountsMobsOnUs(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     require.Equal(t, 0, bot.SelfAttackerCount(), "no mobs, no aggro")
 
     // Two gremlins swing at the character, a third chases someone
@@ -61,7 +61,7 @@ func TestSelfAttackerCountsMobsOnUs(t *testing.T) {
 // hit target placement and a monotonic sequence.
 func TestCombatEventsFeedSwings(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     // The mob swings at the character.
     bot.ApplyAttack(Attack{
@@ -99,7 +99,7 @@ func TestCombatEventsFeedSwings(t *testing.T) {
 // refresh records nothing.
 func TestCombatEventsFeedDamage(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     spawnNpcInfo(bot, 7, 1000001, 45300)
 
     // The first vitals establish the baseline: no damage yet.
@@ -138,7 +138,7 @@ func TestCombatEventsFeedDamage(t *testing.T) {
 // never grows the snapshot payload without end.
 func TestCombatEventsFeedBounded(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     for i := range combatEventMax + 10 {
         bot.ApplyAttack(Attack{
             AttackerID: 7, X: 45300, Y: 50000, Z: -3500,
@@ -157,7 +157,7 @@ func TestCombatEventsFeedBounded(t *testing.T) {
 // nothing, a dual hit draws one swing per landed blow.
 func TestApplyAttackSkipsMissedHits(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetOnline("test1")
+    bot.SetOnline("unittest1")
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 46000, Y: 50000, Name: "Gremlin",

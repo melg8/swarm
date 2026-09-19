@@ -61,9 +61,9 @@ func TestTownLegPartialWalksClosestReachable(t *testing.T) {
 // the closest reachable point.
 func TestQuestSegmentPartialWalksClosestReachable(t *testing.T) {
     bot := state.NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 11, Race: 1, ClassID: 18,
+        Name: "unittest1", Level: 11, Race: 1, ClassID: 18,
         Exp: 50000,
         X:   45000, Y: 50000, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,

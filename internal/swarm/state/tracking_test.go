@@ -18,7 +18,7 @@ import (
 // web UI focus.
 func TestForeignWaitTypeTracksRest(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyPlayerInfo(PlayerInfo{ObjectID: 55, Name: "Bot2", X: 100, Y: 100})
     bot.ApplyPlayerInfo(PlayerInfo{ObjectID: 56, Name: "Bot3", X: 120, Y: 100})
 
@@ -39,7 +39,7 @@ func TestForeignWaitTypeTracksRest(t *testing.T) {
 // the moment it walks into the known list.
 func TestCharInfoCarriesSitting(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     bot.ApplyPlayerInfo(PlayerInfo{
         ObjectID: 55, Name: "Bot2", X: 100, Y: 100,
@@ -53,7 +53,7 @@ func TestCharInfoCarriesSitting(t *testing.T) {
 
 func TestRotationPacketsTurnObjects(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyPlayerInfo(PlayerInfo{ObjectID: 55, Name: "Other", X: 100, Y: 100})
 
     // The pair a standing player announces on spawn: begin carries the
@@ -68,7 +68,7 @@ func TestRotationPacketsTurnObjects(t *testing.T) {
 
 func TestAttackFacesTheTarget(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 46000, Y: 50000, Z: -3500, Name: "Gremlin",
@@ -94,7 +94,7 @@ func TestAttackFacesTheTarget(t *testing.T) {
 
 func TestSelfAttackFacesTargetAndKeepsTarget(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 46000, Y: 50000, Z: -3500, Name: "Gremlin",
@@ -115,7 +115,7 @@ func TestSelfAttackFacesTargetAndKeepsTarget(t *testing.T) {
 
 func TestSelfPawnMovementChasesTarget(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     bot.ApplyPawnMovement(PawnMovement{
         ObjectID: 100, TargetID: 7, Distance: 40,
@@ -145,7 +145,7 @@ func TestMoveTypeUpdatesRunFlag(t *testing.T) {
 
 func TestSelfTargetTracking(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 100, Y: 100, Name: "Gremlin",
@@ -164,7 +164,7 @@ func TestSelfTargetTracking(t *testing.T) {
 
 func TestTeleportSnapsPosition(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     bot.ApplyTeleport(Teleport{
         ObjectID: 100, X: 47000, Y: 51000, Z: -3500, Heading: 8192,
@@ -178,7 +178,7 @@ func TestTeleportSnapsPosition(t *testing.T) {
 
 func TestSpawnItemAndPickup(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     bot.ApplySpawnItem(ItemInfo{
         ObjectID: 9, TemplateID: 1057, Count: 5, X: 45040, Y: 50040, Z: -3500,
@@ -202,7 +202,7 @@ func TestSpawnItemAndPickup(t *testing.T) {
 
 func TestNearestGroundItemSkipsBlacklisted(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 0, 0, 0, 50, 30)
     bot.ApplySpawnItem(ItemInfo{ObjectID: 1, TemplateID: 57, X: 100, Y: 0, Z: 0})
     bot.ApplySpawnItem(ItemInfo{ObjectID: 2, TemplateID: 57, X: 500, Y: 0, Z: 0})
 
@@ -224,7 +224,7 @@ func TestNearestGroundItemSkipsBlacklisted(t *testing.T) {
 
 func TestInventoryTracking(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 0, 0, 0, 50, 30)
 
     items := []InventoryItem{
         {ObjectID: 1, ItemID: 57, Count: 500, Type2: 4},
@@ -269,7 +269,7 @@ func TestEffectiveSpeedAppliesMultiplier(t *testing.T) {
 
 func TestSelfTargetClearedWhenTargetDies(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, X: 100, Y: 100, Name: "Gremlin", Attackable: true,
     })
@@ -285,7 +285,7 @@ func TestSelfTargetClearedWhenTargetDies(t *testing.T) {
 
 func TestSelfTargetClearedWhenTargetRemoved(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, X: 100, Y: 100, Name: "Gremlin", Attackable: true,
     })
@@ -299,7 +299,7 @@ func TestSelfTargetClearedWhenTargetRemoved(t *testing.T) {
 
 func TestSelfTargetClearedOnOwnTargetUnselected(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, X: 100, Y: 100, Name: "Gremlin", Attackable: true,
     })
@@ -314,7 +314,7 @@ func TestSelfTargetClearedOnOwnTargetUnselected(t *testing.T) {
 
 func TestObjectTargetTrackedFromTargetSelected(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyPlayerInfo(PlayerInfo{
         ObjectID: 55, Name: "Other", X: 100, Y: 100,
     })
@@ -333,7 +333,7 @@ func TestObjectTargetTrackedFromTargetSelected(t *testing.T) {
 
 func TestSelfFightingFreshness(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 46000, Y: 50000, Name: "Gremlin",
@@ -367,7 +367,7 @@ func TestSelfFightingFreshness(t *testing.T) {
 
 func TestObjectAttackableSplitsVillagersFromMobs(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     // A gremlin and the teacher Ellenia: the same npc kind, only the
     // attackable flag splits them.
     bot.ApplyNpcInfo(NpcInfo{
@@ -397,7 +397,7 @@ func TestObjectAttackableSplitsVillagersFromMobs(t *testing.T) {
 
 func TestObjectLevelReadsTheNpcLevel(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 46000, Y: 50000, Name: "Gremlin",

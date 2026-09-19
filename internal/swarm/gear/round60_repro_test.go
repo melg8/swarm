@@ -17,7 +17,7 @@ import (
 const leatherPantsID = int32(29)
 
 // The reproduction of the 2026-09-12 04:58 state dump report: the
-// level 14 elven fighter test2 returned from a town trip without its
+// level 14 elven fighter unittest2 returned from a town trip without its
 // legs armor - every other slot was filled (Sickle, Buckler, Leather
 // Shirt, Wooden Helmet, Gloves, Leather Shoes, the basic jewels) and
 // the bag carried nothing but the 13162 adena. This file asks the

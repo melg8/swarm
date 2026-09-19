@@ -93,7 +93,7 @@ func (s *fakeGameServer) characterFlow(conn net.Conn, cipher *crypt.GameCrypt) {
     payload := s.readEncrypted(conn, cipher)
     require.Equal(s.t, byte(0x08), payload[0])
     login := readUtf16String(payload[1:])
-    require.Equal(s.t, "test1", login)
+    require.Equal(s.t, "unittest1", login)
 
     var charList []byte
     charList = append(charList, 0x1F)
@@ -103,8 +103,8 @@ func (s *fakeGameServer) characterFlow(conn net.Conn, cipher *crypt.GameCrypt) {
     payload = s.readEncrypted(conn, cipher)
     require.Equal(s.t, byte(0x0B), payload[0])
     name := readUtf16String(payload[1:])
-    require.Equal(s.t, "test1", name)
-    race := binary.LittleEndian.Uint32(payload[1+len("test1")*2+2:])
+    require.Equal(s.t, "unittest1", name)
+    race := binary.LittleEndian.Uint32(payload[1+len("unittest1")*2+2:])
     require.Equal(s.t, uint32(1), race, "elf race id")
 
     s.writeEncrypted(conn, cipher,
@@ -126,7 +126,7 @@ func (s *fakeGameServer) characterFlow(conn net.Conn, cipher *crypt.GameCrypt) {
 func (s *fakeGameServer) worldFlow(conn net.Conn, cipher *crypt.GameCrypt) {
     var selected []byte
     selected = append(selected, 0x21)
-    selected = append(selected, utf16Bytes("test1")...)
+    selected = append(selected, utf16Bytes("unittest1")...)
     selected = binary.LittleEndian.AppendUint32(selected, 100)
     selected = append(selected, utf16Bytes("")...)
     selected = binary.LittleEndian.AppendUint32(selected, 42)
@@ -263,9 +263,9 @@ func readUtf16String(data []byte) string {
 
 // buildCharacterEntry builds a binary char list entry for the bot character.
 func buildCharacterEntry() []byte {
-    data := utf16Bytes("test1")
+    data := utf16Bytes("unittest1")
     data = binary.LittleEndian.AppendUint32(data, 100)
-    data = append(data, utf16Bytes("test1")...)
+    data = append(data, utf16Bytes("unittest1")...)
     data = binary.LittleEndian.AppendUint32(data, 0) // session id
     data = binary.LittleEndian.AppendUint32(data, 0) // clan
     data = binary.LittleEndian.AppendUint32(data, 0) // builder
@@ -305,7 +305,7 @@ func TestGameClientFullFlow(t *testing.T) {
     require.NotNil(t, client.crypt)
 
     charList, err := client.Authenticate(GameSessionParams{
-        Account:    "test1",
+        Account:    "unittest1",
         LoginOkID1: 1,
         LoginOkID2: 2,
         PlayOkID1:  3,
@@ -315,7 +315,7 @@ func TestGameClientFullFlow(t *testing.T) {
     require.Empty(t, charList.Characters)
 
     updated, err := client.EnsureCharacter(CharacterParams{
-        Name:      "test1",
+        Name:      "unittest1",
         Race:      1,
         Female:    0,
         ClassID:   18,
@@ -325,7 +325,7 @@ func TestGameClientFullFlow(t *testing.T) {
     }, charList)
     require.NoError(t, err)
 
-    slot, info, found := updated.FindCharacterByName("test1")
+    slot, info, found := updated.FindCharacterByName("unittest1")
     require.True(t, found)
     require.Equal(t, int32(18), info.BaseClassID)
 
@@ -335,7 +335,7 @@ func TestGameClientFullFlow(t *testing.T) {
     ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
     defer cancel()
 
-    err = client.Run(ctx, "test1")
+    err = client.Run(ctx, "unittest1")
     require.NoError(t, err)
     require.GreaterOrEqual(t, client.PacketCount(), 1)
 }
@@ -426,11 +426,11 @@ func TestGameClientTracksWorldState(t *testing.T) {
     client, err := NewGameClient(conn)
     require.NoError(t, err)
 
-    tracker := state.NewBot("test1")
+    tracker := state.NewBot("unittest1")
     client.SetTracker(tracker)
 
     charList, err := client.Authenticate(GameSessionParams{
-        Account:    "test1",
+        Account:    "unittest1",
         LoginOkID1: 1,
         LoginOkID2: 2,
         PlayOkID1:  3,
@@ -439,7 +439,7 @@ func TestGameClientTracksWorldState(t *testing.T) {
     require.NoError(t, err)
 
     updated, err := client.EnsureCharacter(CharacterParams{
-        Name:      "test1",
+        Name:      "unittest1",
         Race:      1,
         Female:    0,
         ClassID:   18,
@@ -449,17 +449,17 @@ func TestGameClientTracksWorldState(t *testing.T) {
     }, charList)
     require.NoError(t, err)
 
-    slot, _, found := updated.FindCharacterByName("test1")
+    slot, _, found := updated.FindCharacterByName("unittest1")
     require.True(t, found)
     require.NoError(t, client.EnterWorld(int32(slot)))
 
     ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
     defer cancel()
-    require.NoError(t, client.Run(ctx, "test1"))
+    require.NoError(t, client.Run(ctx, "unittest1"))
 
     snapshot := tracker.Snapshot()
     require.Equal(t, state.StatusOffline, snapshot.Status)
-    require.Equal(t, "test1", snapshot.Character.Name)
+    require.Equal(t, "unittest1", snapshot.Character.Name)
     require.Equal(t, int32(45050), snapshot.Character.X)
     require.Equal(t, int32(16384), snapshot.Character.Heading)
 
@@ -496,7 +496,7 @@ func TestGameClientSessionSilenceWatchdog(t *testing.T) {
 
         var selected []byte
         selected = append(selected, 0x21)
-        selected = append(selected, utf16Bytes("test1")...)
+        selected = append(selected, utf16Bytes("unittest1")...)
         selected = binary.LittleEndian.AppendUint32(selected, 100)
         selected = append(selected, utf16Bytes("")...)
         selected = binary.LittleEndian.AppendUint32(selected, 42)
@@ -526,7 +526,7 @@ func TestGameClientSessionSilenceWatchdog(t *testing.T) {
     require.NoError(t, err)
 
     charList, err := client.Authenticate(GameSessionParams{
-        Account:    "test1",
+        Account:    "unittest1",
         LoginOkID1: 1,
         LoginOkID2: 2,
         PlayOkID1:  3,
@@ -535,7 +535,7 @@ func TestGameClientSessionSilenceWatchdog(t *testing.T) {
     require.NoError(t, err)
 
     updated, err := client.EnsureCharacter(CharacterParams{
-        Name:      "test1",
+        Name:      "unittest1",
         Race:      1,
         Female:    0,
         ClassID:   18,
@@ -544,11 +544,11 @@ func TestGameClientSessionSilenceWatchdog(t *testing.T) {
         Face:      0,
     }, charList)
     require.NoError(t, err)
-    slot, _, found := updated.FindCharacterByName("test1")
+    slot, _, found := updated.FindCharacterByName("unittest1")
     require.True(t, found)
     require.NoError(t, client.EnterWorld(int32(slot)))
 
-    err = client.Run(context.Background(), "test1")
+    err = client.Run(context.Background(), "unittest1")
     require.Error(t, err)
     require.Contains(t, err.Error(), "game session silent")
 }
@@ -568,7 +568,7 @@ func TestGameClientSessionSilenceWatchdogKeepsQuietTrafficAlive(t *testing.T) {
 
         var selected []byte
         selected = append(selected, 0x21)
-        selected = append(selected, utf16Bytes("test1")...)
+        selected = append(selected, utf16Bytes("unittest1")...)
         selected = binary.LittleEndian.AppendUint32(selected, 100)
         selected = append(selected, utf16Bytes("")...)
         selected = binary.LittleEndian.AppendUint32(selected, 42)
@@ -604,7 +604,7 @@ func TestGameClientSessionSilenceWatchdogKeepsQuietTrafficAlive(t *testing.T) {
     require.NoError(t, err)
 
     charList, err := client.Authenticate(GameSessionParams{
-        Account:    "test1",
+        Account:    "unittest1",
         LoginOkID1: 1,
         LoginOkID2: 2,
         PlayOkID1:  3,
@@ -613,7 +613,7 @@ func TestGameClientSessionSilenceWatchdogKeepsQuietTrafficAlive(t *testing.T) {
     require.NoError(t, err)
 
     updated, err := client.EnsureCharacter(CharacterParams{
-        Name:      "test1",
+        Name:      "unittest1",
         Race:      1,
         Female:    0,
         ClassID:   18,
@@ -622,13 +622,13 @@ func TestGameClientSessionSilenceWatchdogKeepsQuietTrafficAlive(t *testing.T) {
         Face:      0,
     }, charList)
     require.NoError(t, err)
-    slot, _, found := updated.FindCharacterByName("test1")
+    slot, _, found := updated.FindCharacterByName("unittest1")
     require.True(t, found)
     require.NoError(t, client.EnterWorld(int32(slot)))
 
     ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
     defer cancel()
 
-    err = client.Run(ctx, "test1")
+    err = client.Run(ctx, "unittest1")
     require.NoError(t, err, "the ping traffic keeps the session alive")
 }

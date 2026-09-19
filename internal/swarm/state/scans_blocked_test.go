@@ -11,7 +11,7 @@ import (
 )
 
 // The reproduction scene of the standing bot state dump (2026-09-10
-// 02:11:07, bot test1 in the hunting square elven-2019_23-b1): the
+// 02:11:07, bot unittest1 in the hunting square elven-2019_23-b1): the
 // character stands exactly at the zone center, and the ONLY living
 // attackable npcs inside the square are a Kaboo Orc Fighter and a
 // Kaboo Orc Fighter Lieutenant 294 units apart - both of the ORC
@@ -34,15 +34,15 @@ const (
 )
 
 // reproDumpBot builds the tracker state of the dumped character: the
-// elven fighter test1 (object 268450864, level 13) standing at the
+// elven fighter unittest1 (object 268450864, level 13) standing at the
 // center of the hunting square with a healthy 306 of 321 hp.
 func reproDumpBot(t *testing.T) *Bot {
     t.Helper()
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 268450864, 18,
+    bot.SetCharacter("unittest1", 268450864, 18,
         reproDumpSelfX, reproDumpSelfY, reproDumpSelfZ, 306, 129)
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 13, Race: 1, ClassID: 18,
+        Name: "unittest1", Level: 13, Race: 1, ClassID: 18,
         X: reproDumpSelfX, Y: reproDumpSelfY, Z: reproDumpSelfZ,
         MaxHP: 321, CurHP: 306, MaxMP: 129, CurMP: 129,
     })
@@ -159,7 +159,7 @@ func TestNearestBlockedTargetsReportsTheClanPack(t *testing.T) {
     // A pickable loner never appears in the list: the far target walk
     // reaches it, it is simply not engaged yet.
     loner := NewBot("acc1")
-    loner.SetCharacter("test1", 268450864, 18,
+    loner.SetCharacter("unittest1", 268450864, 18,
         reproDumpSelfX, reproDumpSelfY, reproDumpSelfZ, 306, 129)
     loner.ApplyNpcInfo(NpcInfo{
         ObjectID: 268439688, TemplateID: reproFighterWireID,

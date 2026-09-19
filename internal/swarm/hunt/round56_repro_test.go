@@ -15,7 +15,7 @@ import (
 )
 
 // The reproduction of the 2026-09-11 06:19 building stuck report (the
-// round 56 dump): bot test2 (level 11, phase townWalk, build 896865d)
+// round 56 dump): bot unittest2 (level 11, phase townWalk, build 896865d)
 // stood at the elven village trainer hall AISLE entrance (44728 51992
 // -2792) on the walk to the teacher Ellenia (45725 52105 -2792) with
 // the plan "wp 2 (44728 52040 -2792) <-- TARGET" - 48 units south -

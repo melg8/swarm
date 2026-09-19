@@ -14,7 +14,7 @@ import (
 )
 
 // The reproduction of the 2026-09-12 03:25 state dump report (build
-// a4c9e15, bot test1, phase engage, uptime 7m13s): the level 14
+// a4c9e15, bot unittest1, phase engage, uptime 7m13s): the level 14
 // character stood at x 35224 y 47288 z -3656 with the selected target
 // 268439361 (Kaboo Orc Fighter, level 10, hp 257/257) at 35144 47288
 // -3656 - 80 units away, the exact melee standoff - with "moving: no",
@@ -54,7 +54,7 @@ import (
 //     clock past every refusal.
 const (
     // reproRound59X/Y/Z is the reported stuck position (the dump of
-    // 2026-09-12 03:25:34, the character test1 in the Spore Fungus SW
+    // 2026-09-12 03:25:34, the character unittest1 in the Spore Fungus SW
     // spot).
     reproRound59X = int32(35224)
     reproRound59Y = int32(47288)
@@ -77,7 +77,7 @@ const (
     reproDumpKabooFighter = int32(1000471)
 )
 
-// reproRound59Scene builds the dump standoff: the character test1 at
+// reproRound59Scene builds the dump standoff: the character unittest1 at
 // the dump position inside the dump zone, the obstructed Kaboo Orc
 // Fighter at 80 units, the spare Spore Fungus of the dump object list
 // as the only other pickable mob, and the loop in the engage phase
@@ -86,10 +86,10 @@ const (
 func reproRound59Scene(t *testing.T) (*Loop, *fakeGame, *state.Bot) {
     t.Helper()
     bot := state.NewBot("acc1")
-    bot.SetCharacter("test1", 268450864, 18,
+    bot.SetCharacter("unittest1", 268450864, 18,
         reproRound59X, reproRound59Y, reproRound59Z, 339, 137)
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 14, Race: 1, ClassID: 18,
+        Name: "unittest1", Level: 14, Race: 1, ClassID: 18,
         X: reproRound59X, Y: reproRound59Y, Z: reproRound59Z,
         MaxHP: 339, CurHP: 339, MaxMP: 137, CurMP: 137,
     })
@@ -187,7 +187,7 @@ func TestReproRound59PhantomChaseSwitchesTarget(t *testing.T) {
 
     // The walk reached its vantage point; the engage is handed back.
     vantage := loop.losWaypoints[len(loop.losWaypoints)-1]
-    bot.SetCharacter("test1", 268450864, 18, int32(vantage.X), int32(vantage.Y), int32(vantage.Z), 339, 137)
+    bot.SetCharacter("unittest1", 268450864, 18, int32(vantage.X), int32(vantage.Y), int32(vantage.Z), 339, 137)
     loop.tick()
     require.True(t, loop.losAt.IsZero(), "the arrival clears the walk")
 

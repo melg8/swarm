@@ -105,7 +105,7 @@ func TestZoneAreaNilSemantics(t *testing.T) {
     // attackable npc counts (the legacy NearestAttackable(nil)
     // behavior of the tests).
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 0, 0, 0, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, X: 100, Y: 0, Name: "Gremlin", Attackable: true,
     })

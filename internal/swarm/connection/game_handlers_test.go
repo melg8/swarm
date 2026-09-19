@@ -743,7 +743,7 @@ func TestEnsureCharacterReportsCreationFail(t *testing.T) {
     client.SetLogger(log.New(io.Discard, "", 0))
 
     _, err = client.EnsureCharacter(CharacterParams{
-        Name:      "test1",
+        Name:      "unittest1",
         Race:      1,
         Female:    0,
         ClassID:   18,
@@ -762,7 +762,7 @@ func (s *fakeGameServer) createFailFlow(
     payload := s.readEncrypted(conn, cipher)
     require.Equal(s.t, byte(0x0B), payload[0])
     name := readUtf16String(payload[1:])
-    require.Equal(s.t, "test1", name)
+    require.Equal(s.t, "unittest1", name)
 
     reason := []byte{0x26, 0x02, 0x00, 0x00, 0x00} // name already exists
     s.writeEncrypted(conn, cipher, reason)

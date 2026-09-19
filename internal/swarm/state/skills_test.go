@@ -28,7 +28,7 @@ func elvenFighterSkills() []LearnedSkill {
 // list lands in the snapshot enriched with the display data of the
 // generated dictionary, sorted by skill id.
 func TestSetSkillsPublishesTheSnapshot(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     require.Nil(t, bot.Snapshot().Skills,
         "no skills before the server lists them")
 
@@ -62,9 +62,9 @@ func TestSetSkillsPublishesTheSnapshot(t *testing.T) {
 // strikes and the weapon mastery), the defense skills second, the
 // rest last; within a category the unlock level orders the lessons.
 func TestSkillPlanOrdersWarriorPriorities(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 100,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 100,
     })
     bot.SetSkills(elvenFighterSkills())
 
@@ -114,7 +114,7 @@ func TestSkillPlanOrdersWarriorPriorities(t *testing.T) {
     // Power Strike lessons become affordable (the level 15 ones at
     // 1100 sp stay out of reach).
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 400,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 400,
     })
     plan = bot.Snapshot().SkillPlan
     for _, entry := range plan.Entries {
@@ -127,9 +127,9 @@ func TestSkillPlanOrdersWarriorPriorities(t *testing.T) {
 // TestSkillPlanTotals pins the queue economics: the SP wallet, the
 // total cost of the whole queue and the missing SP.
 func TestSkillPlanTotals(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
     })
     bot.SetSkills(nil)
 
@@ -149,9 +149,9 @@ func TestSkillPlanTotals(t *testing.T) {
 // drops the learned list and the queue (the fresh login republishes
 // them).
 func TestSkillPlanClearedBySessionReset(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1,
     })
     bot.SetSkills(elvenFighterSkills())
     require.NotNil(t, bot.Snapshot().SkillPlan)
@@ -167,9 +167,9 @@ func TestSkillPlanClearedBySessionReset(t *testing.T) {
 // are not warriors - the dictionary still answers them - but a bogus
 // class id must not crash the snapshot).
 func TestSkillPlanUnknownClassStaysNull(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 5, ClassID: 999, Race: 1,
+        Name: "unittest1", Level: 5, ClassID: 999, Race: 1,
     })
     bot.SetSkills(elvenFighterSkills())
 
@@ -179,9 +179,9 @@ func TestSkillPlanUnknownClassStaysNull(t *testing.T) {
 // TestSkillPlanJSONShape pins the JSON contract of the queue and the
 // learned list: the field names the web UI reads.
 func TestSkillPlanJSONShape(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
     })
     bot.SetSkills([]LearnedSkill{{SkillID: 142, Level: 1, Passive: true}})
 
@@ -224,9 +224,9 @@ func TestSkillPlanJSONShape(t *testing.T) {
 // spellbooks (the item id and the resolved name), the strikes learn
 // without one.
 func TestSkillPlanCarriesTheBooks(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
     })
     bot.SetSkills([]LearnedSkill{{SkillID: 142, Level: 1, Passive: true}})
 
@@ -257,9 +257,9 @@ func TestSkillPlanCarriesTheBooks(t *testing.T) {
 // purchase plan) sort before the attack lessons of the other
 // weapons; the defense and the rest stay behind.
 func TestSkillPlanWeaponPriority(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 200,
     })
     bot.SetSkills([]LearnedSkill{{SkillID: 142, Level: 1, Passive: true}})
 

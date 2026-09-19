@@ -13,7 +13,7 @@ import (
 )
 
 // The village escape scenario tests: the 2026-09-14 12:31 stuck dump
-// (build 73fcfa6, bot test3, phase townReturn) - the character stood
+// (build 73fcfa6, bot unittest3, phase townReturn) - the character stood
 // at the village plaza cell through a whole day of refused walks and
 // must get out of the city within two minutes of the world entry.
 
@@ -167,9 +167,9 @@ func TestEvaluateVillageEscapeConditions(t *testing.T) {
         Name: escapeAccount, Level: 15, ClassID: 18,
         X: 40648, Y: 52680, Z: -3224,
     })
-    test2 := &Test{}
-    test2.setChecks(villageEscapeChecks())
-    escaped, _ = evaluateVillageEscape(offline, test2)
+    unittest2 := &Test{}
+    unittest2.setChecks(villageEscapeChecks())
+    escaped, _ = evaluateVillageEscape(offline, unittest2)
     require.False(t, escaped)
-    require.False(t, test2.checks[0].Done)
+    require.False(t, unittest2.checks[0].Done)
 }

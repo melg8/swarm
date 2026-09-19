@@ -15,11 +15,11 @@ import (
 
 // enterWorldCharacter fills the tracker with a live character state.
 func enterWorldCharacter(tracker *state.Bot) {
-    tracker.SetCharacter("test1", 7, 18, 100, 200, -3000, 80, 40)
-    tracker.SetOnline("test1")
+    tracker.SetCharacter("unittest1", 7, 18, 100, 200, -3000, 80, 40)
+    tracker.SetOnline("unittest1")
     tracker.SetPhase("engage")
     tracker.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 5, Race: 1, ClassID: 18,
+        Name: "unittest1", Level: 5, Race: 1, ClassID: 18,
         X: 100, Y: 200, Z: -3000,
         Exp: 2500, MaxHP: 100, CurHP: 90, MaxMP: 50, CurMP: 40,
         CurrentLoad: 10, MaxLoad: 100,
@@ -29,7 +29,7 @@ func enterWorldCharacter(tracker *state.Bot) {
 // levelUpCharacter bumps the character to the next level.
 func levelUpCharacter(tracker *state.Bot) {
     tracker.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 6, Race: 1, ClassID: 18,
+        Name: "unittest1", Level: 6, Race: 1, ClassID: 18,
         X: 100, Y: 200, Z: -3000,
         Exp: 3000, MaxHP: 100, CurHP: 90, MaxMP: 50, CurMP: 40,
         CurrentLoad: 10, MaxLoad: 100,
@@ -43,21 +43,21 @@ func levelUpCharacter(tracker *state.Bot) {
 // by then, so the test stays deterministic.
 func TestSamplerPublishes(t *testing.T) {
     // A fresh tracker has no character: nothing lands in the journal.
-    empty := state.NewBot("test1")
+    empty := state.NewBot("unittest1")
     journalEmpty, err := NewJournal(t.TempDir(), nil)
     require.NoError(t, err)
-    NewSampler("test1", empty, journalEmpty).publish()
+    NewSampler("unittest1", empty, journalEmpty).publish()
     journalEmpty.Close()
     require.Empty(t, readLines(t, journalEmpty.Path()))
 
     // The character enters the world: the baseline sample lands with
     // the level, the cumulative exp and the phase; a level up emits
     // the level mark.
-    tracker := state.NewBot("test1")
+    tracker := state.NewBot("unittest1")
     journal, err := NewJournal(t.TempDir(), nil)
     require.NoError(t, err)
     enterWorldCharacter(tracker)
-    sampler := NewSampler("test1", tracker, journal)
+    sampler := NewSampler("unittest1", tracker, journal)
     sampler.publish()
     levelUpCharacter(tracker)
     sampler.publish()
@@ -77,14 +77,14 @@ func TestSamplerPublishes(t *testing.T) {
 
 // TestSamplerRunStops verifies the run loop exits with the context.
 func TestSamplerRunStops(t *testing.T) {
-    tracker := state.NewBot("test1")
-    tracker.SetCharacter("test1", 7, 18, 100, 200, -3000, 80, 40)
+    tracker := state.NewBot("unittest1")
+    tracker.SetCharacter("unittest1", 7, 18, 100, 200, -3000, 80, 40)
     journal, err := NewJournal(t.TempDir(), nil)
     require.NoError(t, err)
     defer journal.Close()
 
     ctx, cancel := context.WithCancel(context.Background())
-    sampler := NewSampler("test1", tracker, journal)
+    sampler := NewSampler("unittest1", tracker, journal)
     done := make(chan struct{})
     go func() {
         sampler.Run(ctx)
@@ -100,9 +100,9 @@ func TestSamplerRunStops(t *testing.T) {
 
 // TestSamplerNilJournal verifies the disabled journal is a no-op.
 func TestSamplerNilJournal(t *testing.T) {
-    tracker := state.NewBot("test1")
+    tracker := state.NewBot("unittest1")
     enterWorldCharacter(tracker)
-    sampler := NewSampler("test1", tracker, nil)
+    sampler := NewSampler("unittest1", tracker, nil)
     require.NotPanics(t, func() {
         sampler.publish()
         sampler.Run(context.Background())
@@ -111,8 +111,8 @@ func TestSamplerNilJournal(t *testing.T) {
 
 // TestNilJournalRun verifies Run exits at once without a journal.
 func TestNilJournalRun(t *testing.T) {
-    tracker := state.NewBot("test1")
-    sampler := NewSampler("test1", tracker, nil)
+    tracker := state.NewBot("unittest1")
+    sampler := NewSampler("unittest1", tracker, nil)
     done := make(chan struct{})
     go func() {
         sampler.Run(context.Background())

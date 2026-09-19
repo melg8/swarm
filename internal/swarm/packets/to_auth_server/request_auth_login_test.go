@@ -14,12 +14,12 @@ import (
 func TestRequestAuthLoginToBytes(t *testing.T) {
     t.Run("valid credentials", func(t *testing.T) {
         writer := packet.NewWriter()
-        req := &RequestAuthLogin{Account: "test1", Password: "test"}
+        req := &RequestAuthLogin{Account: "unittest1", Password: "test"}
         err := req.ToBytes(writer)
         require.NoError(t, err)
 
         expected := []byte{0x00}
-        expected = append(expected, field("test1")...)
+        expected = append(expected, field("unittest1")...)
         expected = append(expected, field("test")...)
 
         require.Equal(t, expected, writer.Bytes())
@@ -34,7 +34,7 @@ func TestRequestAuthLoginToBytes(t *testing.T) {
 
     t.Run("empty password", func(t *testing.T) {
         writer := packet.NewWriter()
-        req := &RequestAuthLogin{Account: "test1", Password: ""}
+        req := &RequestAuthLogin{Account: "unittest1", Password: ""}
         err := req.ToBytes(writer)
         require.Error(t, err)
     })

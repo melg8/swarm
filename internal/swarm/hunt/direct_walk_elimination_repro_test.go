@@ -22,7 +22,7 @@ import (
 )
 
 // The reproduction of the 2026-09-19 16:02 state dump report (build
-// 07ccb0e, bot test1, phase townReturn): the character spawned at the
+// 07ccb0e, bot unittest1, phase townReturn): the character spawned at the
 // village cell 43032 50408 -2992 and NEVER moved - "не исправил либо
 // не залил? опять прямая линия до зоны - ее НЕ должно быть, ТОЛЬКО
 // идти по маршрутам и НИКОГДА не идти напрямую".

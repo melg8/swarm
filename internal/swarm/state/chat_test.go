@@ -20,7 +20,7 @@ func chatLines(bot *Bot) []ChatEvent {
 
 func TestApplySystemMessageFormatsAdena(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     // id 28: "You picked up $s1 adena." with an int parameter.
     bot.ApplySystemMessage(SystemMessage{
@@ -35,7 +35,7 @@ func TestApplySystemMessageFormatsAdena(t *testing.T) {
 
 func TestApplySystemMessageResolvesItemNames(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     // id 30: "You picked up $s1." with an item name parameter: the
     // generated item dictionary resolves the display id.
@@ -58,7 +58,7 @@ func TestApplySystemMessageUnknownIdFallsBack(t *testing.T) {
 
 func TestApplySocialActionMarkerAndLevelUps(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 100, Y: 100, Name: "Gremlin",
@@ -105,7 +105,7 @@ func TestChatWindowRollsOver(t *testing.T) {
 
 func TestApplySystemMessageRecordsCannotSeeTarget(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     // Any other system message leaves the refusal time untouched.
     bot.ApplySystemMessage(SystemMessage{ID: 28})

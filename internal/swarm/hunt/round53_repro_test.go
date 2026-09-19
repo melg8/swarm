@@ -14,7 +14,7 @@ import (
 )
 
 // The reproduction of the 2026-09-11 round 53 stuck report: bot
-// test2 (level 11, phase townReturn) stood at x 46008 y 51992 z
+// unittest2 (level 11, phase townReturn) stood at x 46008 y 51992 z
 // -2792 (the elven village teacher plaza) trying to walk back to the
 // Kaboo Orc Grunt S hunting zone (42278 56761 -3672), but cycled
 // "town walk stuck, skipping waypoint (1..3 of 3)" -> "the server
@@ -27,7 +27,7 @@ import (
 // channel this dump exposes.
 const (
     // reproRound53X/Y/Z is the reported stuck position (the dump of
-    // 2026-09-11T05:06:14+03:00, bot test2 phase townReturn).
+    // 2026-09-11T05:06:14+03:00, bot unittest2 phase townReturn).
     reproRound53X = int32(46008)
     reproRound53Y = int32(51992)
     reproRound53Z = int32(-2792)

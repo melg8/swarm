@@ -15,7 +15,7 @@ import (
 )
 
 // The zone return scenario tests: the round 58 acceptance round of the
-// 2026-09-12 freeze dump (build 2149ad1, bot test1, phase engage) - the
+// 2026-09-12 freeze dump (build 2149ad1, bot unittest1, phase engage) - the
 // character woke on the reported stuck village cell with the reported
 // item set and must walk to its selected hunting zone on its own.
 
@@ -175,10 +175,10 @@ func TestEvaluateZoneReturnConditions(t *testing.T) {
         Name: returnAccount, Level: 14, ClassID: 18,
         X: 35214, Y: 51358, Z: zoneReturnSpawnZ,
     })
-    test2 := &Test{}
-    test2.setChecks(zoneReturnChecks())
-    evaluateZoneReturnConditions(offline, test2)
-    require.False(t, test2.checks[1].Done)
+    unittest2 := &Test{}
+    unittest2.setChecks(zoneReturnChecks())
+    evaluateZoneReturnConditions(offline, unittest2)
+    require.False(t, unittest2.checks[1].Done)
 }
 
 // TestResetCharacterInjectsDumpItems pins the database half of the

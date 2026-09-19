@@ -178,7 +178,7 @@ func buildSelfVitals(objectID int32, curHP int32) []byte {
 // buildCharSelected builds the CharSelected packet of the test character.
 func buildCharSelected() []byte {
     selected := []byte{0x21}
-    selected = append(selected, utf16Bytes("test1")...)
+    selected = append(selected, utf16Bytes("unittest1")...)
     selected = binary.LittleEndian.AppendUint32(selected, 100)
     selected = append(selected, utf16Bytes("")...)
     selected = binary.LittleEndian.AppendUint32(selected, 42)
@@ -245,11 +245,11 @@ func startHuntBot(
     client, err := NewGameClient(conn)
     require.NoError(t, err)
 
-    tracker := state.NewBot("test1")
+    tracker := state.NewBot("unittest1")
     client.SetTracker(tracker)
 
     charList, err := client.Authenticate(GameSessionParams{
-        Account:    "test1",
+        Account:    "unittest1",
         LoginOkID1: 1,
         LoginOkID2: 2,
         PlayOkID1:  3,
@@ -258,7 +258,7 @@ func startHuntBot(
     require.NoError(t, err)
 
     updated, err := client.EnsureCharacter(CharacterParams{
-        Name:      "test1",
+        Name:      "unittest1",
         Race:      1,
         Female:    0,
         ClassID:   18,
@@ -268,7 +268,7 @@ func startHuntBot(
     }, charList)
     require.NoError(t, err)
 
-    slot, _, found := updated.FindCharacterByName("test1")
+    slot, _, found := updated.FindCharacterByName("unittest1")
     require.True(t, found)
     require.NoError(t, client.EnterWorld(int32(slot)))
 
@@ -278,7 +278,7 @@ func startHuntBot(
         hunt.NewLoop(client, tracker).Run(ctx)
     }()
     go func() {
-        done <- client.Run(ctx, "test1")
+        done <- client.Run(ctx, "unittest1")
     }()
 
     return tracker, cancel, done

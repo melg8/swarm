@@ -26,12 +26,12 @@ import (
 // onto the walker cell and the move was canceled - "town walk stuck,
 // re-pathing (1 of 3)" ground through the whole budget while the
 // character never moved. The live server log of the reproduction:
-// "MOVEDBG: test1 move CANCELED, distance=0.0 (geodata collapsed the
+// "MOVEDBG: unittest1 move CANCELED, distance=0.0 (geodata collapsed the
 // target onto the walker), cur 44440 51688 -2832 -> 44440 51688
 // -2832".
 const (
     // reproVillageX/Y/Z is the reported stuck position (the dump of
-    // 2026-09-10, the relogin position of test1).
+    // 2026-09-10, the relogin position of unittest1).
     reproVillageX = int32(44440)
     reproVillageY = int32(51688)
     reproVillageZ = int32(-2832)

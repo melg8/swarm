@@ -22,8 +22,8 @@ import (
 func liveSnapshotBot(t *testing.T) *Bot {
     t.Helper()
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 268473919, 18, 45000, 50000, -3500, 100, 50)
-    bot.SetOnline("test1")
+    bot.SetCharacter("unittest1", 268473919, 18, 45000, 50000, -3500, 100, 50)
+    bot.SetOnline("unittest1")
     bot.SetPhase("engage")
     bot.SetHuntingZone(45000, 50000, 1650)
     bot.SetHuntingZones([]ZoneView{
@@ -201,7 +201,7 @@ func TestAppendSnapshotJSONEmptyBot(t *testing.T) {
 // a stale plan encodes as null on both paths.
 func TestAppendSnapshotJSONExpiredWalkPlan(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 100, 50)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 100, 50)
     bot.SetWalkPlan(WalkPlan{Points: []WalkPoint{{X: 1, Y: 2, Z: 3}}})
 
     bot.mu.Lock()

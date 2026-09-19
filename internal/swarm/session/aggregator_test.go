@@ -13,7 +13,7 @@ import (
 
 // sampleAt builds a sample record helper for the aggregate tests.
 func sampleAt(t int64, lv int32, xp int64, ad int64, x int32, y int32, ph string) record {
-    r := newRecord("test1", kindSample, time.Unix(t, 0))
+    r := newRecord("unittest1", kindSample, time.Unix(t, 0))
     r.Lv = lv
     r.Xp = xp
     r.Ad = ad
@@ -28,7 +28,7 @@ func sampleAt(t int64, lv int32, xp int64, ad int64, x int32, y int32, ph string
 // the sample stream (the first level is the baseline, not a mark; the
 // duplicates dedup on the level value).
 func TestAggregatorLevelMarks(t *testing.T) {
-    agg := newBotAgg("test1")
+    agg := newBotAgg("unittest1")
     agg.apply(sampleAt(1700000000, 1, 100, 0, 10, 10, "engage"))
     agg.apply(sampleAt(1700000030, 2, 300, 0, 20, 20, "engage"))
     agg.apply(sampleAt(1700000060, 3, 700, 0, 30, 30, "engage"))
@@ -41,7 +41,7 @@ func TestAggregatorLevelMarks(t *testing.T) {
 // TestAggregatorKillStats verifies the kill counters, the per-mob
 // statistics and the fight histogram.
 func TestAggregatorKillStats(t *testing.T) {
-    agg := newBotAgg("test1")
+    agg := newBotAgg("unittest1")
     kills := []struct {
         mob string
         lvl int32
@@ -53,7 +53,7 @@ func TestAggregatorKillStats(t *testing.T) {
         {"Elder Wolf", 7, 65},
     }
     for i, k := range kills {
-        r := newRecord("test1", kindKill, time.Unix(int64(1700000000+i*60), 0))
+        r := newRecord("unittest1", kindKill, time.Unix(int64(1700000000+i*60), 0))
         r.Mob = k.mob
         r.Lvl = k.lvl
         r.Dur = k.dur
@@ -80,11 +80,11 @@ func TestAggregatorKillStats(t *testing.T) {
 // TestAggregatorTrips verifies the town trip brackets: the duration,
 // the reason counting and the longest trip.
 func TestAggregatorTrips(t *testing.T) {
-    agg := newBotAgg("test1")
-    start := newRecord("test1", kindTripStart, time.Unix(1700000000, 0))
+    agg := newBotAgg("unittest1")
+    start := newRecord("unittest1", kindTripStart, time.Unix(1700000000, 0))
     start.R = "inventory full"
     agg.apply(start)
-    end := newRecord("test1", kindTripEnd, time.Unix(1700000600, 0))
+    end := newRecord("unittest1", kindTripEnd, time.Unix(1700000600, 0))
     end.R = "walked back"
     end.Dur = 600
     agg.apply(end)
@@ -94,7 +94,7 @@ func TestAggregatorTrips(t *testing.T) {
     require.InDelta(t, 600.0, agg.tripMax.dur, 0.001)
     // A trip end without a start (a zone return walk that reuses the
     // machinery) is a no-op, not a crash.
-    orphan := newRecord("test1", kindTripEnd, time.Unix(1700001200, 0))
+    orphan := newRecord("unittest1", kindTripEnd, time.Unix(1700001200, 0))
     orphan.R = "zone return"
     agg.apply(orphan)
     require.Equal(t, 1, agg.trips)
@@ -104,7 +104,7 @@ func TestAggregatorTrips(t *testing.T) {
 // six consecutive samples on one cell while the phase farms record a
 // freeze; the moving samples reset the run.
 func TestAggregatorFreezeDetection(t *testing.T) {
-    agg := newBotAgg("test1")
+    agg := newBotAgg("unittest1")
     for i := range freezeRunThreshold + 2 {
         agg.apply(sampleAt(
             int64(1700000000+i*samplePeriodSec), 5, 100, 0, 10, 10, "engage"))
@@ -129,7 +129,7 @@ func TestAggregatorFreezeDetection(t *testing.T) {
 // TestAggregatorGapDetection verifies the offline gap marks between
 // distant samples.
 func TestAggregatorGapDetection(t *testing.T) {
-    agg := newBotAgg("test1")
+    agg := newBotAgg("unittest1")
     agg.apply(sampleAt(1700000000, 5, 100, 0, 1, 1, "engage"))
     agg.apply(sampleAt(1700000000+gapThresholdSec+10, 5, 100, 0, 1, 1,
         "engage"))
@@ -140,7 +140,7 @@ func TestAggregatorGapDetection(t *testing.T) {
 // TestAggregatorHourBuckets verifies the hourly attribution: the
 // phase seconds, the xp and adena deltas of the bucket.
 func TestAggregatorHourBuckets(t *testing.T) {
-    agg := newBotAgg("test1")
+    agg := newBotAgg("unittest1")
     agg.apply(sampleAt(1700000000, 5, 1000, 500, 1, 1, "engage"))
     agg.apply(sampleAt(1700000030, 5, 1300, 700, 2, 2, "engage"))
     agg.apply(sampleAt(1700000060, 5, 1600, 900, 3, 3, "townWalk"))
@@ -156,12 +156,12 @@ func TestAggregatorHourBuckets(t *testing.T) {
 // TestAggregatorStallKind verifies the stall split between the xp and
 // position lists.
 func TestAggregatorStallKind(t *testing.T) {
-    agg := newBotAgg("test1")
-    xp := newRecord("test1", kindStall, time.Unix(1700000000, 0))
+    agg := newBotAgg("unittest1")
+    xp := newRecord("unittest1", kindStall, time.Unix(1700000000, 0))
     xp.R = "xp"
     xp.Dur = 1200
     agg.apply(xp)
-    pos := newRecord("test1", kindStall, time.Unix(1700000200, 0))
+    pos := newRecord("unittest1", kindStall, time.Unix(1700000200, 0))
     pos.R = "pos"
     pos.Dur = 600
     pos.X, pos.Y = 10, 20
@@ -173,8 +173,8 @@ func TestAggregatorStallKind(t *testing.T) {
 
 // TestAggregatorMoneyTrail verifies the buy marks.
 func TestAggregatorMoneyTrail(t *testing.T) {
-    agg := newBotAgg("test1")
-    buy := newRecord("test1", kindBuy, time.Unix(1700000000, 0))
+    agg := newBotAgg("unittest1")
+    buy := newRecord("unittest1", kindBuy, time.Unix(1700000000, 0))
     buy.Items = "Short Sword, Leather Shield"
     buy.N = 2
     buy.Cost = 2500
@@ -196,9 +196,9 @@ func TestAppendCapped(t *testing.T) {
 // TestAggregatorStoryRing verifies the ring keeps the newest line
 // last.
 func TestAggregatorStoryRing(t *testing.T) {
-    agg := newBotAgg("test1")
+    agg := newBotAgg("unittest1")
     for i := range storyRingLen + 5 {
-        r := newRecord("test1", kindStory, time.Unix(int64(1700000000+i), 0))
+        r := newRecord("unittest1", kindStory, time.Unix(int64(1700000000+i), 0))
         r.M = "line " + itoa(int64(i))
         agg.apply(r)
     }

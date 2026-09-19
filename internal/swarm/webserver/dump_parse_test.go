@@ -42,11 +42,11 @@ func TestParseDumpRoundTrip(t *testing.T) {
     require.NoError(t, err)
 
     // The identity and the phase.
-    require.Equal(t, "test1", snap.ID)
+    require.Equal(t, "unittest1", snap.ID)
     require.Equal(t, state.StatusOnline, snap.Status)
 
     // The character: the position, the HP, the sit state.
-    require.Equal(t, "test1", snap.Character.Name)
+    require.Equal(t, "unittest1", snap.Character.Name)
     require.Equal(t, int32(100), snap.Character.ObjectID)
     require.Equal(t, int32(45000), snap.Character.X)
     require.Equal(t, int32(50000), snap.Character.Y)
@@ -90,8 +90,8 @@ func TestParseDumpRoundTrip(t *testing.T) {
 // class line, the position, the vitals, the stats and the load all
 // read back correctly.
 func TestParseDumpCharacterFields(t *testing.T) {
-    bot := state.NewBot("test1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot := state.NewBot("unittest1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyStatusUpdate(100, []state.Attribute{
         {ID: state.AttrCurHP, Value: 80},
         {ID: state.AttrMaxHP, Value: 113},
@@ -118,8 +118,8 @@ func TestParseDumpCharacterFields(t *testing.T) {
 // back correctly. The level depends on the npcdata lookup of the
 // template id; the parser reads whatever level the dump printed.
 func TestParseDumpObjects(t *testing.T) {
-    bot := state.NewBot("test1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot := state.NewBot("unittest1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID:   200,
         TemplateID: 10001,
@@ -166,8 +166,8 @@ func TestParseDumpEmptyDump(t *testing.T) {
 // TestParseDumpNoWalkPlan pins the "walk plan: none" case: the
 // snapshot carries no walk plan and no origin/dest.
 func TestParseDumpNoWalkPlan(t *testing.T) {
-    bot := state.NewBot("test1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot := state.NewBot("unittest1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     dump := BuildStateDump(bot)
     snap, err := ParseDump(dump)
     require.NoError(t, err)
@@ -183,8 +183,8 @@ func TestParseDumpNoWalkPlan(t *testing.T) {
 // restores it as the walk plan of the repro bot, so a stuck leg
 // report reproduces the whole planned walk.
 func TestParseDumpLastWalkPlan(t *testing.T) {
-    bot := state.NewBot("test1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot := state.NewBot("unittest1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     origin := state.WalkPoint{X: 45000, Y: 50000, Z: -3500}
     dest := state.WalkPoint{X: 46200, Y: 51100, Z: -3500}
     bot.SetWalkPlan(state.WalkPlan{
@@ -227,8 +227,8 @@ func TestParseDumpLastWalkPlan(t *testing.T) {
 // TestParseDumpNoHuntingZone pins the "hunting zone: none" case: the
 // snapshot carries no hunting zone.
 func TestParseDumpNoHuntingZone(t *testing.T) {
-    bot := state.NewBot("test1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot := state.NewBot("unittest1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     dump := BuildStateDump(bot)
     snap, err := ParseDump(dump)
     require.NoError(t, err)
@@ -242,8 +242,8 @@ func TestParseDumpNoHuntingZone(t *testing.T) {
 // search the plan answers.
 func TestParseDumpWalkPlanSearch(t *testing.T) {
     build := func(search *state.WalkSearch) string {
-        bot := state.NewBot("test1")
-        bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+        bot := state.NewBot("unittest1")
+        bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
         bot.SetWalkPlan(state.WalkPlan{
             Origin: &state.WalkPoint{X: 45000, Y: 50000, Z: -3500},
             Points: []state.WalkPoint{
@@ -298,9 +298,9 @@ func TestParseDumpWalkPlanSearch(t *testing.T) {
 // exactly like a live session built them.
 func TestApplyDumpRebuildsCharacter(t *testing.T) {
     source := state.NewBot("source")
-    source.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    source.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     source.ApplyUserInfo(state.UserInfo{
-        Name:  "test1",
+        Name:  "unittest1",
         Level: 5,
         Race:  1,
         X:     45000, Y: 50000, Z: -3500,
@@ -329,7 +329,7 @@ func TestApplyDumpRebuildsCharacter(t *testing.T) {
 // rebuilt bot with the same object id, position and HP.
 func TestApplyDumpRebuildsObjects(t *testing.T) {
     source := state.NewBot("source")
-    source.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    source.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     source.ApplyNpcInfo(state.NpcInfo{
         ObjectID:   200,
         Name:       "Keltir",
@@ -363,7 +363,7 @@ func TestApplyDumpRebuildsObjects(t *testing.T) {
 // through ApplyDump.
 func TestApplyDumpRebuildsHuntingZone(t *testing.T) {
     source := state.NewBot("source")
-    source.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    source.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     source.SetHuntingZone(46112, 41500, 450)
     dump := BuildStateDump(source)
     snap, err := ParseDump(dump)
@@ -384,7 +384,7 @@ func TestApplyDumpRebuildsHuntingZone(t *testing.T) {
 // aiming index all survive.
 func TestApplyDumpRebuildsWalkPlan(t *testing.T) {
     source := state.NewBot("source")
-    source.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    source.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     source.SetWalkPlan(state.WalkPlan{
         Origin: &state.WalkPoint{X: 45800, Y: 41700, Z: -3500},
         Points: []state.WalkPoint{
@@ -417,7 +417,7 @@ func TestApplyDumpRebuildsWalkPlan(t *testing.T) {
 // against it (the whole point of the Apply API replay).
 func TestApplyDumpEnablesHuntScan(t *testing.T) {
     source := state.NewBot("source")
-    source.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    source.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     source.ApplyNpcInfo(state.NpcInfo{
         ObjectID:   200,
         Name:       "Keltir",

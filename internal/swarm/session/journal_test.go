@@ -47,9 +47,9 @@ func TestJournalLifecycle(t *testing.T) {
     require.NoError(t, err)
     journal.Build("main:abc123 dirty=true")
     at := time.Unix(1700000000, 0)
-    journal.Story("test1", "Hunt: zone switch to Elven Ruins", at)
-    journal.Kill("test1", "Kaboo Orc", 4, 8.2, 87.5, 45000, 50000)
-    journal.Death("test1", 5, -1234, 4567)
+    journal.Story("unittest1", "Hunt: zone switch to Elven Ruins", at)
+    journal.Kill("unittest1", "Kaboo Orc", 4, 8.2, 87.5, 45000, 50000)
+    journal.Death("unittest1", 5, -1234, 4567)
     journal.Close()
 
     lines := readLines(t, journal.Path())
@@ -70,7 +70,7 @@ func TestJournalLifecycle(t *testing.T) {
 // TestJournalWireFormat pins the compactness contract: the kill line
 // uses the short flat keys and stays under 120 bytes.
 func TestJournalWireFormat(t *testing.T) {
-    r := newRecord("test1", kindKill, time.Unix(1700000000, 0))
+    r := newRecord("unittest1", kindKill, time.Unix(1700000000, 0))
     r.Mob = "Kaboo Orc Fighter"
     r.Lvl = 6
     r.Dur = 12.5
@@ -91,21 +91,21 @@ func TestJournalNilSafe(t *testing.T) {
     require.Empty(t, journal.Path())
     require.Equal(t, uint64(0), journal.Dropped())
     journal.Build("identity")
-    journal.Story("test1", "message", time.Now())
-    journal.Sample("test1", Sample{})
-    journal.Kill("test1", "mob", 1, 1, 1, 0, 0)
-    journal.Death("test1", 1, 0, 0)
-    journal.TripStart("test1", "reason")
-    journal.TripEnd("test1", "reason", time.Second)
-    journal.Buy("test1", "item", 1, 10)
-    journal.Sell("test1", 1)
-    journal.Zone("test1", "zone", "reason")
-    journal.Stall("test1", "xp", time.Minute, 0, 0, "engage")
-    journal.Repath("test1", 1)
-    journal.Connect("test1", "entered", "")
-    journal.Lost("test1", "reason")
+    journal.Story("unittest1", "message", time.Now())
+    journal.Sample("unittest1", Sample{})
+    journal.Kill("unittest1", "mob", 1, 1, 1, 0, 0)
+    journal.Death("unittest1", 1, 0, 0)
+    journal.TripStart("unittest1", "reason")
+    journal.TripEnd("unittest1", "reason", time.Second)
+    journal.Buy("unittest1", "item", 1, 10)
+    journal.Sell("unittest1", 1)
+    journal.Zone("unittest1", "zone", "reason")
+    journal.Stall("unittest1", "xp", time.Minute, 0, 0, "engage")
+    journal.Repath("unittest1", 1)
+    journal.Connect("unittest1", "entered", "")
+    journal.Lost("unittest1", "reason")
     journal.Shutdown("reason")
-    _, err := journal.Report("test1", nil)
+    _, err := journal.Report("unittest1", nil)
     require.ErrorIs(t, err, errNoJournal)
     journal.Close()
 }
@@ -119,7 +119,7 @@ func TestStoryCap(t *testing.T) {
     require.NoError(t, err)
     at := time.Unix(1700000000, 0)
     for i := range storyCapPerMin * 2 {
-        journal.Story("test1", "flood line "+itoa(int64(i)), at)
+        journal.Story("unittest1", "flood line "+itoa(int64(i)), at)
     }
     journal.Close()
 
@@ -128,7 +128,7 @@ func TestStoryCap(t *testing.T) {
     for _, line := range lines {
         require.Equal(t, kindStory, line.E)
     }
-    report, err := journal.Report("test1", nil)
+    report, err := journal.Report("unittest1", nil)
     require.NoError(t, err)
     require.Contains(t, report, "story muted by the flood cap: "+
         itoa(int64(storyCapPerMin)))
@@ -137,16 +137,16 @@ func TestStoryCap(t *testing.T) {
 // TestStoryCapWindowReset verifies the budget refreshes on the next
 // minute boundary.
 func TestStoryCapWindowReset(t *testing.T) {
-    agg := newBotAgg("test1")
+    agg := newBotAgg("unittest1")
     minute := int64(1700000000 / 60)
     for range storyCapPerMin {
-        r := newRecord("test1", kindStory, time.Unix(minute*60, 0))
+        r := newRecord("unittest1", kindStory, time.Unix(minute*60, 0))
         r.M = "line"
         require.True(t, agg.accept(r))
     }
-    r := newRecord("test1", kindStory, time.Unix(minute*60, 0))
+    r := newRecord("unittest1", kindStory, time.Unix(minute*60, 0))
     require.False(t, agg.accept(r))
-    next := newRecord("test1", kindStory, time.Unix((minute+1)*60, 0))
+    next := newRecord("unittest1", kindStory, time.Unix((minute+1)*60, 0))
     require.True(t, agg.accept(next))
     require.Equal(t, 1, agg.storyMuted)
 }
@@ -158,19 +158,19 @@ func TestJournalReportLive(t *testing.T) {
     journal, err := NewJournal(dir, nil)
     require.NoError(t, err)
     at := time.Unix(1700000000, 0)
-    journal.Story("test1", "Hunt: the story line", at)
-    journal.Kill("test1", "Kaboo Orc", 4, 8.2, 87.5, 45000, 50000)
+    journal.Story("unittest1", "Hunt: the story line", at)
+    journal.Kill("unittest1", "Kaboo Orc", 4, 8.2, 87.5, 45000, 50000)
     journal.Close()
     live := &LiveView{
-        ID: "test1", Status: "online", Phase: "engage", Level: 5,
+        ID: "unittest1", Status: "online", Phase: "engage", Level: 5,
         ExpPercent: 42.5, Health: 93, Adena: 45123, X: -12345, Y: 98765,
         StartedUnix: at.Unix(),
     }
-    report, err := journal.Report("test1", live)
+    report, err := journal.Report("unittest1", live)
     require.NoError(t, err)
     require.Contains(t, report, "swarm session report")
     require.Contains(t, report, "journal: "+journal.Path())
-    require.Contains(t, report, "bot: test1")
+    require.Contains(t, report, "bot: unittest1")
     require.Contains(t, report, "live now: level 5")
     require.Contains(t, report, "Hunt: the story line")
 
@@ -224,14 +224,14 @@ func TestJournalMultipleBots(t *testing.T) {
     dir := t.TempDir()
     journal, err := NewJournal(dir, nil)
     require.NoError(t, err)
-    journal.Kill("test1", "Kaboo Orc", 4, 8.2, 87.5, 45000, 50000)
-    journal.Kill("test2", "Wolf", 2, 3.1, 99, 1, 2)
+    journal.Kill("unittest1", "Kaboo Orc", 4, 8.2, 87.5, 45000, 50000)
+    journal.Kill("unittest2", "Wolf", 2, 3.1, 99, 1, 2)
     journal.Close()
 
     lines := readLines(t, journal.Path())
     require.Len(t, lines, 2)
-    require.Equal(t, "test1", lines[0].B)
-    require.Equal(t, "test2", lines[1].B)
+    require.Equal(t, "unittest1", lines[0].B)
+    require.Equal(t, "unittest2", lines[1].B)
 }
 
 // TestGroupDigits pins the report number rendering.
@@ -266,7 +266,7 @@ func TestHasGzipExt(t *testing.T) {
 // TestReportEmptyBot renders the report of a bot with no events: the
 // sections still land, no zero-division panics.
 func TestReportEmptyBot(t *testing.T) {
-    agg := newBotAgg("test1")
+    agg := newBotAgg("unittest1")
     report := renderReport("some/path.jsonl", agg, nil)
     require.Contains(t, report, "swarm session report")
     require.Contains(t, report, "no events recorded")

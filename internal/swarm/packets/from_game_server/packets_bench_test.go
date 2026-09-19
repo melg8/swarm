@@ -17,9 +17,9 @@ func buildBenchmarkCharList(n int) []byte {
     binary.LittleEndian.PutUint32(count[:], uint32(n))
     data = append(data, count[:]...)
 
-    entry := utf16("test1")
+    entry := utf16("unittest1")
     entry = putInt32(entry, 100)
-    entry = append(entry, utf16("test1")...)
+    entry = append(entry, utf16("unittest1")...)
     entry = putInt32(entry, 0) // session id
     entry = putInt32(entry, 0) // clan id
     entry = putInt32(entry, 0) // builder
@@ -122,7 +122,7 @@ func buildUserInfoPayload() []byte {
     data = putInt32(data, -3500)
     data = putInt32(data, 0) // vehicle id
     data = putInt32(data, 268473919)
-    data = append(data, utf16("test1")...)
+    data = append(data, utf16("unittest1")...)
     for _, value := range []int32{
         1, 0, 18, 5, 2000, // race, female, base class, level, exp
         36, 35, 36, 23, 14, 25, // STR DEX CON INT WIT MEN

@@ -19,7 +19,7 @@ import (
 )
 
 // The reproduction of the 2026-09-14 10:18 state dump report (build
-// c22d529, bot test3, phase townReturn, uptime 7m24s): the level 15
+// c22d529, bot unittest3, phase townReturn, uptime 7m24s): the level 15
 // character stood at x 45768 y 49848 z -3056 (the elven village
 // center) and never moved a single cell through NINE aborted trips
 // while the corridor bans grew (43512 50504 widened to r768, then the
@@ -64,7 +64,7 @@ import (
 // идти напрямую - see direct_walk_elimination_repro_test.go).
 const (
     // refusalDumpX/Y/Z is the reported stuck position (the dump of
-    // 2026-09-14 10:18, the village center stand of test3).
+    // 2026-09-14 10:18, the village center stand of unittest3).
     refusalDumpX = int32(45768)
     refusalDumpY = int32(49848)
     refusalDumpZ = int32(-3056)

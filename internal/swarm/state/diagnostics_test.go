@@ -133,7 +133,7 @@ func TestDiagnosticsLoginCooldown(t *testing.T) {
 // stale walk with the broadcast age.
 func TestDiagnosticsWalkFreshness(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 100, 50)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 100, 50)
     bot.ApplyMovement(Movement{
         ObjectID: 100,
         X:        45000, Y: 50000, Z: -3500,
@@ -162,7 +162,7 @@ func TestDiagnosticsWalkFreshness(t *testing.T) {
 // age and the hit age of an incoming blow.
 func TestDiagnosticsCombatNuance(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 268473919, 18, 45000, 50000, -3500, 100, 50)
+    bot.SetCharacter("unittest1", 268473919, 18, 45000, 50000, -3500, 100, 50)
     snapshot := bot.Snapshot()
     require.False(t, snapshot.Diagnostics.AutoAttacking)
     require.Equal(t, int32(0), snapshot.Diagnostics.FightingTargetID)

@@ -201,8 +201,8 @@ func TestParseCharSelectInfoPacket(t *testing.T) {
     t.Run("two characters", func(t *testing.T) {
         data := []byte{0x1F}
         data = putInt32(data, 2)
-        data = append(data, buildCharacterEntry("test1", "test1")...)
-        data = append(data, buildCharacterEntry("other", "test1")...)
+        data = append(data, buildCharacterEntry("unittest1", "unittest1")...)
+        data = append(data, buildCharacterEntry("other", "unittest1")...)
 
         p := NewCharSelectInfoPacket()
         err := ParseCharSelectInfoPacket(p, data)
@@ -210,11 +210,11 @@ func TestParseCharSelectInfoPacket(t *testing.T) {
         require.Equal(t, int32(2), p.Count)
         require.Len(t, p.Characters, 2)
 
-        slot, info, found := p.FindCharacterByName("test1")
+        slot, info, found := p.FindCharacterByName("unittest1")
         require.True(t, found)
         require.NotNil(t, info)
         require.Equal(t, 0, slot)
-        require.Equal(t, "test1", info.Name)
+        require.Equal(t, "unittest1", info.Name)
         require.Equal(t, int32(18), info.BaseClassID)
         require.Equal(t, int32(1), info.Race)
         require.Equal(t, int32(1), info.Level)
@@ -229,7 +229,7 @@ func TestParseCharSelectInfoPacket(t *testing.T) {
         p := NewCharSelectInfoPacket()
         data := []byte{0x1F}
         data = putInt32(data, 1)
-        data = append(data, buildCharacterEntry("test1", "test1")...)
+        data = append(data, buildCharacterEntry("unittest1", "unittest1")...)
 
         require.NoError(t, ParseCharSelectInfoPacket(p, data))
         require.NoError(t, ParseCharSelectInfoPacket(p, data))
@@ -262,7 +262,7 @@ func TestParseCharSelectInfoPacketErrors(t *testing.T) {
     t.Run("truncated character", func(t *testing.T) {
         data := []byte{0x1F}
         data = putInt32(data, 1)
-        data = append(data, utf16("test1")...)
+        data = append(data, utf16("unittest1")...)
 
         p := NewCharSelectInfoPacket()
         err := ParseCharSelectInfoPacket(p, data)
@@ -273,7 +273,7 @@ func TestParseCharSelectInfoPacketErrors(t *testing.T) {
 func TestParseCharSelectedPacket(t *testing.T) {
     t.Run("full packet", func(t *testing.T) {
         data := []byte{0x21}
-        data = append(data, utf16("test1")...)
+        data = append(data, utf16("unittest1")...)
         data = putInt32(data, 100) // object id
         data = append(data, utf16("title")...)
         data = putInt32(data, 42) // session id
@@ -292,7 +292,7 @@ func TestParseCharSelectedPacket(t *testing.T) {
         p := NewCharSelectedPacket()
         err := ParseCharSelectedPacket(p, data)
         require.NoError(t, err)
-        require.Equal(t, "test1", p.Name)
+        require.Equal(t, "unittest1", p.Name)
         require.Equal(t, int32(100), p.ObjectID)
         require.Equal(t, int32(42), p.SessionID)
         require.Equal(t, int32(18), p.ClassID)
@@ -311,7 +311,7 @@ func TestParseCharSelectedPacket(t *testing.T) {
 
     t.Run("truncated", func(t *testing.T) {
         data := []byte{0x21}
-        data = append(data, utf16("test1")...)
+        data = append(data, utf16("unittest1")...)
 
         p := NewCharSelectedPacket()
         err := ParseCharSelectedPacket(p, data)

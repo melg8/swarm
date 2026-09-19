@@ -361,9 +361,9 @@ func TestGameServerToleratesUnreadableAuthLogin(t *testing.T) {
 func TestReadGameAuthLoginLayouts(t *testing.T) {
     // The documented Mobius layout: null terminated utf16.
     terminated := []byte{0x08}
-    terminated = appendUTF16(terminated, "test1")
+    terminated = appendUTF16(terminated, "unittest1")
     terminated = binary.LittleEndian.AppendUint32(terminated, 1)
-    require.Equal(t, "test1", readGameAuthLogin(terminated))
+    require.Equal(t, "unittest1", readGameAuthLogin(terminated))
 
     // The fallback layout: short length prefixed utf16.
     prefixed := []byte{0x08, 0x02, 0x00}

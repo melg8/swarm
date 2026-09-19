@@ -23,7 +23,7 @@ import (
 func newCasterBot(curMP int32) *state.Bot {
     bot := newTestBot()
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 10, ClassID: 25, Race: 1,
+        Name: "unittest1", Level: 10, ClassID: 25, Race: 1,
         X: 45000, Y: 50000, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 100, CurMP: curMP,
     })
@@ -367,7 +367,7 @@ func TestSittingMageKeepsSittingBelowStandThreshold(t *testing.T) {
 func TestFighterNeverRestsOnMana(t *testing.T) {
     bot := newTestBot()
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 10, ClassID: 18, Race: 1,
+        Name: "unittest1", Level: 10, ClassID: 18, Race: 1,
         X: 45000, Y: 50000, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 100, CurMP: 5,
     })
@@ -421,7 +421,7 @@ func TestFighterClassKeepsMeleeGearProfile(t *testing.T) {
 func TestShoppingPlanFeedsTheWeaponPriority(t *testing.T) {
     bot := newTestBot()
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 40, ClassID: 18, Race: 1, Sp: 50000,
+        Name: "unittest1", Level: 40, ClassID: 18, Race: 1, Sp: 50000,
         X: 45000, Y: 50000, Z: -3500,
         MaxHP: 100, CurHP: 90,
     })

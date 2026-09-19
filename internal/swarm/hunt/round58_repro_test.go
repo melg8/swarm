@@ -13,7 +13,7 @@ import (
 )
 
 // The reproduction of the 2026-09-12 01:50 state dump report (build
-// 2149ad1, bot test1, phase engage, uptime 10h32m): the character stood
+// 2149ad1, bot unittest1, phase engage, uptime 10h32m): the character stood
 // at x 43048 y 50312 z -2992 (the elven village main street, next to
 // Herbiel) with the hunting zone 7900 units away at 35214 51358 (the
 // Kaboo Orc Fighter SW spot leash, half 1448), the walk plan empty, and
@@ -49,7 +49,7 @@ import (
 //     budget) and the paced log line explains the standing hunter.
 const (
     // reproRound58X/Y/Z is the reported stuck position (the dump of
-    // 2026-09-12 01:50, the village respawn cell of test1).
+    // 2026-09-12 01:50, the village respawn cell of unittest1).
     reproRound58X = int32(43048)
     reproRound58Y = int32(50312)
     reproRound58Z = int32(-2992)

@@ -17,7 +17,7 @@ import (
 )
 
 // The reproduction of the 2026-09-12 04:58 state dump report (build
-// 4deb888, bot test2, phase engage, uptime 1m44s): the level 14
+// 4deb888, bot unittest2, phase engage, uptime 1m44s): the level 14
 // elven fighter returned from its town trip without the legs armor -
 // the equipment held 11 pieces (Sickle, Buckler, Leather Shirt,
 // Wooden Helmet, Gloves, Leather Shoes, the basic jewels), the bag
@@ -74,7 +74,7 @@ func applyRound60Gear(bot *state.Bot, adena int64, withPants bool) {
     })
     bot.ApplyItemList(items)
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test2", Level: 14, ClassID: 18, Race: 1,
+        Name: "unittest2", Level: 14, ClassID: 18, Race: 1,
         X: 45000, Y: 50000, Z: -3500,
         MaxHP: 339, CurHP: 339, MaxMP: 137, CurMP: 137,
         PaperdollObjectIDs: round60Paperdoll(withPants),

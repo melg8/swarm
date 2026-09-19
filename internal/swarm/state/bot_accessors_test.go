@@ -12,7 +12,7 @@ import (
 
 func TestSelfAccessorsTrackTheCharacter(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     // The CharSelected placement answers before the first UserInfo.
     require.Equal(t, int32(100), bot.SelfObjectID())
@@ -29,7 +29,7 @@ func TestSelfAccessorsTrackTheCharacter(t *testing.T) {
     paperdoll := [PaperdollSlots]int32{}
     paperdoll[0] = 555
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 7, Exp: 4242,
+        Name: "unittest1", Level: 7, Exp: 4242,
         X: 45100, Y: 50100, Z: -3400,
         MaxHP: 122, CurHP: 90, MaxMP: 40, CurMP: 35,
         CurrentLoad: 640, MaxLoad: 64000,
@@ -73,7 +73,7 @@ func TestSelfPositionUnknownWithoutCharacter(t *testing.T) {
 
 func TestApplyWaitTypeTracksTheSitState(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 45200, Y: 50200, Name: "Gremlin"})
 
     bot.ApplyWaitType(WaitType{ObjectID: 100, Sitting: true})
@@ -89,7 +89,7 @@ func TestApplyWaitTypeTracksTheSitState(t *testing.T) {
 
 func TestStatusUpdateAppliesLevelAndLoad(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     bot.ApplyStatusUpdate(100, []Attribute{
         {ID: AttrLevel, Value: 9},
@@ -115,7 +115,7 @@ func TestStatusUpdateAppliesLevelAndLoad(t *testing.T) {
 
 func TestObjectAccessorsServeKnownObjects(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, Attackable: true, X: 45200, Y: 50200, Z: -3400,
         Name: "Gremlin",
@@ -145,7 +145,7 @@ func TestObjectAccessorsServeKnownObjects(t *testing.T) {
 
 func TestApplyItemInfoTracksGroundItems(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     bot.ApplyItemInfo(ItemInfo{
         ObjectID: 201, TemplateID: 57, Count: 25,
@@ -202,7 +202,7 @@ func TestCountPacketAccountsTraffic(t *testing.T) {
 
 func TestNearestAttackerFindsTheClosestChaser(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     spawnNpcInfo(bot, 7, 1000001, 45300)
     spawnNpcInfo(bot, 8, 1000001, 45100)
 
@@ -232,7 +232,7 @@ func TestNearestAttackerFindsTheClosestChaser(t *testing.T) {
 
 func TestZoneHasAttackableReadsTheSquare(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     require.False(t, bot.ZoneHasAttackable(nil))
     require.False(t, bot.ZoneHasAttackable(&Zone{CX: 45000, CY: 50000, Half: 300}))
@@ -255,7 +255,7 @@ func TestZoneHasAttackableReadsTheSquare(t *testing.T) {
 // and a zero ceiling disables the filter.
 func TestZoneHasAttackableBelowAppliesTheLevelCeiling(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     // Display 6 is the Orc Archer (level 8), display 1 the Gremlin
     // (level 1).
     spawnNpcInfo(bot, 7, 1000006, 45100)
@@ -284,7 +284,7 @@ func TestZoneHasAttackableBelowAppliesTheLevelCeiling(t *testing.T) {
 // variants share the bias.
 func TestNearestAttackablePreferredAppliesThePriorityBias(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     // A gremlin at 300 units and a rabbit at 600.
     spawnNpcInfo(bot, 7, 1000001, 45300)
     spawnNpcInfo(bot, 8, 1000002, 45600)
@@ -329,7 +329,7 @@ func TestNearestAttackablePreferredAppliesThePriorityBias(t *testing.T) {
 
 func TestNearestNpcByTemplatesPicksTheClosest(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     spawnNpcInfo(bot, 7, 1000001, 45300)
     spawnNpcInfo(bot, 8, 1000003, 45100)
 
@@ -348,7 +348,7 @@ func TestNearestNpcByTemplatesPicksTheClosest(t *testing.T) {
 
 func TestMedianZoneMobLevel(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     require.Zero(t, bot.MedianZoneMobLevel(nil))
     zone := &Zone{CX: 45000, CY: 50000, Half: 500}
@@ -408,7 +408,7 @@ drained:
 
 func TestPaperdollAndInventoryAccessors(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     paperdoll := [PaperdollSlots]int32{}
     paperdoll[1] = 555
@@ -432,7 +432,7 @@ func TestPaperdollAndInventoryAccessors(t *testing.T) {
 
 func TestDestroyableItemsRanksQuestAndGearFirst(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyItemList([]InventoryItem{
         {ObjectID: 1, ItemID: 1864, Count: 10, Type2: 5}, // stackable junk
         {ObjectID: 2, ItemID: 1000, Count: 1, Type2: 3},  // quest item
@@ -452,7 +452,7 @@ func TestDestroyableItemsRanksQuestAndGearFirst(t *testing.T) {
 
 func TestApplyAutoAttackFlagsTrackSelfAndUnknown(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     bot.ApplyAutoAttackStart(100)
     require.True(t, bot.Snapshot().Character.InCombat)

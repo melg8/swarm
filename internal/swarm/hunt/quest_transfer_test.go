@@ -73,7 +73,7 @@ func (g *transferGame) SendBypass(command string) error {
             g.stage = 2
             if !g.noMove {
                 g.bot.ApplyUserInfo(state.UserInfo{
-                    Name: "test1", Level: 20,
+                    Name: "unittest1", Level: 20,
                     X: g.arriveX, Y: g.arriveY, Z: -3043,
                 })
             }
@@ -257,7 +257,7 @@ func (m *movingGame) WalkTo(x int32, y int32, z int32) error {
         return err
     }
     m.bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 20, X: x, Y: y, Z: z,
+        Name: "unittest1", Level: 20, X: x, Y: y, Z: z,
     })
 
     return nil

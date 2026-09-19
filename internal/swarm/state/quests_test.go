@@ -27,7 +27,7 @@ func classTransferJournal() ([]QuestEntryView, []QuestItemView) {
 // TestApplyQuestListPinsTheJournal pins the apply path: the whole
 // journal lands and the accessors answer per quest and per item.
 func TestApplyQuestListPinsTheJournal(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     require.Equal(t, 0, bot.QuestCount())
     _, active := bot.QuestCond(406)
     require.False(t, active, "no quest before the server lists it")
@@ -66,7 +66,7 @@ func TestApplyQuestListPinsTheJournal(t *testing.T) {
 // semantics: a later packet with fewer quests drops the stale
 // entries instead of merging (the server resends everything).
 func TestApplyQuestListReplacesTheJournal(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     quests, items := classTransferJournal()
     bot.ApplyQuestList(quests, items)
 
@@ -83,7 +83,7 @@ func TestApplyQuestListReplacesTheJournal(t *testing.T) {
 
 // TestQuestIDsAreSorted pins the deterministic accessor order.
 func TestQuestIDsAreSorted(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyQuestList([]QuestEntryView{
         {QuestID: 407, State: 1},
         {QuestID: 406, State: 1},
@@ -98,7 +98,7 @@ func TestQuestIDsAreSorted(t *testing.T) {
 // same semantics the skill list applies), so a lost session must not
 // leak its quests into the next login window.
 func TestResetSessionClearsTheJournal(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     quests, items := classTransferJournal()
     bot.ApplyQuestList(quests, items)
 

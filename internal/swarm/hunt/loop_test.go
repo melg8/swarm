@@ -283,7 +283,7 @@ func (m eventMirror) Write(p []byte) (int, error) {
 
 func newTestBot() *state.Bot {
     bot := state.NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     // A healthy character: the hunt loop engages the next target
     // immediately when the HP is above the re-engage threshold.
     bot.ApplyStatusUpdate(100, []state.Attribute{

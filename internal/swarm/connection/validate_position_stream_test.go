@@ -77,7 +77,7 @@ func absorbingFlowWithMoves(
         // EnterWorld call of the client waits for).
         var selected []byte
         selected = append(selected, 0x21)
-        selected = append(selected, utf16Bytes("test1")...)
+        selected = append(selected, utf16Bytes("unittest1")...)
         selected = binary.LittleEndian.AppendUint32(selected, 100)
         selected = append(selected, utf16Bytes("")...)
         selected = binary.LittleEndian.AppendUint32(selected, 42)
@@ -127,7 +127,7 @@ func newValidatingSession(
     require.NoError(t, err)
 
     charList, err := client.Authenticate(GameSessionParams{
-        Account:    "test1",
+        Account:    "unittest1",
         LoginOkID1: 1,
         LoginOkID2: 2,
         PlayOkID1:  3,
@@ -136,7 +136,7 @@ func newValidatingSession(
     require.NoError(t, err)
 
     updated, err := client.EnsureCharacter(CharacterParams{
-        Name:      "test1",
+        Name:      "unittest1",
         Race:      1,
         Female:    0,
         ClassID:   18,
@@ -145,13 +145,13 @@ func newValidatingSession(
         Face:      0,
     }, charList)
     require.NoError(t, err)
-    slot, _, found := updated.FindCharacterByName("test1")
+    slot, _, found := updated.FindCharacterByName("unittest1")
     require.True(t, found)
     require.NoError(t, client.EnterWorld(int32(slot)))
 
-    tracker := state.NewBot("test1")
+    tracker := state.NewBot("unittest1")
     client.SetTracker(tracker)
-    tracker.SetCharacter("test1", 100, 18,
+    tracker.SetCharacter("unittest1", 100, 18,
         45768, 49848, -3056, 358, 145)
 
     return client, tracker
@@ -307,7 +307,7 @@ func TestGameClientRunStreamsThePositionValidation(t *testing.T) {
 
     ctx, cancel := context.WithTimeout(context.Background(), 2600*time.Millisecond)
     defer cancel()
-    require.NoError(t, client.Run(ctx, "test1"))
+    require.NoError(t, client.Run(ctx, "unittest1"))
 
     // At least two reports left the session (the first ticker fire
     // and one after a placement change) and every report carries the

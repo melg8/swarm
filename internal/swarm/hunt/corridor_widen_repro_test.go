@@ -19,7 +19,7 @@ import (
 )
 
 // The reproduction of the 2026-09-14 08:42 state dump report (build
-// 6e45624, bot test3, phase engage, uptime 1m33s): the level 15
+// 6e45624, bot unittest3, phase engage, uptime 1m33s): the level 15
 // character stood at x 45768 y 49848 z -3056 (the elven village south
 // terrace deck) with the held cell "Kaboo Orc Fighter SW-7" 10200
 // units away at 36000 46765, the walk plan empty, the character
@@ -73,7 +73,7 @@ import (
 //     learning back to the widening ladder.
 const (
     // reproWidenX/Y/Z is the reported stuck position (the dump of
-    // 2026-09-14 08:42, the village south terrace deck of test3).
+    // 2026-09-14 08:42, the village south terrace deck of unittest3).
     reproWidenX = int32(45768)
     reproWidenY = int32(49848)
     reproWidenZ = int32(-3056)

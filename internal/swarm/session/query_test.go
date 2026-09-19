@@ -59,28 +59,28 @@ func queryScript() []record {
     // digits collapse into one pattern key, and the interleaved game
     // events give the context mode non-matching neighbors to print.
     for i := range 15 {
-        records = append(records, story("test1",
+        records = append(records, story("unittest1",
             fmt.Sprintf("Hunt: steering the walk around Kaboo Orc at 29%d76 52%d06", i, i),
             60+i*7))
-        records = append(records, story("test1", "npc spawned: Dryad", 63+i*7))
+        records = append(records, story("unittest1", "npc spawned: Dryad", 63+i*7))
     }
     // The kill clock accumulation: the same mob, growing durations.
     for i := range 6 {
-        r := newRecord("test1", kindKill, at(300+i*40))
+        r := newRecord("unittest1", kindKill, at(300+i*40))
         r.Mob = "Kaboo Orc Fighter Lieutenant"
         r.Lvl = 11
         r.Dur = float64(60 + i*40)
         records = append(records, r)
     }
     // One real outlier fight.
-    r := newRecord("test1", kindKill, at(1500))
+    r := newRecord("unittest1", kindKill, at(1500))
     r.Mob = "Crimson Spider"
     r.Lvl = 15
     r.Dur = 4369
     records = append(records, r)
     // The death streak at two positions.
     for i := range 6 {
-        d := newRecord("test1", kindDeath, at(2000+i*30))
+        d := newRecord("unittest1", kindDeath, at(2000+i*30))
         d.Lv = 18
         d.X = []int32{42971, 47595}[i%2]
         d.Y = []int32{51372, 51569}[i%2]
@@ -88,34 +88,34 @@ func queryScript() []record {
     }
     // The emergency logout streak with its closed-socket lost marks.
     for i := range 4 {
-        records = append(records, story("test1",
+        records = append(records, story("unittest1",
             "Hunt: 3 mobs piled on us, emergency logout for 2s", 3000+i*20))
-        l := newRecord("test1", kindLost, at(3002+i*20))
+        l := newRecord("unittest1", kindLost, at(3002+i*20))
         l.R = "game connection lost: failed to read packet header: " +
             "read tcp 1.2.3.4:1->1.2.3.4:7777: use of closed network connection"
         records = append(records, l)
-        c := newRecord("test1", kindConnect, at(3010+i*20))
+        c := newRecord("unittest1", kindConnect, at(3010+i*20))
         c.R = "entered"
         c.M = "level 17"
         records = append(records, c)
     }
     // The town trip abort loop.
     for i := range 4 {
-        s := newRecord("test1", kindTripStart, at(4000+i*300))
+        s := newRecord("unittest1", kindTripStart, at(4000+i*300))
         s.R = "the shop strategy plans purchases worth 62214 adena"
         records = append(records, s)
-        e := newRecord("test1", kindTripEnd, at(4003+i*300))
+        e := newRecord("unittest1", kindTripEnd, at(4003+i*300))
         e.R = "aborted, no walkable path to the shop"
         e.Dur = 4
         records = append(records, e)
     }
     // A healthy second bot.
-    r = newRecord("test2", kindKill, at(500))
+    r = newRecord("unittest2", kindKill, at(500))
     r.Mob = "Dryad"
     r.Lvl = 13
     r.Dur = 18
     records = append(records, r)
-    records = append(records, story("test2", "Hunt: target died, looting", 510))
+    records = append(records, story("unittest2", "Hunt: target died, looting", 510))
 
     return records
 }
@@ -126,7 +126,7 @@ func TestRunQueryFiltersByEventKind(t *testing.T) {
     path := writeQueryJournal(t, queryScript())
     var out strings.Builder
     require.NoError(t, RunQuery(path, QueryFilter{
-        Bot: "test1", Events: []string{"death"},
+        Bot: "unittest1", Events: []string{"death"},
     }, &out))
     text := out.String()
     require.Contains(t, text, "died at level 18")
@@ -140,7 +140,7 @@ func TestRunQueryMatchAndContext(t *testing.T) {
     path := writeQueryJournal(t, queryScript())
     var out strings.Builder
     require.NoError(t, RunQuery(path, QueryFilter{
-        Bot: "test1", Match: "steering", Context: 30 * time.Second,
+        Bot: "unittest1", Match: "steering", Context: 30 * time.Second,
     }, &out))
     text := out.String()
     require.Contains(t, text, "steering")
@@ -154,7 +154,7 @@ func TestRunQueryTimeWindow(t *testing.T) {
     path := writeQueryJournal(t, queryScript())
     var out strings.Builder
     require.NoError(t, RunQuery(path, QueryFilter{
-        Bot: "test1", From: "23:59", To: "23:59:30", Events: []string{"kill"},
+        Bot: "unittest1", From: "23:59", To: "23:59:30", Events: []string{"kill"},
     }, &out))
     // Every scripted kill sits before 23:16: the minute window sees
     // none of them.
@@ -166,7 +166,7 @@ func TestRunQueryLimit(t *testing.T) {
     path := writeQueryJournal(t, queryScript())
     var out strings.Builder
     require.NoError(t, RunQuery(path, QueryFilter{
-        Bot: "test1", Events: []string{"story"}, Limit: 3,
+        Bot: "unittest1", Events: []string{"story"}, Limit: 3,
     }, &out))
     printed := 0
     for _, line := range strings.Split(out.String(), "\n") {
@@ -213,13 +213,13 @@ func TestParseJournalFileWindow(t *testing.T) {
     full, err := ParseJournalFileWindow(path, "", "")
     require.NoError(t, err)
     require.Len(t, full.Order, 2)
-    require.Equal(t, 7, full.Aggs["test1"].kills)
+    require.Equal(t, 7, full.Aggs["unittest1"].kills)
     // The tight window starts at +1000s: only the +1500s outlier kill
     // and the later events fold.
     from := at(1000).Format("15:04:05")
     tight, err := ParseJournalFileWindow(path, from, "")
     require.NoError(t, err)
-    agg := tight.Aggs["test1"]
+    agg := tight.Aggs["unittest1"]
     require.Equal(t, 1, agg.kills)
     require.Len(t, agg.deaths, 6)
 }

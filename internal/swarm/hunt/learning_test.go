@@ -18,7 +18,7 @@ import (
 func learnTestBot(sp int32) *state.Bot {
     bot := newTestBot()
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: sp,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: sp,
     })
     bot.SetSkills([]state.LearnedSkill{
         {SkillID: 142, Level: 1, Passive: true},
@@ -154,7 +154,7 @@ func TestLearnLessonConfirmsBySkillList(t *testing.T) {
     })
     stopPos := loop.tripStops[0].merchant
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 440,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 440,
         X: stopPos.X, Y: stopPos.Y, Z: stopPos.Z,
     })
     loop.learnAt = time.Time{}
@@ -204,7 +204,7 @@ func TestLearnTripBuysTheSpellbooks(t *testing.T) {
     // head is the Attack Aura lesson with its spellbook 1095, the
     // Defence Aura spellbook 1294 follows it.
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 15, ClassID: 18, Race: 1, Sp: 2000,
+        Name: "unittest1", Level: 15, ClassID: 18, Race: 1, Sp: 2000,
     })
     bot.SetSkills([]state.LearnedSkill{
         {SkillID: 3, Level: 9, Passive: false},
@@ -301,7 +301,7 @@ func TestTripWaitsForTheSkillList(t *testing.T) {
     // The fresh session state: the character entered the world, the
     // vitals arrived, the skills have NOT been listed yet.
     bot := state.NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyStatusUpdate(100, []state.Attribute{
         {ID: state.AttrMaxHP, Value: 100},
         {ID: state.AttrCurHP, Value: 90},
@@ -325,7 +325,7 @@ func TestTripWaitsForTheSkillList(t *testing.T) {
         {SkillID: 194, Level: 1, Passive: true},
     })
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
     })
     loop.tick()
     require.True(t, loop.tripActive(),
@@ -352,7 +352,7 @@ func TestTripWaitsForTheSkillListAfterAReconnect(t *testing.T) {
     // reconnects: the skill list is gone until the enter world burst
     // re-delivers it.
     bot.ResetSession()
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyStatusUpdate(100, []state.Attribute{
         {ID: state.AttrMaxHP, Value: 100},
         {ID: state.AttrCurHP, Value: 90},
@@ -368,7 +368,7 @@ func TestTripWaitsForTheSkillListAfterAReconnect(t *testing.T) {
         {SkillID: 194, Level: 1, Passive: true},
     })
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
     })
     loop.lastHit = time.Now().Add(-time.Minute)
     loop.tick()

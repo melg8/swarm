@@ -203,7 +203,7 @@ func TestEventsStreamPollsVersionChanges(t *testing.T) {
 
     recorder := newSyncRecorder()
     request := httptest.NewRequest(
-        http.MethodGet, "/api/bots/test1/events", nil)
+        http.MethodGet, "/api/bots/unittest1/events", nil)
     done := make(chan struct{})
     go func() {
         defer close(done)
@@ -285,7 +285,7 @@ func TestWriteSnapshotEventStreamsVersionChanges(t *testing.T) {
     bot.ApplyNpcInfo(state.NpcInfo{ObjectID: 9, Name: "Orc"})
     writeSnapshotEvent(recorder, recorder, bot, &lastVersion, stream)
     require.Contains(t, recorder.Body.String(), "event: snapshot")
-    require.Contains(t, recorder.Body.String(), `"id":"test1"`)
+    require.Contains(t, recorder.Body.String(), `"id":"unittest1"`)
     require.Equal(t, bot.Version(), lastVersion)
 
     // The delivered version does not repeat.
@@ -393,7 +393,7 @@ func TestBotZoneCommandQueues(t *testing.T) {
     body := `{"kind":"zone","count":1}`
     recorder := httptest.NewRecorder()
     server.httpServer.Handler.ServeHTTP(recorder,
-        httptest.NewRequest(http.MethodPost, "/api/bots/test1/commands",
+        httptest.NewRequest(http.MethodPost, "/api/bots/unittest1/commands",
             bytes.NewBufferString(body)))
 
     require.Equal(t, http.StatusAccepted, recorder.Code)
@@ -414,8 +414,8 @@ func TestDescribeCommandFallback(t *testing.T) {
 
 func TestServerShutdownClosesEventStreams(t *testing.T) {
     registry := state.NewRegistry()
-    bot := state.NewBot("test1")
-    bot.SetOnline("test1")
+    bot := state.NewBot("unittest1")
+    bot.SetOnline("unittest1")
     registry.Add(bot)
     server := NewServer(registry, "127.0.0.1:0", log.New(io.Discard, "", 0))
 
@@ -426,7 +426,7 @@ func TestServerShutdownClosesEventStreams(t *testing.T) {
     go func() {
         defer close(done)
         server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
-            http.MethodGet, "/api/bots/test1/events", nil))
+            http.MethodGet, "/api/bots/unittest1/events", nil))
     }()
 
     require.Eventually(t, func() bool {

@@ -190,7 +190,7 @@ func TestParseUserInfoPacket(t *testing.T) {
         data = putInt32(data, -3500)
         data = putInt32(data, 0) // vehicle id
         data = putInt32(data, 268473919)
-        data = append(data, utf16("test1")...)
+        data = append(data, utf16("unittest1")...)
         data = putInt32(data, 1)  // race
         data = putInt32(data, 0)  // female
         data = putInt32(data, 18) // base class
@@ -228,7 +228,7 @@ func TestParseUserInfoPacket(t *testing.T) {
         err := ParseUserInfoPacket(p, data)
         require.NoError(t, err)
         require.Equal(t, int32(268473919), p.ObjectID)
-        require.Equal(t, "test1", p.Name)
+        require.Equal(t, "unittest1", p.Name)
         require.Equal(t, int32(1), p.Race)
         require.Equal(t, int32(18), p.ClassID)
         require.Equal(t, int32(5), p.Level)

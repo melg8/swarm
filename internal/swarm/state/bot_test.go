@@ -22,8 +22,8 @@ func TestNewBotStartsConnecting(t *testing.T) {
 
 func TestSetCharacterAndPlacement(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-    bot.SetOnline("test1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetOnline("unittest1")
 
     // The self placement corrects position and heading.
     bot.ApplyPlacement(Placement{
@@ -32,7 +32,7 @@ func TestSetCharacterAndPlacement(t *testing.T) {
 
     snap := bot.Snapshot()
     require.Equal(t, StatusOnline, snap.Status)
-    require.Equal(t, "test1", snap.Character.Name)
+    require.Equal(t, "unittest1", snap.Character.Name)
     require.Equal(t, int32(45100), snap.Character.X)
     require.Equal(t, int32(50100), snap.Character.Y)
     require.Equal(t, int32(16384), snap.Character.Heading)
@@ -66,7 +66,7 @@ func TestApplyNpcInfoUpsert(t *testing.T) {
 
 func TestMovementUpdatesHeadingAndDestination(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 0, 0, 0, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 0, Y: 0, Z: 0, Name: "Gremlin"})
 
     // Movement to the south east (dx=1, dy=1) yields heading 45 degrees.
@@ -92,7 +92,7 @@ func TestMovementUpdatesHeadingAndDestination(t *testing.T) {
 
 func TestSelfMovementUpdatesCharacter(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 0, 0, 0, 50, 30)
 
     bot.ApplyMovement(Movement{
         ObjectID: 100, X: 0, Y: 0, Z: 0, DestX: 0, DestY: 100, DestZ: 0,
@@ -157,7 +157,7 @@ func TestNpcInfoCarriesSpeedAndAggro(t *testing.T) {
 
 func TestAttackMarksCombat(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 0, 0, 0, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 0, Y: 0, Name: "Gremlin"})
 
     var targets [4]int32
@@ -195,7 +195,7 @@ func TestAutoAttackFlags(t *testing.T) {
 
 func TestPawnMovementChasesTarget(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 500, 500, 0, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 500, 500, 0, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{ObjectID: 7, X: 300, Y: 300, Name: "Orc"})
 
     bot.ApplyPawnMovement(PawnMovement{
@@ -255,9 +255,9 @@ func TestRemoveObject(t *testing.T) {
 
 func TestStatusUpdateAppliesVitals(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 0, 0, 0, 50, 30)
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 3, MaxHP: 90, CurHP: 90, MaxMP: 40, CurMP: 40,
+        Name: "unittest1", Level: 3, MaxHP: 90, CurHP: 90, MaxMP: 40, CurMP: 40,
     })
 
     bot.ApplyStatusUpdate(100, []Attribute{
@@ -315,8 +315,8 @@ func itoaInt(value int) string {
 
 func TestSnapshotJSONShape(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 1, 2, 3, 50, 30)
-    bot.SetOnline("test1")
+    bot.SetCharacter("unittest1", 100, 18, 1, 2, 3, 50, 30)
+    bot.SetOnline("unittest1")
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 1, X: 10, Y: 20, Attackable: true, Name: "Keltir",
     })
@@ -330,7 +330,7 @@ func TestSnapshotJSONShape(t *testing.T) {
     require.Equal(t, "online", decoded["status"])
     char, ok := decoded["character"].(map[string]any)
     require.True(t, ok)
-    require.Equal(t, "test1", char["name"])
+    require.Equal(t, "unittest1", char["name"])
     objects, ok := decoded["objects"].([]any)
     require.True(t, ok)
     require.Len(t, objects, 1)
@@ -338,8 +338,8 @@ func TestSnapshotJSONShape(t *testing.T) {
 
 func TestSnapshotCarriesClanAndClampedAggro(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 1, 2, 3, 50, 30)
-    bot.SetOnline("test1")
+    bot.SetCharacter("unittest1", 100, 18, 1, 2, 3, 50, 30)
+    bot.SetOnline("unittest1")
     // A werewolf of the xml data: aggroRange 1000 (clamped to the
     // server MaxAggroRange 450), clanHelpRange 300, the WEREWOLF clan.
     bot.ApplyNpcInfo(NpcInfo{
@@ -418,7 +418,7 @@ func TestVersionBumpsOnChanges(t *testing.T) {
 
 func TestBotConcurrentAccess(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 0, 0, 0, 50, 30)
 
     var wg sync.WaitGroup
     for i := range 8 {
@@ -517,13 +517,13 @@ func TestRegistryFleetKillMarks(t *testing.T) {
 
 func TestBotInfo(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
-    bot.ApplyUserInfo(UserInfo{Name: "test1", Level: 5})
-    bot.SetOnline("test1")
+    bot.SetCharacter("unittest1", 100, 18, 0, 0, 0, 50, 30)
+    bot.ApplyUserInfo(UserInfo{Name: "unittest1", Level: 5})
+    bot.SetOnline("unittest1")
 
     info := bot.Info()
     require.Equal(t, "acc1", info.ID)
-    require.Equal(t, "test1", info.Name)
+    require.Equal(t, "unittest1", info.Name)
     require.Equal(t, StatusOnline, info.Status)
     require.Equal(t, int32(5), info.Level)
 }
@@ -547,7 +547,7 @@ func TestBotKind(t *testing.T) {
     })
 
     t.Run("long-running tag survives Info", func(t *testing.T) {
-        bot := NewBot("test1")
+        bot := NewBot("unittest1")
         bot.SetKind(KindLongRunning)
         info := bot.Info()
         require.Equal(t, KindLongRunning, info.Kind)
@@ -570,7 +570,7 @@ func TestSetPhase(t *testing.T) {
     bot := NewBot("acc1")
     require.Empty(t, bot.Phase(), "the phase starts empty")
 
-    bot.SetOnline("test1")
+    bot.SetOnline("unittest1")
     snap := bot.Snapshot()
     require.Empty(t, snap.Phase, "the snapshot phase is empty before set")
 
@@ -604,14 +604,14 @@ func TestSetPhase(t *testing.T) {
 
 func TestSetOffline(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetOnline("test1")
+    bot.SetOnline("unittest1")
     bot.SetOffline()
     require.Equal(t, StatusOffline, bot.Status())
 }
 
 func TestNearestAttackable(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 0, 0, 0, 50, 30)
     bot.ApplyNpcInfo(NpcInfo{
         ObjectID: 7, X: 100, Y: 0, Name: "Gremlin", Attackable: true,
     })
@@ -646,7 +646,7 @@ func spawnNpcInfo(bot *Bot, objectID, templateID, x int32) {
 // unresolved template) stays eligible.
 func TestNearestAttackableSkipsTooStrongMobs(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     // Display 6 is the Orc Archer (level 8), display 3 the Goblin
     // (level 5).
     spawnNpcInfo(bot, 7, 1000006, 45100)
@@ -675,7 +675,7 @@ func TestNearestAttackableSkipsTooStrongMobs(t *testing.T) {
 // fight), the clanless loner next to the pack is picked instead.
 func TestNearestAttackableAvoidsSocialPacks(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     // Two Orc Archer mates (display 6, clan ORC, clanHelpRange 300)
     // standing 200 units apart - a pull of one drags both. The
     // Gremlin (display 1, no clan) is a loner: nobody answers its
@@ -709,7 +709,7 @@ func TestNearestAttackableAvoidsSocialPacks(t *testing.T) {
 // like on the server, so the goblin next to the fungus stays valid).
 func TestNearestAttackableTreatsAllClanAsUniversal(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     // Display 7 is the Green Fungus (clan ALL, clanHelpRange 300).
     spawnNpcInfo(bot, 7, 1000007, 45100)
     // Display 3 is the Goblin (clan GOBLIN, clanHelpRange 300).
@@ -742,7 +742,7 @@ func TestNearestAttackableTreatsAllClanAsUniversal(t *testing.T) {
 // it again.
 func TestWalkPlanPublishesAndClears(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     require.Empty(t, bot.Snapshot().WalkPath)
 
@@ -797,7 +797,7 @@ func TestWalkPlanPublishesAndClears(t *testing.T) {
 // keeps its own copy after the clear.
 func TestWalkPlanTimingTracksTheLegs(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     origin := WalkPoint{X: 45000, Y: 50000, Z: -3500}
     dest := WalkPoint{X: 46200, Y: 51100, Z: -3500}
@@ -883,7 +883,7 @@ func TestWalkPlanTimingTracksTheLegs(t *testing.T) {
 // leaves a stale line on the map.
 func TestWalkPlanExpires(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     bot.SetWalkPlan(WalkPlan{Points: []WalkPoint{{X: 1, Y: 2, Z: 3}}})
     require.Len(t, bot.Snapshot().WalkPath, 1)
@@ -904,7 +904,7 @@ func TestWalkPlanExpires(t *testing.T) {
 // already over - and the next published plan overwrites the record.
 func TestLastWalkPlanSurvivesTheWalk(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     origin := WalkPoint{X: 45000, Y: 50000, Z: -3500}
     dest := WalkPoint{X: 46200, Y: 51100, Z: -3500}
@@ -956,7 +956,7 @@ func TestLastWalkPlanSurvivesTheWalk(t *testing.T) {
 // login never inherits the walk plan of the previous session.
 func TestResetSessionClearsWalkPlan(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.SetWalkPlan(WalkPlan{Points: []WalkPoint{{X: 1, Y: 2, Z: 3}}})
 
     bot.ResetSession()
@@ -969,7 +969,7 @@ func TestResetSessionClearsWalkPlan(t *testing.T) {
 // answer for both the listed and the updated inventory.
 func TestInventoryItemState(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     _, ok := bot.InventoryItemState(555)
     require.False(t, ok, "an unknown item must report missing")
@@ -999,7 +999,7 @@ func TestInventoryItemState(t *testing.T) {
 
 func TestSelfMovementTracksDestination(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 0, 0, 0, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 0, 0, 0, 50, 30)
 
     bot.ApplyMovement(Movement{
         ObjectID: 100, X: 0, Y: 0, Z: 0, DestX: 300, DestY: 400, DestZ: 0,
@@ -1021,7 +1021,7 @@ func TestSelfMovementTracksDestination(t *testing.T) {
 
 func TestNearestAttackableUsesProjectedPosition(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     // A standing mob recorded near the character but the farthest away.
     bot.ApplyNpcInfo(NpcInfo{
@@ -1055,7 +1055,7 @@ func TestNearestAttackableUsesProjectedPosition(t *testing.T) {
 
 func TestSelfHealthPercent(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
     require.InDelta(t, 100.0, bot.SelfHealthPercent(), 0.001)
 
@@ -1090,7 +1090,7 @@ func TestExpPercent(t *testing.T) {
 
 func TestSnapshotCarriesExpPercent(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyUserInfo(UserInfo{Level: 2, Exp: 215})
 
     snap := bot.Snapshot()

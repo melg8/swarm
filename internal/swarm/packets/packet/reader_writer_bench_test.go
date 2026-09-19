@@ -214,7 +214,7 @@ func BenchmarkReadStringNoTerminator(b *testing.B) {
 // commands all write ASCII names through this method. The optimized
 // form writes directly into the buffer without a scratch allocation.
 func BenchmarkWriteStringAsUtf16ASCII(b *testing.B) {
-    value := "test1"
+    value := "unittest1"
 
     b.ReportAllocs()
     b.ResetTimer()
@@ -233,7 +233,7 @@ func BenchmarkWriteStringAsUtf16ASCII(b *testing.B) {
 // packets through fresh writers today, but a future pooling change
 // would land here.
 func BenchmarkWriteStringAsUtf16ReusedWriter(b *testing.B) {
-    value := "test1"
+    value := "unittest1"
     w := NewWriter()
 
     b.ReportAllocs()

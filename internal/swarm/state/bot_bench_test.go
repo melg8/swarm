@@ -43,7 +43,7 @@ const (
 // whole population.
 func benchWorld(npcCount int) *Bot {
     bot := NewBot("bench")
-    bot.SetCharacter("test1", benchSelfObjectID, 18,
+    bot.SetCharacter("unittest1", benchSelfObjectID, 18,
         benchSelfX, benchSelfY, benchSelfZ, 100, 50)
     bot.SetHuntingZone(benchSelfX, benchSelfY, benchZoneHalf)
     for i := range npcCount {

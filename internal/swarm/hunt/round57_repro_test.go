@@ -15,7 +15,7 @@ import (
 )
 
 // The reproduction of the 2026-09-11 11:34 state dump report: the
-// relogged character test2 stood at x 44296 y 51480 z -2848 (the
+// relogged character unittest2 stood at x 44296 y 51480 z -2848 (the
 // elven village south terrace) in the townReturn phase, the plan held
 // the 11 waypoints to the Kaboo Orc Grunt S zone (the first one 22
 // units out at 44280 51464 -2832, up the 16 unit terrace step), and
@@ -37,7 +37,7 @@ import (
 // see. The follower kept re-clicking the same un-rescuable target.
 const (
     // reproRound57X/Y/Z is the reported stuck position (the dump of
-    // 2026-09-11 11:34, the relogin position of test2).
+    // 2026-09-11 11:34, the relogin position of unittest2).
     reproRound57X = int32(44296)
     reproRound57Y = int32(51480)
     reproRound57Z = int32(-2848)

@@ -25,7 +25,7 @@ func BenchmarkProtocolVersionToBytes(b *testing.B) {
 
 func BenchmarkAuthLoginToBytes(b *testing.B) {
     auth := &AuthLogin{
-        Login:      "test1",
+        Login:      "unittest1",
         PlayOkID1:  1,
         PlayOkID2:  2,
         LoginOkID1: 3,
@@ -44,7 +44,7 @@ func BenchmarkAuthLoginToBytes(b *testing.B) {
 
 func BenchmarkCharacterCreateToBytes(b *testing.B) {
     create := &CharacterCreate{
-        Name:      "test1",
+        Name:      "unittest1",
         Race:      1,
         Female:    0,
         ClassID:   18,

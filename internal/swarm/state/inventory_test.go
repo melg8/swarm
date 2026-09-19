@@ -20,7 +20,7 @@ import (
 // 1867 Thread (sell 75, weight 2).
 func TestSellableItemsOrdersJunkFirst(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyItemList([]InventoryItem{
         {ObjectID: 1, ItemID: 17, Count: 500, Type2: 5, Change: 1},
         {ObjectID: 2, ItemID: 1060, Count: 30, Type2: 5, Change: 1},
@@ -57,7 +57,7 @@ func TestSellableItemsEmptyInventory(t *testing.T) {
     items := bot.SellableItems()
     require.Empty(t, items)
 
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyItemList([]InventoryItem{
         {ObjectID: 8, ItemID: 57, Count: 100, Type2: 4, Change: 1},
         {
@@ -74,7 +74,7 @@ func TestSellableItemsEmptyInventory(t *testing.T) {
 // before the plain items and the adena counter matches.
 func TestSnapshotInventoryWidget(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyItemList([]InventoryItem{
         // Short Sword, equipped on the right hand.
         {
@@ -120,7 +120,7 @@ func TestSnapshotInventoryWidget(t *testing.T) {
 // of the widget view.
 func TestSnapshotInventoryEnchant(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyItemList([]InventoryItem{
         {
             ObjectID: 1, ItemID: 10, Count: 1, Type2: 0, Equipped: true,
@@ -139,9 +139,9 @@ func TestSnapshotInventoryEnchant(t *testing.T) {
 // values instead of the zero placeholders an early version wrote.
 func TestSelfSnapshotCarriesAdenaAndSlots(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 5, Exp: 4000,
+        Name: "unittest1", Level: 5, Exp: 4000,
         MaxHP: 100, CurHP: 90, MaxMP: 50, CurMP: 40,
     })
 
@@ -180,7 +180,7 @@ func TestSelfSnapshotCarriesAdenaAndSlots(t *testing.T) {
 // piece is the kept one, the surplus stays the sellable duplicate.
 func TestSellableItemsExcludingKeepsPlannedEquips(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyItemList([]InventoryItem{
         {ObjectID: 1, ItemID: 17, Count: 500, Type2: 5, Change: 1},
         {ObjectID: 5, ItemID: 35, Count: 1, Type2: 1, Change: 1},
@@ -210,7 +210,7 @@ func TestSellableItemsExcludingKeepsPlannedEquips(t *testing.T) {
 // junk behind it takes the destroy batch instead.
 func TestDestroyableItemsExcludingKeepsPlannedEquips(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyItemList([]InventoryItem{
         {ObjectID: 1, ItemID: 1864, Count: 10, Type2: 5, Change: 1},
         {ObjectID: 2, ItemID: 1864, Count: 10, Type2: 5, Change: 1},
@@ -235,14 +235,14 @@ func TestDestroyableItemsExcludingKeepsPlannedEquips(t *testing.T) {
 // an unknown tome sell as before.
 func TestSellableItemsKeepTheDemandedSpellbooks(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     // Level 5 elven fighter, the level 5 lessons queued: the queue
     // build needs the learned set and the skill tree of class 18.
     bot.SetSkills([]LearnedSkill{
         {SkillID: 142, Level: 1, Passive: true},
         {SkillID: 194, Level: 1, Passive: true},
     })
-    bot.ApplyUserInfo(UserInfo{Name: "test1", Level: 5, ClassID: 18})
+    bot.ApplyUserInfo(UserInfo{Name: "unittest1", Level: 5, ClassID: 18})
     bot.ApplyItemList([]InventoryItem{
         // The Attack Aura spellbook of the level 15 lesson: above the
         // level window, sellable junk.
@@ -268,7 +268,7 @@ func TestSellableItemsKeepTheDemandedSpellbooks(t *testing.T) {
 // list whatever the sell ranking would do with them.
 func TestSellableItemsKeepTheUnlockedSpellbooks(t *testing.T) {
     bot := NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     // Level 15 with the strikes and masteries learned: the queue
     // head is the Attack Aura lesson (spellbook 1095) and the Defence
     // Aura lesson (spellbook 1294) - the same setup the learning
@@ -281,7 +281,7 @@ func TestSellableItemsKeepTheUnlockedSpellbooks(t *testing.T) {
         {SkillID: 142, Level: 5, Passive: true},
         {SkillID: 194, Level: 1, Passive: true},
     })
-    bot.ApplyUserInfo(UserInfo{Name: "test1", Level: 15, ClassID: 18})
+    bot.ApplyUserInfo(UserInfo{Name: "unittest1", Level: 15, ClassID: 18})
     bot.ApplyItemList([]InventoryItem{
         {ObjectID: 1, ItemID: 1095, Count: 1, Type2: 5, Change: 1},
         {ObjectID: 2, ItemID: 1294, Count: 1, Type2: 5, Change: 1},

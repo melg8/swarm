@@ -15,7 +15,7 @@ import (
 )
 
 // The reproduction of the 2026-09-14 07:53 state dump (build 140aa42,
-// bot test2, phase engage, uptime 1m57s): the level 14 character
+// bot unittest2, phase engage, uptime 1m57s): the level 14 character
 // stood at x 42712 y 49128 z -2992 (the Elven Village terrace deck)
 // while its held hunting cell "Kaboo Orc Fighter SW-7" sat 7000 units
 // west at center 36000 46765 on the field deck (z ~-3576). The dump
@@ -50,7 +50,7 @@ import (
 
 const (
     // reproDeckVillageX/Y/Z is the reported stuck position (the dump
-    // of 2026-09-14 07:53:33, the character test2 on the Elven
+    // of 2026-09-14 07:53:33, the character unittest2 on the Elven
     // Village terrace deck).
     reproDeckVillageX = int32(42712)
     reproDeckVillageY = int32(49128)
@@ -77,7 +77,7 @@ const (
 )
 
 // reproDeckScene builds the dump standoff: the level 14 character
-// test2 on the village terrace deck, the held cell "Kaboo Orc
+// unittest2 on the village terrace deck, the held cell "Kaboo Orc
 // Fighter SW-7" 7000 units west on the field deck, and the nearest
 // visible mob (a Kaboo Orc Grunt level 7) on the field deck at 3157
 // units. The loop is in the engage phase with no target. The cell
@@ -87,14 +87,14 @@ const (
 func reproDeckScene(t *testing.T) (*Loop, *fakeGame, *state.Bot) {
     t.Helper()
     bot := state.NewBot("acc1")
-    bot.SetCharacter("test2", 268451289, 18,
+    bot.SetCharacter("unittest2", 268451289, 18,
         reproDeckVillageX, reproDeckVillageY, reproDeckVillageZ, 339, 137)
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test2", Level: 14, Race: 1, ClassID: 18,
+        Name: "unittest2", Level: 14, Race: 1, ClassID: 18,
         X: reproDeckVillageX, Y: reproDeckVillageY, Z: reproDeckVillageZ,
         MaxHP: 339, CurHP: 339, MaxMP: 137, CurMP: 137, Exp: 238925,
     })
-    bot.SetOnline("test2")
+    bot.SetOnline("unittest2")
     // The nearest visible mob of the dump: a Kaboo Orc Grunt level 7
     // on the field deck at 3157 units. The cell window floor of a
     // level 14 character is 14-8 = 6, so the level 7 mob passes the
@@ -255,10 +255,10 @@ func TestReproDeckVillageEngagesSameDeckMob(t *testing.T) {
     loop, game, bot := reproDeckScene(t)
     // Move the character onto the field deck next to the nearest mob
     // (same deck, same z - the free-roam engage path).
-    bot.SetCharacter("test2", 268451289, 18,
+    bot.SetCharacter("unittest2", 268451289, 18,
         reproDeckMobX-200, reproDeckMobY, reproDeckFieldZ, 339, 137)
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test2", Level: 14, Race: 1, ClassID: 18,
+        Name: "unittest2", Level: 14, Race: 1, ClassID: 18,
         X: reproDeckMobX - 200, Y: reproDeckMobY, Z: reproDeckFieldZ,
         MaxHP: 339, CurHP: 339, MaxMP: 137, CurMP: 137, Exp: 238925,
     })

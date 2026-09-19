@@ -23,7 +23,7 @@ func TestSessionReportDisabled(t *testing.T) {
     server.SetSessionJournal(nil)
     response := httptest.NewRecorder()
     request := httptest.NewRequest(
-        http.MethodGet, "/api/bots/test1/session-report", nil)
+        http.MethodGet, "/api/bots/unittest1/session-report", nil)
     server.httpServer.Handler.ServeHTTP(response, request)
     require.Equal(t, http.StatusServiceUnavailable, response.Code)
     require.Contains(t, response.Body.String(), "session journal is disabled")
@@ -50,7 +50,7 @@ func TestSessionReportNotFound(t *testing.T) {
 func TestSessionReportRenders(t *testing.T) {
     server, bot := newTestServer(t)
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 5, Race: 1, ClassID: 18,
+        Name: "unittest1", Level: 5, Race: 1, ClassID: 18,
         X: 45000, Y: 50000, Z: -3500,
         Exp: 2500, MaxHP: 100, CurHP: 90, MaxMP: 50, CurMP: 40,
         CurrentLoad: 10, MaxLoad: 100,
@@ -59,14 +59,14 @@ func TestSessionReportRenders(t *testing.T) {
     require.NoError(t, err)
     defer journal.Close()
     server.SetSessionJournal(journal)
-    journal.Kill("test1", "Kaboo Orc", 4, 8.2, 87.5, 45000, 50000)
-    journal.Story("test1", "Hunt: the hunt decision",
+    journal.Kill("unittest1", "Kaboo Orc", 4, 8.2, 87.5, 45000, 50000)
+    journal.Story("unittest1", "Hunt: the hunt decision",
         time.Unix(1700000000, 0))
 
     require.Eventually(t, func() bool {
         response := httptest.NewRecorder()
         request := httptest.NewRequest(
-            http.MethodGet, "/api/bots/test1/session-report", nil)
+            http.MethodGet, "/api/bots/unittest1/session-report", nil)
         server.httpServer.Handler.ServeHTTP(response, request)
         if response.Code != http.StatusOK {
             return false
@@ -85,12 +85,12 @@ func TestSessionReportRenders(t *testing.T) {
     // aggregate carries both records.
     response := httptest.NewRecorder()
     request := httptest.NewRequest(
-        http.MethodGet, "/api/bots/test1/session-report", nil)
+        http.MethodGet, "/api/bots/unittest1/session-report", nil)
     server.httpServer.Handler.ServeHTTP(response, request)
     require.Equal(t, http.StatusOK, response.Code)
     body := response.Body.String()
     require.Contains(t, body, "swarm session report")
-    require.Contains(t, body, "bot: test1")
+    require.Contains(t, body, "bot: unittest1")
     require.Contains(t, body, "live now: level 5")
     require.Contains(t, body, "Hunt: the hunt decision")
 }

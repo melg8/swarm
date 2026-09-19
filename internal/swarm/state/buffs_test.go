@@ -16,7 +16,7 @@ import (
 // sorted by skill id, with the remaining seconds counted down from
 // the arrival of the server list.
 func TestSetBuffsPublishesTheSnapshot(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     require.Nil(t, bot.Snapshot().Buffs,
         "no buffs before the server lists them")
 
@@ -45,7 +45,7 @@ func TestSetBuffsPublishesTheSnapshot(t *testing.T) {
 // TestSetBuffsCountsDown pins the remaining seconds: the views count
 // down from the arrival of the last server list, floor at zero.
 func TestSetBuffsCountsDown(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.SetBuffs([]BuffEntry{{SkillID: 91, Level: 1, Time: 10}})
 
     snap := bot.Snapshot()
@@ -64,7 +64,7 @@ func TestSetBuffsCountsDown(t *testing.T) {
 // TestSetBuffsReplacesTheList pins the full replace semantics: an
 // expired buff leaves the list when the server refreshes it.
 func TestSetBuffsReplacesTheList(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.SetBuffs([]BuffEntry{
         {SkillID: 91, Level: 1, Time: 1200},
         {SkillID: 77, Level: 1, Time: 600},
@@ -86,7 +86,7 @@ func TestSetBuffsReplacesTheList(t *testing.T) {
 // the effects it never times out with a huge value, the views clamp
 // those to a day.
 func TestSetBuffsCapsTheNeverTimedOut(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.SetBuffs([]BuffEntry{{SkillID: 91, Level: 1, Time: 2147483647}})
 
     snap := bot.Snapshot()
@@ -97,7 +97,7 @@ func TestSetBuffsCapsTheNeverTimedOut(t *testing.T) {
 // TestBuffsClearedBySessionReset pins the session reset: the effects
 // die with the session (the server never persists them).
 func TestBuffsClearedBySessionReset(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.SetBuffs([]BuffEntry{{SkillID: 91, Level: 1, Time: 1200}})
     require.True(t, bot.SelfHasBuff(91))
 
@@ -108,7 +108,7 @@ func TestBuffsClearedBySessionReset(t *testing.T) {
 
 // TestBuffsJSONShape pins the encoded field names of the buffs view.
 func TestBuffsJSONShape(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.SetBuffs([]BuffEntry{{SkillID: 91, Level: 1, Time: 1200}})
 
     encoded := bot.AppendSnapshotJSON(nil)
@@ -121,11 +121,11 @@ func TestBuffsJSONShape(t *testing.T) {
 
 // TestSelfManaPercent pins the mana percent accessor.
 func TestSelfManaPercent(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     require.InDelta(t, 0, bot.SelfManaPercent(), 0.0001)
 
     bot.ApplyUserInfo(UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1,
         MaxMP: 100, CurMP: 42,
     })
     require.InDelta(t, 42.0, bot.SelfManaPercent(), 0.0001)
@@ -134,13 +134,13 @@ func TestSelfManaPercent(t *testing.T) {
 // TestSelfWeaponKind pins the weapon family accessor: the right hand
 // paperdoll slot resolves through the item stats of the inventory.
 func TestSelfWeaponKind(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     kind, ok := bot.SelfWeaponKind()
     require.False(t, ok)
     require.Empty(t, kind)
 
     // A short sword (item id 1) in the right hand.
-    bot.ApplyUserInfo(UserInfo{Name: "test1", Level: 5, ClassID: 18, Race: 1})
+    bot.ApplyUserInfo(UserInfo{Name: "unittest1", Level: 5, ClassID: 18, Race: 1})
     bot.ApplyItemList([]InventoryItem{{
         ObjectID: 10, ItemID: 1, Count: 1,
     }})

@@ -47,7 +47,7 @@ func rainsDialogPage() DialogPageView {
 // TestApplyDialogPinsThePage pins the apply path: the page lands
 // with its links and the origin npc.
 func TestApplyDialogPinsThePage(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     require.Nil(t, bot.DialogLinks())
     require.Equal(t, int32(0), bot.DialogOrigin())
 
@@ -64,7 +64,7 @@ func TestApplyDialogPinsThePage(t *testing.T) {
 // semantics: a later page replaces the earlier one - the links of
 // the old page stop validating.
 func TestApplyDialogReplacesThePage(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyDialog(soriusDialogPage())
     require.True(t, bot.IsDialogCommand(
         "Script Q00406_PathOfTheElvenKnight 30327-05.htm"))
@@ -84,7 +84,7 @@ func TestApplyDialogReplacesThePage(t *testing.T) {
 // rule of the server validation: a link ending with the '$' marker
 // validates every command carrying its prefix.
 func TestIsDialogCommandParameterPrefix(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyDialog(DialogPageView{
         NpcObjID: 818056,
         Links: []DialogLinkView{
@@ -104,7 +104,7 @@ func TestIsDialogCommandParameterPrefix(t *testing.T) {
 // returned slice (or the applied page after the call) does not
 // rewrite the stored dialog.
 func TestDialogLinksCopyNotAlias(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     page := soriusDialogPage()
     bot.ApplyDialog(page)
     page.Links[0].Command = "mutated after apply"
@@ -120,7 +120,7 @@ func TestDialogLinksCopyNotAlias(t *testing.T) {
 // TestResetSessionClearsTheDialog pins the session reset: the
 // relogin starts with no dialog open.
 func TestResetSessionClearsTheDialog(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyDialog(soriusDialogPage())
 
     bot.ResetSession()
@@ -132,7 +132,7 @@ func TestResetSessionClearsTheDialog(t *testing.T) {
 
 // TestClearDialogDropsThePage pins the explicit clear.
 func TestClearDialogDropsThePage(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.ApplyDialog(soriusDialogPage())
 
     bot.ClearDialog()

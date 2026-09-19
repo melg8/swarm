@@ -14,7 +14,7 @@ import (
 )
 
 // The zone return stuck regression of 2026-09-11 06:00: the dump
-// (build c1faefb, bot test3, phase engage) showed the bot at
+// (build c1faefb, bot unittest3, phase engage) showed the bot at
 // 43000 50184 -2992 (near Herbiel, outside the zone) for 3 minutes.
 // Events: "no dry path to 38553 50080, the walk would swim" repeated,
 // then a learning trip started and also failed with "no dry path to
@@ -76,7 +76,7 @@ func TestTownTripWeaponRunStartsOutsideTheZone(t *testing.T) {
     bot := newTestBot()
     // Level 5, no weapon, enough adena for a Short Sword.
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 100,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 100,
     })
     bot.SetSkills([]state.LearnedSkill{
         {SkillID: 142, Level: 1, Passive: true},

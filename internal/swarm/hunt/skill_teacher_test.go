@@ -56,7 +56,7 @@ func TestElvenMysticTeachers(t *testing.T) {
 // stands near Ellenia (the eastern teacher), the nearest is Ellenia.
 func TestNearestTeacherPicksClosest(t *testing.T) {
     bot := state.NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 44440, 52552, -2832, 13, 25023)
+    bot.SetCharacter("unittest1", 100, 18, 44440, 52552, -2832, 13, 25023)
     loop := NewLoop(&fakeGame{}, bot)
 
     // The character at the dump stuck position (44440 52552) is

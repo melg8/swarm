@@ -907,7 +907,7 @@ func TestZoneMobPriorityTranslatesTheRegistryIDs(t *testing.T) {
 // places it at the elven village.
 func setZoneTestLevel(bot *state.Bot, level int32) {
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: level,
+        Name: "unittest1", Level: level,
         X: 46112, Y: 41500, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
     })

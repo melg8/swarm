@@ -21,7 +21,7 @@ func TestCharSelectInfoToBytesRoundTrip(t *testing.T) {
         Characters: []CharacterInfo{{
             Name:     "proxybot",
             ObjectID: 1055,
-            Account:  "test1",
+            Account:  "unittest1",
             // SessionID and ClanID are skipped by the parser (never
             // stored), so the round trip compares them as zeros.
             SessionID:   0,

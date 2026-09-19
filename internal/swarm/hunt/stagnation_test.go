@@ -22,11 +22,11 @@ import (
 func stagnationBot() *state.Bot {
     bot := newTestBot()
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 10, ClassID: 18, Race: 1,
+        Name: "unittest1", Level: 10, ClassID: 18, Race: 1,
         X: 45000, Y: 50000, Z: -3500, Exp: 1000,
         MaxHP: 100, CurHP: 90, MaxMP: 100, CurMP: 50,
     })
-    bot.SetOnline("test1")
+    bot.SetOnline("unittest1")
 
     return bot
 }
@@ -91,7 +91,7 @@ func TestStagnationXPRefreshesWhileFarming(t *testing.T) {
 
     // The kill landed: the experience grew.
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 10, ClassID: 18, Race: 1,
+        Name: "unittest1", Level: 10, ClassID: 18, Race: 1,
         X: 45000, Y: 50000, Z: -3500, Exp: 1042,
         MaxHP: 100, CurHP: 90, MaxMP: 100, CurMP: 50,
     })
@@ -169,7 +169,7 @@ func TestStagnationQuietForManualAndOffline(t *testing.T) {
     require.True(t, loop.stagXPAt.IsZero())
 
     // The relogin re-arms from the fresh values: no inherited stall.
-    bot.SetOnline("test1")
+    bot.SetOnline("unittest1")
     loop.observeStagnation(time.Now())
     require.False(t, loop.stagXPAt.IsZero())
     require.True(t, loop.stagPosSet)

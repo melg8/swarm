@@ -15,7 +15,7 @@ import (
 func TestDebugDumpServerListBytes(t *testing.T) {
     lc := NewLoginCrypt(MobiusAuthKey())
 
-    authLogin := &toauthserver.RequestAuthLogin{Account: "test1", Password: "test"}
+    authLogin := &toauthserver.RequestAuthLogin{Account: "unittest1", Password: "test"}
     wire1, err := lc.SealPacket(nil, authLogin)
     if err != nil {
         t.Fatal(err)

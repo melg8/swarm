@@ -1328,3 +1328,30 @@ facing a direction it never walked during the wasd walk.
   the webui run button, the 256 unit / two minute contract).
 - Gates: `go test -count=1 ./...` every package ok, golangci-lint 0
   issues, the whitespace gate green. The mobius server untouched.
+### Progress (2026-09-19, the unittest account ladder round)
+
+- the owner directive: remove the test account ladder
+  (test1/test2/test3 - the same accounts the live swarm logs in
+  with) from the Go tests, replace it with the unittest1 ladder, so
+  a test run can never collide with the running swarm work (the
+  same account name logged in twice kicks the live bot).
+- the rename swept 79 test files, 498 occurrences: every
+  bot/account/character string of the ladder test1/test2/test3 is
+  now unittest1/unittest2/unittest3 (word boundary sed, the 4 space
+  indentation untouched), including the historical dump references
+  in the repro test comments (the scenarios read the same, the bot
+  name is now the unittest one).
+- the already separated ladders stay untouched: the acceptance
+  scenarios ride temp1..temp11, the fleet benchmark fleet001..100,
+  the proxy e2e proxye2e, the live dialog walker dialogw1 - the
+  collision surface was the unit test surface only.
+- the production defaults of cmd/swarm (test1/test) stay: they are
+  the live swarm contract documented in README/AGENTS.md, not a
+  test surface.
+- one byte pin followed the rename by hand:
+  TestWriteStringAsUtf16ASCIIVsReference carried the hand written
+  UTF-16LE bytes of "test1" (the sed renamed the input string, the
+  expected byte array now spells unittest1).
+- verification: go build ./... ok, go test -count=1 ./... answers
+  28 packages ok zero failures, the gofmt-spaces gate is silent.
+a38b90a (test gate: the unit test account ladder renames to unittest1 - the tests shared the account names test1/test2/test3 with the live swarm run (the same fleet ladder the production -account default spawns) so any test that builds a session under a running swarm collided with the live bots on the account name alone; every bot/account/character string of the ladder in the 79 test files (498 occurrences, word boundary sed, the 4 space indent untouched) is now unittest1/unittest2/unittest3 including the historical dump references in the repro test comments (the scenarios read the same, the bot name is the unittest one); the already separated ladders stay (the acceptance temp1..temp11, the fleet benchmark fleet001..100, the proxy e2e proxye2e, the live dialog walker dialogw1), the production defaults of cmd/swarm stay (the live contract of README/AGENTS.md); the UTF-16 byte pin of TestWriteStringAsUtf16ASCIIVsReference follows by hand (the sed renamed the input string, the expected byte array now spells unittest1); verification: go build ok, go test -count=1 ./... 28 packages ok zero failures, the gofmt-spaces gate silent)

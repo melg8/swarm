@@ -17,7 +17,7 @@ import (
 )
 
 // The reproduction of the 2026-09-19 17:18 state dump report (build
-// 94ec5e3, bot test1, phase townReturn): the cursor key escape of the
+// 94ec5e3, bot unittest1, phase townReturn): the cursor key escape of the
 // refused spawn cell finally walked ALONG the planned route (the
 // previous round's contract held - "the refused clicks hand the walk
 // to the cursor key escape, walking along the planned route toward

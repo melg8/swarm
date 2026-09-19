@@ -22,7 +22,7 @@ import (
 // instead of the tested path).
 func weaponRunUserInfo(level int32) state.UserInfo {
     return state.UserInfo{
-        Name: "test2", Level: level, ClassID: 18, Race: 1,
+        Name: "unittest2", Level: level, ClassID: 18, Race: 1,
         X: 45000, Y: 50000, Z: -3500,
         MaxHP: 285, CurHP: 285, MaxMP: 113, CurMP: 113,
     }
@@ -83,7 +83,7 @@ func TestWeaponlessRunCarriesLearning(t *testing.T) {
     // The learning budget of the learn tests (500 sp of queued level 5
     // strikes) PLUS no weapon: the weapon run must win the trip.
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
         X: 45000, Y: 50000, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
     })
@@ -220,7 +220,7 @@ func TestWeaponUpgradeRoutesToWeaponMerchant(t *testing.T) {
     // The sickle-wearing character of the replacement test with the
     // wallet for the next weapon milestone.
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 8,
+        Name: "unittest1", Level: 8,
         X: 46112, Y: 41500, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
         PaperdollObjectIDs: [state.PaperdollSlots]int32{0, 0, 0, 0, 0, 0, 0, 100},

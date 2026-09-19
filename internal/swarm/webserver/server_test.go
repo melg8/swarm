@@ -68,9 +68,9 @@ func newTestServer(t *testing.T) (*Server, *state.Bot) {
     t.Helper()
 
     registry := state.NewRegistry()
-    bot := state.NewBot("test1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
-    bot.SetOnline("test1")
+    bot := state.NewBot("unittest1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetOnline("unittest1")
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID: 7, X: 45100, Y: 50100, Name: "Keltir", Attackable: true,
     })
@@ -92,7 +92,7 @@ func TestBotListEndpoint(t *testing.T) {
     var bots []state.BotInfo
     require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &bots))
     require.Len(t, bots, 1)
-    require.Equal(t, "test1", bots[0].ID)
+    require.Equal(t, "unittest1", bots[0].ID)
     require.Equal(t, state.StatusOnline, bots[0].Status)
 }
 
@@ -114,7 +114,7 @@ func TestFleetKillsEndpoint(t *testing.T) {
     var marks []state.KillMarkView
     require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &marks))
     require.Len(t, marks, 2)
-    require.Equal(t, "test1", marks[0].BotID)
+    require.Equal(t, "unittest1", marks[0].BotID)
     require.Equal(t, int32(45000), marks[0].X)
     require.Equal(t, int64(2000), marks[1].AtMs)
 }
@@ -134,15 +134,15 @@ func TestBotStateEndpoint(t *testing.T) {
     server, _ := newTestServer(t)
     recorder := httptest.NewRecorder()
     server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
-        http.MethodGet, "/api/bots/test1/state", nil))
+        http.MethodGet, "/api/bots/unittest1/state", nil))
 
     require.Equal(t, http.StatusOK, recorder.Code)
 
     var snapshot state.Snapshot
     require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &snapshot))
-    require.Equal(t, "test1", snapshot.ID)
+    require.Equal(t, "unittest1", snapshot.ID)
     require.Equal(t, state.StatusOnline, snapshot.Status)
-    require.Equal(t, "test1", snapshot.Character.Name)
+    require.Equal(t, "unittest1", snapshot.Character.Name)
     require.Equal(t, int32(45000), snapshot.Character.X)
     require.Len(t, snapshot.Objects, 1)
     require.Equal(t, "Keltir", snapshot.Objects[0].Name)
@@ -192,7 +192,7 @@ func TestEventsStreamDeliversSnapshots(t *testing.T) {
 
     recorder := newSyncRecorder()
     request := httptest.NewRequest(
-        http.MethodGet, "/api/bots/test1/events", nil)
+        http.MethodGet, "/api/bots/unittest1/events", nil)
     done := make(chan struct{})
 
     go func() {
@@ -218,7 +218,7 @@ func TestEventsStreamDeliversSnapshots(t *testing.T) {
     body := recorder.String()
     require.Contains(t, body, "event: snapshot")
     require.Contains(t, body, "data: ")
-    require.Contains(t, body, `"id":"test1"`)
+    require.Contains(t, body, `"id":"unittest1"`)
 }
 
 func TestEventsStreamUnknownBot(t *testing.T) {

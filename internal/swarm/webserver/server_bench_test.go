@@ -26,8 +26,8 @@ const (
 
 // benchSnapshotBot builds a loaded bot for the JSON measurements.
 func benchSnapshotBot(npcCount int) *state.Bot {
-    bot := state.NewBot("test1")
-    bot.SetCharacter("test1", 268473919, 18,
+    bot := state.NewBot("unittest1")
+    bot.SetCharacter("unittest1", 268473919, 18,
         benchSelfX, benchSelfY, benchSelfZ, 100, 50)
     bot.SetHuntingZone(benchSelfX, benchSelfY, 1650)
     for i := range npcCount {

@@ -55,12 +55,12 @@ func TestRunAnomaliesFindings(t *testing.T) {
 // TestRunAnomaliesQuiet verifies a healthy journal renders no findings.
 func TestRunAnomaliesQuiet(t *testing.T) {
     records := []record{}
-    r := newRecord("test2", kindKill, at(10))
+    r := newRecord("unittest2", kindKill, at(10))
     r.Mob = "Dryad"
     r.Lvl = 13
     r.Dur = 18
     records = append(records, r)
-    story := newRecord("test2", kindStory, at(20))
+    story := newRecord("unittest2", kindStory, at(20))
     story.M = "Hunt: target died, looting"
     records = append(records, story)
     path := writeQueryJournal(t, records)
@@ -73,9 +73,9 @@ func TestRunAnomaliesQuiet(t *testing.T) {
 // TestAnomalyBotPatternNormalize verifies the digit collapsing of the
 // pattern normalizer: coordinates and ids fold into one shape.
 func TestAnomalyBotPatternNormalize(t *testing.T) {
-    bot := newAnomalyBot("test1")
+    bot := newAnomalyBot("unittest1")
     for i := range 14 {
-        r := newRecord("test1", kindStory, at(i*10))
+        r := newRecord("unittest1", kindStory, at(i*10))
         r.M = strings.Replace(
             "Hunt: no pickable target: Kaboo Orc (268439512) at 29176 52406",
             "268439512", "26843951"+string(rune('0'+i%10)), 1)
@@ -88,16 +88,16 @@ func TestAnomalyBotPatternNormalize(t *testing.T) {
 
 // TestAnomalyBotDeathBursts verifies the sliding death window.
 func TestAnomalyBotDeathBursts(t *testing.T) {
-    bot := newAnomalyBot("test1")
+    bot := newAnomalyBot("unittest1")
     // Six deaths inside ten minutes flag one burst.
     for i := range 6 {
-        r := newRecord("test1", kindDeath, at(2000+i*60))
+        r := newRecord("unittest1", kindDeath, at(2000+i*60))
         r.Lv, r.X, r.Y = 18, 42971, 51372
         bot.apply(r)
     }
     // A scattered pair outside the window stays quiet.
     for i := range 2 {
-        r := newRecord("test1", kindDeath, at(6000+i*1200))
+        r := newRecord("unittest1", kindDeath, at(6000+i*1200))
         r.Lv, r.X, r.Y = 18, 1, 1
         bot.apply(r)
     }
@@ -108,9 +108,9 @@ func TestAnomalyBotDeathBursts(t *testing.T) {
 
 // TestAnomalyBotMutedCount verifies the story cap replication.
 func TestAnomalyBotMutedCount(t *testing.T) {
-    bot := newAnomalyBot("test1")
+    bot := newAnomalyBot("unittest1")
     for i := range storyCapPerMin + 40 {
-        r := newRecord("test1", kindStory, at(0))
+        r := newRecord("unittest1", kindStory, at(0))
         r.M = "npc spawned: Dryad"
         // Every line lands in the same minute of the anchor day.
         r.T = at(i % 30).Unix()

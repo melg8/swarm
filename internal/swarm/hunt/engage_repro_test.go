@@ -16,7 +16,7 @@ import (
 )
 
 // The reproduction of the standing bot state dump (2026-09-10
-// 02:11:07): the bot test1 (level 13, 306 of 321 hp, hunting phase
+// 02:11:07): the bot unittest1 (level 13, 306 of 321 hp, hunting phase
 // engage) stood exactly at the center of the square elven-2019_23-b1
 // (Kaboo Orc Fighter Lieutenant SW-b1, center 30502 62755, half
 // 1400) for 49 seconds without a target, without a walk and without
@@ -82,17 +82,17 @@ var reproDumpObjects = []reproDumpNpc{
 }
 
 // reproDumpScene builds the hunt loop over the dumped tracker state:
-// the character test1 at the zone center with the full dump object
+// the character unittest1 at the zone center with the full dump object
 // list, the elven zone registry and a captured log.
 func reproDumpScene(
     t *testing.T,
 ) (*Loop, *fakeGame, *bytes.Buffer) {
     t.Helper()
     bot := state.NewBot("acc1")
-    bot.SetCharacter("test1", 268450864, 18,
+    bot.SetCharacter("unittest1", 268450864, 18,
         reproDumpBotX, reproDumpBotY, reproDumpBotZ, 306, 129)
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 13, Race: 1, ClassID: 18,
+        Name: "unittest1", Level: 13, Race: 1, ClassID: 18,
         X: reproDumpBotX, Y: reproDumpBotY, Z: reproDumpBotZ,
         MaxHP: 321, CurHP: 306, MaxMP: 129, CurMP: 129,
     })

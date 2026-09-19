@@ -67,7 +67,7 @@ func TestDefinitionsAreSane(t *testing.T) {
 
 // TestDefinitionsUseTempAccounts pins the temp account contract: the
 // scenarios own temp1 through temp11 and never collide with the
-// -bots fleet accounts (test1, test2, ...).
+// -bots fleet accounts (unittest1, unittest2, ...).
 func TestDefinitionsUseTempAccounts(t *testing.T) {
     for _, def := range Definitions() {
         switch def.Account {

@@ -90,7 +90,7 @@ func TestEngageBlindRepositionArrivesAndReEngages(t *testing.T) {
     require.Len(t, game.walks, 1)
 
     // The walk ran to the waypoint: the character now stands there.
-    bot.SetCharacter("test1", 100, 18, 45300, 50300, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45300, 50300, -3500, 50, 30)
     bot.ApplyStatusUpdate(100, []state.Attribute{
         {ID: state.AttrMaxHP, Value: 100},
         {ID: state.AttrCurHP, Value: 90},
@@ -213,7 +213,7 @@ func TestEngageBlindRecoveryRetriesOnce(t *testing.T) {
     loop.tick()
     require.Equal(t, 1, loop.losTried)
     vantage := loop.losWaypoints[len(loop.losWaypoints)-1]
-    bot.SetCharacter("test1", 100, 18,
+    bot.SetCharacter("unittest1", 100, 18,
         int32(vantage.X), int32(vantage.Y), int32(vantage.Z), 50, 30)
     bot.ApplyStatusUpdate(100, []state.Attribute{
         {ID: state.AttrMaxHP, Value: 100},

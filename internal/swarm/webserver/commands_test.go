@@ -33,7 +33,7 @@ func postCommand(
 func TestBotCommandQueued(t *testing.T) {
     server, bot := newTestServer(t)
 
-    recorder := postCommand(t, server, "test1",
+    recorder := postCommand(t, server, "unittest1",
         `{"kind":"move","x":46112,"y":41500,"z":-3056}`)
     require.Equal(t, http.StatusAccepted, recorder.Code)
 
@@ -73,7 +73,7 @@ func TestBotCommandValidation(t *testing.T) {
         `{"kind":"move","x":0,"y":0,"z":0}`,
         `not json`,
     } {
-        recorder := postCommand(t, server, "test1", body)
+        recorder := postCommand(t, server, "unittest1", body)
         require.Equal(t, http.StatusBadRequest, recorder.Code,
             "body %q must be rejected", body)
     }
@@ -109,7 +109,7 @@ func TestBotCommandKinds(t *testing.T) {
     for _, want := range commands {
         body, err := json.Marshal(want)
         require.NoError(t, err)
-        recorder := postCommand(t, server, "test1", string(body))
+        recorder := postCommand(t, server, "unittest1", string(body))
         require.Equal(t, http.StatusAccepted, recorder.Code,
             "command %s must be accepted", want.Kind)
         select {

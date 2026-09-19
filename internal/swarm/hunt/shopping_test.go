@@ -327,7 +327,7 @@ func TestReplacementSalesSellBeforeBuy(t *testing.T) {
         {ObjectID: 999, ItemID: 57, Count: 60000, Type2: 4, Change: 1},
     })
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 8,
+        Name: "unittest1", Level: 8,
         X: 46112, Y: 41500, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
         PaperdollObjectIDs: [state.PaperdollSlots]int32{0, 0, 0, 0, 0, 0, 0, 100},
@@ -573,7 +573,7 @@ func TestTripShoppingViewHoldsThePlanDuringWalk(t *testing.T) {
 }
 
 // test1DumpPaperdoll is the UserInfo paperdoll block of the
-// 2026-09-11 10:30 test1 dump at its trip start: the Short Sword, the
+// 2026-09-11 10:30 unittest1 dump at its trip start: the Short Sword, the
 // Gloves and the Apprentice's Shoes worn among the rest of the outfit
 // (the same object ids the dump carries).
 var test1DumpPaperdoll = [state.PaperdollSlots]int32{
@@ -615,7 +615,7 @@ func test1DumpInventory() []state.InventoryItem {
 }
 
 // TestTripPlanFreezesPurchasesAgainstResale replays the 2026-09-11
-// 10:30 test1 trip on the frozen plan machinery: the trip plans
+// 10:30 unittest1 trip on the frozen plan machinery: the trip plans
 // [Brandish + Low Boots] once at its start (worth 69999 adena, the
 // dump's own number), sells the displaced Short Sword and Apprentice's
 // Shoes - and the stop planning distributes EXACTLY the frozen plan.
@@ -629,7 +629,7 @@ func TestTripPlanFreezesPurchasesAgainstResale(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     bot.ApplyItemList(test1DumpInventory())
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 14,
+        Name: "unittest1", Level: 14,
         X: 45000, Y: 50000, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
         PaperdollObjectIDs: test1DumpPaperdoll,

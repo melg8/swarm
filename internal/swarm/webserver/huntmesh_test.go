@@ -59,7 +59,7 @@ func TestHuntMeshEndpoint(t *testing.T) {
     })
     recorder = httptest.NewRecorder()
     server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
-        http.MethodGet, "/api/bots/test1/state", nil))
+        http.MethodGet, "/api/bots/unittest1/state", nil))
     body := recorder.Body.String()
     require.Contains(t, body, `"huntMesh":"test-mesh-1"`,
         "the mesh version rides the snapshot")

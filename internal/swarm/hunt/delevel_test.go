@@ -23,9 +23,9 @@ var stardenPos = [3]int32{42971, 51372, -2992}
 // penalty only applies from level 10 up), target level 9.
 func newDelevelLoop(level int32) (*Loop, *fakeGame, *state.Bot, *fakeNavigator) {
     bot := state.NewBot("acc1")
-    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: level, Race: 1, ClassID: 18,
+        Name: "unittest1", Level: level, Race: 1, ClassID: 18,
         Exp: 50000,
         X:   45000, Y: 50000, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
@@ -84,7 +84,7 @@ func TestDelevelSkipsAtProperLevel(t *testing.T) {
     loop.navigator = nil
     bot := loop.tracker
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 11, Race: 1, ClassID: 18, Exp: 50000,
+        Name: "unittest1", Level: 11, Race: 1, ClassID: 18, Exp: 50000,
         X: 45000, Y: 50000, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
         MaxLoad: 88320, RunSpeed: 125, WalkSpeed: 60,
@@ -177,7 +177,7 @@ func TestDelevelFinishesAtTarget(t *testing.T) {
 
     // The deaths did their work: level 6, the deleveling ends.
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 6, Race: 1, ClassID: 18, Exp: 46000,
+        Name: "unittest1", Level: 6, Race: 1, ClassID: 18, Exp: 46000,
         X: 45000, Y: 50000, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
         MaxLoad: 88320, RunSpeed: 125, WalkSpeed: 60,
@@ -388,7 +388,7 @@ func TestDelevelDeathProgressResetsFreeCounter(t *testing.T) {
     // The server then pays the penalty: the UserInfo refresh carries
     // a lower exp and the next death resets the counter.
     bot.ApplyUserInfo(state.UserInfo{
-        Name: "test1", Level: 11, Race: 1, ClassID: 18, Exp: 46000,
+        Name: "unittest1", Level: 11, Race: 1, ClassID: 18, Exp: 46000,
         X: 45000, Y: 50000, Z: -3500,
         MaxHP: 100, CurHP: 1, MaxMP: 40, CurMP: 30,
         MaxLoad: 88320, RunSpeed: 125, WalkSpeed: 60,

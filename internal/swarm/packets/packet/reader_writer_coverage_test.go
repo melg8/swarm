@@ -207,10 +207,13 @@ func TestWriteStringAsUtf16Empty(t *testing.T) {
 // produces the same bytes as the original byte by byte implementation:
 // each ASCII character as [char, 0], followed by [0, 0].
 func TestWriteStringAsUtf16ASCIIVsReference(t *testing.T) {
-    value := "test1"
+    value := "unittest1"
     writer := NewWriter()
     require.NoError(t, writer.WriteStringAsUtf16(value))
 
-    expected := []byte{'t', 0, 'e', 0, 's', 0, 't', 0, '1', 0, 0, 0}
+    expected := []byte{
+        'u', 0, 'n', 0, 'i', 0, 't', 0, 't', 0,
+        'e', 0, 's', 0, 't', 0, '1', 0, 0, 0,
+    }
     require.Equal(t, expected, writer.Bytes())
 }

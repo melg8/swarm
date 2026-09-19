@@ -61,7 +61,7 @@ func TestGameClientTapObservesFullSession(t *testing.T) {
     client.SetTap(collector.tap)
 
     charList, err := client.Authenticate(GameSessionParams{
-        Account:    "test1",
+        Account:    "unittest1",
         LoginOkID1: 1,
         LoginOkID2: 2,
         PlayOkID1:  3,
@@ -70,7 +70,7 @@ func TestGameClientTapObservesFullSession(t *testing.T) {
     require.NoError(t, err)
 
     updated, err := client.EnsureCharacter(CharacterParams{
-        Name:      "test1",
+        Name:      "unittest1",
         Race:      1,
         Female:    0,
         ClassID:   18,
@@ -80,13 +80,13 @@ func TestGameClientTapObservesFullSession(t *testing.T) {
     }, charList)
     require.NoError(t, err)
 
-    slot, _, found := updated.FindCharacterByName("test1")
+    slot, _, found := updated.FindCharacterByName("unittest1")
     require.True(t, found)
     require.NoError(t, client.EnterWorld(int32(slot)))
 
     ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
     defer cancel()
-    require.NoError(t, client.Run(ctx, "test1"))
+    require.NoError(t, client.Run(ctx, "unittest1"))
 
     opcodes := collector.opcodes()
     require.Contains(t, opcodes, byte(0x1F), "char list not tapped")
@@ -112,7 +112,7 @@ func TestGameClientSendRawForwardsClientPackets(t *testing.T) {
 
         var selected []byte
         selected = append(selected, 0x21)
-        selected = append(selected, utf16Bytes("test1")...)
+        selected = append(selected, utf16Bytes("unittest1")...)
         selected = binaryLittleEndianAppendUint32(selected, 100)
         selected = append(selected, utf16Bytes("")...)
         selected = binaryLittleEndianAppendUint32(selected, 42)
@@ -150,7 +150,7 @@ func TestGameClientSendRawForwardsClientPackets(t *testing.T) {
     require.NoError(t, err)
 
     charList, err := client.Authenticate(GameSessionParams{
-        Account:    "test1",
+        Account:    "unittest1",
         LoginOkID1: 1,
         LoginOkID2: 2,
         PlayOkID1:  3,
@@ -159,7 +159,7 @@ func TestGameClientSendRawForwardsClientPackets(t *testing.T) {
     require.NoError(t, err)
 
     updated, err := client.EnsureCharacter(CharacterParams{
-        Name:      "test1",
+        Name:      "unittest1",
         Race:      1,
         Female:    0,
         ClassID:   18,
@@ -169,7 +169,7 @@ func TestGameClientSendRawForwardsClientPackets(t *testing.T) {
     }, charList)
     require.NoError(t, err)
 
-    slot, _, found := updated.FindCharacterByName("test1")
+    slot, _, found := updated.FindCharacterByName("unittest1")
     require.True(t, found)
     require.NoError(t, client.EnterWorld(int32(slot)))
 

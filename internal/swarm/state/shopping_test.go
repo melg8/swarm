@@ -42,7 +42,7 @@ func shoppingView() ShoppingPlanView {
 // version (the periodic refresh never churns the event stream) and a
 // changed plan bumps it.
 func TestSetShoppingPlanPublishesTheSnapshot(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     require.Nil(t, bot.Snapshot().Shopping,
         "no plan is published before the loop starts")
 
@@ -75,7 +75,7 @@ func TestSetShoppingPlanPublishesTheSnapshot(t *testing.T) {
 // the hunt loop publishes an empty queue when the shopping is off and
 // the tracker drops the plan instead of storing an empty shell.
 func TestSetShoppingPlanEmptyViewClears(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.SetShoppingPlan(shoppingView())
     require.NotNil(t, bot.Snapshot().Shopping)
     bot.SetShoppingPlan(ShoppingPlanView{})
@@ -86,7 +86,7 @@ func TestSetShoppingPlanEmptyViewClears(t *testing.T) {
 // reconnecting session publishes a fresh plan of its own, the plan of
 // the lost session must not leak into its snapshots.
 func TestResetSessionClearsShoppingPlan(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.SetShoppingPlan(shoppingView())
     require.NotNil(t, bot.Snapshot().Shopping)
     bot.ResetSession()
@@ -97,7 +97,7 @@ func TestResetSessionClearsShoppingPlan(t *testing.T) {
 // older than shoppingPlanTTL leaves the snapshot (the hunt loop died
 // or moved on) exactly like an expired walk plan.
 func TestShoppingPlanExpiryPinsTheTTL(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     bot.SetShoppingPlan(shoppingView())
     require.NotNil(t, bot.Snapshot().Shopping)
 
@@ -112,7 +112,7 @@ func TestShoppingPlanExpiryPinsTheTTL(t *testing.T) {
 // caller mutating its queue slice after the publish must not change
 // the published view (the hunt loop keeps its cache in place).
 func TestSetShoppingPlanCopiesEntries(t *testing.T) {
-    bot := NewBot("test1")
+    bot := NewBot("unittest1")
     view := shoppingView()
     entries := view.Entries
     bot.SetShoppingPlan(view)

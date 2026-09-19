@@ -24,7 +24,7 @@ func newStatsServer(t *testing.T) (*Server, *state.Bot) {
     t.Helper()
 
     registry := state.NewRegistry()
-    bot := state.NewBot("test1")
+    bot := state.NewBot("unittest1")
     // The production session order: the reset clears the tracker
     // world, then the login fills it back (runBot calls ResetSession
     // before the first login).
@@ -81,7 +81,7 @@ func TestStatsFleetEndpoint(t *testing.T) {
     require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
     require.Equal(t, int(15), response.SamplePeriodSec)
     require.Len(t, response.Bots, 1)
-    require.Equal(t, "test1", response.Bots[0].ID)
+    require.Equal(t, "unittest1", response.Bots[0].ID)
     require.EqualValues(t, 2, response.Bots[0].Kills)
     require.EqualValues(t, 1, response.Bots[0].Sessions)
     require.EqualValues(t, 0, response.Bots[0].Rejoins)
@@ -125,12 +125,12 @@ func TestStatsBotEndpoint(t *testing.T) {
 
     recorder := httptest.NewRecorder()
     server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
-        http.MethodGet, "/api/stats/test1", nil))
+        http.MethodGet, "/api/stats/unittest1", nil))
 
     require.Equal(t, http.StatusOK, recorder.Code)
     var response botStatsResponse
     require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
-    require.Equal(t, "test1", response.ID)
+    require.Equal(t, "unittest1", response.ID)
     require.EqualValues(t, 2, response.Kills)
     require.Len(t, response.Events, 2)
     require.Equal(t, eventKill, response.Events[0].Kind)
@@ -170,7 +170,7 @@ func TestStatsBotEndpointBeforeFirstSample(t *testing.T) {
 
     recorder := httptest.NewRecorder()
     server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
-        http.MethodGet, "/api/stats/test1", nil))
+        http.MethodGet, "/api/stats/unittest1", nil))
 
     require.Equal(t, http.StatusOK, recorder.Code)
     var response botStatsResponse
@@ -191,7 +191,7 @@ func TestStatsWindowFilter(t *testing.T) {
 
     recorder := httptest.NewRecorder()
     server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
-        http.MethodGet, "/api/stats/test1?window=120", nil))
+        http.MethodGet, "/api/stats/unittest1?window=120", nil))
 
     require.Equal(t, http.StatusOK, recorder.Code)
     var response botStatsResponse
@@ -262,7 +262,7 @@ func TestStatsEventDeltas(t *testing.T) {
     })
     server.stats.sample(now)
 
-    series := server.stats.bots["test1"]
+    series := server.stats.bots["unittest1"]
     require.NotNil(t, series)
     kinds := make(map[string]int)
     for _, event := range series.events {
@@ -337,7 +337,7 @@ func TestStatsGapCarriesTheCharacter(t *testing.T) {
     })
     now := time.Now()
     server.stats.sample(now.Add(-2 * time.Minute))
-    series := server.stats.bots["test1"]
+    series := server.stats.bots["unittest1"]
     require.NotNil(t, series)
     require.True(t, series.based)
     require.Equal(t, int64(5000), series.expBase)
@@ -359,7 +359,7 @@ func TestStatsGapCarriesTheCharacter(t *testing.T) {
     // The live view holds the last known character through the gap.
     recorder := httptest.NewRecorder()
     server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
-        http.MethodGet, "/api/stats/test1", nil))
+        http.MethodGet, "/api/stats/unittest1", nil))
     require.Equal(t, http.StatusOK, recorder.Code)
     var response botStatsResponse
     require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
@@ -381,7 +381,7 @@ func TestStatsGapCarriesTheCharacter(t *testing.T) {
     server.stats.sample(now)
     recorder = httptest.NewRecorder()
     server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
-        http.MethodGet, "/api/stats/test1", nil))
+        http.MethodGet, "/api/stats/unittest1", nil))
     require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
     require.Equal(t, int32(11), response.Level)
     require.Equal(t, int64(1000), response.ExpGained)
@@ -414,7 +414,7 @@ func TestStatsAdenaIncome(t *testing.T) {
 
     recorder := httptest.NewRecorder()
     server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
-        http.MethodGet, "/api/stats/test1", nil))
+        http.MethodGet, "/api/stats/unittest1", nil))
     require.Equal(t, http.StatusOK, recorder.Code)
     var response botStatsResponse
     require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
@@ -499,7 +499,7 @@ func TestStatsHistoryStableAcrossPolls(t *testing.T) {
     for i := range 1500 {
         server.stats.sample(base.Add(time.Duration(i) * statsSamplePeriod))
     }
-    series := server.stats.bots["test1"]
+    series := server.stats.bots["unittest1"]
     require.NotNil(t, series)
     const window = 6 * time.Hour
     history := func(pollAt time.Time) []int64 {

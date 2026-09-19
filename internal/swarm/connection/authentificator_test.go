@@ -168,9 +168,9 @@ func TestAuthenticateFullFlow(t *testing.T) {
     conn, err := net.Dial("tcp", server.Addr())
     require.NoError(t, err)
 
-    result, err := Authenticate(conn, "test1", "test")
+    result, err := Authenticate(conn, "unittest1", "test")
     require.NoError(t, err)
-    require.Equal(t, "test1", result.Account)
+    require.Equal(t, "unittest1", result.Account)
     require.Equal(t, int32(11), result.LoginOkID1)
     require.Equal(t, int32(22), result.LoginOkID2)
     require.Equal(t, int32(33), result.PlayOkID1)
@@ -184,7 +184,7 @@ func TestAuthenticateFullFlow(t *testing.T) {
 
     // The auth login carries the credentials in fixed 14 byte fields.
     require.Equal(t, byte(0x00), server.contents[0][0])
-    require.Equal(t, "test1", loginContentField(server.contents[0], 1, 14))
+    require.Equal(t, "unittest1", loginContentField(server.contents[0], 1, 14))
     require.Equal(t, "test", loginContentField(server.contents[0], 15, 14))
 
     // The server list request repeats the login session keys.
@@ -211,7 +211,7 @@ func TestAuthenticateReportsLoginFail(t *testing.T) {
     conn, err := net.Dial("tcp", server.Addr())
     require.NoError(t, err)
 
-    _, err = Authenticate(conn, "test1", "wrong")
+    _, err = Authenticate(conn, "unittest1", "wrong")
     require.Error(t, err)
     require.Contains(t, err.Error(), "login failed")
     require.Contains(t, err.Error(), "user or password wrong")
@@ -232,7 +232,7 @@ func TestAuthenticateRejectsEmptyServerList(t *testing.T) {
     conn, err := net.Dial("tcp", server.Addr())
     require.NoError(t, err)
 
-    _, err = Authenticate(conn, "test1", "test")
+    _, err = Authenticate(conn, "unittest1", "test")
     require.Error(t, err)
     require.Contains(t, err.Error(), "no available game server")
 
@@ -249,7 +249,7 @@ func TestAuthenticateRejectsUnexpectedInit(t *testing.T) {
     conn, err := net.Dial("tcp", server.Addr())
     require.NoError(t, err)
 
-    _, err = Authenticate(conn, "test1", "test")
+    _, err = Authenticate(conn, "unittest1", "test")
     require.Error(t, err)
     require.Contains(t, err.Error(), "unexpected packet id")
 

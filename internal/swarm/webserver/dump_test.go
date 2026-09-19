@@ -41,7 +41,7 @@ func TestBotDumpEndpoint(t *testing.T) {
 
     recorder := httptest.NewRecorder()
     server.httpServer.Handler.ServeHTTP(recorder, httptest.NewRequest(
-        http.MethodGet, "/api/bots/test1/dump", nil))
+        http.MethodGet, "/api/bots/unittest1/dump", nil))
 
     require.Equal(t, http.StatusOK, recorder.Code)
     require.Equal(t, "text/plain; charset=utf-8",
@@ -51,10 +51,10 @@ func TestBotDumpEndpoint(t *testing.T) {
     // The header identifies the code state and the session.
     require.Contains(t, report, "swarm state dump")
     require.Contains(t, report, "build: ")
-    require.Contains(t, report, "bot: test1 (status online")
+    require.Contains(t, report, "bot: unittest1 (status online")
 
     // The character sheet: the position, the vitals, the sit state.
-    require.Contains(t, report, "name: test1 (object 100)")
+    require.Contains(t, report, "name: unittest1 (object 100)")
     require.Contains(t, report, "position: x 45000, y 50000, z -3500")
     require.Contains(t, report, "sitting true")
 
@@ -251,7 +251,7 @@ func TestDumpSlotNames(t *testing.T) {
 // pair names its empty half.
 func TestDumpEmptySlots(t *testing.T) {
     bot := state.NewBot("acc1")
-    bot.SetCharacter("test2", 100, 18, 38344, 46248, -3592, 339, 137)
+    bot.SetCharacter("unittest2", 100, 18, 38344, 46248, -3592, 339, 137)
     // The dump character of the report: every slot filled except the
     // legs, one earring worn (the other half empty).
     bot.ApplyItemList([]state.InventoryItem{
@@ -278,7 +278,7 @@ func TestDumpEmptySlots(t *testing.T) {
 // blocked slot a hole.
 func TestDumpEmptySlotsBlockers(t *testing.T) {
     bot := state.NewBot("acc1")
-    bot.SetCharacter("test2", 100, 18, 38344, 46248, -3592, 339, 137)
+    bot.SetCharacter("unittest2", 100, 18, 38344, 46248, -3592, 339, 137)
     bot.ApplyItemList([]state.InventoryItem{
         {ObjectID: 1, ItemID: 1333, Count: 1, Equipped: true, BodyPart: 0x4000},
     })

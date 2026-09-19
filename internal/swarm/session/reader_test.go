@@ -24,17 +24,17 @@ func writeTestJournal(t *testing.T, path string) {
     // NewJournal names its own file; write the records, then move the
     // file to the requested path.
     journal.Build("main:abc123 dirty=false")
-    journal.Story("test1", "Hunt: the recorded line",
+    journal.Story("unittest1", "Hunt: the recorded line",
         time.Unix(1700000000, 0))
-    r := newRecord("test1", kindSample, time.Unix(1700000000, 0))
+    r := newRecord("unittest1", kindSample, time.Unix(1700000000, 0))
     r.Lv, r.Xp, r.Ad, r.Hp = 5, 1000, 500, 90
     r.X, r.Y, r.Ph = 10, 20, "engage"
-    journal.Sample("test1", Sample{
+    journal.Sample("unittest1", Sample{
         Level: 5, Exp: 1000, Adena: 500, Health: 90, X: 10, Y: 20,
         Phase: "engage",
     })
     _ = r
-    journal.Kill("test1", "Kaboo Orc", 4, 8.2, 87.5, 0, 0)
+    journal.Kill("unittest1", "Kaboo Orc", 4, 8.2, 87.5, 0, 0)
     journal.Close()
     require.NoError(t, os.Rename(journal.Path(), path))
 }
@@ -47,13 +47,13 @@ func TestParseJournalFile(t *testing.T) {
     parsed, err := ParseJournalFile(path)
     require.NoError(t, err)
     require.Equal(t, "main:abc123 dirty=false", parsed.Build)
-    require.Equal(t, []string{"test1"}, parsed.Order)
-    agg := parsed.Aggs["test1"]
+    require.Equal(t, []string{"unittest1"}, parsed.Order)
+    agg := parsed.Aggs["unittest1"]
     require.Equal(t, 1, agg.kills)
     require.Equal(t, "Kaboo Orc", agg.slowFight[0].mob)
     require.NotNil(t, agg.prev)
     require.Equal(t, int64(500), agg.prev.ad)
-    report, err := parsed.Report("test1")
+    report, err := parsed.Report("unittest1")
     require.NoError(t, err)
     require.Contains(t, report, "swarm session report")
     require.Contains(t, report, "journal: "+path)
@@ -79,7 +79,7 @@ func TestParseJournalGzip(t *testing.T) {
     require.NoError(t, target.Close())
     parsed, err := ParseJournalFile(source + ".gz")
     require.NoError(t, err)
-    agg := parsed.Aggs["test1"]
+    agg := parsed.Aggs["unittest1"]
     require.Equal(t, 1, agg.kills)
 }
 
@@ -87,13 +87,13 @@ func TestParseJournalGzip(t *testing.T) {
 // torn final line is skipped, the records before it survive.
 func TestParseJournalTornLine(t *testing.T) {
     path := filepath.Join(t.TempDir(), "session-torn.jsonl")
-    body := "{\"t\":1700000000,\"b\":\"test1\",\"e\":\"story\"," +
+    body := "{\"t\":1700000000,\"b\":\"unittest1\",\"e\":\"story\"," +
         "\"m\":\"the complete line\"}\n" +
-        "{\"t\":1700000001,\"b\":\"test1\",\"e\":\"ki"
+        "{\"t\":1700000001,\"b\":\"unittest1\",\"e\":\"ki"
     require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
     parsed, err := ParseJournalFile(path)
     require.NoError(t, err)
-    agg := parsed.Aggs["test1"]
+    agg := parsed.Aggs["unittest1"]
     require.Len(t, agg.ring, 1)
     require.Equal(t, "the complete line", agg.ring[0].msg)
 }
@@ -111,7 +111,7 @@ func TestReportOfflineSections(t *testing.T) {
     writeTestJournal(t, path)
     parsed, err := ParseJournalFile(path)
     require.NoError(t, err)
-    report, err := parsed.Report("test1")
+    report, err := parsed.Report("unittest1")
     require.NoError(t, err)
     for _, section := range []string{
         "== character journey ==",
