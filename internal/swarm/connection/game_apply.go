@@ -201,7 +201,7 @@ func (gc *GameClient) applyStopMove(payload []byte) {
             X:        stop.X,
             Y:        stop.Y,
             Z:        stop.Z,
-            Heading:  stop.Heading,
+            Heading:  gc.placementHeading(stop.Heading, stop.ObjectID),
             Moving:   false,
         })
     }
@@ -222,10 +222,31 @@ func (gc *GameClient) applyValidateLocation(payload []byte) {
             X:        place.X,
             Y:        place.Y,
             Z:        place.Z,
-            Heading:  place.Heading,
+            Heading:  gc.placementHeading(place.Heading, place.ObjectID),
             Moving:   false,
         })
     }
+}
+
+// placementHeading passes the broadcast heading through, except while
+// the claimed positions own the stream (the cursor key escape): the
+// echo of a claim carries the server side move heading (the arm
+// direction - ValidateLocation reads the location's heading, the
+// claimed facing lands in the client heading field the server does
+// not broadcast back), so the echo would flip the displayed facing
+// back to the arm line every claim. The claims set the facing
+// themselves (see state.Bot.ApplySelfFacing); the normal placements
+// own it again once the mouse clicks resume (WalkTo clears the
+// claims gate).
+func (gc *GameClient) placementHeading(
+    heading int32, objectID int32,
+) int32 {
+    if gc.claimsOwnStream.Load() && gc.tracker != nil &&
+        objectID == gc.tracker.SelfObjectID() {
+        return gc.tracker.SelfHeading()
+    }
+
+    return heading
 }
 
 // applyStatusUpdate parses StatusUpdate and applies the vitals changes.

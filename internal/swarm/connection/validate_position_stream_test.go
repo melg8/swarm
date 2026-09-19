@@ -445,3 +445,107 @@ func TestGameClientClaimsOwnTheValidationStream(t *testing.T) {
     require.Equal(t, int32(-3040), z)
     require.Equal(t, int32(32114), heading)
 }
+
+// TestGameClientClaimEchoKeepsTheClaimFacing pins the heading of the
+// claim echoes: while the claims own the stream, the ValidateLocation
+// and StopMove answers of the claimed placements carry the SERVER
+// side move heading (the arm direction - the mobius ValidateLocation
+// reads the location's heading, the claimed facing lands in the
+// client heading field the server does not broadcast back), so an
+// echo that applied its heading would flip the displayed facing back
+// to the arm line every claim (the 2026-09-19 17:18 report: the web
+// UI showed a direction the character never walked). The claim facing
+// (state.Bot.ApplySelfFacing) stays the truth while the echo applies
+// only the placement; the normal placements own the heading again
+// once the mouse walk clears the claims gate.
+func TestGameClientClaimEchoKeepsTheClaimFacing(t *testing.T) {
+    server := startFakeGameServer(t)
+    server.flow = absorbingFlow(nil)
+
+    client, tracker := newValidatingSession(t, server)
+
+    // The claim facing latches (the cursor key escape's optimistic
+    // facing) and the claims gate closes.
+    tracker.ApplySelfFacing(16000)
+    client.claimsOwnStream.Store(true)
+
+    // The echo of the claim: the placement applies, the arm heading
+    // in the echo does not flip the facing.
+    client.applyValidateLocation(
+        buildValidateLocationAt(100, 45600, 49900, -3050, 32768))
+    x, y, z, ok := tracker.SelfPosition()
+    require.True(t, ok)
+    require.Equal(t, int32(45600), x, "the echo placement applies")
+    require.Equal(t, int32(49900), y)
+    require.Equal(t, int32(-3050), z)
+    require.Equal(t, int32(16000), tracker.SelfHeading(),
+        "the echo heading must not flip the claim facing")
+
+    // The stop move of the armed walk: the same contract.
+    client.applyStopMove(buildStopMove(100, 45500, 49800, -3050, 32768))
+    require.Equal(t, int32(16000), tracker.SelfHeading(),
+        "the stop move heading must not flip the claim facing either")
+
+    // Another character's placement keeps its own heading: the gate
+    // protects the self facing only.
+    tracker.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 2, TemplateID: 1,
+        X: 44900, Y: 49900, Z: -3050, Heading: 4096,
+    })
+    client.applyValidateLocation(
+        buildValidateLocationAt(2, 44900, 49900, -3050, 4096))
+    otherHeading, fok := snapshotObjectHeading(tracker, 2)
+    require.True(t, fok)
+    require.Equal(t, int32(4096), otherHeading,
+        "the other character's heading passes through")
+
+    // The mouse walk clears the claims gate: the echo heading owns
+    // the facing again.
+    client.claimsOwnStream.Store(false)
+    client.applyValidateLocation(
+        buildValidateLocationAt(100, 45500, 49850, -3050, 32768))
+    require.Equal(t, int32(32768), tracker.SelfHeading(),
+        "the normal placement broadcast owns the facing again")
+}
+
+// buildValidateLocationAt builds a ValidateLocation packet with an
+// explicit z (the placement variant of buildValidateLocation).
+func buildValidateLocationAt(
+    objectID int32, x int32, y int32, z int32, heading int32,
+) []byte {
+    data := []byte{0x76}
+    data = appendInt32(data, objectID)
+    data = appendInt32(data, x)
+    data = appendInt32(data, y)
+    data = appendInt32(data, z)
+    data = appendInt32(data, heading)
+
+    return data
+}
+
+// buildStopMove builds a StopMove packet (opcode 0x59, the object id
+// with the placement it stopped at).
+func buildStopMove(
+    objectID int32, x int32, y int32, z int32, heading int32,
+) []byte {
+    data := []byte{0x59}
+    data = appendInt32(data, objectID)
+    data = appendInt32(data, x)
+    data = appendInt32(data, y)
+    data = appendInt32(data, z)
+    data = appendInt32(data, heading)
+
+    return data
+}
+
+// snapshotObjectHeading reads the heading of a world object from the
+// tracker snapshot (false when the object is unknown).
+func snapshotObjectHeading(tracker *state.Bot, objectID int32) (int32, bool) {
+    for _, obj := range tracker.Snapshot().Objects {
+        if obj.ObjectID == objectID {
+            return obj.Heading, true
+        }
+    }
+
+    return 0, false
+}

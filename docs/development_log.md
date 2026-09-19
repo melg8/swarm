@@ -4248,7 +4248,7 @@ one-item-per-slot-per-trip invariants keep their semantics.
   Creamees sold the spellbook, Ariel bought "Leather Pants, Wooden
   Breastplate" (list 3014800) and the auto equipment equipped
   "Leather Pants (27) into the empty legs slot" - PASS.
-=======
+
 ## Round 61: the trainer hall entry - the frozen corridor ban, the close teacher ring and the delevel median agreement (2026-09-12)
 
 The user reproduced the 2026-09-12 03:56 hang locally (build 6a2ac91,
@@ -6609,3 +6609,149 @@ priced - and the walker walks the wet legs the plan carries.
   zone data omits still cross at the land rate - unchanged from the
   zone pricing round, the server itself walks those beds at the run
   speed.
+## Round 91: the wasd walk marks its own ground - the escape claims advance the plan cursor and carry the server heading (2026-09-19)
+
+Scope: the owner report against the 2026-09-19 17:18 session (build
+94ec5e3, bot test1, phase townReturn): "прошел несколько точек по
+wasd - при этом они не отметились как пройденные и потом перейдя в
+обычный режим вернулся назад к предыдущим точкам, webui при ходьбе
+wasd - не корректно отображается направление персонажа (не по ходу
+движения)". The mobius server stays untouched (the server integrity
+rules): both fixes live in the swarm client.
+
+### The 17:18 session pins two defects of the round 89 escape
+
+Round 89's escape worked - the dump's own event log shows the ladder
+arming along the route ("the refused clicks hand the walk to the
+cursor key escape, walking along the planned route toward 42748
+51232 (18 claimed steps)") and the claims walking the character out
+of the refusal pocket. Two defects surfaced on the way:
+
+1. The walked waypoints never marked passed. The escape built its
+   claim ladder from the plan (cursorEscapeRouteSteps starts at the
+   follower cursor), the claims walked the character across the
+   route's first waypoints - and the cursor stayed where the escape
+   found it. The settle resumed the clicks on the same stale cursor:
+   the dump's fingerprint is "town walk stuck, skipping waypoint
+   (cursor 1 of 49)" one second after the settle (the pre escape
+   stuck verdict carried through the escape), then the follower
+   walked BACK - the plan view shows wp 0 passed at t+22.5s (the
+   resume time, not the walk time) and 8.3 s, 5.0 s, 10.7 s legs
+   spent walking back to the waypoints the escape had already
+   covered. Two minutes of the trip burned on the walked prefix.
+
+   Why the existing advanceWaypoints could not fix it after the
+   settle: a waypoint counts passed only when the projection of the
+   character onto the wp->next segment stays inside the segment
+   corridor (waypointCorridor), and the escaped character stands
+   BEHIND the stale waypoint's plane by hundreds of units - the
+   projection test answers "not passed", the cursor stays pinned,
+   and the skip machinery walks the character back to re-verify the
+   walked prefix one waypoint at a time.
+
+2. The wasd facing pointed nowhere. Two stacked causes:
+   - cursorEscapeHeading fed math.Atan2 the swapped arguments
+     (atan2(dx, dy) instead of the server's atan2(deltaY, deltaX)):
+     the reference Mobius master computes the client heading as the
+     degrees of atan2(deltaY, deltaX) scaled by 65536/360
+     (LocationUtil.calculateHeadingFrom), the same convention the
+     state tracker applies to the movement broadcasts
+     (state.HeadingFromDelta - the dump's own click move
+     "x 29549, y 51756, heading 33472" matches it to the unit). The
+     swapped claims named the mirrored direction (48408 where the
+     server says 33472 for the same step). The mirror is not only
+     cosmetic: the mobius cursor key movement probes its obstacle
+     front along the heading (Creature.updatePosition), the
+     mirrored claims probe behind the character's back.
+   - The claim echo would have overwritten the facing anyway: the
+     mobius ValidatePosition stores the claimed heading in the
+     client heading field (setClientHeading - "no real need to
+     validate heading") and broadcasts ValidateLocation with the
+     LOCATION's heading - the arm direction of the server side move
+     the mode 0 request started. Every claim echo carried that
+     stale arm heading back into the tracker.
+
+### The fix: the wasd walk IS the ground progress
+
+- cursorEscapeRouteSteps returns the steps with their waypoint map
+  (wpMap: the route waypoint every step completes, -1 for the mid
+  segment strides). The drive marks the walked ground as the claims
+  stream: every completing claim advances the follower cursor past
+  its route waypoint (markEscapeClaimedWaypoint) - the plan view
+  stamps the walked waypoints passed the moment the claims walk onto
+  them, exactly what the owner demanded. The marking rides the
+  escapeFollows verdict (the server position drifted past the follow
+  margin from the escape origin): a server that ignores the claims
+  never moves the character, and progress it never delivered must
+  never mark the plan - the honest abort ladder of the ignoring
+  server (TestWalkStuckAbortsAfterMaxRePaths) keeps ending its trips.
+- The settle advances the cursor with advanceWaypoints at the
+  position the character ACTUALLY reached (the tracker position,
+  never the ladder's aim - a server that ignored the claims left the
+  character on the origin ground, and an aim-fed advance completed
+  the plan out of thin air in the offline probe), and re-baselines
+  the stuck window (stuckAt/stuckX/stuckY zeroed) - the frozen
+  verdict of the pre escape ground must not fire on the resumed
+  clicks. The resumed click aims the first waypoint still ahead.
+- cursorEscapeHeading follows the mobius convention (atan2(deltaY,
+  deltaX), east 0, south 16384, west 32768, north 49152) and the
+  claims update the session facing optimistically
+  (state.Bot.ApplySelfFacing) - the official client renders the
+  arrow walk facing from its own movement simulation, the keyboard
+  movement owns the stream.
+- The connection gates the claim echoes: while claimsOwnStream
+  latches, the ValidateLocation and StopMove answers of the claimed
+  placements apply the placement but keep the claim facing
+  (GameClient.placementHeading) - the echo's server side move
+  heading would flip the displayed facing back to the arm line every
+  claim. The first mouse-mode walk clears the gate and the normal
+  broadcasts own the heading again.
+
+### The reproduction
+
+cursor_escape_wp_sync_repro_test.go drives the 17:18 scenario end to
+end on the real pack + the real mesh tiles (the spawnDumpLoop
+harness of the round 89):
+
+- TestReproEscapeClaimsMarkWalkedWaypointsPassed: the escape arms,
+  the claims walk the character along the route, every completing
+  claim marks its route waypoint passed while the escape streams,
+  the settle leaves the cursor past the walked prefix, the plan view
+  stamps every waypoint before the cursor, the first resumed click
+  aims ground closer to the escaped character than to the escape
+  origin (the dump's resume clicked wp 1 - 1100 units BACK), no
+  stuck skip runs between the settle and the first resumed click,
+  and the walk reaches the hunting zone. Pre-fix the test fails at
+  "the plan cursor regressed" - cursor 0 while the claims completed
+  waypoint 1, the exact dump artifact.
+- TestReproEscapeClaimsCarryTheServerHeading: every claim's heading
+  equals state.HeadingFromDelta of its own step direction (the mobius
+  convention), and the tracker facing follows the last claim.
+- TestCursorEscapeHeadingMatchesTheServerConvention: the compass
+  anchors (east 0, south 16384, west 32768, north 49152), the
+  agreement with HeadingFromDelta over eight directions, and the
+  dump's own sample (the walk from 29549 51756 toward 28928 51714
+  names 33472 - the old formula produced 48408 for the same step).
+- TestEscapeSettleRebaselinesTheStuckWindow: the ticks right after
+  the settle carry no "town walk stuck, skipping waypoint" and no
+  re-path - the carried verdict is gone. Pre-fix the test reproduces
+  the dump's fingerprint byte for byte ("town walk stuck, skipping
+  waypoint (cursor 1 of 64)").
+- TestGameClientClaimEchoKeepsTheClaimFacing (the connection suite):
+  the echo applies the placement and keeps the claim facing, the
+  stop move keeps it too, the other characters' headings pass
+  through, and the mouse walk hands the heading back to the normal
+  broadcasts.
+- The route ladder unit pins (cursor_escape_route_test.go) follow
+  the new signature and pin the map itself: the bend completing step
+  maps its waypoint, the map length follows the steps, the planless
+  fallback answers nil.
+
+### The verification
+
+- The live acceptance scenario village-escape answers PASS on the
+  built binary against the deployed stack (login 2106, game 7777).
+- tools/mobius_e2e.sh answers E2E_OK (the graceful shutdown ride).
+- The hunt suite green (60 s), `go test ./...` answers every
+  package ok, golangci-lint 0 issues, the whitespace gate green.
+- The mobius server stays untouched, it is the source of truth.

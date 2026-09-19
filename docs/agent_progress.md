@@ -1226,6 +1226,7 @@ three independent defects, all fixed in one round:
   the uncapped lint green.
 
 ## Active task: the priced water - the walled form retires, the bot plans through the water objects (2026-09-19)
+## Active task: the wasd ground progress - the escape claims mark the walked waypoints and carry the server heading (2026-09-19)
 
 Started: 2026-09-19. Branch: `feature/new-pathfind-alternative`.
 Commits as melg8. Other agents may push to the same branch
@@ -1240,6 +1241,7 @@ The owner directive ("в коде кажется остались устарев
 outdated way. One search remains - the water is a price (the
 run/swim ratio 2.3), never a wall - and the walker walks the wet
 legs the plan carries.
+
 ### The round (the full analysis is Round 90 of the development log)
 - `navmesh`: `AllowWater`, `DryFilter`, `RouteDry` deleted;
   `DefaultFilter` is the one priced search (the escape keeps its 8x
@@ -1267,3 +1269,34 @@ legs the plan carries.
   parser, the state wire, the pricing pins (the wide band swims, the
   narrow band detours - whole flat block worlds, the per cell setCell
   pillar artifact documented), the escape gate pin, the docs rounds.
+The owner reported two defects of the round 89 escape on the 17:18
+session (build 94ec5e3, bot test1): the wasd walked waypoints did not
+mark passed and the resumed clicks walked BACK to them (two minutes
+of backtrack legs in the dump), and the web UI showed the character
+facing a direction it never walked during the wasd walk.
+
+### Outcome
+
+- The claim ladder carries a waypoint map now: every completing claim
+  marks its route waypoint passed while the escape streams (gated on
+  the escapeFollows verdict - a server that ignores the claims never
+  fakes progress), the settle advances the cursor at the position the
+  character actually reached (never the ladder's aim) and
+  re-baselines the stuck window, so the resumed clicks aim forward.
+- The claim heading follows the mobius convention
+  (LocationUtil.calculateHeadingFrom: atan2(deltaY, deltaX) - the
+  swapped atan2 the old code carried mirrored the facing; the mirror
+  also pointed the mobius cursor-key obstacle probe behind the
+  character's back), the claims set the session facing optimistically
+  (state.Bot.ApplySelfFacing), and the claim echoes keep that facing
+  while the claims own the stream (GameClient.placementHeading gates
+  the ValidateLocation/StopMove headings).
+- Reproductions: cursor_escape_wp_sync_repro_test.go (the walked
+  waypoints marked passed mid-escape and after the settle, the
+  forward-only resumed clicks, the no-skip window after the settle,
+  the heading convention pins with the dump's own 33472 sample) and
+  TestGameClientClaimEchoKeepsTheClaimFacing in the connection suite.
+- Live gates: village-escape PASS on the deployed stack,
+  tools/mobius_e2e.sh E2E_OK, `go test ./...` every package ok,
+  golangci-lint 0 issues, the whitespace gate green. The mobius
+  server stays untouched.

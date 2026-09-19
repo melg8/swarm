@@ -1206,7 +1206,15 @@ type cursorEscapeState struct {
     originX int32
     originY int32
     steps   [][3]int32
-    next    int
+    // wpMap names the route waypoint every claimed step completes
+    // (the index into the leg's waypoints, -1 for the mid segment
+    // strides): the WASD walk IS the ground progress, the waypoint
+    // the claims walk onto marks passed (the owner report of the
+    // 2026-09-19 17:18 dump - the wasd walked points must never be
+    // walked again by the resumed clicks). Nil for the planless
+    // fallback whose straight ladder owns no route waypoints.
+    wpMap []int
+    next  int
     // lastClaimAt paces the claims at the official client cadence.
     lastClaimAt time.Time
     // claimsSinceMove counts the claims since the last observed
@@ -1223,6 +1231,7 @@ func zeroCursorEscape() cursorEscapeState {
         originX:         0,
         originY:         0,
         steps:           nil,
+        wpMap:           nil,
         next:            0,
         lastClaimAt:     time.Time{},
         claimsSinceMove: 0,
@@ -1257,7 +1266,7 @@ func (l *Loop) beginCursorKeyEscape(
     if l.cursorEscapes >= cursorEscapeAttemptsMax {
         return false
     }
-    steps := l.cursorEscapeRouteSteps(selfX, selfY, selfZ)
+    steps, wpMap := l.cursorEscapeRouteSteps(selfX, selfY, selfZ)
     form := "along the planned route"
     if len(steps) == 0 {
         // The planless fallback: the straight ladder toward the aim,
@@ -1273,6 +1282,7 @@ func (l *Loop) beginCursorKeyEscape(
         }
         steps = l.cursorEscapeSteps(selfX, selfY, selfZ,
             aimX, aimY, aimZ)
+        wpMap = nil
         form = "toward the aim"
     }
     if len(steps) == 0 {
@@ -1292,6 +1302,7 @@ func (l *Loop) beginCursorKeyEscape(
         originX:         selfX,
         originY:         selfY,
         steps:           steps,
+        wpMap:           wpMap,
         next:            0,
         lastClaimAt:     time.Time{},
         claimsSinceMove: 0,
@@ -1317,14 +1328,18 @@ func (l *Loop) beginCursorKeyEscape(
 // walked around the way the planner drew it. The route length caps
 // at cursorEscapeRouteMax so one escape stays a pocket recovery -
 // the claims never walk the character across the whole map. It
-// returns nil without a plan (the straight fallback owns the leg).
+// returns the steps with their waypoint map (the route waypoint
+// every step completes, -1 for the mid segment strides - the WASD
+// ground progress of the drive, see markEscapeClaimedWaypoint) and
+// nil maps without a plan (the straight fallback owns the leg).
 func (l *Loop) cursorEscapeRouteSteps(
     selfX, selfY, selfZ int32,
-) [][3]int32 {
+) ([][3]int32, []int) {
     if l.navigator == nil || l.wpIndex >= len(l.waypoints) {
-        return nil
+        return nil, nil
     }
     steps := make([][3]int32, 0, 16)
+    wpMap := make([]int, 0, 16)
     px, py, pz := float64(selfX), float64(selfY), float64(selfZ)
     budget := cursorEscapeRouteMax
     for i := l.wpIndex; i < len(l.waypoints); i++ {
@@ -1341,19 +1356,27 @@ func (l *Loop) cursorEscapeRouteSteps(
             sy := oy + dy*frac
             sz := oz + dz*frac
             if l.escapeStepWet(px, py, pz, sx, sy, sz) {
-                return steps
+                return steps, wpMap
+            }
+            // A stride that lands within the coincide radius of the
+            // segment's waypoint completes it (the closing step
+            // below is then skipped).
+            done := -1
+            if math.Hypot(wp.X-sx, wp.Y-sy) <= hopCoincideDist {
+                done = i
             }
             steps = append(steps, [3]int32{
                 int32(math.Round(sx)),
                 int32(math.Round(sy)),
                 int32(math.Round(sz)),
             })
+            wpMap = append(wpMap, done)
             px, py, pz = sx, sy, sz
             budget -= cursorEscapeStep
             stride += cursorEscapeStep
         }
         if budget <= 0 {
-            return steps
+            return steps, wpMap
         }
         // Close the segment onto the waypoint itself when the last
         // stride ended short of it: the bend points stay on the
@@ -1361,19 +1384,20 @@ func (l *Loop) cursorEscapeRouteSteps(
         // not from a corner the stride cut.
         if math.Hypot(wp.X-px, wp.Y-py) > hopCoincideDist {
             if l.escapeStepWet(px, py, pz, wp.X, wp.Y, wp.Z) {
-                return steps
+                return steps, wpMap
             }
             steps = append(steps, [3]int32{
                 int32(math.Round(wp.X)),
                 int32(math.Round(wp.Y)),
                 int32(math.Round(wp.Z)),
             })
+            wpMap = append(wpMap, i)
             px, py, pz = wp.X, wp.Y, wp.Z
             budget -= cursorEscapeStep
         }
     }
 
-    return steps
+    return steps, wpMap
 }
 
 // escapeStepWet reports whether the straight line of one claimed step
@@ -1501,9 +1525,27 @@ func (l *Loop) driveCursorKeyEscape(
             step[0], step[1], step[2], heading); err != nil {
             l.logf("Hunt: the claimed position failed: %v", err)
         }
+        // The official client renders the arrow walk facing from its
+        // own movement simulation - the claim facing IS the client
+        // side truth while the keyboard movement owns the stream
+        // (the server echo carries the arm heading instead, see
+        // ApplySelfFacing).
+        l.tracker.ApplySelfFacing(heading)
         l.cursorEscape.next++
         l.cursorEscape.lastClaimAt = now
         l.cursorEscape.claimsSinceMove++
+        // The WASD ground progress: the claims of a FOLLOWED escape
+        // mark the route waypoints passed (the server position moved
+        // - the claims own the character, the walked points stay
+        // passed for the resumed clicks). The claims of an ignored
+        // escape mark nothing - the plan cursor never fakes the
+        // ground the character never walked, the abort ladder of the
+        // ignoring server stays honest.
+        if l.escapeFollows(selfX, selfY) {
+            for k := range l.cursorEscape.next {
+                l.markEscapeClaimedWaypoint(k)
+            }
+        }
 
         return
     }
@@ -1514,22 +1556,84 @@ func (l *Loop) driveCursorKeyEscape(
     if now.Sub(l.cursorEscape.lastClaimAt) >= cursorEscapeSettle {
         aim := l.cursorEscape.steps[len(l.cursorEscape.steps)-1]
         l.cursorEscape.armed = false
+        // The WASD ground becomes the plan progress: the position the
+        // character ACTUALLY reached advances the cursor (the arrival
+        // radius and the route projection of the real ground) - the
+        // resumed clicks aim the first waypoint still ahead, never
+        // back to the walked ones (the owner report of the 2026-09-19
+        // 17:18 dump: the walk returned to the wasd walked points and
+        // burned two minutes skipping them). The ladder's aim itself
+        // is never trusted here: a server that ignored the claims
+        // left the character on the origin ground, and progress the
+        // server never delivered must never complete the plan.
+        if sx, sy, sz, ok := l.tracker.SelfPosition(); ok {
+            l.advanceWaypoints(sx, sy, sz)
+        }
+        // The escape moved the character server side: the stuck
+        // window re-baselines from the settle ground - the frozen
+        // verdict of the pre escape ground must not fire on the
+        // resumed clicks (the dump: the skip fired one second after
+        // the resume).
+        l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
         l.logf("Hunt: the cursor key escape walked to %d %d, "+
             "resuming the planned walk clicks", aim[0], aim[1])
     }
 }
 
-// cursorEscapeHeading renders the L2 heading of a step direction:
-// the 65536-unit turn with zero at north, the cosmetic facing the
-// official client reports alongside its claimed positions (the
-// server stores it without validating - ValidatePosition.runImpl
-// calls it "no real need to validate heading").
+// escapeFollows reports whether the server follows the claimed stream
+// of the running escape: the character position drifted past the
+// follow margin from the escape origin (the same verdict the follow
+// probe of the drive applies). The ground progress marking rides this
+// verdict - a server that ignores the claims never moves the
+// character, and progress it never delivered must never mark the
+// plan.
+func (l *Loop) escapeFollows(selfX, selfY int32) bool {
+    return math.Hypot(
+        float64(selfX-l.cursorEscape.originX),
+        float64(selfY-l.cursorEscape.originY),
+    ) > cursorEscapeFollowStep
+}
+
+// markEscapeClaimedWaypoint advances the plan cursor past the route
+// waypoint the claimed step completed: the WASD walk IS the ground
+// progress, the waypoint the claims walked onto counts as passed
+// (the owner report: the points the wasd walked must show passed and
+// the resumed clicks must never walk back to them). No line gate
+// stands here on purpose: the claim ladder follows the planner's own
+// bends, the ground the claim landed on IS the route ground - the
+// conservative advance gates would re-introduce the exact backtrack
+// the report pinned (the walked prefix marked unpassed because the
+// line test ran from the walked ground to a waypoint behind it).
+func (l *Loop) markEscapeClaimedWaypoint(stepIndex int) {
+    if stepIndex >= len(l.cursorEscape.wpMap) {
+        return
+    }
+    wp := l.cursorEscape.wpMap[stepIndex]
+    if wp < 0 || wp < l.wpIndex {
+        return
+    }
+    l.wpIndex = wp + 1
+    l.moveAt = time.Time{}
+}
+
+// cursorEscapeHeading renders the L2 heading of a step direction in
+// the convention of the reference Mobius master
+// (LocationUtil.calculateHeadingFrom: the degrees of atan2(deltaY,
+// deltaX) scaled by 65536 over 360, so east is 0, south 16384, west
+// 32768 and north 49152) - the same convention the state tracker
+// applies to the movement broadcasts (state.HeadingFromDelta). The
+// swapped atan2 arguments this function carried before the
+// 2026-09-19 17:18 report mirrored the facing (the character walked
+// west while the web UI drew the south line) and the mirror is not
+// only cosmetic: the mobius cursor key movement probes its obstacle
+// front along the heading (Creature.updatePosition), the mirrored
+// claims probe behind the character's back.
 func cursorEscapeHeading(
     fromX, fromY, toX, toY int32,
 ) int32 {
     dx := float64(toX - fromX)
     dy := float64(toY - fromY)
-    angle := math.Atan2(dx, dy)
+    angle := math.Atan2(dy, dx)
     if angle < 0 {
         angle += 2 * math.Pi
     }

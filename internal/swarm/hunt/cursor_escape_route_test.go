@@ -64,9 +64,15 @@ func TestCursorEscapeRouteStepsFollowThePlanBend(t *testing.T) {
     }
     loop.wpIndex = 0
 
-    steps := loop.cursorEscapeRouteSteps(0, 0, -3000)
+    steps, wpMap := loop.cursorEscapeRouteSteps(0, 0, -3000)
     require.NotEmpty(t, steps,
         "a planned route arms a route following ladder")
+    require.Len(t, wpMap, len(steps),
+        "every claimed step carries its route waypoint map")
+    for i, done := range wpMap {
+        require.True(t, done == -1 || done >= 0 && done < len(loop.waypoints),
+            "step %d maps outside the plan: %d", i, done)
+    }
 
     self := pathfind.Vec3{X: 0, Y: 0, Z: -3000}
     walked := 0.0
@@ -86,12 +92,16 @@ func TestCursorEscapeRouteStepsFollowThePlanBend(t *testing.T) {
     require.LessOrEqual(t, walked, cursorEscapeRouteMax+cursorEscapeStep,
         "the ladder walks past the route cap")
     // The bend closure: the route bend point lands among the steps
-    // (the segment leaves from the bend, not from a cut corner).
+    // (the segment leaves from the bend, not from a cut corner) and
+    // the step that walks onto the bend COMPLETES the bend waypoint
+    // in the map (the WASD ground progress of the drive).
     bend := loop.waypoints[0]
     found := false
-    for _, step := range steps {
+    for i, step := range steps {
         if math.Hypot(float64(step[0])-bend.X,
             float64(step[1])-bend.Y) <= hopCoincideDist {
+            require.Equal(t, 0, wpMap[i],
+                "the step on the bend completes the bend waypoint")
             found = true
 
             break
@@ -117,8 +127,9 @@ func TestCursorEscapeRouteStepsCapKeepsThePocketRecovery(t *testing.T) {
     loop.waypoints = waypoints
     loop.wpIndex = 0
 
-    steps := loop.cursorEscapeRouteSteps(0, 0, -3000)
+    steps, wpMap := loop.cursorEscapeRouteSteps(0, 0, -3000)
     require.NotEmpty(t, steps)
+    require.Len(t, wpMap, len(steps))
     last := steps[len(steps)-1]
     total := math.Hypot(float64(last[0]), float64(last[1]))
     require.LessOrEqual(t, total, cursorEscapeRouteMax+cursorEscapeStep,
@@ -136,7 +147,7 @@ func TestCursorEscapeRouteStepsStopAtTheWetStride(t *testing.T) {
     }
     loop.wpIndex = 0
 
-    steps := loop.cursorEscapeRouteSteps(0, 0, -3000)
+    steps, _ := loop.cursorEscapeRouteSteps(0, 0, -3000)
     require.Empty(t, steps,
         "a wet stride must end the route ladder at once")
 }
@@ -147,15 +158,18 @@ func TestCursorEscapeRouteStepsStopAtTheWetStride(t *testing.T) {
 // toward the validated aim owns the escape.
 func TestCursorEscapeRouteStepsNilWithoutPlan(t *testing.T) {
     loop := NewLoop(&fakeGame{}, newTestBot())
-    require.Nil(t, loop.cursorEscapeRouteSteps(0, 0, -3000),
+    _, wpMap := loop.cursorEscapeRouteSteps(0, 0, -3000)
+    require.Nil(t, wpMap,
         "no navigator: no route ladder")
 
     loop.SetNavigator(&fakeNavigator{})
-    require.Nil(t, loop.cursorEscapeRouteSteps(0, 0, -3000),
+    _, wpMap = loop.cursorEscapeRouteSteps(0, 0, -3000)
+    require.Nil(t, wpMap,
         "no waypoints: no route ladder")
 
     loop.waypoints = []pathfind.Vec3{{X: 100, Y: 0, Z: -3000}}
     loop.wpIndex = 1
-    require.Nil(t, loop.cursorEscapeRouteSteps(0, 0, -3000),
+    _, wpMap = loop.cursorEscapeRouteSteps(0, 0, -3000)
+    require.Nil(t, wpMap,
         "an exhausted cursor: no route ladder")
 }

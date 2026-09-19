@@ -751,6 +751,26 @@ func (b *Bot) SelfHeading() int32 {
     return b.char.Heading
 }
 
+// ApplySelfFacing records the facing the client itself drives: the
+// cursor key escape claims the placement AND the facing of the
+// official client's own movement simulation (the arrow walk renders
+// its facing locally), while the server echo of the claimed placement
+// carries the server side move heading (ValidateLocation reads the
+// location's heading - the arm direction of the running move - the
+// claimed facing lands in the client heading field the server does
+// not broadcast back). The claim facing is the truth the web UI
+// shows while the keyboard movement owns the stream; the normal
+// placement broadcasts own it again once the mouse clicks resume.
+func (b *Bot) ApplySelfFacing(heading int32) {
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    if b.selfID == 0 {
+        return
+    }
+    b.char.Heading = heading
+    b.touch()
+}
+
 // SelfSitting reports whether the character is sitting. The hunt loop
 // gates the rest transitions on it because the sit/stand action is a
 // server side toggle.
