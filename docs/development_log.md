@@ -6006,3 +6006,128 @@ it planned:
 - The MOVEDBG logging patch stays in the local Mobius checkout only
   (never committed to the swarm repository - the server integrity
   rules).
+
+## Round 86: the server frame click transport - the clicks never carry a mesh frame z again (2026-09-19)
+
+Scope: the owner directive of the 2026-09-19 round ("на стороне нашего
+swarm исправь пункт 3 - так чтобы описанная ситуация по кликам с
+неправильной Z координатой не случалась, сам mobius сервер
+модифицировать нельзя, он источник истины") - the bot side cure of the
+destination side flip surface the round 85 analysis left as a
+hardening item. The mobius server stays untouched (the server
+integrity rules): the fix lives entirely in the walk layer of the
+bot.
+
+### The design - the z frame transport
+
+The round 85 analysis established the refusal mechanism: the server
+resolves the click's destination layer by the NEAREST height to the z
+the request carries (`isCompletelyBlocked(target, targetZ)` in the
+packet handler; the final layer rule of `getValidLocation` collapses
+the destination back onto the walker when the Bresenham walk arrives
+on a layer other than the one the clicked z names - the distance
+drops under the cancellation limit and the deployed build answers
+ActionFailed). The plan waypoints carry the bot pack's mesh z
+(`node.layer.Height`), the deployed server validates with its own
+pack, and wherever the vintages disagree about a surface's absolute
+height (the village sandwich: the plaza deck over the water floor 872
+apart, the teacher hall interior flip margins down to 164 units) the
+raw mesh z names the wrong layer and the click refuses.
+
+The transport accepts the server as the source of truth and measures
+the vintage shift at the ONE pair of z values both frames vouch for:
+the character's standing z (every position broadcast carries it - the
+server's own answer for the cell it stands on) against the plan's
+first waypoint z (the same cell resolved on the bot pack - the search
+starts at the character's cell). The difference is the frame offset
+of the standing surface, and every plan derived click z rides it into
+the server frame:
+
+- `startWalkLegSearch` calibrates the offset when it accepts a fresh
+  plan (`legFrameOffset`); `planWaterEscape` leaves it zero (the swim
+  z rides the water surface while the mesh z names the floor - the
+  pair is geometry, not a vintage disagreement; the server skips the
+  geodata click validation for swimming movement anyway);
+  `armDirectLeg` leaves it zero (the direct leg's single waypoint is
+  the destination spec, not a mesh cell).
+- `clickWaypoint` anchors the near leg click z and the long leg
+  split: the split interpolates from the server vouched standing z to
+  the anchored waypoint z, so the intermediate point names the same
+  layer the full leg would in the server frame.
+- The forward route samples of `extendShortClickCandidates`, the
+  escape hops of `clickEscapeHop` and the varied aims of
+  `sendVariedAim` anchor their z the same way - every recovery mode
+  transports its clicks, the refusal ladder never reintroduces the
+  raw mesh z.
+- The user manual walk follower (its own `userFrameOffset`, measured
+  by `planUserWalk`) and the quest segment follower (a per segment
+  measurement, `followWaypoint` carries the offset) transport their
+  clicks too - the manual walks into the village and the quest route
+  legs name the walked surface's layer in the server frame exactly
+  like the autonomous town legs do.
+- The server vouched clicks stay untouched: the drop pickups (the
+  item z the server broadcast), the chase walks (the mob z), the self
+  position aims (the stop walks, the escape legs, the steering), the
+  merchant and teacher approach points (the npc z), the user
+  specified target triples, the direct leg hops (self z anchored
+  interpolations of spec destinations).
+
+The Gludio lesson rides unchanged: the transport never sends the bare
+self z - the anchored z carries the plan's own relative geometry (the
+mesh rise of the 864 unit Gludio segment sits inside the anchored z),
+the quest follower's click stays "the geodata height of the waypoint,
+not the stale self height", it just arrives in the server frame.
+Anchoring never hurts: the anchored z error is the vintage shift
+DIFFERENCE between the standing cell and the target cell (zero for a
+uniform pack disagreement, the smooth field case), the raw mesh z
+error is the full shift at the target.
+
+The measured pair carries two honest guards. An offset beyond
+`frameOffsetLimit` (500 units - a real vintage shift sits in the tens
+to low hundreds band against the measured flip margins of 164 and
+436; the 872 unit deck over water layer gap exceeds it) is a LAYER
+SNAP, not a shift - the measurement discards and the plan rides raw
+mesh z (the refusal ladder owns the plans whose start the pack cannot
+resolve onto the standing layer). And a character the pack answers
+underwater measures no shift (the OverWater guard of the
+calibration).
+
+The arrival re-measurement the first implementation carried
+(recalibrate the offset on every waypoint arrival) died in the
+teacher walk repro: the ramp steps stand 16-35 units apart, the
+arrive radius (150 units, 3D) counts the NEXT step arrived while the
+character still stands at the previous one, and the fresh measurement
+injects the ramp's rise into the offset (-32 units on the repro's
+ramp top click, the pinned -2776 click degraded to -2808). The offset
+calibrates at the plan starts only - each re-path is a fresh plan and
+re-measures from the cell the character actually stands on, which is
+the honest per surface re-anchoring a walk needs.
+
+### Verification
+
+- `hunt/click_frame_test.go`: the measurement (the signed shift, the
+  limit boundary, the layer snap discard), the fresh leg calibration
+  (the standing pair measures the shift; the swim pair measures
+  none), the systemic click pin (the walk click carries the anchored
+  z, never the raw mesh z), the long leg split pin (the intermediate
+  point interpolates standing z to anchored z), the raw mesh z pin at
+  the zero offset, the manual walk pin and the quest segment pin.
+- The existing suites stay green untouched: the fake routes start at
+  the character's cell with the self z, the measured offset is zero
+  and every pinned click z is byte identical - the full
+  `go test ./...` answers 26 packages ok, `golangci-lint run --new`
+  stays clean.
+
+### Residual
+
+- The surfaces the walk enters WITHOUT a re-path (a plan that crosses
+  from the deck into the teacher hall interior in one leg) keep the
+  standing surface's offset over the whole leg: the interior click
+  error is the deck-to-interior shift difference between the packs,
+  and the flip margins down there shrink to 164 units. The escapes
+  (the varied aims, the escape hops, the cursor key claims) own the
+  residual, and every stuck re-path re-measures on the new surface.
+- The claims transport (the cursor key escape) still claims the plan
+  polyline in the mesh frame z: the server syncs the claimed
+  placements verbatim in the cursor key branch and the escape proved
+  itself live, the round stays out of that proven path.

@@ -938,3 +938,35 @@ Commits as melg8. Rebase before every push.
   tree on every host, and CI (setup-go + the toolchain directive)
   would have caught the mismatch instead of silently going red on
   the whitespace gate.
+
+- 2026-09-19: the server frame click transport (the point 3 bot side
+  cure). The WHY: the round 85 refusal mechanism names the clicked z
+  the layer selector - the server resolves the click's destination
+  layer by the nearest height to the z the request carries, the plan
+  waypoints carry the bot pack's mesh z, and wherever the pack
+  vintages disagree about a surface's absolute height the raw mesh z
+  names the wrong layer (the village sandwich flips) and the click
+  refuses. The HOW: the walk layer measures the vintage shift at the
+  one pair both frames vouch for - the character's server vouched
+  standing z against the plan's first waypoint z (the same cell on
+  the pack) - and rides every plan derived click z into the server
+  frame: the town leg clicks and their long leg splits, the forward
+  route samples, the escape hops, the varied aims, the manual walk
+  follower and the quest segment follower (each machinery measures
+  its own plan start). The server vouched clicks (drops, mobs, npc
+  approach points, self position aims) stay untouched. The guards:
+  an offset beyond 500 units is a layer snap and measures zero (the
+  872 unit deck over water gap must never anchor), a swimming
+  character measures no shift (the swim z against the mesh floor is
+  geometry), and the arrival re-measurement died in the teacher walk
+  repro (the 16-35 unit ramp steps made the 150 unit arrive radius
+  measure the NEXT step's rise into the offset) - the offset
+  calibrates at the plan starts only, each re-path re-measures on the
+  surface the character actually stands on. The Gludio lesson rides
+  unchanged: the anchored z is never the bare self z, it carries the
+  plan's own relative geometry in the server frame. Tests:
+  `hunt/click_frame_test.go` pins the measurement, the calibration,
+  the systemic click transport, the long leg split, the layer snap
+  discard, the manual walk and the quest segment; the existing suites
+  stay byte identical green (26 packages ok, lint --new clean).
+

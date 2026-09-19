@@ -34,7 +34,7 @@ func TestExtendShortClickCandidatesMarchForward(t *testing.T) {
         {X: 1020, Y: 1200, Z: 0},
     }
     // The character stands between the first bend and the far leg.
-    candidates, count := extendShortClickCandidates(1010, 1100, waypoints, 1)
+    candidates, count := extendShortClickCandidates(1010, 1100, waypoints, 1, 0)
     require.Positive(t, count, "the march must collect the far samples")
     for c := 0; c < count; c++ {
         sample := candidates[c]
@@ -50,7 +50,7 @@ func TestExtendShortClickCandidatesMarchForward(t *testing.T) {
     require.LessOrEqual(t, count, extendCandidateMax,
         "the march stops at the candidate cap")
     // The last waypoint aim collects nothing (no forward segment).
-    _, count = extendShortClickCandidates(1010, 1100, waypoints, 2)
+    _, count = extendShortClickCandidates(1010, 1100, waypoints, 2, 0)
     require.Zero(t, count,
         "the arrival aim keeps its plain waypoint click")
 }

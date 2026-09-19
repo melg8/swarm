@@ -1033,6 +1033,22 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
     l.legStart = from
     l.waterEscape = false
     l.directLeg = false
+    // The fresh plan opens with a fresh frame measurement: the plan's
+    // first waypoint IS the character's own cell resolved on the pack,
+    // so the difference of the two z values is the vintage shift of
+    // the standing surface (see click_frame.go) - the offset every
+    // click of this leg rides into the server frame. A character the
+    // pack answers underwater measures no shift: the swim z rides the
+    // water surface while the mesh z names the floor, the pair is not
+    // a vintage pair (the swim-floor gap is geometry, not a pack
+    // disagreement) and anchoring by it would corrupt the leg's
+    // clicks.
+    l.legFrameOffset = 0
+    if !l.navigator.OverWater(
+        float64(selfX), float64(selfY), int16(selfZ)) {
+        l.legFrameOffset = measureFrameOffset(
+            selfZ, result.Waypoints[0].Z)
+    }
     l.moveAt = time.Time{}
     l.stuckAt = time.Time{}
     l.stuckFast = false
@@ -1865,12 +1881,19 @@ func (l *Loop) clickWaypoint(
     dx := wp.X - float64(selfX)
     dy := wp.Y - float64(selfY)
     dist := math.Hypot(dx, dy)
-    moveX, moveY, moveZ := wp.X, wp.Y, wp.Z
+    // The click z rides the server frame transport (see
+    // click_frame.go): the mesh frame waypoint height plus the
+    // measured vintage shift of the standing surface - the server
+    // resolves the click's destination layer by the nearest height to
+    // this z, and the raw mesh z names the wrong layer wherever the
+    // packs disagree (the village sandwich refusals).
+    wpZ := anchorZToServerFrame(wp.Z, l.legFrameOffset)
+    moveX, moveY, moveZ := wp.X, wp.Y, wpZ
     if dist > maxMoveLeg {
         frac := maxMoveLeg / dist
         moveX = float64(selfX) + dx*frac
         moveY = float64(selfY) + dy*frac
-        moveZ = float64(selfZ) + (wp.Z-float64(selfZ))*frac
+        moveZ = float64(selfZ) + (wpZ-float64(selfZ))*frac
     }
     if l.extendArmed {
         // The recovery of a stuck leg (extendArmed): the stuck
@@ -2013,7 +2036,7 @@ func (l *Loop) extendShortClick(
         X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
     }
     candidates, count := extendShortClickCandidates(
-        selfX, selfY, l.waypoints, l.wpIndex)
+        selfX, selfY, l.waypoints, l.wpIndex, l.legFrameOffset)
     for c := range count {
         sample := candidates[c]
         if waterGuard {
@@ -2047,7 +2070,7 @@ func (l *Loop) extendShortClick(
 // collects nothing - the arrival case keeps its plain waypoint click.
 func extendShortClickCandidates(
     selfX, selfY int32,
-    waypoints []pathfind.Vec3, index int,
+    waypoints []pathfind.Vec3, index int, frameOffset float64,
 ) ([extendCandidateMax]pathfind.Vec3, int) {
     var out [extendCandidateMax]pathfind.Vec3
     count := 0
@@ -2077,7 +2100,8 @@ func extendShortClickCandidates(
             }
             out[count] = pathfind.Vec3{
                 X: qx, Y: qy,
-                Z: from.Z + (to.Z-from.Z)*frac,
+                Z: anchorZToServerFrame(
+                    from.Z+(to.Z-from.Z)*frac, frameOffset),
             }
             count++
         }
@@ -2208,9 +2232,11 @@ func (l *Loop) clickEscapeHop(
             continue
         }
         if _, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
-            X: wp.X, Y: wp.Y, Z: wp.Z,
+            X: wp.X, Y: wp.Y,
+            Z: anchorZToServerFrame(wp.Z, l.legFrameOffset),
         }); ok {
-            *moveX, *moveY, *moveZ = wp.X, wp.Y, wp.Z
+            *moveX, *moveY, *moveZ = wp.X, wp.Y,
+                anchorZToServerFrame(wp.Z, l.legFrameOffset)
             l.logger.Printf("Hunt: walk click refused, hopping "+
                 "back to the plan bend at %d %d",
                 int32(wp.X), int32(wp.Y))
@@ -2330,6 +2356,13 @@ func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
     l.waypoints = result.Waypoints
     l.wpIndex = 0
     l.waterEscape = true
+    // The escape plan starts at the swimming cell: the swim z rides
+    // the water surface, the mesh z names the floor - the pair is not
+    // a vintage pair and measures no frame offset (see
+    // click_frame.go). The escape clicks ride the raw mesh z; the
+    // server skips the geodata click validation for swimming movement
+    // anyway.
+    l.legFrameOffset = 0
     l.moveAt = time.Time{}
     l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
     l.stuckFast = false
@@ -2435,6 +2468,13 @@ func (l *Loop) sendVariedAim(
         return false
     }
     wp := l.waypoints[l.wpIndex]
+    // The varied aims ride the same server frame transport as the
+    // plain clicks (see click_frame.go): the interpolated z of every
+    // variant starts from the anchored waypoint height, so the
+    // variant that finally validates names the standing surface's
+    // layer in the server frame, not the mesh frame the packs
+    // disagree about.
+    wp.Z = anchorZToServerFrame(wp.Z, l.legFrameOffset)
     from := pathfind.Vec3{
         X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
     }
@@ -3026,6 +3066,10 @@ func (l *Loop) armDirectLeg(reason string) {
     l.directLegUntil = time.Now().Add(directLegWindow)
     l.waypoints = []pathfind.Vec3{l.legDest}
     l.wpIndex = 0
+    // The direct leg's single waypoint is the destination spec, not
+    // the character's cell resolved on the pack - no frame pair to
+    // measure, the spec z rides as given.
+    l.legFrameOffset = 0
     l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
     l.stuckFast = false
     l.moveAt = time.Time{}
@@ -3521,6 +3565,7 @@ func (l *Loop) endTownTrip(reason string) {
     l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
     l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
     l.waterEscape = false
+    l.legFrameOffset = 0
     l.extendArmed = false
     l.directLeg = false
     l.cursorEscape = zeroCursorEscape()
@@ -3624,6 +3669,7 @@ func (l *Loop) resetTownTrip() {
     l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
     l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
     l.waterEscape = false
+    l.legFrameOffset = 0
     l.extendArmed = false
     l.directLeg = false
     l.cursorEscape = zeroCursorEscape()

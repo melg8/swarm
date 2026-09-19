@@ -375,7 +375,18 @@ type Loop struct {
     legDest       pathfind.Vec3
     legStart      pathfind.Vec3
     waterEscape   bool
-    moveAt        time.Time
+    // legFrameOffset is the measured z frame offset of the current
+    // leg plan (see click_frame.go): the difference between the
+    // server vouched standing z and the mesh frame height of the same
+    // cell, calibrated when a fresh plan is accepted and re-measured
+    // by every re-path (each plan starts at the cell the character
+    // actually stands on). Every plan derived click z rides it into
+    // the server frame before the click guards and the wire see it
+    // (clickWaypoint, the route samples, the escape hops, the varied
+    // aims); a plan without a measurable offset keeps it zero and
+    // rides the raw mesh z.
+    legFrameOffset float64
+    moveAt         time.Time
     // questWalkAt paces the quest trip walk requests (the flood
     // protector mute of the 2026-09-12 class transfer run).
     questWalkAt time.Time
@@ -690,6 +701,11 @@ type Loop struct {
     userWaypoints []pathfind.Vec3
     userWpIndex   int
     userPathTried bool
+    // userFrameOffset is the measured z frame offset of the manual
+    // walk plan (the legFrameOffset of the user follower, see
+    // click_frame.go): calibrated when planUserWalk accepts a fresh
+    // mesh route and ridden by the follower's waypoint clicks.
+    userFrameOffset float64
     // userRedirect marks a manual command that replaced a walk
     // still running on the server: the next walk request fires at
     // once instead of waiting for the old walk to finish.
@@ -862,6 +878,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         legDest:           pathfind.Vec3{X: 0, Y: 0, Z: 0},
         legStart:          pathfind.Vec3{X: 0, Y: 0, Z: 0},
         waterEscape:       false,
+        legFrameOffset:    0,
         moveAt:            time.Time{},
         moveStartAt:       time.Time{},
         moveStartX:        0,
@@ -1026,6 +1043,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         userWaypoints:     nil,
         userWpIndex:       0,
         userPathTried:     false,
+        userFrameOffset:   0,
         userRedirect:      false,
         pendingActions:    make(map[int32]pendingInventory),
         userDeferred:      nil,

@@ -325,6 +325,7 @@ func (l *Loop) userMovement(cmd state.Command) {
     l.userWaypoints = nil
     l.userWpIndex = 0
     l.userPathTried = false
+    l.userFrameOffset = 0
     // The walk plan origin: where the character stood when the click
     // arrived (the dump prints the whole walk from it). Unknown
     // positions keep the zero sentinel and publish no origin.
@@ -473,6 +474,19 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     }
     l.userWaypoints = result.Waypoints
     l.userWpIndex = 0
+    // The manual walk plan opens with the same frame measurement as
+    // every fresh plan (see click_frame.go): the route's first
+    // waypoint is the character's own cell resolved on the pack, its
+    // z against the server vouched standing z is the vintage shift
+    // the follower's clicks ride. A swimming character measures no
+    // shift: the swim z against the mesh floor is geometry, not a
+    // pack disagreement.
+    l.userFrameOffset = 0
+    if !l.navigator.OverWater(
+        float64(selfX), float64(selfY), int16(selfZ)) {
+        l.userFrameOffset = measureFrameOffset(
+            selfZ, result.Waypoints[0].Z)
+    }
     l.userMoveAt = time.Time{}
     l.logf("Hunt: manual walk path planned: %d waypoints, "+
         "%.0f units (%.2fs search)", len(result.Waypoints),
@@ -535,7 +549,12 @@ func (l *Loop) followUserWaypoints(
     dx := wp.X - float64(selfX)
     dy := wp.Y - float64(selfY)
     dist := math.Hypot(dx, dy)
-    moveX, moveY, moveZ := wp.X, wp.Y, wp.Z
+    // The click z rides the server frame transport of the manual
+    // plan (see click_frame.go): the mesh height plus the measured
+    // vintage shift - the raw mesh z names the wrong layer wherever
+    // the packs disagree about a surface's absolute height.
+    wpZ := anchorZToServerFrame(wp.Z, l.userFrameOffset)
+    moveX, moveY, moveZ := wp.X, wp.Y, wpZ
     if dist > maxMoveLeg {
         // Split the leg into a straight intermediate point: the
         // smoothing verified the whole segment, the server only
@@ -543,7 +562,7 @@ func (l *Loop) followUserWaypoints(
         scale := maxMoveLeg / dist
         moveX = float64(selfX) + dx*scale
         moveY = float64(selfY) + dy*scale
-        moveZ = float64(selfZ)
+        moveZ = float64(selfZ) + (wpZ-float64(selfZ))*scale
     }
     l.userRedirect = false
     l.userMoveAt = now

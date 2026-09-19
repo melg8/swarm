@@ -390,6 +390,13 @@ func (l *Loop) followPlannedSegment(
     // direct click at the first sealed segment.
     partial := !result.Found
     waypoints := result.Waypoints
+    // The segment plan starts at the character's own cell resolved on
+    // the pack: the standing z against the first waypoint's mesh z
+    // measures the frame offset the segment's waypoint clicks ride
+    // (see click_frame.go) - the quest route legs name the surface
+    // the character stands on in the server frame, wherever the
+    // pack vintages disagree.
+    frameOffset := measureFrameOffset(selfZ, waypoints[0].Z)
     if partial {
         l.logf("quest: walking a partial segment toward (%d, %d), "+
             "the closest reachable dry point is %d waypoints ahead",
@@ -400,7 +407,7 @@ func (l *Loop) followPlannedSegment(
             selfX, selfY)
     }
     for i := range waypoints {
-        if !l.followWaypoint(waypoints, i, deadline) {
+        if !l.followWaypoint(waypoints, i, frameOffset, deadline) {
             return true
         }
     }
@@ -427,7 +434,8 @@ func (l *Loop) followPlannedSegment(
 // (the follower returns, the caller plans a fresh segment); true
 // when the waypoint was reached or the segment ran out of budget.
 func (l *Loop) followWaypoint(
-    waypoints []pathfind.Vec3, index int, deadline time.Time,
+    waypoints []pathfind.Vec3, index int, frameOffset float64,
+    deadline time.Time,
 ) bool {
     wp := waypoints[index]
     sent := false
@@ -484,10 +492,15 @@ func (l *Loop) followWaypoint(
         // the stale self height: the server validates the click z
         // against its own geodata (the same run stalled on the
         // segment west of Gludio - an 864 unit rise with every click
-        // riding the self z, every request ActionFailed).
+        // riding the self z, every request ActionFailed). The height
+        // rides the server frame transport (see click_frame.go): the
+        // mesh height plus the measured vintage shift of the
+        // segment's standing surface, so the click names the walked
+        // surface's layer in the server frame wherever the packs
+        // disagree about absolute heights.
         clickZ := selfZ
         if wp.Z != 0 {
-            clickZ = int32(wp.Z)
+            clickZ = int32(anchorZToServerFrame(wp.Z, frameOffset))
         }
         if err := l.game.WalkTo(
             int32(wp.X), int32(wp.Y), clickZ); err != nil {
