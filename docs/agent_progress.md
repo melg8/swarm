@@ -851,3 +851,18 @@ Commits as melg8. Rebase before every push.
   the escape once they are spent, the claims owning the leg, no
   further mouse clicks), the direct leg silent hop escape; the
   varied aim and plaza repros re-verified green.
+
+- 2026-09-19: the refused click root cause documented (commit 3).
+  The WHY: the village geodata is a layer sandwich (the deck over
+  the water floor 872 apart; the teacher hall roof/interior/water
+  328/1136 apart; the shop interior partially walled; the deck not
+  flat even inside one pack) and the server resolves every click
+  target and line step layer by the NEAREST z - a pack vintage
+  disagreement flips the layer, the line check refuses, the click
+  collapses and the deployed build answers ActionFailed (the
+  official client's mouse clicks met the same wall). The evidence
+  pins in `pathfind/village_layer_sandwich_test.go` (the four
+  measured stacks), the full analysis lives in Round 85 of
+  `docs/development_log.md` with the owner side cure (the geodata
+  vintage alignment + the master's direct-movement fallback). The
+  bot side answer is the claim transport of commits 1-2.

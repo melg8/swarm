@@ -5885,3 +5885,124 @@ the way it froze the official client's mouse clicks.
 - The MOVEDBG logging patch stays in the local Mobius checkout only
   (never committed to the swarm repository - the server integrity
   rules).
+
+## Round 85: the refused click root cause - the village layer sandwich and the claim transport (2026-09-19)
+
+Scope: the owner question of the 2026-09-19 round ("подробно изучить
+ПОЧЕМУ сервер не дает в этой зоне пройти обычными кликами,
+подобное же происходит с попыткой входа в магазины и в главное
+здание для обучения") with the acceptance contract of the
+village-escape scenario (the refused-click dump cell), plus the two
+behavior rules: the WASD-like recovery must walk the pathfind route
+(never a straight line across the map) and the walker must switch
+recovery modes the moment the current one proves useless.
+
+### Root cause analysis - why the clicks refuse
+
+The Mobius C1 click path refuses a ground click in three places
+(`MoveToLocation.runImpl`, `Creature.moveToLocation`,
+`GeoEngine.getValidLocation`):
+
+1. `isCompletelyBlocked(target, targetZ)` - the destination cell
+   resolves to a layer whose four NSWE walls are all closed: silent
+   ActionFailed, no movement.
+2. The line walk: `getValidLocation` marches the Bresenham line cell
+   by cell and resolves EVERY cell's layer by the NEAREST height to
+   the z the request carries (`getNearestZ` / MultilayerBlock). The
+   first closed NSWE or blocked cell collapses the destination onto
+   the last walked position.
+3. The collapse gates: a collapse longer than 30 units hands the
+   click to the server's own A* (`PathFinding.findPath`) which starts
+   from the character's own cell resolved on the server's geodata; a
+   shorter collapse silently cancels the move. `findPath` from a
+   walled or wrong-layer start cell returns null, and the deployed
+   build family answers ActionFailed (the current master falls
+   through to direct movement - the commented out ActionFailed block
+   - but the user's older build refuses; the dumps prove it).
+
+The village geodata is a LAYER SANDWICH (measured from the pack the
+repository ships, `pathfind/village_layer_sandwich_test.go`):
+
+- the deck cells stack the open deck top (-3056) over the open water
+  floor (-3928): an 872 unit gap, a 436 unit flip margin for the
+  nearest-layer resolution;
+- the teacher hall block stacks THREE layers: the roof band (-2464),
+  the interior floor (-2792) and the water floor (-3928): the
+  interior flip margins shrink to 164 and 568 units - a pack
+  disagreement of 165 units of z flips a click into the hall onto
+  the roof layer;
+- the shop interior cells are partially walled in the pack (the nswe
+  mask 7, the east wall closed): the line check against the interior
+  layer refuses where the deck layer walks;
+- the deck is not flat even inside one pack: the plaza deck sits at
+  -3056, the southwest gate corridor deck at -2992 - a 64 unit step
+  that already puts interpolated click z values on layer boundaries.
+
+The bot clicks carry z values from ITS pack (the plan waypoint z,
+the self z of another vintage); the deployed server validates with
+ITS pack. Where the two vintages disagree near the sandwich - the
+plaza cell, the shop decks, the teacher hall approach - the resolved
+layer flips, the line check refuses, the click collapses, and the
+older build answers ActionFailed. The refusal is ORIGIN-anchored
+when the server pack walls the standing cell's own neighborhood
+(every click from that cell collapses - the official client's mouse
+clicks met the same refusals, the user verified live) and
+TARGET-anchored when the flip hits the destination layer (the shop
+and teacher hall entries). Only the claimed ValidatePosition stream
+(the arrow keys of the official client, the cursor key branch of
+`ValidatePosition.runImpl`) moves the character, because it syncs
+the placement with NO line check - which is exactly the recovery the
+user proved live ("удалось только движение по стрелкам - после этого
+отлипло").
+
+### Fix - the claim transport as a first class recovery
+
+The bot cannot fix the server's pack (the server integrity rules);
+the elegant solution accepts the refusal channel as the ground truth
+and makes the arrow-key transport carry the bot out along the route
+it planned:
+
+1. The route following cursor escape: the claimed steps follow the
+   plan polyline from the current cursor (water guarded per stride,
+   capped at 2500 units) instead of the straight chord - the claims
+   bend where the planner bent and never carry the character across
+   the map.
+2. The move start watchdog: a walk click that never started the
+   movement (no broadcast, no position change) forces the recovery
+   ladder within 3 s instead of standing out the 15 s/4 s stuck
+   windows - the walker switches modes as fast as the dead click can
+   be named.
+3. The refusing pocket verdict: the refusal evidence on the first
+   refusal cell after the varied aims are spent hands the leg to the
+   escape at once (the varied aims keep their chance to cure the
+   target specific refusals first - the round 82 order), and the
+   follower drives the claims while the escape holds the leg.
+
+### Verification
+
+- `pathfind/village_layer_sandwich_test.go`: the four measured
+  stacks pinned (the plaza two layer deck, the teacher hall three
+  layer block, the shop interior wall mask, the not-flat deck step).
+- `hunt/cursor_escape_route_test.go`: the bend corridor, the route
+  cap, the wet stride stop, the planless fallback.
+- `hunt/move_start_watchdog_test.go`: the silent click recovery
+  inside the move start window, the pocket sequence (the variants
+  one per verdict, the escape once spent, the claims owning the leg),
+  the direct leg silent hop escape.
+- The full hunt, pathfind and state suites green; the
+  village-escape acceptance scenario PASS on the live stack.
+
+### Follow ups
+
+- A geodata refresh of the server deployment to the same vintage the
+  bot plans with (the 165 region pack of `data/geodata`, the
+  reference layout: the files copied into the server's geodata
+  directory, `PathFinding = 2`) removes the mismatch at the source
+  and is the owner side cure of the whole refusal family.
+- The z discipline of the clicks (the server-blessed z of the npc
+  targets, the self z for the short ground clicks) would shrink the
+  destination-side flip surface; the claim transport makes it a
+  hardening, not a cure.
+- The MOVEDBG logging patch stays in the local Mobius checkout only
+  (never committed to the swarm repository - the server integrity
+  rules).
