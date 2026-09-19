@@ -134,7 +134,7 @@ func TestUserWalkRefusalLadderWalksTheRefusingPorch(t *testing.T) {
 
     base := time.Now()
     done := false
-    for i := 0; i < 240; i++ {
+    for i := range 240 {
         now := base.Add(time.Duration(i*2) * time.Second)
         loop.tickUserMove(now)
         sim.consume(game, bot, now)

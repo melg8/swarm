@@ -74,9 +74,11 @@ func TestManualMeshPlanCarriesSearchContract(t *testing.T) {
 
     require.NotEmpty(t, loop.userWaypoints,
         "the fake navigator answers a route")
-    require.Equal(t, 46200.0, loop.userWaypoints[len(loop.userWaypoints)-1].X,
+    require.InDelta(t, 46200.0,
+        loop.userWaypoints[len(loop.userWaypoints)-1].X, 0.01,
         "the exact plan ends at the clicked point")
-    require.Equal(t, 51100.0, loop.userWaypoints[len(loop.userWaypoints)-1].Y,
+    require.InDelta(t, 51100.0,
+        loop.userWaypoints[len(loop.userWaypoints)-1].Y, 0.01,
         "the exact plan ends at the clicked point")
     plan := loop.activeWalkPlan()
     require.NotNil(t, plan)
@@ -110,8 +112,8 @@ func TestManualWalkPlansTheExactClickedPoint(t *testing.T) {
 
     require.NotEmpty(t, loop.userWaypoints)
     last := loop.userWaypoints[len(loop.userWaypoints)-1]
-    require.Equal(t, 44718.0, last.X)
-    require.Equal(t, 52291.0, last.Y)
+    require.InDelta(t, 44718.0, last.X, 0.01)
+    require.InDelta(t, 52291.0, last.Y, 0.01)
     require.Empty(t, nav.approachEnds,
         "the reachable click never asks the approach search")
     plan := loop.activeWalkPlan()

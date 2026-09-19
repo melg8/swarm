@@ -513,7 +513,7 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     l.userMoveAt = time.Time{}
     l.userRefusalVariants = 0
     l.cursorEscapes = 0
-    l.cursorEscape = cursorEscapeState{}
+    l.cursorEscape = cursorEscapeState{} //nolint:exhaustruct_v5 // zero reset
     l.logf("Hunt: manual walk path planned: %d waypoints, "+
         "%.0f units (%.2fs search)", len(result.Waypoints),
         result.Length, result.Duration.Seconds())
@@ -621,6 +621,7 @@ func (l *Loop) beginUserCursorKeyEscape(
         next:            0,
         lastClaimAt:     time.Time{},
         claimsSinceMove: 0,
+        wpMap:           nil,
     }
     if err := l.game.CursorKeyWalkTo(arm[0], arm[1], arm[2]); err != nil {
         l.logf("Hunt: the cursor key arm failed: %v", err)
@@ -641,6 +642,8 @@ func (l *Loop) beginUserCursorKeyEscape(
 // waypoint it missed). The walk ends when the last waypoint is
 // reached or the manual deadline passes; a leg that stalls (the server
 // stopped the character short) re-issues at the walk request period.
+//
+//nolint:cyclop,funlen // the follower ladder is one linear decision train
 func (l *Loop) followUserWaypoints(
     now time.Time, selfX int32, selfY int32, selfZ int32,
 ) {

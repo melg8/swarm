@@ -88,19 +88,41 @@ func churchEntryChecks() []Check {
         {
             ID:     checkChurchWalk,
             Label:  "the walk command moved the character off the plaza",
+            Done:   false,
             Detail: "standing at the plaza cell",
         },
         {
             ID:     checkChurchInside,
             Label:  "the character stands on the temple interior cell",
+            Done:   false,
             Detail: "outside the temple",
         },
         {
             ID:     checkChurchNpc,
             Label:  "the character stands next to Asterios inside",
+            Done:   false,
             Detail: "far from the temple NPC",
         },
     }
+}
+
+// startChurchSession launches the manual only bot session of the
+// temple scenario: the hunt loop consumes the web commands and never
+// arms its own trips, so the walk of this scenario is the exact
+// manual walk the owner drives. The goroutine reports the session
+// end on the channel, the caller owns the cancel.
+func startChurchSession(
+    ctx context.Context, m *Manager, test *Test,
+) (context.CancelFunc, chan error) {
+    sessionCtx, cancelSession := context.WithCancel(ctx)
+    sessionDone := make(chan error, 1)
+    go func() {
+        sessionDone <- m.runSession(sessionCtx, churchAccount,
+            churchPassword, churchAccount, false, m.proxy,
+            test.appendLog)
+    }()
+
+    return cancelSession, sessionDone
 }
 
 // churchEntryScenario runs the temple entrance round: the temp
@@ -124,17 +146,8 @@ func churchEntryScenario(ctx context.Context, m *Manager, t *Test) error {
     }
     time.Sleep(ensurePause)
 
-    sessionCtx, cancelSession := context.WithCancel(ctx)
+    cancelSession, sessionDone := startChurchSession(ctx, m, test)
     defer cancelSession()
-    sessionDone := make(chan error, 1)
-    go func() {
-        // The manual only mode: the hunt loop consumes the web
-        // commands and never arms its own trips, so the walk of this
-        // scenario is the exact manual walk the owner drives.
-        sessionDone <- m.runSession(sessionCtx, churchAccount,
-            churchPassword, churchAccount, false, m.proxy,
-            test.appendLog)
-    }()
 
     tracker := m.tracker(test)
     if err := waitOnline(ctx, tracker, test); err != nil {
@@ -145,10 +158,12 @@ func churchEntryScenario(ctx context.Context, m *Manager, t *Test) error {
     }
 
     tracker.PushCommand(state.Command{
-        Kind: state.CommandMove,
-        X:    churchTargetX,
-        Y:    churchTargetY,
-        Z:    churchTargetZ,
+        Kind:     state.CommandMove,
+        ObjectID: 0,
+        Count:    0,
+        X:        churchTargetX,
+        Y:        churchTargetY,
+        Z:        churchTargetZ,
     })
     test.appendLog("acceptance: the walk command to the temple " +
         "interior (44718 52291 -2792) is queued, watching the walk")
