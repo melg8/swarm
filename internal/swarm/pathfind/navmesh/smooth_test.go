@@ -74,9 +74,9 @@ func TestSmoothWithoutArmingKeepsRawFunnel(t *testing.T) {
 // squared) opens east into the stacked pair B (south) and C (north)
 // through the full shared edge, and B and C are linked along their
 // shared edge (the walkable boundary the pivot offset treats as a
-// wall). The corridor A to B bends at the portal whose north span end
-// adjoins the OPEN A-C span - the funnel pulls its pivot 7.5 units
-// off it, the shortcut pass crosses at the boundary itself.
+// wall). The corridor A to B crosses the portal whose north span end
+// adjoins the OPEN A-C span - the open continuation keeps the span
+// end at its full extent and the raw funnel crosses it straight.
 func smoothTWorld() *Tile {
     rects := []rectSpec{
         {x0: 0, y0: 0, x1: 16, y1: 16, h: 0, area: AreaGround},  // 0 A
@@ -95,27 +95,27 @@ func smoothTWorld() *Tile {
     return assembleTile(21, 19, rects, links, nil)
 }
 
-// TestSmoothMergesAcrossOpenBoundary pins the merge half of the
-// shortcut pass: the funnel pivot sits 7.5 units off the portal span
-// end that adjoins another open span, the chord crosses at the open
-// boundary itself (every wall edge stays far away) and the merged
-// answer walks two straight legs instead of three.
-func TestSmoothMergesAcrossOpenBoundary(t *testing.T) {
+// TestFunnelWalksOpenSpanEndStraight pins the open span end contract
+// of the clearance (the owner zigzag fix): the span end adjoining
+// another open span stands on no wall, the clearance keeps its
+// extent and the raw funnel walks the straight chord through the
+// open boundary - the pull of the shrunk end answered a pivot there
+// and the walk micro steered the junction.
+func TestFunnelWalksOpenSpanEndStraight(t *testing.T) {
     mesh := NewMesh(writeTiles(t, smoothTWorld()))
     filter := DefaultFilter()
     filter.WaypointClearance = 7.5
     filter.Smooth = true
     // The straight chord start-end crosses the A-B portal at world y
-    // (216+32)/2 = 124: inside the open span (0..128), past the
-    // shrunk span end (120.5) the funnel pivots at.
+    // (216+32)/2 = 124: inside the open span (0..128), at the span
+    // end (128) the open A-C span adjoins.
     route, err := mesh.Route(worldPos(2, 13.5, 0), worldPos(30, 2, 0),
         filter)
     require.NoError(t, err)
     require.True(t, route.Found)
-    require.Len(t, route.RawWaypoints, 3,
-        "the funnel pivots at the shrunk span end")
-    require.Len(t, route.Waypoints, 2,
-        "the chord through the open boundary merges the pivot")
+    require.Len(t, route.RawWaypoints, 2,
+        "the open span end keeps its extent, the funnel walks straight")
+    require.Len(t, route.Waypoints, 2)
     // The merged answer keeps the endpoints.
     require.Equal(t, route.RawWaypoints[0], route.Waypoints[0])
     require.Equal(t, route.RawWaypoints[len(route.RawWaypoints)-1],
@@ -252,14 +252,15 @@ func (g *guardStub) LegClear(ax, ay, _ float64,
 // pass: the guard the filter arms answers every chord before the
 // mesh wall spans, a refused chord keeps the funnel pivots and an
 // allowing guard merges them - the corridor portal crossings stay
-// the hard rule under both.
+// the hard rule under both. The L corridor arms the case: the funnel
+// pivots at the inner wall corner and the direct chord grazes it.
 func TestSmoothGuardRefusesChord(t *testing.T) {
-    mesh := NewMesh(writeTiles(t, smoothTWorld()))
-    start := worldPos(2, 13.5, 0)
-    end := worldPos(30, 2, 0)
+    mesh := NewMesh(writeTiles(t, smoothCornerWorld()))
+    start := worldPos(3.5, 0.5, 0)
+    end := worldPos(0.5, 3.5, 0)
 
-    // The allowing guard: the merge of the open boundary chord goes
-    // through (the same answer the mesh spans give).
+    // The allowing guard: the merge of the corner chord goes through
+    // (the guard the filter arms overrules the mesh wall spans).
     allowing := &guardStub{}
     filter := DefaultFilter()
     filter.WaypointClearance = 7.5

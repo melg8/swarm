@@ -74,12 +74,14 @@ type Filter struct {
     // at the avoidEscapeMultiplier). A nil slice bans nothing.
     Avoid []AvoidCircle
     // WaypointClearance pulls the funnel pivots inward from the
-    // portal span ends by this radius before the string pulling: the
-    // span ends sit on the wall boundary - the exact Detour pivot is
-    // where a character capsule clips the corner - and the turn
-    // happens a capsule radius away from it instead. A span narrower
-    // than twice the radius pivots at its middle (the deepest point
-    // of a narrow doorway). Zero keeps the exact pivots.
+    // portal span ends a wall abuts before the string pulling
+    // (shrunkPortalSpan): the wall abutting end sits on the wall
+    // boundary - the exact Detour pivot is where a character capsule
+    // clips the corner - and the turn happens a capsule radius away
+    // from it instead. A span end the open ground continues past
+    // keeps its extent (no wall to clear), and a span narrower than
+    // the pulled ends pivots at its middle (the deepest point of a
+    // narrow doorway). Zero keeps the exact pivots.
     WaypointClearance float64
     // Smooth runs the shortcut pass over the funnel answer (the
     // smoothing): the greedy farthest visible merge walks the corridor
@@ -168,8 +170,9 @@ type Route struct {
 }
 
 // answerWaypoints fills the route waypoints from the corridor: the
-// raw funnel answer, smoothed through the shortcut pass when the
-// filter arms it (the raw answer rides along for the comparison).
+// raw funnel answer, folded through the corridor region shortcut
+// when the filter arms it (the raw answer rides along for the
+// comparison).
 func (m *Mesh) answerWaypoints(route *Route, corridor []PolyRef,
     startPos, endPos Pos, filter Filter,
 ) {
@@ -177,7 +180,8 @@ func (m *Mesh) answerWaypoints(route *Route, corridor []PolyRef,
         filter.WaypointClearance)
     if filter.Smooth && filter.WaypointClearance > 0 {
         route.RawWaypoints = funnelPositions(wps)
-        route.Waypoints = m.smoothPath(corridor, wps, filter)
+        route.Waypoints = m.shortenCorridorWaypoints(corridor, wps,
+            filter)
 
         return
     }

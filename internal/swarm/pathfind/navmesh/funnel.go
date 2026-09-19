@@ -28,9 +28,12 @@ type funnelWp struct {
 // appends the funnel apex as a turning point. The waypoints never
 // leave the corridor polygons and only cross shared edges inside
 // their open portal spans - the NSWE wall fidelity of the mesh.
-// The clearance radius pulls every pivot inward from the span ends
-// (offsetPortal) so a turning waypoint keeps the character capsule
-// away from the walls the span end sits on.
+// The clearance radius pulls the span ends a wall abuts inward
+// (shrunkPortalSpan) so a turning waypoint keeps the character
+// capsule away from the walls the span end sits on; the span ends
+// the open ground continues past keep their extent - the strip
+// joints of the merged mesh stay open portals and the open terrain
+// walks straight.
 //
 // The corridor must be a connected polygon chain (the A* answer). The
 // start and end positions snap onto the corridor surface like
@@ -147,7 +150,7 @@ func (m *Mesh) runFunnel(corridor []PolyRef, closestStart, closestEnd Pos,
 // corridorPortal returns the left and right portal points of the
 // corridor transition at index i (the shared edge between the
 // polygons i and i+1, or the end position at the corridor end),
-// pulled inward by the clearance radius (offsetPortal).
+// pulled inward from the wall abutting span ends (shrunkPortalSpan).
 func (m *Mesh) corridorPortal(corridor []PolyRef, i int, closestEnd Pos,
     clearance float64,
 ) (Pos, Pos, bool) {
@@ -162,8 +165,11 @@ func (m *Mesh) corridorPortal(corridor []PolyRef, i int, closestEnd Pos,
     if nextTile == nil {
         return Pos{}, Pos{}, false
     }
-    left, right := m.portalLeftRight(tile, poly, link, nextTile, nextPoly)
-    left, right = offsetPortal(left, right, clearance)
+    ax, ay, bx, by := tile.Portal(poly, link)
+    ax, ay, bx, by = m.shrunkPortalSpan(tile, poly, link, nextTile,
+        nextPoly, ax, ay, bx, by, clearance)
+    left, right := labelPortalEnds(tile, poly, nextTile, nextPoly,
+        ax, ay, bx, by)
 
     return left, right, true
 }
@@ -245,15 +251,15 @@ func (m *Mesh) linkBetween(ref, next PolyRef,
     return nil, nil, nil, false
 }
 
-// portalLeftRight returns the portal endpoints labeled by the local
+// labelPortalEnds returns the portal endpoints labeled by the local
 // travel direction: the endpoint on the left of the corridor crossing
 // (the from-polygon center toward the neighbor center) is the left
 // cone side, the other one the right. The heights come from the
 // surface of the polygon the link leaves.
-func (m *Mesh) portalLeftRight(tile *Tile, poly *Poly, link *Link,
+func labelPortalEnds(tile *Tile, poly *Poly,
     nextTile *Tile, nextPoly *Poly,
+    ax, ay, bx, by float64,
 ) (Pos, Pos) {
-    ax, ay, bx, by := tile.Portal(poly, link)
     midX, midY := (ax+bx)*0.5, (ay+by)*0.5
     cx0, cy0 := rectCenter(tile, poly)
     cx1, cy1 := rectCenter(nextTile, nextPoly)
@@ -281,41 +287,189 @@ func rectCenter(tile *Tile, poly *Poly) (float64, float64) {
     return (x0 + x1) * 0.5, (y0 + y1) * 0.5
 }
 
-// offsetPortal pulls the portal endpoints inward along the shared
-// edge by the clearance radius: the exact Detour pivot is the span
-// end - the point where the open span meets the wall - and a
-// character capsule turning exactly there clips the wall corner. A
-// span narrower than twice the radius pivots at its middle: the
-// deepest point of a narrow doorway is the best the capsule gets.
-func offsetPortal(left, right Pos, radius float64) (Pos, Pos) {
-    if radius <= 0 {
-        return left, right
+// shrunkPortalSpan pulls the portal span ends inward from the walls
+// that abut them: the capsule clearance of the turning pivots. The
+// eroded free space of the walkable union shrinks a span end only
+// when the shared edge continues into a wall at it (spanEndWall) - an
+// end whose edge continues open into the neighboring cells keeps its
+// extent, the strip joints of the merged mesh stay open portals and
+// the funnel walks the open terrain straight (the owner zigzag
+// report of the raw answer). A span narrower than the pulled ends
+// pivots at its middle: the deepest point of a narrow doorway is the
+// best the capsule gets.
+func (m *Mesh) shrunkPortalSpan(tile *Tile, poly *Poly, link *Link,
+    nextTile *Tile, nextPoly *Poly,
+    ax, ay, bx, by, clearance float64,
+) (float64, float64, float64, float64) {
+    if clearance <= 0 {
+        return ax, ay, bx, by
     }
-    dx, dy := right.X-left.X, right.Y-left.Y
+    lowPull := m.spanEndWall(tile, poly, link, nextTile, nextPoly, true)
+    highPull := m.spanEndWall(tile, poly, link, nextTile, nextPoly, false)
+    if !lowPull && !highPull {
+        return ax, ay, bx, by
+    }
+    dx, dy := bx-ax, by-ay
     length := math.Hypot(dx, dy)
     if length < 1e-6 {
-        return left, right
+        return ax, ay, bx, by
     }
-    if length <= 2*radius {
-        mid := Pos{
-            X: (left.X + right.X) / 2,
-            Y: (left.Y + right.Y) / 2,
-            Z: (left.Z + right.Z) / 2,
-        }
+    low, high := 0.0, 0.0
+    if lowPull {
+        low = clearance
+    }
+    if highPull {
+        high = clearance
+    }
+    if low+high >= length {
+        midX, midY := (ax+bx)*0.5, (ay+by)*0.5
 
-        return mid, mid
+        return midX, midY, midX, midY
     }
     ux, uy := dx/length, dy/length
-    t := radius / length
-    pulled := func(from Pos, sign float64) Pos {
-        return Pos{
-            X: from.X + sign*ux*radius,
-            Y: from.Y + sign*uy*radius,
-            Z: from.Z + sign*(right.Z-left.Z)*t,
+
+    return ax + ux*low, ay + uy*low, bx - ux*high, by - uy*high
+}
+
+// spanEndWall answers whether a wall of the walkable union abuts one
+// end of the link portal span along the shared edge (the low end: the
+// T0 cell side, the high end: the T1+1 cell side). The edge continues
+// past the span end into the neighboring cells on both sides: a wall
+// stands at the end when either side closes there - the polygon whose
+// range covers the continuation cell without a link on the edge side,
+// or the polygon whose corner the span end is, walled along the
+// perpendicular side that meets the edge there.
+func (m *Mesh) spanEndWall(tile *Tile, poly *Poly, link *Link,
+    nextTile *Tile, nextPoly *Poly, low bool,
+) bool {
+    cell := link.T0 - 1
+    if !low {
+        cell = link.T1 + 1
+    }
+    if spanSideWalled(tile, poly, link.Side, cell, low) {
+        return true
+    }
+    // The neighbor side of the edge: the continuation cell maps into
+    // the neighbor tile grid (the cross tile links carry their own
+    // tile anchors, the cell coordinates resume there).
+    nextCell := cell
+    if nextTile != tile {
+        nextCell = mapCellAcrossTiles(tile, nextTile, link.Side, cell)
+    }
+
+    return spanSideWalled(nextTile, nextPoly,
+        oppositeSide(link.Side), nextCell, low)
+}
+
+// spanSideWalled answers whether the shared edge at the continuation
+// cell walls on the given polygon's side: the polygon walled at the
+// cell its own range covers, or the polygon corner the span end is,
+// closed along the perpendicular side meeting the edge there.
+func spanSideWalled(tile *Tile, poly *Poly, side uint8, cell int32,
+    low bool,
+) bool {
+    if sideRangeCovers(poly, side, cell) {
+        return !polySideLinkCovers(tile, poly, side, cell)
+    }
+
+    return polyCornerWalled(tile, poly, side, low)
+}
+
+// sideRangeCovers answers whether the polygon's side of the given
+// orientation spans the cell coordinate (the along side axis range).
+func sideRangeCovers(poly *Poly, side uint8, cell int32) bool {
+    lo, hi := poly.Y0, poly.Y1
+    if side == SideMinY || side == SideMaxY {
+        lo, hi = poly.X0, poly.X1
+    }
+
+    return cell >= lo && cell < hi
+}
+
+// polySideLinkCovers answers whether one of the polygon's links on
+// the given side opens the crossing at the cell coordinate.
+func polySideLinkCovers(tile *Tile, poly *Poly, side uint8,
+    cell int32,
+) bool {
+    for li := poly.FirstLink; li >= 0 && int(li) < len(tile.Links); {
+        link := &tile.Links[li]
+        li = link.Next
+        if link.Side == side && cell >= link.T0 && cell <= link.T1 {
+            return true
         }
     }
 
-    return pulled(left, 1), pulled(right, -1)
+    return false
+}
+
+// polyCornerWalled answers whether the polygon boundary walls along
+// the perpendicular side that meets the shared edge at the span end
+// corner: the corner cell of the perpendicular side carries no link.
+// The span end is the polygon corner exactly when the continuation
+// cell falls outside the side range (the caller checked).
+func polyCornerWalled(tile *Tile, poly *Poly, edgeSide uint8,
+    low bool,
+) bool {
+    var perp uint8
+    var corner int32
+    switch edgeSide {
+    case SideMinX:
+        perp, corner = SideMinY, poly.X0
+        if !low {
+            perp = SideMaxY
+        }
+    case SideMaxX:
+        perp, corner = SideMinY, poly.X1-1
+        if !low {
+            perp = SideMaxY
+        }
+    case SideMinY:
+        perp, corner = SideMinX, poly.Y0
+        if !low {
+            perp = SideMaxX
+        }
+    default: // SideMaxY
+        perp, corner = SideMinX, poly.Y1-1
+        if !low {
+            perp = SideMaxX
+        }
+    }
+
+    return !polySideLinkCovers(tile, poly, perp, corner)
+}
+
+// mapCellAcrossTiles maps the continuation cell coordinate of the
+// from tile into the neighbor tile grid along the side axis: the
+// world coordinate of the cell boundary resumes as the neighbor cell
+// index (the region tiles are cell aligned).
+func mapCellAcrossTiles(fromTile, toTile *Tile, side uint8,
+    cell int32,
+) int32 {
+    world, origin := 0.0, 0.0
+    if side == SideMinX || side == SideMaxX {
+        world = fromTile.worldMinY + float64(cell)*cellSizeWorld
+        origin = toTile.worldMinY
+    } else {
+        world = fromTile.worldMinX + float64(cell)*cellSizeWorld
+        origin = toTile.worldMinX
+    }
+
+    return int32(math.Round((world - origin) / cellSizeWorld))
+}
+
+// oppositeSide returns the side of the neighbor polygon that faces
+// the given side of the shared edge.
+func oppositeSide(side uint8) uint8 {
+    switch side {
+    case SideMinX:
+        return SideMaxX
+    case SideMaxX:
+        return SideMinX
+    case SideMinY:
+        return SideMaxY
+    default: // SideMaxY
+        return SideMinY
+    }
 }
 
 // appendWp appends a funnel corner with its corridor portal unless it

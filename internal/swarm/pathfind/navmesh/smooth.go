@@ -4,19 +4,15 @@
 
 package navmesh
 
-import (
-    "math"
-    "sort"
-    "sync"
-)
+import "sort"
 
 // The shortcut pass of the route answer (the smoothing): the funnel
-// on the exact square mesh pivots at every portal the clearance
-// shrinks into a pinhole, so a long walk turns at every height run
-// edge and the walker micro steers through hundreds of waypoints (the
-// owner report: the bot hooks and sticks on the dense turns). The
-// pass merges the funnel waypoints into the longest chords the
-// corridor geometry allows:
+// pivots where the walls of the corridor force the turns and the
+// wall run chains them into pivot farms (a tight wall the corridor
+// threads pivot by pivot), so a long walk micro steers through the
+// dense turn runs (the owner report: the bot hooks and sticks on the
+// dense turns). The pass merges the funnel waypoints into the longest
+// chords the corridor geometry allows:
 //
 //  1. the chord from waypoint i to waypoint k must cross every
 //     intermediate portal inside its open span - a crossing outside
@@ -37,166 +33,10 @@ import (
 // leaves the corridor.
 
 // smoothEpsilon relaxes the wall distance rule by a hair: the funnel
-// pivots sit exactly one radius off the wall edges (offsetPortal) and
-// the chords through them must survive the float rounding of the
+// pivots sit exactly one radius off the wall edges (shrunkPortalSpan)
+// and the chords through them must survive the float rounding of the
 // distance comparison.
 const smoothEpsilon = 1e-6
-
-// smoothScanWindow caps how far the greedy scan walks back per anchor
-// before it accepts the next waypoint: a bound on the worst case
-// work of one merge attempt round (the deep far-end probes that fail
-// early dominate the cost, the cap keeps the pass inside the search
-// budget of the caller).
-const smoothScanWindow = 256
-
-// smoothParallelBatch is the candidate probe width of the guarded
-// greedy scan: the batch runs the chord answers in parallel and picks
-// the farthest clear one - the same winner the sequential far to near
-// scan picks (the first clear from the far end is the farthest clear),
-// the wall clock folds by the core count instead.
-const smoothParallelBatch = 16
-
-// smoothPath merges the funnel waypoints into the longest safe chords
-// (greedy farthest visible): the answer holds a subset of the input
-// positions - the first, the last and every pivot no safe chord
-// skips.
-func (m *Mesh) smoothPath(corridor []PolyRef, wps []funnelWp,
-    filter Filter,
-) []Pos {
-    clearance := filter.WaypointClearance
-    if len(wps) == 0 {
-        return nil
-    }
-    if len(wps) < 3 || clearance <= 0 || len(corridor) < 2 {
-        return funnelPositions(wps)
-    }
-
-    walls := make(map[PolyRef]*[4][]wallSpan, len(corridor))
-    merged := make([]Pos, 0, len(wps))
-    merged = append(merged, wps[0].pos)
-    anchor := 0
-    for anchor < len(wps)-1 {
-        far := anchor + 1
-        if last := len(wps) - 1; far+smoothScanWindow < last {
-            far += smoothScanWindow
-        } else {
-            far = last
-        }
-        chosen := m.farthestClearChord(corridor, wps, anchor, far,
-            filter, walls)
-        merged = append(merged, wps[chosen].pos)
-        anchor = chosen
-    }
-
-    return merged
-}
-
-// farthestClearChord answers the farthest waypoint the anchor merges
-// into: the guarded form probes the candidates in parallel batches
-// (the guard oracle is read only over the engine and the mesh), the
-// mesh span form walks the sequential far to near scan (the wall span
-// map is the shared per pass state). Both pick the first clear
-// candidate from the far end.
-func (m *Mesh) farthestClearChord(corridor []PolyRef, wps []funnelWp,
-    anchor, far int, filter Filter, walls map[PolyRef]*[4][]wallSpan,
-) int {
-    if filter.Guard == nil || far-anchor < 2 {
-        for k := far; k > anchor+1; k-- {
-            if m.chordClear(corridor, wps[anchor], wps[k], filter,
-                walls) {
-                return k
-            }
-        }
-
-        return anchor + 1
-    }
-    for k := far; k > anchor+1; {
-        lo := k - smoothParallelBatch + 1
-        if lo < anchor+2 {
-            lo = anchor + 2
-        }
-        answers := make([]bool, k-lo+1)
-        var wg sync.WaitGroup
-        for c := lo; c <= k; c++ {
-            wg.Add(1)
-            go func(c int) {
-                defer wg.Done()
-                answers[c-lo] = m.chordClear(corridor, wps[anchor],
-                    wps[c], filter, walls)
-            }(c)
-        }
-        wg.Wait()
-        for c := k; c >= lo; c-- {
-            if answers[c-lo] {
-                return c
-            }
-        }
-        k = lo - 1
-    }
-
-    return anchor + 1
-}
-
-// chordClear answers whether the straight chord from the waypoint
-// "from" to the waypoint "to" walks the corridor safely: it crosses
-// every intermediate portal inside the open span, and the walls keep
-// the clearance - the armed guard (the server accurate raster)
-// answers the whole chord, the mesh wall spans answer per polygon.
-func (m *Mesh) chordClear(corridor []PolyRef, from, to funnelWp,
-    filter Filter, walls map[PolyRef]*[4][]wallSpan,
-) bool {
-    clearance := filter.WaypointClearance
-    start := int(from.portal) + 1
-    if start < 0 {
-        start = 0
-    }
-    end := int(to.portal)
-    if end > len(corridor)-1 {
-        end = len(corridor) - 1
-    }
-    if start > end {
-        return false
-    }
-    if filter.Guard != nil && !filter.Guard.LegClear(
-        from.pos.X, from.pos.Y, from.pos.Z,
-        to.pos.X, to.pos.Y, to.pos.Z, clearance) {
-        return false
-    }
-
-    current := from.pos
-    for q := start; q < end; q++ {
-        tile, poly, link, ok := m.linkBetween(corridor[q], corridor[q+1])
-        if !ok {
-            return false
-        }
-        ax, ay, bx, by := tile.Portal(poly, link)
-        x, y, crossed := segmentCrossing(current.X, current.Y,
-            to.pos.X, to.pos.Y, ax, ay, bx, by)
-        if !crossed {
-            return false
-        }
-        if filter.Guard == nil {
-            spans := wallSpansOf(m, corridor[q], walls)
-            if spans == nil {
-                return false
-            }
-            // The pass is 2D: the crossing height rides on the chord
-            // endpoints, the exit carries none.
-            exit := Pos{X: x, Y: y, Z: 0}
-            if !polyWallClear(spans, current, exit, clearance) {
-                return false
-            }
-        }
-        current = Pos{X: x, Y: y, Z: current.Z}
-    }
-    if filter.Guard != nil {
-        return true
-    }
-    spans := wallSpansOf(m, corridor[end], walls)
-
-    return spans != nil && polyWallClear(spans, current, to.pos,
-        clearance)
-}
 
 // wallSpan is one closed wall portion of a polygon side in world
 // coordinates (the segment form the distance check consumes).
@@ -336,28 +176,6 @@ func polyWallClear(spans *[4][]wallSpan, a, b Pos, clearance float64,
     }
 
     return true
-}
-
-// segmentCrossing returns the intersection point of the segments ab
-// and cd when they properly cross (the chord through the portal
-// span). Parallel and collinear pairs answer false: a chord running
-// along the portal edge is no crossing.
-func segmentCrossing(ax, ay, bx, by, cx, cy, dx, dy float64,
-) (float64, float64, bool) {
-    rx, ry := bx-ax, by-ay
-    sx, sy := dx-cx, dy-cy
-    denom := rx*sy - ry*sx
-    if math.Abs(denom) < 1e-12 {
-        return 0, 0, false
-    }
-    t := ((cx-ax)*sy - (cy-ay)*sx) / denom
-    s := ((cx-ax)*ry - (cy-ay)*rx) / denom
-    const slack = 1e-9
-    if t < -slack || t > 1+slack || s < -slack || s > 1+slack {
-        return 0, 0, false
-    }
-
-    return ax + t*rx, ay + t*ry, true
 }
 
 // segSegDistSqr2D is the squared distance between two 2D segments

@@ -1,11 +1,21 @@
 # Agent Notes
 
+The load bearing repo manual lives in `AGENTS.md` (the rules, the
+subsystem map, the docs index); this file carries the session run
+notes the owner asked to keep on top.
+
 ## Session limits (owner instruction, mandatory)
 
-- One agent process lives at most 2 hours from the owner prompt. Stop all work
-  and hand control back to the user no later than 1 hour 30 minutes in: the
-  last 30 minutes stay unused on purpose. Plan the work so every push happens
-  before the 1h30m mark.
+- One agent process lives at most 2 hours from the owner prompt. Stop
+  all work and hand control back to the user no later than 1 hour 45
+  minutes in - the stop is mandatory even mid task, everything must
+  be pushed before it. Plan the work so every push happens well
+  before the mark.
+- A new owner prompt resets the timer: the 2 hour life and the 1h45m
+  stop mark count again from the fresh prompt.
+- Stamp the session start into `/home/z/my-project/.session_start_ts`
+  (a unix timestamp, one line) at the session start; read it back to
+  compute the spent time before starting any long operation.
 
 ## Long running subprocesses (servers, builds)
 
