@@ -784,6 +784,179 @@ function initSessionButton() {
   });
 }
 
+// ---- pathfind link button ----
+
+// The 3D navmesh viewer the pathfind link button targets: the
+// -show-navmesh process the owner runs beside the bot session (the
+// default address matches the documented local setup, the shift click
+// of the button asks for a different base and remembers it in the
+// localStorage). The link freezes the current walk (the planning
+// origin as from, the final destination as to, the tiles around the
+// pair) plus a three quarter orbit camera over the route computed
+// with the same math the viewer frames its tiles with - opening the
+// link reproduces the route context in the 3D world without a single
+// click, ready for the own experiments or for attaching to an agent
+// problem report.
+const pathfindViewerBaseDefault = "http://127.0.0.1:8082/";
+const pathfindViewerBaseKey = "swarm.pathfindViewerBase";
+// The world span of one navmesh tile (the l2j region, 32768 units)
+// and the region file name anchors the viewer tile keys live on
+// (navmesh.TileWorldSize / TileZeroCol / TileZeroRow).
+const pathfindTileSize = 32768;
+const pathfindTileZeroCol = 20;
+const pathfindTileZeroRow = 18;
+
+// pathfindViewerBase reads the configured viewer base URL: the
+// localStorage override first (set through the shift click), the
+// documented local address second. A missing storage (the sandboxed
+// contexts) answers the default.
+function pathfindViewerBase() {
+  try {
+    const stored = window.localStorage.getItem(pathfindViewerBaseKey);
+    if (stored) { return stored; }
+  } catch (err) { /* the storage stays silent */ }
+
+  return pathfindViewerBaseDefault;
+}
+
+// walkPointOf builds the link triple of one walk waypoint: the
+// rounded world x,y,z the viewer from/to params read.
+function walkPointOf(p) {
+  return Math.round(p.x) + "," + Math.round(p.y) + "," +
+    Math.round(p.z);
+}
+
+// pathfindRoutePair picks the from/to pair of the link off the bot
+// snapshot: the published walk plan of the running leg (the planning
+// origin and the final destination; the origin falls back to the
+// first waypoint, the destination to the last one). A snapshot
+// without a published plan answers null - the link then opens the
+// viewer at the bot camera without a route pair (the last walk plan
+// never rides the wire snapshot, the live one is the route the bot
+// follows right now).
+function pathfindRoutePair(snap) {
+  if (!snap || !snap.walkPath || !snap.walkPath.length) { return null; }
+  const to = snap.walkDest ||
+    snap.walkPath[snap.walkPath.length - 1];
+  if (!to) { return null; }
+  const c = snap.character || {};
+  const self = { x: c.x || 0, y: c.y || 0, z: c.z || 0 };
+  const from = snap.walkOrigin || snap.walkPath[0] || self;
+
+  return { from, to };
+}
+
+// pathfindTiles lists the tile keys covering the route pair: the
+// bounding box of the two points grows by half a tile on every side
+// (the visible context the example links carry) and every intersecting
+// tile joins, capped at twelve (a cross region walk lists the strip).
+function pathfindTiles(from, to) {
+  const half = pathfindTileSize / 2;
+  const minX = Math.min(from.x, to.x) - half;
+  const maxX = Math.max(from.x, to.x) + half;
+  const minY = Math.min(from.y, to.y) - half;
+  const maxY = Math.max(from.y, to.y) + half;
+  const colOf = (x) =>
+    Math.floor(x / pathfindTileSize) + pathfindTileZeroCol;
+  const rowOf = (y) =>
+    Math.floor(y / pathfindTileSize) + pathfindTileZeroRow;
+  const tiles = [];
+  for (let col = colOf(minX); col <= colOf(maxX); col++) {
+    for (let row = rowOf(minY); row <= rowOf(maxY); row++) {
+      tiles.push(col + "_" + row);
+      if (tiles.length >= 12) { return tiles; }
+    }
+  }
+
+  return tiles;
+}
+
+// buildPathfindLink freezes the snapshot walk into the viewer URL:
+// the from/to pair, the tiles around it, the swim filter, the default
+// height scale and geometry variant, and the camera pose computed
+// with the viewer framing math (the three quarter orbit south east of
+// the route midpoint, the yaw and the pitch derived from the look
+// direction - the same analytic route frameInitialTiles flies).
+function buildPathfindLink(snap) {
+  const pair = pathfindRoutePair(snap);
+  const params = new URLSearchParams();
+  if (pair) {
+    const { from, to } = pair;
+    params.set("from", walkPointOf(from));
+    params.set("to", walkPointOf(to));
+    const spanX = Math.abs(from.x - to.x);
+    const spanY = Math.abs(from.y - to.y);
+    const size = Math.max(spanX, spanY, 3000);
+    const midX = (from.x + to.x) / 2;
+    const midY = (from.y + to.y) / 2;
+    const camX = midX + size * 0.75;
+    const camY = midY + size * 0.75;
+    const camZ = Math.max(from.z || 0, to.z || 0) + size * 0.7;
+    // The viewer renders three y as the world height and three z as
+    // the world y axis; the yaw and the pitch follow the analytic
+    // frame of navmesh_view.js (yaw = atan2(-dx, -dy) over the world
+    // axes, pitch = atan2(height delta, flat distance)).
+    const dirX = midX - camX;
+    const dirY = midY - camY;
+    const flat = Math.hypot(dirX, dirY);
+    const yaw = Math.atan2(-dirX, -dirY);
+    const pitch = Math.atan2((from.z + to.z) / 2 - camZ, flat);
+    params.set("cam", [
+      Math.round(camX), Math.round(camY), Math.round(camZ),
+      yaw.toFixed(4), pitch.toFixed(4),
+    ].join(","));
+    params.set("tiles", pathfindTiles(from, to).join(","));
+  }
+  params.set("filter", "swim");
+  params.set("scale", "1");
+  params.set("geom", "mesh");
+  params.set("path", "smooth");
+  const base = pathfindViewerBase().split(/[?#]/)[0];
+  const baseTrimmed = base.endsWith("/") ? base : base + "/";
+
+  return baseTrimmed + "?" + params.toString();
+}
+
+// initPathfindLinkButton wires the HUD pathfind link button: it
+// freezes the current walk of the selected bot into the 3D navmesh
+// viewer link and copies it to the clipboard - the fastest way to
+// experiment in the 3D world or to attach a reproducible route to an
+// agent report. The clipboard fallbacks mirror the dump state button;
+// the shift click asks for the viewer base address and remembers it.
+function initPathfindLinkButton() {
+  const button = document.getElementById("hud-pathlink");
+  if (!button) { return; }
+  button.addEventListener("click", async (event) => {
+    if (event.shiftKey) {
+      const asked = window.prompt(
+        "the 3D pathfind viewer base URL",
+        pathfindViewerBase());
+      if (asked !== null) {
+        try {
+          window.localStorage.setItem(pathfindViewerBaseKey, asked);
+        } catch (err) { /* the storage stays silent */ }
+      }
+
+      return;
+    }
+    const url = buildPathfindLink(App.snapshot);
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(url);
+        flashDumpButton(button, "copied");
+
+        return;
+      } catch (err) { /* fall through to the legacy copy */ }
+    }
+    if (legacyCopyText(url)) {
+      flashDumpButton(button, "copied");
+    } else {
+      window.prompt("copy the pathfind link", url);
+      flashDumpButton(button, "failed");
+    }
+  });
+}
+
 // ---- the effects panel (the server buff list) ----
 
 // The effects panel state: the collapse choice (persisted in the

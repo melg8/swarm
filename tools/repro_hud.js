@@ -110,6 +110,7 @@ function loadAppJs(appFile) {
     };
     const sandbox = {
         Math, JSON, Number, Date, isNaN,
+        URLSearchParams,
         window: { localStorage: {
             getItem: () => null, setItem: () => {}
         } },
@@ -150,7 +151,9 @@ function loadAppJs(appFile) {
         " phaseLabel: typeof phaseLabel === 'function'" +
         " ? phaseLabel : undefined," +
         " renderBuffs: typeof renderBuffs === 'function'" +
-        " ? renderBuffs : undefined };",
+        " ? renderBuffs : undefined," +
+        " buildPathfindLink: typeof buildPathfindLink === 'function'" +
+        " ? buildPathfindLink : undefined };",
         sandbox);
 
     return { hud: sandbox.__hud, elements, sandbox };
@@ -491,6 +494,71 @@ function main() {
         check(results, "renderBotStatus carries the detail text",
             typeof detailText === "string" && detailText.length > 0,
             "got " + JSON.stringify(detailText));
+    }
+
+    // The pathfind link button freezes the live walk into the 3D
+    // navmesh viewer URL: the from/to pair off the walk plan, the
+    // tiles around the pair, the swim filter, the defaults of the
+    // viewer toggles and the three quarter orbit camera computed with
+    // the viewer framing math.
+    if (typeof hud.buildPathfindLink !== "function") {
+        check(results, "buildPathfindLink exists", false,
+            "app.js carries no buildPathfindLink");
+    } else {
+        const walkSnap = snapshotWith(0);
+        walkSnap.walkOrigin = { x: 45257, y: 49353, z: -3059 };
+        walkSnap.walkPath = [
+            { x: 40000, y: 50000, z: -3100 },
+            { x: 25500, y: 51095, z: -3408 }
+        ];
+        walkSnap.walkDest = { x: 25500, y: 51095, z: -3408 };
+        const url = hud.buildPathfindLink(walkSnap);
+        check(results, "the pathfind link opens the viewer base",
+            url.startsWith("http://127.0.0.1:8082/?"), "got " + url);
+        const query = new URLSearchParams(
+            url.slice(url.indexOf("?") + 1));
+        check(results, "the pathfind link carries the from pair",
+            query.get("from") === "45257,49353,-3059",
+            "got " + JSON.stringify(query.get("from")));
+        check(results, "the pathfind link carries the to pair",
+            query.get("to") === "25500,51095,-3408",
+            "got " + JSON.stringify(query.get("to")));
+        const cam = (query.get("cam") || "").split(",").map(Number);
+        check(results, "the pathfind link camera has five numbers",
+            cam.length === 5 && cam.every((n) => Number.isFinite(n)),
+            "got " + JSON.stringify(query.get("cam")));
+        check(results, "the camera flies south east above the route",
+            cam[0] > 45257 && cam[1] > 51095 && cam[2] > 0,
+            "got " + JSON.stringify(cam.slice(0, 3)));
+        check(results, "the camera yaw faces the route",
+            Math.abs(cam[3] - Math.PI / 4) < 0.01,
+            "got yaw " + cam[3]);
+        check(results, "the camera pitch looks down",
+            cam[4] < -0.3, "got pitch " + cam[4]);
+        const tiles = (query.get("tiles") || "").split(",");
+        check(results, "the tiles cover the route neighborhood",
+            ["20_19", "20_20", "21_19", "21_20"].every(
+                (t) => tiles.includes(t)),
+            "got " + JSON.stringify(tiles));
+        check(results, "the viewer defaults ride the link",
+            query.get("filter") === "swim" &&
+            query.get("scale") === "1" &&
+            query.get("geom") === "mesh" &&
+            query.get("path") === "smooth",
+            "got " + url);
+
+        // A snapshot without a walk plan opens the viewer bare: the
+        // route pair and the camera stay out, the defaults stay in.
+        const bareUrl = hud.buildPathfindLink(snapshotWith(0));
+        const bareQuery = new URLSearchParams(
+            bareUrl.slice(bareUrl.indexOf("?") + 1));
+        check(results, "the bare link carries no route pair",
+            !bareQuery.has("from") && !bareQuery.has("to") &&
+            !bareQuery.has("cam") && !bareQuery.has("tiles"),
+            "got " + bareUrl);
+        check(results, "the bare link keeps the viewer defaults",
+            bareQuery.get("filter") === "swim" &&
+            bareQuery.get("path") === "smooth", "got " + bareUrl);
     }
 
     let failed = 0;

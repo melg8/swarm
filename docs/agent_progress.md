@@ -749,3 +749,21 @@ atomic commit):
 ### Progress
 
 - The walk plan timing view and the dump suffixes - this commit.
+- the pathfind link button (webui): the map toolbar gains the
+  `pathfind link` button beside the session dump - one click freezes
+  the published walk of the selected bot into the 3D navmesh viewer
+  URL and copies it (the clipboard fallbacks mirror the dump button).
+  The link carries the from/to pair off the walk plan (the planning
+  origin, the final destination), the tiles around the pair (the
+  bounding box grown by half a tile - the owner example link's
+  20_19..21_20 block reproduces exactly), the swim filter, the
+  scale/geom/path defaults and the camera pose computed with the
+  viewer framing math (the three quarter orbit south east of the
+  route midpoint, the analytic yaw/pitch of frameInitialTiles) - the
+  pasted link answers itself in the -show-navmesh viewer, ready for
+  the own experiments or for attaching to an agent report. The shift
+  click asks for the viewer base address and remembers it in the
+  localStorage (the default stays http://127.0.0.1:8082/). The
+  repro_hud harness pins the URL structure (the pair, the camera
+  orientation, the tiles, the defaults, the bare snapshot without a
+  plan).
