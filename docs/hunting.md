@@ -400,9 +400,15 @@ value; bows score zero for melee), `NextUpgrade` plans the next
 strictly improving use item request against the tracked paperdoll
 (empty slot fills, strict slot swaps, the pair swap through freeing the
 weaker jewel, the two hand weapon and one-piece family guards) and the
-hunt loop executes one action every 2 seconds behind the shared
-confirmation gate of the manual inventory commands, so the paperdoll
-stays optimal after every loot, buy and death event.
+hunt loop executes one action per tick behind the shared confirmation
+gate of the manual inventory commands: the deployed build disables the
+UseItem flood protector (`FloodProtectorUseItemInterval = 0`, the
+retail matching config) and the UseItem request never touches the one
+second PlayerActionFloodProtector of the attack and select packets, so
+the server confirmation is the only pacer - a character that enters
+the world with the gear in the inventory wears the whole bag within
+one tick per piece, and the paperdoll stays optimal after every loot,
+buy and death event.
 `gear.TotalGearPoints` summarizes the equipped gear for the zone gates
 (weapon damage per hit plus defenses).
 

@@ -12,18 +12,25 @@ import (
 
 // Auto equipment of the hunt loop: the gear planner of the gear
 // package computes the next strictly improving use item action from
-// the tracked inventory and paperdoll and the manager paces the
-// requests. The confirmation gate is shared with the manual inventory
-// commands (markInventoryAction): the next request - manual or
-// automatic - only goes out after the inventory update confirmed the
-// previous one flipped the equipped flag, so a lost answer can never
-// toggle an item back off and the two sources never race on the same
-// item.
+// the tracked inventory and paperdoll and the confirmation gate paces
+// the requests. The gate is shared with the manual inventory commands
+// (markInventoryAction): the next request - manual or automatic -
+// only goes out after the inventory update confirmed the previous one
+// flipped the equipped flag, so a lost answer can never toggle an
+// item back off and the two sources never race on the same item. The
+// deployed build disables the UseItem flood protector
+// (FloodProtectorUseItemInterval = 0, the retail matching config), so
+// the confirmation is the only pacer the server really enforces: a
+// character that enters the world with the gear in the inventory
+// wears the whole bag within one tick per piece instead of one fixed
+// pause per piece.
 type equipManager struct {
     // profile scores the gear for the combat class of the character.
     profile gear.Profile
-    // lastActionAt paces the use item requests between the player
-    // action flood protector windows.
+    // lastActionAt records the last inventory action of the manager:
+    // the starter destroy flow keeps its fixed spacing from it (the
+    // equips themselves pace on the confirmation gate alone, see
+    // equipActionPeriod).
     lastActionAt time.Time
     // starterRetryAt maps a starter item object id to the time its
     // failed destroy request may retry.
@@ -48,10 +55,15 @@ type equipManager struct {
     keepsScanned bool
 }
 
-// equipActionPeriod paces the auto equipment requests: the Mobius
-// PlayerActionFloodProtector accepts one player action per second and
-// the equipment shares the budget with the attack and select
-// requests.
+// equipActionPeriod spaces the item flows that keep a fixed window:
+// the starter kit destroys (the server refuses fast destroys with
+// "You are destroying items too fast.") and the shop unequip request
+// retries of the replacement sales. The auto equips do not use it -
+// the deployed build disables the UseItem flood protector
+// (FloodProtectorUseItemInterval = 0) and the UseItem request never
+// touches the one second PlayerActionFloodProtector of the attack and
+// select packets, so the shared confirmation gate alone paces them at
+// the speed the server actually applies the flips.
 const equipActionPeriod = 2 * time.Second
 
 // starterRetryDelay spaces the destroy retries of one starter item:
@@ -108,11 +120,16 @@ func (l *Loop) equipment() gear.Equipment {
 
 // maybeEquipGear executes the next auto equipment action. It defers
 // to the manual inventory command queue (in flight or deferred
-// commands own the item action budget), paces its own requests and
-// arms the shared confirmation gate for the flip of the equipped
-// flag. Called on every tick of the autonomous hunting phases; after
-// every inventory changing event (loot, buy, sell) the next call
-// re-plans and keeps the paperdoll up to date while the bot works.
+// commands own the item action budget) and arms the shared
+// confirmation gate for the flip of the equipped flag: the next
+// request goes out as soon as the tracker observed the effect of the
+// previous one, at most one request per tick. The deployed build
+// disables the UseItem flood protector, so no fixed pause limits the
+// chain and a full starting outfit lands within a few ticks of the
+// world entry. Called on every tick of the autonomous hunting phases;
+// after every inventory changing event (loot, buy, sell) the next
+// call re-plans and keeps the paperdoll up to date while the bot
+// works.
 func (l *Loop) maybeEquipGear() {
     manager := l.equip
     if manager == nil || l.game == nil {
@@ -133,9 +150,6 @@ func (l *Loop) maybeEquipGear() {
         // equipment would pull the melee weapon back over the bow in
         // the middle of the pull (the bow scores zero for the melee
         // profile, the planner cannot know the lure wants it worn).
-        return
-    }
-    if now.Sub(manager.lastActionAt) < equipActionPeriod {
         return
     }
     // The scan cache: an unchanged bag since the last empty scan

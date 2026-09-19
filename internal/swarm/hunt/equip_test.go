@@ -6,7 +6,6 @@ package hunt
 
 import (
     "testing"
-    "time"
 
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
@@ -92,9 +91,13 @@ func TestAutoEquipDefersToManualCommands(t *testing.T) {
         "the deferred manual command flushes after the confirmation")
 }
 
-// TestAutoEquipPacesRequests pins the request pacing: two upgrades
-// never share one flood protector window.
-func TestAutoEquipPacesRequests(t *testing.T) {
+// TestAutoEquipBurstsOnConfirmation pins the burst pacing: the
+// confirmation is the only pacer between the auto equips (the
+// deployed build disables the UseItem flood protector,
+// FloodProtectorUseItemInterval = 0) - an unconfirmed equip holds the
+// next request and its flip releases the next equip on the very next
+// tick, no fixed pause is waited out in between.
+func TestAutoEquipBurstsOnConfirmation(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     loop := NewLoop(game, bot)
@@ -106,8 +109,14 @@ func TestAutoEquipPacesRequests(t *testing.T) {
     loop.tick()
     require.Equal(t, []int32{555}, game.uses)
 
-    // The first equip confirms fast, but the second request must
-    // wait for the pacing period.
+    // The first equip is still in flight: extra ticks send nothing.
+    loop.tick()
+    loop.tick()
+    require.Equal(t, []int32{555}, game.uses,
+        "an unconfirmed equip holds the next request")
+
+    // The server applies the flip: the very next tick equips the
+    // second piece without any pacing pause.
     bot.ApplyInventoryUpdate([]state.InventoryItem{
         {
             ObjectID: 555, ItemID: shortSwordItemID, Count: 1,
@@ -116,13 +125,64 @@ func TestAutoEquipPacesRequests(t *testing.T) {
     })
     bot.ApplyPaperdoll(paperdollWith(state.PaperdollRHand, 555))
     loop.tick()
-    require.Equal(t, []int32{555}, game.uses,
-        "the second equip waits for the pacing period")
-
-    loop.equip.lastActionAt = time.Now().Add(-equipActionPeriod)
-    loop.tick()
     require.Equal(t, []int32{555, 556}, game.uses,
-        "the paced second equip runs after the period")
+        "the confirmation releases the next equip immediately")
+}
+
+// TestAutoEquipDressesTheWholeBagInABurst pins the world entry dress:
+// a character holding its whole outfit in the inventory wears
+// everything at the server confirmation pace - one tick per piece,
+// no tick ever stalls the chain, no fixed pause sits between the
+// pieces.
+func TestAutoEquipDressesTheWholeBagInABurst(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+
+    // The outfit of four distinct slots: the Short Sword (right
+    // hand), the Wooden Breastplate (chest), the Cloth Cap (head) and
+    // the Leather Shoes (feet). The planner picks the pieces by their
+    // score, the test follows the actual order.
+    outfit := []state.InventoryItem{
+        {ObjectID: 555, ItemID: shortSwordItemID, Count: 1},
+        {ObjectID: 556, ItemID: 23, Count: 1},
+        {ObjectID: 557, ItemID: 41, Count: 1},
+        {ObjectID: 558, ItemID: 37, Count: 1},
+    }
+    bot.ApplyItemList(outfit)
+
+    dollSlot := map[int32]int{
+        1:  state.PaperdollRHand,
+        23: state.PaperdollChest,
+        41: state.PaperdollHead,
+        37: state.PaperdollFeet,
+    }
+    pending := map[int32]int32{555: 1, 556: 23, 557: 41, 558: 37}
+    var doll [state.PaperdollSlots]int32
+    for i := range outfit {
+        loop.tick()
+        require.Len(t, game.uses, i+1,
+            "tick %d: the dress continues without a pacing pause", i)
+        used := game.uses[i]
+        itemID, ok := pending[used]
+        require.True(t, ok,
+            "the tick must equip one of the pending pieces")
+        delete(pending, used)
+
+        // The server applies the equip: the flip lands in the
+        // tracker and the paperdoll shows the piece worn.
+        bot.ApplyInventoryUpdate([]state.InventoryItem{
+            {
+                ObjectID: used, ItemID: itemID, Count: 1,
+                Equipped: true, Change: 2,
+            },
+        })
+        doll[dollSlot[itemID]] = used
+        bot.ApplyPaperdoll(doll)
+    }
+    loop.tick()
+    require.Len(t, game.uses, len(outfit),
+        "the dressed character has nothing left to equip")
 }
 
 // TestAutoEquipPairSwapTwoSteps verifies the two step pair swap: the
@@ -152,7 +212,6 @@ func TestAutoEquipPairSwapTwoSteps(t *testing.T) {
     })
     bot.ApplyPaperdoll(paperdollPair(state.PaperdollLEar, 700,
         state.PaperdollREar, 0))
-    loop.equip.lastActionAt = time.Now().Add(-equipActionPeriod)
     loop.tick()
     require.Equal(t, []int32{555, 556}, game.uses,
         "the better earring equips into the freed slot")
