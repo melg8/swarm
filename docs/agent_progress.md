@@ -1389,3 +1389,28 @@ a38b90a (test gate: the unit test account ladder renames to unittest1 - the test
   residual (the fresh tile build vs the dump repro pins of the
   priced water builder) is recorded as the next round's work in
   docs/development_log.md Round 92.
+
+### Progress (2026-09-20, the fresh tile re-validation round)
+
+- the round 92 residual (the fresh priced water tiles vs the dump
+  repro pins) closed green: the sandbox had no tiles at all, the
+  fresh `cmd/navmesh-build` run over 20_18..21_20 built 6 regions
+  (4479142 polys, 11861108 links) in 19.8 s with 0 failed, and the
+  full `go test -count=1 ./...` on the clean tree answers 28
+  packages ok zero failures against those tiles - the dump
+  reproductions (cursor_escape_wp_sync, refusal_signal,
+  direct_walk_elimination) ran for real and passed, the pinned
+  windows hold on the round 90 builder output.
+- why it reconciled: the pins are the scenario contract through
+  relative assertions, not absolute durations, and the church entry
+  round plus the pocket escape round both re-validated the ladder on
+  fresh tiles before the merge; the recorded residual described the
+  pre merge tree state. Round 93 of docs/development_log.md pins
+  the fresh environment run.
+- the canonical mesh regeneration command is now in the log:
+  `go run ./cmd/navmesh-build -geodata data/geodata -out
+  data/navmesh` (the -regions and -force modifiers documented).
+- the rebase over the parallel pocket escape round kept both
+  rounds' log entries and renamed the church entry acceptance
+  account to temp13 (the pocket round's railing-pocket scenario
+  took temp12), the acceptance suite owns temp1..temp13 now.

@@ -6977,3 +6977,76 @@ refusal_signal, direct_walk_elimination) fail on the fresh 20_18..
 were built by the pre pricing builder. The tile build and the repro
 pins need a re-validation round of their own; the acceptance runs of
 this round used the fresh tiles through the explicit -navmesh path.
+
+## Round 93: the fresh tile re-validation - the round 92 residual closes green (2026-09-20)
+
+Scope: the round 92 residual (the church entry round): "the freshly
+built tiles (the priced water builder of round 90) answer the 16:02
+dump reproduction walks slower than the pinned windows - the dump
+repro tests fail on the fresh 20_18..21_20 build on the clean tree
+too, the previous environment's tiles were built by the pre pricing
+builder". The owner re-raised it: the tiles built by the new builder
+break the repro tests even on a clean tree, the previous session's
+tiles came from the old builder. The demand: reconcile the tile
+build with the repro pins so a fresh `cmd/navmesh-build` run and a
+clean tree agree, and publish the canonical regeneration command.
+
+### The verification that closes the residual
+
+The mismatch does not reproduce on the merged tree
+(bb39078 + the unittest ladder + the church entry rounds). The
+sandbox had no tiles at all (a fresh clone), so the whole pipeline
+ran exactly the way a clean environment does:
+
+1. `go run ./cmd/navmesh-build -geodata data/geodata -out
+   data/navmesh -regions 20_18,20_19,20_20,21_18,21_19,21_20` -
+   the village and hunting zone tile set every dump repro loads
+   through `spawnDumpNavmeshDir` - built 6 regions, 4479142 polys,
+   11861108 links, 159.3 MB in 19.8 s, 0 failed.
+2. `go test -count=1 ./...` on the clean tree against those fresh
+   tiles: 28 packages ok, zero failures. The three named dump
+   reproductions (cursor_escape_wp_sync, refusal_signal,
+   direct_walk_elimination) ran for real (the only skip in the hunt
+   package is the live dialog walker that needs the deployed stack)
+   and passed, so the pinned windows hold on the round 90 priced
+   water builder output.
+
+### Why it already reconciled
+
+The pins are not raw builder fingerprints: the dump reproductions
+pin the scenario contract (the escape marches the route corridor,
+the first resumed click aims closer to the escaped character, no
+stuck skip fires after the settle) through relative assertions, not
+absolute walk durations. The two rounds that merged after the
+residual was recorded both re-validated the ladder on fresh tiles:
+the church entry round rebuilt the tiles to drive its red/green
+acceptance (the pre fix binary answers 225 units and holds at the
+door, the fixed binary walks in 371 units) and the pocket escape
+round re-ran the whole suite including the whole map suites. The
+recorded residual described the pre merge tree state; the merge
+carried the reconciled pins. This round pins that state with a
+fresh environment run.
+
+### The canonical mesh regeneration
+
+The tiles are a gitignored runtime artifact exactly like the
+geodata pack; the repro tests skip with an honest message when they
+are absent. The one command to regenerate them the way every suite
+expects:
+
+    go run ./cmd/navmesh-build -geodata data/geodata -out data/navmesh
+
+- add `-regions 20_18,20_19,20_20,21_18,21_19,21_20` to build just
+  the village and hunting zone tile set the dump repros load (the
+  full pack build takes every `X_Y.l2j` of `data/geodata`),
+- add `-force` to rebuild past the mtime check,
+- `go run ./cmd/navmesh-build -h` lists the rest (workers,
+  compress, repair-fake).
+
+After the rebuild the whole ladder is the verification:
+`go test -count=1 ./...` must answer every package ok on the fresh
+tiles, the way this round's run did.
+
+Verification: the fresh tile build above (0 failed) and the full
+`go test -count=1 ./...` = 28 packages ok, zero failures; the
+gofmt-spaces gate silent. The mobius server stays untouched.
