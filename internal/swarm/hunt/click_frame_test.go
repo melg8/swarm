@@ -93,8 +93,8 @@ func TestFreshLegCalibratesFrameOffsetFromTheStandingPair(t *testing.T) {
 
     require.True(t, loop.startWalkLeg(
         pathfind.Vec3{X: 46200, Y: 51200, Z: -3100}))
-    require.Equal(t, 400.0, loop.legFrameOffset,
-        "the standing pair measures the vintage shift")
+    require.InDelta(t, 400.0, loop.legFrameOffset,
+        0.001, "the standing pair measures the vintage shift")
 
     // The swimming character measures no shift: the swim z rides the
     // water surface, the mesh z names the floor, the pair is
@@ -180,8 +180,8 @@ func TestUserWalkClickRidesTheServerFrameTransport(t *testing.T) {
     moveSelfTo(bot, 46000, 51000, -2600)
 
     loop.planUserWalk(46000, 51000, -2600)
-    require.Equal(t, 400.0, loop.userFrameOffset,
-        "the manual plan measures the same standing pair")
+    require.InDelta(t, 400.0, loop.userFrameOffset,
+        0.001, "the manual plan measures the same standing pair")
 
     // The cursor rides the second waypoint: the first one sits under
     // the character (its z gap above the server z keeps the 3D

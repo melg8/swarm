@@ -295,13 +295,17 @@ func (s *Server) handleNavmeshOriginal(w http.ResponseWriter,
     _, _ = w.Write(payload)
 }
 
+// filterNameDry is the wire word the dump header and the pathfind
+// link carry for the dry (water sealed) mesh search.
+const filterNameDry = "dry"
+
 // handleNavmeshPath runs one corridor search of the mesh between the
 // two double clicked points (the exact destination, the fold pipeline)
 // or one plan repro search of a pathfind link (the approach radius,
 // the ban circles, the raw answer), and measures the construction
 // time.
 //
-//nolint:funlen // the handler mirrors the request validation steps in order
+//nolint:funlen,cyclop // the handler mirrors the validation steps in order
 func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     body, err := io.ReadAll(io.LimitReader(r.Body, navmeshPathBodyLimit))
     if err != nil {
@@ -315,8 +319,8 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
 
         return
     }
-    filter, filterName := navmesh.DryFilter(), "dry"
-    if request.Filter != "dry" {
+    filter, filterName := navmesh.DryFilter(), filterNameDry
+    if request.Filter != filterNameDry {
         filter, filterName = navmesh.DefaultFilter(), "swim"
         // The swim pricing follows the server water zone data: the
         // water polygons a C1 WaterZone cuboid covers swim at the

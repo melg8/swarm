@@ -1486,7 +1486,7 @@ func (b *Bot) publishWalkPlanLocked(plan *WalkPlan, now time.Time) {
 // arrivals) copies with the points, so the dump of a finished walk
 // still reads the leg durations.
 func (b *Bot) rememberWalkPlanLocked(plan *WalkPlan) {
-    record := WalkPlan{ //nolint:exhaustruct_v5 // the optional views fill below
+    record := WalkPlan{
         Index: plan.Index,
     }
     if plan.Origin != nil {

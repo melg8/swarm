@@ -421,6 +421,8 @@ func writeDumpWalkPlan(b *strings.Builder, snap state.Snapshot) {
 // moment the plan ended (the finished walk keeps the leg durations,
 // an unfinished one shows how long the follower sat on the waypoint
 // it never confirmed).
+//
+//nolint:cyclop // the section mirrors the plan states in order
 func writeWalkPlanSection(
     b *strings.Builder, headerPrefix string,
     path []state.WalkPoint, origin *state.WalkPoint, index int,
@@ -435,7 +437,7 @@ func writeWalkPlanSection(
     if search != nil {
         filterWord := "swim"
         if search.Dry {
-            filterWord = "dry"
+            filterWord = filterNameDry
         }
         fmt.Fprintf(b, "%s%d waypoints, %s, aiming at wp %d):\n",
             headerPrefix, len(path), filterWord, target)

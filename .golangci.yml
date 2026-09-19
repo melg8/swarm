@@ -141,6 +141,12 @@ linters:
         - .*navmesh\.Route$
         - .*navmesh\.TileGrid$
         - .*state\.Snapshot$
+        # The walk plan contract wire structs: the stamping sites set
+        # the fields the plan carries and leave the rest at the
+        # documented zeros (no ban circles, the exact destination, the
+        # planless dump line has no search contract at all).
+        - .*state\.WalkSearch$
+        - .*state\.WalkPlan$
         - .*acceptance\.characterReset$
         - .*acceptance\.fullDressWatch$
         # The option and stat aggregates.

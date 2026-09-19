@@ -994,6 +994,8 @@ func legSearchView(
 // although the geodata pack modeled it as open - so the deterministic
 // planner detours instead of reproducing the frozen corridor. It
 // reports whether the leg was planned.
+//
+//nolint:funlen // the contract stamps and the plumbing ride one body
 func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
