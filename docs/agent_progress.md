@@ -1076,3 +1076,57 @@ its `search` line for the paste-a-dump flow.
   the real pack, the planless fallback unit pin, the village escape
   end to end over the refusal pocket), the hunt suite green, 28
   packages ok, lint --new clean.
+## Active task: the unit test gate red - the race slice budget and the coverage lift (2026-09-19)
+
+Started: 2026-09-19. Branch: `feature/new-pathfind-alternative`.
+Commits as melg8. Other agents may push to the same branch
+concurrently - rebase before every push.
+
+### Goal
+
+The owner reported the unit tests red. The diagnosis split into
+three independent defects, all fixed in one round:
+
+1. the whitespace gate was red tree-wide: `runs/.cover-run.log`
+   (a runtime artifact of `tools/coverage_delta.sh`) was committed
+   in 56adde9 and its `go test` output carries tabs, so
+   `task fmt:check` / `task verify` / prepush fail on any machine;
+2. the CI race slice (`connection` + `pathfind` under `-race`) was
+   red: `TestFindPathFromDeckToFarWestZoneStaysOnRamps` asserts the
+   production hunt tick budget (`< 5s`) on a wall clock the race
+   detector inflates 6-10x (8.15 s measured against the plain
+   0.84 s run) - the assertion reported instrumentation cost as a
+   route failure;
+3. the per package coverage sat low in the packages whose logic is
+   reachable but untested (cmd/swarm 7.4%, huntaudit 19.1%).
+
+### Progress
+
+- `runs/.cover-run.log` and `runs/.coverage-current.txt` untracked,
+  both gitignored (the committed baseline stays
+  `runs/coverage-latest.txt`); the whitespace gate is green again.
+- The race budget pinned, not the tolerance: `raceDetectorBudget`
+  (a build tag pair in pathfind, 10 under `-race`, 1 plain) scales
+  the two zone route wall time budgets; the assertion still fails
+  on a real 10x planning regression. Plain mode keeps the exact
+  production figure. The flake ledger row added (the detector
+  overhead is instrumentation, not scheduler nondeterminism).
+- Coverage lifted with reachable-surface tests: `cmd/swarm`
+  7.4 -> 11.4 (the fleet account ladder, the address split),
+  `huntaudit` 19.1 -> 23.0 (the spot filter, the game endpoint
+  renderer, the draft mode no-op), the packet wire layouts pinned
+  per file (the sell multi-entry body, the creation request full
+  field order, the cursor key move mode, the cast modifiers).
+- Real bug found by the new pins: `fleetAccountName` collided a
+  numbered base with its first follower (temp2 fleet ran
+  temp2, temp2, temp4) - the ladder now continues the base number
+  (temp2, temp3, temp4); both call sites (the per bot account and
+  the startup log line) share the fixed function.
+- `to_game_server` stays at 65.3% honestly: the remaining branches
+  are the defensive `Writer` error plumbing that a `bytes.Buffer`
+  backend can never fire - reachable ceiling reached without
+  touching production code.
+- Baseline: `runs/coverage-latest.txt` re-committed, total
+  statement coverage 75.3%; verify (build, vet, lint, test,
+  fmt:check) green, the two fixed zone route tests green under
+  `-race` directly.

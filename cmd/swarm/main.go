@@ -979,16 +979,25 @@ func runFleet(cfg config) {
 
 // fleetAccountName derives the account name of bot i from the base
 // name. The base name (cfg.account, default "test1") is used as-is for
-// the first bot; subsequent bots get the base stripped of its trailing
-// digits plus the 1-based index (test1 -> test2, test3, ...). A base
-// without a trailing digit just appends the index (bot -> bot2, bot3).
+// the first bot; a numbered base continues its own ladder
+// (test1 -> test2, test3 - and temp2 -> temp3, temp4), a base without
+// a trailing digit starts the ladder at two (bot -> bot2, bot3).
 func fleetAccountName(base string, i int) string {
     if i == 0 {
         return base
     }
     stripped := strings.TrimRight(base, "0123456789")
+    // A numbered base continues its own ladder: the temp2 fleet runs
+    // temp2, temp3, temp4 - the follower index rides the base number
+    // instead of colliding with the base itself (temp2, temp2).
+    baseNum := 1
+    if digits := base[len(stripped):]; digits != "" {
+        if parsed, err := strconv.Atoi(digits); err == nil {
+            baseNum = parsed
+        }
+    }
 
-    return stripped + strconv.Itoa(i+1)
+    return stripped + strconv.Itoa(baseNum+i)
 }
 
 // fleetAccountList builds the comma separated account list for the

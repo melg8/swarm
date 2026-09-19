@@ -849,6 +849,16 @@ commit keeps it at zero:
   not in scattered directives.
 - Dead code (`unused`) is deleted, not suppressed: an unused
   constant, field, function or test helper is a removal commit.
+- The runtime artifacts of `tools/coverage_delta.sh`
+  (`runs/.cover-run.log`, `runs/.coverage-current.txt`) are
+  gitignored - never commit them (their `go test` output carries
+  tabs and turns the whitespace gate red tree-wide). The committed
+  baseline is `runs/coverage-latest.txt` only.
+- Wall time budgets in tests ride `raceDetectorBudget` (the pathfind
+  build tag pair: 10 under `-race`, 1 plain). The race detector
+  inflates the hot loop 6-10x; a fixed budget under `-race`
+  reports instrumentation cost as a failure (the flake ledger row
+  of 2026-09-19). Keep the plain figure at the production number.
 
 ## Logging conventions
 

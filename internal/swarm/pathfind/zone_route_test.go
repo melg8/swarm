@@ -80,7 +80,7 @@ func TestFindPathFromCityDeckToGroundZone(t *testing.T) {
     require.False(t, result.Aborted)
     require.Greater(t, result.Length, 5000.0,
         "the route spans the west of the elven lands")
-    require.Less(t, result.Duration, 5*time.Second,
+    require.Less(t, result.Duration, 5*time.Second*raceDetectorBudget,
         "the planned route must not freeze the hunt tick")
 
     // The route descends from the city deck onto the ground west of
@@ -177,7 +177,7 @@ func TestFindPathFromDeckToFarWestZoneStaysOnRamps(t *testing.T) {
     require.True(t, result.Found,
         "the far west zone route must exist from the deck")
     require.False(t, result.Aborted)
-    require.Less(t, result.Duration, 5*time.Second,
+    require.Less(t, result.Duration, 5*time.Second*raceDetectorBudget,
         "the planned route must not freeze the hunt tick")
     assertRampSteps(t, result)
 

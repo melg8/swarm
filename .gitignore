@@ -43,3 +43,9 @@ data/navmesh/
 
 # The cargo build artifacts of the l2bridge harness
 tools/l2bridge/target/
+
+# The runtime artifacts of tools/coverage_delta.sh (the raw run
+# log and the current run summary - the committed baseline is
+# runs/coverage-latest.txt)
+runs/.cover-run.log
+runs/.coverage-current.txt
