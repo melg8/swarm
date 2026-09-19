@@ -109,9 +109,41 @@ const fullDressTimeout = 5 * time.Minute
 // (tools/mobius_e2e.sh and tools/proxy_e2e.sh) so the whole
 // acceptance suite runs from one place.
 //
-//nolint:funlen // the scenario registry is one linear table by design
+//nolint:funlen,maintidx // the scenario registry is one linear table by design
 func Definitions() []TestDef {
     return []TestDef{
+        {
+            ID:      delevelScenarioID,
+            Title:   "delevel · the guard death cycle",
+            Account: delevelAccount,
+            Timeout: delevelTimeout,
+            Description: "Start: the elven fighter temp14 wakes ON the " +
+                "Green Dryad S-16 hunting cell (43500 54560 -3664, the " +
+                "cell focus on its single geodata layer, 3200 units " +
+                "south of the Starden guard post) as level 15 with the " +
+                "BOTTOM of level experience and the wearable outfit in " +
+                "the bag. The cell median is 8 (the Green Dryad and " +
+                "the Kaboo Orc Grunt of the ground), so the trigger " +
+                "gap holds for the live and the static median alike " +
+                "and the target (median + 5) lands at 13 - two guard " +
+                "deaths from the level bottom (the Mobius death " +
+                "penalty removes a percentage of the level span, every " +
+                "death from the bottom crosses one level boundary). " +
+                "Flow: the deleveling announces its target level and " +
+                "its reason in the webui message (the diagnostics " +
+                "carry the target, the start level and the zone " +
+                "median), the bot walks to the archer guard, provokes " +
+                "it, pays the death penalty, repeats until the target " +
+                "and walks home. Pass: the walk made progress (no " +
+                "freeze), at least one death paid the penalty, the " +
+                "character reached the announced target, the bot " +
+                "returned onto the farm ground and NO new deleveling " +
+                "started within the no retry window after the finish " +
+                "(the anti ping-pong contract - the escalating abort " +
+                "wait of the deleveling, the unit ladder lives in " +
+                "hunt/delevel_oscillation_test.go).",
+            Scenario: delevelScenario,
+        },
         {
             ID:      "church-entry",
             Title:   "church entry · the temple NPC walk",

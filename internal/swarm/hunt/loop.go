@@ -557,11 +557,16 @@ type Loop struct {
     // direct zone legs (see noteZoneLegStall): the baseline arms on
     // the first leg send, a cell change re-baselines it and a hold
     // past the stuck timeout re-arms the pathfound zone return.
-    zoneLegAt      time.Time
-    zoneLegX       int32
-    zoneLegY       int32
-    roadFights     int
-    delevelTarget  int32
+    zoneLegAt     time.Time
+    zoneLegX      int32
+    zoneLegY      int32
+    roadFights    int
+    delevelTarget int32
+    // delevelMedian is the live median mob level of the held ground
+    // at the deleveling start: the trigger evidence the webui
+    // message renders next to the target level (the character level
+    // is too high for exactly this ground).
+    delevelMedian  int32
     delevelGuard   int32
     delevelTried   map[string]bool
     delevelFight   time.Time
@@ -571,8 +576,14 @@ type Loop struct {
     delevelFree    int
     delevelWait    time.Time
     delevelCounted bool
-    engageAt       time.Time
-    targetSkip     map[int32]time.Time
+    // delevelAborts counts the consecutive ABORTED delevelings (no
+    // completed one in between): every abort arms the escalating
+    // wait through delevelAbortWait, only a finished deleveling
+    // resets the streak - the systemic guard against the farm and
+    // village commute of never completing attempts.
+    delevelAborts int
+    engageAt      time.Time
+    targetSkip    map[int32]time.Time
     // The lure is the ranged luring state of the current pick (nil when
     // no lure runs): the melee answer to a covered target, see
     // lure.go.
@@ -1009,6 +1020,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         zoneLegY:            0,
         roadFights:          0,
         delevelTarget:       0,
+        delevelMedian:       0,
         delevelGuard:        0,
         delevelTried:        nil,
         delevelFight:        time.Time{},
@@ -1018,6 +1030,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         delevelFree:         0,
         delevelWait:         time.Time{},
         delevelCounted:      false,
+        delevelAborts:       0,
         engageAt:            time.Time{},
         targetSkip:          nil,
         lure:                nil,

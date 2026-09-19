@@ -126,6 +126,23 @@ type HuntDiagnostics struct {
     // LastAction is the last decision line of the loop (the same
     // text the event log carries).
     LastAction string `json:"lastAction"`
+    // DelevelActive reports the deleveling phase right now: the webui
+    // banner renders the deleveling message (the target level and the
+    // trigger evidence) only while the phase runs, the zero view
+    // outside the phase clears it.
+    DelevelActive bool `json:"delevelActive"`
+    // DelevelTarget is the level the running deleveling drops the
+    // character to (the median zone mob level plus the full drop
+    // chance gap, clamped by the Lucky newbie protection level).
+    DelevelTarget int32 `json:"delevelTarget"`
+    // DelevelFromLevel is the character level the deleveling started
+    // from: the "why" evidence next to the zone median (this level is
+    // too high for that ground).
+    DelevelFromLevel int32 `json:"delevelFromLevel"`
+    // DelevelZoneMedian is the live median mob level of the held
+    // hunting ground at the deleveling start: the ground the
+    // character outleveled.
+    DelevelZoneMedian int32 `json:"delevelZoneMedian"`
     // LastActionAgoMs is the age of the last decision.
     LastActionAgoMs int64 `json:"lastActionAgoMs"`
     // TickAgoMs is the time since the loop last published: the hunt

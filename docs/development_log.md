@@ -7226,3 +7226,121 @@ probes live only in the packet and actor layer), the Doors.xml
 copies are md5 identical, the geodata and geoengine path queries
 bound the change window to the single release commit; the swarm
 tree itself is untouched by this round (docs only).
+
+## Round 96: the deleveling round - the webui message, the anti ping-pong wait and the guard death cycle acceptance (2026-09-20)
+
+Scope: the owner demand "добавить аксептанс webui тест делевелинга,
+проверить застревания, плюс проверить, что боты не добиваются
+делевела и возвращаются к фарму, потом опять бегут на делевел.
+плюс добавить в сообщение webui - до какого уровня и почему выбран
+делевелинг." Three asks: the acceptance scenario of the whole
+deleveling cycle runnable from the webui, the stuck and the ping
+pong checks inside it, and the webui message that names the target
+level and the reason the deleveling was chosen.
+
+### The mechanism audit before the fix
+
+The deleveling state machine (hunt/delevel.go) already answered the
+first half of the message ask: startDelevel computed the target
+(the median zone mob level plus the full drop chance gap, clamped
+by the Lucky newbie protection) and logged it once into the event
+log. But the message lived only in the log file: the webui phase
+banner rendered the static "dying at the town guards to drop
+levels" and the sidebar showed the bare "deleveling" - the owner
+watching the bot could not see the target or the trigger without
+digging the log.
+
+The ping pong hole was real and structural. Two paths leave the
+delevel phase: finishDelevel (the target reached) and
+abortDelevel (the timeout, the walk plan failure, the free death
+cap). A finished deleveling cannot re-trigger by construction - the
+level now sits under the trigger gap. But an ABORTED deleveling
+left the level above the trigger with only the flat one minute
+delevelCooldown between the attempts: the bot walked home, farmed
+for sixty seconds and marched back to the guards - the farm and
+village commute the owner named, repeating forever whenever the
+attempt kept aborting (a silent guard, a refused walk, the
+timeout).
+
+### The fix: the message, the escalating wait, the acceptance
+
+- The webui message (the why and the target): HuntDiagnostics
+  carries DelevelActive, DelevelTarget, DelevelFromLevel and
+  DelevelZoneMedian, published by the loop diagnostics only while
+  the phase runs (the zero view outside the phase clears the
+  message the same tick it ends). The phase banner renders
+  "dropping to level X - level Y is too high for the level Z mobs
+  (the drops collapsed)"; the sidebar activity banner reads
+  "deleveling -> lv X" from the new BotInfo.DelevelTarget. The
+  trigger evidence rides the start: startDelevel captures the live
+  median into delevelMedian together with the start level it
+  already logged.
+- The anti ping-pong wait: every abortDelevel counts the
+  consecutive abort streak (delevelAborts) and arms
+  delevelAbortWait - the base 5 minutes scaled by the streak with
+  the factor 5, capped at delevelFreeCooldown (30 minutes). The
+  streak resets ONLY on finishDelevel: the mechanism proved itself,
+  the next legitimate cycle (the level climbed back over the
+  trigger hours later) starts from the short pause again. A new
+  start never resets the streak. While the wait holds, a still true
+  trigger (the level above the gap) stays silent - the bot farms
+  instead of commuting, and a persistently failing deleveling
+  escalates instead of repeating every minute.
+- The acceptance scenario "delevel" (account temp14): the elven
+  fighter wakes ON the Green Dryad S-16 focus cell (43500 54560
+  -3664, the standing ground handoff of the cell policy) as level
+  15 with the BOTTOM of level experience and the wearable outfit in
+  the bag. The cell median is 8 (the Green Dryad and the Kaboo Orc
+  Grunt of the ground), the trigger gap holds, the target (median +
+  5) lands at 13 - two guard deaths from the level bottom (the
+  Mobius death penalty removes a percentage of the LEVEL SPAN, so
+  every death from the bottom crosses one level boundary). The
+  check list rides the whole cycle: the deleveling announced its
+  target level and reason (the diagnostics fields), the delevel
+  walk made progress (2000 units of movement - the frozen walk of
+  the stuck reports never leaves the start neighborhood), a guard
+  death paid the penalty (the death edge tracker), the character
+  reached the announced target, the bot walked back onto the farm
+  ground (1500 units ring) and NO new deleveling started within
+  the no retry window after the finish (6 minutes by default, the
+  SWARM_DELEVEL_NORETRY_SECONDS knob bounds the sandbox
+  verification runs). A re-entry inside the window fails the run
+  immediately with the ping-pong error.
+- The unit ladder (hunt/delevel_oscillation_test.go): the escalating
+  wait ladder (the first abort arms the base, the second
+  multiplies, the third caps), the trigger silence while the wait
+  holds, the finish-only reset and the diagnostics message fields
+  (the target, the start level, the zone median - and the clear on
+  the finish tick).
+- The scratch helper cmd/dbpos: prints the character rows from the
+  stack DB through the acceptance wire client (the live watch
+  helper the scenario verification ran with), the plain character
+  name alphabet guard before the query.
+
+### The lint gate reconciliation
+
+The full golangci-lint run ./... was red on the merged tree: the
+church entry commit carried the exhaustruct pins without the Done
+fields, the state.Command literal without the ObjectID/Count fields
+and a 68 statement scenario body; the porch refusal ladder commit
+carried the cursorEscapeState literals without the full field lists
+and a for loop the intrange linter wants as an integer range. The
+fixes: the Done:false pins, the Command fields, the session
+bootstrap helper startChurchSession (the scenario body back under
+the budget), the wpMap nil field in the manual escape arm (the
+manual walk escape owns no plan cursor - the nil mapping is the
+honest value), the zero reset nolint with the intended rationale,
+the integer range loop and the linear train nolint on
+followUserWaypoints (the follower ladder is one linear decision
+train; splitting it would hide the ordering the refusal recovery
+depends on). The walk_search_test float pins moved to require.
+InDelta. The gate answers 0 issues again.
+
+Verification: go test ./... answers 28 packages ok zero failures
+(hunt 59.7s, acceptance 8.8s, state, webserver among them),
+golangci-lint run ./... 0 issues, the gofmt-spaces gate silent on
+the touched packages; the live acceptance run of the delevel
+scenario against the deployed stack stays for the next session
+with the stack up (the sandbox stack was down at the round time;
+the scenario contract is exercised by the unit ladder and the
+acceptance suite sanity tests in the meantime).

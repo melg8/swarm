@@ -385,8 +385,17 @@ function botActivityLabel(bot) {
     return { kind: "town", text: "selling" };
   case "townReturn":
     return { kind: "return", text: "walking to farm spot" };
-  case "delevel":
-    return { kind: "delevel", text: "deleveling" };
+  case "delevel": {
+    // The compact deleveling banner carries the target level the
+    // diagnostics publish (the same message the map HUD detail
+    // renders): the overview answers "up to which level" at a
+    // glance.
+    const targetText = bot.delevelTarget > 0
+      ? "deleveling -> lv " + bot.delevelTarget
+      : "deleveling";
+
+    return { kind: "delevel", text: targetText };
+  }
   case "user":
     if (bot.inCombat) {
       return { kind: "combat", text: "manual · attacking" };
@@ -553,9 +562,25 @@ function phaseLabel(snap) {
   case "townReturn":
     return { kind: "return", text: "walking to farm spot",
       detail: walkDetail("heading back to the hunting zone", hunt) };
-  case "delevel":
+  case "delevel": {
+    // The deleveling message: the target level and the trigger
+    // evidence (the start level against the median mob level of the
+    // held ground) ride the hunt diagnostics the loop publishes
+    // every tick. The detail answers the owner questions - up to
+    // which level and why the deleveling was chosen - without
+    // opening the event log.
+    let delevelDetail = "dying at the town guards to drop levels";
+    if (hunt && hunt.delevelActive && hunt.delevelTarget > 0) {
+      delevelDetail = "dropping to level " + hunt.delevelTarget;
+      if (hunt.delevelFromLevel > 0 && hunt.delevelZoneMedian > 0) {
+        delevelDetail += " - level " + hunt.delevelFromLevel +
+          " is too high for the level " + hunt.delevelZoneMedian +
+          " mobs (the drops collapsed)";
+      }
+    }
     return { kind: "delevel", text: "deleveling",
-      detail: walkDetail("dying at the town guards to drop levels", hunt) };
+      detail: walkDetail(delevelDetail, hunt) };
+  }
   case "user":
     return userPhaseLabel(snap);
   case "idle":

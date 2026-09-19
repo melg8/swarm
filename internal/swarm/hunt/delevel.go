@@ -91,6 +91,27 @@ const (
     // delevelCooldown pauses new deleveling after one ended, guarding
     // against a flickering median of the zone mob levels.
     delevelCooldown = time.Minute
+    // delevelAbortBackoffBase is the pause the FIRST consecutive
+    // aborted deleveling arms: an abort leaves the level above the
+    // trigger, so without a growing pause the flat delevelCooldown
+    // would send the bot straight back to the guards after every
+    // failed attempt - the farm <-> village commute the owner report
+    // named (the bots that never reach the delevel target return to
+    // the farm spot only to run to the guards again). The backoff
+    // gives the bot real farming time between the attempts and the
+    // server state time to change (a stale guard AI resets, the
+    // peace zone walk out lands).
+    delevelAbortBackoffBase = 5 * time.Minute
+    // delevelAbortBackoffFactor is the growth of the abort backoff:
+    // every further CONSECUTIVE abort (no completed deleveling in
+    // between) multiplies the wait, so a persistently failing
+    // deleveling escalates instead of commuting forever.
+    delevelAbortBackoffFactor = 5
+    // delevelAbortBackoffMax caps the abort backoff at the free death
+    // cooldown: past that the deleveling is as wrong for the
+    // character as the penalty free server is, and the pause cannot
+    // grow beyond a half hour.
+    delevelAbortBackoffMax = delevelFreeCooldown
     // returnWalkLeg caps the direct walk requests of the zone return:
     // the server refuses move requests with a target farther than 9900
     // units (MoveToLocation runImpl), and a village respawn, a guard
@@ -202,6 +223,7 @@ func (l *Loop) startDelevel() {
     l.tripStart = time.Now()
     l.rePaths = 0
     l.delevelTarget = target
+    l.delevelMedian = median
     l.delevelGuard = 0
     l.delevelFight = time.Time{}
     l.delevelTried = nil
@@ -213,9 +235,26 @@ func (l *Loop) startDelevel() {
     l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
     l.waterEscape = false
     l.phase = phaseDelevel
-    l.logf("Hunt: level %d is too high for level %d mobs, "+
-        "deleveling to %d at the town guards", l.tracker.SelfLevel(),
-        median, target)
+    l.logf("Hunt: level %d is too high for level %d mobs (the level "+
+        "gap collapsed the drops), deleveling to %d at the town "+
+        "guards", l.tracker.SelfLevel(), median, target)
+}
+
+// delevelAbortWait returns the pause the next aborted deleveling
+// arms: the base scaled by the consecutive abort streak (the aborts
+// since the last completed deleveling), capped at the maximum. The
+// first abort waits the base, the escalation only answers repeated
+// failures.
+func (l *Loop) delevelAbortWait() time.Duration {
+    wait := delevelAbortBackoffBase
+    for i := 1; i < l.delevelAborts && wait < delevelAbortBackoffMax; i++ {
+        wait *= delevelAbortBackoffFactor
+    }
+    if wait > delevelAbortBackoffMax {
+        wait = delevelAbortBackoffMax
+    }
+
+    return wait
 }
 
 // tickDelevel advances the deleveling by one decision: walk to the
@@ -442,11 +481,15 @@ func (l *Loop) noteDelevelDeath() {
 
 // finishDelevel returns the character to the hunt: the walk back to the
 // farm spot reuses the town trip return leg, the engage routine resumes
-// when it arrives.
+// when it arrives. The deleveling reached its target - the mechanism
+// works, the abort streak of the past attempts resets so the next
+// LEGITIMATE cycle (the level climbed back over the trigger) starts
+// from the short pause again.
 func (l *Loop) finishDelevel() {
     l.delevelEnd = time.Now()
     l.delevelTarget = 0
     l.delevelGuard = 0
+    l.delevelAborts = 0
     l.logf("Hunt: delevel finished at level %d, walking back",
         l.tracker.SelfLevel())
     l.startDelevelReturnLeg()
@@ -456,12 +499,22 @@ func (l *Loop) finishDelevel() {
 // the town trip return leg as well: the raw engage phase would issue one
 // direct walk to the zone center, which the server refuses from the far
 // guard posts (the 9900 unit move limit) and the loop would hang on the
-// refused requests.
+// refused requests. The consecutive abort streak arms the escalating
+// pause through the delevelWait gate: an abort leaves the level above
+// the trigger, so the flat one minute cooldown would send the bot
+// straight back to the guards after the return walk - the farm and
+// village commute without a completed deleveling the owner report
+// named. The streak resets only on a finished deleveling
+// (finishDelevel), never on the next start.
 func (l *Loop) abortDelevel(reason string) {
     l.delevelEnd = time.Now()
     l.delevelTarget = 0
     l.delevelGuard = 0
-    l.logf("Hunt: delevel aborted: " + reason)
+    l.delevelAborts++
+    wait := l.delevelAbortWait()
+    l.delevelWait = time.Now().Add(wait)
+    l.logf("Hunt: delevel aborted: %s (the next attempt waits %s)",
+        reason, wait)
     l.startDelevelReturnLeg()
 }
 

@@ -1473,3 +1473,45 @@ a38b90a (test gate: the unit test account ladder renames to unittest1 - the test
   door frames - the concrete identity of Round 94's "server class";
   the refusal ladder stays as the recovery for deployments that
   cannot update. Round 95 of docs/development_log.md.
+
+### Progress (2026-09-20, the deleveling round)
+
+- the owner demand: the deleveling acceptance test in the webui,
+  the stuck and the ping-pong checks inside it, and the webui
+  message carrying the target level and the reason.
+- the audit: the delevel message lived only in the event log (the
+  webui banner was static text) and the ping-pong hole was
+  structural - every ABORTED attempt left the level above the
+  trigger with the flat one minute cooldown, so the bot commuted
+  farm <-> village forever whenever the attempts kept failing.
+- the fix: HuntDiagnostics carries DelevelActive/DelevelTarget/
+  DelevelFromLevel/DelevelZoneMedian while the phase runs (the
+  banner renders "dropping to level X - level Y is too high for the
+  level Z mobs (the drops collapsed)", the sidebar "deleveling ->
+  lv X"); every abort arms the escalating wait (base 5 min, factor
+  5, cap 30 min = delevelFreeCooldown) through the delevelAborts
+  streak that resets ONLY on a finished deleveling; the trigger
+  stays silent while the wait holds.
+- the acceptance scenario "delevel" (temp14, the webui run button):
+  the level 15 fighter with the bottom of level experience on the
+  Green Dryad S-16 cell (median 8, target 13, two guard deaths
+  from the level bottom), the checks ride the announcement, the
+  walk progress (2000 units - the stuck class never leaves the
+  start), the death penalty, the target, the return to the farm
+  ground and the no-retry window (6 min default,
+  SWARM_DELEVEL_NORETRY_SECONDS knob); a re-entry fails the run
+  with the ping-pong error.
+- the unit ladder hunt/delevel_oscillation_test.go pins the wait
+  ladder, the silence, the finish-only reset and the message
+  fields; the scratch helper cmd/dbpos prints the character rows
+  through the acceptance wire client.
+- the lint gate reconciliation: the church entry and porch refusal
+  ladder commits' lint debt closed (the exhaustruct Done/Command
+  fields, the startChurchSession helper, the wpMap nil arm field,
+  the intrange loop, the InDelta pins, the linear train nolint) -
+  the full gate answers 0 issues again.
+- verification: go test ./... 28 packages ok zero failures,
+  golangci-lint run ./... 0 issues, gofmt-spaces clean; the live
+  delevel acceptance run stays for the next session with the stack
+  up (the full cycle needs the guards, the stack was down at the
+  round time). Round 96 of docs/development_log.md.

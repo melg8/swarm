@@ -2956,15 +2956,31 @@ type BotInfo struct {
     // for the 24/7 fleet bots, KindAcceptance for the temp bots of
     // the acceptance test manager. The empty string is the default
     // of an untagged bot and reads as long-running.
-    Kind       string  `json:"kind"`
-    Level      int32   `json:"level"`
-    CurHP      float64 `json:"curHp"`
-    MaxHP      float64 `json:"maxHp"`
-    CurMP      float64 `json:"curMp"`
-    MaxMP      float64 `json:"maxMp"`
-    ExpPercent float64 `json:"expPercent"`
-    InCombat   bool    `json:"inCombat"`
-    Sitting    bool    `json:"sitting"`
+    Kind  string `json:"kind"`
+    Level int32  `json:"level"`
+    // DelevelTarget is the level the running deleveling drops the
+    // character to (non zero only while the delevel phase runs): the
+    // sidebar row renders it in the compact activity banner
+    // ("deleveling -> lv 9").
+    DelevelTarget int32   `json:"delevelTarget"`
+    CurHP         float64 `json:"curHp"`
+    MaxHP         float64 `json:"maxHp"`
+    CurMP         float64 `json:"curMp"`
+    MaxMP         float64 `json:"maxMp"`
+    ExpPercent    float64 `json:"expPercent"`
+    InCombat      bool    `json:"inCombat"`
+    Sitting       bool    `json:"sitting"`
+}
+
+// delevelTarget reads the published deleveling target of the hunt
+// diagnostics: non zero only while the delevel phase runs (the loop
+// clears the delevel block of the diagnostics outside the phase).
+func (b *Bot) delevelTarget() int32 {
+    if !b.hunt.DelevelActive {
+        return 0
+    }
+
+    return b.hunt.DelevelTarget
 }
 
 // Info returns the compact bot description.
@@ -2973,19 +2989,20 @@ func (b *Bot) Info() BotInfo {
     defer b.mu.RUnlock()
 
     return BotInfo{
-        ID:         b.id,
-        Name:       b.char.Name,
-        Status:     b.status,
-        Phase:      b.phase,
-        Kind:       b.kind,
-        Level:      b.char.Level,
-        CurHP:      b.char.CurHP,
-        MaxHP:      b.char.MaxHP,
-        CurMP:      b.char.CurMP,
-        MaxMP:      b.char.MaxMP,
-        ExpPercent: ExpPercent(b.char.Level, int64(b.char.Exp)),
-        InCombat:   b.char.inCombat(time.Now()),
-        Sitting:    b.char.Sitting,
+        ID:            b.id,
+        Name:          b.char.Name,
+        Status:        b.status,
+        Phase:         b.phase,
+        Kind:          b.kind,
+        Level:         b.char.Level,
+        DelevelTarget: b.delevelTarget(),
+        CurHP:         b.char.CurHP,
+        MaxHP:         b.char.MaxHP,
+        CurMP:         b.char.CurMP,
+        MaxMP:         b.char.MaxMP,
+        ExpPercent:    ExpPercent(b.char.Level, int64(b.char.Exp)),
+        InCombat:      b.char.inCombat(time.Now()),
+        Sitting:       b.char.Sitting,
     }
 }
 

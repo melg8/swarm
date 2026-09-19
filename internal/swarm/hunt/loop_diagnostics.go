@@ -56,9 +56,13 @@ func (l *Loop) diagnostics(now time.Time) state.HuntDiagnostics {
         // The last action and the publication age belong to the
         // tracker: NoteAction owns the text, the encoders age the
         // publication stamp of SetHuntDiagnostics.
-        LastAction:      "",
-        LastActionAgoMs: 0,
-        TickAgoMs:       0,
+        LastAction:        "",
+        LastActionAgoMs:   0,
+        DelevelActive:     false,
+        DelevelTarget:     0,
+        DelevelFromLevel:  0,
+        DelevelZoneMedian: 0,
+        TickAgoMs:         0,
     }
     // The stuck watchdog and the trip clock only run while the loop
     // follows a planned walk: outside those phases the residual
@@ -68,6 +72,16 @@ func (l *Loop) diagnostics(now time.Time) state.HuntDiagnostics {
     }
     if l.tripActive() || l.phase == phaseDelevel {
         report.TripForMs = state.AgeMs(since(now, l.tripStart))
+    }
+    // The deleveling message of the webui: the phase banner renders
+    // the target level and the trigger evidence (the start level
+    // against the median mob level of the held ground) from these
+    // fields. The zero view outside the phase clears the message.
+    if l.phase == phaseDelevel {
+        report.DelevelActive = true
+        report.DelevelTarget = l.delevelTarget
+        report.DelevelFromLevel = l.delevelLevel
+        report.DelevelZoneMedian = l.delevelMedian
     }
 
     return report
