@@ -866,3 +866,23 @@ Commits as melg8. Rebase before every push.
   `docs/development_log.md` with the owner side cure (the geodata
   vintage alignment + the master's direct-movement fallback). The
   bot side answer is the claim transport of commits 1-2.
+
+### Progress (2026-09-19, the feedback loops audit)
+
+- the audit of the feedback an autonomous agent receives lands as
+  docs/agent_feedback_loops.md (the inventory by layer: static, test,
+  live stack, runtime observability, process memory; what is good,
+  what needs improvement, what is missing, the priority order) - the
+  doc joins the AGENTS.md documentation map.
+- PROGRESS.md regenerated through tools/progress_report.sh: the
+  ladder now reads M1 red (last run FAIL - the class transfer runs of
+  2026-09-13), the stale 2026-09-12 page is gone; the dashboard
+  staleness is recorded in the audit as an improvement item (the
+  regeneration rule exists, it just was not applied).
+- the headline findings of the audit: task check:all misses the
+  build and vet gates the verify-loop skill mandates; coverage is
+  collected but never archived; benchmarks have no committed
+  baseline to diff; CI is absent while the go-verify-loop skill
+  references it; the acceptance scenarios run serially against a
+  parallel-ready account partition; the session start ritual is
+  prose, not a command.

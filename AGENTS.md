@@ -127,6 +127,7 @@ one of them is the reference for its subsystem:
 | `docs/protocol_description.md` | The wire protocol: packet framing, the login and game flows, per-packet layouts (originally written against l2j-lisvus; Mobius C1 is the current reference) |
 | `docs/development_log.md` | The permanent record of the development rounds with root cause analyses - read it before reworking movement rendering or the hunt behavior |
 | `docs/agent_progress.md` | The crash-safe task handover file (see the work protocol below) |
+| `docs/agent_feedback_loops.md` | The audit of the feedback an autonomous agent receives (the verification loop, the live acceptance, the observability, the process memory), what is good, what to improve, what is missing |
 | `docs/project_description.md` | The long term design goals, scalability ideas (packet deduplication, "eyes" bot concept, synchronized party behavior) - read it before making architectural decisions |
 | `docs/quality_review_and_agent_prompts.md` | The 2026-09-07 architecture review and its improvement program (a historical snapshot - verify the state of a finding against the code before acting on it) |
 | `docs/webui_modernization_proposal.md` | The pending web UI modernization proposal (awaiting user approval; do not implement before it) |
