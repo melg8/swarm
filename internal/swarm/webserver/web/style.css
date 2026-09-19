@@ -132,6 +132,8 @@ body {
 
 .tab.active { color: var(--accent); background: var(--bg-panel-2); }
 
+.tab.hidden { display: none; }
+
 .header-right {
   display: flex;
   align-items: center;
@@ -181,6 +183,19 @@ body {
   padding: 10px 12px 6px;
 }
 
+/* The bot section owns the flexible middle of the sidebar: it grows
+   into the space the legend leaves free and its view keeps a bounded
+   height, so the long bot lists scroll inside their own box instead
+   of pushing the legend and the rest of the panel off the viewport
+   (the sidebar itself never scrolls). */
+#bot-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* The sidebar shows two views through a tab switch: LIVE for the
    long-running fleet bots, TESTS for the acceptance test bots and
    their scenarios. The tab strip sits at the top of the bot section
@@ -210,6 +225,8 @@ body {
 
 .sidebar-tab:hover { color: var(--text); }
 
+.sidebar-tab.hidden { display: none; }
+
 .sidebar-tab.active {
   color: var(--text-bright);
   border-bottom-color: var(--accent);
@@ -229,9 +246,10 @@ body {
 .sidebar-view-empty.hidden { display: none; }
 
 /* The acceptance bots group inside the TESTS view keeps its sub-title
-   so the user reads the temp bots separate from the scenarios list
-   below. */
-.bot-group { display: flex; flex-direction: column; }
+   so the user reads the temp bots as their own block, and the group
+   itself fills the view so its bot list scrolls inside the bounded
+   box the same way the LIVE list does. */
+.bot-group { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .bot-group.hidden { display: none; }
 
 .bot-group-title {
@@ -2646,25 +2664,47 @@ canvas.fxg-cell.picked {
 
 /* ---- acceptance tests panel ---- */
 
-/* The panel sits under the bot list of the sidebar: the run buttons
-   and the per scenario rows with the status dot, the check list and
-   the run/restart button. The hover tooltip with the scenario
+/* The scenarios live in their own top tab now (next to Map, Log and
+   Stats): the wide page gives every scenario a card of its own - the
+   run button, the status dot and the check list breathe instead of
+   squeezing into the two hundred pixels of the old sidebar column.
+   The wrap centers one comfortable column, the head row carries the
+   title and the run all buttons. The hover tooltip with the scenario
    description floats over everything (see .acc-tooltip). */
+.scenarios-wrap {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 14px 16px 20px;
+}
+
 .acceptance-panel {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 6px 0 8px;
-  border-bottom: 1px solid var(--border-soft);
+  gap: 10px;
+  padding: 12px 14px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
 }
 
 .acceptance-panel.hidden { display: none; }
 
+.scenarios-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scenarios-head .sidebar-title { padding: 0; }
+
 .acc-actions {
   display: flex;
   gap: 6px;
-  padding: 0 12px 4px;
 }
+
+.scenarios-head .acc-runall-btn { flex: 0 0 auto; min-width: 130px; }
 
 /* The run all and the per scenario run buttons of the acceptance
    panel need a comfortable click target: the base .btn is sized for
@@ -2692,14 +2732,26 @@ canvas.fxg-cell.picked {
   color: var(--accent);
 }
 
-.acc-list { list-style: none; }
-
-.acc-item {
-  padding: 6px 12px 7px;
-  border-left: 2px solid transparent;
+/* The scenario rows read as cards on the wide page: the grid folds
+   the list into as many columns as the width carries, each card
+   keeps the status stripe on the left edge. */
+.acc-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 8px;
+  align-items: start;
 }
 
-.acc-item:hover { background: var(--bg-panel-2); }
+.acc-item {
+  padding: 8px 10px 9px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  border-left: 2px solid transparent;
+  border-radius: 6px;
+}
+
+.acc-item:hover { background: var(--bg-panel); }
 
 .acc-item.status-passed { border-left-color: var(--green); }
 .acc-item.status-failed { border-left-color: var(--red); }

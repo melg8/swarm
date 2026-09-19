@@ -193,16 +193,16 @@ function proxyTargetId() {
 
 function renderBotList() {
   // The sidebar shows two views through a tab switch: LIVE for the
-  // long-running fleet bots, TESTS for the acceptance test bots and
-  // their scenarios. A bot without an explicit kind (the default of
-  // an untagged bot) reads as long-running - the acceptance manager
-  // tags its temp bots with kind="acceptance".
+  // long-running fleet bots, TESTS for the acceptance test bots. The
+  // scenarios live in their own top tab now, so the TESTS view owns
+  // the temp bots alone. A bot without an explicit kind (the default
+  // of an untagged bot) reads as long-running - the acceptance
+  // manager tags its temp bots with kind="acceptance".
   const longList = document.getElementById("bot-list-long");
   const accList = document.getElementById("bot-list-acc");
   const accGroup = document.getElementById("bot-group-acc");
   const longEmpty = document.getElementById("bot-list-long-empty");
   const testsEmpty = document.getElementById("tests-view-empty");
-  const accPanel = document.getElementById("acceptance-panel");
   if (!longList || !accList) { return; }
   longList.innerHTML = "";
   accList.innerHTML = "";
@@ -235,13 +235,20 @@ function renderBotList() {
   if (longEmpty) {
     longEmpty.classList.toggle("hidden", longBots.length > 0);
   }
-  // The empty hint of the TESTS view shows when there are no
-  // acceptance bots AND no scenarios panel (the pathfind and fight
-  // modes have neither).
+  // The TESTS view carries the acceptance bots only now: the whole
+  // tab hides while no temp bot runs, and an active TESTS choice
+  // falls back to LIVE so the sidebar never rests on a hidden tab.
+  const tabTests = document.getElementById("tab-tests");
+  if (tabTests) {
+    const showTests = accBots.length > 0;
+    const wasActive = tabTests.classList.contains("active");
+    tabTests.classList.toggle("hidden", !showTests);
+    if (wasActive && !showTests) { selectSidebarTab("live"); }
+  }
+  // The empty hint of the TESTS view covers the transient window
+  // between the tab flip and the first temp bot registration.
   if (testsEmpty) {
-    const hasScenarios = accPanel && !accPanel.classList.contains("hidden");
-    testsEmpty.classList.toggle("hidden",
-      accBots.length > 0 || hasScenarios);
+    testsEmpty.classList.toggle("hidden", accBots.length > 0);
   }
 }
 
@@ -257,9 +264,10 @@ function activeSidebarTab() {
 }
 
 // selectSidebarTab flips the sidebar view: "live" shows the
-// long-running bot list, "tests" shows the acceptance bots and the
-// scenarios panel. The tab strip updates the aria-selected and the
-// active class so the underline lands on the picked tab.
+// long-running bot list, "tests" shows the acceptance temp bots (the
+// scenarios live in their own top tab now). The tab strip updates the
+// aria-selected and the active class so the underline lands on the
+// picked tab.
 function selectSidebarTab(name) {
   const live = document.getElementById("view-live");
   const tests = document.getElementById("view-tests");
@@ -3598,12 +3606,30 @@ function renderAcceptance() {
   const panel = document.getElementById("acceptance-panel");
   const list = document.getElementById("acc-list");
   if (!panel || !list) { return; }
+  // The Scenarios top tab follows the payload: the processes without
+  // the acceptance manager never show it, and an active tab falls
+  // back to the map when a poll loses the tests.
+  const tabBtn = document.getElementById("tab-btn-scenarios");
+  const hasTests = Array.isArray(App.acceptance) &&
+    App.acceptance.length > 0;
+  if (tabBtn) {
+    const wasActive = tabBtn.classList.contains("active");
+    tabBtn.classList.toggle("hidden", !hasTests);
+    if (!hasTests && wasActive) {
+      const mapBtn = document.querySelector('.tab[data-tab="map"]');
+      if (mapBtn) { mapBtn.click(); }
+    }
+  }
   if (!App.acceptance) {
     panel.classList.add("hidden");
 
     return;
   }
   panel.classList.remove("hidden");
+  const emptyHint = document.getElementById("scenarios-empty");
+  if (emptyHint) {
+    emptyHint.classList.toggle("hidden", hasTests);
+  }
   const payload = JSON.stringify(App.acceptance);
   if (payload === lastAcceptanceJSON) { return; }
   lastAcceptanceJSON = payload;
