@@ -1544,3 +1544,23 @@ a38b90a (test gate: the unit test account ladder renames to unittest1 - the test
   in ~4 seconds). Verification: go test ./... 28 packages ok,
   golangci-lint 0 issues, gofmt-spaces clean. Round 97 of
   docs/development_log.md.
+### Progress (2026-09-20, the shop quarter round)
+
+- the farm readiness report (level 15): the bot did not buy, slid
+  along the outer railing and talked to the merchants from outside.
+  The merchant legs now plan the exact mesh search (the customer
+  cell across the counter, 40-42 units from the npc at floor level
+  on the real tiles, the counters never walked) and the final
+  arrival is the tight pass radius.
+- the second bug the live run exposed: the exact search to a far
+  unreachable destination exhaustively floods the whole mesh
+  component (the Herbiel leg froze the live bot inside one query,
+  the offline rerun OOMs in 4.4 s). The exact legs are gated by
+  exactLegMaxDistance (2000), the far legs walk the priced ring
+  (the hierarchy answers them in milliseconds) and the walk
+  completion arms the near exact final approach; the re-paths
+  preserve the leg contract (replanTownWalkLeg).
+- the live verification bought the whole level 15 kit through four
+  merchants (every purchase confirmed, the frozen Herbiel leg
+  walked in 51 s); the offline pins and the full suite stay green.
+  Round 96 of docs/development_log.md.

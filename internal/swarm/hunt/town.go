@@ -302,6 +302,24 @@ const (
     // unit server interaction distance but outside the walled
     // interior.
     npcApproachOffset = 150.0
+    // exactLegDeckTolerance bounds the z gap between the merchant
+    // spawn z and the plan end cell of the exact merchant leg: the
+    // customer cell sits on the merchant's own floor scale (the elven
+    // stall fronts answer 0-3 units off, the trainer hall decks 40),
+    // a roof layer over the shop sits hundreds above - the foreign
+    // deck plan is discarded for the ring fallback instead of walked.
+    exactLegDeckTolerance = 96.0
+    // exactLegMaxDistance bounds how far from the merchant the exact
+    // leg may plan: the exact search serves the final approach (the
+    // customer cell across the counter), the long haul belongs to the
+    // priced ring search whose hierarchy answers the reachable far
+    // routes in milliseconds. An exact search at a FAR unreachable
+    // destination degenerates into an exhaustive exploration of the
+    // whole mesh component (the Herbiel leg of the farm readiness
+    // round froze the live bot for minutes inside one query) - the
+    // distance gate keeps the exact search inside the neighborhood
+    // where its partial exhaustion stays local and bounded.
+    exactLegMaxDistance = 2000.0
 )
 
 // townNpc is a town npc the trip machinery navigates to: a shop
@@ -730,9 +748,33 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
     }
     l.logf("Hunt: %s, walking to the trader %s", reason,
         merchant.Name)
-    l.legRadius = tripApproachRadius
-    if !l.startWalkLeg(townNpcPosition(merchant)) {
-        l.abortTownTrip("no walkable path to the shop")
+    // The first stop walks the exact mesh search when the merchant is
+    // near enough (the same authority the later stops of
+    // advanceTripStop plan with): the approach ring ends the plan on
+    // the first deck polygon inside its radius - outside the shop, on
+    // the outer railing side - and the talk fires from there (or
+    // slides along the railing forever). The exact search lands on
+    // the customer cell across the counter; the ring fallback runs
+    // for the one failure class the exact search cannot answer - the
+    // plan that resolved onto a foreign deck (the roof over the
+    // shop), see startWalkExactLeg. The far merchants walk the ring
+    // leg first (the long haul of the hierarchy), the walk completion
+    // arms the near exact approach (see tickTownTrip).
+    planned := false
+    if l.merchantWithinExactRange(merchant) {
+        var ringFallback bool
+        planned, ringFallback = l.startWalkExactLeg(
+            townNpcPosition(merchant))
+        if !planned && ringFallback {
+            l.legRadius = tripApproachRadius
+            planned = l.startWalkLeg(townNpcPosition(merchant))
+        }
+    }
+    if !planned {
+        l.legRadius = tripApproachRadius
+        if !l.startWalkLeg(townNpcPosition(merchant)) {
+            l.abortTownTrip("no walkable path to the shop")
+        }
     }
 }
 
@@ -806,6 +848,40 @@ func (l *Loop) walkToward(x, y, z int32, now time.Time) {
     }
 }
 
+// exactApproachWanted reports whether the completed town walk leg
+// deserves the exact final approach: the current stop is a merchant
+// stop whose leg this walk just finished (the leg destination IS the
+// merchant spawn), the leg itself was the ring approach (the exact
+// legs arrive at the customer cell and need no second pass), and the
+// merchant sits beyond the customer ring but inside the exact
+// distance gate - near enough for the bounded search, far enough
+// that the talk would fire from the ring edge instead of the
+// counter.
+func (l *Loop) exactApproachWanted() bool {
+    if len(l.tripStops) == 0 || l.tripStops[0].teach {
+        return false
+    }
+    merchant := l.tripStops[0].merchant
+    if l.legDest != townNpcPosition(merchant) {
+        return false
+    }
+    if l.legSearch != nil && l.legSearch.Approach == 0 {
+        return false
+    }
+    if !l.merchantWithinExactRange(merchant) {
+        return false
+    }
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
+    }
+    dx := float64(merchant.X - selfX)
+    dy := float64(merchant.Y - selfY)
+    dz := float64(merchant.Z - selfZ)
+
+    return math.Sqrt(dx*dx+dy*dy+dz*dz) > npcApproachOffset
+}
+
 // tickTownTrip advances the running town trip by one decision.
 func (l *Loop) tickTownTrip() {
     if time.Since(l.tripStart) > tripTimeout {
@@ -819,7 +895,18 @@ func (l *Loop) tickTownTrip() {
     switch l.phase {
     case phaseTownWalk:
         if l.walkTownWaypoints() {
-            l.enterSellPhase()
+            // The completed leg hands over to the talk machinery -
+            // unless the leg was the long haul ring approach and the
+            // merchant is still beyond the customer ring: the exact
+            // final approach leg arms here (near enough now for the
+            // bounded search) and walks the character to the
+            // customer cell across the counter (the shop quarter
+            // round of the user report: the talk fired - or bounced -
+            // from the outer railing side instead).
+            planned, _ := l.startWalkExactLeg(l.legDest)
+            if !l.exactApproachWanted() || !planned {
+                l.enterSellPhase()
+            }
         }
     case phaseTownSell:
         l.tickTownSell()
@@ -974,6 +1061,140 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3) bool {
         l.logf("Hunt: no route to %d %d, walking the closest "+
             "reachable point", int(dest.X), int(dest.Y))
     }
+
+    return l.armTownWalkLeg(selfX, selfY, selfZ, from, dest, result,
+        radius)
+}
+
+// merchantWithinExactRange reports whether the merchant is close
+// enough for the exact leg: the distance gate of exactLegMaxDistance
+// (see the constant comment - the far exact searches are the
+// exhaustive flood class).
+func (l *Loop) merchantWithinExactRange(npc townNpc) bool {
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
+    }
+    dx := float64(npc.X - selfX)
+    dy := float64(npc.Y - selfY)
+    dz := float64(npc.Z - selfZ)
+
+    return math.Sqrt(dx*dx+dy*dy+dz*dz) <= exactLegMaxDistance
+}
+
+// replanTownWalkLeg re-plans the current town leg from the standing
+// cell to its own destination, preserving the leg's search contract:
+// the exact legs re-plan the exact search (a stuck merchant walk must
+// re-arm the customer cell plan, not degrade into the approach ring
+// that ends the plan outside the shop again), the ring legs re-plan
+// with their own radius. It reports whether the leg was planned.
+func (l *Loop) replanTownWalkLeg(dest pathfind.Vec3) bool {
+    if l.legSearch != nil && l.legSearch.Approach == 0 {
+        planned, ringFallback := l.startWalkExactLeg(dest)
+        if planned || !ringFallback {
+            return planned
+        }
+
+        return l.startWalkLegSearch(dest)
+    }
+
+    return l.startWalkLegSearch(dest)
+}
+
+// startWalkExactLeg plans the walk to the exact destination through
+// the mesh corridor search (approach zero - the plan must arrive at
+// the destination cell, whatever walkable cell the mesh resolves it
+// onto) and arms the waypoint follower. The merchant stops navigate
+// with it: the approach ring catches the first deck polygon inside
+// its radius and ends the plan short - the shop quarter round of the
+// user report held the wide ring plans 147-232 units from the
+// merchant, on the outer railing side of the stall, and the talk
+// fired from there (or slid along the railing forever). The exact
+// search answers the customer cell across the counter instead: the
+// merchant's own cell sits on ground the mesh never walks onto (the
+// counter row), so the corridor ends at the closest walkable floor
+// cell to the npc - the standing spot of a real customer.
+//
+// It reports whether the leg was planned and whether the approach
+// ring fallback is worth running. The ring fallback owns exactly one
+// failure class - the plan that resolved onto a foreign deck (a
+// connected roof over the shop answers the closest layer of the
+// destination cell, a roof-scale z gap above the merchant's floor):
+// the conservative ring stop on the surrounding deck is the safe
+// answer there. The hard navigator errors and the corridor-less mesh
+// answers fail the ring search the very same way (the reachable
+// component of the mesh is the same for both goals - no corridor to
+// the destination cell means no corridor to its ring either), so the
+// callers skip the fallback there and the trip attempt keeps its one
+// search cost (the cooldown pins of the broken path search).
+func (l *Loop) startWalkExactLeg(dest pathfind.Vec3) (bool, bool) {
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false, false
+    }
+    from := pathfind.Vec3{
+        X: float64(selfX),
+        Y: float64(selfY),
+        Z: float64(selfZ),
+    }
+    result, err := l.navigator.FindPath(from, dest)
+    if err != nil {
+        l.logf("Hunt: town trip exact path search failed: %v", err)
+
+        return false, false
+    }
+    if result == nil || len(result.Waypoints) == 0 {
+        l.logf("Hunt: no exact path to %d %d at all",
+            int(dest.X), int(dest.Y))
+
+        return false, false
+    }
+    if !result.Found && !result.Partial {
+        // The manual walk contract (planUserWalk): a bare not found
+        // with no corridor means the destination ground the mesh does
+        // not reach at all - the ring goal of the same mesh answers
+        // the same nothing.
+        l.logf("Hunt: no exact route to %d %d, no corridor",
+            int(dest.X), int(dest.Y))
+
+        return false, false
+    }
+    last := result.Waypoints[len(result.Waypoints)-1]
+    if dz := math.Abs(last.Z - dest.Z); dz > exactLegDeckTolerance {
+        // The plan resolved onto a foreign deck: the roof over the
+        // shop (the connected roof layer answers the destination
+        // cell's closest-layer resolution) or a floor the merchant
+        // does not stand on. The ring stop on the surrounding deck is
+        // the safe answer, the talk machinery owns the rest.
+        l.logf("Hunt: exact route to %d %d lands %.0f units off "+
+            "the merchant deck, falling back to the ring",
+            int(dest.X), int(dest.Y), dz)
+
+        return false, true
+    }
+    if !result.Found {
+        // The partial corridor of the exact search IS the answer the
+        // merchant stop wants: the destination sits on the counter
+        // row the mesh never walks onto, the funnel ends at the
+        // customer cell in front of it.
+        l.logf("Hunt: exact route to %d %d ends at the closest "+
+            "walkable cell (the counter row)", int(dest.X), int(dest.Y))
+    }
+
+    return l.armTownWalkLeg(selfX, selfY, selfZ, from, dest, result, 0),
+        false
+}
+
+// armTownWalkLeg arms the waypoint follower with a planned town walk:
+// the plan view (the search contract of the answer), the frame
+// measurement and the fresh leg state. Shared by the ring planner
+// (startWalkLegSearch) and the exact planner (startWalkExactLeg).
+func (l *Loop) armTownWalkLeg(
+    selfX, selfY, selfZ int32,
+    from, dest pathfind.Vec3,
+    result *pathfind.Result,
+    radius float64,
+) bool {
     l.waypoints = result.Waypoints
     l.wpIndex = 0
     l.legDest = dest
@@ -1070,8 +1291,19 @@ func waypointArrived(
 // the route end, the wide slack accepts a stop a full ring short of
 // the teacher and dumps the last stretch onto the straight offset
 // clicks whose lines cross the roof-only interior bands (the trainer
-// hall rows carry the floor, the spaces between them do not).
+// hall rows carry the floor, the spaces between them do not). The
+// exact legs (the merchant stops' approach zero search) answer the
+// tight radius the same way: their final cell is the customer spot
+// the leg exists to reach.
 func (l *Loop) finalArriveRadius() float64 {
+    // The exact legs (the merchant stops' startWalkExactLeg) must walk
+    // the plan all the way to its final cell: the wide arrive radius
+    // would end the walk a whole arrive radius short of the customer
+    // cell the exact search answered - the standing spot opposite the
+    // merchant behind the counter.
+    if l.legSearch != nil && l.legSearch.Approach == 0 {
+        return waypointPassDist
+    }
     if l.legRadius > 0 && l.legRadius < tripApproachRadius {
         return waypointPassDist
     }
@@ -1184,7 +1416,7 @@ func (l *Loop) walkTownWaypoints() bool {
             l.stuckFast = false
             l.logger.Printf("Hunt: back on the shore at %d %d %d, "+
                 "re-planning the walk", selfX, selfY, selfZ)
-            if !l.startWalkLeg(l.legDest) {
+            if !l.replanTownWalkLeg(l.legDest) {
                 l.abortTownTrip("no walkable path from the shore")
 
                 return false
@@ -2006,7 +2238,7 @@ func (l *Loop) clickServerValidated(
     l.logger.Printf("Hunt: the server would refuse the walk click to "+
         "%d %d, re-pathing (%d of %d)",
         int32(*moveX), int32(*moveY), l.rePaths, maxRePaths)
-    if !l.startWalkLeg(l.legDest) {
+    if !l.replanTownWalkLeg(l.legDest) {
         // The re-path found no route: the same freeze evidence the
         // stuck path carries - the ladder owns it (see
         // stuckTownWalk).
@@ -2635,7 +2867,7 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
     if l.journal != nil {
         l.journal.Repath(l.tracker.ID(), l.rePaths)
     }
-    if !l.startWalkLeg(l.legDest) {
+    if !l.replanTownWalkLeg(l.legDest) {
         // The fresh plan found no route (the bans plus the water may
         // wall every dry one): the freeze evidence still belongs to
         // the escalation ladder - the rungs widen the ban and re-plan

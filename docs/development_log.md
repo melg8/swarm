@@ -7473,3 +7473,66 @@ the terrace edge, the farm reached inside the window; the second
 spot: the escape plan walked out clean in ~4 seconds, the farm
 reached without a single refusal - the horizontal displacement
 floor delivering the honest aim).
+## Round 96: the merchant legs walk to the customer cell - the shop quarter round (2026-09-20)
+
+Scope: the owner report on the farm readiness acceptance (level 15):
+the character does not buy, stalls against the outer railing and
+slides along it, and the trip approaches the merchant npcs from
+outside the building - the interaction point must move inside, the
+bot must stand opposite the npc across the counter without walking
+onto the counters.
+
+Diagnosis: the merchant stop legs planned the wide trip approach
+ring (200) - the search answers the first deck polygon inside its
+radius and the elven village merchants sit inside their shops, so
+the plans ended 147-232 units from Unoren and Ariel on the outer
+railing side and the talk fired (or bounced) through the wall; the
+offline mesh probe answers the customer cells at 40-42 units from
+both merchants at floor level (the counter row the mesh never walks
+onto - the landing the user rule asks for). The second bug the live
+run exposed: the exact search the church round introduced explodes
+when the destination is far AND unreachable - the Herbiel leg (3.6
+km, the counter cell) froze the live bot for the rest of the
+window inside one query (the offline rerun is OOM killed in 4.4 s:
+the exhaustive exploration of the whole mesh component), the ring
+query to the same merchant answers found in 72 ms.
+
+Fix:
+- the merchant stops (the trip start and every advanceTripStop
+  stop) plan the exact mesh search when the merchant is inside
+  exactLegMaxDistance (2000): the plan lands on the customer cell
+  across the counter (the counter row itself never walked), the
+  talk fires face to face; the deck-mismatch class (a plan that
+  resolved onto a connected roof layer, the z gap above
+  exactLegDeckTolerance 96) falls back to the ring, the
+  corridor-less answer takes no fallback (the reachable mesh
+  component is the same for both goals - the one-search cost
+  contract of the cooldown pins holds).
+- the far merchants walk the priced ring leg first (the hierarchy
+  answers the reachable long routes in milliseconds) and the walk
+  completion hook (tickTownTrip, exactApproachWanted) arms the near
+  exact final approach when the character landed beyond the
+  customer ring - the customer cell without any far exact query.
+- the re-paths preserve the leg's search contract
+  (replanTownWalkLeg): a stuck exact leg re-plans the exact search
+  instead of degrading into the ring that ends outside again.
+- the final arrival radius of the exact legs is the tight pass
+  distance (finalArriveRadius reads the leg contract's approach
+  zero) - the walk reaches the customer cell instead of stopping a
+  wide arrive radius short of it.
+
+Verification: the offline pins (merchant_counter_leg_test.go) walk
+the real pack and the real tiles - the sell stop leg ends 40 units
+from Ariel at floor level inside the interaction distance with the
+approach zero contract (the wide ring ended 232 away), the re-path
+preserves the contract, the roof plan falls back to the ring; the
+full suite answers every package ok zero failures and the
+gofmt-spaces gate is silent. The live acceptance run bought the
+whole level 15 kit through the fixed legs: Unoren (Brandish, Bow),
+Ariel (the five armor pieces), Herbiel (the arrows - the leg that
+froze the previous run for the whole window walked in 51 s),
+Creamees (the jewels and the two spellbooks) - every purchase
+confirmed, the walk proceeded to the teacher legs; the scenario
+window exceeded the sandbox's ten minute call limit mid learning
+(the farmTimeout of twenty minutes owns the full run, the shopping
+round itself completed inside three minutes).

@@ -958,6 +958,7 @@ func (l *Loop) advanceTripStop() {
     l.merchantDeckUntil = time.Time{}
     stop := l.tripStops[0]
     l.logf("Hunt: shop: walking to %s", stop.merchant.Name)
+    planFailed := true
     if stop.teach {
         // The teacher stop walks right up to the class master: the
         // close approach ring of the npc approach offset, planned by
@@ -969,13 +970,45 @@ func (l *Loop) advanceTripStop() {
         // no walkable route at all, the approach window owns the last
         // stretch there.
         l.legRadius = npcApproachOffset
-        if !l.startWalkLeg(townNpcPosition(stop.merchant)) {
+        planFailed = !l.startWalkLeg(townNpcPosition(stop.merchant))
+        if planFailed {
             l.legRadius = tripApproachRadius
+            planFailed = !l.startWalkLeg(townNpcPosition(stop.merchant))
         }
     } else {
-        l.legRadius = tripApproachRadius
+        // The merchant stop walks the exact mesh search first (the
+        // same authority the manual walk plans with): the approach
+        // ring catches the first deck polygon inside its radius and
+        // ends the plan outside the shop - the shop quarter round of
+        // the user report held the wide ring plans 147-232 units from
+        // the merchant on the outer railing side, the talk fired (or
+        // bounced) from there and the buys never ran. The exact
+        // search lands the plan on the customer cell across the
+        // counter instead (the merchant's own cell sits on ground the
+        // mesh never walks onto, the funnel ends at the closest
+        // walkable floor cell to the npc - the standing spot of a
+        // real customer), the character walks in through the stall
+        // front and trades face to face with the merchant. The ring
+        // fallback runs for the one failure class the exact search
+        // cannot answer - the plan that resolved onto a foreign deck
+        // (the roof over the shop), see startWalkExactLeg.
+        planned := false
+        if l.merchantWithinExactRange(stop.merchant) {
+            var ringFallback bool
+            planned, ringFallback = l.startWalkExactLeg(
+                townNpcPosition(stop.merchant))
+            if !planned && ringFallback {
+                l.legRadius = tripApproachRadius
+                planned = l.startWalkLeg(
+                    townNpcPosition(stop.merchant))
+            }
+        }
+        if !planned {
+            l.legRadius = tripApproachRadius
+            planned = l.startWalkLeg(townNpcPosition(stop.merchant))
+        }
+        planFailed = !planned
     }
-    planFailed := !l.startWalkLeg(townNpcPosition(stop.merchant))
     if l.phase == phaseTownWalk && planFailed {
         l.abortTownTrip("no walkable path to the shop of " +
             stop.merchant.Name)
