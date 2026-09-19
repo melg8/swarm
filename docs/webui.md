@@ -381,6 +381,20 @@ console (`map fps: 58 fps · draw avg 2.1 ms · worst 3.4 ms`), so a lag
 report pastes the measurements next to the build identity of the state
 dump.
 
+The **cursor chip** (`#foot-cursor`, left of the fps counter) shows the
+world coordinates under the mouse - the bare x y pair of the world
+point, upgraded to the full x y z triple while the pointer holds a
+walk plan waypoint (the dump walk line format). The `ctrl+c` (or
+`meta+c`) pressed with the pointer over the map copies exactly what
+the chip shows (the selection aware fall through never masks the
+browser copy: a shortcut with the pointer off the map or an active
+text selection goes through untouched) and flashes `copied: ...` into
+the chip for a moment. The 3D navmesh viewer coordinate inputs accept
+the copied lines: the wp prefixed dump lines bind the first three
+numbers after the `wp` marker (the timing suffix carries numbers of
+its own), every other line keeps the last three numbers contract, and
+a bare x y pair inherits the z from the other line.
+
 ## Combat animation layer (map.js + state combatEvents)
 
 The map plays the combat the tracker observes: every `Attack`
@@ -443,6 +457,24 @@ grow by the 2 s window, so the payload stays small.
   material of an 8-24 hour session in one click; the offline
   post-mortem renders the same report through `-session-report
   <file>` (see [session_journal.md](session_journal.md)).
+- Pathfind link: the pathfind link button of the map toolbar (next to
+  the session dump) copies a 3D navmesh viewer URL of the current
+  walk (`buildPathfindLink` in app.js) - the `from`/`to` pair off the
+  published walk plan (the planning origin and the final
+  destination), the tile keys around the pair (the bounding box
+  grown by half a tile), the `filter=swim scale=1 geom=mesh
+  path=smooth` defaults and a camera pose computed with the viewer
+  framing math (the three quarter orbit south east of the route
+  midpoint, the analytic yaw/pitch of `frameInitialTiles`). Opening
+  the link in the `-show-navmesh` viewer reproduces the route context
+  and answers the route itself - the fast path to experiment in the
+  3D world or to attach a reproducible route to an agent report. The
+  base address defaults to the documented local viewer
+  (`http://127.0.0.1:8082/`); the shift click asks for a different
+  one and remembers it in the localStorage
+  (`swarm.pathfindViewerBase`). A snapshot without a published plan
+  opens the viewer bare (no route pair, no camera, the defaults
+  stay).
 - Bot status banner: a compact chip pinned to the top center of the
   map (`#bot-status` in index.html, `renderBotStatus` in app.js) shows
   the current activity of the active bot at a glance - hunting,
@@ -475,14 +507,30 @@ grow by the 2 s window, so the payload stays small.
   tracker (`state.Bot.SetWalkPlan`: the origin, the full waypoint
   list, the follower cursor and the destination, refreshed every tick,
   expiring on its own after 2 s without a refresh); the map draws it
-  while the paths toggle is on. The state dump
+  while the paths toggle is on. The coordinate labels of the
+  waypoints draw on hover only: the constant per waypoint labels
+  littered every planned walk, the hovered waypoint prints its full
+  x y z triple (the dump walk line format) next to the dot instead,
+  and the status bar cursor chip plus the ctrl+c copy carry the same
+  values (see the cursor chip below). The state dump
   (`/api/bots/<id>/dump`) prints the same whole leg with the origin
-  ("from"), every waypoint marked `(passed)` and the `<-- TARGET`
-  marker on the current one, and the `dest` line last - a stuck or
-  drifting walk reads at a glance (the 2026-09-10 water stuck report
-  drove the format: the walk plan (3 waypoints) of the dump hid the
-  northern escape leg the re-path had planned and the character had
-  skipped past).
+  ("from"), the walk zero point (the `started` line with the last
+  seen moment and the time on the walk), every passed waypoint with
+  its timing (`(passed, t+10.4s, leg 5.2s)` - the moment the follower
+  reached it on the walk timeline and the leg duration that ended
+  there) and the `<-- TARGET` marker on the current one with its
+  walking time (`(walking 45.2s)`, the stuck leg number - the last
+  walk plan measures the aimed leg to the moment the plan ended), and
+  the `dest` line last - a stuck or dawdling walk reads at a glance
+  (the 2026-09-10 water stuck report drove the format: the walk plan
+  (3 waypoints) of the dump hid the northern escape leg the re-path
+  had planned and the character had skipped past; the 2026-09-19
+  timing round added the per waypoint cost so a dawdling point shows
+  how long it eats, not just its name). The tracker observes the
+  arrivals through the cursor advance of the every tick republish
+  (`walkWpAt`, see `publishWalkPlanLocked`), so the resolution is the
+  250 ms hunt tick and the last walk record keeps the timing after
+  the walk ends.
 
 ## Equipment widget and the shop queue flyout
 
