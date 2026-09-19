@@ -78,6 +78,7 @@ type TestView struct {
     ID          string    `json:"id"`
     Title       string    `json:"title"`
     Account     string    `json:"account"`
+    Bots        []string  `json:"bots"`
     Description string    `json:"description"`
     TimeoutSec  int       `json:"timeoutSec"`
     Status      string    `json:"status"`
@@ -125,6 +126,7 @@ func (t *Test) view() TestView {
         ID:          t.def.ID,
         Title:       t.def.Title,
         Account:     t.def.Account,
+        Bots:        []string{t.def.Account},
         Description: t.def.Description,
         TimeoutSec:  int(t.def.Timeout / time.Second),
         Status:      t.status,

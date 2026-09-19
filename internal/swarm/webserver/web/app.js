@@ -3657,9 +3657,46 @@ function renderAcceptance() {
     run.title = "start (or restart) the scenario: the temp bot is " +
       "recreated with the same name and the same path";
     run.dataset.id = test.id;
-    run.addEventListener("click", () => runAcceptanceTest(test.id));
+    run.addEventListener("click", (event) => {
+      // The run keeps its own action: the card under it jumps to the
+      // bot, the stopPropagation separates the two.
+      event.stopPropagation();
+      runAcceptanceTest(test.id);
+    });
     row.append(dot, name, status, run);
     item.append(row);
+
+    // The bot chips: the temp bots the scenario drives (one today, the
+    // list keeps the room for the multi bot scenarios). The chip
+    // carries the live status dot of the bot and the click jumps to
+    // it - the sidebar selects the plaque, the map tab follows the
+    // world view.
+    const botIds = Array.isArray(test.bots) && test.bots.length > 0
+      ? test.bots
+      : [test.account].filter(Boolean);
+    if (botIds.length > 0) {
+      const botsRow = document.createElement("div");
+      botsRow.className = "acc-bots";
+      for (const botId of botIds) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "acc-bot-chip";
+        const live = App.bots.find((b) => b.id === botId);
+        const chipDot = document.createElement("span");
+        chipDot.className = "dot " + (live ? live.status : "offline");
+        const chipName = document.createElement("span");
+        chipName.textContent = botId;
+        chip.title = "the bot of this scenario - the click selects it " +
+          "in the sidebar and follows it on the map";
+        chip.append(chipDot, chipName);
+        chip.addEventListener("click", (event) => {
+          event.stopPropagation();
+          jumpToScenarioBot(botId);
+        });
+        botsRow.append(chip);
+      }
+      item.append(botsRow);
+    }
 
     // The check list: the narrative of the scenario with the live
     // state of every condition.
@@ -3702,8 +3739,33 @@ function renderAcceptance() {
     });
     item.addEventListener("mouseleave", hideAccTooltip);
 
+    // The card click jumps to the scenario bot the same way the chip
+    // does (the first bot of the list): the run button and the chips
+    // keep their own actions through the stopPropagation above.
+    item.addEventListener("click", () => {
+      if (botIds[0]) { jumpToScenarioBot(botIds[0]); }
+    });
+
     list.append(item);
   }
+}
+
+// jumpToScenarioBot selects the scenario bot everywhere at once: the
+// sidebar flips to the tests view where the temp bots live and the
+// plaque scrolls into sight, the map tab activates so the world view
+// of the bot lands on the screen right away. The selection also
+// rebinds the HUD, the event stream and the proxy target (the
+// selectBot side effects).
+function jumpToScenarioBot(botId) {
+  if (!botId) { return; }
+  selectBot(botId);
+  const mapBtn = document.querySelector('.tab[data-tab="map"]');
+  if (mapBtn && !mapBtn.classList.contains("active")) { mapBtn.click(); }
+  selectSidebarTab("tests");
+  const plaque = document.querySelector(
+    '#bot-list-acc .bot-item[data-id="' +
+    (window.CSS && CSS.escape ? CSS.escape(botId) : botId) + '"]');
+  if (plaque) { plaque.scrollIntoView({ block: "nearest" }); }
 }
 
 // runAcceptanceTest starts (or restarts) one scenario.

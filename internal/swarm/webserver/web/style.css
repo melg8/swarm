@@ -2753,6 +2753,54 @@ canvas.fxg-cell.picked {
 
 .acc-item:hover { background: var(--bg-panel); }
 
+/* The card itself is a jump target: the click selects the scenario
+   bot in the sidebar and follows it on the map, so the cursor reads
+   as a pointer over the whole card (the run button and the chips
+   keep their own actions). */
+.acc-item { cursor: pointer; }
+
+/* The bot chips of the scenario card: the temp bots the scenario
+   drives, one pill per bot with the live status dot. */
+.acc-bots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0 0 16px;
+}
+
+.acc-bot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  min-height: 20px;
+  padding: 2px 9px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.acc-bot-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.acc-bot-chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gray);
+  flex-shrink: 0;
+}
+
+.acc-bot-chip .dot.online { background: var(--green); }
+.acc-bot-chip .dot.connecting { background: var(--accent); }
+.acc-bot-chip .dot.offline { background: var(--red); }
+
 .acc-item.status-passed { border-left-color: var(--green); }
 .acc-item.status-failed { border-left-color: var(--red); }
 .acc-item.status-running { border-left-color: var(--accent); }
