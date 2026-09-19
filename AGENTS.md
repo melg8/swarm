@@ -11,6 +11,58 @@ This file holds the RULES and the load-bearing FACTS only; the
 implementation-level detail of every subsystem lives in `docs/` (see
 the documentation map below) and is read on demand, not upfront.
 
+## Session limits (owner instruction, mandatory)
+
+- One agent process lives at most **2 hours** from the owner prompt.
+  **Stop all work and hand control back to the user no later than
+  1 hour 45 minutes in** - the stop is mandatory even mid task, and
+  everything must be pushed to the remote branch before it. Plan the
+  work so every atomic commit lands well before the mark.
+- A new owner prompt **resets the timer**: the 2 hour life and the
+  1h45m stop mark count again from the fresh prompt.
+- Stamp the session start into `/home/z/my-project/.session_start_ts`
+  (a unix timestamp, one line) at the session start; read it back
+  (`cat /home/z/my-project/.session_start_ts`) and compare with
+  `date +%s` before starting any long operation. Budget with the
+  measured cycle times in the deploy section below (the full verify
+  loop is ~5.5 minutes).
+- The exact kill mechanism is not observable from inside the
+  sandbox; treat the limits as a hard owner directive, not a
+  hypothesis (the registry below collects server facts, this is an
+  operational rule).
+
+## Long running subprocesses in the agent sandbox
+
+The sandbox host reaps session processes, but the behavior changed
+over time - re-test before relying on either verdict; both studies
+keep their probe scripts under `/home/z/my-project/scripts/`.
+
+- **Study of 2026-09-19 (latest, verified with the heartbeat probes
+  `detach_probe_a.sh` / `detach_probe_b.sh`)**: a detached process
+  **survives across tool calls**. Verified variants: `setsid nohup
+  ... < /dev/null > /dev/null 2>&1 &` (own session, PPID 1) and the
+  double fork with `env -i` and a renamed binary - both stayed alive
+  and serving 8+ minutes after the launching call returned. The
+  earlier verdicts below do NOT reproduce in the current sandbox.
+- **Study of 2026-09-18 (superseded, kept for the failure mode)**:
+  every detached variant died at the end of the launching tool call,
+  whatever the pid trick; `unshare --fork --mount-proc` answered
+  "Operation not permitted" (still forbidden today); the
+  agent-browser daemon and its Chrome survived across calls, so the
+  reaper tracked the session bookkeeping, not the process tree.
+- **The always-correct pattern**: run an operation up to 10 minutes
+  inside ONE tool call - start the server, wait for the port, run
+  every probe, kill the server, print the results (a bash script
+  under `scripts/` keeps it reproducible; the Bash tool allows a
+  10 minute timeout).
+- A detached server is the option for services that must outlive
+  the call. Re-verify it with `ps -eo pid,ppid,sid,cmd | grep NAME`
+  before every reuse, and kill the leftover before starting a twin
+  (a port conflict means the previous instance is still alive).
+- If a long-lived server is load-bearing for the task, re-run the
+  probe at the session start: the reaper behavior is a property of
+  the sandbox version, not of the command.
+
 ## Tech stack at a glance (read this first)
 
 - **Language**: Go 1.24 (deployed by `tools/swarm_fast_deploy.sh`).
@@ -604,18 +656,85 @@ before changing a layer; keep the layer boundaries (parsers stay pure,
 the tracker stays the only shared mutable state, the web layer never
 talks to the connection directly).
 
-## Mobius stack pitfalls (the two that bite hardest)
+## Mobius stack operational notes
 
-- **Never probe the login port by connecting to it** (the flood
-  protector silently drops the socket after 50 connections from one
-  IP; readiness checks use `ss -ltn`, never `/dev/tcp`).
-- **A restarted login server loses the game server registration** for
-  seconds - an empty server list means "wait", not "broken".
-
-The rest of the operational notes (stuck `account in use`, slow
-SIGTERM, sandbox shell kills, stack logs and tunables) live in
+Lessons learned while running the stack locally; relevant when
+debugging connectivity issues (the full inventory lives in
 `docs/deployment.md`; the `mobius-stack` skill condenses them for a
-debugging session.
+debugging session):
+
+- **Never probe the login port by connecting to it.** The login
+  server runs `FloodProtectorListener` on 2106: every accepted socket
+  from one IP increments an in-memory counter that never decays while
+  the connection state exists, and once the count exceeds
+  `MaxConnectionPerIP` (50) the server silently drops the socket,
+  which the client sees as EOF on the first read. Readiness checks
+  use `ss -ltn`, never `/dev/tcp` (this is what `port_open` in
+  `tools/mobius_env.sh` does). A clean bot reconnect clears the
+  counter entry.
+- **A restarted login server loses the game server registration**
+  for seconds - the game server re-registers on port 9014 within
+  seconds, but until then the server list is empty and the bot fails
+  with `no available game server in the server list`. An empty list
+  means "wait", not "broken"; `mobius_start.sh` waits for the
+  `Updated Gameserver` line in `login.log` for this reason.
+- **Stuck `account in use` states self heal.** When the bot's login
+  connection closes, `LoginClient` removes the login client and the
+  flood protection entry in its `finally` block, so simply retrying
+  works; restarting the login server also clears it instantly.
+- **SIGTERM on the game server is slow.** The JVM shutdown hook saves
+  the whole world and can hold port 7777 open for tens of seconds,
+  which looks like "already running". Wait for the process to
+  disappear before restarting the stack.
+- **Restricted sandbox shells may kill background processes when the
+  invoking shell exits** (see the subprocess section above for the
+  verified current behavior). `tools/mobius_e2e.sh` runs the stack
+  and the bot in a single invocation - the reliable way to test end
+  to end.
+- Account auto registration is enabled by the shipped login config
+  (`AutoCreateAccounts = True`), so the bot simply logs in with
+  `test1`/`test` and the account is created on first use.
+
+## Client proxy (short form)
+
+`internal/swarm/proxy` is the MITM server a real Lineage 2 C1 client
+connects to (run the bot with `-proxy`). `docs/proxy.md` is the
+reference (the l2.ini recipes, the relogin handoff, `proxy.log`
+triage); the facts every proxy change builds on:
+
+- The emulated login server accepts any account/password pair and
+  answers a one entry server list pointing at the proxy game port;
+  the emulated game server serves exactly one character (the bot
+  selected in the web UI, the first session without a selection) and
+  answers the character selection with the recorded `CharSelected`
+  packet of the bot session patched to the live tracker state.
+- After the client's `EnterWorld` the proxy replays the recorded
+  server->client stream (the `Recorder` history fed by the
+  `GameClient` tap) and then relays live packets both ways,
+  re-encrypting on the direction specific cipher chains. The replay
+  model keeps the chains independent - that is what makes packet
+  rewriting safe and is the contract of the `proxy.Transformer` seam
+  (identity today, the future debug spoofing hangs there). The
+  replayed self packets are live-patched (paperdoll on the char
+  list, position/vitals on `CharSelected` and `UserInfo`, stale self
+  movement dropped except the newest one), so a reconnecting client
+  spawns where the bot actually stands.
+- Client packets ride the SAME outbound cipher chain as the hunt
+  loop actions (`GameClient.SendRaw` encrypts under the session
+  writeMu), so proxied clicks and autonomous actions interleave
+  without corrupting the cipher.
+- The client connection log is a dedicated file (`proxy.log`,
+  `-proxy-log`): connection numbers, credentials, state transitions,
+  replay stats, every client -> server packet id and close reasons.
+  A failed real client login is diagnosed from that file alone.
+- The live E2E of the whole path is `tools/proxy_e2e.sh` (needs the
+  deployed stack; a fake C1 client walks the real protocol through
+  the proxy and prints `PROXY_E2E_OK`).
+- Port layout: the classic C1 exe hardcodes the auth port 2106 (the
+  ini [URL] Port line is an Unreal leftover it ignores), so the
+  proxy login listeners answer 2106 and 2107 on both `127.0.0.1` and
+  `127.0.0.2`, proxy game `127.0.0.1:7778` + `127.0.0.2:7778`; the
+  redirected client l2.ini ships in `data/client/`.
 
 ## Code conventions
 
@@ -756,6 +875,13 @@ The facts every packet change builds on:
   (`MonsterExpMaxLevelDifference`). The elven fields mobs are levels
   1-5, so a level 11 character gets 10% item drops - the deleveling
   exists to fix that (docs/hunting.md).
+- Guard retaliation in the delevel cycle (live validated): an archer
+  guard shoots at everything within its 850+ unit bow range with no
+  karma gate (`thinkAttack` -> `doAttack`), while a melee guard only
+  follows the provoker (`Guard.addDamage` -> `startFollow`) and the
+  chase dies in the `checkTarget` gate (`Player.isAutoAttackable`
+  returns karma > 0 for guards) - the delevel provokes the archer
+  sentinels (Kendell, Starden) only, in melee.
 - The elven fighter creation values: race 1 (ELF), classId 18
   (ELVEN_FIGHTER), see
   `gameserver/entity/actor/enums/player/PlayerClass`.

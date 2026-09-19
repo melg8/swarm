@@ -683,3 +683,31 @@ over the Dion hunting grounds.
   maps load lazily per query (the tile LRU 4, the abstract LRU 32,
   the hop cache 4096), the whole pack loads only in the viewer mode
   (the bare -show-navmesh stitches every tile).
+
+### Progress (2026-09-19, the agents.md restoration round)
+
+- the owner session limits land in AGENTS.md as the mandatory first
+  section (the 2 hour life from the owner prompt, the mandatory stop
+  at 1h45m with everything pushed, the timer reset on every fresh
+  prompt, the /home/z/my-project/.session_start_ts stamp protocol) -
+  the rule previously lived only in the agents.md run notes.
+- the sandbox subprocess study of this session lands: both detached
+  variants (setsid own session, double fork env -i renamed binary)
+  survive 8+ minutes across tool calls with heartbeat probes
+  (scripts/detach_probe_a.sh, detach_probe_b.sh in the sandbox, not
+  in the repo) - the 09-18 verdicts do not reproduce today; the
+  single-tool-call pattern stays the always-correct option, the
+  detached server stays the verified option with a ps re-check.
+- the pre-split operational nuggets return from the c7786c9 split in
+  the condensed form: the Mobius stack operational notes are whole
+  again (flood protector mechanics, re-registration wait, account in
+  use self heal, slow SIGTERM, single invocation e2e, auto
+  registration), the client proxy short form is back (emulated
+  login, replay+relay contract, shared cipher chain, proxy.log,
+  proxy_e2e, port layout), the archer guard retaliation fact joins
+  the protocol notes.
+- verified against the collected versions (the file history
+  v01..v09): the c7786c9 split dropped nothing load-bearing - the
+  ~163 absent lines of the 1733 are reflowed, superseded or
+  rephrased in docs/; the restoration adds the operational layer
+  back, not the 112 KB blob.

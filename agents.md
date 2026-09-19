@@ -1,8 +1,10 @@
 # Agent Notes
 
 The load bearing repo manual lives in `AGENTS.md` (the rules, the
-subsystem map, the docs index); this file carries the session run
-notes the owner asked to keep on top.
+session limits, the sandbox subprocess verdicts, the subsystem map,
+the docs index); this file carries the session run notes the owner
+asked to keep on top. Keep the two in sync by editing `AGENTS.md`
+first and mirroring the operational digest here.
 
 ## Session limits (owner instruction, mandatory)
 
@@ -19,34 +21,32 @@ notes the owner asked to keep on top.
 
 ## Long running subprocesses (servers, builds)
 
-- UPDATE 2026-09-19 (fresh full study, supersedes the 09-18 note):
-  nothing escapes the reaper, no matter how detached. Dead between
-  tool calls in every variant: `setsid nohup ... &` with own session
-  (PID=PGID=SID, PPID 1), the same plus `env -i`, and a renamed
-  binary copy; `unshare --fork --mount-proc` stays "Operation not
-  permitted". The death lands at the END of the launching tool call,
-  not on a fixed timer - the process serves the whole call (the UI
-  harness answered curls and browser probes for minutes) and is gone
-  the moment the call returns. The agent tooling itself survives (the
-  agent-browser daemon and its Chrome keep living across calls), so
-  the reaper tracks the session bookkeeping, not the process tree or
-  the session id - no pid trick escapes it.
-- The working pattern (verified): run the long operation inside ONE
-  tool call. Start the server, wait for the port, run every probe,
-  kill the server, print the results - a bash script under
-  /home/z/my-project/scripts keeps it reproducible, the Bash tool
-  allows 10 minutes per call. For a UI check the agent-browser daemon
-  persists between calls (it is whitelisted tooling), only the page
-  needs the server alive during the same call.
-- A detached server still serves the seconds of its own call - quick
-  curl checks fit, anything longer needs the single call pattern.
-- A port conflict means the previous instance still runs: check
-  `ps -eo pid,cmd | grep CMD` and reuse or kill it before starting a
-  twin.
+- UPDATE 2026-09-19, second study of the day (heartbeat probes
+  `scripts/detach_probe_a.sh` / `detach_probe_b.sh`, both variants
+  alive 8+ minutes across tool calls): in the CURRENT sandbox a
+  detached process SURVIVES across tool calls - `setsid nohup ...
+  < /dev/null > /dev/null 2>&1 &` with its own session (PPID 1) and
+  the double fork with `env -i` plus a renamed binary both keep
+  running and serving after the launching call returned. The 09-18
+  morning verdicts (death at the call end, the 15-20 second window)
+  do NOT reproduce today; the reaper behavior is a property of the
+  sandbox version - re-run the probe at the session start when a
+  long-lived server is load-bearing.
+- Still true from the 09-18 study: `unshare --fork --mount-proc` is
+  forbidden ("Operation not permitted"); the agent tooling itself
+  (the agent-browser daemon) survives across calls regardless.
+- The always-correct pattern: run an operation up to 10 minutes
+  inside ONE tool call - start the server, wait for the port, run
+  every probe, kill the server, print the results; the harness
+  script under `scripts/` keeps it reproducible.
+- A detached server still needs a `ps` re-check before every reuse,
+  and a leftover must be killed before starting a twin (a port
+  conflict means the previous instance is still running).
 
 ## Repo conventions
 
 - Commits carry the melg8 authorship, all work lands on the branch
   `feature/new-pathfind-alternative`, push significant changes as soon as
-  they are ready.
+  they are ready, rebase on the remote before every push (other
+  agents push concurrently).
 - The Go sources use the space indentation (4 spaces, not the gofmt tabs).
