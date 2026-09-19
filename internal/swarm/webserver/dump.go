@@ -394,19 +394,24 @@ func writeDumpWalkPlan(b *strings.Builder, snap state.Snapshot) {
         writeWalkPlanSection(b, "last walk plan (",
             snap.LastWalkPath, snap.LastWalkOrigin,
             snap.LastWalkIndex, snap.LastWalkDest,
+            snap.LastWalkSearch,
             snap.LastWalkStart, snap.LastWalkAt, snap.LastWalkWpAt)
 
         return
     }
     writeWalkPlanSection(b, "walk plan (", snap.WalkPath,
         snap.WalkOrigin, snap.WalkIndex, snap.WalkDest,
+        snap.WalkSearch,
         snap.WalkStart, snap.WalkAt, snap.WalkWpAt)
 }
 
 // writeWalkPlanSection prints one walk plan section under the given
-// header prefix: the waypoint count and the follower cursor, the
-// planning origin, the walk zero point (the started line the timing
-// suffixes read against), every waypoint with the aimed one
+// header prefix: the waypoint count with the search word of the mesh
+// contract the plan answers (dry walls the water, swim prices it -
+// the repro word the pathfind link replays the search with; no word
+// for the direct legs no mesh search produced), the follower cursor,
+// the planning origin, the walk zero point (the started line the
+// timing suffixes read against), every waypoint with the aimed one
 // emphasized and the final destination. The timing suffixes print
 // from the observed arrival times (the walkWpAt record): a passed
 // waypoint carries its moment on the walk timeline (t+) and the leg
@@ -419,15 +424,41 @@ func writeDumpWalkPlan(b *strings.Builder, snap state.Snapshot) {
 func writeWalkPlanSection(
     b *strings.Builder, headerPrefix string,
     path []state.WalkPoint, origin *state.WalkPoint, index int,
-    dest *state.WalkPoint, start time.Time, at time.Time,
+    dest *state.WalkPoint, search *state.WalkSearch,
+    start time.Time, at time.Time,
     wpAt []time.Time,
 ) {
     target := index
     if target < 0 || target >= len(path) {
         target = len(path) - 1
     }
-    fmt.Fprintf(b, "%s%d waypoints, aiming at wp %d):\n",
-        headerPrefix, len(path), target)
+    if search != nil {
+        filterWord := "swim"
+        if search.Dry {
+            filterWord = "dry"
+        }
+        fmt.Fprintf(b, "%s%d waypoints, %s, aiming at wp %d):\n",
+            headerPrefix, len(path), filterWord, target)
+        // The full search contract rides its own line: the filter
+        // word alone rebuilds a lookalike, the approach radius and
+        // the ban circles rebuild the very search (the paste a dump
+        // into the HUD flow restores the plan through the parser).
+        fmt.Fprintf(b, "  search approach %.0f", search.Approach)
+        if len(search.Avoid) > 0 {
+            circles := make([]string, len(search.Avoid))
+            for i := range search.Avoid {
+                circles[i] = fmt.Sprintf("%.0f %.0f %.0f",
+                    search.Avoid[i].X,
+                    search.Avoid[i].Y,
+                    search.Avoid[i].R)
+            }
+            fmt.Fprintf(b, " avoid %s", strings.Join(circles, ","))
+        }
+        fmt.Fprint(b, "\n")
+    } else {
+        fmt.Fprintf(b, "%s%d waypoints, aiming at wp %d):\n",
+            headerPrefix, len(path), target)
+    }
     if origin != nil {
         fmt.Fprintf(b, "  from %d %d %d\n",
             origin.X, origin.Y, origin.Z)

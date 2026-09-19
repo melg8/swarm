@@ -872,13 +872,21 @@ function pathfindTiles(from, to) {
 }
 
 // buildPathfindLink freezes the snapshot walk into the viewer URL:
-// the from/to pair, the tiles around it, the swim filter, the default
-// height scale and geometry variant, and the camera pose computed
-// with the viewer framing math (the three quarter orbit south east of
-// the route midpoint, the yaw and the pitch derived from the look
-// direction - the same analytic route frameInitialTiles flies).
+// the from/to pair, the tiles around it, the search contract the plan
+// answered (the filter, the approach radius, the ban circles and the
+// unfolded answer of the plan repro mode), the default height scale
+// and geometry variant, and the camera pose computed with the viewer
+// framing math (the three quarter orbit south east of the route
+// midpoint, the yaw and the pitch derived from the look direction -
+// the same analytic route frameInitialTiles flies). The search
+// contract is the repro guarantee: the viewer rebuilds the very
+// search the bot walked instead of a lookalike - the 2026-09-19
+// route mismatch report (a dry zone return rebuilt with the swim
+// filter and folded into a straight water blind chord) drove the
+// contract.
 function buildPathfindLink(snap) {
   const pair = pathfindRoutePair(snap);
+  const search = (snap && snap.walkSearch) || null;
   const params = new URLSearchParams();
   if (pair) {
     const { from, to } = pair;
@@ -907,7 +915,23 @@ function buildPathfindLink(snap) {
     ].join(","));
     params.set("tiles", pathfindTiles(from, to).join(","));
   }
-  params.set("filter", "swim");
+  if (search) {
+    // The plan answers a mesh search: the link carries its contract
+    // and the plan repro mode (the unfolded answer).
+    params.set("filter", search.dry ? "dry" : "swim");
+    if (search.approach > 0) {
+      params.set("approach", String(search.approach));
+    }
+    if (search.avoid && search.avoid.length > 0) {
+      params.set("avoid", search.avoid.map((circle) =>
+        circle.x + "," + circle.y + "," + circle.r).join(";"));
+    }
+    params.set("fold", "0");
+  } else {
+    // No mesh contract (a direct leg or a bare snapshot): the viewer
+    // defaults stay (the swim filter, the folded answer).
+    params.set("filter", "swim");
+  }
   params.set("scale", "1");
   params.set("geom", "mesh");
   params.set("path", "smooth");

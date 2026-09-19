@@ -126,6 +126,31 @@ type navmeshPathRequest struct {
     Start  navmeshPoint `json:"start"`
     End    navmeshPoint `json:"end"`
     Filter string       `json:"filter"`
+    // Approach is the approach radius of the search (the plan repro
+    // contract): a positive value succeeds on the first polygon whose
+    // surface sits within the radius of the end (the bot trip
+    // searches plan with 200), the zero default keeps the exact
+    // destination contract of the double click pair.
+    Approach float64 `json:"approach,omitempty"`
+    // Avoid lists the ban circles the search seals (the frozen areas
+    // the plan carried). Empty for the clean searches.
+    Avoid []navmeshAvoidCircle `json:"avoid,omitempty"`
+    // Fold runs the capsule post pass over the answer (the pushes and
+    // the bend pass, then the fold into the longest grid clear legs -
+    // the double click default). The plan repro links send false: the
+    // answer then IS the search answer the bot publishes as its walk
+    // plan, no grid pass bends it (the grid oracle is water blind -
+    // the 2026-09-19 route mismatch round: the fold drew a straight
+    // chord over the lake the mesh route detours).
+    Fold *bool `json:"fold,omitempty"`
+}
+
+// navmeshAvoidCircle is one ban circle of the route request: the
+// center on the world plane and the radius to seal.
+type navmeshAvoidCircle struct {
+    X float64 `json:"x"`
+    Y float64 `json:"y"`
+    R float64 `json:"r"`
 }
 
 // navmeshPathResponse is the reply of POST /api/navmesh/path: the
@@ -271,7 +296,10 @@ func (s *Server) handleNavmeshOriginal(w http.ResponseWriter,
 }
 
 // handleNavmeshPath runs one corridor search of the mesh between the
-// two double clicked points and measures the construction time.
+// two double clicked points (the exact destination, the fold pipeline)
+// or one plan repro search of a pathfind link (the approach radius,
+// the ban circles, the raw answer), and measures the construction
+// time.
 //
 //nolint:funlen // the handler mirrors the request validation steps in order
 func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
@@ -311,8 +339,21 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         Z: request.Start.Z}
     end := navmesh.Pos{X: request.End.X, Y: request.End.Y,
         Z: request.End.Z}
+    for _, circle := range request.Avoid {
+        filter.Avoid = append(filter.Avoid, navmesh.AvoidCircle{
+            CenterX: circle.X,
+            CenterY: circle.Y,
+            Radius:  circle.R,
+        })
+    }
     began := time.Now()
-    route, err := s.navmeshMesh.Route(start, end, filter)
+    var route *navmesh.Route
+    if request.Approach > 0 {
+        route, err = s.navmeshMesh.RouteApproach(start, end,
+            request.Approach, filter)
+    } else {
+        route, err = s.navmeshMesh.Route(start, end, filter)
+    }
     duration := time.Since(began)
     // The console line keeps the construction cost observable from
     // the server window (the viewer answer carries the same number
@@ -362,13 +403,22 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         response.Partial = route.Partial
         response.Explored = route.Explored
         response.Corridor = len(route.Corridor)
-        // The smoothed answer walks the full pipeline: the pushes and
-        // the bends of the capsule pass, then the fold into the
-        // longest grid clear legs. The raw funnel answer keeps the
+        // The fold switch: the smoothed answer walks the full
+        // pipeline (the pushes and the bends of the capsule pass,
+        // then the fold into the longest grid clear legs), the plan
+        // repro answer (fold=false) serves the search waypoints as
+        // the bot publishes them. The raw funnel answer keeps the
         // legacy post pass only - it is the before picture of the
         // comparison toggle.
-        response.Waypoints = toNavmeshPoints(
-            s.clearedWaypoints(route.Waypoints, clearance))
+        fold := true
+        if request.Fold != nil {
+            fold = *request.Fold
+        }
+        waypoints := route.Waypoints
+        if fold {
+            waypoints = s.clearedWaypoints(route.Waypoints, clearance)
+        }
+        response.Waypoints = toNavmeshPoints(waypoints)
         response.RawWaypoints = toNavmeshPoints(
             s.legacyWaypoints(route.RawWaypoints, clearance))
     }

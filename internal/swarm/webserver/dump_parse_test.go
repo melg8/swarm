@@ -235,6 +235,66 @@ func TestParseDumpNoHuntingZone(t *testing.T) {
     require.Nil(t, snap.HuntingZone)
 }
 
+// TestParseDumpWalkPlanSearch pins the search word of the walk plan
+// header through the whole dump round trip: the dry zone return plans
+// print "dry", the swim plans print "swim", the direct legs (no mesh
+// search) keep the bare header and parse back to a nil contract - the
+// pathfind link replays the very search the plan answers.
+func TestParseDumpWalkPlanSearch(t *testing.T) {
+    build := func(search *state.WalkSearch) string {
+        bot := state.NewBot("test1")
+        bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+        bot.SetWalkPlan(state.WalkPlan{
+            Origin: &state.WalkPoint{X: 45000, Y: 50000, Z: -3500},
+            Points: []state.WalkPoint{
+                {X: 45600, Y: 50400, Z: -3500},
+            },
+            Index:  0,
+            Dest:   &state.WalkPoint{X: 46200, Y: 51100, Z: -3500},
+            Search: search,
+        })
+
+        return BuildStateDump(bot)
+    }
+
+    dry := build(&state.WalkSearch{
+        Dry:      true,
+        Approach: 200,
+        Avoid:    []state.WalkAvoidCircle{{X: 43000, Y: 42000, R: 300}},
+    })
+    require.Contains(t, dry,
+        "walk plan (1 waypoints, dry, aiming at wp 0):")
+
+    swim := build(&state.WalkSearch{Dry: false, Approach: 150})
+    require.Contains(t, swim,
+        "walk plan (1 waypoints, swim, aiming at wp 0):")
+
+    direct := build(nil)
+    require.Contains(t, direct,
+        "walk plan (1 waypoints, aiming at wp 0):")
+
+    snap, err := ParseDump(dry)
+    require.NoError(t, err)
+    require.NotNil(t, snap.WalkSearch)
+    require.True(t, snap.WalkSearch.Dry)
+    require.InDelta(t, 200, snap.WalkSearch.Approach, 0.01)
+    require.Len(t, snap.WalkSearch.Avoid, 1)
+    require.InDelta(t, 43000, snap.WalkSearch.Avoid[0].X, 0.01)
+    require.InDelta(t, 300, snap.WalkSearch.Avoid[0].R, 0.01)
+
+    snap, err = ParseDump(swim)
+    require.NoError(t, err)
+    require.NotNil(t, snap.WalkSearch)
+    require.False(t, snap.WalkSearch.Dry)
+    require.InDelta(t, 150, snap.WalkSearch.Approach, 0.01)
+    require.Empty(t, snap.WalkSearch.Avoid)
+
+    snap, err = ParseDump(direct)
+    require.NoError(t, err)
+    require.Nil(t, snap.WalkSearch,
+        "the bare header parses to no search contract")
+}
+
 // TestApplyDumpRebuildsCharacter pins the ApplyDump contract: a
 // parsed snapshot replays into a fresh bot through the Apply API so
 // the character fields the hunt loop reads (level, HP, position) hold

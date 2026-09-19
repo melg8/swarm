@@ -629,6 +629,7 @@ func (p *dumpParser) parseWalkPlan(header string, last bool) error {
     count := parseInt32(takeAfter(header, "waypoints"))
     aimingRest := takeAfter(header, "aiming at wp ")
     aiming := parseInt32(takeBefore(aimingRest, ")"))
+    search := parseWalkPlanSearch(header)
     points := make([]state.WalkPoint, 0, count)
     var origin *state.WalkPoint
     var dest *state.WalkPoint
@@ -648,6 +649,8 @@ func (p *dumpParser) parseWalkPlan(header string, last bool) error {
             coords := takeAfter(field, "dest ")
             wp := parseWalkCoords(coords)
             dest = &wp
+        case strings.HasPrefix(field, "search "):
+            parseWalkSearchLine(field, search)
         case strings.HasPrefix(field, "wp "):
             // "wp <i>: <x> <y> <z>" or "... (passed)" or
             // "... <-- TARGET"
@@ -664,14 +667,60 @@ func (p *dumpParser) parseWalkPlan(header string, last bool) error {
         p.snap.LastWalkOrigin = origin
         p.snap.LastWalkDest = dest
         p.snap.LastWalkIndex = int(aiming)
+        p.snap.LastWalkSearch = search
     } else {
         p.snap.WalkPath = points
         p.snap.WalkOrigin = origin
         p.snap.WalkDest = dest
         p.snap.WalkIndex = int(aiming)
+        p.snap.WalkSearch = search
     }
 
     return nil
+}
+
+// parseWalkPlanSearch reads the search word of the walk plan header
+// ("N waypoints, dry, aiming..." vs "N waypoints, aiming..."): the
+// mesh filter the plan answers, nil for the direct legs no mesh
+// search produced (the header names no word).
+func parseWalkPlanSearch(header string) *state.WalkSearch {
+    middle := takeBefore(takeAfter(header, "waypoints"),
+        "aiming at wp")
+    switch {
+    case strings.Contains(middle, "dry"):
+        return &state.WalkSearch{Dry: true}
+    case strings.Contains(middle, "swim"):
+        return &state.WalkSearch{Dry: false}
+    }
+
+    return nil
+}
+
+// parseWalkSearchLine reads the search contract line of the walk
+// plan ("search approach 200 avoid 43000 42000 300,43500 42200 250")
+// into the parsed search: the approach radius always rides, the ban
+// circles only when the line carries them.
+func parseWalkSearchLine(field string, search *state.WalkSearch) {
+    if search == nil {
+        return
+    }
+    if rest := takeAfter(field, "approach"); rest != field {
+        rest = takeBefore(rest, " avoid")
+        search.Approach = parseFloat64(strings.TrimSpace(rest))
+    }
+    if rest := takeAfter(field, "avoid "); rest != field {
+        for _, part := range strings.Split(rest, ",") {
+            numbers := strings.Fields(part)
+            if len(numbers) != 3 {
+                continue
+            }
+            search.Avoid = append(search.Avoid, state.WalkAvoidCircle{
+                X: parseFloat64(numbers[0]),
+                Y: parseFloat64(numbers[1]),
+                R: parseFloat64(numbers[2]),
+            })
+        }
+    }
 }
 
 // parseWalkCoords reads "<x> <y> <z>" into a WalkPoint.

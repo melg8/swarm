@@ -546,6 +546,62 @@ function main() {
             query.get("geom") === "mesh" &&
             query.get("path") === "smooth",
             "got " + url);
+        check(results, "the default link arms no repro contract",
+            !query.has("approach") && !query.has("avoid") &&
+            !query.has("fold"), "got " + url);
+
+        // The plan's mesh search contract rides the link (the repro
+        // guarantee of the 2026-09-19 route mismatch round): the dry
+        // zone return plans emit filter=dry with the approach radius
+        // and the ban circles, and the plan repro mode (fold=0) so
+        // the viewer serves the search answer the bot publishes
+        // instead of the water blind grid fold.
+        const drySnap = snapshotWith(0);
+        drySnap.walkOrigin = { x: 46045, y: 41251, z: -3504 };
+        drySnap.walkPath = [{ x: 36184, y: 46744, z: -3720 }];
+        drySnap.walkDest = { x: 36000, y: 46765, z: -3712 };
+        drySnap.walkSearch = {
+            dry: true,
+            approach: 200,
+            avoid: [{ x: 43000, y: 42000, r: 300 }],
+        };
+        const dryUrl = hud.buildPathfindLink(drySnap);
+        const dryQuery = new URLSearchParams(
+            dryUrl.slice(dryUrl.indexOf("?") + 1));
+        check(results, "the dry plan link carries the dry filter",
+            dryQuery.get("filter") === "dry", "got " + dryUrl);
+        check(results, "the dry plan link carries the approach radius",
+            dryQuery.get("approach") === "200", "got " + dryUrl);
+        check(results, "the dry plan link carries the ban circles",
+            dryQuery.get("avoid") === "43000,42000,300",
+            "got " + dryUrl);
+        check(results, "the plan link arms the plan repro mode",
+            dryQuery.get("fold") === "0", "got " + dryUrl);
+        check(results, "the plan link keeps the pair and the camera",
+            dryQuery.get("from") === "46045,41251,-3504" &&
+            dryQuery.get("to") === "36000,46765,-3712" &&
+            dryQuery.has("cam") && dryQuery.has("tiles"),
+            "got " + dryUrl);
+
+        const swimSearchSnap = snapshotWith(0);
+        swimSearchSnap.walkOrigin = { x: 45000, y: 50000, z: -3500 };
+        swimSearchSnap.walkPath = [{ x: 46200, y: 51100, z: -3500 }];
+        swimSearchSnap.walkDest = { x: 46200, y: 51100, z: -3500 };
+        swimSearchSnap.walkSearch = { dry: false, approach: 150 };
+        const swimSearchUrl = hud.buildPathfindLink(swimSearchSnap);
+        const swimSearchQuery = new URLSearchParams(
+            swimSearchUrl.slice(swimSearchUrl.indexOf("?") + 1));
+        check(results, "the swim plan link carries the swim filter",
+            swimSearchQuery.get("filter") === "swim",
+            "got " + swimSearchUrl);
+        check(results, "the swim plan link carries its approach radius",
+            swimSearchQuery.get("approach") === "150",
+            "got " + swimSearchUrl);
+        check(results, "the clean plan link carries no bans",
+            !swimSearchQuery.has("avoid"), "got " + swimSearchUrl);
+        check(results, "the swim plan link arms the plan repro mode",
+            swimSearchQuery.get("fold") === "0",
+            "got " + swimSearchUrl);
 
         // A snapshot without a walk plan opens the viewer bare: the
         // route pair and the camera stay out, the defaults stay in.

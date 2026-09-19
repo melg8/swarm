@@ -100,7 +100,7 @@ func appendSnapshotJSON(dst []byte, s Snapshot) []byte {
     dst = appendChatJSON(dst, s.Chat)
     dst = append(dst, `,"walkPath":`...)
     dst = appendWalkPlanFieldsJSON(dst, s.WalkPath, s.WalkOrigin,
-        s.WalkIndex, s.WalkDest)
+        s.WalkIndex, s.WalkDest, s.WalkSearch)
     dst = append(dst, `,"shopping":`...)
     dst = appendShoppingPlanJSON(dst, s.Shopping)
     dst = append(dst, `,"skills":`...)
@@ -459,12 +459,12 @@ func appendChatEventJSON(dst []byte, line ChatEvent) []byte {
 }
 
 // appendWalkPlanFieldsJSON writes the walk plan field group of the
-// snapshot: the waypoint array plus the origin, the follower cursor
-// and the destination (the Snapshot and the live state encoders share
-// the exact field order).
+// snapshot: the waypoint array plus the origin, the follower cursor,
+// the destination and the search contract (the Snapshot and the live
+// state encoders share the exact field order).
 func appendWalkPlanFieldsJSON(
     dst []byte, points []WalkPoint, origin *WalkPoint, index int,
-    dest *WalkPoint,
+    dest *WalkPoint, search *WalkSearch,
 ) []byte {
     dst = appendWalkPathJSON(dst, points)
     dst = append(dst, `,"walkOrigin":`...)
@@ -472,8 +472,43 @@ func appendWalkPlanFieldsJSON(
     dst = append(dst, `,"walkIndex":`...)
     dst = strconv.AppendInt(dst, int64(index), 10)
     dst = append(dst, `,"walkDest":`...)
+    dst = appendWalkPointPtrJSON(dst, dest)
+    dst = append(dst, `,"walkSearch":`...)
 
-    return appendWalkPointPtrJSON(dst, dest)
+    return appendWalkSearchJSON(dst, search)
+}
+
+// appendWalkSearchJSON writes the mesh search contract of the walk
+// plan (null when the plan came from no mesh search).
+func appendWalkSearchJSON(dst []byte, search *WalkSearch) []byte {
+    if search == nil {
+        return append(dst, `null`...)
+    }
+    dst = append(dst, `{"dry":`...)
+    dst = strconv.AppendBool(dst, search.Dry)
+    dst = append(dst, `,"approach":`...)
+    dst = appendJSONFloat(dst, search.Approach)
+    dst = append(dst, `,"avoid":`...)
+    if search.Avoid == nil {
+        dst = append(dst, `null`...)
+    } else {
+        dst = append(dst, '[')
+        for i := range search.Avoid {
+            if i > 0 {
+                dst = append(dst, ',')
+            }
+            dst = append(dst, `{"x":`...)
+            dst = appendJSONFloat(dst, search.Avoid[i].X)
+            dst = append(dst, `,"y":`...)
+            dst = appendJSONFloat(dst, search.Avoid[i].Y)
+            dst = append(dst, `,"r":`...)
+            dst = appendJSONFloat(dst, search.Avoid[i].R)
+            dst = append(dst, '}')
+        }
+        dst = append(dst, ']')
+    }
+
+    return append(dst, '}')
 }
 
 // appendWalkPathJSON writes the walk plan array.

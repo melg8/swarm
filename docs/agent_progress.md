@@ -1001,3 +1001,56 @@ Commits as melg8. Rebase before every push.
 - CI workflow copied to `.github/workflows/ci.yml` (lint step flipped
   from `--new` to the full run); the push needs the workflow-scoped
   token, otherwise the owner copy stays the fallback.
+
+## Active task: the pathfind link repro contract - the viewer rebuilds the very search the bot walks (2026-09-19)
+
+Started: 2026-09-19. Branch: `feature/new-pathfind-alternative`.
+Commits as melg8. Other agents may push to the same branch
+concurrently - rebase before every push.
+
+### Goal
+
+The owner report ("Выясни почему не совпал маршрут у бота в реальном
+мире и при построении через веб", the 2026-09-19 14:26 temp11 dump):
+the bot walked its planned 17 waypoint dry zone return from the elven
+village plaza to the hunting square center, the pathfind link opened
+the 3D viewer at the same from/to pair, and the drawn route had
+nothing in common with the walk. Find the cause and make the link a
+reproduction.
+
+### The diagnosis (the full analysis is Round 87 of the development log)
+
+1. The viewer's capsule post pass folded the whole mesh route into
+   ONE straight chord: the grid oracle of the fold is water blind
+   (LegClear=true while 5 of 65 sampled chord points sit over the
+   elven lake). The bot's plan is the search answer as produced; the
+   fold drew a route the bot never walks.
+2. The link hardcoded `filter=swim`; the zone return plans the DRY
+   search - two different corridors (13.3 km dry detour vs 11.9 km
+   swim cut).
+3. The viewer answered the exact destination; the bot plans the
+   approach search (radius 200) - the plan legitimately ends 185
+   units short of the destination.
+4. The frozen area bans never rode the link (silent in the clean
+   session, a real gap in general).
+
+### The fix (this commit)
+
+The search contract rides the plan: `state.WalkPlan.Search`
+(the `walkSearch` wire field: dry, approach, avoid circles) stamped
+by `startWalkLegSearch` / `planUserWalk`, cleared by
+`armDirectLeg`, published by `geodataWalkPlan` / `userWalkPlan`;
+the viewer POST gains `approach` / `avoid` / `fold`, the viewer URL
+and the HUD link round-trip the same (`fold=0` = the plan repro mode
+serving the answer as the bot publishes it); the dump names the
+filter word in the walk plan header and carries the full contract on
+its `search` line for the paste-a-dump flow.
+
+### Progress
+
+- Round 87 lands as one commit: the state contract, the hunt
+  stamps, the viewer handler/URL/POST, the HUD link serialization,
+  the dump header word + search line, the tests (state JSON, the
+  webserver handler pins, the hunt stamps, the HUD harness, the
+  dump round trip) and the docs (webui.md, navmesh.md, this file,
+  the development log round).

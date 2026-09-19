@@ -1386,6 +1386,42 @@ type WalkPlan struct {
     // spawn, the farm spot, the clicked point), nil when the plan
     // itself carries it.
     Dest *WalkPoint `json:"dest"`
+    // Search carries the mesh search contract the plan answers (the
+    // repro contract of the 3D pathfind link): the filter, the
+    // approach radius and the ban circles the search ran with. Nil
+    // for the plans no mesh search produced (the direct server
+    // routed legs) - the link then keeps the viewer defaults.
+    Search *WalkSearch `json:"search,omitempty"`
+}
+
+// WalkSearch is the mesh search contract behind a walk plan: the
+// exact parameters a replay of the search needs (the 2026-09-19
+// route mismatch round: the web viewer rebuilt the bot's walk with
+// the swim filter, the exact destination and no bans, and folded
+// the answer with a water blind grid pass - the drawn route had
+// nothing in common with the walk the bot follows).
+type WalkSearch struct {
+    // Dry walls the water polygons off (the zone return dry leg);
+    // false prices the water at the swim rate instead (the manual
+    // walks, the mesh default).
+    Dry bool `json:"dry"`
+    // Approach is the approach radius of the search: the search
+    // succeeds on the first polygon whose surface sits within the
+    // radius of the destination (the trip searches plan with 200),
+    // zero keeps the exact destination contract (the plan then ends
+    // on the destination polygon itself).
+    Approach float64 `json:"approach"`
+    // Avoid lists the ban circles the search walled off (the frozen
+    // areas of the session). Empty for the clean searches.
+    Avoid []WalkAvoidCircle `json:"avoid,omitempty"`
+}
+
+// WalkAvoidCircle is one ban circle of a walk search: the center on
+// the world plane and the radius the search seals around it.
+type WalkAvoidCircle struct {
+    X float64 `json:"x"`
+    Y float64 `json:"y"`
+    R float64 `json:"r"`
 }
 
 // SetWalkPlan publishes the walk plan of a running leg: the planning
@@ -1461,6 +1497,12 @@ func (b *Bot) rememberWalkPlanLocked(plan *WalkPlan) {
         dest := *plan.Dest
         record.Dest = &dest
     }
+    if plan.Search != nil {
+        search := *plan.Search
+        search.Avoid = make([]WalkAvoidCircle, len(plan.Search.Avoid))
+        copy(search.Avoid, plan.Search.Avoid)
+        record.Search = &search
+    }
     record.Points = make([]WalkPoint, len(plan.Points))
     copy(record.Points, plan.Points)
     b.lastWalkPlan = &record
@@ -1508,7 +1550,11 @@ func walkPlansSameRoute(a, b WalkPlan) bool {
 func walkPlansEqual(a, b WalkPlan) bool {
     if (a.Origin == nil) != (b.Origin == nil) ||
         (a.Dest == nil) != (b.Dest == nil) ||
+        (a.Search == nil) != (b.Search == nil) ||
         a.Index != b.Index || len(a.Points) != len(b.Points) {
+        return false
+    }
+    if a.Search != nil && !walkSearchesEqual(*a.Search, *b.Search) {
         return false
     }
     if a.Origin != nil && *a.Origin != *b.Origin {
@@ -1519,6 +1565,22 @@ func walkPlansEqual(a, b WalkPlan) bool {
     }
     for i := range a.Points {
         if a.Points[i] != b.Points[i] {
+            return false
+        }
+    }
+
+    return true
+}
+
+// walkSearchesEqual compares two search contracts field by field,
+// the ban circles element wise.
+func walkSearchesEqual(a, b WalkSearch) bool {
+    if a.Dry != b.Dry || a.Approach != b.Approach ||
+        len(a.Avoid) != len(b.Avoid) {
+        return false
+    }
+    for i := range a.Avoid {
+        if a.Avoid[i] != b.Avoid[i] {
             return false
         }
     }
@@ -2454,6 +2516,10 @@ type Snapshot struct {
     // WalkDest is the final destination of the published walk,
     // null when the plan itself carries it.
     WalkDest *WalkPoint `json:"walkDest"`
+    // WalkSearch is the mesh search contract behind the published
+    // walk (the repro contract of the 3D pathfind link), null when
+    // the plan came from no mesh search.
+    WalkSearch *WalkSearch `json:"walkSearch"`
     // LastWalkPath carries the most recent published walk plan after
     // its walk ended (see state lastWalkPlan): the report of a stuck
     // leg needs the whole planned walk even when the live plan is
@@ -2463,6 +2529,7 @@ type Snapshot struct {
     LastWalkOrigin *WalkPoint  `json:"-"`
     LastWalkIndex  int         `json:"-"`
     LastWalkDest   *WalkPoint  `json:"-"`
+    LastWalkSearch *WalkSearch `json:"-"`
     LastWalkAt     time.Time   `json:"-"`
     // WalkStart is the moment the published walk was first seen
     // (the zero point of the waypoint timing) and WalkWpAt holds
@@ -2709,6 +2776,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
         snap.WalkOrigin = b.walkPlan.Origin
         snap.WalkIndex = b.walkPlan.Index
         snap.WalkDest = b.walkPlan.Dest
+        snap.WalkSearch = b.walkPlan.Search
         snap.WalkStart = b.walkPlanStart
         snap.WalkAt = b.walkPlanAt
         snap.WalkWpAt = make([]time.Time, len(b.walkWpAt))
@@ -2721,6 +2789,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
         snap.LastWalkOrigin = b.lastWalkPlan.Origin
         snap.LastWalkIndex = b.lastWalkPlan.Index
         snap.LastWalkDest = b.lastWalkPlan.Dest
+        snap.LastWalkSearch = b.lastWalkPlan.Search
         snap.LastWalkAt = b.lastWalkPlanAt
         snap.LastWalkStart = b.lastWalkStart
         snap.LastWalkWpAt = make([]time.Time, len(b.lastWalkWpAt))

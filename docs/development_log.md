@@ -6131,3 +6131,130 @@ the honest per surface re-anchoring a walk needs.
   polyline in the mesh frame z: the server syncs the claimed
   placements verbatim in the cursor key branch and the escape proved
   itself live, the round stays out of that proven path.
+
+## Round 87: the pathfind link repro contract - the viewer rebuilds the very search the bot walks (2026-09-19)
+
+Scope: the owner report of the 2026-09-19 14:26 temp11 dump ("Выясни
+почему не совпал маршрут у бота в реальном мире и при построении через
+веб") - the bot walked its planned 17 waypoint zone return from the
+elven village plaza (46045 41251 -3504) to the hunting square center
+(36000 46765 -3712), the pathfind link opened the 3D viewer at the same
+pair, and the drawn route had nothing in common with the walk.
+
+### The diagnosis - three stacked lookalikes
+
+The offline replay against the rebuilt real tile (21_19 plus its
+neighbors, `cmd/navmesh-build -regions 20_18..22_20`) reproduced the
+mismatch end to end and separated its three stacked causes:
+
+1. **The water blind fold (the dominant one).** The viewer route
+   handler ran the capsule post pass over every answer
+   (`clearedWaypoints`: the ApplyPath pushes, then the ShortenPath
+   fold into the longest grid clear legs). The fold's wall oracle is
+   the grid capsule, and the grid raster knows no water zones: the
+   straight village -> zone chord answers `LegClear=true` while 5 of
+   its 65 sampled points sit over the elven lake the mesh prices at
+   the swim rate. The fold collapsed the whole 23 waypoint swim
+   corridor into ONE 11.4 km straight chord (2 waypoints). The bot's
+   plan is the mesh answer as the search produced it
+   (`navmeshNavigator.meshWaypoints` folds nothing - the corridor
+   bound shortcut pass inside the search already owns the wall
+   avoidance), so the viewer drew a route the bot never walks, and
+   would never walk: the chord swims a lake.
+2. **The filter lookalike.** The link button hardcoded
+   `filter=swim`. The zone return plans the DRY search first
+   (`startZoneReturnLeg` -> `FindPathApproachDryAvoiding` -> the
+   water walled filter): the bot's own answer detours 13.3 km around
+   the water, the swim replay answers 11.9 km through it. Two
+   different corridors before any post pass.
+3. **The destination lookalike.** The viewer answered the exact
+   destination contract (`Route`, radius 0); the bot plans the
+   approach search (radius 200, the trip ring): the dump plan
+   legitimately ends 185 units short of the destination (wp 16
+   36184 46744 -3720, the first polygon within the ring), the exact
+   replay walks onto the destination polygon itself.
+
+The clean session in the dump carried no frozen area bans, so the
+fourth difference (the avoid circles the bot arms and the viewer
+never saw) stayed silent there - still a real repro gap in general.
+
+### The design - the search contract rides the plan
+
+The fix makes the link a REPRODUCTION instead of a lookalike: every
+published walk plan carries the mesh search contract it answered, the
+link serializes it, the viewer honors it.
+
+- `state`: `WalkPlan.Search *WalkSearch` (the wire `walkSearch`
+  field of the snapshot, null for the plans no mesh search
+  produced): the dry flag, the approach radius and the ban circles
+  (`WalkAvoidCircle`). The last plan record copies the contract for
+  the post walk dump view. The hand rolled JSON encoder grows the
+  `appendWalkSearchJSON` writer; the reflection match pins it.
+- `hunt`: `startWalkLegSearch` freezes the contract of every planned
+  leg (`legSearchView`: the dry flag off the nonDry switch, the
+  approach radius the leg searched with, the frozen areas of the
+  moment), `planUserWalk` stamps the manual mesh plan (swim, the
+  user approach radius), `armDirectLeg` clears it (the direct legs
+  answer no mesh search), `geodataWalkPlan`/`userWalkPlan` publish
+  it.
+- `webserver` (the viewer POST `/api/navmesh/path`): the request
+  gains `approach` (positive -> `RouteApproach`, the first polygon
+  within the radius succeeds; zero -> the exact `Route`), `avoid`
+  (the ban circles onto the filter) and `fold` (the capsule post
+  pass switch, default on). `fold=false` serves the search answer as
+  the bot publishes it - the plan repro mode.
+- `webserver/web/navmesh_view.js`: the URL gains `approach=`,
+  `avoid=x,y,r;...` and `fold=0|1`; the boot arms them BEFORE the
+  restored route re-runs, the POST body carries them, the shared
+  view links round-trip them. A double click under a pasted repro
+  link experiments under the plan's own conditions.
+- `webserver/web/app.js`: `buildPathfindLink` serializes the plan's
+  contract - `filter=dry|swim` off the search, `approach=`,
+  `avoid=`, `fold=0` - and keeps the viewer defaults only for the
+  plans no mesh search produced.
+- `webserver/dump.go` + `dump_parse.go`: the walk plan header names
+  the filter word (`17 waypoints, dry, aiming at wp 1`) and a
+  `search approach 200 avoid 43000 42000 300` detail line carries
+  the full contract, so a pasted dump restores the repro contract
+  through the parser too (the paste a dump into the HUD flow).
+
+### Verification
+
+- The offline replay (the scratch repro program against the rebuilt
+  tile): the bot contract (dry, approach 200, no fold) answers the
+  23 waypoint corridor; the viewer contract (swim, exact, folded)
+  answered the 2 waypoint water chord - the mismatch reproduced and
+  the contract replay eliminates it.
+- `webserver`: `TestNavmeshPathApproach` (the approach answer ends
+  on the first polygon within the radius instead of walking onto the
+  water polygon), `TestNavmeshPathAvoid` (the way-out rule of the
+  start ban, the sealed goal of the destination ban),
+  `TestNavmeshPathFoldSwitch` (fold=false IS the mesh answer, the
+  default walks the capsule pass - both against the direct mesh
+  calls), `TestWalkPlanSectionSearchWord` +
+  `TestParseDumpWalkPlanSearch` (the header word and the search line
+  through the whole dump round trip), the view script contract pins
+  the three new URL parameters.
+- `state`: `TestSnapshotJSONWalkSearchField` (the populated contract
+  rides as the repro object, the nil stays null), the reflection
+  match covers the new writer through the golden fixture.
+- `hunt`: `TestZoneReturnPlanCarriesDrySearchContract`,
+  `TestDirectLegPlanCarriesNoSearchContract` (the stale contract of
+  a previous leg must not leak into the direct leg's plan),
+  `TestManualMeshPlanCarriesSwimSearchContract`.
+- `tools/repro_hud.js`: the dry plan link (filter=dry, approach=200,
+  the ban circles, fold=0), the swim plan link (the swim filter, its
+  own approach, no bans, fold=0), the default link arms no repro
+  contract - ALL PASS.
+- The existing suites stay green untouched.
+
+### Residual
+
+- The viewer's fold pass stays the double click default: its
+  water-blind chord is exactly the experiment view the owner asked
+  the pass to model, and the plan repro links - the reports - arm
+  `fold=0`. A water aware fold oracle (the mesh corridor bound
+  ShortenPath) is the deeper cure and stays open.
+- The dump search line prints the ban circles rounded to whole
+  units (`%.0f`): the mesh bans live on the world plane at whole
+  cell granularities, the sub unit precision carries no surface.

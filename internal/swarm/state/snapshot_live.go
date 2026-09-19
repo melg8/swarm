@@ -196,15 +196,16 @@ func (b *Bot) appendLiveChatJSON(dst []byte) []byte {
 
 // appendLiveWalkPathJSON writes the published walk plan (null when
 // none is fresh) exactly like the Snapshot view: the full waypoint
-// array plus the origin, the current target index and the final
-// destination. The caller must hold a lock.
+// array plus the origin, the current target index, the final
+// destination and the search contract. The caller must hold a lock.
 func (b *Bot) appendLiveWalkPathJSON(dst []byte) []byte {
     if b.walkPlan != nil && time.Since(b.walkPlanAt) <= walkPlanTTL {
         return appendWalkPlanFieldsJSON(dst, b.walkPlan.Points,
-            b.walkPlan.Origin, b.walkPlan.Index, b.walkPlan.Dest)
+            b.walkPlan.Origin, b.walkPlan.Index, b.walkPlan.Dest,
+            b.walkPlan.Search)
     }
 
-    return appendWalkPlanFieldsJSON(dst, nil, nil, 0, nil)
+    return appendWalkPlanFieldsJSON(dst, nil, nil, 0, nil, nil)
 }
 
 // appendLiveShoppingJSON writes the published shopping plan (null

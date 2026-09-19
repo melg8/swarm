@@ -319,6 +319,160 @@ func TestNavmeshPathEndpoint(t *testing.T) {
     })
 }
 
+// TestNavmeshPathApproach pins the plan repro search of the viewer:
+// the approach radius succeeds on the first polygon whose surface
+// sits within the radius of the end point - with the radius 50 the
+// search stops on the middle ground polygon (48.7 units from the
+// end) instead of walking onto the water polygon the exact
+// destination contract reaches (the tail the bot's own trip searches
+// plan with, the 2026-09-19 route mismatch round).
+func TestNavmeshPathApproach(t *testing.T) {
+    server := newNavmeshTestServer(t, nil)
+    recorder := navmeshPost(t, server,
+        `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-48},`+
+            `"filter":"swim","approach":50}`)
+
+    require.Equal(t, http.StatusOK, recorder.Code)
+
+    var response navmeshPathResponse
+    require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+    require.True(t, response.Found,
+        "the ground polygon within 50 of the end succeeds the search")
+    require.NotEmpty(t, response.Waypoints)
+    last := response.Waypoints[len(response.Waypoints)-1]
+    require.InDelta(t, 32, last.X, 0.01,
+        "the answer ends on the closest surface point of the "+
+            "approach polygon")
+    require.InDelta(t, 0, last.Z, 0.01,
+        "the answer never walks onto the water polygon the "+
+            "approach radius made unnecessary")
+}
+
+// TestNavmeshPathAvoid pins the ban circles of the route request: the
+// ban holding the start prices the escape route out of it (the
+// way-out rule - the walker inside a ban must plan its way OUT), the
+// ban over the destination polygon seals the goal and answers no
+// route on the strip world no detour exists on.
+func TestNavmeshPathAvoid(t *testing.T) {
+    server := newNavmeshTestServer(t, nil)
+
+    t.Run("the ban holding the start keeps the way out", func(t *testing.T) {
+        recorder := navmeshPost(t, server,
+            `{"start":{"x":8,"y":8,"z":0},"end":{"x":40,"y":8,"z":-48},`+
+                `"filter":"swim","avoid":[{"x":8,"y":8,"r":6}]}`)
+
+        require.Equal(t, http.StatusOK, recorder.Code)
+
+        var response navmeshPathResponse
+        require.NoError(t, json.Unmarshal(recorder.Body.Bytes(),
+            &response))
+        require.True(t, response.Found,
+            "the escape polygons of the own ban stay passable")
+        require.NotEmpty(t, response.Waypoints)
+    })
+
+    t.Run("the ban over the destination seals the goal", func(t *testing.T) {
+        recorder := navmeshPost(t, server,
+            `{"start":{"x":8,"y":8,"z":0},"end":{"x":24,"y":8,"z":0},`+
+                `"filter":"swim","avoid":[{"x":24,"y":8,"r":6}]}`)
+
+        require.Equal(t, http.StatusOK, recorder.Code)
+
+        var response navmeshPathResponse
+        require.NoError(t, json.Unmarshal(recorder.Body.Bytes(),
+            &response))
+        require.False(t, response.Found,
+            "the banned destination polygon never answers found")
+        require.False(t, response.Partial,
+            "the strip world makes no progress past the start poly")
+        require.Empty(t, response.Waypoints)
+    })
+}
+
+// TestNavmeshPathFoldSwitch pins the fold switch of the plan repro
+// mode: the default answer walks the capsule post pass (the pushes,
+// the bends, the fold into the longest grid clear legs), fold=false
+// serves the search answer as the bot publishes it. Both answers
+// compare against the direct mesh calls of the same contract, so the
+// pin holds whatever shape the funnel answers on this world.
+func TestNavmeshPathFoldSwitch(t *testing.T) {
+    tileDir := writeNavmeshTestTile(t)
+    geoDir := t.TempDir()
+    // A flat region 20_18 at height 0: every block is a flat block.
+    region := make([]byte, 0, 65536*3)
+    for range 65536 {
+        region = append(region, 0, 0, 0)
+    }
+    require.NoError(t, os.WriteFile(
+        filepath.Join(geoDir, "20_18.l2j"), region, 0o600))
+    engine := pathfind.NewEngine(geoDir)
+    engine.SetCapsuleClearance(pathfind.DefaultCollisionRadius)
+    capsule := pathfind.NewCapsule(engine)
+    const clearance = pathfind.DefaultCollisionRadius
+
+    // The direct mesh answer of the same contract the handler arms:
+    // the swim filter with the zone table, the clearance pivots, the
+    // shortcut pass and the capsule guard.
+    mesh := navmesh.NewMesh(tileDir)
+    filter := navmesh.DefaultFilter()
+    filter.WaterZones = navmesh.C1WaterZones()
+    filter.WaypointClearance = clearance
+    filter.Smooth = true
+    filter.Guard = capsule
+    route, err := mesh.Route(navmesh.Pos{X: 8, Y: 8, Z: 0},
+        navmesh.Pos{X: 24, Y: 8, Z: 0}, filter)
+    require.NoError(t, err)
+    require.NotNil(t, route)
+    require.True(t, route.Found)
+
+    post := func(body string) navmeshPathResponse {
+        server := NewNavmeshServer(navmesh.NewMesh(tileDir),
+            "127.0.0.1:0", log.New(io.Discard, "", 0),
+            NavmeshOptions{Engine: engine})
+        recorder := navmeshPost(t, server, body)
+        require.Equal(t, http.StatusOK, recorder.Code)
+
+        var response navmeshPathResponse
+        require.NoError(t, json.Unmarshal(recorder.Body.Bytes(),
+            &response))
+
+        return response
+    }
+
+    requireWaypoints := func(got []navmeshPoint,
+        want []navmesh.Pos, label string) {
+        t.Helper()
+        require.Len(t, got, len(want), label)
+        for i := range want {
+            require.InDelta(t, want[i].X, got[i].X, 0.01, label)
+            require.InDelta(t, want[i].Y, got[i].Y, 0.01, label)
+            require.InDelta(t, want[i].Z, got[i].Z, 0.01, label)
+        }
+    }
+
+    unfolded := post(`{"start":{"x":8,"y":8,"z":0},` +
+        `"end":{"x":24,"y":8,"z":0},"filter":"swim","fold":false}`)
+    require.True(t, unfolded.Found)
+    requireWaypoints(unfolded.Waypoints, route.Waypoints,
+        "the plan repro answer IS the mesh search answer")
+
+    folded := post(`{"start":{"x":8,"y":8,"z":0},` +
+        `"end":{"x":24,"y":8,"z":0},"filter":"swim"}`)
+    require.True(t, folded.Found)
+    vecs := make([]pathfind.Vec3, len(route.Waypoints))
+    for i, wp := range route.Waypoints {
+        vecs[i] = pathfind.Vec3{X: wp.X, Y: wp.Y, Z: wp.Z}
+    }
+    vecs = capsule.ShortenPath(
+        capsule.ApplyPath(vecs, clearance), clearance)
+    foldedWant := make([]navmesh.Pos, len(vecs))
+    for i, vec := range vecs {
+        foldedWant[i] = navmesh.Pos{X: vec.X, Y: vec.Y, Z: vec.Z}
+    }
+    requireWaypoints(folded.Waypoints, foldedWant,
+        "the default answer walks the capsule post pass")
+}
+
 // TestEncodeNavmeshGeometryRejectsEmptyTiles pins the guard: a tile
 // without polygons has no viewer payload.
 func TestEncodeNavmeshGeometryRejectsEmptyTiles(t *testing.T) {
@@ -436,13 +590,19 @@ func TestNavmeshViewScriptContract(t *testing.T) {
 
     // The view state link: the boot parses the camera pose, the route
     // pair, the tile selection, the filter and the scale; the copy
-    // button builds the URL back.
+    // button builds the URL back. The plan repro contract (the
+    // approach radius, the ban circles, the fold switch) rides the
+    // same channel - the pathfind link of the HUD arms it.
     for _, part := range []string{
         `search.get("cam")`, `search.get("from")`, `search.get("to")`,
         `search.get("tiles")`, `search.get("filter")`,
         `search.get("scale")`,
+        `search.get("approach")`, `search.get("avoid")`,
+        `search.get("fold")`,
         `params.set("cam"`, `params.set("from"`, `params.set("to"`,
         `params.set("tiles"`, `params.set("filter"`, `params.set("scale"`,
+        `params.set("approach"`, `params.set("avoid"`,
+        `params.set("fold"`,
         `copyViewState)`, `id="nmv-copy"`, `id="nmv-link"`,
     } {
         require.Contains(t, source, part,

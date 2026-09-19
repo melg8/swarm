@@ -963,6 +963,28 @@ func (l *Loop) startZoneReturnLeg(dest pathfind.Vec3) bool {
     return l.startWalkLegSearch(dest, true)
 }
 
+// legSearchView freezes one mesh search contract into the walk plan
+// view: the filter (dry walls the water, swim prices it), the
+// approach radius and the ban circles the search ran with.
+func legSearchView(
+    dry bool, approach float64, avoid []pathfind.AvoidArea,
+) *state.WalkSearch {
+    search := &state.WalkSearch{Dry: dry, Approach: approach}
+    if len(avoid) == 0 {
+        return search
+    }
+    search.Avoid = make([]state.WalkAvoidCircle, len(avoid))
+    for i := range avoid {
+        search.Avoid[i] = state.WalkAvoidCircle{
+            X: avoid[i].Center.X,
+            Y: avoid[i].Center.Y,
+            R: avoid[i].Radius,
+        }
+    }
+
+    return search
+}
+
 // startWalkLegSearch plans the walk to the destination through either
 // the dry or the non-dry approach search and arms the waypoint
 // follower. The dry switch walls the water off (the town trips refuse
@@ -1033,6 +1055,14 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
     l.legStart = from
     l.waterEscape = false
     l.directLeg = false
+    // The plan view carries the search contract the leg answers (the
+    // repro contract of the 3D pathfind link): the filter, the
+    // approach radius and the ban circles of this very search, so a
+    // viewer replay rebuilds the walk the bot follows instead of a
+    // lookalike (the 2026-09-19 route mismatch: the swim filter plus
+    // the water blind fold drew a straight chord over the lake the
+    // dry return detours).
+    l.legSearch = legSearchView(!nonDry, radius, l.frozenAreas)
     // The fresh plan opens with a fresh frame measurement: the plan's
     // first waypoint IS the character's own cell resolved on the pack,
     // so the difference of the two z values is the vintage shift of
@@ -3074,6 +3104,11 @@ func (l *Loop) armDirectLeg(reason string) {
     l.directLegUntil = time.Now().Add(directLegWindow)
     l.waypoints = []pathfind.Vec3{l.legDest}
     l.wpIndex = 0
+    // The direct leg answers no mesh search: the plan view carries
+    // no search contract and the pathfind link keeps the viewer
+    // defaults (the single destination leg is the walk spec, not a
+    // corridor answer).
+    l.legSearch = nil
     // The direct leg's single waypoint is the destination spec, not
     // the character's cell resolved on the pack - no frame pair to
     // measure, the spec z rides as given.

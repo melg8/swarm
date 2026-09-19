@@ -536,7 +536,16 @@ type Loop struct {
     // walkable ring cells (the trainer hall interior is walkable only
     // along its rows, the straight line offset ring lands on the
     // roof-only band). The re-paths of the leg inherit it.
-    legRadius         float64
+    legRadius float64
+    // legSearch is the mesh search contract the current leg's plan
+    // answered (the filter, the approach radius and the ban circles
+    // startWalkLegSearch ran with): the walk plan view publishes it,
+    // so the 3D pathfind link rebuilds the very search the walk
+    // follows instead of a lookalike (the 2026-09-19 route mismatch:
+    // the viewer rebuilt a dry zone return with the swim filter and
+    // folded the answer into a straight water blind chord). Nil for
+    // the direct legs no mesh search produced.
+    legSearch         *state.WalkSearch
     farmX             int32
     farmY             int32
     farmZ             int32
@@ -701,6 +710,12 @@ type Loop struct {
     userWaypoints []pathfind.Vec3
     userWpIndex   int
     userPathTried bool
+    // userSearch is the mesh search contract of the manual walk plan
+    // (the swim filter, the user approach radius - see planUserWalk):
+    // the walk plan view publishes it, the 3D pathfind link rebuilds
+    // the very search. Nil for the direct manual walks no mesh search
+    // produced.
+    userSearch *state.WalkSearch
     // userFrameOffset is the measured z frame offset of the manual
     // walk plan (the legFrameOffset of the user follower, see
     // click_frame.go): calibrated when planUserWalk accepts a fresh
@@ -894,6 +909,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         rePaths:           0,
         extendArmed:       false,
         legRadius:         tripApproachRadius,
+        legSearch:         nil,
         repathX:           0,
         repathY:           0,
         frozenRepaths:     0,
@@ -1043,6 +1059,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         userWaypoints:     nil,
         userWpIndex:       0,
         userPathTried:     false,
+        userSearch:        nil,
         userFrameOffset:   0,
         userRedirect:      false,
         pendingActions:    make(map[int32]pendingInventory),

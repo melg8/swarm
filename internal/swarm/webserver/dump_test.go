@@ -78,6 +78,34 @@ func TestBotDumpEndpoint(t *testing.T) {
     require.Contains(t, report, "Hunt: outside the hunting zone")
 }
 
+// TestWalkPlanSectionSearchWord pins the search word of the walk
+// plan header (the repro contract of the 3D pathfind link): a mesh
+// plan names its filter (dry walls the water, swim prices it) so the
+// report names the search the link replays, the direct legs (no mesh
+// search) keep the bare header.
+func TestWalkPlanSectionSearchWord(t *testing.T) {
+    paths := []state.WalkPoint{{X: 1, Y: 2, Z: 3}}
+
+    var b strings.Builder
+    writeWalkPlanSection(&b, "walk plan (", paths, nil, 0, nil,
+        &state.WalkSearch{Dry: true}, time.Time{}, time.Time{}, nil)
+    require.Contains(t, b.String(),
+        "walk plan (1 waypoints, dry, aiming at wp 0):")
+
+    b.Reset()
+    writeWalkPlanSection(&b, "walk plan (", paths, nil, 0, nil,
+        &state.WalkSearch{Dry: false, Approach: 150},
+        time.Time{}, time.Time{}, nil)
+    require.Contains(t, b.String(),
+        "walk plan (1 waypoints, swim, aiming at wp 0):")
+
+    b.Reset()
+    writeWalkPlanSection(&b, "walk plan (", paths, nil, 0, nil,
+        nil, time.Time{}, time.Time{}, nil)
+    require.Contains(t, b.String(),
+        "walk plan (1 waypoints, aiming at wp 0):")
+}
+
 // TestWalkPlanSectionTiming pins the timing suffixes of the walk
 // plan section: a passed waypoint prints its moment on the walk
 // timeline (t+) and the leg duration that ended there, the aimed one
@@ -103,6 +131,7 @@ func TestWalkPlanSectionTiming(t *testing.T) {
         },
         &state.WalkPoint{X: 0, Y: 0, Z: 0}, 2,
         &state.WalkPoint{X: 10, Y: 11, Z: 12},
+        nil,
         start, now.Add(-5*time.Second), wpAt)
     report := b.String()
 
@@ -125,7 +154,7 @@ func TestWalkPlanSectionTiming(t *testing.T) {
     b.Reset()
     writeWalkPlanSection(&b, "walk plan (",
         []state.WalkPoint{{X: 1, Y: 2, Z: 3}, {X: 4, Y: 5, Z: 6}},
-        nil, 1, nil,
+        nil, 1, nil, nil,
         longStart, now.Add(-time.Second),
         []time.Time{longStart.Add(65300 * time.Millisecond), {}})
     report = b.String()
@@ -140,7 +169,7 @@ func TestWalkPlanSectionTiming(t *testing.T) {
 func TestWalkPlanSectionUntimed(t *testing.T) {
     var b strings.Builder
     writeWalkPlanSection(&b, "last walk plan (",
-        []state.WalkPoint{{X: 1, Y: 2, Z: 3}}, nil, 0, nil,
+        []state.WalkPoint{{X: 1, Y: 2, Z: 3}}, nil, 0, nil, nil,
         time.Time{}, time.Time{}, nil)
     report := b.String()
 

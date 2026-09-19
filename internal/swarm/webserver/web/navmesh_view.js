@@ -150,6 +150,14 @@ const viewer = {
   // corridor geometry allows), "raw" draws the raw funnel steps. One
   // search serves both - the answer carries the two waypoint lists.
   pathVariant: "smooth",
+  // The route search contract the requests carry (the plan repro
+  // contract of the pathfind link): the approach radius (0 = the
+  // exact destination), the ban circles and the fold switch of the
+  // capsule post pass. The defaults keep the double click behavior;
+  // the plan repro links arm their own values.
+  approach: 0,
+  avoid: [],
+  fold: true,
   pendingStart: null,
   path: null,
   routeStart: null,
@@ -249,6 +257,19 @@ function init(config) {
     applyCameraState(view.cam);
   } else {
     frameInitialTiles(initial);
+  }
+  // The search contract applies before the route run: the boot route
+  // of a plan repro link must rebuild the very search the link
+  // freezes (the filter, the approach radius, the bans, the fold
+  // switch), not the double click defaults.
+  if (view.approach) {
+    viewer.approach = view.approach;
+  }
+  if (view.avoid) {
+    viewer.avoid = view.avoid;
+  }
+  if (view.fold !== null) {
+    viewer.fold = view.fold;
   }
   // The whole world selections arm the camera residency: the boot
   // loads only the RESIDENCY_CAP tiles nearest the camera, the far
@@ -1596,6 +1617,9 @@ async function requestRoute(start, end) {
         start: { x: start.x, y: start.y, z: start.z },
         end: { x: end.x, y: end.y, z: end.z },
         filter: viewer.filter,
+        approach: viewer.approach,
+        avoid: viewer.avoid,
+        fold: viewer.fold,
       }),
     });
     if (!response.ok) {
@@ -1940,6 +1964,19 @@ function showStatus(kind, text) {
 //                         toggle: the detour mesh or the original
 //                         l2j cells (the route, the camera and the
 //                         tile selection stay variant independent)
+//   approach=200         the approach radius of the search (the plan
+//                         repro contract: the search succeeds on the
+//                         first polygon within the radius of the to
+//                         point; omitted = the exact destination)
+//   avoid=x,y,r;x,y,r    the ban circles the search seals (the frozen
+//                         areas of the plan; omitted = no bans)
+//   fold=0|1             the capsule post pass over the answer (the
+//                         pushes, the bends and the fold into the
+//                         longest grid clear legs). fold=0 serves the
+//                         search answer as the bot publishes it - the
+//                         plan repro links of the HUD carry it (the
+//                         grid oracle of the fold is water blind and
+//                         bends the route the bot never walks).
 // The world axes mapping matters: the viewer renders three y as the
 // height, so a pasted link reads the same at every height scale (the
 // restore re-applies the scale of the link itself).
@@ -1956,6 +1993,9 @@ function parseViewParams() {
     scale: null,
     geom: null,
     path: null,
+    approach: null,
+    avoid: null,
+    fold: null,
   };
   const tiles = search.get("tiles");
   if (tiles) {
@@ -1978,8 +2018,38 @@ function parseViewParams() {
   if (path === "smooth" || path === "raw") {
     view.path = path;
   }
+  const approach = Number(search.get("approach"));
+  if (Number.isFinite(approach) && approach > 0) {
+    view.approach = approach;
+  }
+  const avoid = parseAvoidParam(search.get("avoid"));
+  if (avoid) {
+    view.avoid = avoid;
+  }
+  const fold = search.get("fold");
+  if (fold === "0" || fold === "1") {
+    view.fold = fold === "1";
+  }
 
   return view;
+}
+
+// parseAvoidParam reads the ban circle list of the link (the
+// semicolon separated x,y,r triples); a malformed list answers null.
+function parseAvoidParam(text) {
+  if (!text) {
+    return null;
+  }
+  const circles = [];
+  for (const part of text.split(";")) {
+    const triple = part.split(",").map(Number);
+    if (triple.length !== 3 || triple.some((n) => !Number.isFinite(n))) {
+      return null;
+    }
+    circles.push({ x: triple[0], y: triple[1], r: triple[2] });
+  }
+
+  return circles;
 }
 
 // parsePointParam reads one world x,y,z triple.
@@ -2057,6 +2127,16 @@ function buildViewStateUrl() {
   params.set("scale", String(viewer.heightScale));
   params.set("geom", viewer.variant);
   params.set("path", viewer.pathVariant);
+  if (viewer.approach > 0) {
+    params.set("approach", String(viewer.approach));
+  }
+  if (viewer.avoid.length > 0) {
+    params.set("avoid", viewer.avoid.map((circle) =>
+      circle.x + "," + circle.y + "," + circle.r).join(";"));
+  }
+  if (!viewer.fold) {
+    params.set("fold", "0");
+  }
 
   return window.location.origin + window.location.pathname + "?" +
     params.toString();

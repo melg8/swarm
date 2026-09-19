@@ -419,6 +419,24 @@ parameters live in `navmesh_view.js` (`parseViewParams` is the boot
 half, `buildViewStateUrl` the copy half) and
 `TestNavmeshViewScriptContract` pins them against drift.
 
+The route search contract rides the same channel (the plan repro
+contract of the HUD pathfind link, the 2026-09-19 route mismatch
+round): `approach=<units>` replays the approach radius search (the
+search succeeds on the first polygon whose surface sits within the
+radius of the `to` point - the bot trip searches plan with 200, so
+their plans legitimately end short of the exact destination),
+`avoid=x,y,r;...` seals the ban circles the plan carried (the frozen
+areas of the session) and `fold=0` skips the capsule post pass - the
+answer then IS the search answer the bot publishes as its walk plan.
+The post pass exists for the double click experiments (the pushes
+and the bend pass, then the fold into the longest grid clear legs),
+but its grid oracle is water blind: on the elven mismatch report it
+folded the whole mesh route into one straight chord across the lake
+the bot detours, so every plan repro link arms `fold=0`. The viewer
+POST body (`/api/navmesh/path`) carries the same fields; a bare
+double click keeps the defaults (the exact destination, no bans, the
+fold on).
+
 The flag selection bounds the initially VISIBLE tiles only: the
 route queries always run over the full directory mesh, so a path may
 leave the visible tiles (the checkbox list loads more tiles on

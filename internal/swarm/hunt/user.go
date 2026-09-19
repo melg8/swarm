@@ -323,6 +323,7 @@ func (l *Loop) userMovement(cmd state.Command) {
     // the destination of a running walk with the next move request).
     l.userRedirect = true
     l.userWaypoints = nil
+    l.userSearch = nil
     l.userWpIndex = 0
     l.userPathTried = false
     l.userFrameOffset = 0
@@ -474,6 +475,11 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     }
     l.userWaypoints = result.Waypoints
     l.userWpIndex = 0
+    // The manual plan publishes its search contract (the swim filter
+    // with the user approach radius, no bans): the 3D pathfind link
+    // rebuilds the very search instead of a lookalike.
+    l.userSearch = &state.WalkSearch{Dry: false,
+        Approach: userApproachRadius}
     // The manual walk plan opens with the same frame measurement as
     // every fresh plan (see click_frame.go): the route's first
     // waypoint is the character's own cell resolved on the pack, its
@@ -642,6 +648,7 @@ func (l *Loop) userWalkPlan() *state.WalkPlan {
         Points: pts,
         Index:  min(l.userWpIndex, len(pts)-1),
         Dest:   &dest,
+        Search: l.userSearch,
     }
 }
 
@@ -686,7 +693,22 @@ func (l *Loop) geodataWalkPlan() *state.WalkPlan {
         Points: pts,
         Index:  min(l.wpIndex, len(pts)-1),
         Dest:   dest,
+        // The mesh search contract rides the plan (the repro contract
+        // of the 3D pathfind link); the direct legs answer no mesh
+        // search and publish nil.
+        Search: l.publishedLegSearch(),
     }
+}
+
+// publishedLegSearch returns the search contract of the current leg:
+// the mesh answer of startWalkLegSearch carries it, the direct legs
+// (no mesh search) answer nil.
+func (l *Loop) publishedLegSearch() *state.WalkSearch {
+    if l.directLeg {
+        return nil
+    }
+
+    return l.legSearch
 }
 
 // tickUserAttack forces the attack on the clicked object until the
