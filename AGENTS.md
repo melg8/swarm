@@ -40,6 +40,17 @@ The sandbox host reaps session processes, but the behavior changed
 over time - re-test before relying on either verdict; both studies
 keep their probe scripts under `/home/z/my-project/scripts/`.
 
+- **Owner instruction (2026-09-20, mandatory): background processes
+  live at most 10 minutes.** Whatever the studies below observed, a
+  detached process must be treated as dead 10 minutes after its
+  launch: never assume a server or daemon started earlier is still
+  serving - re-check it (`ps -eo pid,ppid,sid,cmd | grep NAME`)
+  immediately before every reuse, kill the leftover and start a
+  fresh twin, and never hand a long task to a background process and
+  walk away. The one-call pattern below (start, probe, kill, report
+  inside a single tool call) is the reliable shape for anything
+  longer than a few minutes.
+
 - **Study of 2026-09-19 (latest, verified with the heartbeat probes
   `detach_probe_a.sh` / `detach_probe_b.sh`)**: a detached process
   **survives across tool calls**. Verified variants: `setsid nohup
@@ -65,6 +76,22 @@ keep their probe scripts under `/home/z/my-project/scripts/`.
 - If a long-lived server is load-bearing for the task, re-run the
   probe at the session start: the reaper behavior is a property of
   the sandbox version, not of the command.
+
+## Measurements (owner instruction, 2026-09-20)
+
+- Do not run long measurements (benchmarks, soak probes, timing
+  loops, repeated live acceptance rounds) unless the owner asked for
+  them. A verification that answers "does it work" stays bounded:
+  one representative run of the affected suite plus the lint and
+  format gates. Minutes-scale or hours-scale measurements burn the
+  2 hour session clock and the 10 minute background process budget
+  for little extra confidence.
+- If a question genuinely needs a long measurement (a soak, a
+  concurrency ladder, a performance baseline), ask the owner first
+  and budget it explicitly against the session clock; prefer the
+  shortest measurement that answers the question (fewer iterations,
+  a smaller bot count, a shorter window) and record the cycle time
+  in the docs so the next agent does not re-measure blindly.
 
 ## Tech stack at a glance (read this first)
 
