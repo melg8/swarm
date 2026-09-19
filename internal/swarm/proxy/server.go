@@ -536,7 +536,7 @@ func (s *Server) logBindHint(login bool, addr string) {
             "and run swarm with -login 127.0.0.3:2106). A bind rejected with "+
             "access permissions on Windows also means the port is reserved "+
             "(Hyper-V/WinNAT: 'netsh interface ipv4 show excludedportrange "+
-            "protocol=tcp' lists 2106, 'net stop winnat' or a reboot frees it).",
+            "protocol=tcp' lists 2106, 'net stop winnat' or a reboot frees it)",
         addr)
 }
 

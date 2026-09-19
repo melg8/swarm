@@ -886,3 +886,55 @@ Commits as melg8. Rebase before every push.
   references it; the acceptance scenarios run serially against a
   parallel-ready account partition; the session start ritual is
   prose, not a command.
+
+### Progress (2026-09-19, the feedback audit remediation: all twelve items)
+
+- every improvement and every missing item of
+  docs/agent_feedback_loops.md landed in one tooling round (the
+  implementation status section of the audit maps each item to its
+  landing place):
+  - the gate: `task verify` (build + vet + lint + test + fmt:check,
+    check:all is the alias) - check:all no longer skips the two
+    gates the verify-loop skill mandates; `docs/ci_workflow.yml`
+    (the owner copies it to `docs/ci_workflow.yml` - the push of
+    a workflow file needs the workflow-scoped token) runs the same
+    order on every push plus the race slice of
+    connection/pathfind and the logfmt scan (the CI that did not
+    exist now exists); `task prepush` (tools/prepush.sh, the 20-40 s
+    touched-packages gate) is documented as mandatory in the git
+    conventions and installable as a git hook
+    (`tools/install_dev_tools.sh hook`).
+  - the numbers: `task test:cover` archives
+    runs/coverage-latest.txt (committed, 27 packages seeded) and
+    fails on a per package drop beyond COVER_DROP_LIMIT (2.0 pp);
+    `task bench:save` + `task bench:diff` (cmd/benchdiff, the
+    offline benchstat twin with its own tests) give the benchmark
+    rule its committed baseline; `task progress` is the one-word
+    PROGRESS.md regeneration.
+  - the wall time: `-acceptance all-parallel` (Manager.RunAllParallel)
+    launches every scenario at once on the temp account partition
+    with the flood protector stagger and collects every failure
+    instead of stopping at the first - the headless run pays the
+    slowest scenario, not the sum (the barrier test pins the
+    overlap).
+  - the conventions: internal/logfmt parses the module and asserts
+    capital-first (component tags count) and no trailing period at
+    every production log call site - the six existing violations it
+    found (main.go, proxy/server.go, webserver/navmesh.go) are
+    fixed, the rule starts from zero debt; docs/flake_ledger.md
+    opened with the 8034403 poll-test pins as the seed rows and the
+    verify-loop skill names it mandatory after every flake fix.
+  - the ritual: tools/session_start.sh prints the bootstrap
+    checklist (the stamp age against the 2h/1h45m budget, the
+    fetch/rebase verdict, the ss 2106 probe, the open H-001..H-004
+    ids, the active task headline); the hypotheses registry carries
+    the advance-or-close-one-per-session rule; progress_report.sh
+    gained the trailing-window trends (per scenario pass rate, XP/h
+    and stuck deltas).
+- the formatting source of truth is pinned: go.mod carries
+  `toolchain go1.26.8` (the tree is gofmt-spaces clean under the
+  1.26 gofmt; the 1.24-line gofmt disagrees on the struct field
+  comment layout) - `task fmt:check` now agrees with the committed
+  tree on every host, and CI (setup-go + the toolchain directive)
+  would have caught the mismatch instead of silently going red on
+  the whitespace gate.

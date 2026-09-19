@@ -7,10 +7,9 @@ package gear
 import (
     "testing"
 
-    "github.com/stretchr/testify/require"
-
     "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/state"
+    "github.com/stretchr/testify/require"
 )
 
 // bowTestCatalog mirrors the elven village deployment with the weapon

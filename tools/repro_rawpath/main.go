@@ -10,8 +10,8 @@
 //
 // Usage:
 //
-//	go run ./tools/repro_rawpath -mesh data/navmesh-world \
-//	    -from 45257,49353,-3059 -to 25500,51095,-3408
+//    go run ./tools/repro_rawpath -mesh data/navmesh-world \
+//        -from 45257,49353,-3059 -to 25500,51095,-3408
 package main
 
 import (

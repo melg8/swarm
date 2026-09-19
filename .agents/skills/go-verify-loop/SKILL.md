@@ -34,8 +34,13 @@ cold cache, and a background process does not survive the return of
 the call that started it (docs/deployment.md, "Foreground
 execution is mandatory").
 
-`task check:all` runs lint + test + fmt:check; the individual tasks are
-`task test`, `task lint`, `task test:race`, `task fmt`. The Windows
+`task check:all` is the alias of `task verify` - the full gate: build
++ vet + lint + test + fmt:check (`.github/workflows/ci.yml` runs the
+same order on every push). The fast pre-push gate is `task prepush`
+(build, vet, `lint --new`, whitespace, the tests of the touched
+packages; installable as a git hook via
+`tools/install_dev_tools.sh hook`). The individual tasks are `task
+test`, `task lint`, `task test:race`, `task fmt`. The Windows
 dev host has `task` 3.53.1 and golangci-lint v2.13.2 installed;
 `-race` needs cgo with gcc, which the Windows host lacks -
 `task test:race` belongs to environments with cgo (the Linux sandbox,
@@ -56,6 +61,16 @@ CI).
   not for timing: the hunt/state logic uses injected clocks where it
   matters. If your change makes a test flaky, fix the determinism, not
   the tolerance.
+
+## When a test flakes
+
+A flaky test is a bug in the test: fix the determinism (the injected
+clock, the ordered channel, the synchronised stub), never the
+tolerance (the sleep, the retry count). After fixing (or pinning) a
+flake, append one row to `docs/flake_ledger.md` - the searchable
+memory of the flakes this repository has already paid for. A new
+failure that resembles a ledger row reads the ledger first: the pin
+may need strengthening, not re-inventing.
 
 ## //nolint etiquette
 

@@ -11,9 +11,25 @@ tasks:
       - task --list --sort=alphanumeric
 
   check:all:
-    desc: Lint and test
+    desc: Alias of verify (build, vet, lint, test, fmt:check)
     aliases: [all]
-    deps: [lint, test, fmt:check]
+    deps: [verify]
+
+  verify:
+    desc: The full gate - build, vet, lint, test, fmt:check (the CI gate; the skill order, no step skipped)
+    aliases: [v]
+    deps: [build, vet, lint, test, fmt:check]
+
+  build:
+    desc: Compiles everything including cmd/
+    aliases: [b]
+    cmds:
+      - go build ./...
+
+  vet:
+    desc: Runs go vet (the cheap static checks)
+    cmds:
+      - go vet ./...
 
   fmt:
     desc: Formats the tree with spaces only (gofmt-spaces)
@@ -105,10 +121,31 @@ tasks:
       - CGO_ENABLED=1 go test ./... -race -count=1
 
   test:cover:
-    desc: Runs test suite with coverage
+    desc: Test suite with coverage, the per package delta against runs/coverage-latest.txt (fails on a drop beyond COVER_DROP_LIMIT, default 2.0 pp)
     aliases: [tc]
     cmds:
-      - go test ./... --cover --count=1
+      - bash tools/coverage_delta.sh
+
+  bench:save:
+    desc: Saves the benchmark baseline of PKG into runs/bench-<name>.txt (commit it; tools/bench_save.sh)
+    cmds:
+      - bash tools/bench_save.sh {{.PKG}}
+
+  bench:diff:
+    desc: Compares two benchmark outputs (cmd/benchdiff, the offline benchstat) - BASE=runs/bench-<name>.txt NEW=<fresh run>
+    cmds:
+      - go run ./cmd/benchdiff -base {{.BASE}} -new {{.NEW}}
+
+  prepush:
+    desc: The fast pre-push gate - build, vet, lint --new, whitespace, the tests of the touched packages (tools/prepush.sh; mandatory before every push)
+    cmds:
+      - bash tools/prepush.sh
+
+  progress:
+    desc: Regenerates PROGRESS.md from the live sources (the ladder, the metrics, the commits)
+    aliases: [pr]
+    cmds:
+      - bash tools/progress_report.sh
 
   repro:hud:
     desc: Runs the character HUD reproduction harness

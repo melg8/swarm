@@ -23,6 +23,8 @@
 #   tools/install_dev_tools.sh           install the tools
 #   tools/install_dev_tools.sh check     verify presence, exit 1 if any
 #                                        missing (use in CI / preflight)
+#   tools/install_dev_tools.sh hook      install the pre-push gate as
+#                                        .git/hooks/pre-push (opt-in)
 #
 # Environment overrides:
 #   GO_BIN      path to the go binary (default: auto-detect on PATH,
@@ -87,6 +89,26 @@ if [ "$MODE" = "check" ]; then
         fi
     done
     exit "$missing"
+fi
+
+# Hook mode: install the pre-push gate as a git hook (opt-in, this
+# clone only - the hook file is not tracked). The hook runs
+# tools/prepush.sh (build, vet, lint --new, whitespace, the tests of
+# the touched packages) so a red push cannot reach the shared branch
+# unnoticed.
+if [ "$MODE" = "hook" ]; then
+    HOOK_DIR="$REPO_ROOT/.git/hooks"
+    mkdir -p "$HOOK_DIR"
+    cat > "$HOOK_DIR/pre-push" <<HOOK
+#!/usr/bin/env bash
+# Installed by tools/install_dev_tools.sh hook - the fast pre-push
+# gate (tools/prepush.sh). Remove the file to opt out.
+exec bash "$REPO_ROOT/tools/prepush.sh"
+HOOK
+    chmod +x "$HOOK_DIR/pre-push"
+    echo "hook: $HOOK_DIR/pre-push installed (runs tools/prepush.sh)"
+
+    exit 0
 fi
 
 # Install mode: install each missing tool with its pinned version.

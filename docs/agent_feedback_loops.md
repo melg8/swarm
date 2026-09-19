@@ -272,3 +272,65 @@ cheapest sufficient implementation.
 4. Parallel acceptance scenarios (the session budget lever).
 5. Session bootstrap script; hypothesis and flake ledgers ride it.
 6. Metrics trend reader; the PROGRESS.md regeneration rule.
+
+## Implementation status (2026-09-19, the same day)
+
+The whole actionable list landed in one tooling round on the same
+feature branch. Where each item lives now:
+
+- Improvement 1 + missing 2: `task verify` (build, vet, lint, test,
+  fmt:check) is the canonical full gate, `check:all` its alias;
+  `task prepush` (`tools/prepush.sh`, installable as a git hook via
+  `tools/install_dev_tools.sh hook`) is the 20-40 s pre-push gate
+  the git conventions now mandate before every push; the gate lands as a
+  GitHub Actions workflow (kept in `docs/ci_workflow.yml` - the
+  push of a workflow file needs the workflow-scoped token, the owner
+  copies it to `.github/workflows/ci.yml` verbatim to activate).
+  The CI lint step runs `lint --new` for now: the full lint surfaced
+  ~200 tracked pre-existing findings (the parallel commits of the
+  week landed without the full gate - the exact failure mode this
+  document describes), the strict whole-tree lint returns to CI
+  when the debt clears.
+- Improvement 2: `task test:cover` runs `tools/coverage_delta.sh` -
+  the suite with `-coverprofile=runs/cover.out` (gitignored), the
+  per package delta table against the committed
+  `runs/coverage-latest.txt`, and a hard fail beyond
+  `COVER_DROP_LIMIT` (default 2.0 pp); the fresh summary must be
+  committed with the change that moved the numbers.
+- Improvement 3: `task bench:save` (`tools/bench_save.sh`) commits
+  the `-benchmem` output of a touched package into
+  `runs/bench-<name>.txt`; `task bench:diff` wraps
+  `cmd/benchdiff` (the offline benchstat twin: ns/op, B/op,
+  allocs/op, MB/s deltas, the missing-baseline list).
+- Improvement 4: `task progress` regenerates PROGRESS.md in one
+  word.
+- Improvement 5: the CLI gained `-acceptance all-parallel`
+  (`Manager.RunAllParallel`): every scenario launches at once on
+  its own temp account (the flood protector stagger of the web
+  parallel mode), one failure no longer stops the rest, the
+  combined error names every failure - the headless run pays the
+  wall time of the slowest scenario instead of the sum.
+- Improvement 6: `internal/logfmt` parses the module and asserts
+  the message conventions at every production log call site
+  (`TestRepoLogConventions`, also a CI step); the six existing
+  violations it found were fixed, so the rule starts from zero
+  debt.
+- Missing 3: `tools/session_start.sh` prints the bootstrap
+  checklist (the stamp age against the 2h/1h45m budget, the
+  fetch/rebase verdict, the ss-based 2106 port probe, the open
+  H-NNN ids, the active task headline).
+- Missing 4: `tools/progress_report.sh` gained the trailing-window
+  trends section (per scenario pass rate, XP/h and stuck-event
+  deltas).
+- Missing 5: the bootstrap lists the open hypotheses; the AGENTS.md
+  hypotheses registry carries the "advance or close one per
+  session" rule.
+- Missing 6: `docs/flake_ledger.md` opened with the two pinned
+  poll-test flakes of 8034403 as the seed rows; the
+  go-verify-loop skill names it as the mandatory stop after every
+  flake fix.
+
+The serial `-acceptance all` stays available (stop at the first
+failure, definition order) for the runs that want the strict
+ladder; `all-parallel` is the default recommendation for the agent
+sessions.

@@ -9,8 +9,8 @@
 //
 // Usage:
 //
-//	go run ./tools/repro_gamepath -mesh data/navmesh-world \
-//	    -geodata data/geodata -from 45956,49341,-3051 -to 47595,51569,-2992
+//    go run ./tools/repro_gamepath -mesh data/navmesh-world \
+//        -geodata data/geodata -from 45956,49341,-3051 -to 47595,51569,-2992
 package main
 
 import (

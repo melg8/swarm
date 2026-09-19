@@ -1,0 +1,86 @@
+# NOTE (2026-09-19): this file lives under docs/ because pushing a
+# workflow into .github/workflows/ needs a token with the workflow
+# scope - the commit that created it was rejected by GitHub. To
+# activate the gate, copy this file verbatim to
+# .github/workflows/ci.yml (a push from a workflow-scoped token, or
+# the GitHub web UI "Add file"), the content needs no changes.
+
+# SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+#
+# SPDX-License-Identifier: MIT
+
+# The shared verification gate of the swarm repository. Every gate
+# used to live in the local agent's honesty (the go-verify-loop
+# skill prose); this workflow makes the same order (build, vet,
+# test, whitespace, lint, the race slice of the connection and
+# pathfind packages) run on the push itself, so a red commit is
+# caught by the runner instead of the next session's budget.
+# The tool versions come from tools/install_dev_tools.sh - the same
+# pins the dev hosts install, one source of version truth.
+name: ci
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install the pinned dev tools (task, golangci-lint, gci, gofmt-spaces)
+        run: bash tools/install_dev_tools.sh
+
+      - name: Add the tool bin to PATH
+        run: echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./... -count=1
+
+      - name: Whitespace (spaces only, no tabs)
+        run: task fmt:check
+
+      - name: Lint (new code only - the tracked pre-existing debt is 200 findings, the full gate returns when the debt clears)
+        run: golangci-lint run --new
+
+      - name: Race the connection and pathfind packages
+        run: CGO_ENABLED=1 go test ./internal/swarm/connection/... ./internal/swarm/pathfind/... -race -count=1
+
+      - name: Log conventions (the logfmt scan)
+        run: go test ./internal/logfmt/ -count=1 -run TestRepoLogConventions
+
+  acceptance-list:
+    # The headless acceptance CLI answers `-acceptance list` without
+    # the live stack: the smoke check keeps the discovery surface
+    # (the scenario ids the docs promise) compiled and honest.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: The acceptance CLI lists the scenarios
+        run: |
+          output=$(go run ./cmd/swarm -acceptance list -web "" 2>&1)
+          echo "$output"
+          for id in soak farm-readiness bot-lifetime proxy-relay; do
+            echo "$output" | grep -q "$id" || { echo "Error missing scenario id $id"; exit 1; }
+          done

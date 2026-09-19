@@ -10,6 +10,7 @@ import (
     "fmt"
     "log"
     "strconv"
+    "strings"
     "sync"
     "time"
 
@@ -363,6 +364,60 @@ func (m *Manager) RunAll(ctx context.Context) error {
         if err := m.Run(ctx, test.def.ID); err != nil {
             return err
         }
+    }
+
+    return nil
+}
+
+// RunAllParallel launches every scenario at once and blocks until
+// they all reach their terminal state. The account partition gives
+// every test its own temp bot, so the parallel runs never collide on
+// the character side; the launch staggers the logins off the flood
+// protector burst path the same way the parallel StartAll does. Unlike
+// the sequential RunAll, one failing scenario does not stop the
+// others: every failure is collected and the combined error names
+// them all, so a single red scenario cannot hide the verdict of the
+// rest (the headless agent run pays the wall time of the slowest
+// scenario instead of the sum of all of them).
+func (m *Manager) RunAllParallel(ctx context.Context) error {
+    type outcome struct {
+        id  string
+        err error
+    }
+    outcomes := make(chan outcome, len(m.tests))
+    var wg sync.WaitGroup
+    for i, test := range m.tests {
+        if test.def.Scenario == nil {
+            outcomes <- outcome{
+                id:  test.def.ID,
+                err: fmt.Errorf("test %s has no scenario", test.def.ID),
+            }
+
+            continue
+        }
+        wg.Add(1)
+        go func(index int, t *Test) {
+            defer wg.Done()
+            if index > 0 {
+                time.Sleep(time.Duration(index) * parallelStartStagger)
+            }
+            outcomes <- outcome{
+                id:  t.def.ID,
+                err: m.Run(ctx, t.def.ID),
+            }
+        }(i, test)
+    }
+    wg.Wait()
+    close(outcomes)
+    failures := make([]string, 0, len(m.tests))
+    for o := range outcomes {
+        if o.err != nil {
+            failures = append(failures, o.id+": "+o.err.Error())
+        }
+    }
+    if len(failures) > 0 {
+        return fmt.Errorf("%d of %d scenarios failed: %s",
+            len(failures), len(m.tests), strings.Join(failures, "; "))
     }
 
     return nil

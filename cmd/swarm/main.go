@@ -269,9 +269,11 @@ func parseFlags() config {
         "run an acceptance scenario headless instead of the bot: "+
             "the value is a scenario id (soak, farm-readiness, "+
             "bot-lifetime, proxy-relay) or 'all' to run every "+
-            "scenario in definition order, or 'list' to print "+
-            "the available ids and exit. No fleet bot supervisor "+
-            "runs; the acceptance manager launches the temp bot "+
+            "scenario in definition order, 'all-parallel' to launch "+
+            "them at once (the account partition keeps the runs "+
+            "apart, the wall time drops to the slowest scenario) or "+
+            "'list' to print the available ids and exit. No fleet bot "+
+            "supervisor runs; the acceptance manager launches the temp bot "+
             "of the scenario, runs it and exits. The soak scenario "+
             "reads SWARM_SOAK_MINUTES (default 10, the M1 proof "+
             "sets 480) for the window length. Pass an empty "+
@@ -1027,7 +1029,7 @@ func startProxy(cfg config) *proxy.Server {
         }
     }()
 
-    logger.Printf("proxy started, login bound to %v, game bound to %v, log %s",
+    logger.Printf("Proxy started, login bound to %v, game bound to %v, log %s",
         server.LoginAddrs(), server.GameAddrs(), cfg.proxyLog)
     // The routing banner: a C1 client reaching none of the login
     // listeners never appears in this file (the classic exe dials
@@ -1552,7 +1554,8 @@ func runHuntAuditCLI(cfg config) {
 // runAcceptanceCLI drives the acceptance scenarios headless: the
 // process launches no fleet bot supervisor, only the acceptance
 // manager. The "list" value prints the available scenario ids and
-// exits; "all" runs every scenario in definition order; a specific id
+// exits; "all" runs every scenario in definition order; "all-parallel"
+// launches them at once and collects every failure; a specific id
 // runs just that one. The exit code reflects the outcome (0 for a
 // pass, 1 for a fail) so an agent or a CI gate can drive the suite
 // without the web UI.
@@ -1606,6 +1609,10 @@ func runAcceptanceCLI(cfg config) {
         log.Printf("Acceptance: running %d scenarios sequentially",
             len(manager.IDs()))
         err = manager.RunAll(ctx)
+    case "all-parallel":
+        log.Printf("Acceptance: running %d scenarios in parallel",
+            len(manager.IDs()))
+        err = manager.RunAllParallel(ctx)
     default:
         log.Printf("Acceptance: running scenario %s",
             cfg.acceptanceRun)

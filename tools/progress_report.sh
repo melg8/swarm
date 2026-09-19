@@ -69,6 +69,71 @@ for raw in sys.stdin:
 '
 }
 
+# render_trends answers the question the last-10-rows table cannot:
+# is the bot degrading over the trailing window? python3 groups the
+# JSONL rows by scenario and reports, per scenario, the pass rate of
+# the last 10 runs plus the XP per hour and stuck event deltas (the
+# latest row against the row before it, where the numbers exist).
+render_trends() {
+        if [ ! -f "${METRICS}" ]; then
+                echo "_No metrics trail yet (runs/metrics.jsonl missing)._"
+
+                return
+        fi
+        python3 - "${METRICS}" <<'PYEOF'
+import json, sys
+
+window = 10
+rows = []
+with open(sys.argv[1], encoding="utf-8") as handle:
+    for raw in handle:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            rows.append(json.loads(raw))
+        except json.JSONDecodeError:
+            continue
+
+by_scenario = {}
+for row in rows:
+    by_scenario.setdefault(row.get("scenario", "?"), []).append(row)
+
+if not by_scenario:
+    print("_The metrics trail is empty._")
+    raise SystemExit(0)
+
+print("| Scenario | Runs | Pass rate (last %d) | XP/h latest | "
+      "XP/h delta | Stuck latest | Stuck delta |" % window)
+print("| --- | --- | --- | --- | --- | --- | --- |")
+for scenario in sorted(by_scenario):
+    runs = by_scenario[scenario]
+    recent = runs[-window:]
+    passes = sum(1 for row in recent
+                 if row.get("status") == "PASS")
+    rate = 100.0 * passes / len(recent) if recent else 0.0
+
+    xp_now, xp_before = "-", "-"
+    if len(runs) >= 2:
+        last, prev = runs[-1], runs[-2]
+        if last.get("xpPerHour") and prev.get("xpPerHour"):
+            delta = (last["xpPerHour"] - prev["xpPerHour"]) \
+                / prev["xpPerHour"] * 100
+            xp_now = "%.0f" % last["xpPerHour"]
+            xp_before = "%+.1f%%" % delta
+    stuck_now, stuck_before = "-", "-"
+    if len(runs) >= 2:
+        last, prev = runs[-1], runs[-2]
+        if "stuckEvents" in last and "stuckEvents" in prev:
+            stuck_now = str(last["stuckEvents"])
+            stuck_before = "%+d" % (last["stuckEvents"]
+                                    - prev["stuckEvents"])
+    print("| %s | %d | %.0f%% | %s | %s | %s | %s |" % (
+        scenario, len(runs), rate, xp_now, xp_before,
+        stuck_now, stuck_before))
+PYEOF
+}
+
 # render_commits shows the last 20 commits.
 render_commits() {
         git -C "${REPO_DIR}" log --oneline -20 2>/dev/null || \
@@ -146,6 +211,10 @@ if not steps:
         echo "## Soak metrics (last 10 runs)"
         echo
         render_metrics
+        echo
+        echo "## Trends (the trailing window)"
+        echo
+        render_trends
         echo
         echo "## Recent commits"
         echo

@@ -33,9 +33,9 @@ import (
     "math"
     "time"
 
-    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/gear"
-        "github.com/melg8/swarm/internal/swarm/state"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // The timing and geometry constants of the luring.

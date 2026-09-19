@@ -317,10 +317,10 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     // in the duration field): the cold request pays the tile decode,
     // the repeat answers from the resident mesh.
     if err != nil {
-        s.logger.Printf("navmesh route (%s): failed in %.1f ms: %v",
+        s.logger.Printf("Navmesh route (%s): failed in %.1f ms: %v",
             filterName, float64(duration.Nanoseconds())/1e6, err)
     } else if route == nil {
-        s.logger.Printf("navmesh route (%s): no path in %.1f ms",
+        s.logger.Printf("Navmesh route (%s): no path in %.1f ms",
             filterName, float64(duration.Nanoseconds())/1e6)
     } else {
         status := "no path"
@@ -330,7 +330,7 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         case route.Partial:
             status = "partial"
         }
-        s.logger.Printf("navmesh route (%s): %s in %.1f ms - "+
+        s.logger.Printf("Navmesh route (%s): %s in %.1f ms - "+
             "%d waypoints, %d regions", filterName, status,
             float64(duration.Nanoseconds())/1e6,
             len(route.Waypoints), len(route.Corridor))
@@ -520,7 +520,7 @@ func (s *Server) navmeshGeometry(key navmesh.RegionKey,
     // The first open of a tile pays the polygon soup encode (the
     // process cache answers the repeats); the console line keeps
     // that cost observable.
-    s.logger.Printf("navmesh geometry %d_%d: %.1f ms, %.1f MB",
+    s.logger.Printf("Navmesh geometry %d_%d: %.1f ms, %.1f MB",
         key.Col, key.Row, float64(duration.Nanoseconds())/1e6,
         float64(len(payload))/(1024*1024))
     if err != nil {

@@ -467,3 +467,98 @@ func TestIDsReturnsDefinitionOrder(t *testing.T) {
     manager := testManager(t, defs)
     require.Equal(t, []string{"z", "a"}, manager.IDs())
 }
+
+// TestRunAllParallelRunsConcurrently pins the parallel CLI contract:
+// every scenario launches even while the others still run (the
+// barrier proves the overlap - a serial walk would never collect the
+// three started ids), one failing scenario does not stop the rest
+// and the combined error names the failure, so the agent run pays
+// the wall time of the slowest scenario instead of the sum.
+func TestRunAllParallelRunsConcurrently(t *testing.T) {
+    started := make(chan string, 8)
+    release := make(chan struct{})
+    barrier := func(id string) func(context.Context, *Manager, *Test) error {
+        return func(ctx context.Context, _ *Manager, _ *Test) error {
+            started <- id
+            select {
+            case <-release:
+                return nil
+            case <-ctx.Done():
+                return errors.New("cancelled before the release")
+            }
+        }
+    }
+    defs := []TestDef{
+        {
+            ID: "a", Title: "a", Description: "a", Account: "temp5",
+            Timeout: 30 * time.Second, Scenario: barrier("a"),
+        },
+        {
+            ID: "b", Title: "b", Description: "b", Account: "temp4",
+            Timeout: 30 * time.Second,
+            Scenario: func(context.Context, *Manager, *Test) error {
+                started <- "b"
+
+                return errors.New("b broke")
+            },
+        },
+        {
+            ID: "c", Title: "c", Description: "c", Account: "temp6",
+            Timeout: 30 * time.Second, Scenario: barrier("c"),
+        },
+    }
+    manager := testManager(t, defs)
+    done := make(chan error, 1)
+    go func() {
+        done <- manager.RunAllParallel(context.Background())
+    }()
+
+    // All three scenarios must enter before the run can finish: the
+    // barrier waits for every one of them.
+    seen := map[string]bool{}
+    for i := range 3 {
+        select {
+        case id := <-started:
+            seen[id] = true
+        case <-time.After(15 * time.Second):
+            t.Fatalf("scenario %d did not start, started: %v", i, seen)
+        }
+    }
+    require.Len(t, seen, 3)
+    close(release)
+
+    err := <-done
+    require.Error(t, err)
+    require.Contains(t, err.Error(), "1 of 3 scenarios failed")
+    require.Contains(t, err.Error(), "b: test \"b\" failed: b broke")
+    require.Equal(t, StatusPassed, manager.Tests()[0].Status)
+    require.Equal(t, StatusFailed, manager.Tests()[1].Status)
+    require.Equal(t, StatusPassed, manager.Tests()[2].Status)
+}
+
+// TestRunAllParallelPassesEveryScenario pins the happy path: every
+// scenario passing leaves RunAllParallel returning nil and every
+// test in the passed state.
+func TestRunAllParallelPassesEveryScenario(t *testing.T) {
+    defs := []TestDef{
+        {
+            ID: "a", Title: "a", Description: "a", Account: "temp5",
+            Timeout: 5 * time.Second,
+            Scenario: func(context.Context, *Manager, *Test) error {
+                return nil
+            },
+        },
+        {
+            ID: "b", Title: "b", Description: "b", Account: "temp4",
+            Timeout: 5 * time.Second,
+            Scenario: func(context.Context, *Manager, *Test) error {
+                return nil
+            },
+        },
+    }
+    manager := testManager(t, defs)
+
+    require.NoError(t, manager.RunAllParallel(context.Background()))
+    require.Equal(t, StatusPassed, manager.Tests()[0].Status)
+    require.Equal(t, StatusPassed, manager.Tests()[1].Status)
+}

@@ -25,7 +25,10 @@ the documentation map below) and is read on demand, not upfront.
   (`cat /home/z/my-project/.session_start_ts`) and compare with
   `date +%s` before starting any long operation. Budget with the
   measured cycle times in the deploy section below (the full verify
-  loop is ~5.5 minutes).
+  loop is ~5.5 minutes). `tools/session_start.sh` prints the whole
+  bootstrap checklist in one command (the stamp age, the rebase
+  verdict, the login port probe, the open hypotheses, the active
+  task headline).
 - The exact kill mechanism is not observable from inside the
   sandbox; treat the limits as a hard owner directive, not a
   hypothesis (the registry below collects server facts, this is an
@@ -156,6 +159,11 @@ conversation or in a commit message: it lives in the registry below.
 - Entries append at the end; ids are never reused or renumbered.
   The seed entries came from the open items of
   `docs/navigation_analysis.md` (T-005).
+- **Advance or close one hypothesis per session** when the touched
+  area matches its verification plan: the session bootstrap
+  (`tools/session_start.sh`) lists the open ids, an entry ages out
+  of "open" only by the evidence its plan asks for - not by a
+  session deciding it no longer matters.
 
 ### H-001: the swimming semantics of deep water crossings
 
@@ -515,20 +523,40 @@ The full `task lint` (39 s) is the CI gate and runs against the whole
 tree - use it before a push, not on every save:
 
 ```bash
-task check:all            # lint + test + fmt:check (the CI gate, ~160 s with the stack up)
+task check:all            # alias of verify: build + vet + lint + test + fmt:check (the CI gate, ~170 s)
+task verify               # the same, the canonical name (v)
+task prepush              # the fast pre-push gate: build, vet, lint --new, whitespace, touched-package tests (~30 s)
 task lint                 # golangci-lint run (full, ~39 s, all code)
 task lint:new             # golangci-lint run --new (~2 s, changed code only)
 task lint:fix             # golangci-lint run --fix
-task test:cover           # go test ./... --cover --count=1 (~123 s)
+task test:cover           # coverage + the per package delta vs runs/coverage-latest.txt (fails on a drop > 2 pp)
+task bench:save PKG=./internal/swarm/pathfind   # commit the benchmark baseline into runs/bench-<name>.txt
+task bench:diff BASE=runs/bench-pathfind.txt NEW=<fresh>  # the offline benchstat (cmd/benchdiff)
+task progress             # regenerate PROGRESS.md from the live sources
 task fmt                  # gofmt-spaces + whitespace normalization (spaces only)
 task fmt:check            # fails on any tab left in a tracked text file
 task tidy                 # go mod tidy (re-tabs go.mod: run task fmt after)
 ```
 
-The branch carries a small set of accepted pre-existing lint findings
-(testifylint float-compare, revive redefines-builtin-id in test
-files, a couple of unused symbols). They are tracked, not yours to
-fix in an unrelated change. Use `task lint:new` for the changed-code
+`docs/ci_workflow.yml` (the copy the owner places into
+`.github/workflows/ci.yml` - the workflow-scoped token) runs the same
+gate on every push (build,
+vet, test, fmt:check, lint --new, the race slice of connection and
+pathfind, the logfmt scan) - a red commit is caught by the runner,
+not by the next session. The logging conventions are enforced by the
+`internal/logfmt` scan (the `TestRepoLogConventions` test): capital
+first letter (a lowercase component tag like `login#%d:` counts), no
+trailing period - fix the message, not the checker.
+
+The branch carries a tracked pre-existing lint debt (~200 findings
+as of 2026-09-19: funlen/cyclop/gocognit on the wire parsers and
+scenario tables, exhaustruct in the reset fixtures, lll in the long
+descriptions, plus the historical accepted set). The findings are
+not yours to fix in an unrelated change - shrink them opportunistically
+when the touched function is already in your diff, and never add new
+ones (the CI gate runs `lint --new`, which only reads the changed
+lines; the full `golangci-lint run` returns to the gate when the debt
+clears). Use `task lint:new` for the changed-code
 verdict; if `--new` is clean, your change is lint-clean regardless of
 the full-tree count.
 
@@ -953,7 +981,8 @@ with a link to the reference Mobius Java class.
 - **Rebase before every push.** Several agent sessions push to the
   same branch concurrently, so a push can be rejected as
   non-fast-forward at any moment. The push procedure is: `git fetch
-  origin`, `git rebase origin/<branch>`, then `git push`. Never merge
+  origin`, `git rebase origin/<branch>`, `task prepush`, then `git
+  push`. Never merge
   remote commits into the local branch (no "Merge branch" commits - the
   history stays linear) and never force-push (it would destroy the
   parallel sessions' work). On a rebase conflict resolve both sides'
