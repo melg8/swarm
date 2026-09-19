@@ -224,6 +224,15 @@ const (
     // origin re-arms the follow patience (the character moved - the
     // claims own it).
     cursorEscapeFollowStep = 64.0
+    // cursorEscapeRouteMax caps the planned route length one escape
+    // walks: the route-following claims follow the plan polyline
+    // (see cursorEscapeRouteSteps) and the cap keeps the escape a
+    // pocket recovery - the walk along the route ends at the cap
+    // and the clicks resume from there, the escape never walks the
+    // character across the whole map on claims alone. The value
+    // matches directHopMax: one escape covers the same ground one
+    // server routed hop would.
+    cursorEscapeRouteMax = 2500.0
     // extendMarchStep is the stride of the forward route march of
     // extendShortClickCandidates: one geodata cell.
     extendMarchStep = 16.0
@@ -1375,17 +1384,26 @@ func zeroCursorEscape() cursorEscapeState {
 // client drives from its own movement simulation moves the character
 // server-side without any click validation (ValidatePosition.runImpl
 // syncs the claimed placement into the world and broadcasts it). The
-// claimed steps follow the validated dry hop aim the click would
-// have walked, one run-speed step per second. It reports whether the
-// escape armed; a server that ignores the claims burns the attempts
-// (see driveCursorKeyEscape) and the caller keeps its honest abort.
+// claimed steps follow the planned route when the leg holds one (the
+// route ladder bends where the plan bends - see
+// cursorEscapeRouteSteps) and fall back to the straight line toward
+// the validated dry hop aim without a plan, one run-speed step per
+// second. It reports whether the escape armed; a server that ignores
+// the claims burns the attempts (see driveCursorKeyEscape) and the
+// caller keeps its honest abort.
 func (l *Loop) beginCursorKeyEscape(
     selfX, selfY, selfZ, aimX, aimY, aimZ int32,
 ) bool {
     if l.cursorEscapes >= cursorEscapeAttemptsMax {
         return false
     }
-    steps := l.cursorEscapeSteps(selfX, selfY, selfZ, aimX, aimY, aimZ)
+    steps := l.cursorEscapeRouteSteps(selfX, selfY, selfZ)
+    form := "along the planned route"
+    if len(steps) == 0 {
+        steps = l.cursorEscapeSteps(selfX, selfY, selfZ,
+            aimX, aimY, aimZ)
+        form = "toward the aim"
+    }
     if len(steps) == 0 {
         // No dry step exists toward the aim: the water guard owns
         // this direction, the honest abort of the caller stands.
@@ -1405,11 +1423,101 @@ func (l *Loop) beginCursorKeyEscape(
     if err := l.game.CursorKeyWalkTo(aimX, aimY, aimZ); err != nil {
         l.logf("Hunt: the cursor key arm failed: %v", err)
     }
-    l.logf("Hunt: the server refused the routed walk clicks, trying "+
-        "the cursor key escape toward %d %d (%d claimed steps)",
-        aimX, aimY, len(steps))
+    l.logf("Hunt: the server refused the routed walk clicks, walking "+
+        "%s toward %d %d (%d claimed steps)",
+        form, aimX, aimY, len(steps))
 
     return true
+}
+
+// cursorEscapeRouteSteps builds the claimed steps of a route
+// following escape: the planned waypoints from the current cursor
+// (the pathfind route the leg already holds) interpolated into
+// run-speed strides whose lines stay dry - the water guard holds for
+// the claims the same way it holds for the clicks. The strides march
+// every segment of the route in order, so the ladder bends where the
+// plan bends: an obstacle the straight chord would push the
+// character through (the tree on the plaza, the railing corner) is
+// walked around the way the planner drew it. The route length caps
+// at cursorEscapeRouteMax so one escape stays a pocket recovery -
+// the claims never walk the character across the whole map. It
+// returns nil without a plan (the straight fallback owns the leg).
+func (l *Loop) cursorEscapeRouteSteps(
+    selfX, selfY, selfZ int32,
+) [][3]int32 {
+    if l.navigator == nil || l.wpIndex >= len(l.waypoints) {
+        return nil
+    }
+    steps := make([][3]int32, 0, 16)
+    px, py, pz := float64(selfX), float64(selfY), float64(selfZ)
+    budget := cursorEscapeRouteMax
+    for i := l.wpIndex; i < len(l.waypoints); i++ {
+        wp := l.waypoints[i]
+        ox, oy, oz := px, py, pz
+        dx := wp.X - ox
+        dy := wp.Y - oy
+        dz := wp.Z - oz
+        dist := math.Hypot(dx, dy)
+        stride := cursorEscapeStep
+        for stride < dist && budget > 0 {
+            frac := stride / dist
+            sx := ox + dx*frac
+            sy := oy + dy*frac
+            sz := oz + dz*frac
+            if l.escapeStepWet(px, py, pz, sx, sy, sz) {
+                return steps
+            }
+            steps = append(steps, [3]int32{
+                int32(math.Round(sx)),
+                int32(math.Round(sy)),
+                int32(math.Round(sz)),
+            })
+            px, py, pz = sx, sy, sz
+            budget -= cursorEscapeStep
+            stride += cursorEscapeStep
+        }
+        if budget <= 0 {
+            return steps
+        }
+        // Close the segment onto the waypoint itself when the last
+        // stride ended short of it: the bend points stay on the
+        // route, the next segment leaves from the route bend and
+        // not from a corner the stride cut.
+        if math.Hypot(wp.X-px, wp.Y-py) > hopCoincideDist {
+            if l.escapeStepWet(px, py, pz, wp.X, wp.Y, wp.Z) {
+                return steps
+            }
+            steps = append(steps, [3]int32{
+                int32(math.Round(wp.X)),
+                int32(math.Round(wp.Y)),
+                int32(math.Round(wp.Z)),
+            })
+            px, py, pz = wp.X, wp.Y, wp.Z
+            budget -= cursorEscapeStep
+        }
+    }
+
+    return steps
+}
+
+// escapeStepWet reports whether the straight line of one claimed step
+// crosses water: a claim never names a wet cell (the same contract
+// the clicks hold - the escape steps stop at the first wet stride
+// and the shore route owns the crossing). A geodata error counts as
+// dry, like the water guard does.
+func (l *Loop) escapeStepWet(
+    fromX, fromY, fromZ, toX, toY, toZ float64,
+) bool {
+    if l.navigator == nil {
+        return false
+    }
+    crossed, err := l.navigator.WaterCrossed(pathfind.Vec3{
+        X: fromX, Y: fromY, Z: fromZ,
+    }, pathfind.Vec3{
+        X: toX, Y: toY, Z: toZ,
+    })
+
+    return err == nil && crossed
 }
 
 // cursorEscapeSteps builds the claimed steps of the cursor key

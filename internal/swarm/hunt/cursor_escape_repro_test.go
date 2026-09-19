@@ -248,8 +248,8 @@ func TestReproCursorKeyEscapeWalksOutOfTheRefusingCell(t *testing.T) {
     require.Empty(t, loop.frozenAreas,
         "a server that refuses the clicks does not name frozen "+
             "corridors - the session must not poison the planner")
-    require.Contains(t, sink.String(), "trying the cursor key escape",
-        "the escape line names the recovery")
+    require.Contains(t, sink.String(), "walking along the planned route",
+        "the escape line names the route following recovery")
     require.Contains(t, sink.String(),
         "the cursor key escape walked to",
         "the settle line names the escaped ground")

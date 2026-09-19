@@ -782,3 +782,42 @@ atomic commit):
   contract broke for the dump walk lines). The repro_map_render
   harness drives the whole surface (the label absence, the hover
   label, the chip, the copy shortcut, the flash, the leave reset).
+
+## Active task: the village escape round - the route following cursor escape, the move start watchdog and the refused click root cause (2026-09-19)
+
+Started: 2026-09-19. Branch: `feature/new-pathfind-alternative`.
+Commits as melg8. Rebase before every push.
+
+### Goal (the owner prompt of 2026-09-19)
+
+1. The cursor key escape (the WASD-like recovery of a click refusing
+   cell) walks STRAIGHT lines toward the aim today - the owner rule:
+   the claimed steps must follow the PATHFIND ROUTE and must never
+   try to cross the whole map in a straight line.
+2. The walker must switch to the next recovery mode AS FAST AS
+   POSSIBLE when the current one did nothing - a movement command
+   that never started the movement must not wait a full stuck window
+   (15 s / 4 s today).
+3. The owner asks WHY the server refuses the ordinary ground clicks
+   in the village plaza zone, and the same at the shop and the
+   teacher hall entries - a systemic question, with an elegant
+   solution wanted. Acceptance: the `village-escape` scenario
+   (the refused-click dump cell) must keep passing.
+
+### Progress
+
+- 2026-09-19: the route following cursor escape (commit 1). The
+  escape arms `cursorEscapeRouteSteps` when the leg holds a plan:
+  the claimed ValidatePosition steps march the plan polyline from
+  the current cursor (the pathfind route the leg already walks),
+  interpolated into run-speed strides, water guarded per stride and
+  capped at `cursorEscapeRouteMax` (2500 units, one direct hop of
+  ground) so an escape stays a pocket recovery - the claims never
+  carry the character across the map. The straight line ladder
+  stays as the planless fallback. The bend closure keeps the route
+  bend points among the steps so the next segment leaves from the
+  bend and not from a cut corner. Tests: the bend corridor (every
+  step sits on the planned line, the bend lands among the steps,
+  the stride spacing, the cap), the cap on a 12000 unit route, the
+  wet stride stop, the planless nil fallback; the plaza repro tests
+  re-verified green with the route following ladder.
