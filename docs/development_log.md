@@ -7050,3 +7050,101 @@ tiles, the way this round's run did.
 Verification: the fresh tile build above (0 failed) and the full
 `go test -count=1 ./...` = 28 packages ok, zero failures; the
 gofmt-spaces gate silent. The mobius server stays untouched.
+
+## Round 94: the porch refusal ladder and the injection block fix (2026-09-20)
+
+Scope: the owner report "все еще упирается" with the temp13 state
+dump at commit a1fc212: the walk plan is the exact mesh answer now
+(2 waypoints, 371 units, approach 0 - the church entry round's fix
+works), the character walked 71 units onto the temple porch
+(44696 51992 -2792) and stood there for the remaining 31 seconds of
+the walk window, "moving: no", with "last action failed: 1s ago".
+The sandbox reproduction grid: plaza spawn direct, plaza spawn
+through the proxy, porch spawn direct, porch spawn through the
+proxy - all PASS (the reference stack accepts the click from the
+porch and walks the character inside itself), so the stall belongs
+to the owner deployment's server class: it validates the click
+lines with its own geodata, stops its own walk at the door frame
+and answers every straight re-click from the porch with
+ActionFailed - the plain follower re-issued the same aim every walk
+request period and the same refusal bounced forever, exactly the
+15:10 server class the town walk follower already owns a recovery
+for.
+
+### The fix: the manual walk refusal ladder
+
+The user walk follower gets the town walk's refusal machinery:
+
+- userLegRefused: the sent click attribution of refusalEvidence
+  (the ActionFailed answer lands inside the 4 second window after
+  the walk request and no other request owns it), reading the
+  manual leg's own userMoveAt.
+- sendUserVariedAim: the refusalVariantTarget ladder (the half
+  click, the quarter click, the two sideways probes) against the
+  current manual waypoint, every variant through the click
+  validation port on the real pack, the server frame z transport of
+  the manual plan riding every aim. The refusal is target specific
+  - the sideways aim crosses the door opening where the straight
+  line clips the frame.
+- beginUserCursorKeyEscape: once the variants spent, the leg hands
+  to the cursor key escape - the mode 0 arm plus the claimed
+  ValidatePosition stream the server follows WITHOUT any click
+  validation (the 2026-09-14 15:10 report proved a server that
+  answers no click from a cell still walks the arrow key claims).
+  The claimed ladder marches the planned waypoint line in run
+  speed strides with the water guard - the claims follow the
+  plan's own ground, never a straight cut the planner did not
+  draw. The drive ownership, the follow probe, the no progress
+  abort and the settle reuse the town walk state machine (the
+  phases are exclusive, the cursorEscapeState rides the loop).
+- The variant counter resets on the plan boundaries and on every
+  waypoint the follower advances past; a fresh manual command
+  clears the escape state and the attempts.
+
+The reproduction user_refusal_ladder_test.go pins the ladder end to
+end on the real pack and the real mesh tiles (the porchServer
+model: the clicks from the porch radius bounce with ActionFailed,
+the clicks from the clear ground validate, the claims walk): the
+straight clicks bounce, the varied aims bounce with them, the
+cursor key escape arms and walks the character onto the interior
+cell, the plan completes - pre fix the walk sat on the porch until
+the timeout.
+
+### The second bug the dump surfaced: the injection object id blocks
+
+The live reproduction of the church entry scenario collided on the
+DB layer before it ever reached the walk: "inject adena: db exec:
+1062 Duplicate entry '368450866'". The acceptance injection derives
+the item object ids as charID+100000000+i - the scheme landed ABOVE
+the FIRST_OBJECT_ID (268435456) it documents (the character ids
+themselves start just past 268435456, so charID+100M ~ 368M), the
+blocks of sibling temp characters overlapped whenever two creations
+sat closer than the kit length (temp12 at 268450853 vs temp13 at
+268450866: the bow of one was the adena of the other), and the
+band pushed the server's restart scan past the injected ids. The
+fix derives the ids from a per character block
+base+(charID mod 1000000)*32+i: the base sits at 150000000 (the
+band the IdManager never allocates from), the blocks stay disjoint
+until two character ids sit exactly a million apart, the stride
+keeps every block wider than the kit. The live verification ran
+church-entry and railing-pocket back to back against the shared
+stack - both PASS, the two temp characters' inventories coexist.
+
+### The mesh route note
+
+The offline route probe of the temple walk (Route 44694 51921 -2808
+to 44718 52291 -2792) answers a straight 2 waypoint funnel with an
+empty raw waypoint list - the mesh folds the door pivot away and
+the single 371 unit leg crosses the narrow entrance. The reference
+server walks that line clean (the probes confirm the arrival), the
+owner deployment's server stalls its own walk at the frame - the
+follower ladder above is the recovery for every deployment whose
+walk or click validation disagrees with the pack, the planning
+layer stays the source of the route. A bottleneck aware funnel
+(keep the pivot of a narrow passage) stays open as the follow up
+that removes the stall class at the plan layer.
+
+Verification: go test -count=1 ./... every package ok zero failures
+on the merged tree, the gofmt-spaces gate silent, the live
+acceptance church-entry PASS and railing-pocket PASS back to back
+against the deployed stack, the mobius server untouched.

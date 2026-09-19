@@ -1414,3 +1414,35 @@ a38b90a (test gate: the unit test account ladder renames to unittest1 - the test
   rounds' log entries and renamed the church entry acceptance
   account to temp13 (the pocket round's railing-pocket scenario
   took temp12), the acceptance suite owns temp1..temp13 now.
+
+### Progress (2026-09-20, the porch refusal ladder round)
+
+- the owner dump at a1fc212: the walk plan is the exact mesh answer
+  (the church entry fix works), but the character stood on the
+  temple porch for 31 seconds with the server answering every
+  straight re-click ActionFailed - the plain user walk follower
+  re-issued the same aim forever. The sandbox grid (plaza/porch x
+  direct/proxy) all PASS, so the stall belongs to the owner
+  deployment's server class (the 15:10 class: its geodata seals the
+  porch lines and it answers no click from there).
+- the fix: the manual walk refusal ladder - userLegRefused (the
+  sent click attribution), sendUserVariedAim (the shared
+  refusalVariantTarget ladder through the click validation port)
+  and beginUserCursorKeyEscape (the claimed ValidatePosition
+  stream the server follows without any click validation, the
+  claims march the planned waypoint line). The reproduction
+  user_refusal_ladder_test.go pins the ladder end to end on the
+  real pack and the real mesh (pre fix the walk sat on the porch
+  until the timeout).
+- the second bug the dump surfaced: the acceptance injection
+  derived item object ids charID+100M landed above FIRST_OBJECT_ID
+  and the sibling temp blocks overlapped (temp12's bow was
+  temp13's adena, the duplicate key 1062 of the live run). The new
+  per character block base+(charID mod 1M)*32+i sits below the
+  server range and stays disjoint; church-entry and
+  railing-pocket ran back to back live - both PASS.
+- the mesh route probe of the temple walk answered a straight 2
+  waypoint funnel (the door pivot folded away, raw list empty) -
+  the bottleneck aware funnel stays open as the follow up; the
+  follower ladder owns every deployment whose walk disagrees with
+  the pack. Round 94 of docs/development_log.md.

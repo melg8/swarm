@@ -217,20 +217,21 @@ func TestResetCharacterInjectsDumpItems(t *testing.T) {
     // derived object id, the adena included.
     adena := "INSERT INTO items (owner_id, object_id, item_id, count, " +
         "loc, loc_data) VALUES (7, " +
-        strconv.FormatInt(charID+adenaObjectIDBase, 10) + ", 57, 31857, " +
+        strconv.FormatInt(injectObjectID(charID, 0), 10) + ", 57, 31857, " +
         "'INVENTORY', 0)"
     require.Contains(t, served, adena, "the adena stack of the dump")
     for i, item := range zoneReturnItems {
         insert := "INSERT INTO items (owner_id, object_id, item_id, " +
             "count, loc, loc_data) VALUES (7, " +
-            strconv.FormatInt(charID+adenaObjectIDBase+int64(i)+1, 10) +
+            strconv.FormatInt(injectObjectID(charID, i+1), 10) +
             ", " + strconv.Itoa(int(item.ItemID)) + ", " +
             strconv.Itoa(int(item.Count)) + ", 'INVENTORY', 0)"
         require.Contains(t, served, insert,
             "the dump stack "+strconv.Itoa(int(item.ItemID)))
     }
     // The derived object ids never reach the server range.
-    require.Less(t, charID+adenaObjectIDBase+int64(len(zoneReturnItems))+1,
+    require.Less(t,
+        injectObjectID(charID, len(zoneReturnItems)+1),
         int64(268435456))
     // The character row rewrite carries the dump position and vitals.
     var vitals bool

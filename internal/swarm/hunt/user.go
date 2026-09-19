@@ -511,9 +511,125 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
             selfZ, result.Waypoints[0].Z)
     }
     l.userMoveAt = time.Time{}
+    l.userRefusalVariants = 0
+    l.cursorEscapes = 0
+    l.cursorEscape = cursorEscapeState{}
     l.logf("Hunt: manual walk path planned: %d waypoints, "+
         "%.0f units (%.2fs search)", len(result.Waypoints),
         result.Length, result.Duration.Seconds())
+}
+
+// userLegRefused reports whether the server answered the last manual
+// walk click with ActionFailed while the character stood still: the
+// same sent click attribution the town walk follower applies (see
+// refusalEvidence - the one byte refusal answer is the only online
+// channel that names a server side move refusal, and the answer
+// carries no request identity, so the correlation skips the answers
+// that belong to a non walk request sent between the click and the
+// refusal).
+func (l *Loop) userLegRefused() bool {
+    if l.userMoveAt.IsZero() {
+        return false
+    }
+    failedAt := l.tracker.LastActionFailed()
+
+    return failedAt.After(l.userMoveAt) &&
+        failedAt.Sub(l.userMoveAt) <= refusalAnswerWindow &&
+        !l.tracker.OtherRequestBetween(l.userMoveAt, failedAt)
+}
+
+// sendUserVariedAim answers a refused manual walk click by varying
+// the aim at the current waypoint: the refusal of the server is
+// target specific - the Bresenham raster of a shorter prefix or a
+// sideways offset of the same waypoint often validates where the
+// plain aim bounced (the temple entrance porch: the straight line to
+// the interior clipped the door frame, the east sideways aim crossed
+// the opening). The variants ride the same server frame transport
+// and the same offline gates as the planned click (the click
+// validation port on the line, the geometry inside the move limit)
+// and share the refusalVariantTarget ladder of the town walk. It
+// reports whether a variant was sent.
+func (l *Loop) sendUserVariedAim(
+    selfX, selfY, selfZ int32, now time.Time,
+) bool {
+    if l.navigator == nil || l.userWpIndex >= len(l.userWaypoints) ||
+        l.userRefusalVariants >= refusalVariantsMax {
+        return false
+    }
+    wp := l.userWaypoints[l.userWpIndex]
+    wpZ := anchorZToServerFrame(wp.Z, l.userFrameOffset)
+    from := pathfind.Vec3{
+        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+    }
+    for ; l.userRefusalVariants < refusalVariantsMax; l.userRefusalVariants++ {
+        variant := refusalVariantTarget(
+            pathfind.Vec3{X: wp.X, Y: wp.Y, Z: wpZ}, from,
+            l.userRefusalVariants)
+        if variant == nil {
+            continue
+        }
+        to := pathfind.Vec3{
+            X: variant[0], Y: variant[1], Z: variant[2],
+        }
+        if _, ok := l.navigator.ValidateClick(from, to); !ok {
+            continue
+        }
+        l.userRefusalVariants++
+        l.logf("Hunt: the server refused the manual walk click, "+
+            "varying the aim to %.0f %.0f (%d of %d)",
+            to.X, to.Y, l.userRefusalVariants, refusalVariantsMax)
+        l.userMoveAt = now
+        if err := l.game.WalkTo(
+            int32(to.X), int32(to.Y), int32(to.Z)); err != nil {
+            l.logf("Hunt: manual walk request failed: %v", err)
+        }
+
+        return true
+    }
+
+    return false
+}
+
+// beginUserCursorKeyEscape hands a refused manual leg to the cursor
+// key escape: the keyboard mode 0 arm plus the claimed
+// ValidatePosition stream the server follows without any click
+// validation (the 2026-09-14 15:10 report proved a server that
+// answers NO mouse click from a cell still walks the arrow key
+// claims - the same recovery the town walk follower owns). The
+// claimed ladder marches the planned waypoint line in run speed
+// strides with the water guard - the claims follow the plan's own
+// ground, never a straight cut the planner did not draw. It reports
+// whether the escape armed.
+func (l *Loop) beginUserCursorKeyEscape(
+    selfX, selfY, selfZ, aimX, aimY, aimZ int32,
+) bool {
+    if l.cursorEscapes >= cursorEscapeAttemptsMax {
+        return false
+    }
+    steps := l.cursorEscapeSteps(selfX, selfY, selfZ,
+        aimX, aimY, aimZ)
+    if len(steps) == 0 {
+        return false
+    }
+    arm := steps[len(steps)-1]
+    l.cursorEscapes++
+    l.cursorEscape = cursorEscapeState{
+        armed:           true,
+        originX:         selfX,
+        originY:         selfY,
+        steps:           steps,
+        next:            0,
+        lastClaimAt:     time.Time{},
+        claimsSinceMove: 0,
+    }
+    if err := l.game.CursorKeyWalkTo(arm[0], arm[1], arm[2]); err != nil {
+        l.logf("Hunt: the cursor key arm failed: %v", err)
+    }
+    l.logf("Hunt: the refused manual clicks hand the walk to the "+
+        "cursor key escape toward %d %d (%d claimed steps)",
+        arm[0], arm[1], len(steps))
+
+    return true
 }
 
 // followUserWaypoints walks the planned legs of a long manual move:
@@ -533,6 +649,7 @@ func (l *Loop) followUserWaypoints(
             selfX, selfY, selfZ, waypointArriveDist) {
             l.userWpIndex++
             l.userMoveAt = time.Time{}
+            l.userRefusalVariants = 0
 
             continue
         }
@@ -543,6 +660,7 @@ func (l *Loop) followUserWaypoints(
                 l.userWaypoints[l.userWpIndex+1], selfX, selfY) {
             l.userWpIndex++
             l.userMoveAt = time.Time{}
+            l.userRefusalVariants = 0
 
             continue
         }
@@ -561,12 +679,47 @@ func (l *Loop) followUserWaypoints(
 
         return
     }
+    // The cursor key escape owns the walk while it runs: the claim
+    // ladder drives the character past the refusing ground (the
+    // server follows the claimed ValidatePosition stream without any
+    // click validation), the click machinery stays down until the
+    // escape ends - the same ownership the town walk follower
+    // applies (the 2026-09-14 15:10 report: a server that answers NO
+    // click from a cell still walks the arrow key claims).
+    if l.cursorEscape.armed {
+        l.driveCursorKeyEscape(now, selfX, selfY)
+
+        return
+    }
     if l.tracker.SelfWalking() && !l.userRedirect {
         // The current leg is running: do not restart the server path.
         return
     }
     if !l.userMoveAt.IsZero() && now.Sub(l.userMoveAt) < walkRequestPeriod {
         return
+    }
+    // The refusal ladder of the manual walk: the server answered the
+    // last click of this leg with ActionFailed while the character
+    // stood still. The plain follower re-clicked the same aim every
+    // period and the same refusal bounced forever (the temple
+    // entrance round: the server stopped its own walk at the door
+    // frame and refused every straight re-click from the porch while
+    // the character stood there for the whole walk window). The
+    // ladder first varies the aim (the refusal is target specific -
+    // a shorter prefix or a sideways offset validates where the
+    // plain aim bounced) and hands the leg to the cursor key escape
+    // once the variants spent: the claims walk without any click
+    // validation, so the ground no click leaves is still walkable.
+    if l.userLegRefused() {
+        if l.sendUserVariedAim(selfX, selfY, selfZ, now) {
+            return
+        }
+        wp := l.userWaypoints[l.userWpIndex]
+        wpZ := anchorZToServerFrame(wp.Z, l.userFrameOffset)
+        if l.beginUserCursorKeyEscape(selfX, selfY, selfZ,
+            int32(wp.X), int32(wp.Y), int32(wpZ)) {
+            return
+        }
     }
     wp := l.userWaypoints[l.userWpIndex]
     dx := wp.X - float64(selfX)

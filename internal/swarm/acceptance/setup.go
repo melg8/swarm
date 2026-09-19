@@ -37,12 +37,39 @@ type ResetItem struct {
     Count  int32
 }
 
-// adenaObjectIDBase is the object id of the injected adena stack. It
-// stays below the FIRST_OBJECT_ID (268435456) of the server IdManager
-// on purpose: the running server allocates every new world object id
-// from that range, so the injected rows can never collide with it,
-// and the IdManager restart scan skips the below range ids anyway.
-const adenaObjectIDBase = 100000000
+// The injected object id block of one character: the base sits in
+// the band the server IdManager never allocates from (every world
+// object id starts at FIRST_OBJECT_ID 268435456, so the band below
+// it is permanently factory free), the modulus spreads the blocks
+// by the character id and the stride keeps every block wider than
+// the injected kit (the adena stack plus the item list). The old
+// scheme charID+100000000 landed ABOVE the first object id (the
+// character ids themselves start just past 268435456), collided
+// with the sibling temp characters' blocks whenever two creations
+// sat closer than the kit length (temp12 at 268450853 vs temp13 at
+// 268450866: the bow of one was the adena of the other, the
+// duplicate key 1062 of the 2026-09-20 church entry run) and pushed
+// the server's restart scan past the injected band. The modulus
+// makes two blocks collide only for character ids exactly modulus
+// apart, which no temp ladder reaches.
+const (
+    injectObjectIDBase    = 150000000
+    injectObjectIDModulus = 1000000
+    injectObjectIDStride  = 32
+)
+
+// injectObjectID derives the object id of the injected inventory row
+// i (0 names the adena stack) of the character: the per character
+// block at base+(charID mod modulus)*stride, the rows inside it
+// sequential. The block stays disjoint from every other character's
+// block and below the FIRST_OBJECT_ID range the server allocates
+// from, and the wipe of the owned rows keeps the numbering
+// idempotent on a re-run.
+func injectObjectID(charID int64, i int) int64 {
+    return injectObjectIDBase +
+        (charID%injectObjectIDModulus)*injectObjectIDStride +
+        int64(i)
+}
 
 // onlinePollPeriod and onlinePollTimeout bound the wait for the
 // server side flush after a session stops: the logout store runs
@@ -385,10 +412,10 @@ func resetCharacter(db *DB, reset characterReset, log func(string)) error {
         return fmt.Errorf("wipe item reuse: %w", err)
     }
 
-    // The injected adena stack: the fixed object id keeps the insert
-    // idempotent (a re-run deletes the rows above first).
+    // The injected adena stack: the derived object id keeps the
+    // insert idempotent (a re-run deletes the rows above first).
     adena := strconv.FormatInt(reset.Adena, 10)
-    objectID := strconv.FormatInt(charID+adenaObjectIDBase, 10)
+    objectID := strconv.FormatInt(injectObjectID(charID, 0), 10)
     if _, err := db.Exec(
         "INSERT INTO items (owner_id, object_id, item_id, count, loc, " +
             "loc_data) VALUES (" + strconv.FormatInt(charID, 10) + ", " +
@@ -397,12 +424,13 @@ func resetCharacter(db *DB, reset characterReset, log func(string)) error {
         return fmt.Errorf("inject adena: %w", err)
     }
 
-    // The injected inventory stacks: the derived object ids stay
-    // below the FIRST_OBJECT_ID range like the adena stack (the
-    // wipe above keeps the numbering idempotent on a re-run).
+    // The injected inventory stacks: the derived object ids ride the
+    // same per character block as the adena stack (see
+    // injectObjectID - disjoint blocks, below the server allocation
+    // range, idempotent on a re-run).
     for i, item := range reset.Items {
         itemObjectID := strconv.FormatInt(
-            charID+adenaObjectIDBase+int64(i)+1, 10)
+            injectObjectID(charID, i+1), 10)
         if _, err := db.Exec(
             "INSERT INTO items (owner_id, object_id, item_id, count, " +
                 "loc, loc_data) VALUES (" +
