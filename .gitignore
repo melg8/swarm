@@ -49,3 +49,8 @@ tools/l2bridge/target/
 # runs/coverage-latest.txt)
 runs/.cover-run.log
 runs/.coverage-current.txt
+
+# The runtime artifact of the full repo race run (the per package
+# results land in the terminal and the commit message - the log
+# itself is not a baseline)
+runs/race_full.log

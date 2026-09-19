@@ -118,7 +118,11 @@ tasks:
     desc: Runs the test suite under the race detector (needs cgo/gcc, the race tests of connection and pathfind target the 2026-09-08 send and layer pool races)
     aliases: [tr]
     cmds:
-      - CGO_ENABLED=1 go test ./... -race -count=1
+      # The 30m package timeout: the detector's 6-10x hot loop
+      # overhead pushes pathfind (112 s plain) and navbuild past the
+      # 10m default on a two core box - the 2026-09-19 run died in a
+      # 600 s panic with the search tests mid-flight, no race found.
+      - CGO_ENABLED=1 go test ./... -race -count=1 -timeout=30m
 
   test:cover:
     desc: Test suite with coverage, the per package delta against runs/coverage-latest.txt (fails on a drop beyond COVER_DROP_LIMIT, default 2.0 pp)

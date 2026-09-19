@@ -10,6 +10,7 @@ import (
     "log"
     "math"
     "strings"
+    "sync"
     "testing"
     "time"
 
@@ -55,9 +56,25 @@ type fakeGame struct {
     noTargets   bool
     logouts     int
     bypasses    []string
-    htmlNPC     int32
-    htmlBody    string
-    lastError   error
+    // htmlMu guards the html dialog pair: the production await loop
+    // polls LastHTMLDialog from the loop goroutine while the test
+    // server simulation writes the reply from its own goroutine.
+    htmlMu    sync.Mutex
+    htmlNPC   int32
+    htmlBody  string
+    lastError error
+}
+
+// setHTMLDialog delivers the server html reply the way the wire does:
+// the production loop polls LastHTMLDialog from its own goroutine,
+// so the test writer and the poll reader share this mutex - the
+// direct field write from the simulated server goroutine would race
+// the poll.
+func (f *fakeGame) setHTMLDialog(npc int32, body string) {
+    f.htmlMu.Lock()
+    defer f.htmlMu.Unlock()
+    f.htmlNPC = npc
+    f.htmlBody = body
 }
 
 func (f *fakeGame) AttackTarget(objectID int32) error {
@@ -184,6 +201,9 @@ func (f *fakeGame) SendBypass(command string) error {
 }
 
 func (f *fakeGame) LastHTMLDialog() (int32, string) {
+    f.htmlMu.Lock()
+    defer f.htmlMu.Unlock()
+
     return f.htmlNPC, f.htmlBody
 }
 

@@ -33,8 +33,7 @@ func TestDriveGatekeeperTeleportHappyPath(t *testing.T) {
     // the showTeleports bypass: the awaitDialog loop reads the html.
     go func() {
         time.Sleep(100 * time.Millisecond)
-        game.htmlNPC = 30146
-        game.htmlBody = gatekeeperTestHTML
+        game.setHTMLDialog(30146, gatekeeperTestHTML)
     }()
     loop := NewLoop(game, state.NewBot("gatekeeper"))
 
@@ -91,8 +90,7 @@ func TestDriveGatekeeperTeleportStaleHtmlIgnored(t *testing.T) {
     }
     go func() {
         time.Sleep(100 * time.Millisecond)
-        game.htmlNPC = 30146
-        game.htmlBody = gatekeeperTestHTML
+        game.setHTMLDialog(30146, gatekeeperTestHTML)
     }()
     loop := NewLoop(game, state.NewBot("gatekeeper"))
     err := loop.DriveGatekeeperTeleport(30146, "NORMAL", "The Town of Gludio")

@@ -9,17 +9,41 @@ import (
     "context"
     "log"
     "strings"
+    "sync"
     "testing"
     "time"
 
     "github.com/stretchr/testify/require"
 )
 
+// syncBuffer wraps a bytes.Buffer with a mutex: the watch goroutine
+// writes through the log.Logger while the test reads the rendered
+// lines from the same buffer, and the two sides never overlap the
+// unsynchronized interior of bytes.Buffer.
+type syncBuffer struct {
+    mu  sync.Mutex
+    buf bytes.Buffer
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+
+    return s.buf.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+
+    return s.buf.String()
+}
+
 // TestWatchLogsFootprintLines pins the log contract: one line at
 // once, then one per period, each carrying the heap, sys, goroutine
 // and gc numbers the memory investigation pairs across runs.
 func TestWatchLogsFootprintLines(t *testing.T) {
-    var out bytes.Buffer
+    var out syncBuffer
     logger := log.New(&out, "", 0)
     ctx, cancel := context.WithCancel(context.Background())
     defer cancel()

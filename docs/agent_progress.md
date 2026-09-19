@@ -1161,3 +1161,47 @@ three independent defects, all fixed in one round:
   answers PASS on the built binary, tools/mobius_e2e.sh answers
   E2E_OK, the hunt suite green, every package ok, no new lint
   findings, the whitespace gate green.
+
+### Progress (2026-09-19, the red unit tests and the coverage lift round)
+
+- The owner report ("исправь тесты чтоб все проходили") verified
+  against the full gate surface: build, vet, the full uncapped lint
+  and the plain `go test ./...` (28 packages, `-count=1`) were green
+  already - the red tests live in the race slice and in the
+  per package timeout.
+- Three fixes, two real races found by `go test -race -count=1
+  ./...` (first full-repo race run on record):
+  1. `memwatch` `TestWatchLogsFootprintLines`: the watch goroutine
+     logged into a plain `bytes.Buffer` while the test polled
+     `out.String()` from the test goroutine - the log.Logger mutex
+     covers only its own writes, never the reader. The test now
+     wraps the buffer in a `syncBuffer` (a mutex-guarded pair of
+     Write/String), the race detector stays silent across 5
+     consecutive runs.
+  2. `hunt` `TestDriveGatekeeperTeleportHappyPath` /
+     `TestDriveGatekeeperTeleportStaleHtmlIgnored`: the simulated
+     server goroutine wrote `fakeGame.htmlNPC`/`htmlBody` directly
+     while the production `awaitDialog` loop polled
+     `LastHTMLDialog()` from the loop goroutine. `fakeGame` gains
+     the `htmlMu` mutex; the poll reads and the simulation writes
+     go through `setHTMLDialog`; verified with `-race -count=3`.
+  3. `pathfind` (600.065 s) and `pathfind/navbuild` (600.049 s)
+     both died in the 10m default `go test` timeout with the search
+     tests mid-flight at 4 s and 24 s - the detector's 6-10x hot
+     loop overhead on a two core box, no race found. `task
+     test:race` now carries `-timeout=30m` with the measured
+     reasoning in the comment.
+- Coverage lifted where the reachable surface was untested:
+  `cmd/gofmt-spaces` 34.5 -> 84.5 (the CLI layer: -l/-w/stdout
+  modes, the dot and underscore dir skip rules, the explicit dot
+  root entry, the single file and non-go arguments, the broken
+  source failure that does not stop the batch, the default cwd
+  walk), `cmd/benchdiff` 60.7 -> 75.3 (the metric block rendering
+  and the empty-unit skip, the missing file error, the zero base
+  delta guard, the vanished-benchmarks report, the one-sided
+  metric join, the GOMAXPROCS strip boundary), `huntaudit`
+  23.0 -> 24.5 (the broken JSON resume refusal, the directory read
+  error path, the atomic temp+rename write with the summary stamp,
+  the missing anchors file refusal). `memwatch` holds 100.
+- Total statement coverage 75.3 -> 75.6; the baseline
+  `runs/coverage-latest.txt` re-committed with the deltas.
