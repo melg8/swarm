@@ -1424,8 +1424,7 @@ func (b *Bot) SetWalkPlan(plan WalkPlan) {
 func (b *Bot) publishWalkPlanLocked(plan *WalkPlan, now time.Time) {
     if b.walkPlan != nil && plan.Index >= b.walkPlan.Index &&
         walkPlansSameRoute(*b.walkPlan, *plan) {
-        for i := b.walkPlan.Index; i < plan.Index && i < len(b.walkWpAt);
-            i++ {
+        for i := b.walkPlan.Index; i < plan.Index && i < len(b.walkWpAt); i++ {
             b.walkWpAt[i] = now
         }
         b.walkPlan = plan
