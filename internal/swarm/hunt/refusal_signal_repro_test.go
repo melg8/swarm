@@ -57,11 +57,11 @@ import (
 // (ApplyActionFailed), the hunt walk machinery reads them as the
 // online refusal evidence (refusalEvidence), a refused stuck varies
 // the aim before anything else (sendVariedAim), a leg with refusal
-// evidence never bans a corridor (escalateFrozenLeg) and its routed
-// walk aborts early with the honest reason, the routed walk hops
-// under the straight line boundary (directHopMax) with the water
-// guard on the hop line, and the zone leg stall holds the return
-// backoff instead of re-arming.
+// evidence never bans a corridor (escalateFrozenLeg), and the frozen
+// ladder hands the leg to the cursor key escape along the planned
+// route - the direct server routed walk those rungs used to arm is
+// eliminated (the owner rule of the 2026-09-19 round: НИКОГДА не
+// идти напрямую - see direct_walk_elimination_repro_test.go).
 const (
     // refusalDumpX/Y/Z is the reported stuck position (the dump of
     // 2026-09-14 10:18, the village center stand of test3).
@@ -177,49 +177,18 @@ func TestReproRefusedClickSkipsTheCorridorBan(t *testing.T) {
         loop.lastHit = time.Now().Add(-time.Minute)
         loop.returnToZone()
         if loop.phase != phaseTownReturn {
-            // The post-abort grind of the dump: the direct zone legs
-            // against the refusing server - the stall must hold the
-            // return backoff, not re-arm it.
-            zone := loop.zone()
-            require.NotNil(t, zone)
-            grind := time.Now()
-            // Two stall windows: the first refusal stall re-arms
-            // (the progress probe has nothing yet), the second on
-            // the same unmoved cell holds the backoff.
-            for range 40 {
-                grind = grind.Add(time.Second)
-                x, y, z, ok := bot.SelfPosition()
-                require.True(t, ok)
-                loop.walkZoneLeg(zone, x, y, z, grind)
-                sim.consumeAt(game, bot, grind)
-            }
-
+            // The post-abort state: the return holds or re-plans on
+            // the next call - no direct zone legs arm against the
+            // refusing server anymore.
             continue
         }
         now := time.Now()
         for i := 0; i < 400 && loop.phase == phaseTownReturn; i++ {
             now = now.Add(2 * time.Second)
-            x, y, z, ok := bot.SelfPosition()
-            require.True(t, ok, "the character position must be known")
-            // The production dispatch of walkTownWaypoints: the armed
-            // escape drives before the direct leg check (the re-plan
-            // of a direct leg escape stands the direct leg down while
-            // the claims run).
-            if loop.cursorEscape.armed || loop.directLeg {
-                // armDirectLeg stamps its window with the real
-                // clock while this driver walks on the synthetic
-                // one: re-arm the window so the leg lives inside
-                // the driven timeline.
-                loop.directLegUntil = now.Add(directLegWindow)
-                loop.walkDirectLeg(now, x, y, z)
-                sim.consumeAt(game, bot, now)
-
-                continue
-            }
-            if loop.followWaypoints(x, y, z, now, true) {
-                break
-            }
-            sim.consumeAt(game, bot, now)
+            // The production dispatch mirror drives the armed escape
+            // first; the routed legs follow the waypoints.
+            driveTownWalkTick(t, loop, game, bot, now, false,
+                sim.consumeAt)
         }
     }
 
@@ -242,16 +211,11 @@ func TestReproRefusedClickSkipsTheCorridorBan(t *testing.T) {
     require.Contains(t, sink.String(), "skipping the corridor ban",
         "the escalation gate reads the refusal latch")
     require.Contains(t, sink.String(),
-        "the server refused the routed walk clicks",
-        "the direct leg aborts early with the honest reason")
-    require.Contains(t, sink.String(), "holding the return backoff",
-        "the zone leg grind stops re-arming the refused cycle")
-    // The backoff holds at the budget: the last stall window of the
-    // grind stood on the refusing cell (a re-arm would clear the
-    // counter to zero). The exact count rides the abort cadence of
-    // the driven escape cycles - the hold state is the contract.
-    require.GreaterOrEqual(t, loop.zoneFails, zoneReturnFailBudget,
-        "the refused grind keeps the return backoff armed")
+        "the refused clicks hand the walk to the cursor key escape",
+        "the frozen ladder hands the leg to the claims transport "+
+            "along the planned route")
+    require.NotContains(t, sink.String(), "by the server routing",
+        "the direct server routed walk never arms")
 }
 
 // TestReproRefusedClickVariedAimWalksOut pins the target specific
@@ -280,24 +244,12 @@ func TestReproRefusedClickVariedAimWalksOut(t *testing.T) {
             }
 
             now = now.Add(2 * time.Second)
-            x, y, z, ok := bot.SelfPosition()
-            require.True(t, ok, "the character position must be known")
-            // The production dispatch of walkTownWaypoints: the armed
-            // escape drives before the direct leg check (the re-plan
-            // of a direct leg escape stands the direct leg down while
-            // the claims run).
-            if loop.cursorEscape.armed || loop.directLeg {
-                loop.walkDirectLeg(now, x, y, z)
-                sim.consumeAt(game, bot, now)
-
-                continue
-            }
-            if loop.followWaypoints(x, y, z, now, true) {
-                loop.endTownTrip("back at the farm spot")
-
+            // The production dispatch mirror drives the armed escape
+            // first; the routed legs follow the waypoints.
+            if driveTownWalkTick(t, loop, game, bot, now, true,
+                sim.consumeAt) {
                 break
             }
-            sim.consumeAt(game, bot, now)
         }
         if x, y, _, ok := bot.SelfPosition(); ok &&
             inZoneSquare(x, y, refusalDumpZoneX, refusalDumpZoneY, 633) &&
@@ -324,165 +276,6 @@ func TestReproRefusedClickVariedAimWalksOut(t *testing.T) {
         "the server refused the routed walk clicks",
         "the routed fallback never runs dry: the varied aims keep "+
             "the walk moving")
-}
-
-// TestReproDirectLegHopsUnderTheCap pins the hop geometry of the
-// server routed walk: the old fallback clicked the far leg target
-// once (a 10200 unit request the server refuses beyond its 9900
-// cap, or walks as a wet straight line past the 3000 boundary -
-// the dump aborted on it instantly), the hop fallback sends clicks
-// capped at directHopMax, every hop passes the offline click port
-// before it leaves (no blind refused clicks) and the walk carries
-// the character toward its target - progress first, the honest
-// abort last.
-func TestReproDirectLegHopsUnderTheCap(t *testing.T) {
-    loop, game, bot, sim, sink := refusalDumpLoop(t, false, 0)
-    loop.legDest = pathfind.Vec3{
-        X: float64(refusalDumpZoneX), Y: float64(refusalDumpZoneY),
-        Z: -3560,
-    }
-    loop.armDirectLeg("test hop walk")
-
-    startX, startY, _, _ := bot.SelfPosition()
-    startDist := math.Hypot(
-        float64(refusalDumpZoneX-startX),
-        float64(refusalDumpZoneY-startY))
-    now := time.Now()
-    for i := 0; i < 30 && loop.directLeg; i++ {
-        now = now.Add(2 * time.Second)
-        x, y, z, ok := bot.SelfPosition()
-        require.True(t, ok)
-        loop.walkDirectLeg(now, x, y, z)
-        if len(game.walks) > sim.requests {
-            target := game.walks[len(game.walks)-1]
-            hop := math.Hypot(
-                float64(target[0]-x), float64(target[1]-y))
-            require.LessOrEqual(t, hop, directHopMax+1,
-                "every routed hop stays under the straight line "+
-                    "boundary the server routing owns")
-        }
-        sim.consumeAt(game, bot, now)
-    }
-
-    require.False(t, loop.directLeg,
-        "the hop walk must finish within the window")
-    require.Zero(t, sim.refused,
-        "every sent hop passed the offline click port - the routed "+
-            "walk never sends a click the reference server collapses")
-    require.Positive(t, sim.accepted,
-        "the hops moved the character")
-    x, y, _, _ := bot.SelfPosition()
-    endDist := math.Hypot(
-        float64(refusalDumpZoneX-x), float64(refusalDumpZoneY-y))
-    require.Less(t, endDist, startDist,
-        "the hop walk carried the character toward its target "+
-            "instead of aborting at the start cell the way the dump "+
-            "did")
-
-    // A dry nearby target walks the whole hop chain to arrival.
-    game2 := &fakeGame{}
-    bot2 := newTestBot()
-    moveSelfTo(bot2, refusalDumpX, refusalDumpY, refusalDumpZ)
-    loop2 := NewLoop(game2, bot2)
-    engine := reproEngine(t)
-    loop2.SetNavigator(NewNavigator(engine))
-    loop2.SetHuntingZone(refusalDumpZoneX, refusalDumpZoneY, 633)
-    sink2 := &bytes.Buffer{}
-    loop2.SetLogger(log.New(
-        io.MultiWriter(sink2, eventMirror{bot: bot2}), "", 0))
-    sim2 := &refusingClickServer{engine: engine}
-    loop2.legDest = pathfind.Vec3{X: 43512, Y: 50504, Z: -2992}
-    loop2.armDirectLeg("test dry hop walk")
-    now = time.Now()
-    for range 10 {
-        if !loop2.directLeg {
-            break
-        }
-
-        now = now.Add(2 * time.Second)
-        x2, y2, z2, ok := bot2.SelfPosition()
-        require.True(t, ok)
-        loop2.walkDirectLeg(now, x2, y2, z2)
-        sim2.consumeAt(game2, bot2, now)
-    }
-    require.False(t, loop2.directLeg, "the dry hop walk finishes")
-    require.Contains(t, sink2.String(), "the server routed walk reached",
-        "the dry direction arrives at the hop target")
-    require.Zero(t, sim2.refused,
-        "the dry hops pass the offline port as well")
-    _ = sink
-}
-
-// TestShortenWetHopHalvesToTheDryPrefix pins the water guard of the
-// routed hops: a hop whose line crosses the lake shortens toward its
-// dry prefix (the walkable shore prefix carries the character to the
-// waterline) and a hop that stays wet down to the floor reports no
-// dry prefix at all - the direction is water blocked and the trip
-// ends with the honest abort.
-func TestShortenWetHopHalvesToTheDryPrefix(t *testing.T) {
-    engine := reproEngine(t)
-    nav := NewNavigator(engine)
-    bot := newTestBot()
-    moveSelfTo(bot, refusalDumpX, refusalDumpY, refusalDumpZ)
-    game := &fakeGame{}
-    loop := NewLoop(game, bot)
-    loop.SetNavigator(nav)
-
-    from := pathfind.Vec3{
-        X: float64(refusalDumpX), Y: float64(refusalDumpY),
-        Z: float64(refusalDumpZ),
-    }
-    zone := pathfind.Vec3{
-        X: float64(refusalDumpZoneX), Y: float64(refusalDumpZoneY),
-        Z: -3560,
-    }
-    // Walk the dump line west until the first wet sample: the stand
-    // one step before it is the shore cell of the test.
-    dx := zone.X - from.X
-    dy := zone.Y - from.Y
-    wetAt := 1.0
-    for frac := 0.05; frac < 1.0; frac += 0.05 {
-        probe := pathfind.Vec3{
-            X: from.X + dx*frac, Y: from.Y + dy*frac, Z: from.Z,
-        }
-        crossed, err := nav.WaterCrossed(from, probe)
-        if err == nil && crossed {
-            wetAt = frac
-
-            break
-        }
-    }
-    require.Negative(t, wetAt-1.0+0.05,
-        "the dump line crosses water: the wet sample must exist")
-    shore := pathfind.Vec3{
-        X: from.X + dx*(wetAt-0.05), Y: from.Y + dy*(wetAt-0.05),
-        Z: from.Z,
-    }
-
-    // The full hop from the shore crosses the water.
-    hop := pathfind.Vec3{
-        X: shore.X + dx*0.3, Y: shore.Y + dy*0.3, Z: shore.Z,
-    }
-    crossed, err := nav.WaterCrossed(shore, hop)
-    require.NoError(t, err)
-    require.True(t, crossed,
-        "the hop from the shore toward the zone crosses the lake")
-
-    hopX, hopY, hopZ, dry := loop.shortenWetHop(
-        int32(shore.X), int32(shore.Y), int32(shore.Z),
-        int32(hop.X), int32(hop.Y), int32(hop.Z))
-    require.True(t, dry,
-        "a hop over the lake has a dry shore prefix")
-    short := pathfind.Vec3{
-        X: float64(hopX), Y: float64(hopY), Z: float64(hopZ),
-    }
-    crossed, err = nav.WaterCrossed(shore, short)
-    require.NoError(t, err)
-    require.False(t, crossed,
-        "the shortened hop line stays dry")
-    require.Less(t, math.Hypot(short.X-shore.X, short.Y-shore.Y),
-        math.Hypot(hop.X-shore.X, hop.Y-shore.Y),
-        "the shortened hop is a prefix of the refused one")
 }
 
 // TestReproZoneLegStallHoldsBackoffOnRefusal pins the grind gate: the

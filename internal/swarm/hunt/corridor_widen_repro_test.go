@@ -278,21 +278,12 @@ func TestReproCorridorWidenEscapesTheWalledApproach(t *testing.T) {
         loop.lastHit = time.Now().Add(-time.Minute)
         loop.returnToZone()
         if loop.phase != phaseTownReturn {
-            // The budget-gated direct zone legs of the dump's terminal
-            // grind: drive their stall window with a synthetic clock
-            // until the no-movement detector re-arms the return.
-            zone := loop.zone()
-            require.NotNil(t, zone)
-            grind := time.Now()
-            for i := 0; i < 40 && loop.zoneFails != 0; i++ {
-                grind = grind.Add(time.Second)
-                x, y, z, ok := bot.SelfPosition()
-                require.True(t, ok)
-                loop.walkZoneLeg(zone, x, y, z, grind)
-                sim.consume(game, bot)
-            }
+            // The budget hold of the eliminated direct zone legs: the
+            // returnToZone call paces its own retry (the hold resets
+            // the fail counter once per backoff window), the next call
+            // plans a fresh route.
             require.Zero(t, loop.zoneFails,
-                "the grind stall must re-arm the pathfound return")
+                "the budget hold resets the fail counter for the retry")
 
             continue
         }
@@ -302,11 +293,11 @@ func TestReproCorridorWidenEscapesTheWalledApproach(t *testing.T) {
             loop.moveAt = time.Time{}
             x, y, z, ok := bot.SelfPosition()
             require.True(t, ok, "the character position must be known")
-            if loop.directLeg {
+            if loop.cursorEscape.armed {
                 // The frozen leg escalation handed the walk to the
-                // server routing: the whole-line water guard of the
-                // dump aborts the leg at once.
-                loop.walkTownWaypoints()
+                // cursor key escape: the claims walk the plan while
+                // they hold.
+                loop.driveCursorKeyEscape(now, x, y)
                 sim.consume(game, bot)
 
                 continue

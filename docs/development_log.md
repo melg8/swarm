@@ -6350,3 +6350,147 @@ froze.
 - The full hunt suite stays green (70 s), `go test ./...` answers
   28 packages ok, `golangci-lint run --new` clean, the whitespace
   gate green.
+
+## Round 89: the direct walk dies - every plan is a route, the escape arms along it (2026-09-19)
+
+Scope: the owner directive of the 2026-09-19 16:02 dump ("не исправил
+либо не залил? опять прямая линия до зоны - ее НЕ должно быть, ТОЛЬКО
+идти по маршрутам и НИКОГДА не идти напрямую"). The mobius server
+stays untouched (the server integrity rules): the fix lives in the
+hunt walk layer of the swarm client.
+
+### The 16:02 dump pins the path the previous round did not cover
+
+The 16:02:05 dump (build 07ccb0e, bot test1, phase townReturn): the
+character spawned at the village cell 43032 50408 -2992 and never
+moved - the walk plan view carried the SINGLE FAR WAYPOINT (1
+waypoints, wp 0: 25500 59756 -3544 <-- TARGET) for 24.7 s, the third
+cycle of the same ladder. Round 88 fixed the escape arming OVER the
+degenerate plan; this dump walks the path where the escape never arms
+at all:
+
+1. The spawn cell is a LOCAL refusal pocket on the real pack: the
+   offline click port (ValidateClick) refuses every direction from
+   43032 50408 but south - the dump's own first refused click is the
+   8 unit neighbor 43032 50416 ("the server would refuse the walk
+   click", re-pathing 1 of 3 at 16:00:07, the character freshly
+   selected). The clicks never leave the bot, so no server answer
+   ever arrives: refusalEvidence stays silent, noteMoveStart never
+   arms, the pocket branch of stuckTownWalk never runs.
+2. The ladder climbs on the frozen evidence instead: noteRepathCell
+   (frozenRepathLimit 1) aborts into escalateFrozenLeg, rung 1 bans
+   the corridor at 43032 50416 and re-plans the detour. The offline
+   probe against the real pack + the real mesh tiles shows the
+   detour's first funnel waypoint STAYS the same 8 unit step (the
+   start cell sits inside its own ban by the way-out rule, the mesh
+   wp 0 is 8 units from the spawn whatever the ban radius - r48, r96
+   and r192 all answer first-leg-validate=false), the detour freezes
+   within one second, and rung 2 answers armDirectLeg ("the detour
+   route froze as well, walking to 25500 59756 by the server
+   routing").
+3. walkDirectLeg validates every hop through the same poisoned port:
+   the validation gate (the shorten loop) stands BEFORE the escape
+   arming branches of that function, so a pocket that refuses every
+   hop prefix returns false every tick, the 45 s window burns, the
+   trip aborts ("the server routed walk made no progress") and the
+   next trip re-arms the same direct leg with a wider ban (the dump
+   events: the widening 48 -> 96 -> 192 across three trips, the last
+   one armed at 16:01:40 and still standing at the dump moment).
+
+### The probes
+
+Two offline probes against the real geodata pack and the real mesh
+tiles (the regions 20_18..21_20 built with cmd/navmesh-build) pin both
+halves of the freeze: the mesh hybrid plans the 64 waypoint dry route
+from the spawn (its wp 0 IS the refused 43032 50416 -2992), while the
+grid click port refuses the spawn's neighbor ring (N/E/W and the
+diagonals refuse, the 8 unit first leg refuses, the first five plan
+legs refuse) - the mesh/grid disagreement the session froze in. South
+stays open on the grid, and the widened bans cannot move the first
+funnel waypoint off the pocket.
+
+### The fix: the direct server routed walk is eliminated
+
+The owner rule is absolute now: the bot walks ROUTES, never the
+direct line. The direct leg machinery is gone from the hunt layer:
+
+- escalateFrozenLeg rung 2 arms the CURSOR KEY ESCAPE ALONG THE
+  CURRENT PLAN instead of armDirectLeg: the plan stays the leg's own
+  route (the detour rung just re-planned it), the claims follow the
+  planner's bends (cursorEscapeRouteSteps), and the settle returns
+  the walk to the normal routed clicks on the same plan - the owner
+  contract verbatim (wasd along the route, the normal mode at the
+  point). The re-arm repeats while the trip's escape attempts last
+  (cursorEscapeAttemptsMax), a spent budget falls back to the honest
+  trip abort with its cooldown. The refusal-evidence leg (the rung 1
+  skip) reaches the same rung - the escape takes over at once, the
+  mode switch the owner demanded happens as soon as the clicks prove
+  dead.
+- armDirectLeg, walkDirectLeg, directLegTarget, replanDirectEscapeRoute
+  and shortenWetHop are deleted with the directLeg/directLegUntil
+  fields and the directLegWindow/directHopMax constants; every
+  `l.directLeg = false` reset, the walkTownWaypoints branch, the
+  publishedLegSearch nil gate and the settle's re-arm branch go with
+  them. Every walk plan of the loop now carries its mesh search
+  contract (legSearch) - the search-less plan view WAS the direct
+  leg's fingerprint.
+- The zone return keeps the walk honest too: the budget-burned hold
+  (holdZoneReturn) parks the return with a paced log line instead of
+  marching walkZoneLeg toward the zone, and a failed planning cycle
+  holds the same way ("no route to X, holding the zone return instead
+  of the direct legs") - one fresh planning cycle arms per backoff
+  window, so the widened bans of every failed trip get their re-plan.
+  walkZoneLeg itself stays only for the in-zone targetless patrol
+  pacing and the deployments without a navigator (the legacy no
+  geodata world, where the direct short legs are the only movement
+  machinery there is).
+- beginCursorKeyEscape drops the legRefused side effect (the callers
+  with real refusal evidence latch it themselves; the frozen ladder's
+  arming must not seal the corridors) and clamps the planless aim
+  into the pocket radius (cursorEscapeRouteMax): a far target can
+  never pull a straight march out of the planless escape.
+
+### The reproduction
+
+`hunt/direct_walk_elimination_repro_test.go` (replaces the round 88
+repro file whose contract inverted):
+
+- TestReproRefusedSpawnNeverWalksTheDirectLine: the 16:02 dump end to
+  end on the real pack + the real mesh tiles with the honest server
+  (no refusal answers - the freeze lived inside the bot): the ladder
+  arms the escape along the route, the claims walk the character off
+  the poisoned cell following the planner's bends, the settle returns
+  the normal clicks, the walk reaches the hunting zone; at every
+  driven tick the plan keeps its search contract, no line of the
+  session ever names the server routed walk; every escape's claims
+  sit on its own plan corridor and every claimed step stays dry.
+  Pre-fix the test fails at the search-contract invariant (the
+  search-less plan view) - the exact dump artifact.
+- TestReproRefusedSpawnLadderArmsTheEscapeWithoutServerAnswers: the
+  refusal family itself - the server never refused anything, the
+  frozen ladder still switches the walk to the escape over a real
+  route whose far end is the leg destination.
+- TestCursorEscapePlanlessAimStaysPocketSized: the planless straight
+  ladder clamps its aim to the pocket radius.
+
+The affected pins follow the new contract: click_guard and
+walk_stuck_skip pin the escape rung (the plan stays a route), town_test
+pins the ladder's second rung, the budget-abort pin drives the escape
+to its honest end, zone_return_stuck pins the no-route hold
+(TestZoneReturnDryFailureHoldsTheReturn), corridor_widen drives the
+hold + the escape mirror, cursor_escape_repro and refusal_signal_repro
+use the shared driveTownWalkTick dispatch mirror and pin "no direct
+walk line" in the logs; the direct leg test set
+(cursor_escape_direct_leg_repro_test.go, TestDirectLegPlanCarriesNoSearchContract,
+TestDirectLegSilentHopsArmTheEscape, TestReproDirectLegHopsUnderTheCap,
+TestShortenWetHopHalvesToTheDryPrefix) retires with the machinery.
+
+### The verification
+
+- The live acceptance scenario village-escape answers PASS on the
+  built binary against the deployed stack (login 2106, game 7777).
+- tools/mobius_e2e.sh answers E2E_OK (the graceful shutdown ride).
+- The hunt suite stays green, `go test ./...` answers every package
+  ok, golangci-lint answers no new findings over the previous round
+  (the 5 residual ones are the lint version drift that already shows
+  on the base commit), the whitespace gate green.

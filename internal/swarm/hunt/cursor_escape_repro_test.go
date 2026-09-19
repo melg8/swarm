@@ -183,6 +183,36 @@ func cursorEscapeDumpLoop(
     return loop, game, bot, sim, sink
 }
 
+// driveTownWalkTick mirrors the production dispatch of
+// walkTownWaypoints for one simulated tick after the direct walk
+// elimination: the armed escape drives the claims first, the routed
+// legs follow their waypoints, and a finished plan optionally ends
+// the trip (the tickTownTrip side effect of the return leg). The
+// consume call answers the requests the tick sent the way the modeled
+// server does. It reports whether the walk plan finished.
+func driveTownWalkTick(
+    t *testing.T, loop *Loop, game *fakeGame, bot *state.Bot,
+    now time.Time, endOnFinish bool,
+    consume func(*fakeGame, *state.Bot, time.Time),
+) bool {
+    t.Helper()
+    x, y, z, ok := bot.SelfPosition()
+    require.True(t, ok, "the character position must be known")
+    if loop.cursorEscape.armed {
+        loop.driveCursorKeyEscape(now, x, y)
+        consume(game, bot, now)
+
+        return false
+    }
+    finished := loop.followWaypoints(x, y, z, now, true)
+    if finished && endOnFinish {
+        loop.endTownTrip("back at the farm spot")
+    }
+    consume(game, bot, now)
+
+    return finished
+}
+
 // TestReproCursorKeyEscapeWalksOutOfTheRefusingCell pins the
 // arrow-key recovery of the 15:10 report: the plaza cell refuses
 // every mouse click (the official client's clicks die on it too),
@@ -211,26 +241,12 @@ func TestReproCursorKeyEscapeWalksOutOfTheRefusingCell(t *testing.T) {
                 break
             }
             now = now.Add(2 * time.Second)
-            x, y, z, ok := bot.SelfPosition()
-            require.True(t, ok, "the character position must be known")
-            // The production dispatch of walkTownWaypoints: the armed
-            // escape drives first (the re-plan of a direct leg escape
-            // stands the direct leg down while the claims run - the
-            // walkDirectLeg top guard owns both), the direct leg walks
-            // its hops, the routed legs follow the waypoints.
-            if loop.cursorEscape.armed || loop.directLeg {
-                loop.directLegUntil = now.Add(directLegWindow)
-                loop.walkDirectLeg(now, x, y, z)
-                sim.consumeAt(game, bot, now)
-
-                continue
-            }
-            if loop.followWaypoints(x, y, z, now, true) {
-                loop.endTownTrip("back at the farm spot")
-
+            // The production dispatch mirror drives the armed escape
+            // first; the routed legs follow the waypoints.
+            if driveTownWalkTick(t, loop, game, bot, now, true,
+                sim.consumeAt) {
                 break
             }
-            sim.consumeAt(game, bot, now)
         }
         if x, y, _, ok := bot.SelfPosition(); ok &&
             inZoneSquare(x, y, refusalDumpZoneX, refusalDumpZoneY, 633) &&
@@ -256,7 +272,7 @@ func TestReproCursorKeyEscapeWalksOutOfTheRefusingCell(t *testing.T) {
     require.Contains(t, sink.String(), "walking along the planned route",
         "the escape line names the route following recovery")
     require.Regexp(t,
-        `resuming the (planned walk|server routed) clicks`,
+        `resuming the planned walk clicks`,
         sink.String(),
         "the clicks resume after the escape")
     require.NotContains(t, sink.String(),
@@ -305,24 +321,10 @@ func TestReproCursorKeyEscapeAbortsWhenTheServerIgnoresTheClaims(
         now := time.Now()
         for i := 0; i < 400 && loop.phase == phaseTownReturn; i++ {
             now = now.Add(2 * time.Second)
-            x, y, z, ok := bot.SelfPosition()
-            require.True(t, ok, "the character position must be known")
-            // The production dispatch of walkTownWaypoints: the armed
-            // escape drives first (the re-plan of a direct leg escape
-            // stands the direct leg down while the claims run - the
-            // walkDirectLeg top guard owns both), the direct leg walks
-            // its hops, the routed legs follow the waypoints.
-            if loop.cursorEscape.armed || loop.directLeg {
-                loop.directLegUntil = now.Add(directLegWindow)
-                loop.walkDirectLeg(now, x, y, z)
-                sim.consumeAt(game, bot, now)
-
-                continue
-            }
-            if loop.followWaypoints(x, y, z, now, true) {
-                break
-            }
-            sim.consumeAt(game, bot, now)
+            // The production dispatch mirror drives the armed escape
+            // first; the routed legs follow the waypoints.
+            driveTownWalkTick(t, loop, game, bot, now, false,
+                sim.consumeAt)
         }
     }
 
@@ -340,9 +342,11 @@ func TestReproCursorKeyEscapeAbortsWhenTheServerIgnoresTheClaims(
         "the cursor key escape made no progress",
         "the ignoring server is named honestly")
     require.Contains(t, sink.String(),
-        "the server refused the routed walk clicks",
+        "walk stuck, no movement since the re-path",
         "the attempts burn out and the trip aborts with the honest "+
             "reason")
+    require.NotContains(t, sink.String(), "by the server routing",
+        "the direct server routed walk never arms")
     require.GreaterOrEqual(t,
         strings.Count(sink.String(), "the cursor key escape made no "+
             "progress"),

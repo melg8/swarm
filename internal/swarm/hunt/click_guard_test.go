@@ -160,8 +160,8 @@ func TestFollowerRefusedClickRepathsAndAborts(t *testing.T) {
         "the escalation keeps the trip walking")
 
     // The third refusal from the same cell (the detour froze as well)
-    // climbs to the direct server routed walk: the follower drops the
-    // plan and arms the direct leg, bounded by its window.
+    // climbs to the cursor key escape along the plan: the claims
+    // transport owns the leg, the plan stays the leg's own route.
     loop.waypoints = []pathfind.Vec3{
         {X: 1000, Y: 1000, Z: 0},
         {X: 1020, Y: 1000, Z: 0},
@@ -170,15 +170,12 @@ func TestFollowerRefusedClickRepathsAndAborts(t *testing.T) {
     loop.wpIndex = 0
     loop.moveAt = time.Time{}
     follow(loop)
-    require.True(t, loop.directLeg,
-        "the frozen detour escalates to the direct server routed walk")
-
-    // The direct window burning without the server moving the
-    // character aborts the trip.
-    loop.directLegUntil = time.Now().Add(-directLegWindow - time.Second)
-    follow(loop)
-    require.Equal(t, phaseEngage, loop.phase,
-        "the expired direct walk ends the trip back into the hunt")
+    require.True(t, loop.cursorEscape.armed,
+        "the frozen detour escalates to the cursor key escape along "+
+            "the planned route")
+    require.Greater(t, len(loop.waypoints), 1,
+        "the escape arms over the real route, never a single far "+
+            "waypoint plan")
     require.Empty(t, game.walks,
         "a refused click is never sent")
 }

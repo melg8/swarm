@@ -131,11 +131,12 @@ func TestZoneReturnNonDryFallback(t *testing.T) {
         "both the dry and the non-dry search ran")
 }
 
-// TestZoneReturnDryFailureFallsBackToWalkZoneLeg pins the last
-// resort: when both the dry and the non-dry searches fail, the zone
-// return falls back to walkZoneLeg (direct walks toward the zone
-// center).
-func TestZoneReturnDryFailureFallsBackToWalkZoneLeg(t *testing.T) {
+// TestZoneReturnDryFailureHoldsTheReturn pins the no-route rule: when
+// both the dry and the non-dry searches fail, the zone return HOLDS
+// instead of marching the direct legs toward the zone center (the
+// owner rule of the 2026-09-19 round: НИКОГДА не идти напрямую - the
+// paced log names the standing return).
+func TestZoneReturnDryFailureHoldsTheReturn(t *testing.T) {
     loop, game, bot, nav := newTripLoop()
     moveSelfTo(bot, 43000, 50184, -2992)
     loop.zoneCX = 38553
@@ -150,9 +151,9 @@ func TestZoneReturnDryFailureFallsBackToWalkZoneLeg(t *testing.T) {
     require.True(t, loop.zoneReturn,
         "the zone return is armed")
     require.Equal(t, phaseEngage, loop.phase,
-        "the fallback keeps the engage phase (walkZoneLeg sends direct walks)")
-    require.NotEmpty(t, game.walks,
-        "walkZoneLeg sends a direct walk toward the zone center")
+        "the no-route hold keeps the engage phase")
+    require.Empty(t, game.walks,
+        "no direct walk toward the zone center ever goes out")
 }
 
 // TestStartZoneReturnLegTriesDryThenNonDry pins the search order of

@@ -1130,3 +1130,34 @@ three independent defects, all fixed in one round:
   statement coverage 75.3%; verify (build, vet, lint, test,
   fmt:check) green, the two fixed zone route tests green under
   `-race` directly.
+
+- 2026-09-19: the direct walk dies (the 16:02 dump round). The WHY:
+  the 16:02 dump (build 07ccb0e, bot test1) walked the path round 88
+  did not cover - the spawn cell 43032 50408 is a LOCAL refusal
+  pocket on the real pack (every direction refuses but south), the
+  clicks never left the bot so no server answer ever arrived, the
+  escape arming branches never ran, the ladder collapsed the plan
+  into the single far waypoint through armDirectLeg and the walk sat
+  on the forbidden direct line for three trip cycles while the
+  widened bans (48 -> 96 -> 192) could not move the mesh's first
+  funnel waypoint off the pocket. The offline probes (the real pack +
+  the built real mesh tiles) pin both halves: the mesh plans the 64
+  waypoint route whose wp 0 IS the refused 8 unit click, the grid
+  refuses every first leg. The HOW: the direct server routed walk is
+  ELIMINATED - escalateFrozenLeg rung 2 arms the cursor key escape
+  ALONG THE CURRENT PLAN (the claims follow the planner's bends, the
+  settle returns the normal routed clicks on the same plan, the
+  re-arm repeats while the attempts last), the budget-burned zone
+  return and the failed planning hold with a paced log instead of
+  marching walkZoneLeg (which stays only for the in-zone patrol and
+  the no-navigator deployments), and the planless escape aim clamps
+  into the pocket radius. Every walk plan of the loop now carries its
+  mesh search contract - the search-less plan view WAS the direct
+  leg's fingerprint. Tests:
+  `hunt/direct_walk_elimination_repro_test.go` (the 16:02 dump end to
+  end on the real pack + mesh, the no-server-answer ladder pin, the
+  planless clamp) + the reworked contract pins; the direct leg test
+  set retires with the machinery. The live acceptance village-escape
+  answers PASS on the built binary, tools/mobius_e2e.sh answers
+  E2E_OK, the hunt suite green, every package ok, no new lint
+  findings, the whitespace gate green.

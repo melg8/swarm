@@ -175,22 +175,38 @@ func TestWalkStuckAbortsAfterMaxRePaths(t *testing.T) {
         "the detour re-plan calls the navigator again")
 
     // The third stuck from the same cell (the detour froze as well)
-    // climbs rung 2: the direct server routed walk - the follower
-    // drops the plan and clicks the stop target directly, bounded by
-    // the window.
+    // climbs rung 2: the cursor key escape along the plan - the
+    // claims transport owns the leg, the plan stays the leg's own
+    // route (the owner rule: the WASD walks ALONG the route, never
+    // the direct line to the far target).
     armStuck(loop, bot)
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase,
-        "the frozen detour escalates to the direct server routed walk")
-    require.True(t, loop.directLeg,
-        "the direct leg is armed")
+        "the frozen detour escalates to the cursor key escape")
+    require.True(t, loop.cursorEscape.armed,
+        "the escape is armed")
+    require.Greater(t, len(loop.waypoints), 1,
+        "the escape arms over the real route")
 
-    // The direct window burning without progress aborts the trip: the
-    // ladder is exhausted, the cooldown recovery owns the rest.
-    loop.directLegUntil = time.Now().Add(-directLegWindow - time.Second)
-    loop.tick()
+    // The escape ignoring the character (no claim is ever followed -
+    // no server in this test) burns the follow patience and the
+    // ladder re-arms or aborts: the trip ends with the honest
+    // recovery instead of grinding claims into the silence.
+    now := time.Now()
+    for i := 0; i < 200 && loop.phase == phaseTownWalk; i++ {
+        now = now.Add(2 * time.Second)
+        x, y, z, _ := bot.SelfPosition()
+        if loop.cursorEscape.armed {
+            loop.driveCursorKeyEscape(now, x, y)
+
+            continue
+        }
+        if loop.followWaypoints(x, y, z, now, true) {
+            break
+        }
+    }
     require.NotEqual(t, phaseTownWalk, loop.phase,
-        "the expired direct walk aborts the trip")
+        "the escape that moved nothing ends the trip")
 }
 
 // TestWalkStuckBudgetBoundsMovingRepaths pins the maxRePaths budget

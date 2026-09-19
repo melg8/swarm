@@ -240,20 +240,39 @@ func (l *Loop) adoptOutZoneFight(now time.Time) bool {
     return false
 }
 
+// holdZoneReturn parks the budget-burned return: the walk holds
+// instead of marching the direct legs toward the zone (the owner rule
+// of the 2026-09-19 round: ТОЛЬКО идти по маршрутам и НИКОГДА не идти
+// напрямую). One fresh planning cycle arms per backoff window - the
+// counter resets with the paced log line, so the next returnToZone
+// retries the planner while the session's frozen corridor bans
+// (widened by every failed trip) keep reshaping the routes it may
+// answer.
+func (l *Loop) holdZoneReturn(now time.Time) {
+    if now.Sub(l.zoneLegLogAt) >= noPickLogPeriod {
+        l.zoneLegLogAt = now
+        l.logf("Hunt: %d zone returns found no walkable route, "+
+            "holding the return instead of the direct legs",
+            l.zoneFails)
+        l.zoneFails = 0
+    }
+}
+
 // returnToZone walks the character back into the hunting square over the
 // geodata waypoints: a village respawn after death or a deleveling guard
 // post sits behind the village walls, and a direct walk bumps into them,
 // so the return is planned with the pathfinder and followed by the town
 // trip waypoint machinery (leg splitting, passed waypoint skipping, stuck
 // re-pathing) through phaseTownReturn. The remembered farm spot is the
-// destination when one exists, the zone center otherwise. The failures of
-// the pathfound legs (a missing geodata region, an unreachable deck) fall
-// back to the legacy direct legs, so a character without a walkable path
-// still moves home. The return needs a standing character: the server
-// refuses every move request while it sits (the AI stays on the REST
-// intention and answers ActionFailed), so a zone switch that lands on a
-// resting character first waits out the sit transition, stands up and
-// only then plans the walk.
+// destination when one exists, the zone center otherwise. A return whose
+// budget burned or whose planning failed HOLDS the walk (the paced log
+// names it): the direct legs toward the zone are the march the owner
+// forbade - only the deployments without a route planner keep them (the
+// whole return machinery there is). The return needs a standing
+// character: the server refuses every move request while it sits (the
+// AI stays on the REST intention and answers ActionFailed), so a zone
+// switch that lands on a resting character first waits out the sit
+// transition, stands up and only then plans the walk.
 func (l *Loop) returnToZone() {
     now := time.Now()
     if !l.standUpGuarded(now) {
@@ -286,31 +305,61 @@ func (l *Loop) returnToZone() {
     }
     if (l.navigator == nil) || l.zoneFails >= zoneReturnFailBudget {
         l.phase = phaseEngage
-        l.walkZoneLeg(zone, selfX, selfY, selfZ, now)
+        if l.navigator == nil {
+            // No geodata: the direct short legs are the whole return
+            // machinery there is (the legacy deployment without a
+            // route planner - nothing exists to follow instead).
+            l.walkZoneLeg(zone, selfX, selfY, selfZ, now)
+
+            return
+        }
+        l.holdZoneReturn(now)
 
         return
     }
-    dest := l.zoneReturnDestination(zone, selfZ)
-    farmKnown := l.farmX != 0 || l.farmY != 0
-    if farmKnown && zone.Contains(l.farmX, l.farmY) {
-        dest = pathfind.Vec3{
-            X: float64(l.farmX),
-            Y: float64(l.farmY),
-            Z: float64(l.farmZ),
-        }
-    }
+    dest := l.zoneReturnGoal(zone, selfZ)
     l.tripStart = time.Now()
     l.rePaths = 0
     l.phase = phaseTownReturn
     l.legRadius = tripApproachRadius
     if !l.startZoneReturnLeg(dest) {
-        // No geodata path: direct legs toward the zone, the server
-        // stops them at obstacles and the next second plans again.
+        // The planner owns no route to the zone at all (both searches
+        // failed): the return holds instead of marching the direct
+        // legs toward the zone (the owner rule of the 2026-09-19
+        // round: НИКОГДА не идти напрямую). The paced line explains
+        // the standing hunter in the state dump; the next returnToZone
+        // re-plans (a failed trip's bans may have reshaped the answer
+        // by then).
         l.phase = phaseEngage
-        l.walkZoneLeg(zone, selfX, selfY, selfZ, now)
+        l.zoneFails++
+        if now.Sub(l.zoneLegLogAt) >= noPickLogPeriod {
+            l.zoneLegLogAt = now
+            l.logf("Hunt: no route to %d %d, holding the zone return "+
+                "instead of the direct legs", int(dest.X), int(dest.Y))
+        }
 
         return
     }
+}
+
+// zoneReturnGoal builds the search goal of the zone return: the
+// remembered farm spot when it lies inside the zone (the walk home
+// returns to the ground the hunt left), the square center's resolved
+// deck position otherwise (see zoneReturnDestination).
+func (l *Loop) zoneReturnGoal(
+    zone *state.Zone, selfZ int32,
+) pathfind.Vec3 {
+    if l.farmX != 0 || l.farmY != 0 {
+        if zone.Contains(l.farmX, l.farmY) {
+            return pathfind.Vec3{
+                X: float64(l.farmX),
+                Y: float64(l.farmY),
+                Z: float64(l.farmZ),
+            }
+        }
+    }
+
+    return l.zoneReturnDestination(zone, selfZ)
 }
 
 // zoneReturnDestination builds the search goal of the zone return for
@@ -347,22 +396,25 @@ func (l *Loop) zoneReturnDestination(
 }
 
 // walkZoneLeg walks one direct short leg toward the zone center: the
-// emergency fallback of the pathfinding zone return. The leg length
-// respects the server move request limit (9900 units) and the walk rate
-// limits itself through the select pacing of the return. The
-// aggro-aware steering bends the leg around the idle aggressive camps
-// sitting on its line (see loop_avoid.go) - the mobs at the zone
-// center itself stay exempt: the ground the return deliberately
-// enters carries its own prey. The click guard runs before the
-// request: a leg the server would cancel never moves the character,
-// so a refused leg re-arms the pathfound return instead of grinding
-// refused clicks forever (see guardZoneLegClick). The no-movement
-// stall of noteZoneLegStall runs first: legs the offline guard
-// blessed but the server silently refuses (a wall the geodata pack
-// does not model) grind nothing forever without it - the terminal
-// freeze of the 2026-09-14 08:42 dump, whose bot stood at the village
-// terrace clicking the collapsed southwest leg once a second with no
-// stuck window, no abort and no log line left to see.
+// pacing leg of the in-zone targetless patrol and the whole return
+// machinery of the deployments without a route planner (the owner
+// rule of the 2026-09-19 round keeps it out of the pathfound return:
+// a session with a navigator walks ROUTES only, the direct legs are
+// gone from its ladder). The leg length respects the server move
+// request limit (9900 units) and the walk rate limits itself through
+// the select pacing. The aggro-aware steering bends the leg around
+// the idle aggressive camps sitting on its line (see loop_avoid.go) -
+// the mobs at the zone center itself stay exempt: the ground the
+// patrol deliberately enters carries its own prey. The click guard
+// runs before the request: a leg the server would cancel never moves
+// the character, so a refused leg re-arms the pathfound return
+// instead of grinding refused clicks forever (see guardZoneLegClick).
+// The no-movement stall of noteZoneLegStall runs first: legs the
+// offline guard blessed but the server silently refuses (a wall the
+// geodata pack does not model) grind nothing forever without it - the
+// terminal freeze of the 2026-09-14 08:42 dump, whose bot stood at
+// the village terrace clicking the collapsed southwest leg once a
+// second with no stuck window, no abort and no log line left to see.
 func (l *Loop) walkZoneLeg(
     zone *state.Zone, selfX int32, selfY int32, selfZ int32, now time.Time,
 ) {

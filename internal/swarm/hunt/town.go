@@ -170,11 +170,6 @@ const (
     // existing ban does not count against the cap - the wall model
     // grows in place, the list only counts its centers.
     frozenBanMax = 8
-    // directLegWindow bounds the direct server routed walk of a
-    // frozen town leg: the clicks go out at the walk request period
-    // and the window leaves room for a server pathfinder walk plus
-    // a few position broadcasts before the stop gives up.
-    directLegWindow = 45 * time.Second
     // refusalVariantsMax bounds the varied aim attempts one leg
     // spends on the online refusal answer (see stuckTownWalk): the
     // server refuses a click for its own reasons (a different build
@@ -191,18 +186,6 @@ const (
     // flank the server refused, close enough to stay on the same
     // walkable deck the plan already verified.
     refusalVariantStep = 192.0
-    // directHopMax caps one hop of the direct server routed walk
-    // (see walkDirectLeg): Mobius walks a player click beyond 3000
-    // units as a straight line (no geodata correction, no server
-    // pathfinding - Creature.moveToLocation skips both) and refuses
-    // a click beyond 9900 outright (MoveToLocation.runImpl caps the
-    // request distance), so the single far click of the old fallback
-    // never moved anything: over the cap it bounced with
-    // ActionFailed, under it the straight line crossed the water the
-    // guard refuses. A hop under the boundary keeps the server's own
-    // geodata routing on the click - the routing the fallback exists
-    // for - while the water guard checks the actual hop line.
-    directHopMax = 2500.0
     // cursorEscapeStep is one claimed step of the cursor key escape:
     // about one second of run speed, the cadence the official client
     // streams its own movement simulation at while the player walks
@@ -241,9 +224,10 @@ const (
     // (see cursorEscapeRouteSteps) and the cap keeps the escape a
     // pocket recovery - the walk along the route ends at the cap
     // and the clicks resume from there, the escape never walks the
-    // character across the whole map on claims alone. The value
-    // matches directHopMax: one escape covers the same ground one
-    // server routed hop would.
+    // character across the whole map on claims alone. The planless
+    // aim of the straight fallback is clamped to the same radius
+    // (see beginCursorKeyEscape): a far target can never pull a
+    // straight march out of the escape.
     cursorEscapeRouteMax = 2500.0
     // extendMarchStep is the stride of the forward route march of
     // extendShortClickCandidates: one geodata cell.
@@ -712,7 +696,6 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
     l.buyConfirmAt = time.Time{}
     l.buyRetries = 0
     l.frozenStage = 0
-    l.directLeg = false
     l.legRefused = false
     l.refusalVariants = 0
     l.resetReplacementSales()
@@ -1056,7 +1039,6 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
     l.legDest = dest
     l.legStart = from
     l.waterEscape = false
-    l.directLeg = false
     // The plan view carries the search contract the leg answers (the
     // repro contract of the 3D pathfind link): the filter, the
     // approach radius and the ban circles of this very search, so a
@@ -1229,13 +1211,6 @@ func (l *Loop) walkTownWaypoints() bool {
 
         return false
     }
-    if l.directLeg {
-        // The frozen leg escalation handed the walk to the
-        // server's own routing: the geodata plan proved unable
-        // to move the character, the plain follower has nothing
-        // left to follow (see walkDirectLeg).
-        return l.walkDirectLeg(time.Now(), selfX, selfY, selfZ)
-    }
     if l.navigator != nil {
         if l.navigator.OverWater(
             float64(selfX), float64(selfY), int16(selfZ)) {
@@ -1262,174 +1237,6 @@ func (l *Loop) walkTownWaypoints() bool {
     }
 
     return l.followWaypoints(selfX, selfY, selfZ, time.Now(), true)
-}
-
-// walkDirectLeg drives the server routed walk of a frozen town leg:
-// the geodata plan could not move the character (the frozen abort
-// escalated here), so the follower drops the plan and clicks the leg
-// target directly - the server's own routing answers (its pathfinder
-// walks the click around the walls its geodata knows, a server
-// without geodata walks the straight line, and the water guard keeps
-// the bot ashore either way). The target of an npc stop is the npc
-// approach point - the converging offset ring of npcApproachPoint -
-// so the character walks right up to the npc instead of clicking its
-// exact spawn cell (the roof step-over hazard of the interior cells).
-// The window bounds the walk: a target the server routing also
-// refuses to move to ends the trip with its cooldown instead of
-// grinding refused clicks forever. It reports whether the leg
-// arrived at its destination.
-//
-//nolint:cyclop,funlen // the refusal branches read best side by side
-func (l *Loop) walkDirectLeg(
-    now time.Time, selfX, selfY, selfZ int32,
-) bool {
-    radius := l.legRadius
-    if radius <= 0 {
-        radius = tripApproachRadius
-    }
-    if waypointDistance(l.legDest, selfX, selfY, selfZ) <= radius {
-        l.directLeg = false
-        l.logf("Hunt: the server routed walk reached %d %d",
-            int32(l.legDest.X), int32(l.legDest.Y))
-
-        return true
-    }
-    // The cursor key escape owns the leg while it runs: the server
-    // refused the routed clicks and the arrow emulation walks the
-    // character off the refusing ground claim by claim (see
-    // driveCursorKeyEscape) - the click machinery below stays down
-    // until the escape ends.
-    if l.cursorEscape.armed {
-        l.driveCursorKeyEscape(now, selfX, selfY)
-
-        return false
-    }
-    if now.After(l.directLegUntil) {
-        l.directLeg = false
-        l.abortTownTrip("the server routed walk made no progress")
-
-        return false
-    }
-    // The routed walk hops instead of clicking the far target once:
-    // Mobius walks a player click beyond 3000 units as a straight
-    // line (no geodata correction, no pathfinding) and refuses one
-    // beyond 9900 outright, so the single far click of the old
-    // fallback either bounced with ActionFailed or walked the wet
-    // straight line the water guard refused - the fallback could
-    // never move anything (the 2026-09-14 10:18 dump: every "the
-    // server routed walk would swim" abort clicked a target 10200
-    // units away). A hop under the boundary keeps the server's own
-    // geodata routing on each click, which is the routing the
-    // fallback exists for.
-    moveX, moveY, moveZ := l.directLegTarget(selfX, selfY)
-    hopDX := float64(moveX) - float64(selfX)
-    hopDY := float64(moveY) - float64(selfY)
-    if hopDist := math.Hypot(hopDX, hopDY); hopDist > directHopMax {
-        frac := directHopMax / hopDist
-        moveX = int32(float64(selfX) + hopDX*frac)
-        moveY = int32(float64(selfY) + hopDY*frac)
-        moveZ = int32(float64(selfZ) +
-            (float64(moveZ)-float64(selfZ))*frac)
-    }
-    // The hop passes the same offline click port the planned clicks
-    // do: a hop whose line the reference server collapses (the far
-    // half of a long line rasterizes differently than the planned
-    // leg) is shortened toward its validating prefix - the Bresenham
-    // prefix of a split hop is not a prefix of the full raster, a
-    // shorter line often validates where the full hop bounced. A hop
-    // no prefix validates is held for this tick (the window and the
-    // refusal shortcut own the outcome), never sent blind.
-    if l.navigator != nil {
-        from := pathfind.Vec3{
-            X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-        }
-        hopX, hopY, hopZ := float64(moveX), float64(moveY), float64(moveZ)
-        if _, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
-            X: hopX, Y: hopY, Z: hopZ,
-        }); !ok {
-            if !l.shortenClickLeg(
-                selfX, selfY, selfZ, &hopX, &hopY, &hopZ, from) {
-                return false
-            }
-            moveX, moveY, moveZ =
-                int32(hopX), int32(hopY), int32(hopZ)
-        }
-    }
-    if l.navigator != nil {
-        crossed, err := l.navigator.WaterCrossed(pathfind.Vec3{
-            X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-        }, pathfind.Vec3{
-            X: float64(moveX), Y: float64(moveY), Z: float64(moveZ),
-        })
-        if err == nil && crossed {
-            // The hop line would swim: shorten the hop toward its
-            // dry prefix first - the walkable shore prefix carries
-            // the character to the waterline, from where the next
-            // hop re-aims - and only abort when even the shortest
-            // sensible hop stays wet (the direction is water
-            // blocked, the geodata shore route owns it and it
-            // already failed).
-            hopX, hopY, hopZ, dry := l.shortenWetHop(
-                selfX, selfY, selfZ, moveX, moveY, moveZ)
-            if !dry {
-                l.directLeg = false
-                l.abortTownTrip("the server routed walk would swim")
-
-                return false
-            }
-            moveX, moveY, moveZ = hopX, hopY, hopZ
-        }
-    }
-    if ax, ay, dodged := l.steerClearOfAggro(
-        selfX, selfY, selfZ, moveX, moveY, moveZ,
-        int32(l.legDest.X), int32(l.legDest.Y), now); dodged {
-        moveX, moveY = ax, ay
-    }
-    // A refused routed hop hands the leg to the cursor key escape
-    // or aborts early: the branch sits after the hop validation and
-    // the water guard so the escape aims at the validated dry hop
-    // the clicks would have walked. The refusal answer of the
-    // server arrived for the last click and the character did not
-    // move - the 2026-09-14 15:10 report proved the user's server
-    // answers NO click from that cell at all (even the official
-    // client stood frozen until the player walked the arrows), so
-    // the escape emulates exactly that: the cursor key arm plus the
-    // claimed ValidatePosition stream the server follows without
-    // any click validation. A server that ignores the claims too
-    // burns the escape attempts and the trip ends with the honest
-    // reason instead of grinding clicks it keeps bouncing.
-    if l.refusalEvidence() {
-        if l.beginCursorKeyEscape(
-            selfX, selfY, selfZ, moveX, moveY, moveZ) {
-            return false
-        }
-        l.legRefused = true
-        l.directLeg = false
-        l.abortTownTrip("the server refused the routed walk clicks")
-
-        return false
-    }
-    // The move start watchdog of the routed walk: a hop whose
-    // movement never started (no broadcast, no position change, no
-    // refusal answer) is dead exactly like a refused one - the
-    // cursor key escape takes over at once instead of re-hopping
-    // into the silence until the leg window burns (the owner rule
-    // of the 2026-09-19 round: the recovery switches modes as soon
-    // as the current one proves useless).
-    if l.noteMoveStart(now, selfX, selfY) {
-        if l.beginCursorKeyEscape(
-            selfX, selfY, selfZ, moveX, moveY, moveZ) {
-            return false
-        }
-        l.directLeg = false
-        l.abortTownTrip("the routed walk hops never started " +
-            "the movement")
-
-        return false
-    }
-    l.walkToward(moveX, moveY, moveZ, now)
-
-    return false
 }
 
 // cursorEscapeState carries the armed cursor key escape: the origin
@@ -1464,33 +1271,6 @@ func zeroCursorEscape() cursorEscapeState {
     }
 }
 
-// replanDirectEscapeRoute gives the escape of a direct leg a real
-// route to walk: the direct leg's waypoint plan is the single
-// destination spec (armDirectLeg), and the route ladder over it is
-// the straight chord to the far target - the walk the user forbade
-// (the 2026-09-19 14:46 dump: "wasd пошел на прямую к зоне", both
-// escape aims of the refused walk sat on the chord through the
-// village, the second died on the water guard four strides in). The
-// re-plan runs the same search the leg start runs for the phase (the
-// session's frozen corridor bans respected), installs the fresh route
-// as the leg plan and stands the direct leg down: the escape claims
-// walk along the planner's bends, and the settle returns the walk to
-// the normal routed clicks on the same plan - the WASD along the
-// route, the normal mode at the point. It reports whether a fresh
-// route was installed.
-func (l *Loop) replanDirectEscapeRoute() bool {
-    if !l.directLeg || l.navigator == nil {
-        return false
-    }
-    if !l.startZoneReturnOrWalkLeg() {
-        return false
-    }
-    l.logf("Hunt: the routed walk escape re-plans the town route, " +
-        "the claims follow it")
-
-    return true
-}
-
 // beginCursorKeyEscape arms the cursor key escape of a click
 // refusing cell: the routed walk clicks bounced with ActionFailed
 // while the character stood still, and the 2026-09-14 15:10 report
@@ -1506,37 +1286,33 @@ func (l *Loop) replanDirectEscapeRoute() bool {
 // claimed steps follow the planned route when the leg holds one (the
 // route ladder bends where the plan bends - see
 // cursorEscapeRouteSteps) and fall back to the straight line toward
-// the validated dry hop aim without a plan, one run-speed step per
-// second. It reports whether the escape armed; a server that ignores
-// the claims burns the attempts (see driveCursorKeyEscape) and the
-// caller keeps its honest abort.
+// the aim without a plan, one run-speed step per second - the aim
+// clamped into the pocket radius, so a far target can never pull a
+// straight march out of the planless escape (the owner rule of the
+// 2026-09-19 round: НИКОГДА не идти напрямую). It reports whether
+// the escape armed; a server that ignores the claims burns the
+// attempts (see driveCursorKeyEscape) and the caller keeps its
+// honest abort.
 func (l *Loop) beginCursorKeyEscape(
     selfX, selfY, selfZ, aimX, aimY, aimZ int32,
 ) bool {
     if l.cursorEscapes >= cursorEscapeAttemptsMax {
         return false
     }
-    // The direct leg's single waypoint plan is the destination spec,
-    // not a route: the route ladder over it interpolates the straight
-    // chord to the far target and the claims drag the character
-    // through the geometry the planner would route around (the
-    // 2026-09-19 14:46 dump - the repro of this round). Give the
-    // escape a real route first: the re-plan installs the fresh plan
-    // and returns the walk to the routed mode, the claims follow the
-    // planner's bends and the normal clicks resume on the same plan
-    // when the point is reached.
-    l.replanDirectEscapeRoute()
     steps := l.cursorEscapeRouteSteps(selfX, selfY, selfZ)
     form := "along the planned route"
-    if l.directLeg {
-        // The re-plan found no route (the planner owns no path from
-        // the standing cell): the single far waypoint plan is still
-        // no route - the planless straight ladder toward the
-        // validated hop aim owns the escape, pocket sized, never a
-        // march toward the far target.
-        steps = nil
-    }
     if len(steps) == 0 {
+        // The planless fallback: the straight ladder toward the aim,
+        // pocket sized. A far aim is clamped to the pocket radius
+        // along its line - the escape walks the first stretch toward
+        // the target and the re-plans of the settle own the rest.
+        dx := float64(aimX - selfX)
+        dy := float64(aimY - selfY)
+        if dist := math.Hypot(dx, dy); dist > cursorEscapeRouteMax {
+            frac := cursorEscapeRouteMax / dist
+            aimX = selfX + int32(dx*frac)
+            aimY = selfY + int32(dy*frac)
+        }
         steps = l.cursorEscapeSteps(selfX, selfY, selfZ,
             aimX, aimY, aimZ)
         form = "toward the aim"
@@ -1562,7 +1338,6 @@ func (l *Loop) beginCursorKeyEscape(
         lastClaimAt:     time.Time{},
         claimsSinceMove: 0,
     }
-    l.legRefused = true
     if err := l.game.CursorKeyWalkTo(arm[0], arm[1], arm[2]); err != nil {
         l.logf("Hunt: the cursor key arm failed: %v", err)
     }
@@ -1774,20 +1549,15 @@ func (l *Loop) driveCursorKeyEscape(
 
         return
     }
-    // The settle message names the walk that resumes: the direct leg
-    // mode re-arms its window and probes the server with fresh routed
-    // hops, the follower mode resumes the planned waypoint clicks.
+    // The settle message names the walk that resumes: the follower
+    // mode resumes the planned waypoint clicks on the same plan the
+    // claims just walked (the owner contract: the normal mode at the
+    // point).
     if now.Sub(l.cursorEscape.lastClaimAt) >= cursorEscapeSettle {
         aim := l.cursorEscape.steps[len(l.cursorEscape.steps)-1]
         l.cursorEscape.armed = false
-        if l.directLeg {
-            l.directLegUntil = now.Add(directLegWindow)
-            l.logf("Hunt: the cursor key escape walked to %d %d, "+
-                "resuming the server routed clicks", aim[0], aim[1])
-        } else {
-            l.logf("Hunt: the cursor key escape walked to %d %d, "+
-                "resuming the planned walk clicks", aim[0], aim[1])
-        }
+        l.logf("Hunt: the cursor key escape walked to %d %d, "+
+            "resuming the planned walk clicks", aim[0], aim[1])
     }
 }
 
@@ -1807,61 +1577,6 @@ func cursorEscapeHeading(
     }
 
     return int32(angle * 65536 / (2 * math.Pi))
-}
-
-// shortenWetHop halves a hop whose line crosses water toward its dry
-// prefix: the direct leg hops along the straight line to the leg
-// target, and a lake on that line must not end the walk while a dry
-// shore prefix still carries the character to the waterline - from
-// there the next hop re-aims along the line and the planner's shore
-// route owns the crossing itself. The halving floor matches the walk
-// click floor (minWalkClick): a shorter hop cannot carry a
-// meaningful step anyway. A geodata error counts as dry (the same
-// contract the water guard uses: a line the geodata cannot verify
-// stays walkable). It returns the shortened hop and whether a dry
-// prefix was found at all.
-func (l *Loop) shortenWetHop(
-    selfX, selfY, selfZ int32,
-    moveX, moveY, moveZ int32,
-) (int32, int32, int32, bool) {
-    from := pathfind.Vec3{
-        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-    }
-    dx := float64(moveX) - float64(selfX)
-    dy := float64(moveY) - float64(selfY)
-    dz := float64(moveZ) - float64(selfZ)
-    full := math.Hypot(dx, dy)
-    for leg := full / 2; leg >= minWalkClick; leg /= 2 {
-        frac := leg / full
-        hopX := int32(float64(selfX) + dx*frac)
-        hopY := int32(float64(selfY) + dy*frac)
-        hopZ := int32(float64(selfZ) + dz*frac)
-        crossed, err := l.navigator.WaterCrossed(from, pathfind.Vec3{
-            X: float64(hopX), Y: float64(hopY), Z: float64(hopZ),
-        })
-        if err != nil || !crossed {
-            return hopX, hopY, hopZ, true
-        }
-    }
-
-    return moveX, moveY, moveZ, false
-}
-
-// directLegTarget resolves the click target of the direct server
-// routed walk: the npc approach point when the leg walks to the npc
-// of the current trip stop (the offset ring keeps the click line
-// outside the interior walls and converges with the character), the
-// leg destination itself for every other target (the return leg, the
-// farm spot).
-func (l *Loop) directLegTarget(selfX, selfY int32) (int32, int32, int32) {
-    if len(l.tripStops) > 0 {
-        npc := l.tripStops[0].merchant
-        if townNpcPosition(npc) == l.legDest {
-            return npcApproachPoint(npc.X, npc.Y, npc.Z, selfX, selfY)
-        }
-    }
-
-    return int32(l.legDest.X), int32(l.legDest.Y), int32(l.legDest.Z)
 }
 
 // advanceWaypoints walks the waypoint cursor forward as far as the
@@ -2984,34 +2699,31 @@ func (l *Loop) noteRepathCell(selfX int32, selfY int32) bool {
 // abortFrozenTrip ends a trip whose re-path produced no movement and
 // escalates the recovery of the frozen leg before giving up: the town
 // walk legs and the zone return legs both try the escalation ladder
-// (the banned detour re-plan, the direct server routed walk - see
-// escalateFrozenLeg). Without the ladder the zone return cycles between
-// the pathfound-return-stuck-abort and the refused direct leg, never
-// moving: the deterministic planner re-plans the identical route the
-// server keeps refusing (the 2026-09-14 08:25 dump, build d2ea298: the
-// bot stood at the village terrace for 34s after the abort, no walk
-// sent, no Hunt log). The banned detour re-plan routes around the
-// walled corridor instead of reproducing it. The shopping trips keep
-// their cooldown recovery when the ladder is exhausted: the hunt
-// continues and the next trip retries from a fresh state.
+// (the banned detour re-plan, the cursor key escape along the fresh
+// route - see escalateFrozenLeg). Without the ladder the zone return
+// cycles between the pathfound-return-stuck-abort and the frozen
+// re-plan, never moving: the deterministic planner re-plans the
+// identical route the ground keeps refusing (the 2026-09-14 08:25
+// dump, build d2ea298: the bot stood at the village terrace for 34s
+// after the abort, no walk sent, no Hunt log). The banned detour
+// re-plan routes around the walled corridor instead of reproducing
+// it. The shopping trips keep their cooldown recovery when the ladder
+// is exhausted: the hunt continues and the next trip retries from a
+// fresh state.
 func (l *Loop) abortFrozenTrip(reason string) {
     if l.escalateFrozenLeg() {
         return
     }
-    wasReturn := l.phase == phaseTownReturn
     l.abortTownTrip(reason)
-    if wasReturn {
-        l.zoneFails = zoneReturnFailBudget
-    }
 }
 
 // escalateFrozenLeg climbs the recovery ladder of a frozen town walk
 // leg - a leg whose full re-path cycle produced no movement at all,
-// the signature of a server side refusal the offline click validation
-// cannot see (the 2026-09-12 trainer hall aisle dump: the plan
-// entered the building through the west aisle column, the server
-// walled it, and the character stood frozen through every re-path of
-// two whole trips). The rungs, one per frozen abort of the same leg:
+// the signature of a ground the click transport cannot cross (the
+// 2026-09-12 trainer hall aisle dump: the plan entered the building
+// through the west aisle column, the server walled it, and the
+// character stood frozen through every re-path of two whole trips).
+// The rungs, one per frozen abort of the same leg:
 //
 //  1. The banned detour re-plan: the aimed waypoint's cells join the
 //     session's avoid areas and the leg re-plans around them - the
@@ -3019,14 +2731,22 @@ func (l *Loop) abortFrozenTrip(reason string) {
 //     building instead of through the walled corridor) instead of
 //     reproducing the identical frozen one.
 //
-//  2. The direct server routed walk: the follower drops the plan and
-//     clicks the stop target directly, handing the routing to the
-//     server itself (its pathfinder walks around the walls its
-//     geodata knows), bounded by a window.
+//  2. The cursor key escape along the current plan: the clicks of
+//     every plan this ladder produced die on the same ground, so the
+//     claims transport takes over (the keyboard mode 0 arm plus the
+//     claimed ValidatePosition stream the server follows without any
+//     click validation) and walks the character ALONG THE PLANNED
+//     ROUTE - the plan stays the leg's own route, the claims bend
+//     where it bends, and the settle returns the walk to the normal
+//     routed clicks on the same plan (the owner contract of the
+//     2026-09-19 round: wasd along the route, the normal mode at the
+//     point, НИКОГДА не идти напрямую - the rung never replaces the
+//     plan with a straight line to the far target). The re-arm
+//     repeats while the trip's escape attempts last; a spent budget
+//     falls back to the plain trip abort with its cooldown.
 //
-// Rung 3 does not exist: the window burning without progress falls
-// back to the plain trip abort with its cooldown. The ladder reports
-// whether a rung took over the recovery (the caller skips its abort).
+// The ladder reports whether a rung took over the recovery (the
+// caller skips its abort).
 func (l *Loop) escalateFrozenLeg() bool {
     if l.navigator == nil {
         return false
@@ -3037,8 +2757,8 @@ func (l *Loop) escalateFrozenLeg() bool {
     // the banned detour re-plan to route around the walled corridor
     // instead of reproducing the identical frozen route (the
     // 2026-09-14 08:25 dump: the zone return at the village terrace
-    // cycled between the pathfound-return-stuck-abort and the refused
-    // direct leg because the ladder never ran for it).
+    // cycled between the pathfound-return-stuck-abort and the frozen
+    // legs because the ladder never ran for it).
     if l.phase != phaseTownWalk && l.phase != phaseTownReturn {
         return false
     }
@@ -3051,10 +2771,9 @@ func (l *Loop) escalateFrozenLeg() bool {
             // the rest of the session (the 2026-09-14 10:18 dump:
             // six corridor bans and a widened r768 ban across both
             // village exits while the server refused every click for
-            // its own reasons - a build whose validation the offline
-            // port cannot mirror). The direct leg rung takes over
-            // instead: its fresh short clicks probe whether the
-            // server accepts anything from this position at all.
+            // its own reasons). The escape rung takes over instead:
+            // the claims walk the character off the refusing ground
+            // without any click validation at all.
             l.logf("Hunt: the server refused the clicks of this " +
                 "leg, skipping the corridor ban")
         } else if l.banFrozenCorridor() {
@@ -3063,15 +2782,22 @@ func (l *Loop) escalateFrozenLeg() bool {
             if l.startZoneReturnOrWalkLeg() {
                 return true
             }
-            // No route around the ban: the direct walk is the
-            // only rung left.
+            // No route around the ban: the escape rung owns the
+            // recovery over the current plan.
         }
     }
-    if l.frozenStage == 1 {
+    if l.frozenStage >= 1 {
         l.frozenStage = 2
-        l.armDirectLeg("the detour route froze as well")
-
-        return true
+        selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+        if !ok {
+            return false
+        }
+        if wp, hasWp := l.currentWaypoint(); hasWp {
+            if l.beginCursorKeyEscape(selfX, selfY, selfZ,
+                int32(wp.X), int32(wp.Y), int32(wp.Z)) {
+                return true
+            }
+        }
     }
 
     return false
@@ -3143,37 +2869,6 @@ func (l *Loop) banFrozenCorridor() bool {
     return true
 }
 
-// armDirectLeg switches the frozen town leg to the direct server
-// routed walk (see walkDirectLeg): the waypoint plan dies, the walk
-// plan view carries the single destination leg and the window starts.
-func (l *Loop) armDirectLeg(reason string) {
-    l.directLeg = true
-    l.directLegUntil = time.Now().Add(directLegWindow)
-    l.waypoints = []pathfind.Vec3{l.legDest}
-    l.wpIndex = 0
-    // The direct leg answers no mesh search: the plan view carries
-    // no search contract and the pathfind link keeps the viewer
-    // defaults (the single destination leg is the walk spec, not a
-    // corridor answer).
-    l.legSearch = nil
-    // The direct leg's single waypoint is the destination spec, not
-    // the character's cell resolved on the pack - no frame pair to
-    // measure, the spec z rides as given.
-    l.legFrameOffset = 0
-    l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
-    l.stuckFast = false
-    l.moveAt = time.Time{}
-    l.moveStartAt = time.Time{}
-    l.forceStuck = false
-    l.refusalVariants = 0
-    // A fresh routed leg starts a fresh escape state: the attempts
-    // stay counted per trip, the armed ladder never leaks across
-    // the leg boundary.
-    l.cursorEscape = zeroCursorEscape()
-    l.logf("Hunt: %s, walking to %d %d by the server routing",
-        reason, int32(l.legDest.X), int32(l.legDest.Y))
-}
-
 // nextClearWaypoint scans the plan ahead for the first waypoint the
 // standing cell can click directly: the stuck skip must only arm
 // targets the server walks, never a line it would collapse partway
@@ -3215,7 +2910,6 @@ func (l *Loop) enterSellPhase() {
     l.merchantID = 0
     l.merchantPick = time.Time{}
     l.merchantDeckUntil = time.Time{}
-    l.directLeg = false
     if l.sellableStop() {
         l.logf("Hunt: shop reached, selling the junk")
 
@@ -3657,7 +3351,6 @@ func (l *Loop) endTownTrip(reason string) {
     l.waterEscape = false
     l.legFrameOffset = 0
     l.extendArmed = false
-    l.directLeg = false
     l.cursorEscape = zeroCursorEscape()
     l.cursorEscapes = 0
     l.frozenStage = 0
@@ -3761,7 +3454,6 @@ func (l *Loop) resetTownTrip() {
     l.waterEscape = false
     l.legFrameOffset = 0
     l.extendArmed = false
-    l.directLeg = false
     l.cursorEscape = zeroCursorEscape()
     l.cursorEscapes = 0
     l.frozenStage = 0

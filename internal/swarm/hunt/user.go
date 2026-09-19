@@ -694,20 +694,16 @@ func (l *Loop) geodataWalkPlan() *state.WalkPlan {
         Index:  min(l.wpIndex, len(pts)-1),
         Dest:   dest,
         // The mesh search contract rides the plan (the repro contract
-        // of the 3D pathfind link); the direct legs answer no mesh
-        // search and publish nil.
+        // of the 3D pathfind link); every plan of the loop is a mesh
+        // answer - the walk always follows routes.
         Search: l.publishedLegSearch(),
     }
 }
 
 // publishedLegSearch returns the search contract of the current leg:
-// the mesh answer of startWalkLegSearch carries it, the direct legs
-// (no mesh search) answer nil.
+// the mesh answer of startWalkLegSearch carries it (every walk plan
+// of the loop is a mesh answer - the walk always follows routes).
 func (l *Loop) publishedLegSearch() *state.WalkSearch {
-    if l.directLeg {
-        return nil
-    }
-
     return l.legSearch
 }
 

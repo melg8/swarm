@@ -685,22 +685,19 @@ func TestTripStuckWalkRepaths(t *testing.T) {
 
     // The stuck cycles from the same cell climb the frozen leg
     // escalation ladder instead of re-planning the identical route:
-    // the detour re-plan first, the direct server routed walk second.
+    // the detour re-plan first, the cursor key escape along the plan
+    // second.
     for range maxRePaths {
         loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
         loop.tick()
         require.Equal(t, phaseTownWalk, loop.phase,
             "the escalation keeps the trip walking")
     }
-    require.True(t, loop.directLeg,
-        "the ladder armed the direct server routed walk")
-
-    // The direct window burning without progress aborts the trip.
-    loop.directLegUntil = time.Now().Add(-directLegWindow - time.Second)
-    loop.tick()
-    require.Equal(t, phaseEngage, loop.phase,
-        "the trip aborts when the direct walk window is spent")
-    require.False(t, loop.tripCooldownOver())
+    require.True(t, loop.cursorEscape.armed,
+        "the ladder armed the cursor key escape along the plan")
+    require.Greater(t, len(loop.waypoints), 1,
+        "the escape arms over the real route, never a single far "+
+            "waypoint plan")
 }
 
 // TestTripWaitsForTheFightToEnd pins the combat gate of the trip start:

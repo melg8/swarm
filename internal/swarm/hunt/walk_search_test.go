@@ -16,7 +16,6 @@ import (
     "testing"
     "time"
 
-    "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -52,31 +51,6 @@ func TestZoneReturnPlanCarriesDrySearchContract(t *testing.T) {
     require.InDelta(t, tripApproachRadius, plan.Search.Approach, 0.01)
     require.Empty(t, plan.Search.Avoid,
         "the clean session carries no ban circles")
-}
-
-// TestDirectLegPlanCarriesNoSearchContract pins the direct leg stamp:
-// the server routed fallback answers no mesh search, the plan view
-// carries no contract and the pathfind link keeps the viewer defaults.
-func TestDirectLegPlanCarriesNoSearchContract(t *testing.T) {
-    bot := newTestBot()
-    game := &fakeGame{}
-    game.noTargets = true
-    loop := NewLoop(game, bot)
-    loop.SetNavigator(&fakeNavigator{found: true, height: -3539})
-    loop.phase = phaseTownReturn
-    loop.legDest = pathfind.Vec3{X: 46112, Y: 41500, Z: -3539}
-    loop.legStart = pathfind.Vec3{X: 49308, Y: 44213, Z: -3539}
-    // A stale mesh contract of a previous leg must not leak into the
-    // direct leg's plan view.
-    loop.legSearch = &state.WalkSearch{Dry: true,
-        Approach: tripApproachRadius}
-
-    loop.armDirectLeg("the waypoint plan died")
-
-    plan := loop.activeWalkPlan()
-    require.NotNil(t, plan)
-    require.Nil(t, plan.Search,
-        "the direct leg answers no mesh search")
 }
 
 // TestManualMeshPlanCarriesSwimSearchContract pins the manual move

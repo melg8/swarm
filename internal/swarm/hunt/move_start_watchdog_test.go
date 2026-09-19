@@ -145,32 +145,11 @@ func TestPocketRefusalArmsTheCursorEscapeAtOnce(t *testing.T) {
         "no further mouse click goes out while the escape runs")
 }
 
-// TestDirectLegSilentHopsArmTheEscape pins the direct leg fast path:
-// a routed hop whose movement never started arms the cursor key
-// escape at once instead of re-hopping into the silence until the
-// 45 s leg window burns.
-func TestDirectLegSilentHopsArmTheEscape(t *testing.T) {
-    bot := newTestBot()
-    moveSelfTo(bot, reproFastStuckX, reproFastStuckY, reproFastStuckZ)
-    game := &fakeGame{}
-    loop := NewLoop(game, bot)
-    loop.legDest = pathfind.Vec3{
-        X: float64(reproFastStuckZoneX),
-        Y: float64(reproFastStuckZoneY),
-        Z: float64(reproFastStuckZoneZ),
-    }
-    loop.directLeg = true
-    loop.directLegUntil = time.Now().Add(directLegWindow)
-
-    now := time.Now()
-    _, _, selfZ, _ := bot.SelfPosition()
-    _ = loop.walkDirectLeg(now, reproFastStuckX, reproFastStuckY, selfZ)
-    require.NotEmpty(t, game.walks, "the first hop went out")
-
-    now = now.Add(moveStartWindow + time.Second)
-    _ = loop.walkDirectLeg(now, reproFastStuckX, reproFastStuckY, selfZ)
-    require.Equal(t, 1, loop.cursorEscapes,
-        "the silent hop armed the cursor key escape")
-    require.NotEmpty(t, game.cursorWalks,
-        "the movement mode 0 arm went out")
-}
+// TestDirectLegSilentHopsArmTheEscape was the direct leg fast path
+// pin; the direct server routed walk is eliminated (the owner rule of
+// the 2026-09-19 16:02 round: НИКОГДА не идти напрямую - see
+// direct_walk_elimination_repro_test.go). The never-burn-the-window
+// contract lives on in the follower path: the move start watchdog
+// forces the stuck verdict per dead click (the first test of this
+// file) and the frozen ladder arms the cursor escape along the plan
+// (the new repro file).

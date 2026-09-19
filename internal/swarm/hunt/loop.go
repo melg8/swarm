@@ -464,16 +464,10 @@ type Loop struct {
     // detour.
     frozenAreas []pathfind.AvoidArea
     // frozenStage counts the escalation rungs of the frozen town
-    // leg (0: none, 1: the banned detour re-plan, 2: the direct
-    // server routed walk): see escalateFrozenLeg. It resets on the
-    // stop boundaries, not on the re-plans of the same leg.
+    // leg (0: none, 1: the banned detour re-plan, 2: the cursor
+    // key escape along the plan): see escalateFrozenLeg. It resets
+    // on the stop boundaries, not on the re-plans of the same leg.
     frozenStage int
-    // directLeg marks the town leg that walks by the server's own
-    // routing (see armDirectLeg): the geodata plan proved unable to
-    // move the character, so the follower drops it and clicks the
-    // stop target directly - bounded by directLegUntil.
-    directLeg      bool
-    directLegUntil time.Time
     // cursorEscape carries the cursor key escape of a click-refusing
     // cell (see beginCursorKeyEscape): the armed state, the claimed
     // dry steps toward the escape aim, the claim cursor and the
@@ -915,8 +909,6 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         frozenRepaths:     0,
         frozenAreas:       nil,
         frozenStage:       0,
-        directLeg:         false,
-        directLegUntil:    time.Time{},
         legRefused:        false,
         refusalVariants:   0,
         zoneRefusalX:      0,
