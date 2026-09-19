@@ -216,7 +216,12 @@ func (m *Manager) runSession(
     // (the web UI stays interactive either way).
     loop := hunt.NewLoop(game, tracker)
     loop.SetLogger(sessionLogger(tracker, logLine))
-    if m.engine != nil {
+    if m.engine != nil && m.mesh != nil {
+        // The mesh navigator of the live integration: the scenarios
+        // plan through the same mesh corridor search the fleet bot
+        // serves (the pure grid navigator answers a different walk).
+        loop.SetNavigator(hunt.NewNavmeshNavigator(m.engine, m.mesh))
+    } else if m.engine != nil {
         loop.SetNavigator(hunt.NewNavigator(m.engine))
     }
     if autonomous {

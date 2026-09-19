@@ -112,7 +112,7 @@ func TestNewAcceptanceManagerRegistersTempBots(t *testing.T) {
         loginAddress:  "127.0.0.1:2106",
         acceptanceRun: "list",
     }
-    manager := newAcceptanceManager(registry, cfg, nil, nil)
+    manager := newAcceptanceManager(registry, cfg, nil, nil, nil)
     require.NotNil(t, manager)
 
     // The shipped scenario ids come back in the same order the web UI

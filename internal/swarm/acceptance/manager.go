@@ -15,6 +15,7 @@ import (
     "time"
 
     "github.com/melg8/swarm/internal/swarm/pathfind"
+    "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
     "github.com/melg8/swarm/internal/swarm/proxy"
     "github.com/melg8/swarm/internal/swarm/state"
 )
@@ -208,6 +209,7 @@ type Manager struct {
     registry *state.Registry
     login    string
     engine   *pathfind.Engine
+    mesh     *navmesh.Mesh
     proxy    *proxy.Server
     logger   *log.Logger
     dbConfig DBConfig
@@ -223,6 +225,12 @@ type ManagerDeps struct {
     Registry *state.Registry
     Login    string
     Engine   *pathfind.Engine
+    // Mesh is the navigation mesh of the live integration: the
+    // scenarios plan through the same mesh navigator the fleet bot
+    // runs (the church entry round proved the acceptance suite must
+    // exercise the planner the user's bot serves, the pure grid
+    // navigator answers a different walk).
+    Mesh     *navmesh.Mesh
     Proxy    *proxy.Server
     Logger   *log.Logger
     DBConfig DBConfig
@@ -237,6 +245,7 @@ func NewManager(deps ManagerDeps, defs []TestDef) *Manager {
         registry: deps.Registry,
         login:    deps.Login,
         engine:   deps.Engine,
+        mesh:     deps.Mesh,
         proxy:    deps.Proxy,
         logger:   deps.Logger,
         dbConfig: deps.DBConfig,

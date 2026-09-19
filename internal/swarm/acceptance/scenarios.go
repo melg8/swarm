@@ -113,6 +113,26 @@ const fullDressTimeout = 5 * time.Minute
 func Definitions() []TestDef {
     return []TestDef{
         {
+            ID:      "church-entry",
+            Title:   "church entry · the temple NPC walk",
+            Account: churchAccount,
+            Timeout: churchEntryTimeout,
+            Description: "Start: the elven fighter temp13 wakes at the " +
+                "village plaza cell in front of the temple (44694 51921 " +
+                "-2808, the walk start of the 2026-09-19 owner report) " +
+                "as the level 15 character with the starter outfit. " +
+                "Flow: the manual walk command aims the temple interior " +
+                "cell (44718 52291 -2792) 40 units from the hierarch " +
+                "Asterios, the hunt loop (manual only mode) plans the " +
+                "route and clicks the legs, the way the owner drives " +
+                "the map walks. Pass: the character leaves the plaza, " +
+                "crosses the temple entrance and stands on the interior " +
+                "cell within the NPC ring (the report held the character " +
+                "at the entrance forever - the same click from the real " +
+                "client through the proxy refused to enter too).",
+            Scenario: churchEntryScenario,
+        },
+        {
             ID:      "full-dress",
             Title:   "full dress · the world entry burst",
             Account: dressAccount,
@@ -171,7 +191,7 @@ func Definitions() []TestDef {
             Title:   "railing pocket · the mesh island cell",
             Account: pocketAccount,
             Timeout: railingPocketTimeout,
-            Description: "Start: the elven fighter temp12 wakes at the " +
+            Description: "Start: the elven fighter temp13 wakes at the " +
                 "reported route cell of the 2026-09-19 report (43736 " +
                 "47048 -2992, the elven village deck cell just off the " +
                 "railings) as a level 15 fighter with the standard " +

@@ -75,6 +75,11 @@ type fakeNavigator struct {
     // miss makes the leg planner searches answer not found: the
     // destination no route reaches (the abort pins).
     miss bool
+    // exactMiss makes the exact FindPath search answer not found
+    // while the approach searches keep answering: the manual walk
+    // fallback tests arm it (the clicked point on unreachable ground
+    // falls back to the approach corridor).
+    exactMiss bool
     // partialRoute makes the leg planner searches answer the
     // partial closest-reachable corridor (Found=false with Partial
     // set and these waypoints - the navmesh hybrid partial round):
@@ -200,6 +205,22 @@ func (f *fakeNavigator) FindPathApproachAvoiding(
 func (f *fakeNavigator) FindPath(
     start, end pathfind.Vec3,
 ) (*pathfind.Result, error) {
+    if f.exactMiss {
+        f.calls++
+        f.callsAt = append(f.callsAt, time.Now())
+
+        return &pathfind.Result{
+            Found:     false,
+            Aborted:   false,
+            Waypoints: nil,
+            RawPath:   nil,
+            Duration:  0,
+            Explored:  0,
+            OpenLeft:  0,
+            Length:    0,
+        }, nil
+    }
+
     return f.result(start, end)
 }
 

@@ -1355,3 +1355,37 @@ facing a direction it never walked during the wasd walk.
 - verification: go build ./... ok, go test -count=1 ./... answers
   28 packages ok zero failures, the gofmt-spaces gate is silent.
 a38b90a (test gate: the unit test account ladder renames to unittest1 - the tests shared the account names test1/test2/test3 with the live swarm run (the same fleet ladder the production -account default spawns) so any test that builds a session under a running swarm collided with the live bots on the account name alone; every bot/account/character string of the ladder in the 79 test files (498 occurrences, word boundary sed, the 4 space indent untouched) is now unittest1/unittest2/unittest3 including the historical dump references in the repro test comments (the scenarios read the same, the bot name is the unittest one); the already separated ladders stay (the acceptance temp1..temp11, the fleet benchmark fleet001..100, the proxy e2e proxye2e, the live dialog walker dialogw1), the production defaults of cmd/swarm stay (the live contract of README/AGENTS.md); the UTF-16 byte pin of TestWriteStringAsUtf16ASCIIVsReference follows by hand (the sed renamed the input string, the expected byte array now spells unittest1); verification: go build ok, go test -count=1 ./... 28 packages ok zero failures, the gofmt-spaces gate silent)
+
+### Progress (2026-09-19, the church entry round)
+
+- the owner directive: the acceptance test for the walk 44694 51921
+  -2808 -> 44718 52291 -2792 (the temple entrance to the hierarch
+  Asterios), the mobius server instrumented for the refusal
+  diagnosis, the systemic cause found and the entry working - the
+  same walk refused for the real client through the proxy too.
+- the acceptance scenario church-entry (temp12) landed; the
+  acceptance manager now wires the navigation mesh (ManagerDeps.Mesh
+  through both the headless CLI and the web UI paths) so the suite
+  exercises the same mesh navigator the fleet bot serves.
+- the diagnosis chain: the offline pack answers the line clear, the
+  [GEOPROBE] server probes (MoveToLocation, ValidatePosition,
+  Creature.moveToLocation, the l2j_geoprobe.patch copy) prove the
+  server accepts the click and confirms the arrival inside, the mesh
+  split the queries - the exact Route crosses the entrance (371
+  units) while the user ring approach search legally ends the plan
+  at the doorway polygon (44718 52144, 147 units short of the click,
+  inside the 150 unit ring). The bot walked to the door and declared
+  arrival; with the real client attached the active plan kept
+  re-issuing the door leg and out-raced every client click.
+- the fix: planUserWalk plans the exact mesh search first (approach
+  zero), the approach corridor stays the fallback for the
+  unreachable click; the published WalkSearch contract carries the
+  answer's own approach. The town and NPC approach legs keep their
+  rings. The fresh tile repro on the pre fix binary fails at the
+  door (225 units), the fixed binary walks in (371 units, PASS).
+- verification: go test -count=1 ./... answers 28 packages ok zero
+  failures, the gofmt-spaces gate silent, the live acceptance
+  church-entry PASS against the deployed stack with the mesh. The
+  residual (the fresh tile build vs the dump repro pins of the
+  priced water builder) is recorded as the next round's work in
+  docs/development_log.md Round 92.

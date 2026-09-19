@@ -444,11 +444,19 @@ func (l *Loop) tickUserMove(now time.Time) {
 }
 
 // planUserWalk computes the mesh path of one long manual move. The
-// search runs once per move (a missing tile or a bare not found
-// leaves the direct server routed walk). The result becomes the leg
-// plan the follower walks one server accepted leg at a time; a
-// partial corridor (the destination unreachable under the filter)
-// walks the closest reachable point instead.
+// exact search runs first (the owner clicked the point - the walk
+// must arrive at it): the approach ring of the NPC legs is the
+// fallback only, because the ring can catch an early corridor
+// polygon and end the plan short - the temple entrance round of the
+// owner report (the doorway polygon 147 units short of the clicked
+// interior cell inside the 150 ring) held the walk at the door
+// forever. A failed exact search (the clicked point on ground the
+// mesh does not reach) falls back to the approach corridor, a
+// missing tile or a bare not found leaves the direct server routed
+// walk. The result becomes the leg plan the follower walks one
+// server accepted leg at a time; a partial corridor (the
+// destination unreachable under the filter) walks the closest
+// reachable point instead.
 func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     from := pathfind.Vec3{
         X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
@@ -456,7 +464,14 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     end := pathfind.Vec3{
         X: float64(l.userX), Y: float64(l.userY), Z: float64(l.userZ),
     }
-    result, err := l.navigator.FindPathApproach(from, end, userApproachRadius)
+    approach := 0.0
+    result, err := l.navigator.FindPath(from, end)
+    if err != nil || result == nil || len(result.Waypoints) == 0 ||
+        (!result.Found && !result.Partial) {
+        approach = userApproachRadius
+        result, err = l.navigator.FindPathApproach(from, end,
+            userApproachRadius)
+    }
     if err != nil {
         l.logf("Hunt: manual walk path search failed: %v", err)
 
@@ -475,10 +490,12 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     }
     l.userWaypoints = result.Waypoints
     l.userWpIndex = 0
-    // The manual plan publishes its search contract (the user
-    // approach radius, no bans): the 3D pathfind link rebuilds the
-    // very search instead of a lookalike.
-    l.userSearch = &state.WalkSearch{Approach: userApproachRadius,
+    // The manual plan publishes its search contract (the approach
+    // radius of the answer - zero for the exact destination search,
+    // the user approach radius of the fallback corridor - and no
+    // bans): the 3D pathfind link rebuilds the very search instead
+    // of a lookalike.
+    l.userSearch = &state.WalkSearch{Approach: approach,
         Avoid: nil}
     // The manual walk plan opens with the same frame measurement as
     // every fresh plan (see click_frame.go): the route's first

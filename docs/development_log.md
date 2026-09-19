@@ -6883,3 +6883,97 @@ The next plan cycle routes from the exit ground the arrival lands on
   starts, the flood bound aborts on the first out of box poly).
 - golangci-lint 0 issues, the whitespace gate green.
 - The mobius server stays untouched, it is the source of truth.
+## Round 92: the church entry - the manual walk plans the exact clicked point, the approach ring stops being the manual goal (2026-09-19)
+
+Scope: the owner directive against the live stack: "создай
+полноценный аксептанс тест проверяющий переход из 44694 51921 -2808
+в 44718 52291 -2792 (вход в церковь к нпц), инструментируй сервер
+mobius чтобы понять почему отклоняются запросы и персонаж не заходит
+внутрь (он упирается у входа) тоже самое происходит даже когда я
+подключаю настоящий клиент и пытаюсь кликнуть внутрь (через swarm
+как прокси). Явно присутствует какая-то системная проблема, которая
+приводит к этому. добейся успешного входа". The owner authorized the
+server instrumentation for the diagnosis (the mobius integrity rule
+carries the explicit exception of this round).
+
+### The diagnosis chain: offline pack, server probes, the mesh answer
+
+1. The target is the temple interior: the hierarch Asterios (npc
+   30154) spawns at 44692 52261 -2792 (the datapack spawn of
+   ElvenVillageNPCs.xml), the clicked cell 44718 52291 -2792 stands
+   40 units inside; the start 44694 51921 -2808 is the plaza cell at
+   the temple entrance. Doors.xml holds no temple door (41 entries,
+   castles and clan halls only) - no server door entity exists to
+   block or open the entrance.
+2. The offline geodata pack answers the straight line clear: the
+   grid FindPathApproach plans 44696 51928 -2808 -> 44712 52296
+   -2792 (two waypoints, 369 units) - the entrance is passable on
+   the pack the server itself vouched for.
+3. The server instrumentation (the [GEOPROBE] stdout probes in
+   MoveToLocation.runImpl, ValidatePosition.runImpl and
+   Creature.moveToLocation/updatePosition, the patch copy lives next
+   to the checkout as l2j_geoprobe.patch, the compiled classes ride
+   the deployed build_bin) logged the live walk: the click is
+   accepted (no completelyBlocked - the check is a no-op under
+   PathFinding=0 - and no doorsBetween refusal), the AI receives the
+   destination, the character walks and the final ValidatePosition
+   confirms the server position 44712 52296 -2792 - inside the
+   temple. The server never rejects anything here.
+4. The mesh answer was the only surface left. The fresh
+   cmd/navmesh-build of the temple tile (21_19) split the queries:
+   the VIEWER exact Route crosses the entrance and ends at the
+   clicked point (371 units), while the BOT approach search with the
+   user ring ends at 44718 52144 -2792 (225 units) - the doorway
+   polygon, 147 units short of the clicked cell and inside the 150
+   unit userApproachRadius. The approach semantics ("the first
+   polygon within the radius succeeds") legally truncates the plan
+   at the door: the bot walks to the entrance, the plan reports done,
+   the character stands at the door - the owner's "упирается у
+   входа". With a real client attached through the proxy the active
+   manual plan keeps re-issuing the door leg (the follower re-issues
+   every stalled leg at the walk request period), so the client's
+   own clicks inside lost the walk-request race to the bot's door
+   leg - the same systemic truncation surfaced as a client side
+   refusal.
+
+### The fix: the manual walk plans the exact route, the approach is the fallback
+
+planUserWalk runs the exact mesh search first (FindPath, the
+approach zero of the viewer contract) - the owner clicked the point,
+the walk must arrive at it. The approach search (the user ring)
+stays the fallback for the click the mesh cannot reach exactly (the
+closest reachable corridor keeps the partial contract). The
+published WalkSearch contract carries the answer's own approach
+(zero for the exact plan, the user radius for the fallback), so the
+3D pathfind link rebuilds the very search either way. The town legs
+and the NPC approach searches keep their rings - only the manual
+map walk changes.
+
+The new acceptance scenario church-entry (temp12) pins the owner
+contract end to end: the injected level 15 fighter wakes on the
+plaza cell, the manual walk command aims the interior cell, the
+pass requires the character off the plaza, on the interior cell
+(60 units) and next to Asterios (200 units). The manager now
+receives the navigation mesh (ManagerDeps.Mesh, both the headless
+CLI and the web UI path wire loadNavmesh through) so the acceptance
+suite exercises the same mesh navigator the fleet bot serves - the
+pure grid navigator answered a different walk and masked the bug.
+
+The verification: the fresh tile build reproduces the defect on the
+pre fix binary (the plan answers 225 units and the scenario times
+out at the door) and the fixed binary walks in (the plan answers 371
+units, the mesh exact search, and the scenario passes within
+seconds, the server probes confirm the arrival at 44712 52296
+-2792); the hunt suite green, go test -count=1 ./... answers 28
+packages ok zero failures, the gofmt-spaces gate silent.
+
+### The residual: the fresh tile build and the dump repro pins
+
+The freshly built tiles (the priced water builder of round 90)
+answer the 16:02 dump reproduction walks slower than the pinned
+windows - the dump repro tests (cursor_escape_wp_sync,
+refusal_signal, direct_walk_elimination) fail on the fresh 20_18..
+21_20 build on the clean tree too, the previous environment's tiles
+were built by the pre pricing builder. The tile build and the repro
+pins need a re-validation round of their own; the acceptance runs of
+this round used the fresh tiles through the explicit -navmesh path.

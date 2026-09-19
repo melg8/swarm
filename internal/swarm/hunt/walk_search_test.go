@@ -51,9 +51,11 @@ func TestZoneReturnPlanCarriesSearchContract(t *testing.T) {
 }
 
 // TestManualMeshPlanCarriesSearchContract pins the manual move stamp:
-// the mesh planned user walk publishes the search contract with the
-// user approach radius, so the link rebuilds the manual walk the
-// follower walks.
+// the mesh planned user walk publishes the search contract of the
+// exact destination search (approach zero, no bans), so the link
+// rebuilds the manual walk the follower walks - the walk the owner
+// clicked must arrive at the clicked point, the approach ring is the
+// fallback only.
 func TestManualMeshPlanCarriesSearchContract(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
@@ -72,6 +74,77 @@ func TestManualMeshPlanCarriesSearchContract(t *testing.T) {
 
     require.NotEmpty(t, loop.userWaypoints,
         "the fake navigator answers a route")
+    require.Equal(t, 46200.0, loop.userWaypoints[len(loop.userWaypoints)-1].X,
+        "the exact plan ends at the clicked point")
+    require.Equal(t, 51100.0, loop.userWaypoints[len(loop.userWaypoints)-1].Y,
+        "the exact plan ends at the clicked point")
+    plan := loop.activeWalkPlan()
+    require.NotNil(t, plan)
+    require.NotNil(t, plan.Search)
+    require.InDelta(t, 0.0, plan.Search.Approach, 0.01)
+}
+
+// TestManualWalkPlansTheExactClickedPoint pins the temple entrance
+// round of the 2026-09-19 owner report: the manual walk from the
+// plaza cell (44694 51921 -2808) to the temple interior cell
+// (44718 52291 -2792) plans the exact route - the approach ring
+// search would end the plan at the doorway polygon (44718 52144,
+// 147 units short of the clicked cell, inside the 150 ring) and hold
+// the character at the entrance forever.
+func TestManualWalkPlansTheExactClickedPoint(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    game.noTargets = true
+    nav := &fakeNavigator{found: true, height: -2792}
+    loop := NewLoop(game, bot)
+    loop.SetNavigator(nav)
+
+    bot.ApplyMovement(state.Movement{
+        ObjectID: 100, X: 44694, Y: 51921, Z: -2808,
+        DestX: 44694, DestY: 51921, DestZ: -2808,
+    })
+    loop.phase = phaseUser
+    loop.userKind = state.CommandMove
+    loop.userX, loop.userY, loop.userZ = 44718, 52291, -2792
+    loop.planUserWalk(44694, 51921, -2808)
+
+    require.NotEmpty(t, loop.userWaypoints)
+    last := loop.userWaypoints[len(loop.userWaypoints)-1]
+    require.Equal(t, 44718.0, last.X)
+    require.Equal(t, 52291.0, last.Y)
+    require.Empty(t, nav.approachEnds,
+        "the reachable click never asks the approach search")
+    plan := loop.activeWalkPlan()
+    require.NotNil(t, plan)
+    require.NotNil(t, plan.Search)
+    require.InDelta(t, 0.0, plan.Search.Approach, 0.01)
+}
+
+// TestManualMeshPlanFallsBackToApproach pins the fallback: the exact
+// search without an answer (the clicked point on ground the mesh
+// does not reach) plans the approach corridor instead and the
+// published contract names the user approach radius.
+func TestManualMeshPlanFallsBackToApproach(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    game.noTargets = true
+    nav := &fakeNavigator{exactMiss: true, found: true, height: -3500}
+    loop := NewLoop(game, bot)
+    loop.SetNavigator(nav)
+
+    bot.ApplyMovement(state.Movement{
+        ObjectID: 100, X: 45000, Y: 50000, Z: -3500,
+        DestX: 45000, DestY: 50000, DestZ: -3500,
+    })
+    loop.phase = phaseUser
+    loop.userKind = state.CommandMove
+    loop.userX, loop.userY, loop.userZ = 46200, 51100, -3500
+    loop.planUserWalk(45000, 50000, -3500)
+
+    require.NotEmpty(t, loop.userWaypoints,
+        "the approach fallback answers the corridor")
+    require.Len(t, nav.approachEnds, 1,
+        "the fallback asked the approach search once")
     plan := loop.activeWalkPlan()
     require.NotNil(t, plan)
     require.NotNil(t, plan.Search)

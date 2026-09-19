@@ -871,7 +871,7 @@ func main() {
     mesh := loadNavmesh(cfg)
 
     web := startWebInterface(cfg, registry, nil, proxyServer)
-    attachAcceptance(web, registry, cfg, engine, proxyServer)
+    attachAcceptance(web, registry, cfg, engine, mesh, proxyServer)
     if web != nil && journal != nil {
         web.SetSessionJournal(journal)
     }
@@ -936,9 +936,10 @@ func runFleet(cfg config) {
         log.Println("No geodata files found in " + stats.Dir +
             ", the bot hunts without town trips")
     }
+    mesh := loadNavmesh(cfg)
 
     web := startWebInterface(cfg, registry, nil, proxyServer)
-    attachAcceptance(web, registry, cfg, engine, proxyServer)
+    attachAcceptance(web, registry, cfg, engine, mesh, proxyServer)
     if web != nil && journal != nil {
         web.SetSessionJournal(journal)
     }
@@ -954,7 +955,6 @@ func runFleet(cfg config) {
     // Launch every bot supervisor in its own goroutine. A per-bot
     // config carries the derived account and char name; the rest of
     // the flags (login, hunt, geodata, navmesh, proxy) stay shared.
-    mesh := loadNavmesh(cfg)
     var wg sync.WaitGroup
     for i, tracker := range trackers {
         botCfg := cfg
@@ -1497,12 +1497,13 @@ func startWebInterface(
 // connectable through the client proxy exactly like the fleet bots.
 func attachAcceptance(
     web *webserver.Server, registry *state.Registry, cfg config,
-    engine *pathfind.Engine, proxyServer *proxy.Server,
+    engine *pathfind.Engine, mesh *navmesh.Mesh, proxyServer *proxy.Server,
 ) {
     if web == nil {
         return
     }
-    manager := newAcceptanceManager(registry, cfg, engine, proxyServer)
+    manager := newAcceptanceManager(registry, cfg, engine, mesh,
+        proxyServer)
     web.SetAcceptance(manager)
     log.Printf("Acceptance tests ready: %d scenarios on the accounts %s",
         len(acceptance.Definitions()), acceptance.AccountList())
@@ -1514,12 +1515,13 @@ func attachAcceptance(
 // way.
 func newAcceptanceManager(
     registry *state.Registry, cfg config,
-    engine *pathfind.Engine, proxyServer *proxy.Server,
+    engine *pathfind.Engine, mesh *navmesh.Mesh, proxyServer *proxy.Server,
 ) *acceptance.Manager {
     return acceptance.NewManager(acceptance.ManagerDeps{
         Registry: registry,
         Login:    cfg.loginAddress,
         Engine:   engine,
+        Mesh:     mesh,
         Proxy:    proxyServer,
         Logger:   log.Default(),
         DBConfig: acceptance.DefaultDBConfig(),
@@ -1607,8 +1609,10 @@ func runAcceptanceCLI(cfg config) {
     }
     engine = pathfind.NewEngine(dir)
     engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
+    mesh := loadNavmesh(cfg)
 
-    manager := newAcceptanceManager(registry, cfg, engine, proxyServer)
+    manager := newAcceptanceManager(registry, cfg, engine, mesh,
+        proxyServer)
     web := startWebInterface(cfg, registry, nil, proxyServer)
     if web != nil {
         web.SetAcceptance(manager)
