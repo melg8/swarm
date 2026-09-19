@@ -1205,3 +1205,22 @@ three independent defects, all fixed in one round:
   the missing anchors file refusal). `memwatch` holds 100.
 - Total statement coverage 75.3 -> 75.6; the baseline
   `runs/coverage-latest.txt` re-committed with the deltas.
+
+### Progress (2026-09-19, the post-rebase verification round)
+
+- The full plain `go test ./...` after the rebase onto 7a9544a (the
+  direct walk elimination) surfaced the repro tests the round left
+  hard-failing on any tree without the local artifacts:
+  `TestReproRefusedSpawnNeverWalksTheDirectLine` and
+  `TestReproRefusedSpawnLadderArmsTheEscapeWithoutServerAnswers`
+  died in `spawnDumpMesh` on `require.NotEmpty(dir)` while the
+  navmesh tiles are a gitignored runtime artifact (the same class
+  as the geodata pack, which `reproEngine` skips correctly).
+  `spawnDumpMesh` now skips with the honest message when the tiles
+  are absent (the repo skip pattern of navbuild/real_test.go) - the
+  dump reproduction still runs to the end where the tiles exist
+  (verified: the tiles rebuilt for 20_18..21_20 with
+  `cmd/navmesh-build -regions ...`, both tests green against them).
+- Final verification after the fixes: `go test -count=1 ./...`
+  answers 28 packages ok, zero failures, the whitespace gate and
+  the uncapped lint green.

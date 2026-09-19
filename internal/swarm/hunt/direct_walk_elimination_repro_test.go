@@ -94,12 +94,16 @@ func spawnDumpNavmeshDir() string {
 }
 
 // spawnDumpMesh loads the real navmesh mesh of the live integration
-// (the tiles cover the village and the hunting zone regions).
+// (the tiles cover the village and the hunting zone regions). The
+// tiles are a local runtime artifact (cmd/navmesh-build, gitignored)
+// the same way the geodata pack is: a tree without them skips the
+// dump reproduction instead of failing it.
 func spawnDumpMesh(t *testing.T) *navmesh.Mesh {
     t.Helper()
     dir := spawnDumpNavmeshDir()
-    require.NotEmpty(t, dir,
-        "the navmesh tiles must exist for the dump reproduction")
+    if dir == "" {
+        t.Skip("no local navmesh tiles, the dump reproduction needs them")
+    }
     mesh := navmesh.NewMesh(dir)
     require.Positive(t, mesh.Stats().TileFiles,
         "the mesh must hold tiles")
