@@ -85,6 +85,18 @@ const (
     // shorter window keeps the recovery responsive while still letting
     // a slow server position broadcast land before the next skip.
     stuckFastTimeout = 4 * time.Second
+    // moveStartWindow bounds the move start watchdog: a walk click
+    // whose movement never STARTED (no server movement broadcast, no
+    // position change, no refusal answer) fast forwards the stuck
+    // recovery after this window instead of waiting the full stuck
+    // timeout - the owner rule of the 2026-09-19 round: a movement
+    // command that did not start the movement switches the recovery
+    // mode at once, the walker never stands out a whole window on a
+    // click it can already name dead. The value covers the server's
+    // once per second movement broadcast gate plus the network lag
+    // with head room, and stays under the fast stuck window so the
+    // never-started verdict always lands first.
+    moveStartWindow = 3 * time.Second
     // stuckProgressUnits is the net progress margin of the stuck
     // window: the current waypoint must come closer by this many
     // units for the movement to count as progress. A walk covers
@@ -1028,8 +1040,11 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3, nonDry bool) bool {
     // online refusal answer re-arms (the legRefused latch itself
     // stays - it carries the trip level evidence the frozen trip
     // escalation gate reads, a re-path inside the same trip must
-    // not erase it).
+    // not erase it) and the move start watchdog re-arms with the
+    // fresh plan's first click.
     l.refusalVariants = 0
+    l.moveStartAt = time.Time{}
+    l.forceStuck = false
     // A planned geodata leg owns the movement now: the direct zone
     // leg stall watcher stands down (its window would otherwise read
     // a trip's frozen standstill as its own and fire early on the
@@ -1155,6 +1170,15 @@ func waypointPassed(
 func (l *Loop) walkTownWaypoints() bool {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
+        return false
+    }
+    // The cursor key escape owns the leg while it runs: the claim
+    // ladder drives the character (the escape arms from the follower
+    // recovery too - the refusing pocket branch of stuckTownWalk),
+    // the click machinery stays down until the escape ends.
+    if l.cursorEscape.armed {
+        l.driveCursorKeyEscape(time.Now(), selfX, selfY)
+
         return false
     }
     if l.directLeg {
@@ -1335,6 +1359,24 @@ func (l *Loop) walkDirectLeg(
 
         return false
     }
+    // The move start watchdog of the routed walk: a hop whose
+    // movement never started (no broadcast, no position change, no
+    // refusal answer) is dead exactly like a refused one - the
+    // cursor key escape takes over at once instead of re-hopping
+    // into the silence until the leg window burns (the owner rule
+    // of the 2026-09-19 round: the recovery switches modes as soon
+    // as the current one proves useless).
+    if l.noteMoveStart(now, selfX, selfY) {
+        if l.beginCursorKeyEscape(
+            selfX, selfY, selfZ, moveX, moveY, moveZ) {
+            return false
+        }
+        l.directLeg = false
+        l.abortTownTrip("the routed walk hops never started " +
+            "the movement")
+
+        return false
+    }
     l.walkToward(moveX, moveY, moveZ, now)
 
     return false
@@ -1409,6 +1451,12 @@ func (l *Loop) beginCursorKeyEscape(
         // this direction, the honest abort of the caller stands.
         return false
     }
+    // The arm request aims the ladder's far end: the mode 0 move
+    // starts the server side walk the claims then own, and a target
+    // on the character's own cell would answer the stopMove refusal
+    // before the flag ever latches (the fresh plan's first waypoint
+    // is the standing cell itself).
+    arm := steps[len(steps)-1]
     l.cursorEscapes++
     l.cursorEscape = cursorEscapeState{
         armed:           true,
@@ -1420,12 +1468,12 @@ func (l *Loop) beginCursorKeyEscape(
         claimsSinceMove: 0,
     }
     l.legRefused = true
-    if err := l.game.CursorKeyWalkTo(aimX, aimY, aimZ); err != nil {
+    if err := l.game.CursorKeyWalkTo(arm[0], arm[1], arm[2]); err != nil {
         l.logf("Hunt: the cursor key arm failed: %v", err)
     }
-    l.logf("Hunt: the server refused the routed walk clicks, walking "+
-        "%s toward %d %d (%d claimed steps)",
-        form, aimX, aimY, len(steps))
+    l.logf("Hunt: the refused clicks hand the walk to the cursor key "+
+        "escape, walking %s toward %d %d (%d claimed steps)",
+        form, arm[0], arm[1], len(steps))
 
     return true
 }
@@ -1631,15 +1679,20 @@ func (l *Loop) driveCursorKeyEscape(
 
         return
     }
-    // The ladder is claimed out: settle for the position broadcasts,
-    // then hand the leg back to its clicks - re-armed with a fresh
-    // window so the hops probe the server from the escaped ground.
+    // The settle message names the walk that resumes: the direct leg
+    // mode re-arms its window and probes the server with fresh routed
+    // hops, the follower mode resumes the planned waypoint clicks.
     if now.Sub(l.cursorEscape.lastClaimAt) >= cursorEscapeSettle {
         aim := l.cursorEscape.steps[len(l.cursorEscape.steps)-1]
         l.cursorEscape.armed = false
-        l.directLegUntil = now.Add(directLegWindow)
-        l.logf("Hunt: the cursor key escape walked to %d %d, "+
-            "resuming the server routed clicks", aim[0], aim[1])
+        if l.directLeg {
+            l.directLegUntil = now.Add(directLegWindow)
+            l.logf("Hunt: the cursor key escape walked to %d %d, "+
+                "resuming the server routed clicks", aim[0], aim[1])
+        } else {
+            l.logf("Hunt: the cursor key escape walked to %d %d, "+
+                "resuming the planned walk clicks", aim[0], aim[1])
+        }
     }
 }
 
@@ -1762,6 +1815,12 @@ func (l *Loop) followWaypoints(
     if l.wpIndex >= len(l.waypoints) {
         return true
     }
+    // The move start watchdog: a click whose movement never started
+    // forces the stuck verdict below - the recovery ladder runs at
+    // once instead of standing out the full window on a dead click.
+    if l.noteMoveStart(now, selfX, selfY) {
+        l.forceStuck = true
+    }
     if l.walkStuck(now, selfX, selfY) {
         return false
     }
@@ -1771,7 +1830,13 @@ func (l *Loop) followWaypoints(
     // collapses (distance below the cancellation limit) - the round 56
     // reproduction caught the recovery burning a second re-path on
     // exactly that refusal. Re-run the cursor advance so the click
-    // below aims the fresh plan's first real waypoint instead.
+    // below aims the fresh plan's first real waypoint instead. The
+    // stuck recovery may also have armed the cursor key escape (the
+    // refusing pocket branch): the claims own the leg then, the click
+    // below stays down until the escape settles.
+    if l.cursorEscape.armed {
+        return false
+    }
     l.advanceWaypoints(selfX, selfY, selfZ)
     if l.wpIndex >= len(l.waypoints) {
         return true
@@ -2449,6 +2514,49 @@ func refusalVariantTarget(
     return &[3]float64{x, y, z}
 }
 
+// noteMoveStart is the move start watchdog of the walker: the
+// deadline arms when a walk click goes out (the moveAt send slot)
+// while the character stands still, a position change or the server's
+// own movement broadcast clears it (the click obviously started the
+// movement) and a deadline that passes with the character still on
+// the baseline cell names the click dead. It reports the fire: the
+// caller runs its next recovery mode at once instead of standing out
+// the full stuck window - the owner rule of the 2026-09-19 round: a
+// movement command that did not start the movement must not leave
+// the character standing in one spot while the window burns. The
+// window covers the server's once per second movement broadcast gate
+// plus the network lag with head room, so an accepted click always
+// clears the deadline before it can fire.
+func (l *Loop) noteMoveStart(
+    now time.Time, selfX int32, selfY int32,
+) bool {
+    if l.moveStartAt.IsZero() {
+        if l.moveAt.IsZero() || l.tracker.SelfWalking() {
+            return false
+        }
+        l.moveStartAt = l.moveAt.Add(moveStartWindow)
+        l.moveStartX, l.moveStartY = selfX, selfY
+        // Fall through: the arming tick may already sit past the
+        // deadline (the click went out a tick before the watchdog
+        // first saw it) - the fire below must not wait another
+        // window for a verdict it can already name.
+    }
+    if selfX != l.moveStartX || selfY != l.moveStartY ||
+        l.tracker.SelfWalking() {
+        l.moveStartAt = time.Time{}
+
+        return false
+    }
+    if now.Before(l.moveStartAt) {
+        return false
+    }
+    // The click never started the movement: one fire per arming, the
+    // deadline re-arms on the next recovery click.
+    l.moveStartAt = time.Time{}
+
+    return true
+}
+
 // walkStuck tracks the movement progress of the walker and re-paths
 // around the obstacle once the character stands still for too long OR
 // wobbles without net progress toward the current waypoint. The same
@@ -2467,9 +2575,13 @@ func refusalVariantTarget(
 // the server refuses its clicks on this leg, waiting the full window
 // for every waypoint just burns the trip's time budget. The skip of a
 // waypoint does NOT consume the re-path budget: only the full leg
-// re-plan (startWalkLeg) does. It reports whether the trip had to
-// abort.
+// re-plan (startWalkLeg) does. The move start watchdog force (see
+// noteMoveStart, wired by followWaypoints) skips the window check for
+// one verdict: a click that never started the movement runs the
+// recovery at once. It reports whether the trip had to abort.
 func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
+    forced := l.forceStuck
+    l.forceStuck = false
     if l.stuckAt.IsZero() {
         l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
         l.stuckWP = l.wpIndex
@@ -2488,7 +2600,7 @@ func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
     if l.stuckFast {
         timeout = stuckFastTimeout
     }
-    if now.Sub(l.stuckAt) < timeout {
+    if !forced && now.Sub(l.stuckAt) < timeout {
         return false
     }
     l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
@@ -2553,6 +2665,24 @@ func (l *Loop) stuckWaterEscape(_ time.Time, selfX int32, selfY int32) bool {
     return false
 }
 
+// pocketRefused reports whether the current refusal verdict stands on
+// the very cell where the leg's first refusal latched: the ground the
+// character stands on refuses every click (the refusing pocket of
+// the 2026-09-14 15:10 report), not one specific click line.
+func (l *Loop) pocketRefused(selfX int32, selfY int32) bool {
+    return l.legRefused &&
+        selfX == l.legRefusedX && selfY == l.legRefusedY
+}
+
+// currentWaypoint returns the waypoint the follower cursor aims at.
+func (l *Loop) currentWaypoint() (pathfind.Vec3, bool) {
+    if l.wpIndex < 0 || l.wpIndex >= len(l.waypoints) {
+        return pathfind.Vec3{X: 0, Y: 0, Z: 0}, false
+    }
+
+    return l.waypoints[l.wpIndex], true
+}
+
 // stuckTownWalk drives the town leg stuck recovery: first try to SKIP
 // the current waypoint (a further one may be reachable through a cell
 // the server accepts), and when no waypoint ahead has a walkable line
@@ -2594,9 +2724,14 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
     if l.refusalEvidence() {
         if !l.legRefused {
             l.legRefused = true
+            l.legRefusedX, l.legRefusedY = selfX, selfY
             l.logf("Hunt: the server refused the walk click " +
                 "(ActionFailed), varying the aim")
         }
+        // The varied aims run first: the refusal is target specific
+        // far more often than it is a pocket (the round 82 evidence),
+        // one variant per stuck verdict - a variant the server
+        // accepts walks the character where the plain aim bounced.
         if l.sendVariedAim(selfX, selfY, l.selfZForEscape(), now) {
             l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
             l.stuckWP = l.wpIndex
@@ -2604,6 +2739,29 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
             l.stuckFast = true
 
             return false
+        }
+        // The refusing pocket: the varied aims of this leg are spent
+        // (or nothing exists to vary) and the character still stands
+        // on the very cell where the first refusal latched - the
+        // server answers NO click from this ground (the 2026-09-14
+        // 15:10 report: even the official client's mouse clicks died
+        // on the plaza cell). The cursor key escape owns the recovery
+        // now, walking the claims along the planned route (see
+        // beginCursorKeyEscape) - more refused clicks from the same
+        // ground would only burn the trip budget.
+        if l.pocketRefused(selfX, selfY) {
+            if wp, ok := l.currentWaypoint(); ok {
+                if l.beginCursorKeyEscape(selfX, selfY,
+                    l.selfZForEscape(), int32(wp.X), int32(wp.Y),
+                    int32(wp.Z)) {
+                    l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
+                    l.stuckWP = l.wpIndex
+                    l.stuckBest = l.stuckWaypointDistance(selfX, selfY)
+                    l.stuckFast = true
+
+                    return false
+                }
+            }
         }
     }
     next := l.nextClearWaypoint(selfX, selfY, l.selfZForEscape())
@@ -2871,6 +3029,8 @@ func (l *Loop) armDirectLeg(reason string) {
     l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
     l.stuckFast = false
     l.moveAt = time.Time{}
+    l.moveStartAt = time.Time{}
+    l.forceStuck = false
     l.refusalVariants = 0
     // A fresh routed leg starts a fresh escape state: the attempts
     // stay counted per trip, the armed ladder never leaks across
@@ -3368,6 +3528,9 @@ func (l *Loop) endTownTrip(reason string) {
     l.frozenStage = 0
     l.repathX, l.repathY = 0, 0
     l.frozenRepaths = 0
+    l.moveStartAt = time.Time{}
+    l.forceStuck = false
+    l.legRefusedX, l.legRefusedY = 0, 0
     l.tripPlan = nil
     l.tripStops = nil
     l.buysPlanned = false
@@ -3468,6 +3631,9 @@ func (l *Loop) resetTownTrip() {
     l.frozenStage = 0
     l.repathX, l.repathY = 0, 0
     l.frozenRepaths = 0
+    l.moveStartAt = time.Time{}
+    l.forceStuck = false
+    l.legRefusedX, l.legRefusedY = 0, 0
     l.tripPlan = nil
     l.tripStops = nil
     l.buysPlanned = false

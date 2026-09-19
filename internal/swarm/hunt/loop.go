@@ -402,6 +402,23 @@ type Loop struct {
     // the full stuckTimeout for each one. resetTownTrip and
     // startWalkLeg clear it.
     stuckFast bool
+    // moveStartAt/X/Y are the move start watchdog of the walker (see
+    // noteMoveStart): the deadline arms when a walk click goes out,
+    // a position change or the server movement broadcast clears it
+    // and a deadline that passes with the character still standing
+    // on the baseline cell names the click dead - the recovery
+    // ladder fast forwards instead of waiting the full stuck window
+    // (the owner rule of the 2026-09-19 round: a movement command
+    // that did not start the movement switches the recovery mode at
+    // once).
+    moveStartAt time.Time
+    moveStartX  int32
+    moveStartY  int32
+    // forceStuck arms when the move start watchdog names a fresh
+    // click dead: the next walkStuck verdict runs the recovery at
+    // once (the stuck window check is skipped for that one verdict)
+    // instead of standing out the remaining window.
+    forceStuck bool
     // tripAbortRun counts the consecutive aborted trips of this
     // session: past the escalation threshold the trip cooldown
     // doubles per abort (capped), so a deployment whose paths never
@@ -474,6 +491,17 @@ type Loop struct {
     // refused every click for its own reasons). It clears on the leg
     // boundaries with the other leg state.
     legRefused bool
+    // legRefusedX/Y remember the cell where the leg's first refusal
+    // verdict latched (see latchLegRefused): a stuck verdict with
+    // refusal evidence ON THAT VERY CELL names a refusing pocket -
+    // the server answers no click from the ground the character
+    // stands on (the 2026-09-14 15:10 report: even the official
+    // client's mouse clicks died on the plaza cell) - and the cursor
+    // key escape owns the recovery at once, the varied aims only
+    // grind more refused clicks from the same ground. It clears on
+    // the trip boundaries with the legRefused latch.
+    legRefusedX int32
+    legRefusedY int32
     // refusalVariants counts the varied aim attempts spent on the
     // current leg (see stuckTownWalk): the refusal answer of the
     // server is target specific - a shorter prefix or a sideways
@@ -795,10 +823,10 @@ type Loop struct {
     // each action holds only its own item and write set back.
     pendingActions map[int32]pendingInventory
     userDeferred   []state.Command
-    userLastDist     float64
-    userDistAt       time.Time
-    engLastDist      float64
-    engDistAt        time.Time
+    userLastDist   float64
+    userDistAt     time.Time
+    engLastDist    float64
+    engDistAt      time.Time
 }
 
 // NewLoop creates the hunt loop for a connected game client.
@@ -835,6 +863,10 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         legStart:          pathfind.Vec3{X: 0, Y: 0, Z: 0},
         waterEscape:       false,
         moveAt:            time.Time{},
+        moveStartAt:       time.Time{},
+        moveStartX:        0,
+        moveStartY:        0,
+        forceStuck:        false,
         stuckAt:           time.Time{},
         stuckX:            0,
         stuckY:            0,

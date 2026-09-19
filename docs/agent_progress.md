@@ -821,3 +821,33 @@ Commits as melg8. Rebase before every push.
   the stride spacing, the cap), the cap on a 12000 unit route, the
   wet stride stop, the planless nil fallback; the plaza repro tests
   re-verified green with the route following ladder.
+
+- 2026-09-19: the move start watchdog and the refusing pocket fast
+  path (commit 2). The new `noteMoveStart` watchdog arms a deadline
+  (`moveStartWindow`, 3 s) when a walk click goes out while the
+  character stands still, clears it on a position change or the
+  server's own movement broadcast and names the click dead when the
+  deadline passes on the baseline cell - a dead click forces the
+  stuck verdict (the `forceStuck` gate of walkStuck skips the window
+  check for one verdict), so the recovery ladder runs at ~3 s per
+  rung instead of the 15 s first window. Wired into the three walk
+  machineries: followWaypoints (the planned legs, force), the direct
+  routed leg (a silent hop arms the cursor key escape instead of
+  re-hopping into the 45 s window) and the direct zone legs (the
+  stall backdate fires noteZoneLegStall this tick). The refusing
+  pocket verdict: a stuck verdict with refusal evidence ON the cell
+  where the leg's first refusal latched, AFTER the varied aims of
+  the leg are spent - the varied aims keep their chance to cure the
+  target specific refusals (the round 82 order), the escape takes
+  over the moment they prove useless from the same ground. The
+  escape arms from the follower path now too: walkTownWaypoints
+  drives the claims while the escape holds the leg (symmetric with
+  walkDirectLeg), followWaypoints stands its clicks down while
+  armed, the settle message names the walk that resumes (the routed
+  hops or the planned clicks), and the mode 0 arm aims the ladder's
+  far end (a self cell arm answers the stopMove refusal before the
+  flag latches). Tests: the silent click recovery inside the move
+  start window, the pocket sequence (the variants one per verdict,
+  the escape once they are spent, the claims owning the leg, no
+  further mouse clicks), the direct leg silent hop escape; the
+  varied aim and plaza repros re-verified green.

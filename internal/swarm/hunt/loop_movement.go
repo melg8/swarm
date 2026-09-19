@@ -366,6 +366,18 @@ func (l *Loop) zoneReturnDestination(
 func (l *Loop) walkZoneLeg(
     zone *state.Zone, selfX int32, selfY int32, selfZ int32, now time.Time,
 ) {
+    // The move start fast path of the direct zone legs: a leg click
+    // sent after the stall baseline whose movement never started (no
+    // broadcast, no position change) backdates the stall window so
+    // noteZoneLegStall fires this tick - the dead click re-discovers
+    // itself in seconds instead of standing out the full stuck
+    // timeout (the owner rule of the 2026-09-19 round).
+    if !l.moveAt.IsZero() && l.moveAt.After(l.zoneLegAt) &&
+        selfX == l.zoneLegX && selfY == l.zoneLegY &&
+        !l.tracker.SelfWalking() &&
+        now.Sub(l.moveAt) >= moveStartWindow {
+        l.zoneLegAt = now.Add(-stuckTimeout)
+    }
     if l.noteZoneLegStall(now, selfX, selfY) {
         return
     }
