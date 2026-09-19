@@ -19,28 +19,30 @@ notes the owner asked to keep on top.
 
 ## Long running subprocesses (servers, builds)
 
-- UPDATE 2026-09-18: the recipe below no longer survives the reaper.
-  A setsid detached viewer (own session, PID=PGID=SID) died within
-  ~20 seconds, every restart the same; `unshare --fork --mount-proc`
-  answers "Operation not permitted". The practical use of a detached
-  server now: the ~15-20 second survival window after start - enough
-  to curl the endpoints (config, geometry, a POST route) while the
-  process lives, not enough for anything longer. Long running servers
-  stay the owner's job (they run them on their own machine); inside
-  the agent session plan endpoint checks inside the window and expect
-  the death.
-- The sandbox kills the subprocesses of the agent session unless they detach.
-  A detached process survives the session end (verified: the navmesh viewer
-  of a previous session kept serving port 8082 across sessions).
-- The working detach recipe (Linux):
-  `setsid nohup CMD > LOG 2>&1 < /dev/null &`
-  - `setsid` gives the child its own session and process group (the reaper
-    kills by process group, the new session escapes it).
-  - `nohup` plus the redirected stdio drop the terminal dependency.
-  - Verify before long operations: `ps -o pid,pgid,sid,cmd -p PID` - the
-    PID, PGID and SID must all equal the new pid (own session).
-- A port conflict means the previous detached instance still runs: check
-  `ps -eo pid,cmd | grep CMD` and reuse or kill it before starting a twin.
+- UPDATE 2026-09-19 (fresh full study, supersedes the 09-18 note):
+  nothing escapes the reaper, no matter how detached. Dead between
+  tool calls in every variant: `setsid nohup ... &` with own session
+  (PID=PGID=SID, PPID 1), the same plus `env -i`, and a renamed
+  binary copy; `unshare --fork --mount-proc` stays "Operation not
+  permitted". The death lands at the END of the launching tool call,
+  not on a fixed timer - the process serves the whole call (the UI
+  harness answered curls and browser probes for minutes) and is gone
+  the moment the call returns. The agent tooling itself survives (the
+  agent-browser daemon and its Chrome keep living across calls), so
+  the reaper tracks the session bookkeeping, not the process tree or
+  the session id - no pid trick escapes it.
+- The working pattern (verified): run the long operation inside ONE
+  tool call. Start the server, wait for the port, run every probe,
+  kill the server, print the results - a bash script under
+  /home/z/my-project/scripts keeps it reproducible, the Bash tool
+  allows 10 minutes per call. For a UI check the agent-browser daemon
+  persists between calls (it is whitelisted tooling), only the page
+  needs the server alive during the same call.
+- A detached server still serves the seconds of its own call - quick
+  curl checks fit, anything longer needs the single call pattern.
+- A port conflict means the previous instance still runs: check
+  `ps -eo pid,cmd | grep CMD` and reuse or kill it before starting a
+  twin.
 
 ## Repo conventions
 
