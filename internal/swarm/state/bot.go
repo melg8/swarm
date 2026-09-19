@@ -458,17 +458,27 @@ type Bot struct {
     // (see SetWalkPlan): the planning origin, the full waypoint
     // list of the leg, the waypoint the follower currently heads
     // to and the final destination - the whole walk reads at a
-    // glance in the dump.
-    walkPlan   *WalkPlan
-    walkPlanAt time.Time
+    // glance in the dump. walkPlanStart pins the moment the walk
+    // was first published (the zero point of the waypoint timing
+    // line of the dump) and walkWpAt holds the observed arrival
+    // time of every waypoint (the entry i fills when the follower
+    // cursor moves past i, see publishWalkPlanLocked).
+    walkPlan      *WalkPlan
+    walkPlanAt    time.Time
+    walkPlanStart time.Time
+    walkWpAt      []time.Time
     // lastWalkPlan keeps the most recent published walk plan after
     // its walk ended: the live plan expires with the walk (the TTL,
     // the arrive, the timeout), the report of a stuck leg needs the
     // whole planned walk even when the walk is already over (see
     // rememberWalkPlanLocked). The next published plan overwrites
-    // the record; nothing clears it.
+    // the record; nothing clears it. lastWalkStart and lastWalkWpAt
+    // carry the timing view of the record (the same zero point and
+    // arrivals the live plan held, deep copied).
     lastWalkPlan   *WalkPlan
     lastWalkPlanAt time.Time
+    lastWalkStart  time.Time
+    lastWalkWpAt   []time.Time
     // shopping holds the published purchase queue of the shop
     // strategy (see SetShoppingPlan): what the bot plans to buy next
     // with the prices and the missing adena, nil while nothing is
@@ -1390,21 +1400,55 @@ func (b *Bot) SetWalkPlan(plan WalkPlan) {
 
         return
     }
+    now := time.Now()
     if b.walkPlan != nil && walkPlansEqual(*b.walkPlan, plan) {
-        b.walkPlanAt = time.Now()
+        b.walkPlanAt = now
 
         return
     }
-    b.walkPlan = &plan
-    b.walkPlanAt = time.Now()
+    b.publishWalkPlanLocked(&plan, now)
     b.rememberWalkPlanLocked(&plan)
     b.touch()
+}
+
+// publishWalkPlanLocked installs a changed plan with its timing
+// view, the caller must hold the state write lock. The same route
+// with the follower cursor ahead (the every tick republish after a
+// waypoint was passed) keeps the walk zero point and records the
+// observed arrival time of every newly passed waypoint - the dump
+// prints how long each leg took. A different route (a fresh walk,
+// a re-plan) or a cursor that moved back starts a new timing view:
+// the zero point moves to now and the waypoints the plan already
+// aims past pre-fill with now (a mid walk publish never loses the
+// passed prefix).
+func (b *Bot) publishWalkPlanLocked(plan *WalkPlan, now time.Time) {
+    if b.walkPlan != nil && plan.Index >= b.walkPlan.Index &&
+        walkPlansSameRoute(*b.walkPlan, *plan) {
+        for i := b.walkPlan.Index; i < plan.Index && i < len(b.walkWpAt);
+            i++ {
+            b.walkWpAt[i] = now
+        }
+        b.walkPlan = plan
+        b.walkPlanAt = now
+
+        return
+    }
+    b.walkPlanStart = now
+    arrivals := make([]time.Time, len(plan.Points))
+    for i := 0; i < plan.Index && i < len(arrivals); i++ {
+        arrivals[i] = now
+    }
+    b.walkWpAt = arrivals
+    b.walkPlan = plan
+    b.walkPlanAt = now
 }
 
 // rememberWalkPlanLocked copies the plan into the last walk record
 // (the caller must hold the state write lock): a deep copy, so a
 // later mutation of the published slice never rewrites the record
-// the dump already reads.
+// the dump already reads. The timing view (the zero point and the
+// arrivals) copies with the points, so the dump of a finished walk
+// still reads the leg durations.
 func (b *Bot) rememberWalkPlanLocked(plan *WalkPlan) {
     record := WalkPlan{ //nolint:exhaustruct_v5 // the optional views fill below
         Index: plan.Index,
@@ -1421,6 +1465,9 @@ func (b *Bot) rememberWalkPlanLocked(plan *WalkPlan) {
     copy(record.Points, plan.Points)
     b.lastWalkPlan = &record
     b.lastWalkPlanAt = time.Now()
+    b.lastWalkStart = b.walkPlanStart
+    b.lastWalkWpAt = make([]time.Time, len(b.walkWpAt))
+    copy(b.lastWalkWpAt, b.walkWpAt)
 }
 
 // ClearWalkPlan drops the published walk plan (a no-op when none
@@ -1432,14 +1479,28 @@ func (b *Bot) ClearWalkPlan() {
 }
 
 // clearWalkPlanLocked drops the walk plan, the caller must hold
-// the state write lock.
+// the state write lock. The timing view drops with the plan (the
+// last walk record kept its own copy, see rememberWalkPlanLocked).
 func (b *Bot) clearWalkPlanLocked() {
     if b.walkPlan == nil {
         return
     }
     b.walkPlan = nil
     b.walkPlanAt = time.Time{}
+    b.walkPlanStart = time.Time{}
+    b.walkWpAt = nil
     b.touch()
+}
+
+// walkPlansSameRoute compares two walk plans ignoring the follower
+// cursor: the planning origin, the destination and the point list
+// decide. The every tick republish of one walk rides this (the
+// timing view survives, see publishWalkPlanLocked), a re-planned
+// walk over the same waypoints with a restarted cursor does not.
+func walkPlansSameRoute(a, b WalkPlan) bool {
+    a.Index, b.Index = 0, 0
+
+    return walkPlansEqual(a, b)
 }
 
 // walkPlansEqual compares two walk plans field by field, the points
@@ -2402,6 +2463,19 @@ type Snapshot struct {
     LastWalkIndex  int         `json:"-"`
     LastWalkDest   *WalkPoint  `json:"-"`
     LastWalkAt     time.Time   `json:"-"`
+    // WalkStart is the moment the published walk was first seen
+    // (the zero point of the waypoint timing) and WalkWpAt holds
+    // the observed arrival time of every waypoint (the entry i is
+    // set when the follower cursor moved past i). WalkAt is the
+    // last plan refresh (the moment the walk was last seen alive).
+    // The timing view rides the Go side dump only (the json "-",
+    // see LastWalkPath); the last walk record carries its own copy
+    // in LastWalkStart and LastWalkWpAt.
+    WalkStart     time.Time   `json:"-"`
+    WalkWpAt      []time.Time `json:"-"`
+    WalkAt        time.Time   `json:"-"`
+    LastWalkStart time.Time   `json:"-"`
+    LastWalkWpAt  []time.Time `json:"-"`
     // Shopping carries the published purchase queue of the shop
     // strategy (see SetShoppingPlan): what the bot plans to buy next
     // with the prices and the missing adena, null when nothing is
@@ -2609,6 +2683,11 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
         LastWalkIndex:  0,
         LastWalkDest:   nil,
         LastWalkAt:     time.Time{},
+        WalkStart:      time.Time{},
+        WalkWpAt:       nil,
+        WalkAt:         time.Time{},
+        LastWalkStart:  time.Time{},
+        LastWalkWpAt:   nil,
         Shopping:       nil,
         Skills:         nil,
         SkillPlan:      nil,
@@ -2629,6 +2708,10 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
         snap.WalkOrigin = b.walkPlan.Origin
         snap.WalkIndex = b.walkPlan.Index
         snap.WalkDest = b.walkPlan.Dest
+        snap.WalkStart = b.walkPlanStart
+        snap.WalkAt = b.walkPlanAt
+        snap.WalkWpAt = make([]time.Time, len(b.walkWpAt))
+        copy(snap.WalkWpAt, b.walkWpAt)
     }
     if b.lastWalkPlan != nil {
         snap.LastWalkPath = make([]WalkPoint,
@@ -2638,6 +2721,9 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
         snap.LastWalkIndex = b.lastWalkPlan.Index
         snap.LastWalkDest = b.lastWalkPlan.Dest
         snap.LastWalkAt = b.lastWalkPlanAt
+        snap.LastWalkStart = b.lastWalkStart
+        snap.LastWalkWpAt = make([]time.Time, len(b.lastWalkWpAt))
+        copy(snap.LastWalkWpAt, b.lastWalkWpAt)
     }
     if b.shoppingPlanLive(now) {
         entries := make([]ShoppingEntryView, len(b.shopping.Entries))

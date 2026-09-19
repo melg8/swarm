@@ -10,6 +10,7 @@ import (
     "strconv"
     "strings"
     "testing"
+    "time"
 
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
@@ -57,12 +58,17 @@ func TestBotDumpEndpoint(t *testing.T) {
     require.Contains(t, report, "position: x 45000, y 50000, z -3500")
     require.Contains(t, report, "sitting true")
 
-    // The objects around, the walk plan and the zone.
+    // The objects around, the walk plan and the zone. The passed
+    // waypoint carries its timing suffix (the plan published with the
+    // cursor already past it pre-fills the arrival with the publish
+    // moment - the zero legs of a mid walk publish).
     require.Contains(t, report, "Keltir")
     require.Contains(t, report,
         "walk plan (2 waypoints, aiming at wp 1):")
     require.Contains(t, report, "  from 45800 41700 -3500")
-    require.Contains(t, report, "wp 0: 46000 41600 -3500 (passed)")
+    require.Contains(t, report, "  started ")
+    require.Contains(t, report,
+        "wp 0: 46000 41600 -3500 (passed, t+0.0s, leg 0.0s)")
     require.Contains(t, report, "wp 1: 46112 41500 -3510  <-- TARGET")
     require.Contains(t, report, "  dest 46150 41480 -3512")
     require.Contains(t, report, "hunting zone: center 46112 41500, half 450")
@@ -70,6 +76,78 @@ func TestBotDumpEndpoint(t *testing.T) {
     // The event log mirrors the game events and the hunt decisions.
     require.Contains(t, report, "sat down to rest")
     require.Contains(t, report, "Hunt: outside the hunting zone")
+}
+
+// TestWalkPlanSectionTiming pins the timing suffixes of the walk
+// plan section: a passed waypoint prints its moment on the walk
+// timeline (t+) and the leg duration that ended there, the aimed one
+// prints the time the walk already spends on it (the stuck number),
+// the future ones stay plain, and the sub minute precision folds
+// into the minute shape for the long legs.
+func TestWalkPlanSectionTiming(t *testing.T) {
+    now := time.Now()
+    start := now.Add(-90 * time.Second)
+    wpAt := []time.Time{
+        start.Add(10400 * time.Millisecond),
+        start.Add(30200 * time.Millisecond),
+        {},
+        {},
+    }
+    var b strings.Builder
+    writeWalkPlanSection(&b, "walk plan (",
+        []state.WalkPoint{
+            {X: 1, Y: 2, Z: 3},
+            {X: 4, Y: 5, Z: 6},
+            {X: 7, Y: 8, Z: 9},
+            {X: 10, Y: 11, Z: 12},
+        },
+        &state.WalkPoint{X: 0, Y: 0, Z: 0}, 2,
+        &state.WalkPoint{X: 10, Y: 11, Z: 12},
+        start, now.Add(-5*time.Second), wpAt)
+    report := b.String()
+
+    require.Contains(t, report, "walk plan (4 waypoints, aiming at wp 2):")
+    require.Contains(t, report, "  started ")
+    require.Contains(t, report, ", last seen ")
+    require.Contains(t, report, " on the walk\n")
+    require.Contains(t, report,
+        "wp 0: 1 2 3 (passed, t+10.4s, leg 10.4s)")
+    require.Contains(t, report,
+        "wp 1: 4 5 6 (passed, t+30.2s, leg 19.8s)")
+    // The aimed waypoint measures to the moment the plan was last
+    // seen alive: (now-5s) - (start+30.2s) = 54.8s.
+    require.Contains(t, report, "wp 2: 7 8 9  <-- TARGET (walking 54.8s)")
+    require.Contains(t, report, "wp 3: 10 11 12\n",
+        "the future waypoints stay plain")
+
+    // The long legs fold into the minute shape.
+    longStart := now.Add(-3 * time.Minute)
+    b.Reset()
+    writeWalkPlanSection(&b, "walk plan (",
+        []state.WalkPoint{{X: 1, Y: 2, Z: 3}, {X: 4, Y: 5, Z: 6}},
+        nil, 1, nil,
+        longStart, now.Add(-time.Second),
+        []time.Time{longStart.Add(65300 * time.Millisecond), {}})
+    report = b.String()
+    require.Contains(t, report,
+        "wp 0: 1 2 3 (passed, t+1m5s, leg 1m5s)")
+    require.Contains(t, report, "<-- TARGET (walking 1m54s)")
+}
+
+// TestWalkPlanSectionUntimed pins the plain shape: a walk without a
+// timing view (the zero start, the empty arrivals) prints the legacy
+// lines - the parser and the owner eye read the same either way.
+func TestWalkPlanSectionUntimed(t *testing.T) {
+    var b strings.Builder
+    writeWalkPlanSection(&b, "last walk plan (",
+        []state.WalkPoint{{X: 1, Y: 2, Z: 3}}, nil, 0, nil,
+        time.Time{}, time.Time{}, nil)
+    report := b.String()
+
+    require.Contains(t, report, "wp 0: 1 2 3  <-- TARGET\n")
+    require.NotContains(t, report, "walking")
+    require.NotContains(t, report, "t+")
+    require.NotContains(t, report, "started")
 }
 
 // TestBotDumpUnknownBot: the dump of an unknown bot is a 404 like the

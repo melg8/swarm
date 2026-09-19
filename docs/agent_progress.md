@@ -711,3 +711,41 @@ over the Dion hunting grounds.
   ~163 absent lines of the 1733 are reflowed, superseded or
   rephrased in docs/; the restoration adds the operational layer
   back, not the 112 KB blob.
+## Active task: the webui debugging surface - the walk plan timings, the pathfind link and the hover coordinates (2026-09-19)
+
+Started: 2026-09-19. Branch: `feature/new-pathfind-alternative`. Commits
+as melg8. Other agents may push to the same branch concurrently -
+rebase before every push. Owner request (three pieces, each its own
+atomic commit):
+
+1. **The dump state walk plan timings** - the state dump of a walking
+   bot carries not only which waypoint it aims at but how long every
+   leg took: a stuck point shows its cost, not just its name.
+   - `state/bot.go`: the timing view of the published walk plan - the
+     zero point (`walkPlanStart`, the first publish of the route) and
+     the observed arrival of every waypoint (`walkWpAt`, the entry i
+     fills when the follower cursor moves past i on the same route
+     republish). A fresh route (or a cursor that moved back) restarts
+     the view; a mid walk publish with the cursor already ahead
+     pre-fills the passed prefix. `publishWalkPlanLocked` +
+     `walkPlansSameRoute` (the cursor blind route compare). The last
+     walk record copies the timing view (lastWalkStart, lastWalkWpAt)
+     so a finished walk keeps its leg durations. The Snapshot carries
+     the Go side dump fields only (`json:"-"`, the wire stays byte
+     identical): WalkStart, WalkWpAt, WalkAt, LastWalkStart,
+     LastWalkWpAt.
+   - `webserver/dump.go`: the walk plan section prints the `started`
+     line (the zero point, the last seen moment, the time on the
+     walk), the passed waypoints carry `(passed, t+10.4s, leg 5.2s)`
+     and the aimed one ` <-- TARGET (walking 45.2s)` - the stuck leg
+     number. The last walk plan measures the aimed leg to the moment
+     the plan ended. Sub minute durations keep the tenth of a second,
+     the longer ones fold into the minute shape. The dump parser
+     needs no change (the wp lines keep the leading `x y z` triple).
+   - Tests: the state timing tracking (the advance, the equal
+     republish, the fresh route, the record copy) and the section
+     formatting (the suffixes, the minute fold, the untimed shape).
+
+### Progress
+
+- The walk plan timing view and the dump suffixes - this commit.

@@ -202,7 +202,8 @@ func TestParseDumpLastWalkPlan(t *testing.T) {
     require.Contains(t, dump,
         "last walk plan (2 waypoints, aiming at wp 1):")
     require.Contains(t, dump, "  from 45000 50000 -3500")
-    require.Contains(t, dump, "wp 0: 45600 50400 -3500 (passed)")
+    require.Contains(t, dump,
+        "wp 0: 45600 50400 -3500 (passed, t+0.0s, leg 0.0s)")
     require.Contains(t, dump, "wp 1: 46000 51000 -3500  <-- TARGET")
     require.Contains(t, dump, "  dest 46200 51100 -3500")
 

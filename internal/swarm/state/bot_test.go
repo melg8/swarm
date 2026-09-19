@@ -788,6 +788,96 @@ func TestWalkPlanPublishesAndClears(t *testing.T) {
     require.Empty(t, bot.Snapshot().WalkPath)
 }
 
+// TestWalkPlanTimingTracksTheLegs pins the per waypoint timing view
+// the state dump reads: the first publish opens the walk zero point,
+// the every tick republish of the same route with the follower cursor
+// ahead records the observed arrival of every newly passed waypoint
+// (the leg durations of the dump), an equal republish touches
+// nothing, a fresh route restarts the view and the last walk record
+// keeps its own copy after the clear.
+func TestWalkPlanTimingTracksTheLegs(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("test1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+    origin := WalkPoint{X: 45000, Y: 50000, Z: -3500}
+    dest := WalkPoint{X: 46200, Y: 51100, Z: -3500}
+    plan := WalkPlan{
+        Origin: &origin,
+        Points: []WalkPoint{
+            {X: 45600, Y: 50400, Z: -3500},
+            {X: 46000, Y: 51000, Z: -3500},
+            {X: 46200, Y: 51100, Z: -3500},
+        },
+        Index: 0,
+        Dest:  &dest,
+    }
+    bot.SetWalkPlan(plan)
+    first := bot.Snapshot()
+    require.False(t, first.WalkStart.IsZero(),
+        "the first publish opens the walk zero point")
+    require.False(t, first.WalkAt.IsZero())
+    require.Len(t, first.WalkWpAt, len(plan.Points))
+    for i, at := range first.WalkWpAt {
+        require.True(t, at.IsZero(),
+            "no waypoint arrived yet, entry %d must stay zero", i)
+    }
+
+    // The cursor advance on the same route records the arrivals of
+    // the newly passed waypoints and keeps the zero point.
+    advanced := plan
+    advanced.Index = 2
+    bot.SetWalkPlan(advanced)
+    second := bot.Snapshot()
+    require.Equal(t, first.WalkStart, second.WalkStart,
+        "the same route keeps the walk zero point")
+    require.False(t, second.WalkWpAt[0].IsZero(),
+        "the passed waypoint 0 records its arrival")
+    require.False(t, second.WalkWpAt[1].IsZero(),
+        "the passed waypoint 1 records its arrival")
+    require.True(t, second.WalkWpAt[0].Before(second.WalkWpAt[1]) ||
+        second.WalkWpAt[0].Equal(second.WalkWpAt[1]))
+    require.True(t, second.WalkWpAt[2].IsZero(),
+        "the aimed waypoint has no arrival yet")
+
+    // The equal republish (the steady tick refresh) changes nothing
+    // and the last walk record mirrors the advanced walk's timing.
+    version := second.Version
+    bot.SetWalkPlan(advanced)
+    steady := bot.Snapshot()
+    require.Equal(t, version, steady.Version)
+    require.Equal(t, second.WalkWpAt, steady.WalkWpAt)
+    require.Equal(t, first.WalkStart, steady.LastWalkStart,
+        "the record copies the timing view of its own walk")
+    require.Equal(t, second.WalkWpAt, steady.LastWalkWpAt)
+
+    // A fresh route restarts the timing view; the waypoints the plan
+    // already aims past pre-fill with the publish moment.
+    fresh := WalkPlan{Points: []WalkPoint{
+        {X: 47000, Y: 52000, Z: -3500},
+        {X: 48000, Y: 53000, Z: -3500},
+    }, Index: 1}
+    bot.SetWalkPlan(fresh)
+    third := bot.Snapshot()
+    require.False(t, third.WalkStart.Before(second.WalkStart),
+        "the fresh walk restarts the zero point")
+    require.Len(t, third.WalkWpAt, len(fresh.Points))
+    require.False(t, third.WalkWpAt[0].IsZero(),
+        "the pre-filled passed prefix of the fresh plan")
+    require.True(t, third.WalkWpAt[1].IsZero())
+
+    // The clear keeps the timing copy in the last walk record (the
+    // record of the fresh walk, the last one the plan remembered).
+    bot.ClearWalkPlan()
+    last := bot.Snapshot()
+    require.Empty(t, last.WalkPath)
+    require.Equal(t, third.WalkStart, last.LastWalkStart,
+        "the record keeps the zero point of its own walk")
+    require.Len(t, last.LastWalkWpAt, len(fresh.Points))
+    require.False(t, last.LastWalkWpAt[0].IsZero())
+    require.True(t, last.LastWalkWpAt[1].IsZero(),
+        "the record keeps the arrivals of its own walk only")
+}
+
 // TestWalkPlanExpires pins the plan lifetime: without a refresh the
 // snapshot drops the plan after walkPlanTTL so a crashed loop never
 // leaves a stale line on the map.
