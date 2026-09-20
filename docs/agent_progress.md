@@ -73,6 +73,10 @@ where the review demands one and the full gate before every push.
   the race slice covers state and webserver too, the govulncheck
   step joins) plus the gomod dependabot config and the pinned
   govulncheck in tools/install_dev_tools.sh (task vuln locally).
+  The activation was attempted the same day: the verbatim copy to
+  .github/workflows/ci.yml was rejected by GitHub - the push token
+  lacks the workflow scope - so the file stays the owner step (the
+  web UI Add file path, the note at the top of docs/ci_workflow.yml).
 - P1-13: the docs drift batch - the Go version story told one way
   (AGENTS.md and README follow the go.mod toolchain line), the
   verify-loop skill numbers and the CI citation fixed, the
