@@ -13,6 +13,14 @@ check the archive when the recent context references an older task.
 
 ## Active task (status: in progress): the farm readiness frame round (2026-09-20)
 
+Round 105 landed (commit 1762d1c): the acceptance ping pong of the
+walk to the teacher answered - the passed aim never walks the
+character back (the backward aim hold across the marched bends) and
+the march counts its own ground (the destination progress term of
+the stuck gate, corridor gated). The live acceptance farm readiness
+PASSED end to end on the built binary: all six checks, 714 s, zero
+backward walks.
+
 Started: 2026-09-20. Branch: `feature/new-pathfind-alternative`,
 commits as melg8. Other agents push to the same branch - rebase
 before every push. The owner report: the level 15 farm readiness

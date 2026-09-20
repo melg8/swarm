@@ -8120,3 +8120,96 @@ with the stack up (the sandbox stack was down at the round time).
   quarter) - the varied aim ladder and the escape own them; the
   ladder must never burn without a walk attempt now that the cursor
   cannot pin on the plan's own start.
+
+## Round 105: the passed aim never walks the character back - the march counts its own ground (2026-09-20)
+
+Scope: the farm readiness acceptance follow up - the level 15 bot
+bought at the jewelry shop and froze on the walk to the teacher in
+another building: stepping one step away from the route origin,
+returning back, repeating several times, then giving the teacher up
+and building a strange short route toward the farm zone. The owner
+asked to remove the restrictions that interfere after the mesh
+migration and to keep the generated mesh set minimal.
+
+The live per packet trail of the acceptance run pinned the shape the
+report described: the walk clicks alternated between two adjacent
+route points 63 units apart - one step out, one step home, one step
+per walk request period, eight cycles on the first pair alone - and
+the alternation reopened at the next waypoint pair after every
+recovery re-path until the frozen rule aborted the trip and the bot
+fell back to its farm spot (the "strange short route" of the report).
+
+The offline plan repro answered the plan itself clean: nine
+waypoints, no fold back, every consecutive line validated by the
+click port. The follower broke a clean plan. The mechanism: the
+advance gate pins the cursor on a waypoint whose sight line ahead is
+walled (the elven village corridor walls the sight oracle for whole
+legs - the offline probes answer BLOCKED for every line of the
+Ellenia corridor in both frames), and the pinned aim then targets a
+waypoint the character has already marched past. The armed extension
+walked the step out (the forward route sample the min walk floor
+march picks), the raw aim of the passed waypoint walked it straight
+back - the ping pong. A transport-oracle swap of the advance gate
+was prototyped and reverted: the click port answers ok with a
+destination correction that can collapse onto the standing cell, so
+a transport blessing is a false one for the advance decision - the
+sight oracle stays the honest gate, and the collapse corrections
+belong to the refusal ladder.
+
+Two restrictions answered:
+
+- The backward aim hold: the follower never sends a click whose
+  target the character already moved PAST along the route itself
+  (waypointPassedAlongRoute + waypointPassedBehind). The shapes the
+  single segment projection missed: the march past a bend the pinned
+  cursor never advanced onto - the extension walks the character
+  along the route samples across the wp 1 bend while the cursor
+  stays pinned on wp 0, and the plain test measured the lateral to
+  the OLD segment a full corridor width off and answered not passed
+  exactly there (the whole bend back walked at the acceptance
+  round's second pair). A character inside the arrival radius of the
+  aimed waypoint keeps its pull back onto it (the re-approach click
+  of the ramp corner, the round 56 gated waypoint design). Armed,
+  the verdict hands the click to the forward route samples as
+  before; unarmed, the click holds and the stuck window owns the
+  answer.
+
+- The march counts its ground: the stuck detector's progress gate
+  measured only the distance to the AIMED waypoint - on the pinned
+  march that waypoint sits BEHIND the character and its distance
+  GROWS, so the healthy march read as a stuck and burned the re-path
+  budget every window. The progress gate gains the segment
+  destination term: the destination distance shrinking by the
+  progress margin counts as progress, gated on the character staying
+  inside the remaining route corridor (the tangent flip-flop's
+  sideways bounce stays a stuck - the off-route hop that merely
+  points destination-ward never counts, the oscillation pin holds).
+
+The reproductions: pingpong_march_repro_test.go - the pinned
+corridor march never sends a click that leaves the character farther
+from the destination than the tick before (pre-fix it ping ponged on
+tick 6, a whole bend back), and the marched ground resets the stuck
+window. The dump spawn reproductions (the 16:02 pocket walk and the
+17:18 escape claims round) skip when the pack premise does not hold:
+the geodata pack is a live artifact and the 2026-09-20 12:13 repair
+reopened the east and the north chords of the dump spawn cell - the
+pocket the reproductions were authored against no longer exists on
+this pack (the offline probe answers three validating directions of
+eight where the round pinned exactly one), the probe skips with the
+verdict count instead of failing against a pack they were never
+authored for.
+
+Verification: go build, go vet, golangci-lint run 0 issues on the
+touched packages (v2.13.2), gofmt-spaces clean, go test -count=1
+./... 30 packages ok zero failures; the live acceptance farm
+readiness PASS on the built binary against the deployed stack
+(commit 1762d1c): all four merchants and the spellbooks bought, 35
+lessons learned at the transaction pace, the walk home crossed the
+report's stuck corridor with ten skip-ladder recoveries and zero
+backward walks, the farm zone reached, a Kaboo Orc Fighter killed at
+36382 47271, attack and defence auras running - all six checks
+completed in 714 s.
+
+Follow ups: none. The eye of the round: a recovery ladder is only
+as honest as its progress signal - the march the ladder armed was
+the cure, and the detector that armed it was starving it.
