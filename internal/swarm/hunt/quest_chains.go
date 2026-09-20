@@ -86,7 +86,7 @@ type QuestStage struct {
     // Kill is the farming block of the stage (the zero QuestKill
     // of a pure talk stage).
     Kill QuestKill
-    // Transfer is the optional gatekeeper leg the stage opens
+    // Transfer is the optional gatekeeper segment the stage opens
     // with: the station sits in another town (Kluto of Gludin
     // while the character stands in Gludio), so the stage first
     // walks to the gatekeeper and rides the teleport. Nil when
@@ -103,7 +103,7 @@ type QuestStage struct {
 // draft's "Trisha" stands in Dion, the quest_protocol correction).
 type QuestTransfer struct {
     // Gatekeeper is the teleporter npc of the town the character
-    // leaves (the walk target of the leg).
+    // leaves (the walk target of the segment).
     Gatekeeper QuestNpc
     // DestLabel selects the teleport list button (a substring of
     // the button label: "The Village of Gludin",
@@ -143,7 +143,7 @@ type QuestChain struct {
     RewardSP  int64
 }
 
-// ClassChange is the profession change leg at the grand master: the
+// ClassChange is the profession change segment at the grand master: the
 // dialog route from the master's static page to the change link.
 type ClassChange struct {
     Npc QuestNpc
@@ -200,7 +200,7 @@ func questKillStage(cond int32, kill QuestKill) QuestStage {
     }
 }
 
-// withTransfer returns the stage with the gatekeeper leg attached
+// withTransfer returns the stage with the gatekeeper segment attached
 // (the builder of the cross-town talk stages).
 func (s QuestStage) withTransfer(transfer *QuestTransfer) QuestStage {
     s.Transfer = transfer
@@ -295,7 +295,7 @@ func TransferGludinToGludio() *QuestTransfer {
 
 // ElvenKnightChain is the Q00406 Path to an Elven Knight ladder:
 // the skeleton hunt of the Ruins of Agony and the Ol Mahum camp
-// second leg, read from the script.
+// second segment, read from the script.
 //
 // The registered quest items (removed at the exit): Sorius' Letter
 // 1202, Kluto's Box 1203, Topaz Piece 1205, Emerald Piece 1206,
@@ -382,7 +382,7 @@ func ElvenKnightChain() QuestChain {
 
 // ElvenScoutChain is the Q00407 Path to an Elven Scout ladder: the
 // Ol Mahum Patrol torn letter hunt, the Prias rescue south of the
-// Neutral Zone and the return legs, read from the script.
+// Neutral Zone and the return segments, read from the script.
 //
 // The registered quest items: Reisa's Letter 1207, the four torn
 // letter pieces 1208-1211, Moretti's Herb 1212, Moretti's Letter
@@ -464,7 +464,7 @@ func ElvenScoutChain() QuestChain {
     }
 }
 
-// ElvenKnightClassChange is the Elven Fighter -> Elven Knight leg
+// ElvenKnightClassChange is the Elven Fighter -> Elven Knight segment
 // at Grand Master Rains (the class id 19, the Elven Knight Brooch
 // proof of Q00406).
 func ElvenKnightClassChange() ClassChange {
@@ -487,7 +487,7 @@ func ElvenKnightClassChange() ClassChange {
     }
 }
 
-// ElvenScoutClassChange is the Elven Fighter -> Elven Scout leg at
+// ElvenScoutClassChange is the Elven Fighter -> Elven Scout segment at
 // Grand Master Rains (the class id 22, the Reisa's Recommendation
 // proof of Q00407).
 func ElvenScoutClassChange() ClassChange {

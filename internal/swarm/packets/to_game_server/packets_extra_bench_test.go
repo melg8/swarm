@@ -12,7 +12,7 @@ import (
 
 // BenchmarkMoveToLocationToBytes measures the serialization of the
 // most frequent outbound packet: the hunt loop sends one per movement
-// leg per bot, so the 100 bot fleet pays this thousands of times per
+// segment per bot, so the 100 bot fleet pays this thousands of times per
 // second during walks.
 func BenchmarkMoveToLocationToBytes(b *testing.B) {
     move := &MoveToLocationRequestPacket{

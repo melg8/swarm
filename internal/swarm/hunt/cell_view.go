@@ -21,7 +21,7 @@ import (
 
 // cellLiveStateFarming marks the live record of a bot working its
 // ground (inside the polygon), cellLiveStateMoving the record of a
-// bot walking to its ground (outside it - the return leg or the
+// bot walking to its ground (outside it - the return segment or the
 // fresh rotation).
 const (
     cellLiveStateFarming = "farming"
@@ -89,7 +89,7 @@ func (h *cellHunter) publishView(l *Loop, now time.Time) {
         next = int32(eta.Seconds())
     }
     // The state marker: the character inside the polygon farms the
-    // ground, outside it the return leg (or the fresh rotation)
+    // ground, outside it the return segment (or the fresh rotation)
     // walks there - the map answers "which zone is the bot going
     // to" through exactly this element.
     liveState := cellLiveStateMoving

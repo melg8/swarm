@@ -22,9 +22,9 @@ import "sort"
 //     edge of the polygons it passes: the walls are the side portions
 //     without a link (the complement of the open spans), the same
 //     closed edges the capsule clearance pass pushes away from. A
-//     straight leg closer than the radius to a wall edge sweeps the
+//     straight segment closer than the radius to a wall edge sweeps the
 //     capsule into it - the hook the pivot offset removed from the
-//     turns comes back through the merged legs.
+//     turns comes back through the merged segments.
 //
 // The open spans of this mesh are whole geodata cells (16 units), so
 // every span holds a crossing a 7.5 capsule clears (16 > 2 * 7.5) and
@@ -157,7 +157,7 @@ func complementSpans(lo, hi int32, open [][2]int32) [][2]int32 {
 }
 
 // polyWallClear answers whether the segment keeps the clearance from
-// every wall span of the polygon (2D: the capsule sweeps the leg, a
+// every wall span of the polygon (2D: the capsule sweeps the segment, a
 // wall edge closer than the radius eats the capsule side).
 func polyWallClear(spans *[4][]wallSpan, a, b Pos, clearance float64,
 ) bool {

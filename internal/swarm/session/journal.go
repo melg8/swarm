@@ -445,7 +445,7 @@ func (j *Journal) Stall(
     j.send(r)
 }
 
-// Repath records one stuck-and-replanned walk leg.
+// Repath records one stuck-and-replanned walk segment.
 func (j *Journal) Repath(bot string, attempt int) {
     r := newRecord(bot, kindRepath, time.Now())
     r.N = int32(attempt)

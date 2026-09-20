@@ -20,7 +20,7 @@ import (
 )
 
 // TestZoneReturnPlanCarriesSearchContract pins the zone return stamp:
-// the planned return leg publishes the search contract with the trip
+// the planned return segment publishes the search contract with the trip
 // approach radius - the viewer replay of the link rebuilds the priced
 // approach search, not the exact destination lookalike.
 func TestZoneReturnPlanCarriesSearchContract(t *testing.T) {

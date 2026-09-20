@@ -186,8 +186,8 @@ func cursorEscapeDumpLoop(
 // driveTownWalkTick mirrors the production dispatch of
 // walkTownWaypoints for one simulated tick after the direct walk
 // elimination: the armed escape drives the claims first, the routed
-// legs follow their waypoints, and a finished plan optionally ends
-// the trip (the tickTownTrip side effect of the return leg). The
+// segments follow their waypoints, and a finished plan optionally ends
+// the trip (the tickTownTrip side effect of the return segment). The
 // consume call answers the requests the tick sent the way the modeled
 // server does. It reports whether the walk plan finished.
 func driveTownWalkTick(
@@ -242,7 +242,7 @@ func TestReproCursorKeyEscapeWalksOutOfTheRefusingCell(t *testing.T) {
             }
             now = now.Add(2 * time.Second)
             // The production dispatch mirror drives the armed escape
-            // first; the routed legs follow the waypoints.
+            // first; the routed segments follow the waypoints.
             if driveTownWalkTick(t, loop, game, bot, now, true,
                 sim.consumeAt) {
                 break
@@ -322,7 +322,7 @@ func TestReproCursorKeyEscapeAbortsWhenTheServerIgnoresTheClaims(
         for i := 0; i < 400 && loop.phase == phaseTownReturn; i++ {
             now = now.Add(2 * time.Second)
             // The production dispatch mirror drives the armed escape
-            // first; the routed legs follow the waypoints.
+            // first; the routed segments follow the waypoints.
             driveTownWalkTick(t, loop, game, bot, now, false,
                 sim.consumeAt)
         }

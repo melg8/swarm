@@ -21,7 +21,7 @@ import (
 // resets only on a finished deleveling. These tests pin the ladder,
 // the reset and the silence of the trigger while the wait holds.
 
-// restartDelevelAfterAbort ends the return leg of a just aborted
+// restartDelevelAfterAbort ends the return segment of a just aborted
 // deleveling (the character walks home to the zone center) and waits
 // for the trigger to start the next attempt: the wait is cleared and
 // the end cooldown warped, the way the hours of farming would pass.

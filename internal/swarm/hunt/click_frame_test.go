@@ -34,7 +34,7 @@ var frameRoute = []pathfind.Vec3{
 }
 
 // frameTripLoop builds the town walk state the transport pins walk
-// through: the trip mid leg with the cursor on the second waypoint of
+// through: the trip mid segment with the cursor on the second waypoint of
 // frameRoute and the character standing on the shifted surface (the
 // server z -2600 against the mesh -3000).
 func frameTripLoop() (*Loop, *fakeGame, *state.Bot, *fakeNavigator) {
@@ -51,7 +51,7 @@ func frameTripLoop() (*Loop, *fakeGame, *state.Bot, *fakeNavigator) {
     }}
     loop.waypoints = route
     loop.wpIndex = 1
-    loop.legDest = pathfind.Vec3{X: 46300, Y: 51300, Z: -3100}
+    loop.segmentDest = pathfind.Vec3{X: 46300, Y: 51300, Z: -3100}
     moveSelfTo(bot, 46000, 51000, -2600)
 
     return loop, game, bot, nav
@@ -78,12 +78,12 @@ func TestMeasureFrameOffsetDiscardsLayerSnaps(t *testing.T) {
             "measures no shift")
 }
 
-// TestFreshLegCalibratesFrameOffsetFromTheStandingPair pins the
-// calibration of a fresh leg plan: the plan's first waypoint is the
+// TestFreshSegmentCalibratesFrameOffsetFromTheStandingPair pins the
+// calibration of a fresh segment plan: the plan's first waypoint is the
 // character's own cell resolved on the pack, so its mesh z against
 // the server vouched standing z measures the shift every click of
-// this leg rides.
-func TestFreshLegCalibratesFrameOffsetFromTheStandingPair(t *testing.T) {
+// this segment rides.
+func TestFreshSegmentCalibratesFrameOffsetFromTheStandingPair(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     nav.route = []pathfind.Vec3{
         {X: 46000, Y: 51000, Z: -3000},
@@ -91,9 +91,9 @@ func TestFreshLegCalibratesFrameOffsetFromTheStandingPair(t *testing.T) {
     }
     moveSelfTo(bot, 46000, 51000, -2600)
 
-    require.True(t, loop.startWalkLeg(
+    require.True(t, loop.startWalkSegment(
         pathfind.Vec3{X: 46200, Y: 51200, Z: -3100}))
-    require.InDelta(t, 400.0, loop.legFrameOffset,
+    require.InDelta(t, 400.0, loop.segmentFrameOffset,
         0.001, "the standing pair measures the vintage shift")
 
     // The swimming character measures no shift: the swim z rides the
@@ -107,9 +107,9 @@ func TestFreshLegCalibratesFrameOffsetFromTheStandingPair(t *testing.T) {
     loop2, _, bot2, _ := newTripLoop()
     loop2.SetNavigator(nav2)
     moveSelfTo(bot2, 46000, 51000, -3720)
-    require.True(t, loop2.startWalkLeg(
+    require.True(t, loop2.startWalkSegment(
         pathfind.Vec3{X: 46200, Y: 51200, Z: -3100}))
-    require.Zero(t, loop2.legFrameOffset,
+    require.Zero(t, loop2.segmentFrameOffset,
         "the swim floor pair is not a vintage pair")
 }
 
@@ -121,7 +121,7 @@ func TestFreshLegCalibratesFrameOffsetFromTheStandingPair(t *testing.T) {
 // disagreed and every such click answered ActionFailed.
 func TestWalkClickRidesTheServerFrameTransport(t *testing.T) {
     loop, game, _, _ := frameTripLoop()
-    loop.legFrameOffset = 400
+    loop.segmentFrameOffset = 400
 
     loop.tick()
 
@@ -130,14 +130,14 @@ func TestWalkClickRidesTheServerFrameTransport(t *testing.T) {
             "(-3050 mesh + 400 shift), never the raw mesh z")
 }
 
-// TestWalkClickLongLegSplitsInTheServerFrame pins the far split of
-// the transport: a waypoint beyond the move leg cap splits into a
+// TestWalkClickLongSegmentSplitsInTheServerFrame pins the far split of
+// the transport: a waypoint beyond the move segment cap splits into a
 // straight intermediate point whose z interpolates from the server
 // vouched standing z to the anchored waypoint z - the split point
-// names the same layer the full leg would in the server frame.
-func TestWalkClickLongLegSplitsInTheServerFrame(t *testing.T) {
+// names the same layer the full segment would in the server frame.
+func TestWalkClickLongSegmentSplitsInTheServerFrame(t *testing.T) {
     loop, game, _, _ := frameTripLoop()
-    loop.legFrameOffset = 400
+    loop.segmentFrameOffset = 400
     loop.waypoints[2] = pathfind.Vec3{X: 47400, Y: 52400, Z: -3100}
     loop.wpIndex = 2
 
@@ -157,7 +157,7 @@ func TestWalkClickLongLegSplitsInTheServerFrame(t *testing.T) {
 // onto the standing layer.
 func TestWalkClickRidesRawMeshZWhenThePairIsALayerSnap(t *testing.T) {
     loop, game, _, _ := frameTripLoop()
-    loop.legFrameOffset = 0
+    loop.segmentFrameOffset = 0
 
     loop.tick()
 
@@ -170,7 +170,7 @@ func TestWalkClickRidesRawMeshZWhenThePairIsALayerSnap(t *testing.T) {
 // its waypoint clicks with the offset measured at the plan start -
 // the manual walks into the village sandwich name the standing
 // surface's layer in the server frame exactly like the autonomous
-// legs do.
+// segments do.
 func TestUserWalkClickRidesTheServerFrameTransport(t *testing.T) {
     loop, game, bot, nav := newTripLoop()
     nav.route = []pathfind.Vec3{

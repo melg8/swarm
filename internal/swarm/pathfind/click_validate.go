@@ -126,7 +126,7 @@ func (e *Engine) validLocation(
 // clickLine is a verbatim port of the server GridLineIterator2D: the
 // Bresenham raster whose diagonal double steps the anti corner cut
 // rule of the server applies to (the t/k supercover raster of the
-// search splits the same line into cardinal steps - a leg the search
+// search splits the same line into cardinal steps - a segment the search
 // verifies can still fail the server walk).
 type clickLine struct {
     curX, curY     int32

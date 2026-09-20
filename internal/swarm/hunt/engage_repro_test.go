@@ -26,7 +26,7 @@ import (
 // ORC clan) fenced each other out of the target search, the plain
 // emptiness reading of the rotation kept seeing them, the aggressive
 // fighter sat 1065 units out - just past its 1000 unit aggro range -
-// and the center patrol had no leg to walk. The tests below rebuild
+// and the center patrol had no segment to walk. The tests below rebuild
 // the scene with the dump's exact positions and pin the fix: the
 // diagnostic log that names the opponents with their positions, and
 // the zone rotation that reads the fenced square as empty and moves
@@ -134,7 +134,7 @@ func TestReproDumpStandingBotExplainsItselfInLog(t *testing.T) {
     loop.lastHit = time.Now().Add(-time.Minute)
     loop.tick()
     require.Empty(t, game.forces, "nothing is attackable in the square")
-    require.Empty(t, game.walks, "no far target and no patrol leg exist")
+    require.Empty(t, game.walks, "no far target and no patrol segment exist")
     require.Equal(t, "elven-2019_23-b1", loop.zonePickedID)
 
     // The patience expires: the far search confirms the whole square

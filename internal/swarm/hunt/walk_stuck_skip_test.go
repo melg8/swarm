@@ -22,7 +22,7 @@ import (
 // the identical route from the identical start, the walker burned its
 // whole re-path budget on the same refused click and the trip aborted.
 // The fix: on a stuck, SKIP the current waypoint and try the next one
-// before re-planning the whole leg. The next waypoint may be reachable
+// before re-planning the whole segment. The next waypoint may be reachable
 // through a different cell the server accepts.
 
 // armStuck simulates the character standing still past the stuck
@@ -48,7 +48,7 @@ func armStuck(loop *Loop, bot *state.Bot) {
 // cursor advances to the end waypoint and a fresh walk click targets
 // the end waypoint (not the mid one the server refused). The skip does
 // NOT consume the re-path budget (rePaths stays zero): the budget bounds
-// the expensive full leg re-plan, not the cursor advance.
+// the expensive full segment re-plan, not the cursor advance.
 func TestWalkStuckSkipsCurrentWaypoint(t *testing.T) {
     loop, game, bot, nav := newTripLoop()
     nav.found = true
@@ -86,7 +86,7 @@ func TestWalkStuckSkipsCurrentWaypoint(t *testing.T) {
 // TestWalkStuckRepathsAfterAllWaypointsSkipped verifies the re-path
 // fallback: when all intermediate waypoints have been skipped and the
 // character is still stuck at the final waypoint, the next stuck
-// re-plans the whole leg from the current position to the destination.
+// re-plans the whole segment from the current position to the destination.
 // The re-plan (not the skip) consumes the re-path budget.
 func TestWalkStuckRepathsAfterAllWaypointsSkipped(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
@@ -110,7 +110,7 @@ func TestWalkStuckRepathsAfterAllWaypointsSkipped(t *testing.T) {
     require.Equal(t, 2, loop.wpIndex)
 
     // Second stuck: the last waypoint is the final one (no more to
-    // skip), so the leg re-plans from the current position. The re-plan
+    // skip), so the segment re-plans from the current position. The re-plan
     // consumes the re-path budget. The follower cursor resets and
     // immediately advances past the fresh plan's wp 0 (the standing
     // cell itself - a click at it is the self-click the server always
@@ -124,7 +124,7 @@ func TestWalkStuckRepathsAfterAllWaypointsSkipped(t *testing.T) {
         "the re-planned cursor must advance past the standing wp 0 onto the first real waypoint")
     require.True(t, loop.stuckFast,
         "the re-plan arms the fast stuck window - the plain clicks "+
-            "of the leg did not move the character, the next "+
+            "of the segment did not move the character, the next "+
             "stuck detection fires on the fast timeout (4s) instead "+
             "of the full stuckTimeout (15s), the recovery of the "+
             "2026-09-14 08:13 dump")
@@ -134,7 +134,7 @@ func TestWalkStuckRepathsAfterAllWaypointsSkipped(t *testing.T) {
 
 // TestWalkStuckAbortsAfterMaxRePaths verifies the abort: with a
 // two-waypoint route (no intermediate waypoint to skip), each stuck
-// re-plans the leg - and a re-path that produced no movement aborts
+// re-plans the segment - and a re-path that produced no movement aborts
 // the next same-cell stuck instead of re-planning the identical route
 // (the frozen re-path rule). The maxRePaths budget still bounds the
 // walks whose re-paths DO move the character between them.
@@ -149,7 +149,7 @@ func TestWalkStuckAbortsAfterMaxRePaths(t *testing.T) {
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
 
-    // The first stuck re-plans the leg (the character stands still,
+    // The first stuck re-plans the segment (the character stands still,
     // the route has no waypoint to skip onto).
     armStuck(loop, bot)
     loop.tick()
@@ -163,7 +163,7 @@ func TestWalkStuckAbortsAfterMaxRePaths(t *testing.T) {
 
     // The second stuck from the same cell (no movement since the
     // re-path) climbs the escalation ladder rung 1: the frozen
-    // corridor joins the session bans and the leg re-plans the detour
+    // corridor joins the session bans and the segment re-plans the detour
     // around it - the identical frozen route is never re-planned again.
     armStuck(loop, bot)
     loop.tick()
@@ -176,7 +176,7 @@ func TestWalkStuckAbortsAfterMaxRePaths(t *testing.T) {
 
     // The third stuck from the same cell (the detour froze as well)
     // climbs rung 2: the cursor key escape along the plan - the
-    // claims transport owns the leg, the plan stays the leg's own
+    // claims transport owns the segment, the plan stays the segment's own
     // route (the owner rule: the WASD walks ALONG the route, never
     // the direct line to the far target).
     armStuck(loop, bot)
@@ -286,7 +286,7 @@ func TestWalkStuckFastTimeoutArmsAfterSkip(t *testing.T) {
 
 // TestWalkStuckDoesNotSkipWaterEscape verifies the water escape branch
 // is unchanged: a stuck water escape re-plans the escape itself, not
-// the town leg. The skip logic only applies to the normal town walk.
+// the town segment. The skip logic only applies to the normal town walk.
 func TestWalkStuckDoesNotSkipWaterEscape(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     nav.found = true
@@ -318,7 +318,7 @@ func TestWalkStuckDoesNotSkipWaterEscape(t *testing.T) {
 // line from the standing cell is walkable. When every successor line
 // is blocked, the skip must NOT advance the cursor (a blind skip arms
 // the follower with a click the server collapses partway - the
-// character creeps cell by cell into a trap pocket) and the leg
+// character creeps cell by cell into a trap pocket) and the segment
 // re-plans instead, consuming the re-path budget.
 func TestWalkStuckSkipNeedsAClearLine(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
@@ -339,7 +339,7 @@ func TestWalkStuckSkipNeedsAClearLine(t *testing.T) {
     require.Equal(t, 1, loop.wpIndex)
 
     // The stuck fires with every successor line blocked: the skip must
-    // refuse to arm the blocked waypoint and re-plan the leg instead.
+    // refuse to arm the blocked waypoint and re-plan the segment instead.
     // The re-planned cursor advances past the standing wp 0 onto the
     // first real waypoint in the same tick (no self-click).
     armStuck(loop, bot)
@@ -350,7 +350,7 @@ func TestWalkStuckSkipNeedsAClearLine(t *testing.T) {
         "the re-planned cursor must advance onto the first real waypoint")
     require.True(t, loop.stuckFast,
         "the re-plan arms the fast stuck window - the plain clicks "+
-            "of the leg did not move the character")
+            "of the segment did not move the character")
 }
 
 // TestWalkStuckSkipJumpsToTheFirstClearWaypoint pins the forward scan

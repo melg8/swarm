@@ -38,7 +38,7 @@ func settleMerchant(
     spawnMerchantNPC(bot, npc, objectID)
     moveSelfTo(bot, npc.X, npc.Y, npc.Z)
     loop.merchantID = 0
-    // The arrival tick (the walk leg completes) precedes the merchant
+    // The arrival tick (the walk segment completes) precedes the merchant
     // pick: tick until the merchant shows up.
     for range 3 {
         loop.merchantPick = time.Now().Add(-2 * time.Second)
@@ -151,7 +151,7 @@ func TestShoppingTripBuysAfterSelling(t *testing.T) {
     bot.ApplyInventoryUpdate(bought)
 
     // The confirmation completes the stop; the next tick starts the
-    // return leg.
+    // return segment.
     loop.tick()
     loop.tick()
     require.Equal(t, phaseTownReturn, loop.phase)
@@ -245,7 +245,7 @@ func TestShoppingWithoutGearProfile(t *testing.T) {
 }
 
 // TestAdvanceTripStopReturnsHome verifies the last stop flows into
-// the return leg.
+// the return segment.
 func TestAdvanceTripStopReturnsHome(t *testing.T) {
     loop, _, _, _ := newTripLoop()
     loop.tripStops = []tripStop{{merchant: townMerchants[0]}}
@@ -546,7 +546,7 @@ func affordableTotal(entries []state.ShoppingEntryView) int64 {
 // TestTripShoppingViewHoldsThePlanDuringWalk pins the widget view of
 // the town walk: the trip stops are planned only at the shop (after
 // the junk selling), so the walk to town carried an EMPTY trip view
-// and the widget went blank for the whole leg - the reported "the
+// and the widget went blank for the whole segment - the reported "the
 // shopping list is missing after the bot switch". The plan that
 // triggered the trip (the cached hunt queue) stays on the widget
 // until the stop planning replaces it.

@@ -58,16 +58,16 @@ func TestWeaponlessRunStartsTheWeaponStop(t *testing.T) {
     require.NotEmpty(t, game.walks,
         "the walk to the weapon merchant started")
     // The walk aims at Unoren, not at the nearest merchant of the farm
-    // spot (Creamees/Herbiel across the village): the first leg is the
-    // split of the long route (maxMoveLeg), so its target compares
-    // through the leg walk helper.
+    // spot (Creamees/Herbiel across the village): the first segment is the
+    // split of the long route (maxMoveDistance), so its target compares
+    // through the segment walk helper.
     unoren := townMerchants[0]
-    require.Equal(t, [][3]int32{legWalkTarget([3]int32{45000, 50000, -3500},
+    require.Equal(t, [][3]int32{segmentWalkTarget([3]int32{45000, 50000, -3500},
         pathfind.Vec3{
             X: float64(unoren.X), Y: float64(unoren.Y),
             Z: float64(unoren.Z),
         })}, game.walks,
-        "the walk aims along the leg to the weapon merchant")
+        "the walk aims along the segment to the weapon merchant")
 }
 
 // TestWeaponlessRunCarriesLearning pins the one town visit rule: the
@@ -76,7 +76,7 @@ func TestWeaponlessRunStartsTheWeaponStop(t *testing.T) {
 // and the milestone buys there), then the gear, the books and the
 // teacher follow in the same visit. The bare-handed abort risk the
 // old skip guarded against cannot fire anymore: the weapon stop runs
-// before every learn stop, so a stuck teacher leg never strands the
+// before every learn stop, so a stuck teacher segment never strands the
 // character unarmed.
 func TestWeaponlessRunCarriesLearning(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
@@ -240,7 +240,7 @@ func TestWeaponUpgradeRoutesToWeaponMerchant(t *testing.T) {
         "the upgrade trip sells at the weapon merchant")
 }
 
-// TestEngagesOnZoneEntryHoldsWhenWeaponless pins the return leg: a
+// TestEngagesOnZoneEntryHoldsWhenWeaponless pins the return segment: a
 // bare-handed character walks home past a pickable target instead of
 // engaging it - the weapon run owns the next ticks.
 func TestEngagesOnZoneEntryHoldsWhenWeaponless(t *testing.T) {
@@ -268,7 +268,7 @@ func TestEngagesOnZoneEntryHoldsWhenWeaponless(t *testing.T) {
 // the reset bot walked from the village to the Spore Fungus SW ground
 // bare handed and livelocked in the logout cycle). The trip machinery
 // owns the walk instead: the weapon run shops first and its return
-// leg walks home armed.
+// segment walks home armed.
 func TestWeaponlessHoldBlocksTheZoneReturn(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     logBuf := &bytes.Buffer{}
@@ -318,7 +318,7 @@ func TestWeaponlessHoldBlocksTheZoneReturn(t *testing.T) {
 // past the budget no new fight starts and the leash walks the
 // character home through the blows (the 2026-09-11 08:04 parallel
 // round: the adoption held the character on the road forever, the
-// farm leg timed out with the walk home never resumed).
+// farm segment timed out with the walk home never resumed).
 func TestRoadFightBudgetResumesTheWalkHome(t *testing.T) {
     loop, _, bot, _ := newTripLoop()
     bot.ApplyUserInfo(weaponRunUserInfo(11))

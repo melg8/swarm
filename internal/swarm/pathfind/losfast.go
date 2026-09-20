@@ -20,7 +20,7 @@ import (
 // supercover with plain values: the same cell sequence, the same
 // closest layer resolution, the same wall and height rules, the same
 // server click verification - one region cache slot instead of the
-// maps, one scratch buffer per leg instead of per cell allocations.
+// maps, one scratch buffer per segment instead of per cell allocations.
 
 // cellState is one rastered cell with its resolved layer: the plain
 // value pair the fast raster carries instead of the node objects.
@@ -154,10 +154,10 @@ func cellClickWorld(c cellState) (int32, int32, int32) {
         int32(c.layer.Height)
 }
 
-// serverLegVerifiedBetween resolves the endpoint cells and runs the
-// server click validation between them (the serverLegVerified
+// serverSegmentVerifiedBetween resolves the endpoint cells and runs the
+// server click validation between them (the serverSegmentVerified
 // contract without the nodes).
-func (e *Engine) serverLegVerifiedBetween(a, b Vec3) bool {
+func (e *Engine) serverSegmentVerifiedBetween(a, b Vec3) bool {
     var slot regionSlot
     fromLayer, ok := e.cellLayerAt(&slot,
         WorldToCell(a.X, a.Y), int16(a.Z))
@@ -178,23 +178,23 @@ func (e *Engine) serverLegVerifiedBetween(a, b Vec3) bool {
     return vx == toX && vy == toY && vz == toZ
 }
 
-// legClearCells answers the capsule guard contract for one leg: the
+// segmentClearCells answers the capsule guard contract for one segment: the
 // supercover raster stays walkable end to end, the wall clearance of
 // the open interior holds everywhere (every crossed cell checks the
-// true minimum distance of its leg portion against the walls of its
+// true minimum distance of its segment portion against the walls of its
 // 3x3 neighborhood - strictly tighter than a 4 unit point sample
 // chain, the walls are axis aligned segments) and the server click
-// validation accepts the leg wholesale. The endpoints stay unprobed
+// validation accepts the segment wholesale. The endpoints stay unprobed
 // (the first and the last four units ride on the callers: the start
 // is where the character stands, the end is where it asked to go -
 // the waypoint passes own their clearance). A missing endpoint cell
-// reads as not clear (the legWalkable error contract).
-func (e *Engine) legClearCells(a, b Vec3, radius float64,
+// reads as not clear (the segmentWalkable error contract).
+func (e *Engine) segmentClearCells(a, b Vec3, radius float64,
     maxPassableHeight uint16,
 ) bool {
     walked, err := e.walkSupercover(a, b, int(maxPassableHeight), radius)
 
-    return err == nil && walked && e.serverLegVerifiedBetween(a, b)
+    return err == nil && walked && e.serverSegmentVerifiedBetween(a, b)
 }
 
 // lineOfSightCells answers whether the straight walk between two
@@ -214,7 +214,7 @@ func (e *Engine) lineOfSightCells(start, end Vec3,
         return false, nil
     }
 
-    return e.serverLegVerifiedBetween(start, end), nil
+    return e.serverSegmentVerifiedBetween(start, end), nil
 }
 
 // lineOfSightNodes is the node graph oracle of the fast raster (the
@@ -344,7 +344,7 @@ func (e *Engine) walkSupercoverCells(slot regionSlot, from,
     }
 
     // The tail portion of the last cell (the destination cell never
-    // exits, its clearance portion ends the leg).
+    // exits, its clearance portion ends the segment).
     if radius > 0 && length > 0 {
         return portionClear(e, &slot, current, a, b, tEnter, 1.0,
             trimStart, trimEnd, radius, scratch)
@@ -353,7 +353,7 @@ func (e *Engine) walkSupercoverCells(slot regionSlot, from,
     return true
 }
 
-// crossingT answers the line parameter where the leg crosses the cell
+// crossingT answers the line parameter where the segment crosses the cell
 // boundary at the given world coordinate (the boundary always sits
 // between the endpoints on that axis).
 func crossingT(a, b, boundary float64) float64 {
@@ -364,14 +364,14 @@ func crossingT(a, b, boundary float64) float64 {
     return (boundary - a) / (b - a)
 }
 
-// capsuleClearanceTrim is the unprobed arc length at both leg ends of
+// capsuleClearanceTrim is the unprobed arc length at both segment ends of
 // the clearance raster: the four unit first sample of the point chain
 // it replaces (the start is where the character stands, the end is
 // the asked destination - their wall distance belongs to the waypoint
 // passes).
 const capsuleClearanceTrim = 4.0
 
-// portionClear answers whether the leg portion between the line
+// portionClear answers whether the segment portion between the line
 // parameters lo and hi keeps the radius from every closed wall edge
 // of the containing cell's 3x3 neighborhood (the layers resolved
 // against the portion's middle height - the nearestWall layer choice
@@ -436,7 +436,7 @@ func portionClear(e *Engine, slot *regionSlot, cell cellState,
 }
 
 // portionWallsClear folds the closed wall edges of one neighbor cell
-// into the distance check of the leg portion (the mergeCellWalls
+// into the distance check of the segment portion (the mergeCellWalls
 // wall set with the segment form of the distance).
 func portionWallsClear(x0, y0, x1, y1 float64, key RegionKey,
     nx, ny int, layer Layer, radius float64,
@@ -471,7 +471,7 @@ func portionWallsClear(x0, y0, x1, y1 float64, key RegionKey,
 // segmentSegmentDistance answers the smallest distance between two
 // segments: zero when they touch, the minimum of the endpoint to
 // segment distances otherwise (the walls are axis aligned edges, the
-// leg portions are short slivers, the closed form stays simple).
+// segment portions are short slivers, the closed form stays simple).
 func segmentSegmentDistance(ax, ay, bx, by, cx, cy, dx,
     dy float64,
 ) float64 {

@@ -142,7 +142,7 @@ func reproRound59PhantomChase(bot *state.Bot) {
 // fix: the phantom chase (a fresh fight view built from the chase steps
 // of the very attack the server keeps refusing) must not suppress the
 // blind engage recovery. The tick after the refusal arms the recovery
-// and walks the first geodata reposition leg at once - the inversion of
+// and walks the first geodata reposition segment at once - the inversion of
 // the dump signature (a character standing forever, no walk, no switch).
 func TestReproRound59PhantomChaseArmsBlindRecovery(t *testing.T) {
     loop, game, bot := reproRound59Scene(t)
@@ -163,7 +163,7 @@ func TestReproRound59PhantomChaseArmsBlindRecovery(t *testing.T) {
     require.Empty(t, game.forces,
         "no attack re-request may fire while the reposition runs")
     require.Len(t, game.walks, 1,
-        "the first reposition leg walks on the planning tick")
+        "the first reposition segment walks on the planning tick")
     require.InDelta(t, 35190, game.walks[0][0], 1)
     require.InDelta(t, 47230, game.walks[0][1], 1)
 }

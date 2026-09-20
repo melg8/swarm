@@ -15,11 +15,11 @@ import (
     "github.com/stretchr/testify/require"
 )
 
-// TestTownLegPhaseTrace walks one town leg through the hierarchical
+// TestTownSegmentPhaseTrace walks one town segment through the hierarchical
 // phases with the per phase and per hop timing - the diagnostic round
-// for the long leg cost. The leg picks via the SWARM_TOWN_LEG env
+// for the long segment cost. The segment picks via the SWARM_TOWN_LEG env
 // (0,1,2); the test skips when the pack is absent.
-func TestTownLegPhaseTrace(t *testing.T) {
+func TestTownSegmentPhaseTrace(t *testing.T) {
     dir := "../../../../data/navmesh"
     mesh := NewMesh(dir)
     if len(mesh.TileFiles()) < 100 {
@@ -30,19 +30,19 @@ func TestTownLegPhaseTrace(t *testing.T) {
     idx := 0
     if text := os.Getenv("SWARM_TOWN_LEG"); text != "" {
         n, err := strconv.Atoi(text)
-        if err == nil && n >= 0 && n < len(townLegs) {
+        if err == nil && n >= 0 && n < len(townSegments) {
             idx = n
         }
     }
-    leg := townLegs[idx]
+    segment := townSegments[idx]
 
-    startRef, startPos, ok := mesh.FindNearestPoly(leg.start)
+    startRef, startPos, ok := mesh.FindNearestPoly(segment.start)
     require.True(t, ok)
-    endRef, endPos, ok := mesh.FindNearestPoly(leg.end)
+    endRef, endPos, ok := mesh.FindNearestPoly(segment.end)
     require.True(t, ok)
     sc, sr := TileOf(startRef)
     ec, er := TileOf(endRef)
-    t.Logf("%s: tiles %d_%d -> %d_%d, straight %.0f", leg.name,
+    t.Logf("%s: tiles %d_%d -> %d_%d, straight %.0f", segment.name,
         sc, sr, ec, er, dist3(startPos, endPos))
 
     state := mesh.acquireState()
@@ -109,9 +109,9 @@ func TestTownLegPhaseTrace(t *testing.T) {
         len(chain.edges), totalExplored, maxHop, time.Since(began))
 }
 
-// TestTownLegFlatProbe answers the flat search reachability for one
-// leg (the diagnostic round for the coarse flood).
-func TestTownLegFlatProbe(t *testing.T) {
+// TestTownSegmentFlatProbe answers the flat search reachability for one
+// segment (the diagnostic round for the coarse flood).
+func TestTownSegmentFlatProbe(t *testing.T) {
     dir := "../../../../data/navmesh"
     mesh := NewMesh(dir)
     if len(mesh.TileFiles()) < 100 {
@@ -121,14 +121,14 @@ func TestTownLegFlatProbe(t *testing.T) {
     idx := 0
     if text := os.Getenv("SWARM_TOWN_LEG"); text != "" {
         if n, err := strconv.Atoi(text); err == nil &&
-            n >= 0 && n < len(townLegs) {
+            n >= 0 && n < len(townSegments) {
             idx = n
         }
     }
-    leg := townLegs[idx]
-    startRef, startPos, ok := mesh.FindNearestPoly(leg.start)
+    segment := townSegments[idx]
+    startRef, startPos, ok := mesh.FindNearestPoly(segment.start)
     require.True(t, ok)
-    endRef, endPos, ok := mesh.FindNearestPoly(leg.end)
+    endRef, endPos, ok := mesh.FindNearestPoly(segment.end)
     require.True(t, ok)
     state := mesh.acquireState()
     defer mesh.releaseState(state)
@@ -154,7 +154,7 @@ func TestTownLegFlatProbe(t *testing.T) {
 // TestTownGoalComponentProbe answers the goal cluster component
 // arithmetic: the end poly's component, the crossings into the goal
 // cluster and their entry components (the diagnostic round for the
-// coarse flood of the town legs).
+// coarse flood of the town segments).
 func TestTownGoalComponentProbe(t *testing.T) {
     dir := "../../../../data/navmesh"
     mesh := NewMesh(dir)
@@ -162,8 +162,8 @@ func TestTownGoalComponentProbe(t *testing.T) {
         t.Skip("the whole map pack is not present")
     }
     mesh.SetCacheCapacity(8)
-    leg := townLegs[1]
-    endRef, endPos, ok := mesh.FindNearestPoly(leg.end)
+    segment := townSegments[1]
+    endRef, endPos, ok := mesh.FindNearestPoly(segment.end)
     require.True(t, ok)
     gc, gr := TileOf(endRef)
     goalAbstract := mesh.abstractOf(RegionKey{Col: gc, Row: gr})
@@ -180,7 +180,7 @@ func TestTownGoalComponentProbe(t *testing.T) {
         gc, gr, endIdx, goalComp, count, len(goalAbstract.comps))
 
     // The start poly component too (the Gludio side).
-    startRef, _, ok := mesh.FindNearestPoly(leg.start)
+    startRef, _, ok := mesh.FindNearestPoly(segment.start)
     require.True(t, ok)
     sc, sr := TileOf(startRef)
     startAbstract := mesh.abstractOf(RegionKey{Col: sc, Row: sr})
@@ -287,7 +287,7 @@ func TestTileBorderComps(t *testing.T) {
 }
 
 // TestBayCrossingProbe lists the abstract edge census of the bay
-// tiles between Gludio and Gludin (the swim route the town leg
+// tiles between Gludio and Gludin (the swim route the town segment
 // expects): every edge leaving each tile grouped by the target tile
 // and the target area (the water wall question of the stitch).
 func TestBayCrossingProbe(t *testing.T) {
@@ -332,10 +332,10 @@ func TestCoarseReverseReach(t *testing.T) {
         t.Skip("the whole map pack is not present")
     }
     mesh.SetCacheCapacity(64)
-    leg := townLegs[1]
-    startRef, startPos, ok := mesh.FindNearestPoly(leg.start)
+    segment := townSegments[1]
+    startRef, startPos, ok := mesh.FindNearestPoly(segment.start)
     require.True(t, ok)
-    endRef, endPos, ok := mesh.FindNearestPoly(leg.end)
+    endRef, endPos, ok := mesh.FindNearestPoly(segment.end)
     require.True(t, ok)
     sc, sr := TileOf(startRef)
     ec, er := TileOf(endRef)
@@ -473,7 +473,7 @@ func TestCoarseReverseReach(t *testing.T) {
 
 // TestWaterBorderStitch probes the raw external links across the
 // water borders south of the Gludin Gludio line (the swim route the
-// town legs need): whether the water polygons stitch across the tile
+// town segments need): whether the water polygons stitch across the tile
 // borders at all.
 func TestWaterBorderStitch(t *testing.T) {
     dir := "../../../../data/navmesh"

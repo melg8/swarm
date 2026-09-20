@@ -60,7 +60,7 @@ func TestBuildRegionInteriorWall(t *testing.T) {
 // every adjacent kept cell pair that lands inside ONE polygon must be
 // an open step (the paired NSWE walls plus the climb height rule) -
 // the interior-walkable contract the link walk's same-polygon skip and
-// the funnel legs rely on. The wall-blind growth of the first rounds
+// the funnel segments rely on. The wall-blind growth of the first rounds
 // failed this audit on the town regions by the millions.
 func TestBuildRegionInteriorWalls(t *testing.T) {
     for _, region := range [][2]int16{{21, 19}, {21, 22}} {

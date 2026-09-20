@@ -49,14 +49,14 @@ func TestSteerFlipFlopWaypointIsThreatened(t *testing.T) {
     loop := NewLoop(&fakeGame{}, bot)
 
     // The click target sits inside the 600 unit margin circle.
-    require.True(t, loop.legTargetThreatened(45676, 50000, 49000, 50000),
+    require.True(t, loop.segmentTargetThreatened(45676, 50000, 49000, 50000),
         "a click target 338 units from the camp is threatened")
     // A destination-exempt mob never blocks: the ground the walk
     // deliberately enters carries its own mobs.
-    require.False(t, loop.legTargetThreatened(45676, 50000, 45338, 50000),
+    require.False(t, loop.segmentTargetThreatened(45676, 50000, 45338, 50000),
         "the mob at the walk destination is exempt")
     // A click target far outside every circle stays clean.
-    require.False(t, loop.legTargetThreatened(47000, 50000, 49000, 50000),
+    require.False(t, loop.segmentTargetThreatened(47000, 50000, 49000, 50000),
         "a click target 1662 units from the camp is clean")
 }
 

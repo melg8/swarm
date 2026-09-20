@@ -595,7 +595,7 @@ func TestLoopWalksBackIntoTheZone(t *testing.T) {
     loop.lastHit = time.Now().Add(-time.Minute)
 
     // The character respawns far outside the hunting square: the leash
-    // walks it back toward the zone center in short legs (the server
+    // walks it back toward the zone center in short segments (the server
     // refuses move requests beyond 9900 units), not one direct walk.
     bot.ApplyMovement(state.Movement{
         ObjectID: 100, X: 49308, Y: 44213, Z: -3539,
@@ -604,20 +604,20 @@ func TestLoopWalksBackIntoTheZone(t *testing.T) {
     loop.lastHit = time.Now().Add(-2 * time.Second)
     loop.tick()
     require.Len(t, game.walks, 1, "the leash walks toward the zone center")
-    leg := game.walks[0]
-    dist := math.Hypot(float64(leg[0]-49308), float64(leg[1]-44213))
-    // The int32 truncation of the leg target extends the leg by up to
+    segment := game.walks[0]
+    dist := math.Hypot(float64(segment[0]-49308), float64(segment[1]-44213))
+    // The int32 truncation of the segment target extends the segment by up to
     // sqrt(2) units; the server move limit itself is 9900.
-    require.LessOrEqual(t, dist, returnWalkLeg+2,
-        "the return leg stays below the server move limit")
-    require.Greater(t, dist, 0.0, "the leg moves")
-    dx := float64(leg[0] - 49308)
-    dy := float64(leg[1] - 44213)
+    require.LessOrEqual(t, dist, returnWalkSegment+2,
+        "the return segment stays below the server move limit")
+    require.Greater(t, dist, 0.0, "the segment moves")
+    dx := float64(segment[0] - 49308)
+    dy := float64(segment[1] - 44213)
     tdx := float64(46112 - 49308)
     tdy := float64(41500 - 44213)
     perp := math.Abs(dx*tdy-dy*tdx) / math.Hypot(tdx, tdy)
     require.LessOrEqual(t, perp, 2.0,
-        "the leg points at the zone center")
+        "the segment points at the zone center")
 
     // Back inside: the zone no longer pushes the walk.
     bot.ApplyMovement(state.Movement{
@@ -644,7 +644,7 @@ func TestLoopPathfindsBackIntoTheZone(t *testing.T) {
 
     // The character respawns outside the hunting square: the return is
     // planned through the geodata navigator (the walls and rivers between
-    // the village and the fields make direct legs walk into obstacles).
+    // the village and the fields make direct segments walk into obstacles).
     bot.ApplyMovement(state.Movement{
         ObjectID: 100, X: 49308, Y: 44213, Z: -3539,
         DestX: 49308, DestY: 44213, DestZ: -3539,
@@ -653,16 +653,17 @@ func TestLoopPathfindsBackIntoTheZone(t *testing.T) {
     loop.tick()
     require.Equal(t, phaseTownReturn, loop.phase,
         "the zone return follows the geodata waypoints")
-    require.Equal(t, 1, nav.calls, "the return leg was planned")
+    require.Equal(t, 1, nav.calls, "the return segment was planned")
     require.Empty(t, game.walks, "no walk before the follower tick")
 
-    // The follower walks the planned waypoints in server legal legs.
+    // The follower walks the planned waypoints in server legal segments.
     loop.tick()
     require.Len(t, game.walks, 1, "the follower walks the waypoints")
-    leg := game.walks[0]
+    segment := game.walks[0]
     require.LessOrEqual(t,
-        math.Hypot(float64(leg[0]-49308), float64(leg[1]-44213)),
-        maxMoveLeg+2, "the waypoint leg respects the server move limit")
+        math.Hypot(float64(segment[0]-49308), float64(segment[1]-44213)),
+        maxMoveDistance+2,
+        "the waypoint segment respects the server move limit")
 
     // Arriving home ends the return and resumes the hunt.
     bot.ApplyMovement(state.Movement{
@@ -888,7 +889,7 @@ func TestLoopEscapesWhenHurtUnderAttack(t *testing.T) {
     // A mob hits the character (Attack broadcast with the bot as
     // target) while its HP is low: the character keeps moving instead
     // of sitting into the blows or starting a fight it cannot win -
-    // one escape leg away from the attacker.
+    // one escape segment away from the attacker.
     bot.ApplyStatusUpdate(100, []state.Attribute{
         {ID: state.AttrCurHP, Value: 20},
     })
@@ -903,7 +904,7 @@ func TestLoopEscapesWhenHurtUnderAttack(t *testing.T) {
     require.Zero(t, game.sits, "no sitting into the blows of a fight")
     require.Empty(t, game.forces,
         "a hurt character does not start a losing fight")
-    require.Len(t, game.walks, 1, "one escape leg away from the attacker")
+    require.Len(t, game.walks, 1, "one escape segment away from the attacker")
     require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0])
 
     // The escape walk is paced: the next ticks do not spam move
@@ -912,7 +913,7 @@ func TestLoopEscapesWhenHurtUnderAttack(t *testing.T) {
         loop.lastHit = time.Now().Add(-2 * time.Second)
         loop.tick()
     }
-    require.Len(t, game.walks, 1, "the escape legs are paced")
+    require.Len(t, game.walks, 1, "the escape segments are paced")
 
     // The health recovers above the hurt gate: even under the fresh
     // blows the character stops running and answers the attacker.
@@ -1003,7 +1004,7 @@ func TestLoopSelectsNextTargetAfterKill(t *testing.T) {
     // units from the character - the fight never closed the distance
     // in this fake world): the corpse grace walks the character to
     // the drops instead of leaving them on the ground, so the loot
-    // phase holds and issues the approach leg.
+    // phase holds and issues the approach segment.
     loop.lastHit = time.Now().Add(-2 * time.Second)
     loop.tick()
     require.Equal(t, phaseLoot, loop.phase,
@@ -1101,7 +1102,7 @@ func TestLoopEscapesALosingFight(t *testing.T) {
 
     require.Equal(t, int32(0), loop.target, "the losing fight is dropped")
     require.Empty(t, game.forces, "no further attack requests")
-    require.Len(t, game.walks, 1, "one escape leg away from the mob")
+    require.Len(t, game.walks, 1, "one escape segment away from the mob")
     require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0])
     require.True(t, loop.targetSkipped(7, time.Now().Add(time.Minute)),
         "the fled target stays out of the search for the long delay")
@@ -1134,7 +1135,7 @@ func TestLoopEscapesTheLevelGapFight(t *testing.T) {
     loop.tick()
 
     require.Equal(t, int32(0), loop.target, "the gap fight is dropped early")
-    require.Len(t, game.walks, 1, "one escape leg away from the mob")
+    require.Len(t, game.walks, 1, "one escape segment away from the mob")
 }
 
 func TestLoopFinishesTheBeatenTarget(t *testing.T) {
@@ -1177,19 +1178,19 @@ func TestLoopPatrolsTowardTheCenterWithoutTargets(t *testing.T) {
     loop.tick()
     require.Empty(t, game.walks, "the patience holds the center walk")
 
-    // The patience expires: one paced leg toward the zone center (the
+    // The patience expires: one paced segment toward the zone center (the
     // next searches pick up any mob the walk passes).
     loop.noTargetSince = time.Now().Add(-noTargetPatience - time.Second)
     loop.lastHit = time.Now().Add(-2 * time.Second)
     loop.tick()
     require.Len(t, game.walks, 1, "an idle hunter walks toward the center")
-    leg := game.walks[0]
+    segment := game.walks[0]
     dx := float64(46500 - 45000)
     dy := float64(50800 - 50000)
     dist := math.Hypot(dx, dy)
-    frac := math.Min(1, returnWalkLeg/dist)
-    require.InDelta(t, float64(45000)+dx*frac, float64(leg[0]), 1)
-    require.InDelta(t, float64(50000)+dy*frac, float64(leg[1]), 1)
+    frac := math.Min(1, returnWalkSegment/dist)
+    require.InDelta(t, float64(45000)+dx*frac, float64(segment[0]), 1)
+    require.InDelta(t, float64(50000)+dy*frac, float64(segment[1]), 1)
 }
 
 func TestLoopWalksToFarTargetsOfABigZone(t *testing.T) {
@@ -1213,7 +1214,7 @@ func TestLoopWalksToFarTargetsOfABigZone(t *testing.T) {
         "the targetless hunter walks toward the far pack")
     walk := game.walks[len(game.walks)-1]
     require.True(t, walk[0] > 45000 && walk[0] <= 46000,
-        "the walk leg heads toward the mob (x grows, capped at the leg length)")
+        "the walk segment heads toward the mob (x grows, capped at the segment)")
     require.Equal(t, int32(50000), walk[1],
         "the walk keeps the line to the mob")
 }
@@ -1262,7 +1263,7 @@ func TestLoopLogsOutWhenTheFleeNeverShakesTheChase(t *testing.T) {
     require.Zero(t, game.logouts, "the fresh flee starts with a budget")
 
     // The episode ages past the budget while the blows keep landing:
-    // the next escape leg never happens, the logout does.
+    // the next escape segment never happens, the logout does.
     loop.fleeAt = time.Now().Add(-2 * time.Second)
     loop.fleeSince = time.Now().Add(-fleeLogoutAfter - time.Second)
     loop.lastHit = time.Now().Add(-2 * time.Second)
@@ -1325,7 +1326,7 @@ func TestLoopLogsOutAtCriticalHealthUnderAttack(t *testing.T) {
         "the login cooldown is two seconds - the aggro resets on "+
             "the disappearance, a long pause would only idle the farm")
     require.Len(t, game.walks, 1,
-        "the last escape leg keeps the offline character moving")
+        "the last escape segment keeps the offline character moving")
     require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0])
 
     // The request is one shot: the dying ticks stay quiet while the
@@ -1369,20 +1370,20 @@ func TestLoopRunsFromThePileUpBeforeLoggingOut(t *testing.T) {
     require.Zero(t, game.logouts,
         "the pile up does not log the character out on the spot")
     require.Len(t, game.walks, 1,
-        "the pile up run starts with an escape leg")
+        "the pile up run starts with an escape segment")
     require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0],
-        "the leg runs away from the mob pack")
+        "the segment runs away from the mob pack")
     require.False(t, loop.panicAt.IsZero(), "the aggro anchor is armed")
     require.Equal(t, int32(45000), loop.panicX)
     require.Equal(t, int32(50000), loop.panicY)
 
-    // The pacing holds the legs to one per second: an immediate
+    // The pacing holds the segments to one per second: an immediate
     // re-tick neither walks again nor logs out.
     loop.tick()
     require.Len(t, game.walks, 1)
     require.Zero(t, game.logouts)
 
-    // The character covers the first leg (700 units west, past
+    // The character covers the first segment (700 units west, past
     // the 600 unit escape distance): the logout fires there.
     bot.ApplyMovement(state.Movement{
         ObjectID: 100, X: 44300, Y: 50000, Z: -3500,
@@ -1417,7 +1418,7 @@ func TestLoopLogsOutWhenThePileUpRunNeverMakesDistance(t *testing.T) {
     loop.lastHit = time.Now().Add(-time.Minute)
 
     // A cornered run: the pack holds the character in place
-    // (the escape legs keep failing, the character never moves).
+    // (the escape segments keep failing, the character never moves).
     // The budget ends the session wherever it got to instead of
     // running forever.
     for _, id := range []int32{7, 8} {
@@ -1596,7 +1597,7 @@ func TestLoopFinishesTheFightOutsideTheZone(t *testing.T) {
 }
 
 // TestLoopFightsBackOutsideTheZone pins the chaser adoption: the
-// character stands outside the square (the escape legs carried it
+// character stands outside the square (the escape segments carried it
 // out) with healthy health and a mob keeps attacking it - fighting
 // back beats the walk home through the blows. A hurt character under
 // attack keeps fleeing instead (pinned by the escape tests above).
@@ -1722,7 +1723,7 @@ func TestEngageFleesTheUnwinnableAttacker(t *testing.T) {
     loop.tick()
     require.Zero(t, loop.target, "no fight with an unwinnable attacker")
     require.Empty(t, game.forces)
-    require.Len(t, game.walks, 1, "the standard escape leg runs")
+    require.Len(t, game.walks, 1, "the standard escape segment runs")
     require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[0])
     require.False(t, loop.fleeSince.IsZero(),
         "the flee episode is armed with its logout budget")

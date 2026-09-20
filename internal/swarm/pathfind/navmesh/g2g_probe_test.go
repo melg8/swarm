@@ -7,7 +7,7 @@ import (
     "github.com/stretchr/testify/require"
 )
 
-// TestGludioToGiranOneShot probes the road leg Gludio -> Giran (the
+// TestGludioToGiranOneShot probes the road segment Gludio -> Giran (the
 // land route around the inner bay).
 func TestGludioToGiranOneShot(t *testing.T) {
     dir := "../../../../data/navmesh"

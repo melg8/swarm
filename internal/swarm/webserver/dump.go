@@ -372,15 +372,15 @@ func writeDumpObjects(b *strings.Builder, snap state.Snapshot) {
 }
 
 // writeDumpWalkPlan writes the active walk plan of the hunt loop: the
-// whole leg from the planning origin (where we wanted to go from) to
+// whole segment from the planning origin (where we wanted to go from) to
 // the final destination (where we want to arrive), with every passed
 // waypoint marked, the per waypoint timing (when the follower reached
-// it and how long the leg took - a point the bot dawdles on shows its
+// it and how long the segment took - a point the bot dawdles on shows its
 // cost right on the line) and the waypoint the follower currently
 // aims at emphasized with its walking time - a stuck or drifting walk
 // reads at a glance. When the live plan is already gone (the walk
 // arrived, timed out or the loop left the phase), the most recent
-// plan prints instead - the report of a stuck leg needs the whole
+// plan prints instead - the report of a stuck segment needs the whole
 // planned walk even when the walk is over (the owner pathfind test
 // round: the double click plans, the bot walks, the dump names the
 // waypoint it stuck on).
@@ -408,17 +408,17 @@ func writeDumpWalkPlan(b *strings.Builder, snap state.Snapshot) {
 // writeWalkPlanSection prints one walk plan section under the given
 // header prefix: the waypoint count with the search word of the mesh
 // contract the plan answers (a plan some mesh search produced names
-// the word, the direct legs no mesh search produced name nothing),
+// the word, the direct segments no mesh search produced name nothing),
 // the follower cursor, the planning origin, the walk zero point (the
 // started line the timing suffixes read against), every waypoint with
 // the aimed one emphasized and the final destination. The timing
 // suffixes print from the observed arrival times (the walkWpAt
 // record): a passed waypoint carries its moment on the walk timeline
-// (t+) and the leg duration from the previous waypoint (or the
+// (t+) and the segment duration from the previous waypoint (or the
 // start), the aimed one carries the time the walk already spends on
-// it - the stuck leg number. The last walk plan reads the same
+// it - the stuck segment number. The last walk plan reads the same
 // suffixes against the moment the plan ended (the finished walk keeps
-// the leg durations, an unfinished one shows how long the follower
+// the segment durations, an unfinished one shows how long the follower
 // sat on the waypoint it never confirmed).
 func writeWalkPlanSection(
     b *strings.Builder, headerPrefix string,
@@ -487,8 +487,8 @@ func writeWalkPlanSection(
 }
 
 // walkPassedSuffix renders the timing suffix of a passed waypoint
-// line: ", t+12.4s, leg 5.2s" - the moment the follower reached the
-// waypoint on the walk timeline and the duration of the leg that
+// line: ", t+12.4s, segment 5.2s" - the moment the follower reached the
+// waypoint on the walk timeline and the duration of the segment that
 // ended there. An empty string keeps the plain line when the walk
 // carries no timing view (an arrival was never observed - the zero
 // entries of the record, or a plan older than the timing tracking).
@@ -496,19 +496,19 @@ func walkPassedSuffix(start time.Time, wpAt []time.Time, i int) string {
     if start.IsZero() || i >= len(wpAt) || wpAt[i].IsZero() {
         return ""
     }
-    legStart := start
+    segmentStart := start
     if i > 0 && !wpAt[i-1].IsZero() {
-        legStart = wpAt[i-1]
+        segmentStart = wpAt[i-1]
     }
 
-    return fmt.Sprintf(", t+%s, leg %s",
-        walkDur(wpAt[i].Sub(start)), walkDur(wpAt[i].Sub(legStart)))
+    return fmt.Sprintf(", t+%s, segment %s",
+        walkDur(wpAt[i].Sub(start)), walkDur(wpAt[i].Sub(segmentStart)))
 }
 
 // walkTargetSuffix renders the timing suffix of the aimed waypoint
 // line: " (walking 45.2s)" - the time the walk already spends on
-// the leg that has not confirmed its arrival yet, the stuck number
-// of a dawdling point. The leg opened at the previous waypoint's
+// the segment that has not confirmed its arrival yet, the stuck number
+// of a dawdling point. The segment opened at the previous waypoint's
 // arrival (or the walk start); the live plan measures up to now,
 // the ended one up to the moment the plan was last seen alive.
 func walkTargetSuffix(
@@ -517,19 +517,19 @@ func walkTargetSuffix(
     if start.IsZero() {
         return ""
     }
-    legStart := start
+    segmentStart := start
     if i > 0 && i-1 < len(wpAt) && !wpAt[i-1].IsZero() {
-        legStart = wpAt[i-1]
+        segmentStart = wpAt[i-1]
     }
     end := time.Now()
     if !at.IsZero() && at.Before(end) {
         end = at
     }
-    if !end.After(legStart) {
+    if !end.After(segmentStart) {
         return ""
     }
 
-    return fmt.Sprintf(" (walking %s)", walkDur(end.Sub(legStart)))
+    return fmt.Sprintf(" (walking %s)", walkDur(end.Sub(segmentStart)))
 }
 
 // walkDur renders one walk timing: sub minute durations keep the

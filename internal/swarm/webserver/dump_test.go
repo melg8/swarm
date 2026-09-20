@@ -61,14 +61,14 @@ func TestBotDumpEndpoint(t *testing.T) {
     // The objects around, the walk plan and the zone. The passed
     // waypoint carries its timing suffix (the plan published with the
     // cursor already past it pre-fills the arrival with the publish
-    // moment - the zero legs of a mid walk publish).
+    // moment - the zero segments of a mid walk publish).
     require.Contains(t, report, "Keltir")
     require.Contains(t, report,
         "walk plan (2 waypoints, aiming at wp 1):")
     require.Contains(t, report, "  from 45800 41700 -3500")
     require.Contains(t, report, "  started ")
     require.Contains(t, report,
-        "wp 0: 46000 41600 -3500 (passed, t+0.0s, leg 0.0s)")
+        "wp 0: 46000 41600 -3500 (passed, t+0.0s, segment 0.0s)")
     require.Contains(t, report, "wp 1: 46112 41500 -3510  <-- TARGET")
     require.Contains(t, report, "  dest 46150 41480 -3512")
     require.Contains(t, report, "hunting zone: center 46112 41500, half 450")
@@ -81,7 +81,7 @@ func TestBotDumpEndpoint(t *testing.T) {
 // TestWalkPlanSectionSearchWord pins the search word of the walk
 // plan header (the repro contract of the 3D pathfind link): a mesh
 // plan names the word (the priced search needs no filter name) so
-// the report names the search the link replays, the direct legs (no
+// the report names the search the link replays, the direct segments (no
 // mesh search) keep the bare header.
 func TestWalkPlanSectionSearchWord(t *testing.T) {
     paths := []state.WalkPoint{{X: 1, Y: 2, Z: 3}}
@@ -108,10 +108,10 @@ func TestWalkPlanSectionSearchWord(t *testing.T) {
 
 // TestWalkPlanSectionTiming pins the timing suffixes of the walk
 // plan section: a passed waypoint prints its moment on the walk
-// timeline (t+) and the leg duration that ended there, the aimed one
+// timeline (t+) and the segment duration that ended there, the aimed one
 // prints the time the walk already spends on it (the stuck number),
 // the future ones stay plain, and the sub minute precision folds
-// into the minute shape for the long legs.
+// into the minute shape for the long segments.
 func TestWalkPlanSectionTiming(t *testing.T) {
     now := time.Now()
     start := now.Add(-90 * time.Second)
@@ -140,16 +140,16 @@ func TestWalkPlanSectionTiming(t *testing.T) {
     require.Contains(t, report, ", last seen ")
     require.Contains(t, report, " on the walk\n")
     require.Contains(t, report,
-        "wp 0: 1 2 3 (passed, t+10.4s, leg 10.4s)")
+        "wp 0: 1 2 3 (passed, t+10.4s, segment 10.4s)")
     require.Contains(t, report,
-        "wp 1: 4 5 6 (passed, t+30.2s, leg 19.8s)")
+        "wp 1: 4 5 6 (passed, t+30.2s, segment 19.8s)")
     // The aimed waypoint measures to the moment the plan was last
     // seen alive: (now-5s) - (start+30.2s) = 54.8s.
     require.Contains(t, report, "wp 2: 7 8 9  <-- TARGET (walking 54.8s)")
     require.Contains(t, report, "wp 3: 10 11 12\n",
         "the future waypoints stay plain")
 
-    // The long legs fold into the minute shape.
+    // The long segments fold into the minute shape.
     longStart := now.Add(-3 * time.Minute)
     b.Reset()
     writeWalkPlanSection(&b, "walk plan (",
@@ -159,7 +159,7 @@ func TestWalkPlanSectionTiming(t *testing.T) {
         []time.Time{longStart.Add(65300 * time.Millisecond), {}})
     report = b.String()
     require.Contains(t, report,
-        "wp 0: 1 2 3 (passed, t+1m5s, leg 1m5s)")
+        "wp 0: 1 2 3 (passed, t+1m5s, segment 1m5s)")
     require.Contains(t, report, "<-- TARGET (walking 1m54s)")
 }
 
@@ -247,7 +247,7 @@ func TestDumpSlotNames(t *testing.T) {
 // farming without its legs armor (the 2026-09-12 04:58 pantsless
 // report) read as a fine outfit - the empty families now name
 // themselves below the worn pieces. The two hand weapon blocks the
-// left hand and the one-piece armor the legs, and a half-filled
+// left hand and the one-piece armor the segments, and a half-filled
 // pair names its empty half.
 func TestDumpEmptySlots(t *testing.T) {
     bot := state.NewBot("acc1")
@@ -274,7 +274,7 @@ func TestDumpEmptySlots(t *testing.T) {
 
 // TestDumpEmptySlotsBlockers pins the family blockers: a two hand
 // weapon fills the right hand and blocks the left hand, a one-piece
-// armor fills the chest and blocks the legs - neither names the
+// armor fills the chest and blocks the segments - neither names the
 // blocked slot a hole.
 func TestDumpEmptySlotsBlockers(t *testing.T) {
     bot := state.NewBot("acc1")

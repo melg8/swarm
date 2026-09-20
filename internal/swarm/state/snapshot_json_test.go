@@ -391,7 +391,7 @@ func TestSnapshotJSONRoundTrip(t *testing.T) {
 // TestSnapshotJSONWalkSearchField pins the wire encoding of the walk
 // plan search contract (the repro contract of the 3D pathfind link):
 // the populated view rides as the approach/avoid object, the nil
-// contract of the direct legs stays null.
+// contract of the direct segments stays null.
 func TestSnapshotJSONWalkSearchField(t *testing.T) {
     snapshot := goldenSnapshot()
     data, err := json.Marshal(snapshot)

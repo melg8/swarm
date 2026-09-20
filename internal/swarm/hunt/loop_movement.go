@@ -25,10 +25,10 @@ import (
 // character stands, and standing still until luck walks a mob
 // into the radius stalls the hunt (the zone rotation only fires
 // on a fully empty square, a far pack keeps it armed). One paced
-// leg at a time - the per second target search of the engage
-// picks up any mob the leg comes past, so the character engages
+// segment at a time - the per second target search of the engage
+// picks up any mob the segment comes past, so the character engages
 // the moment something valid enters the radius. The cell mode
-// drops the fence entirely (see pickZone): the leg walks toward
+// drops the fence entirely (see pickZone): the segment walks toward
 // the nearest VISIBLE enemy wherever it stands - toward the zone
 // that holds the enemies, never into an enemy-less one. Reports
 // whether the tick was handled (a far target exists); without one
@@ -73,8 +73,8 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
     moveX, moveY := pick.X, pick.Y
     dx := float64(pick.X - selfX)
     dy := float64(pick.Y - selfY)
-    if dist > returnWalkLeg {
-        frac := returnWalkLeg / dist
+    if dist > returnWalkSegment {
+        frac := returnWalkSegment / dist
         moveX = int32(float64(selfX) + dx*frac)
         moveY = int32(float64(selfY) + dy*frac)
     }
@@ -142,9 +142,9 @@ func (l *Loop) logWeaponWait(now time.Time) {
 
 // patrolToCenter walks a targetless hunter toward the zone center:
 // the pack moved on or the social fence keeps the camps out of
-// reach, and standing still waits for luck. One paced leg at a
+// reach, and standing still waits for luck. One paced segment at a
 // time, so the per second target search of the engage picks up
-// any mob the leg comes past - the character engages the moment
+// any mob the segment comes past - the character engages the moment
 // something valid enters the radius instead of marching to the
 // center first.
 func (l *Loop) patrolToCenter(now time.Time) {
@@ -172,7 +172,7 @@ func (l *Loop) patrolToCenter(now time.Time) {
         return
     }
     l.lastHit = now
-    l.walkZoneLeg(zone, selfX, selfY, selfZ, now)
+    l.walkZoneSegment(zone, selfX, selfY, selfZ, now)
 }
 
 // adoptOutZoneFight keeps the fight that crossed the hunting zone
@@ -193,7 +193,7 @@ func (l *Loop) adoptOutZoneFight(now time.Time) bool {
     // The road budget: the aggressive territory on the walk home
     // feeds a fresh attacker every respawn window - adopting each
     // one holds the character on the road forever (the 2026-09-11
-    // 08:04 parallel round: the farm leg timed out on the road
+    // 08:04 parallel round: the farm segment timed out on the road
     // fights, the walk home never resumed). Past the budget no new
     // fight starts: the walk home continues through the blows, the
     // flee flow above owns the hurt case and the mobs leash back
@@ -241,7 +241,7 @@ func (l *Loop) adoptOutZoneFight(now time.Time) bool {
 }
 
 // holdZoneReturn parks the budget-burned return: the walk holds
-// instead of marching the direct legs toward the zone (the owner rule
+// instead of marching the direct segments toward the zone (the owner rule
 // of the 2026-09-19 round: ТОЛЬКО идти по маршрутам и НИКОГДА не идти
 // напрямую). One fresh planning cycle arms per backoff window - the
 // counter resets with the paced log line, so the next returnToZone
@@ -249,10 +249,10 @@ func (l *Loop) adoptOutZoneFight(now time.Time) bool {
 // (widened by every failed trip) keep reshaping the routes it may
 // answer.
 func (l *Loop) holdZoneReturn(now time.Time) {
-    if now.Sub(l.zoneLegLogAt) >= noPickLogPeriod {
-        l.zoneLegLogAt = now
+    if now.Sub(l.zoneSegmentLogAt) >= noPickLogPeriod {
+        l.zoneSegmentLogAt = now
         l.logf("Hunt: %d zone returns found no walkable route, "+
-            "holding the return instead of the direct legs",
+            "holding the return instead of the direct segments",
             l.zoneFails)
         l.zoneFails = 0
     }
@@ -262,11 +262,11 @@ func (l *Loop) holdZoneReturn(now time.Time) {
 // geodata waypoints: a village respawn after death or a deleveling guard
 // post sits behind the village walls, and a direct walk bumps into them,
 // so the return is planned with the pathfinder and followed by the town
-// trip waypoint machinery (leg splitting, passed waypoint skipping, stuck
+// trip waypoint machinery (segment splitting, passed waypoint skipping, stuck
 // re-pathing) through phaseTownReturn. The remembered farm spot is the
 // destination when one exists, the zone center otherwise. A return whose
 // budget burned or whose planning failed HOLDS the walk (the paced log
-// names it): the direct legs toward the zone are the march the owner
+// names it): the direct segments toward the zone are the march the owner
 // forbade - only the deployments without a route planner keep them (the
 // whole return machinery there is). The return needs a standing
 // character: the server refuses every move request while it sits (the
@@ -294,8 +294,8 @@ func (l *Loop) returnToZone() {
     l.clearBlindRecovery()
     l.lootID = 0
     if l.zoneReturn && l.phase == phaseEngage {
-        // The previous pathfound return leg ended without reaching
-        // the zone (a stuck walk aborts the leg): count the failure
+        // The previous pathfound return segment ended without reaching
+        // the zone (a stuck walk aborts the segment): count the failure
         // and stop planning past the budget.
         l.zoneFails++
     }
@@ -306,10 +306,10 @@ func (l *Loop) returnToZone() {
     if (l.navigator == nil) || l.zoneFails >= zoneReturnFailBudget {
         l.phase = phaseEngage
         if l.navigator == nil {
-            // No geodata: the direct short legs are the whole return
+            // No geodata: the direct short segments are the whole return
             // machinery there is (the legacy deployment without a
             // route planner - nothing exists to follow instead).
-            l.walkZoneLeg(zone, selfX, selfY, selfZ, now)
+            l.walkZoneSegment(zone, selfX, selfY, selfZ, now)
 
             return
         }
@@ -321,21 +321,21 @@ func (l *Loop) returnToZone() {
     l.tripStart = time.Now()
     l.rePaths = 0
     l.phase = phaseTownReturn
-    l.legRadius = tripApproachRadius
-    if !l.startZoneReturnLeg(dest) {
+    l.segmentRadius = tripApproachRadius
+    if !l.startZoneReturnSegment(dest) {
         // The planner owns no route to the zone at all (both searches
         // failed): the return holds instead of marching the direct
-        // legs toward the zone (the owner rule of the 2026-09-19
+        // segments toward the zone (the owner rule of the 2026-09-19
         // round: НИКОГДА не идти напрямую). The paced line explains
         // the standing hunter in the state dump; the next returnToZone
         // re-plans (a failed trip's bans may have reshaped the answer
         // by then).
         l.phase = phaseEngage
         l.zoneFails++
-        if now.Sub(l.zoneLegLogAt) >= noPickLogPeriod {
-            l.zoneLegLogAt = now
+        if now.Sub(l.zoneSegmentLogAt) >= noPickLogPeriod {
+            l.zoneSegmentLogAt = now
             l.logf("Hunt: no route to %d %d, holding the zone return "+
-                "instead of the direct legs", int(dest.X), int(dest.Y))
+                "instead of the direct segments", int(dest.X), int(dest.Y))
         }
 
         return
@@ -395,49 +395,49 @@ func (l *Loop) zoneReturnDestination(
     return dest
 }
 
-// walkZoneLeg walks one direct short leg toward the zone center: the
-// pacing leg of the in-zone targetless patrol and the whole return
+// walkZoneSegment walks one direct short segment toward the zone center: the
+// pacing segment of the in-zone targetless patrol and the whole return
 // machinery of the deployments without a route planner (the owner
 // rule of the 2026-09-19 round keeps it out of the pathfound return:
-// a session with a navigator walks ROUTES only, the direct legs are
-// gone from its ladder). The leg length respects the server move
+// a session with a navigator walks ROUTES only, the direct segments are
+// gone from its ladder). The segment length respects the server move
 // request limit (9900 units) and the walk rate limits itself through
-// the select pacing. The aggro-aware steering bends the leg around
+// the select pacing. The aggro-aware steering bends the segment around
 // the idle aggressive camps sitting on its line (see loop_avoid.go) -
 // the mobs at the zone center itself stay exempt: the ground the
 // patrol deliberately enters carries its own prey. The click guard
-// runs before the request: a leg the server would cancel never moves
-// the character, so a refused leg re-arms the pathfound return
-// instead of grinding refused clicks forever (see guardZoneLegClick).
-// The no-movement stall of noteZoneLegStall runs first: legs the
+// runs before the request: a segment the server would cancel never moves
+// the character, so a refused segment re-arms the pathfound return
+// instead of grinding refused clicks forever (see guardZoneSegmentClick).
+// The no-movement stall of noteZoneSegmentStall runs first: segments the
 // offline guard blessed but the server silently refuses (a wall the
 // geodata pack does not model) grind nothing forever without it - the
 // terminal freeze of the 2026-09-14 08:42 dump, whose bot stood at
-// the village terrace clicking the collapsed southwest leg once a
+// the village terrace clicking the collapsed southwest segment once a
 // second with no stuck window, no abort and no log line left to see.
-func (l *Loop) walkZoneLeg(
+func (l *Loop) walkZoneSegment(
     zone *state.Zone, selfX int32, selfY int32, selfZ int32, now time.Time,
 ) {
-    // The move start fast path of the direct zone legs: a leg click
+    // The move start fast path of the direct zone segments: a segment click
     // sent after the stall baseline whose movement never started (no
     // broadcast, no position change) backdates the stall window so
-    // noteZoneLegStall fires this tick - the dead click re-discovers
+    // noteZoneSegmentStall fires this tick - the dead click re-discovers
     // itself in seconds instead of standing out the full stuck
     // timeout (the owner rule of the 2026-09-19 round).
-    if !l.moveAt.IsZero() && l.moveAt.After(l.zoneLegAt) &&
-        selfX == l.zoneLegX && selfY == l.zoneLegY &&
+    if !l.moveAt.IsZero() && l.moveAt.After(l.zoneSegmentAt) &&
+        selfX == l.zoneSegmentX && selfY == l.zoneSegmentY &&
         !l.tracker.SelfWalking() &&
         now.Sub(l.moveAt) >= moveStartWindow {
-        l.zoneLegAt = now.Add(-stuckTimeout)
+        l.zoneSegmentAt = now.Add(-stuckTimeout)
     }
-    if l.noteZoneLegStall(now, selfX, selfY) {
+    if l.noteZoneSegmentStall(now, selfX, selfY) {
         return
     }
     moveX, moveY := zone.CX, zone.CY
     dx := float64(zone.CX - selfX)
     dy := float64(zone.CY - selfY)
-    if dist := math.Hypot(dx, dy); dist > returnWalkLeg {
-        frac := returnWalkLeg / dist
+    if dist := math.Hypot(dx, dy); dist > returnWalkSegment {
+        frac := returnWalkSegment / dist
         moveX = int32(float64(selfX) + dx*frac)
         moveY = int32(float64(selfY) + dy*frac)
     }
@@ -446,13 +446,13 @@ func (l *Loop) walkZoneLeg(
         now); dodged {
         moveX, moveY = ax, ay
     }
-    if !l.guardZoneLegClick(selfX, selfY, selfZ, moveX, moveY) {
+    if !l.guardZoneSegmentClick(selfX, selfY, selfZ, moveX, moveY) {
         return
     }
     // The click timestamp lands in the shared moveAt slot so the
-    // online refusal evidence correlates the zone legs with the
+    // online refusal evidence correlates the zone segments with the
     // ActionFailed answers the same way it correlates the town walk
-    // clicks (see refusalEvidence): without it the legs bypass the
+    // clicks (see refusalEvidence): without it the segments bypass the
     // channel and a server that refuses them reads as a plain
     // freeze.
     l.moveAt = now
@@ -461,41 +461,42 @@ func (l *Loop) walkZoneLeg(
     }
 }
 
-// noteZoneLegStall watches the direct zone legs for the freeze the
+// noteZoneSegmentStall watches the direct zone segments for the freeze the
 // offline click guard cannot see: a server wall the geodata pack does
 // not model passes the ValidateClick port, the click goes out and the
 // server silently cancels it - the character never moves a cell while
-// the legs keep going out once a second (the terminal state of the
+// the segments keep going out once a second (the terminal state of the
 // 2026-09-14 08:42 dump: after three aborted zone return trips the
-// budget-gated direct legs ground against the village railing forever
-// with no detector left). The window baselines on the first leg send,
+// budget-gated direct segments ground against the village railing forever
+// with no detector left). The window baselines on the first segment send,
 // re-baselines on every cell change and fires when the position holds
 // past the stuck timeout: the stall re-arms the pathfound zone return
 // (the zone return fail budget clears, the same recovery the offline
-// refusal of guardZoneLegClick arms) so the next tick plans a fresh
+// refusal of guardZoneSegmentClick arms) so the next tick plans a fresh
 // geodata route - whose frozen corridor ban the ladder keeps widening
 // (see banFrozenCorridor), so every stall window buys a different
 // route instead of reproducing the identical frozen one. It reports
 // whether the stall fired (the caller holds the click of this tick).
-func (l *Loop) noteZoneLegStall(
+func (l *Loop) noteZoneSegmentStall(
     now time.Time, selfX int32, selfY int32,
 ) bool {
     if l.navigator == nil {
-        // No geodata: the direct legs are the whole return machinery,
+        // No geodata: the direct segments are the whole return machinery,
         // the pathfound re-arm the stall arms has nothing to plan.
         return false
     }
-    if l.zoneLegAt.IsZero() || selfX != l.zoneLegX || selfY != l.zoneLegY {
-        l.zoneLegAt, l.zoneLegX, l.zoneLegY = now, selfX, selfY
+    if l.zoneSegmentAt.IsZero() || selfX != l.zoneSegmentX ||
+        selfY != l.zoneSegmentY {
+        l.zoneSegmentAt, l.zoneSegmentX, l.zoneSegmentY = now, selfX, selfY
 
         return false
     }
-    held := now.Sub(l.zoneLegAt)
+    held := now.Sub(l.zoneSegmentAt)
     if held < stuckTimeout {
         return false
     }
     // The refusal answer separates the two stall families: without
-    // it the legs froze mid corridor (the re-arm below answers -
+    // it the segments froze mid corridor (the re-arm below answers -
     // the fresh geodata route widens the bans). With it the server
     // refused the click itself, and the answer splits once more by
     // the ground covered since the last refusal stall: a character
@@ -508,10 +509,10 @@ func (l *Loop) noteZoneLegStall(
     // the pathfound return every 15 s for seven minutes on a server
     // that refused every click).
     if l.refusalEvidence() {
-        l.zoneLegAt = time.Time{}
+        l.zoneSegmentAt = time.Time{}
         if selfX == l.zoneRefusalX && selfY == l.zoneRefusalY {
             l.zoneFails = zoneReturnFailBudget
-            l.logf("Hunt: the direct zone legs moved nothing for %s "+
+            l.logf("Hunt: the direct zone segments moved nothing for %s "+
                 "at %d %d and the server refused the clicks, "+
                 "holding the return backoff",
                 held.Round(time.Second), selfX, selfY)
@@ -520,15 +521,15 @@ func (l *Loop) noteZoneLegStall(
         }
         l.zoneRefusalX, l.zoneRefusalY = selfX, selfY
         l.zoneFails = 0
-        l.logf("Hunt: the direct zone legs moved nothing for %s at "+
+        l.logf("Hunt: the direct zone segments moved nothing for %s at "+
             "%d %d and the server refused the clicks, re-arming "+
             "the pathfound return",
             held.Round(time.Second), selfX, selfY)
 
         return true
     }
-    l.zoneLegAt = time.Time{}
-    l.logf("Hunt: the direct zone legs moved nothing for %s at %d %d, "+
+    l.zoneSegmentAt = time.Time{}
+    l.logf("Hunt: the direct zone segments moved nothing for %s at %d %d, "+
         "re-arming the pathfound return",
         held.Round(time.Second), selfX, selfY)
     l.zoneFails = 0
@@ -536,23 +537,23 @@ func (l *Loop) noteZoneLegStall(
     return true
 }
 
-// guardZoneLegClick validates one direct zone leg through the server
+// guardZoneSegmentClick validates one direct zone segment through the server
 // click port (Navigator.ValidateClick) and reports whether the request
 // may be sent. A click the server would cancel never moves the
 // character - the geodata correction collapses its target onto the
 // walker cell (the village walls, the deck edges), the answer is a
 // silent ActionFailed and the character freezes - so the escalation
-// to the direct legs must not send it: the refusal re-arms the
+// to the direct segments must not send it: the refusal re-arms the
 // pathfound zone return instead (zoneFails back under the escalation
 // budget, the next returnToZone plans a fresh geodata route whose
 // first click the offline probe validates before it leaves) and the
 // paced log line explains the standing hunter in the state dump (the
 // 2026-09-12 01:50 report: the post-abort escalation clicked the same
-// collapsed southwest leg of the elven village street for over an
+// collapsed southwest segment of the elven village street for over an
 // hour without a single event or a single cell of movement). Without
 // a navigator there is nothing to validate with: the legacy behavior
 // stands and the click goes out as it always did.
-func (l *Loop) guardZoneLegClick(
+func (l *Loop) guardZoneSegmentClick(
     selfX int32, selfY int32, selfZ int32, moveX int32, moveY int32,
 ) bool {
     if l.navigator == nil {
@@ -571,9 +572,9 @@ func (l *Loop) guardZoneLegClick(
         l.zoneFails = 0
     }
     now := time.Now()
-    if now.Sub(l.zoneLegLogAt) >= noPickLogPeriod {
-        l.zoneLegLogAt = now
-        l.logf("Hunt: the direct zone leg to %d %d is walled, "+
+    if now.Sub(l.zoneSegmentLogAt) >= noPickLogPeriod {
+        l.zoneSegmentLogAt = now
+        l.logf("Hunt: the direct zone segment to %d %d is walled, "+
             "re-arming the pathfound return", moveX, moveY)
     }
 

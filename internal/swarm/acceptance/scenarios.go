@@ -68,7 +68,7 @@ const gearGapTimeout = 15 * time.Minute
 
 // buildingEntryTimeout bounds the trainer hall entry scenario: the
 // weapon run town round - the weapon, the armor, the jewels, the
-// spellbooks and the teacher leg into the hall - measured ~2.2
+// spellbooks and the teacher segment into the hall - measured ~2.2
 // minutes on the live stack run (the dump's own town visit), the
 // bound leaves room for the walk retries and the aggressive road
 // mobs of the village surroundings.
@@ -156,7 +156,7 @@ func Definitions() []TestDef {
                 "Flow: the manual walk command aims the temple interior " +
                 "cell (44718 52291 -2792) 40 units from the hierarch " +
                 "Asterios, the hunt loop (manual only mode) plans the " +
-                "route and clicks the legs, the way the owner drives " +
+                "route and clicks the segments, the way the owner drives " +
                 "the map walks. Pass: the character leaves the plaza, " +
                 "crosses the temple entrance and stands on the interior " +
                 "cell within the NPC ring (the report held the character " +
@@ -206,7 +206,7 @@ func Definitions() []TestDef {
                 "arrows and the hunting bow in the bag. Flow: the bot " +
                 "walks itself out of the village - the walk plans the " +
                 "geodata route through the village streets, the follower " +
-                "clicks its legs and the stuck recovery (the varied aim, " +
+                "clicks its segments and the stuck recovery (the varied aim, " +
                 "the corridor detours, the server routed hops) owns every " +
                 "refused click along the way. Pass: the character stands " +
                 "outside the city - 3000+ units from the village plaza, " +
@@ -404,8 +404,8 @@ func Definitions() []TestDef {
                 "empty inventory, exactly the state the dump's town visit " +
                 "began from. Flow: the weapon run trip arms at once, buys " +
                 "the gear and the spellbooks across the village merchants " +
-                "and then walks the teacher leg from the last stop through " +
-                "the building entrance right up to the class master Ellenia " +
+                "and then walks the teacher segment from the last stop " +
+                "through the building entrance right up to the class master " +
                 "inside the hall, and the lessons begin. Pass: the character " +
                 "stands within the interaction distance of Ellenia and at " +
                 "least one lesson consumed SP (the dump freeze held the " +
@@ -446,11 +446,11 @@ func Definitions() []TestDef {
                 "dump (38344 46248 -3592, the Spore Fungus SW ground) " +
                 "as the level 14 character test2 of the report with " +
                 "the exact paperdoll it carried - every slot filled " +
-                "EXCEPT the legs (the town trip had sold the piece " +
+                "EXCEPT the segments (the town trip had sold the piece " +
                 "for a replacement that never landed) - and the " +
                 "13,162 adena of the report, nothing in the bag. " +
                 "Flow: the bot picks its hunting zone, the shop " +
-                "strategy plans the legs filler against the empty " +
+                "strategy plans the segments filler against the empty " +
                 "slot and the town trip buys it. Pass: the legs slot " +
                 "of the paperdoll is dressed again (the report's bot " +
                 "farmed on without it - the round 60 gear debt fix " +

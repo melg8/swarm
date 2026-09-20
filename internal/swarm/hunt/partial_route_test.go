@@ -8,7 +8,7 @@ package hunt
 // approach search answering the closest-reachable corridor (Result
 // with Found=false and Partial set - what the navmesh hybrid serves
 // once the engine confirms the destination unreachable) plans the
-// town legs and the quest segments instead of aborting them - the
+// town segments and the quest segments instead of aborting them - the
 // walk goes toward the closest reachable point.
 
 import (
@@ -20,13 +20,13 @@ import (
     "github.com/stretchr/testify/require"
 )
 
-// TestTownLegPartialWalksClosestReachable pins the town leg planner:
+// TestTownSegmentPartialWalksClosestReachable pins the town segment planner:
 // a partial dry answer arms the waypoint follower with the
-// closest-reachable corridor - the leg plans (no abort), the
+// closest-reachable corridor - the segment plans (no abort), the
 // destination stays the requested one (the arrival checks of the
 // trip machinery answer the not-reached case through their own
 // flows), and the first follower click aims the partial corridor.
-func TestTownLegPartialWalksClosestReachable(t *testing.T) {
+func TestTownSegmentPartialWalksClosestReachable(t *testing.T) {
     loop, game, _, nav := newDelevelLoop(11)
     partial := []pathfind.Vec3{
         {X: 45000, Y: 50600, Z: -3500},
@@ -37,12 +37,12 @@ func TestTownLegPartialWalksClosestReachable(t *testing.T) {
     loop.tripStart = time.Now()
 
     dest := pathfind.Vec3{X: 45000, Y: 52000, Z: -3500}
-    require.True(t, loop.startWalkLeg(dest),
-        "the partial corridor plans the leg")
+    require.True(t, loop.startWalkSegment(dest),
+        "the partial corridor plans the segment")
     require.Equal(t, partial, loop.waypoints,
         "the follower arms on the closest-reachable waypoints")
-    require.Equal(t, dest, loop.legDest,
-        "the leg destination stays the requested one")
+    require.Equal(t, dest, loop.segmentDest,
+        "the segment destination stays the requested one")
     require.Equal(t, phaseTownWalk, loop.phase,
         "the trip walks instead of aborting")
 
@@ -116,18 +116,18 @@ func (g *movingQuestGame) WalkTo(x int32, y int32, z int32) error {
     return nil
 }
 
-// TestTownLegDryMissStillAborts pins the boundary: a bare not found
+// TestTownSegmentDryMissStillAborts pins the boundary: a bare not found
 // (no waypoints, the verdict the engine answers for a swim-only
-// destination) still refuses to plan the leg - the partial round
+// destination) still refuses to plan the segment - the partial round
 // changes the closest-reachable walk, never the reachability
 // verdict itself.
-func TestTownLegDryMissStillAborts(t *testing.T) {
+func TestTownSegmentDryMissStillAborts(t *testing.T) {
     loop, _, _, nav := newDelevelLoop(11)
     nav.miss = true
     loop.phase = phaseTownWalk
     loop.tripStart = time.Now()
 
-    require.False(t, loop.startWalkLeg(
+    require.False(t, loop.startWalkSegment(
         pathfind.Vec3{X: 45000, Y: 52000, Z: -3500}),
-        "the bare not found still aborts the leg")
+        "the bare not found still aborts the segment")
 }

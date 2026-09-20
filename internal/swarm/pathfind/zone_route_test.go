@@ -33,7 +33,7 @@ var (
     sporeZone    = Vec3{X: 36090, Y: 47434, Z: -2992}
     // The live dump position heading to the Spore Fungus SW-e1 zone:
     // the follower consumed the deck edge drop waypoint (80 units
-    // away in 2D, 920 below) and ground the long west leg into the
+    // away in 2D, 920 below) and ground the long west segment into the
     // city walls at exactly this spot.
     liveDeckStuck = Vec3{X: 42440, Y: 49032, Z: -2992}
     sporeZoneEast = Vec3{X: 32206, Y: 49064, Z: -2992}

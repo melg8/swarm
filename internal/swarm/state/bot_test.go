@@ -735,7 +735,7 @@ func TestNearestAttackableTreatsAllClanAsUniversal(t *testing.T) {
 }
 
 // TestWalkPlanPublishesAndClears pins the walk plan view of the web
-// UI and the state dump: SetWalkPlan publishes the whole leg (the
+// UI and the state dump: SetWalkPlan publishes the whole segment (the
 // origin, the waypoints, the follower cursor and the destination),
 // republishing the same plan only refreshes the lifetime without
 // churning the version, and ClearWalkPlan (or an empty plan) drops
@@ -788,14 +788,14 @@ func TestWalkPlanPublishesAndClears(t *testing.T) {
     require.Empty(t, bot.Snapshot().WalkPath)
 }
 
-// TestWalkPlanTimingTracksTheLegs pins the per waypoint timing view
+// TestWalkPlanTimingTracksTheSegments pins the per waypoint timing view
 // the state dump reads: the first publish opens the walk zero point,
 // the every tick republish of the same route with the follower cursor
 // ahead records the observed arrival of every newly passed waypoint
-// (the leg durations of the dump), an equal republish touches
+// (the segment durations of the dump), an equal republish touches
 // nothing, a fresh route restarts the view and the last walk record
 // keeps its own copy after the clear.
-func TestWalkPlanTimingTracksTheLegs(t *testing.T) {
+func TestWalkPlanTimingTracksTheSegments(t *testing.T) {
     bot := NewBot("acc1")
     bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
 
@@ -900,7 +900,7 @@ func TestWalkPlanExpires(t *testing.T) {
 // TestLastWalkPlanSurvivesTheWalk pins the post walk record of the
 // owner pathfind test round: the live plan expires with the walk
 // (the TTL, the clear), the last plan record survives it - the dump
-// of a stuck leg names the whole planned walk even when the walk is
+// of a stuck segment names the whole planned walk even when the walk is
 // already over - and the next published plan overwrites the record.
 func TestLastWalkPlanSurvivesTheWalk(t *testing.T) {
     bot := NewBot("acc1")

@@ -12,7 +12,7 @@ import (
 )
 
 // The differential pin of the map free raster: the fast line of sight
-// and the node graph oracle must answer every leg identically (the
+// and the node graph oracle must answer every segment identically (the
 // boolean and the error presence both) - the guard probes changed the
 // carrier, never the contract.
 
@@ -68,11 +68,11 @@ func losWorld(t *testing.T) (*Engine, func(float64, float64) Vec3) {
 }
 
 // TestLineOfSightFastMatchesNodes walks deterministic pseudo random
-// legs over the synthetic world and requires the fast raster and the
+// segments over the synthetic world and requires the fast raster and the
 // node oracle to agree everywhere.
 func TestLineOfSightFastMatchesNodes(t *testing.T) {
     engine, world := losWorld(t)
-    //nolint:gosec // the fixed seed makes the leg walk deterministic:
+    //nolint:gosec // the fixed seed makes the segment walk deterministic:
     // the weak generator is the point, no secret is involved.
     rng := rand.New(rand.NewSource(20260918))
     checked := 0
@@ -90,23 +90,23 @@ func TestLineOfSightFastMatchesNodes(t *testing.T) {
             DefaultMaxPassableHeight)
 
         require.Equal(t, oracleErr != nil, fastErr != nil,
-            "leg %.1f %.1f -> %.1f %.1f: the error presence differs"+
+            "segment %.1f %.1f -> %.1f %.1f: the error presence differs"+
                 " (fast %v, oracle %v)", ax, ay, bx, by, fastErr,
             oracleErr)
         require.Equal(t, oracle, fast,
-            "leg %.1f %.1f -> %.1f %.1f: the answers differ",
+            "segment %.1f %.1f -> %.1f %.1f: the answers differ",
             ax, ay, bx, by)
         checked++
     }
     require.Positive(t, checked)
 }
 
-// TestLineOfSightFastAxisLegs pins the degenerate steppings the
+// TestLineOfSightFastAxisSegments pins the degenerate steppings the
 // random walk rarely produces: the vertical, the horizontal, the
-// exact diagonal and the zero length leg.
-func TestLineOfSightFastAxisLegs(t *testing.T) {
+// exact diagonal and the zero length segment.
+func TestLineOfSightFastAxisSegments(t *testing.T) {
     engine, world := losWorld(t)
-    legs := [][2][2]float64{
+    segments := [][2][2]float64{
         {{100, 100}, {100, 190}},   // the vertical
         {{100, 100}, {190, 100}},   // the horizontal
         {{100, 100}, {190, 190}},   // the exact diagonal
@@ -114,9 +114,9 @@ func TestLineOfSightFastAxisLegs(t *testing.T) {
         {{10.5, 10.5}, {10.5, 14}}, // the short vertical
         {{10.5, 10.5}, {14, 10.5}}, // the short horizontal
     }
-    for _, leg := range legs {
-        a := world(leg[0][0], leg[0][1])
-        b := world(leg[1][0], leg[1][1])
+    for _, segment := range segments {
+        a := world(segment[0][0], segment[0][1])
+        b := world(segment[1][0], segment[1][1])
         fast, fastErr := engine.LineOfSight(a, b,
             DefaultMaxPassableHeight)
         oracle, oracleErr := engine.lineOfSightNodes(a, b,

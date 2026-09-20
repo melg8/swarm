@@ -254,7 +254,7 @@ type Result struct {
     // corridors through this flag once the engine has confirmed the
     // destination truly unreachable - the consumer can walk the
     // waypoints toward the closest reachable point instead of
-    // aborting the leg at the start position.
+    // aborting the segment at the start position.
     Partial   bool
     Aborted   bool
     Waypoints []Vec3
@@ -331,7 +331,7 @@ func (e *Engine) FindPathApproachAvoiding(
 // AvoidArea names one world patch the recovery searches route around:
 // a circle over the ground the live server refused to walk although
 // the geodata pack modeled it as open. The hunt loop derives the
-// patches from its freeze reports (the aimed waypoint of a leg whose
+// patches from its freeze reports (the aimed waypoint of a segment whose
 // re-path produced no movement at all) and keeps them for the session,
 // so every later plan detours around the frozen corridor instead of
 // re-planning the identical deterministic route into it.

@@ -23,7 +23,7 @@ var gatekeeperDialogWait = 5 * time.Second
 // lapses.
 const gatekeeperPollPeriod = 250 * time.Millisecond
 
-// DriveGatekeeperTeleport drives one leg of the H-002 gatekeeper flow:
+// DriveGatekeeperTeleport drives one segment of the H-002 gatekeeper flow:
 // the bot already stands within the interaction distance of the
 // teleporter npc. The step sends the showTeleports bypass, waits for
 // the teleport list html, finds the destination button whose label

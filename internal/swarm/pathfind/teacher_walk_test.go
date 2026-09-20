@@ -26,7 +26,7 @@ import (
 // runs PathFinding = 0, every click is a straight line validation)
 // canceled the move at the character's own position. These tests pin
 // the exact geometry of that corner against the real geodata pack.
-// teacherShopStart is the leg origin the dump walk plan carried.
+// teacherShopStart is the segment origin the dump walk plan carried.
 var teacherShopStart = Vec3{X: 44872, Y: 46936, Z: -2992}
 
 // teacherSpawn is the elven fighter teacher Ellenia.
@@ -46,7 +46,7 @@ var teacherRampFoot = Vec3{X: 46152, Y: 51640, Z: -2808}
 var teacherPlaza = Vec3{X: 45992, Y: 52040, Z: -2792}
 
 // TestTeacherRouteMatchesTheDumpPlan pins the planned route of the
-// teacher leg: the dry approach search from the shop area to Ellenia
+// teacher segment: the dry approach search from the shop area to Ellenia
 // finds the walk the dump carried, including the tight ramp steps
 // before the plaza (wp 8..10 sit 16..48 units apart).
 func TestTeacherRouteMatchesTheDumpPlan(t *testing.T) {
@@ -97,10 +97,10 @@ func TestTeacherRouteMatchesTheDumpPlan(t *testing.T) {
 // west wall of the pocket cell). The only clear line out of the
 // pocket goes south to the ramp foot, and the ramp climb opens from
 // the foot - exactly the recovery the follower gate keeps. The plaza
-// leg of the dump route no longer collapses into one straight click
+// segment of the dump route no longer collapses into one straight click
 // either: the reverse wall rule of the concurrent Round 49 refines
 // the route with intermediate waypoints there instead, so the
-// follower clicks a chain of verified short legs.
+// follower clicks a chain of verified short segments.
 func TestTeacherCornerWallBlocksTheStraightClick(t *testing.T) {
     engine := townTestEngine(t)
 
@@ -138,7 +138,7 @@ func TestTeacherCornerWallBlocksTheStraightClick(t *testing.T) {
         teacherRampTop, teacherPlaza, DefaultMaxPassableHeight)
     require.NoError(t, err)
     require.False(t, planned,
-        "the plaza leg stays split into verified steps: the reverse "+
+        "the plaza segment stays split into verified steps: the reverse "+
             "wall rule of the 2026-09-11 Round 49 keeps the straight "+
             "collapse honest")
 }

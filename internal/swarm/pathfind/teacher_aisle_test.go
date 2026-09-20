@@ -21,7 +21,7 @@ import (
 // east of the aisle has no floor layer at all, so a route may only
 // enter through the west aisle column or around the building - the
 // tests pin that every plan the search builds for Ellenia consists of
-// legs the server click validation accepts in full (the round 52
+// segments the server click validation accepts in full (the round 52
 // port), from every approach direction.
 var elleniaSpawn = Vec3{X: 45725, Y: 52105, Z: -2792}
 
@@ -46,9 +46,9 @@ var elleniaApproaches = []struct {
 // TestElleniaReachableFromEveryVillageApproach walks the dry approach
 // search from every village position to Ellenia and verifies the two
 // invariants the follower needs: the route ends within the trip
-// approach radius of the teacher, and EVERY leg of the plan is a
+// approach radius of the teacher, and EVERY segment of the plan is a
 // click the server would accept in full (the validated destination is
-// the clicked waypoint itself) - a plan of fully validated legs can
+// the clicked waypoint itself) - a plan of fully validated segments can
 // never arm the collapsed partial click that crept the dump character
 // into the dead-end pocket.
 func TestElleniaReachableFromEveryVillageApproach(t *testing.T) {
@@ -71,12 +71,12 @@ func TestElleniaReachableFromEveryVillageApproach(t *testing.T) {
                 to := result.Waypoints[i]
                 validated, ok := engine.ValidateClick(from, to)
                 require.True(t, ok,
-                    "the leg %d -> %d must survive the server validation",
+                    "the segment %d -> %d must survive the server validation",
                     i-1, i)
                 require.InDelta(t, to.X, validated.X, 1.0,
-                    "the leg %d must validate in full (no partial collapse)", i)
+                    "the segment %d must validate in full", i)
                 require.InDelta(t, to.Y, validated.Y, 1.0,
-                    "the leg %d must validate in full (no partial collapse)", i)
+                    "the segment %d must validate in full", i)
             }
         })
     }
@@ -84,7 +84,7 @@ func TestElleniaReachableFromEveryVillageApproach(t *testing.T) {
 
 // TestElleniaAisleRouteMatchesTheDumpPlan pins the exact dump walk
 // from the aisle entrance: the route must enter the building through
-// the aisle column south (the 48 unit leg the dump carried as wp 2)
+// the aisle column south (the 48 unit segment the dump carried as wp 2)
 // and cross the south hall east - the same plan the 06:19 state dump
 // shows, now verified as fully server-valid.
 func TestElleniaAisleRouteMatchesTheDumpPlan(t *testing.T) {
@@ -146,7 +146,7 @@ func TestElleniaPocketLinesRefuseTheHallClick(t *testing.T) {
 
 // The frozen corridor ban of the hunt loop recovery (the 2026-09-12
 // trainer hall aisle freeze): the session records the aimed waypoint
-// of a leg whose re-path produced no movement at all, and every later
+// of a segment whose re-path produced no movement at all, and every later
 // dry search routes around the banned patch - the deterministic
 // planner must never reproduce the identical frozen corridor.
 
@@ -156,7 +156,7 @@ func TestElleniaPocketLinesRefuseTheHallClick(t *testing.T) {
 // banned, the same search detours around the building - north over
 // the terrace, east past the hall, into the approach ring from the
 // east. The detour stays dry, ends inside the approach ring and every
-// one of its legs survives the server click validation in full (the
+// one of its segments survives the server click validation in full (the
 // follower only clicks verified lines).
 func TestAvoidingSearchDetoursAroundTheFrozenAisle(t *testing.T) {
     engine := townTestEngine(t)
@@ -184,9 +184,9 @@ func TestAvoidingSearchDetoursAroundTheFrozenAisle(t *testing.T) {
     last := result.Waypoints[len(result.Waypoints)-1]
     require.LessOrEqual(t, dist3D(last, elleniaSpawn), 200.0,
         "the detour must end inside the Ellenia approach ring")
-    // Every leg of the detour validates in full: the follower clicks
+    // Every segment of the detour validates in full: the follower clicks
     // only lines the ported server rules accept completely (the
-    // degenerate zero length legs of the duplicated plan start are
+    // degenerate zero length segments of the duplicated plan start are
     // skipped by the follower cursor, they never become clicks).
     for i := 1; i < len(result.Waypoints); i++ {
         from := result.Waypoints[i-1]
@@ -196,11 +196,11 @@ func TestAvoidingSearchDetoursAroundTheFrozenAisle(t *testing.T) {
         }
         validated, ok := engine.ValidateClick(from, to)
         require.True(t, ok,
-            "the detour leg %d must survive the server validation", i)
+            "the detour segment %d must survive the server validation", i)
         require.InDelta(t, to.X, validated.X, 1.0,
-            "the detour leg %d must validate in full (no partial collapse)", i)
+            "the detour segment %d must validate in full", i)
         require.InDelta(t, to.Y, validated.Y, 1.0,
-            "the detour leg %d must validate in full (no partial collapse)", i)
+            "the detour segment %d must validate in full", i)
     }
 }
 

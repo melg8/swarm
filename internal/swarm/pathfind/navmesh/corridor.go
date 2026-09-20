@@ -295,7 +295,7 @@ func (m *Mesh) chordWalksRegion(corridor []PolyRef, from, to funnelWp,
         return false
     }
     if filter.Guard != nil {
-        return filter.Guard.LegClear(from.pos.X, from.pos.Y,
+        return filter.Guard.SegmentClear(from.pos.X, from.pos.Y,
             from.pos.Z, to.pos.X, to.pos.Y, to.pos.Z,
             filter.WaypointClearance)
     }

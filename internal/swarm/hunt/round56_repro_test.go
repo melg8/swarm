@@ -43,7 +43,7 @@ import (
 // logged. The round 53 budget fix already stopped the abort; this
 // round removes the trap itself: the skip only jumps onto a waypoint
 // with a walkable line (nextClearWaypoint), so the recovery re-plans
-// the aisle entrance route (whose first leg - 48 units south through
+// the aisle entrance route (whose first segment - 48 units south through
 // the aisle column - the server always accepts) instead of creeping
 // into the pocket.
 const (
@@ -59,7 +59,7 @@ const (
     reproRound56ElleniaZ = int32(-2792)
 )
 
-// walkToEllenia plans the town leg from the current position to
+// walkToEllenia plans the town segment from the current position to
 // Ellenia with the real geodata and walks it with the simulated
 // server, bypassing the click pacing between the ticks. It reports
 // whether the walk completed before the deadline.
@@ -68,7 +68,7 @@ func walkToEllenia(
     game *fakeGame, sim *villageClickServer,
 ) bool {
     t.Helper()
-    require.True(t, loop.startWalkLeg(pathfind.Vec3{
+    require.True(t, loop.startWalkSegment(pathfind.Vec3{
         X: float64(reproRound56ElleniaX),
         Y: float64(reproRound56ElleniaY),
         Z: float64(reproRound56ElleniaZ),
@@ -139,7 +139,7 @@ func TestReproRound56AisleWalksToEllenia(t *testing.T) {
 // armed the east hall waypoint here - the partial clicks crept the
 // character into the dead-end pocket (44776 51992) and the pocket
 // refused the click wholesale. The gated skip must instead re-plan
-// the leg: the fresh aisle route starts with the 48 unit south click
+// the segment: the fresh aisle route starts with the 48 unit south click
 // through the aisle column, and once the freeze releases the walk
 // completes - with ZERO refused clicks (the pocket never armed) and
 // exactly one recovery re-path.
@@ -154,7 +154,7 @@ func TestReproRound56StuckSkipNeverCreepsIntoThePocket(t *testing.T) {
     loop.lastHit = time.Now().Add(-time.Minute)
     sim := &villageClickServer{engine: engine}
 
-    require.True(t, loop.startWalkLeg(pathfind.Vec3{
+    require.True(t, loop.startWalkSegment(pathfind.Vec3{
         X: float64(reproRound56ElleniaX),
         Y: float64(reproRound56ElleniaY),
         Z: float64(reproRound56ElleniaZ),
@@ -174,7 +174,7 @@ func TestReproRound56StuckSkipNeverCreepsIntoThePocket(t *testing.T) {
     // The stuck fires: no successor of the aisle plan has a walkable
     // line from the aisle entrance (the lines to the east hall cross
     // the floorless interior and the walled flank), so the skip must
-    // NOT arm them - the leg re-plans instead. The cursor returns to
+    // NOT arm them - the segment re-plans instead. The cursor returns to
     // the fresh plan's start and the character stays on the aisle
     // entrance cell, never creeping east toward the pocket.
     loop.moveAt = time.Time{}

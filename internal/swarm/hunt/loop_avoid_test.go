@@ -37,12 +37,12 @@ func avoidCampMob(bot *state.Bot, x int32, y int32) {
     })
 }
 
-// TestSteerClearDeflectsLegAroundCamp pins the core deflection: a
-// leg whose straight line runs over an idle aggressive mob bends its
+// TestSteerClearDeflectsSegmentAroundCamp pins the core deflection: a
+// segment whose straight line runs over an idle aggressive mob bends its
 // endpoint sideways, and the bent endpoint clears the on-sight
 // trigger circle of the mob (its aggro range plus the steering
 // clearance) in the planar distance the walk can control.
-func TestSteerClearDeflectsLegAroundCamp(t *testing.T) {
+func TestSteerClearDeflectsSegmentAroundCamp(t *testing.T) {
     bot := avoidSceneBot()
     avoidCampMob(bot, 45500, 50000)
     loop := NewLoop(&fakeGame{}, bot)
@@ -57,15 +57,15 @@ func TestSteerClearDeflectsLegAroundCamp(t *testing.T) {
     clearance := math.Hypot(float64(toX-45500), float64(toY-50000))
     require.GreaterOrEqual(t, clearance, 600.0)
     // The bend leaves the original line: the endpoint moved sideways,
-    // not just shortened along the leg.
+    // not just shortened along the segment.
     require.NotEqual(t, 50000, toY)
 }
 
-// TestSteerClearLeavesCleanLegAlone pins the negative: a leg whose
+// TestSteerClearLeavesCleanSegmentAlone pins the negative: a segment whose
 // line passes far beyond the trigger circle of every mob (the mob
 // 2000 units off the line) issues unchanged - the steering never
 // invents detours on clean ground.
-func TestSteerClearLeavesCleanLegAlone(t *testing.T) {
+func TestSteerClearLeavesCleanSegmentAlone(t *testing.T) {
     bot := avoidSceneBot()
     avoidCampMob(bot, 45500, 52000)
     loop := NewLoop(&fakeGame{}, bot)
@@ -80,7 +80,7 @@ func TestSteerClearLeavesCleanLegAlone(t *testing.T) {
 
 // TestSteerClearExemptsDestinationMobs pins the arrival exemption:
 // the mobs standing at the destination of the walk itself never bend
-// the leg - the ground the walk deliberately enters carries its own
+// the segment - the ground the walk deliberately enters carries its own
 // content, and passing within the aggro range on arrival is the
 // point of the walk (the engage phase answers whatever the entry
 // radius offers).
@@ -98,7 +98,7 @@ func TestSteerClearExemptsDestinationMobs(t *testing.T) {
 
 // TestSteerClearIgnoresPassiveBusyAndTargetMobs pins the threat
 // filters of the steering: a passive mob on the line never bends the
-// leg, a mob already holding a target never bends it (a chaser
+// segment, a mob already holding a target never bends it (a chaser
 // belongs to the flee machinery, a busy fighter to somebody else's
 // fight), and the current fight target of the loop drops out through
 // its id.
@@ -113,7 +113,7 @@ func TestSteerClearIgnoresPassiveBusyAndTargetMobs(t *testing.T) {
     _, _, dodged := loop.steerClearOfAggro(
         45000, 50000, -3500, 46000, 50000, -3500,
         47000, 50000, time.Now())
-    require.False(t, dodged, "a passive mob never bends the leg")
+    require.False(t, dodged, "a passive mob never bends the segment")
 
     // The busy mob: the aggressive fighter holds another object as
     // its target.
@@ -124,7 +124,7 @@ func TestSteerClearIgnoresPassiveBusyAndTargetMobs(t *testing.T) {
     _, _, dodged = loop.steerClearOfAggro(
         45000, 50000, -3500, 46000, 50000, -3500,
         47000, 50000, time.Now())
-    require.False(t, dodged, "a mob holding a target never bends the leg")
+    require.False(t, dodged, "a mob holding a target never bends the segment")
 
     // The fight target: the aggressive mob IS the target the loop
     // walks to (the forced approach of the engage).
@@ -135,7 +135,7 @@ func TestSteerClearIgnoresPassiveBusyAndTargetMobs(t *testing.T) {
     _, _, dodged = loop.steerClearOfAggro(
         45000, 50000, -3500, 46000, 50000, -3500,
         47000, 50000, time.Now())
-    require.False(t, dodged, "the current fight target never bends the leg")
+    require.False(t, dodged, "the current fight target never bends the segment")
 }
 
 // TestSteerClearLeavesAnotherDeckAlone pins the 3D trigger gate: a
@@ -165,7 +165,7 @@ func TestTownWalkSteersAroundCamp(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.phase = phaseTownReturn
-    loop.legDest = pathfind.Vec3{X: 46500, Y: 50000, Z: -3500}
+    loop.segmentDest = pathfind.Vec3{X: 46500, Y: 50000, Z: -3500}
     loop.waypoints = []pathfind.Vec3{
         {X: 46000, Y: 50000, Z: -3500},
     }
@@ -178,16 +178,16 @@ func TestTownWalkSteersAroundCamp(t *testing.T) {
     require.GreaterOrEqual(t, clearance, 600.0)
 }
 
-// TestZoneLegSteersAroundCamp pins the steering inside the direct
-// zone return leg: the fallback walk toward the zone center bends
+// TestZoneSegmentSteersAroundCamp pins the steering inside the direct
+// zone return segment: the fallback walk toward the zone center bends
 // around the camp the straight line would run over.
-func TestZoneLegSteersAroundCamp(t *testing.T) {
+func TestZoneSegmentSteersAroundCamp(t *testing.T) {
     bot := avoidSceneBot()
     avoidCampMob(bot, 45400, 50000)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     zone := &state.Zone{CX: 46500, CY: 50000, Half: 800}
-    loop.walkZoneLeg(zone, 45000, 50000, -3500, time.Now())
+    loop.walkZoneSegment(zone, 45000, 50000, -3500, time.Now())
     require.Len(t, game.walks, 1)
     walk := game.walks[0]
     require.NotEqual(t, int32(50000), walk[1])
@@ -196,10 +196,10 @@ func TestZoneLegSteersAroundCamp(t *testing.T) {
 }
 
 // TestSteerRidesTheTangentOfTheCircle pins the tangent construction:
-// a leg clipping the margin circle of a threat the character stands
+// a segment clipping the margin circle of a threat the character stands
 // OUTSIDE of bends onto the tangent ray of that circle - the issued
 // segment grazes the trigger distance without entering it, on the
-// side the original leg leaned to.
+// side the original segment leaned to.
 func TestSteerRidesTheTangentOfTheCircle(t *testing.T) {
     bot := avoidSceneBot()
     // 762 units out, north-east of the eastbound line.
@@ -221,7 +221,7 @@ func TestSteerRidesTheTangentOfTheCircle(t *testing.T) {
     cx, cy := 45000+dirX*foot, 50000+dirY*foot
     graze := math.Hypot(45700-cx, 50300-cy)
     require.InDelta(t, 600.0, graze, 1.0)
-    // The tangent rides the south side (the leg leaned south of the
+    // The tangent rides the south side (the segment leaned south of the
     // threat axis).
     require.Less(t, toY, int32(50000))
 }
@@ -280,14 +280,14 @@ func TestSteerRecedingHorizonPassesCampCleanly(t *testing.T) {
 // TestSteerUsesProjectedThreatPosition pins the moving-threat
 // handling: the scan reads the PROJECTED position of a walking mob,
 // not its stale spawn point - a camp drifting across the walk line
-// (the slow movers of the user report) bends the leg exactly like a
+// (the slow movers of the user report) bends the segment exactly like a
 // standing one, and a mob whose projected position already cleared
 // the line does not.
 func TestSteerUsesProjectedThreatPosition(t *testing.T) {
     bot := avoidSceneBot()
     // The camp spawns 500 north of the walk line - clear of it - and
     // its movement broadcast walks it south, across the line: the
-    // projected position (46500 50100) already menaces the leg end.
+    // projected position (46500 50100) already menaces the segment end.
     avoidCampMob(bot, 46500, 50500)
     bot.ApplyMovement(state.Movement{
         ObjectID: 7, X: 46500, Y: 50100, Z: -3500,
@@ -298,9 +298,9 @@ func TestSteerUsesProjectedThreatPosition(t *testing.T) {
         45000, 50000, -3500, 46000, 50000, -3500,
         48000, 50000, time.Now())
     require.True(t, dodged,
-        "the projected position across the line bends the leg")
+        "the projected position across the line bends the segment")
 
-    // The same camp never moving stays 707 units off the leg end -
+    // The same camp never moving stays 707 units off the segment end -
     // beyond the trigger margin - and never bends it.
     bot = avoidSceneBot()
     avoidCampMob(bot, 46500, 50500)
@@ -309,7 +309,7 @@ func TestSteerUsesProjectedThreatPosition(t *testing.T) {
         45000, 50000, -3500, 46000, 50000, -3500,
         48000, 50000, time.Now())
     require.False(t, dodged,
-        "a camp projected clear of the line never bends the leg")
+        "a camp projected clear of the line never bends the segment")
 }
 
 // fightingScene builds a hunting loop mid-fight: the character at

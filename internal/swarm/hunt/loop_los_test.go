@@ -30,7 +30,7 @@ func armBlindEngage(t *testing.T, bot *state.Bot, loop *Loop) {
 // TestEngageRepositionsBlindTarget pins level A of the recovery: a
 // fresh "Cannot see target." refusal on an engage that never went
 // fresh plans the geodata route to a vantage point and walks its
-// first leg at once, instead of re-requesting the refused attack (an
+// first segment at once, instead of re-requesting the refused attack (an
 // attack request would replace the walk intention server side and
 // cancel the recovery).
 func TestEngageRepositionsBlindTarget(t *testing.T) {
@@ -58,7 +58,7 @@ func TestEngageRepositionsBlindTarget(t *testing.T) {
     require.Empty(t, game.forces,
         "no attack request may fire while the reposition runs")
     require.Len(t, game.walks, 1,
-        "the first reposition leg walks on the planning tick")
+        "the first reposition segment walks on the planning tick")
     require.InDelta(t, 45300, game.walks[0][0], 1)
     require.InDelta(t, 50300, game.walks[0][1], 1)
     // The search goal sits on the vantage ring around the mob: the

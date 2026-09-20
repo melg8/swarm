@@ -430,7 +430,7 @@ func (l *Loop) handleTeacher(now time.Time) bool {
 // once the character stands on the ring (the 2026-09-12 user rule: the
 // character must walk from the building entrance right up to the
 // training npc, not talk to it through the wall from wherever the
-// geodata leg happened to end).
+// geodata segment happened to end).
 //
 // The approach walk clicks the ground at the npc approach point, not
 // at the teacher's exact cell: the server's getValidLocation walks a

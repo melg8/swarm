@@ -62,7 +62,7 @@ type CellLiveView struct {
     // cell right now.
     Occupancy int32 `json:"occupancy"`
     // KillX and KillY are the kill centroid EMA (the live focus the
-    // walk-to-cell leg uses), 0 when unknown.
+    // walk-to-cell segment uses), 0 when unknown.
     KillX int32 `json:"killX"`
     KillY int32 `json:"killY"`
 }

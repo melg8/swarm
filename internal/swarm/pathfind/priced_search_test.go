@@ -53,25 +53,25 @@ func TestPricedApproachSwimsAWideBand(t *testing.T) {
     require.True(t, result.Found, "the priced search answers the band")
     // The route crosses the water: the straight chord through the
     // band beats the land detour at the 2.3x rate (the smoothing
-    // folds the swim into one leg whose endpoints stand dry, so the
-    // crossing shows on the leg raster, not the waypoint heights).
-    wetLegs := 0
+    // folds the swim into one segment whose endpoints stand dry, so the
+    // crossing shows on the segment raster, not the waypoint heights).
+    wetSegments := 0
     for i := 1; i < len(result.Waypoints); i++ {
         crossed, err := engine.WaterCrossed(
             result.Waypoints[i-1], result.Waypoints[i])
         require.NoError(t, err)
         if crossed {
-            wetLegs++
+            wetSegments++
         }
     }
-    require.Positive(t, wetLegs,
+    require.Positive(t, wetSegments,
         "the swim across the band beats the land detour at 2.3x")
 }
 
 // TestPricedApproachDetoursANarrowBand pins the land side: a band
 // only 8 cells tall is cheaper to walk around than to swim across
 // (the 2.3x rate more than doubles the 48 cell crossing), so the
-// priced search detours it and every waypoint and every leg of the
+// priced search detours it and every waypoint and every segment of the
 // answer stays dry - the slowdown keeps the bot ashore whenever
 // running is the faster walk.
 func TestPricedApproachDetoursANarrowBand(t *testing.T) {
@@ -95,13 +95,13 @@ func TestPricedApproachDetoursANarrowBand(t *testing.T) {
         require.GreaterOrEqual(t, wp.Z, float64(WaterLevel),
             "waypoint %d must stay dry", i)
     }
-    // Every leg is a clean dry walk: the follower clicks straight
-    // along each leg without entering the water.
+    // Every segment is a clean dry walk: the follower clicks straight
+    // along each segment without entering the water.
     for i := 1; i < len(result.Waypoints); i++ {
         crossed, err := engine.WaterCrossed(
             result.Waypoints[i-1], result.Waypoints[i])
         require.NoError(t, err)
-        require.False(t, crossed, "the leg %d must stay dry", i-1)
+        require.False(t, crossed, "the segment %d must stay dry", i-1)
     }
 }
 

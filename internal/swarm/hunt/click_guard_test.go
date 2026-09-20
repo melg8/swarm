@@ -16,7 +16,7 @@ import (
 // 2026-09-10 town walk stuck report (the click to the second waypoint
 // collapsed onto the walker through the village plaza corner) - the
 // follower now gates every click through the validation port and
-// reacts to a refusal with the leg shortening, the plan bend hop and
+// reacts to a refusal with the segment shortening, the plan bend hop and
 // the re-path instead of grinding ActionFailed answers into the stuck
 // timeout.
 
@@ -43,7 +43,7 @@ func newClickGuardLoop(
         {X: 1600, Y: 1000, Z: 0},
     }
     loop.wpIndex = 0
-    loop.legDest = pathfind.Vec3{X: 1600, Y: 1000, Z: 0}
+    loop.segmentDest = pathfind.Vec3{X: 1600, Y: 1000, Z: 0}
     loop.lastHit = time.Now().Add(-time.Minute)
 
     return loop, game, nav
@@ -70,13 +70,13 @@ func TestFollowerSendsValidatedClick(t *testing.T) {
     require.Zero(t, nav.calls, "no re-plan search runs")
 }
 
-// TestFollowerRefusedClickShortensLeg pins the shortening reaction:
-// the far click refuses, the half leg validates and the follower
+// TestFollowerRefusedClickShortensSegment pins the shortening reaction:
+// the far click refuses, the half segment validates and the follower
 // sends the shortened target instead of the refused one.
-func TestFollowerRefusedClickShortensLeg(t *testing.T) {
+func TestFollowerRefusedClickShortensSegment(t *testing.T) {
     loop, game, nav := newClickGuardLoop(
         func(_, to pathfind.Vec3) (pathfind.Vec3, bool) {
-            // Refuse the full leg to the waypoint, accept the
+            // Refuse the full segment to the waypoint, accept the
             // shortened prefixes.
             if to.X >= 1500 {
                 return to, false
@@ -89,7 +89,7 @@ func TestFollowerRefusedClickShortensLeg(t *testing.T) {
         "the shortened click must be sent")
     sent := float64(game.walks[0][0])
     require.InDelta(t, 1300, sent, 1,
-        "the first shortening halves the 600 unit leg to the far goal")
+        "the first shortening halves the 600 unit segment to the far goal")
     require.Zero(t, loop.rePaths, "a shortened click needs no re-path")
     require.Zero(t, nav.calls, "no re-plan search runs")
 }
@@ -148,7 +148,7 @@ func TestFollowerRefusedClickRepathsAndAborts(t *testing.T) {
     }
     loop.wpIndex = 0
     loop.moveAt = time.Time{}
-    // The second refusal from the same cell climbs the frozen leg
+    // The second refusal from the same cell climbs the frozen segment
     // escalation ladder: the frozen corridor joins the session bans
     // and the detour re-plan runs (never the identical route again).
     follow(loop)
@@ -161,7 +161,7 @@ func TestFollowerRefusedClickRepathsAndAborts(t *testing.T) {
 
     // The third refusal from the same cell (the detour froze as well)
     // climbs to the cursor key escape along the plan: the claims
-    // transport owns the leg, the plan stays the leg's own route.
+    // transport owns the segment, the plan stays the segment's own route.
     loop.waypoints = []pathfind.Vec3{
         {X: 1000, Y: 1000, Z: 0},
         {X: 1020, Y: 1000, Z: 0},

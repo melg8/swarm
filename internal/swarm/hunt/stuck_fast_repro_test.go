@@ -34,8 +34,8 @@ import (
 //
 // Root cause: stuckTownWalk arms stuckFast = true on the WAYPOINT
 // SKIP branch (nextClearWaypoint finds a clear successor) but NOT
-// on the RE-PATH branch (no clear successor, the leg re-plans).
-// The re-path proved the plain clicks of this leg do not move the
+// on the RE-PATH branch (no clear successor, the segment re-plans).
+// The re-path proved the plain clicks of this segment do not move the
 // character - the same evidence the waypoint skip carries - so the
 // fast window belongs there too. The fix arms stuckFast and
 // re-baselines the stuck window from the re-path tick on the
@@ -90,7 +90,7 @@ func TestStuckRepathArmsFastWindow(t *testing.T) {
         Y: float64(reproFastStuckZoneY),
         Z: float64(reproFastStuckZoneZ),
     }
-    require.True(t, loop.startZoneReturnLeg(dest),
+    require.True(t, loop.startZoneReturnSegment(dest),
         "the zone return must plan the 6 waypoint route of the dump")
     require.Len(t, loop.waypoints, 6,
         "the plan matches the dump's 6 waypoint route")
@@ -177,7 +177,7 @@ func TestStuckSkipWaypointStillArmsFastWindow(t *testing.T) {
         Y: float64(reproFastStuckZoneY),
         Z: float64(reproFastStuckZoneZ),
     }
-    require.True(t, loop.startZoneReturnLeg(dest))
+    require.True(t, loop.startZoneReturnSegment(dest))
     require.Len(t, loop.waypoints, 3)
 
     // The first followWaypoints tick: the click to wp1 is refused
@@ -238,7 +238,7 @@ func TestStuckRepathRebaselinesStuckWindow(t *testing.T) {
         Y: float64(reproFastStuckZoneY),
         Z: float64(reproFastStuckZoneZ),
     }
-    require.True(t, loop.startZoneReturnLeg(dest))
+    require.True(t, loop.startZoneReturnSegment(dest))
     loop.phase = phaseTownReturn
 
     // Open the stuck window at the dump position, then advance past

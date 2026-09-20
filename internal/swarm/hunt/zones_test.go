@@ -759,7 +759,7 @@ func TestZoneSwitchDropsTheStaleFarmSpot(t *testing.T) {
     require.Equal(t, zones[0].ID, loop.zonePickedID)
 
     // The farm spot of the starter square (outside the sibling
-    // ground): a zone switch must drop it, a return leg aims at the
+    // ground): a zone switch must drop it, a return segment aims at the
     // new zone center instead of walking to the old square.
     loop.farmX, loop.farmY, loop.farmZ = 46200, 41600, -3455
     loop.stopForZoneSwitch()

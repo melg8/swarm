@@ -15,16 +15,16 @@ type Pos struct {
     X, Y, Z float64
 }
 
-// LegGuard is the wall oracle of the shortcut pass: the server
-// accurate wall question for one straight leg. The mesh wall spans
+// SegmentGuard is the wall oracle of the shortcut pass: the server
+// accurate wall question for one straight segment. The mesh wall spans
 // are the side level approximation - the grid movement validation
 // sees the per cell walls (the paired NSWE walls and the diagonal
 // anti corner cut) the rectangle sides lump together. A guard armed
 // on the filter (the grid capsule of the caller) answers every
 // shortcut chord against the authoritative raster; without one the
 // pass falls back to the mesh wall spans.
-type LegGuard interface {
-    LegClear(ax, ay, az, bx, by, bz, radius float64) bool
+type SegmentGuard interface {
+    SegmentClear(ax, ay, az, bx, by, bz, radius float64) bool
 }
 
 // WaterZone is one server water zone cuboid (the ZoneCuboid of the
@@ -95,10 +95,10 @@ type Filter struct {
     // WaypointClearance keeps the raw funnel answer.
     Smooth bool
     // Guard is the optional wall oracle of the shortcut pass (see
-    // LegGuard): when armed, every merged chord answers to it instead
+    // SegmentGuard): when armed, every merged chord answers to it instead
     // of the mesh wall spans - the grid raster is the authority the
     // side level spans approximate.
-    Guard LegGuard
+    Guard SegmentGuard
     // AvoidGrazed prices the foreign banned ground whose own portal
     // segment stays clear of the circle at avoidGrazedMultiplier
     // instead of sealing it (the route shaping contract: the ban

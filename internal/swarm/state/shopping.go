@@ -63,7 +63,7 @@ type ShoppingPlanView struct {
 // under a second), so an expired plan means the loop moved on (or
 // died) and the snapshot falls back to null like an expired walk
 // plan. The window is generous against a slow tick (a heavy geodata
-// leg) because a stale queue misleads far less than a stale walk
+// segment) because a stale queue misleads far less than a stale walk
 // line.
 const shoppingPlanTTL = 10 * time.Second
 

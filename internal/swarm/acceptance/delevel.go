@@ -68,7 +68,7 @@ const (
 const delevelProgressUnits = 2000.0
 
 // delevelReturnRadius is the arrival ring of the walk home: the
-// return leg aims at the remembered farm spot (the injection point),
+// return segment aims at the remembered farm spot (the injection point),
 // the arrival lands the character back on the dryad ground.
 const delevelReturnRadius = 1500.0
 

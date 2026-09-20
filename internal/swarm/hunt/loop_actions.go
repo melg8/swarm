@@ -189,8 +189,8 @@ func (l *Loop) killApproachWalk() bool {
     moveX, moveY := l.killX, l.killY
     dx := float64(l.killX - selfX)
     dy := float64(l.killY - selfY)
-    if dist > returnWalkLeg {
-        frac := returnWalkLeg / dist
+    if dist > returnWalkSegment {
+        frac := returnWalkSegment / dist
         moveX = int32(float64(selfX) + dx*frac)
         moveY = int32(float64(selfY) + dy*frac)
     }

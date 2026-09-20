@@ -194,7 +194,7 @@ func TestElvenScoutChainPinsTheScriptFacts(t *testing.T) {
     require.Equal(t, 100, s2.Kill.DropPercent)
     require.Equal(t, int32(4), s2.Kill.Target)
 
-    // The Prias legs: the cond 4 talk, the cond 5 sentry key (60
+    // The Prias segments: the cond 4 talk, the cond 5 sentry key (60
     // percent, one key).
     s4, ok := QuestStageByCond(chain, 4)
     require.True(t, ok)
@@ -214,7 +214,7 @@ func TestElvenScoutChainPinsTheScriptFacts(t *testing.T) {
     require.False(t, ok, "the ladder ends at cond 8")
 }
 
-// TestClassChangePinsTheScriptFacts pins the two class change legs:
+// TestClassChangePinsTheScriptFacts pins the two class change segments:
 // the master, the target class ids, the proof items and the route
 // texts of the Rains pages (30288.htm -> 11 -> 12/15 -> the change
 // links).

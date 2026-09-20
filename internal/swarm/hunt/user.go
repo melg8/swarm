@@ -421,7 +421,7 @@ func (l *Loop) tickUserMove(now time.Time) {
         // request: the map double click IS the pathfind call - the
         // planned waypoints publish into the walk plan view and the
         // state dump exactly like the bot's own planned walks, so a
-        // stuck leg reads at a glance). A failed or missing path
+        // stuck segment reads at a glance). A failed or missing path
         // falls through to the direct server routed walk.
         l.userPathTried = true
         l.planUserWalk(selfX, selfY, selfZ)
@@ -445,7 +445,7 @@ func (l *Loop) tickUserMove(now time.Time) {
 
 // planUserWalk computes the mesh path of one long manual move. The
 // exact search runs first (the owner clicked the point - the walk
-// must arrive at it): the approach ring of the NPC legs is the
+// must arrive at it): the approach ring of the NPC segments is the
 // fallback only, because the ring can catch an early corridor
 // polygon and end the plan short - the temple entrance round of the
 // owner report (the doorway polygon 147 units short of the clicked
@@ -453,8 +453,8 @@ func (l *Loop) tickUserMove(now time.Time) {
 // forever. A failed exact search (the clicked point on ground the
 // mesh does not reach) falls back to the approach corridor, a
 // missing tile or a bare not found leaves the direct server routed
-// walk. The result becomes the leg plan the follower walks one
-// server accepted leg at a time; a partial corridor (the
+// walk. The result becomes the segment plan the follower walks one
+// server accepted segment at a time; a partial corridor (the
 // destination unreachable under the filter) walks the closest
 // reachable point instead.
 func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
@@ -519,7 +519,7 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
         result.Length, result.Duration.Seconds())
 }
 
-// userLegRefused reports whether the server answered the last manual
+// userSegmentRefused reports whether the server answered the last manual
 // walk click with ActionFailed while the character stood still: the
 // same sent click attribution the town walk follower applies (see
 // refusalEvidence - the one byte refusal answer is the only online
@@ -527,7 +527,7 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
 // carries no request identity, so the correlation skips the answers
 // that belong to a non walk request sent between the click and the
 // refusal).
-func (l *Loop) userLegRefused() bool {
+func (l *Loop) userSegmentRefused() bool {
     if l.userMoveAt.IsZero() {
         return false
     }
@@ -590,7 +590,7 @@ func (l *Loop) sendUserVariedAim(
     return false
 }
 
-// beginUserCursorKeyEscape hands a refused manual leg to the cursor
+// beginUserCursorKeyEscape hands a refused manual segment to the cursor
 // key escape: the keyboard mode 0 arm plus the claimed
 // ValidatePosition stream the server follows without any click
 // validation (the 2026-09-14 15:10 report proved a server that
@@ -633,14 +633,14 @@ func (l *Loop) beginUserCursorKeyEscape(
     return true
 }
 
-// followUserWaypoints walks the planned legs of a long manual move:
-// every waypoint gets a ground click walk, legs longer than the server
+// followUserWaypoints walks the planned segments of a long manual move:
+// every waypoint gets a ground click walk, segments longer than the server
 // move limit split into straight intermediate points (the smoothing
-// keeps the line of sight of every leg), and a waypoint the character
+// keeps the line of sight of every segment), and a waypoint the character
 // already passed ON THE ROUTE skips ahead (the projection pass test of
 // the town walker - a character beside the route keeps targeting the
 // waypoint it missed). The walk ends when the last waypoint is
-// reached or the manual deadline passes; a leg that stalls (the server
+// reached or the manual deadline passes; a segment that stalls (the server
 // stopped the character short) re-issues at the walk request period.
 //
 //nolint:cyclop,funlen // the follower ladder is one linear decision train
@@ -695,14 +695,14 @@ func (l *Loop) followUserWaypoints(
         return
     }
     if l.tracker.SelfWalking() && !l.userRedirect {
-        // The current leg is running: do not restart the server path.
+        // The current segment is running: do not restart the server path.
         return
     }
     if !l.userMoveAt.IsZero() && now.Sub(l.userMoveAt) < walkRequestPeriod {
         return
     }
     // The refusal ladder of the manual walk: the server answered the
-    // last click of this leg with ActionFailed while the character
+    // last click of this segment with ActionFailed while the character
     // stood still. The plain follower re-clicked the same aim every
     // period and the same refusal bounced forever (the temple
     // entrance round: the server stopped its own walk at the door
@@ -710,10 +710,10 @@ func (l *Loop) followUserWaypoints(
     // the character stood there for the whole walk window). The
     // ladder first varies the aim (the refusal is target specific -
     // a shorter prefix or a sideways offset validates where the
-    // plain aim bounced) and hands the leg to the cursor key escape
+    // plain aim bounced) and hands the segment to the cursor key escape
     // once the variants spent: the claims walk without any click
     // validation, so the ground no click leaves is still walkable.
-    if l.userLegRefused() {
+    if l.userSegmentRefused() {
         if l.sendUserVariedAim(selfX, selfY, selfZ, now) {
             return
         }
@@ -734,11 +734,11 @@ func (l *Loop) followUserWaypoints(
     // the packs disagree about a surface's absolute height.
     wpZ := anchorZToServerFrame(wp.Z, l.userFrameOffset)
     moveX, moveY, moveZ := wp.X, wp.Y, wpZ
-    if dist > maxMoveLeg {
-        // Split the leg into a straight intermediate point: the
+    if dist > maxMoveDistance {
+        // Split the segment into a straight intermediate point: the
         // smoothing verified the whole segment, the server only
         // gets the short piece it accepts.
-        scale := maxMoveLeg / dist
+        scale := maxMoveDistance / dist
         moveX = float64(selfX) + dx*scale
         moveY = float64(selfY) + dy*scale
         moveZ = float64(selfZ) + (wpZ-float64(selfZ))*scale
@@ -752,8 +752,8 @@ func (l *Loop) followUserWaypoints(
 }
 
 // publishWalkPlan refreshes the walk plan view of the web UI: while a
-// walk runs (a manual move, a town trip leg or a deleveling guard
-// walk), the full plan of the current leg publishes - the planning
+// walk runs (a manual move, a town trip segment or a deleveling guard
+// walk), the full plan of the current segment publishes - the planning
 // origin, every planned waypoint with the follower cursor and the
 // final destination - so the map draws the planned line against the
 // live character position and the state dump reads the whole walk at
@@ -770,7 +770,7 @@ func (l *Loop) publishWalkPlan() {
     l.tracker.SetWalkPlan(*plan)
 }
 
-// activeWalkPlan returns the walk plan of the leg the loop is
+// activeWalkPlan returns the walk plan of the segment the loop is
 // currently following: the planning origin, the full waypoint list,
 // the waypoint the follower currently heads to and the final
 // destination. Returns nil when the loop is not walking a planned
@@ -826,14 +826,14 @@ func (l *Loop) userWalkPlan() *state.WalkPlan {
 }
 
 // geodataWalkPlan builds the walk plan of a town trip or a deleveling
-// guard walk: the planning origin (the position startWalkLeg planned
+// guard walk: the planning origin (the position startWalkSegment planned
 // from, the point where we wanted to go), the full waypoint list
-// (shared l.waypoints slice, l.wpIndex cursor) and the leg destination
-// last. startWalkLeg arms l.legDest with the destination it planned
+// (shared l.waypoints slice, l.wpIndex cursor) and the segment destination
+// last. startWalkSegment arms l.segmentDest with the destination it planned
 // the walk to (the merchant spawn, the farm spot, the guard spawn), so
 // the map can draw the final target even when the smoothing collapsed
 // it into the last waypoint. Returns nil when the loop is between
-// legs (no waypoints, no destination).
+// segments (no waypoints, no destination).
 func (l *Loop) geodataWalkPlan() *state.WalkPlan {
     if len(l.waypoints) == 0 {
         return nil
@@ -845,19 +845,19 @@ func (l *Loop) geodataWalkPlan() *state.WalkPlan {
         })
     }
     var origin *state.WalkPoint
-    if l.legStart.X != 0 || l.legStart.Y != 0 {
+    if l.segmentStart.X != 0 || l.segmentStart.Y != 0 {
         origin = &state.WalkPoint{
-            X: int32(l.legStart.X),
-            Y: int32(l.legStart.Y),
-            Z: int32(l.legStart.Z),
+            X: int32(l.segmentStart.X),
+            Y: int32(l.segmentStart.Y),
+            Z: int32(l.segmentStart.Z),
         }
     }
     var dest *state.WalkPoint
-    if l.legDest.X != 0 || l.legDest.Y != 0 {
+    if l.segmentDest.X != 0 || l.segmentDest.Y != 0 {
         dest = &state.WalkPoint{
-            X: int32(l.legDest.X),
-            Y: int32(l.legDest.Y),
-            Z: int32(l.legDest.Z),
+            X: int32(l.segmentDest.X),
+            Y: int32(l.segmentDest.Y),
+            Z: int32(l.segmentDest.Z),
         }
     }
 
@@ -869,15 +869,15 @@ func (l *Loop) geodataWalkPlan() *state.WalkPlan {
         // The mesh search contract rides the plan (the repro contract
         // of the 3D pathfind link); every plan of the loop is a mesh
         // answer - the walk always follows routes.
-        Search: l.publishedLegSearch(),
+        Search: l.publishedSegmentSearch(),
     }
 }
 
-// publishedLegSearch returns the search contract of the current leg:
-// the mesh answer of startWalkLegSearch carries it (every walk plan
+// publishedSegmentSearch returns the search contract of the current segment:
+// the mesh answer of startWalkSegmentSearch carries it (every walk plan
 // of the loop is a mesh answer - the walk always follows routes).
-func (l *Loop) publishedLegSearch() *state.WalkSearch {
-    return l.legSearch
+func (l *Loop) publishedSegmentSearch() *state.WalkSearch {
+    return l.segmentSearch
 }
 
 // tickUserAttack forces the attack on the clicked object until the

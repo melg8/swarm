@@ -621,7 +621,7 @@ func parseObjectLine(line string) (state.ObjectSnapshot, bool) {
 
 // parseWalkPlan reads the "walk plan (N waypoints, aiming at wp M):"
 // section, or its post walk form "last walk plan (...)" (the most
-// recent plan kept after its walk ended - the stuck leg report).
+// recent plan kept after its walk ended - the stuck segment report).
 // The last flag routes the fields into the last plan view of the
 // snapshot.
 func (p *dumpParser) parseWalkPlan(header string, last bool) error {
@@ -683,7 +683,7 @@ func (p *dumpParser) parseWalkPlan(header string, last bool) error {
 
 // parseWalkPlanSearch reads the search word of the walk plan header
 // ("N waypoints, mesh, aiming..." vs "N waypoints, aiming..."): the
-// marker of a plan some mesh search produced, nil for the direct legs
+// marker of a plan some mesh search produced, nil for the direct segments
 // no mesh search produced (the header names no word). The approach
 // radius and the ban circles ride the "search ..." line (see
 // parseWalkSearchLine).

@@ -96,10 +96,10 @@ type HuntDiagnostics struct {
     // patience before the patrol toward the zone center walks.
     NoTargetForMs int64 `json:"noTargetForMs"`
     // RePaths is the re-path count of the running walk: each entry
-    // is a stuck and re-planned leg.
+    // is a stuck and re-planned segment.
     RePaths int `json:"rePaths"`
     // StuckForMs is the time the walker stood still on the current
-    // leg (the re-path watchdog input).
+    // segment (the re-path watchdog input).
     StuckForMs int64 `json:"stuckForMs"`
     // WaypointsLeft is the count of waypoints remaining on the
     // planned walk (the manual plan, the town or delevel geodata

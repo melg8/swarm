@@ -53,7 +53,7 @@ func (d *deathEdgeTracker) deaths() int {
 }
 
 // soakRePaths reads the hunt loop re-path count from the tracker
-// diagnostics. Each re-path is a stuck-and-replanned leg, so the delta
+// diagnostics. Each re-path is a stuck-and-replanned segment, so the delta
 // over the soak window is the stuck-event metric the M1 trail
 // reports. The snapshot is a read under the tracker lock; a nil
 // engine or a not-yet-ticking loop reports zero.

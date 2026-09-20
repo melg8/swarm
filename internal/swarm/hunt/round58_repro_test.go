@@ -25,26 +25,26 @@ import (
 // village, the guard walk's first click failed the offline validation
 // from the respawn cell ("the server would refuse the walk click"),
 // the frozen re-path rule aborted the deleveling and the machinery
-// started the return leg to the farm spot - which inherited the FROZEN
-// re-path cell of the guard walk (startWalkLegSearch kept
+// started the return segment to the farm spot - which inherited the FROZEN
+// re-path cell of the guard walk (startWalkSegmentSearch kept
 // repathX/repathY), so its own first refused click ended the whole
 // trip in one second ("town trip ended: aborted, the server refuses
 // the walk click from this cell"). The abortFrozenTrip escalation
 // armed zoneFails = zoneReturnFailBudget and the engage phase fell
-// back to the direct zone legs (walkZoneLeg): every one of those
+// back to the direct zone segments (walkZoneSegment): every one of those
 // clicks aimed 1000 units southwest - straight into the walled
 // southern side of the street - the server click validation collapses
 // that line onto the walker, the move is silently canceled and the
-// character freezes. walkZoneLeg never validated its clicks, never
+// character freezes. walkZoneSegment never validated its clicks, never
 // noticed the missing movement and never logged a line: the bot ground
 // the same refused click once per second forever.
 //
 // The fix (two halves, both pinned here):
-//  1. startWalkLegSearch resets the frozen re-path cell: a fresh plan
-//     owns a fresh frozen budget, the return leg survives its first
+//  1. startWalkSegmentSearch resets the frozen re-path cell: a fresh plan
+//     owns a fresh frozen budget, the return segment survives its first
 //     refused click with a re-path like any walk.
-//  2. guardZoneLegClick validates every direct zone leg through the
-//     server click port: a refused leg is never sent, the refusal
+//  2. guardZoneSegmentClick validates every direct zone segment through the
+//     server click port: a refused segment is never sent, the refusal
 //     re-arms the pathfound zone return (zoneFails back under the
 //     budget) and the paced log line explains the standing hunter.
 const (
@@ -78,7 +78,7 @@ func TestReproRound58VillageStuckCellWalksToZone(t *testing.T) {
     loop.SetHuntingZone(reproRound58ZoneX, reproRound58ZoneY, 1448)
     loop.lastHit = time.Now().Add(-time.Minute)
     // The post-abort state of the dump: the frozen re-path aborted the
-    // return leg, abortFrozenTrip armed the fail budget and the zone
+    // return segment, abortFrozenTrip armed the fail budget and the zone
     // return flag survived the deleveling (the "back in the zone" reset
     // only runs inside the zone, which the character never reached).
     loop.zoneFails = zoneReturnFailBudget
@@ -129,11 +129,11 @@ func inZoneSquare(x, y, cx, cy, half int32) bool {
     return dx <= half && dy <= half
 }
 
-// TestReproRound58ZoneLegGuardRefusalReArmsPathfoundReturn pins the
-// guard itself: a direct zone leg the server would refuse is never
+// TestReproRound58ZoneSegmentGuardRefusalReArmsReturn pins the
+// guard itself: a direct zone segment the server would refuse is never
 // sent, the refusal re-arms the pathfound return (zoneFails back
 // under the budget) and the paced diagnostic names the wall.
-func TestReproRound58ZoneLegGuardRefusalReArmsPathfoundReturn(t *testing.T) {
+func TestReproRound58ZoneSegmentGuardRefusalReArmsReturn(t *testing.T) {
     loop, game, bot, nav := newTripLoop()
     moveSelfTo(bot, reproRound58X, reproRound58Y, reproRound58Z)
     loop.zoneCX = reproRound58ZoneX
@@ -144,34 +144,34 @@ func TestReproRound58ZoneLegGuardRefusalReArmsPathfoundReturn(t *testing.T) {
 
     zone := loop.zone()
     require.NotNil(t, zone)
-    loop.walkZoneLeg(zone, reproRound58X, reproRound58Y, reproRound58Z,
+    loop.walkZoneSegment(zone, reproRound58X, reproRound58Y, reproRound58Z,
         time.Now())
 
     require.Empty(t, game.walks,
-        "the refused direct leg is never sent to the server")
+        "the refused direct segment is never sent to the server")
     require.Zero(t, loop.zoneFails,
         "the refusal re-arms the pathfound zone return")
 
-    // The validated leg goes out as before: the guard must not silence
-    // the working direct legs of the open ground.
+    // The validated segment goes out as before: the guard must not silence
+    // the working direct segments of the open ground.
     nav.refuseClicks = false
     loop.zoneFails = zoneReturnFailBudget
-    loop.zoneLegAt = time.Time{}
-    loop.walkZoneLeg(zone, reproRound58X, reproRound58Y, reproRound58Z,
+    loop.zoneSegmentAt = time.Time{}
+    loop.walkZoneSegment(zone, reproRound58X, reproRound58Y, reproRound58Z,
         time.Now())
     require.Len(t, game.walks, 1,
-        "a validated direct leg is sent")
+        "a validated direct segment is sent")
     require.Equal(t, zoneReturnFailBudget, loop.zoneFails,
-        "a validated leg keeps the escalation state")
+        "a validated segment keeps the escalation state")
 }
 
-// TestReproRound58ReturnLegResetsFrozenRepath pins the frozen budget
-// reset: the return leg is a fresh logical unit, it never inherits the
+// TestReproRound58ReturnSegmentResetsFrozenRepath pins the frozen budget
+// reset: the return segment is a fresh logical unit, it never inherits the
 // frozen re-path cell of the guard walk that came before it, so its
 // first refused click re-paths instead of aborting the whole trip
-// instantly (the dump lost the guard walk and the return leg from the
+// instantly (the dump lost the guard walk and the return segment from the
 // same cell in one second).
-func TestReproRound58ReturnLegResetsFrozenRepath(t *testing.T) {
+func TestReproRound58ReturnSegmentResetsFrozenRepath(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     moveSelfTo(bot, reproRound58X, reproRound58Y, reproRound58Z)
     loop.zoneCX = reproRound58ZoneX
@@ -181,33 +181,33 @@ func TestReproRound58ReturnLegResetsFrozenRepath(t *testing.T) {
     loop.frozenRepaths = frozenRepathLimit
     nav.refuseClicks = true
 
-    loop.startReturnLeg()
+    loop.startReturnSegment()
 
     require.Equal(t, phaseTownReturn, loop.phase,
-        "the return leg takes over the trip")
+        "the return segment takes over the trip")
     require.Zero(t, loop.repathX)
     require.Zero(t, loop.repathY)
     require.Zero(t, loop.frozenRepaths,
-        "the return leg starts with a clean frozen budget")
+        "the return segment starts with a clean frozen budget")
 
-    // The first refused click of the fresh return leg re-paths instead
+    // The first refused click of the fresh return segment re-paths instead
     // of aborting: the inherited frozen cell is gone.
     selfX, selfY, selfZ, ok := bot.SelfPosition()
     require.True(t, ok)
     require.False(t, loop.followWaypoints(selfX, selfY, selfZ, time.Now()),
-        "the leg is not finished after one refused click")
+        "the segment is not finished after one refused click")
     require.Equal(t, 1, loop.rePaths,
         "the refused click spent one ordinary re-path")
     require.NotEmpty(t, loop.waypoints,
-        "the re-path re-planned the leg")
+        "the re-path re-planned the segment")
     require.Equal(t, phaseTownReturn, loop.phase,
-        "the leg keeps running after the refused click")
+        "the segment keeps running after the refused click")
 }
 
 // TestReproRound58DelevelAbortKeepsFrozenBudgetClean drives the abort
 // path of the dump end to end: the deleveling that dies on a frozen
-// cell hands a CLEAN frozen budget to its return leg - the abort, the
-// return leg start and the first refused click of the return leg all
+// cell hands a CLEAN frozen budget to its return segment - the abort, the
+// return segment start and the first refused click of the return segment all
 // happen in one tick sequence without the instant trip abort of the
 // report.
 func TestReproRound58DelevelAbortKeepsFrozenBudgetClean(t *testing.T) {
@@ -226,9 +226,9 @@ func TestReproRound58DelevelAbortKeepsFrozenBudgetClean(t *testing.T) {
     loop.abortDelevel("the server refuses the walk click from this cell")
 
     require.Equal(t, phaseTownReturn, loop.phase,
-        "the abort hands over to the return leg")
+        "the abort hands over to the return segment")
     require.Zero(t, loop.repathX)
     require.Zero(t, loop.repathY)
     require.Zero(t, loop.frozenRepaths,
-        "the return leg starts with a clean frozen budget")
+        "the return segment starts with a clean frozen budget")
 }

@@ -1250,7 +1250,7 @@ func newBotEngine(cfg config) *pathfind.Engine {
     }
     engine := pathfind.NewEngine(dir)
     engine.SetMaxPassableHeight(uint16(cfg.maxPassable))
-    // The capsule clearance keeps every planned waypoint and leg away
+    // The capsule clearance keeps every planned waypoint and segment
     // from the walls: the server movement validation is cell level and
     // never checks the character capsule (the elven fighter template
     // radius 7.5), so the planner owns the clearance

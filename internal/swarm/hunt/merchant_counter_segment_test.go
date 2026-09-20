@@ -41,7 +41,7 @@ const (
 // armMerchantStop arms the sell stop of the weapon merchant the way
 // the trip machinery advances into it: two stops queued, the
 // advanceTripStop drops the first and plans the second - the real
-// planning branch of the merchant legs.
+// planning branch of the merchant segments.
 func armMerchantStop(t *testing.T, loop *Loop, npc townNpc) {
     t.Helper()
     loop.phase = phaseTownWalk
@@ -61,7 +61,7 @@ func lastWaypointDistanceToAriel(
 ) (d2D float64, dz float64, d3D float64) {
     t.Helper()
     require.NotEmpty(t, loop.waypoints,
-        "the merchant leg must plan")
+        "the merchant segment must plan")
     last := loop.waypoints[len(loop.waypoints)-1]
     d2D = math.Hypot(last.X-float64(arielX), last.Y-float64(arielY))
     dz = math.Abs(last.Z - float64(arielZ))
@@ -71,8 +71,8 @@ func lastWaypointDistanceToAriel(
 }
 
 // TestMerchantStopWalksToTheCustomerCell pins the user rule on the
-// real pack and the real mesh tiles: the sell stop leg of the weapon
-// merchant plans the exact search (approach zero in the leg contract)
+// real pack and the real mesh tiles: the sell stop segment of the weapon
+// merchant plans the exact search (approach zero in the segment contract)
 // and its plan end sits at the customer cell - floor level, inside
 // the interaction distance, far inside the old wide ring stop.
 func TestMerchantStopWalksToTheCustomerCell(t *testing.T) {
@@ -88,7 +88,7 @@ func TestMerchantStopWalksToTheCustomerCell(t *testing.T) {
     armMerchantStop(t, loop, townNpc{TemplateID: 7148, Name: "Ariel",
         X: arielX, Y: arielY, Z: arielZ})
     require.Equal(t, phaseTownWalk, loop.phase,
-        "the merchant leg must plan (no trip abort)")
+        "the merchant segment must plan (no trip abort)")
     d2D, dz, d3D := lastWaypointDistanceToAriel(t, loop)
     require.LessOrEqual(t, d2D, npcApproachOffset,
         "the plan must end at the customer cell across the counter, "+
@@ -98,16 +98,16 @@ func TestMerchantStopWalksToTheCustomerCell(t *testing.T) {
             "layer above the shop")
     require.LessOrEqual(t, d3D, npcInteractionDist,
         "the talk gate must fire from the plan end")
-    require.NotNil(t, loop.legSearch)
-    require.Equal(t, 0.0, loop.legSearch.Approach,
-        "the leg contract must carry the exact search")
-    require.Equal(t, waypointPassDist, loop.finalArriveRadius(),
-        "the exact leg must walk to its final cell, not stop a wide "+
+    require.NotNil(t, loop.segmentSearch)
+    require.Zero(t, loop.segmentSearch.Approach,
+        "the segment contract must carry the exact search")
+    require.InDelta(t, waypointPassDist, loop.finalArriveRadius(), 0.001,
+        "the exact segment must walk to its final cell, not stop a wide "+
             "arrive radius short of it")
 }
 
 // TestMerchantExactContractSurvivesTheRepath pins the re-path
-// preservation: a stuck exact leg re-plans the exact search (the
+// preservation: a stuck exact segment re-plans the exact search (the
 // customer cell plan re-arms), it must not degrade into the approach
 // ring that ends the plan outside the shop again.
 func TestMerchantExactContractSurvivesTheRepath(t *testing.T) {
@@ -122,16 +122,16 @@ func TestMerchantExactContractSurvivesTheRepath(t *testing.T) {
 
     armMerchantStop(t, loop, townNpc{TemplateID: 7148, Name: "Ariel",
         X: arielX, Y: arielY, Z: arielZ})
-    require.NotNil(t, loop.legSearch)
-    require.Equal(t, 0.0, loop.legSearch.Approach)
+    require.NotNil(t, loop.segmentSearch)
+    require.Zero(t, loop.segmentSearch.Approach)
 
-    require.True(t, loop.replanTownWalkLeg(loop.legDest),
-        "the exact leg must re-plan")
+    require.True(t, loop.replanTownWalkSegment(loop.segmentDest),
+        "the exact segment must re-plan")
     d2D, dz, _ := lastWaypointDistanceToAriel(t, loop)
     require.LessOrEqual(t, d2D, npcApproachOffset,
-        "the re-planned leg must still end at the customer cell")
+        "the re-planned segment must still end at the customer cell")
     require.LessOrEqual(t, dz, 64.0,
-        "the re-planned leg must still end on the merchant floor")
+        "the re-planned segment must still end on the merchant floor")
 }
 
 // TestMerchantStopFallsBackToTheRing pins the fallback of the one
@@ -162,8 +162,8 @@ func TestMerchantStopFallsBackToTheRing(t *testing.T) {
     require.Equal(t, phaseTownWalk, loop.phase,
         "the ring fallback must keep the trip walking")
     require.NotEmpty(t, loop.waypoints,
-        "the ring fallback must plan the leg")
-    require.NotNil(t, loop.legSearch)
-    require.Equal(t, tripApproachRadius, loop.legSearch.Approach,
-        "the fallback leg carries the ring contract")
+        "the ring fallback must plan the segment")
+    require.NotNil(t, loop.segmentSearch)
+    require.InDelta(t, tripApproachRadius, loop.segmentSearch.Approach, 0.001,
+        "the fallback segment carries the ring contract")
 }

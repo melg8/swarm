@@ -19,14 +19,14 @@ import (
 // packStripWorld synthesizes a 2x2 region block with a walkable cross
 // through the middle that reaches the region borders: the internal
 // borders of the block must stitch (the strips pair through the pack
-// phase B) whichever worker count builds the pack. The cross legs
+// phase B) whichever worker count builds the pack. The cross segments
 // touch all four region sides, so the components survive the island
 // filter of the build.
 func packStripWorld(cx, cy int) []layerSpec {
     const half = regionCellsSide / 2
-    const legHalf = 8
-    if (cx >= half-legHalf && cx < half+legHalf) ||
-        (cy >= half-legHalf && cy < half+legHalf) {
+    const segmentHalf = 8
+    if (cx >= half-segmentHalf && cx < half+segmentHalf) ||
+        (cy >= half-segmentHalf && cy < half+segmentHalf) {
         return []layerSpec{{h: -3504, nswe: 0x0F}}
     }
 

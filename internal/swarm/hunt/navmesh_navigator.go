@@ -23,7 +23,7 @@ package hunt
 // toward the closest reachable point instead of the bare abort at the
 // start position. A destination on ground the sheet decomposition
 // dropped answers the honest not found (the manual walk falls back to
-// the direct server routed walk, the town legs keep their recovery).
+// the direct server routed walk, the town segments keep their recovery).
 
 import (
     "math"

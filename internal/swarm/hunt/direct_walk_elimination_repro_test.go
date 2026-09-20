@@ -41,7 +41,7 @@ import (
 //     25500 59756 by the server routing": the walk plan collapsed
 //     into the SINGLE FAR WAYPOINT (the dump's walk plan view: 1
 //     waypoints, wp 0: 25500 59756 -3544 <-- TARGET);
-//   - the direct leg's own hops were refused locally too - its
+//   - the direct segment's own hops were refused locally too - its
 //     validation gate stands BEFORE the escape arming branches - so
 //     the walk sat on the forbidden plan for the whole 45 s window,
 //     the trip aborted and the cycle repeated three times (the
@@ -141,9 +141,9 @@ func spawnDumpLoop(
 
 // driveSpawnWalk mirrors the production dispatch of
 // walkTownWaypoints for one simulated tick after the direct walk
-// elimination: the armed escape drives the claims, the routed legs
+// elimination: the armed escape drives the claims, the routed segments
 // follow their waypoints, and a finished plan ends the trip the way
-// tickTownTrip ends the return leg. The consumeAt call answers the
+// tickTownTrip ends the return segment. The consumeAt call answers the
 // requests the tick sent the way an honest server does.
 func driveSpawnWalk(
     t *testing.T, loop *Loop, sim *cursorKeyServer, game *fakeGame,
@@ -179,7 +179,7 @@ func TestReproRefusedSpawnNeverWalksTheDirectLine(t *testing.T) {
         "the zone return plans the walk")
     require.Greater(t, len(loop.waypoints), 1,
         "the pathfound return plans a real multi waypoint route")
-    require.NotNil(t, loop.legSearch,
+    require.NotNil(t, loop.segmentSearch,
         "the plan carries its mesh search contract")
 
     arrived := false
@@ -190,9 +190,9 @@ func TestReproRefusedSpawnNeverWalksTheDirectLine(t *testing.T) {
         // The live invariant of the owner contract: the walk plan
         // is ALWAYS a real route - every plan of this walk carries
         // its mesh search contract, the search-less plan view was
-        // the direct leg's single far waypoint.
+        // the direct segment's single far waypoint.
         if loop.tripActive() && len(loop.waypoints) > 0 {
-            require.NotNil(t, loop.legSearch,
+            require.NotNil(t, loop.segmentSearch,
                 "the walk plan lost its search contract - the "+
                     "plan view fell back to the search-less direct "+
                     "line the owner forbade")
@@ -314,7 +314,7 @@ func escapeSnapshotClaims(
 // ever arrived - and the frozen ladder must STILL switch the walk to
 // the cursor key escape (the owner rule: the recovery switches modes
 // as soon as the current one proves useless). The escape arms over a
-// real route whose far end leads to the leg destination.
+// real route whose far end leads to the segment destination.
 func TestReproRefusedSpawnLadderArmsTheEscapeWithoutServerAnswers(
     t *testing.T,
 ) {
@@ -348,11 +348,11 @@ func TestReproRefusedSpawnLadderArmsTheEscapeWithoutServerAnswers(
         "the claimed steps walked the route")
     require.Greater(t, len(armPlan), 1,
         "the escape arms over the real route")
-    dest := loop.legDest
+    dest := loop.segmentDest
     last := armPlan[len(armPlan)-1]
     require.LessOrEqual(t,
         math.Hypot(last.X-dest.X, last.Y-dest.Y), tripApproachRadius,
-        "the route the escape walks leads to the leg destination")
+        "the route the escape walks leads to the segment destination")
     require.Contains(t, sink.String(), "walking along the planned route",
         "the escape line names the route following recovery")
 }

@@ -54,12 +54,12 @@ zones) cost `waterCostMultiplier` (3x) per step so bridges and shores
 beat swimming whenever they exist. The line of sight raster keeps the
 strict symmetric height rule, so the smoothing never collapses a
 detour into a straight drop. The smoothing is also water aware
-(`legDry`): a leg between two dry points must stay above the water
+(`segmentDry`): a segment between two dry points must stay above the water
 surface - the string pulling only asks the line of sight, and the
 sight lines across the gradual lake beds stay open, so without the
 rule the smoothed path would ford the very bays the cost aware search
 paid to route around (the 2026-09-10 elven lake regression,
-`TestSmoothedLegsStayDry`). Legs that start or end in the water are
+`TestSmoothedLegsStayDry`). Segments that start or end in the water are
 exempt: they belong to the swim escape below.
 
 The engine answers three water queries besides the searches:
@@ -82,7 +82,7 @@ start already on dry ground answers Found=false.
 - Wall hits are skipped instead of being pushed into the open set with
   an astronomic cost (the original can return a wall crossing path for
   a sealed target).
-- The smoothing anchor stays on the committed waypoint, so every leg
+- The smoothing anchor stays on the committed waypoint, so every segment
   of the smoothed path is line of sight verified (the original jumps
   the anchor past the commit and can cut wall corners near gaps).
 - Search nodes are keyed by (cell, layer height) instead of one node
@@ -99,14 +99,14 @@ start already on dry ground answers Found=false.
   agree on it). A route that cuts a walled corner plans a walk the
   server refuses wholesale (round 52: the town walk click collapse
   onto the walker).
-- The smoothing verifies every collapsed leg against the server click
+- The smoothing verifies every collapsed segment against the server click
   validation port (`Engine.ValidateClick`, the faithful port of the
   MoveToLocation geodata correction): the server rasterizes a click
   with its Bresenham iterator whose diagonal double steps carry the
   anti corner cut, while the t/k supercover raster of the line of
   sight splits the same line into cardinal steps and never cuts the
-  diagonals - a supercover-legal leg can still be refused by the
-  server, so a planned leg must survive the server rules themselves.
+  diagonals - a supercover-legal segment can still be refused by the
+  server, so a planned segment must survive the server rules themselves.
 
 ## Capsule clearance
 
@@ -127,7 +127,7 @@ The clearance machinery lives in `capsule.go` and serves both engines:
   engine: every search runs its smoothed waypoints through
   `Capsule.ApplyPath` - interior waypoints whose clearance falls below
   the radius are pushed away from the nearest wall (damped projection,
-  every move validated by the engine's own line of sight), every leg
+  every move validated by the engine's own line of sight), every segment
   is sampled and bent around the walls through pushed-in anchor
   chains. The first and the last waypoints never move, and every
   adjustment falls back to the original geometry when the walk rules

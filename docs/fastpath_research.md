@@ -10,16 +10,16 @@ seconds at the worst, ideally under 1 second.
 
 ## 1. The measured baseline (the corridor pack, this round)
 
-The three town legs (the teleporter arrival points, the hierarchical
+The three town segments (the teleporter arrival points, the hierarchical
 route, the corridor pack of 31 regions, the fake cell repair on):
 
-| leg | straight | cold | warm | one shot |
+| segment | straight | cold | warm | one shot |
 | --- | --- | --- | --- | --- |
 | Elven Village -> Gludio | 92939 | 1.77 s | 545 ms | found |
 | Gludio -> Gludin | 73199 | 2.61 s | 3.4 ms | found |
 | Gludin -> Giran | 164172 | 2.16 s | 130 ms | partial (the strand, section 4) |
 
-The previous session measured the same Elven leg at 10.8 s cold on
+The previous session measured the same Elven segment at 10.8 s cold on
 the full pack. The corridor pack, the uint16 tile format and the
 fake repair together bought the 6x. The warm answers are already sub
 1 second everywhere the one shot works - the remaining gap is the
@@ -71,7 +71,7 @@ agents per target. The arithmetic at this scale:
   continent is 165 regions = 690M cells. One field build walks every
   reachable cell - the cost of ~1000 warm A* queries spent to answer
   ONE query.
-- The mesh A* explores 11k-43k polygons for the town legs (the
+- The mesh A* explores 11k-43k polygons for the town segments (the
   fraction of a percent of the 15M polygon corridor). The flow field
   explores 100 percent by construction. It loses the single query by
   3 to 4 orders of magnitude, exactly the opposite of the goal.
@@ -140,9 +140,9 @@ than the decode speed.
 2. Keep the hierarchical A* and the LRU; skip the flow fields
    (section 3).
 3. Land the fake cell repair as the default for the pack builds (the
-   bay legs already answer one shot with it; the flag flip is the
+   bay segments already answer one shot with it; the flag flip is the
    release decision).
-4. The Giran leg rides the re-targeted re-path until (1) lands, then
+4. The Giran segment rides the re-targeted re-path until (1) lands, then
    re-measure (section 4).
 
 ## 7. The external engine benchmarks: the raasta and the condor measurements

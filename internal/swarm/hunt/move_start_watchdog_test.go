@@ -20,10 +20,10 @@ import (
 // name dead. The three dead click families each get their fast
 // path: the silent click (the server accepted the packet and did
 // nothing), the refusing pocket (ActionFailed from the ground the
-// character stands on) and the silent routed hop of the direct leg.
+// character stands on) and the silent routed hop of the direct segment.
 
 // watchdogRoute is the 6 waypoint plan of the 2026-09-14 08:13 dump
-// (the same route the stuck fast repro walks): the follower leg
+// (the same route the stuck fast repro walks): the follower segment
 // whose first click the server swallows.
 var watchdogRoute = []pathfind.Vec3{
     {X: 43512, Y: 50504, Z: -2992},
@@ -56,7 +56,7 @@ func TestMoveStartWatchdogForcesTheRecovery(t *testing.T) {
         Y: float64(reproFastStuckZoneY),
         Z: float64(reproFastStuckZoneZ),
     }
-    require.True(t, loop.startZoneReturnLeg(dest))
+    require.True(t, loop.startZoneReturnSegment(dest))
     loop.phase = phaseTownReturn
 
     now := time.Now()
@@ -102,7 +102,7 @@ func TestPocketRefusalArmsTheCursorEscapeAtOnce(t *testing.T) {
         Y: float64(reproFastStuckZoneY),
         Z: float64(reproFastStuckZoneZ),
     }
-    require.True(t, loop.startZoneReturnLeg(dest))
+    require.True(t, loop.startZoneReturnSegment(dest))
     loop.phase = phaseTownReturn
 
     now := time.Now()
@@ -133,19 +133,19 @@ func TestPocketRefusalArmsTheCursorEscapeAtOnce(t *testing.T) {
     require.NotEmpty(t, game.cursorWalks,
         "the movement mode 0 arm went out")
 
-    // The armed escape owns the leg: the phase handler (the walk
+    // The armed escape owns the segment: the phase handler (the walk
     // town waypoints entry the real loop ticks through) drives the
     // claims, the mouse clicks stay down.
     claimCount := len(game.claims)
     walkCount := len(game.walks)
     _ = loop.walkTownWaypoints()
     require.Greater(t, len(game.claims), claimCount,
-        "the claims advance while the escape owns the leg")
+        "the claims advance while the escape owns the segment")
     require.Len(t, game.walks, walkCount,
         "no further mouse click goes out while the escape runs")
 }
 
-// TestDirectLegSilentHopsArmTheEscape was the direct leg fast path
+// TestDirectSegmentSilentHopsArmTheEscape was the direct segment fast path
 // pin; the direct server routed walk is eliminated (the owner rule of
 // the 2026-09-19 16:02 round: НИКОГДА не идти напрямую - see
 // direct_walk_elimination_repro_test.go). The never-burn-the-window

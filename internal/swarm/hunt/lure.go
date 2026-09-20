@@ -11,7 +11,7 @@ package hunt
 // bow answers the covered pick the archer way:
 //
 //   - the approach stops at a standoff point outside every threat
-//     circle (a bow shoots at 500 units, the approach leg walks there
+//     circle (a bow shoots at 500 units, the approach segment walks there
 //     without entering the aggro radius of the cover);
 //   - the arm phase equips the bow (the right hand swap: the melee
 //     weapon remembers itself for the swap back) and the quiver (the
@@ -47,9 +47,9 @@ const (
     // lureArriveRange is the distance the pulled mob closes to before
     // the melee weapon swaps back.
     lureArriveRange = 200.0
-    // lureApproachSlack widens the approach leg pacing: one walk
+    // lureApproachSlack widens the approach segment pacing: one walk
     // request per second matches the far target walk cadence.
-    lureLegPeriod = 1 * time.Second
+    lureSegmentPeriod = 1 * time.Second
     // lureArmPeriod paces the equip requests of the arm phase: the
     // flood protector window of the player actions.
     lureArmPeriod = 2 * time.Second
@@ -92,7 +92,7 @@ type lureState struct {
     standX     int32
     standY     int32
     startedAt  time.Time
-    legAt      time.Time
+    segmentAt  time.Time
     armAt      time.Time
     armedBow   bool
     armedArrow bool
@@ -150,7 +150,7 @@ func (l *Loop) maybeBeginLure(now time.Time) {
         standX:     standX,
         standY:     standY,
         startedAt:  now,
-        legAt:      time.Time{},
+        segmentAt:  time.Time{},
         armAt:      time.Time{},
         armedBow:   false,
         armedArrow: false,
@@ -197,7 +197,7 @@ func (l *Loop) lureTick(now time.Time) bool {
 }
 
 // lureApproachTick walks the character to the standoff point one
-// paced leg at a time. The arrival hands the phase over to the arm.
+// paced segment at a time. The arrival hands the phase over to the arm.
 func (l *Loop) lureApproachTick(lure *lureState, now time.Time) bool {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
@@ -210,15 +210,15 @@ func (l *Loop) lureApproachTick(lure *lureState, now time.Time) bool {
 
         return true
     }
-    if !lure.legAt.IsZero() && now.Sub(lure.legAt) < lureLegPeriod {
+    if !lure.segmentAt.IsZero() && now.Sub(lure.segmentAt) < lureSegmentPeriod {
         return true
     }
-    lure.legAt = now
+    lure.segmentAt = now
     moveX, moveY := lure.standX, lure.standY
     dx := float64(lure.standX - selfX)
     dy := float64(lure.standY - selfY)
-    if dist > returnWalkLeg {
-        frac := returnWalkLeg / dist
+    if dist > returnWalkSegment {
+        frac := returnWalkSegment / dist
         moveX = int32(float64(selfX) + dx*frac)
         moveY = int32(float64(selfY) + dy*frac)
     }

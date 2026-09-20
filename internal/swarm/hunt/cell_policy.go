@@ -843,7 +843,7 @@ func (h *cellHunter) waitOrRotate(l *Loop, now time.Time) {
     if pending && eta <= cellWaitPatience {
         // The respawn comes back before any walk could reach an
         // equivalent ground: hold the ground, drift toward the
-        // predicted corpse position (one paced leg).
+        // predicted corpse position (one paced segment).
         h.waitWalk(l, predX, predY, selfX, selfY, selfZ, now)
 
         return
@@ -857,8 +857,8 @@ func (h *cellHunter) waitOrRotate(l *Loop, now time.Time) {
 }
 
 // waitWalk drifts the waiting hunter toward a predicted respawn
-// position: one paced short leg (the per second target search of the
-// engage picks up any mob the leg comes past), suppressed while the
+// position: one paced short segment (the per second target search of the
+// engage picks up any mob the segment comes past), suppressed while the
 // character already stands on the respawn point.
 func (h *cellHunter) waitWalk(
     l *Loop, x int32, y int32,
@@ -876,8 +876,8 @@ func (h *cellHunter) waitWalk(
     moveX, moveY := x, y
     dx := float64(x - selfX)
     dy := float64(y - selfY)
-    if dist > returnWalkLeg {
-        frac := returnWalkLeg / dist
+    if dist > returnWalkSegment {
+        frac := returnWalkSegment / dist
         moveX = int32(float64(selfX) + dx*frac)
         moveY = int32(float64(selfY) + dy*frac)
     }

@@ -133,7 +133,7 @@ func TestFindPathToShopPlainWaterArrival(t *testing.T) {
 // measured route: 42 831 units, 25 waypoints, 0.94M nodes, ~9 s).
 // A geodata refresh or a search regression that breaks the mainland
 // connectivity of the band trips fails here instead of surfacing as
-// a walk that never arrives. The elven -> Gludio leg (1.25M nodes,
+// a walk that never arrives. The elven -> Gludio segment (1.25M nodes,
 // 25 percent above the shipped cap) stays the documentation fact of
 // docs/navigation_analysis.md - the cap-as-a-parameter roadmap item
 // owns it.

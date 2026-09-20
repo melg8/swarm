@@ -22,7 +22,7 @@ import (
 //  1. The town trip started while the bot was outside the zone,
 //     interfering with the zone return.
 //  2. The zone return had no non-dry fallback: when the dry search
-//     failed, it fell back to walkZoneLeg (direct walks) which may
+//     failed, it fell back to walkZoneSegment (direct walks) which may
 //     cross water/walls and get refused by the server.
 
 // TestTownTripBlockedOutsideTheZone pins fix #1: a bot outside the
@@ -131,7 +131,7 @@ func TestZoneReturnPlansThroughThePricedSearch(t *testing.T) {
 
 // TestZoneReturnDryFailureHoldsTheReturn pins the no-route rule: when
 // the priced search fails, the zone return HOLDS instead of marching
-// the direct legs toward the zone center (the owner rule of the
+// the direct segments toward the zone center (the owner rule of the
 // 2026-09-19 round: НИКОГДА не идти напрямую - the paced log names the
 // standing return).
 func TestZoneReturnDryFailureHoldsTheReturn(t *testing.T) {
@@ -154,11 +154,11 @@ func TestZoneReturnDryFailureHoldsTheReturn(t *testing.T) {
         "no direct walk toward the zone center ever goes out")
 }
 
-// TestStartZoneReturnLegRunsOnePricedSearch pins the search count of
-// the zone return leg: one priced search per planning attempt - the
+// TestStartZoneReturnSegmentRunsOnePricedSearch pins the search count of
+// the zone return segment: one priced search per planning attempt - the
 // dry then non-dry escalation of the old rounds is retired with the
 // walled water form.
-func TestStartZoneReturnLegRunsOnePricedSearch(t *testing.T) {
+func TestStartZoneReturnSegmentRunsOnePricedSearch(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     moveSelfTo(bot, 43000, 50184, -2992)
     nav.found = true
@@ -169,9 +169,9 @@ func TestStartZoneReturnLegRunsOnePricedSearch(t *testing.T) {
     }
 
     dest := pathfind.Vec3{X: 38553, Y: 50080, Z: -3512}
-    ok := loop.startZoneReturnLeg(dest)
+    ok := loop.startZoneReturnSegment(dest)
 
-    require.True(t, ok, "the zone return leg was planned")
+    require.True(t, ok, "the zone return segment was planned")
     require.Equal(t, 1, nav.calls,
         "the priced search runs once per planning attempt")
     require.NotEmpty(t, loop.waypoints,

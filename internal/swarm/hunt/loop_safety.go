@@ -35,7 +35,7 @@ func (l *Loop) fleeFromTarget(targetID int32, now time.Time) {
 
 // fleeFromThreat walks the character away from the nearest living
 // threat (the chasing mob of a fled fight, an aggressive pull it
-// never selected): one paced leg per call, straight away from the
+// never selected): one paced segment per call, straight away from the
 // threat when the escape point stays inside the zone and toward
 // the zone center when it does not (the center direction leashes
 // the chasers near their spawns). A sitting character stands up
@@ -74,7 +74,7 @@ func (l *Loop) fleeFromThreat(now time.Time) {
     }
 }
 
-// escapeWalkDestination plans one escape leg away from the nearest
+// escapeWalkDestination plans one escape segment away from the nearest
 // threat: straight away from it while the point stays inside the
 // zone, toward the zone center when it does not (the center
 // direction leashes the chasers near their spawns).
@@ -140,7 +140,7 @@ func (l *Loop) threatPosition() (int32, int32, bool) {
 // instant logout. The first call anchors the aggro point - the
 // spot the pack piled up on - and drops the current fight (the
 // walk away must not re-engage it), every later call walks one
-// paced escape leg away from the threats. The logout fires only
+// paced escape segment away from the threats. The logout fires only
 // once the run opened panicRunDistance units between the character
 // and the anchor: the chasing pack stays behind, the mobs drop the
 // target and walk home while the character is offline, and the
@@ -239,7 +239,7 @@ func (l *Loop) panicAnchorDistance() float64 {
 // emergencyLogout saves a character with no way out: the health
 // is critical, the blows keep landing and the escape could not
 // shake the chase, or the pile up run opened its escape distance
-// (or lapsed its budget) away from the pack. One last escape leg
+// (or lapsed its budget) away from the pack. One last escape segment
 // keeps the character moving through the combat window the server
 // holds an offline character in the world (fifteen seconds), then
 // the session logs out and the supervisor reconnects after the
@@ -262,7 +262,7 @@ func (l *Loop) emergencyLogout() {
 
 // emergencyLogoutWithReason is the shared body of the emergency
 // logout: the reason line names what drove the session out, the
-// escape leg keeps the character moving through the logout combat
+// escape segment keeps the character moving through the logout combat
 // window and the login cooldown paces the supervisor reconnect.
 // The stagnation recovery calls it with its own honest reason (a
 // livelocked loop is as good a reason to rebuild the session as a

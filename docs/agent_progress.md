@@ -88,7 +88,7 @@ pieces from the research verdict:
   polygon-granularity form of the grid nodeReached) and the avoid
   areas (the recovery bans: Filter.Avoid carries AvoidCircle disks,
   a polygon whose footprint a ban touches walls the search - the
-  over-walling direction, so no funnelled leg ever enters the banned
+  over-walling direction, so no funnelled segment ever enters the banned
   ground; the ban holding the start opens its escape ring within 256
   units at the 6x multiplier, the foreign ban wins over the escape
   ring - the rectangle granularity port of the grid
@@ -144,8 +144,8 @@ pieces from the research verdict:
   sum of both searches). The strict forms (FindPathApproach,
   FindPath) never surface partials - the blind engage recovery and
   the user walks keep their verdict semantics. The consumers:
-  startWalkLegSearch arms the follower on the partial waypoints (the
-  town legs and zone returns walk toward the closest reachable point
+  startWalkSegmentSearch arms the follower on the partial waypoints (the
+  town segments and zone returns walk toward the closest reachable point
   instead of aborting; the bare not found still refuses to plan),
   followPlannedSegment walks the partial quest segments (the
   re-plan loop and the no-progress guard stay the safety net). Four
@@ -155,7 +155,7 @@ pieces from the research verdict:
   partial of a broken chain, the engine error surfacing without
   geodata; the REAL hard pair dry - the elven village deck to the
   water under the bridge answers the dry partial with every waypoint
-  above the water level) plus three consumer pins (the town leg
+  above the water level) plus three consumer pins (the town segment
   arming on the partial, the quest segment walking it through the
   moving game simulator, the bare not found still aborting).
 
@@ -441,7 +441,7 @@ over the Dion hunting grounds.
   of the layer nearest the reference z, exact within one cell) and
   `ApplyPath` enforces the radius over a planned waypoint path (the
   interior waypoints pushed off the walls by the damped projection,
-  every leg sampled and bent around the walls through pushed-in
+  every segment sampled and bent around the walls through pushed-in
   anchor chains, every move validated by the engine line of sight,
   the first and the last waypoints never move, the honest fallback
   keeps the original geometry). The mesh funnel pulls its pivots
@@ -570,17 +570,17 @@ over the Dion hunting grounds.
   both) draws the two answers; the bot navigator and the viewer arm
   the pass with the engine capsule radius. The owner repro route
   (21_19 swim) answers 63 smoothed waypoints of 81 raw, the granular
-  legs (< 16 units) drop from 7 to 1. Tests: the corner under the
+  segments (< 16 units) drop from 7 to 1. Tests: the corner under the
   capsule stays (the chord 5.66 off the inner wall is refused), the
   open boundary merge (the funnel pivot at a soft span end folds),
   the void detour keeps every pivot, the portal index chain, the
   unarmed contract. KNOWN NEXT: the grid per cell walls (the
   diagonal anti corner cut) are finer than the mesh side level link
-  spans - 26 of 62 smoothed legs still hold a grid wall sample under
+  spans - 26 of 62 smoothed segments still hold a grid wall sample under
   the radius (worst 1.6 units near the owner stuck area), the grid
   capsule pass re-fragments the answer with micro anchors; the next
   round binds the shortcut pass to the grid wall oracle (the
-  LegGuard seam) so the merged chords clear the server accurate
+  SegmentGuard seam) so the merged chords clear the server accurate
   raster directly.
 
 - 2026-09-17: the wall oracle round: the grid per cell walls (the
@@ -588,17 +588,17 @@ over the Dion hunting grounds.
   spans - the funnel pivots one radius off a mesh span end sit up to
   6 units off a real grid wall on the staircase (the owner stuck at
   wp 25), and the capsule pass re fragmentation (129 wps, 79 tiny
-  legs) defeated the mesh smoothing end to end. Filter.Guard arms
-  the LegGuard seam: the shortcut pass answers every chord to the
-  grid capsule (pathfind.Capsule.LegClear - the movement line of
+  segments) defeated the mesh smoothing end to end. Filter.Guard arms
+  the SegmentGuard seam: the shortcut pass answers every chord to the
+  grid capsule (pathfind.Capsule.SegmentClear - the movement line of
   sight plus the 4 unit clearance sampling), and the walker answer
   composes ApplyPath with the new ShortenPath fold (the greedy
-  farthest visible over the post pass points, every surviving leg
-  LegClear). The owner repro walks 14 waypoints of the legacy 148
-  (path 4947 -> 4852, max leg 1070), the raw toggle variant keeps
+  farthest visible over the post pass points, every surviving segment
+  SegmentClear). The owner repro walks 14 waypoints of the legacy 148
+  (path 4947 -> 4852, max segment 1070), the raw toggle variant keeps
   the legacy pipeline as the before picture. Tests: the guard
   refusal keeps the pivots, the guard merge folds (navmesh), the
-  LegClear corridor center through wall answers, the ShortenPath
+  SegmentClear corridor center through wall answers, the ShortenPath
   open collapse and the sealed detour keep (pathfind). Visual
   verification on 127.0.0.1:8082: the staircase closeup draws the
   granular raw dots vs the clean smoothed line, the toggle and the
@@ -610,20 +610,20 @@ over the Dion hunting grounds.
   smoothing could trip. The Mobius C1 sources answer twice
   (network/clientpackets/MoveToLocation.java,
   entity/actor/Creature.java moveToLocation): the 9900 unit packet
-  refusal (the walker's own maxMoveLeg = 1000 split already covers
+  refusal (the walker's own maxMoveDistance = 1000 split already covers
   it) and the WATER clamp - the destination of every swimming move
   request scales onto the 700 unit sphere around the current
   position (the isInWater divider), and a target beyond it never
-  answers. The smoothed open water legs (the owner repro runs the
-  swim filter, the measured max leg 1070) trip exactly that clamp:
+  answers. The smoothed open water segments (the owner repro runs the
+  swim filter, the measured max segment 1070) trip exactly that clamp:
   the server stops the character short of every such waypoint and
   the follower never sees the arrival. Capsule.ShortenPath now
-  answers the server clamp per anchor (the new legLimit probe over
+  answers the server clamp per anchor (the new segmentLimit probe over
   the engine water raster, the same OverWater oracle the water
-  escape uses): a leg that leaves a water position splits at the
+  escape uses): a segment that leaves a water position splits at the
   clamp distance, the fold resumes from the split over the same
-  horizon, the dry anchored legs keep their unclamped merge. Tests:
-  the water legs cap (the split preserves the walk length and the
+  horizon, the dry anchored segments keep their unclamped merge. Tests:
+  the water segments cap (the split preserves the walk length and the
   endpoints), the dry flip (the long clear chord survives). The
   viewer smoothed variant rides the same fold.
 
@@ -669,7 +669,7 @@ over the Dion hunting grounds.
   straight line aims do not bind) and the 18_21/17_21 border steps
   land heights over the climb (land against flat sea - the stitch
   refuses honestly). The re-path walk (the bot's real pattern) covers
-  58 852 of 73 199 units in 3 replans on the Gludio Gludin leg.
+  58 852 of 73 199 units in 3 replans on the Gludio Gludin segment.
   The fix belongs to the data: a water filled geodata refresh or the
   operator waypoint graph. (3) The map size arithmetic: the pack is
   3.5 GB of gzip tiles against the 543 MB l2j geodata (6.4x) - the
@@ -720,7 +720,7 @@ atomic commit):
 
 1. **The dump state walk plan timings** - the state dump of a walking
    bot carries not only which waypoint it aims at but how long every
-   leg took: a stuck point shows its cost, not just its name.
+   segment took: a stuck point shows its cost, not just its name.
    - `state/bot.go`: the timing view of the published walk plan - the
      zero point (`walkPlanStart`, the first publish of the route) and
      the observed arrival of every waypoint (`walkWpAt`, the entry i
@@ -730,15 +730,15 @@ atomic commit):
      pre-fills the passed prefix. `publishWalkPlanLocked` +
      `walkPlansSameRoute` (the cursor blind route compare). The last
      walk record copies the timing view (lastWalkStart, lastWalkWpAt)
-     so a finished walk keeps its leg durations. The Snapshot carries
+     so a finished walk keeps its segment durations. The Snapshot carries
      the Go side dump fields only (`json:"-"`, the wire stays byte
      identical): WalkStart, WalkWpAt, WalkAt, LastWalkStart,
      LastWalkWpAt.
    - `webserver/dump.go`: the walk plan section prints the `started`
      line (the zero point, the last seen moment, the time on the
-     walk), the passed waypoints carry `(passed, t+10.4s, leg 5.2s)`
-     and the aimed one ` <-- TARGET (walking 45.2s)` - the stuck leg
-     number. The last walk plan measures the aimed leg to the moment
+     walk), the passed waypoints carry `(passed, t+10.4s, segment 5.2s)`
+     and the aimed one ` <-- TARGET (walking 45.2s)` - the stuck segment
+     number. The last walk plan measures the aimed segment to the moment
      the plan ended. Sub minute durations keep the tenth of a second,
      the longer ones fold into the minute shape. The dump parser
      needs no change (the wp lines keep the leading `x y z` triple).
@@ -807,9 +807,9 @@ Commits as melg8. Rebase before every push.
 ### Progress
 
 - 2026-09-19: the route following cursor escape (commit 1). The
-  escape arms `cursorEscapeRouteSteps` when the leg holds a plan:
+  escape arms `cursorEscapeRouteSteps` when the segment holds a plan:
   the claimed ValidatePosition steps march the plan polyline from
-  the current cursor (the pathfind route the leg already walks),
+  the current cursor (the pathfind route the segment already walks),
   interpolated into run-speed strides, water guarded per stride and
   capped at `cursorEscapeRouteMax` (2500 units, one direct hop of
   ground) so an escape stays a pocket recovery - the claims never
@@ -831,25 +831,25 @@ Commits as melg8. Rebase before every push.
   stuck verdict (the `forceStuck` gate of walkStuck skips the window
   check for one verdict), so the recovery ladder runs at ~3 s per
   rung instead of the 15 s first window. Wired into the three walk
-  machineries: followWaypoints (the planned legs, force), the direct
-  routed leg (a silent hop arms the cursor key escape instead of
-  re-hopping into the 45 s window) and the direct zone legs (the
-  stall backdate fires noteZoneLegStall this tick). The refusing
+  machineries: followWaypoints (the planned segments, force), the direct
+  routed segment (a silent hop arms the cursor key escape instead of
+  re-hopping into the 45 s window) and the direct zone segments (the
+  stall backdate fires noteZoneSegmentStall this tick). The refusing
   pocket verdict: a stuck verdict with refusal evidence ON the cell
-  where the leg's first refusal latched, AFTER the varied aims of
-  the leg are spent - the varied aims keep their chance to cure the
+  where the segment's first refusal latched, AFTER the varied aims of
+  the segment are spent - the varied aims keep their chance to cure the
   target specific refusals (the round 82 order), the escape takes
   over the moment they prove useless from the same ground. The
   escape arms from the follower path now too: walkTownWaypoints
-  drives the claims while the escape holds the leg (symmetric with
-  walkDirectLeg), followWaypoints stands its clicks down while
+  drives the claims while the escape holds the segment (symmetric with
+  walkDirectSegment), followWaypoints stands its clicks down while
   armed, the settle message names the walk that resumes (the routed
   hops or the planned clicks), and the mode 0 arm aims the ladder's
   far end (a self cell arm answers the stopMove refusal before the
   flag latches). Tests: the silent click recovery inside the move
   start window, the pocket sequence (the variants one per verdict,
-  the escape once they are spent, the claims owning the leg, no
-  further mouse clicks), the direct leg silent hop escape; the
+  the escape once they are spent, the claims owning the segment, no
+  further mouse clicks), the direct segment silent hop escape; the
   varied aim and plaza repros re-verified green.
 
 - 2026-09-19: the refused click root cause documented (commit 3).
@@ -950,7 +950,7 @@ Commits as melg8. Rebase before every push.
   one pair both frames vouch for - the character's server vouched
   standing z against the plan's first waypoint z (the same cell on
   the pack) - and rides every plan derived click z into the server
-  frame: the town leg clicks and their long leg splits, the forward
+  frame: the town segment clicks and their long segment splits, the forward
   route samples, the escape hops, the varied aims, the manual walk
   follower and the quest segment follower (each machinery measures
   its own plan start). The server vouched clicks (drops, mobs, npc
@@ -966,7 +966,7 @@ Commits as melg8. Rebase before every push.
   unchanged: the anchored z is never the bare self z, it carries the
   plan's own relative geometry in the server frame. Tests:
   `hunt/click_frame_test.go` pins the measurement, the calibration,
-  the systemic click transport, the long leg split, the layer snap
+  the systemic click transport, the long segment split, the layer snap
   discard, the manual walk and the quest segment; the existing suites
   stay byte identical green (26 packages ok, lint --new clean).
 
@@ -1022,7 +1022,7 @@ reproduction.
 
 1. The viewer's capsule post pass folded the whole mesh route into
    ONE straight chord: the grid oracle of the fold is water blind
-   (LegClear=true while 5 of 65 sampled chord points sit over the
+   (SegmentClear=true while 5 of 65 sampled chord points sit over the
    elven lake). The bot's plan is the search answer as produced; the
    fold drew a route the bot never walks.
 2. The link hardcoded `filter=swim`; the zone return plans the DRY
@@ -1038,8 +1038,8 @@ reproduction.
 
 The search contract rides the plan: `state.WalkPlan.Search`
 (the `walkSearch` wire field: dry, approach, avoid circles) stamped
-by `startWalkLegSearch` / `planUserWalk`, cleared by
-`armDirectLeg`, published by `geodataWalkPlan` / `userWalkPlan`;
+by `startWalkSegmentSearch` / `planUserWalk`, cleared by
+`armDirectSegment`, published by `geodataWalkPlan` / `userWalkPlan`;
 the viewer POST gains `approach` / `avoid` / `fold`, the viewer URL
 and the HUD link round-trip the same (`fold=0` = the plan repro mode
 serving the answer as the bot publishes it); the dump names the
@@ -1057,21 +1057,21 @@ its `search` line for the paste-a-dump flow.
 
 - 2026-09-19: the escape walks the route, not the chord (the 14:46
   dump round). The WHY: the 14:46 dump proved the cursor key escape of
-  a DIRECT leg marched the straight chord to the far zone target -
-  armDirectLeg replaces the waypoints with the single destination
+  a DIRECT segment marched the straight chord to the far zone target -
+  armDirectSegment replaces the waypoints with the single destination
   spec, the route following ladder over it interpolates the chord
   (both escape aims of the dump sat on it byte for byte), the claims
   dragged the character through the village geometry and the water
-  guard stranded it. The HOW: replanDirectEscapeRoute runs the leg
+  guard stranded it. The HOW: replanDirectEscapeRoute runs the segment
   start search for the phase (the session bans respected) before the
-  claims build, installs the fresh route as the leg plan and stands
-  the direct leg down - the WASD escape walks along the planner's
+  claims build, installs the fresh route as the segment plan and stands
+  the direct segment down - the WASD escape walks along the planner's
   bends and the settle returns the walk to the normal routed clicks
   on the same plan (the owner contract: WASD along the route, the
   normal mode at the point); the planless fallback keeps the pocket
   contract toward the validated hop aim. The existing repro drivers
   now mirror the production dispatch (the armed escape drives before
-  the direct leg check). Tests:
+  the direct segment check). Tests:
   `hunt/cursor_escape_direct_leg_repro_test.go` (the dump repro on
   the real pack, the planless fallback unit pin, the village escape
   end to end over the refusal pocket), the hunt suite green, 28
@@ -1137,26 +1137,26 @@ three independent defects, all fixed in one round:
   pocket on the real pack (every direction refuses but south), the
   clicks never left the bot so no server answer ever arrived, the
   escape arming branches never ran, the ladder collapsed the plan
-  into the single far waypoint through armDirectLeg and the walk sat
+  into the single far waypoint through armDirectSegment and the walk sat
   on the forbidden direct line for three trip cycles while the
   widened bans (48 -> 96 -> 192) could not move the mesh's first
   funnel waypoint off the pocket. The offline probes (the real pack +
   the built real mesh tiles) pin both halves: the mesh plans the 64
   waypoint route whose wp 0 IS the refused 8 unit click, the grid
-  refuses every first leg. The HOW: the direct server routed walk is
-  ELIMINATED - escalateFrozenLeg rung 2 arms the cursor key escape
+  refuses every first segment. The HOW: the direct server routed walk is
+  ELIMINATED - escalateFrozenSegment rung 2 arms the cursor key escape
   ALONG THE CURRENT PLAN (the claims follow the planner's bends, the
   settle returns the normal routed clicks on the same plan, the
   re-arm repeats while the attempts last), the budget-burned zone
   return and the failed planning hold with a paced log instead of
-  marching walkZoneLeg (which stays only for the in-zone patrol and
+  marching walkZoneSegment (which stays only for the in-zone patrol and
   the no-navigator deployments), and the planless escape aim clamps
   into the pocket radius. Every walk plan of the loop now carries its
   mesh search contract - the search-less plan view WAS the direct
-  leg's fingerprint. Tests:
+  segment's fingerprint. Tests:
   `hunt/direct_walk_elimination_repro_test.go` (the 16:02 dump end to
   end on the real pack + mesh, the no-server-answer ladder pin, the
-  planless clamp) + the reworked contract pins; the direct leg test
+  planless clamp) + the reworked contract pins; the direct segment test
   set retires with the machinery. The live acceptance village-escape
   answers PASS on the built binary, tools/mobius_e2e.sh answers
   E2E_OK, the hunt suite green, every package ok, no new lint
@@ -1240,7 +1240,7 @@ The owner directive ("в коде кажется остались устарев
 медленней чем бежать"): the dry/swim filter dichotomy is the
 outdated way. One search remains - the water is a price (the
 run/swim ratio 2.3), never a wall - and the walker walks the wet
-legs the plan carries.
+segments the plan carries.
 
 ### The round (the full analysis is Round 90 of the development log)
 - `navmesh`: `AllowWater`, `DryFilter`, `RouteDry` deleted;
@@ -1248,8 +1248,8 @@ legs the plan carries.
   water price).
 - The grid engine: `search.dry`, `FindPathApproachDry(+-Avoiding)`,
   `DryLine` deleted; the pricing, the direct line dry gate and the
-  `legDry` smoothing stay (they ARE the pricing honesty).
-- The hunt loop: one priced search everywhere (`startWalkLegSearch`
+  `segmentDry` smoothing stay (they ARE the pricing honesty).
+- The hunt loop: one priced search everywhere (`startWalkSegmentSearch`
   without the non-dry switch, the shop escalation and the zone
   return fallback ladder deleted); the click water guard retired
   (`clickWouldEnterWater`, `shortenWetHop`, the wet variant skip,
@@ -1272,7 +1272,7 @@ legs the plan carries.
 The owner reported two defects of the round 89 escape on the 17:18
 session (build 94ec5e3, bot test1): the wasd walked waypoints did not
 mark passed and the resumed clicks walked BACK to them (two minutes
-of backtrack legs in the dump), and the web UI showed the character
+of backtrack segments in the dump), and the web UI showed the character
 facing a direction it never walked during the wasd walk.
 
 ### Outcome
@@ -1376,11 +1376,11 @@ a38b90a (test gate: the unit test account ladder renames to unittest1 - the test
   at the doorway polygon (44718 52144, 147 units short of the click,
   inside the 150 unit ring). The bot walked to the door and declared
   arrival; with the real client attached the active plan kept
-  re-issuing the door leg and out-raced every client click.
+  re-issuing the door segment and out-raced every client click.
 - the fix: planUserWalk plans the exact mesh search first (approach
   zero), the approach corridor stays the fallback for the
   unreachable click; the published WalkSearch contract carries the
-  answer's own approach. The town and NPC approach legs keep their
+  answer's own approach. The town and NPC approach segments keep their
   rings. The fresh tile repro on the pre fix binary fails at the
   door (225 units), the fixed binary walks in (371 units, PASS).
 - verification: go test -count=1 ./... answers 28 packages ok zero
@@ -1425,7 +1425,7 @@ a38b90a (test gate: the unit test account ladder renames to unittest1 - the test
   direct/proxy) all PASS, so the stall belongs to the owner
   deployment's server class (the 15:10 class: its geodata seals the
   porch lines and it answers no click from there).
-- the fix: the manual walk refusal ladder - userLegRefused (the
+- the fix: the manual walk refusal ladder - userSegmentRefused (the
   sent click attribution), sendUserVariedAim (the shared
   refusalVariantTarget ladder through the click validation port)
   and beginUserCursorKeyEscape (the claimed ValidatePosition
@@ -1548,19 +1548,47 @@ a38b90a (test gate: the unit test account ladder renames to unittest1 - the test
 
 - the farm readiness report (level 15): the bot did not buy, slid
   along the outer railing and talked to the merchants from outside.
-  The merchant legs now plan the exact mesh search (the customer
+  The merchant segments now plan the exact mesh search (the customer
   cell across the counter, 40-42 units from the npc at floor level
   on the real tiles, the counters never walked) and the final
   arrival is the tight pass radius.
 - the second bug the live run exposed: the exact search to a far
   unreachable destination exhaustively floods the whole mesh
-  component (the Herbiel leg froze the live bot inside one query,
-  the offline rerun OOMs in 4.4 s). The exact legs are gated by
-  exactLegMaxDistance (2000), the far legs walk the priced ring
+  component (the Herbiel segment froze the live bot inside one query,
+  the offline rerun OOMs in 4.4 s). The exact segments are gated by
+  exactSegmentMaxDistance (2000), the far segments walk the priced ring
   (the hierarchy answers them in milliseconds) and the walk
   completion arms the near exact final approach; the re-paths
-  preserve the leg contract (replanTownWalkLeg).
+  preserve the segment contract (replanTownWalkSegment).
 - the live verification bought the whole level 15 kit through four
-  merchants (every purchase confirmed, the frozen Herbiel leg
+  merchants (every purchase confirmed, the frozen Herbiel segment
   walked in 51 s); the offline pins and the full suite stay green.
   Round 96 of docs/development_log.md.
+
+### Progress (2026-09-20, the segment term round)
+
+- the owner asked for a naming audit of the pathfind and the movement
+  code: the "leg" term (a planned stretch of movement between two
+  points) reads unnatural in the derived names (legX, legHalf,
+  maxMoveLeg, LegGuard). The term retired to "segment" (the standard
+  pathfinding word) across the movement code, the tests and the
+  current-facing docs: the identifiers (startWalkSegment, zoneSegmentAt,
+  SegmentGuard, maxMoveDistance - the one deliberate special case, the
+  1000 unit move cap is a distance), the webui visible strings (the
+  avoidance bend, the stall diagnostics, the walk plan dump
+  ", t+12.4s, segment 5.2s") and the comment prose. The equipment
+  "legs" (the armor slot: PaperdollLegs, SlotLegs, partLegs,
+  legsPurchase, legsItemIDOf, legsSellFirstOf, legsWord) and the game
+  data stay untouched; the historical journals (docs/development_log.md,
+  docs/session_journal.md, docs/agent_progress_archive.md) keep their
+  dated record. The test file merchant_counter_leg_test.go renamed to
+  merchant_counter_segment_test.go.
+- the lint shrink the touched functions owe: the ineffectual planFailed
+  initializer of the shopping trip and the gocognit directive of
+  maybeStartTownTrip answered, the four float-compares of the merchant
+  segment test moved to require.Zero/require.InDelta - the full
+  golangci-lint run answers 0 issues again.
+- verification: go build, go vet, task lint 0 issues, task fmt:check
+  clean, go test -count=1 ./... 28 packages ok (pathfind 126 s
+  dominates). No live behavior change: the rename is textual, the
+  movement semantics, the wire packets and the plans are identical.

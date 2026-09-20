@@ -171,16 +171,16 @@ const (
     // destroyBatch is the number of junk items destroyed per cleanup.
     destroyBatch = 4
     // zoneReturnFailBudget bounds the consecutive pathfound zone return
-    // legs that end without reaching the zone (a stuck walk aborts the
-    // leg): past the budget the return falls back to the direct legacy
-    // legs, which at least keep the character moving home.
+    // segments that end without reaching the zone (a stuck walk aborts the
+    // segment): past the budget the return falls back to the direct legacy
+    // segments, which at least keep the character moving home.
     zoneReturnFailBudget = 3
     // roadFightBudget bounds the consecutive fights the out of zone
     // adoption may start during one walk home: the aggressive
     // territory on the road feeds a fresh attacker every respawn
     // window, so without a cap the adoption holds the character on
     // the road forever (the 2026-09-11 08:04 parallel round: the
-    // walk home never resumed, the farm leg timed out on the road
+    // walk home never resumed, the farm segment timed out on the road
     // fights). Past the budget the walk home continues through the
     // blows - the flee flow owns the hurt case, the mobs leash back
     // once the character leaves the aggro radius. The budget resets
@@ -231,7 +231,7 @@ const (
     // straight back into the mob the character just ran from
     // re-creates the same death risk at lower health.
     fleeSkipDelay = 2 * time.Minute
-    // escapeWalkDistance is one escape leg of the flee flow.
+    // escapeWalkDistance is one escape segment of the flee flow.
     escapeWalkDistance = 700.0
     // noTargetPatience is the idle time before a targetless hunter
     // patrols toward the zone center: entering a zone engages the
@@ -372,11 +372,11 @@ type Loop struct {
     navigator     Navigator
     waypoints     []pathfind.Vec3
     wpIndex       int
-    legDest       pathfind.Vec3
-    legStart      pathfind.Vec3
+    segmentDest   pathfind.Vec3
+    segmentStart  pathfind.Vec3
     waterEscape   bool
-    // legFrameOffset is the measured z frame offset of the current
-    // leg plan (see click_frame.go): the difference between the
+    // segmentFrameOffset is the measured z frame offset of the current
+    // segment plan (see click_frame.go): the difference between the
     // server vouched standing z and the mesh frame height of the same
     // cell, calibrated when a fresh plan is accepted and re-measured
     // by every re-path (each plan starts at the cell the character
@@ -385,8 +385,8 @@ type Loop struct {
     // (clickWaypoint, the route samples, the escape hops, the varied
     // aims); a plan without a measurable offset keeps it zero and
     // rides the raw mesh z.
-    legFrameOffset float64
-    moveAt         time.Time
+    segmentFrameOffset float64
+    moveAt             time.Time
     // questWalkAt paces the quest trip walk requests (the flood
     // protector mute of the 2026-09-12 class transfer run).
     questWalkAt time.Time
@@ -411,7 +411,7 @@ type Loop struct {
     // stuck detections use the shorter stuckFastTimeout so the walker
     // cycles through the remaining waypoints quickly instead of waiting
     // the full stuckTimeout for each one. resetTownTrip and
-    // startWalkLeg clear it.
+    // startWalkSegment clear it.
     stuckFast bool
     // moveStartAt/X/Y are the move start watchdog of the walker (see
     // noteMoveStart): the deadline arms when a walk click goes out,
@@ -441,7 +441,7 @@ type Loop struct {
     // extendArmed arms the short click extension of the town walk
     // follower: it flips on the first stuck that finds no clear
     // successor waypoint (the pinned cursor - the plain clicks of
-    // the leg proved they do not move the character) and clears at
+    // the segment proved they do not move the character) and clears at
     // the trip boundaries. While armed, the clicks whose primary
     // target sits under the server rescue floor (minWalkClick) or
     // behind the character on the route re-aim at the forward
@@ -455,7 +455,7 @@ type Loop struct {
     frozenRepaths int
     // frozenAreas is the session memory of the ground the live
     // server refused to walk although the geodata pack modeled it
-    // as open: every dry town leg search routes around them (see
+    // as open: every dry town segment search routes around them (see
     // banFrozenCorridor). The 2026-09-12 trainer hall aisle dump:
     // the plan entered the building through the west aisle column,
     // the server walled it, the deterministic re-plan reproduced
@@ -464,9 +464,9 @@ type Loop struct {
     // detour.
     frozenAreas []pathfind.AvoidArea
     // frozenStage counts the escalation rungs of the frozen town
-    // leg (0: none, 1: the banned detour re-plan, 2: the cursor
-    // key escape along the plan): see escalateFrozenLeg. It resets
-    // on the stop boundaries, not on the re-plans of the same leg.
+    // segment (0: none, 1: the banned detour re-plan, 2: the cursor
+    // key escape along the plan): see escalateFrozenSegment. It resets
+    // on the stop boundaries, not on the re-plans of the same segment.
     frozenStage int
     // cursorEscape carries the cursor key escape of a click-refusing
     // cell (see beginCursorKeyEscape): the armed state, the claimed
@@ -485,43 +485,43 @@ type Loop struct {
     // branch) burns the attempts and the trip aborts with the
     // honest reason instead of grinding the escape ladder forever.
     cursorEscapes int
-    // legRefused latches the online refusal evidence of the current
-    // leg: the server answered a click of this leg with
+    // segmentRefused latches the online refusal evidence of the current
+    // segment: the server answered a click of this segment with
     // ActionFailed while the character stood still (see
     // refusalEvidence). The corridor ban rung of the frozen trip
-    // escalation reads it - a leg the server refused does not name a
+    // escalation reads it - a segment the server refused does not name a
     // frozen corridor, banning it would seal innocent ground for the
     // session (the 2026-09-14 10:18 dump: six corridor bans and a
     // widened r768 ban across both village exits while the server
-    // refused every click for its own reasons). It clears on the leg
-    // boundaries with the other leg state.
-    legRefused bool
-    // legRefusedX/Y remember the cell where the leg's first refusal
-    // verdict latched (see latchLegRefused): a stuck verdict with
+    // refused every click for its own reasons). It clears on the segment
+    // boundaries with the other segment state.
+    segmentRefused bool
+    // segmentRefusedX/Y remember the cell where the segment's first refusal
+    // verdict latched (see latchSegmentRefused): a stuck verdict with
     // refusal evidence ON THAT VERY CELL names a refusing pocket -
     // the server answers no click from the ground the character
     // stands on (the 2026-09-14 15:10 report: even the official
     // client's mouse clicks died on the plaza cell) - and the cursor
     // key escape owns the recovery at once, the varied aims only
     // grind more refused clicks from the same ground. It clears on
-    // the trip boundaries with the legRefused latch.
-    legRefusedX int32
-    legRefusedY int32
+    // the trip boundaries with the segmentRefused latch.
+    segmentRefusedX int32
+    segmentRefusedY int32
     // refusalVariants counts the varied aim attempts spent on the
-    // current leg (see stuckTownWalk): the refusal answer of the
+    // current segment (see stuckTownWalk): the refusal answer of the
     // server is target specific - a shorter prefix or a sideways
     // offset of the same waypoint often walks where the plain click
     // was refused - so the stuck verdict varies the aim before it
-    // re-paths the whole leg.
+    // re-paths the whole segment.
     refusalVariants int
     // zoneRefusalX/Y remembers the cell where the server's refusal
-    // answers last stalled the direct zone legs: a later refusal
+    // answers last stalled the direct zone segments: a later refusal
     // stall on the very same cell (no ground covered in between)
     // holds the return backoff instead of re-arming the cycle the
-    // server keeps refusing (see noteZoneLegStall).
+    // server keeps refusing (see noteZoneSegmentStall).
     zoneRefusalX int32
     zoneRefusalY int32
-    // legRadius is the approach radius the current town leg searches
+    // segmentRadius is the approach radius the current town segment searches
     // its route within: the wide trip ring (tripApproachRadius) for
     // the merchant stops and the returns, the close ring
     // (npcApproachOffset) for the teacher stops - the user rule of
@@ -529,17 +529,17 @@ type Loop struct {
     // training npc, and the geodata search is the one that knows the
     // walkable ring cells (the trainer hall interior is walkable only
     // along its rows, the straight line offset ring lands on the
-    // roof-only band). The re-paths of the leg inherit it.
-    legRadius float64
-    // legSearch is the mesh search contract the current leg's plan
+    // roof-only band). The re-paths of the segment inherit it.
+    segmentRadius float64
+    // segmentSearch is the mesh search contract the current segment's plan
     // answered (the filter, the approach radius and the ban circles
-    // startWalkLegSearch ran with): the walk plan view publishes it,
+    // startWalkSegmentSearch ran with): the walk plan view publishes it,
     // so the 3D pathfind link rebuilds the very search the walk
     // follows instead of a lookalike (the 2026-09-19 route mismatch:
     // the viewer rebuilt a dry zone return with the swim filter and
     // folded the answer into a straight water blind chord). Nil for
-    // the direct legs no mesh search produced.
-    legSearch         *state.WalkSearch
+    // the direct segments no mesh search produced.
+    segmentSearch     *state.WalkSearch
     farmX             int32
     farmY             int32
     farmZ             int32
@@ -553,13 +553,14 @@ type Loop struct {
     tripEndedAt       time.Time
     zoneReturn        bool
     zoneFails         int
-    // zoneLegAt/zoneLegX/zoneLegY hold the no-movement window of the
-    // direct zone legs (see noteZoneLegStall): the baseline arms on
-    // the first leg send, a cell change re-baselines it and a hold
+    // zoneSegmentAt/zoneSegmentX/zoneSegmentY hold the no-movement
+    // window of the direct zone segments (see noteZoneSegmentStall):
+    // the baseline arms on
+    // the first segment send, a cell change re-baselines it and a hold
     // past the stuck timeout re-arms the pathfound zone return.
-    zoneLegAt     time.Time
-    zoneLegX      int32
-    zoneLegY      int32
+    zoneSegmentAt time.Time
+    zoneSegmentX  int32
+    zoneSegmentY  int32
     roadFights    int
     delevelTarget int32
     // delevelMedian is the live median mob level of the held ground
@@ -650,10 +651,10 @@ type Loop struct {
     stagHardAt   time.Time
     // avoidScratch is the reused threat buffer of the aggro-aware
     // walk steering (see loop_avoid.go): the scan refills it in
-    // place, so the per leg danger pass costs no allocation.
+    // place, so the per segment danger pass costs no allocation.
     avoidScratch []state.AggroThreat
     // avoidLogAt paces the detour diagnostic of the walk steering:
-    // a busy corridor bends every leg, the log names it once per
+    // a busy corridor bends every segment, the log names it once per
     // period instead of every request.
     avoidLogAt time.Time
     // combatAvoidScanAt paces the impending-add threat scan of the
@@ -670,17 +671,17 @@ type Loop struct {
     // server-side, so the engage holds its re-requests until the step
     // finished.
     combatAvoidUntil time.Time
-    // zoneLegLogAt paces the walled direct leg diagnostic of the
-    // zone return escalation (see guardZoneLegClick): the refusal
+    // zoneSegmentLogAt paces the walled direct segment diagnostic of the
+    // zone return escalation (see guardZoneSegmentClick): the refusal
     // repeats every second while the character stands in the
     // pocket, the log names the wall once per period.
-    zoneLegLogAt time.Time
+    zoneSegmentLogAt time.Time
     // fleeAt paces the escape walk requests: the escape must not
     // wait out the attack request pacing of the engage (the last
     // forced attack fired moments before the threshold crossed).
     fleeAt time.Time
     // fleeSince tracks the start of the running flee episode: the
-    // escape legs never stop the chase by themselves when the
+    // escape segments never stop the chase by themselves when the
     // pursuing pack is fast, and past the fleeLogoutAfter budget
     // the session logs out to reset the aggro instead of running
     // forever. A recovered health or a fresh fight clears it.
@@ -722,7 +723,7 @@ type Loop struct {
     // produced.
     userSearch *state.WalkSearch
     // userFrameOffset is the measured z frame offset of the manual
-    // walk plan (the legFrameOffset of the user follower, see
+    // walk plan (the segmentFrameOffset of the user follower, see
     // click_frame.go): calibrated when planUserWalk accepts a fresh
     // mesh route and ridden by the follower's waypoint clicks.
     userFrameOffset float64
@@ -882,107 +883,107 @@ type Loop struct {
 // convention), which exceeds the line budget.
 func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
     return &Loop{
-        game:              game,
-        tracker:           tracker,
-        logger:            log.Default(),
-        journal:           nil,
-        autonomous:        true,
-        phase:             phaseEngage,
-        equip:             newEquipManager(gear.MeleeFighter{}),
-        target:            0,
-        lastHit:           time.Time{},
-        fightStartAt:      time.Time{},
-        fightStartFor:     0,
-        lootID:            0,
-        lootAt:            time.Time{},
-        lootMoveAt:        time.Time{},
-        skipped:           make(map[int32]time.Time),
-        restActionAt:      time.Time{},
-        restActionSit:     false,
-        restartAt:         time.Time{},
-        zoneCX:            0,
-        zoneCY:            0,
-        zoneRegion:        "",
-        zoneHalf:          0,
-        navigator:         nil,
-        waypoints:         nil,
-        wpIndex:           0,
-        legDest:           pathfind.Vec3{X: 0, Y: 0, Z: 0},
-        legStart:          pathfind.Vec3{X: 0, Y: 0, Z: 0},
-        waterEscape:       false,
-        legFrameOffset:    0,
-        moveAt:            time.Time{},
-        moveStartAt:       time.Time{},
-        moveStartX:        0,
-        moveStartY:        0,
-        forceStuck:        false,
-        stuckAt:           time.Time{},
-        stuckX:            0,
-        stuckY:            0,
-        stuckWP:           0,
-        stuckBest:         0,
-        stuckFast:         false,
-        tripAbortRun:      0,
-        rePaths:           0,
-        extendArmed:       false,
-        legRadius:         tripApproachRadius,
-        legSearch:         nil,
-        repathX:           0,
-        repathY:           0,
-        frozenRepaths:     0,
-        frozenAreas:       nil,
-        frozenStage:       0,
-        legRefused:        false,
-        refusalVariants:   0,
-        zoneRefusalX:      0,
-        zoneRefusalY:      0,
-        farmX:             0,
-        farmY:             0,
-        farmZ:             0,
-        sellAt:            time.Time{},
-        sellPhaseAt:       time.Time{},
-        merchantID:        0,
-        merchantPick:      time.Time{},
-        merchantDeckUntil: time.Time{},
-        sold:              make(map[int32]bool),
-        tripPlan:          nil,
-        tripStops:         nil,
-        buysPlanned:       false,
-        buyAt:             time.Time{},
-        buyRequested:      nil,
-        buyConfirmAt:      time.Time{},
-        buyRetries:        0,
-        shoppingPlanAt:    time.Time{},
-        shoppingPlanCache: nil,
-        shoppingPlanAdena: 0,
-        learnPlanCache:    nil,
-        learnPlanAt:       time.Time{},
-        learnPlanRevision: 0,
-        teacherID:         0,
-        teacherPick:       time.Time{},
-        teacherDeckUntil:  time.Time{},
-        teacherWalkUntil:  time.Time{},
-        learnRequested:    nil,
-        learnConfirmAt:    time.Time{},
-        learnRetries:      0,
-        learnAt:           time.Time{},
-        learnRevision:     0,
-        castAt:            time.Time{},
-        buffAt:            time.Time{},
-        skillReuse:        make(map[int32]time.Time),
-        profilePicked:     false,
-        weaponWaitLogAt:   time.Time{},
-        stagXP:            0,
-        stagXPAt:          time.Time{},
-        stagPosX:          0,
-        stagPosY:          0,
-        stagPosZ:          0,
-        stagPosSet:        false,
-        stagPosAt:         time.Time{},
-        stagPosFires:      0,
-        stagXPFires:       0,
-        stagHardAt:        time.Time{},
-        zoneLegLogAt:      time.Time{},
+        game:               game,
+        tracker:            tracker,
+        logger:             log.Default(),
+        journal:            nil,
+        autonomous:         true,
+        phase:              phaseEngage,
+        equip:              newEquipManager(gear.MeleeFighter{}),
+        target:             0,
+        lastHit:            time.Time{},
+        fightStartAt:       time.Time{},
+        fightStartFor:      0,
+        lootID:             0,
+        lootAt:             time.Time{},
+        lootMoveAt:         time.Time{},
+        skipped:            make(map[int32]time.Time),
+        restActionAt:       time.Time{},
+        restActionSit:      false,
+        restartAt:          time.Time{},
+        zoneCX:             0,
+        zoneCY:             0,
+        zoneRegion:         "",
+        zoneHalf:           0,
+        navigator:          nil,
+        waypoints:          nil,
+        wpIndex:            0,
+        segmentDest:        pathfind.Vec3{X: 0, Y: 0, Z: 0},
+        segmentStart:       pathfind.Vec3{X: 0, Y: 0, Z: 0},
+        waterEscape:        false,
+        segmentFrameOffset: 0,
+        moveAt:             time.Time{},
+        moveStartAt:        time.Time{},
+        moveStartX:         0,
+        moveStartY:         0,
+        forceStuck:         false,
+        stuckAt:            time.Time{},
+        stuckX:             0,
+        stuckY:             0,
+        stuckWP:            0,
+        stuckBest:          0,
+        stuckFast:          false,
+        tripAbortRun:       0,
+        rePaths:            0,
+        extendArmed:        false,
+        segmentRadius:      tripApproachRadius,
+        segmentSearch:      nil,
+        repathX:            0,
+        repathY:            0,
+        frozenRepaths:      0,
+        frozenAreas:        nil,
+        frozenStage:        0,
+        segmentRefused:     false,
+        refusalVariants:    0,
+        zoneRefusalX:       0,
+        zoneRefusalY:       0,
+        farmX:              0,
+        farmY:              0,
+        farmZ:              0,
+        sellAt:             time.Time{},
+        sellPhaseAt:        time.Time{},
+        merchantID:         0,
+        merchantPick:       time.Time{},
+        merchantDeckUntil:  time.Time{},
+        sold:               make(map[int32]bool),
+        tripPlan:           nil,
+        tripStops:          nil,
+        buysPlanned:        false,
+        buyAt:              time.Time{},
+        buyRequested:       nil,
+        buyConfirmAt:       time.Time{},
+        buyRetries:         0,
+        shoppingPlanAt:     time.Time{},
+        shoppingPlanCache:  nil,
+        shoppingPlanAdena:  0,
+        learnPlanCache:     nil,
+        learnPlanAt:        time.Time{},
+        learnPlanRevision:  0,
+        teacherID:          0,
+        teacherPick:        time.Time{},
+        teacherDeckUntil:   time.Time{},
+        teacherWalkUntil:   time.Time{},
+        learnRequested:     nil,
+        learnConfirmAt:     time.Time{},
+        learnRetries:       0,
+        learnAt:            time.Time{},
+        learnRevision:      0,
+        castAt:             time.Time{},
+        buffAt:             time.Time{},
+        skillReuse:         make(map[int32]time.Time),
+        profilePicked:      false,
+        weaponWaitLogAt:    time.Time{},
+        stagXP:             0,
+        stagXPAt:           time.Time{},
+        stagPosX:           0,
+        stagPosY:           0,
+        stagPosZ:           0,
+        stagPosSet:         false,
+        stagPosAt:          time.Time{},
+        stagPosFires:       0,
+        stagXPFires:        0,
+        stagHardAt:         time.Time{},
+        zoneSegmentLogAt:   time.Time{},
         shoppingViewCache: state.ShoppingPlanView{
             Entries: nil,
             Adena:   0,
@@ -1015,9 +1016,9 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         zoneMobPriority:     nil,
         zoneReturn:          false,
         zoneFails:           0,
-        zoneLegAt:           time.Time{},
-        zoneLegX:            0,
-        zoneLegY:            0,
+        zoneSegmentAt:       time.Time{},
+        zoneSegmentX:        0,
+        zoneSegmentY:        0,
         roadFights:          0,
         delevelTarget:       0,
         delevelMedian:       0,
@@ -1282,7 +1283,7 @@ func (l *Loop) cellEnemiesVisible(now time.Time) bool {
 // of the economy and the audit fence on the WHOLE hexagon - the
 // farm ground is the complete hexagon, never a square approximation
 // of it), the movement square otherwise. The movement machinery (the
-// patrol, the return leg, the flee steps) keeps the square zone() -
+// patrol, the return segment, the flee steps) keeps the square zone() -
 // the inscribed patrol square never leaves the cell. The target
 // SEARCH itself runs unfenced in the cell mode (see pickZone) - the
 // hunt fights the nearest visible enemy even outside the held
@@ -1560,7 +1561,7 @@ func (l *Loop) recoverFromDeath() {
         // the deleveling once the character is alive again.
         l.noteDelevelDeath()
         l.waypoints = nil
-        l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.segmentStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
         l.waterEscape = false
     } else {
         if l.autonomous {
@@ -1657,7 +1658,7 @@ func (l *Loop) engage() {
                 // Spore Fungus SW ground bare handed and
                 // livelocked in the logout cycle). The trip
                 // machinery starts the weapon run on the
-                // next tick and its return leg walks home
+                // next tick and its return segment walks home
                 // armed; the wallet that cannot afford any
                 // weapon keeps the ordinary return (the
                 // punches are all it has).
@@ -1778,7 +1779,7 @@ func (l *Loop) engage() {
         // kills, so the fight is dropped and the character runs.
         // It stays ahead of the blind recovery: an add grinding a
         // repositioning character must escalate into the flee, not
-        // into another detour leg.
+        // into another detour segment.
         l.fleeFromTarget(l.target, now)
 
         return

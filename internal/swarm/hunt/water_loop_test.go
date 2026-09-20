@@ -17,7 +17,7 @@ import (
 // trip ended: aborted, the walk would cross water" every 1.3 seconds
 // for 25 minutes straight. Two defects chained: the planner planned
 // water crossing routes the click guard refused (fixed by the dry
-// search of startWalkLeg), and the abort of a delevel walk ended only
+// search of startWalkSegment), and the abort of a delevel walk ended only
 // the town trip - the delevel state stayed armed without a cooldown,
 // so the very next tick restarted the walk into the same blocker.
 

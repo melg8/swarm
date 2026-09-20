@@ -10,7 +10,7 @@ import (
     "time"
 )
 
-// TestGiranStrandProbe walks the Gludin Giran leg replan by replan
+// TestGiranStrandProbe walks the Gludin Giran segment replan by replan
 // and names the stall point of every partial answer (the region, the
 // local cell and the world position) - the anatomy of the strand the
 // town route measurement reports.
@@ -35,7 +35,7 @@ func TestGiranStrandProbe(t *testing.T) {
     current := startPos
     for iteration := 1; iteration <= 12; iteration++ {
         began := time.Now()
-        leg, err := mesh.Route(current, endPos, DefaultFilter())
+        segment, err := mesh.Route(current, endPos, DefaultFilter())
         if err != nil {
             t.Fatal(err)
         }
@@ -47,21 +47,21 @@ func TestGiranStrandProbe(t *testing.T) {
             return formatRegionCell(col, row, lx, ly)
         }
         t.Logf("iter %d: found=%t partial=%t explored=%d wps=%d"+
-            " length=%.0f %s from %s", iteration, leg.Found,
-            leg.Partial, leg.Explored, len(leg.Waypoints),
-            routeLength(leg), time.Since(began).Round(time.Millisecond),
+            " length=%.0f %s from %s", iteration, segment.Found,
+            segment.Partial, segment.Explored, len(segment.Waypoints),
+            routeLength(segment), time.Since(began).Round(time.Millisecond),
             tag(current))
-        if leg.Found {
+        if segment.Found {
             t.Logf("  REACHED after %d replans", iteration)
 
             return
         }
-        if len(leg.Waypoints) < 2 {
+        if len(segment.Waypoints) < 2 {
             t.Logf("  the partial answer carries no advance pair")
 
             return
         }
-        next := leg.Waypoints[len(leg.Waypoints)-1]
+        next := segment.Waypoints[len(segment.Waypoints)-1]
         t.Logf("  advances to %s (%.0f, %.0f, %.0f), step %.0f", tag(next),
             next.X, next.Y, next.Z, dist3(current, next))
         if dist3(current, next) < 1000 {

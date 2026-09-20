@@ -124,7 +124,7 @@ func TestFunnelWalksOpenSpanEndStraight(t *testing.T) {
 
 // TestSmoothMergesGranularStairPivots walks a long flat corridor of
 // one-cell wide strips (the granular pivot farm of the exact square
-// mesh) and pins the pass at scale: every merged leg keeps the
+// mesh) and pins the pass at scale: every merged segment keeps the
 // capsule clearance from the walls, the answer never grows.
 func TestSmoothMergesGranularStairPivots(t *testing.T) {
     // One long hall of four stacked strips with staggered side walls:
@@ -155,19 +155,19 @@ func TestSmoothMergesGranularStairPivots(t *testing.T) {
     require.True(t, route.Found)
     require.NotNil(t, route.RawWaypoints)
     require.LessOrEqual(t, len(route.Waypoints), len(route.RawWaypoints))
-    // Every merged leg stays inside the hall: the wall spans of the
+    // Every merged segment stays inside the hall: the wall spans of the
     // hall border (x 0 and x 256 world) keep the 7.5 clearance along
-    // every leg of the smoothed answer.
+    // every segment of the smoothed answer.
     for i := 0; i+1 < len(route.Waypoints); i++ {
         a, b := route.Waypoints[i], route.Waypoints[i+1]
         require.GreaterOrEqual(t, a.X, 32768+7.5-1e-6,
-            "leg %d start hugs the west wall", i)
+            "segment %d start hugs the west wall", i)
         require.GreaterOrEqual(t, b.X, 32768+7.5-1e-6,
-            "leg %d end hugs the west wall", i)
+            "segment %d end hugs the west wall", i)
         require.LessOrEqual(t, a.X, 32768+16*16-7.5+1e-6,
-            "leg %d start hugs the east wall", i)
+            "segment %d start hugs the east wall", i)
         require.LessOrEqual(t, b.X, 32768+16*16-7.5+1e-6,
-            "leg %d end hugs the east wall", i)
+            "segment %d end hugs the east wall", i)
     }
 }
 
@@ -240,7 +240,7 @@ type guardStub struct {
     asked   int
 }
 
-func (g *guardStub) LegClear(ax, ay, _ float64,
+func (g *guardStub) SegmentClear(ax, ay, _ float64,
     _, _, _, _ float64,
 ) bool {
     g.asked++

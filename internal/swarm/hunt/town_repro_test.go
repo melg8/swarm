@@ -45,7 +45,7 @@ const (
     // reproWaterSurface is the C1 water surface height (the maxZ of
     // the water zones, see round 35): a walk below it is a swim.
     reproWaterSurface = -3780.0
-    // reproSimStep is the sim stride along a walk leg (one geodata
+    // reproSimStep is the sim stride along a walk segment (one geodata
     // cell is 16 units; the sim advances the straight line cell by
     // cell like the server move validation does).
     reproSimStep = 16.0
@@ -329,7 +329,7 @@ func TestReproTownTripFromTheUserStuckSpot(t *testing.T) {
 
     // Walk the plan under the simulated server: the follower paces a
     // walk request every two seconds, the sim advances the character
-    // along each requested leg.
+    // along each requested segment.
     deadline := time.Now().Add(40 * time.Second)
     for time.Now().Before(deadline) {
         loop.tick()

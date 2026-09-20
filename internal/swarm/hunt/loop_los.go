@@ -203,7 +203,7 @@ func (l *Loop) startBlindReposition(now time.Time) {
     l.losMoveAt = time.Time{}
     l.logger.Printf("Hunt: target %d is not visible from here, "+
         "walking around the obstacle", l.target)
-    // The first leg leaves on the planning tick: the detour around a
+    // The first segment leaves on the planning tick: the detour around a
     // small obstacle is short, a planning tick of pure standing would
     // double the recovery latency.
     l.walkBlindWaypoints(now)
@@ -252,7 +252,7 @@ func (l *Loop) blindVantagePoint(
 }
 
 // walkBlindWaypoints follows the planned reposition route with paced
-// ground click walks: one leg per walk request period, the long legs
+// ground click walks: one segment per walk request period, the long segments
 // split at the server move limit like every hunt walk. A waypoint
 // counts as reached within its arrival radius (tight for the
 // intermediate turns, wide for the vantage goal) and only a waypoint
@@ -305,8 +305,8 @@ func (l *Loop) walkBlindWaypoints(now time.Time) {
     moveX, moveY := int32(wp.X), int32(wp.Y)
     dx := wp.X - float64(selfX)
     dy := wp.Y - float64(selfY)
-    if leg := math.Hypot(dx, dy); leg > maxMoveLeg {
-        frac := maxMoveLeg / leg
+    if segment := math.Hypot(dx, dy); segment > maxMoveDistance {
+        frac := maxMoveDistance / segment
         moveX = int32(float64(selfX) + dx*frac)
         moveY = int32(float64(selfY) + dy*frac)
     }

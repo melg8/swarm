@@ -25,7 +25,7 @@ import (
 // server kept silently canceling the move.
 //
 // The root cause (probed against the live stack): the plan itself is
-// valid - every leg of it validates against the server click port and
+// valid - every segment of it validates against the server click port and
 // the local stack walks the exact dump scenario in one go (proven with
 // the MOVEDBG diagnostics build). The freeze sits in the interaction
 // of the short first click with the server's own move machinery: a
@@ -54,7 +54,7 @@ const (
 // character never moves) while the longer clicks walk their validated
 // destination, and a correction that shortens a longer line past the
 // threshold hands the click to the server side pathfinder (the
-// character walks the planned first leg instead of the collapsed
+// character walks the planned first segment instead of the collapsed
 // prefix). This is the observed behavior split of the 11:34 dump: the
 // 22 unit waypoint click froze through two whole trip cycles while
 // the very same cells walked under every longer click of the plan.
@@ -101,7 +101,7 @@ func (s *shortClickFreezeServer) consume(game *fakeGame, bot *state.Bot) {
     if full-cut > 30 {
         // The correction shortened the line past the threshold: the
         // server side pathfinder walks its own route to the original
-        // target (the sim collapses the walk time into the first leg).
+        // target (the sim collapses the walk time into the first segment).
         if res, err := s.engine.FindPath(
             from, to, pathfind.DefaultMaxPassableHeight); err == nil &&
             res != nil && res.Found && len(res.Waypoints) > 1 {
@@ -146,7 +146,7 @@ func TestReproRound57ShortClickFreezeWalksThePlan(t *testing.T) {
     loop.lastHit = time.Now().Add(-time.Minute)
     sim := &shortClickFreezeServer{engine: engine}
 
-    // The zone return leg: the destination the returnToZone flow
+    // The zone return segment: the destination the returnToZone flow
     // would plan (the zone center on its real deck height).
     deckZ, err := engine.ClosestHeight(
         float64(reproRound57ZoneX), float64(reproRound57ZoneY),
@@ -157,7 +157,7 @@ func TestReproRound57ShortClickFreezeWalksThePlan(t *testing.T) {
         Y: float64(reproRound57ZoneY),
         Z: float64(deckZ),
     }
-    require.True(t, loop.startZoneReturnLeg(dest),
+    require.True(t, loop.startZoneReturnSegment(dest),
         "the zone return must plan a dry geodata route")
     require.Len(t, loop.waypoints, 11,
         "the plan must be the dump's 11 waypoint route")
@@ -262,7 +262,7 @@ func TestRound57ZoneReturnFromEveryVillageStart(t *testing.T) {
             loop.lastHit = time.Now().Add(-time.Minute)
             sim := &shortClickFreezeServer{engine: engine}
 
-            require.True(t, loop.startZoneReturnLeg(dest),
+            require.True(t, loop.startZoneReturnSegment(dest),
                 "the zone return must plan from this start")
             now := time.Now()
             arrived := false
@@ -296,7 +296,7 @@ func TestRound57ZoneReturnFromEveryVillageStart(t *testing.T) {
 // server that moves nothing at all (the total freeze) aborts the trip
 // after ONE no-movement re-path - two stuck windows instead of the
 // dump's four per trip times the trip restart cycle - and the zone
-// return escalates straight to the direct server routed legs.
+// return escalates straight to the direct server routed segments.
 func TestReproRound57FrozenServerEscalatesFast(t *testing.T) {
     engine := reproEngine(t)
     nav := NewNavigator(engine)
@@ -312,7 +312,7 @@ func TestReproRound57FrozenServerEscalatesFast(t *testing.T) {
         Y: float64(reproRound57ZoneY),
         Z: float64(reproRound57ZoneZ),
     }
-    require.True(t, loop.startZoneReturnLeg(dest))
+    require.True(t, loop.startZoneReturnSegment(dest))
     loop.phase = phaseTownReturn
 
     // The frozen aisle server: every click validates against the
@@ -337,7 +337,7 @@ func TestReproRound57FrozenServerEscalatesFast(t *testing.T) {
     require.Equal(t, phaseEngage, loop.phase, "the trip aborts back to the hunt")
     // The escalation ladder runs both rungs (the detour re-plan and
     // the direct server routed walk) before the trip aborts - the
-    // zone return no longer aborts straight to the direct legs. The
+    // zone return no longer aborts straight to the direct segments. The
     // recovery stays fast: a couple of stuck windows instead of the
     // dump's four per trip times the trip restart cycle.
     require.LessOrEqual(t, loop.frozenStage, 2,

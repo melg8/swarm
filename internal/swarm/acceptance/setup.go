@@ -199,7 +199,7 @@ func zoneReturnReset(account string) characterReset {
 // The dump start state of the gear gap scenario (the 2026-09-12
 // 04:58 pantsless report, build 4deb888): the level 14 fighter test2
 // stood at its Spore Fungus SW farm spot wearing every slot EXCEPT
-// the legs - the town trip had sold the piece for a replacement that
+// the segments - the town trip had sold the piece for a replacement that
 // never landed - with the 13162 adena of the report and nothing in
 // the bag. The scenario verifies the recovery invariant: the hunt
 // loop detects the hole, shops and dresses it.
@@ -266,8 +266,8 @@ func gearGapReset(account string) characterReset {
 // trip arms at once (the dump's own first trip: "no weapon in hand,
 // the weapon run comes first, 33 lessons worth 18690 sp wait at the
 // teacher"), buys the gear and the spellbooks across the village
-// merchants and then walks the teacher leg from the last stop into
-// the trainer hall - the exact leg the dump froze on.
+// merchants and then walks the teacher segment from the last stop into
+// the trainer hall - the exact segment the dump froze on.
 const (
     // entrySpawnX/Y/Z is the dump walk plan origin: the aisle
     // entrance of the elven village trainer hall.

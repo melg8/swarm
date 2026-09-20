@@ -417,7 +417,7 @@ func TestNavmeshNavigatorPricedSearchSwimsToWaterTargets(t *testing.T) {
     require.True(t, engineResult.Found)
 
     // The hybrid serves the mesh corridor through the water band: the
-    // walk ends on the destination polygon, the wet legs priced at
+    // walk ends on the destination polygon, the wet segments priced at
     // the swim rate.
     result, err := navigator.FindPathApproachAvoiding(
         start, end, 150, nil)

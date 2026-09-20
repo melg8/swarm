@@ -301,7 +301,7 @@ func buildingEntryChecks() []Check {
 }
 
 // evaluateGearGapConditions rewrites the check list of the pantsless
-// dump scenario from the live tracker state: the legs check holds
+// dump scenario from the live tracker state: the segments check holds
 // once the character wears any piece in the paperdoll legs slot the
 // town trip bought back (the auto equipment wears the filler within
 // seconds of its arrival).
@@ -315,8 +315,8 @@ func evaluateGearGapConditions(tracker *state.Bot, test *Test) {
 }
 
 // legsWord renders the legs slot state of the gear gap detail.
-func legsWord(legs int) string {
-    if legs == 1 {
+func legsWord(segments int) string {
+    if segments == 1 {
         return "the legs slot is dressed"
     }
 

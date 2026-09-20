@@ -25,7 +25,7 @@ import (
 // character back - the position ping pong that broke the delevel loop
 // (the guards never reached, the fight timeouts, the aborted delevel,
 // the stalled return walk). The proxy severs the loop: a report that
-// contradicts the bot tracker beyond one walk leg plus slack never
+// contradicts the bot tracker beyond one walk segment plus slack never
 // transits, the client receives the same ValidateLocation correction
 // the server would have sent for an out of sync report.
 
@@ -120,7 +120,7 @@ func TestProxyStalePositionReportCorrectedLocally(t *testing.T) {
 
 // TestProxyLivePositionReportTransits verifies the in range report
 // path: a client that follows its own character (the view within one
-// walk leg plus slack of the bot tracker, even mid movement) keeps the
+// walk segment plus slack of the bot tracker, even mid movement) keeps the
 // full server contract - the report transits unchanged and no
 // correction is synthesized.
 func TestProxyLivePositionReportTransits(t *testing.T) {
@@ -135,7 +135,7 @@ func TestProxyLivePositionReportTransits(t *testing.T) {
     require.Equal(t, byte(0x04), client.readPacket()[0], "the replayed user info")
 
     // Mid walk interpolation: a thousand units ahead of the tracker
-    // position, well within the walk leg slack.
+    // position, well within the walk segment slack.
     live := buildTestValidatePosition(45900, 50900, -3500)
     client.sendPacket(live)
     select {

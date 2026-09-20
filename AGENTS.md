@@ -234,7 +234,7 @@ conversation or in a commit message: it lives in the registry below.
   into navigation teleport edges priced by the fee, and a bot drives
   a gatekeeper through the html dialog bypass flow.
 - Relied on by: the meta transport plan of
-  `docs/navigation_analysis.md` and the M3 navigation legs.
+  `docs/navigation_analysis.md` and the M3 navigation segments.
 - Verify: read `Teleporter.onBypassFeedback` (the `chat`,
   `show teleports <list>` and `teleport <list> <index>` bypass
   commands), `RequestBypassToServer` (the client packet routing the
@@ -258,7 +258,7 @@ conversation or in a commit message: it lives in the registry below.
   `RequestGetOffVehicle`, `MoveToLocationInVehicle` and their
   server answers); then observe the `VehicleInfo` and
   `VehicleDeparture` broadcasts at a wharf at the schedule time and
-  ride one leg live, recording the boarding bypass command and the
+  ride one segment live, recording the boarding bypass command and the
   oust position.
 - Status: open.
 

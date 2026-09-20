@@ -280,7 +280,7 @@ clusters on the real mesh when the sampled crossings strand.
   4096 pop cap and the f spread bound; a stranded gated attempt
   hands over to the **gate free plain HPA\*** chain whose honesty
   the refinement hops and the confined fallback restore (the
-  measured pairs where the sampled crossings strand: the bay legs).
+  measured pairs where the sampled crossings strand: the bay segments).
 - **The caches**: the tile LRU (4 tiles default), the abstract LRU
   (32 regions - the comps array costs 4 bytes per polygon and the
   whole pack sums into the hundreds of megabytes), the hop corridor
@@ -433,7 +433,7 @@ their plans legitimately end short of the exact destination),
 areas of the session) and `fold=0` skips the capsule post pass - the
 answer then IS the search answer the bot publishes as its walk plan.
 The post pass exists for the double click experiments (the pushes
-and the bend pass, then the fold into the longest grid clear legs),
+and the bend pass, then the fold into the longest grid clear segments),
 but its grid oracle is water blind: on the elven mismatch report it
 folded the whole mesh route into one straight chord across the lake
 the bot detours, so every plan repro link arms `fold=0`. The viewer
@@ -524,22 +524,22 @@ comparison. The open spans of the mesh are whole geodata cells
 (16 units), so every span holds a crossing a 7.5 capsule clears and
 the pass never dead ends.
 
-## The wall oracle (the LegGuard seam)
+## The wall oracle (the SegmentGuard seam)
 
 The mesh wall spans are the side level approximation of the walls:
 the grid movement validation sees the per cell walls (the paired
 NSWE walls and the diagonal anti corner cut) that a rectangle side
 lumps together, and a funnel pivot one radius off a mesh span end
 can still sit a few units off a grid wall on the staircase terrain.
-`Filter.Guard` arms the wall oracle (the `LegGuard` interface - a
-`LegClear(ax, ay, az, bx, by, bz, radius)` answer for one straight
-leg): the shortcut pass then asks the guard about every chord before
+`Filter.Guard` arms the wall oracle (the `SegmentGuard` interface - a
+`SegmentClear(ax, ay, az, bx, by, bz, radius)` answer for one straight
+segment): the shortcut pass then asks the guard about every chord before
 the mesh spans, and the grid capsule of the caller
-(`pathfind.Capsule.LegClear` - the line of sight the movement channel
+(`pathfind.Capsule.SegmentClear` - the line of sight the movement channel
 applies plus the 4 unit clearance sampling of the bend pass) is the
 authority. The composition closes at the caller: the walker answer
 runs the capsule push and bend pass (`ApplyPath`) and folds into the
-longest grid clear legs (`ShortenPath`) - every leg the bot consumes
+longest grid clear segments (`ShortenPath`) - every segment the bot consumes
 answers the server movement rules with the capsule clearance. The
 owner repro route (21_19 swim) walks 14 waypoints of the legacy 148,
 the path length drops 4947 to 4852, and the raw variant of the
@@ -579,7 +579,7 @@ engine answered.
   corridor (the destination unreachable under the filter) and the
   engine CONFIRMS it with its own clean not found, the avoiding
   forms serve the mesh funnel waypoints with Found=false and
-  Partial set - the town legs and the quest segments walk toward the
+  Partial set - the town segments and the quest segments walk toward the
   closest reachable point instead of aborting at the start position
   (the shore of a swim-only destination, the border of the sealed
   corridor). The engine run comes FIRST on every mesh partial, so a
@@ -592,16 +592,16 @@ engine answered.
   already paid); trusting the mesh verdict without the engine
   confirmation is the acceptance-switch round's headroom.
 - **The validation layer never leaves the grid engine**:
-  ValidateClick (the click guard of every walked leg), the sight
+  ValidateClick (the click guard of every walked segment), the sight
   lines, the water rasters and the deck heights stay on the raster
   the server itself walks. The mesh plans, the raster validates -
   the division the acceptance stack of the town trips already
-  enforces leg by leg.
+  enforces segment by segment.
 - **The recovery bans wall the mesh at rectangle granularity**: a
   polygon whose footprint a ban disk touches walls the corridor
-  search (the over-walling direction - no funnelled leg ever enters
+  search (the over-walling direction - no funnelled segment ever enters
   the banned ground, where the grid only keeps the cell centers of
-  the smoothed legs out), the ban holding the start opens its escape
+  the smoothed segments out), the ban holding the start opens its escape
   ring within 256 units of the start at the 6x multiplier, a foreign
   ban wins over the escape ring. The ban disks come from the same
   freeze reports the grid bans come from - one report, two engines,

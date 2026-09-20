@@ -25,7 +25,7 @@ import (
 // while the corridor bans grew (43512 50504 widened to r768, then the
 // fresh bans 44104 49544, 44200 49560, 44296 49576, 44392 49592,
 // 44488 49608 - the whole northern exit sealed for the session), the
-// direct zone legs ground ("moved nothing for 16s, re-arming the
+// direct zone segments ground ("moved nothing for 16s, re-arming the
 // pathfound return") and every server routed walk aborted at once on
 // "the server routed walk would swim".
 //
@@ -49,16 +49,16 @@ import (
 //     guard correctly refused the wet line - the "anti water law"
 //     was right in spirit but it guarded an impossible geometry).
 //
-//  3. The zone leg grind stall re-armed the pathfound return on
+//  3. The zone segment grind stall re-armed the pathfound return on
 //     refusal evidence too: the cycle the server kept refusing ran
 //     another seven minutes in the dump.
 //
 // The fix: the tracker records the ActionFailed arrivals
 // (ApplyActionFailed), the hunt walk machinery reads them as the
 // online refusal evidence (refusalEvidence), a refused stuck varies
-// the aim before anything else (sendVariedAim), a leg with refusal
-// evidence never bans a corridor (escalateFrozenLeg), and the frozen
-// ladder hands the leg to the cursor key escape along the planned
+// the aim before anything else (sendVariedAim), a segment with refusal
+// evidence never bans a corridor (escalateFrozenSegment), and the frozen
+// ladder hands the segment to the cursor key escape along the planned
 // route - the direct server routed walk those rungs used to arm is
 // eliminated (the owner rule of the 2026-09-19 round: НИКОГДА не
 // идти напрямую - see direct_walk_elimination_repro_test.go).
@@ -168,7 +168,7 @@ func refusalDumpLoop(
 // ActionFailed answer arrives for each one, the character never
 // moves) must not ban a single corridor - the corridors are innocent,
 // the refusal evidence names the server - the trips abort with the
-// honest reasons and the zone leg grind holds the return backoff
+// honest reasons and the zone segment grind holds the return backoff
 // instead of re-arming the cycle the server keeps refusing.
 func TestReproRefusedClickSkipsTheCorridorBan(t *testing.T) {
     loop, game, bot, sim, sink := refusalDumpLoop(t, true, 0)
@@ -178,7 +178,7 @@ func TestReproRefusedClickSkipsTheCorridorBan(t *testing.T) {
         loop.returnToZone()
         if loop.phase != phaseTownReturn {
             // The post-abort state: the return holds or re-plans on
-            // the next call - no direct zone legs arm against the
+            // the next call - no direct zone segments arm against the
             // refusing server anymore.
             continue
         }
@@ -186,7 +186,7 @@ func TestReproRefusedClickSkipsTheCorridorBan(t *testing.T) {
         for i := 0; i < 400 && loop.phase == phaseTownReturn; i++ {
             now = now.Add(2 * time.Second)
             // The production dispatch mirror drives the armed escape
-            // first; the routed legs follow the waypoints.
+            // first; the routed segments follow the waypoints.
             driveTownWalkTick(t, loop, game, bot, now, false,
                 sim.consumeAt)
         }
@@ -212,7 +212,7 @@ func TestReproRefusedClickSkipsTheCorridorBan(t *testing.T) {
         "the escalation gate reads the refusal latch")
     require.Contains(t, sink.String(),
         "the refused clicks hand the walk to the cursor key escape",
-        "the frozen ladder hands the leg to the claims transport "+
+        "the frozen ladder hands the segment to the claims transport "+
             "along the planned route")
     require.NotContains(t, sink.String(), "by the server routing",
         "the direct server routed walk never arms")
@@ -221,7 +221,7 @@ func TestReproRefusedClickSkipsTheCorridorBan(t *testing.T) {
 // TestReproRefusedClickVariedAimWalksOut pins the target specific
 // refusal recovery: a server that refuses the long clicks (its
 // pathfinder gives up past the 600 unit bound) still accepts the
-// varied aims - the half leg prefix of the same waypoint - and the
+// varied aims - the half segment prefix of the same waypoint - and the
 // walk inches out of the village and into the zone without a single
 // corridor ban, re-path or abort.
 func TestReproRefusedClickVariedAimWalksOut(t *testing.T) {
@@ -245,7 +245,7 @@ func TestReproRefusedClickVariedAimWalksOut(t *testing.T) {
 
             now = now.Add(2 * time.Second)
             // The production dispatch mirror drives the armed escape
-            // first; the routed legs follow the waypoints.
+            // first; the routed segments follow the waypoints.
             if driveTownWalkTick(t, loop, game, bot, now, true,
                 sim.consumeAt) {
                 break
@@ -278,15 +278,15 @@ func TestReproRefusedClickVariedAimWalksOut(t *testing.T) {
             "the walk moving")
 }
 
-// TestReproZoneLegStallHoldsBackoffOnRefusal pins the grind gate: the
-// direct zone legs against a refusing server (ActionFailed per
+// TestReproZoneSegmentStallHoldsBackoffOnRefusal pins the grind gate: the
+// direct zone segments against a refusing server (ActionFailed per
 // click, zero movement) stall into the honest line that HOLDS the
 // return backoff - the fail budget stays armed, the cycle the server
 // keeps refusing does not restart.
-func TestReproZoneLegStallHoldsBackoffOnRefusal(t *testing.T) {
+func TestReproZoneSegmentStallHoldsBackoffOnRefusal(t *testing.T) {
     loop, game, bot, sim, sink := refusalDumpLoop(t, true, 0)
     // The post-abort state of the dump: the budget is armed and the
-    // engage phase answers direct legs only.
+    // engage phase answers direct segments only.
     loop.zoneFails = zoneReturnFailBudget
     loop.zoneReturn = true
     loop.phase = phaseEngage
@@ -301,7 +301,7 @@ func TestReproZoneLegStallHoldsBackoffOnRefusal(t *testing.T) {
         now = now.Add(time.Second)
         x, y, z, ok := bot.SelfPosition()
         require.True(t, ok)
-        loop.walkZoneLeg(zone, x, y, z, now)
+        loop.walkZoneSegment(zone, x, y, z, now)
         sim.consumeAt(game, bot, now)
     }
     require.Equal(t, zoneReturnFailBudget, loop.zoneFails,

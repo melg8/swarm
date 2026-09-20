@@ -26,7 +26,7 @@ import (
 // links, the STATIC page entry every conversation starts from), a
 // kill stage walks to the ground and engages the quest mobs until
 // the journal item counters fill - until the exit talk drops the
-// quest and the proof item lands. The class change leg (the Rains
+// quest and the proof item lands. The class change segment (the Rains
 // route of quest_chains.go) stays with the caller: it rides the
 // same DriveDialog on the manual loop.
 //
@@ -46,14 +46,14 @@ const questNpcScanRadius = 6000.0
 const questNpcFindWait = 30 * time.Second
 
 // questWalkTimeout bounds one walk to a station or a kill ground:
-// the far legs of the class transfer chain (Gludio to the Ruins of
+// the far segments of the class transfer chain (Gludio to the Ruins of
 // Agony, the Ol Mahum camps north of Gludin) run over 30 000 units
 // of planned segments, so the bound holds the whole walk plus the
 // re-plans.
 const questWalkTimeout = 10 * time.Minute
 
 // questSegmentLen bounds one planned segment of the route walk: the
-// geodata search of a long leg (Gludio to the Ruins of Agony is
+// geodata search of a long segment (Gludio to the Ruins of Agony is
 // 37 500 units) would burn the shipped 1M expansion cap, so the
 // route splits into segments of this length and every segment plans
 // its own path (~200k expansions, far under the cap).
@@ -101,7 +101,7 @@ const questPotionItemID = 1060
 
 // questTransitFightTimeout bounds one transit fight of the route
 // walk: an aggressive mob that chases the walking character must die
-// inside it or the walk gives up on the leg.
+// inside it or the walk gives up on the segment.
 const questTransitFightTimeout = 2 * time.Minute
 
 // questEquipConfirmWait bounds the wait for the inventory mutation
@@ -273,7 +273,7 @@ func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
 }
 
 // walkQuestRoute walks to the destination through planned geodata
-// segments: one long leg (tens of thousands of units) exceeds the
+// segments: one long segment (tens of thousands of units) exceeds the
 // shipped expansion cap of one search, so the route splits into
 // questSegmentLen hops along the straight line to the goal and every
 // hop plans its own waypoint path. A hop whose search fails falls
@@ -281,7 +281,7 @@ func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
 // a walled click, the stuck detector re-plans). The walk stands on
 // itself: it re-plans on a stuck segment until the timeout.
 //
-//nolint:gocognit // the quest leg branches read best side by side
+//nolint:gocognit // the quest segment branches read best side by side
 func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
     deadline := time.Now().Add(timeout)
     for {
@@ -395,7 +395,7 @@ func (l *Loop) followPlannedSegment(
     // The segment plan starts at the character's own cell resolved on
     // the pack: the standing z against the first waypoint's mesh z
     // measures the frame offset the segment's waypoint clicks ride
-    // (see click_frame.go) - the quest route legs name the surface
+    // (see click_frame.go) - the quest route segments name the surface
     // the character stands on in the server frame, wherever the
     // pack vintages disagree.
     frameOffset := measureFrameOffset(selfZ, waypoints[0].Z)
@@ -567,7 +567,7 @@ func questItemCount(tracker *state.Bot, itemIDs []int32) int32 {
 // conversation when the journal does not carry the quest yet, then
 // the stage ladder by the journal cond until the exit talk drops
 // the quest (the proof item survives in the inventory, the class
-// change leg of the caller consumes it). A cond outside the ladder,
+// change segment of the caller consumes it). A cond outside the ladder,
 // a stage that misses its deadline or a health floor breach returns
 // an error naming the stage; the journal drop ends the run clean.
 func (l *Loop) DriveQuestChain(
@@ -610,7 +610,7 @@ func (l *Loop) DriveQuestChain(
 }
 
 // driveQuestStage runs one stage of the ladder: the optional
-// gatekeeper leg first (the station sits in another town), then the
+// gatekeeper segment first (the station sits in another town), then the
 // talk half walks to the station and drives the dialog route, the
 // kill half farms the item counters on the ground.
 func (l *Loop) driveQuestStage(
@@ -1000,7 +1000,7 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
 }
 
 // questWalkPotionHP is the health share the route walk drinks at:
-// the aggressive mobs along the approach legs (the Ruins of Agony
+// the aggressive mobs along the approach segments (the Ruins of Agony
 // clans assist each other) grind a passing character down, so the
 // walk keeps the health buffer full instead of arriving half dead
 // (the first live runs reached the kill ground at 26 percent and

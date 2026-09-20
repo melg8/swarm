@@ -171,7 +171,7 @@ func TestCellWaitsForPredictedRespawn(t *testing.T) {
     hunter.emptySince = now.Add(-2 * time.Second)
     loop.cellEvaluate(now)
     require.Equal(t, "test-home", loop.zonePickedID)
-    // The drift walk issued one leg toward the corpse position.
+    // The drift walk issued one segment toward the corpse position.
     require.Len(t, game.walks, 1)
 }
 
@@ -565,7 +565,7 @@ func TestCellOutGroundWalksHomeWhenNothingVisible(t *testing.T) {
     require.Empty(t, game.forces, "nothing is engaged")
     require.NotEmpty(t, game.walks,
         "the zero-enemy last resort walks the character home")
-    require.True(t, loop.zoneReturn, "the return leg armed")
+    require.True(t, loop.zoneReturn, "the return segment armed")
 }
 
 // TestCellKillAttributesToTheGroundOfTheCorpse pins the free-roam

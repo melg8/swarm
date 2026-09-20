@@ -13,12 +13,12 @@ package hunt
 // deployment) and a line of sight exists, so a walk that passes an
 // idle aggressive mob closer than that collects a chaser - the train
 // that later forces the pile up run and the emergency relogin. The
-// steering deflects one walk leg at a time around such camps: the leg
+// steering deflects one walk segment at a time around such camps: the segment
 // direction rides the tangent of the threat circle (the effective
-// aggro range plus the clearance margin), so the issued leg never
+// aggro range plus the clearance margin), so the issued segment never
 // enters the trigger distance; the walk follower re-issues its
 // requests every period from the live position, and the chained
-// tangent legs arc the route around the camp while the underlying
+// tangent segments arc the route around the camp while the underlying
 // waypoint plan stays untouched. A character already inside the
 // margin circle side-steps straight out first (the tangent does not
 // exist from inside). Mobs that stand at the destination itself are
@@ -36,15 +36,15 @@ const (
     // avoidClearance is the margin the steering keeps between the
     // walk line and an aggressive mob beyond its effective aggro
     // range: the projected positions lag the real server positions by
-    // up to a broadcast interval and the mob may drift while the leg
+    // up to a broadcast interval and the mob may drift while the segment
     // walks, so the raw trigger radius alone would graze the circle.
     avoidClearance = 150.0
-    // avoidMinLeg suppresses the steering on legs too short to bend
+    // avoidMinSegment suppresses the steering on segments too short to bend
     // anywhere (a stop request, an arrival shuffle).
-    avoidMinLeg = 100.0
+    avoidMinSegment = 100.0
     // avoidScanRange bounds the threat scan around the character: the
-    // legs issue at most maxMoveLeg ahead, and only mobs within that
-    // leg plus their trigger circle plus the clearance can endanger
+    // segments issue at most maxMoveDistance ahead, and only mobs within that
+    // segment plus their trigger circle plus the clearance can endanger
     // the line.
     avoidScanRange = 1600.0
     // avoidArriveExempt drops the steering for the mobs standing at
@@ -55,18 +55,18 @@ const (
     // whatever the entry radius offers.
     avoidArriveExempt = 500.0
     // avoidLogPeriod paces the detour diagnostic: a busy corridor
-    // bends every leg, the log names the corridor once per period.
+    // bends every segment, the log names the corridor once per period.
     avoidLogPeriod = 5 * time.Second
 )
 
-// steerClearOfAggro deflects one walk leg around the aggressive mobs
-// camped on its line: the leg end moves onto the tangent ray of the
+// steerClearOfAggro deflects one walk segment around the aggressive mobs
+// camped on its line: the segment end moves onto the tangent ray of the
 // first threat circle the straight line would enter - the on-sight
 // trigger distance (the effective aggro range plus the clearance
-// margin) - on the side the original leg leaned to. The receding
+// margin) - on the side the original segment leaned to. The receding
 // horizon does the rest: the walk follower re-issues its request
 // every period from the live position, and every re-issue re-spawns
-// the tangent, so the chained legs arc the route around the camp
+// the tangent, so the chained segments arc the route around the camp
 // without touching the waypoint plan. The endangerment check is 3D
 // like the server's own trigger (a mob on another deck never blocks
 // a ground line), the tangent itself is planar (the walk cannot steer
@@ -81,9 +81,9 @@ func (l *Loop) steerClearOfAggro(
     destX int32, destY int32,
     now time.Time,
 ) (int32, int32, bool) {
-    legX, legY := float64(toX-fromX), float64(toY-fromY)
-    legLen := math.Hypot(legX, legY)
-    if legLen < avoidMinLeg {
+    segmentX, segmentY := float64(toX-fromX), float64(toY-fromY)
+    segmentLen := math.Hypot(segmentX, segmentY)
+    if segmentLen < avoidMinSegment {
         return toX, toY, false
     }
     l.avoidScratch = l.tracker.AppendAggroThreats(
@@ -91,7 +91,7 @@ func (l *Loop) steerClearOfAggro(
     if len(l.avoidScratch) == 0 {
         return toX, toY, false
     }
-    // The first threat the straight leg would wake: the smallest
+    // The first threat the straight segment would wake: the smallest
     // along-line parameter among the endangered mobs (the deepest
     // penetration breaks the tie - the mob the line grazes hardest).
     first := -1
@@ -109,14 +109,14 @@ func (l *Loop) steerClearOfAggro(
         // clearance, mirroring the server's own isInsideRadius3D
         // trigger (a mob on another deck never blocks a ground line).
         relX, relY := threat.X-float64(fromX), threat.Y-float64(fromY)
-        t := (relX*legX + relY*legY) / (legLen * legLen)
+        t := (relX*segmentX + relY*segmentY) / (segmentLen * segmentLen)
         if t < 0 {
             t = 0
         } else if t > 1 {
             t = 1
         }
-        cx := float64(fromX) + legX*t
-        cy := float64(fromY) + legY*t
+        cx := float64(fromX) + segmentX*t
+        cy := float64(fromY) + segmentY*t
         dz := float64(threat.Z) -
             (float64(fromZ) + (float64(toZ)-float64(fromZ))*t)
         clear2 := math.Hypot(threat.X-cx, threat.Y-cy)
@@ -133,15 +133,15 @@ func (l *Loop) steerClearOfAggro(
     threat := &l.avoidScratch[first]
     dirX, dirY := tangentClearDirection(
         float64(fromX), float64(fromY), threat.X, threat.Y,
-        legX/legLen, legY/legLen,
+        segmentX/segmentLen, segmentY/segmentLen,
         threat.AggroRange+avoidClearance)
-    endX := float64(fromX) + dirX*legLen
-    endY := float64(fromY) + dirY*legLen
+    endX := float64(fromX) + dirX*segmentLen
+    endY := float64(fromY) + dirY*segmentLen
     endXI, endYI := int32(math.Round(endX)), int32(math.Round(endY))
     if l.avoidLogAt.IsZero() || now.Sub(l.avoidLogAt) >= avoidLogPeriod {
         l.avoidLogAt = now
         l.logger.Printf("Hunt: steering the walk around %s at %d %d "+
-            "(leg %d %d -> %d %d bends to %d %d)",
+            "(segment %d %d -> %d %d bends to %d %d)",
             threat.Name, int32(math.Round(threat.X)),
             int32(math.Round(threat.Y)),
             fromX, fromY, toX, toY, endXI, endYI)
@@ -150,11 +150,11 @@ func (l *Loop) steerClearOfAggro(
     return endXI, endYI, true
 }
 
-// legTargetThreatened reports whether the next click target of the
+// segmentTargetThreatened reports whether the next click target of the
 // walk sits inside the trigger circle of an idle aggressive mob that
 // does not stand at the walk destination. No steering arc can land
 // there: every tangent ray only grazes the circle, so the receding
-// horizon re-issues the leg from alternating tangent endpoints and
+// horizon re-issues the segment from alternating tangent endpoints and
 // flips its side at every hop - the character ping-pongs between two
 // points without a unit of net progress (the observed delevel walk
 // burned an hour exactly so around one idle Kaboo Orc Fighter, its
@@ -162,7 +162,7 @@ func (l *Loop) steerClearOfAggro(
 // skips such a waypoint instead of clicking into the circle; a mob at
 // the walk destination stays exempt exactly like in the steering (the
 // ground the walk deliberately enters carries its own mobs).
-func (l *Loop) legTargetThreatened(
+func (l *Loop) segmentTargetThreatened(
     toX int32, toY int32, destX int32, destY int32,
 ) bool {
     l.avoidScratch = l.tracker.AppendAggroThreats(
@@ -182,33 +182,33 @@ func (l *Loop) legTargetThreatened(
     return false
 }
 
-// tangentClearDirection resolves the deflected leg direction around
+// tangentClearDirection resolves the deflected segment direction around
 // one threat circle: the tangent ray from the position to the circle
-// of the needed radius, on the side the original leg direction leans
+// of the needed radius, on the side the original segment direction leans
 // to (the shorter arc around the camp). A position already inside
 // the circle has no tangent - the direction becomes the pure
 // side-step perpendicular to the threat axis there (the walk leaves
 // the margin circle straight before any tangent ride, and the
 // side-step never closes a unit of the distance: the perpendicular
-// keeps the radius constant while the leg lasts).
+// keeps the radius constant while the segment lasts).
 func tangentClearDirection(
     fromX, fromY, threatX, threatY float64,
-    legUX, legUY float64,
+    segmentUX, segmentUY float64,
     needed float64,
 ) (float64, float64) {
     towardX, towardY := threatX-fromX, threatY-fromY
     sp := math.Hypot(towardX, towardY)
     if sp < 1 {
         // The threat sits on the position itself: any perpendicular
-        // leaves it behind; right of the leg wins by convention.
-        return legUY, -legUX
+        // leaves it behind; right of the segment wins by convention.
+        return segmentUY, -segmentUX
     }
     towardX, towardY = towardX/sp, towardY/sp
     if sp <= needed {
         // Inside the margin circle: the side-step perpendicular to
-        // the threat axis, on the side the leg leans to (the arc the
+        // the threat axis, on the side the segment leans to (the arc the
         // route would take anyway), straight out of the circle.
-        side := towardX*legUY - towardY*legUX
+        side := towardX*segmentUY - towardY*segmentUX
         if side >= 0 {
             return -towardY, towardX
         }
@@ -218,10 +218,10 @@ func tangentClearDirection(
     // The tangent half-angle: the angle between the threat axis and
     // the grazing ray (sin of it is the needed radius over the
     // distance). The deflected direction is the threat axis rotated
-    // by it, toward the side the original leg leans to.
+    // by it, toward the side the original segment leans to.
     beta := math.Asin(math.Min(1, needed/sp))
     s := 1.0
-    if towardX*legUY-towardY*legUX < 0 {
+    if towardX*segmentUY-towardY*segmentUX < 0 {
         s = -1
     }
     cos, sin := math.Cos(beta), s*math.Sin(beta)

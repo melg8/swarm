@@ -137,7 +137,7 @@ const (
 // validateDivergenceLimit is the 2D distance beyond which a client
 // position report contradicts the world the attached bot session
 // observes. A live client follows the own character through the
-// server broadcasts, so its reports stay within one walk leg of the
+// server broadcasts, so its reports stay within one walk segment of the
 // bot's tracker position even mid movement; a stale spectator view
 // (a death spot held across the bot's village restart, a frozen pawn
 // after a teleport screen) reports thousands of units away, and the
@@ -715,12 +715,12 @@ func (gc *gameConn) answerNetPingLocally() {
 // the server side position: an out of sync report snaps the character
 // to the reported place with no distance bound. A client that rides
 // the bot session as a spectator holds a local view the bot's own
-// actions (a death restart to the village, a walk leg, a hunt teleport)
+// actions (a death restart to the village, a walk segment, a hunt teleport)
 // can leave thousands of units behind - the death spot held across
 // the restart, the frozen pawn of a teleport screen - and its periodic
 // reports would drag the character away from every bot decision. The
 // check compares the report against the bot tracker position: within
-// one walk leg plus slack the client is live (its view follows the
+// one walk segment plus slack the client is live (its view follows the
 // broadcasts of its own movement), beyond that the report is stale.
 // An unreadable or empty report and a session without a known
 // position transit untouched: the server stays the authority there.

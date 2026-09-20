@@ -90,12 +90,13 @@ func TestLureAnswersTheCoveredPick(t *testing.T) {
     require.Equal(t, int32(501), loop.lure.meleeObjID,
         "the worn sword is remembered for the swap back")
 
-    // The approach walks toward the standoff (one paced leg).
+    // The approach walks toward the standoff (one paced segment).
     require.NotEmpty(t, game.walks)
-    leg := game.walks[len(game.walks)-1]
-    legDist := math.Hypot(float64(leg[0]-45800), float64(leg[1]-50000))
-    require.InDelta(t, lureStandoff, legDist, 260,
-        "the approach leg aims at the standoff ring of the target")
+    segment := game.walks[len(game.walks)-1]
+    segmentDist := math.Hypot(float64(segment[0]-45800),
+        float64(segment[1]-50000))
+    require.InDelta(t, lureStandoff, segmentDist, 260,
+        "the approach segment aims at the standoff ring of the target")
     require.Empty(t, game.forces, "no forced attack during the approach")
 
     // The character arrives at the standoff: the approach hands the
@@ -103,7 +104,7 @@ func TestLureAnswersTheCoveredPick(t *testing.T) {
     bot.ApplyPlacement(state.Placement{
         ObjectID: 100, X: loop.lure.standX, Y: loop.lure.standY, Z: -3500,
     })
-    loop.lure.legAt = time.Now().Add(-lureLegPeriod)
+    loop.lure.segmentAt = time.Now().Add(-lureSegmentPeriod)
     loop.tick()
     require.Equal(t, lureArm, loop.lure.phase)
     loop.tick()

@@ -10,8 +10,8 @@ package navmesh
 // polygon whose footprint the ban disk TOUCHES - the over-walling
 // direction, deliberately: a funnelled route crosses only corridor
 // polygons, and no corridor polygon touches the disk, so no point of
-// any walked leg ever enters the banned ground (the grid only keeps
-// the cell centers of the smoothed legs out - the mesh guarantee is
+// any walked segment ever enters the banned ground (the grid only keeps
+// the cell centers of the smoothed segments out - the mesh guarantee is
 // strictly stronger). A big rectangle grazed by a ban at its corner is
 // walled whole; the detours err long, never through the freeze the
 // ban exists to detour.

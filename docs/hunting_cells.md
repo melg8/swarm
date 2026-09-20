@@ -140,7 +140,7 @@ port of the spot economy, the geometry replaced):
   bias the white-green subrange `[L-4, L-1]` strongest.
 - **The dynamic focus**: the kill centroid EMA per cell feeds the
   map label and the walk targets drift to the live mass (the
-  wait-walk legs to the predicted corpse positions). The PARTITION
+  wait-walk segments to the predicted corpse positions). The PARTITION
   stays static (the fleet shares one registry - the cells, the
   neighbors and the ripeness clocks of one bot never re-map the
   ground of another).
@@ -169,7 +169,7 @@ left the zone.
 - **The far walk** (`walkToFarTarget`): a targetless hunter walks
   toward the nearest visible enemy ANYWHERE in sight - toward the
   zone that holds the enemies, never into an enemy-less one. One
-  paced leg at a time; the per-second pick takes any enemy the leg
+  paced segment at a time; the per-second pick takes any enemy the segment
   comes past.
 - **The out-of-ground gate** (`onHeldGround`, `cellEnemiesVisible`):
   a character outside its held hexagon with a visible enemy keeps

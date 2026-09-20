@@ -112,13 +112,13 @@ const (
     // character as the penalty free server is, and the pause cannot
     // grow beyond a half hour.
     delevelAbortBackoffMax = delevelFreeCooldown
-    // returnWalkLeg caps the direct walk requests of the zone return:
+    // returnWalkSegment caps the direct walk requests of the zone return:
     // the server refuses move requests with a target farther than 9900
     // units (MoveToLocation runImpl), and a village respawn, a guard
     // post of the deleveling or a long chase easily starts farther than
     // that from the zone center, which locked the loop into an endless
     // stream of refused requests.
-    returnWalkLeg = 1000.0
+    returnWalkSegment = 1000.0
     // delevelTimeout bounds a whole deleveling: 11 to 6 costs tens of
     // deaths at ~30 s each.
     delevelTimeout = 60 * time.Minute
@@ -232,7 +232,7 @@ func (l *Loop) startDelevel() {
     l.delevelFree = 0
     l.delevelCounted = false
     l.waypoints = nil
-    l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+    l.segmentStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
     l.waterEscape = false
     l.phase = phaseDelevel
     l.logf("Hunt: level %d is too high for level %d mobs (the level "+
@@ -307,7 +307,7 @@ func (l *Loop) planDelevelWalk() {
         return
     }
     l.delevelGuard = 0
-    if !l.startWalkLeg(townNpcPosition(guard)) {
+    if !l.startWalkSegment(townNpcPosition(guard)) {
         l.abortDelevel("no walkable path to the guard")
 
         return
@@ -437,7 +437,7 @@ func (l *Loop) fightDelevelGuard(now time.Time) {
             l.delevelTried[guardName] = true
         }
         l.waypoints = nil
-        l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.segmentStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
         l.waterEscape = false
 
         return
@@ -480,7 +480,7 @@ func (l *Loop) noteDelevelDeath() {
 }
 
 // finishDelevel returns the character to the hunt: the walk back to the
-// farm spot reuses the town trip return leg, the engage routine resumes
+// farm spot reuses the town trip return segment, the engage routine resumes
 // when it arrives. The deleveling reached its target - the mechanism
 // works, the abort streak of the past attempts resets so the next
 // LEGITIMATE cycle (the level climbed back over the trigger) starts
@@ -492,11 +492,11 @@ func (l *Loop) finishDelevel() {
     l.delevelAborts = 0
     l.logf("Hunt: delevel finished at level %d, walking back",
         l.tracker.SelfLevel())
-    l.startDelevelReturnLeg()
+    l.startDelevelReturnSegment()
 }
 
 // abortDelevel gives the deleveling up and returns to the hunt through
-// the town trip return leg as well: the raw engage phase would issue one
+// the town trip return segment as well: the raw engage phase would issue one
 // direct walk to the zone center, which the server refuses from the far
 // guard posts (the 9900 unit move limit) and the loop would hang on the
 // refused requests. The consecutive abort streak arms the escalating
@@ -515,15 +515,15 @@ func (l *Loop) abortDelevel(reason string) {
     l.delevelWait = time.Now().Add(wait)
     l.logf("Hunt: delevel aborted: %s (the next attempt waits %s)",
         reason, wait)
-    l.startDelevelReturnLeg()
+    l.startDelevelReturnSegment()
 }
 
-// startDelevelReturnLeg starts the walk back to the farm spot with a
+// startDelevelReturnSegment starts the walk back to the farm spot with a
 // fresh trip budget: the deleveling ran under its own timeout and the
-// return leg must not inherit its elapsed time, or the trip timeout
+// return segment must not inherit its elapsed time, or the trip timeout
 // would end the return before it started.
-func (l *Loop) startDelevelReturnLeg() {
+func (l *Loop) startDelevelReturnSegment() {
     l.tripStart = time.Now()
     l.rePaths = 0
-    l.startReturnLeg()
+    l.startReturnSegment()
 }

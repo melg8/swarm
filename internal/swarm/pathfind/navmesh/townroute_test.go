@@ -13,18 +13,18 @@ import (
     "github.com/stretchr/testify/require"
 )
 
-// townLegs are the classic trip legs the owner named: the Elven
+// townSegments are the classic trip segments the owner named: the Elven
 // Village to Gludio, Gludio to Gludin, Gludin to Giran - the whole
 // map scale routes the bot fleet has to plan fast. The coordinates
 // are the teleporter arrival points of the Mobius C1 data
 // (dist/game/data/teleporters/town).
-type townLeg struct {
+type townSegment struct {
     name  string
     start Pos
     end   Pos
 }
 
-var townLegs = []townLeg{
+var townSegments = []townSegment{
     {"ElvenToGludio", Pos{X: 46890, Y: 51531, Z: -2976},
         Pos{X: -12787, Y: 122779, Z: -3114}},
     {"GludioToGludin", Pos{X: -12787, Y: 122779, Z: -3114},
@@ -33,7 +33,7 @@ var townLegs = []townLeg{
         Pos{X: 83336, Y: 147972, Z: -3404}},
 }
 
-// TestNavmeshTownRoutes runs every leg as a subtest (each leg is one
+// TestNavmeshTownRoutes runs every segment as a subtest (each segment is one
 // -run filter away: the cold whole map searches outlast a single
 // sandbox process, the subtests separate them). The mesh capacity
 // rides SWARM_TOWN_CAPACITY (the production default is 4, the
@@ -41,7 +41,7 @@ var townLegs = []townLeg{
 func TestNavmeshTownRoutes(t *testing.T) {
     dir := "../../../../data/navmesh"
     mesh := NewMesh(dir)
-    // The corridor pack serves the town legs: the three legs ride
+    // The corridor pack serves the town segments: the three segments ride
     // the regions 16..22 x 19..22, the whole map pack answers the
     // same queries with the coarse cache pressure on top.
     if len(mesh.TileFiles()) < 20 {
@@ -49,16 +49,16 @@ func TestNavmeshTownRoutes(t *testing.T) {
     }
     mesh.SetCacheCapacity(townCapacity())
 
-    for _, l := range townLegs {
+    for _, l := range townSegments {
         t.Run(l.name, func(t *testing.T) {
-            runTownLeg(t, mesh, l.name, l.start, l.end)
+            runTownSegment(t, mesh, l.name, l.start, l.end)
         })
     }
 }
 
-// runTownLeg measures one leg: the coarse chain phase, the hop
+// runTownSegment measures one segment: the coarse chain phase, the hop
 // refinement phase and the production Route answer (cold and warm).
-func runTownLeg(t *testing.T, mesh *Mesh, name string, start, end Pos) {
+func runTownSegment(t *testing.T, mesh *Mesh, name string, start, end Pos) {
     t.Helper()
     startRef, startPos, ok := mesh.FindNearestPoly(start)
     require.True(t, ok, "%s: the start must bind", name)
@@ -106,10 +106,10 @@ func runTownLeg(t *testing.T, mesh *Mesh, name string, start, end Pos) {
     reached := false
     for iterations < 12 {
         iterations++
-        leg, err := mesh.Route(current, endPos, DefaultFilter())
+        segment, err := mesh.Route(current, endPos, DefaultFilter())
         require.NoError(t, err)
-        if leg.Found {
-            wps := leg.Waypoints
+        if segment.Found {
+            wps := segment.Waypoints
             if len(wps) > 1 {
                 walked += dist3(current, wps[len(wps)-1])
             }
@@ -120,7 +120,7 @@ func runTownLeg(t *testing.T, mesh *Mesh, name string, start, end Pos) {
         // The partial answer: advance to the waypoint pair past the
         // last one (the walk consumes it, the next plan starts from
         // the arrival).
-        wps := leg.Waypoints
+        wps := segment.Waypoints
         if len(wps) < 2 {
             break
         }

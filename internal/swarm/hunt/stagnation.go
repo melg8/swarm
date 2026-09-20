@@ -220,7 +220,7 @@ func (l *Loop) stagnationSoftReset(now time.Time) {
     // fresh geodata route instead of inheriting the failed one.
     l.zoneReturn = false
     l.zoneFails = 0
-    l.zoneLegAt = time.Time{}
+    l.zoneSegmentAt = time.Time{}
     l.standUpGuarded(now)
 }
 

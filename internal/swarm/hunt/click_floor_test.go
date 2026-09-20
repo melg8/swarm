@@ -33,7 +33,7 @@ func TestExtendShortClickCandidatesMarchForward(t *testing.T) {
         {X: 1020, Y: 1000, Z: 0},
         {X: 1020, Y: 1200, Z: 0},
     }
-    // The character stands between the first bend and the far leg.
+    // The character stands between the first bend and the far segment.
     candidates, count := extendShortClickCandidates(1010, 1100, waypoints, 1, 0)
     require.Positive(t, count, "the march must collect the far samples")
     for c := range count {
@@ -94,7 +94,7 @@ func TestFollowerExtendsShortClickAfterStuck(t *testing.T) {
         {X: 1600, Y: 1000, Z: 0},
     }
     loop.wpIndex = 1
-    loop.legDest = pathfind.Vec3{X: 1600, Y: 1000, Z: 0}
+    loop.segmentDest = pathfind.Vec3{X: 1600, Y: 1000, Z: 0}
     loop.phase = phaseTownWalk
     loop.extendArmed = true
 
@@ -111,7 +111,7 @@ func TestFollowerExtendsShortClickAfterStuck(t *testing.T) {
 }
 
 // TestFollowerKeepsShortClickBeforeStuck pins the unarmed behavior:
-// without a stuck (the normal tight ramp climb of the teacher legs),
+// without a stuck (the normal tight ramp climb of the teacher segments),
 // the short waypoint click stands as is - the extension never fires
 // on a walking plan.
 func TestFollowerKeepsShortClickBeforeStuck(t *testing.T) {
@@ -127,7 +127,7 @@ func TestFollowerKeepsShortClickBeforeStuck(t *testing.T) {
         {X: 1600, Y: 1000, Z: 0},
     }
     loop.wpIndex = 1
-    loop.legDest = pathfind.Vec3{X: 1600, Y: 1000, Z: 0}
+    loop.segmentDest = pathfind.Vec3{X: 1600, Y: 1000, Z: 0}
     loop.phase = phaseTownWalk
     require.False(t, loop.extendArmed)
 
@@ -157,7 +157,7 @@ func TestFollowerHoldsBackwardClickWhenArmed(t *testing.T) {
         {X: 1600, Y: 1000, Z: 0},
     }
     loop.wpIndex = 1
-    loop.legDest = pathfind.Vec3{X: 1600, Y: 1000, Z: 0}
+    loop.segmentDest = pathfind.Vec3{X: 1600, Y: 1000, Z: 0}
     loop.phase = phaseTownWalk
     loop.extendArmed = true
     // The character stands well past wp1 on the route.

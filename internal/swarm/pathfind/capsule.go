@@ -10,7 +10,7 @@ import "math"
 // engines (the grid A* smoothing and the mesh funnel) may sit closer
 // to a wall than the character's collision cylinder allows: the funnel
 // pivots at the portal span ends - exactly on the wall boundary - and
-// a smoothed leg can graze a wall corner while staying inside open
+// a smoothed segment can graze a wall corner while staying inside open
 // cells. A character that walks such a plan clips every wall edge and
 // corner with its capsule and sticks (the owner report: the path
 // points "too close to the wall edges and corners").
@@ -30,9 +30,9 @@ import "math"
 //     is pushed away from the nearest wall until it clears it (the
 //     move is validated against the engine's own walk rules and
 //     dropped when the validation refuses it),
-//  3. every leg is sampled; a leg that grazes a wall is bent around
+//  3. every segment is sampled; a segment that grazes a wall is bent around
 //     the tightest spot at a pushed-in anchor point (bounded depth,
-//     the original leg stays when no valid bend exists).
+//     the original segment stays when no valid bend exists).
 //
 // The first and the last waypoint never move: the start is where the
 // character actually stands and the end is the destination the caller
@@ -53,7 +53,7 @@ const DefaultCollisionRadius = 7.5
 // clearance question for a radius below 16 is answered exactly.
 const capsuleMaxDistance = 32.0
 
-// The post-pass tunables: the leg sampling step (the clearance field
+// The post-pass tunables: the segment sampling step (the clearance field
 // changes at the 16 unit cell granularity, a 4 unit sample cannot
 // step over a tight spot), the push headroom over the radius, the
 // minimum anchor spacing of a bend chain and the bend recursion
@@ -218,31 +218,31 @@ func segmentDistance(x, y, ax, ay, bx, by float64,
     return math.Hypot(x-px, y-py), px, py
 }
 
-// LegClear answers whether the straight leg walks the server accurate
+// SegmentClear answers whether the straight segment walks the server accurate
 // grid safely: the line of sight the movement channel applies (the
 // supercover raster with the strict symmetric height rule) passes end
-// to end and every sampled point of the leg keeps the radius from the
+// to end and every sampled point of the segment keeps the radius from the
 // nearest closed wall edge (the 4 unit sample of the bend pass - the
 // wall field changes at the 16 unit cell granularity, a 4 unit sample
 // cannot step over a tight spot). The mesh wall spans of the shortcut
 // pass are the side level approximation; this oracle is the authority
 // the grid movement validation enforces.
-func (c *Capsule) LegClear(ax, ay, az, bx, by, bz, radius float64) bool {
+func (c *Capsule) SegmentClear(ax, ay, az, bx, by, bz, radius float64) bool {
     if c == nil || c.engine == nil {
         return true
     }
 
-    return c.engine.legClearCells(Vec3{X: ax, Y: ay, Z: az},
+    return c.engine.segmentClearCells(Vec3{X: ax, Y: ay, Z: az},
         Vec3{X: bx, Y: by, Z: bz}, radius,
         c.engine.MaxPassableHeight())
 }
 
-// ShortenPath folds the waypoint path into the longest legs the grid
+// ShortenPath folds the waypoint path into the longest segments the grid
 // wall oracle allows (greedy farthest visible over the ordered
-// points): every surviving leg answers LegClear - the server walk
+// points): every surviving segment answers SegmentClear - the server walk
 // rules end to end and the capsule radius off every sampled wall -
 // and the server move clamps (the 9900 unit packet refusal is the
-// walker's own maxMoveLeg concern, the water clamp of the swimming
+// walker's own maxMoveDistance concern, the water clamp of the swimming
 // moves splits here). The first and the last waypoints never move.
 // The scan window caps the merge horizon per anchor: the wall bends
 // chain every handful of points, a longer chord beyond the window is
@@ -266,7 +266,7 @@ func (c *Capsule) ShortenPath(waypoints []Vec3, radius float64,
         }
         chosen := index + 1
         for k := far; k > index+1; k-- {
-            if c.LegClear(anchor.X, anchor.Y, anchor.Z,
+            if c.SegmentClear(anchor.X, anchor.Y, anchor.Z,
                 waypoints[k].X, waypoints[k].Y, waypoints[k].Z,
                 radius) {
                 chosen = k
@@ -275,15 +275,15 @@ func (c *Capsule) ShortenPath(waypoints []Vec3, radius float64,
             }
         }
         target := waypoints[chosen]
-        if limit, capped := c.legLimit(anchor); capped {
-            leg := math.Hypot(target.X-anchor.X, target.Y-anchor.Y)
-            if leg > limit {
+        if limit, capped := c.segmentLimit(anchor); capped {
+            segment := math.Hypot(target.X-anchor.X, target.Y-anchor.Y)
+            if segment > limit {
                 // The server would truncate this move on its own:
                 // the fold cuts it at the same distance first, so
                 // the waypoint the walker aims at is the waypoint
                 // the character actually reaches.
                 split := c.snapZ(
-                    legPoint(anchor, target, limit/leg), anchor.Z)
+                    segmentPoint(anchor, target, limit/segment), anchor.Z)
                 out = append(out, split)
                 anchor = split
                 // The index holds: the fold resumes from the split
@@ -300,27 +300,27 @@ func (c *Capsule) ShortenPath(waypoints []Vec3, radius float64,
     return out
 }
 
-// waterMoveLeg mirrors the server clamp of the water moves: the
+// waterMoveSegment mirrors the server clamp of the water moves: the
 // moveToLocation of the game server scales the destination of every
 // swimming move request onto the 700 unit sphere around the current
 // position (Creature.moveToLocation - the isInWater divider), and a
 // target beyond it never answers. The smoothing over open water
-// merges the funnel pinholes into legs several times the clamp - the
+// merges the funnel pinholes into segments several times the clamp - the
 // server would stop the character short of every such waypoint and
 // the follower would never see the arrival (the path "is not
 // passed", the owner report). The fold splits the water anchored
-// legs at the clamp instead.
-const waterMoveLeg = 700.0
+// segments at the clamp instead.
+const waterMoveSegment = 700.0
 
-// legLimit answers the server move clamp of a walk that leaves the
-// point. A water anchored leg truncates at the water move limit: the
+// segmentLimit answers the server move clamp of a walk that leaves the
+// point. A water anchored segment truncates at the water move limit: the
 // character issues the click from the water, the server clamps the
-// destination. A dry leg answers no cap - the land moves run the
+// destination. A dry segment answers no cap - the land moves run the
 // server's own getValidLocation truncation and pathfinding instead,
 // nothing the planner has to pre-split.
-func (c *Capsule) legLimit(from Vec3) (float64, bool) {
+func (c *Capsule) segmentLimit(from Vec3) (float64, bool) {
     if c.engine.OverWater(from.X, from.Y, int16(from.Z)) {
-        return waterMoveLeg, true
+        return waterMoveSegment, true
     }
 
     return 0, false
@@ -328,7 +328,7 @@ func (c *Capsule) legLimit(from Vec3) (float64, bool) {
 
 // ApplyPath returns the waypoint path with the capsule clearance
 // enforced: every interior waypoint clears the walls by the radius
-// and every leg passes no closer than the radius to a wall edge. The
+// and every segment passes no closer than the radius to a wall edge. The
 // first and the last waypoints never move. Every adjustment is
 // validated against the engine's own walk rules (the line of sight
 // the server movement channel applies) and falls back to the
@@ -350,16 +350,16 @@ func (c *Capsule) ApplyPath(waypoints []Vec3, radius float64) []Vec3 {
         if !ok {
             continue
         }
-        if c.legWalkable(out[i-1], pushed) &&
-            c.legWalkable(pushed, out[i+1]) {
+        if c.segmentWalkable(out[i-1], pushed) &&
+            c.segmentWalkable(pushed, out[i+1]) {
             out[i] = c.snapZ(pushed, waypoint.Z)
         }
     }
-    // Phase B: the legs around the walls.
+    // Phase B: the segments around the walls.
     result := make([]Vec3, 0, len(out)+4)
     result = append(result, out[0])
     for i := 1; i < len(out); i++ {
-        result = append(result, c.fixLeg(result[len(result)-1], out[i],
+        result = append(result, c.fixSegment(result[len(result)-1], out[i],
             radius, 0)...)
     }
 
@@ -409,14 +409,14 @@ func (c *Capsule) pushClear(point Vec3, radius float64,
     return point, false
 }
 
-// fixLeg walks the leg from a to b and bends it around the walls:
+// fixSegment walks the segment from a to b and bends it around the walls:
 // every sampled point whose clearance falls below the radius becomes
 // a pushed-in anchor (the clearance projection), the anchor chain
-// replaces the straight leg and the chain legs recurse. A leg that
+// replaces the straight segment and the chain segments recurse. A segment that
 // clears the radius passes through unchanged; a chain the walk rules
-// refuse falls back to the original straight leg - the original plan
+// refuse falls back to the original straight segment - the original plan
 // is the honest fallback, never a broken one.
-func (c *Capsule) fixLeg(a, b Vec3, radius float64, depth int) []Vec3 {
+func (c *Capsule) fixSegment(a, b Vec3, radius float64, depth int) []Vec3 {
     anchors := c.bendAnchors(a, b, radius)
     if len(anchors) == 0 {
         return []Vec3{b}
@@ -428,11 +428,11 @@ func (c *Capsule) fixLeg(a, b Vec3, radius float64, depth int) []Vec3 {
     result := make([]Vec3, 0, len(chain))
     current := chain[0]
     for _, next := range chain[1:] {
-        if !c.legWalkable(current, next) {
+        if !c.segmentWalkable(current, next) {
             return []Vec3{b}
         }
         if depth < capsuleMaxBendDepth {
-            result = append(result, c.fixLeg(current, next, radius,
+            result = append(result, c.fixSegment(current, next, radius,
                 depth+1)...)
         } else {
             result = append(result, next)
@@ -443,14 +443,14 @@ func (c *Capsule) fixLeg(a, b Vec3, radius float64, depth int) []Vec3 {
     return result
 }
 
-// bendAnchors samples the leg at capsuleSampleStep and lifts every
-// tight sample out of the wall danger zone. The push follows the leg
+// bendAnchors samples the segment at capsuleSampleStep and lifts every
+// tight sample out of the wall danger zone. The push follows the segment
 // perpendicular first (the detour direction - away from a wall the
-// leg runs along, around the end of a face it runs into), falls back
+// segment runs along, around the end of a face it runs into), falls back
 // to the nearest wall projection, and every candidate is snapped back
 // onto the geodata surface. The anchors keep a minimum spacing so a
-// long wall-parallel leg bends at a handful of ridge points instead
-// of one waypoint per sample, and the count is capped per leg.
+// long wall-parallel segment bends at a handful of ridge points instead
+// of one waypoint per sample, and the count is capped per segment.
 func (c *Capsule) bendAnchors(a, b Vec3, radius float64) []Vec3 {
     length := math.Hypot(b.X-a.X, b.Y-a.Y)
     samples := int(length/capsuleSampleStep) + 1
@@ -464,7 +464,7 @@ func (c *Capsule) bendAnchors(a, b Vec3, radius float64) []Vec3 {
     var last Vec3
     for i := 1; i < samples; i++ {
         t := float64(i) / float64(samples)
-        sample := legPoint(a, b, t)
+        sample := segmentPoint(a, b, t)
         if c.Clearance(sample.X, sample.Y, int16(sample.Z)) >= radius {
             continue
         }
@@ -472,13 +472,13 @@ func (c *Capsule) bendAnchors(a, b Vec3, radius float64) []Vec3 {
             break
         }
         pushed, ok := c.pushDirected(sample, nx, ny, target)
-        if !ok || !c.legWalkable(sample, pushed) {
+        if !ok || !c.segmentWalkable(sample, pushed) {
             pushed, ok = c.pushDirected(sample, -nx, -ny, target)
         }
-        if !ok || !c.legWalkable(sample, pushed) {
+        if !ok || !c.segmentWalkable(sample, pushed) {
             pushed, ok = c.pushClear(sample, target, 32)
         }
-        if !ok || !c.legWalkable(sample, pushed) {
+        if !ok || !c.segmentWalkable(sample, pushed) {
             continue
         }
         pushed = c.snapZ(pushed, sample.Z)
@@ -516,8 +516,8 @@ func (c *Capsule) pushDirected(point Vec3, nx, ny, target float64,
     return point, false
 }
 
-// legPoint interpolates the leg at t, the height included.
-func legPoint(a, b Vec3, t float64) Vec3 {
+// segmentPoint interpolates the segment at t, the height included.
+func segmentPoint(a, b Vec3, t float64) Vec3 {
     return Vec3{
         X: a.X + (b.X-a.X)*t,
         Y: a.Y + (b.Y-a.Y)*t,
@@ -525,12 +525,12 @@ func legPoint(a, b Vec3, t float64) Vec3 {
     }
 }
 
-// legWalkable answers the engine line of sight for one adjusted leg:
+// segmentWalkable answers the engine line of sight for one adjusted segment:
 // the walk rules the server movement channel applies (the supercover
 // raster with the strict symmetric height rule). An error (no geodata
 // under an endpoint) reads as not walkable - the caller keeps the
 // original geometry then.
-func (c *Capsule) legWalkable(a, b Vec3) bool {
+func (c *Capsule) segmentWalkable(a, b Vec3) bool {
     ok, err := c.engine.LineOfSight(a, b, c.engine.MaxPassableHeight())
 
     return err == nil && ok

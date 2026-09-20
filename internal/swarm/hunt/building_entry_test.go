@@ -16,7 +16,7 @@ import (
 
 // The reproduction of the 2026-09-12 03:56 trainer hall freeze (the
 // user report, build 6a2ac91): the level 15 fighter walked the learn
-// leg to the teacher Ellenia (45725 52105 -2792, inside the elven
+// segment to the teacher Ellenia (45725 52105 -2792, inside the elven
 // village trainer hall), the geodata plan entered the building
 // through the west aisle column (44728 51992 -> 44728 52040 ->
 // 45160 52120) and the character froze at the aisle entrance - the
@@ -26,7 +26,7 @@ import (
 // re-path budget standing on the same cell. The user rule these
 // tests pin: the character must walk from the building entrance
 // right up to the training npc - not talk to it through the wall
-// from wherever the geodata leg happened to end.
+// from wherever the geodata segment happened to end.
 const (
     // aisleEntranceX/Y/Z is the dump freeze cell: the north end of
     // the trainer hall west aisle column.
@@ -60,7 +60,7 @@ func aisleWalledServer(engine *pathfind.Engine) *reproServer {
     }
 }
 
-// armTeachStop arms the learn leg of the dump: the character walks to
+// armTeachStop arms the learn segment of the dump: the character walks to
 // the teacher Ellenia inside the trainer hall.
 func armTeachStop(t *testing.T, loop *Loop) {
     t.Helper()
@@ -73,15 +73,15 @@ func armTeachStop(t *testing.T, loop *Loop) {
         },
         teach: true,
     }}
-    // The teach leg searches the close ring (the advanceTripStop
+    // The teach segment searches the close ring (the advanceTripStop
     // teach radius), the wide trip ring stays the fallback.
-    loop.legRadius = npcApproachOffset
-    if !loop.startWalkLeg(pathfind.Vec3{
+    loop.segmentRadius = npcApproachOffset
+    if !loop.startWalkSegment(pathfind.Vec3{
         X: float64(elleniaX), Y: float64(elleniaY), Z: float64(elleniaZ),
     }) {
-        loop.legRadius = tripApproachRadius
+        loop.segmentRadius = tripApproachRadius
     }
-    require.True(t, loop.startWalkLeg(pathfind.Vec3{
+    require.True(t, loop.startWalkSegment(pathfind.Vec3{
         X: float64(elleniaX), Y: float64(elleniaY), Z: float64(elleniaZ),
     }), "the aisle route must plan")
 }
@@ -118,7 +118,7 @@ func TestBuildingEntryWalksFromTheAisleEntrance(t *testing.T) {
     loop.SetNavigator(nav)
     loop.lastHit = time.Now().Add(-time.Minute)
     // The farm spot the trip return plans back to. Without it the
-    // zero spot sends the return leg dry search across the whole world
+    // zero spot sends the return segment dry search across the whole world
     // pack - seconds of A* inside one tick (the production farm spot
     // always sits inside the hunting zone, the search stays local).
     loop.farmX, loop.farmY, loop.farmZ = elleniaX, elleniaY, elleniaZ
@@ -144,7 +144,7 @@ func TestBuildingEntryWalksFromTheAisleEntrance(t *testing.T) {
 // TestBuildingEntryEscapesTheWalledAisle pins the freeze model of the
 // dump: the simulated server walls the aisle column the plan walks
 // through - the character stalls at the entrance exactly the way the
-// dump froze - and the escalation ladder must rescue the leg: the
+// dump froze - and the escalation ladder must rescue the segment: the
 // frozen corridor joins the session bans, the re-plan detours around
 // the building (the north and east approach), the walk reaches the
 // teacher and the talk click fires right by the npc.
@@ -159,7 +159,7 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
     loop.SetNavigator(nav)
     loop.lastHit = time.Now().Add(-time.Minute)
     // The farm spot the trip return plans back to. Without it the
-    // zero spot sends the return leg dry search across the whole world
+    // zero spot sends the return segment dry search across the whole world
     // pack - seconds of A* inside one tick (the production farm spot
     // always sits inside the hunting zone, the search stays local).
     loop.farmX, loop.farmY, loop.farmZ = elleniaX, elleniaY, elleniaZ
@@ -214,7 +214,7 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
 // walkToTheTalk drives the loop and the simulated server until the
 // teach stop talks to the teacher, then pins the user rule: the
 // character stands right by the npc (the close ring, not the wide
-// approach radius the geodata leg ends on) and the talk click fired.
+// approach radius the geodata segment ends on) and the talk click fired.
 func walkToTheTalk(
     t *testing.T, loop *Loop, game *fakeGame, bot *state.Bot, sim *reproServer,
 ) {
@@ -259,7 +259,7 @@ func walkToTheTalkMax(
 // arms the stuck timer ONLY when the plan is not fresh (no re-plan
 // armed a new waypoint slice this iteration) and the character has
 // not moved a cell since the previous iteration - a freshly re-planned
-// leg gets its grace iteration first, exactly the way the production
+// segment gets its grace iteration first, exactly the way the production
 // stuck window gives every plan time to click before the next
 // escalation judges it.
 type walkDrive struct {

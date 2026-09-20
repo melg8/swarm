@@ -14,7 +14,7 @@ import (
 // the town trip to the trader Ariel once entered the elven village
 // lake and stood paralyzed under the plateau cliff (the water zone of
 // the C1 server covers everything below -3780). The defenses of this
-// round: the smoothing keeps the legs the search priced (a chord over
+// round: the smoothing keeps the segments the search priced (a chord over
 // water between dry points never folds), the escape search finds the
 // nearest shore for a position standing in a lake, and the plans
 // price every crossing at the swim rate - the water is walkable, the
@@ -35,7 +35,7 @@ const shoreBed = int16(-3800)
 // points inside its y range, the priced search detours it (the 2.3x
 // swim rate makes the crossing the slower walk) and the smoothing
 // must not collapse the detour back into the straight water crossing
-// - every leg of the smoothed route stays dry and walkable.
+// - every segment of the smoothed route stays dry and walkable.
 func TestPricedRouteKeepsTheShorePivots(t *testing.T) {
     spec := &regionSpec{}
     spec.setFlat(shoreLand)
@@ -62,13 +62,13 @@ func TestPricedRouteKeepsTheShorePivots(t *testing.T) {
         require.GreaterOrEqual(t, wp.Z, float64(WaterLevel),
             "waypoint %d must stay dry", i)
     }
-    // Every smoothed leg is a clean dry walk: the follower may click
-    // straight along each leg without entering the water.
+    // Every smoothed segment is a clean dry walk: the follower may click
+    // straight along each segment without entering the water.
     for i := 1; i < len(result.Waypoints); i++ {
         crossed, err := engine.WaterCrossed(
             result.Waypoints[i-1], result.Waypoints[i])
         require.NoError(t, err)
-        require.False(t, crossed, "the leg %d must stay dry", i-1)
+        require.False(t, crossed, "the segment %d must stay dry", i-1)
     }
 }
 
@@ -213,7 +213,7 @@ func TestOverWater(t *testing.T) {
 // the real geodata pack: the character swam into the elven village
 // lake and stood below the plateau cliff at 47136 46564 -3738. The
 // escape search must find the nearest shore from there, the town
-// route from the hunting grounds must stay dry leg by leg, and the
+// route from the hunting grounds must stay dry segment by segment, and the
 // over water query must separate the lake position from the village
 // deck position.
 func TestElvenLakeStuckEscape(t *testing.T) {
@@ -240,7 +240,7 @@ func TestElvenLakeStuckEscape(t *testing.T) {
         "the escape target itself is ashore")
 
     // The town trip from the hunting spot to the trader Ariel prices
-    // every crossing at the swim rate: the lake legs the plan carries
+    // every crossing at the swim rate: the lake segments the plan carries
     // (if any) are the faster walk, the rest stays ashore.
     spot := Vec3{X: 53504, Y: 45249, Z: -3520}
     ariel := Vec3{X: 44683, Y: 46952, Z: -2981}

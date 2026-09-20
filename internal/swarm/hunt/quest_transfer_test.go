@@ -382,7 +382,7 @@ func TestQuestSegmentTarget(t *testing.T) {
     require.Equal(t, int32(50000), farY)
 }
 
-// TestKnightChainTransferData pins the gatekeeper legs of the knight
+// TestKnightChainTransferData pins the gatekeeper segments of the knight
 // chain: the Bella hop out of Gludio, the Richlin hop back.
 func TestKnightChainTransferData(t *testing.T) {
     chain := ElvenKnightChain()

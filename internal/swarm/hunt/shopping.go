@@ -928,7 +928,7 @@ func (l *Loop) buysArrived(batch []gear.Purchase) bool {
 }
 
 // advanceTripStop finishes the current stop and walks to the next
-// one (a buy stop or the return leg when none is left).
+// one (a buy stop or the return segment when none is left).
 func (l *Loop) advanceTripStop() {
     if len(l.tripStops) > 0 {
         l.tripStops = l.tripStops[1:]
@@ -940,7 +940,7 @@ func (l *Loop) advanceTripStop() {
     l.buyRetries = 0
     l.resetLearnState()
     // A fresh stop starts with a fresh escalation ladder: the frozen
-    // aborts of the previous leg spent its rungs, the next leg deserves
+    // aborts of the previous segment spent its rungs, the next segment deserves
     // its own detour re-plan and escape rung before the trip gives up.
     l.frozenStage = 0
     // The finished stop talked to its npc: drop the selection the
@@ -948,7 +948,7 @@ func (l *Loop) advanceTripStop() {
     // trip end walks home with a clean engage.
     l.clearTalkedTarget()
     if len(l.tripStops) == 0 {
-        l.startReturnLeg()
+        l.startReturnSegment()
 
         return
     }
@@ -958,7 +958,7 @@ func (l *Loop) advanceTripStop() {
     l.merchantDeckUntil = time.Time{}
     stop := l.tripStops[0]
     l.logf("Hunt: shop: walking to %s", stop.merchant.Name)
-    planFailed := true
+    var planFailed bool
     if stop.teach {
         // The teacher stop walks right up to the class master: the
         // close approach ring of the npc approach offset, planned by
@@ -969,11 +969,11 @@ func (l *Loop) advanceTripStop() {
         // ring stays the fallback for a teacher whose tight ring has
         // no walkable route at all, the approach window owns the last
         // stretch there.
-        l.legRadius = npcApproachOffset
-        planFailed = !l.startWalkLeg(townNpcPosition(stop.merchant))
+        l.segmentRadius = npcApproachOffset
+        planFailed = !l.startWalkSegment(townNpcPosition(stop.merchant))
         if planFailed {
-            l.legRadius = tripApproachRadius
-            planFailed = !l.startWalkLeg(townNpcPosition(stop.merchant))
+            l.segmentRadius = tripApproachRadius
+            planFailed = !l.startWalkSegment(townNpcPosition(stop.merchant))
         }
     } else {
         // The merchant stop walks the exact mesh search first (the
@@ -991,21 +991,21 @@ func (l *Loop) advanceTripStop() {
         // front and trades face to face with the merchant. The ring
         // fallback runs for the one failure class the exact search
         // cannot answer - the plan that resolved onto a foreign deck
-        // (the roof over the shop), see startWalkExactLeg.
+        // (the roof over the shop), see startWalkExactSegment.
         planned := false
         if l.merchantWithinExactRange(stop.merchant) {
             var ringFallback bool
-            planned, ringFallback = l.startWalkExactLeg(
+            planned, ringFallback = l.startWalkExactSegment(
                 townNpcPosition(stop.merchant))
             if !planned && ringFallback {
-                l.legRadius = tripApproachRadius
-                planned = l.startWalkLeg(
+                l.segmentRadius = tripApproachRadius
+                planned = l.startWalkSegment(
                     townNpcPosition(stop.merchant))
             }
         }
         if !planned {
-            l.legRadius = tripApproachRadius
-            planned = l.startWalkLeg(townNpcPosition(stop.merchant))
+            l.segmentRadius = tripApproachRadius
+            planned = l.startWalkSegment(townNpcPosition(stop.merchant))
         }
         planFailed = !planned
     }
@@ -1118,7 +1118,7 @@ func (l *Loop) snapshotTripGear() {
 // a replacement the trip never landed - a buy the server silently
 // refused three times, a merchant that never showed up, an aborted
 // walk, an attacker interrupt, a session death the relogin resumed
-// into the return leg) becomes a debt entry that runs the refill trip
+// into the return segment) becomes a debt entry that runs the refill trip
 // on the gear run cooldown. A piece that still sits in the bag is no
 // debt: the auto equipment re-wears it within seconds. The snapshot
 // dies with the check - the next trip freezes a fresh one.

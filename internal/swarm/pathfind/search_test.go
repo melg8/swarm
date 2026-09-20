@@ -51,7 +51,7 @@ func TestFindPathOpenField(t *testing.T) {
 
 // TestFindPathAroundWall builds a full height wall with a single gap and
 // checks that the path crosses the wall inside the gap and that every
-// smoothed leg has line of sight.
+// smoothed segment has line of sight.
 func TestFindPathAroundWall(t *testing.T) {
     spec := &regionSpec{}
     spec.setFlat(0)
@@ -73,13 +73,13 @@ func TestFindPathAroundWall(t *testing.T) {
     require.True(t, result.Found)
     require.Greater(t, len(result.Waypoints), 2)
 
-    // Every smoothed leg must be walkable by construction.
+    // Every smoothed segment must be walkable by construction.
     for i := 0; i+1 < len(result.Waypoints); i++ {
         cleared, err := engine.LineOfSight(
             result.Waypoints[i], result.Waypoints[i+1],
             DefaultMaxPassableHeight)
         require.NoError(t, err)
-        require.True(t, cleared, "leg %d of the path is blocked", i)
+        require.True(t, cleared, "segment %d of the path is blocked", i)
     }
 
     // The raw cell path crosses the wall line inside the gap rows.

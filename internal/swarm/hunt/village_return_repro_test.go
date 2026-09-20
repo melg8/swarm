@@ -121,7 +121,7 @@ func TestReproVillageZoneReturnWalksThePlan(t *testing.T) {
     loop.lastHit = time.Now().Add(-time.Minute)
     sim := &villageClickServer{engine: engine}
 
-    // The zone return leg: the destination the returnToZone flow
+    // The zone return segment: the destination the returnToZone flow
     // would plan (the zone center on its real deck height).
     deckZ, err := engine.ClosestHeight(
         float64(reproVillageZoneX), float64(reproVillageZoneY),
@@ -132,7 +132,7 @@ func TestReproVillageZoneReturnWalksThePlan(t *testing.T) {
         Y: float64(reproVillageZoneY),
         Z: float64(deckZ),
     }
-    require.True(t, loop.startWalkLeg(dest),
+    require.True(t, loop.startWalkSegment(dest),
         "the zone return must plan a dry geodata route")
 
     // Walk the plan: the follower paces its clicks (the pacing gate is

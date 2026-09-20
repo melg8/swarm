@@ -54,7 +54,7 @@ const gatedCoarsePops = 4096
 // maxConfinedNodes bounds the corridor confined fallback search: the
 // allowed set keeps the exploration inside the coarse chain clusters,
 // so the bound only guards the pathological mazes. The whole map town
-// legs thread half a million real polygons through their chain - the
+// segments thread half a million real polygons through their chain - the
 // bound rides at a million expansions (the node memory is the flat
 // search's, the pooled state carries it).
 const maxConfinedNodes = 1 << 20

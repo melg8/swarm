@@ -336,11 +336,11 @@ func (l *Loop) SetHuntingZoneRegion(region string) {
 
 // stopForZoneSwitch halts the walks a ground switch makes pointless:
 // a manual move, a town trip walk to the trader or back and a zone
-// return leg all aimed at the old square. The server
+// return segment all aimed at the old square. The server
 // keeps a walk running until the next move request replaces its
 // destination, so one walk request to the current spot stops it. The
 // selling stop (the character stands at the merchant) keeps running
-// - its return leg re-targets the new zone on its own - and the
+// - its return segment re-targets the new zone on its own - and the
 // deleveling refuses the stop like it refuses every movement
 // command.
 func (l *Loop) stopForZoneSwitch() {

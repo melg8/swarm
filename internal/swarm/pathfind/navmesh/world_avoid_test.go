@@ -25,7 +25,7 @@ func worldPackDir(t *testing.T) string {
 
 // worldRouteProfile measures the walk answer of one route: the total
 // length, the water share (the polygon area class under every raw
-// waypoint leg midpoint) and the search cost.
+// waypoint segment midpoint) and the search cost.
 type worldRouteProfile struct {
     length   float64
     waterLen float64
@@ -70,8 +70,8 @@ func profileWorldRoute(t *testing.T, mesh *Mesh, start, end Pos,
     }
     for i := 0; i+1 < len(waypoints); i++ {
         a, b := waypoints[i], waypoints[i+1]
-        leg := math.Hypot(b.X-a.X, b.Y-a.Y)
-        profile.length += leg
+        segment := math.Hypot(b.X-a.X, b.Y-a.Y)
+        profile.length += segment
         for _, ref := range route.Corridor {
             col, row := TileOf(ref)
             tile, _ := mesh.Tile(RegionKey{Col: col, Row: row})
@@ -83,7 +83,7 @@ func profileWorldRoute(t *testing.T, mesh *Mesh, start, end Pos,
             mx, my := (a.X+b.X)/2, (a.Y+b.Y)/2
             if mx >= x0 && mx <= x1 && my >= y0 && my <= y1 {
                 if water[ref] {
-                    profile.waterLen += leg
+                    profile.waterLen += segment
                 }
 
                 break

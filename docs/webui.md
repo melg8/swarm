@@ -488,7 +488,7 @@ grow by the 2 s window, so the payload stays small.
   priced round of 2026-09-19 retired the walled form of the water,
   every search prices the crossings at the swim rate (swimming is
   slower than running) and the plan may swim. A plan from no mesh
-  search (the direct legs)
+  search (the direct segments)
   keeps the viewer defaults. The viewer POST body carries the same
   fields (`approach`, `avoid`, `fold`) and the shared view links
   round-trip them (`parseViewParams` / `buildViewStateUrl` in
@@ -518,7 +518,7 @@ grow by the 2 s window, so the payload stays small.
   signal. The publishWalkPlan path covers every walking phase of the
   hunt loop, not only the manual move: town trips (the walk to the
   trader and the walk back to the farm spot) and the deleveling guard
-  walks publish their full geodata leg too, so the map draws the
+  walks publish their full geodata segment too, so the map draws the
   planned path of every autonomous walk. The follower cursor
   (`snapshot.walkIndex`) carries a small ring on the waypoint the
   walker currently aims at, and the plan clears on the non walking
@@ -536,17 +536,17 @@ grow by the 2 s window, so the payload stays small.
   x y z triple (the dump walk line format) next to the dot instead,
   and the status bar cursor chip plus the ctrl+c copy carry the same
   values (see the cursor chip below). The state dump
-  (`/api/bots/<id>/dump`) prints the same whole leg with the origin
+  (`/api/bots/<id>/dump`) prints the same whole segment with the origin
   ("from"), the walk zero point (the `started` line with the last
   seen moment and the time on the walk), every passed waypoint with
-  its timing (`(passed, t+10.4s, leg 5.2s)` - the moment the follower
-  reached it on the walk timeline and the leg duration that ended
+  its timing (`(passed, t+10.4s, segment 5.2s)` - the moment the follower
+  reached it on the walk timeline and the segment duration that ended
   there) and the `<-- TARGET` marker on the current one with its
-  walking time (`(walking 45.2s)`, the stuck leg number - the last
-  walk plan measures the aimed leg to the moment the plan ended), and
+  walking time (`(walking 45.2s)`, the stuck segment number - the last
+  walk plan measures the aimed segment to the moment the plan ended), and
   the `dest` line last - a stuck or dawdling walk reads at a glance
   (the 2026-09-10 water stuck report drove the format: the walk plan
-  (3 waypoints) of the dump hid the northern escape leg the re-path
+  (3 waypoints) of the dump hid the northern escape segment the re-path
   had planned and the character had skipped past; the 2026-09-19
   timing round added the per waypoint cost so a dawdling point shows
   how long it eats, not just its name). The tracker observes the
@@ -566,7 +566,7 @@ grow by the 2 s window, so the payload stays small.
   inventory as `snapshot.inventory` with the resolved display name and
   icon file name per item, sorted equipped-first. The paperdoll is
   compact: a 3x3 wear block ordered like the C1 client doll (shirt,
-  head, cloak / weapon, chest, shield / gloves, legs, boots) on the
+  head, cloak / weapon, chest, shield / gloves, segments, boots) on the
   left and a 2x3 jewelry block on the right whose middle-left cell is
   a blank hole with the necklace on the middle-right - the classic
   character has only five jewelry slots (two earrings, a necklace, two
@@ -779,8 +779,8 @@ stay off, the village restart after a death still works. The geodata
 engine loads in every mode and serves the manual long walks: the
 server side pathfinder silently refuses far targets (observed stuck
 walks past a few thousand units), so a click beyond 2000 units plans
-the geodata path once and follows the waypoints in server accepted legs
-(userWaypoints, 1s request pace, legs capped at 1000 units). A manual
+the geodata path once and follows the waypoints in server accepted segments
+(userWaypoints, 1s request pace, segments capped at 1000 units). A manual
 command that replaces a walk still running on the server re-issues the
 walk request at once (`userRedirect`: the next tick fires the new
 MoveToLocation instead of waiting for the old walk - the server

@@ -29,7 +29,7 @@ const (
     classTransferAccount    = "temp9"
     classTransferPassword   = "temp9"
     // classTransferTimeout bounds the whole run: the kill stages walk
-    // 37 000 unit legs twice each, farm 20 pieces at a 50-70 percent
+    // 37 000 unit segments twice each, farm 20 pieces at a 50-70 percent
     // drop rate, two gatekeeper teleports bridge the towns and the
     // closing chain talks pace their bypasses - an hour and a half
     // holds the honest run with the re-plans inside.
@@ -241,7 +241,7 @@ func classTransferScenario(ctx context.Context, m *Manager, t *Test) error {
     return classTransferDrive(ctx, m, test, tracker, session)
 }
 
-// classTransferDrive runs the full quest leg of the scenario: the
+// classTransferDrive runs the full quest segment of the scenario: the
 // dress-up, the chain drive of the quest trip engine (the journal
 // cond ladder with the kill stages, the rests and the two town
 // transfers), the Rains class change and the double verification,
@@ -326,7 +326,7 @@ func classTransferDrive(
 
 // driveClassChange walks to the grand master and drives the change
 // route of the dialog walker (the static villagemaster page entry,
-// the three links of the change leg).
+// the three links of the change segment).
 func driveClassChange(
     loop *hunt.Loop, rains state.AttackTarget, change hunt.ClassChange,
 ) error {

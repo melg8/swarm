@@ -30,7 +30,7 @@ type fakeNavigator struct {
     // blind marks the LineOfSight answer as blocked for every
     // queried line (the blind engage recovery asks it per candidate
     // standing point): the default answers a clear line - the
-    // follower leg gate of the town walks needs one.
+    // follower segment gate of the town walks needs one.
     blind bool
     // sightFunc answers the LineOfSight queries per line: the
     // waypoint follower gate tests pin the exact blocked corner
@@ -59,7 +59,7 @@ type fakeNavigator struct {
     // escapeRoute overrides the waypoints of the water escape search.
     escapeRoute []pathfind.Vec3
     // avoidRoute overrides the waypoints of the avoiding approach
-    // search (the frozen leg recovery re-plan); avoiding records
+    // search (the frozen segment recovery re-plan); avoiding records
     // the avoid areas the loop passed.
     avoidRoute []pathfind.Vec3
     avoiding   [][]pathfind.AvoidArea
@@ -67,12 +67,12 @@ type fakeNavigator struct {
     escapeErr   bool
     escapeCalls int
     // route overrides the planned waypoints of a successful search
-    // (the blind reposition tests pin the leg following on a detour).
+    // (the blind reposition tests pin the segment following on a detour).
     route []pathfind.Vec3
     // approachEnds records the destinations the approach searches
     // received (the zone return goal checks live here).
     approachEnds []pathfind.Vec3
-    // miss makes the leg planner searches answer not found: the
+    // miss makes the segment planner searches answer not found: the
     // destination no route reaches (the abort pins).
     miss bool
     // exactMiss makes the exact FindPath search answer not found
@@ -80,10 +80,10 @@ type fakeNavigator struct {
     // fallback tests arm it (the clicked point on unreachable ground
     // falls back to the approach corridor).
     exactMiss bool
-    // partialRoute makes the leg planner searches answer the
+    // partialRoute makes the segment planner searches answer the
     // partial closest-reachable corridor (Found=false with Partial
     // set and these waypoints - the navmesh hybrid partial round):
-    // the leg planners accept it and walk toward the closest
+    // the segment planners accept it and walk toward the closest
     // reachable point instead of aborting.
     partialRoute []pathfind.Vec3
 }
@@ -319,17 +319,17 @@ func (f *fakeNavigator) FindWaterEscape(
 // the nearest town merchant of the test farm spot (45000, 50000).
 var herbielPos = [3]int32{42766, 50037, -2984}
 
-// legWalkTarget computes the walk target the follower sends for a leg
+// segmentWalkTarget computes the walk target the follower sends for a segment
 // from the point towards the waypoint: the waypoint itself when it is
-// within the move leg limit, the intermediate straight line point
+// within the move segment limit, the intermediate straight line point
 // otherwise (mirroring walkTownWaypoints).
-func legWalkTarget(from [3]int32, to pathfind.Vec3) [3]int32 {
+func segmentWalkTarget(from [3]int32, to pathfind.Vec3) [3]int32 {
     dx := to.X - float64(from[0])
     dy := to.Y - float64(from[1])
     dist := math.Hypot(dx, dy)
     moveX, moveY, moveZ := to.X, to.Y, to.Z
-    if dist > maxMoveLeg {
-        frac := maxMoveLeg / dist
+    if dist > maxMoveDistance {
+        frac := maxMoveDistance / dist
         moveX = float64(from[0]) + dx*frac
         moveY = float64(from[1]) + dy*frac
         moveZ = float64(from[2]) + (to.Z-float64(from[2]))*frac
@@ -384,16 +384,16 @@ func TestTripTriggersOnFullSlots(t *testing.T) {
 
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
-    require.Equal(t, [][3]int32{legWalkTarget([3]int32{45000, 50000, -3500},
+    require.Equal(t, [][3]int32{segmentWalkTarget([3]int32{45000, 50000, -3500},
         pathfind.Vec3{X: float64(herbielPos[0]), Y: float64(herbielPos[1]), Z: float64(herbielPos[2])})}, game.walks,
-        "the walk aims along the leg to the nearest town trader")
+        "the walk aims along the segment to the nearest town trader")
 
     // A second tick while the character has not moved does not resend
     // the walk immediately (rate limited) and does not re-plan.
     loop.tick()
     require.Len(t, game.walks, 1)
     require.Equal(t, 1, len(loop.waypoints)-loop.wpIndex,
-        "the leg keeps its waypoint list")
+        "the segment keeps its waypoint list")
 }
 
 // TestTripWalkPlanPublishes pins the walk plan view of a town trip:
@@ -429,7 +429,7 @@ func TestTripTriggersOnWeight(t *testing.T) {
     })
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
-    require.Equal(t, [][3]int32{legWalkTarget([3]int32{45000, 50000, -3500},
+    require.Equal(t, [][3]int32{segmentWalkTarget([3]int32{45000, 50000, -3500},
         pathfind.Vec3{X: float64(herbielPos[0]), Y: float64(herbielPos[1]), Z: float64(herbielPos[2])})}, game.walks)
 }
 
@@ -563,15 +563,15 @@ func TestTripFullFlow(t *testing.T) {
     loop.tick()
     require.Equal(t, phaseTownReturn, loop.phase)
 
-    // The return leg walks home; the trip ends at the farm spot and
+    // The return segment walks home; the trip ends at the farm spot and
     // the hunt resumes.
     loop.tick()
     require.Equal(t, [][3]int32{
-        legWalkTarget([3]int32{45000, 50000, -3500},
+        segmentWalkTarget([3]int32{45000, 50000, -3500},
             pathfind.Vec3{X: float64(herbielPos[0]), Y: float64(herbielPos[1]), Z: float64(herbielPos[2])}),
-        legWalkTarget(herbielPos,
+        segmentWalkTarget(herbielPos,
             pathfind.Vec3{X: 45000, Y: 50000, Z: -3500}),
-    }, game.walks, "the return leg walks home")
+    }, game.walks, "the return segment walks home")
     moveSelfTo(bot, 45000, 50000, -3500)
     loop.tick()
     require.Equal(t, phaseEngage, loop.phase)
@@ -645,7 +645,7 @@ func TestTripNoCleanupDuringTrip(t *testing.T) {
 }
 
 // TestTripStuckWalkRepaths verifies the stuck handling: a character
-// standing still on a leg re-paths, and after the re-path budget is
+// standing still on a segment re-paths, and after the re-path budget is
 // spent the trip aborts instead of walking into a wall forever.
 func TestTripStuckWalkRepaths(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
@@ -662,7 +662,7 @@ func TestTripStuckWalkRepaths(t *testing.T) {
     require.Equal(t, 2, nav.calls, "the stuck walk re-paths")
     require.Equal(t, phaseTownWalk, loop.phase)
 
-    // The stuck cycles from the same cell climb the frozen leg
+    // The stuck cycles from the same cell climb the frozen segment
     // escalation ladder instead of re-planning the identical route:
     // the detour re-plan first, the cursor key escape along the plan
     // second.
@@ -848,7 +848,7 @@ func TestReturnEngagesTargetOnZoneEntry(t *testing.T) {
     nav := &fakeNavigator{found: true}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    // The character stands inside the zone, the return leg still has
+    // The character stands inside the zone, the return segment still has
     // waypoints to go.
     loop.SetHuntingZone(45500, 50000, 1500)
     loop.phase = phaseTownReturn
@@ -975,7 +975,7 @@ func TestTripClearsTheTalkedNpcSelection(t *testing.T) {
     loop.tick()
 
     // The stop ends with Herbiel still selected: the clear fires
-    // before the return leg starts.
+    // before the return segment starts.
     require.Equal(t, phaseTownReturn, loop.phase)
     require.GreaterOrEqual(t, game.clears, 1,
         "the stop end dropped the merchant selection")
@@ -992,7 +992,7 @@ func TestTripInterruptsForTheAttacker(t *testing.T) {
 
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
-    // A mob reaches the walking character mid leg and holds it as
+    // A mob reaches the walking character mid segment and holds it as
     // its target.
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
@@ -1007,8 +1007,8 @@ func TestTripInterruptsForTheAttacker(t *testing.T) {
         "the attacker is the fight of the interrupted trip")
     require.True(t, loop.tripEndedAt.IsZero(),
         "the interrupt is a pause: no trip cooldown is armed")
-    // The walk requests of the leg stopped for the fight answer: the
-    // initial trip leg went out before the mob attacked, nothing
+    // The walk requests of the segment stopped for the fight answer: the
+    // initial trip segment went out before the mob attacked, nothing
     // follows it while the fight runs.
     require.Len(t, game.walks, 1)
 
@@ -1046,7 +1046,7 @@ func TestTripInterruptsIntoDefenseForTheUnwinnableAttacker(t *testing.T) {
     require.Equal(t, phaseEngage, loop.phase)
     require.Zero(t, loop.target, "no fight with the unwinnable mob")
     require.Len(t, game.walks, 2,
-        "the trip leg then the standard escape leg answered the interrupt")
+        "the trip segment then the escape segment answered the interrupt")
     require.Equal(t, [3]int32{44300, 50000, -3500}, game.walks[1],
         "the escape runs away from the mob")
     require.False(t, loop.fleeSince.IsZero(),

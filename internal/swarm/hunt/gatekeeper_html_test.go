@@ -70,7 +70,7 @@ func TestParseGatekeeperHTMLShowTeleportsWithList(t *testing.T) {
 
 // TestFindTeleportButtonByLabel pins the destination lookup: the hunt
 // loop finds the button whose label contains the wanted destination
-// name (the "The Town of Gludio" leg of Mirabel -> Gludio).
+// name (the "The Town of Gludio" segment of Mirabel -> Gludio).
 func TestFindTeleportButtonByLabel(t *testing.T) {
     buttons := []BypassButton{
         {

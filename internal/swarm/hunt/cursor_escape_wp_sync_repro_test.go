@@ -33,7 +33,7 @@ import (
 //     17:16:22, then "town walk stuck, skipping waypoint (cursor 1
 //     of 49)" one second later, then the plan view showing wp 0
 //     passed at t+22.5s (the resume time, not the walk time) and
-//     legs of 8.3s, 5.0s, 10.7s spent walking BACK to the waypoints
+//     segments of 8.3s, 5.0s, 10.7s spent walking BACK to the waypoints
 //     the escape had already covered. Two minutes of the trip burned
 //     on the walked prefix.
 //   - "webui при ходьбе wasd - не корректно отображается направление
@@ -53,7 +53,7 @@ import (
 
 // syncDriveTick mirrors the production tick of walkTownWaypoints plus
 // the plan view publish of the loop tick: the armed escape drives the
-// claims, the routed legs follow their waypoints, every tick
+// claims, the routed segments follow their waypoints, every tick
 // republishes the walk plan the way the loop does (the plan view
 // stamps the passed waypoints as the cursor moves).
 func syncDriveTick(
@@ -90,7 +90,7 @@ func nearestPlanWaypoint(
 // stamps them the moment the claims walk onto them), the settle
 // leaves the cursor on the first waypoint still ahead, and the
 // resumed clicks aim forward - never back to the walked prefix (the
-// dump: two minutes of backtracking legs after the resume).
+// dump: two minutes of backtracking segments after the resume).
 func TestReproEscapeClaimsMarkWalkedWaypointsPassed(t *testing.T) {
     loop, game, bot, sim, sink := spawnDumpLoop(t)
 

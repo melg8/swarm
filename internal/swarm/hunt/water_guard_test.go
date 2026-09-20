@@ -24,7 +24,7 @@ import (
 
 // TestTripWaterEscapePlansShoreWalk pins the recovery entry: a
 // character standing over a lake bed during a town trip replaces the
-// leg with the shore escape walk, clicks along the escape waypoints
+// segment with the shore escape walk, clicks along the escape waypoints
 // without the water guard and never towards the original village
 // waypoint while it stands in the water.
 func TestTripWaterEscapePlansShoreWalk(t *testing.T) {
@@ -45,7 +45,7 @@ func TestTripWaterEscapePlansShoreWalk(t *testing.T) {
     require.True(t, loop.waterEscape,
         "the water escape must be armed")
     require.Equal(t, nav.escapeRoute, loop.waypoints,
-        "the escape waypoints must replace the trip leg")
+        "the escape waypoints must replace the trip segment")
     require.Zero(t, loop.wpIndex)
     require.Empty(t, game.walks,
         "the planning tick sends no walk yet")
@@ -59,11 +59,11 @@ func TestTripWaterEscapePlansShoreWalk(t *testing.T) {
         "the escape walk must aim at the shore waypoint")
 }
 
-// TestTripWaterEscapeReplansLegOnShore pins the recovery exit: once
+// TestTripWaterEscapeReplansSegmentOnShore pins the recovery exit: once
 // the character walks onto dry ground, the escape drops and the
-// interrupted trip leg re-plans from the shore with a fresh re-path
+// interrupted trip segment re-plans from the shore with a fresh re-path
 // budget.
-func TestTripWaterEscapeReplansLegOnShore(t *testing.T) {
+func TestTripWaterEscapeReplansSegmentOnShore(t *testing.T) {
     loop, game, bot, nav := newTripLoop()
     fillInventory(bot)
     nav.overWater = true
@@ -84,16 +84,16 @@ func TestTripWaterEscapeReplansLegOnShore(t *testing.T) {
         "the recovery leaves a fresh re-path budget")
     require.NotNil(t, loop.waypoints)
     require.NotEqual(t, nav.escapeRoute, loop.waypoints,
-        "the trip leg must re-plan to the trader")
-    legDest := state.WalkPoint{
+        "the trip segment must re-plan to the trader")
+    segmentDest := state.WalkPoint{
         X: herbielPos[0], Y: herbielPos[1], Z: herbielPos[2],
     }
     snap := bot.Snapshot()
     require.NotNil(t, snap.WalkDest)
-    require.Equal(t, legDest, *snap.WalkDest,
-        "the re-planned leg still aims at the trader")
+    require.Equal(t, segmentDest, *snap.WalkDest,
+        "the re-planned segment still aims at the trader")
     require.Empty(t, game.walks,
-        "the shore tick plans the new leg without walking yet")
+        "the shore tick plans the new segment without walking yet")
 }
 
 // TestTripWaterEscapeWithoutShoreAborts pins the failure path: a
@@ -114,7 +114,7 @@ func TestTripWaterEscapeWithoutShoreAborts(t *testing.T) {
 
 // TestTripWaterEscapeStuckReplans pins the stuck handling of the
 // escape: a swimming character that stands still re-plans the escape
-// itself, not the town leg.
+// itself, not the town segment.
 func TestTripWaterEscapeStuckReplans(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     fillInventory(bot)
@@ -126,7 +126,7 @@ func TestTripWaterEscapeStuckReplans(t *testing.T) {
 
     loop.tick()
     require.True(t, loop.waterEscape)
-    legSearches := len(nav.approachEnds)
+    segmentSearches := len(nav.approachEnds)
     // The character stands still in the water past the stuck window.
     for range 20 {
         loop.stuckAt = time.Now().Add(-stuckTimeout - time.Second)
@@ -134,15 +134,15 @@ func TestTripWaterEscapeStuckReplans(t *testing.T) {
     }
     require.GreaterOrEqual(t, nav.escapeCalls, 2,
         "the stuck escape must re-plan the escape itself")
-    require.Len(t, nav.approachEnds, legSearches,
-        "the stuck escape must never re-plan the town leg")
+    require.Len(t, nav.approachEnds, segmentSearches,
+        "the stuck escape must never re-plan the town segment")
     require.Equal(t, phaseEngage, loop.phase,
         "the escape exhausts its budget and aborts the trip")
 }
 
 // TestTripWetClickWalksThePlan pins the priced water round: the plan
 // prices every crossing at the swim rate, so the follower walks the
-// wet legs it planned - a click line that crosses water goes out
+// wet segments it planned - a click line that crosses water goes out
 // unchanged (the guard that refused wet clicks and re-planned around
 // the shore was the outdated way this round retired), and the escape
 // machinery owns the off-plan swims instead.
@@ -170,8 +170,8 @@ func TestTripPlannedSwimKeepsFollowingThePlan(t *testing.T) {
     nav.overWater = true
     loop.phase = phaseTownWalk
     loop.tripStart = time.Now()
-    loop.legDest = pathfind.Vec3{X: 45200, Y: 50200, Z: -3539}
-    loop.legStart = pathfind.Vec3{X: 45000, Y: 50000, Z: -3800}
+    loop.segmentDest = pathfind.Vec3{X: 45200, Y: 50200, Z: -3539}
+    loop.segmentStart = pathfind.Vec3{X: 45000, Y: 50000, Z: -3800}
     // The plan crosses the lake: the aimed waypoint stands on the bed
     // ahead of the character.
     loop.waypoints = []pathfind.Vec3{

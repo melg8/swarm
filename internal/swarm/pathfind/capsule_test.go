@@ -64,7 +64,7 @@ func capsuleWallWorld(t *testing.T) (*Engine, func(float64, float64) Vec3) {
     }
 }
 
-// pathMinClearance walks the sampled legs of the path and returns the
+// pathMinClearance walks the sampled segments of the path and returns the
 // smallest wall clearance along them.
 func pathMinClearance(capsule *Capsule, path []Vec3) float64 {
     worst := math.MaxFloat64
@@ -77,7 +77,7 @@ func pathMinClearance(capsule *Capsule, path []Vec3) float64 {
         }
         for k := 0; k <= samples; k++ {
             t := float64(k) / float64(samples)
-            point := legPoint(a, b, t)
+            point := segmentPoint(a, b, t)
             worst = math.Min(worst,
                 capsule.Clearance(point.X, point.Y, int16(point.Z)))
         }
@@ -110,7 +110,7 @@ func TestCapsuleClearance(t *testing.T) {
 // TestCapsulePushesWaypointOffWall runs the post pass over a path
 // whose middle waypoint sits on the corridor wall line: the waypoint
 // moves into the corridor until the capsule clears the wall, the
-// endpoints stay and every leg of the answer clears the radius.
+// endpoints stay and every segment of the answer clears the radius.
 func TestCapsulePushesWaypointOffWall(t *testing.T) {
     engine, world := capsuleWallWorld(t)
     capsule := NewCapsule(engine)
@@ -133,12 +133,12 @@ func TestCapsulePushesWaypointOffWall(t *testing.T) {
         DefaultCollisionRadius-1e-6)
 }
 
-// TestCapsuleBendsGrazingLeg bends a straight leg that runs into a
+// TestCapsuleBendsGrazingSegment bends a straight segment that runs into a
 // pillar: one fully blocked corridor cell protrudes into the row and
-// the leg skims its faces at sub radius distances. The answer keeps
+// the segment skims its faces at sub radius distances. The answer keeps
 // the endpoints, adds the bend anchors skirtting the pillar and every
-// leg of the answer clears the radius.
-func TestCapsuleBendsGrazingLeg(t *testing.T) {
+// segment of the answer clears the radius.
+func TestCapsuleBendsGrazingSegment(t *testing.T) {
     _, world := capsuleWallWorld(t)
     // Rebuild the region with one blocked pillar cell inside the
     // corridor (the row 10 cell at x 10).
@@ -167,17 +167,17 @@ func TestCapsuleBendsGrazingLeg(t *testing.T) {
     start := world(5.5, 10.5)
     end := world(15.5, 10.5)
     path := capsule.ApplyPath([]Vec3{start, end}, DefaultCollisionRadius)
-    require.Greater(t, len(path), 2, "the leg must gain bend anchors")
+    require.Greater(t, len(path), 2, "the segment must gain bend anchors")
     require.Equal(t, start, path[0])
     require.Equal(t, end, path[len(path)-1])
     require.GreaterOrEqual(t, pathMinClearance(capsule, path),
-        DefaultCollisionRadius-1e-6, "every leg must clear the capsule")
+        DefaultCollisionRadius-1e-6, "every segment must clear the capsule")
 }
 
-// TestCapsuleKeepsClearLegUntouched pins the no-churn contract: a
-// corridor path whose waypoints and legs already clear the capsule
+// TestCapsuleKeepsClearSegmentUntouched pins the no-churn contract: a
+// corridor path whose waypoints and segments already clear the capsule
 // passes through the post pass unchanged.
-func TestCapsuleKeepsClearLegUntouched(t *testing.T) {
+func TestCapsuleKeepsClearSegmentUntouched(t *testing.T) {
     engine, world := capsuleWallWorld(t)
     capsule := NewCapsule(engine)
 
@@ -191,7 +191,7 @@ func TestCapsuleKeepsClearLegUntouched(t *testing.T) {
 
 // TestCapsuleFallbackKeepsImpossibleWaypoint pins the honest
 // fallback: a waypoint inside a solid wall block cannot be pushed
-// anywhere walkable, so the pass keeps it and the legs unchanged.
+// anywhere walkable, so the pass keeps it and the segments unchanged.
 func TestCapsuleFallbackKeepsImpossibleWaypoint(t *testing.T) {
     _, world := capsuleWallWorld(t)
     // Solid block over the cells 8..12 x 10..11: the corridor sealed
@@ -269,35 +269,35 @@ func TestEngineCapsuleClearanceIntegration(t *testing.T) {
         DefaultCollisionRadius-1e-6)
 }
 
-// TestCapsuleLegClear pins the wall oracle of the mesh shortcut pass:
-// a leg down the corridor center clears the radius, a leg through the
+// TestCapsuleSegmentClear pins the wall oracle of the mesh shortcut pass:
+// a segment down the corridor center clears the radius, a segment through the
 // corridor wall refuses, and the refused answer matches the sampled
 // clearance the bend pass pushes away.
-func TestCapsuleLegClear(t *testing.T) {
+func TestCapsuleSegmentClear(t *testing.T) {
     engine, world := capsuleWallWorld(t)
     capsule := NewCapsule(engine)
 
     // The corridor center line runs between the wall rows: every
     // sample keeps 8 or more units off the walls.
-    require.True(t, capsule.LegClear(
+    require.True(t, capsule.SegmentClear(
         world(6, 10.5).X, world(6, 10.5).Y, 0,
         world(19, 11.5).X, world(19, 11.5).Y, 0, 7.5))
 
-    // The leg through the sealed end wall crosses closed cells: the
+    // The segment through the sealed end wall crosses closed cells: the
     // walk rules refuse it.
-    require.False(t, capsule.LegClear(
+    require.False(t, capsule.SegmentClear(
         world(3.5, 10.5).X, world(3.5, 10.5).Y, 0,
         world(21.5, 10.5).X, world(21.5, 10.5).Y, 0, 7.5))
 
     // A zero radius keeps the walk rules answer only.
-    require.False(t, capsule.LegClear(
+    require.False(t, capsule.SegmentClear(
         world(3.5, 10.5).X, world(3.5, 10.5).Y, 0,
         world(21.5, 10.5).X, world(21.5, 10.5).Y, 0, 0))
 }
 
 // TestCapsuleShortenPath pins the fold of the wall oracle: a path
 // whose redundant middle points ride the open corridor collapses to
-// the long clear legs, a path whose middle point is the only way
+// the long clear segments, a path whose middle point is the only way
 // around the corridor seal keeps it.
 func TestCapsuleShortenPath(t *testing.T) {
     engine, world := capsuleWallWorld(t)
@@ -312,7 +312,7 @@ func TestCapsuleShortenPath(t *testing.T) {
     out := capsule.ShortenPath(path, 7.5)
     require.Equal(t, []Vec3{path[0], path[len(path)-1]}, out)
 
-    // The sealed corridor: the leg across the seal refuses, the
+    // The sealed corridor: the segment across the seal refuses, the
     // detour through the only opening keeps its points.
     sealed := []Vec3{
         world(2, 10.5), world(2.5, 12.5), world(5, 12.5),
@@ -327,14 +327,14 @@ func TestCapsuleShortenPath(t *testing.T) {
     require.Equal(t, two, capsule.ShortenPath(two, 7.5))
 }
 
-// TestCapsuleShortenPathCapsWaterLegs pins the server water move
+// TestCapsuleShortenPathCapsWaterSegments pins the server water move
 // clamp of the fold: the moveToLocation of the game server truncates
-// every swimming move request to waterMoveLeg from the current
+// every swimming move request to waterMoveSegment from the current
 // position (Creature.moveToLocation, the isInWater divider), so a
-// smoothed leg that leaves the water longer than the clamp never
+// smoothed segment that leaves the water longer than the clamp never
 // reaches its waypoint - the fold splits it at the clamp instead and
-// every leg the walker issues from the water lands on its target.
-func TestCapsuleShortenPathCapsWaterLegs(t *testing.T) {
+// every segment the walker issues from the water lands on its target.
+func TestCapsuleShortenPathCapsWaterSegments(t *testing.T) {
     // The open underwater plane: no walls, the only constraint the
     // fold answers is the water clamp.
     spec := &regionSpec{}
@@ -354,9 +354,9 @@ func TestCapsuleShortenPathCapsWaterLegs(t *testing.T) {
     require.Equal(t, end, out[len(out)-1],
         "the last waypoint never moves")
     for i := 1; i < len(out); i++ {
-        leg := math.Hypot(out[i].X-out[i-1].X, out[i].Y-out[i-1].Y)
-        require.LessOrEqual(t, leg, waterMoveLeg,
-            "the water leg %d must fit the server move clamp", i-1)
+        segment := math.Hypot(out[i].X-out[i-1].X, out[i].Y-out[i-1].Y)
+        require.LessOrEqual(t, segment, waterMoveSegment,
+            "the water segment %d must fit the server move clamp", i-1)
     }
     // The split keeps the route geometry: the path still advances
     // monotonically along the original line.
@@ -375,11 +375,11 @@ func TestCapsuleShortenPathCapsWaterLegs(t *testing.T) {
         "the split must not shorten the walk")
 }
 
-// TestCapsuleShortenPathKeepsDryLegs pins the flip side: a dry
+// TestCapsuleShortenPathKeepsDrySegments pins the flip side: a dry
 // anchored chord has no server clamp (the land moves run the
 // server's own truncation and pathfinding), so the fold keeps the
-// long clear legs the water would split.
-func TestCapsuleShortenPathKeepsDryLegs(t *testing.T) {
+// long clear segments the water would split.
+func TestCapsuleShortenPathKeepsDrySegments(t *testing.T) {
     spec := &regionSpec{}
     spec.setFlat(0)
     engine := newTestEngine(t, spec)
@@ -393,8 +393,8 @@ func TestCapsuleShortenPathKeepsDryLegs(t *testing.T) {
     out := capsule.ShortenPath(
         []Vec3{start, mid, end}, DefaultCollisionRadius)
     require.Equal(t, []Vec3{start, end}, out,
-        "the dry chord merges into one leg whatever its length")
-    leg := math.Hypot(end.X-start.X, end.Y-start.Y)
-    require.Greater(t, leg, waterMoveLeg,
+        "the dry chord merges into one segment whatever its length")
+    segment := math.Hypot(end.X-start.X, end.Y-start.Y)
+    require.Greater(t, segment, waterMoveSegment,
         "the test chord must exceed the water clamp to pin the flip")
 }

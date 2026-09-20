@@ -135,7 +135,7 @@ type navmeshPathRequest struct {
     // the plan carried). Empty for the clean searches.
     Avoid []navmeshAvoidCircle `json:"avoid,omitempty"`
     // Fold runs the capsule post pass over the answer (the pushes and
-    // the bend pass, then the fold into the longest grid clear legs -
+    // the bend pass, then the fold into the longest grid clear segments -
     // the double click default). The plan repro links send false: the
     // answer then IS the search answer the bot publishes as its walk
     // plan, no grid pass bends it (the grid oracle is water blind -
@@ -402,7 +402,7 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         response.Corridor = len(route.Corridor)
         // The fold switch: the smoothed answer walks the full
         // pipeline (the pushes and the bends of the capsule pass,
-        // then the fold into the longest grid clear legs), the plan
+        // then the fold into the longest grid clear segments), the plan
         // repro answer (fold=false) serves the search waypoints as
         // the bot publishes them. The raw funnel answer keeps the
         // legacy post pass only - it is the before picture of the
@@ -425,9 +425,9 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
 // clearedWaypoints runs the answer waypoints through the capsule
 // clearance post pass when the viewer engine arms it (the funnel
 // pivot clearance covers the turns, the smoothing covers the merged
-// legs, the post pass covers whatever still grazes a wall) and folds
-// the result into the longest grid clear legs - the walker consumes
-// legs that answer the server movement rules with the capsule
+// segments, the post pass covers whatever still grazes a wall) and folds
+// the result into the longest grid clear segments - the walker consumes
+// segments that answer the server movement rules with the capsule
 // clearance.
 func (s *Server) clearedWaypoints(waypoints []navmesh.Pos,
     clearance float64,

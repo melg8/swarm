@@ -46,7 +46,7 @@ const (
     kindZone = "zone"
     // kindStall is a stagnation watch event (xp or position hold).
     kindStall = "stall"
-    // kindRepath is a stuck-and-replanned walk leg.
+    // kindRepath is a stuck-and-replanned walk segment.
     kindRepath = "repath"
     // kindConnect, kindLost and kindShutdown are the session
     // lifecycle marks of the supervisor.

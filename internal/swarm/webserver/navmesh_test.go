@@ -368,7 +368,7 @@ func TestNavmeshPathAvoid(t *testing.T) {
 
 // TestNavmeshPathFoldSwitch pins the fold switch of the plan repro
 // mode: the default answer walks the capsule post pass (the pushes,
-// the bends, the fold into the longest grid clear legs), fold=false
+// the bends, the fold into the longest grid clear segments), fold=false
 // serves the search answer as the bot publishes it. Both answers
 // compare against the direct mesh calls of the same contract, so the
 // pin holds whatever shape the funnel answers on this world.

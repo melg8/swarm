@@ -46,14 +46,14 @@ import (
 //     straight line from the terrace to the zone center crosses the
 //     lake) and the abort cycled forever.
 //
-//  2. The budget-gated direct zone legs ground silently. After the
+//  2. The budget-gated direct zone segments ground silently. After the
 //     third abort zoneFails reached zoneReturnFailBudget and the
-//     return fell back to walkZoneLeg: the 1000 unit hops toward the
+//     return fell back to walkZoneSegment: the 1000 unit hops toward the
 //     zone center pass the offline click validation (the pack models
 //     the southwest line open) but the server silently cancels every
-//     one of them - and walkZoneLeg had no movement watcher, no abort
+//     one of them - and walkZoneSegment had no movement watcher, no abort
 //     and no log line: the bot stood clicking the collapsed southwest
-//     leg once a second forever (the regression of the 2026-09-12
+//     segment once a second forever (the regression of the 2026-09-12
 //     01:50 report through the new abort path).
 //
 // The fix (pinned by the tests below):
@@ -65,10 +65,10 @@ import (
 //     sweep against the real pack: 384 flips the elven village exit
 //     from the walled southwest corridor to the shop deck route).
 //
-//  2. walkZoneLeg runs the no-movement stall of noteZoneLegStall: a
+//  2. walkZoneSegment runs the no-movement stall of noteZoneSegmentStall: a
 //     position that holds past the stuck timeout while the direct
-//     legs go out re-arms the pathfound zone return (the same
-//     recovery the offline refusal of guardZoneLegClick arms), so the
+//     segments go out re-arms the pathfound zone return (the same
+//     recovery the offline refusal of guardZoneSegmentClick arms), so the
 //     grind becomes a bounded, loud window that hands the geometry
 //     learning back to the widening ladder.
 const (
@@ -90,11 +90,11 @@ const (
 // reproWidenWalls models the server side disagreement of the dump:
 // the walled patches the user's server refuses to walk although the
 // bot's geodata pack models the ground open. The band covers the
-// whole southwest approach from the terrace (the first legs of the
+// whole southwest approach from the terrace (the first segments of the
 // r48/r96/r192 plans cross it, the 1000 unit grind hop lands inside
 // it) while the shop deck route - the r384 re-plan - threads below it
 // and the west side stairs clear it (verified against the real pack:
-// the sweep of the probe run, 0 walled legs on the escape route).
+// the sweep of the probe run, 0 walled segments on the escape route).
 func reproWidenWalls() []pathfind.AvoidArea {
     return []pathfind.AvoidArea{
         {Center: pathfind.Vec3{X: 44900, Y: 50050}, Radius: 550},
@@ -187,7 +187,7 @@ func (s *walledVillageServer) lineWalled(from, to pathfind.Vec3) bool {
 // count cap does not block the widening.
 func TestReproCorridorWidenDoublesTheCoveredBan(t *testing.T) {
     loop, _, _, _ := newTripLoop()
-    // The frozen leg of the dump's second trip: the aimed waypoint is
+    // The frozen segment of the dump's second trip: the aimed waypoint is
     // the detour's first waypoint, 66 units from the corridor ban the
     // first trip armed.
     loop.waypoints = []pathfind.Vec3{
@@ -278,7 +278,7 @@ func TestReproCorridorWidenEscapesTheWalledApproach(t *testing.T) {
         loop.lastHit = time.Now().Add(-time.Minute)
         loop.returnToZone()
         if loop.phase != phaseTownReturn {
-            // The budget hold of the eliminated direct zone legs: the
+            // The budget hold of the eliminated direct zone segments: the
             // returnToZone call paces its own retry (the hold resets
             // the fail counter once per backoff window), the next call
             // plans a fresh route.
@@ -294,7 +294,7 @@ func TestReproCorridorWidenEscapesTheWalledApproach(t *testing.T) {
             x, y, z, ok := bot.SelfPosition()
             require.True(t, ok, "the character position must be known")
             if loop.cursorEscape.armed {
-                // The frozen leg escalation handed the walk to the
+                // The frozen segment escalation handed the walk to the
                 // cursor key escape: the claims walk the plan while
                 // they hold.
                 loop.driveCursorKeyEscape(now, x, y)
@@ -330,14 +330,14 @@ func TestReproCorridorWidenEscapesTheWalledApproach(t *testing.T) {
         "the widening is visible to the operator")
 }
 
-// TestReproZoneLegGrindStallReArmsThePathfoundReturn pins the grind
-// stall of the dump's terminal state: the direct zone legs pass the
+// TestReproZoneSegmentGrindStallReArmsThePathfoundReturn pins the grind
+// stall of the dump's terminal state: the direct zone segments pass the
 // offline validation, the server silently cancels them and the
 // character holds its cell - the window fires past the stuck timeout,
 // logs one honest line and clears the fail budget so the next
 // returnToZone tick plans a fresh geodata route instead of grinding
-// the collapsed leg forever.
-func TestReproZoneLegGrindStallReArmsThePathfoundReturn(t *testing.T) {
+// the collapsed segment forever.
+func TestReproZoneSegmentGrindStallReArmsThePathfoundReturn(t *testing.T) {
     engine := reproEngine(t)
     nav := NewNavigator(engine)
     bot := newTestBot()
@@ -350,7 +350,7 @@ func TestReproZoneLegGrindStallReArmsThePathfoundReturn(t *testing.T) {
     loop.SetLogger(log.New(
         io.MultiWriter(sink, eventMirror{bot: bot}), "", 0))
     // The post-abort state of the dump: the third trip ended, the
-    // budget is armed and the engage phase answers direct legs only.
+    // budget is armed and the engage phase answers direct segments only.
     loop.zoneFails = zoneReturnFailBudget
     loop.zoneReturn = true
     loop.phase = phaseEngage
@@ -358,14 +358,14 @@ func TestReproZoneLegGrindStallReArmsThePathfoundReturn(t *testing.T) {
     require.NotNil(t, zone)
 
     now := time.Now()
-    // The grind: one leg per second, the character never moves (the
+    // The grind: one segment per second, the character never moves (the
     // sim of the escape test refuses the line; the stall window alone
     // is under test here, so the clicks simply go out).
     fired := false
     for i := 0; i < 40 && !fired; i++ {
         now = now.Add(time.Second)
         clicks := len(game.walks)
-        loop.walkZoneLeg(zone, reproWidenX, reproWidenY, reproWidenZ, now)
+        loop.walkZoneSegment(zone, reproWidenX, reproWidenY, reproWidenZ, now)
         if len(game.walks) == clicks && i > 0 {
             // The held click of the firing tick: the stall answered.
             fired = true
@@ -375,10 +375,10 @@ func TestReproZoneLegGrindStallReArmsThePathfoundReturn(t *testing.T) {
         "the no-movement stall must fire within the stuck timeout")
     require.Zero(t, loop.zoneFails,
         "the stall re-arms the pathfound zone return")
-    require.True(t, loop.zoneLegAt.IsZero(),
+    require.True(t, loop.zoneSegmentAt.IsZero(),
         "the stall window clears after the fire")
     require.Contains(t, sink.String(),
-        "the direct zone legs moved nothing",
+        "the direct zone segments moved nothing",
         "the grind is no longer silent")
 
     // The re-armed return plans a geodata route on the next tick.
@@ -390,12 +390,12 @@ func TestReproZoneLegGrindStallReArmsThePathfoundReturn(t *testing.T) {
         "the fresh geodata route is planned")
 }
 
-// TestReproZoneLegStallRebaselinesOnMovement pins the honest-flow
-// guard: a character that MOVES between the direct legs (the open
+// TestReproZoneSegmentStallRebaselinesOnMovement pins the honest-flow
+// guard: a character that MOVES between the direct segments (the open
 // ground walk the fallback exists for) re-baselines the window - no
-// stall fires, the legs keep going out and the escalation state
+// stall fires, the segments keep going out and the escalation state
 // stays armed.
-func TestReproZoneLegStallRebaselinesOnMovement(t *testing.T) {
+func TestReproZoneSegmentStallRebaselinesOnMovement(t *testing.T) {
     engine := reproEngine(t)
     nav := NewNavigator(engine)
     bot := newTestBot()
@@ -410,28 +410,28 @@ func TestReproZoneLegStallRebaselinesOnMovement(t *testing.T) {
     require.NotNil(t, zone)
 
     now := time.Now()
-    loop.walkZoneLeg(zone, reproWidenX, reproWidenY, reproWidenZ, now)
-    require.Len(t, game.walks, 1, "the first leg goes out")
+    loop.walkZoneSegment(zone, reproWidenX, reproWidenY, reproWidenZ, now)
+    require.Len(t, game.walks, 1, "the first segment goes out")
 
-    // The character walks its leg: the window re-baselines on the new
+    // The character walks its segment: the window re-baselines on the new
     // cell, however long the later ticks take.
     moveSelfTo(bot, 45000, 49600, -3056)
     now = now.Add(time.Minute)
-    loop.walkZoneLeg(zone, 45000, 49600, -3056, now)
+    loop.walkZoneSegment(zone, 45000, 49600, -3056, now)
     require.Len(t, game.walks, 2,
-        "a moved character keeps its direct legs - no stall fired")
+        "a moved character keeps its direct segments - no stall fired")
     require.Equal(t, zoneReturnFailBudget, loop.zoneFails,
         "the escalation state survives the moving grind")
-    require.False(t, loop.zoneLegAt.IsZero(),
+    require.False(t, loop.zoneSegmentAt.IsZero(),
         "the window re-baselined on the new cell")
 }
 
-// TestReproZoneLegStallStandsDownOnPlannedLeg pins the reset: a
-// planned geodata leg owns the movement, so the stall watcher stands
+// TestReproZoneSegmentStallStandsDownOnPlannedSegment pins the reset: a
+// planned geodata segment owns the movement, so the stall watcher stands
 // down - its window would otherwise read a trip's frozen standstill
-// as its own and fire early on the legs the budget gate resumes when
+// as its own and fire early on the segments the budget gate resumes when
 // the trip ends.
-func TestReproZoneLegStallStandsDownOnPlannedLeg(t *testing.T) {
+func TestReproZoneSegmentStallStandsDownOnPlannedSegment(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     moveSelfTo(bot, reproWidenX, reproWidenY, reproWidenZ)
     loop.zoneCX = reproWidenZoneX
@@ -441,10 +441,10 @@ func TestReproZoneLegStallStandsDownOnPlannedLeg(t *testing.T) {
     require.NotNil(t, zone)
 
     now := time.Now()
-    loop.walkZoneLeg(zone, reproWidenX, reproWidenY, reproWidenZ, now)
+    loop.walkZoneSegment(zone, reproWidenX, reproWidenY, reproWidenZ, now)
     require.Len(t, game.walks, 1)
-    require.False(t, loop.zoneLegAt.IsZero(),
-        "the direct leg armed the stall watcher")
+    require.False(t, loop.zoneSegmentAt.IsZero(),
+        "the direct segment armed the stall watcher")
 
     loop.waypoints = []pathfind.Vec3{
         {X: float64(reproWidenX), Y: float64(reproWidenY),
@@ -452,9 +452,9 @@ func TestReproZoneLegStallStandsDownOnPlannedLeg(t *testing.T) {
         {X: 45464, Y: 49208, Z: -3064},
     }
     loop.wpIndex = 0
-    require.True(t, loop.startWalkLeg(pathfind.Vec3{
+    require.True(t, loop.startWalkSegment(pathfind.Vec3{
         X: 36000, Y: 46765, Z: -3712,
     }))
-    require.True(t, loop.zoneLegAt.IsZero(),
-        "the planned leg stands the stall watcher down")
+    require.True(t, loop.zoneSegmentAt.IsZero(),
+        "the planned segment stands the stall watcher down")
 }

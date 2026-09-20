@@ -180,7 +180,7 @@ func TestParseDumpNoWalkPlan(t *testing.T) {
 // pathfind test round: the live plan is gone (the walk ended), the
 // dump prints the "last walk plan (...)" section and the parser
 // routes it into the last plan view - and the ApplyDump replay
-// restores it as the walk plan of the repro bot, so a stuck leg
+// restores it as the walk plan of the repro bot, so a stuck segment
 // report reproduces the whole planned walk.
 func TestParseDumpLastWalkPlan(t *testing.T) {
     bot := state.NewBot("unittest1")
@@ -203,7 +203,7 @@ func TestParseDumpLastWalkPlan(t *testing.T) {
         "last walk plan (2 waypoints, aiming at wp 1):")
     require.Contains(t, dump, "  from 45000 50000 -3500")
     require.Contains(t, dump,
-        "wp 0: 45600 50400 -3500 (passed, t+0.0s, leg 0.0s)")
+        "wp 0: 45600 50400 -3500 (passed, t+0.0s, segment 0.0s)")
     require.Contains(t, dump, "wp 1: 46000 51000 -3500  <-- TARGET")
     require.Contains(t, dump, "  dest 46200 51100 -3500")
 
@@ -237,7 +237,7 @@ func TestParseDumpNoHuntingZone(t *testing.T) {
 
 // TestParseDumpWalkPlanSearch pins the search word of the walk plan
 // header through the whole dump round trip: the mesh plans print
-// "mesh", the direct legs (no mesh search) keep the bare header and
+// "mesh", the direct segments (no mesh search) keep the bare header and
 // parse back to a nil contract - the pathfind link replays the very
 // search the plan answers.
 func TestParseDumpWalkPlanSearch(t *testing.T) {

@@ -419,12 +419,12 @@ func TestManualOnlyDeathRestartsAtVillage(t *testing.T) {
     require.Equal(t, phaseIdle, loop.phase)
 }
 
-// TestUserMoveFarWalkPlansLegs pins the geodata planning of a long
+// TestUserMoveFarWalkPlansSegments pins the geodata planning of a long
 // manual move: the click beyond the planning distance asks the
-// navigator once and follows its waypoints leg by leg (the far leg
+// navigator once and follows its waypoints segment by segment (the far segment
 // splits into server accepted pieces), the arrival at the final
 // waypoint ends the manual phase.
-func TestUserMoveFarWalkPlansLegs(t *testing.T) {
+func TestUserMoveFarWalkPlansSegments(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     loop := NewLoop(game, bot)
@@ -442,21 +442,21 @@ func TestUserMoveFarWalkPlansLegs(t *testing.T) {
     require.NotNil(t, loop.userWaypoints,
         "the far click must plan the geodata path")
 
-    // The follower walks the first leg on the next tick: the fake
+    // The follower walks the first segment on the next tick: the fake
     // path runs from the self position to the clicked point, the first
-    // leg is capped by the server move limit.
+    // segment is capped by the server move limit.
     loop.tick()
     require.Len(t, game.walks, 1,
-        "the follower must walk the first planned leg")
+        "the follower must walk the first planned segment")
     first := game.walks[0]
     dist := math.Hypot(
         float64(first[0]-45000), float64(first[1]-50000))
-    require.LessOrEqual(t, dist, maxMoveLeg+1,
-        "the leg must stay within the server move limit")
+    require.LessOrEqual(t, dist, maxMoveDistance+1,
+        "the segment must stay within the server move limit")
 
-    // The character completes the first leg: the follower issues the
+    // The character completes the first segment: the follower issues the
     // next one without asking the navigator again (the request period
-    // of the legs is backed off like a real walk pace).
+    // of the segments is backed off like a real walk pace).
     bot.ApplyMovement(state.Movement{
         ObjectID: 100, X: first[0], Y: first[1], Z: -3500,
         DestX: first[0], DestY: first[1], DestZ: -3500,
@@ -464,7 +464,7 @@ func TestUserMoveFarWalkPlansLegs(t *testing.T) {
     loop.userMoveAt = time.Now().Add(-2 * walkRequestPeriod)
     loop.tick()
     require.Len(t, game.walks, 2,
-        "the completed leg must be followed by the next one")
+        "the completed segment must be followed by the next one")
     require.Equal(t, 1, navigator.calls,
         "the path search must run exactly once per move")
 
@@ -484,7 +484,7 @@ func TestUserMoveFarWalkPlansLegs(t *testing.T) {
 // click IS the pathfind call, a near click included. The planned
 // waypoints land in the walk plan view and the state dump exactly
 // like the bot's own planned walks, and the follower walks the plan
-// (the near leg reaches the clicked point in one server accepted
+// (the near segment reaches the clicked point in one server accepted
 // click).
 func TestUserMoveNearWalkPlansToo(t *testing.T) {
     bot := newTestBot()
@@ -505,11 +505,11 @@ func TestUserMoveNearWalkPlansToo(t *testing.T) {
         "the near click asks the navigator once")
     loop.tick()
     require.Equal(t, [][3]int32{{45600, 50400, -3500}}, game.walks,
-        "the planned near leg walks straight to the clicked point")
+        "the planned near segment walks straight to the clicked point")
 }
 
 // TestUserMoveReplaceDropsThePlannedPath pins the replacement: a new
-// move command drops the leg plan of the previous click and plans
+// move command drops the segment plan of the previous click and plans
 // its own fresh path, the new click never walks the old plan.
 func TestUserMoveReplaceDropsThePlannedPath(t *testing.T) {
     bot := newTestBot()

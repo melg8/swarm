@@ -456,7 +456,7 @@ type Bot struct {
     commandQueue chan Command
     // The published walk plan of the web UI and the state dump
     // (see SetWalkPlan): the planning origin, the full waypoint
-    // list of the leg, the waypoint the follower currently heads
+    // list of the segment, the waypoint the follower currently heads
     // to and the final destination - the whole walk reads at a
     // glance in the dump. walkPlanStart pins the moment the walk
     // was first published (the zero point of the waypoint timing
@@ -469,7 +469,7 @@ type Bot struct {
     walkWpAt      []time.Time
     // lastWalkPlan keeps the most recent published walk plan after
     // its walk ended: the live plan expires with the walk (the TTL,
-    // the arrive, the timeout), the report of a stuck leg needs the
+    // the arrive, the timeout), the report of a stuck segment needs the
     // whole planned walk even when the walk is already over (see
     // rememberWalkPlanLocked). The next published plan overwrites
     // the record; nothing clears it. lastWalkStart and lastWalkWpAt
@@ -1386,17 +1386,17 @@ type WalkPoint struct {
     Z int32 `json:"z"`
 }
 
-// WalkPlan is the published walk plan of a running leg: where the
-// leg was planned from (Origin), the full waypoint list of the plan
+// WalkPlan is the published walk plan of a running segment: where the
+// segment was planned from (Origin), the full waypoint list of the plan
 // (Points), the waypoint the follower currently heads to (Index) and
 // the final destination of the walk (Dest). The state dump prints
 // the whole thing - a stuck trip reads at a glance - and the map
 // draws the planned line against the live character position.
 type WalkPlan struct {
-    // Origin is the position the leg was planned from, nil when the
+    // Origin is the position the segment was planned from, nil when the
     // publisher does not know it (the manual direct walks).
     Origin *WalkPoint `json:"origin"`
-    // Points lists every planned waypoint of the leg in walk order,
+    // Points lists every planned waypoint of the segment in walk order,
     // including the passed ones.
     Points []WalkPoint `json:"points"`
     // Index is the position in Points the follower currently aims
@@ -1409,7 +1409,7 @@ type WalkPlan struct {
     // Search carries the mesh search contract the plan answers (the
     // repro contract of the 3D pathfind link): the approach radius
     // and the ban circles the search ran with. Nil for the plans no
-    // mesh search produced (the direct server routed legs) - the
+    // mesh search produced (the direct server routed segments) - the
     // link then keeps the viewer defaults.
     Search *WalkSearch `json:"search,omitempty"`
 }
@@ -1442,7 +1442,7 @@ type WalkAvoidCircle struct {
     R float64 `json:"r"`
 }
 
-// SetWalkPlan publishes the walk plan of a running leg: the planning
+// SetWalkPlan publishes the walk plan of a running segment: the planning
 // origin, the full waypoint list, the current target index and the
 // final destination. A plan without points clears it. Republishing
 // an equal plan only refreshes its lifetime, so the steady per tick
@@ -1471,7 +1471,7 @@ func (b *Bot) SetWalkPlan(plan WalkPlan) {
 // with the follower cursor ahead (the every tick republish after a
 // waypoint was passed) keeps the walk zero point and records the
 // observed arrival time of every newly passed waypoint - the dump
-// prints how long each leg took. A different route (a fresh walk,
+// prints how long each segment took. A different route (a fresh walk,
 // a re-plan) or a cursor that moved back starts a new timing view:
 // the zero point moves to now and the waypoints the plan already
 // aims past pre-fill with now (a mid walk publish never loses the
@@ -1502,7 +1502,7 @@ func (b *Bot) publishWalkPlanLocked(plan *WalkPlan, now time.Time) {
 // later mutation of the published slice never rewrites the record
 // the dump already reads. The timing view (the zero point and the
 // arrivals) copies with the points, so the dump of a finished walk
-// still reads the leg durations.
+// still reads the segment durations.
 func (b *Bot) rememberWalkPlanLocked(plan *WalkPlan) {
     record := WalkPlan{
         Index: plan.Index,
@@ -2522,7 +2522,7 @@ type Snapshot struct {
     Events    []Event                 `json:"events"`
     Chat      []ChatEvent             `json:"chat"`
     WalkPath  []WalkPoint             `json:"walkPath"`
-    // WalkOrigin is the position the published leg was planned
+    // WalkOrigin is the position the published segment was planned
     // from (the "where we wanted to go from" of the dump), null
     // when the publisher carries no origin.
     WalkOrigin *WalkPoint `json:"walkOrigin"`
@@ -2539,7 +2539,7 @@ type Snapshot struct {
     WalkSearch *WalkSearch `json:"walkSearch"`
     // LastWalkPath carries the most recent published walk plan after
     // its walk ended (see state lastWalkPlan): the report of a stuck
-    // leg needs the whole planned walk even when the live plan is
+    // segment needs the whole planned walk even when the live plan is
     // already gone. The fields ride the Go side dump only, the wire
     // payload of the snapshot stays byte identical (the json "-").
     LastWalkPath   []WalkPoint `json:"-"`

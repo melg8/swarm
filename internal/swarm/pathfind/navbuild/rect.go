@@ -41,7 +41,7 @@ const cellsTotal = regionCellsSide * regionCellsSide
 // whose mutual steps are open (the paired walls of both sides plus
 // the climb height rule), so the interior of every polygon is
 // walkable by construction - the contract the link walk's
-// same-polygon skip and the funnel legs rely on. The wall-blind
+// same-polygon skip and the funnel segments rely on. The wall-blind
 // growth of the first rounds let a single polygon swallow walled
 // cell pairs (the Dion merchant quarter measured 1.24M such pairs in
 // 21_22, 1.43M in 22_22): the corridor search then tunnelled

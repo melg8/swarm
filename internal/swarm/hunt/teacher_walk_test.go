@@ -31,7 +31,7 @@ import (
 // the next waypoint: the pocket cell keeps targeting the waypoint it
 // can still reach, walking onto it re-opens the line.
 
-// The teacher leg fixtures of the dump: the last waypoints of the
+// The teacher segment fixtures of the dump: the last waypoints of the
 // planned route (the ramp climb into the trainer plaza) and the
 // reported standing position one cell east of the ramp top.
 var (
@@ -81,7 +81,7 @@ func teacherSight(from, to pathfind.Vec3) (bool, error) {
 func TestTeacherWalkKeepsTheWaypointWhenTheLineAheadIsWalled(t *testing.T) {
     loop, game, bot, nav := newTripLoop()
     nav.sightFunc = teacherSight
-    // The dump state: the trip walks the teacher leg, the follower
+    // The dump state: the trip walks the teacher segment, the follower
     // aims at wp 9 while the character already stands beside it.
     loop.phase = phaseTownWalk
     loop.tripStart = time.Now()
@@ -93,7 +93,7 @@ func TestTeacherWalkKeepsTheWaypointWhenTheLineAheadIsWalled(t *testing.T) {
     }}
     loop.waypoints = teacherWalkRoute
     loop.wpIndex = 9
-    loop.legDest = teacherWalkDest
+    loop.segmentDest = teacherWalkDest
     moveSelfTo(bot, 46152, 51656, -2808)
 
     loop.tick()
@@ -138,9 +138,9 @@ func TestTeacherWalkKeepsTheWaypointWhenTheLineAheadIsWalled(t *testing.T) {
 // TestTeacherWalkRecoversFromTheDumpStuckSpot runs the exact reported
 // state against the real geodata pack under the simulated server: the
 // character stands at the dump position (the pocket cell east of the
-// ramp top) with the teacher leg running. The follower must click the
+// ramp top) with the teacher segment running. The follower must click the
 // reachable ramp foot waypoint first (never the walled plaza waypoint
-// the dump clicked), walk the corner and complete the leg into the
+// the dump clicked), walk the corner and complete the segment into the
 // stop phase - the dump burned all three re-paths and aborted without
 // ever moving. The simulated server models the straight line
 // validation conservatively (its raster refuses steps the real
@@ -157,7 +157,7 @@ func TestTeacherWalkRecoversFromTheDumpStuckSpot(t *testing.T) {
     loop.lastHit = time.Now().Add(-time.Minute)
     sim := &reproServer{nav: engine, minZ: -2808}
 
-    // The dump state: the teach stop is current, the teacher leg
+    // The dump state: the teach stop is current, the teacher segment
     // planned from the standing position (the re-planned corner
     // route, exactly what the stuck re-path machinery produces).
     loop.phase = phaseTownWalk
@@ -169,7 +169,7 @@ func TestTeacherWalkRecoversFromTheDumpStuckSpot(t *testing.T) {
         },
         teach: true,
     }}
-    require.True(t, loop.startWalkLeg(teacherWalkDest),
+    require.True(t, loop.startWalkSegment(teacherWalkDest),
         "the corner re-plan from the pocket must find the teacher")
 
     // The first click aims at the reachable waypoint, not through the
@@ -192,14 +192,14 @@ func TestTeacherWalkRecoversFromTheDumpStuckSpot(t *testing.T) {
         time.Sleep(100 * time.Millisecond)
     }
     require.Equal(t, phaseTownSell, loop.phase,
-        "the teacher leg must complete into the stop phase, no abort")
+        "the teacher segment must complete into the stop phase, no abort")
     require.LessOrEqual(t, loop.rePaths, 1,
         "the corner passes within the recovery budget (the dump "+
             "burned all three and aborted)")
     selfX, selfY, selfZ, ok := bot.SelfPosition()
     require.True(t, ok)
     dist := dist3DTo(selfX, selfY, selfZ, 45725, 52105, -2792)
-    t.Logf("the teacher leg walked to %d %d %d (dist to Ellenia %.0f)",
+    t.Logf("the teacher segment walked to %d %d %d (dist to Ellenia %.0f)",
         selfX, selfY, selfZ, dist)
     require.LessOrEqual(t, dist, 350.0,
         "the walk must end inside the teacher approach ring - the "+

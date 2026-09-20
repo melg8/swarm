@@ -201,7 +201,7 @@ const maxNpcObjID = 2_000_000_000
 // FindTeleportButton returns the teleport button of the given list
 // whose label or LocID matches the wanted destination, or nil when no
 // button matches. The hunt loop calls this after ParseGatekeeperHTML to
-// pick the destination of the next leg.
+// pick the destination of the next segment.
 func FindTeleportButton(
     buttons []BypassButton, listName string, wantLabel string,
 ) *BypassButton {

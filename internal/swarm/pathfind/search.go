@@ -110,7 +110,7 @@ type search struct {
     // (the frozen-cell ban of the hunt loop recovery): a step onto a
     // banned cell costs impassable, so the A* detours around the
     // patch, and neither the direct line shortcut nor the smoothing
-    // may collapse a leg across it. The ban is the planner's own
+    // may collapse a segment across it. The ban is the planner's own
     // memory of ground the live server refused to walk although the
     // geodata pack modeled it as open (the 2026-09-12 trainer hall
     // aisle freeze: the plan entered through the west aisle column,
@@ -376,8 +376,8 @@ func (s *search) astar(from *node) []*node {
 func (s *search) directOrAstar(from, to *node) ([]*node, []*node) {
     direct := s.straightPath(from, to)
     if len(direct) > 0 && direct[len(direct)-1].coords == to.coords &&
-        s.directLineDry(direct) && s.serverLegVerified(from, to) &&
-        s.legAllowed(from, to) {
+        s.directLineDry(direct) && s.serverSegmentVerified(from, to) &&
+        s.segmentAllowed(from, to) {
         return direct, []*node{direct[0], direct[len(direct)-1]}
     }
 
@@ -420,19 +420,19 @@ func (s *search) dryLine(from, to *node) bool {
     return true
 }
 
-// legDry reports whether the smoothing may replace the walk between
-// two nodes with a straight leg: a leg between two dry points must
+// segmentDry reports whether the smoothing may replace the walk between
+// two nodes with a straight segment: a segment between two dry points must
 // stay above the water surface. The string pulling itself is water
 // blind - it only asks the line of sight - and the line of sight
 // happily crosses a lake bed whose shores step within the passable
 // height, so without this rule the smoothed path fords bays the cost
-// aware search priced out and hands the walker water crossing legs
+// aware search priced out and hands the walker water crossing segments
 // the plan never priced (the elven village lake sent the town trips
-// swimming). A leg that starts or ends in the water is exempt: it
+// swimming). A segment that starts or ends in the water is exempt: it
 // belongs to a crossing the search itself priced (or the swim escape
 // of a character that already stands in a lake), and the water is the
 // only surface such a walk can use.
-func (s *search) legDry(from, to *node) bool {
+func (s *search) segmentDry(from, to *node) bool {
     if from.layer.Height < WaterLevel || to.layer.Height < WaterLevel {
         return true
     }
@@ -636,7 +636,7 @@ func (s *search) obstacleMultiplier(ring []*node) float32 {
 // (a deck edge behind a railing the geodata does not model, a cliff):
 // planning it sends the walker over the railing the server never
 // lets it cross or into a fall. The line of sight raster and the
-// smoothing share the same strict symmetric form so no leg of the
+// smoothing share the same strict symmetric form so no segment of the
 // smoothed path ever leaves the surface either.
 func (s *search) canStep(from, to *node) bool {
     if !s.wallsOpen(from, to) {
@@ -758,7 +758,7 @@ func (s *search) diagonalFlanksOpen(from, to *node) bool {
 // cell open for the direction and the symmetric height difference
 // within the passable limit - the same terrace rule canStep applies
 // to the search expansions. The line of sight raster and the
-// smoothing use this strict form: a leg they verify must stay on one
+// smoothing use this strict form: a segment they verify must stay on one
 // walkable surface, never drop off it.
 func (s *search) canMoveTo(from, to *node) bool {
     return s.canStep(from, to)
@@ -820,21 +820,21 @@ func (s *search) lineOfSight(from, to *node) bool {
         }
     }
 
-    return s.serverLegVerified(from, to)
+    return s.serverSegmentVerified(from, to)
 }
 
-// serverLegVerified answers whether the game server's click
+// serverSegmentVerified answers whether the game server's click
 // validation walks the straight line between two nodes: the smoothing
-// may only collapse turns into legs the follower can click. The
+// may only collapse turns into segments the follower can click. The
 // server rasterizes the click with its Bresenham iterator whose
 // diagonal double steps pass the anti corner cut rule, while the t/k
 // supercover raster of straightPath decomposes the same line into
-// cardinal steps and never cuts the diagonals - a leg verified by the
+// cardinal steps and never cuts the diagonals - a segment verified by the
 // supercover alone can still be refused wholesale by the server (the
 // click collapses onto the walker, every re-click comes back
 // ActionFailed and the character freezes - the village plaza corner
 // of the 2026-09-10 town walk stuck report).
-func (s *search) serverLegVerified(from, to *node) bool {
+func (s *search) serverSegmentVerified(from, to *node) bool {
     fromX, fromY, fromZ := nodeClickWorld(from)
     toX, toY, toZ := nodeClickWorld(to)
     vx, vy, vz := s.engine.validLocation(fromX, fromY, fromZ, toX, toY, toZ)
@@ -888,11 +888,11 @@ func (s *search) straightPath(from, to *node) []*node {
 // smoothPath pulls the raw path straight: it keeps the last node that
 // still sees the candidate ahead and commits a turning point whenever
 // the line of sight breaks. The anchor stays on the committed point, so
-// every leg between two waypoints was verified with a line of sight -
+// every segment between two waypoints was verified with a line of sight -
 // the original jumped the anchor one node past the commit, which left
-// the leg between two waypoints unchecked and let the smoothed path cut
-// wall corners near gaps. Every leg between two dry points must also
-// stay dry (legDry): the cost aware search may have walked around a
+// the segment between two waypoints unchecked and let the smoothed path cut
+// wall corners near gaps. Every segment between two dry points must also
+// stay dry (segmentDry): the cost aware search may have walked around a
 // lake while the sight lines across its bed stay open, and collapsing
 // them back would reintroduce the swim the search paid to avoid.
 func (s *search) smoothPath(path []*node) []*node {
@@ -902,8 +902,8 @@ func (s *search) smoothPath(path []*node) []*node {
     result := []*node{path[0]}
     current := path[0]
     for i := 1; i < len(path); i++ {
-        if s.lineOfSight(current, path[i]) && s.legDry(current, path[i]) &&
-            s.legAllowed(current, path[i]) {
+        if s.lineOfSight(current, path[i]) && s.segmentDry(current, path[i]) &&
+            s.segmentAllowed(current, path[i]) {
             continue
         }
         current = path[i-1]
@@ -981,11 +981,11 @@ func (s *search) startAvoidIndex(from *node) int {
     return -1
 }
 
-// legAllowed reports whether the straight leg between two nodes stays
+// segmentAllowed reports whether the straight segment between two nodes stays
 // outside every avoid area: the direct line shortcut and the smoothing
-// may only collapse legs the ban does not cross, otherwise the shortcut
+// may only collapse segments the ban does not cross, otherwise the shortcut
 // hands the walker back the very corridor the re-plan meant to detour.
-func (s *search) legAllowed(from, to *node) bool {
+func (s *search) segmentAllowed(from, to *node) bool {
     if len(s.avoid) == 0 {
         return true
     }

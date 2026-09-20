@@ -64,9 +64,9 @@ func TestDelevelTriggersOnOutleveledZone(t *testing.T) {
     require.Equal(t, phaseDelevel, loop.phase)
     require.Equal(t, int32(9), loop.delevelTarget,
         "gremlins are level 1, the target clamps at the Lucky protection level")
-    require.Equal(t, [][3]int32{legWalkTarget(
+    require.Equal(t, [][3]int32{segmentWalkTarget(
         [3]int32{45000, 50000, -3500}, pathfind.Vec3{X: float64(stardenPos[0]), Y: float64(stardenPos[1]), Z: float64(stardenPos[2])})},
-        game.walks, "the walk aims along the leg to the nearest guard")
+        game.walks, "the walk aims along the segment to the nearest guard")
 }
 
 // TestDelevelSkipsAtProperLevel verifies the hysteresis of the cycle: a
@@ -287,15 +287,15 @@ func TestDelevelFightTimeoutSwitchesGuard(t *testing.T) {
 
     // The replanned walk goes to the nearest untried guard: Kendell
     // is the only other archer guard of the village, 4600 units east
-    // of Starden's post, so the first walk leg stops 1000 units along
+    // of Starden's post, so the first walk segment stops 1000 units along
     // the way (the server move request limit).
     loop.tick()
     require.Equal(t, callsBefore+1, nav.calls, "the path replanned")
     require.Len(t, game.walks, 2, "the walk to the next guard started")
-    require.Equal(t, legWalkTarget(stardenPos, pathfind.Vec3{
+    require.Equal(t, segmentWalkTarget(stardenPos, pathfind.Vec3{
         X: float64(kendellPos[0]), Y: float64(kendellPos[1]),
         Z: float64(kendellPos[2]),
-    }), game.walks[1], "the walk starts the leg toward the Kendell spawn")
+    }), game.walks[1], "the walk starts the segment toward the Kendell spawn")
 
     // Kendell ignores the landed provocation too: with every archer
     // guard marked as tried there is nothing left to walk to.
@@ -306,12 +306,12 @@ func TestDelevelFightTimeoutSwitchesGuard(t *testing.T) {
     require.Equal(t, 2, loop.rePaths)
 
     // Both archer guards ignored the provocation: the deleveling
-    // aborts into the walk home through the town trip return leg
+    // aborts into the walk home through the town trip return segment
     // (a direct engage walk from the guard post would be refused by
     // the 9900 unit server move limit).
     loop.tick()
     require.Equal(t, phaseTownReturn, loop.phase,
-        "the aborted delevel walks home through the return leg")
+        "the aborted delevel walks home through the return segment")
     require.False(t, loop.delevelCooldownOver())
 }
 

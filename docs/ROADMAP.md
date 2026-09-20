@@ -64,7 +64,7 @@ character selection packet.
 Zone registries for the 20+ grounds reachable from the elven lands
 (survey the Mobius spawn data for the bands; generate the same
 spawn-true squares), the teachers of the second class tier, the gear
-planner catalogs for the band, navigation legs through the gatekeeper
+planner catalogs for the band, navigation segments through the gatekeeper
 network where walking is impractical.
 
 Acceptance: level 20 to 40 demonstrated by a continuous soak run with

@@ -182,7 +182,7 @@ func TestReproDeckVillageReturnToZoneOnDifferentDeck(t *testing.T) {
     require.NotEmpty(t, game.walks,
         "the first waypoint of the pathfound return walked")
     // The first walk of the pathfound return is the first waypoint
-    // of the planned route (capped at maxMoveLeg = 1000 units along
+    // of the planned route (capped at maxMoveDistance = 1000 units along
     // the line to the first waypoint). The route heads west toward
     // the cell center on the field deck, NOT directly toward the mob.
     firstWalk := game.walks[0]
@@ -191,10 +191,10 @@ func TestReproDeckVillageReturnToZoneOnDifferentDeck(t *testing.T) {
     require.InDelta(t, -1.0, dx/math.Hypot(dx, dy), 0.1,
         "the pathfound return heads west toward the cell center")
     // The walk stays on the village terrace z of the character (the
-    // first leg walks the terrace toward the ramp, not the field
-    // deck directly - the leg interpolation keeps the starting z).
+    // first segment walks the terrace toward the ramp, not the field
+    // deck directly - the segment interpolation keeps the starting z).
     require.InDelta(t, reproDeckVillageZ, firstWalk[2], 1,
-        "the first leg keeps the village terrace z")
+        "the first segment keeps the village terrace z")
 }
 
 // TestReproDeckVillageNoDirectWalkTowardCrossDeckMob pins the freeze
@@ -233,7 +233,7 @@ func TestReproDeckVillageNoDirectWalkTowardCrossDeckMob(t *testing.T) {
         // zone return heads along the planned route - the first
         // waypoint (41000, 49000) sits (-1712, -128) from the
         // character, a heading of (-0.997, -0.075) - close to the
-        // direct line but the leg is the pathfound one, not the
+        // direct line but the segment is the pathfound one, not the
         // direct mob walk. The test pins the absence of the direct
         // mob walk by asserting the walk targets the waypoint, not
         // the mob: the waypoint sits ~1700 units west, the mob

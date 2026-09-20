@@ -49,7 +49,7 @@ const (
     refusalAnswerWindow = 4 * time.Second
     // waypointArriveDist is the distance within which the FINAL
     // waypoint of a walk plan counts as reached: the wide trip
-    // arrival radius (two geodata cells of slack) so a leg ends
+    // arrival radius (two geodata cells of slack) so a segment ends
     // even when the server stops the character slightly short of
     // the clicked point.
     waypointArriveDist = 150.0
@@ -70,17 +70,18 @@ const (
     // - the bridge railing side - has not passed anything and
     // walks back to the entry it missed.
     waypointCorridor = 100.0
-    // maxMoveLeg splits the walk legs: the server refuses move requests
-    // with a target farther than 9900 units (MoveToLocation readImpl),
-    // and the smoothed geodata paths happily produce longer legs over
+    // maxMoveDistance splits the walk segments: the server refuses
+    // move requests with a target farther than 9900 units
+    // (MoveToLocation readImpl),
+    // and the smoothed geodata paths happily produce longer segments over
     // the open terrain.
-    maxMoveLeg = 1000.0
-    // stuckTimeout is how long the character may stand still on a leg
+    maxMoveDistance = 1000.0
+    // stuckTimeout is how long the character may stand still on a segment
     // before the walker re-paths around the obstacle.
     stuckTimeout = 15 * time.Second
     // stuckFastTimeout is the shorter timeout that applies after the
     // first stuck skip of a trip: once the walker knows the server
-    // refuses its clicks on this leg, waiting the full 15 seconds for
+    // refuses its clicks on this segment, waiting the full 15 seconds for
     // every subsequent waypoint just burns the trip's time budget. The
     // shorter window keeps the recovery responsive while still letting
     // a slow server position broadcast land before the next skip.
@@ -113,7 +114,7 @@ const (
     // tripAbortMaxCooldown caps the escalation of the abort streak.
     tripAbortMaxCooldown = time.Hour
     // maxRePaths bounds the re-paths of one trip before it aborts.
-    // The budget bounds only the full leg re-plan (startWalkLeg) - the
+    // The budget bounds only the full segment re-plan (startWalkSegment) - the
     // waypoint skip of walkStuck does NOT consume it. This lets the
     // walker cycle through several waypoints looking for one the server
     // accepts without exhausting the budget, while still bounding the
@@ -144,10 +145,10 @@ const (
     // offline validation cannot see). The next identical re-path
     // would burn a full stuck window on the same freeze - the trip
     // aborts and hands the recovery to its callers instead (the
-    // zone return escalates to the direct server routed legs at
+    // zone return escalates to the direct server routed segments at
     // once, the shop trip arms its cooldown).
     frozenRepathLimit = 1
-    // frozenBanRadius is the radius of the avoid area a frozen leg
+    // frozenBanRadius is the radius of the avoid area a frozen segment
     // bans: three geodata cells around the aimed waypoint close the
     // corridor the server refused to walk without fencing in the
     // standing character itself (the start cell of a search may sit
@@ -164,13 +165,13 @@ const (
     // village exit from the walled southwest corridor to the shop
     // deck route, 1200 flips it to the far north detour).
     frozenBanMaxRadius = 1536.0
-    // frozenBanMax bounds the session ban list: every frozen leg
+    // frozenBanMax bounds the session ban list: every frozen segment
     // adds one area, and the list must never grow into a wall the
     // planner cannot detour around at all. The widening of an
     // existing ban does not count against the cap - the wall model
     // grows in place, the list only counts its centers.
     frozenBanMax = 8
-    // refusalVariantsMax bounds the varied aim attempts one leg
+    // refusalVariantsMax bounds the varied aim attempts one segment
     // spends on the online refusal answer (see stuckTownWalk): the
     // server refuses a click for its own reasons (a different build
     // or geodata validates the same line differently), and the
@@ -178,7 +179,7 @@ const (
     // offset of the same waypoint often walks where the plain aim
     // bounced. The variants are cheap (one click each, no re-plan),
     // so a small ladder covers the common target specific refusals
-    // before the leg falls back to the re-path machinery.
+    // before the segment falls back to the re-path machinery.
     refusalVariantsMax = 4
     // refusalVariantStep is the sideways offset of the perpendicular
     // refusal variants: about twelve geodata cells off the route
@@ -207,7 +208,7 @@ const (
     // cursorEscapeSettle bounds the wait for the position broadcasts
     // after the last claimed step: the server answers each claim
     // with a ValidateLocation broadcast, and the settle window lets
-    // the tracker catch up before the leg resumes its clicks.
+    // the tracker catch up before the segment resumes its clicks.
     cursorEscapeSettle = 2 * time.Second
     // cursorEscapeAttemptsMax bounds the cursor key escape attempts
     // of one town trip: a pocket that keeps refusing the clicks
@@ -280,7 +281,7 @@ const (
     // clickShortenFloor bounds the halving of a walk click the
     // server validation refuses: below it the refusal is local (the
     // character stands boxed) and the follower hops or re-paths
-    // instead of crawling micro legs.
+    // instead of crawling micro segments.
     clickShortenFloor = 100.0
     // hopCoincideDist is the distance under which a walked-past
     // waypoint counts as stood on: the escape hop of a refused
@@ -302,24 +303,24 @@ const (
     // unit server interaction distance but outside the walled
     // interior.
     npcApproachOffset = 150.0
-    // exactLegDeckTolerance bounds the z gap between the merchant
-    // spawn z and the plan end cell of the exact merchant leg: the
+    // exactSegmentDeckTolerance bounds the z gap between the merchant
+    // spawn z and the plan end cell of the exact merchant segment: the
     // customer cell sits on the merchant's own floor scale (the elven
     // stall fronts answer 0-3 units off, the trainer hall decks 40),
     // a roof layer over the shop sits hundreds above - the foreign
     // deck plan is discarded for the ring fallback instead of walked.
-    exactLegDeckTolerance = 96.0
-    // exactLegMaxDistance bounds how far from the merchant the exact
-    // leg may plan: the exact search serves the final approach (the
+    exactSegmentDeckTolerance = 96.0
+    // exactSegmentMaxDistance bounds how far from the merchant the exact
+    // segment may plan: the exact search serves the final approach (the
     // customer cell across the counter), the long haul belongs to the
     // priced ring search whose hierarchy answers the reachable far
     // routes in milliseconds. An exact search at a FAR unreachable
     // destination degenerates into an exhaustive exploration of the
-    // whole mesh component (the Herbiel leg of the farm readiness
+    // whole mesh component (the Herbiel segment of the farm readiness
     // round froze the live bot for minutes inside one query) - the
     // distance gate keeps the exact search inside the neighborhood
     // where its partial exhaustion stays local and bounded.
-    exactLegMaxDistance = 2000.0
+    exactSegmentMaxDistance = 2000.0
 )
 
 // townNpc is a town npc the trip machinery navigates to: a shop
@@ -591,7 +592,9 @@ func (l *Loop) inventoryFull() bool {
 // cooldown is over. Everything that can block the trip (no navigator,
 // no geodata, no path) arms the cooldown, so a broken deployment does
 // not retry every tick.
-func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
+//
+//nolint:cyclop,funlen,gocognit // learning joined
+func (l *Loop) maybeStartTownTrip() {
     // The first trip of a session waits for the server skill list:
     // the learning stops plan on the skill queue and the packet burst
     // of the enter world (UserInfo, ItemList, SkillList) races the
@@ -678,7 +681,7 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
     l.tripStart = time.Now()
     l.sold = make(map[int32]bool)
     l.rePaths = 0
-    l.legRefused = false
+    l.segmentRefused = false
     l.refusalVariants = 0
     l.tripStops = []tripStop{{
         merchant: merchant,
@@ -692,7 +695,7 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
     l.buyConfirmAt = time.Time{}
     l.buyRetries = 0
     l.frozenStage = 0
-    l.legRefused = false
+    l.segmentRefused = false
     l.refusalVariants = 0
     l.resetReplacementSales()
     l.resetLearnState()
@@ -701,9 +704,9 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
     // one town visit buys the weapon, the armor, the jewels, the
     // books and teaches the lessons - the user rule of the one
     // town visit. The weapon stop still runs FIRST (the sell stop
-    // routes to the weapon merchant), so a stuck teacher leg can
+    // routes to the weapon merchant), so a stuck teacher segment can
     // no longer strand a bare-handed character: the weapon is
-    // bought and worn before the teacher leg ever runs.
+    // bought and worn before the teacher segment ever runs.
     l.phase = phaseTownWalk
     stats := l.tracker.InventoryStats()
     reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
@@ -757,22 +760,22 @@ func (l *Loop) maybeStartTownTrip() { //nolint:cyclop,funlen // learning joined
     // the customer cell across the counter; the ring fallback runs
     // for the one failure class the exact search cannot answer - the
     // plan that resolved onto a foreign deck (the roof over the
-    // shop), see startWalkExactLeg. The far merchants walk the ring
-    // leg first (the long haul of the hierarchy), the walk completion
+    // shop), see startWalkExactSegment. The far merchants walk the ring
+    // segment first (the long haul of the hierarchy), the walk completion
     // arms the near exact approach (see tickTownTrip).
     planned := false
     if l.merchantWithinExactRange(merchant) {
         var ringFallback bool
-        planned, ringFallback = l.startWalkExactLeg(
+        planned, ringFallback = l.startWalkExactSegment(
             townNpcPosition(merchant))
         if !planned && ringFallback {
-            l.legRadius = tripApproachRadius
-            planned = l.startWalkLeg(townNpcPosition(merchant))
+            l.segmentRadius = tripApproachRadius
+            planned = l.startWalkSegment(townNpcPosition(merchant))
         }
     }
     if !planned {
-        l.legRadius = tripApproachRadius
-        if !l.startWalkLeg(townNpcPosition(merchant)) {
+        l.segmentRadius = tripApproachRadius
+        if !l.startWalkSegment(townNpcPosition(merchant)) {
             l.abortTownTrip("no walkable path to the shop")
         }
     }
@@ -848,11 +851,11 @@ func (l *Loop) walkToward(x, y, z int32, now time.Time) {
     }
 }
 
-// exactApproachWanted reports whether the completed town walk leg
+// exactApproachWanted reports whether the completed town walk segment
 // deserves the exact final approach: the current stop is a merchant
-// stop whose leg this walk just finished (the leg destination IS the
-// merchant spawn), the leg itself was the ring approach (the exact
-// legs arrive at the customer cell and need no second pass), and the
+// stop whose segment this walk just finished (the segment destination IS the
+// merchant spawn), the segment itself was the ring approach (the exact
+// segments arrive at the customer cell and need no second pass), and the
 // merchant sits beyond the customer ring but inside the exact
 // distance gate - near enough for the bounded search, far enough
 // that the talk would fire from the ring edge instead of the
@@ -862,10 +865,10 @@ func (l *Loop) exactApproachWanted() bool {
         return false
     }
     merchant := l.tripStops[0].merchant
-    if l.legDest != townNpcPosition(merchant) {
+    if l.segmentDest != townNpcPosition(merchant) {
         return false
     }
-    if l.legSearch != nil && l.legSearch.Approach == 0 {
+    if l.segmentSearch != nil && l.segmentSearch.Approach == 0 {
         return false
     }
     if !l.merchantWithinExactRange(merchant) {
@@ -895,15 +898,15 @@ func (l *Loop) tickTownTrip() {
     switch l.phase {
     case phaseTownWalk:
         if l.walkTownWaypoints() {
-            // The completed leg hands over to the talk machinery -
-            // unless the leg was the long haul ring approach and the
+            // The completed segment hands over to the talk machinery -
+            // unless the segment was the long haul ring approach and the
             // merchant is still beyond the customer ring: the exact
-            // final approach leg arms here (near enough now for the
+            // final approach segment arms here (near enough now for the
             // bounded search) and walks the character to the
             // customer cell across the counter (the shop quarter
             // round of the user report: the talk fired - or bounced -
             // from the outer railing side instead).
-            planned, _ := l.startWalkExactLeg(l.legDest)
+            planned, _ := l.startWalkExactSegment(l.segmentDest)
             if !l.exactApproachWanted() || !planned {
                 l.enterSellPhase()
             }
@@ -961,23 +964,23 @@ func (l *Loop) interruptTripForAttacker(now time.Time) bool {
     return true
 }
 
-// startWalkLeg plans the walk to the destination and arms the waypoint
+// startWalkSegment plans the walk to the destination and arms the waypoint
 // follower. The search prices the water at the swim rate (swimming is
 // slower than running): the plan crosses a lake only when the crossing
-// is the genuinely faster walk, and the follower walks the wet legs it
+// is the genuinely faster walk, and the follower walks the wet segments it
 // planned - the walker and the planner share one water policy. The
 // search goal is the approach radius of the destination (the merchant
 // interaction distance): a destination behind a counter or on a floor
 // layer the geodata does not model is still reached on the surrounding
 // deck. A destination no route reaches reports false - the callers
 // abort the trip and arm their cooldowns. The planning position
-// publishes as the leg origin of the walk plan view - the dump shows
-// the whole walk from it. It reports whether the leg was planned.
-func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
-    return l.startWalkLegSearch(dest)
+// publishes as the segment origin of the walk plan view - the dump shows
+// the whole walk from it. It reports whether the segment was planned.
+func (l *Loop) startWalkSegment(dest pathfind.Vec3) bool {
+    return l.startWalkSegmentSearch(dest)
 }
 
-// startZoneReturnLeg plans the zone return walk through the priced
+// startZoneReturnSegment plans the zone return walk through the priced
 // approach search: the water crossings compete with the land detours
 // on the honest travel time, the session's frozen corridors stay
 // banned. The zone return must bring the bot home whenever any route
@@ -987,14 +990,14 @@ func (l *Loop) startWalkLeg(dest pathfind.Vec3) bool {
 // paths - the runtime difference is unresolved, the priced search
 // with its partial corridor answer gives the bot the walkable route
 // toward home in every case the corridor exists). It reports whether
-// the leg was planned.
-func (l *Loop) startZoneReturnLeg(dest pathfind.Vec3) bool {
-    return l.startWalkLegSearch(dest)
+// the segment was planned.
+func (l *Loop) startZoneReturnSegment(dest pathfind.Vec3) bool {
+    return l.startWalkSegmentSearch(dest)
 }
 
-// legSearchView freezes one mesh search contract into the walk plan
+// segmentSearchView freezes one mesh search contract into the walk plan
 // view: the approach radius and the ban circles the search ran with.
-func legSearchView(
+func segmentSearchView(
     approach float64, avoid []pathfind.AvoidArea,
 ) *state.WalkSearch {
     search := &state.WalkSearch{Approach: approach, Avoid: nil}
@@ -1013,17 +1016,17 @@ func legSearchView(
     return search
 }
 
-// startWalkLegSearch plans the walk to the destination through the
+// startWalkSegmentSearch plans the walk to the destination through the
 // priced approach search and arms the waypoint follower. The water
 // crossings pay the swim rate (swimming is slower than running), so
 // the plan prefers the land detours whenever they are the faster walk
 // and swims whenever the water cut wins - the follower walks the wet
-// legs the plan carries. The search routes around the frozen areas of
+// segments the plan carries. The search routes around the frozen areas of
 // the session - ground the live server refused to walk although the
 // geodata pack modeled it as open - so the deterministic planner
 // detours instead of reproducing the frozen corridor. It reports
-// whether the leg was planned.
-func (l *Loop) startWalkLegSearch(dest pathfind.Vec3) bool {
+// whether the segment was planned.
+func (l *Loop) startWalkSegmentSearch(dest pathfind.Vec3) bool {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
         return false
@@ -1033,7 +1036,7 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3) bool {
         Y: float64(selfY),
         Z: float64(selfZ),
     }
-    radius := l.legRadius
+    radius := l.segmentRadius
     if radius <= 0 {
         radius = tripApproachRadius
     }
@@ -1054,7 +1057,7 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3) bool {
         // The partial round (docs/navmesh.md): both engines agree the
         // destination is unreachable under the filter, and the mesh
         // funnel still holds the walkable corridor toward it - the
-        // leg walks the closest reachable point instead of aborting
+        // segment walks the closest reachable point instead of aborting
         // at the start position, so the trip continues from wherever
         // the ground ends (the shore of a swim-only destination, the
         // border of the sealed corridor).
@@ -1062,12 +1065,12 @@ func (l *Loop) startWalkLegSearch(dest pathfind.Vec3) bool {
             "reachable point", int(dest.X), int(dest.Y))
     }
 
-    return l.armTownWalkLeg(selfX, selfY, selfZ, from, dest, result,
+    return l.armTownWalkSegment(selfX, selfY, selfZ, from, dest, result,
         radius)
 }
 
 // merchantWithinExactRange reports whether the merchant is close
-// enough for the exact leg: the distance gate of exactLegMaxDistance
+// enough for the exact segment: the distance gate of exactSegmentMaxDistance
 // (see the constant comment - the far exact searches are the
 // exhaustive flood class).
 func (l *Loop) merchantWithinExactRange(npc townNpc) bool {
@@ -1079,29 +1082,29 @@ func (l *Loop) merchantWithinExactRange(npc townNpc) bool {
     dy := float64(npc.Y - selfY)
     dz := float64(npc.Z - selfZ)
 
-    return math.Sqrt(dx*dx+dy*dy+dz*dz) <= exactLegMaxDistance
+    return math.Sqrt(dx*dx+dy*dy+dz*dz) <= exactSegmentMaxDistance
 }
 
-// replanTownWalkLeg re-plans the current town leg from the standing
-// cell to its own destination, preserving the leg's search contract:
-// the exact legs re-plan the exact search (a stuck merchant walk must
+// replanTownWalkSegment re-plans the current town segment from the standing
+// cell to its own destination, preserving the segment's search contract:
+// the exact segments re-plan the exact search (a stuck merchant walk must
 // re-arm the customer cell plan, not degrade into the approach ring
-// that ends the plan outside the shop again), the ring legs re-plan
-// with their own radius. It reports whether the leg was planned.
-func (l *Loop) replanTownWalkLeg(dest pathfind.Vec3) bool {
-    if l.legSearch != nil && l.legSearch.Approach == 0 {
-        planned, ringFallback := l.startWalkExactLeg(dest)
+// that ends the plan outside the shop again), the ring segments re-plan
+// with their own radius. It reports whether the segment was planned.
+func (l *Loop) replanTownWalkSegment(dest pathfind.Vec3) bool {
+    if l.segmentSearch != nil && l.segmentSearch.Approach == 0 {
+        planned, ringFallback := l.startWalkExactSegment(dest)
         if planned || !ringFallback {
             return planned
         }
 
-        return l.startWalkLegSearch(dest)
+        return l.startWalkSegmentSearch(dest)
     }
 
-    return l.startWalkLegSearch(dest)
+    return l.startWalkSegmentSearch(dest)
 }
 
-// startWalkExactLeg plans the walk to the exact destination through
+// startWalkExactSegment plans the walk to the exact destination through
 // the mesh corridor search (approach zero - the plan must arrive at
 // the destination cell, whatever walkable cell the mesh resolves it
 // onto) and arms the waypoint follower. The merchant stops navigate
@@ -1115,7 +1118,7 @@ func (l *Loop) replanTownWalkLeg(dest pathfind.Vec3) bool {
 // counter row), so the corridor ends at the closest walkable floor
 // cell to the npc - the standing spot of a real customer.
 //
-// It reports whether the leg was planned and whether the approach
+// It reports whether the segment was planned and whether the approach
 // ring fallback is worth running. The ring fallback owns exactly one
 // failure class - the plan that resolved onto a foreign deck (a
 // connected roof over the shop answers the closest layer of the
@@ -1127,7 +1130,7 @@ func (l *Loop) replanTownWalkLeg(dest pathfind.Vec3) bool {
 // the destination cell means no corridor to its ring either), so the
 // callers skip the fallback there and the trip attempt keeps its one
 // search cost (the cooldown pins of the broken path search).
-func (l *Loop) startWalkExactLeg(dest pathfind.Vec3) (bool, bool) {
+func (l *Loop) startWalkExactSegment(dest pathfind.Vec3) (bool, bool) {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
         return false, false
@@ -1160,7 +1163,7 @@ func (l *Loop) startWalkExactLeg(dest pathfind.Vec3) (bool, bool) {
         return false, false
     }
     last := result.Waypoints[len(result.Waypoints)-1]
-    if dz := math.Abs(last.Z - dest.Z); dz > exactLegDeckTolerance {
+    if dz := math.Abs(last.Z - dest.Z); dz > exactSegmentDeckTolerance {
         // The plan resolved onto a foreign deck: the roof over the
         // shop (the connected roof layer answers the destination
         // cell's closest-layer resolution) or a floor the merchant
@@ -1181,15 +1184,15 @@ func (l *Loop) startWalkExactLeg(dest pathfind.Vec3) (bool, bool) {
             "walkable cell (the counter row)", int(dest.X), int(dest.Y))
     }
 
-    return l.armTownWalkLeg(selfX, selfY, selfZ, from, dest, result, 0),
+    return l.armTownWalkSegment(selfX, selfY, selfZ, from, dest, result, 0),
         false
 }
 
-// armTownWalkLeg arms the waypoint follower with a planned town walk:
+// armTownWalkSegment arms the waypoint follower with a planned town walk:
 // the plan view (the search contract of the answer), the frame
-// measurement and the fresh leg state. Shared by the ring planner
-// (startWalkLegSearch) and the exact planner (startWalkExactLeg).
-func (l *Loop) armTownWalkLeg(
+// measurement and the fresh segment state. Shared by the ring planner
+// (startWalkSegmentSearch) and the exact planner (startWalkExactSegment).
+func (l *Loop) armTownWalkSegment(
     selfX, selfY, selfZ int32,
     from, dest pathfind.Vec3,
     result *pathfind.Result,
@@ -1197,36 +1200,36 @@ func (l *Loop) armTownWalkLeg(
 ) bool {
     l.waypoints = result.Waypoints
     l.wpIndex = 0
-    l.legDest = dest
-    l.legStart = from
+    l.segmentDest = dest
+    l.segmentStart = from
     l.waterEscape = false
-    // The plan view carries the search contract the leg answers (the
+    // The plan view carries the search contract the segment answers (the
     // repro contract of the 3D pathfind link): the approach radius
     // and the ban circles of this very search, so a viewer replay
     // rebuilds the walk the bot follows instead of a lookalike (the
     // 2026-09-19 route mismatch).
-    l.legSearch = legSearchView(radius, l.frozenAreas)
+    l.segmentSearch = segmentSearchView(radius, l.frozenAreas)
     // The fresh plan opens with a fresh frame measurement: the plan's
     // first waypoint IS the character's own cell resolved on the pack,
     // so the difference of the two z values is the vintage shift of
     // the standing surface (see click_frame.go) - the offset every
-    // click of this leg rides into the server frame. A character the
+    // click of this segment rides into the server frame. A character the
     // pack answers underwater measures no shift: the swim z rides the
     // water surface while the mesh z names the floor, the pair is not
     // a vintage pair (the swim-floor gap is geometry, not a pack
-    // disagreement) and anchoring by it would corrupt the leg's
+    // disagreement) and anchoring by it would corrupt the segment's
     // clicks.
-    l.legFrameOffset = 0
+    l.segmentFrameOffset = 0
     if !l.navigator.OverWater(
         float64(selfX), float64(selfY), int16(selfZ)) {
-        l.legFrameOffset = measureFrameOffset(
+        l.segmentFrameOffset = measureFrameOffset(
             selfZ, result.Waypoints[0].Z)
     }
     l.moveAt = time.Time{}
     l.stuckAt = time.Time{}
     l.stuckFast = false
-    // A fresh plan is a fresh leg: the varied aim budget of the
-    // online refusal answer re-arms (the legRefused latch itself
+    // A fresh plan is a fresh segment: the varied aim budget of the
+    // online refusal answer re-arms (the segmentRefused latch itself
     // stays - it carries the trip level evidence the frozen trip
     // escalation gate reads, a re-path inside the same trip must
     // not erase it) and the move start watchdog re-arms with the
@@ -1234,11 +1237,11 @@ func (l *Loop) armTownWalkLeg(
     l.refusalVariants = 0
     l.moveStartAt = time.Time{}
     l.forceStuck = false
-    // A planned geodata leg owns the movement now: the direct zone
-    // leg stall watcher stands down (its window would otherwise read
+    // A planned geodata segment owns the movement now: the direct zone
+    // segment stall watcher stands down (its window would otherwise read
     // a trip's frozen standstill as its own and fire early on the
-    // legs the budget gate resumes after the trip ends).
-    l.zoneLegAt = time.Time{}
+    // segments the budget gate resumes after the trip ends).
+    l.zoneSegmentAt = time.Time{}
 
     return true
 }
@@ -1248,7 +1251,7 @@ func (l *Loop) armTownWalkLeg(
 // waypoint followers must use it: a 2D-only radius once marked a deck
 // edge drop waypoint as reached - 80 units away horizontally but 920
 // units below the character - and the follower jumped straight to the
-// leg beyond the drop the character never walked, straight into the
+// segment beyond the drop the character never walked, straight into the
 // city railing. The geodata waypoints carry the real layer height,
 // so the z axis is exact for them.
 func waypointDistance(
@@ -1266,9 +1269,9 @@ func waypointDistance(
 // waypoints need the tight pass radius (a detour turn or a bridge ramp
 // entry must be walked through - the wide radius let the follower cut
 // the corner into the railing), the final waypoint keeps the trip
-// arrival radius of the leg (the search goal of the leg, the server
+// arrival radius of the segment (the search goal of the segment, the server
 // may stop the character slightly short of the click). The tight ring
-// legs (the teach stop close approach) pass their own tight final
+// segments (the teach stop close approach) pass their own tight final
 // radius: the wide slack would end the walk a whole ring short of the
 // teacher.
 func waypointArrived(
@@ -1285,26 +1288,26 @@ func waypointArrived(
 }
 
 // finalArriveRadius answers the arrival radius of the final waypoint
-// of the current town leg: the wide trip slack for the ordinary legs,
-// the tight pass radius for the close ring legs - a leg that searches
+// of the current town segment: the wide trip slack for the ordinary segments,
+// the tight pass radius for the close ring segments - a segment that searches
 // its route within npcApproachOffset of the npc must actually reach
 // the route end, the wide slack accepts a stop a full ring short of
 // the teacher and dumps the last stretch onto the straight offset
 // clicks whose lines cross the roof-only interior bands (the trainer
 // hall rows carry the floor, the spaces between them do not). The
-// exact legs (the merchant stops' approach zero search) answer the
+// exact segments (the merchant stops' approach zero search) answer the
 // tight radius the same way: their final cell is the customer spot
-// the leg exists to reach.
+// the segment exists to reach.
 func (l *Loop) finalArriveRadius() float64 {
-    // The exact legs (the merchant stops' startWalkExactLeg) must walk
+    // The exact segments (the merchant stops' startWalkExactSegment) must walk
     // the plan all the way to its final cell: the wide arrive radius
     // would end the walk a whole arrive radius short of the customer
     // cell the exact search answered - the standing spot opposite the
     // merchant behind the counter.
-    if l.legSearch != nil && l.legSearch.Approach == 0 {
+    if l.segmentSearch != nil && l.segmentSearch.Approach == 0 {
         return waypointPassDist
     }
-    if l.legRadius > 0 && l.legRadius < tripApproachRadius {
+    if l.segmentRadius > 0 && l.segmentRadius < tripApproachRadius {
         return waypointPassDist
     }
 
@@ -1352,10 +1355,10 @@ func waypointPassed(
 // walks and returns true when the final waypoint is reached. The water
 // guards run first: a character standing over a lake bed enters the
 // shore escape (the water escape state below), and a character that
-// walked out of one re-plans the interrupted leg from the shore.
-// Legs longer than the server move request limit are split into
+// walked out of one re-plans the interrupted segment from the shore.
+// Segments longer than the server move request limit are split into
 // straight intermediate points (the smoothing guarantees the line of
-// sight of every leg, so the intermediate points stay on the verified
+// sight of every segment, so the intermediate points stay on the verified
 // segment). Every click of a dry walk is verified against the water:
 // the server moves characters into water without any hesitation (its
 // own pathfinding carries no water cost and swimming move requests
@@ -1365,14 +1368,14 @@ func waypointPassed(
 // skipped: a server position correction or a restart jump can place
 // the character ahead of the follower, and walking back to a passed
 // waypoint would loop. A walk that stands still re-paths from the
-// current position to the leg destination, bounded by the re-path
+// current position to the segment destination, bounded by the re-path
 // budget of the trip.
 func (l *Loop) walkTownWaypoints() bool {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
         return false
     }
-    // The cursor key escape owns the leg while it runs: the claim
+    // The cursor key escape owns the segment while it runs: the claim
     // ladder drives the character (the escape arms from the follower
     // recovery too - the refusing pocket branch of stuckTownWalk),
     // the click machinery stays down until the escape ends.
@@ -1389,7 +1392,7 @@ func (l *Loop) walkTownWaypoints() bool {
             // stands on a bed below the C1 water surface, ahead of
             // the character - the swim IS the walk, keep following
             // it. The escape arms for the off-plan swims (a server
-            // push, a click drift), for a leg planned from a wet
+            // push, a click drift), for a segment planned from a wet
             // standing cell (the aim is the own wet cell, the plan
             // goes ashore first) and for the escape walk itself:
             // the shore walk recovers everything the plan does not
@@ -1408,7 +1411,7 @@ func (l *Loop) walkTownWaypoints() bool {
         }
         if l.waterEscape {
             // The character is back on dry ground: the escape is done,
-            // the interrupted leg re-plans from the shore with a fresh
+            // the interrupted segment re-plans from the shore with a fresh
             // re-path budget (the escape was a recovery, not a failure).
             l.waterEscape = false
             l.rePaths = 0
@@ -1416,7 +1419,7 @@ func (l *Loop) walkTownWaypoints() bool {
             l.stuckFast = false
             l.logger.Printf("Hunt: back on the shore at %d %d %d, "+
                 "re-planning the walk", selfX, selfY, selfZ)
-            if !l.replanTownWalkLeg(l.legDest) {
+            if !l.replanTownWalkSegment(l.segmentDest) {
                 l.abortTownTrip("no walkable path from the shore")
 
                 return false
@@ -1439,7 +1442,7 @@ type cursorEscapeState struct {
     originY int32
     steps   [][3]int32
     // wpMap names the route waypoint every claimed step completes
-    // (the index into the leg's waypoints, -1 for the mid segment
+    // (the index into the segment's waypoints, -1 for the mid segment
     // strides): the WASD walk IS the ground progress, the waypoint
     // the claims walk onto marks passed (the owner report of the
     // 2026-09-19 17:18 dump - the wasd walked points must never be
@@ -1454,7 +1457,7 @@ type cursorEscapeState struct {
     claimsSinceMove int
 }
 
-// zeroCursorEscape returns the cleared escape state of the leg and
+// zeroCursorEscape returns the cleared escape state of the segment and
 // trip boundaries: every field explicit (the exhaustruct convention
 // of the repository).
 func zeroCursorEscape() cursorEscapeState {
@@ -1482,7 +1485,7 @@ func zeroCursorEscape() cursorEscapeState {
 // client drives from its own movement simulation moves the character
 // server-side without any click validation (ValidatePosition.runImpl
 // syncs the claimed placement into the world and broadcasts it). The
-// claimed steps follow the planned route when the leg holds one (the
+// claimed steps follow the planned route when the segment holds one (the
 // route ladder bends where the plan bends - see
 // cursorEscapeRouteSteps) and fall back to the straight line toward
 // the aim without a plan, one run-speed step per second - the aim
@@ -1551,7 +1554,7 @@ func (l *Loop) beginCursorKeyEscape(
 
 // cursorEscapeRouteSteps builds the claimed steps of a route
 // following escape: the planned waypoints from the current cursor
-// (the pathfind route the leg already holds) interpolated into
+// (the pathfind route the segment already holds) interpolated into
 // run-speed strides whose lines stay dry - the water guard holds for
 // the claims the same way it holds for the clicks. The strides march
 // every segment of the route in order, so the ladder bends where the
@@ -1563,7 +1566,7 @@ func (l *Loop) beginCursorKeyEscape(
 // returns the steps with their waypoint map (the route waypoint
 // every step completes, -1 for the mid segment strides - the WASD
 // ground progress of the drive, see markEscapeClaimedWaypoint) and
-// nil maps without a plan (the straight fallback owns the leg).
+// nil maps without a plan (the straight fallback owns the segment).
 func (l *Loop) cursorEscapeRouteSteps(
     selfX, selfY, selfZ int32,
 ) ([][3]int32, []int) {
@@ -1725,7 +1728,7 @@ func (l *Loop) cursorEscapeSteps(
 // key branch of ValidatePosition) burns the follow patience and the
 // escape ends with the honest log line for the caller's abort
 // ladder. The settle window after the last claim lets the position
-// broadcasts land before the leg resumes its clicks.
+// broadcasts land before the segment resumes its clicks.
 func (l *Loop) driveCursorKeyEscape(
     now time.Time, selfX, selfY int32,
 ) {
@@ -1896,7 +1899,7 @@ func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
         if !arrived && !passed {
             return
         }
-        if !l.legAdvanceClear(selfX, selfY, selfZ, l.wpIndex+1) {
+        if !l.segmentAdvanceClear(selfX, selfY, selfZ, l.wpIndex+1) {
             return
         }
         l.wpIndex++
@@ -1905,10 +1908,10 @@ func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
 }
 
 // followWaypoints is the shared waypoint follower core of the town
-// legs and the water escapes: the waypoint arrival (tight for the
+// segments and the water escapes: the waypoint arrival (tight for the
 // intermediate turns, wide for the final goal), the passed waypoint
 // skipping, the stuck tracking and the click pace. The planned water
-// legs walk like the dry ones: the plan prices the crossings (the
+// segments walk like the dry ones: the plan prices the crossings (the
 // swim rate), the follower follows it - the escape machinery owns
 // the off-plan swims instead of a click guard (see walkTownWaypoints).
 func (l *Loop) followWaypoints(
@@ -1927,7 +1930,7 @@ func (l *Loop) followWaypoints(
     if l.walkStuck(now, selfX, selfY) {
         return false
     }
-    // The stuck handling may have re-planned the leg: the fresh plan
+    // The stuck handling may have re-planned the segment: the fresh plan
     // starts at the standing cell, so its wp 0 IS the character's own
     // position and a click at it is the self-click the server always
     // collapses (distance below the cancellation limit) - the round 56
@@ -1935,7 +1938,7 @@ func (l *Loop) followWaypoints(
     // exactly that refusal. Re-run the cursor advance so the click
     // below aims the fresh plan's first real waypoint instead. The
     // stuck recovery may also have armed the cursor key escape (the
-    // refusing pocket branch): the claims own the leg then, the click
+    // refusing pocket branch): the claims own the segment then, the click
     // below stays down until the escape settles.
     if l.cursorEscape.armed {
         return false
@@ -1954,7 +1957,7 @@ func (l *Loop) followWaypoints(
 
 // clickWaypoint aims the current waypoint, bends the click around the
 // idle aggressive camps, guards the line against the server refusal
-// and sends it. The leg splitting caps the click at the
+// and sends it. The segment splitting caps the click at the
 // server move request limit; the short click extension re-aims the
 // clicks under the server rescue floor at the plan polyline (see
 // minWalkClick); the server click validation runs after the steering
@@ -1974,17 +1977,17 @@ func (l *Loop) clickWaypoint(
     // resolves the click's destination layer by the nearest height to
     // this z, and the raw mesh z names the wrong layer wherever the
     // packs disagree (the village sandwich refusals).
-    wpZ := anchorZToServerFrame(wp.Z, l.legFrameOffset)
+    wpZ := anchorZToServerFrame(wp.Z, l.segmentFrameOffset)
     moveX, moveY, moveZ := wp.X, wp.Y, wpZ
-    if dist > maxMoveLeg {
-        frac := maxMoveLeg / dist
+    if dist > maxMoveDistance {
+        frac := maxMoveDistance / dist
         moveX = float64(selfX) + dx*frac
         moveY = float64(selfY) + dy*frac
         moveZ = float64(selfZ) + (wpZ-float64(selfZ))*frac
     }
     if l.extendArmed {
-        // The recovery of a stuck leg (extendArmed): the stuck
-        // proved the plain clicks of this leg do not move the
+        // The recovery of a stuck segment (extendArmed): the stuck
+        // proved the plain clicks of this segment do not move the
         // character (a server side refusal the offline click
         // validation cannot see), so the primary target under
         // the server rescue floor or behind the character on
@@ -2012,14 +2015,14 @@ func (l *Loop) clickWaypoint(
     }
     // A click target inside an idle mob's trigger circle cannot be
     // reached by any tangent arc (the tangent side flips at every
-    // re-issue, see legTargetThreatened): skip the waypoint ahead
+    // re-issue, see segmentTargetThreatened): skip the waypoint ahead
     // instead of ping-ponging around the camp for hours. The skip
     // reuses the stuck machinery's clear-successor gate, so the cursor
     // only jumps onto a waypoint the standing cell can click directly.
     moveXI, moveYI := int32(math.Round(moveX)), int32(math.Round(moveY))
     moveZI := int32(math.Round(moveZ))
-    if l.legTargetThreatened(moveXI, moveYI,
-        int32(l.legDest.X), int32(l.legDest.Y)) {
+    if l.segmentTargetThreatened(moveXI, moveYI,
+        int32(l.segmentDest.X), int32(l.segmentDest.Y)) {
         if next := l.nextClearWaypoint(selfX, selfY, selfZ); next > l.wpIndex {
             l.wpIndex = next
             l.moveAt = time.Time{}
@@ -2029,16 +2032,16 @@ func (l *Loop) clickWaypoint(
 
             return
         }
-        // No clear successor: the stuck escalation owns the leg.
+        // No clear successor: the stuck escalation owns the segment.
     }
     // The aggro-aware steering: the camps of idle aggressive mobs
-    // sitting on the leg bend it sideways (see loop_avoid.go). Every
+    // sitting on the segment bend it sideways (see loop_avoid.go). Every
     // transit walk passes through it - the town runs both ways, the
     // returns to the farm spot, the inter-ground walks of the spot
     // economy - while the mobs at the destination stay exempt.
     if ax, ay, dodged := l.steerClearOfAggro(
         selfX, selfY, selfZ, moveXI, moveYI, moveZI,
-        int32(l.legDest.X), int32(l.legDest.Y), now); dodged {
+        int32(l.segmentDest.X), int32(l.segmentDest.Y), now); dodged {
         moveX, moveY = float64(ax), float64(ay)
     }
     // The server click validation runs last: the server refuses
@@ -2119,7 +2122,7 @@ func (l *Loop) extendShortClick(
         X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
     }
     candidates, count := extendShortClickCandidates(
-        selfX, selfY, l.waypoints, l.wpIndex, l.legFrameOffset)
+        selfX, selfY, l.waypoints, l.wpIndex, l.segmentFrameOffset)
     for c := range count {
         sample := candidates[c]
         if _, ok := l.navigator.ValidateClick(from, sample); !ok {
@@ -2194,8 +2197,8 @@ func extendShortClickCandidates(
 // stuck of 2026-09-10 (the bot clicked the second waypoint 58 units
 // over the village plaza corner, the geodata correction collapsed the
 // target onto the walker and the character froze through all three
-// re-paths). A refused click shortens the leg first (the Bresenham
-// prefix of a split leg is not a prefix of the full raster, a shorter
+// re-paths). A refused click shortens the segment first (the Bresenham
+// prefix of a split segment is not a prefix of the full raster, a shorter
 // line often validates), then hops to the nearest swallowed plan bend
 // (the escape step out of a trap cell), and finally falls back to the
 // re-path of the stuck path. It reports whether the click target in
@@ -2211,7 +2214,7 @@ func (l *Loop) clickServerValidated(
         pathfind.Vec3{X: *moveX, Y: *moveY, Z: *moveZ}); ok {
         return true
     }
-    if l.shortenClickLeg(selfX, selfY, selfZ, moveX, moveY, moveZ, from) {
+    if l.shortenClickSegment(selfX, selfY, selfZ, moveX, moveY, moveZ, from) {
         return true
     }
     if l.clickEscapeHop(selfX, selfY, selfZ, moveX, moveY, moveZ) {
@@ -2238,7 +2241,7 @@ func (l *Loop) clickServerValidated(
     l.logger.Printf("Hunt: the server would refuse the walk click to "+
         "%d %d, re-pathing (%d of %d)",
         int32(*moveX), int32(*moveY), l.rePaths, maxRePaths)
-    if !l.replanTownWalkLeg(l.legDest) {
+    if !l.replanTownWalkSegment(l.segmentDest) {
         // The re-path found no route: the same freeze evidence the
         // stuck path carries - the ladder owns it (see
         // stuckTownWalk).
@@ -2248,13 +2251,13 @@ func (l *Loop) clickServerValidated(
     return false
 }
 
-// shortenClickLeg halves a refused click leg toward its target until a
-// prefix validates: the split legs of a long waypoint line rasterize
-// differently than the planned leg (the Bresenham accumulator starts
+// shortenClickSegment halves a refused click segment toward its target until a
+// prefix validates: the split segments of a long waypoint line rasterize
+// differently than the planned segment (the Bresenham accumulator starts
 // from the endpoint deltas), so the far half of a line can fail where
 // a shorter prefix passes. It reports whether the move pointers carry
 // a validated shorter target.
-func (l *Loop) shortenClickLeg(
+func (l *Loop) shortenClickSegment(
     selfX, selfY, selfZ int32,
     moveX, moveY, moveZ *float64, from pathfind.Vec3,
 ) bool {
@@ -2262,8 +2265,8 @@ func (l *Loop) shortenClickLeg(
     dy := *moveY - float64(selfY)
     dz := *moveZ - float64(selfZ)
     full := math.Hypot(dx, dy)
-    for leg := full / 2; leg >= clickShortenFloor; leg /= 2 {
-        frac := leg / full
+    for segment := full / 2; segment >= clickShortenFloor; segment /= 2 {
+        frac := segment / full
         shortX := float64(selfX) + dx*frac
         shortY := float64(selfY) + dy*frac
         shortZ := float64(selfZ) + dz*frac
@@ -2310,10 +2313,10 @@ func (l *Loop) clickEscapeHop(
         }
         if _, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
             X: wp.X, Y: wp.Y,
-            Z: anchorZToServerFrame(wp.Z, l.legFrameOffset),
+            Z: anchorZToServerFrame(wp.Z, l.segmentFrameOffset),
         }); ok {
             *moveX, *moveY, *moveZ = wp.X, wp.Y,
-                anchorZToServerFrame(wp.Z, l.legFrameOffset)
+                anchorZToServerFrame(wp.Z, l.segmentFrameOffset)
             l.logger.Printf("Hunt: walk click refused, hopping "+
                 "back to the plan bend at %d %d",
                 int32(wp.X), int32(wp.Y))
@@ -2332,7 +2335,7 @@ func (l *Loop) clickEscapeHop(
 // waypoints are walked out while the character still stands wet
 // re-plans from the current position: the arrival slack may have
 // stopped the character a wet cell short of the waterline. It never
-// reports the trip leg complete - the leg re-plans from the shore
+// reports the trip segment complete - the segment re-plans from the shore
 // once the character is dry (walkTownWaypoints routes back to the
 // normal follower then).
 func (l *Loop) walkWaterEscape(
@@ -2362,7 +2365,7 @@ func (l *Loop) walkWaterEscape(
 }
 
 // planWaterEscape arms the walk out of the water to the nearest
-// shore: the escape waypoints replace the current leg, the follower
+// shore: the escape waypoints replace the current segment, the follower
 // cursor restarts and the stuck tracking clears so the slow swim
 // gets a fresh stuck window. It reports whether an escape was found.
 func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
@@ -2388,7 +2391,7 @@ func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
     // click_frame.go). The escape clicks ride the raw mesh z; the
     // server skips the geodata click validation for swimming movement
     // anyway.
-    l.legFrameOffset = 0
+    l.segmentFrameOffset = 0
     l.moveAt = time.Time{}
     l.stuckAt, l.stuckX, l.stuckY = time.Time{}, 0, 0
     l.stuckFast = false
@@ -2400,7 +2403,7 @@ func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
     return true
 }
 
-// legAdvanceClear reports whether the follower may advance past the
+// segmentAdvanceClear reports whether the follower may advance past the
 // waypoint whose successor sits at the index: the straight line from
 // the CURRENT character position to that next waypoint must be
 // walkable over the geodata. The server validates every ground click
@@ -2419,7 +2422,7 @@ func (l *Loop) planWaterEscape(selfX, selfY, selfZ int32) bool {
 // skipped-from waypoint as the target until walking onto it re-opens
 // the line. A line the geodata cannot verify stays clear - the
 // follower then keeps the pre-gate behavior.
-func (l *Loop) legAdvanceClear(
+func (l *Loop) segmentAdvanceClear(
     selfX, selfY, selfZ int32, next int,
 ) bool {
     if next >= len(l.waypoints) || l.navigator == nil {
@@ -2439,7 +2442,7 @@ func (l *Loop) legAdvanceClear(
 }
 
 // refusalEvidence reports whether the server answered the last walk
-// click of this leg with ActionFailed while the character stood
+// click of this segment with ActionFailed while the character stood
 // still: the one byte refusal answer is the only online channel that
 // names a server side move refusal (the offline click validation
 // port mirrors the reference Mobius master, but a deployment running
@@ -2480,7 +2483,7 @@ func (l *Loop) refusalEvidence() bool {
 // target specific - the Bresenham raster of a shorter prefix or a
 // sideways offset of the same waypoint often validates where the
 // plain aim bounced. The variant list walks from the safest
-// variation (half of the leg) to the sideways probes (the
+// variation (half of the segment) to the sideways probes (the
 // perpendicular offsets that relocate the character off the refused
 // flank). Each variant passes the same offline gates as a planned
 // click (the server click port and the water guard on its line);
@@ -2500,7 +2503,7 @@ func (l *Loop) sendVariedAim(
     // variant that finally validates names the standing surface's
     // layer in the server frame, not the mesh frame the packs
     // disagree about.
-    wp.Z = anchorZToServerFrame(wp.Z, l.legFrameOffset)
+    wp.Z = anchorZToServerFrame(wp.Z, l.segmentFrameOffset)
     from := pathfind.Vec3{
         X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
     }
@@ -2534,11 +2537,11 @@ func (l *Loop) sendVariedAim(
 
 // refusalVariantTarget computes the varied click target of one
 // refusal variant index. The variation works on the CLICK geometry,
-// not the raw waypoint distance: the plain click caps at maxMoveLeg
-// (the follower's leg splitting), so the variants must sit INSIDE
+// not the raw waypoint distance: the plain click caps at maxMoveDistance
+// (the follower's segment splitting), so the variants must sit INSIDE
 // that cap or they aim farther than the click that just bounced. On
-// the capped leg, variant 0 halves the click (the Bresenham prefix
-// of a split leg rasterizes differently than the full line), 1
+// the capped segment, variant 0 halves the click (the Bresenham prefix
+// of a split segment rasterizes differently than the full line), 1
 // quarters it, 2 and 3 bend the half click sideways (left and right
 // of the route direction - the probe that relocates the character
 // off the refused flank while keeping the forward progress). It
@@ -2552,11 +2555,11 @@ func refusalVariantTarget(
     if full < minWalkClick {
         return nil
     }
-    // The click geometry: the plain click caps at maxMoveLeg, the
+    // The click geometry: the plain click caps at maxMoveDistance, the
     // variants vary the click - never the raw waypoint distance.
     click := full
-    if click > maxMoveLeg {
-        click = maxMoveLeg
+    if click > maxMoveDistance {
+        click = maxMoveDistance
     }
     frac := 0.5
     side := 0.0
@@ -2623,7 +2626,7 @@ func (l *Loop) noteMoveStart(
 // around the obstacle once the character stands still for too long OR
 // wobbles without net progress toward the current waypoint. The same
 // cell check alone misses the oscillation loops: the aggro steering
-// flips its tangent side whenever the leg target sits inside a threat
+// flips its tangent side whenever the segment target sits inside a threat
 // circle, and the character ping-pongs between the two tangent
 // endpoints - every hop moves, so a plain movement reset never fires,
 // while the walk makes no progress at all (the observed delevel walk
@@ -2634,10 +2637,10 @@ func (l *Loop) noteMoveStart(
 // of a trip waits the full stuckTimeout (a slow server position
 // broadcast must not trip a false stuck); subsequent stucks within the
 // same trip wait the shorter stuckFastTimeout - once the walker knows
-// the server refuses its clicks on this leg, waiting the full window
+// the server refuses its clicks on this segment, waiting the full window
 // for every waypoint just burns the trip's time budget. The skip of a
-// waypoint does NOT consume the re-path budget: only the full leg
-// re-plan (startWalkLeg) does. The move start watchdog force (see
+// waypoint does NOT consume the re-path budget: only the full segment
+// re-plan (startWalkSegment) does. The move start watchdog force (see
 // noteMoveStart, wired by followWaypoints) skips the window check for
 // one verdict: a click that never started the movement runs the
 // recovery at once. It reports whether the trip had to abort.
@@ -2677,7 +2680,7 @@ func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
 
 // stuckWaypointDistance measures the planar distance from the position
 // to the current waypoint (0 without a plan: the follower only runs
-// over a planned leg).
+// over a planned segment).
 func (l *Loop) stuckWaypointDistance(selfX int32, selfY int32) float64 {
     if l.wpIndex < 0 || l.wpIndex >= len(l.waypoints) {
         return 0
@@ -2708,7 +2711,7 @@ func (l *Loop) stuckProgressed(selfX int32, selfY int32) bool {
 }
 
 // stuckWaterEscape re-plans the water escape itself when the character
-// stands still mid-escape. The town leg is meaningless until the
+// stands still mid-escape. The town segment is meaningless until the
 // character is back ashore. Consumes the re-path budget.
 func (l *Loop) stuckWaterEscape(_ time.Time, selfX int32, selfY int32) bool {
     l.rePaths++
@@ -2729,12 +2732,12 @@ func (l *Loop) stuckWaterEscape(_ time.Time, selfX int32, selfY int32) bool {
 }
 
 // pocketRefused reports whether the current refusal verdict stands on
-// the very cell where the leg's first refusal latched: the ground the
+// the very cell where the segment's first refusal latched: the ground the
 // character stands on refuses every click (the refusing pocket of
 // the 2026-09-14 15:10 report), not one specific click line.
 func (l *Loop) pocketRefused(selfX int32, selfY int32) bool {
-    return l.legRefused &&
-        selfX == l.legRefusedX && selfY == l.legRefusedY
+    return l.segmentRefused &&
+        selfX == l.segmentRefusedX && selfY == l.segmentRefusedY
 }
 
 // currentWaypoint returns the waypoint the follower cursor aims at.
@@ -2746,10 +2749,10 @@ func (l *Loop) currentWaypoint() (pathfind.Vec3, bool) {
     return l.waypoints[l.wpIndex], true
 }
 
-// stuckTownWalk drives the town leg stuck recovery: first try to SKIP
+// stuckTownWalk drives the town segment stuck recovery: first try to SKIP
 // the current waypoint (a further one may be reachable through a cell
 // the server accepts), and when no waypoint ahead has a walkable line
-// from the standing cell, re-plan the whole leg from the current
+// from the standing cell, re-plan the whole segment from the current
 // position. The skip does NOT consume the re-path budget - it advances
 // the cursor without re-planning, so the walker can skip several
 // waypoints in a row while looking for one the server accepts. The
@@ -2768,7 +2771,7 @@ func (l *Loop) currentWaypoint() (pathfind.Vec3, bool) {
 // the first skip so subsequent stuck detections fire on the shorter
 // window.
 //
-//nolint:funlen // the town walk repeats the stuck checks per leg
+//nolint:funlen // the town walk repeats the stuck checks per segment
 func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
     // The online refusal answer separates the server side refusal
     // from the corridor freeze: an ActionFailed that answered the
@@ -2783,13 +2786,13 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
     // holds. The corridor ban machinery below answers the OTHER
     // family: a click the server accepted but never delivered on
     // (the frozen corridor). Latching the refusal also arms the
-    // escalation gate (see escalateFrozenLeg): a leg the server
+    // escalation gate (see escalateFrozenSegment): a segment the server
     // refused does not name a frozen corridor, banning it would
     // seal innocent ground for the rest of the session.
     if l.refusalEvidence() {
-        if !l.legRefused {
-            l.legRefused = true
-            l.legRefusedX, l.legRefusedY = selfX, selfY
+        if !l.segmentRefused {
+            l.segmentRefused = true
+            l.segmentRefusedX, l.segmentRefusedY = selfX, selfY
             l.logf("Hunt: the server refused the walk click " +
                 "(ActionFailed), varying the aim")
         }
@@ -2805,7 +2808,7 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 
             return false
         }
-        // The refusing pocket: the varied aims of this leg are spent
+        // The refusing pocket: the varied aims of this segment are spent
         // (or nothing exists to vary) and the character still stands
         // on the very cell where the first refusal latched - the
         // server answers NO click from this ground (the 2026-09-14
@@ -2853,7 +2856,7 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
         return true
     }
     // The stuck found no clear successor (the pinned cursor): the
-    // plain waypoint clicks of this leg do not move the character
+    // plain waypoint clicks of this segment do not move the character
     // - arm the short click extension for the recovery clicks.
     l.extendArmed = true
     l.rePaths++
@@ -2867,7 +2870,7 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
     if l.journal != nil {
         l.journal.Repath(l.tracker.ID(), l.rePaths)
     }
-    if !l.replanTownWalkLeg(l.legDest) {
+    if !l.replanTownWalkSegment(l.segmentDest) {
         // The fresh plan found no route (the bans plus the water may
         // wall every dry one): the freeze evidence still belongs to
         // the escalation ladder - the rungs widen the ban and re-plan
@@ -2880,7 +2883,7 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 
         return true
     }
-    // The re-path proved the plain clicks of this leg do not move
+    // The re-path proved the plain clicks of this segment do not move
     // the character: arm the fast stuck window for the next detection
     // (4 s instead of 15 s) and re-baseline the stuck window from
     // the re-path tick, so the next stuck fires on the fast timeout
@@ -2908,7 +2911,7 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 // 2026-09-11 11:34 dump: three identical re-paths per trip, two trip
 // cycles, the character never moved a cell). Any movement between the
 // re-paths clears the counter - a different plan shape then has a
-// different first leg to try.
+// different first segment to try.
 func (l *Loop) noteRepathCell(selfX int32, selfY int32) bool {
     frozen := selfX == l.repathX && selfY == l.repathY
     if frozen {
@@ -2922,10 +2925,10 @@ func (l *Loop) noteRepathCell(selfX int32, selfY int32) bool {
 }
 
 // abortFrozenTrip ends a trip whose re-path produced no movement and
-// escalates the recovery of the frozen leg before giving up: the town
-// walk legs and the zone return legs both try the escalation ladder
+// escalates the recovery of the frozen segment before giving up: the town
+// walk segments and the zone return segments both try the escalation ladder
 // (the banned detour re-plan, the cursor key escape along the fresh
-// route - see escalateFrozenLeg). Without the ladder the zone return
+// route - see escalateFrozenSegment). Without the ladder the zone return
 // cycles between the pathfound-return-stuck-abort and the frozen
 // re-plan, never moving: the deterministic planner re-plans the
 // identical route the ground keeps refusing (the 2026-09-14 08:25
@@ -2936,22 +2939,22 @@ func (l *Loop) noteRepathCell(selfX int32, selfY int32) bool {
 // is exhausted: the hunt continues and the next trip retries from a
 // fresh state.
 func (l *Loop) abortFrozenTrip(reason string) {
-    if l.escalateFrozenLeg() {
+    if l.escalateFrozenSegment() {
         return
     }
     l.abortTownTrip(reason)
 }
 
-// escalateFrozenLeg climbs the recovery ladder of a frozen town walk
-// leg - a leg whose full re-path cycle produced no movement at all,
+// escalateFrozenSegment climbs the recovery ladder of a frozen town walk
+// segment - a segment whose full re-path cycle produced no movement at all,
 // the signature of a ground the click transport cannot cross (the
 // 2026-09-12 trainer hall aisle dump: the plan entered the building
 // through the west aisle column, the server walled it, and the
 // character stood frozen through every re-path of two whole trips).
-// The rungs, one per frozen abort of the same leg:
+// The rungs, one per frozen abort of the same segment:
 //
 //  1. The banned detour re-plan: the aimed waypoint's cells join the
-//     session's avoid areas and the leg re-plans around them - the
+//     session's avoid areas and the segment re-plans around them - the
 //     deterministic search produces a different route (around the
 //     building instead of through the walled corridor) instead of
 //     reproducing the identical frozen one.
@@ -2961,7 +2964,7 @@ func (l *Loop) abortFrozenTrip(reason string) {
 //     claims transport takes over (the keyboard mode 0 arm plus the
 //     claimed ValidatePosition stream the server follows without any
 //     click validation) and walks the character ALONG THE PLANNED
-//     ROUTE - the plan stays the leg's own route, the claims bend
+//     ROUTE - the plan stays the segment's own route, the claims bend
 //     where it bends, and the settle returns the walk to the normal
 //     routed clicks on the same plan (the owner contract of the
 //     2026-09-19 round: wasd along the route, the normal mode at the
@@ -2972,24 +2975,24 @@ func (l *Loop) abortFrozenTrip(reason string) {
 //
 // The ladder reports whether a rung took over the recovery (the
 // caller skips its abort).
-func (l *Loop) escalateFrozenLeg() bool {
+func (l *Loop) escalateFrozenSegment() bool {
     if l.navigator == nil {
         return false
     }
-    // The ladder runs for both the town walk legs (phaseTownWalk) and
-    // the zone return legs (phaseTownReturn): both follow a planned
+    // The ladder runs for both the town walk segments (phaseTownWalk) and
+    // the zone return segments (phaseTownReturn): both follow a planned
     // geodata route whose clicks the server may refuse, and both need
     // the banned detour re-plan to route around the walled corridor
     // instead of reproducing the identical frozen route (the
     // 2026-09-14 08:25 dump: the zone return at the village terrace
     // cycled between the pathfound-return-stuck-abort and the frozen
-    // legs because the ladder never ran for it).
+    // segments because the ladder never ran for it).
     if l.phase != phaseTownWalk && l.phase != phaseTownReturn {
         return false
     }
     if l.frozenStage == 0 {
         l.frozenStage = 1
-        if l.legRefused {
+        if l.segmentRefused {
             // The freeze evidence carries ActionFailed answers: the
             // server refused the clicks themselves, the corridor is
             // not frozen. Banning it would seal innocent ground for
@@ -3000,11 +3003,11 @@ func (l *Loop) escalateFrozenLeg() bool {
             // the claims walk the character off the refusing ground
             // without any click validation at all.
             l.logf("Hunt: the server refused the clicks of this " +
-                "leg, skipping the corridor ban")
+                "segment, skipping the corridor ban")
         } else if l.banFrozenCorridor() {
             l.logf("Hunt: the walk froze on this corridor, " +
                 "re-planning the detour around it")
-            if l.startZoneReturnOrWalkLeg() {
+            if l.startZoneReturnOrWalkSegment() {
                 return true
             }
             // No route around the ban: the escape rung owns the
@@ -3028,21 +3031,21 @@ func (l *Loop) escalateFrozenLeg() bool {
     return false
 }
 
-// startZoneReturnOrWalkLeg re-plans the frozen leg with the right
+// startZoneReturnOrWalkSegment re-plans the frozen segment with the right
 // search for the phase: the zone return (phaseTownReturn) uses the
-// non-dry fallback (startZoneReturnLeg), the town walk (phaseTownWalk)
-// uses the dry search (startWalkLeg). The zone return must allow
+// non-dry fallback (startZoneReturnSegment), the town walk (phaseTownWalk)
+// uses the dry search (startWalkSegment). The zone return must allow
 // water crossings as a fallback - the path through the village ramp
 // may need to cross a water cell the dry search walls off.
-func (l *Loop) startZoneReturnOrWalkLeg() bool {
+func (l *Loop) startZoneReturnOrWalkSegment() bool {
     if l.phase == phaseTownReturn {
-        return l.startZoneReturnLeg(l.legDest)
+        return l.startZoneReturnSegment(l.segmentDest)
     }
 
-    return l.startWalkLeg(l.legDest)
+    return l.startWalkSegment(l.segmentDest)
 }
 
-// banFrozenCorridor adds the aimed waypoint of the frozen leg to the
+// banFrozenCorridor adds the aimed waypoint of the frozen segment to the
 // session's avoid areas: every later dry search routes around the
 // patch, so the corridor the server refused to walk stays out of each
 // following plan (the next trip included). A waypoint an existing ban
@@ -3097,12 +3100,12 @@ func (l *Loop) banFrozenCorridor() bool {
 // nextClearWaypoint scans the plan ahead for the first waypoint the
 // standing cell can click directly: the stuck skip must only arm
 // targets the server walks, never a line it would collapse partway
-// into a trap cell (the legAdvanceClear gate of the cursor advance).
+// into a trap cell (the segmentAdvanceClear gate of the cursor advance).
 // It returns the index of the first clear successor, or the current
 // cursor when no successor ahead is reachable.
 func (l *Loop) nextClearWaypoint(selfX, selfY, selfZ int32) int {
     for next := l.wpIndex + 1; next < len(l.waypoints); next++ {
-        if l.legAdvanceClear(selfX, selfY, selfZ, next) {
+        if l.segmentAdvanceClear(selfX, selfY, selfZ, next) {
             return next
         }
     }
@@ -3157,9 +3160,9 @@ func (l *Loop) enterSellPhase() {
 // the sale later). The sell first step banks the credits the frozen
 // trip plan counted on, the stop planning distributes its purchases,
 // every buy stop completes when its purchases were requested, and
-// the return leg starts when no stop is left.
+// the return segment starts when no stop is left.
 //
-//nolint:cyclop,gocognit // the town sell trip legs
+//nolint:cyclop,gocognit // the town sell trip segments
 func (l *Loop) tickTownSell() {
     now := time.Now()
     if l.teachStop() {
@@ -3212,7 +3215,7 @@ func (l *Loop) tickTownSell() {
             // the gear stop of its merchant when they match, see
             // planLearnStops). The weapon stop already ran (the
             // sell stop routes to the weapon merchant), so an
-            // abort on the teacher leg never strands a
+            // abort on the teacher segment never strands a
             // bare-handed character.
             l.planLearnStops()
         }
@@ -3239,7 +3242,7 @@ func (l *Loop) tickTownSell() {
 
         return
     }
-    l.startReturnLeg()
+    l.startReturnSegment()
 }
 
 // handleMerchant approaches the shop merchant and selects it like the
@@ -3454,7 +3457,7 @@ func (l *Loop) sellJunk() {
         }
     }
     if len(batch) == 0 {
-        l.startReturnLeg()
+        l.startReturnSegment()
 
         return
     }
@@ -3507,16 +3510,16 @@ func (l *Loop) engagesOnZoneEntry() bool {
     return true
 }
 
-// startReturnLeg plans the walk back to the farm spot. The leg is a
+// startReturnSegment plans the walk back to the farm spot. The segment is a
 // fresh logical unit of the trip machinery (the sell stop handed the
 // walk over after the shopping, the deleveling aborted into it), so
 // the frozen re-path cell of whatever walk came before dies here: the
-// return leg must not inherit the frozen budget of the guard walk or
+// return segment must not inherit the frozen budget of the guard walk or
 // the sell approach, or its own first refused click ends it instantly
-// - the delevel abort and the return leg of the 2026-09-12 01:50 dump
+// - the delevel abort and the return segment of the 2026-09-12 01:50 dump
 // died back to back from the same cell in one second, leaving the
-// character to the direct zone legs and the permanent freeze.
-func (l *Loop) startReturnLeg() {
+// character to the direct zone segments and the permanent freeze.
+func (l *Loop) startReturnSegment() {
     l.phase = phaseTownReturn
     l.repathX, l.repathY = 0, 0
     l.frozenRepaths = 0
@@ -3532,8 +3535,8 @@ func (l *Loop) startReturnLeg() {
         Y: float64(destY),
         Z: float64(destZ),
     }
-    l.legRadius = tripApproachRadius
-    if !l.startWalkLeg(dest) {
+    l.segmentRadius = tripApproachRadius
+    if !l.startWalkSegment(dest) {
         l.abortTownTrip("no walkable path back to the farm spot")
 
         return
@@ -3571,10 +3574,10 @@ func (l *Loop) endTownTrip(reason string) {
     l.clearBlindRecovery()
     l.lootID = 0
     l.waypoints = nil
-    l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
-    l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+    l.segmentDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+    l.segmentStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
     l.waterEscape = false
-    l.legFrameOffset = 0
+    l.segmentFrameOffset = 0
     l.extendArmed = false
     l.cursorEscape = zeroCursorEscape()
     l.cursorEscapes = 0
@@ -3583,7 +3586,7 @@ func (l *Loop) endTownTrip(reason string) {
     l.frozenRepaths = 0
     l.moveStartAt = time.Time{}
     l.forceStuck = false
-    l.legRefusedX, l.legRefusedY = 0, 0
+    l.segmentRefusedX, l.segmentRefusedY = 0, 0
     l.tripPlan = nil
     l.tripStops = nil
     l.buysPlanned = false
@@ -3674,10 +3677,10 @@ func (l *Loop) resetTownTrip() {
     l.clearBlindRecovery()
     l.lootID = 0
     l.waypoints = nil
-    l.legDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
-    l.legStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+    l.segmentDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+    l.segmentStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
     l.waterEscape = false
-    l.legFrameOffset = 0
+    l.segmentFrameOffset = 0
     l.extendArmed = false
     l.cursorEscape = zeroCursorEscape()
     l.cursorEscapes = 0
@@ -3686,7 +3689,7 @@ func (l *Loop) resetTownTrip() {
     l.frozenRepaths = 0
     l.moveStartAt = time.Time{}
     l.forceStuck = false
-    l.legRefusedX, l.legRefusedY = 0, 0
+    l.segmentRefusedX, l.segmentRefusedY = 0, 0
     l.tripPlan = nil
     l.tripStops = nil
     l.buysPlanned = false

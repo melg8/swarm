@@ -183,7 +183,7 @@ func (b *Bot) ZoneHasAttackableBelow(zone ZoneArea, maxLevel int32) bool {
 // rotation uses this as its emptiness reading: a square whose only
 // survivors stand in mutually fenced social packs reads EMPTY to the
 // picker even though mobs live in it, and a hunter that waits in such
-// a square forever - no pick, no far walk, no patrol leg off the
+// a square forever - no pick, no far walk, no patrol segment off the
 // center - stalls the whole session. A nil zone never holds pickable
 // targets.
 func (b *Bot) ZoneHasPickable(

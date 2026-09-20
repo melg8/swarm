@@ -9,7 +9,7 @@ package navbuild
 // height 0 with the walls fully open (the east halves of the column
 // 17 regions, the whole 17_23). The filler builds into a floating
 // plateau 3.8k units above the sea floor with cliffs against every
-// real neighbour: the town legs strand on it (the Gludio Gludin bay
+// real neighbour: the town segments strand on it (the Gludio Gludin bay
 // crossing, the Gludin town cells inside the filler area).
 //
 // The repair rebuilds the filler from the nearest real cells: the

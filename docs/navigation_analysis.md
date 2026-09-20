@@ -20,7 +20,7 @@ Mobius C1 stack and its geodata pack (215 regions in
 - The elven lands connect to Gludio and Dion on foot (the T-018
   verification of the band survey, 2026-09-12): the Neutral Zone
   corridor routes exist end to end, so the survey band is reachable
-  walking too - the elven -> Gludio leg just exceeds the shipped
+  walking too - the elven -> Gludio segment just exceeds the shipped
   expansion cap by 25 percent (1.25M nodes).
 - Multi region search, multilayer cells (bridges, decks, interiors),
   line of sight, post smoothing, cell level visualization of the
@@ -126,7 +126,7 @@ experiment):
   must also handle boarding, riding and disembarking packets).
 - The universal A → B route planner should run over the combined graph
   (walk edges from the pathfinder + teleport edges + boat edges) and
-  return a sequence of legs, each leg being a walkable path or a
+  return a sequence of segments, each segment being a walkable path or a
   transport ride.
 
 ## Dynamic world elements
@@ -196,7 +196,7 @@ proves the mainland is connected.
    106 s into sub second), search scoped region cache, cap as a
    parameter.
 2. Meta graph: parse teleporters and boat routes, multimodal route
-   planner returning legs.
+   planner returning segments.
 3. Walker: waypoint execution, stuck detection, server corrections,
    arrival handling.
 4. Water: swim speed cost, depth/breath limits, live swim verification

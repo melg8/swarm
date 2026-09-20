@@ -27,7 +27,7 @@ import (
 // resumed across a relogin: the sell first step had banked the
 // legs piece for a replacement the trip never landed (the session
 // death, the silent buy refusal, the abort - every exit path ends
-// the trip without the replacement), the return leg walked home and
+// the trip without the replacement), the return segment walked home and
 // the machinery congratulated itself. The fix: the trip snapshots
 // the paperdoll it starts with and every exit arms the gear debt
 // for a slot it left empty with the piece gone - the debt logs the
@@ -98,7 +98,7 @@ func round60Paperdoll(withPants bool) [state.PaperdollSlots]int32 {
 // of the dump: the trip sells the displaced Leather Pants for the
 // Hard Leather Pants replacement, the buy requests the server
 // silently refuses never arrive, the retry budget skips them, the
-// return leg walks home and the trip ends as a success - the gear
+// return segment walks home and the trip ends as a success - the gear
 // debt arms at the end instead of letting the bot farm on half
 // dressed.
 func TestRound60DebtArmsOnStrandedReplacement(t *testing.T) {
@@ -113,14 +113,14 @@ func TestRound60DebtArmsOnStrandedReplacement(t *testing.T) {
     // sale needs in reach.
     applyRound60Gear(bot, 6000, true)
     // The luring tool is owned (see gear/bow.go): the 6000 wallet
-    // stays sized for the legs upgrade through the sell credit.
+    // stays sized for the segments upgrade through the sell credit.
     bot.ApplyInventoryUpdate([]state.InventoryItem{
         {ObjectID: 300, ItemID: 1864, Count: 5, Type2: 5, Change: 1},
         {ObjectID: 301, ItemID: 13, Count: 1, Change: 1},
         {ObjectID: 302, ItemID: 17, Count: 600, Change: 1},
     })
     require.True(t, loop.shoppingWanted(),
-        "the legs upgrade through the sell credit plans a trip")
+        "the segments upgrade through the sell credit plans a trip")
 
     // The trip starts and walks to the nearest merchant.
     loop.tick()
@@ -220,10 +220,10 @@ func TestRound60DebtArmsOnStrandedReplacement(t *testing.T) {
     loop.tick()
     require.NotEqual(t, phaseTownSell, loop.phase,
         "the skipped batch completes the stop")
-    // The return leg arrives at the farm spot and the trip ends.
+    // The return segment arrives at the farm spot and the trip ends.
     for loop.phase == phaseTownReturn {
-        moveSelfTo(bot, int32(loop.legDest.X), int32(loop.legDest.Y),
-            int32(loop.legDest.Z))
+        moveSelfTo(bot, int32(loop.segmentDest.X), int32(loop.segmentDest.Y),
+            int32(loop.segmentDest.Z))
         loop.tick()
     }
 
@@ -245,7 +245,7 @@ func TestRound60DebtArmsOnStrandedReplacement(t *testing.T) {
 
 // TestRound60DebtRunsTheRefillTrip continues the stranding above: the
 // debt armed, the next trip after the gear run cooldown refills the
-// hole - the fresh plan prices the affordable legs filler (the
+// hole - the fresh plan prices the affordable segments filler (the
 // Leather Pants) and the trip start names the gear debt.
 func TestRound60DebtRunsTheRefillTrip(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
@@ -269,7 +269,7 @@ func TestRound60DebtRunsTheRefillTrip(t *testing.T) {
         }
     }
     require.True(t, legsPurchase,
-        "the refill plan carries the legs filler")
+        "the refill plan carries the segments filler")
     require.Equal(t, int32(29), legsItemIDOf(loop.tripPlan),
         "the affordable legs filler of the dump wallet is the Leather Pants")
     require.Contains(t, logBuf.String(), "(the gear debt refill)",
@@ -326,14 +326,14 @@ func TestRound60ResetTownTripArmsDebt(t *testing.T) {
 // TestRound60FreshLoopRefillsTheDumpState pins the fresh process
 // case: the pantsless bot of the dump enters a loop with no trip
 // history and no debt (a process death lost the bookkeeping) - the
-// ordinary trigger alone (the affordable plan of the empty legs
+// ordinary trigger alone (the affordable plan of the empty segments
 // slot) must still send it shopping at once.
 func TestRound60FreshLoopRefillsTheDumpState(t *testing.T) {
     loop, _, bot, _ := newTripLoop()
     applyRound60Gear(bot, round60DumpAdena, false)
     require.Empty(t, loop.gearDebt)
     require.True(t, loop.shoppingWanted(),
-        "the affordable legs filler of the dump wallet plans a trip")
+        "the affordable segments filler of the dump wallet plans a trip")
 
     loop.tick()
 
@@ -343,7 +343,7 @@ func TestRound60FreshLoopRefillsTheDumpState(t *testing.T) {
         "the trip plan buys the Leather Pants back")
 }
 
-// legsSellFirstOf lists the sell first object ids of the legs
+// legsSellFirstOf lists the sell first object ids of the segments
 // purchases of a plan.
 func legsSellFirstOf(plan []gear.Purchase) []int32 {
     var ids []int32
@@ -357,7 +357,7 @@ func legsSellFirstOf(plan []gear.Purchase) []int32 {
     return ids
 }
 
-// legsItemIDOf resolves the item id of the first legs purchase of a
+// legsItemIDOf resolves the item id of the first segments purchase of a
 // plan (0 when the plan carries none).
 func legsItemIDOf(plan []gear.Purchase) int32 {
     for _, purchase := range plan {

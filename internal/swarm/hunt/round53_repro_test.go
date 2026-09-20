@@ -62,7 +62,7 @@ func TestReproRound53ZoneReturnWalksThePlan(t *testing.T) {
     loop.lastHit = time.Now().Add(-time.Minute)
     sim := &villageClickServer{engine: engine}
 
-    // The zone return leg: resolve the destination deck height the way
+    // The zone return segment: resolve the destination deck height the way
     // returnToZone does (ClosestHeight on the zone center with the
     // character's z as the reference).
     deckZ, err := engine.ClosestHeight(
@@ -74,7 +74,7 @@ func TestReproRound53ZoneReturnWalksThePlan(t *testing.T) {
         Y: float64(reproRound53ZoneY),
         Z: float64(deckZ),
     }
-    require.True(t, loop.startWalkLeg(dest),
+    require.True(t, loop.startWalkSegment(dest),
         "the zone return must plan a dry geodata route")
 
     // Walk the plan: the follower paces its clicks (the pacing gate is
@@ -104,7 +104,7 @@ func TestReproRound53ZoneReturnWalksThePlan(t *testing.T) {
 }
 
 // TestReproRound53FirstClickValidates isolates the very first click
-// of the reported stuck leg: the character stands at the dump
+// of the reported stuck segment: the character stands at the dump
 // position (46008, 51992, -2792), the plan's wp 2 is 48 units south
 // (46008, 52040, -2792), and the click between them MUST validate
 // against the ported server rules. The dump's first event - "town
@@ -121,7 +121,7 @@ func TestReproRound53FirstClickValidates(t *testing.T) {
     to := pathfind.Vec3{X: 46008, Y: 52040, Z: -2792}
     validated, ok := engine.ValidateClick(from, to)
     require.True(t, ok,
-        "the click to wp 2 must validate (the dump's first leg)")
+        "the click to wp 2 must validate (the dump's first segment)")
     require.InDelta(t, 46008.0, validated.X, 1.0,
         "the validated destination must be wp 2 itself")
     require.InDelta(t, 52040.0, validated.Y, 1.0,

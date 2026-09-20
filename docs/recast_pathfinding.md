@@ -76,7 +76,7 @@ to the island over the water. The results
   (`getHeight(tx, ty, tz)` semantics) and the layer poisoning fixes.
 - **The full route exists and is honest**: village deck -> bridge ->
   mainland -> shore ramp -> water -> under the bridge target, 19
-  polygons, the water legs priced 3x exactly like
+  polygons, the water segments priced 3x exactly like
   `waterCostMultiplier`. The same route with the swim area excluded
   answers the partial path to the closest dry polygon - the honest
   "you cannot get there dry" the hunt loop needs (the current engine
@@ -186,7 +186,7 @@ the invisible wall gap of the pure navmesh route - the plans can
 cross walls the server refuses. Three mitigations, all compatible
 with the architecture the bot already has:
 
-1. The plan level guard stays: every smoothed leg is already
+1. The plan level guard stays: every smoothed segment is already
    verified against the ported server click validation
    (`Engine.ValidateClick`) before the walker sends it - a navmesh
    plan crossing an invisible wall dies at the same gate a bad grid
@@ -261,7 +261,7 @@ mesh), and removes the last C++ dependency of the round.
 | `waterCostMultiplier` 3x per underwater cell | water polys carry a swim area cost (the same 3x, per area not per step) |
 | `FindPathApproachDry` walling the water | a filter that excludes the swim areas; unreachable targets answer the partial path with the closest dry point |
 | `FindWaterEscape` breadth first flood | an ordinary findPath with a high water area cost |
-| `legDry` smoothing rule (the ford regression) | the funnel never leaves the poly corridor; water legs stay water legs |
+| `segmentDry` smoothing rule (the ford regression) | the funnel never leaves the poly corridor; water segments stay water segments |
 | layer poisoning fix (`nodeKey` = cell + height) | stacked layers are separate polygons by construction |
 | the 1M expansion cap and its aborts | the corridor is hundreds of polys; world routes stop costing millions of nodes |
 | region LRU thrash (4 regions, 140 ms misses) | 2.89 MB tiles, 1.45 ms loads, all resident feasible |

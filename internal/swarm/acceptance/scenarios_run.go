@@ -86,7 +86,7 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
 // 2026-09-12 03:56 freeze dump: the temp character wakes at the west
 // aisle entrance of the trainer hall with the dump inventory and the
 // learning trip armed - the sell stop walks first (every vendor trip
-// sells the accumulated junk), then the teacher leg must cross the
+// sells the accumulated junk), then the teacher segment must cross the
 // building entrance and reach the class master Ellenia inside the
 // hall, and the lessons begin. The dump freeze held the character at
 // the entrance forever; the frozen corridor ban, the detour re-plan

@@ -125,7 +125,7 @@ func fordWaterWaypoints(points []Pos) int {
 }
 
 // fordZoneAwareCost prices the polyline under the zone aware model:
-// the leg pays the run/swim ratio on the zoned swim ground, the
+// the segment pays the run/swim ratio on the zoned swim ground, the
 // plain rate elsewhere - the character time the server actually
 // charges.
 func fordZoneAwareCost(points []Pos) float64 {
@@ -136,7 +136,7 @@ func fordZoneAwareCost(points []Pos) float64 {
     total := 0.0
     for i := 1; i < len(points); i++ {
         a, b := points[i-1], points[i]
-        leg := dist3(a, b)
+        segment := dist3(a, b)
         mx, my := (a.X+b.X)*0.5, (a.Y+b.Y)*0.5
         mz := math.Min(a.Z, b.Z)
         swim := false
@@ -149,9 +149,9 @@ func fordZoneAwareCost(points []Pos) float64 {
             }
         }
         if swim {
-            leg *= 2.3
+            segment *= 2.3
         }
-        total += leg
+        total += segment
     }
 
     return total
