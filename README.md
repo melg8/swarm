@@ -11,12 +11,13 @@ Control a Lineage 2 character from the browser.
 **swarm** - is a headless client for Lineage 2, written in Go. It speaks
 the game protocol directly - no game window, no screen reading, no input
 emulation - and plays the character on its own: it picks targets and
-fights, loots, sits down to regenerate, walks A* routes over the real
-geodata, goes to town for gear and consumables when the adena is enough,
-delevels on purpose when it outgrows its spot, and reconnects with a
-growing backoff when a session drops. Everything it does is visible in
-the built-in web interface, and in proxy mode a real game client
-attaches to the running character and takes over at any moment.
+fights, loots, sits down to regenerate, walks the routes of a
+navigation mesh built from the real geodata, goes to town for gear and
+consumables when the adena is enough, delevels on purpose when it
+outgrows its spot, and reconnects with a growing backoff when a session
+drops. Everything it does is visible in the built-in web interface, and
+in proxy mode a real game client attaches to the running character and
+takes over at any moment.
 
 The playground fits one Linux machine: a single script brings up a local
 [L2J Mobius][1] server (the `L2J_Mobius_C1_HarbingersOfWar` module,
@@ -41,11 +42,18 @@ Chronicle 1) with its MariaDB database and builds the client binary.
 ## Features
 
 - \[x] A live map of the world, built from the real game tiles: every
-  spawned creature with name and level, the hunting zone, the character
-  HUD with HP/MP/XP, adena, weight and inventory, and the target of the
-  current fight. Double click the map to move, attack or loot
+  spawned creature with name and level, the hunting cell the bot farms
+  right now, the character HUD with HP/MP/XP, adena, weight and
+  inventory, and the target of the current fight. The map plays the
+  combat it observes: every landed swing draws its streak and impact,
+  the damage floats over the hurt unit. Double click the map to move,
+  attack or loot
 
-  ![The map view of a hunting session](docs/images/webui-overview.jpg)
+  ![The map view of a hunting session](docs/images/webui-overview.png)
+
+  The hunt as the map plays it - the approach, the fight, the kill:
+
+  ![The hunt from the approach to the kill](docs/images/webui-fight.gif)
 
 - \[x] The shopping strategy as a visible plan: the equipment paperdoll,
   the prices, the adena wallet, what is bought next and what waits for
@@ -53,31 +61,43 @@ Chronicle 1) with its MariaDB database and builds the client binary.
   milestone follows, the jewelry waits behind both. Drag bag items onto
   the paperdoll to equip them yourself
 
-  ![The equipment view with the shopping queue](docs/images/webui-shop.jpg)
+  ![The equipment view with the shopping queue](docs/images/webui-shop.png)
 
 - \[x] The skill plan: the learned skills, the SP wallet and the queued
   lessons, attack power first (the learning itself is not wired to the
   server yet)
 
-  ![The skills view with the lesson queue](docs/images/webui-skills.jpg)
+  ![The skills view with the lesson queue](docs/images/webui-skills.png)
+
+- \[x] The statistics of the whole fleet: the kills, deaths, experience
+  and adena history charts, the hit rate, the per bot comparison table
+  and the phase timelines - the long run picture a 24/7 deployment
+  needs
+
+  ![The statistics tab with the fleet charts](docs/images/webui-stats.png)
 
 - \[x] Several sessions in one process, each on its own auto created
   account, all in one sidebar with their vital bars and current activity
 
-  ![Three sessions in the sidebar](docs/images/webui-fleet.jpg)
+  ![Three sessions in the sidebar](docs/images/webui-fleet.png)
 
 - \[x] The raw event stream of a session - spawns, combat, loot, town
   trips, relogs - with a text filter and auto scroll
 
-  ![The log view](docs/images/webui-log.jpg)
+  ![The log view](docs/images/webui-log.png)
 
 - \[x] A dark theme for the whole interface
 
-  ![The dark theme](docs/images/webui-dark.jpg)
+  ![The dark theme](docs/images/webui-dark.png)
 
-- \[x] A* pathfinding over the real C1 geodata, height and collision
-  aware, with a test UI of its own (`-pathfind-test`): drag the start
-  and the end markers and watch the route
+- \[x] The mesh pathfinding over the real C1 geodata, height and
+  collision aware: the tiles build from the geodata region by region
+  (`go run ./cmd/navmesh-build -regions 21_19` covers the elven start,
+  a full world pass is gigabytes), the long hunt routes serve from the
+  mesh with the water priced at the swim rate, and the 3D navmesh
+  viewer (`-show-navmesh`) renders the world with the route searches -
+  drag the start and the end markers and watch the search. The grid
+  engine stays the click validation and local walk layer
 
 - \[x] The client proxy: a real Chronicle 1 client connects to the swarm
   as if it were the server, the session stays alive on the real server,
@@ -136,7 +156,8 @@ HUD, the target, the equipment and the skills. Interact with the
 world directly: double click the map to move, attack or loot, drag
 inventory items onto the paperdoll to equip them. The `view` menu
 toggles the map layers, the sun button flips the theme, the `log`
-tab shows the raw event stream.
+tab shows the raw event stream, the `stats` tab the fleet
+statistics.
 
 The run variants:
 
@@ -144,6 +165,7 @@ The run variants:
    go run ./cmd/swarm -hunt -bots 3     # three sessions: test1, test2, test3
    go run ./cmd/swarm -hunt -proxy      # plus the client proxy
    go run ./cmd/swarm -pathfind-test    # the geodata pathfinder test UI
+   go run ./cmd/swarm -show-navmesh     # the 3D navmesh viewer
 ```
 
 | Flag | Default | Meaning |
@@ -155,6 +177,7 @@ The run variants:
 | `-login` | `127.0.0.1:2106` | login server address |
 | `-account` / `-char` | `test1` / `test1` | account and character name |
 | `-pathfind-test` | off | the geodata pathfinder test UI |
+| `-show-navmesh` | off | the 3D navmesh viewer of the mesh pathfinder |
 
 Run with `-h` for the rest: the fight FX galleries, the geodata and
 passability overrides, the proxy ports.
