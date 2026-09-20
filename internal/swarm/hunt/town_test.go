@@ -267,6 +267,28 @@ func (f *fakeNavigator) ValidateClick(
 // the nearest town merchant of the test farm spot (45000, 50000).
 var herbielPos = [3]int32{42766, 50037, -2984}
 
+// herbielStand resolves the stand table cell of the Herbiel spawn:
+// the walk target of the trip stops since the counter stand round
+// (the spawn cell itself sits inside the roofed stall the pack never
+// walks). The npc spawn positions in the tests stay the spawn - the
+// npc stands there - only the walk targets move to the stand.
+func herbielStand() [3]int32 {
+    stand := merchantStandPoint(townNpc{
+        TemplateID: 7150, Name: "Herbiel",
+        X: herbielPos[0], Y: herbielPos[1], Z: herbielPos[2],
+    })
+
+    return [3]int32{int32(stand.X), int32(stand.Y), int32(stand.Z)}
+}
+
+// herbielStandVec is the pathfind.Vec3 form of the Herbiel stand.
+func herbielStandVec() pathfind.Vec3 {
+    stand := herbielStand()
+
+    return pathfind.Vec3{X: float64(stand[0]), Y: float64(stand[1]),
+        Z: float64(stand[2])}
+}
+
 // segmentWalkTarget computes the walk target the follower sends for a segment
 // from the point towards the waypoint: the waypoint itself when it is
 // within the move segment limit, the intermediate straight line point
@@ -333,7 +355,7 @@ func TestTripTriggersOnFullSlots(t *testing.T) {
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
     require.Equal(t, [][3]int32{segmentWalkTarget([3]int32{45000, 50000, -3500},
-        pathfind.Vec3{X: float64(herbielPos[0]), Y: float64(herbielPos[1]), Z: float64(herbielPos[2])})}, game.walks,
+        herbielStandVec())}, game.walks,
         "the walk aims along the segment to the nearest town trader")
 
     // A second tick while the character has not moved does not resend
@@ -361,8 +383,9 @@ func TestTripWalkPlanPublishes(t *testing.T) {
     require.Equal(t, "townWalk", snap.Phase,
         "the phase must publish for the activity banner")
     last := snap.WalkPath[len(snap.WalkPath)-1]
+    stand := herbielStand()
     require.Equal(t, state.WalkPoint{
-        X: herbielPos[0], Y: herbielPos[1], Z: herbielPos[2],
+        X: stand[0], Y: stand[1], Z: stand[2],
     }, last, "the trader destination must close the plan")
 }
 
@@ -378,7 +401,7 @@ func TestTripTriggersOnWeight(t *testing.T) {
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
     require.Equal(t, [][3]int32{segmentWalkTarget([3]int32{45000, 50000, -3500},
-        pathfind.Vec3{X: float64(herbielPos[0]), Y: float64(herbielPos[1]), Z: float64(herbielPos[2])})}, game.walks)
+        herbielStandVec())}, game.walks)
 }
 
 // TestTripNeedsNavigator verifies that a loop without geodata never
@@ -512,11 +535,12 @@ func TestTripFullFlow(t *testing.T) {
     require.Equal(t, phaseTownReturn, loop.phase)
 
     // The return segment walks home; the trip ends at the farm spot and
-    // the hunt resumes.
+    // the hunt resumes. The return walk issues from the merchant spawn
+    // the sell phase parked the character on.
     loop.tick()
     require.Equal(t, [][3]int32{
         segmentWalkTarget([3]int32{45000, 50000, -3500},
-            pathfind.Vec3{X: float64(herbielPos[0]), Y: float64(herbielPos[1]), Z: float64(herbielPos[2])}),
+            herbielStandVec()),
         segmentWalkTarget(herbielPos,
             pathfind.Vec3{X: 45000, Y: 50000, Z: -3500}),
     }, game.walks, "the return segment walks home")
@@ -531,7 +555,8 @@ func TestTripFullFlow(t *testing.T) {
 func TestTripSellsRemainingJunkInBatches(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     fillInventory(bot)
-    moveSelfTo(bot, herbielPos[0], herbielPos[1], herbielPos[2])
+    stand := herbielStand()
+    moveSelfTo(bot, stand[0], stand[1], stand[2])
 
     loop.tick()
     require.Equal(t, phaseTownSell, loop.phase)

@@ -1016,30 +1016,32 @@ func (l *Loop) advanceTripStop() {
         // ends the plan outside the shop - the shop quarter round of
         // the user report held the wide ring plans 147-232 units from
         // the merchant on the outer railing side, the talk fired (or
-        // bounced) from there and the buys never ran. The exact
-        // search lands the plan on the customer cell across the
-        // counter instead (the merchant's own cell sits on ground the
-        // mesh never walks onto, the funnel ends at the closest
-        // walkable floor cell to the npc - the standing spot of a
-        // real customer), the character walks in through the stall
-        // front and trades face to face with the merchant. The ring
-        // fallback runs for the one failure class the exact search
-        // cannot answer - the plan that resolved onto a foreign deck
-        // (the roof over the shop), see startWalkExactSegment.
+        // bounced) from there and the buys never ran. The target is
+        // the customer stand point of the stand table (the counter
+        // front cell along the merchant facing - the spawn cell sits
+        // inside the roofed stall the pack never walks, and the raw
+        // spawn route answered the outer side of the stall front, the
+        // user report of the counter stand round), so the plan lands
+        // the character face to face with the merchant across the
+        // counter. The ring fallback runs for the one failure class
+        // the exact search cannot answer - the plan that resolved onto
+        // a foreign deck (the roof over the shop), see
+        // startWalkExactSegment.
         planned := false
         if l.merchantWithinExactRange(stop.merchant) {
             var ringFallback bool
             planned, ringFallback = l.startWalkExactSegment(
-                townNpcPosition(stop.merchant))
+                merchantStandPoint(stop.merchant))
             if !planned && ringFallback {
                 l.segmentRadius = tripApproachRadius
                 planned = l.startWalkSegment(
-                    townNpcPosition(stop.merchant))
+                    merchantStandPoint(stop.merchant))
             }
         }
         if !planned {
             l.segmentRadius = tripApproachRadius
-            planned = l.startWalkSegment(townNpcPosition(stop.merchant))
+            planned = l.startWalkSegment(
+                merchantStandPoint(stop.merchant))
         }
         planFailed = !planned
     }

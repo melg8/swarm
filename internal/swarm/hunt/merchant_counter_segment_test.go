@@ -25,6 +25,18 @@ import (
 // mesh search lands the plan on the closest walkable floor cell to
 // the npc (the counter row itself the mesh never walks onto) - the
 // standing spot of a real customer.
+//
+// The counter stand round (2026-09-20, the follow up user report):
+// the closest walkable cell to the spawn is still the wrong side for
+// the stall merchants - for Unoren the spawn route answered the
+// OUTER side of the stall front 42 units north-west (the spawn cell
+// sits inside the roofed stall the pack models as roof-only cells,
+// nobody can stand on it directly), while the customer side is the
+// counter front along the merchant facing heading. The merchant
+// stops now target the curated stand table (merchantStands): the
+// cell just beyond the counter front, verified against the mesh by
+// cmd/counterprobe, so the plan ends face to face with the merchant
+// across the counter.
 const (
     // arielX/Y/Z is the elven village weapon merchant spawn
     // (townMerchants).
@@ -166,4 +178,69 @@ func TestMerchantStopFallsBackToTheRing(t *testing.T) {
     require.NotNil(t, loop.segmentSearch)
     require.InDelta(t, tripApproachRadius, loop.segmentSearch.Approach, 0.001,
         "the fallback segment carries the ring contract")
+}
+
+// TestMerchantStandTableCoversTheCounterTraders pins the stand table
+// integrity: every known shop merchant carries a customer stand
+// entry, every stand sits on the customer side of the counter (a
+// distinct cell from the spawn) and stays well inside the interaction
+// distance of the spawn the talk gates measure.
+func TestMerchantStandTableCoversTheCounterTraders(t *testing.T) {
+    for _, list := range [][]townNpc{townMerchants, dionMerchants} {
+        for _, npc := range list {
+            stand, ok := merchantStands[npc.TemplateID]
+            require.True(t, ok,
+                "the counter trader %s must carry a stand entry", npc.Name)
+            require.NotEqual(t, townNpcPosition(npc), stand,
+                "the stand of %s must not be the blocked spawn cell",
+                npc.Name)
+            d3D := math.Sqrt(
+                math.Pow(stand.X-float64(npc.X), 2) +
+                    math.Pow(stand.Y-float64(npc.Y), 2) +
+                    math.Pow(stand.Z-float64(npc.Z), 2))
+            require.LessOrEqual(t, d3D, npcInteractionDist,
+                "the stand of %s must sit inside the interaction "+
+                    "distance of the spawn the talk gates measure",
+                npc.Name)
+        }
+    }
+}
+
+// TestUnorenStopTargetsTheCounterStand pins the user report of the
+// counter stand round on the real pack and the real mesh tiles: the
+// sell stop of the weapon merchant Unoren plans the exact search to
+// the STAND TABLE cell (the counter front west of the stall, the
+// customer side) and its plan end sits on that cell - not on the old
+// outer side of the stall front 42 units north-west of the spawn the
+// raw spawn route answered.
+func TestUnorenStopTargetsTheCounterStand(t *testing.T) {
+    disablePace(t)
+    engine := reproEngine(t)
+    nav := NewNavmeshNavigator(engine, spawnDumpMesh(t))
+    bot := newTestBot()
+    moveSelfTo(bot, customerApproachX, customerApproachY,
+        customerApproachZ)
+    loop := NewLoop(&fakeGame{}, bot)
+    loop.SetNavigator(nav)
+
+    unoren := townNpc{TemplateID: 7147, Name: "Unoren",
+        X: 44667, Y: 46896, Z: -2982}
+    stand := merchantStandPoint(unoren)
+    require.Equal(t, merchantStands[7147], stand,
+        "the stand table must know the Unoren customer cell")
+
+    armMerchantStop(t, loop, unoren)
+    require.Equal(t, phaseTownWalk, loop.phase,
+        "the merchant segment must plan (no trip abort)")
+    require.Equal(t, stand, loop.segmentDest,
+        "the segment must target the stand cell, not the spawn")
+    require.NotEmpty(t, loop.waypoints,
+        "the merchant segment must plan")
+    last := loop.waypoints[len(loop.waypoints)-1]
+    miss := math.Hypot(last.X-stand.X, last.Y-stand.Y)
+    require.LessOrEqual(t, miss, 16.0,
+        "the plan must end on the stand cell at the counter front")
+    d2D := math.Hypot(last.X-float64(unoren.X), last.Y-float64(unoren.Y))
+    require.LessOrEqual(t, d2D, npcInteractionDist,
+        "the talk gate must fire from the stand cell")
 }

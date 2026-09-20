@@ -843,6 +843,26 @@ The short form:
   scenario runs live through tools/repro_stuck_trip.sh, which places
   the character at the stuck spot through the database and captures
   the mid-walk state dump).
+- The counter stand round (2026-09-20): the merchant stops target the
+  curated customer stand table (`merchantStands` in town.go) instead
+  of the merchant spawn. The spawn cell of a stall merchant sits
+  inside the roofed stall the geodata pack models as roof-only cells
+  (the cell holds no floor layer - nobody can stand on it directly,
+  the owner report), and the raw spawn route answered the OUTER side
+  of the counter for Unoren (42 units north-west of the spawn). The
+  stands sit on the customer side of each counter front: the counter
+  line is read off the geodata as the closed NSWE cell faces along
+  the merchant's facing heading (cmd/counterprobe -mode detect names
+  the direction, -mode scan pins the cell, -mode verify walks the
+  mesh route and checks every leg with the grid line of sight). The
+  table covers the elven pair (Unoren, Ariel on the west corridor of
+  their stall), the elven magic shop (Creamees, Herbiel south-east of
+  their counter bands) and the Dion pair (Sabrin, Casey on the east
+  corridor; Sonia, Lara on the north corridor). The interaction
+  gates keep measuring the spawn; the stands sit 60-100 units from
+  it, well inside the 250 interaction distance. Pinned by
+  TestMerchantStandTableCoversTheCounterTraders and
+  TestUnorenStopTargetsTheCounterStand.
 
 ## Deleveling (internal/swarm/hunt/delevel.go)
 

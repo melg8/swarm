@@ -1780,3 +1780,70 @@ item not forbidden from the sale sells to any merchant.
 - verification: go build, golangci-lint run 0 issues, gofmt-spaces
   clean, go test hunt + pathfind + navbuild + navmesh + prototype +
   acceptance - all ok.
+## Active task: the counter stand round - the merchant stops walk to the customer cell across the counter (2026-09-20)
+
+Started: 2026-09-20. Branch: `feature/new-pathfind-alternative`.
+Commits as melg8.
+
+### Goal (the owner prompt of 2026-09-20)
+
+Some merchants stand in their shops behind counters. The trip points
+the character runs to when it wants to buy or sell must be modified:
+for Unoren the coordinate 44667 46896 -2982 (the spawn) is blocked -
+nobody can stand on it directly; the character must stand inside the
+shop, in front of the counter (the same for Ariel). The owner asked
+for the general curated list of such situations and welcomed the
+counter direction detection idea (how to tell the counter direction
+apart from the wall behind the merchant's back).
+
+### Progress
+
+- the raw geodata diagnosis (cmd/counterprobe, the new scratch probe
+  in the geotest/navanalyze/stuckprobe family): the merchant spawn
+  cells of the elven weapon/armor shop sit inside the roofed stall
+  the pack models as roof-only cells over the sea bed - the spawn
+  cell holds no floor layer at all, the mesh cannot walk onto it and
+  the server side (the local stack runs PathFinding=0, GeoEngine
+  loaded 0 regions) never blocks a walk; "blocked" is the bot's own
+  pack truth. The raw spawn route answered the OUTER side of the
+  stall front for Unoren (44640 46864, 42 units north-west) - not the
+  customer side.
+- the counter direction detector (-mode detect): the counter sits on
+  the FACING side of the merchant (the spawn heading of the Mobius
+  spawn data, LocationUtil.calculateHeadingFrom semantics: 0 = east,
+  16384 = south); among the eight directions the one holding the
+  stall edge (the first floor cell beyond the roof-only interior)
+  within 60 degrees of the heading wins. Verified against the magic
+  shop where the pack models the counter band as raised layers.
+- the curated stand table (`merchantStands` in hunt/town.go): the
+  customer cell just beyond each counter front, one row per merchant
+  (the elven pair Unoren/Ariel on the west corridor of their stall,
+  Creamees/Herbiel south-east of their counter bands, Sabrin/Casey on
+  the east corridor of the Dion weapon shop, Sonia/Lara on the north
+  corridor of the Dion magic shop - all agreeing with the spawn
+  headings). `merchantStandPoint` returns the stand for the walk
+  planning of the merchant stops (advanceTripStop, the shopping trip
+  stop planner, exactApproachWanted); the interaction gates keep
+  measuring the spawn.
+- the grid verification (-mode verify): every stand routes found with
+  the plan ending on the cell; the walk legs are checked with the
+  grid line of sight - the elven corridor approach required the stand
+  at the corridor gate latitude (the deeper rows clip the walled
+  counter corner on the diagonal strides - the honest-server stall
+  the town repro test caught, root caused and fixed by moving the
+  stand to 44584 46944).
+- the tests: TestMerchantStandTableCoversTheCounterTraders (the table
+  integrity), TestUnorenStopTargetsTheCounterStand (the real pack and
+  mesh pin of the stand targeting); the trip test expectations moved
+  from the spawn to the stand (herbielStand helper).
+
+### Verification
+
+go build, go vet, task lint 0 issues, task fmt:check clean, go test
+-count=1 ./... green except TestWorldRiverFord pair 1 (the
+cross-world ford route needs about forty navmesh tiles the 4 GB
+sandbox cannot build - the pre-existing environment limit of the
+sandbox tile pack, the navmesh package untouched by this round).
+The live acceptance run against the deployed stack stays for the
+next session with the stack up (the counters walk, the buys and the
+sells from the customer cells).

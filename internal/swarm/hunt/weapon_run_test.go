@@ -10,7 +10,6 @@ import (
     "testing"
     "time"
 
-    "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -63,10 +62,7 @@ func TestWeaponlessRunStartsTheWeaponStop(t *testing.T) {
     // through the segment walk helper.
     unoren := townMerchants[0]
     require.Equal(t, [][3]int32{segmentWalkTarget([3]int32{45000, 50000, -3500},
-        pathfind.Vec3{
-            X: float64(unoren.X), Y: float64(unoren.Y),
-            Z: float64(unoren.Z),
-        })}, game.walks,
+        merchantStandPoint(unoren))}, game.walks,
         "the walk aims along the segment to the weapon merchant")
 }
 

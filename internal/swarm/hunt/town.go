@@ -367,6 +367,61 @@ var dionMerchants = []townNpc{
     {TemplateID: 7063, Name: "Lara", X: 19223, Y: 146228, Z: -3048},
 }
 
+// merchantStands are the customer stand points of the merchants that
+// trade behind a counter. The merchant spawn itself is no stand
+// point: the spawn cell sits inside the roofed stall (the geodata
+// pack models the stall interior as roof-only cells over the missing
+// floor - the cell answers blocked, nobody can stand on it directly,
+// the user report of the shop quarter round), and the mesh route to
+// the spawn ends wherever the nearest floor poly happens to sit -
+// for Unoren that was the outer side of the stall front 42 units
+// north-west, not the customer side. The stand is the cell just
+// beyond the counter front along the merchant facing heading (the
+// counter sits on the facing side of the stall, the customer cell on
+// the other side of it), derived and verified with cmd/counterprobe
+// (-mode detect names the counter direction, -mode stands and
+// -mode scan pin the cell: every entry routes found with the plan
+// ending exactly on the cell, inside the interaction distance of the
+// spawn). A corrected or a new entry is one table row plus a rerun
+// of the probe; the z of every entry is the pack floor of the cell
+// so the exact search resolves it onto the right deck.
+var merchantStands = map[int32]pathfind.Vec3{
+    // Unoren, the customer corridor west of the counter front, at the
+    // corridor gate latitude (the gate cell row the east approach
+    // lines pass through; deeper rows clip the walled counter corner
+    // on the diagonal strides).
+    7147: {X: 44584, Y: 46944, Z: -2984},
+    // Ariel, the same corridor at her row.
+    7148: {X: 44584, Y: 46952, Z: -2984},
+    // Creamees, the open floor beyond the counter front south-east.
+    7149: {X: 42727, Y: 50115, Z: -2984},
+    // Herbiel, the open floor beyond the counter front south-east.
+    7150: {X: 42798, Y: 50101, Z: -2984},
+    // Sabrin, the customer corridor east of the counter front.
+    7060: {X: 18072, Y: 144488, Z: -3040},
+    // Casey, the same corridor at her row.
+    7061: {X: 18044, Y: 144560, Z: -3040},
+    // Sonia, the customer corridor north of the counter front.
+    7062: {X: 19320, Y: 146168, Z: -3064},
+    // Lara, the same corridor at her row.
+    7063: {X: 19224, Y: 146168, Z: -3064},
+}
+
+// merchantStandPoint returns the customer stand point of the merchant
+// when the stand table knows it, the spawn point otherwise. The walk
+// planning of the merchant stops targets the stand (the character
+// stops face to face with the merchant across the counter); the
+// interaction and approach gates keep measuring the spawn (the stand
+// sits 64-72 units from it, well inside the 250 interaction
+// distance).
+func merchantStandPoint(npc townNpc) pathfind.Vec3 {
+    if stand, ok := merchantStands[npc.TemplateID]; ok {
+        return stand
+    }
+
+    return townNpcPosition(npc)
+}
+
 // Navigator plans walkable paths through the world geodata. The
 // pathfind engine is wrapped into one through NewNavigator; tests fake
 // the interface.
@@ -761,15 +816,15 @@ func (l *Loop) maybeStartTownTrip() {
     if l.merchantWithinExactRange(merchant) {
         var ringFallback bool
         planned, ringFallback = l.startWalkExactSegment(
-            townNpcPosition(merchant))
+            merchantStandPoint(merchant))
         if !planned && ringFallback {
             l.segmentRadius = tripApproachRadius
-            planned = l.startWalkSegment(townNpcPosition(merchant))
+            planned = l.startWalkSegment(merchantStandPoint(merchant))
         }
     }
     if !planned {
         l.segmentRadius = tripApproachRadius
-        if !l.startWalkSegment(townNpcPosition(merchant)) {
+        if !l.startWalkSegment(merchantStandPoint(merchant)) {
             l.abortTownTrip("no walkable path to the shop")
         }
     }
@@ -859,7 +914,7 @@ func (l *Loop) exactApproachWanted() bool {
         return false
     }
     merchant := l.tripStops[0].merchant
-    if l.segmentDest != townNpcPosition(merchant) {
+    if l.segmentDest != merchantStandPoint(merchant) {
         return false
     }
     if l.segmentSearch != nil && l.segmentSearch.Approach == 0 {
