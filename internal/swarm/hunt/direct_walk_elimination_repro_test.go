@@ -113,6 +113,51 @@ func spawnDumpMesh(t *testing.T) *navmesh.Mesh {
     return mesh
 }
 
+// spawnDumpPocketHolds probes the pack premise the dump reproduction
+// stands on: the spawn cell's grid click port refuses every direction
+// but one (the mesh/grid pocket of the 16:02 dump - the offline probe
+// of the round answered exactly one validating direction, south). The
+// geodata pack is a live artifact of the deployment (the geo repair
+// rounds reshape the cell verdicts, the 2026-09-20 12:13 repair
+// reopened the east and the north chords of the spawn cell) - when
+// the pocket no longer exists the scenario has no subject (the walk
+// leaves the cell through an open click and the freeze ladder never
+// runs), the reproduction skips instead of failing against a pack it
+// was never authored for.
+func spawnDumpPocketHolds(t *testing.T, engine *pathfind.Engine) {
+    t.Helper()
+    spawn := pathfind.Vec3{
+        X: float64(spawnDumpX), Y: float64(spawnDumpY),
+        Z: float64(spawnDumpZ),
+    }
+    valid := 0
+    for _, d := range spawnDumpProbeDirections {
+        to := pathfind.Vec3{
+            X: spawn.X + d[0]*spawnDumpProbeRange,
+            Y: spawn.Y + d[1]*spawnDumpProbeRange,
+            Z: spawn.Z,
+        }
+        if _, ok := engine.ValidateClick(spawn, to); ok {
+            valid++
+        }
+    }
+    if valid > 1 {
+        t.Skipf("the dump pocket does not hold on this pack: "+
+            "%d of %d probe directions validate", valid,
+            len(spawnDumpProbeDirections))
+    }
+}
+
+const spawnDumpProbeRange = 300.0
+
+// spawnDumpProbeDirections sweeps the eight compass directions the
+// pocket premise was probed with (the offline probes of the round:
+// every direction but south refuses from the spawn cell).
+var spawnDumpProbeDirections = [8][2]float64{
+    {1, 0}, {1, 1}, {0, 1}, {-1, 1},
+    {-1, 0}, {-1, -1}, {0, -1}, {1, -1},
+}
+
 // spawnDumpLoop builds the loop of the 16:02 dump on the real pack
 // and the real mesh tiles (the live hybrid navigator: the mesh plans,
 // the grid validates the clicks). The server model is the honest one
@@ -124,6 +169,7 @@ func spawnDumpLoop(
 ) (*Loop, *fakeGame, *state.Bot, *cursorKeyServer, *bytes.Buffer) {
     t.Helper()
     engine := reproEngine(t)
+    spawnDumpPocketHolds(t, engine)
     nav := NewNavmeshNavigator(engine, spawnDumpMesh(t))
     bot := newTestBot()
     moveSelfTo(bot, spawnDumpX, spawnDumpY, spawnDumpZ)

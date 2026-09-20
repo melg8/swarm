@@ -1582,6 +1582,53 @@ func waypointPassed(
     return lateral <= waypointCorridor
 }
 
+// waypointPassedAlongRoute reports whether the character already rides
+// the route at or beyond the aimed waypoint: the projection onto the
+// aimed waypoint's own segment past its start (the plain passed test
+// of the cursor advance), or the projection onto ANY later segment of
+// the remaining route (the march past a bend the pinned cursor never
+// advanced onto - the 2026-09-20 acceptance round's armed extension
+// walked the character along the route samples across the wp 1 bend
+// while the cursor stayed pinned on wp 0, and the plain single segment
+// test measured the lateral to the OLD segment - a full corridor
+// width past it - and answered not passed, so the raw aim of the
+// passed start waypoint walked the character the whole bend back).
+// A character inside the arrival radius of the aimed waypoint never
+// counts (the caller gates on it): the pull back onto the waypoint is
+// the re-approach click the ramp corner needs, not a backward walk.
+func waypointPassedAlongRoute(
+    waypoints []pathfind.Vec3, index int, selfX, selfY int32,
+) bool {
+    for j := index; j+1 < len(waypoints); j++ {
+        wp := waypoints[j]
+        next := waypoints[j+1]
+        segX := next.X - wp.X
+        segY := next.Y - wp.Y
+        segLen := math.Hypot(segX, segY)
+        if segLen < 1 {
+            continue
+        }
+        selfDX := float64(selfX) - wp.X
+        selfDY := float64(selfY) - wp.Y
+        along := (selfDX*segX + selfDY*segY) / segLen
+        if along <= 0 {
+            continue
+        }
+        lateral := math.Abs(selfDX*segY-selfDY*segX) / segLen
+        if lateral > waypointCorridor {
+            continue
+        }
+        if j > index || along <= segLen {
+            // On a later segment (any point of it lies past the
+            // aimed waypoint along the walk) or past the aimed
+            // waypoint on its own segment.
+            return true
+        }
+    }
+
+    return false
+}
+
 // walkTownWaypoints follows the planned waypoints with ground click
 // walks and returns true when the final waypoint is reached. The plan
 // prices the water (the mesh swim rate of the C1 zone data), so the
@@ -2099,6 +2146,26 @@ func (l *Loop) followWaypoints(
     return false
 }
 
+// waypointPassedBehind reports whether the aimed waypoint sits behind
+// the character along the route: the character marched past it and a
+// click onto it walks backward (see waypointPassedAlongRoute). A
+// character inside the arrival radius of the aimed waypoint never
+// counts - the pull back onto the waypoint is the re-approach click
+// the ramp corner needs, not a backward walk (the round 56 gated
+// waypoint design).
+func (l *Loop) waypointPassedBehind(
+    wp pathfind.Vec3, selfX, selfY, selfZ int32,
+) bool {
+    if l.wpIndex+1 >= len(l.waypoints) {
+        return false
+    }
+    arrived := waypointDistanceAnchored(wp, selfX, selfY, selfZ,
+        l.segmentFrameOffset) <= waypointPassDist
+
+    return !arrived && waypointPassedAlongRoute(l.waypoints, l.wpIndex,
+        selfX, selfY)
+}
+
 // clickWaypoint aims the current waypoint, bends the click around the
 // idle aggressive camps, guards the line against the server refusal
 // and sends it. The segment splitting caps the click at the
@@ -2129,6 +2196,14 @@ func (l *Loop) clickWaypoint(
         moveY = float64(selfY) + dy*frac
         moveZ = float64(selfZ) + (wpZ-float64(selfZ))*frac
     }
+    // The backward walk guard: an aimed waypoint the character already
+    // moved PAST along the route itself (see waypointPassedAlongRoute)
+    // would walk it BACK off the ground the route samples just covered
+    // - the one step away and return ping pong of the 2026-09-20
+    // acceptance round. The armed extension keeps its own behind
+    // verdict too (the far V-detour waypoint whose leaving segment
+    // already points back, see waypointBehindRoute).
+    passedBehind := l.waypointPassedBehind(wp, selfX, selfY, selfZ)
     if l.extendArmed {
         // The recovery of a stuck segment (extendArmed): the stuck
         // proved the plain clicks of this segment do not move the
@@ -2136,7 +2211,7 @@ func (l *Loop) clickWaypoint(
         // validation cannot see), so the primary target under
         // the server rescue floor or behind the character on
         // the route gives way to the forward route samples.
-        behind := waypointBehindRoute(
+        behind := passedBehind || waypointBehindRoute(
             l.waypoints, l.wpIndex, selfX, selfY)
         if behind || dist < minWalkClick {
             extX, extY, extZ, ok := l.extendShortClick(
@@ -2156,6 +2231,12 @@ func (l *Loop) clickWaypoint(
                 return
             }
         }
+    } else if passedBehind {
+        // The same hold without the armed extension: a backward
+        // click is ground loss no matter the recovery state, and the
+        // stuck window owns the answer (the skip ladder walks the
+        // first clear successor, the re-path plans around the wall).
+        return
     }
     // A waypoint inside an idle mob's trigger circle cannot be reached
     // by any tangent arc (the tangent side flips at every re-issue, see
@@ -2845,10 +2926,24 @@ func (l *Loop) stuckWaypointDistance(selfX int32, selfY int32) float64 {
 // stuckProgressed reports whether the walk made net progress since the
 // stuck window opened: the waypoint cursor advanced AND the character
 // moved (a cursor bump alone - a passed waypoint of a freshly planned
-// route - is plan bookkeeping, not ground covered), or the character
-// moved and the current waypoint came closer by the progress margin. A
-// standstill and an oscillation both fail the gate; a detour climb
-// passes it (every waypoint of the route approaches in turn).
+// route - is plan bookkeeping, not ground covered), the character
+// moved and the current waypoint came closer by the progress margin,
+// or the character moved and the SEGMENT DESTINATION came closer by
+// the margin. The destination term is the pinned cursor's honest
+// progress signal: the advance gate pins the cursor on a
+// waypoint whose sight line ahead is walled (the 2026-09-20
+// acceptance round: every line of the Ellenia corridor ahead of the
+// plan start was walled for the sight oracle), the armed extension
+// then marches the character forward along the route samples while
+// the cursor waits - the aimed waypoint sits BEHIND the marching
+// character and its distance GROWS, so the waypoint term alone
+// judged the healthy march a stuck and burned the re-path budget on
+// a walk that was covering ground every tick. The destination
+// distance shrinks monotonically on that march and grows on a real
+// oscillation (the one step away and return loop lands no closer),
+// so the term separates the two exactly. A standstill and an
+// oscillation both still fail the gate; a detour climb passes it
+// (every waypoint of the route approaches in turn).
 func (l *Loop) stuckProgressed(selfX int32, selfY int32) bool {
     moved := selfX != l.stuckX || selfY != l.stuckY
     if !moved {
@@ -2858,8 +2953,67 @@ func (l *Loop) stuckProgressed(selfX int32, selfY int32) bool {
         return true
     }
 
-    return l.stuckWaypointDistance(selfX, selfY) <
+    waypointCloser := l.stuckWaypointDistance(selfX, selfY) <
         l.stuckBest-stuckProgressUnits
+
+    return waypointCloser || l.stuckDestinationProgressed(selfX, selfY)
+}
+
+// stuckDestinationProgressed reports whether the segment destination
+// came measurably closer since the stuck window opened WHILE the
+// character stays inside the route corridor: the ground covered along
+// the planned route counts as progress even when the cursor is pinned
+// on a waypoint the character already marched past (see
+// stuckProgressed for the pinned march round), while an off-route hop
+// that merely happens to point destination-ward (the tangent
+// flip-flop's sideways bounce) is no progress at all - the corridor
+// test keeps the term honest exactly there.
+func (l *Loop) stuckDestinationProgressed(selfX int32, selfY int32) bool {
+    if !l.stuckOnRouteCorridor(selfX, selfY) {
+        return false
+    }
+
+    return l.stuckDestinationDistance(selfX, selfY) <
+        l.stuckDestinationDistance(l.stuckX, l.stuckY)-stuckProgressUnits
+}
+
+// stuckOnRouteCorridor reports whether the position sits within the
+// lateral corridor of the remaining route (the aimed waypoint's
+// segment and every segment after it): the route the follower plans
+// is the ground the march may cover, the sideways bounce off it is
+// not.
+func (l *Loop) stuckOnRouteCorridor(selfX int32, selfY int32) bool {
+    for i := l.wpIndex; i+1 < len(l.waypoints); i++ {
+        wp := l.waypoints[i]
+        next := l.waypoints[i+1]
+        segX := next.X - wp.X
+        segY := next.Y - wp.Y
+        segLen := math.Hypot(segX, segY)
+        if segLen < 1 {
+            continue
+        }
+        selfDX := float64(selfX) - wp.X
+        selfDY := float64(selfY) - wp.Y
+        along := (selfDX*segX + selfDY*segY) / (segLen * segLen)
+        lateral := math.Abs(selfDX*segY-selfDY*segX) / segLen
+        if along >= 0 && along <= 1 && lateral <= waypointCorridor {
+            return true
+        }
+    }
+
+    return false
+}
+
+// stuckDestinationDistance measures the planar distance from a
+// position to the segment destination (0 without a segment).
+func (l *Loop) stuckDestinationDistance(selfX int32, selfY int32) float64 {
+    if l.segmentDest.X == 0 && l.segmentDest.Y == 0 &&
+        l.segmentDest.Z == 0 {
+        return 0
+    }
+
+    return math.Hypot(l.segmentDest.X-float64(selfX),
+        l.segmentDest.Y-float64(selfY))
 }
 
 // pocketRefused reports whether the current refusal verdict stands on
