@@ -1716,3 +1716,40 @@ item not forbidden from the sale sells to any merchant.
   fmt:check clean (the quests_test.go gofmt drift a parallel push
   landed is fixed in its own commit), no behavior change - the
   round touches the docs and the comments only.
+
+### Progress (2026-09-20, the fresh-eyes evaluation round)
+
+- the owner asked to pick the most fitting skills and evaluate the
+  project with them. The instruments: the vendored collection the
+  AGENTS.md skills section pins - golang-troubleshooting (the
+  code-review-flags and common-go-bugs references), golang-concurrency
+  (the five-checkpoint audit), golang-error-handling, golang-testing,
+  golang-security and go-verify-loop armed four parallel review passes
+  (nil/resources; error handling and slice/map safety; concurrency
+  including every goroutine spawn site; testing, docs onboarding and
+  the CI/deps posture). The external skill marketplace was scanned for
+  a Go review skill (nothing the vendored set lacks) and the web
+  grounding confirmed the govulncheck and CI recommendations.
+- every published finding was re-verified against the tree; the full
+  backlog with file:line evidence lives in the new
+  docs/codebase_review_2026-09-20.md. P0: the journal gzipFile deletes
+  the source segment when the copy fails (contradicts its own
+  comment), the lazy skill/book caches are written under the store
+  RLock from the snapshot encoder (two concurrent readers race),
+  the session lifecycle edges (the leaked gameConn on a pre-Run
+  failure, no read deadlines on the login flow), CI designed but
+  never activated (verified: zero workflow runs on the repo) with the
+  stale --new lint step in docs/ci_workflow.yml, and the handover
+  file carrying seven Active task headings over 1718 lines. P1/P2:
+  the aggro id-domain no-op, the zero-value AttackTarget grind, the
+  rotation wedge, the shutdown tail, the pathfind wall time split,
+  the hot-path logging economics, the manual dependency posture and
+  the docs drift the audit round missed.
+- gates this round: task verify green (28 packages ok, uncapped lint
+  0 issues, fmt:check clean), go test -race green on state,
+  webserver and connection, govulncheck 0 reachable vulnerabilities,
+  no secrets in the tree, the coverage baseline read.
+- next: the recommended round order at the tail of
+  docs/codebase_review_2026-09-20.md - P0 items 1 and 2 first (small
+  diffs, each with a focused test), then the session edges, the
+  handover restructure and the CI activation batch.

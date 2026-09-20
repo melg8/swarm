@@ -169,6 +169,7 @@ one of them is the reference for its subsystem:
 | `docs/agent_feedback_loops.md` | The audit of the feedback an autonomous agent receives (the verification loop, the live acceptance, the observability, the process memory), what is good, what to improve, what is missing |
 | `docs/project_description.md` | The long term design goals, scalability ideas (packet deduplication, "eyes" bot concept, synchronized party behavior) - read it before making architectural decisions |
 | `docs/quality_review_and_agent_prompts.md` | The 2026-09-07 architecture review and its improvement program (a historical snapshot - verify the state of a finding against the code before acting on it) |
+| `docs/codebase_review_2026-09-20.md` | The 2026-09-20 fresh-eyes review: the verified P0/P1/P2 findings and the prioritized improvement backlog - pick the next fix round from here |
 | `docs/webui_modernization_proposal.md` | The pending web UI modernization proposal (awaiting user approval; do not implement before it) |
 | `docs/quest_protocol.md` | The quest subsystem protocol (Mobius C1, the M2 first-profession research): the quest machine, the packet flows, the live traces |
 | `docs/band_20_25_survey.md` | The 20-25 band survey (M3 preparation): the hunting grounds reachable from the elven lands, the travel, the shopping, the learning |

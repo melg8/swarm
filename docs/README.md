@@ -49,6 +49,7 @@ the area you are about to touch, not all of them.
 | [recast_pathfinding.md](recast_pathfinding.md) | The recastnavigation research: what Detour gives the geodata pathfinder, the converter, the prototype, the migration verdict |
 | [fastpath_research.md](fastpath_research.md) | The fast route planning research: the measured baseline, the hierarchical options, the 10 second budget |
 | [quality_review_and_agent_prompts.md](quality_review_and_agent_prompts.md) | The 2026-09-07 architecture review and improvement program (historical snapshot) |
+| [codebase_review_2026-09-20.md](codebase_review_2026-09-20.md) | The 2026-09-20 fresh-eyes review: the verified findings (the journal data-loss path, the read-lock cache writes, the session lifecycle edges, the never-activated CI, the handover file) and the prioritized P0/P1/P2 backlog |
 | [hunting_system_redesign.md](hunting_system_redesign.md) | The spot-anchored farming research behind the retired spot mode: respawn awareness, efficiency scoring, the zone visibility
   measurements - superseded by hunting_cells.md (figures in [hunt_analysis/](hunt_analysis/)) |
 
