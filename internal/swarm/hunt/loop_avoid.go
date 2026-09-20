@@ -150,8 +150,8 @@ func (l *Loop) steerClearOfAggro(
     return endXI, endYI, true
 }
 
-// segmentTargetThreatened reports whether the next click target of the
-// walk sits inside the trigger circle of an idle aggressive mob that
+// segmentTargetThreatened reports whether the waypoint the walk aims
+// at sits inside the trigger circle of an idle aggressive mob that
 // does not stand at the walk destination. No steering arc can land
 // there: every tangent ray only grazes the circle, so the receding
 // horizon re-issues the segment from alternating tangent endpoints and
@@ -161,7 +161,12 @@ func (l *Loop) steerClearOfAggro(
 // waypoint 338 units inside the 600 unit margin circle). The caller
 // skips such a waypoint instead of clicking into the circle; a mob at
 // the walk destination stays exempt exactly like in the steering (the
-// ground the walk deliberately enters carries its own mobs).
+// ground the walk deliberately enters carries its own mobs). The
+// caller passes the waypoint itself, not the clipped click target it
+// issues: the clip parks the click next to the character, and a camp
+// between the character and the horizon would condemn every far
+// waypoint along the direction while the waypoints stay far outside
+// the circle (the mass skip of the 2026-09-20 town walk).
 func (l *Loop) segmentTargetThreatened(
     toX int32, toY int32, destX int32, destY int32,
 ) bool {

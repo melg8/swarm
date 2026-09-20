@@ -2013,15 +2013,25 @@ func (l *Loop) clickWaypoint(
             }
         }
     }
-    // A click target inside an idle mob's trigger circle cannot be
-    // reached by any tangent arc (the tangent side flips at every
-    // re-issue, see segmentTargetThreatened): skip the waypoint ahead
-    // instead of ping-ponging around the camp for hours. The skip
-    // reuses the stuck machinery's clear-successor gate, so the cursor
-    // only jumps onto a waypoint the standing cell can click directly.
+    // A waypoint inside an idle mob's trigger circle cannot be reached
+    // by any tangent arc (the tangent side flips at every re-issue, see
+    // segmentTargetThreatened): skip it ahead instead of ping-ponging
+    // around the camp for hours. The verdict reads the WAYPOINT the
+    // skip would abandon, never the issued click target: a far
+    // waypoint's click rides the maxMoveDistance clip next to the
+    // character, so a camp sitting between the character and the
+    // horizon flags every far waypoint along that direction while the
+    // waypoints themselves stay hundreds to thousands of units outside
+    // the circle - the 2026-09-20 town walk (build 4805d9a, bot test3)
+    // skipped cursors 9 through 23 of 42 in three seconds that way,
+    // marked the whole middle of the plan passed while the character
+    // stood still and walked the rest cross-country. The skip reuses
+    // the stuck machinery's clear-successor gate, so the cursor only
+    // jumps onto a waypoint the standing cell can click directly.
     moveXI, moveYI := int32(math.Round(moveX)), int32(math.Round(moveY))
     moveZI := int32(math.Round(moveZ))
-    if l.segmentTargetThreatened(moveXI, moveYI,
+    wpXI, wpYI := int32(math.Round(wp.X)), int32(math.Round(wp.Y))
+    if l.segmentTargetThreatened(wpXI, wpYI,
         int32(l.segmentDest.X), int32(l.segmentDest.Y)) {
         if next := l.nextClearWaypoint(selfX, selfY, selfZ); next > l.wpIndex {
             l.wpIndex = next
