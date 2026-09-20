@@ -1,0 +1,9 @@
+# ctx-go
+./main.go:7:2: "strconv" imported and not used
+./main.go:28:1: missing return
+./main.go:32:6: declared and not used: count
+./main.go:32:18: cannot use "seven" (untyped string constant) as int value in variable declaration
+./main.go:33:14: undefined: undeclaredVar
+./main.go:34:21: not enough arguments in call to strings.Repeat
+	have (string)
+	want (string, int)

@@ -1,0 +1,44 @@
+    Checking ctx-rs v0.1.0 (/home/z/my-project/benchmarks/ctx-rs)
+error[E0425]: cannot find value `undeclared_var` in this scope
+  --> src/main.rs:29:20
+   |
+29 |     println!("{}", undeclared_var); // bug 3: undefined identifier (E0425)
+   |                    ^^^^^^^^^^^^^^ not found in this scope
+
+error[E0317]: `if` may be missing an `else` clause
+  --> src/main.rs:17:12
+   |
+17 |       } else if xp > 100 {
+   |  ____________^
+18 | |         1
+   | |         - found here
+19 | |     }
+   | |_____^ expected `i32`, found `()`
+   |
+   = note: `if` expressions without `else` evaluate to `()`
+   = help: consider adding an `else` block that evaluates to the expected type
+
+error[E0308]: mismatched types
+  --> src/main.rs:28:23
+   |
+28 |     let _count: i32 = "seven"; // bug 2: type mismatch (E0308)
+   |                 ---   ^^^^^^^ expected `i32`, found `&str`
+   |                 |
+   |                 expected due to this
+
+error[E0061]: this method takes 1 argument but 0 arguments were supplied
+  --> src/main.rs:30:24
+   |
+30 |     println!("{}", "x".repeat()); // bug 4: wrong argument count (E0061)
+   |                        ^^^^^^-- argument #1 of type `usize` is missing
+   |
+note: method defined here
+  --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/str.rs:808:11
+help: provide the argument
+   |
+30 |     println!("{}", "x".repeat(/* usize */)); // bug 4: wrong argument count (E0061)
+   |                               +++++++++++
+
+Some errors have detailed explanations: E0061, E0308, E0317, E0425.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `ctx-rs` (bin "ctx-rs") due to 4 previous errors

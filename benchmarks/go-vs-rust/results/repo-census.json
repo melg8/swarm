@@ -1,0 +1,157 @@
+{
+ "loc_source_non_test": 130520,
+ "loc_test": 49317,
+ "files_source": 199,
+ "files_test": 197,
+ "test_to_code_ratio": 0.378,
+ "patterns_non_test_code": {
+  "error_wrap": 535,
+  "json_tags": 511,
+  "mutex_direct": 208,
+  "select": 88,
+  "context": 84,
+  "goroutine_spawn_var": 63,
+  "chan_decl": 58,
+  "sync_pkg": 43,
+  "time_sleep": 36,
+  "go_func": 34,
+  "net_tcp": 23,
+  "atomic": 20,
+  "http_ws": 17,
+  "unsafe": 12,
+  "crypto": 11,
+  "time_ticker": 10,
+  "os_signal": 9,
+  "interface_decl": 7,
+  "panic": 2,
+  "embed": 2,
+  "generics": 1
+ },
+ "packages": {
+  "pkg:npcdata": {
+   "src_loc": 62980,
+   "test_loc": 692,
+   "files": 13
+  },
+  "pkg:hunt": {
+   "src_loc": 25772,
+   "test_loc": 17217,
+   "files": 81
+  },
+  "pkg:state": {
+   "src_loc": 8536,
+   "test_loc": 5426,
+   "files": 41
+  },
+  "pkg:acceptance": {
+   "src_loc": 5477,
+   "test_loc": 2034,
+   "files": 22
+  },
+  "pkg:webserver": {
+   "src_loc": 3957,
+   "test_loc": 2981,
+   "files": 28
+  },
+  "pkg:proxy": {
+   "src_loc": 3302,
+   "test_loc": 3512,
+   "files": 20
+  },
+  "pkg:packets/from_game_server": {
+   "src_loc": 3220,
+   "test_loc": 2904,
+   "files": 37
+  },
+  "pkg:session": {
+   "src_loc": 3176,
+   "test_loc": 1087,
+   "files": 14
+  },
+  "pkg:gear": {
+   "src_loc": 2913,
+   "test_loc": 2240,
+   "files": 15
+  },
+  "pkg:connection": {
+   "src_loc": 2562,
+   "test_loc": 2681,
+   "files": 14
+  },
+  "pkg:pathfind": {
+   "src_loc": 2517,
+   "test_loc": 3002,
+   "files": 23
+  },
+  "cmd:swarm": {
+   "src_loc": 1339,
+   "test_loc": 94,
+   "files": 2
+  },
+  "pkg:packets/to_game_server": {
+   "src_loc": 1111,
+   "test_loc": 933,
+   "files": 25
+  },
+  "pkg:packets/from_auth_server": {
+   "src_loc": 661,
+   "test_loc": 1285,
+   "files": 12
+  },
+  "pkg:spotaudit": {
+   "src_loc": 636,
+   "test_loc": 144,
+   "files": 2
+  },
+  "other:.agents/skills": {
+   "src_loc": 519,
+   "test_loc": 59,
+   "files": 12
+  },
+  "pkg:crypt": {
+   "src_loc": 453,
+   "test_loc": 886,
+   "files": 10
+  },
+  "pkg:packets/packet": {
+   "src_loc": 368,
+   "test_loc": 863,
+   "files": 7
+  },
+  "cmd:gofmt-spaces": {
+   "src_loc": 275,
+   "test_loc": 123,
+   "files": 2
+  },
+  "pkg:packets/to_auth_server": {
+   "src_loc": 254,
+   "test_loc": 297,
+   "files": 7
+  },
+  "other:internal/version": {
+   "src_loc": 254,
+   "test_loc": 195,
+   "files": 2
+  },
+  "pkg:helpers": {
+   "src_loc": 142,
+   "test_loc": 172,
+   "files": 3
+  },
+  "pkg:memwatch": {
+   "src_loc": 56,
+   "test_loc": 72,
+   "files": 2
+  },
+  "cmd:geotest": {
+   "src_loc": 40,
+   "test_loc": 0,
+   "files": 1
+  },
+  "pkg:fleete2e": {
+   "src_loc": 0,
+   "test_loc": 418,
+   "files": 1
+  }
+ }
+}
