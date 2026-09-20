@@ -1,0 +1,2 @@
+# command-line-arguments
+./g1.go:11:2: "os" imported and not used

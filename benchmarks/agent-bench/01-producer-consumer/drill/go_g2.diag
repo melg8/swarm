@@ -1,0 +1,2 @@
+# command-line-arguments
+./g2.go:98:22: cannot use item (variable of type int64) as int value in argument to q.Send

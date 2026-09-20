@@ -1,0 +1,13 @@
+warning: method `locked` is never used
+  --> rust/r2.rs:45:8
+   |
+32 | impl BoundedQueue {
+   | ----------------- method in this implementation
+...
+45 |     fn locked(&self) -> std::sync::MutexGuard<'_, QueueState> { self.state.lock().unwrap() }
+   |        ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: 1 warning emitted
+

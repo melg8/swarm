@@ -1,0 +1,56 @@
+error[E0308]: mismatched types
+  --> rust/r4.rs:35:20
+   |
+35 |               state: Mutex::new(QueueState {
+   |  ____________________^
+36 | |                 items: VecDeque::with_capacity(capacity),
+37 | |                 closed: false,
+38 | |             }),
+   | |______________^ expected `QueueState`, found `Mutex<QueueState>`
+   |
+   = note: expected struct `QueueState`
+              found struct `std::sync::Mutex<QueueState>`
+
+error[E0599]: no method named `lock` found for struct `QueueState` in the current scope
+  --> rust/r4.rs:63:33
+   |
+19 | struct QueueState {
+   | ----------------- method `lock` not found for this struct
+...
+63 |         let mut st = self.state.lock().unwrap();
+   |                                 ^^^^ method not found in `QueueState`
+
+error[E0599]: no method named `lock` found for struct `QueueState` in the current scope
+  --> rust/r4.rs:76:33
+   |
+19 | struct QueueState {
+   | ----------------- method `lock` not found for this struct
+...
+76 |         let mut st = self.state.lock().unwrap();
+   |                                 ^^^^ method not found in `QueueState`
+
+warning: variable does not need to be mutable
+  --> rust/r4.rs:48:13
+   |
+48 |         let mut st = &mut self.state; // BUG: no lock
+   |             ----^^
+   |             |
+   |             help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+error[E0596]: cannot borrow `self.state` as mutable, as it is behind a `&` reference
+  --> rust/r4.rs:48:22
+   |
+48 |         let mut st = &mut self.state; // BUG: no lock
+   |                      ^^^^^^^^^^^^^^^ `self` is a `&` reference, so it cannot be borrowed as mutable
+   |
+help: consider changing this to be a mutable reference
+   |
+47 |     fn send(&mut self, item: usize) -> Result<(), usize> {
+   |              +++
+
+error: aborting due to 4 previous errors; 1 warning emitted
+
+Some errors have detailed explanations: E0308, E0596, E0599.
+For more information about an error, try `rustc --explain E0308`.

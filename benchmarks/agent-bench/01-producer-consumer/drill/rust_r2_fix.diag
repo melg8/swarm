@@ -1,0 +1,14 @@
+error[E0425]: cannot find type `MutexGuard` in this scope
+  --> rust/r2.rs:45:25
+   |
+45 |     fn locked(&self) -> MutexGuard<'_, QueueState> { self.state.lock().unwrap() }
+   |                         ^^^^^^^^^^ not found in this scope
+   |
+help: consider importing this struct
+   |
+ 8 + use std::sync::MutexGuard;
+   |
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0425`.

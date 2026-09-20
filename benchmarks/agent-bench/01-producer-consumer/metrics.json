@@ -1,0 +1,115 @@
+{
+  "code_written": {
+    "rust": {
+      "bytes": 4195,
+      "lines": 144,
+      "tokens_est": 1049
+    },
+    "go": {
+      "bytes": 3176,
+      "lines": 143,
+      "tokens_est": 794
+    },
+    "rust_over_go_bytes": 1.32
+  },
+  "feedback_received": {
+    "main_task": {
+      "rust": {
+        "bytes": 183,
+        "lines": 3,
+        "tokens_est": 46
+      },
+      "go": {
+        "bytes": 13,
+        "lines": 1,
+        "tokens_est": 3
+      }
+    },
+    "drill": {
+      "rust": {
+        "bytes": 7269,
+        "lines": 207,
+        "tokens_est": 1817
+      },
+      "go": {
+        "bytes": 7915,
+        "lines": 170,
+        "tokens_est": 1979
+      }
+    }
+  },
+  "iterations": {
+    "main_task": {
+      "rust": {
+        "compiles": 1,
+        "fixes": 0
+      },
+      "go": {
+        "builds": 1,
+        "fixes": 0
+      }
+    },
+    "drill": {
+      "rust": {
+        "r1_moved_arc": {
+          "fix_cycles": 1,
+          "diag_bytes": 2004,
+          "errors": 2
+        },
+        "r2_guard_import": {
+          "fix_cycles": 2,
+          "diag_bytes": 858,
+          "errors": 1
+        },
+        "r3_rc_across_threads": {
+          "fix_cycles": 2,
+          "diag_bytes": 2378,
+          "errors": 1
+        },
+        "r4_no_mutex_translation": {
+          "fix_cycles": 0,
+          "unfixable_by_design": "compile-time rejection",
+          "diag_bytes": 2029,
+          "errors": 4
+        }
+      },
+      "go": {
+        "g1_unused_import": {
+          "fix_cycles": 1,
+          "diag_bytes": 66,
+          "errors": 1
+        },
+        "g2_int64_vs_int": {
+          "fix_cycles": 1,
+          "diag_bytes": 116,
+          "errors": 1
+        },
+        "g3_locking_removed": {
+          "fix_cycles": 1,
+          "diag_bytes": 7733,
+          "detected_by": "runtime race detector only (compiler silent)",
+          "errors": 1
+        }
+      }
+    }
+  },
+  "per_error_cost": {
+    "rust": {
+      "errors": 8,
+      "bytes": 7269,
+      "bytes_per_error": 909,
+      "tokens_per_error_est": 227
+    },
+    "go": {
+      "errors": 3,
+      "bytes": 7915,
+      "bytes_per_error": 2638,
+      "tokens_per_error_est": 660
+    }
+  },
+  "runtime": {
+    "rust_runs": "3x runs 50/50 OK, ~5.5 ms wall",
+    "go_runs": "3x runs 50/50 OK + race detector clean after fix",
+    "both": "identical semantics: bounded cap-8 queue, 2x25 produced, 3 consumers, close+drain"
+  }
+}

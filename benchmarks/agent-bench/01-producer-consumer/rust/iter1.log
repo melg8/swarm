@@ -1,0 +1,3 @@
+   Compiling producer_consumer v0.1.0 (/home/z/my-project/swarm/benchmarks/agent-bench/01-producer-consumer/rust)
+    Finished `release` profile [optimized] target(s) in 0.35s
+EXIT=0

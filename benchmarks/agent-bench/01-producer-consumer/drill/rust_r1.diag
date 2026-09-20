@@ -1,0 +1,50 @@
+error[E0382]: the type `Arc` does not implement `Copy`
+  --> rust/r1.rs:90:17
+   |
+85 |     let queue = Arc::new(BoundedQueue::new(QUEUE_CAP));
+   |         ----- this move could be avoided by cloning the original `Arc`, which is inexpensive
+...
+89 |     for p in 0..PRODUCERS {
+   |     --------------------- inside of this loop
+90 |         let q = queue; // BUG: moved instead of cloned
+   |                 ^^^^^ value moved here, in previous iteration of loop
+   |
+   = note: consider using `Arc::clone`
+help: clone the value to increment its reference count
+   |
+90 |         let q = queue.clone(); // BUG: moved instead of cloned
+   |                      ++++++++
+
+error[E0382]: the type `Arc` does not implement `Copy`
+   --> rust/r1.rs:122:5
+    |
+ 85 |     let queue = Arc::new(BoundedQueue::new(QUEUE_CAP));
+    |         ----- this move could be avoided by cloning the original `Arc`, which is inexpensive
+...
+ 89 |     for p in 0..PRODUCERS {
+    |     --------------------- inside of this loop
+ 90 |         let q = queue; // BUG: moved instead of cloned
+    |                 ----- value moved here, in previous iteration of loop
+...
+106 |     for c in 0..CONSUMERS {
+    |     --------------------- inside of this loop
+107 |         let q = queue; // BUG: moved instead of cloned
+    |                 ----- value moved here, in previous iteration of loop
+...
+122 |     queue.close();
+    |     ^^^^^ value borrowed here after move
+    |
+    = note: consider using `Arc::clone`
+    = note: borrow occurs due to deref coercion to `BoundedQueue`
+help: clone the value to increment its reference count
+    |
+ 90 |         let q = queue.clone(); // BUG: moved instead of cloned
+    |                      ++++++++
+help: clone the value to increment its reference count
+    |
+107 |         let q = queue.clone(); // BUG: moved instead of cloned
+    |                      ++++++++
+
+error: aborting due to 2 previous errors
+
+For more information about this error, try `rustc --explain E0382`.
