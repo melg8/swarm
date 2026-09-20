@@ -16,12 +16,12 @@ import (
 // topaz and emerald stacks of the kill grounds.
 func classTransferJournal() ([]QuestEntryView, []QuestItemView) {
     return []QuestEntryView{
-        {QuestID: 406, State: 1},
-        {QuestID: 407, State: 3},
-    }, []QuestItemView{
-        {ItemID: 1205, Count: 20}, // Topaz Piece
-        {ItemID: 1206, Count: 7},  // Emerald Piece
-    }
+            {QuestID: 406, State: 1},
+            {QuestID: 407, State: 3},
+        }, []QuestItemView{
+            {ItemID: 1205, Count: 20}, // Topaz Piece
+            {ItemID: 1206, Count: 7},  // Emerald Piece
+        }
 }
 
 // TestApplyQuestListPinsTheJournal pins the apply path: the whole
