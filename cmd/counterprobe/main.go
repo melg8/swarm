@@ -22,8 +22,11 @@ import (
 )
 
 // merchant is one shop npc of the probe (the townMerchants rows plus
-// the spawn heading of the Mobius data).
+// the spawn heading of the Mobius data). The id field carries the
+// npcdata template id of the world pass rows; the legacy list rows
+// leave it zero.
 type merchant struct {
+    id      int32
     name    string
     x, y, z float64
     heading float64 // the L2 heading (65536 = 360 deg, 0 = east)
@@ -45,14 +48,15 @@ const (
 
 // merchants are the elven village and Dion shop merchants.
 var merchants = []merchant{
-    {unorenName, 44667, 46896, -2982, 31000},
-    {arielName, 44683, 46952, -2981, 28672},
-    {creameesName, 42700, 50057, -2984, 14500},
-    {herbielName, 42766, 50037, -2984, 11500},
-    {sabrinName, 17999, 144484, -3046, 6000},
-    {caseyName, 17948, 144560, -3046, 6000},
-    {soniaName, 19313, 146229, -3069, 49152},
-    {laraName, 19223, 146228, -3069, 49152},
+    {id: 7147, name: unorenName, x: 44667, y: 46896, z: -2982, heading: 31000},
+    {id: 7148, name: arielName, x: 44683, y: 46952, z: -2981, heading: 28672},
+    {id: 7149, name: creameesName, x: 42700, y: 50057, z: -2984,
+        heading: 14500},
+    {id: 7150, name: herbielName, x: 42766, y: 50037, z: -2984, heading: 11500},
+    {id: 7060, name: sabrinName, x: 17999, y: 144484, z: -3046, heading: 6000},
+    {id: 7061, name: caseyName, x: 17948, y: 144560, z: -3046, heading: 6000},
+    {id: 7062, name: soniaName, x: 19313, y: 146229, z: -3069, heading: 49152},
+    {id: 7063, name: laraName, x: 19223, y: 146228, z: -3069, heading: 49152},
 }
 
 // dirs are the eight walk directions of the profiles; north is -y in
@@ -88,7 +92,8 @@ func main() {
     geodata := flag.String("geodata", "data/geodata", "geodata dir")
     meshDir := flag.String("mesh", "data/navmesh", "navmesh tile dir")
     mode := flag.String("mode", "map",
-        "map, route, render, custom, text, stands, scan, detect")
+        "map, route, render, custom, text, stands, scan, detect,"+
+            " world, world-emit")
     out := flag.String("out", ".", "render output dir")
     scale := flag.Int("scale", 8, "render pixel size per cell")
     cx := flag.Float64("cx", 44660, "custom center x")
@@ -139,7 +144,8 @@ func main() {
         mesh := navmesh.NewMesh(*meshDir)
         planEnds := collectPlanEnds(mesh)
         probe := merchant{
-            name: customName, x: *cx, y: *cy, z: *cz, heading: 0,
+            id: 0, name: customName, x: *cx, y: *cy, z: *cz,
+            heading: 0,
         }
         outDir = *out
         renderCustom(regions, *geodata, *scale, *radius, probe,
@@ -148,7 +154,8 @@ func main() {
         mesh := navmesh.NewMesh(*meshDir)
         planEnds := collectPlanEnds(mesh)
         probe := merchant{
-            name: customName, x: *cx, y: *cy, z: *cz, heading: 0,
+            id: 0, name: customName, x: *cx, y: *cy, z: *cz,
+            heading: 0,
         }
         dumpText(regions[regionPath(*geodata, *cx, *cy)], probe,
             merchants, planEnds)
@@ -168,6 +175,10 @@ func main() {
         detectCounter(func(x, y float64) *pathfind.Region {
             return regions[regionPath(*geodata, x, y)]
         })
+    case "world", "world-emit":
+        runWorld(*geodata, *mode == "world-emit")
+    case "one":
+        probeOne(*geodata, int32(parseID(*scanName)))
     }
 }
 

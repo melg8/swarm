@@ -863,6 +863,48 @@ The short form:
   it, well inside the 250 interaction distance. Pinned by
   TestMerchantStandTableCoversTheCounterTraders and
   TestUnorenStopTargetsTheCounterStand.
+- The attack analog pull round (2026-09-20): every npc talk fires the
+  attack analog of the official client - the second plain click on the
+  already selected npc (InteractPull, the Action 0x04 packet the
+  plain talk rides). The Mobius NpcClick handler resolves it to the
+  interact branch: a folk npc outside the 250 interaction distance
+  takes the INTERACT intention and the server walks the character to
+  the npc along the straight line (36 units, thinkInteract) and opens
+  the dialog on arrival, so the interaction distance is met with
+  certainty however the geometry between them sits. It is not the
+  real attack (the AttackRequest 0x0A the guard engage drives - no
+  forced attack intention, no swings, nothing takes damage). The
+  merchant select fires the pull once per merchant after the
+  selection confirms; the deck wait (the z gap the ground clicks
+  cannot close) replaces its ground click re-walk with the select +
+  pull ladder; the teacher talk clicks turn select-or-pull; the
+  gatekeeper transfer sends the paced pull after the entry click;
+  the quest talk already was the two click practice. Pinned by
+  TestMerchantSelectionFiresTheAttackAnalogPull and
+  TestMerchantDeckCaseHandsTheWalkToTheServer.
+- The world stand round (2026-09-20): the same machinery covers every
+  merchant spawn of the world. The generated spawn table
+  (`npcdata/merchant_spawns.go`, tools/generate_merchant_spawns.sh)
+  joins the Mobius spawn xml files with the CT0_to_C4 display ids and
+  the buylist owners: 93 merchant spawns across the towns of the
+  continent. The counterprobe world pass
+  (`cmd/counterprobe -mode world` derives and verifies,
+  `-mode world-emit` prints the table) probes every spawn on the grid
+  engine: a spawn the pack serves (floor at the spawn height plus a
+  verified route onto it) needs no row - the spawn fallback of
+  merchantStandPoint answers it; every other spawn (the roofed shop
+  interiors, the counter fronts) derives its customer cell (the
+  heading push along the facing direction, then the ring scan that
+  prefers the facing sector) and the pass pins it only when the grid
+  route ends exactly on the cell with the line of sight of every leg.
+  The pass verified 58 spawn served (the five Talking Island traders
+  sit in the flat placeholder regions of the pack - no geometry to
+  derive from, the spawn fallback serves), 27 derived stands
+  (merchantStandsWorld in merchant_stands_world.go) and re-verified
+  the 8 curated rows, 0 failed. The approach point resolution reads
+  the curated table, then the world table, then the spawn. Pinned by
+  TestWorldStandTableJoinsTheSpawnData and
+  TestMerchantStandPointResolvesEveryWorldMerchant.
 
 ## Deleveling (internal/swarm/hunt/delevel.go)
 

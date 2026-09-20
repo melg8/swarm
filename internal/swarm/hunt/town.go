@@ -368,13 +368,14 @@ var dionMerchants = []townNpc{
 }
 
 // merchantStands are the customer stand points of the merchants that
-// trade behind a counter. The merchant spawn itself is no stand
-// point: the spawn cell sits inside the roofed stall (the geodata
-// pack models the stall interior as roof-only cells over the missing
-// floor - the cell answers blocked, nobody can stand on it directly,
-// the user report of the shop quarter round), and the mesh route to
-// the spawn ends wherever the nearest floor poly happens to sit -
-// for Unoren that was the outer side of the stall front 42 units
+// trade behind a counter (the curated rows of the counter round: the
+// elven village and the Dion quarter). The merchant spawn itself is no
+// stand point: the spawn cell sits inside the roofed stall (the
+// geodata pack models the stall interior as roof-only cells over the
+// missing floor - the cell answers blocked, nobody can stand on it
+// directly, the user report of the shop quarter round), and the mesh
+// route to the spawn ends wherever the nearest floor poly happens to
+// sit - for Unoren that was the outer side of the stall front 42 units
 // north-west, not the customer side. The stand is the cell just
 // beyond the counter front along the merchant facing heading (the
 // counter sits on the facing side of the stall, the customer cell on
@@ -384,7 +385,9 @@ var dionMerchants = []townNpc{
 // ending exactly on the cell, inside the interaction distance of the
 // spawn). A corrected or a new entry is one table row plus a rerun
 // of the probe; the z of every entry is the pack floor of the cell
-// so the exact search resolves it onto the right deck.
+// so the exact search resolves it onto the right deck. The world
+// wide coverage of the same machinery rides the generated
+// merchantStandsWorld table (merchant_stands_world.go).
 var merchantStands = map[int32]pathfind.Vec3{
     // Unoren, the customer corridor west of the counter front, at the
     // corridor gate latitude (the gate cell row the east approach
@@ -408,14 +411,21 @@ var merchantStands = map[int32]pathfind.Vec3{
 }
 
 // merchantStandPoint returns the customer stand point of the merchant
-// when the stand table knows it, the spawn point otherwise. The walk
-// planning of the merchant stops targets the stand (the character
-// stops face to face with the merchant across the counter); the
-// interaction and approach gates keep measuring the spawn (the stand
-// sits 64-72 units from it, well inside the 250 interaction
+// when a stand table knows it, the spawn point otherwise. The curated
+// counter table answers first (the hand pinned elven and Dion rows),
+// the generated world table second (the counterprobe world pass rows
+// of merchant_stands_world.go) and the spawn fallback covers the
+// spawns the pack serves directly plus the flat placeholder regions.
+// The walk planning of the merchant stops targets the stand (the
+// character stops face to face with the merchant across the counter);
+// the interaction and approach gates keep measuring the spawn (the
+// stand sits 64-80 units from it, well inside the 250 interaction
 // distance).
 func merchantStandPoint(npc townNpc) pathfind.Vec3 {
     if stand, ok := merchantStands[npc.TemplateID]; ok {
+        return stand
+    }
+    if stand, ok := merchantStandsWorld[npc.TemplateID]; ok {
         return stand
     }
 
