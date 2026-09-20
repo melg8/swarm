@@ -36,7 +36,10 @@ func settleMerchant(
 ) {
     t.Helper()
     spawnMerchantNPC(bot, npc, objectID)
-    moveSelfTo(bot, npc.X, npc.Y, npc.Z)
+    // The walk completes at the plan end - the customer stand point
+    // the npc segment walked to (the tight arrive radius).
+    stand := merchantStandPoint(npc)
+    moveSelfTo(bot, int32(stand.X), int32(stand.Y), int32(stand.Z))
     loop.merchantID = 0
     // The arrival tick (the walk segment completes) precedes the merchant
     // pick: tick until the merchant shows up.
@@ -75,7 +78,7 @@ func TestShoppingTripBuysAfterSelling(t *testing.T) {
     // The trip starts on the full inventory and walks to Herbiel.
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
-    moveSelfTo(bot, herbielPos[0], herbielPos[1], herbielPos[2])
+    arriveAtMerchantStand(bot, townMerchants[3])
     loop.tick()
     require.Equal(t, phaseTownSell, loop.phase)
 
@@ -658,7 +661,7 @@ func TestTripPlanFreezesPurchasesAgainstResale(t *testing.T) {
 
     // The sell stop routes to the weapon merchant of the frozen plan.
     unoren := townMerchants[0]
-    moveSelfTo(bot, unoren.X, unoren.Y, unoren.Z)
+    arriveAtMerchantStand(bot, unoren)
     loop.tick()
     require.Equal(t, phaseTownSell, loop.phase)
 

@@ -35,7 +35,7 @@ func TestLootedGearSurvivesTheSellStop(t *testing.T) {
     // The trip starts on the full inventory and walks to Herbiel.
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
-    moveSelfTo(bot, herbielPos[0], herbielPos[1], herbielPos[2])
+    arriveAtMerchantStand(bot, townMerchants[3])
     loop.tick()
     require.Equal(t, phaseTownSell, loop.phase)
 
@@ -143,7 +143,7 @@ func TestLootedJewelSurvivesThePairSwapWindow(t *testing.T) {
     // The trip starts and reaches the sell stop of Herbiel.
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
-    moveSelfTo(bot, herbielPos[0], herbielPos[1], herbielPos[2])
+    arriveAtMerchantStand(bot, townMerchants[3])
     loop.tick()
     require.Equal(t, phaseTownSell, loop.phase)
     settleMerchant(t, loop, game, bot, townMerchants[3], 55)

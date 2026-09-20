@@ -41,12 +41,16 @@ func newLearnLoop(sp int32) (*Loop, *fakeGame, *state.Bot) {
 }
 
 // arriveAtStop walks the trip into the current stop: the character
-// snaps to the stop npc position, the arrival tick switches into the
-// sell phase and the npc spawns in the known list.
+// snaps to the stop's plan end (the customer stand point the npc
+// segment walks to - the tight arrive radius of the npc segment wants
+// the character AT the requested point, the wide 150 slack of the old
+// ring plans is gone), the arrival tick switches into the sell phase
+// and the npc spawns in the known list.
 func arriveAtStop(t *testing.T, loop *Loop, bot *state.Bot) {
     t.Helper()
     stop := loop.tripStops[0]
-    moveSelfTo(bot, stop.merchant.X, stop.merchant.Y, stop.merchant.Z)
+    stand := merchantStandPoint(stop.merchant)
+    moveSelfTo(bot, int32(stand.X), int32(stand.Y), int32(stand.Z))
     loop.tick()
     require.Equal(t, phaseTownSell, loop.phase)
     bot.ApplyNpcInfo(state.NpcInfo{

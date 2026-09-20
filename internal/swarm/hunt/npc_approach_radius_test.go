@@ -56,14 +56,16 @@ func TestFarMerchantTripWalksIntoTheShop(t *testing.T) {
         0.001, "the far merchant segment carries the npc search contract")
 
     last := loop.waypoints[len(loop.waypoints)-1]
-    d2D := math.Hypot(last.X-float64(reproUnorenX),
-        last.Y-float64(reproUnorenY))
-    dz := math.Abs(last.Z - float64(reproUnorenZ))
+    // The requested point of the stop: the customer stand point the
+    // stand table names (the counter front cell inside the shop).
+    stand := merchantStandPoint(unoren)
+    d2D := math.Hypot(last.X-stand.X, last.Y-stand.Y)
+    dz := math.Abs(last.Z - stand.Z)
     d3D := math.Sqrt(d2D*d2D + dz*dz)
     t.Logf("the far merchant plan ends at %.0f %.0f %.0f "+
-        "(dist to Unoren %.0f)", last.X, last.Y, last.Z, d3D)
-    require.LessOrEqual(t, d3D, 100.0,
-        "the plan must end at the merchant's own point - the customer "+
+        "(dist to the stand point %.0f)", last.X, last.Y, last.Z, d3D)
+    require.LessOrEqual(t, d3D, npcApproachRadius+64.0,
+        "the plan must end at the requested stand point - the customer "+
             "cell inside the shop, not on the shop edge the wide ring "+
             "caught (the replay held 226 units there)")
     require.LessOrEqual(t, dz, 64.0,

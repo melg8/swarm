@@ -197,7 +197,7 @@ func TestRound60DebtArmsOnStrandedReplacement(t *testing.T) {
     }
     require.Positive(t, stopBuys, "the stops carry the planned buys")
     ariel := loop.tripStops[0].merchant
-    moveSelfTo(bot, ariel.X, ariel.Y, ariel.Z)
+    arriveAtMerchantStand(bot, ariel)
     loop.tick()
     require.Equal(t, phaseTownSell, loop.phase,
         "the arrival at the buy stop enters the sell phase")

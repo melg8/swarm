@@ -351,6 +351,16 @@ func moveSelfTo(bot *state.Bot, x int32, y int32, z int32) {
     })
 }
 
+// arriveAtMerchantStand snaps the character to the merchant's customer
+// stand point (the plan end the npc segment walks to): the sell phase
+// arrival of the fixtures wants the character AT the requested point -
+// the tight arrive radius of the npc segment, the wide 150 slack of
+// the old ring plans is gone (the 2026-09-20 npc radius round).
+func arriveAtMerchantStand(bot *state.Bot, npc townNpc) {
+    stand := merchantStandPoint(npc)
+    moveSelfTo(bot, int32(stand.X), int32(stand.Y), int32(stand.Z))
+}
+
 // TestTripTriggersOnFullSlots verifies the slot trigger and the first
 // walk of the trip: the loop plans the path to the nearest town trader
 // and starts following it.
@@ -485,7 +495,7 @@ func TestTripFullFlow(t *testing.T) {
     require.Equal(t, phaseTownWalk, loop.phase)
 
     // The character arrives at the shop point: the selling phase starts.
-    moveSelfTo(bot, herbielPos[0], herbielPos[1], herbielPos[2])
+    arriveAtMerchantStand(bot, townMerchants[3])
     loop.tick()
     require.Equal(t, phaseTownSell, loop.phase)
 
@@ -553,7 +563,7 @@ func TestTripFullFlow(t *testing.T) {
     require.Equal(t, [][3]int32{
         segmentWalkTarget([3]int32{45000, 50000, -3500},
             herbielStandVec()),
-        segmentWalkTarget(herbielPos,
+        segmentWalkTarget(herbielStand(),
             pathfind.Vec3{X: 45000, Y: 50000, Z: -3500}),
     }, game.walks, "the return segment walks home")
     moveSelfTo(bot, 45000, 50000, -3500)
@@ -730,7 +740,7 @@ func TestShoppingTripSellsJunkBelowTheTrigger(t *testing.T) {
     // The shopping plan (500 adena of fillers) starts the trip.
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
-    moveSelfTo(bot, herbielPos[0], herbielPos[1], herbielPos[2])
+    arriveAtMerchantStand(bot, townMerchants[3])
     loop.tick()
     require.Equal(t, phaseTownSell, loop.phase)
 
@@ -920,7 +930,7 @@ func TestTripClearsTheTalkedNpcSelection(t *testing.T) {
 
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
-    moveSelfTo(bot, herbielPos[0], herbielPos[1], herbielPos[2])
+    arriveAtMerchantStand(bot, townMerchants[3])
     loop.tick()
     require.Equal(t, phaseTownSell, loop.phase)
     bot.ApplyNpcInfo(state.NpcInfo{
