@@ -388,12 +388,28 @@ func (m *Mesh) WaterEscape(start Pos) (*Route, error) {
     return route, nil
 }
 
-// FindNearestPoly returns the polygon whose surface is closest to the
-// position in 3D together with the closest surface point - the
-// dtNavMeshQuery::findNearestPoly semantics that resolves stacked
-// layers by the 3D distance. The query extents give the horizontal
-// slack and the vertical window; a position without any polygon under
-// it answers false.
+// FindNearestPoly returns the polygon the position stands on together
+// with the closest surface point. The binding mirrors the grid
+// engine's node resolution (the movement authority): the polygon
+// CONTAINING the query x/y wins first - the closest surface z among
+// the stacked candidates of the same column, the exact ClosestLayer
+// semantics - and the pure 3D nearest of the query window answers
+// only when no polygon covers the x/y (a click in the air, a
+// position past the mesh edge).
+//
+// The column preference is the anti strand guard of the staircase
+// drift: the server z of a character walking a visual staircase sits
+// up to a hundred units above the quantized geodata squares, and the
+// pure 3D nearest then binds a walled decorative platform a couple of
+// cells aside (its slanted 3D distance beats the honest ground's
+// vertical one) - a sealed link component the corridor search cannot
+// leave, answering the pocket partial where the grid walks the route
+// (the 2026-09-20 guard stairs round: 46880 50752 -2889 -> the guard
+// at 47595 51569 -2992). The x/y of a real position is exact - the
+// server validates it - so the surface directly under it is the
+// honest stand; the stacked-layer disambiguation of the deck and the
+// water under it keeps working through the z comparison inside the
+// column.
 func (m *Mesh) FindNearestPoly(pos Pos) (PolyRef, Pos, bool) {
     minX, maxX := pos.X-nearestHalfXZ, pos.X+nearestHalfXZ
     minY, maxY := pos.Y-nearestHalfXZ, pos.Y+nearestHalfXZ
@@ -402,6 +418,10 @@ func (m *Mesh) FindNearestPoly(pos Pos) (PolyRef, Pos, bool) {
     bestRef := PolyRef(0)
     bestPos := Pos{}
     bestDist := math.MaxFloat64
+    columnRef := PolyRef(0)
+    columnPos := Pos{}
+    columnDist := math.MaxFloat64
+    columnFound := false
     candidates := make([]int32, 0, 32)
     for _, key := range m.regionKeysOfBox(minX, minY, maxX, maxY) {
         tile, err := m.Tile(key)
@@ -422,7 +442,27 @@ func (m *Mesh) FindNearestPoly(pos Pos) (PolyRef, Pos, bool) {
                 bestRef = RefOf(key.Col, key.Row, uint32(pi))
                 bestPos = Pos{X: cx, Y: cy, Z: cz}
             }
+            // The column containment: the query x/y inside the
+            // polygon rect (the half open cell bounds). The closest
+            // point of a containing polygon sits directly under the
+            // query, so the z distance alone ranks the stacked
+            // candidates of the column.
+            x0, y0, x1, y1 := tile.WorldRect(poly)
+            if pos.X < x0 || pos.X >= x1 || pos.Y < y0 ||
+                pos.Y >= y1 {
+                continue
+            }
+            zDist := dz * dz
+            if zDist < columnDist {
+                columnDist = zDist
+                columnRef = RefOf(key.Col, key.Row, uint32(pi))
+                columnPos = Pos{X: cx, Y: cy, Z: cz}
+                columnFound = true
+            }
         }
+    }
+    if columnFound {
+        return columnRef, columnPos, true
     }
 
     return bestRef, bestPos, bestRef != 0

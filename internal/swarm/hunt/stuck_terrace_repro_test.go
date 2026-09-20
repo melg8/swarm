@@ -6,16 +6,17 @@ package hunt
 
 // The 2026-09-20 stuck point round: the owner found the fleet frozen
 // on two elven village terrace spots - 43632 50560 -2960 and
-// 41920 52128 -3000. Both stand on link components the strict edge
-// only mesh link graph cannot leave (52 and 29 polygons, the 640x752
-// and the 592x432 boxes) while the grid engine plans out of the very
-// same cells through the diagonal squeezes the server movement
-// channels allow. The components outgrew the old 320 pocket side, so
-// the pocket escape declined and the route attempts answered the bare
-// not found (or the partial that walks to the component's inner
-// boundary and strands it there) - the bots stood frozen. The
-// widened escape bound plus the horizontal displacement floor of the
-// exit scan answer the walk out.
+// 41920 52128 -3000. The first stands on a cell whose honest surface
+// is the -2992 ground under the terrace edge: the pure 3D nearest
+// polygon of the old FindNearestPoly snapped one cell north onto the
+// sealed terrace deck (the reported z sits 32 units over the ground)
+// and stranded the route inside its link component, while the
+// column-first binding of the guard stairs round lands on the
+// connected ground and the return plans a normal found route. The
+// second spot is genuinely sealed terrace (29 polygons, the 592x432
+// box, every link direction walled while the diagonal squeezes the
+// server movement channels allow carry the only way out) - the
+// pocket escape rides the walk-what-you-can partial contract there.
 
 import (
     "bytes"
@@ -70,12 +71,13 @@ func stuckTerraceLoop(
 }
 
 // testReproStuckTerraceWalksOut drives the terrace session of one
-// reported point: the bot plans the walk home, the escape rides the
-// walk-what-you-can partial contract, the follower clicks deliver it
-// and the followup plan cycles route from the connected ground - the
-// character leaves the terrace. Pre fix the return held forever.
+// reported point and pins the per spot contract: the bot walks out of
+// the reported spot either through the normal found route (the cured
+// first spot, no escape log) or through the walk-what-you-can partial
+// escape contract (the genuinely sealed second spot). Pre fix the
+// return held forever on both.
 func testReproStuckTerraceWalksOut(
-    t *testing.T, x, y, z int32,
+    t *testing.T, x, y, z int32, wantEscapeLog bool,
 ) {
     t.Helper()
     loop, game, bot, sim, sink := stuckTerraceLoop(t, x, y, z)
@@ -108,19 +110,29 @@ func testReproStuckTerraceWalksOut(
 
     require.True(t, escaped,
         "the bot must walk out of the stuck terrace spot")
-    require.Contains(t, sink.String(),
-        "walking the closest reachable point",
-        "the escape must ride the walk-what-you-can partial contract")
+    if wantEscapeLog {
+        require.Contains(t, sink.String(),
+            "walking the closest reachable point",
+            "the escape must ride the walk-what-you-can partial contract")
+    } else {
+        require.NotContains(t, sink.String(),
+            "walking the closest reachable point",
+            "the cured spot plans the normal found route - the escape "+
+                "must stay silent")
+    }
 }
 
-// TestReproStuckTerrace43632WalksOut pins the first reported point.
+// TestReproStuckTerrace43632WalksOut pins the first reported point:
+// the column-first binding lands on the connected ground under the
+// terrace edge and the return walks the normal found route.
 func TestReproStuckTerrace43632WalksOut(t *testing.T) {
     testReproStuckTerraceWalksOut(t, stuckTerraceAX, stuckTerraceAY,
-        stuckTerraceAZ)
+        stuckTerraceAZ, false)
 }
 
-// TestReproStuckTerrace41920WalksOut pins the second reported point.
+// TestReproStuckTerrace41920WalksOut pins the second reported point:
+// the sealed terrace component keeps the pocket escape walk out.
 func TestReproStuckTerrace41920WalksOut(t *testing.T) {
     testReproStuckTerraceWalksOut(t, stuckTerraceBX, stuckTerraceBY,
-        stuckTerraceBZ)
+        stuckTerraceBZ, true)
 }

@@ -307,69 +307,93 @@ func meshTileOf(t *testing.T, mesh *Mesh, ref PolyRef) *Tile {
 }
 
 // stuckTerraces are the 2026-09-20 stuck point report: the bot
-// positions the owner found the fleet frozen on - the elven village
-// terrace spots whose link components measure 52 and 29 polygons (the
-// 640x752 and the 592x432 boxes) and whose every link direction is
-// walled while the diagonal squeezes the server movement allows carry
-// the only way out. The components outgrew the old 320 pocket side,
-// so the escape declined and every route attempt answered the bare
-// not found (or the inner boundary partial) - the bots stood frozen.
+// positions the owner found the fleet frozen on. The two spots split
+// after the column-first FindNearestPoly round (the guard stairs
+// round): the first stands on a cell whose honest surface is the
+// -2992 ground under the terrace edge - the old pure 3D nearest
+// snapped one cell north onto the sealed terrace deck (the reported z
+// sits 32 units over the ground) and stranded it - while the column
+// of the second is genuinely sealed terrace (29 polygons, the
+// 592x432 box) and keeps the pocket escape contract. The first spot
+// routes found again, the second walks out through the escape.
 func TestReproStuckTerraces43632And41920(t *testing.T) {
     dir := navmeshDataDir()
     if dir == "" {
         t.Skip("no local navmesh tiles, the dump reproduction needs them")
     }
     mesh := NewMesh(dir)
-    starts := []Pos{
-        {X: 43632, Y: 50560, Z: -2960},
-        {X: 41920, Y: 52128, Z: -3000},
-    }
     dests := []Pos{
         {X: 43032, Y: 50408, Z: -2992}, // the village plaza
         {X: 25500, Y: 51095, Z: -3408}, // the hunting zone center
         {X: 45478, Y: 49730, Z: -3056}, // the village center
     }
-    for _, start := range starts {
-        ref, _, ok := mesh.FindNearestPoly(start)
-        require.True(t, ok)
-        _, poly := mesh.polyOfRef(ref)
-        require.GreaterOrEqual(t, poly.FirstLink, int32(0),
-            "the terrace precondition: the standing polygon carries "+
-                "links (the component is the terrace, not a one cell "+
-                "island)")
-        component := mesh.floodPocketComponent(ref)
-        require.NotNil(t, component,
-            "the terrace precondition: the component fits the pocket "+
-                "box (the strand the escape serves)")
-        side := math.Max(component.maxX-component.minX,
-            component.maxY-component.minY)
-        require.Greater(t, side, 320.0,
-            "the terrace precondition: the component outgrows the old "+
-                "pocket side (the class the old bound refused)")
-        require.LessOrEqual(t, side, pocketMaxSide,
-            "the terrace precondition: the component fits the bound")
 
-        x0, y0, x1, y1 := meshTileOf(t, mesh, ref).WorldRect(poly)
-        for _, dest := range dests {
-            route, err := mesh.Route(start, dest, DefaultFilter())
-            require.NoError(t, err)
-            require.NotNil(t, route)
-            require.False(t, route.Found,
-                "the destination itself stays unreachable from the "+
-                    "terrace")
-            require.True(t, route.Partial,
-                "the escape must answer the walk out toward %v", dest)
-            require.True(t, route.PocketEscape)
-            require.Len(t, route.Waypoints, 1)
-            exit := route.Waypoints[0]
-            inStart := exit.X >= x0 && exit.X < x1 && exit.Y >= y0 &&
-                exit.Y < y1
-            require.False(t, inStart,
-                "the exit must leave the standing cell, got %v", exit)
-            horizontal := math.Hypot(exit.X-start.X, exit.Y-start.Y)
-            require.GreaterOrEqual(t, horizontal, 48.0,
-                "the exit must stand horizontally displaced far enough "+
-                    "for the walk clicks, got %v", exit)
-        }
+    // Terrace1 (43632 50560 -2960): the reported z drifts 32 units
+    // over the honest cell surface; the column containment binds the
+    // connected ground and every route answers found - the spot is
+    // cured at the binding level, no escape needed.
+    cured := Pos{X: 43632, Y: 50560, Z: -2960}
+    ref, bound, ok := mesh.FindNearestPoly(cured)
+    require.True(t, ok)
+    require.InDelta(t, -2992.0, bound.Z, 0.5,
+        "the honest binding: the ground under the terrace edge")
+    component := mesh.floodPocketComponent(ref)
+    require.Nil(t, component,
+        "the cured spot: the bound poly is not a pocket")
+    for _, dest := range dests {
+        route, err := mesh.Route(cured, dest, DefaultFilter())
+        require.NoError(t, err)
+        require.NotNil(t, route)
+        require.True(t, route.Found,
+            "the cured spot walks the route to %v", dest)
+        require.False(t, route.Partial)
+        require.False(t, route.PocketEscape)
+    }
+
+    // Terrace2 (41920 52128 -3000): the standing cell is genuinely
+    // sealed terrace - every link direction walled, the diagonal
+    // squeezes the server movement allows carry the only way out the
+    // mesh links do not carry. The escape answers the walk out.
+    sealed := Pos{X: 41920, Y: 52128, Z: -3000}
+    ref, _, ok = mesh.FindNearestPoly(sealed)
+    require.True(t, ok)
+    _, poly := mesh.polyOfRef(ref)
+    require.GreaterOrEqual(t, poly.FirstLink, int32(0),
+        "the terrace precondition: the standing polygon carries "+
+            "links (the component is the terrace, not a one cell "+
+            "island)")
+    component = mesh.floodPocketComponent(ref)
+    require.NotNil(t, component,
+        "the terrace precondition: the component fits the pocket "+
+            "box (the strand the escape serves)")
+    side := math.Max(component.maxX-component.minX,
+        component.maxY-component.minY)
+    require.Greater(t, side, 320.0,
+        "the terrace precondition: the component outgrows the old "+
+            "pocket side (the class the old bound refused)")
+    require.LessOrEqual(t, side, pocketMaxSide,
+        "the terrace precondition: the component fits the bound")
+
+    x0, y0, x1, y1 := meshTileOf(t, mesh, ref).WorldRect(poly)
+    for _, dest := range dests {
+        route, err := mesh.Route(sealed, dest, DefaultFilter())
+        require.NoError(t, err)
+        require.NotNil(t, route)
+        require.False(t, route.Found,
+            "the destination itself stays unreachable from the "+
+                "terrace")
+        require.True(t, route.Partial,
+            "the escape must answer the walk out toward %v", dest)
+        require.True(t, route.PocketEscape)
+        require.Len(t, route.Waypoints, 1)
+        exit := route.Waypoints[0]
+        inStart := exit.X >= x0 && exit.X < x1 && exit.Y >= y0 &&
+            exit.Y < y1
+        require.False(t, inStart,
+            "the exit must leave the standing cell, got %v", exit)
+        horizontal := math.Hypot(exit.X-sealed.X, exit.Y-sealed.Y)
+        require.GreaterOrEqual(t, horizontal, 48.0,
+            "the exit must stand horizontally displaced far enough "+
+                "for the walk clicks, got %v", exit)
     }
 }

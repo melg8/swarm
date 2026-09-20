@@ -7621,3 +7621,63 @@ stack stays for the next session with the stack up (the offline pins
 carry the transaction contract; the live run repeats the level 15
 kit round of the shop quarter fix and watches the weapon stop log
 for the re-pick line).
+
+## Round 99: the guard stairs route binds the honest ground - the column-first endpoint resolution (2026-09-20)
+
+- date, scope: 2026-09-20, the navmesh endpoint binding
+  (`internal/swarm/pathfind/navmesh/query.go`, `FindNearestPoly`).
+- Problem statement: the owner's viewer route
+  (`from=46880,50752,-2889`, `to=47595,51569,-2992`, `approach=200`,
+  the elven village stairs point to the guard) answered the one
+  waypoint pocket partial instead of the walk to the guard, and the
+  drawn plan went somewhere else entirely (the pocket exit aim) while
+  the character stood a straight plateau walk away from the target.
+- Root cause analysis: the reported from z sits 103 units above the
+  quantized geodata surface (-2992) - the honest server z drift of a
+  character walking the visual staircase. The pure 3D nearest
+  polygon of `FindNearestPoly` then bound the sealed decorative
+  platform two cells north of the query x/y (the -2960 strip whose
+  closest surface point measured 77.9 in 3D against the honest
+  ground's vertical 103), the platform's every NSWE pair is walled in
+  the geodata (the builder's link walk refused all four sides
+  honestly - the walls map of the round), so the corridor search
+  could not leave its 19 polygon link component and the pocket
+  escape answered the walk out - toward the connected ground, never
+  toward the guard. The grid engine binds the start by the exact
+  column (nodeAtWorld + ClosestLayer, no horizontal search) and
+  walked the route found in 312 ms - the mesh disagreed with the
+  movement authority on where the character stands.
+- Reproduction: `TestGuardStairsApproachFromStairs` (the navmesh
+  package) - the pre fix binary binds poly 66535 at
+  (46880, 50784, -2960), explores 38 nodes and answers the
+  `PocketEscape` partial with one waypoint; the post fix binary binds
+  the ground strip 66405 at the exact query x/y and answers found
+  with the plan ending inside the approach radius. The grid parity
+  assertion pins the engine's found verdict on the same pair.
+- Fix: `FindNearestPoly` resolves the column first: among the
+  candidate polygons whose rect contains the query x/y the closest
+  surface z wins (the exact `ClosestLayer` semantics - the stacked
+  deck vs the water disambiguation keeps working inside the column),
+  and the pure 3D window nearest answers only when no polygon covers
+  the x/y (a click in the air, a position past the mesh edge). The
+  binding mirrors the grid authority: the surface directly under a
+  real position is the honest stand - the x/y is server validated
+  while the z can drift with the visual geometry.
+- The second effect: the 2026-09-20 stuck terrace spot
+  (43632, 50560, -2960) was the same binding defect - the reported z
+  drifted 32 units over the ground and the old nearest snapped one
+  cell north onto the sealed terrace deck (52 polygons). The
+  column-first binding lands on the connected ground under it and
+  the return plans a normal found route (the terrace walk out test
+  now pins the no escape contract for the spot; the genuinely sealed
+  second spot 41920, 52128, -3000 keeps the pocket escape contract).
+- Verification: the navmesh, navbuild, pathfind, hunt, webserver and
+  acceptance suites answer every package ok zero failures on the
+  fresh 164 tile pack (the whole map flat probes that OOM the 4 GB
+  sandbox on the base commit too stay excluded from the sandbox
+  runs); the gofmt-spaces gate is silent and golangci-lint answers 0
+  issues on the touched navmesh package (the two town/shopping
+  findings predate the round).
+- Follow ups: the pocket escape remains the designed answer for the
+  genuinely sealed starts; the Detour-parity flat tile optimization
+  stays future headroom.

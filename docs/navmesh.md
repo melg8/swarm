@@ -20,8 +20,12 @@ faithful square port - the mesh represents the raw l2j squares as
 they are), and the polygon links carry the open NSWE portal spans of
 the shared edges. The runtime (`internal/swarm/pathfind/navmesh`)
 loads the tiles lazily and answers the queries over them: the 3D
-nearest polygon resolution (the stacked-layer disambiguation), the
-A* corridor search with the water area pricing, the funnel string
+nearest polygon resolution (the column containment first - the
+polygon whose rect covers the query x/y wins with the closest surface
+z, the exact mirror of the grid engine's column + ClosestLayer node
+binding; the pure 3D window nearest answers only when no polygon
+covers the x/y), the A* corridor search with the water area pricing,
+the funnel string
 pulling and the water escape. No C++ anywhere: the Recast build
 pipeline is replaced by the sheet decomposition the research round
 proved.
@@ -210,10 +214,17 @@ blocker.
 
 The `Route`/`WaterEscape` contracts mirror the grid engine's
 `FindPathApproach` family: the stacked-layer
-disambiguation test (the same x/y, the deck vs the water under it),
-the priced swim route to a water target, and the
+disambiguation test (the same x/y, the deck vs the water under it -
+the closest surface z inside the column decides), the priced swim
+route to a water target, and the
 priced water escape all pass on the real mesh
-(`navbuild/real_test.go`).
+(`navbuild/real_test.go`). The endpoint binding of the round of
+2026-09-20 (the guard stairs round) mirrors the grid node resolution
+exactly: the polygon containing the query x/y binds first - the pure
+3D nearest bound a sealed decorative platform two cells aside when
+the reported z drifted a hundred units over the quantized staircase
+ground, and the corridor stranded inside its link component answering
+the pocket partial where the grid walks the route.
 
 ## The corrupt regions of the pack
 
