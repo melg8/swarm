@@ -143,13 +143,16 @@ func (l *Loop) DriveDialog(npcObjID int32, steps []DialogStep) error {
 // within the interaction distance of: the plain client talk is two
 // Action clicks (NpcClick.onAction - the first click of a target
 // the player does not hold yet only selects it, the second click of
-// the same object id walks the interact branch and the server
-// answers with the npc's html page). The two clicks pace at
-// dialogClickPause (the player action flood protector accepts one
-// action per second); every click refreshes the server's last-folk
-// memory the quest events resolve their npc through. A click on an
-// npc that is already the target interacts right away, so the entry
-// is idempotent - the second click re-opens the same page.
+// the same object id is the attack analog: it walks the interact
+// branch and when the character stands outside the interaction
+// distance the server takes the INTERACT intention and pulls the
+// character to the npc along the straight line before the npc's
+// html page answers). The two clicks pace at dialogClickPause (the
+// player action flood protector accepts one action per second);
+// every click refreshes the server's last-folk memory the quest
+// events resolve their npc through. A click on an npc that is
+// already the target interacts right away, so the entry is
+// idempotent - the second click re-opens the same page.
 func (l *Loop) talkToNpc(npcObjID int32) error {
     if err := l.game.ClickObject(npcObjID); err != nil {
         return err

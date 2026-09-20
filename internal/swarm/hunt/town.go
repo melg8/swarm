@@ -3159,9 +3159,11 @@ func (l *Loop) handleMerchant(now time.Time, templates []int32) bool {
 // stand-off slip past 250 and refuse every transaction). The selection
 // re-requests itself once per second until the MyTargetSelected
 // answer confirms it. A merchant standing on another deck of the
-// geodata (the disconnected village decks) is skipped: the 3D
-// interaction distance of the server can never be met and the sale
-// does not need the merchant.
+// geodata (the disconnected village decks) hands the close walk to
+// the server - the select + attack analog pull ladder of the deck
+// window walks the straight line the pack cannot; only when the
+// window burns out is the merchant skipped (the sale does not need
+// the merchant, the buys of its stop do).
 //
 // The approach walk clicks the ground at the npc approach point, not
 // at the merchant's exact cell: the server's getValidLocation walks a
@@ -3200,23 +3202,25 @@ func (l *Loop) approachMerchant(now time.Time) bool {
         if dist2D <= merchantApproachDist {
             // The geodata pack misses some village ramps: the character
             // stands under the merchant deck (the 2D distance is met,
-            // the z is not). The approach point collapses onto the
-            // bot's own cell - the click is a no-op the server
-            // collapses, the deck window bounds the wait before the
-            // merchant is given up. Clicking the merchant's exact cell
-            // here teleported the bot onto the roof (the 2026-09-11
-            // report), so the offset keeps the click safe even when it
-            // cannot help.
+            // the z is not). The ground clicks cannot close a z gap
+            // (clicking the merchant's exact cell here teleported the
+            // bot onto the roof, the 2026-09-11 report), so the deck
+            // window bounds the select + attack analog pull ladder
+            // that hands the walk to the server before the merchant
+            // is given up.
             if l.merchantDeckUntil.IsZero() {
                 l.merchantDeckUntil = now.Add(merchantDeckWindow)
                 l.logf("Hunt: %s stands on another deck (z %d vs "+
-                    "%d), re-walking by server routing",
+                    "%d), the attack analog pull walks the straight "+
+                    "line",
                     l.tracker.ObjectName(l.merchantID), selfZ, z)
             }
             if now.Before(l.merchantDeckUntil) {
-                if approachDist2D > hopCoincideDist {
-                    l.walkToward(ax, ay, az, now)
-                }
+                // The deck walk the ground clicks cannot close: the
+                // select + attack analog pull ladder hands the walk
+                // to the server - the interaction distance is met
+                // however the deck geometry sits between them.
+                l.merchantDeckPullLadder(now)
 
                 return false
             }
@@ -3244,10 +3248,39 @@ func (l *Loop) approachMerchant(now time.Time) bool {
     return l.selectMerchant(now)
 }
 
+// merchantDeckPullLadder runs the select + attack analog pull ladder
+// of the merchant deck wait. The plain click selects the npc at any
+// distance, the pull click on the selected npc takes the interact
+// intention and the server walks the character to the npc along the
+// straight line (one click per select period - the player action
+// flood protector).
+func (l *Loop) merchantDeckPullLadder(now time.Time) {
+    if now.Sub(l.merchantPull) < selectPeriod {
+        return
+    }
+    l.merchantPull = now
+    var err error
+    if l.tracker.SelfTargetID() != l.merchantID {
+        err = l.game.ClickObject(l.merchantID)
+    } else {
+        err = l.game.InteractPull(l.merchantID)
+    }
+    if err != nil {
+        l.logf("Hunt: merchant pull failed: %v", err)
+    }
+}
+
 // selectMerchant re-requests the merchant selection once per select
-// period until the tracker confirms it, then reports ready. The
-// transactions need the merchant as the selected target
-// (RequestBuyItem checks it server side).
+// period until the tracker confirms it, then fires the attack analog
+// pull once and reports ready. The transactions need the merchant as
+// the selected target (RequestBuyItem checks it server side); the
+// pull is the practice of every npc interaction - the second plain
+// click on the selected merchant (the client double click) hands the
+// last stretch to the server: the interact intention walks the
+// character to the merchant along the straight line, so the
+// transaction distance is met with certainty. Within the interaction
+// distance the same click only opens the merchant dialog - harmless,
+// the transactions pace past it.
 func (l *Loop) selectMerchant(now time.Time) bool {
     if l.tracker.SelfTargetID() != l.merchantID {
         // The transactions need the merchant as the selected target
@@ -3262,6 +3295,14 @@ func (l *Loop) selectMerchant(now time.Time) bool {
         }
 
         return false
+    }
+    // The attack analog pull of the interaction practice: once per
+    // merchant (the field compares object ids, a re-pick re-arms it).
+    if l.merchantPulled != l.merchantID {
+        l.merchantPulled = l.merchantID
+        if err := l.game.InteractPull(l.merchantID); err != nil {
+            l.logf("Hunt: merchant pull failed: %v", err)
+        }
     }
 
     return true
