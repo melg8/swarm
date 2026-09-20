@@ -43,6 +43,14 @@ func bowLurer(profile Profile) bool {
     return ok
 }
 
+// BowLurer is the exported form of bowLurer: the hunt loop's junk
+// keep set consults it to protect the luring tool from the sell and
+// destroy flows (the bow scores zero under the melee profile, so the
+// plain planned equips never hold it).
+func BowLurer(profile Profile) bool {
+    return bowLurer(profile)
+}
+
 // ownedBow scans the inventory for the best bow the character owns
 // (equipped or bagged) and reports its attack stat. A character
 // without any bow answers zero.

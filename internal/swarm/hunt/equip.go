@@ -8,6 +8,7 @@ import (
     "time"
 
     "github.com/melg8/swarm/internal/swarm/gear"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
 // Auto equipment of the hunt loop: the burst planner of the gear
@@ -94,12 +95,13 @@ func newEquipManager(profile gear.Profile) *equipManager {
     }
 }
 
-// plannedEquipKeeps resolves the object ids the auto equipment will
-// wear: the unequipped inventory items the gear simulation places on
-// the paperdoll (see gear.PlannedEquips). The junk flows of the town
-// trips and the overflow cleanup exclude them - a looted or bought
-// upgrade waiting for its paced use item request (a pair swap in
-// flight, the confirmation window) is never sold for its instant
+// plannedEquipKeeps resolves the object ids the junk flows must keep:
+// the unequipped inventory items the gear simulation places on the
+// paperdoll (see gear.PlannedEquips) plus the ranged luring tool of
+// the melee profiles (see addLureToolKeeps). The junk flows of the
+// town trips and the overflow cleanup exclude them - a looted or
+// bought upgrade waiting for its paced use item request (a pair swap
+// in flight, the confirmation window) is never sold for its instant
 // adena and never destroyed for bag space. The set is cached per
 // inventory mutation; sessions without a gear profile keep nothing.
 func (l *Loop) plannedEquipKeeps() map[int32]bool {
@@ -111,11 +113,60 @@ func (l *Loop) plannedEquipKeeps() map[int32]bool {
     if manager.keepsScanned && version == manager.keepsVersion {
         return manager.keepsCache
     }
-    manager.keepsCache = gear.PlannedEquips(manager.profile, l.equipment())
+    keeps := gear.PlannedEquips(manager.profile, l.equipment())
+    l.addLureToolKeeps(manager.profile, keeps)
+    manager.keepsCache = keeps
     manager.keepsVersion = version
     manager.keepsScanned = true
 
     return manager.keepsCache
+}
+
+// addLureToolKeeps adds the ranged luring tool of the melee profiles
+// to the keep set: the bow scores zero under the profile (the
+// profile's weapon ladder ranks the close combat damage), so the gear
+// simulation never places it on the paperdoll and the plain keep set
+// never holds it - the junk flows would sell the bought luring bow at
+// the very next vendor visit (the owner report: the bot reaches the
+// vendor and sells the bow it owns although it plans no more
+// expensive bow) and the overflow cleanup would destroy it for bag
+// space. The lure flow equips the bow from the bag on demand (see
+// lure.go), so the strongest owned bow and the arrow stacks must
+// survive every junk decision. A second, weaker bow stays plain junk
+// (the duplicate gear rank of the sell order owns it), the mystic
+// profiles never lure - their inventory bows are junk.
+func (l *Loop) addLureToolKeeps(
+    profile gear.Profile, keeps map[int32]bool,
+) {
+    if !gear.BowLurer(profile) {
+        return
+    }
+    bestBowPower := int32(0)
+    var bestBowObjectID int32
+    for _, item := range l.tracker.InventoryItems() {
+        stats, ok := npcdata.ItemGearStats(item.ItemID)
+        if !ok {
+            continue
+        }
+        if stats.WeaponType == weaponTypeBow {
+            if stats.PAtk > bestBowPower {
+                bestBowPower = stats.PAtk
+                bestBowObjectID = item.ObjectID
+            }
+
+            continue
+        }
+        if stats.Type == "EtcItem" && stats.BodyPart == "lhand" &&
+            stats.WeaponType == "" {
+            // The ammo discriminator of gear/bow.go: an etc item that
+            // rides the left hand is a quiver item (the Mobius arrow
+            // xml: etcitem_type ARROW, bodypart lhand).
+            keeps[item.ObjectID] = true
+        }
+    }
+    if bestBowObjectID != 0 {
+        keeps[bestBowObjectID] = true
+    }
 }
 
 // equipment builds the planner working set from the tracker.

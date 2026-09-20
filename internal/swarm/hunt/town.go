@@ -958,6 +958,53 @@ func (l *Loop) exactApproachWanted() bool {
     return math.Sqrt(dx*dx+dy*dy+dz*dz) > npcApproachOffset
 }
 
+// stopNpcArrivalMet reports whether the running walk segment has
+// brought the character close enough for the current merchant stop's
+// talk machinery to take over: the character stands within the wide
+// arrive radius of the segment destination (the customer stand point)
+// AND within the server interaction distance of the stop's merchant
+// npc. The tight verification of the plan's final cell can grind
+// forever against the vintage geodata disagreement - the live server
+// resolves the clicked destination onto its own surface (the pack
+// holds cells 64 units off the live floor, the creation building
+// interior among them) - and the stuck ladder then burns the whole
+// escalation down to the trip abort while the character stands ready
+// to trade: the stop exists to bring the talk within reach, not to
+// verify the pack's cell. The teach stops keep their own walk
+// contract (the hall rows need the real arrival), the non merchant
+// segments answer false.
+func (l *Loop) stopNpcArrivalMet() bool {
+    if len(l.tripStops) == 0 || l.tripStops[0].teach {
+        return false
+    }
+    dest := l.segmentDest
+    if dest != merchantStandPoint(l.tripStops[0].merchant) {
+        // The segment walks something else (the far haul leg, the
+        // return): the npc handoff owns the merchant stop walks only.
+        return false
+    }
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
+    }
+    dx := dest.X - float64(selfX)
+    dy := dest.Y - float64(selfY)
+    dz := dest.Z - float64(selfZ)
+    if math.Sqrt(dx*dx+dy*dy+dz*dz) > waypointArriveDist {
+        return false
+    }
+    npc, ok := l.tracker.NearestNpcByTemplates(
+        l.stopMerchantTemplates(), merchantFindRadius)
+    if !ok {
+        return false
+    }
+    dx = float64(npc.X - selfX)
+    dy = float64(npc.Y - selfY)
+    dz = float64(npc.Z - selfZ)
+
+    return math.Sqrt(dx*dx+dy*dy+dz*dz) <= npcInteractionDist
+}
+
 // tickTownTrip advances the running town trip by one decision.
 func (l *Loop) tickTownTrip() {
     if time.Since(l.tripStart) > tripTimeout {
@@ -983,6 +1030,18 @@ func (l *Loop) tickTownTrip() {
             if !l.exactApproachWanted() || !planned {
                 l.enterSellPhase()
             }
+
+            return
+        }
+        // The interaction handoff of the merchant stops: the plan's
+        // final cell verification may grind against the vintage
+        // geodata disagreement while the character already stands
+        // within reach of the merchant it walked to (see
+        // stopNpcArrivalMet) - the talk machinery owns the rest.
+        if l.stopNpcArrivalMet() {
+            l.logf("Hunt: the merchant is within the interaction " +
+                "distance, handing the walk to the talk")
+            l.enterSellPhase()
         }
     case phaseTownSell:
         l.tickTownSell()
