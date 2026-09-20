@@ -2225,51 +2225,48 @@ func (l *Loop) clickWaypoint(
     // verdict too (the far V-detour waypoint whose leaving segment
     // already points back, see waypointBehindRoute).
     passedBehind := l.waypointPassedBehind(wp, selfX, selfY, selfZ)
-    if dist < minWalkClick {
+    switch {
+    case dist < minWalkClick:
         // The rescue floor discipline runs IMMEDIATELY, no stuck
         // verdict needed: the server's findPath branch only takes a
         // collapsed click over the rescue threshold, a shorter one is
         // silently canceled with ActionFailed and never moves a cell
-        // (the 2026-09-11 11:34 dump: the 22 unit first waypoint
-        // click froze through two whole trip cycles while the very
-        // same cells walked under every longer click of the plan) -
-        // the sub-floor aim re-aims at the forward route samples
-        // before any click leaves the bot. No sample validating keeps
-        // the plain waypoint click: the refusal machinery of
+        // (the 2026-09-11 11:34 dump froze two whole trip cycles on
+        // the 22 unit first waypoint click) - the sub-floor aim
+        // re-aims at the forward route samples before any click
+        // leaves the bot. No sample validating keeps the plain
+        // waypoint click: the refusal machinery of
         // clickServerValidated answers it exactly like today.
         extX, extY, extZ, ok := l.extendShortClick(
             selfX, selfY, selfZ, moveX, moveY, moveZ)
         if ok {
             moveX, moveY, moveZ = extX, extY, extZ
         }
-    } else if l.extendArmed {
+    case l.extendArmed && (passedBehind || waypointBehindRoute(
+        l.waypoints, l.wpIndex, selfX, selfY)):
         // The recovery of a stuck segment (extendArmed): the stuck
         // proved the plain clicks of this segment do not move the
         // character (a server side refusal the offline click
         // validation cannot see), so the primary target behind the
         // character on the route gives way to the forward route
         // samples.
-        behind := passedBehind || waypointBehindRoute(
-            l.waypoints, l.wpIndex, selfX, selfY)
-        if behind {
-            extX, extY, extZ, ok := l.extendShortClick(
-                selfX, selfY, selfZ,
-                moveX, moveY, moveZ)
-            if ok {
-                moveX, moveY, moveZ = extX, extY, extZ
-            } else {
-                // No forward sample validates and the
-                // waypoint is behind: clicking it walks
-                // the character backward into the pocket
-                // the route samples just escaped. Hold
-                // the click - the stuck window re-plans
-                // from the standing cell, and the
-                // planner knows the wall the server-side
-                // routing has to route around.
-                return
-            }
+        extX, extY, extZ, ok := l.extendShortClick(
+            selfX, selfY, selfZ,
+            moveX, moveY, moveZ)
+        if ok {
+            moveX, moveY, moveZ = extX, extY, extZ
+        } else {
+            // No forward sample validates and the
+            // waypoint is behind: clicking it walks
+            // the character backward into the pocket
+            // the route samples just escaped. Hold
+            // the click - the stuck window re-plans
+            // from the standing cell, and the
+            // planner knows the wall the server-side
+            // routing has to route around.
+            return
         }
-    } else if passedBehind {
+    case passedBehind:
         // The same hold without the armed extension: a backward
         // click is ground loss no matter the recovery state, and the
         // stuck window owns the answer (the skip ladder walks the
