@@ -70,10 +70,15 @@ import (
 // returns to the mouse movement exactly the way the server does.
 type cursorKeyServer struct {
     engine *pathfind.Engine
-    // refuseRadius is the radius around the dump cell whose mouse
+    // refuseRadius is the radius around the refusal cell whose mouse
     // clicks the server refuses: the plaza cell and its immediate
     // ground (the geodata anomaly of the user's deployment).
     refuseRadius float64
+    // refuseX/refuseY name the refusal cell the radius keys on (the
+    // 15:10 plaza cell by default; the spawn pocket reproductions
+    // key it on their own cell).
+    refuseX int32
+    refuseY int32
     // keyboard mirrors ENABLE_KEYBOARD_MOVEMENT of the reference
     // server (default true): false drops the movement mode 0
     // requests silently - the arrow keys themselves would freeze.
@@ -136,9 +141,13 @@ func (s *cursorKeyServer) consumeAt(
             X: float64(target[0]), Y: float64(target[1]),
             Z: float64(target[2]),
         }
+        refuseX, refuseY := s.refuseX, s.refuseY
+        if refuseX == 0 && refuseY == 0 {
+            refuseX, refuseY = refusalDumpX, refusalDumpY
+        }
         cellDist := math.Hypot(
-            float64(selfX-refusalDumpX),
-            float64(selfY-refusalDumpY))
+            float64(selfX-refuseX),
+            float64(selfY-refuseY))
         validated, ok := s.engine.ValidateClick(from, to)
         if cellDist <= s.refuseRadius || !ok {
             s.refusals++
@@ -179,6 +188,7 @@ func cursorEscapeDumpLoop(
         io.MultiWriter(sink, eventMirror{bot: bot}), "", 0))
     sim := &cursorKeyServer{
         engine: engine, refuseRadius: 200, keyboard: keyboard,
+        refuseX: refusalDumpX, refuseY: refusalDumpY,
     }
 
     return loop, game, bot, sim, sink
@@ -267,9 +277,6 @@ func TestReproCursorKeyEscapeWalksOutOfTheRefusingCell(t *testing.T) {
         "the refusing cell bounced the mouse clicks first")
     require.Positive(t, sim.accepted,
         "the clicks resumed from the escaped ground")
-    require.Empty(t, loop.frozenAreas,
-        "a server that refuses the clicks does not name frozen "+
-            "corridors - the session must not poison the planner")
     require.Contains(t, sink.String(), "walking along the planned route",
         "the escape line names the route following recovery")
     require.Regexp(t,
@@ -321,8 +328,6 @@ func TestReproCursorKeyEscapeAbortsWhenTheServerIgnoresTheClaims(
     require.InDelta(t, float64(refusalDumpX), float64(x), 1,
         "the character never moved a cell - the frozen client")
     require.InDelta(t, float64(refusalDumpY), float64(y), 1)
-    require.Empty(t, loop.frozenAreas,
-        "the refusal evidence keeps the corridor bans off")
     require.Contains(t, sink.String(),
         "the cursor key escape made no progress",
         "the ignoring server is named honestly")

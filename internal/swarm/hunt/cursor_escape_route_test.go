@@ -64,7 +64,7 @@ func TestCursorEscapeRouteStepsFollowThePlanBend(t *testing.T) {
     }
     loop.wpIndex = 0
 
-    steps, wpMap := loop.cursorEscapeRouteSteps(0, 0, -3000)
+    steps, wpMap := loop.cursorEscapeRouteSteps(0, 0, -3000, 0)
     require.NotEmpty(t, steps,
         "a planned route arms a route following ladder")
     require.Len(t, wpMap, len(steps),
@@ -127,7 +127,7 @@ func TestCursorEscapeRouteStepsCapKeepsThePocketRecovery(t *testing.T) {
     loop.waypoints = waypoints
     loop.wpIndex = 0
 
-    steps, wpMap := loop.cursorEscapeRouteSteps(0, 0, -3000)
+    steps, wpMap := loop.cursorEscapeRouteSteps(0, 0, -3000, 0)
     require.NotEmpty(t, steps)
     require.Len(t, wpMap, len(steps))
     last := steps[len(steps)-1]
@@ -142,18 +142,18 @@ func TestCursorEscapeRouteStepsCapKeepsThePocketRecovery(t *testing.T) {
 // toward the validated aim owns the escape.
 func TestCursorEscapeRouteStepsNilWithoutPlan(t *testing.T) {
     loop := NewLoop(&fakeGame{}, newTestBot())
-    _, wpMap := loop.cursorEscapeRouteSteps(0, 0, -3000)
+    _, wpMap := loop.cursorEscapeRouteSteps(0, 0, -3000, 0)
     require.Nil(t, wpMap,
         "no navigator: no route ladder")
 
     loop.SetNavigator(&fakeNavigator{})
-    _, wpMap = loop.cursorEscapeRouteSteps(0, 0, -3000)
+    _, wpMap = loop.cursorEscapeRouteSteps(0, 0, -3000, 0)
     require.Nil(t, wpMap,
         "no waypoints: no route ladder")
 
     loop.waypoints = []pathfind.Vec3{{X: 100, Y: 0, Z: -3000}}
     loop.wpIndex = 1
-    _, wpMap = loop.cursorEscapeRouteSteps(0, 0, -3000)
+    _, wpMap = loop.cursorEscapeRouteSteps(0, 0, -3000, 0)
     require.Nil(t, wpMap,
         "an exhausted cursor: no route ladder")
 }

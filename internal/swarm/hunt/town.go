@@ -151,29 +151,6 @@ const (
     // zone return escalates to the direct server routed segments at
     // once, the shop trip arms its cooldown).
     frozenRepathLimit = 1
-    // frozenBanRadius is the radius of the avoid area a frozen segment
-    // bans: three geodata cells around the aimed waypoint close the
-    // corridor the server refused to walk without fencing in the
-    // standing character itself (the start cell of a search may sit
-    // inside its own ban - the search may always leave it).
-    frozenBanRadius = 48.0
-    // frozenBanMaxRadius caps the widening of a single frozen
-    // corridor ban: a detour that freezes on ground an existing ban
-    // already covers proves the server wall is wider than the ban
-    // models, so the ban doubles its radius until the re-plan routes
-    // around the whole walled approach. Six doublings (48 -> 1536)
-    // cover a misread region the size of a village quarter while the
-    // search still finds the detours around it (the sweeps of the
-    // 2026-09-14 08:42 dump: radius 384 already flips the elven
-    // village exit from the walled southwest corridor to the shop
-    // deck route, 1200 flips it to the far north detour).
-    frozenBanMaxRadius = 1536.0
-    // frozenBanMax bounds the session ban list: every frozen segment
-    // adds one area, and the list must never grow into a wall the
-    // planner cannot detour around at all. The widening of an
-    // existing ban does not count against the cap - the wall model
-    // grows in place, the list only counts its centers.
-    frozenBanMax = 8
     // refusalVariantsMax bounds the varied aim attempts one segment
     // spends on the online refusal answer (see stuckTownWalk): the
     // server refuses a click for its own reasons (a different build
@@ -462,9 +439,12 @@ type Navigator interface {
         *pathfind.Result, error,
     )
     // FindPathApproachAvoiding plans the walk around the given avoid
-    // areas: the zone return and the quest segments navigate with it
-    // - a fallback that ignored the bans reproduced the very corridor
-    // they exist to detour.
+    // areas: the composition layer's avoid seam (the mesh ban walls
+    // with the escape ring of the own ban). The hunt loop's frozen
+    // corridor bans were its historical consumer - the plaza round of
+    // 2026-09-20 removed them (the rectangle granularity sealed whole
+    // mesh sheets), the mesh level capability stays for the library
+    // contract.
     FindPathApproachAvoiding(
         start, end pathfind.Vec3, approachRadius float64,
         avoid []pathfind.AvoidArea,
@@ -771,7 +751,6 @@ func (l *Loop) maybeStartTownTrip() {
     l.buyRequested = nil
     l.buyConfirmAt = time.Time{}
     l.buyRetries = 0
-    l.frozenStage = 0
     l.segmentRefused = false
     l.refusalVariants = 0
     l.resetReplacementSales()
@@ -1117,9 +1096,9 @@ func (l *Loop) startWalkSegment(dest pathfind.Vec3) bool {
 
 // startZoneReturnSegment plans the zone return walk through the priced
 // approach search: the water crossings compete with the land detours
-// on the honest travel time, the session's frozen corridors stay
-// banned. The zone return must bring the bot home whenever any route
-// exists (the 2026-09-11 06:00 dump: the search reported no route
+// on the honest travel time. The zone return must bring the bot home
+// whenever any route exists (the 2026-09-11 06:00 dump: the search
+// reported no route
 // from 43000 50184 to both the zone center and Herbiel 276 units
 // away, while the offline probe against the same geodata found both
 // paths - the runtime difference is unresolved, the priced search
@@ -1131,24 +1110,9 @@ func (l *Loop) startZoneReturnSegment(dest pathfind.Vec3) bool {
 }
 
 // segmentSearchView freezes one mesh search contract into the walk plan
-// view: the approach radius and the ban circles the search ran with.
-func segmentSearchView(
-    approach float64, avoid []pathfind.AvoidArea,
-) *state.WalkSearch {
-    search := &state.WalkSearch{Approach: approach, Avoid: nil}
-    if len(avoid) == 0 {
-        return search
-    }
-    search.Avoid = make([]state.WalkAvoidCircle, len(avoid))
-    for i := range avoid {
-        search.Avoid[i] = state.WalkAvoidCircle{
-            X: avoid[i].Center.X,
-            Y: avoid[i].Center.Y,
-            R: avoid[i].Radius,
-        }
-    }
-
-    return search
+// view: the approach radius the search ran with.
+func segmentSearchView(approach float64) *state.WalkSearch {
+    return &state.WalkSearch{Approach: approach, Avoid: nil}
 }
 
 // startWalkSegmentSearch plans the walk to the destination through the
@@ -1156,11 +1120,8 @@ func segmentSearchView(
 // crossings pay the swim rate (swimming is slower than running), so
 // the plan prefers the land detours whenever they are the faster walk
 // and swims whenever the water cut wins - the follower walks the wet
-// segments the plan carries. The search routes around the frozen areas of
-// the session - ground the live server refused to walk although the
-// geodata pack modeled it as open - so the deterministic planner
-// detours instead of reproducing the frozen corridor. It reports
-// whether the segment was planned.
+// segments the plan carries. It reports whether the segment was
+// planned.
 func (l *Loop) startWalkSegmentSearch(dest pathfind.Vec3) bool {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
@@ -1175,8 +1136,7 @@ func (l *Loop) startWalkSegmentSearch(dest pathfind.Vec3) bool {
     if radius <= 0 {
         radius = tripApproachRadius
     }
-    result, err := l.navigator.FindPathApproachAvoiding(
-        from, dest, radius, l.frozenAreas)
+    result, err := l.navigator.FindPathApproach(from, dest, radius)
     if err != nil {
         l.logf("Hunt: town trip path search failed: %v", err)
 
@@ -1246,8 +1206,8 @@ func (l *Loop) planNpcSegment(dest pathfind.Vec3) bool {
         Y: float64(selfY),
         Z: float64(selfZ),
     }
-    result, err := l.navigator.FindPathApproachAvoiding(
-        from, dest, npcApproachRadius, l.frozenAreas)
+    result, err := l.navigator.FindPathApproach(
+        from, dest, npcApproachRadius)
     if err != nil {
         l.logf("Hunt: town trip npc path search failed: %v", err)
 
@@ -1426,11 +1386,10 @@ func (l *Loop) armTownWalkSegment(
     l.segmentDest = dest
     l.segmentStart = from
     // The plan view carries the search contract the segment answers (the
-    // repro contract of the 3D pathfind link): the approach radius
-    // and the ban circles of this very search, so a viewer replay
-    // rebuilds the walk the bot follows instead of a lookalike (the
-    // 2026-09-19 route mismatch).
-    l.segmentSearch = segmentSearchView(radius, l.frozenAreas)
+    // repro contract of the 3D pathfind link): the approach radius of
+    // this very search, so a viewer replay rebuilds the walk the bot
+    // follows instead of a lookalike (the 2026-09-19 route mismatch).
+    l.segmentSearch = segmentSearchView(radius)
     // The fresh plan opens with a fresh frame measurement: the plan's
     // first waypoint IS the character's own cell resolved on the pack,
     // so the difference of the two z values is the vintage shift of
@@ -1730,7 +1689,9 @@ func (l *Loop) beginCursorKeyEscape(
     if l.cursorEscapes >= cursorEscapeAttemptsMax {
         return false
     }
-    steps, wpMap := l.cursorEscapeRouteSteps(selfX, selfY, selfZ)
+    marchStart := l.escapeMarchStart(selfX, selfY, selfZ)
+    steps, wpMap := l.cursorEscapeRouteSteps(
+        selfX, selfY, selfZ, marchStart)
     form := "along the planned route"
     if len(steps) == 0 {
         // The planless fallback: the straight ladder toward the aim,
@@ -1759,6 +1720,15 @@ func (l *Loop) beginCursorKeyEscape(
         // of the caller stands.
         return false
     }
+    // The ground re-anchor: the cursor sits on the first waypoint the
+    // character's ground owes - the claims own the segment now and the
+    // bookkeeping bet of the click ladder (the forward jump, the skip
+    // chain) is void the moment the escape arms. The marks of the
+    // claimed strides advance the cursor from here as the ground is
+    // walked, the settle's own advance reconciles it with the arrival
+    // test, and the plan view the web UI serves during the escape
+    // shows the walked prefix instead of the jumped cursor.
+    l.wpIndex = marchStart
     // The arm request aims the ladder's far end: the mode 0 move
     // starts the server side walk the claims then own, and a target
     // on the character's own cell would answer the stopMove refusal
@@ -1787,10 +1757,10 @@ func (l *Loop) beginCursorKeyEscape(
 }
 
 // cursorEscapeRouteSteps builds the claimed steps of a route
-// following escape: the planned waypoints from the current cursor
-// (the pathfind route the segment already holds) interpolated into
-// run-speed strides - the claims follow the plan the mesh priced,
-// wet strides included. The strides march
+// following escape: the planned waypoints from the character's ground
+// position (the pathfind route the segment already holds)
+// interpolated into run-speed strides - the claims follow the plan
+// the mesh priced, wet strides included. The strides march
 // every segment of the route in order, so the ladder bends where the
 // plan bends: an obstacle the straight chord would push the
 // character through (the tree on the plaza, the railing corner) is
@@ -1808,17 +1778,32 @@ func (l *Loop) beginCursorKeyEscape(
 // every step completes, -1 for the mid segment strides - the WASD
 // ground progress of the drive, see markEscapeClaimedWaypoint) and
 // nil maps without a plan (the straight fallback owns the segment).
+//
+// The march starts at the first waypoint the CHARACTER's ground still
+// owes (see escapeMarchStart), never blindly at the plan cursor: the
+// cursor may sit AHEAD of the walked ground - the click ladder bets
+// far waypoints (the forward jump of a refused click validates a
+// longer chord and jumps the cursor onto it, the stuck skip jumps
+// onto the first clear successor) and a server that refuses the bet
+// leaves the cursor ahead while the character never moved. Marching
+// from the jumped cursor would claim the straight chord from the
+// standing cell to the far waypoint - off the route the planner drew
+// and through whatever the chord cuts. The claims walk the ROUTE
+// from the character's own ground: the stride sequence re-enters the
+// plan at the first un-walked bend and every segment from there is
+// the planner's own geometry.
 func (l *Loop) cursorEscapeRouteSteps(
-    selfX, selfY, selfZ int32,
+    selfX, selfY, selfZ int32, start int,
 ) ([][3]int32, []int) {
-    if l.navigator == nil || l.wpIndex >= len(l.waypoints) {
+    if l.navigator == nil || l.wpIndex >= len(l.waypoints) ||
+        start >= len(l.waypoints) {
         return nil, nil
     }
     steps := make([][3]int32, 0, 16)
     wpMap := make([]int, 0, 16)
     px, py, pz := float64(selfX), float64(selfY), float64(selfZ)
     budget := cursorEscapeRouteMax
-    for i := l.wpIndex; i < len(l.waypoints); i++ {
+    for i := start; i < len(l.waypoints); i++ {
         wp := l.waypoints[i]
         // The waypoint z anchors into the server frame BEFORE the
         // interpolation: the march interpolates between the character
@@ -1875,6 +1860,34 @@ func (l *Loop) cursorEscapeRouteSteps(
     }
 
     return steps, wpMap
+}
+
+// escapeMarchStart answers the index of the first plan waypoint the
+// character's ground still owes: the first waypoint that is neither
+// arrived at (the intermediate pass radius - the walked ground
+// contract of the arrival test) nor passed along the route (the
+// projection test of advanceWaypoints). The plan cursor itself can
+// sit ahead of this index - the forward jump and the stuck skip bet
+// far waypoints whose clicks the offline port validates, and a server
+// that refuses them leaves the bookkeeping ahead of the ground. The
+// escape march trusts the ground: the claims re-enter the plan at the
+// first un-walked bend and the marks (markEscapeClaimedWaypoint) pull
+// the cursor back onto the walked prefix as the strides land.
+func (l *Loop) escapeMarchStart(selfX, selfY, selfZ int32) int {
+    for i := range l.waypoints {
+        if waypointArrived(l.waypoints, i, selfX, selfY, selfZ,
+            l.segmentFrameOffset, waypointPassDist) {
+            continue
+        }
+        if i+1 < len(l.waypoints) &&
+            waypointPassed(l.waypoints[i], l.waypoints[i+1], selfX, selfY) {
+            continue
+        }
+
+        return i
+    }
+
+    return len(l.waypoints)
 }
 
 // cursorEscapeSteps builds the claimed steps of the cursor key
@@ -2030,12 +2043,20 @@ func (l *Loop) escapeFollows(selfX, selfY int32) bool {
 // conservative advance gates would re-introduce the exact backtrack
 // the report pinned (the walked prefix marked unpassed because the
 // line test ran from the walked ground to a waypoint behind it).
+// The mark is UNCONDITIONAL about the cursor it finds: the cursor may
+// sit AHEAD of the walked ground (the forward jump bet a far
+// waypoint's chord and the server refused the click, the skip chain
+// ran ahead while the character stood) - the claim's ground progress
+// is the honest authority and the cursor follows it, the bookkeeping
+// bet never keeps a waypoint the claims have not walked marked
+// passed (the resumed clicks would aim the jumped far waypoint
+// again and re-lose the ground the escape just gained).
 func (l *Loop) markEscapeClaimedWaypoint(stepIndex int) {
     if stepIndex >= len(l.cursorEscape.wpMap) {
         return
     }
     wp := l.cursorEscape.wpMap[stepIndex]
-    if wp < 0 || wp < l.wpIndex {
+    if wp < 0 {
         return
     }
     l.wpIndex = wp + 1
@@ -2204,22 +2225,39 @@ func (l *Loop) clickWaypoint(
     // verdict too (the far V-detour waypoint whose leaving segment
     // already points back, see waypointBehindRoute).
     passedBehind := l.waypointPassedBehind(wp, selfX, selfY, selfZ)
-    if l.extendArmed {
+    if dist < minWalkClick {
+        // The rescue floor discipline runs IMMEDIATELY, no stuck
+        // verdict needed: the server's findPath branch only takes a
+        // collapsed click over the rescue threshold, a shorter one is
+        // silently canceled with ActionFailed and never moves a cell
+        // (the 2026-09-11 11:34 dump: the 22 unit first waypoint
+        // click froze through two whole trip cycles while the very
+        // same cells walked under every longer click of the plan) -
+        // the sub-floor aim re-aims at the forward route samples
+        // before any click leaves the bot. No sample validating keeps
+        // the plain waypoint click: the refusal machinery of
+        // clickServerValidated answers it exactly like today.
+        extX, extY, extZ, ok := l.extendShortClick(
+            selfX, selfY, selfZ, moveX, moveY, moveZ)
+        if ok {
+            moveX, moveY, moveZ = extX, extY, extZ
+        }
+    } else if l.extendArmed {
         // The recovery of a stuck segment (extendArmed): the stuck
         // proved the plain clicks of this segment do not move the
         // character (a server side refusal the offline click
-        // validation cannot see), so the primary target under
-        // the server rescue floor or behind the character on
-        // the route gives way to the forward route samples.
+        // validation cannot see), so the primary target behind the
+        // character on the route gives way to the forward route
+        // samples.
         behind := passedBehind || waypointBehindRoute(
             l.waypoints, l.wpIndex, selfX, selfY)
-        if behind || dist < minWalkClick {
+        if behind {
             extX, extY, extZ, ok := l.extendShortClick(
                 selfX, selfY, selfZ,
                 moveX, moveY, moveZ)
             if ok {
                 moveX, moveY, moveZ = extX, extY, extZ
-            } else if behind {
+            } else {
                 // No forward sample validates and the
                 // waypoint is behind: clicking it walks
                 // the character backward into the pocket
@@ -2508,10 +2546,9 @@ func (l *Loop) clickServerValidated(
 // pointers carry its corrected destination - the same jump the stuck
 // handler runs after its window, moved to click time: the 15 s stuck
 // window never opens for a corner the scan answers, and the re-path
-// ladder (whose deterministic re-plan reproduces the identical route
-// and whose frozen corridor ban then seals the corner ground for the
-// rest of the session) never burns. It reports whether the pointers
-// carry a validated jump target.
+// ladder (whose deterministic re-plan reproduces the identical route)
+// never burns. It reports whether the pointers carry a validated jump
+// target.
 func (l *Loop) clickForwardJump(
     selfX, selfY, selfZ int32,
     moveX, moveY, moveZ *float64, now time.Time,
@@ -2642,39 +2679,89 @@ func (l *Loop) clickEscapeHop(
 // segmentAdvanceClear reports whether the follower may advance past the
 // waypoint whose successor sits at the index: the straight line from
 // the CURRENT character position to that next waypoint must be
-// walkable over the geodata. The server validates every ground click
-// as a straight line (GeoEngine.getValidLocation, the deployment runs
-// PathFinding = 0 so no server side routing exists): a click whose
-// first step hits a closed wall resolves to the character's own
-// position, the move is canceled at once and the character never
-// moves. The old follower skipped any waypoint inside the 50 unit
-// pass radius - tighter than the 16 unit ramp steps of the trainer
-// plaza approach - and clicked the far waypoint straight through the
-// plaza railing: the click canceled, the 15 s stuck detector
-// re-planned the identical deterministic route, the follower skipped
-// the same tight waypoints again and the third budget burned into
-// "town trip ended: aborted, walk stuck" (the 2026-09-11 teacher
-// walk, the lessons never reached the teacher). The gate keeps the
-// skipped-from waypoint as the target until walking onto it re-opens
-// the line. A line the geodata cannot verify stays clear - the
-// follower then keeps the pre-gate behavior.
+// walkable by the SERVER CLICK TRANSPORT - the same oracle the click
+// the follower would send for that waypoint passes (Navigator.
+// ValidateClick, the GeoEngine.getValidLocation port: the climb limit
+// with its layer step-over, the free drops, the source wall plus the
+// anti corner cut). The server validates every ground click as a
+// straight line (the deployment runs PathFinding = 0 so no server side
+// routing exists): a click whose first step hits a closed wall
+// resolves to the character's own position, the move is canceled at
+// once and the character never moves. The old follower skipped any
+// waypoint inside the 50 unit pass radius - tighter than the 16 unit
+// ramp steps of the trainer plaza approach - and clicked the far
+// waypoint straight through the plaza railing: the click canceled, the
+// 15 s stuck detector re-planned the identical deterministic route,
+// the follower skipped the same tight waypoints again and the third
+// budget burned into "town trip ended: aborted, walk stuck" (the
+// 2026-09-11 teacher walk, the lessons never reached the teacher). The
+// gate keeps the skipped-from waypoint as the target until walking
+// onto it re-opens the line.
+//
+// The oracle choice is the load bearing contract: the gate and the
+// click MUST answer through one semantics. The old gate asked the grid
+// engine's symmetric line of sight (the A* node rule: a step must
+// climb no more than the passable height up AND down, both cells'
+// walls open in both directions) while the clicks obeyed the
+// asymmetric server rule - on ordinary terrain (a terrace drop, a one
+// sided wall) the two disagree, the cursor pinned on a waypoint whose
+// click the server walked fine, the short click extension escaped
+// ~60 units out and the pinned cursor clicked the character right
+// back - the plaza ping-pong of the 2026-09-20 farm readiness report
+// (nine alternating MoveToLocation clicks between two points 63 units
+// apart while the server accepted every one of them, the frozen trip
+// verdict then banning the walkable plaza for the session). The
+// round 57 family pinned the same disagreement from the other side:
+// the pinned cursor kept re-clicking the 22 unit first waypoint the
+// server's rescue threshold silently canceled while the far segments
+// of the very plan validated fine.
+//
+// The gate mirrors the click exactly the follower would send: the
+// waypoint height anchored into the server frame (see
+// click_frame.go), the distance capped at the move request limit,
+// and the port's own verdict - a click the transport validates walks
+// the character SOMEWHERE along the line (a running click may stop
+// a hundred units short of the asked cell at a terrace lip; the
+// character still made that progress, the arrival test and the next
+// click converge from there), a click the transport collapses onto
+// the walker (the correction under the cancellation limit) never
+// moves a cell and the cursor keeps the skipped-from waypoint
+// targeted until walking onto it re-opens the line.
 func (l *Loop) segmentAdvanceClear(
     selfX, selfY, selfZ int32, next int,
 ) bool {
     if next >= len(l.waypoints) || l.navigator == nil {
         return true
     }
-    walkable, err := l.navigator.LineOfSight(
-        pathfind.Vec3{
-            X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
-        },
-        l.waypoints[next],
-    )
-    if err != nil {
-        return true
+    wp := l.waypoints[next]
+    targetX, targetY := wp.X, wp.Y
+    targetZ := anchorZToServerFrame(wp.Z, l.segmentFrameOffset)
+    dx := targetX - float64(selfX)
+    dy := targetY - float64(selfY)
+    if dist := math.Hypot(dx, dy); dist > maxMoveDistance {
+        frac := maxMoveDistance / dist
+        targetX = float64(selfX) + dx*frac
+        targetY = float64(selfY) + dy*frac
+        targetZ = float64(selfZ) + (targetZ-float64(selfZ))*frac
     }
-
-    return walkable
+    from := pathfind.Vec3{
+        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+    }
+    corrected, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
+        X: targetX, Y: targetY, Z: targetZ,
+    })
+    if !ok {
+        return false
+    }
+    // The delivery test: the server's correction of the line must
+    // land within the waypoint pass radius of the asked target - a
+    // click that stops a hundred units short (the terrace lip of the
+    // round 57 route, the hall wall of the round 56 aisle approach)
+    // has not delivered the waypoint, the cursor keeps the skipped
+    // from waypoint targeted and the character walks the plan's bends
+    // in the order the planner drew them.
+    return math.Hypot(corrected.X-targetX, corrected.Y-targetY) <=
+        waypointPassDist
 }
 
 // refusalEvidence reports whether the server answered the last walk
@@ -3068,12 +3155,9 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
     // refusal branch runs BEFORE the waypoint skip: the skip aims a
     // FARTHER waypoint (a worse target for a length sensitive
     // refusal), the variation keeps the near aim the plan already
-    // holds. The corridor ban machinery below answers the OTHER
-    // family: a click the server accepted but never delivered on
-    // (the frozen corridor). Latching the refusal also arms the
-    // escalation gate (see escalateFrozenSegment): a segment the server
-    // refused does not name a frozen corridor, banning it would
-    // seal innocent ground for the rest of the session.
+    // holds. Latching the refusal also arms the pocket gate below:
+    // a segment whose every aim the server refused on the very
+    // standing cell hands the walk to the cursor key escape at once.
     if l.refusalEvidence() {
         if !l.segmentRefused {
             l.segmentRefused = true
@@ -3156,14 +3240,13 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
         l.journal.Repath(l.tracker.ID(), l.rePaths)
     }
     if !l.replanTownWalkSegment(l.segmentDest) {
-        // The fresh plan found no route (the bans plus the water may
-        // wall every dry one): the freeze evidence still belongs to
-        // the escalation ladder - the rungs widen the ban and re-plan
-        // with the water permitting fallback instead of aborting the
-        // trip back into the identical cycle (the 2026-09-14 08:42
-        // dump: the re-path failure aborted past the ladder, the
-        // corridor route returned through the ban-less fallback and
-        // the bot looped on it forever).
+        // The fresh plan found no route (the water may wall every dry
+        // one): the freeze evidence still belongs to the escalation
+        // ladder - the escape arms over the current plan instead of
+        // aborting the trip back into the identical cycle (the
+        // 2026-09-14 08:42 dump: the re-path failure aborted past the
+        // ladder, the corridor route returned through the fallback
+        // and the bot looped on it forever).
         l.abortFrozenTrip("re-path failed")
 
         return true
@@ -3211,18 +3294,16 @@ func (l *Loop) noteRepathCell(selfX int32, selfY int32) bool {
 
 // abortFrozenTrip ends a trip whose re-path produced no movement and
 // escalates the recovery of the frozen segment before giving up: the town
-// walk segments and the zone return segments both try the escalation ladder
-// (the banned detour re-plan, the cursor key escape along the fresh
-// route - see escalateFrozenSegment). Without the ladder the zone return
-// cycles between the pathfound-return-stuck-abort and the frozen
+// walk segments and the zone return segments both hand the walk to the
+// cursor key escape along the plan (see escalateFrozenSegment). Without
+// the escape the zone return cycles between the
+// pathfound-return-stuck-abort and the frozen
 // re-plan, never moving: the deterministic planner re-plans the
 // identical route the ground keeps refusing (the 2026-09-14 08:25
 // dump, build d2ea298: the bot stood at the village terrace for 34s
-// after the abort, no walk sent, no Hunt log). The banned detour
-// re-plan routes around the walled corridor instead of reproducing
-// it. The shopping trips keep their cooldown recovery when the ladder
-// is exhausted: the hunt continues and the next trip retries from a
-// fresh state.
+// after the abort, no walk sent, no Hunt log). The shopping trips keep
+// their cooldown recovery when the ladder is exhausted: the hunt
+// continues and the next trip retries from a fresh state.
 func (l *Loop) abortFrozenTrip(reason string) {
     if l.escalateFrozenSegment() {
         return
@@ -3230,35 +3311,44 @@ func (l *Loop) abortFrozenTrip(reason string) {
     l.abortTownTrip(reason)
 }
 
-// escalateFrozenSegment climbs the recovery ladder of a frozen town walk
-// segment - a segment whose full re-path cycle produced no movement at all,
-// the signature of a ground the click transport cannot cross (the
-// 2026-09-12 trainer hall aisle dump: the plan entered the building
-// through the west aisle column, the server walled it, and the
-// character stood frozen through every re-path of two whole trips).
-// The rungs, one per frozen abort of the same segment:
+// escalateFrozenSegment arms the cursor key escape of a frozen town
+// walk segment - a segment whose full re-path cycle produced no
+// movement at all, the signature of a ground the click transport
+// cannot cross (the 2026-09-12 trainer hall aisle dump: the plan
+// entered the building through the west aisle column, the server
+// walled it, and the character stood frozen through every re-path of
+// two whole trips).
 //
-//  1. The banned detour re-plan: the aimed waypoint's cells join the
-//     session's avoid areas and the segment re-plans around them - the
-//     deterministic search produces a different route (around the
-//     building instead of through the walled corridor) instead of
-//     reproducing the identical frozen one.
+// The claims transport takes the walk over: the keyboard mode 0 arm
+// plus the claimed ValidatePosition stream the server follows without
+// any click validation (the 2026-09-14 15:10 report: the official
+// client's mouse clicks died on the refusing cell while the ARROW
+// KEYS walked it out - the claims are the only movement a click
+// refusing ground answers) and walks the character ALONG THE PLANNED
+// ROUTE - the plan stays the segment's own route, the claims bend
+// where it bends, and the settle returns the walk to the normal
+// routed clicks on the same plan (the owner contract of the
+// 2026-09-19 round: wasd along the route, the normal mode at the
+// point, NEVER walk the direct line - the rung never replaces the
+// plan with a straight line to the far target). The re-arm repeats
+// while the trip's escape attempts last (cursorEscapeAttemptsMax); a
+// spent budget falls back to the plain trip abort with its cooldown.
 //
-//  2. The cursor key escape along the current plan: the clicks of
-//     every plan this ladder produced die on the same ground, so the
-//     claims transport takes over (the keyboard mode 0 arm plus the
-//     claimed ValidatePosition stream the server follows without any
-//     click validation) and walks the character ALONG THE PLANNED
-//     ROUTE - the plan stays the segment's own route, the claims bend
-//     where it bends, and the settle returns the walk to the normal
-//     routed clicks on the same plan (the owner contract of the
-//     2026-09-19 round: wasd along the route, the normal mode at the
-//     point, NEVER walk the direct line - the rung never replaces the
-//     plan with a straight line to the far target). The re-arm
-//     repeats while the trip's escape attempts last; a spent budget
-//     falls back to the plain trip abort with its cooldown.
+// The historical rung this ladder replaced - the frozen corridor ban
+// that sealed the walled waypoint's cells into every later search -
+// is gone deliberately: its rectangle granularity walled the whole
+// merged mesh sheet any ban touched (the plaza sheet of the
+// 2026-09-20 farm readiness report spans 368x32 units around the ban
+// center; the reachable world collapsed from 1.3M polygons to 2 and
+// every later route search of the session answered "no path at
+// all"), its trigger read the follower's own cursor pinning as a
+// freeze (the advance gate disagreed with the click transport - see
+// segmentAdvanceClear) and its widening (48 -> 1536 units) compounded
+// every misfire into a sealed village quarter. The escape owns the
+// freeze recovery alone: it walks the character through, it never
+// poisons a later search, and its budget bounds itself.
 //
-// The ladder reports whether a rung took over the recovery (the
+// The ladder reports whether the escape took over the recovery (the
 // caller skips its abort).
 func (l *Loop) escalateFrozenSegment() bool {
     if l.navigator == nil {
@@ -3266,120 +3356,26 @@ func (l *Loop) escalateFrozenSegment() bool {
     }
     // The ladder runs for both the town walk segments (phaseTownWalk) and
     // the zone return segments (phaseTownReturn): both follow a planned
-    // geodata route whose clicks the server may refuse, and both need
-    // the banned detour re-plan to route around the walled corridor
-    // instead of reproducing the identical frozen route (the
+    // geodata route whose clicks the click transport may refuse, and
+    // both need the claims walk off the refusing ground (the
     // 2026-09-14 08:25 dump: the zone return at the village terrace
     // cycled between the pathfound-return-stuck-abort and the frozen
     // segments because the ladder never ran for it).
     if l.phase != phaseTownWalk && l.phase != phaseTownReturn {
         return false
     }
-    if l.frozenStage == 0 {
-        l.frozenStage = 1
-        if l.segmentRefused {
-            // The freeze evidence carries ActionFailed answers: the
-            // server refused the clicks themselves, the corridor is
-            // not frozen. Banning it would seal innocent ground for
-            // the rest of the session (the 2026-09-14 10:18 dump:
-            // six corridor bans and a widened r768 ban across both
-            // village exits while the server refused every click for
-            // its own reasons). The escape rung takes over instead:
-            // the claims walk the character off the refusing ground
-            // without any click validation at all.
-            l.logf("Hunt: the server refused the clicks of this " +
-                "segment, skipping the corridor ban")
-        } else if l.banFrozenCorridor() {
-            l.logf("Hunt: the walk froze on this corridor, " +
-                "re-planning the detour around it")
-            if l.startZoneReturnOrWalkSegment() {
-                return true
-            }
-            // No route around the ban: the escape rung owns the
-            // recovery over the current plan.
-        }
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
     }
-    if l.frozenStage >= 1 {
-        l.frozenStage = 2
-        selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
-        if !ok {
-            return false
-        }
-        if wp, hasWp := l.currentWaypoint(); hasWp {
-            if l.beginCursorKeyEscape(selfX, selfY, selfZ,
-                int32(wp.X), int32(wp.Y), int32(wp.Z)) {
-                return true
-            }
+    if wp, hasWp := l.currentWaypoint(); hasWp {
+        if l.beginCursorKeyEscape(selfX, selfY, selfZ,
+            int32(wp.X), int32(wp.Y), int32(wp.Z)) {
+            return true
         }
     }
 
     return false
-}
-
-// startZoneReturnOrWalkSegment re-plans the frozen segment with the right
-// search for the phase: the zone return (phaseTownReturn) uses the
-// non-dry fallback (startZoneReturnSegment), the town walk (phaseTownWalk)
-// uses the dry search (startWalkSegment). The zone return must allow
-// water crossings as a fallback - the path through the village ramp
-// may need to cross a water cell the dry search walls off.
-func (l *Loop) startZoneReturnOrWalkSegment() bool {
-    if l.phase == phaseTownReturn {
-        return l.startZoneReturnSegment(l.segmentDest)
-    }
-
-    return l.startWalkSegment(l.segmentDest)
-}
-
-// banFrozenCorridor adds the aimed waypoint of the frozen segment to the
-// session's avoid areas: every later dry search routes around the
-// patch, so the corridor the server refused to walk stays out of each
-// following plan (the next trip included). A waypoint an existing ban
-// already covers does not skip the rung: the detour just froze on
-// ground inside the ban's reach, so the server wall is wider than the
-// ban models - the covering ban widens (its radius doubles, capped at
-// frozenBanMaxRadius) and the re-plan routes around the enlarged
-// patch. Without the widening the 2026-09-14 08:42 dump (build
-// 6e45624, bot test3) cycled forever: the corridor ban at 43512 50504
-// covered every detour waypoint the deterministic planner produced
-// from the village terrace (the detour's first waypoint sat 66 units
-// from the ban center, inside the radius-plus-floor coverage), no rung
-// ever changed the plan shape again, and the ladder fell straight to
-// the direct walk each trip. It reports whether a fresh
-// re-plan is warranted - a new area, a widened one, false only when
-// the aimed waypoint sits on no ban, the list is full, or the covering
-// ban already sits at the cap.
-func (l *Loop) banFrozenCorridor() bool {
-    if l.wpIndex >= len(l.waypoints) {
-        return false
-    }
-    wp := l.waypoints[l.wpIndex]
-    for i := range l.frozenAreas {
-        area := &l.frozenAreas[i]
-        if math.Hypot(area.Center.X-wp.X, area.Center.Y-wp.Y) >
-            area.Radius+frozenBanRadius {
-            continue
-        }
-        if area.Radius >= frozenBanMaxRadius {
-            return false
-        }
-        area.Radius = math.Min(area.Radius*2, frozenBanMaxRadius)
-        l.logf("Hunt: widening the frozen corridor ban at %.0f %.0f "+
-            "to the radius %.0f for the session",
-            area.Center.X, area.Center.Y, area.Radius)
-
-        return true
-    }
-    if len(l.frozenAreas) >= frozenBanMax {
-        return false
-    }
-    l.frozenAreas = append(l.frozenAreas, pathfind.AvoidArea{
-        Center: wp,
-        Radius: frozenBanRadius,
-    })
-    l.logf("Hunt: banning the frozen corridor at %.0f %.0f for the "+
-        "session", wp.X, wp.Y)
-
-    return true
 }
 
 // nextClearWaypoint scans the plan ahead for the first waypoint the
@@ -3936,7 +3932,6 @@ func (l *Loop) endTownTrip(reason string) {
     l.extendArmed = false
     l.cursorEscape = zeroCursorEscape()
     l.cursorEscapes = 0
-    l.frozenStage = 0
     l.repathX, l.repathY = 0, 0
     l.frozenRepaths = 0
     l.moveStartAt = time.Time{}
@@ -4038,7 +4033,6 @@ func (l *Loop) resetTownTrip() {
     l.extendArmed = false
     l.cursorEscape = zeroCursorEscape()
     l.cursorEscapes = 0
-    l.frozenStage = 0
     l.repathX, l.repathY = 0, 0
     l.frozenRepaths = 0
     l.moveStartAt = time.Time{}

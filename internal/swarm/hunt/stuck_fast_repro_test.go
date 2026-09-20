@@ -5,6 +5,7 @@
 package hunt
 
 import (
+    "math"
     "testing"
     "time"
 
@@ -55,6 +56,39 @@ const (
     reproFastStuckZoneZ = int32(-3712)
 )
 
+// railingPortAimed models the village railing of the 2026-09-14 08:13
+// dump through the click transport port: the line toward the AIMED
+// waypoint validates (the capped click target and its on-line
+// prefixes - the dump's click went out and the server silently
+// swallowed the move), every line off the aimed line refuses offline
+// (the skip and the forward jump targets over the railing) - the
+// stuck fires the re-path branch, never the waypoint skip. The hook
+// reads the live cursor, so it arms after the loop and its plan
+// exist.
+func railingPortAimed(
+    loop *Loop,
+) func(from, to pathfind.Vec3) (pathfind.Vec3, bool) {
+    return func(from, to pathfind.Vec3) (pathfind.Vec3, bool) {
+        if loop.wpIndex >= len(loop.waypoints) {
+            return to, true
+        }
+        aimed := loop.waypoints[loop.wpIndex]
+        ax, ay := aimed.X-from.X, aimed.Y-from.Y
+        alen := math.Hypot(ax, ay)
+        if alen < 1 {
+            return to, true
+        }
+        tx, ty := to.X-from.X, to.Y-from.Y
+        cross := math.Abs(tx*ay-ty*ax) / alen
+        along := (tx*ax + ty*ay) / alen
+        if cross <= 1 && along >= -1 && along <= maxMoveDistance+1 {
+            return to, true
+        }
+
+        return from, false
+    }
+}
+
 // TestStuckRepathArmsFastWindow pins the fix: after a stuck re-path
 // that did not move the character, the fast stuck window arms, so
 // the next stuck detection fires on stuckFastTimeout (4s) instead of
@@ -69,7 +103,7 @@ func TestStuckRepathArmsFastWindow(t *testing.T) {
     // The click validation passes (the dump's click was accepted by
     // the offline click port - the server silently canceled the move
     // after the validation). The route is the dump's 6 waypoint plan.
-    loop.SetNavigator(&fakeNavigator{
+    nav := &fakeNavigator{
         found: true,
         route: []pathfind.Vec3{
             {X: 43512, Y: 50504, Z: -2992},
@@ -79,12 +113,13 @@ func TestStuckRepathArmsFastWindow(t *testing.T) {
             {X: 36008, Y: 46952, Z: -3704},
             {X: 36000, Y: 46765, Z: -3712},
         },
-        // The line of sight to every forward waypoint is blocked: the
-        // village railing walls every straight line from the standing
-        // cell, so nextClearWaypoint returns the pinned cursor and
-        // the stuck fires the re-path branch (not the waypoint skip).
-        blind: true,
-    })
+    }
+    loop.SetNavigator(nav)
+    // The click transport refuses every line off the aimed waypoint's
+    // line: the village railing walls the skip and the jump targets,
+    // so nextClearWaypoint returns the pinned cursor and the stuck
+    // fires the re-path branch (not the waypoint skip).
+    nav.validateHook = railingPortAimed(loop)
     dest := pathfind.Vec3{
         X: float64(reproFastStuckZoneX),
         Y: float64(reproFastStuckZoneY),
@@ -162,14 +197,14 @@ func TestStuckSkipWaypointStillArmsFastWindow(t *testing.T) {
             {X: 42664, Y: 51336, Z: -2992},
             {X: 36000, Y: 46765, Z: -3712},
         },
-        sightFunc: func(_, to pathfind.Vec3) (bool, error) {
+        validateHook: func(_, to pathfind.Vec3) (pathfind.Vec3, bool) {
             // The line to wp1 is blocked (the wall), the line to
             // wp2 is clear (the skip target).
             if int32(to.X) == 43512 && int32(to.Y) == 50504 {
-                return false, nil
+                return to, false
             }
 
-            return true, nil
+            return to, true
         },
     })
     dest := pathfind.Vec3{
@@ -181,7 +216,7 @@ func TestStuckSkipWaypointStillArmsFastWindow(t *testing.T) {
     require.Len(t, loop.waypoints, 3)
 
     // The first followWaypoints tick: the click to wp1 is refused
-    // (sightFunc blocks it), the clickServerValidated re-path fires,
+    // (the click transport blocks it), the clickServerValidated re-path fires,
     // the re-path plans the identical 3 waypoint route.
     now := time.Now()
     _, _, selfZ, _ := bot.SelfPosition()
@@ -220,19 +255,20 @@ func TestStuckRepathRebaselinesStuckWindow(t *testing.T) {
     moveSelfTo(bot, reproFastStuckX, reproFastStuckY, reproFastStuckZ)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.SetNavigator(&fakeNavigator{
+    nav := &fakeNavigator{
         found: true,
         route: []pathfind.Vec3{
             {X: 43512, Y: 50504, Z: -2992},
             {X: 42664, Y: 51336, Z: -2992},
             {X: 36000, Y: 46765, Z: -3712},
         },
-        // The line of sight to every forward waypoint is blocked: the
-        // village railing walls every straight line, so
-        // nextClearWaypoint returns the pinned cursor and the stuck
-        // fires the re-path branch.
-        blind: true,
-    })
+    }
+    loop.SetNavigator(nav)
+    // The click transport refuses every line off the aimed waypoint's
+    // line: the village railing walls the skip targets, so
+    // nextClearWaypoint returns the pinned cursor and the stuck fires
+    // the re-path branch.
+    nav.validateHook = railingPortAimed(loop)
     dest := pathfind.Vec3{
         X: float64(reproFastStuckZoneX),
         Y: float64(reproFastStuckZoneY),

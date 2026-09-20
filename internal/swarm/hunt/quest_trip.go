@@ -380,8 +380,8 @@ func (l *Loop) followPlannedSegment(
     dest := pathfind.Vec3{
         X: float64(segX), Y: float64(segY), Z: float64(selfZ),
     }
-    result, err := l.navigator.FindPathApproachAvoiding(
-        from, dest, questArriveRadius, l.frozenAreas)
+    result, err := l.navigator.FindPathApproach(
+        from, dest, questArriveRadius)
     if err != nil || result == nil || len(result.Waypoints) == 0 {
         return false
     }

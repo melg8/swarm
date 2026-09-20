@@ -162,29 +162,18 @@ func TestWalkStuckAbortsAfterMaxRePaths(t *testing.T) {
         "the pinned stuck arms the short click extension")
 
     // The second stuck from the same cell (no movement since the
-    // re-path) climbs the escalation ladder rung 1: the frozen
-    // corridor joins the session bans and the segment re-plans the detour
-    // around it - the identical frozen route is never re-planned again.
+    // re-path) escalates the frozen trip: the cursor key escape arms
+    // along the plan at once - the identical frozen route is never
+    // re-planned again and no corridor ban seals any ground (the
+    // plaza round of 2026-09-20 removed the ban system: its rectangle
+    // granularity sealed whole mesh sheets off false freezes).
     armStuck(loop, bot)
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase,
-        "the frozen re-path escalates to the detour re-plan, the trip keeps walking")
-    require.Len(t, loop.frozenAreas, 1,
-        "the frozen corridor joins the session avoid areas")
-    require.GreaterOrEqual(t, nav.calls, 2,
-        "the detour re-plan calls the navigator again")
-
-    // The third stuck from the same cell (the detour froze as well)
-    // climbs rung 2: the cursor key escape along the plan - the
-    // claims transport owns the segment, the plan stays the segment's own
-    // route (the owner rule: the WASD walks ALONG the route, never
-    // the direct line to the far target).
-    armStuck(loop, bot)
-    loop.tick()
-    require.Equal(t, phaseTownWalk, loop.phase,
-        "the frozen detour escalates to the cursor key escape")
+        "the frozen re-path escalates to the cursor key escape, "+
+            "the trip keeps walking")
     require.True(t, loop.cursorEscape.armed,
-        "the escape is armed")
+        "the frozen re-path arms the cursor key escape along the plan")
     require.Greater(t, len(loop.waypoints), 1,
         "the escape arms over the real route")
 
@@ -220,10 +209,16 @@ func TestWalkStuckBudgetBoundsMovingRepaths(t *testing.T) {
         {X: 45000, Y: 50000, Z: -3500},
         {X: 44800, Y: 50200, Z: -3500},
     }
-    // Block every sight line: no waypoint ahead is ever clear, so the
-    // stuck always reaches the re-path branch (no skip).
-    nav.sightFunc = func(_, _ pathfind.Vec3) (bool, error) {
-        return false, nil
+    // Refuse the successor line in the click transport: no waypoint
+    // ahead is ever clickable, so the stuck always reaches the re-path
+    // branch (no skip) while the pinned waypoint's own click still
+    // leaves the bot.
+    nav.validateHook = func(from, to pathfind.Vec3) (pathfind.Vec3, bool) {
+        if int32(to.X) == 44800 && int32(to.Y) == 50200 {
+            return from, false
+        }
+
+        return to, true
     }
     fillInventory(bot)
     loop.tick()
@@ -299,10 +294,14 @@ func TestWalkStuckSkipNeedsAClearLine(t *testing.T) {
         {X: 44800, Y: 50200, Z: -3500},
         {X: 44600, Y: 50400, Z: -3500},
     }
-    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        // The cursor advance onto wp1 stays clear, every successor
+    nav.validateHook = func(from, to pathfind.Vec3) (pathfind.Vec3, bool) {
+        // The cursor advance onto wp1 stays clickable, every successor
         // line ahead of wp1 is blocked.
-        return int32(to.X) == 44800, nil
+        if int32(to.X) == 44800 && int32(to.Y) == 50200 {
+            return to, true
+        }
+
+        return from, false
     }
     fillInventory(bot)
     loop.tick()
@@ -338,9 +337,14 @@ func TestWalkStuckSkipJumpsToTheFirstClearWaypoint(t *testing.T) {
         {X: 44400, Y: 50600, Z: -3500},
     }
     // The cursor line to wp1 is clear, the line to wp2 is blocked, the
-    // line to wp3 is clear again.
-    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return int32(to.X) != 44600, nil
+    // line to wp3 is clear again (the click transport answers the
+    // same lines the skip gate asks).
+    nav.validateHook = func(_, to pathfind.Vec3) (pathfind.Vec3, bool) {
+        if int32(to.X) == 44600 {
+            return to, false
+        }
+
+        return to, true
     }
     fillInventory(bot)
     loop.tick()

@@ -997,10 +997,10 @@ func (l *Loop) advanceTripStop() {
     l.buyConfirmAt = time.Time{}
     l.buyRetries = 0
     l.resetLearnState()
-    // A fresh stop starts with a fresh escalation ladder: the frozen
-    // aborts of the previous segment spent its rungs, the next segment deserves
-    // its own detour re-plan and escape rung before the trip gives up.
-    l.frozenStage = 0
+    // A fresh stop starts with a fresh escape budget: the frozen
+    // aborts of the previous segment spent its attempts, the next
+    // segment deserves its own cursor key escape before the trip
+    // gives up.
     // The finished stop talked to its npc: drop the selection the
     // talk left behind, the next stop selects its own npc and the
     // trip end walks home with a clean engage.

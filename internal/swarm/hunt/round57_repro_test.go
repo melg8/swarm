@@ -129,12 +129,15 @@ func (s *shortClickFreezeServer) consume(game *fakeGame, bot *state.Bot) {
 }
 
 // TestReproRound57ShortClickFreezeWalksThePlan replays the exact dump
-// scenario against the freeze server model: the first short waypoint
-// click is canceled (the dump's freeze), the stuck re-path arms the
-// short click extension and the follow-up clicks ride over the rescue
-// threshold - the walk must arrive at the zone within a single
-// recovery re-path, with every post-stuck click at least the floor
-// length.
+// scenario against the freeze server model. The freeze family of the
+// dump - the 22 unit waypoint click the server silently canceled - is
+// structurally eliminated since the 2026-09-20 plaza round: the
+// follower's advance gate answers through the same click transport
+// the clicks obey, the cursor passes the arrival-swallowed bend onto
+// the far validated waypoint and EVERY click the walk ever sends aims
+// a target over the server rescue threshold, so the canceling branch
+// of the server never engages (no stuck, no re-path, no refused
+// click). The walk must arrive at the zone in one clean pass.
 func TestReproRound57ShortClickFreezeWalksThePlan(t *testing.T) {
     engine := reproEngine(t)
     nav := NewNavigator(engine)
@@ -167,10 +170,11 @@ func TestReproRound57ShortClickFreezeWalksThePlan(t *testing.T) {
 
     // Walk the plan under the freeze server: the synthetic clock
     // advances past every stuck window, the pacing gate is bypassed
-    // between the ticks to keep the test fast. The click lengths after
-    // the first stuck are watched for the rescue floor.
+    // between the ticks to keep the test fast. Every click of the
+    // walk is watched for the rescue floor: the aim discipline must
+    // keep the whole walk over the threshold the dump's server
+    // canceled under.
     now := time.Now()
-    stuckClicks := 0
     arrived := false
     for i := 0; i < 400 && !arrived; i++ {
         now = now.Add(3 * time.Second)
@@ -180,17 +184,14 @@ func TestReproRound57ShortClickFreezeWalksThePlan(t *testing.T) {
         clicksBefore := len(game.walks)
         done := loop.followWaypoints(selfX, selfY, selfZ, now)
         sim.consume(game, bot)
-        if loop.extendArmed && len(game.walks) > clicksBefore {
-            // Every click of the armed recovery rides over the rescue
-            // threshold (the short waypoint clicks re-aim at the
-            // forward route samples).
+        if len(game.walks) > clicksBefore {
             for _, w := range game.walks[clicksBefore:] {
-                stuckClicks++
                 length := math.Hypot(
                     float64(w[0])-float64(selfX), float64(w[1])-float64(selfY))
                 require.GreaterOrEqual(t, length, 31.0,
-                    "every armed recovery click must clear the server "+
-                        "rescue threshold (was %.0f units to %d %d)",
+                    "every walk click must clear the server rescue "+
+                        "threshold - the sub-threshold aim of the dump "+
+                        "is the freeze itself (was %.0f units to %d %d)",
                     length, w[0], w[1])
             }
         }
@@ -205,14 +206,12 @@ func TestReproRound57ShortClickFreezeWalksThePlan(t *testing.T) {
         float64(selfX-reproRound57ZoneX), float64(selfY-reproRound57ZoneY))
     require.LessOrEqual(t, dist, tripApproachRadius,
         "the walk must arrive within the approach radius of the zone")
-    require.Positive(t, stuckClicks,
-        "the armed recovery must have sent the extended clicks")
-    require.Equal(t, 1, loop.rePaths,
-        "exactly one recovery re-path: the dump burned three and "+
-            "restarted the whole trip")
-    require.Positive(t, sim.refused,
-        "the freeze is modeled: the plain short waypoint clicks of the "+
-            "stuck window are canceled without movement")
+    require.Zero(t, loop.rePaths,
+        "the aim discipline keeps the walk over the rescue threshold, "+
+            "the dump's stuck re-path never fires")
+    require.Zero(t, sim.refused,
+        "no click lands under the server cancel threshold - the "+
+            "freeze branch of the dump server never engages")
 }
 
 // round57VillageStarts are the village positions the zone return
@@ -335,11 +334,13 @@ func TestReproRound57FrozenServerEscalatesFast(t *testing.T) {
     }
     require.True(t, aborted, "the frozen walk must end the trip")
     require.Equal(t, phaseEngage, loop.phase, "the trip aborts back to the hunt")
-    // The escalation ladder runs both rungs (the detour re-plan and
-    // the direct server routed walk) before the trip aborts - the
-    // zone return no longer aborts straight to the direct segments. The
-    // recovery stays fast: a couple of stuck windows instead of the
-    // dump's four per trip times the trip restart cycle.
-    require.LessOrEqual(t, loop.frozenStage, 2,
-        "the escalation ladder exhausted both rungs")
+    // The escalation hands the walk to the cursor key escape (the
+    // claims transport along the plan) before the trip aborts - the
+    // zone return no longer aborts straight to the direct segments.
+    // The recovery stays fast: a couple of stuck windows instead of
+    // the dump's four per trip times the trip restart cycle.
+    require.Zero(t, loop.cursorEscapes,
+        "the frozen walk never burned an escape: the simulated server "+
+            "ignores the claims too, so the trip ends with the honest "+
+            "abort")
 }

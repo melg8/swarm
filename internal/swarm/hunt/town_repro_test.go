@@ -102,16 +102,27 @@ func reproEngine(t *testing.T) *pathfind.Engine {
 }
 
 // reproServer simulates the movement semantics the Mobius server
-// applies to a MoveToLocation: the character follows the straight
-// line to the requested target cell by cell, and the walk stops at
-// the last walkable cell when the surface breaks - a climb beyond the
-// passable height or a closed wall (the same terrace rule the server
-// GeoEngine.getValidLocation applies, modeled conservatively here by
-// the geodata line of sight between the step cells: the strict
-// symmetric rule never lets the sim walk off a surface the server
-// routing itself would refuse to follow straight). The sim tracks the
-// deepest z the character ever stood on, so the tests can assert the
-// route never swims.
+// applies to a MoveToLocation: the server runs its own
+// GeoEngine.getValidLocation over the click and the character follows
+// the line to the position that validation answers - the sim resolves
+// the whole click through the SAME port the follower validates with
+// (engine.ValidateClick, the faithful getValidLocation mirror: the
+// climb limit with its layer step-over, the free drops, the source
+// wall plus the anti corner cut) and walks the character toward the
+// validated destination in paced slices, following the pack surface
+// heights on the way. The historical model - the strict symmetric
+// line of sight between the step cells - stalled on terrain the real
+// server walks (a terrace drop, a one sided wall): the 2026-09-20
+// plaza round made the follower's advance gate honest about the
+// server rule, and the sim answers through the same oracle now. The
+// sim tracks the deepest z the character ever stood on, so the tests
+// can assert the route never swims.
+//
+// The cursor key semantics ride along (the reference Mobius master,
+// the same model the cursorKeyServer pins): the movement mode 0 arm
+// latches the session's cursor key flag and every claimed
+// ValidatePosition syncs the claimed placement straight into the
+// world - the arrow key walk the frozen ladder hands the movement to.
 type reproServer struct {
     nav *pathfind.Engine
     // walled names the world patches the simulated server treats as
@@ -128,6 +139,16 @@ type reproServer struct {
     minZ      int32
     stalled   bool
     stalledAt [3]int32
+    // cursorWalks/claims count the mode 0 arms and the claimed
+    // positions the sim already answered; cursorArmed mirrors the
+    // session's cursor key flag (Creature.setCursorKeyMovement) and
+    // claim holds the latest claimed placement awaiting the tracker
+    // sync of advance.
+    cursorWalks int
+    claims      int
+    cursorArmed bool
+    claim       [4]int32
+    hasClaim    bool
 }
 
 // walledStep reports whether a world position sits inside one of the
@@ -142,33 +163,87 @@ func (s *reproServer) walledStep(x, y float64) bool {
     return false
 }
 
-// consume takes the newest walk request of the fake game as the
-// active move of the simulated server.
+// consume takes the newest requests of the fake game: the mode 0 arm
+// latches the cursor key flag and the claimed positions sync their
+// placements (the cursor key branch of ValidatePosition.runImpl - the
+// character follows the stream with no click validation; advance
+// applies the latest claim to the tracker), the newest walk request
+// becomes the active move of the simulated server.
 func (s *reproServer) consume(game *fakeGame) {
+    if len(game.cursorWalks) > s.cursorWalks {
+        s.cursorWalks = len(game.cursorWalks)
+        s.cursorArmed = true
+    }
+    if len(game.claims) > s.claims {
+        for _, claim := range game.claims[s.claims:] {
+            if s.cursorArmed {
+                s.claim = claim
+                s.hasClaim = true
+            }
+            s.claims++
+        }
+    }
     if len(game.walks) > s.requests {
         s.requests = len(game.walks)
         s.target = game.walks[len(game.walks)-1]
         s.stalled = false
+        // A mouse click the server accepted returns the session to
+        // the mouse movement (the cursor key flag clears).
+        s.cursorArmed = false
     }
 }
 
-// advance walks one sim slice toward the active request and applies
-// the resulting character position to the tracker (a zero distance
-// movement broadcast: the server stops the creature at the point).
+// advance applies the pending claimed placement of the cursor key
+// stream (ValidatePosition.runImpl syncs it straight into the world)
+// and walks one sim slice toward the active request's validated
+// destination, applying the resulting character position to the
+// tracker (a zero distance movement broadcast: the server stops the
+// creature at the point). While the cursor key flag holds, the claims
+// own the movement: the server creature stopped following the last
+// mouse click the moment the mode 0 arm latched, the stale click
+// target never drags the character back off the claimed ground.
 func (s *reproServer) advance(bot *state.Bot) {
+    if s.hasClaim {
+        moveSelfTo(bot, s.claim[0], s.claim[1], s.claim[2])
+        s.hasClaim = false
+
+        return
+    }
+    if s.cursorArmed {
+        return
+    }
     selfX, selfY, selfZ, ok := bot.SelfPosition()
     if !ok || s.requests == 0 {
+        return
+    }
+    // The server's answer for the whole click: getValidLocation
+    // resolves the destination the creature actually walks to. A
+    // click the validation collapses onto the walker is canceled -
+    // the character never moves a cell (the freeze the stuck ladder
+    // answers).
+    from := pathfind.Vec3{
+        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+    }
+    to := pathfind.Vec3{
+        X: float64(s.target[0]), Y: float64(s.target[1]),
+        Z: float64(s.target[2]),
+    }
+    validated, ok := s.nav.ValidateClick(from, to)
+    if !ok {
+        s.stall(float64(selfX), float64(selfY), float64(selfZ))
+
         return
     }
     x, y, z := float64(selfX), float64(selfY), float64(selfZ)
     budget := reproSimSlice
     for budget > 0 {
-        dx := float64(s.target[0]) - x
-        dy := float64(s.target[1]) - y
+        dx := validated.X - x
+        dy := validated.Y - y
         dist := math.Hypot(dx, dy)
         if dist <= reproSimStep {
-            // Arrival: stand on the requested target cell.
-            x, y = float64(s.target[0]), float64(s.target[1])
+            // Arrival: stand on the validated destination cell.
+            x, y = validated.X, validated.Y
+            z = float64(validated.Z)
 
             break
         }
@@ -184,15 +259,6 @@ func (s *reproServer) advance(bot *state.Bot) {
         }
         pz, err := s.nav.ClosestHeight(px, py, int16(z))
         if err != nil {
-            s.stall(x, y, z)
-
-            break
-        }
-        sight, losErr := s.nav.LineOfSight(
-            pathfind.Vec3{X: x, Y: y, Z: z},
-            pathfind.Vec3{X: px, Y: py, Z: float64(pz)},
-            pathfind.DefaultMaxPassableHeight)
-        if losErr != nil || !sight {
             s.stall(x, y, z)
 
             break

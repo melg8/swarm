@@ -53,23 +53,31 @@ var (
     teacherWalkDest = pathfind.Vec3{X: 45725, Y: 52105, Z: -2792}
 )
 
-// teacherSight mirrors the real geodata answers of the ramp corner
-// (probed against the deployed pack, see the engine test): the pocket
-// cell 46152 51656 -2808 sees neither the ramp top (the west wall
-// closed) nor the plaza waypoint (the north wall closed), the ramp
-// foot cell sees the ramp top but not the plaza, and the ramp top
-// sees the plaza.
-func teacherSight(from, to pathfind.Vec3) (bool, error) {
+// teacherClickPort mirrors the real geodata answers of the ramp corner
+// through the click transport port (probed against the deployed pack,
+// see the engine test): the pocket cell 46152 51656 -2808 reaches
+// neither the ramp top (the west wall closed) nor the plaza waypoint
+// (the north wall closed), the ramp foot cell reaches the ramp top but
+// not the plaza, and the ramp top reaches the plaza.
+func teacherClickPort(from, to pathfind.Vec3) (pathfind.Vec3, bool) {
     pocket := pathfind.Vec3{X: 46152, Y: 51656, Z: -2808}
     foot := pathfind.Vec3{X: 46152, Y: 51640, Z: -2808}
     if from == pocket {
-        return to == foot, nil
+        if to == foot {
+            return to, true
+        }
+
+        return from, false
     }
     if from == foot {
-        return to.Y == 51656 && to.X == 46136, nil
+        if to.Y == 51656 && to.X == 46136 {
+            return to, true
+        }
+
+        return from, false
     }
 
-    return true, nil
+    return to, true
 }
 
 // TestTeacherWalkKeepsTheWaypointWhenTheLineAheadIsWalled pins the
@@ -80,7 +88,7 @@ func teacherSight(from, to pathfind.Vec3) (bool, error) {
 // 45992 52040 from exactly this position and froze.
 func TestTeacherWalkKeepsTheWaypointWhenTheLineAheadIsWalled(t *testing.T) {
     loop, game, bot, nav := newTripLoop()
-    nav.sightFunc = teacherSight
+    nav.validateHook = teacherClickPort
     // The dump state: the trip walks the teacher segment, the follower
     // aims at wp 9 while the character already stands beside it.
     loop.phase = phaseTownWalk

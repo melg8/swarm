@@ -84,6 +84,11 @@ func TestFollowerRefusedClickShortensSegment(t *testing.T) {
 
             return to, true
         })
+    // The cursor already aims the far goal: the advance ran while the
+    // character stood on the swallowed start cell, and the line from
+    // the CURRENT cell refuses (the mid walk drift of a server
+    // correction) - the shorten ladder answers the refused aim.
+    loop.wpIndex = 2
     follow(loop)
     require.GreaterOrEqual(t, len(game.walks), 1,
         "the shortened click must be sent")
@@ -149,33 +154,35 @@ func TestFollowerRefusedClickRepathsAndAborts(t *testing.T) {
     loop.wpIndex = 0
     loop.moveAt = time.Time{}
     // The second refusal from the same cell climbs the frozen segment
-    // escalation ladder: the frozen corridor joins the session bans
-    // and the detour re-plan runs (never the identical route again).
+    // escalation: the cursor key escape arms along the plan at once -
+    // no corridor ban seals any ground (the plaza round of 2026-09-20
+    // removed the ban system) and the identical frozen route is never
+    // re-planned again.
     follow(loop)
-    require.Equal(t, 2, nav.calls,
-        "the frozen refusal re-plans the detour around the banned corridor")
-    require.Len(t, loop.frozenAreas, 1,
-        "the aimed waypoint joined the session avoid areas")
+    require.True(t, loop.cursorEscape.armed,
+        "the frozen refusal arms the cursor key escape along the plan")
     require.Equal(t, phaseTownWalk, loop.phase,
         "the escalation keeps the trip walking")
 
-    // The third refusal from the same cell (the detour froze as well)
-    // climbs to the cursor key escape along the plan: the claims
-    // transport owns the segment, the plan stays the segment's own route.
-    loop.waypoints = []pathfind.Vec3{
-        {X: 1000, Y: 1000, Z: 0},
-        {X: 1020, Y: 1000, Z: 0},
-        {X: 1600, Y: 1000, Z: 0},
+    // The escape ignoring the character (no claim is ever followed -
+    // no server in this test) burns the follow patience: the trip
+    // ends with the honest recovery instead of grinding claims into
+    // the silence.
+    now := time.Now()
+    for i := 0; i < 100 && loop.phase == phaseTownWalk; i++ {
+        now = now.Add(2 * time.Second)
+        x, y, z, _ := loop.tracker.SelfPosition()
+        if loop.cursorEscape.armed {
+            loop.driveCursorKeyEscape(now, x, y)
+
+            continue
+        }
+        if loop.followWaypoints(x, y, z, now) {
+            break
+        }
     }
-    loop.wpIndex = 0
-    loop.moveAt = time.Time{}
-    follow(loop)
-    require.True(t, loop.cursorEscape.armed,
-        "the frozen detour escalates to the cursor key escape along "+
-            "the planned route")
-    require.Greater(t, len(loop.waypoints), 1,
-        "the escape arms over the real route, never a single far "+
-            "waypoint plan")
+    require.NotEqual(t, phaseTownWalk, loop.phase,
+        "the escape that moved nothing ends the trip")
     require.Empty(t, game.walks,
         "a refused click is never sent")
 }

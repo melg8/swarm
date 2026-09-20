@@ -144,10 +144,15 @@ func TestBuildingEntryWalksFromTheAisleEntrance(t *testing.T) {
 // TestBuildingEntryEscapesTheWalledAisle pins the freeze model of the
 // dump: the simulated server walls the aisle column the plan walks
 // through - the character stalls at the entrance exactly the way the
-// dump froze - and the escalation ladder must rescue the segment: the
-// frozen corridor joins the session bans, the re-plan detours around
-// the building (the north and east approach), the walk reaches the
-// teacher and the talk click fires right by the npc.
+// dump froze - and the frozen trip escalation must rescue the segment:
+// the cursor key escape arms along the plan, the claimed
+// ValidatePosition stream walks the character through the walled
+// aisle (the arrow key movement of the 2026-09-14 15:10 report - the
+// only movement a click refusing ground answers, and the corridor ban
+// system is gone: no search of the session may ever be poisoned by a
+// freeze verdict again), the clicks resume from the escaped ground
+// and the walk reaches the teacher with the talk click firing right
+// by the npc.
 func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
     disablePace(t)
     engine := reproEngine(t)
@@ -172,43 +177,38 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
     // character never moves a cell onto the column, the stuck cycles
     // fire (the walkDrive acceleration stands the freeze exposed in
     // seconds instead of the 15 s real window) and the frozen abort
-    // climbs the escalation ladder.
+    // hands the walk to the cursor key escape.
     drive := newWalkDrive()
     deadline := time.Now().Add(60 * time.Second)
     for time.Now().Before(deadline) {
         drive.step(loop, game, bot, sim)
-        if loop.frozenStage > 0 {
+        if loop.cursorEscape.armed {
             break
         }
         time.Sleep(5 * time.Millisecond)
     }
-    require.Positive(t, loop.frozenStage,
-        "the walled aisle must freeze the plan and arm the escalation")
-    require.Len(t, loop.frozenAreas, 1,
-        "the frozen aisle corridor joined the session avoid areas")
-    require.InDelta(t, 44728.0, loop.frozenAreas[0].Center.X, 1.0,
-        "the ban covers the frozen aisle column")
+    require.True(t, loop.cursorEscape.armed,
+        "the walled aisle must freeze the plan and arm the cursor "+
+            "key escape along it")
     selfX, selfY, _, _ := bot.SelfPosition()
     require.LessOrEqual(t, math.Hypot(
         float64(selfX-44728), float64(selfY-51992)), 120.0,
         "the character still stands at the entrance - the freeze signature")
 
-    // The re-planned route detours around the banned aisle: the walk
-    // crosses the north of the building and the east approach, and
-    // the teach stop talks to the teacher. The strictest server model
-    // walls even the last stretch of the east approach (the roof-only
-    // interior bands), so the close ring cannot close - the approach
-    // window bounds the wait and the talk fires from within the
-    // server interaction distance instead. The walk below drives the
-    // ticks synchronously, so the window is pre-expired: the
-    // approachTeacher arming observes a lapsed deadline and takes
+    // The escape claims walk the character through the walled aisle
+    // along the plan, the settle returns the walk to the normal routed
+    // clicks and the teach stop talks to the teacher. The strictest
+    // server model walls even the last stretch of the east approach
+    // (the roof-only interior bands), so the close ring cannot close -
+    // the approach window bounds the wait and the talk fires from
+    // within the server interaction distance instead. The walk below
+    // drives the ticks synchronously, so the window is pre-expired:
+    // the approachTeacher arming observes a lapsed deadline and takes
     // the same expiry branch the real 45 s wait would take, without
     // the wait itself (the production semantics of the branch stay
     // pinned by npc_approach_test.go).
     loop.teacherWalkUntil = time.Now().Add(-time.Second)
     walkToTheTalkMax(t, loop, game, bot, sim, npcInteractionDist)
-    require.NotEmpty(t, loop.frozenAreas,
-        "the session ban survives the trip for the later plans")
 }
 
 // walkToTheTalk drives the loop and the simulated server until the
@@ -284,7 +284,7 @@ func (d *walkDrive) step(
     // The grace: a tick that replaced the plan (a re-path, a ladder
     // rung) gets its follow-up iteration free of stuck arming - the
     // fresh plan must click first.
-    fresh := &loop.waypoints != d.plan || loop.frozenStage != d.stage
+    fresh := &loop.waypoints != d.plan || loop.cursorEscapes != d.stage
     x, y, _, ok := bot.SelfPosition()
     if ok {
         if !fresh && d.started && sim.stalled &&
@@ -294,7 +294,7 @@ func (d *walkDrive) step(
         d.lastX, d.lastY = x, y
         d.started = true
     }
-    d.plan, d.stage = &loop.waypoints, loop.frozenStage
+    d.plan, d.stage = &loop.waypoints, loop.cursorEscapes
 }
 
 // containsClick reports whether the talk click reached the teacher.

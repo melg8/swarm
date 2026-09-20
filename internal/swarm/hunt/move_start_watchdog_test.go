@@ -5,6 +5,7 @@
 package hunt
 
 import (
+    "math"
     "testing"
     "time"
 
@@ -44,13 +45,14 @@ func TestMoveStartWatchdogForcesTheRecovery(t *testing.T) {
     moveSelfTo(bot, reproFastStuckX, reproFastStuckY, reproFastStuckZ)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.SetNavigator(&fakeNavigator{
+    nav := &fakeNavigator{
         found: true,
         route: watchdogRoute,
-        // Every forward line blocked: the re-path branch owns the
-        // recovery (no waypoint skip).
-        blind: true,
-    })
+    }
+    loop.SetNavigator(nav)
+    // Every forward line blocked: the re-path branch owns the
+    // recovery (no waypoint skip).
+    nav.validateHook = railingPortAimed(loop)
     dest := pathfind.Vec3{
         X: float64(reproFastStuckZoneX),
         Y: float64(reproFastStuckZoneY),
@@ -92,11 +94,35 @@ func TestPocketRefusalArmsTheCursorEscapeAtOnce(t *testing.T) {
     moveSelfTo(bot, reproFastStuckX, reproFastStuckY, reproFastStuckZ)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.SetNavigator(&fakeNavigator{
+    nav := &fakeNavigator{
         found: true,
         route: watchdogRoute[:3],
-        blind: true,
-    })
+    }
+    loop.SetNavigator(nav)
+    // The refusing pocket of the 15:10 report: the port validates the
+    // lines around the aimed waypoint (the varied aims - including
+    // the sideways probes - must leave the bot, the server then
+    // answers ActionFailed for each), the skip lines over the railing
+    // refuse offline.
+    aimed := railingPortAimed(loop)
+    nav.validateHook = func(from, to pathfind.Vec3) (pathfind.Vec3, bool) {
+        if loop.wpIndex >= len(loop.waypoints) {
+            return to, true
+        }
+        target := loop.waypoints[loop.wpIndex]
+        ax, ay := target.X-from.X, target.Y-from.Y
+        alen := math.Hypot(ax, ay)
+        if alen < 1 {
+            return to, true
+        }
+        tx, ty := to.X-from.X, to.Y-from.Y
+        cross := math.Abs(tx*ay-ty*ax) / alen
+        if cross <= refusalVariantStep {
+            return to, true
+        }
+
+        return aimed(from, to)
+    }
     dest := pathfind.Vec3{
         X: float64(reproFastStuckZoneX),
         Y: float64(reproFastStuckZoneY),

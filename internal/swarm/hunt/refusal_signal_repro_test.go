@@ -192,9 +192,6 @@ func TestReproRefusedClickSkipsTheCorridorBan(t *testing.T) {
         }
     }
 
-    require.Empty(t, loop.frozenAreas,
-        "a server that refuses the clicks does not name frozen "+
-            "corridors - the session must not poison the planner")
     require.Positive(t, sim.refused,
         "the refusal model is live: the clicks of the trips bounced")
     require.Zero(t, sim.accepted,
@@ -208,8 +205,6 @@ func TestReproRefusedClickSkipsTheCorridorBan(t *testing.T) {
         "the refusal evidence is visible to the operator")
     require.Contains(t, sink.String(), "varying the aim",
         "the varied aim ladder runs before the re-path machinery")
-    require.Contains(t, sink.String(), "skipping the corridor ban",
-        "the escalation gate reads the refusal latch")
     require.Contains(t, sink.String(),
         "the refused clicks hand the walk to the cursor key escape",
         "the frozen ladder hands the segment to the claims transport "+
@@ -261,17 +256,12 @@ func TestReproRefusedClickVariedAimWalksOut(t *testing.T) {
     require.True(t, arrived,
         "the varied aim must walk the character out of the refused "+
             "village approach and into the zone")
-    require.Empty(t, loop.frozenAreas,
-        "no corridor ban armed: the refusal was target specific, not "+
-            "a frozen corridor")
     require.Positive(t, sim.refused,
         "the plain long clicks are refused by the model")
     require.Positive(t, sim.accepted,
         "the varied aims are accepted by the model")
     require.Contains(t, sink.String(), "varying the aim",
         "the varied aim line names the recovery")
-    require.NotContains(t, sink.String(), "banning the frozen corridor",
-        "the corridor ban never runs on refusal evidence")
     require.NotContains(t, sink.String(),
         "the server refused the routed walk clicks",
         "the routed fallback never runs dry: the varied aims keep "+

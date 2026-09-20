@@ -77,7 +77,7 @@ func TestCursorEscapeClaimsRideServerFrame(t *testing.T) {
     const shift = 64.0
     loop.segmentFrameOffset = shift
 
-    steps, _ := loop.cursorEscapeRouteSteps(0, 0, -2920)
+    steps, _ := loop.cursorEscapeRouteSteps(0, 0, -2920, 0)
     require.NotEmpty(t, steps)
     for i, step := range steps {
         require.InDelta(t, -2920.0, float64(step[2]), 1,

@@ -110,16 +110,27 @@ func TestFollowerExtendsShortClickAfterStuck(t *testing.T) {
     require.Zero(t, loop.rePaths, "no re-path budget burns")
 }
 
-// TestFollowerKeepsShortClickBeforeStuck pins the unarmed behavior:
-// without a stuck (the normal tight ramp climb of the teacher segments),
-// the short waypoint click stands as is - the extension never fires
-// on a walking plan.
-func TestFollowerKeepsShortClickBeforeStuck(t *testing.T) {
+// TestFollowerExtendsShortClickBeforeStuck pins the unarmed behavior:
+// the sub-floor aim discipline is immediate, no stuck verdict needed.
+// A pinned cursor on a waypoint under the server rescue floor (the
+// tight ramp climb of the teacher segments - the 20 unit waypoint)
+// never sends the short click: the server's findPath branch only
+// takes a collapsed click over the threshold, a shorter one is
+// silently canceled (the 2026-09-11 11:34 dump froze through two
+// whole trip cycles on exactly such a click) - the aim re-aims at
+// the forward route samples before any click leaves the bot.
+func TestFollowerExtendsShortClickBeforeStuck(t *testing.T) {
     loop, game, nav := newClickGuardLoop(nil)
     // The successor line stays blocked so the cursor pins on the short
-    // waypoint (the teacher ramp shape).
-    nav.sightFunc = func(_, _ pathfind.Vec3) (bool, error) {
-        return false, nil
+    // waypoint (the teacher ramp shape): the click transport refuses
+    // the far successor while the forward route samples of the plan
+    // stay clickable.
+    nav.validateHook = func(from, to pathfind.Vec3) (pathfind.Vec3, bool) {
+        if int32(to.X) == 1600 {
+            return from, false
+        }
+
+        return to, true
     }
     loop.waypoints = []pathfind.Vec3{
         {X: 1000, Y: 1000, Z: 0},
@@ -134,9 +145,18 @@ func TestFollowerKeepsShortClickBeforeStuck(t *testing.T) {
     follow(loop)
 
     require.NotEmpty(t, game.walks,
-        "the unarmed follower keeps clicking the waypoint")
-    require.Equal(t, int32(1020), game.walks[len(game.walks)-1][0],
-        "the short waypoint click stands as is before any stuck")
+        "the unarmed follower keeps clicking the aim")
+    sent := game.walks[len(game.walks)-1]
+    length := math.Hypot(
+        float64(sent[0]-1000), float64(sent[1]-1000))
+    require.GreaterOrEqual(t, length, minWalkClick,
+        "the sub-floor aim extends to the forward route samples "+
+            "immediately - the short click the server silently "+
+            "cancels never leaves the bot (sent %.0f units to %d %d)",
+        length, sent[0], sent[1])
+    require.NotEqual(t, int32(1600), sent[0],
+        "the refused far successor stays refused, the extension "+
+            "aims the route samples between")
 }
 
 // TestFollowerHoldsBackwardClickWhenArmed pins the hold: an armed

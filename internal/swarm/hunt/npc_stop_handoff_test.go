@@ -51,7 +51,7 @@ func armGrindingMerchantWalk(t *testing.T, loop *Loop) {
             Z: float64(reproUnorenZ)},
     }
     loop.wpIndex = 0
-    loop.segmentSearch = segmentSearchView(npcApproachRadius, nil)
+    loop.segmentSearch = segmentSearchView(npcApproachRadius)
 }
 
 // TestMerchantStopHandsOverOnTheInteractionDistance pins the

@@ -160,10 +160,16 @@ var spawnDumpProbeDirections = [8][2]float64{
 
 // spawnDumpLoop builds the loop of the 16:02 dump on the real pack
 // and the real mesh tiles (the live hybrid navigator: the mesh plans,
-// the grid validates the clicks). The server model is the honest one
-// of the report: no server refusal answers exist in the session (the
-// refused clicks never left the bot), so the sim refuses nothing and
-// follows the claims - the whole freeze lived inside the bot.
+// the grid validates the clicks). The server model refuses the spawn
+// pocket ground itself (the 15:10 family: the plaza cell of that
+// report answered NO mouse click at all, only the arrow keys walked)
+// - the historical premise of this dump, "the freeze lived inside
+// the bot" (the follower's own advance gate refusing lines the click
+// transport accepted), is the 2026-09-20 plaza round's root cause and
+// is fixed: a walk whose clicks the transport accepts now simply
+// walks. The pocket refusal keeps this reproduction exercising the
+// honest recovery ladder: the varied aims, the re-path, the frozen
+// verdict, the cursor key escape along the plan.
 func spawnDumpLoop(
     t *testing.T,
 ) (*Loop, *fakeGame, *state.Bot, *cursorKeyServer, *bytes.Buffer) {
@@ -181,7 +187,8 @@ func spawnDumpLoop(
     loop.SetLogger(log.New(
         io.MultiWriter(sink, eventMirror{bot: bot}), "", 0))
     sim := &cursorKeyServer{
-        engine: engine, refuseRadius: 0, keyboard: true,
+        engine: engine, refuseRadius: 200, keyboard: true,
+        refuseX: spawnDumpX, refuseY: spawnDumpY,
     }
 
     return loop, game, bot, sim, sink
@@ -342,12 +349,13 @@ func escapeSnapshotClaims(
 }
 
 // TestReproRefusedSpawnLadderArmsTheEscapeWithoutServerAnswers pins
-// the 16:02 refusal family itself: the refusals lived in the LOCAL
-// click port (the clicks never left the bot), so no server answer
-// ever arrived - and the frozen ladder must STILL switch the walk to
-// the cursor key escape (the owner rule: the recovery switches modes
-// as soon as the current one proves useless). The escape arms over a
-// real route whose far end leads to the segment destination.
+// the 16:02 refusal family itself: the spawn pocket ground refuses
+// every mouse click (the 15:10 server family - the ActionFailed
+// answers arrive, the varied aims refuse, the re-path reproduces the
+// identical route) and the frozen ladder must STILL switch the walk
+// to the cursor key escape (the owner rule: the recovery switches
+// modes as soon as the current one proves useless). The escape arms
+// over a real route whose far end leads to the segment destination.
 func TestReproRefusedSpawnLadderArmsTheEscapeWithoutServerAnswers(
     t *testing.T,
 ) {
@@ -370,11 +378,10 @@ func TestReproRefusedSpawnLadderArmsTheEscapeWithoutServerAnswers(
     }
 
     require.True(t, armed,
-        "the frozen ladder arms the cursor key escape without any "+
-            "server refusal answer")
-    require.Zero(t, sim.refusals,
-        "the server never refused anything - the refusals of this "+
-            "dump family live in the local click port")
+        "the frozen ladder arms the cursor key escape over the "+
+            "refusing spawn pocket")
+    require.Positive(t, sim.refusals,
+        "the pocket refused the mouse clicks of the ladder")
     require.NotEmpty(t, game.cursorWalks,
         "the cursor key arm was sent")
     require.NotEmpty(t, game.claims,

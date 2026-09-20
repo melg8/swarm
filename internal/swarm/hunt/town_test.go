@@ -134,21 +134,22 @@ func (f *fakeNavigator) result(
     }, nil
 }
 
-// FindPathApproach plans the approach radius search.
+// FindPathApproach plans the approach radius search: it answers the
+// configured avoiding route, the partial corridor or the bare miss
+// the same way the avoiding variant does (the hunt loop's searches
+// all ask the same question - the fake answers them identically).
 func (f *fakeNavigator) FindPathApproach(
     start, end pathfind.Vec3, approachRadius float64,
 ) (*pathfind.Result, error) {
     f.approachEnds = append(f.approachEnds, end)
     f.approachRadii = append(f.approachRadii, approachRadius)
 
-    return f.result(start, end)
+    return f.approachResult(start, end)
 }
 
 // FindPathApproachAvoiding plans the approach search around the avoid
 // areas: it records the ban the loop passed and answers the configured
-// avoiding route, the partial corridor or the bare miss (nil avoid
-// route and partial route: the plain result - the ban made no
-// difference to the fake planner).
+// avoiding route, the partial corridor or the bare miss.
 func (f *fakeNavigator) FindPathApproachAvoiding(
     start, end pathfind.Vec3, approachRadius float64,
     avoid []pathfind.AvoidArea,
@@ -156,6 +157,14 @@ func (f *fakeNavigator) FindPathApproachAvoiding(
     f.approachEnds = append(f.approachEnds, end)
     f.approachRadii = append(f.approachRadii, approachRadius)
     f.avoiding = append(f.avoiding, avoid)
+
+    return f.approachResult(start, end)
+}
+
+// approachResult answers the configured approach search answer.
+func (f *fakeNavigator) approachResult(
+    start, end pathfind.Vec3,
+) (*pathfind.Result, error) {
     if f.avoidRoute != nil {
         f.calls++
         f.callsAt = append(f.callsAt, time.Now())

@@ -216,8 +216,6 @@ func TestCornerTurnBandJumpsTheCursorForward(t *testing.T) {
         "the cursor jumped onto the validating farther waypoint")
     require.NotEmpty(t, game.walks, "the recovery click went out")
     require.Zero(t, loop.rePaths, "the re-path ladder never burned")
-    require.Empty(t, loop.frozenAreas,
-        "no corridor ban sealed the corner ground")
 }
 
 // TestCornerWalkRoundsTheTurnWithoutRepath walks the plan fragment
@@ -258,7 +256,6 @@ func TestCornerWalkRoundsTheTurnWithoutRepath(t *testing.T) {
     require.True(t, passed,
         "the walk crossed the audited corner (the cursor passed it)")
     require.Zero(t, loop.rePaths, "the corner recovery burned no re-path")
-    require.Empty(t, loop.frozenAreas, "the corner stayed unsealed")
 }
 
 // TestCornerTurnJumpScanSendsNothingWhenNothingValidates pins the

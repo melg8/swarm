@@ -34,17 +34,19 @@ import (
 //
 // The root cause (two halves, both pinned here):
 //
-//  1. The frozen corridor ban never grew. banFrozenCorridor added one
-//     48 radius patch at the corridor waypoint and then answered
-//     "covered, skip the rung" for every later freeze: the detour the
-//     re-plan produced aimed 66 units from the ban center - inside
-//     the radius-plus-floor coverage of 96 - so no rung ever changed
-//     the plan shape again. The deterministic planner reproduced the
-//     same walled southwest corridor each trip (the geodata pack
-//     models it open, the user's server walls it), the direct server
-//     routed walk died on the whole-line water guard every time (the
-//     straight line from the terrace to the zone center crosses the
-//     lake) and the abort cycled forever.
+//  1. The deterministic planner reproduced the same walled southwest
+//     corridor each trip (the geodata pack models it open, the user's
+//     server walls it) and the recovery of the era - the frozen
+//     corridor ban with its widening - only ever pushed the modeled
+//     wall outward. The 2026-09-20 plaza round removed that whole
+//     system (its rectangle granularity sealed whole mesh sheets and
+//     its trigger read the follower's own cursor pinning as a
+//     freeze): the cursor key escape now owns the frozen walk - the
+//     claims transport walks the character ALONG THE PLANNED ROUTE
+//     through the walled ground (the arrow key movement of the
+//     2026-09-14 15:10 report, the only movement a click refusing
+//     server answers), the settle returns the walk to the normal
+//     routed clicks and the trip budget bounds itself.
 //
 //  2. The budget-gated direct zone segments ground silently. After the
 //     third abort zoneFails reached zoneReturnFailBudget and the
@@ -58,19 +60,18 @@ import (
 //
 // The fix (pinned by the tests below):
 //
-//  1. banFrozenCorridor widens the covering ban - the radius doubles,
-//     capped at frozenBanMaxRadius - instead of skipping the rung:
-//     every frozen trip pushes the modeled wall outward until the
-//     re-plan routes around the whole walled approach (the radius
-//     sweep against the real pack: 384 flips the elven village exit
-//     from the walled southwest corridor to the shop deck route).
+//  1. The frozen trip escalation hands the walk to the cursor key
+//     escape (see escalateFrozenSegment): the claims walk the plan
+//     through the walled approach, no corridor ban ever seals a
+//     search of the session and the escape budget bounds the
+//     recovery.
 //
 //  2. walkZoneSegment runs the no-movement stall of noteZoneSegmentStall: a
 //     position that holds past the stuck timeout while the direct
 //     segments go out re-arms the pathfound zone return (the same
 //     recovery the offline refusal of guardZoneSegmentClick arms), so the
-//     grind becomes a bounded, loud window that hands the geometry
-//     learning back to the widening ladder.
+//     grind becomes a bounded, loud window that hands the walk back
+//     to the routed segments.
 const (
     // reproWidenX/Y/Z is the reported stuck position (the dump of
     // 2026-09-14 08:42, the village south terrace deck of unittest3).
@@ -81,10 +82,6 @@ const (
     // Kaboo Orc Fighter SW-7 hexagon, the leash half 633).
     reproWidenZoneX = int32(36000)
     reproWidenZoneY = int32(46765)
-    // reproWidenCorridorX/Y is the corridor cell the dump's first
-    // trip banned (the village plaza corner waypoint).
-    reproWidenCorridorX = float64(43512)
-    reproWidenCorridorY = float64(50504)
 )
 
 // reproWidenWalls models the server side disagreement of the dump:
@@ -116,16 +113,40 @@ type walledVillageServer struct {
     walled   []pathfind.AvoidArea
     requests int
     refused  int
+    // cursorWalks/claims count the mode 0 arms and the claimed
+    // positions the sim already answered; cursorArmed mirrors the
+    // session's cursor key flag - the claims sync their placements
+    // straight into the world (the arrow key walk the frozen ladder
+    // hands the movement to), the mouse clicks that validate clear
+    // the flag.
+    cursorWalks int
+    claims      int
+    cursorArmed bool
 }
 
-// consume takes the newest walk request of the fake game, validates
-// it the way the reported server did and applies the destination the
-// server would walk to.
+// consume takes the newest requests of the fake game: the mode 0 arm
+// latches the cursor key flag, the claims sync their placements and
+// the newest walk request validates the way the reported server did -
+// the server would walk the validated destination or silently cancel
+// the line whose steps cross a walled patch.
 func (s *walledVillageServer) consume(game *fakeGame, bot *state.Bot) {
+    if len(game.cursorWalks) > s.cursorWalks {
+        s.cursorWalks = len(game.cursorWalks)
+        s.cursorArmed = true
+    }
+    if len(game.claims) > s.claims {
+        for _, claim := range game.claims[s.claims:] {
+            if s.cursorArmed {
+                moveSelfTo(bot, claim[0], claim[1], claim[2])
+            }
+            s.claims++
+        }
+    }
     if len(game.walks) <= s.requests {
         return
     }
     s.requests = len(game.walks)
+    s.cursorArmed = false
     target := game.walks[len(game.walks)-1]
     selfX, selfY, selfZ, ok := bot.SelfPosition()
     if !ok {
@@ -178,88 +199,19 @@ func (s *walledVillageServer) lineWalled(from, to pathfind.Vec3) bool {
     return false
 }
 
-// TestReproCorridorWidenDoublesTheCoveredBan pins the widening itself:
-// the aimed waypoint of a frozen detour that an existing ban already
-// covers grows that ban (the radius doubles) instead of skipping the
-// rung - the detour just froze on ground inside the ban's reach, so
-// the server wall is wider than the ban models. The growth doubles up
-// to the cap, a fresh waypoint still adds a new area and the area
-// count cap does not block the widening.
-func TestReproCorridorWidenDoublesTheCoveredBan(t *testing.T) {
-    loop, _, _, _ := newTripLoop()
-    // The frozen segment of the dump's second trip: the aimed waypoint is
-    // the detour's first waypoint, 66 units from the corridor ban the
-    // first trip armed.
-    loop.waypoints = []pathfind.Vec3{
-        {X: 45768, Y: 49848, Z: -3056},
-        {X: 43496, Y: 50440, Z: -2992},
-    }
-    loop.wpIndex = 1
-    loop.frozenAreas = []pathfind.AvoidArea{{
-        Center: pathfind.Vec3{
-            X: reproWidenCorridorX, Y: reproWidenCorridorY, Z: -2992,
-        },
-        Radius: frozenBanRadius,
-    }}
-
-    require.True(t, loop.banFrozenCorridor(),
-        "the covered detour waypoint must widen the ban, not skip the rung")
-    require.Len(t, loop.frozenAreas, 1,
-        "the widening grows the existing area in place")
-    require.InDelta(t, 96.0, loop.frozenAreas[0].Radius, 0.01,
-        "the radius doubles from the fresh patch floor")
-
-    require.True(t, loop.banFrozenCorridor())
-    require.InDelta(t, 192.0, loop.frozenAreas[0].Radius, 0.01)
-
-    require.True(t, loop.banFrozenCorridor())
-    require.InDelta(t, 384.0, loop.frozenAreas[0].Radius, 0.01,
-        "the radius the sweep flips the village exit at")
-
-    // The cap: a ban already at frozenBanMaxRadius answers false (the
-    // rung falls through to the direct server routed walk).
-    loop.frozenAreas[0].Radius = frozenBanMaxRadius
-    require.False(t, loop.banFrozenCorridor(),
-        "a capped ban cannot widen further")
-
-    // A fresh waypoint outside every ban still adds a new area.
-    loop.frozenAreas[0].Radius = frozenBanRadius
-    loop.waypoints[1] = pathfind.Vec3{X: 45464, Y: 49208, Z: -3064}
-    require.True(t, loop.banFrozenCorridor())
-    require.Len(t, loop.frozenAreas, 2,
-        "an uncovered waypoint arms a fresh area")
-    require.InDelta(t, frozenBanRadius, loop.frozenAreas[1].Radius, 0.01)
-
-    // The area count cap blocks new areas but not the widening.
-    for range frozenBanMax - 2 {
-        loop.frozenAreas = append(loop.frozenAreas, pathfind.AvoidArea{
-            Center: pathfind.Vec3{X: 40000, Y: 52000, Z: -3500},
-            Radius: frozenBanRadius,
-        })
-    }
-    require.Len(t, loop.frozenAreas, frozenBanMax)
-    // An uncovered waypoint on a full list arms nothing.
-    loop.waypoints[1] = pathfind.Vec3{X: 42000, Y: 48000, Z: -3500}
-    require.False(t, loop.banFrozenCorridor(),
-        "a full list arms no fresh area")
-    // The covering ban still widens on the full list.
-    loop.waypoints[1] = pathfind.Vec3{X: 43496, Y: 50440, Z: -2992}
-    loop.frozenAreas[0].Radius = 96
-    require.True(t, loop.banFrozenCorridor(),
-        "the widening of a covering ban survives the full list")
-    require.InDelta(t, 192.0, loop.frozenAreas[0].Radius, 0.01)
-}
-
-// TestReproCorridorWidenEscapesTheWalledApproach replays the whole
+// TestReproWalledApproachEscapesThroughTheClaims replays the whole
 // dump standoff against the real geodata pack: the character on the
 // terrace cell, the held cell 10200 units west, the server walls the
 // whole southwest approach the deterministic planner keeps routing
-// through. The widening ladder must push the plan off the corridor
-// (the shop deck route of the radius 384 sweep) and the walk must
-// arrive inside the zone - the inversion of the dump signature (three
-// identical aborted trips, then the silent grind, a character that
-// never moved a cell).
-func TestReproCorridorWidenEscapesTheWalledApproach(t *testing.T) {
+// through. The frozen trip escalation must hand the walk to the
+// cursor key escape - the claims walk the character ALONG THE PLANNED
+// ROUTE through the walled ground (the arrow key movement of the
+// 2026-09-14 15:10 report), the settle returns the walk to the normal
+// routed clicks past the wall and the walk arrives inside the zone -
+// the inversion of the dump signature (three identical aborted trips,
+// then the silent grind, a character that never moved a cell), and
+// NO corridor ban ever seals a search of the session.
+func TestReproWalledApproachEscapesThroughTheClaims(t *testing.T) {
     engine := reproEngine(t)
     nav := NewNavigator(engine)
     bot := newTestBot()
@@ -317,17 +269,18 @@ func TestReproCorridorWidenEscapesTheWalledApproach(t *testing.T) {
     }
 
     require.True(t, arrived,
-        "the widened corridor ban must route the return out of the "+
+        "the cursor key escape must walk the return through the "+
             "walled approach and into the zone")
     require.Positive(t, sim.refused,
         "the wall is modeled: the corridor clicks of the frozen trips "+
             "are refused without movement")
-    require.NotEmpty(t, loop.frozenAreas,
-        "the ladder armed the corridor ban")
-    require.GreaterOrEqual(t, loop.frozenAreas[0].Radius, 384.0,
-        "the escape needed the widened ban (the r384 sweep route)")
-    require.Contains(t, sink.String(), "widening the frozen corridor ban",
-        "the widening is visible to the operator")
+    require.NotEmpty(t, game.cursorWalks,
+        "the frozen trips handed the walk to the cursor key escape")
+    require.NotEmpty(t, game.claims,
+        "the claimed ValidatePosition stream walked the walled route")
+    require.NotContains(t, sink.String(), "frozen corridor",
+        "no corridor ban ever seals a search of the session - the "+
+            "system is gone")
 }
 
 // TestReproZoneSegmentGrindStallReArmsThePathfoundReturn pins the grind

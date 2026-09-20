@@ -246,9 +246,7 @@ func (l *Loop) adoptOutZoneFight(now time.Time) bool {
 // walk the direct line). One fresh planning cycle arms per backoff
 // window - the
 // counter resets with the paced log line, so the next returnToZone
-// retries the planner while the session's frozen corridor bans
-// (widened by every failed trip) keep reshaping the routes it may
-// answer.
+// retries the planner fresh.
 func (l *Loop) holdZoneReturn(now time.Time) {
     if now.Sub(l.zoneSegmentLogAt) >= noPickLogPeriod {
         l.zoneSegmentLogAt = now
@@ -329,8 +327,7 @@ func (l *Loop) returnToZone() {
         // segments toward the zone (the owner rule of the 2026-09-19
         // round: NEVER walk the direct line). The paced line explains
         // the standing hunter in the state dump; the next returnToZone
-        // re-plans (a failed trip's bans may have reshaped the answer
-        // by then).
+        // re-plans.
         l.phase = phaseEngage
         l.zoneFails++
         if now.Sub(l.zoneSegmentLogAt) >= noPickLogPeriod {

@@ -101,42 +101,52 @@ func TestReproEscapeClaimsMarkWalkedWaypointsPassed(t *testing.T) {
     require.Greater(t, len(loop.waypoints), 1,
         "the zone return plans a real multi waypoint route")
 
-    armWp := -1
     armed := false
     settled := false
     settleLog := ""
     firstClickAfterSettle := [3]int32{}
+    lastCursor := 0
     now := time.Now()
     for i := 0; i < 400 && !settled; i++ {
         now = now.Add(2 * time.Second)
-        if loop.cursorEscape.armed && !armed {
-            armed = true
-            armWp = loop.wpIndex
-        }
         beforeWalks := len(game.walks)
         syncDriveTick(t, loop, sim, game, bot, now)
+        if loop.cursorEscape.armed && !armed {
+            armed = true
+            lastCursor = loop.wpIndex
+        }
         if armed && !settled {
-            // The cursor of the armed escape never regresses: the
-            // claims only mark the walked ground passed.
-            require.GreaterOrEqual(t, loop.wpIndex, armWp,
-                "the plan cursor regressed under the armed escape")
-            if len(game.claims) > 0 {
-                // Every completing claim marks its route waypoint
-                // passed the moment it lands (the owner contract: the
-                // wasd walked points show passed while the wasd walk
-                // streams).
-                for k := range game.claims {
-                    if k >= len(loop.cursorEscape.wpMap) {
-                        break
-                    }
-                    if done := loop.cursorEscape.wpMap[k]; done >= 0 {
-                        require.GreaterOrEqual(t, loop.wpIndex, done+1,
-                            "claim %d completed route waypoint %d - "+
-                                "the plan cursor must mark it passed", k, done)
-                    }
+            // The cursor follows the CLAIMS' ground progress: it never
+            // regresses under the armed escape (the arm re-anchored it
+            // onto the first un-walked waypoint, the marks only
+            // advance it) and it never runs ahead of the claimed
+            // ground (the highest route waypoint the consumed claims
+            // completed - the forward jump may have bet the cursor
+            // onto a far waypoint the server refused, the claims own
+            // the bookkeeping from the arm on). A claim lands one
+            // tick after its send (the server echo of the claim moves
+            // the character first, the follow verdict of the next
+            // drive runs the mark), so the mark of the just sent
+            // claim is the ceiling, not the floor.
+            marked := -1
+            for k := 0; k < loop.cursorEscape.next &&
+                k < len(loop.cursorEscape.wpMap); k++ {
+                if done := loop.cursorEscape.wpMap[k]; done > marked {
+                    marked = done
                 }
             }
-            if !loop.cursorEscape.armed && armWp >= 0 {
+            require.GreaterOrEqual(t, loop.wpIndex, lastCursor,
+                "the plan cursor regressed under the armed escape")
+            if marked >= 0 && loop.cursorEscape.armed {
+                // The settle tick reconciles the cursor with the
+                // character's arrival ground beyond the marks - the
+                // ceiling holds while the claims own the segment.
+                require.LessOrEqual(t, loop.wpIndex, marked+1,
+                    "the plan cursor runs ahead of the claimed ground "+
+                        "(waypoint %d completed)", marked)
+            }
+            lastCursor = loop.wpIndex
+            if !loop.cursorEscape.armed {
                 settled = true
                 settleLog = sink.String()
                 if len(game.walks) > beforeWalks {
@@ -151,12 +161,21 @@ func TestReproEscapeClaimsMarkWalkedWaypointsPassed(t *testing.T) {
     require.NotEmpty(t, game.claims,
         "the claimed steps walked the route")
 
-    // The cursor moved past the walked prefix: the escape walked
-    // cursorEscapeRouteMax of route ground - the plan must show it
-    // (the dump kept the cursor at wp 1 through the whole escape).
-    require.Greater(t, loop.wpIndex, armWp,
+    // The cursor sits at least on the walked ground: the claims
+    // walked route ground - the plan must show the walked prefix
+    // (the dump kept the cursor at wp 1 through the whole escape and
+    // the resumed clicks walked the ground back), and the settle's
+    // own advance may only move it further onto the ground the
+    // character actually stands on.
+    walked := 0
+    for k := range loop.cursorEscape.wpMap {
+        if k < len(game.claims) && loop.cursorEscape.wpMap[k] >= 0 {
+            walked = loop.cursorEscape.wpMap[k]
+        }
+    }
+    require.GreaterOrEqual(t, loop.wpIndex, walked+1,
         "the wasd walked waypoints must mark passed - the plan "+
-            "cursor must advance past the walked prefix")
+            "cursor must sit on the walked prefix")
 
     // The plan view stamps the walked prefix as passed: every
     // waypoint before the cursor carries its arrival time (the

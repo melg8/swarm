@@ -462,21 +462,6 @@ type Loop struct {
     repathX       int32
     repathY       int32
     frozenRepaths int
-    // frozenAreas is the session memory of the ground the live
-    // server refused to walk although the geodata pack modeled it
-    // as open: every dry town segment search routes around them (see
-    // banFrozenCorridor). The 2026-09-12 trainer hall aisle dump:
-    // the plan entered the building through the west aisle column,
-    // the server walled it, the deterministic re-plan reproduced
-    // the identical route and the character stood frozen through
-    // the whole re-path budget - the ban turns that freeze into a
-    // detour.
-    frozenAreas []pathfind.AvoidArea
-    // frozenStage counts the escalation rungs of the frozen town
-    // segment (0: none, 1: the banned detour re-plan, 2: the cursor
-    // key escape along the plan): see escalateFrozenSegment. It resets
-    // on the stop boundaries, not on the re-plans of the same segment.
-    frozenStage int
     // cursorEscape carries the cursor key escape of a click-refusing
     // cell (see beginCursorKeyEscape): the armed state, the claimed
     // dry steps toward the escape aim, the claim cursor and the
@@ -497,13 +482,11 @@ type Loop struct {
     // segmentRefused latches the online refusal evidence of the current
     // segment: the server answered a click of this segment with
     // ActionFailed while the character stood still (see
-    // refusalEvidence). The corridor ban rung of the frozen trip
-    // escalation reads it - a segment the server refused does not name a
-    // frozen corridor, banning it would seal innocent ground for the
-    // session (the 2026-09-14 10:18 dump: six corridor bans and a
-    // widened r768 ban across both village exits while the server
-    // refused every click for its own reasons). It clears on the segment
-    // boundaries with the other segment state.
+    // refusalEvidence). The varied aim machinery reads it - a
+    // segment the server refused needs its targets varied, not the
+    // same aim re-clicked (the 2026-09-14 10:18 dump: the server
+    // refused every click for its own reasons). It clears on the
+    // segment boundaries with the other segment state.
     segmentRefused bool
     // segmentRefusedX/Y remember the cell where the segment's first refusal
     // verdict latched (see latchSegmentRefused): a stuck verdict with
@@ -541,8 +524,8 @@ type Loop struct {
     // inherit it.
     segmentRadius float64
     // segmentSearch is the mesh search contract the current segment's plan
-    // answered (the filter, the approach radius and the ban circles
-    // startWalkSegmentSearch ran with): the walk plan view publishes it,
+    // answered (the approach radius startWalkSegmentSearch ran with):
+    // the walk plan view publishes it,
     // so the 3D pathfind link rebuilds the very search the walk
     // follows instead of a lookalike (the 2026-09-19 route mismatch:
     // the viewer rebuilt a dry zone return with the swim filter and
@@ -946,8 +929,6 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         repathX:            0,
         repathY:            0,
         frozenRepaths:      0,
-        frozenAreas:        nil,
-        frozenStage:        0,
         segmentRefused:     false,
         refusalVariants:    0,
         zoneRefusalX:       0,
