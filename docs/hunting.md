@@ -505,6 +505,33 @@ The short form:
   that cannot afford any weapon keeps farming: the gate only holds
   when the plan offers a weapon, so a fresh bot still punches
   keltirs until the wallet crosses the cheapest offer.
+- **The merchants specialize and the bot carries the same knowledge**
+  (the 2026-09-20 seller distinction round): a weapon buys only at
+  the weapon trader, an armor piece (with the shields) only at the
+  armor trader, the jewels and the spellbooks only at the jeweler -
+  the server resolves every RequestBuyItem through the targeted folk
+  npc and silently refuses the list the targeted npc does not trade,
+  so a buy aimed at the wrong vendor burns the whole retry budget
+  for nothing. The wares of every town merchant derive from the
+  generated buylists at runtime (`hunt/merchant.go`:
+  `merchantWares` classifies the goods families, `merchantSellsItem`
+  is the exact item check): the elven village splits into Unoren
+  (weapons), Ariel (armor), Creamees (jewels + spellbooks + the
+  mystic amulets), Herbiel (consumables) and the Dion quarter into
+  Sabrin, Casey, Sonia, Lara the same way. The enforcement points:
+  the frozen trip plan drops the lines whose merchant's lists do not
+  carry the item (`dropForeignMerchantPurchases` at the freeze, a
+  data bug surfaces as a loud log line instead of refused requests),
+  and `handleMerchant` re-picks the trader when the selected npc's
+  template answers none of the stop's wanted templates. The sells
+  stay universal: any merchant of the region accepts the sale of any
+  sellable item (the standard inventory sell list), the sell stop
+  picks the nearest vendor - and the stale selection of the sell
+  phase used to aim the merged weapon buys at the armor trader
+  standing next door (the re-pick closes that hole). The merchant
+  sets follow the region (`merchantsForRegion`): the elven default
+  and the Dion set for the 20-25 band, the same set the region shop
+  catalog builds from.
 - **One town visit buys everything** (the 2026-09-12 acceptance
   round): the gear stops distribute first (`planShoppingStops`), the
   learn stops close the trip behind them (`planLearnStops` at the

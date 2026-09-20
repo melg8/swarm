@@ -502,20 +502,29 @@ func (e engineNavigator) ValidateClick(
     return e.engine.ValidateClick(from, to)
 }
 
-// nearestMerchant returns the town merchant closest to the point.
+// merchantsForRegion returns the shop merchants of the region the
+// loop farms near: the elven village set is the default and the Dion
+// set serves the 20-25 band region. The same set builds the region
+// shop catalog (see shopCatalogForRegion), so the trip targets, the
+// sell stop pick and the purchase plan always name the same town's
+// traders.
+func merchantsForRegion(region string) []townNpc {
+    if region == regionDion {
+        return dionMerchants
+    }
+
+    return townMerchants
+}
+
+// nearestMerchant returns the town merchant of the active region
+// closest to the point.
 func (l *Loop) nearestMerchant(
     selfX int32, selfY int32,
 ) (townNpc, bool) {
-    best := townNpc{
-        TemplateID: 0,
-        Name:       "",
-        X:          0,
-        Y:          0,
-        Z:          0,
-    }
+    best := zeroTownNpc
     bestDist := math.MaxFloat64
     found := false
-    for _, merchant := range townMerchants {
+    for _, merchant := range merchantsForRegion(l.zoneRegion) {
         dist := math.Hypot(
             float64(merchant.X-selfX), float64(merchant.Y-selfY))
         if dist < bestDist {
@@ -528,10 +537,19 @@ func (l *Loop) nearestMerchant(
     return best, found
 }
 
-// merchantTemplates lists the packet template ids of the town merchants.
-func merchantTemplates() []int32 {
-    templates := make([]int32, 0, len(townMerchants))
-    for _, merchant := range townMerchants {
+// merchantTemplates lists the packet template ids of the active
+// region's town merchants: the sell stop pick accepts any of them
+// (every vendor accepts the sale of any sellable item), while the buy
+// stops name their own trader through stopMerchantTemplates.
+func (l *Loop) merchantTemplates() []int32 {
+    return townMerchantTemplates(merchantsForRegion(l.zoneRegion))
+}
+
+// townMerchantTemplates lists the packet template ids of the merchant
+// set (the NpcInfo tracker ids carry the display id offset).
+func townMerchantTemplates(merchants []townNpc) []int32 {
+    templates := make([]int32, 0, len(merchants))
+    for _, merchant := range merchants {
         templates = append(templates, merchant.TemplateID+npcDisplayOffset)
     }
 
@@ -3195,7 +3213,7 @@ func (l *Loop) tickTownSell() {
     }
     if l.sellableStop() {
         if l.junkRemaining() {
-            if !l.handleMerchant(now, merchantTemplates()) {
+            if !l.handleMerchant(now, l.merchantTemplates()) {
                 return
             }
             l.sellJunk()
@@ -3261,12 +3279,27 @@ func (l *Loop) tickTownSell() {
 // The sale itself works without a merchant (the standard inventory sell
 // list), so a merchant that never shows up only delays it; the buys
 // need the merchant, their stops skip the purchases instead.
+//
+// The selected npc must trade what the wanted templates name: the sell
+// phase passes every town merchant (the junk sells to any vendor), the
+// buy stops pass their own trader - the server resolves the buy
+// through the targeted folk npc and silently refuses the list the
+// targeted npc does not trade, so a selection left over from the sell
+// phase (the nearest vendor, often the armor trader standing next to
+// the weapon shop) re-picks here instead of aiming the weapon buy at
+// the armor trader.
 func (l *Loop) handleMerchant(now time.Time, templates []int32) bool {
     if l.merchantID < 0 {
         return true
     }
     if l.merchantID > 0 {
-        return l.approachMerchant(now)
+        if merchantTemplateWanted(
+            l.tracker.ObjectTemplateID(l.merchantID), templates) {
+            return l.approachMerchant(now)
+        }
+        l.logf("Hunt: shop: %s does not sell this stop's goods, "+
+            "re-picking the merchant", l.tracker.ObjectName(l.merchantID))
+        l.merchantID = 0
     }
     if now.Sub(l.merchantPick) < selectPeriod {
         return false

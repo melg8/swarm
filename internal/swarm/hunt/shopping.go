@@ -168,7 +168,41 @@ func shopCatalog(merchants []townNpc) gear.Catalog {
 // plan (see maybeStartTownTrip): everything the trip sells and buys
 // reads that frozen plan.
 func (l *Loop) shoppingPlan() []gear.Purchase {
-    return affordablePrefix(l.shoppingQueue())
+    return l.dropForeignMerchantPurchases(
+        affordablePrefix(l.shoppingQueue()))
+}
+
+// dropForeignMerchantPurchases removes the plan lines whose merchant
+// does not trade the item: the planner joins the candidates through
+// the generated catalogs and never pins a wrong merchant, so a
+// foreign line is a data bug - the loud drop at the freeze keeps the
+// trip from burning its buy retries against the silent server refusal
+// (a weapon line pinned to the armor trader would wait out four
+// refused requests per stop). The sell first pieces of a dropped
+// line stay unsold: their credit was never earned.
+func (l *Loop) dropForeignMerchantPurchases(
+    purchases []gear.Purchase,
+) []gear.Purchase {
+    kept := make([]gear.Purchase, 0, len(purchases))
+    for _, purchase := range purchases {
+        if merchantSellsItem(purchase.MerchantTemplateID, purchase.ItemID) {
+            kept = append(kept, purchase)
+
+            continue
+        }
+        merchant, known := merchantByTemplate(purchase.MerchantTemplateID)
+        if known {
+            l.logf("Hunt: shop: %s does not sell %s, dropping the "+
+                "purchase", merchant.Name, npcdata.ItemName(purchase.ItemID))
+
+            continue
+        }
+        l.logf("Hunt: shop: the merchant %d does not sell %s, "+
+            "dropping the purchase", purchase.MerchantTemplateID,
+            npcdata.ItemName(purchase.ItemID))
+    }
+
+    return kept
 }
 
 // shoppingQueue computes the fresh purchase queue against the current
@@ -739,7 +773,7 @@ func merchantByTemplate(templateID int32) (townNpc, bool) {
 // trip stop merchant (offset by the display id base).
 func (l *Loop) stopMerchantTemplates() []int32 {
     if len(l.tripStops) == 0 {
-        return merchantTemplates()
+        return l.merchantTemplates()
     }
 
     return []int32{

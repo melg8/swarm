@@ -1592,3 +1592,33 @@ a38b90a (test gate: the unit test account ladder renames to unittest1 - the test
   clean, go test -count=1 ./... 28 packages ok (pathfind 126 s
   dominates). No live behavior change: the rename is textual, the
   movement semantics, the wire packets and the plans are identical.
+
+## Completed: the merchant seller distinction round (2026-09-20)
+
+Branch: `feature/new-pathfind-alternative`, commits as melg8. The
+owner report: the bot does not correctly distinguish the sellers -
+the knowledge of the armor and the weapon traders was missing, a
+weapon must not buy at the armor trader and vice versa, while any
+item not forbidden from the sale sells to any merchant.
+
+### What was done
+
+- the stale merchant selection of the sell phase aimed the merged
+  buy requests at the wrong trader (the server silently refuses the
+  foreign list and the stop burned its retry budget) -
+  `handleMerchant` re-picks the trader when the selected npc's
+  template answers none of the stop's wanted templates.
+- the new `hunt/merchant.go` carries the merchant wares knowledge
+  derived from the generated buylists at runtime (weapons / armor
+  with the shields / jewels / magic / consumables, per merchant,
+  both towns); `merchantSellsItem` is the exact item check.
+- the frozen trip plan drops the lines whose merchant does not trade
+  the item (`dropForeignMerchantPurchases`, a data bug surfaces as a
+  loud log line).
+- the merchant sets follow the region (`merchantsForRegion`): the
+  Dion band no longer targets the elven traders from the trip start
+  and the sell pick.
+- the tests: hunt/merchant_test.go (the classification of the eight
+  known merchants, the exact join, the freeze filter, the end to end
+  re-selection round, the region sets). The docs: hunting.md shop
+  section, development_log.md Round 98.

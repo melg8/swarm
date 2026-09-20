@@ -7536,3 +7536,88 @@ confirmed, the walk proceeded to the teacher legs; the scenario
 window exceeded the sandbox's ten minute call limit mid learning
 (the farmTimeout of twenty minutes owns the full run, the shopping
 round itself completed inside three minutes).
+
+## Round 98: the merchant wares round - the buy stops re-select their trader and the seller distinction becomes knowledge (2026-09-20)
+
+Scope: the owner report - the bot does not correctly distinguish the
+sellers; there must be the knowledge that the armor and the weapon
+traders exist, a weapon must not buy at the armor trader and vice
+versa, while any item not forbidden from the sale sells to any
+merchant.
+
+Diagnosis: the sell stop picked the nearest vendor npc of the town
+for the junk sale (every merchant accepts any sellable item through
+the standard inventory sell list - that part is correct) and the
+picked object id survived into the buy phase of the same stop. The
+frozen plan's purchases grouped by merchant (planShoppingStops), the
+group of the stop's merchant merged into the current stop - and the
+buy requests went out targeted at whatever npc the sell phase had
+selected. Unoren and Ariel stand 57 units apart in the elven shop
+quarter, so the weapon stop (the sell stop routes to the weapon
+merchant) sold the junk to the armor trader and then asked HER for
+Unoren's weapon list: the server resolves RequestBuyItem through the
+targeted folk npc and refuses the list it does not trade silently
+(bare ActionFailed), the batch burned its three re-requests at 15
+seconds each and the trip left without the weapon - the exact
+"bought nothing at the seller" shape of the report.
+
+Fix:
+- handleMerchant re-picks the merchant when the selected npc's
+  tracker template answers none of the wanted ones: the sell phase
+  keeps the any-merchant pick (the junk sells to any vendor), the
+  buy stops re-select their own trader and the re-selection click
+  goes out like an ordinary select (the merchant no-show path and
+  the skip machinery stay unchanged).
+- the frozen trip plan drops the lines whose merchant's buylists do
+  not carry the item (dropForeignMerchantPurchases at the
+  shoppingPlan freeze): the planner joins the candidates through the
+  generated catalogs and never pins a wrong merchant, so a foreign
+  line is a data bug - the loud log line at the freeze replaces four
+  silently refused requests per stop, and the sell first pieces of a
+  dropped line stay unsold (their credit was never earned).
+- the new merchant wares knowledge (hunt/merchant.go) classifies the
+  traded goods of every town merchant from the generated buylists at
+  runtime (no hardcoded table to drift from the server data):
+  WaresWeapon / WaresArmor (the shields trade at the armor shop) /
+  WaresJewel / WaresMagic (the spellbook, the mystic amulet and the
+  blueprint name prefixes - the item types carry no family for them)
+  / WaresConsumable (the arrows carry a left hand bodypart and must
+  not read as shields - the item type gate catches them first). The
+  elven split: Unoren the weapons, Ariel the armor, Creamees the
+  jewels with the spellbooks, Herbiel the consumables; the Dion
+  quarter the same (Sabrin, Casey, Sonia, Lara - Sonia stocks the
+  amulets too).
+- the merchant sets follow the region (merchantsForRegion): the
+  trip start (nearestMerchant) and the sell pick (merchantTemplates)
+  walked the elven lists unconditionally - a Dion band bot would have
+  targeted the elven traders 40 km away; both read the region's set
+  now, the same set the region shop catalog builds from.
+
+The seller universalism stays as the owner rule says: any merchant
+accepts the sale of any item not forbidden from the sale - the
+sellable set keeps excluding the equipped gear, the adena, the quest
+items, the planned equips, the demanded spellbooks and the
+unsellable starter kit (the destroy flow owns those), and the junk
+sells at the nearest vendor of the region whatever the trip buys
+afterwards.
+
+Verification: the new hunt/merchant_test.go pins the wares
+classification of the eight known merchants against the generated
+catalogs, the exact merchantSellsItem join (the Brandish answers
+false at Ariel, the Shirt false at Unoren), the freeze filter (the
+armor trader line of a weapon drops with the log) and the end to end
+re-selection round: the junk sells to the nearest Ariel while the
+trip targets Unoren, the buy stop logs the mismatch, re-picks
+Unoren, clicks it and the weapon list goes out (red before the
+handleMerchant change - the buy went out targeted at the armor
+trader). The region test pins the elven default and the Dion set of
+nearestMerchant and merchantTemplates. go test ./internal/swarm/hunt
+./internal/swarm/gear ./internal/swarm/state every package ok,
+golangci-lint run --new 0 issues (the full run carries the pre
+existing 5 findings of the untouched counter leg test file and the
+maybeStartTownTrip complexity, identical on the clean HEAD),
+gofmt-spaces clean. The live acceptance run against the deployed
+stack stays for the next session with the stack up (the offline pins
+carry the transaction contract; the live run repeats the level 15
+kit round of the shop quarter fix and watches the weapon stop log
+for the re-pick line).
