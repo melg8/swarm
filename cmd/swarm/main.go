@@ -125,6 +125,13 @@ type config struct {
     // sessionDir is the directory of the persistent session journal
     // ("logs" by default, empty disables the journal entirely).
     sessionDir string
+    // acceptanceLogDir is the directory of the per-run acceptance
+    // bot logs (the hyper-detailed trail of every scenario run: the
+    // test contract, the environment, every packet, every monitor
+    // verdict). Empty derives "<session-dir>/acceptance" (or
+    // "logs/acceptance" when the journal is off), "off" disables
+    // the run logs.
+    acceptanceLogDir string
     // sessionReport renders the compact session report of a journal
     // file to stdout and exits (the post-mortem path: the run may be
     // long over, the journal file carries the story).
@@ -197,6 +204,7 @@ func parseFlags() config {
         bots:             1,
         acceptanceRun:    "",
         sessionDir:       "",
+        acceptanceLogDir: "",
         sessionReport:    "",
         sessionQuery:     "",
         sessionAnomalies: "",
@@ -286,6 +294,14 @@ func parseFlags() config {
             "record of every event since the application start, "+
             "rotated and gzipped; the web UI session dump button "+
             "renders its report). Empty disables the journal")
+    flag.StringVar(&cfg.acceptanceLogDir, "acceptance-log-dir", "",
+        "directory of the per-run acceptance bot logs - one "+
+            "hyper-detailed file per scenario run (the test "+
+            "contract, the environment, every packet the temp bot "+
+            "receives and sends, every monitor check verdict and "+
+            "the outcome block). Empty derives it from -session-dir "+
+            "(<session-dir>/acceptance, or logs/acceptance when the "+
+            "journal is off); 'off' disables the run logs")
     flag.StringVar(&cfg.sessionReport, "session-report", "",
         "render the compact session report of a journal file to "+
             "stdout and exit (the post-mortem analysis of a "+
@@ -1564,7 +1580,27 @@ func newAcceptanceManager(
         Proxy:    proxyServer,
         Logger:   log.Default(),
         DBConfig: acceptance.DefaultDBConfig(),
+        LogDir:   acceptanceLogDir(cfg),
     }, acceptance.Definitions())
+}
+
+// acceptanceLogDir resolves the directory of the per-run acceptance
+// bot logs: an explicit -acceptance-log-dir wins ("off" disables the
+// run logs), the empty default derives "<session-dir>/acceptance"
+// from the journal directory and falls back to "logs/acceptance"
+// when the journal itself is off (the run logs stay on - they are
+// the feedback loop of the acceptance suite).
+func acceptanceLogDir(cfg config) string {
+    switch {
+    case cfg.acceptanceLogDir == "off":
+        return ""
+    case cfg.acceptanceLogDir != "":
+        return cfg.acceptanceLogDir
+    case cfg.sessionDir != "":
+        return filepath.Join(cfg.sessionDir, "acceptance")
+    default:
+        return "logs" + string(os.PathSeparator) + "acceptance"
+    }
 }
 
 // runHuntAuditCLI measures the live hunting ground geometry: the

@@ -64,6 +64,10 @@ func (m *Manager) ensureCharacter(
     if err != nil {
         return err
     }
+    // The creation exchange lands in the run log too (the character
+    // list, the create request and its answer): the prologue of the
+    // run tells whether the temp character existed or was created.
+    m.tapGame(game, account)
     charList, err := game.Authenticate(gameSessionParams(auth))
     if err != nil {
         _ = game.Close()
@@ -111,31 +115,46 @@ func gameSessionParams(auth *connection.AuthResult,
 // authentication and the game server handshake of one temp account.
 // The registrar is the client proxy the session registers with (nil
 // keeps the default proxy of the process, a dedicated server owns the
-// relay scenario).
+// relay scenario). The connection steps land in the run log of the
+// account so the file tells how the session was wired.
 func (m *Manager) openGame(
     account string, password string, registrar *proxy.Server,
 ) (*connection.AuthResult, *connection.GameClient, error) {
+    runLog := m.runLogFor(account)
+    runLog.Session("login dial %s", m.login)
     loginConn, err := sessionDialer.Dial("tcp", m.login)
     if err != nil {
+        runLog.Session("login dial failed: %v", err)
+
         return nil, nil, fmt.Errorf("login dial: %w", err)
     }
     auth, err := connection.Authenticate(loginConn, account, password)
     if err != nil {
+        runLog.Session("login authentication failed: %v", err)
+
         return nil, nil, fmt.Errorf("authenticate: %w", err)
     }
+    runLog.Session("login authenticated, the game server %d waits at %s",
+        auth.ServerID, gameAddress(auth))
     if registrar != nil {
         // The emulated login server of the client proxy mirrors the
         // scrambled RSA modulus of the real one.
         registrar.SetRsaModulus(auth.RsaPublicKey)
     }
+    runLog.Session("game dial %s", gameAddress(auth))
     gameConn, err := sessionDialer.Dial("tcp", gameAddress(auth))
     if err != nil {
+        runLog.Session("game dial failed: %v", err)
+
         return nil, nil, fmt.Errorf("game dial: %w", err)
     }
     game, err := connection.NewGameClient(gameConn)
     if err != nil {
+        runLog.Session("game handshake failed: %v", err)
+
         return nil, nil, fmt.Errorf("game handshake: %w", err)
     }
+    runLog.Session("game handshake accepted (protocol version ok)")
     game.SetLogger(m.logger)
 
     return auth, game, nil
@@ -146,6 +165,42 @@ func gameAddress(auth *connection.AuthResult) string {
     return fmt.Sprintf("%d.%d.%d.%d:%d",
         auth.ServerIP[0], auth.ServerIP[1], auth.ServerIP[2], auth.ServerIP[3],
         auth.ServerPort)
+}
+
+// tapGame wires the packet taps of the run log onto one game client
+// (the short lived creation connection of ensureCharacter).
+func (m *Manager) tapGame(game *connection.GameClient, account string) {
+    runLog := m.runLogFor(account)
+    if runLog == nil {
+        return
+    }
+    game.SetTap(runLog.Recv)
+    game.SetSendTap(runLog.Send)
+}
+
+// wireSessionTaps wires the packet taps of one session: the run log
+// observes every packet the bot receives and sends, the proxy
+// recorder keeps its replay history (the client can attach to the
+// running bot exactly like to any fleet bot).
+func (m *Manager) wireSessionTaps(
+    game *connection.GameClient, account string,
+    proxyRecord func([]byte),
+) {
+    runLog := m.runLogFor(account)
+    if runLog == nil {
+        if proxyRecord != nil {
+            game.SetTap(proxyRecord)
+        }
+
+        return
+    }
+    game.SetTap(func(payload []byte) {
+        if proxyRecord != nil {
+            proxyRecord(payload)
+        }
+        runLog.Recv(payload)
+    })
+    game.SetSendTap(runLog.Send)
 }
 
 // runSession plays the temp character until the context ends: the
@@ -171,11 +226,13 @@ func (m *Manager) runSession(
     // The proxy observes the whole session (the recorder replays it
     // to connecting C1 clients) so the user can attach a real client
     // to the running test bot exactly like to any fleet bot.
+    var proxyRecord func([]byte)
     if registrar != nil {
         sessionRecorder := registrar.RegisterSession(account, game, tracker)
-        game.SetTap(sessionRecorder.Record)
+        proxyRecord = sessionRecorder.Record
         defer registrar.UnregisterSession(account, sessionRecorder)
     }
+    m.wireSessionTaps(game, account, proxyRecord)
 
     charList, err := game.Authenticate(gameSessionParams(auth))
     if err != nil {

@@ -188,6 +188,7 @@ type GameClient struct {
     readBuf        []byte
     tracker        *state.Bot
     tap            func(payload []byte)
+    sendTap        func(payload []byte)
     rawWriteBuf    []byte
     npcInfo        fromgameserver.NpcInfoPacket
     userInfo       fromgameserver.UserInfoPacket
@@ -272,6 +273,7 @@ func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
         readBuf:         nil,
         tracker:         nil,
         tap:             nil,
+        sendTap:         nil,
         rawWriteBuf:     nil,
         npcInfo:         *fromgameserver.NewNpcInfoPacket(),
         userInfo:        *fromgameserver.NewUserInfoPacket(),
@@ -371,6 +373,25 @@ func (gc *GameClient) SetTap(tap func(payload []byte)) {
     gc.tap = tap
 }
 
+// SetSendTap installs a callback that observes every client packet of the
+// session right before the encryption: the serialized plaintext of the
+// typed send calls and of SendRaw (the acceptance run log installs its
+// outbound decoder here). The callback runs on the sending goroutine and
+// must copy the payload synchronously: the encryption transforms the
+// buffer in place afterwards.
+func (gc *GameClient) SetSendTap(tap func(payload []byte)) {
+    gc.sendTap = tap
+}
+
+// notifySendTap hands the plaintext of one outbound packet to the
+// installed observer. The nil check stays on the hot path: the tap is
+// absent on the fleet sessions of the process.
+func (gc *GameClient) notifySendTap(payload []byte) {
+    if gc.sendTap != nil {
+        gc.sendTap(payload)
+    }
+}
+
 // SendRaw sends a raw decrypted client packet payload (opcode and body,
 // without wire framing) through the session cipher, exactly like a typed
 // sendPacket call: the encryption and the wire write share the same
@@ -383,6 +404,7 @@ func (gc *GameClient) SendRaw(payload []byte) error {
     if gc.trace {
         gc.logger.Printf("Sent raw packet id 0x%02x", payload[0])
     }
+    gc.notifySendTap(payload)
 
     gc.writeMu.Lock()
     defer gc.writeMu.Unlock()
@@ -904,6 +926,7 @@ func (gc *GameClient) sendPacket(data crypt.Serializable) error {
     if gc.trace {
         gc.logger.Printf("Sent packet id 0x%02x", writer.Bytes()[0])
     }
+    gc.notifySendTap(writer.Bytes())
     if gc.tracker != nil {
         // The request bookkeeping of the refusal channel: the walk
         // clicks (opcode 0x01) and the action requests (the equips,

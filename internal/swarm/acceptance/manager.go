@@ -14,6 +14,7 @@ import (
     "sync"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/acceptance/botlog"
     "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
     "github.com/melg8/swarm/internal/swarm/proxy"
@@ -52,6 +53,12 @@ const parallelStartStagger = 2 * time.Second
 
 // checkLogLimit bounds how many checks one scenario may publish.
 const checkLogLimit = 12
+
+// huntLinePrefix marks the hunt loop decision lines of the session
+// logger (the logger convention of the hunt package: every line the
+// loop prints starts with it) so the run log tags them apart from
+// the scenario narration.
+const huntLinePrefix = "Hunt:"
 
 // Check is one verified condition of a scenario: the short label the
 // list shows and the detail line of the moment it completed.
@@ -107,12 +114,20 @@ type Test struct {
     status     string
     failReason string
     checks     []Check
+    // checkSeen holds the last decided state of every check id: the
+    // run log mirrors only the flips (a steady pending check
+    // rewrites every monitor period).
+    checkSeen  map[string]bool
     log        []string
     startedAt  time.Time
     finishedAt time.Time
     generation uint64
     cancel     context.CancelFunc
     done       chan struct{}
+    // runLog is the per-run botlog file of the current generation
+    // (nil between the runs and when the log directory is off): the
+    // narration, the checks and the packet taps mirror into it.
+    runLog *botlog.RunLog
 }
 
 // view snapshots the test state for the API.
@@ -176,29 +191,78 @@ func (t *Test) setChecks(checks []Check) {
     t.mu.Lock()
     defer t.mu.Unlock()
     t.checks = checks
+    t.checkSeen = make(map[string]bool, len(checks))
+    if t.runLog != nil {
+        descs := make([]botlog.CheckDesc, 0, len(checks))
+        for i := range checks {
+            descs = append(descs, botlog.CheckDesc{
+                ID:     checks[i].ID,
+                Label:  checks[i].Label,
+                Done:   checks[i].Done,
+                Detail: checks[i].Detail,
+            })
+        }
+        t.runLog.Checks(t.def.Timeout, descs)
+    }
 }
 
-// updateCheck rewrites one check by id.
+// updateCheck rewrites one check by id. The run log mirrors the
+// state flips: the moments the tester decided a condition holds (or
+// slipped back after it once held).
 func (t *Test) updateCheck(id string, done bool, detail string) {
     t.mu.Lock()
     defer t.mu.Unlock()
     for i := range t.checks {
-        if t.checks[i].ID == id {
-            t.checks[i].Done = done
-            t.checks[i].Detail = detail
-
-            return
+        if t.checks[i].ID != id {
+            continue
         }
+        t.checks[i].Done = done
+        t.checks[i].Detail = detail
+        if t.runLog != nil {
+            seen, known := t.checkSeen[id]
+            if !known || seen != done {
+                t.runLog.CheckTransition(id, t.checks[i].Label, done,
+                    detail)
+            }
+            t.checkSeen[id] = done
+        }
+
+        return
     }
 }
 
-// appendLog adds one line to the rolling log.
+// appendLog adds one line to the rolling log and mirrors it into
+// the run log file of the current run. The hunt loop decision lines
+// (they all start with "Hunt:", the logger convention of the loop)
+// ride their own tag so the file separates the bot decisions from
+// the scenario narration.
 func (t *Test) appendLog(line string) {
+    t.mu.Lock()
+    runLog := t.runLog
+    t.mu.Unlock()
+    if runLog != nil {
+        if strings.HasPrefix(line, huntLinePrefix) {
+            runLog.Hunt(line)
+        } else {
+            runLog.Event(line)
+        }
+    }
     t.mu.Lock()
     defer t.mu.Unlock()
     t.log = append(t.log, time.Now().Format("15:04:05")+" "+line)
     if len(t.log) > logRingLimit {
         t.log = t.log[len(t.log)-logRingLimit:]
+    }
+}
+
+// appendDB mirrors one database statement of the character
+// injection into the run log under its own tag.
+func (t *Test) appendDB(statement string) {
+    t.mu.Lock()
+    runLog := t.runLog
+    t.mu.Unlock()
+    if runLog != nil {
+        runLog.DB(statement)
     }
 }
 
@@ -213,6 +277,9 @@ type Manager struct {
     proxy    *proxy.Server
     logger   *log.Logger
     dbConfig DBConfig
+    // logDir is the directory of the per-run botlog files (empty
+    // disables the run logs entirely, see -acceptance-log-dir).
+    logDir string
 
     tests []*Test
 
@@ -234,6 +301,10 @@ type ManagerDeps struct {
     Proxy    *proxy.Server
     Logger   *log.Logger
     DBConfig DBConfig
+    // LogDir is the directory of the per-run botlog files (empty
+    // disables the run logs, the default derives logs/acceptance
+    // from the session directory of the process).
+    LogDir string
 }
 
 // NewManager builds the manager with the given scenario definitions
@@ -249,6 +320,7 @@ func NewManager(deps ManagerDeps, defs []TestDef) *Manager {
         proxy:    deps.Proxy,
         logger:   deps.Logger,
         dbConfig: deps.DBConfig,
+        logDir:   deps.LogDir,
         tests:    nil,
         dbMu:     sync.Mutex{},
         db:       nil,
@@ -265,12 +337,14 @@ func NewManager(deps ManagerDeps, defs []TestDef) *Manager {
             status:     StatusIdle,
             failReason: "",
             checks:     nil,
+            checkSeen:  nil,
             log:        nil,
             startedAt:  time.Time{},
             finishedAt: time.Time{},
             generation: 0,
             cancel:     nil,
             done:       nil,
+            runLog:     nil,
         })
     }
 
@@ -490,7 +564,11 @@ func (m *Manager) launch(test *Test) {
 }
 
 // execute runs one scenario instance bounded by the test timeout and
-// records the terminal status.
+// records the terminal status. The run owns its botlog file from the
+// first line to the verdict: the header (the test card, the pass/fail
+// checks, the environment) is written before the scenario starts and
+// the outcome block after it ends, so even a crashed run leaves the
+// complete story on disk.
 func (m *Manager) execute(
     ctx context.Context, test *Test, cancel context.CancelFunc,
     done chan struct{}, generation uint64,
@@ -502,8 +580,14 @@ func (m *Manager) execute(
         cancel()
         close(done)
     }()
+    runLog := m.openRunLog(test, generation)
+    test.setRunLog(runLog)
     test.setRunning()
     test.appendLog("acceptance: run started")
+
+    samplerCtx, stopSampler := context.WithCancel(ctx)
+    sampler := &runLogSampler{tracker: m.tracker(test), log: runLog}
+    go sampler.Run(samplerCtx)
 
     timeoutCtx, timeoutCancel := context.WithTimeout(ctx, test.def.Timeout)
     defer timeoutCancel()
@@ -521,6 +605,50 @@ func (m *Manager) execute(
         test.finish(generation, nil)
         test.appendLog("acceptance: scenario passed")
     }
+    stopSampler()
+    m.writeVerdict(test, generation, err)
+
+    // The run log closes after the verdict; a session goroutine that
+    // still winds down may emit a few more lines - they drop.
+    test.setRunLog(nil)
+    runLog.Close()
+}
+
+// writeVerdict renders the outcome block of the finished run. The
+// status and the fail reason of the test already carry the verdict
+// of the generation owner (finish filters the stale generations), so
+// the block mirrors them with the final check list.
+func (m *Manager) writeVerdict(
+    test *Test, generation uint64, err error,
+) {
+    test.mu.Lock()
+    if test.generation != generation || test.runLog == nil {
+        test.mu.Unlock()
+
+        return
+    }
+    checks := make([]botlog.CheckDesc, 0, len(test.checks))
+    for i := range test.checks {
+        checks = append(checks, botlog.CheckDesc{
+            ID:     test.checks[i].ID,
+            Label:  test.checks[i].Label,
+            Done:   test.checks[i].Done,
+            Detail: test.checks[i].Detail,
+        })
+    }
+    passed := test.status == StatusPassed
+    reason := test.failReason
+    runLog := test.runLog
+    test.mu.Unlock()
+    runLog.Verdict(passed, reason, checks, err)
+}
+
+// setRunLog installs (or removes) the run log of the test under the
+// lock: the sessions resolve it through the account lookup.
+func (t *Test) setRunLog(log *botlog.RunLog) {
+    t.mu.Lock()
+    defer t.mu.Unlock()
+    t.runLog = log
 }
 
 // StartAll runs every scenario the requested way: sequential runs
@@ -625,12 +753,19 @@ func (m *Manager) dbClose() {
 }
 
 // injectReset opens the database channel, resets the temp character
-// and reports the injection through the test log.
+// and reports the injection through the test log. Every SQL
+// statement of the reset mirrors into the run log (the server side
+// preparation trail of the run: the wipes, the injected stacks and
+// the vitals rewrite).
 func (m *Manager) injectReset(reset characterReset, test *Test) error {
     db, err := m.dbConnect()
     if err != nil {
         return err
     }
+    db.SetQueryLog(func(statement string) {
+        test.appendDB(statement)
+    })
+    defer db.SetQueryLog(nil)
     if err := resetCharacter(db, reset, func(line string) {
         test.appendLog(line)
     }); err != nil {

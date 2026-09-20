@@ -38,6 +38,7 @@ the area you are about to touch, not all of them.
 | --- | --- |
 | [webui.md](webui.md) | The web interface: launch modes, map rendering, movement interpolation, HUD, equipment and shop queue widgets, interactivity, snapshot encoding, state tracker internals, repro harnesses |
 | [session_journal.md](session_journal.md) | The persistent session journal and the session dump report: the JSONL record of the whole run, the web UI button, the offline CLI |
+| [acceptance_botlog.md](acceptance_botlog.md) | The acceptance run logs: the hyper-detailed per-run trail of the test bots (the contract, the environment, every packet, every monitor verdict) an agent reads from one file |
 
 ## History and plans
 

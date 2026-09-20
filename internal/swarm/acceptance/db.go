@@ -73,6 +73,24 @@ type DB struct {
     // sequence is the packet sequence byte: it restarts per command
     // and increments per packet of one exchange.
     sequence byte
+    // queryLog observes every executed statement (the acceptance run
+    // log installs its mirror so the character injection trail rides
+    // the run file). The nil observer keeps the hot path free.
+    queryLog func(statement string)
+}
+
+// SetQueryLog installs (or with nil removes) the statement observer.
+// It is called between the injections, never while a statement is in
+// flight, so the plain field read needs no lock.
+func (db *DB) SetQueryLog(log func(statement string)) {
+    db.queryLog = log
+}
+
+// note hands one executed statement to the observer.
+func (db *DB) note(sql string) {
+    if db.queryLog != nil {
+        db.queryLog(sql)
+    }
 }
 
 // DBConfig describes the database endpoint of the deployment.
@@ -129,7 +147,7 @@ func ConnectDB(config DBConfig) (*DB, error) {
 
             continue
         }
-        db := &DB{conn: conn, sequence: 0}
+        db := &DB{conn: conn, sequence: 0, queryLog: nil}
         if err := db.handshake(config); err != nil {
             _ = conn.Close()
             lastErr = err
@@ -255,6 +273,7 @@ func (db *DB) Query(sql string) ([][]string, error) {
     if err := db.conn.SetDeadline(time.Now().Add(dbTimeout)); err != nil {
         return nil, fmt.Errorf("deadline: %w", err)
     }
+    db.note(sql)
     if err := db.sendCommand(sql); err != nil {
         return nil, err
     }
@@ -307,6 +326,7 @@ func (db *DB) Exec(sql string) (int64, error) {
     if err := db.conn.SetDeadline(time.Now().Add(dbTimeout)); err != nil {
         return 0, fmt.Errorf("deadline: %w", err)
     }
+    db.note(sql)
     if err := db.sendCommand(sql); err != nil {
         return 0, err
     }
