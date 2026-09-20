@@ -54,3 +54,4 @@ runs/.coverage-current.txt
 # results land in the terminal and the commit message - the log
 # itself is not a baseline)
 runs/race_full.log
+pathfind-rs/target/
