@@ -468,11 +468,23 @@ function selectBot(botId) {
   openEventStream(botId);
   renderBotList();
   resetPanels();
-  resetGear();
-  resetShop();
-  resetSkills();
-  resetSkillQueue();
-  resetBuffs();
+  // The snapshot driven panels (the equipment widget with its skills
+  // view, the queue flyouts, the effects panel) hold the previous
+  // bot's content through the reconnect gap: their keyed renderers
+  // diff the first snapshot of the new bot in place, so the icons the
+  // two bots share never re-decode and the right side panel never
+  // flashes blank on the switch (the HUD answers the same gap with
+  // the same hold; a wipe here rebuilt every cell of the widget and
+  // flickered the whole panel on every sidebar click - loudest
+  // between two bots that share the inventory, where the correct
+  // answer is zero visible change). Only the log is a stream panel
+  // and resets (the snapshot events would append below the previous
+  // bot's history). One state must not cross the switch either: an
+  // item drag armed on the old bot's cell or an open drop count
+  // dialog would post the drop or destroy of the old item against
+  // the newly observed bot.
+  GearDrag.item = null;
+  closeDropDialog();
 }
 
 function resetPanels() {
@@ -1148,15 +1160,6 @@ function renderBuffs(snap) {
   }
 }
 
-// resetBuffs drops the effect rows and DOM: switching the observed
-// bot starts the list from scratch.
-function resetBuffs() {
-  BuffsPanel.rows.clear();
-  BuffsPanel.order = "";
-  const list = document.getElementById("buffs-list");
-  if (list) { list.innerHTML = ""; }
-}
-
 // ---- equipment widget ----
 
 // Wearable slot layout of the equipment widget: the left 3x3 block of
@@ -1726,30 +1729,6 @@ function ensureSlotCells(box, slots) {
   }
 }
 
-// resetGear drops every cell record: switching the observed bot starts
-// the widget from scratch instead of mixing two inventories. The
-// pinned footer resets too, so a stale adena or load never survives
-// into the next bot.
-function resetGear() {
-  GearCells.slots.clear();
-  GearCells.inv.clear();
-  GearCells.order = "";
-  for (const id of ["gear-wear", "gear-jewel", "inv-grid"]) {
-    const box = document.getElementById(id);
-    if (box) { box.innerHTML = ""; }
-  }
-  GearDrag.item = null;
-  closeDropDialog();
-  const adena = document.getElementById("gear-adena");
-  if (adena) { adena.textContent = "—"; adena.title = ""; }
-  const fill = document.getElementById("gear-load-fill");
-  if (fill) { fill.style.width = "0%"; fill.className = "load-fill"; fill.style.background = ""; }
-  const loadText = document.getElementById("gear-load-text");
-  if (loadText) { loadText.textContent = "—"; }
-  const row = document.getElementById("gear-weight-row");
-  if (row) { row.title = ""; }
-}
-
 // renderGear refreshes the paperdoll blocks and the inventory grid of
 // the floating equipment widget with keyed cells: unchanged items
 // leave their DOM untouched, so their icons never blink.
@@ -2044,9 +2023,11 @@ function shopRowSignature(plan) {
   return parts.join(";");
 }
 
-// resetShop drops the widget state and DOM: switching the observed
-// bot starts the queue from scratch (the tracker of the other bot
-// publishes its own plan).
+// resetShop drops the widget state and DOM: the renderer calls it
+// when the published plan disappears (nothing published, an expired
+// plan or a session without the shop strategy - the first snapshot
+// of a freshly observed bot answers the same path with its own plan
+// state).
 function resetShop() {
   ShopPanel.rows.clear();
   ShopPanel.order = "";
@@ -2777,28 +2758,6 @@ function renderSkillsFoot(snap, plan) {
   }
 }
 
-// resetSkills drops the learned grid state and DOM: switching the
-// observed bot starts the list from scratch.
-function resetSkills() {
-  SkillCells.cells.clear();
-  SkillCells.order = "";
-  SkillCells.emptyNote = null;
-  SkillCells.blanks = [];
-  GearMode.gridSignature = "";
-  const grid = document.getElementById("skill-grid");
-  if (grid) { grid.innerHTML = ""; }
-  const badge = document.getElementById("gear-mode-skill-badge");
-  if (badge) { badge.textContent = ""; badge.classList.add("hidden"); }
-  const count = document.getElementById("skill-count");
-  if (count) { count.textContent = "0"; }
-  const sp = document.getElementById("skill-sp");
-  if (sp) { sp.textContent = "—"; sp.title = ""; }
-  const next = document.getElementById("skill-next");
-  if (next) { next.textContent = "—"; }
-  const nextRow = document.getElementById("skill-next-row");
-  if (nextRow) { nextRow.title = ""; }
-}
-
 // ---- skill learning queue widget (the lesson plan of the bot) ----
 //
 // The second content of the single queue flyout dock: in SKILLS mode
@@ -2834,8 +2793,10 @@ function skillQueueSignature(plan, level) {
   return parts.join(";");
 }
 
-// resetSkillQueue drops the widget state and DOM: switching the
-// observed bot starts the queue from scratch.
+// resetSkillQueue drops the widget state and DOM: the renderer calls
+// it when the published plan disappears (the first snapshot of a
+// freshly observed bot answers the same path with its own plan
+// state).
 function resetSkillQueue() {
   SkillQueuePanel.rows.clear();
   SkillQueuePanel.order = "";

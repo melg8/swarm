@@ -7792,3 +7792,59 @@ for the re-pick line).
 - Follow ups: none. The standing water check (`OverWater`) serves the
   frame measurement and the server swim clamp mirror; the water
   pricing lives in the mesh filter (the C1 zone data).
+
+## Round 102: the bot switch holds the panels - the right side widget never flashes blank (2026-09-20)
+
+- date, scope: 2026-09-20, the webui observed bot switch
+  (`internal/swarm/webserver/web/app.js`, the `selectBot` chain and
+  the snapshot driven panel renderers).
+- Problem statement: the owner report - the same sidebar click the
+  previous round fixed for the map still flickered the right side of
+  the ui: the equipment widget (paperdoll, bag, the skills view)
+  went blank for the stream reconnect window and popped back with
+  every icon re-decoding, even when both bots share the inventory
+  and the correct answer is zero visible change.
+- Root cause analysis: the map round held the bot independent world
+  but the panel side of `selectBot` still ran the full reset chain -
+  `resetGear`, `resetSkills`, `resetShop`, `resetSkillQueue`,
+  `resetBuffs` wiped the widget DOM ahead of the reconnect (the
+  deliberate "the blank frame reads as loading" contract of the
+  panel resets). The wipe contradicted the renderers it fed: every
+  panel is keyed and signature guarded exactly so a snapshot touches
+  only the changed cells, and the HUD already survives the same gap
+  with the previous bot's values. The wipe destroyed even the bot
+  independent structure (the slot cells, the labels, the footer), so
+  every sidebar click paid the blank window plus the fresh `<img>`
+  decode of every icon.
+- Fix: `selectBot` keeps the snapshot driven panels through the gap -
+  the keyed renderers diff the first snapshot of the new bot in
+  place (the shared items and skills keep their cells and img
+  elements, the dropped ones leave, the new ones join). The reset
+  chain loses its panel calls: `resetGear` and `resetSkills` and
+  `resetBuffs` retire (no production caller left), `resetShop` and
+  `resetSkillQueue` stay as the no-plan paths of their renderers.
+  The log still resets (a stream panel - the snapshot events would
+  append below the previous bot's history). Two state bits must not
+  cross the switch: an item drag armed on the old bot's cell or an
+  open drop count dialog would post the drop or destroy of the old
+  item against the newly observed bot, so `selectBot` now cancels
+  them directly (`GearDrag.item = null`, `closeDropDialog`).
+- Reproduction: the new switch section of `tools/repro_gear.js` -
+  the pre fix app.js answers "the paperdoll was wiped", "the bag was
+  wiped", "the shared item cell was rebuilt", "the skill icon was
+  rebuilt", "the shared icon re-decoded"; the post fix app.js keeps
+  the cells and icons through the switch, cancels the armed drag and
+  the open dialog, and the new bot's first snapshot reuses the
+  shared icon element while dropping and adding exactly the items
+  that changed. The empty state checks now ride the production paths
+  (a snapshot without skills or plan clears the view - the retired
+  reset functions are gone from the harness too).
+- Verification: the bot switch, map render, zone hover, movement,
+  hud, gear, stats and fight ui harnesses answer all pass on the
+  fixed tree; `node --check` stays clean and the whitespace gate is
+  silent on the touched files (no go sources touched, the web assets
+  embed by path).
+- Follow ups: the shop and skill queue flyouts hold their plans the
+  same way and hide on the new bot's first snapshot when it publishes
+  none - the transient window shows the previous bot's plan, the
+  same accepted staleness the HUD carries.

@@ -196,6 +196,9 @@ function loadAppJs(appFile) {
         EventSource: function () {
             this.addEventListener = () => {};
         },
+        // selectBot touches the map view (map.js, not loaded in this
+        // sandbox): the two members the switch reads answer a stub.
+        MapView: { hoverZone: null, resetBot: () => {} },
         Event: function () {}
     };
     vm.createContext(sandbox);
@@ -241,8 +244,10 @@ function loadAppJs(appFile) {
         " : undefined," +
         " renderSkills: typeof renderSkills === 'function'" +
         " ? renderSkills : undefined," +
-        " resetSkills: typeof resetSkills === 'function'" +
-        " ? resetSkills : undefined," +
+        " selectBot: typeof selectBot === 'function'" +
+        " ? selectBot : undefined," +
+        " PendingDrop: typeof PendingDrop !== 'undefined'" +
+        " ? PendingDrop : undefined," +
         " renderSkillQueue: typeof renderSkillQueue === 'function'" +
         " ? renderSkillQueue : undefined," +
         " resetSkillQueue: typeof resetSkillQueue === 'function'" +
@@ -263,8 +268,6 @@ function loadAppJs(appFile) {
         " ? renderSkillTooltip : undefined," +
         " renderBuffs: typeof renderBuffs === 'function'" +
         " ? renderBuffs : undefined," +
-        " resetBuffs: typeof resetBuffs === 'function'" +
-        " ? resetBuffs : undefined," +
         " initBuffsPanel: typeof initBuffsPanel === 'function'" +
         " ? initBuffsPanel : undefined," +
         " applyBuffsPanelState: typeof applyBuffsPanelState ===" +
@@ -1880,17 +1883,26 @@ function main() {
         skillsView.classList.contains("hidden"),
         "the overlay did not hide");
 
-    // The resets: no plan and no skills hide the queue and clear the
-    // badge.
-    gear.resetSkills();
-    gear.resetSkillQueue();
-    check(results, "the reset drops the skills view state",
+    // The empty state rides the production path now: a snapshot
+    // without skills and without a plan (a fresh bot, a harness
+    // setup) drops the keyed cells and hides the queue - the same
+    // answer the first snapshot of a freshly observed bot gives.
+    const emptySkills = Object.assign(skillsSnapshot(),
+        { skills: [], skillPlan: null });
+    gear.renderSkills(emptySkills);
+    gear.renderSkillQueue(emptySkills);
+    check(results, "the empty skills snapshot clears the learned grid",
         gear.SkillCells.cells.size === 0 &&
         gear.SkillCells.blanks.length === 0 &&
-        skillGrid.children.length === 0 &&
+        skillGrid.children.length === 1 &&
+        skillGrid.children[0].className === "skill-empty" &&
         badge.classList.contains("hidden") &&
-        skillqPanel.classList.contains("hidden"),
-        "the reset left state behind");
+        elements.get("skill-count").textContent === "0/0",
+        "the empty snapshot left state behind");
+    check(results, "the empty plan hides the learning queue",
+        skillqPanel.classList.contains("hidden") &&
+        elements.get("skillq-list").children.length === 0,
+        "the queue stayed visible");
 
     // ---- the effects panel (the server buff list) ----
     // The panel hides while no effect runs, appears with the effect
@@ -1993,15 +2005,140 @@ function main() {
         elements.get("buffs-panel-chev").textContent === "\u25BE",
         "the panel did not expand");
 
-    // The reset: switching the observed bot clears the rows.
-    gear.resetBuffs();
-    check(results, "the reset drops the effect rows",
-        gear.BuffsPanel.rows.size === 0 && buffsList.children.length === 0,
-        "the reset left rows behind");
+    // The empty effect list is the production drop path (the new
+    // snapshot carries no effects - the same answer the first
+    // snapshot of a freshly observed bot gives): the rows and the
+    // registry clear, the panel hides.
     gear.renderBuffs(skillsSnapshot());
-    check(results, "the empty effect list hides the panel again",
+    check(results,
+        "the empty effect list drops the rows and hides the panel",
+        gear.BuffsPanel.rows.size === 0 &&
+        buffsList.children.length === 0 &&
         buffsPanel.classList.contains("hidden"),
         "the panel stayed visible");
+
+    // ---- the observed bot switch (the sidebar click) ----
+    //
+    // selectBot holds the snapshot driven panels through the
+    // reconnect gap: the widget DOM survives the switch and the first
+    // snapshot of the new bot diffs the keyed cells in place. The pre
+    // fix wipe rebuilt every cell on every click and flickered the
+    // right side panel (every icon re-decoded) even between two bots
+    // sharing the inventory. Only the in-flight item interactions
+    // cancel: the armed drag and the open drop dialog must not post
+    // the old bot's item against the newly observed bot.
+    const switchChar = (objectId, name, adena, slots) => ({
+        objectId, name, classId: 18, race: 1, level: 9,
+        inventorySlots: slots, inventoryMax: 80,
+        adena, load: 0, maxLoad: 0
+    });
+    // The two bots share the first bag item (the same objectId and
+    // content), the first bot alone holds the second, the new bot
+    // alone holds the third; the learned skill comes back one level
+    // higher on the new bot.
+    const switchA = {
+        id: "acc1",
+        character: switchChar(100, "test1", 1000, 2),
+        inventory: [item(1, 0, false), item(2, 0, false)],
+        skills: [
+            { skillId: 3, level: 3, passive: false,
+                name: "Power Strike", icon: "skill0003" }
+        ],
+        objects: [], events: [], status: "online"
+    };
+    const switchB = {
+        id: "acc2",
+        character: switchChar(200, "test2", 2000, 2),
+        inventory: [item(1, 0, false), item(3, 0, false)],
+        skills: [
+            { skillId: 3, level: 4, passive: false,
+                name: "Power Strike", icon: "skill0003" }
+        ],
+        objects: [], events: [], status: "online"
+    };
+    gear.renderGear(switchA);
+    gear.renderSkills(switchA);
+    const switchInv = elements.get("inv-grid");
+    const sharedCell = findIconCell(switchInv, 1);
+    const sharedImg = findImg(switchInv, 1);
+    const skillRecordBefore = gear.SkillCells.cells.get(3);
+    const wearCountBefore = elements.get("gear-wear").children.length;
+    const bagCountBefore = switchInv.children.length;
+    check(results, "the switch scenario renders the shared state",
+        Boolean(sharedCell) && Boolean(sharedImg) &&
+        Boolean(skillRecordBefore) && wearCountBefore > 0 &&
+        bagCountBefore === 2,
+        "the scenario setup failed");
+
+    // Arm the in-flight interactions: a drag on the second bag cell
+    // and an open drop count dialog for a stack.
+    const stackCell = findIconCell(switchInv, 2);
+    fire(stackCell, "dragstart", { dataTransfer: {},
+        preventDefault: () => {} });
+    check(results, "the drag arms the item before the switch",
+        gear.GearDrag.item !== null &&
+        gear.GearDrag.item.objectId === 20,
+        "no armed drag");
+    gear.dropItemOnMap(Object.assign(item(4, 0, false),
+        { count: 50 }));
+    check(results, "the drop dialog opens before the switch",
+        !elements.get("drop-dialog").classList.contains("hidden") &&
+        gear.PendingDrop.item !== null,
+        "the dialog stayed closed");
+
+    // The switch itself: App.activeBotId starts at acc1 (the harness
+    // set it at the top), so the click really switches.
+    gear.selectBot("acc2");
+
+    check(results, "the switch keeps the paperdoll cells attached",
+        elements.get("gear-wear").children.length === wearCountBefore,
+        "the paperdoll was wiped");
+    check(results, "the switch keeps the bag cells attached",
+        switchInv.children.length === bagCountBefore,
+        "the bag was wiped");
+    check(results, "the switch keeps the shared item cell and icon",
+        findIconCell(switchInv, 1) === sharedCell &&
+        findImg(switchInv, 1) === sharedImg,
+        "the shared item cell was rebuilt");
+    check(results, "the switch keeps the learned skill icon",
+        gear.SkillCells.cells.get(3) === skillRecordBefore &&
+        gear.SkillCells.cells.get(3).img === skillRecordBefore.img,
+        "the skill icon was rebuilt");
+    check(results, "the switch cancels the armed drag",
+        gear.GearDrag.item === null,
+        "the drag crossed the switch");
+    check(results, "the switch closes the drop dialog",
+        elements.get("drop-dialog").classList.contains("hidden") &&
+        gear.PendingDrop.item === null,
+        "the dialog stayed open");
+    check(results, "the switch stores the observed bot choice",
+        gear.App.activeBotId === "acc2",
+        "the active bot stayed acc1");
+
+    // The first snapshot of the new bot: the keyed diff updates the
+    // widget in place - the shared item keeps its img element (no
+    // re-decode, no blink), the dropped item leaves, the new item
+    // joins, the skill icon survives its level bump.
+    gear.renderGear(switchB);
+    gear.renderSkills(switchB);
+    check(results, "the new bot reuses the shared item icon",
+        findImg(switchInv, 1) === sharedImg,
+        "the shared icon re-decoded");
+    check(results, "the new bot drops the item it does not carry",
+        findIconCell(switchInv, 2) === null &&
+        switchInv.children.length === 2,
+        "the old item cell survived");
+    check(results, "the new bot adds its own item",
+        findIconCell(switchInv, 3) !== null,
+        "the new item cell is missing");
+    check(results, "the new bot reuses the skill icon and bumps the level",
+        gear.SkillCells.cells.get(3).img === skillRecordBefore.img &&
+        gear.SkillCells.cells.get(3).level.textContent === "4",
+        "the skill cell re-decoded or kept the old level");
+    check(results, "the new bot footer shows its own adena",
+        elements.get("gear-adena").textContent === "2,000",
+        "the footer kept " +
+        elements.get("gear-adena").textContent);
 
     // The markup and the placement: the panel lives in the map wrap
     // to the right of the character HUD (top left of the map) and is

@@ -212,7 +212,15 @@ colors from the same variables).
   flashed the map white for the stream reconnect - loudest between two
   bots of the same grid where nothing else would change at all. A
   fresh boot before the very first snapshot keeps the blank frame
-  (there is no anchor to hold yet).
+  (there is no anchor to hold yet). The snapshot driven panels hold
+  through the same gap: the equipment widget (paperdoll, bag, the
+  skills view), the queue flyouts and the effects panel keep the
+  previous bot's content until the first snapshot of the new bot
+  diffs their keyed cells in place, so the sidebar click never
+  flashes the right side panel blank and the icons the two bots
+  share never re-decode (the same hold the HUD answers with; only
+  the log resets - a stream panel that would otherwise append the
+  new bot's events below the previous bot's history).
 
 ## Movement interpolation (map.js projectTickwise)
 
@@ -595,7 +603,13 @@ grow by the 2 s window, so the payload stays small.
   incrementally: unchanged items keep their DOM - the icon `<img>`
   elements are never recreated by a snapshot (a fresh element re-decodes
   and the icon blinks), stack count and enchant updates only rewrite
-  the text badges, and reordering moves the persistent cells. A pinned
+  the text badges, and reordering moves the persistent cells. The
+  observed bot switch rides the same keys: the widget survives the
+  switch gap (no wipe - a wipe rebuilt every cell and flickered the
+  panel on every sidebar click), the first snapshot of the new bot
+  diffs the cells in place, and only the in-flight item interactions
+  cancel (an armed drag or an open drop dialog would post the old
+  bot's item against the newly observed bot). A pinned
   footer under the scrolling bag stays always visible: the adena line
   (gold, from `character.adena`) and the weight line (fill by load
   percent from `character.load/maxLoad`) and the trash bin at the far
@@ -1093,7 +1107,11 @@ no bundler, no network dependency; every dynamic text lands through
 - `tools/repro_gear.js` (`task repro:gear`) for the equipment widget
   (paperdoll masks, either-or slot resolution, badges, slot counter,
   the keyed rendering, the pinned footer values, the floating placement
-  and the manual interactions) and the shop queue widget.
+  and the manual interactions), the shop queue widget and the
+  observed bot switch: the widget DOM survives the switch gap with
+  the shared cells and icons kept, the in-flight drag and drop dialog
+  cancel, and the new bot's first snapshot diffs the keyed cells in
+  place (the right side flicker fix).
 - `tools/repro_stats.js` for the statistics tab: the fleet overview
   (activation fetch, KPI cards, chart drawing, the bots table, the
   bot selector), the bot detail view (KPI cards, events, phase
