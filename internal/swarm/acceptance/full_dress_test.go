@@ -62,11 +62,12 @@ func TestFullDressDefinition(t *testing.T) {
     }
     require.True(t, found, "the full-dress scenario is registered")
     // The newest round owns the head of the list the web UI serves
-    // (the delevel round does now, the church entry round follows,
-    // the burst round after it).
-    require.Equal(t, "delevel", Definitions()[0].ID)
-    require.Equal(t, "church-entry", Definitions()[1].ID)
-    require.Equal(t, "full-dress", Definitions()[2].ID)
+    // (the plaza Herbiel round does now, the delevel round follows,
+    // the church entry round after it).
+    require.Equal(t, "plaza-herbiel", Definitions()[0].ID)
+    require.Equal(t, "delevel", Definitions()[1].ID)
+    require.Equal(t, "church-entry", Definitions()[2].ID)
+    require.Equal(t, "full-dress", Definitions()[3].ID)
 }
 
 // TestFullDressResetNakedWithTheWholeBag pins the injected start

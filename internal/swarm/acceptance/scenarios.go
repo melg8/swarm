@@ -118,6 +118,36 @@ const fullDressTimeout = 5 * time.Minute
 func Definitions() []TestDef {
     return []TestDef{
         {
+            ID:      "plaza-herbiel",
+            Title:   "plaza Herbiel walk · the ping-pong corridor",
+            Account: plazaHerbielAccount,
+            Timeout: plazaHerbielTimeout,
+            Description: "Start: the elven fighter temp17 wakes ON the " +
+                "shop plaza cell of the 2026-09-20 ping-pong report " +
+                "(44584 46944 -2920, the Unoren customer stand) as the " +
+                "level 15 character of the farm readiness round with " +
+                "20,000 SP, 100,000 adena and an empty bag - the " +
+                "character is already at the place the ping-pong lived " +
+                "on, no walk-in needed. Flow: the weapon run trip arms " +
+                "at once (the empty bag, no weapon), the stop ladder " +
+                "sells at the stand the character stands on, buys the " +
+                "gear across the plaza merchants and then walks the " +
+                "2.9 km leg to the grocery trader Herbiel through the " +
+                "western village corridor - the leg whose follower " +
+                "ping-ponged between two points 63 units apart through " +
+                "nine alternating clicks while the server accepted " +
+                "every one of them, before the fix made the advance " +
+                "gate answer through the same server click transport " +
+                "the clicks obey. Pass: the character leaves the plaza " +
+                "band (200+ units), crosses the western corridor and " +
+                "stands within the interaction distance of Herbiel's " +
+                "spawn within the budget - no corridor ban may seal " +
+                "the session on the way (the ban system is gone; the " +
+                "offline reproduction lives in " +
+                "hunt/plaza_pingpong_repro_test.go).",
+            Scenario: plazaHerbielScenario,
+        },
+        {
             ID:      delevelScenarioID,
             Title:   "delevel · the guard death cycle",
             Account: delevelAccount,
