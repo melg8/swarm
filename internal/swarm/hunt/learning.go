@@ -32,11 +32,16 @@ const (
     // learnPlanPeriod bounds the learning queue re-reads of the trip
     // trigger: the queue view allocates, the trigger runs every tick.
     learnPlanPeriod = 2 * time.Second
-    // learnPause paces the lesson requests: the server has no flood
-    // protector on RequestAcquireSkill, but every learn answers with
-    // a SkillList and a UserInfo, and a human learner clicks one
-    // lesson at a time.
-    learnPause = 1 * time.Second
+    // learnPause is the minimum spacing of two RequestAcquireSkill
+    // packets. The server side knows no flood protector on the packet
+    // (the mobius handler checks only the trainer distance, the level,
+    // the SP and the spellbook - no FloodProtector call, no rate
+    // limit), so the maximum allowed learn speed is one request per
+    // SkillList answer: the confirm round trip IS the pacing signal
+    // (see tickTeacherLessons). The floor only keeps two sends out of
+    // one decision tick - it matches the loop cadence, the server
+    // never refuses a lesson by pace.
+    learnPause = 250 * time.Millisecond
     // learnConfirmWait bounds the wait for the SkillList bump that
     // confirms a learned lesson.
     learnConfirmWait = 5 * time.Second
@@ -549,14 +554,20 @@ func (l *Loop) clickTeacher(now time.Time) {
     }
 }
 
-// tickTeacherLessons learns the queued lessons one request at a
-// time: every request waits for the SkillList bump of its answer
-// (the server lists the whole learned set after every learn), a
-// lesson that never confirms is re-requested up to the retry budget
-// and then skipped (the refusals answer silently). The lesson list
-// re-reads the live queue every call - the SP drop of each learned
-// lesson drops the tail behind it out of the budget. It reports
-// true when nothing learnable is left and the stop may advance.
+// tickTeacherLessons learns the queued lessons one request at a time
+// at the maximum speed the server allows: the next request fires the
+// moment the previous lesson's SkillList answer lands (the confirm
+// consumes the head and the same tick walks straight into the next
+// send - the confirm round trip is the only real rate limit, the
+// server knows no flood protector on RequestAcquireSkill). A lesson
+// that never confirms is re-requested up to the retry budget and
+// then skipped (the refusals answer silently). A send held back by
+// the pacing pause arms nothing - the request retries on a later
+// tick instead of burning the confirm window on a packet that never
+// went out. The lesson list re-reads the live queue every call - the
+// SP drop of each learned lesson drops the tail behind it out of the
+// budget. It reports true when nothing learnable is left and the
+// stop may advance.
 func (l *Loop) tickTeacherLessons(now time.Time) bool {
     l.refreshLearnPlan()
     lessons := l.learnableLessons()
@@ -565,30 +576,31 @@ func (l *Loop) tickTeacherLessons(now time.Time) bool {
             return true
         }
         head := lessons[0]
+        if !l.sendLearnRequest(head) {
+            return false
+        }
         l.learnRequested = &head
         l.learnConfirmAt = now
         l.learnRevision = l.tracker.SkillsRevision()
-        l.sendLearnRequest(head)
 
         return false
     }
     if l.tracker.SkillsRevision() != l.learnRevision {
         // The SkillList answer of the learned lesson: the queue head
-        // moved, the next lesson waits out the pacing pause.
+        // moved, the next request fires right away (the recursion
+        // walks into the fresh head within this same tick).
         l.logger.Printf("Hunt: learn: learned %s level %d for %d sp",
             skillDisplayName(l.learnRequested.skillID),
             l.learnRequested.level, l.learnRequested.sp)
         l.learnRequested = nil
-        l.learnConfirmAt = now
         l.learnRetries = 0
 
-        return false
+        return l.tickTeacherLessons(now)
     }
     if now.Sub(l.learnConfirmAt) < learnConfirmWait {
         return false
     }
-    l.learnRetries++
-    if l.learnRetries > learnRetries {
+    if l.learnRetries >= learnRetries {
         l.logger.Printf("Hunt: learn: %s level %d never confirmed,"+
             " skipping it",
             skillDisplayName(l.learnRequested.skillID),
@@ -601,22 +613,35 @@ func (l *Loop) tickTeacherLessons(now time.Time) bool {
     }
     l.logger.Printf("Hunt: learn: re-requesting %s level %d (try %d"+
         " of %d)", skillDisplayName(l.learnRequested.skillID),
-        l.learnRequested.level, l.learnRetries, learnRetries)
-    l.sendLearnRequest(*l.learnRequested)
+        l.learnRequested.level, l.learnRetries+1, learnRetries)
+    if !l.sendLearnRequest(*l.learnRequested) {
+        // The pacing pause holds the re-request: the retry budget
+        // only counts requests that actually went out.
+        return false
+    }
+    l.learnRetries++
     l.learnConfirmAt = now
 
     return false
 }
 
-// sendLearnRequest sends one paced lesson request.
-func (l *Loop) sendLearnRequest(lesson lessonTarget) {
+// sendLearnRequest sends one paced lesson request and reports
+// whether the request actually went out: the pacing pause holds the
+// send back and a transport error reports the same way - the caller
+// retries on a later tick and the confirm machinery stays unarmed
+// until a packet is on the wire.
+func (l *Loop) sendLearnRequest(lesson lessonTarget) bool {
     if !l.learnAt.IsZero() && time.Since(l.learnAt) < learnPause {
-        return
+        return false
     }
     l.learnAt = time.Now()
     if err := l.game.AcquireSkill(lesson.skillID, lesson.level); err != nil {
         l.logger.Printf("Hunt: learn: acquire request failed: %v", err)
+
+        return false
     }
+
+    return true
 }
 
 // skillDisplayName resolves the display name of a skill id for the

@@ -38,10 +38,15 @@ const (
 // round - the weapon, the pdef maximizing armor set, the basic jewel
 // set, the spellbooks and the lessons all land in a single village
 // walk, then the bot crosses to its farm zone and kills its first
-// mob under the auras. The measured duration of the fixed flow is
-// ~8 minutes (472 s and 481 s on the local stack, the lessons pacing
-// dominates); the bound holds two and a half times that so a live
-// run whose mob positions, walk retries or road fights drift slower
+// mob under the auras. The measured duration of the fixed flow was
+// ~8 minutes (472 s and 481 s on the local stack) under the early
+// generous pacing - the lessons pacing dominated it; the 2026-09-20
+// server window pacing (the lesson requests ride the SkillList
+// answer round trip, the buy and sell lists share the 1 s
+// transaction window - hunt/learning.go, hunt/shopping.go) cut the
+// shop and the teaching minutes shorter, and the bound keeps its
+// two and a half times margin of the measured flow so a live run
+// whose mob positions, walk retries or road fights drift slower
 // still fits - the aggressive mobs on the village road interrupt the
 // trips (the emergency logout reconnects and retries) and the zone
 // kill may wait out a respawn. The lifetime and relay scenarios are

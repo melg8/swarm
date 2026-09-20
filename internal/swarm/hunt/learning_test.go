@@ -148,9 +148,10 @@ func TestLearnLessonConfirmsBySkillList(t *testing.T) {
     loop.tick()
     require.Len(t, game.lessons, 1)
 
-    // The server confirms the learn with a fresh SkillList: the next
-    // lesson request fires on the following tick (the confirm tick
-    // only consumes the bump).
+    // The server confirms the learn with a fresh SkillList: the
+    // confirm tick walks straight into the next request - the
+    // maximum allowed learn speed paces on the answer round trip,
+    // the server knows no flood protector on the acquire packet.
     bot.SetSkills([]state.LearnedSkill{
         {SkillID: 3, Level: 1, Passive: false},
         {SkillID: 142, Level: 1, Passive: true},
@@ -163,11 +164,50 @@ func TestLearnLessonConfirmsBySkillList(t *testing.T) {
     })
     loop.learnAt = time.Time{}
     loop.tick()
-    loop.learnAt = time.Time{}
-    loop.tick()
-    require.Len(t, game.lessons, 2)
+    require.Len(t, game.lessons, 2,
+        "the confirm tick fires the next lesson request")
     require.Equal(t, [2]int32{3, 2}, game.lessons[1],
         "Power Strike level 2 follows the confirmed level 1")
+}
+
+// TestLearnPacedSendDoesNotBurnTheConfirmWindow pins the paced send
+// contract: a lesson request held back by the pacing pause arms
+// nothing - the confirm window only starts when the packet is on the
+// wire. The early rounds armed the window on every pick and the
+// dropped send burned its full learnConfirmWait before the retry
+// ladder re-requested - every next lesson paid a 5 second stall
+// instead of the 250 ms pause.
+func TestLearnPacedSendDoesNotBurnTheConfirmWindow(t *testing.T) {
+    loop, game, bot := newLearnLoop(500)
+
+    loop.tick()
+    arriveAtStop(t, loop, bot)
+    loop.tick()
+    arriveAtStop(t, loop, bot)
+    loop.tick()
+    require.Equal(t, int32(55), loop.teacherID)
+    bot.ApplySelfTarget(55)
+    loop.teacherPick = time.Now().Add(-2 * time.Second)
+    // The pacing pause is armed right now: the pick must not send
+    // and must not arm the confirm machinery.
+    loop.learnAt = time.Now()
+    loop.tick()
+    require.Empty(t, game.lessons, "the paused send waits")
+    require.Nil(t, loop.learnRequested,
+        "an unsent request never becomes the in flight lesson")
+    require.True(t, loop.learnConfirmAt.IsZero(),
+        "the confirm window stays unarmed while nothing was sent")
+
+    // The pause passes: the request goes out on a later tick and
+    // only then arms the confirm window.
+    loop.teacherPick = time.Now().Add(-2 * time.Second)
+    loop.learnAt = time.Now().Add(-learnPause - time.Second)
+    loop.tick()
+    require.Len(t, game.lessons, 1, "the aged pause releases the send")
+    require.NotNil(t, loop.learnRequested,
+        "the sent lesson is the in flight lesson")
+    require.False(t, loop.learnConfirmAt.IsZero(),
+        "the confirm window arms on the sent packet")
 }
 
 // TestLearnLessonSkipsAfterRetries pins the retry budget: a lesson

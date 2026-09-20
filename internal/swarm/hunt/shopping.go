@@ -31,13 +31,25 @@ import (
 
 // Timing and threshold constants of the shopping.
 const (
-    // buyPause paces the buy requests after the transaction flood
-    // protector of the server (the transaction window is 10 game
-    // ticks = 1 second wide, shared with the sell batches; the pause
-    // keeps the proven generous margin - a refused transaction does
-    // not extend the window and the punishment config may kick
-    // repeat offenders).
-    buyPause = 11 * time.Second
+    // transactionPause is the shared pacing window of every buy and
+    // sell request of the town trips. The server truth (the mobius
+    // stack this deployment runs): FloodProtector.ini holds
+    // FloodProtectorTransactionInterval = 10 game ticks, the game
+    // clock runs 10 ticks per second, so the shared buy and sell
+    // window is 1 second wide; a request inside the window is
+    // refused with a chat message, the window does not extend and
+    // FloodProtectorTransactionPunishmentLimit = 0 means no
+    // punishment - a too early request costs nothing. The pause
+    // keeps a 250 ms margin over that window against the 250 ms
+    // decision tick quantization (the proven generous 11 second
+    // margin made every multi list stop crawl: the spellbook list
+    // of the jewel trader waited 11 s behind the jewel list the
+    // same visit bought - the user rule: the books are bought at
+    // the same moment as the jewels).
+    transactionPause = 1250 * time.Millisecond
+    // buyPause paces the buy requests through the shared transaction
+    // window (see transactionPause and transactionWindowFree).
+    buyPause = transactionPause
     // buyConfirmWait bounds the wait for the inventory update that
     // confirms a buy request landed: the server answers a refused
     // transaction SILENTLY (the flood refusal is a chat message, the
@@ -590,7 +602,7 @@ func (l *Loop) replaceOfferDone(now time.Time) bool {
 
         return true
     }
-    if !l.sellAt.IsZero() && now.Sub(l.sellAt) < sellPause {
+    if !l.transactionWindowFree(now) {
         return false
     }
     if err := l.game.SellItems(batch); err != nil {
@@ -673,6 +685,22 @@ func (l *Loop) replacementTargets() []int32 {
     }
 
     return targets
+}
+
+// transactionWindowFree reports whether the shared buy and sell
+// transaction window of the server flood protector is free: the last
+// transaction of either kind (a sell batch or a buy list) must age
+// out of the window before the next request goes out. Every sender
+// of the town trips paces through this one gate - a sell fired right
+// behind a buy would burn the window and the refused batch would be
+// marked sold without ever leaving the bag.
+func (l *Loop) transactionWindowFree(now time.Time) bool {
+    last := l.buyAt
+    if l.sellAt.After(last) {
+        last = l.sellAt
+    }
+
+    return last.IsZero() || now.Sub(last) >= transactionPause
 }
 
 // planShoppingStops distributes the FROZEN TRIP PLAN into the buy
@@ -850,12 +878,8 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
     }
     // The buy pacing shares the transaction window with the sells: the
     // first buy of a stop waits out the last sell batch as well (the
-    // flood window is 1 s wide, the pause keeps the proven margin).
-    last := l.buyAt
-    if l.sellAt.After(last) {
-        last = l.sellAt
-    }
-    if !last.IsZero() && now.Sub(last) < buyPause {
+    // flood window is 1 s wide, the pause keeps the tick margin).
+    if !l.transactionWindowFree(now) {
         return false
     }
     // One buylist per request: the purchases of the first list id of

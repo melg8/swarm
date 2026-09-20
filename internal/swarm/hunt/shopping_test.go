@@ -781,3 +781,121 @@ func TestStopShoppingSkipsOwnedItems(t *testing.T) {
     require.Empty(t, game.buys, "the owned item is never bought again")
     require.Empty(t, loop.tripStops[0].buys, "the owned line left the stop")
 }
+
+// TestSpellbooksMergeIntoTheJewelStopVisit pins the one visit rule of
+// the user: the spellbooks of the queued lessons ride the stop of the
+// merchant that sells the jewelry - the jewel trader Creamees sells
+// both the basic jewels and the spellbooks, so the trip buys them in
+// the same visit instead of walking to the same counter twice.
+func TestSpellbooksMergeIntoTheJewelStopVisit(t *testing.T) {
+    loop, _, bot, _ := newTripLoop()
+    // Level 15 with the strikes and the masteries learned: the queue
+    // demands the Attack Aura book 1095 and the Defence Aura book
+    // 1294 (the same setup TestLearnTripBuysTheSpellbooks uses).
+    bot.ApplyUserInfo(state.UserInfo{
+        Name: "unittest1", Level: 15, ClassID: 18, Race: 1, Sp: 2000,
+    })
+    bot.SetSkills([]state.LearnedSkill{
+        {SkillID: 3, Level: 9, Passive: false},
+        {SkillID: 16, Level: 9, Passive: false},
+        {SkillID: 56, Level: 9, Passive: false},
+        {SkillID: 141, Level: 3, Passive: true},
+        {SkillID: 142, Level: 5, Passive: true},
+        {SkillID: 194, Level: 1, Passive: true},
+    })
+    // The trip already carries the jewel stop of Creamees (the
+    // Necklace of Knowledge of the jewel floor).
+    creamees := townMerchants[2]
+    loop.tripStops = []tripStop{{merchant: creamees, buys: []gear.Purchase{{
+        ItemID: 906, ListID: 3014900, MerchantTemplateID: 7149,
+        Count: 1, Price: 590, Reason: "buying Necklace of Knowledge",
+        Affordable: true,
+    }}}}
+
+    loop.planLearnStops()
+
+    require.Len(t, loop.tripStops, 2,
+        "the books merged into the jewel stop, the teacher follows")
+    merged := loop.tripStops[0]
+    require.Equal(t, int32(7149), merged.merchant.TemplateID)
+    items := make([]int32, 0, len(merged.buys))
+    lists := make([]int32, 0, len(merged.buys))
+    for _, purchase := range merged.buys {
+        items = append(items, purchase.ItemID)
+        lists = append(lists, purchase.ListID)
+    }
+    require.ElementsMatch(t, []int32{906, 1095, 1294}, items,
+        "the jewels and the books share the one stop")
+    require.ElementsMatch(t, []int32{3014900, 3014901, 3014901}, lists,
+        "the jewel list and the spellbook list ride the same visit")
+    require.True(t, loop.tripStops[1].teach,
+        "the teacher stop closes the trip behind the shopping")
+}
+
+// TestBookListFollowsTheJewelListAtTheTransactionPace pins the batch
+// rhythm of a multi list stop: the jewel list of the merchant goes
+// out first and the spellbook list of the SAME visit follows after
+// the shared transaction window alone - no extra pacing holds the
+// books back, so the books land right behind the jewels.
+func TestBookListFollowsTheJewelListAtTheTransactionPace(t *testing.T) {
+    loop, game, bot, _ := newTripLoop()
+    creamees := townMerchants[2]
+    loop.tripStops = []tripStop{{merchant: creamees, buys: []gear.Purchase{
+        {
+            ItemID: 906, ListID: 3014900, MerchantTemplateID: 7149,
+            Count: 1, Price: 590, Affordable: true,
+        },
+        {
+            ItemID: 1095, ListID: 3014901, MerchantTemplateID: 7149,
+            Count: 1, Price: 86, Affordable: true,
+        },
+    }}}
+    loop.merchantID = -1
+    loop.buyAt = time.Now().Add(-2 * buyPause)
+
+    done := loop.tickStopShopping(time.Now())
+    require.False(t, done, "the stop waits for the second list")
+    require.Len(t, game.buys, 1, "the first list went out alone")
+    require.Equal(t, int32(3014900), game.buys[0][0].ListID,
+        "the jewel list is the first request of the visit")
+
+    // The server confirms the jewels with the inventory update; the
+    // transaction window ages out and the spellbook list fires.
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 9001, ItemID: 906, Count: 1, Type2: 5, Change: 1},
+    })
+    loop.buyAt = time.Now().Add(-buyPause - 100*time.Millisecond)
+    done = loop.tickStopShopping(time.Now())
+    require.False(t, done, "the book batch still waits its arrival")
+    require.Len(t, game.buys, 2, "the spellbook list followed")
+    require.Equal(t, int32(3014901), game.buys[1][0].ListID,
+        "the spellbook list is the second request of the visit")
+
+    // The books confirm: the stop completes with both lists served.
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 9002, ItemID: 1095, Count: 1, Type2: 5, Change: 1},
+    })
+    done = loop.tickStopShopping(time.Now())
+    require.True(t, done, "both lists confirmed and the stop completes")
+}
+
+// TestSellWaitsForTheBuyTransactionWindow pins the shared transaction
+// gate: the sell batches pace through the same flood protector window
+// the buy lists use - a sell fired right behind a buy would burn the
+// window and the refused batch would be marked sold without ever
+// leaving the bag.
+func TestSellWaitsForTheBuyTransactionWindow(t *testing.T) {
+    loop, game, bot, _ := newTripLoop()
+    fillInventory(bot)
+    // A buy list just went out: the transaction window is busy.
+    loop.buyAt = time.Now()
+
+    loop.sellJunk()
+    require.Empty(t, game.sells,
+        "the buy window holds the sell batch back")
+
+    // The window ages out: the junk sells.
+    loop.buyAt = time.Now().Add(-2 * buyPause)
+    loop.sellJunk()
+    require.Len(t, game.sells, 1, "the aged window releases the sell")
+}

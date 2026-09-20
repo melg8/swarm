@@ -1960,3 +1960,52 @@ sells from the customer cells).
   TestDelevelGuardWalkSearchesWithTheNpcRadius,
   TestMerchantRoofFallbackStopsOnTheWideDeck,
   TestFindPathApproachTightRadiusReachesTheTargetCell.
+
+
+### Progress (2026-09-20, the server window speed round)
+
+- the owner directive: the books are bought at the same moment as
+  the jewelry elements, and the skill teaching runs at the maximum
+  speed the server allows; the context is the farm readiness
+  acceptance (level 15: the weapon, the armor, the basic jewel set,
+  the spellbooks and the lessons land in one village walk).
+- the server research (the mobius C1 source of this deployment):
+  the transaction flood protector (buy AND sell share it) is
+  FloodProtectorTransactionInterval = 10 game ticks = 1 second
+  wide, a refused request costs nothing (the window does not
+  extend, FloodProtectorTransactionPunishmentLimit = 0); the
+  RequestAcquireSkill packet has NO flood protector at all - the
+  handler checks only the trainer distance, the level, the SP and
+  the spellbook, and every successful learn answers with a
+  SkillList (the confirm round trip IS the rate limit).
+- the pacing cut: transactionPause 11 s -> 1.25 s (the server
+  window plus the 250 ms decision tick margin) paces the buy lists
+  and the sell batches through one shared gate
+  (Loop.transactionWindowFree) - the spellbook list of the jewel
+  trader follows the jewel list of the same visit right behind
+  (the books ride the Creamees stop via the planLearnStops merge,
+  pinned by TestSpellbooksMergeIntoTheJewelStopVisit and
+  TestBookListFollowsTheJewelListAtTheTransactionPace); sellJunk
+  and the replacement offers joined the shared gate (a sell fired
+  right behind a buy would burn the window and the refused batch
+  would be marked sold without leaving the bag - pinned by
+  TestSellWaitsForTheBuyTransactionWindow).
+- the learn speed: the maximum allowed speed is confirm driven -
+  the next request fires the moment the previous SkillList lands
+  (the confirm tick walks straight into the next send); the
+  pacing pause is a 250 ms tick floor (learnPause 1 s -> 250 ms)
+  and the send drop bug is gone: sendLearnRequest reports whether
+  the packet actually went out and an unsent request arms nothing
+  (the early rounds armed the confirm window on every pick and the
+  dropped send burned its full 5 s learnConfirmWait before the
+  retry re-requested - every lesson paid the stall). Pinned by
+  TestLearnPacedSendDoesNotBurnTheConfirmWindow and the tightened
+  TestLearnLessonConfirmsBySkillList.
+- verification: task fmt, fmt:check, vet, lint (0 issues) and
+  go test -count=1 ./... all green on the rebased tree (the navmesh
+  port revert of the parallel round removed the tools and the
+  artifacts this round had repaired, the gate repair is dropped as
+  moot; 28 packages, the hunt suite 65 s). The measured acceptance flow (~472-481 s under the early
+  pacing) rides the server windows now: the shopping list batches
+  and the ~40 lessons of the level 15 queue pace at the round trip
+  speed instead of the 11 s / 5-6 s stalls.

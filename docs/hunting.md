@@ -557,7 +557,11 @@ The short form:
   of the sale funds the buy; the auto equipment stays suspended over
   that window so nothing re-equips a piece bound for the merchant),
   re-plans with the fresh adena and walks to every merchant of the plan
-  (one buylist per transaction request, 11 second pacing). The auto
+  (one buylist per transaction request, 1.25 s pacing - the server
+  transaction window is 10 game ticks = 1 s wide and a too early
+  request costs nothing, so the spellbook list of a multi list stop
+  follows its jewel list right behind; see the transactionPause
+  comment in hunt/shopping.go). The auto
   equipment runs during the trips so the purchases are worn at the shop
   already. The catalogs are generated from the Mobius buylists
   (`tools/generate_shop_catalogs.sh`, keyed by packet template id).
@@ -823,7 +827,9 @@ The short form:
   the merchant and selects it (interaction distance 250, one selecting
   request per second) like the official client, and falls back to
   selling without one after a 45 s wait. The transaction flood
-  protector paces the batches (one per 11 s, up to 25 items); every
+  protector paces the batches (one per 1.25 s, up to 25 items, the
+  same shared window the buys pace through - see
+  Loop.transactionWindowFree); every
   item is offered once per trip, so items the server refuses to sell
   can not stall the phase. The junk ranking lives in
   state.Bot.SellableItems: duplicated gear pieces first (every piece of

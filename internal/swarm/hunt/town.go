@@ -34,9 +34,12 @@ const (
     tripWeightPercent = 50.0
     // sellBatchSize is the maximum item count of one sell request.
     sellBatchSize = 25
-    // sellPause paces the sell requests after the transaction flood
-    // protector of the server (10 seconds by default).
-    sellPause = 11 * time.Second
+    // sellPause paces the sell requests through the shared
+    // transaction window of the server flood protector (see
+    // transactionPause in shopping.go for the server research: the
+    // window is 1 s wide, refusals cost nothing, the 11 second
+    // margin of the early rounds made the junk selling crawl).
+    sellPause = transactionPause
     // walkRequestPeriod paces the ground click walks of the waypoint
     // follower and the merchant approach.
     walkRequestPeriod = 2 * time.Second
@@ -3521,7 +3524,7 @@ func (l *Loop) junkRemaining() bool {
 // trip. An empty batch (nothing left to sell) ends the selling.
 func (l *Loop) sellJunk() {
     now := time.Now()
-    if !l.sellAt.IsZero() && now.Sub(l.sellAt) < sellPause {
+    if !l.transactionWindowFree(now) {
         return
     }
     l.sellAt = now
