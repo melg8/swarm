@@ -134,7 +134,7 @@ func TestTownSegmentFlatProbe(t *testing.T) {
     defer mesh.releaseState(state)
     began := time.Now()
     result := mesh.astar(state,
-        astarGoal{target: endRef, escape: false, approach: 0},
+        astarGoal{target: endRef, approach: 0},
         startRef, startPos, endPos, DefaultFilter(), noAvoid(), 1<<21,
         nil)
     t.Logf("flat: reached=%t partial=%t capped=%t explored=%d %s",

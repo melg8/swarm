@@ -32,6 +32,23 @@ func waterBand(spec *regionSpec, bx0, bx1, by0, by1 int) {
     }
 }
 
+// lineWet answers whether the straight line between two world
+// positions touches a lake or sea bed (the dryLine raster through the
+// engine's own search): the wet segment probe of the pricing tests.
+func lineWet(engine *Engine, start, end Vec3) bool {
+    search := newSearch(engine, engine.maxPass)
+    from, err := search.nodeAtWorld(start)
+    if err != nil {
+        return false
+    }
+    to, err := search.nodeAtWorld(end)
+    if err != nil {
+        return false
+    }
+
+    return !search.dryLine(from, to)
+}
+
 // TestPricedApproachSwimsAWideBand pins the swim side: a 48 cell wide
 // water band 448 cells tall splits two dry points, the land detour
 // around its far edge costs more than the swim at the 2.3x rate, and
@@ -57,10 +74,8 @@ func TestPricedApproachSwimsAWideBand(t *testing.T) {
     // crossing shows on the segment raster, not the waypoint heights).
     wetSegments := 0
     for i := 1; i < len(result.Waypoints); i++ {
-        crossed, err := engine.WaterCrossed(
-            result.Waypoints[i-1], result.Waypoints[i])
-        require.NoError(t, err)
-        if crossed {
+        if lineWet(engine, result.Waypoints[i-1],
+            result.Waypoints[i]) {
             wetSegments++
         }
     }
@@ -98,10 +113,8 @@ func TestPricedApproachDetoursANarrowBand(t *testing.T) {
     // Every segment is a clean dry walk: the follower clicks straight
     // along each segment without entering the water.
     for i := 1; i < len(result.Waypoints); i++ {
-        crossed, err := engine.WaterCrossed(
-            result.Waypoints[i-1], result.Waypoints[i])
-        require.NoError(t, err)
-        require.False(t, crossed, "the segment %d must stay dry", i-1)
+        require.False(t, lineWet(engine, result.Waypoints[i-1],
+            result.Waypoints[i]), "the segment %d must stay dry", i-1)
     }
 }
 

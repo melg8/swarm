@@ -407,8 +407,7 @@ func (s *search) directLineDry(direct []*node) bool {
 }
 
 // dryLine reports whether the whole raster line between two nodes
-// stays above the water level - the strict form the WaterCrossed
-// raster of the engine serves: a line that touches a lake or sea bed
+// stays above the water level: a line that touches a lake or sea bed
 // anywhere is wet, whatever its endpoints stand on.
 func (s *search) dryLine(from, to *node) bool {
     for _, step := range s.straightPath(from, to) {
@@ -456,93 +455,6 @@ func (s *search) nodeReached(current *node) bool {
     }
 
     return current.coords == s.target
-}
-
-// runEscape plans the way out of the water for a position whose
-// geodata surface lies below the water level: a breadth first flood
-// over the walkable surface (the same canStep rules as the A*) that
-// stops on the first node standing above the water surface - the
-// nearest shore. A character floating over a lake bed cannot trust
-// the ordinary searches: the server refuses move requests whose
-// target resolves onto a deck the bed has no walkable connection to
-// (the terrace under the elven village), so the only sensible walk
-// is the one back to the shore the terrain itself offers. The start
-// must be resolved by the caller; a start already above the water
-// level needs no escape and answers Found=false.
-func (s *search) runEscape(start Vec3) (*Result, error) {
-    began := time.Now()
-    from, err := s.nodeAtWorld(start)
-    if err != nil {
-        return nil, err
-    }
-    result := &Result{
-        Found:     false,
-        Partial:   false,
-        Aborted:   false,
-        Waypoints: nil,
-        RawPath:   nil,
-        Duration:  0,
-        Explored:  0,
-        OpenLeft:  0,
-        Length:    0,
-    }
-    if from.layer.Height >= WaterLevel {
-        return result, nil
-    }
-    raw := s.escape(from)
-    result.Duration = time.Since(began)
-    result.Explored = s.explored
-    result.Aborted = s.aborted
-    if raw == nil {
-        return result, nil
-    }
-    result.Found = true
-    result.RawPath = nodesToWorld(raw)
-    result.Waypoints = nodesToWorld(s.smoothPath(raw))
-    if s.engine.capsuleRadius > 0 {
-        result.Waypoints = NewCapsule(s.engine).ApplyPath(result.Waypoints,
-            s.engine.capsuleRadius)
-    }
-    result.Length = pathLength(result.Waypoints)
-
-    return result, nil
-}
-
-// escape floods the walkable surface from the start and returns the
-// raw node path to the first node above the water level. The flood
-// breathes outward step by step (a plain BFS - the escape wants the
-// nearest shore, not the cheapest one), never re-enters a node it
-// already touched and stops at the expansion cap so a lake without a
-// walkable shore cannot loop forever.
-func (s *search) escape(from *node) []*node {
-    queue := []*node{from}
-    seen := map[nodeKey]bool{from.key: true}
-    for len(queue) > 0 {
-        current := queue[0]
-        queue = queue[1:]
-        if current.layer.Height >= WaterLevel {
-            return s.reconstruct(current)
-        }
-        if s.explored >= MaxSearchExpansions {
-            s.aborted = true
-
-            return nil
-        }
-        s.explored++
-        for _, next := range s.neighbors(current, 1) {
-            if seen[next.key] {
-                continue
-            }
-            if !s.canStep(current, next) {
-                continue
-            }
-            seen[next.key] = true
-            next.parent = current
-            queue = append(queue, next)
-        }
-    }
-
-    return nil
 }
 
 // push inserts a node into the open set.

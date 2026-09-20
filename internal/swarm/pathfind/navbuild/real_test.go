@@ -143,11 +143,6 @@ func TestRealRegionBridgePair(t *testing.T) {
         " %d explored",
         len(route.Corridor), len(route.Waypoints),
         time.Since(started).Microseconds(), route.Explored)
-
-    // The reverse escape: from the water back onto the dry ground.
-    escape, err := mesh.WaterEscape(under)
-    require.NoError(t, err)
-    require.True(t, escape.Found, "the water escape must exist")
 }
 
 // TestRealRegionPairReplay replays the 200 random region wide pairs

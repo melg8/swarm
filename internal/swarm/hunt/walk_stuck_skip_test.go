@@ -284,35 +284,6 @@ func TestWalkStuckFastTimeoutArmsAfterSkip(t *testing.T) {
         "the fast timeout must fire the second skip before the full timeout")
 }
 
-// TestWalkStuckDoesNotSkipWaterEscape verifies the water escape branch
-// is unchanged: a stuck water escape re-plans the escape itself, not
-// the town segment. The skip logic only applies to the normal town walk.
-func TestWalkStuckDoesNotSkipWaterEscape(t *testing.T) {
-    loop, _, bot, nav := newTripLoop()
-    nav.found = true
-    nav.overWater = true
-    nav.route = []pathfind.Vec3{
-        {X: 45000, Y: 50000, Z: -3700},
-        {X: 44800, Y: 50200, Z: -3700},
-    }
-    nav.escapeRoute = []pathfind.Vec3{
-        {X: 45000, Y: 50000, Z: -3700},
-        {X: 45200, Y: 49800, Z: -3500},
-    }
-    fillInventory(bot)
-    moveSelfTo(bot, 45000, 50000, -3700)
-    loop.tick()
-    require.True(t, loop.waterEscape,
-        "the character over water must enter the water escape")
-
-    // Stuck water escape: re-plan the escape, not skip a waypoint.
-    armStuck(loop, bot)
-    loop.tick()
-    require.True(t, loop.waterEscape,
-        "the water escape must stay active through the re-plan")
-    require.Equal(t, 1, loop.rePaths)
-}
-
 // TestWalkStuckSkipNeedsAClearLine pins the skip gate of the 06:19
 // aisle dump: a stuck may only skip onto a waypoint whose straight
 // line from the standing cell is walkable. When every successor line

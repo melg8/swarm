@@ -123,10 +123,6 @@ func DefaultFilter() Filter {
     }
 }
 
-// escapeWaterCost prices the water polygons of the escape search (the
-// research round measured the 8x flood as the honest way out).
-const escapeWaterCost = 8
-
 // nearestHalfXZ/nearestHalfZ are the query extents of the nearest
 // polygon resolution: two cells of horizontal slack around the query
 // point and the stacked-layer disambiguation window vertically.
@@ -271,7 +267,7 @@ func (m *Mesh) RouteApproach(
 
     avoid := newAvoidCtx(filter.Avoid, start)
     result := m.astar(state,
-        astarGoal{target: endRef, escape: false, approach: approachRadius},
+        astarGoal{target: endRef, approach: approachRadius},
         startRef, startPos, endPos, filter, avoid, maxQueryNodes, nil)
     // The capped escalation: a flat search that hit the node budget
     // never saw the target side of the corridor - the hierarchy
@@ -291,8 +287,7 @@ func (m *Mesh) RouteApproach(
         }
     } else if result.capped {
         result = m.astar(state,
-            astarGoal{target: endRef, escape: false,
-                approach: approachRadius},
+            astarGoal{target: endRef, approach: approachRadius},
             startRef, startPos, endPos, filter, avoid, maxQueryNodes*8,
             nil)
     }
@@ -327,63 +322,6 @@ func (m *Mesh) RouteApproach(
     default:
         route.Corridor = nil
     }
-
-    return route, nil
-}
-
-// WaterEscape plans the way out of the water for a position standing
-// on a water polygon: the cheapest corridor to the first dry polygon
-// with the water priced 8x (the FindWaterEscape contract of the grid
-// engine - an ordinary priced search, no dedicated breadth first
-// flood). A start already on dry ground answers Found=false.
-func (m *Mesh) WaterEscape(start Pos) (*Route, error) {
-    startRef, startPos, ok := m.FindNearestPoly(start)
-    if !ok {
-        return nil, wrapNoNavmesh(start)
-    }
-    _, poly := m.polyOfRef(startRef)
-    if poly == nil {
-        return nil, wrapNoNavmesh(start)
-    }
-    if poly.Area == AreaGround {
-        return &Route{
-            Found:     false,
-            Partial:   false,
-            Waypoints: nil,
-            Corridor:  nil,
-            Explored:  0,
-        }, nil
-    }
-
-    state := m.acquireState()
-    defer m.releaseState(state)
-    filter := Filter{
-        WaterCost:         escapeWaterCost,
-        Avoid:             nil,
-        WaypointClearance: 0,
-    }
-    result := m.astar(state, astarGoal{
-        target:   0,
-        escape:   true,
-        approach: 0,
-    }, startRef, startPos, start, filter, noAvoid(), maxQueryNodes,
-        nil)
-
-    route := &Route{
-        Found:     false,
-        Partial:   false,
-        Waypoints: nil,
-        Corridor:  nil,
-        Explored:  result.explored,
-    }
-    if !result.reached {
-        return route, nil
-    }
-    route.Found = true
-    route.Corridor = result.corridor
-    // The walk ends at the crossing into the first dry polygon.
-    route.Waypoints = m.straightPath(result.corridor, startPos,
-        result.end, 0)
 
     return route, nil
 }

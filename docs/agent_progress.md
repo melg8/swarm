@@ -1753,3 +1753,30 @@ item not forbidden from the sale sells to any merchant.
   docs/codebase_review_2026-09-20.md - P0 items 1 and 2 first (small
   diffs, each with a focused test), then the session edges, the
   handover restructure and the CI activation batch.
+
+### Progress (2026-09-20, the water guard retirement round)
+
+- the owner directive: the water guard subsystems were built for the
+  grid navigation; the mesh prices the water, so remove them - but
+  land tests confirming or refuting the belief BEFORE the removal.
+- the belief tests (`world_water_reality_test.go`, the navmesh
+  package, the real elven pack) answered: the mesh plans full trader
+  routes from every wet cell of the 2026-09-20 dump (confirmed), the
+  whole dump trip plans as one found route (confirmed), and the mesh
+  `WaterEscape` returned the dump's own wet escape target 40000
+  43776 -3776 (refuted - the machinery planned walks to shores the
+  grid raster calls water).
+- the removal: hunt (the OverWater escape branch, walkWaterEscape,
+  planWaterEscape, stuckWaterEscape, the wet claim guards,
+  Navigator.WaterCrossed/FindWaterEscape; OverWater stays for the
+  frame measurement and the capsule clamp), pathfind
+  (Engine.FindWaterEscape, Engine.WaterCrossed, the escape BFS),
+  navmesh (Mesh.WaterEscape, the escape water cost, the dead escape
+  goal branch of the A*, the unused straightPath wrapper).
+- the survivor contract pinned by the adapted tests: the planned swim
+  keeps walking (a wet click is a priced walk, not a refusal), a wet
+  standing character recovers through the plain stuck re-plan ladder,
+  no shore search exists.
+- verification: go build, golangci-lint run 0 issues, gofmt-spaces
+  clean, go test hunt + pathfind + navbuild + navmesh + prototype +
+  acceptance - all ok.

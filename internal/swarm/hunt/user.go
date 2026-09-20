@@ -597,8 +597,8 @@ func (l *Loop) sendUserVariedAim(
 // answers NO mouse click from a cell still walks the arrow key
 // claims - the same recovery the town walk follower owns). The
 // claimed ladder marches the planned waypoint line in run speed
-// strides with the water guard - the claims follow the plan's own
-// ground, never a straight cut the planner did not draw. It reports
+// strides - the claims follow the plan's own ground, never a
+// straight cut the planner did not draw. It reports
 // whether the escape armed.
 func (l *Loop) beginUserCursorKeyEscape(
     selfX, selfY, selfZ, aimX, aimY, aimZ int32,

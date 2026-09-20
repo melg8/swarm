@@ -650,8 +650,8 @@ The short form:
   the trainer hall route goes north over the terrace and east past
   the hall), then - if the detour freezes as well - the follower
   drops the plan and clicks the stop target directly by the server's
-  own routing (the npc approach point of the stop, the water guard
-  and the aggro steering stay on), bounded by a 45 s window; only a
+  own routing (the npc approach point of the stop, the aggro
+  steering stays on), bounded by a 45 s window; only a
   direct walk that also makes no progress ends the trip with its
   cooldown. The ban list survives for the session (bounded to 8
   areas) so the later trips route around the frozen corridor too.
@@ -669,8 +669,8 @@ The short form:
   canceled with ActionFailed and never moves the character) or
   behind the character on the route re-aim at the forward route
   samples past the floor (the march along the plan polyline skips
-  the under-floor and backward samples, the water guard and the
-  click validation port gate every sample, and a walled sample only
+  the under-floor and backward samples, the
+  click validation port gates every sample, and a walled sample only
   skips forward to the next route cell). A trip timeout (20 min) and a trigger cooldown
   (5 min after every trip end) bound the whole feature, and a death -
   mid trip or not - clears the cooldown: the village restart lands next
@@ -687,7 +687,7 @@ The short form:
   shared moveAt slot too): a stuck verdict with the evidence first
   varies the aim at the current waypoint (sendVariedAim - the half
   and the quarter of the capped click, then the perpendicular
-  offsets, every variant offline validated and water guarded) because
+  offsets, every variant offline validated) because
   the refusal is target specific; the corridor ban rung of the
   escalation ladder is SKIPPED for a segment whose evidence latched
   (segmentRefused) - a segment the server refused does not name a frozen
@@ -707,7 +707,8 @@ The short form:
   character that stood on the same cell as the previous refusal stall
   holds the return backoff (the fully refusing deployment never
   restarts the cycle the server keeps refusing).
-- Water safety of the trips (the 2026-09-10 stuck regression): the
+- Water safety of the trips (the 2026-09-10 stuck regression, the
+  priced form of the mesh round): the
   server moves characters into water without any hesitation - its own
   move routing carries no water cost, its getValidLocation accepts the
   gradual underwater beds, and every move request of a character it
@@ -720,51 +721,40 @@ The short form:
   village deck resolved onto a layer the lake bed has no walkable
   connection to (the server answers such moves with the character's own
   position - a 0 length walk) and the re-paths replanned from the same
-  floating spot. Four defenses keep the trips ashore now: (0) the
-  planning itself is dry (FindPathApproachDry, the 2026-09-10 delevel
-  water loop): the water is a wall for the trip segment searches, a
-  destination only swimming reaches aborts the segment at once (the
-  cooldowns arm) instead of planning a route the walker refuses segment by
-  segment - the wet route of the ordinary search is exactly what looped the
-  deleveling "walking to the guard" -> "the walk would enter water" ->
-  "aborted, the walk would cross water" every 1.3 s in the reported
-  state dump, (1) the
-  smoothing never collapses a segment between two dry points across water
-  (pathfind legDry), (2) the follower verifies every click line with
-  pathfind.WaterCrossed before sending it - the pure water raster, NOT
-  the DryLine answer: the line of sight half of DryLine fails on the
-  height steps of the village deck ramps, the teacher segments of the
-  learning trips read as water that way and every trip that carried
-  them aborted on the 3 re-path budget (the 2026-09-10 teacher round) -
-  a wet click is refused and the walk re-paths around the shore (the
-  refusals share the 3 re-path budget), and (3) a character that still
-  ends up over a lake bed
-  (the geodata surface under it below the water level, OverWater)
-  enters the water escape: the walk to the nearest shore
-  (FindWaterEscape, a breadth first flood over the walkable surface)
-  replaces the segment, a stuck escape re-plans itself, and once the
-  character stands dry the interrupted segment re-plans from the shore with
-  a fresh re-path budget. An abort of a walk machinery that runs during
+  floating spot. The grid era answered with four defenses (the dry
+  search, the dry smoothing, the wet click refusals and the shore
+  escape); the mesh round retired all four - the mesh plans out of
+  every standing cell, wet included, and prices the water at the
+  measured swim rate (the run/swim speed ratio 2.3, the C1 zone data
+  arms the pricing): the plan may swim, the slowdown priced, and the
+  land detour wins whenever it is the faster walk (the navmesh world
+  water reality tests pin the planning on the real elven pack: every
+  wet cell of the 2026-09-20 dump answers a full trader route whose
+  tail stands dry). The follower walks the wet segments it planned -
+  a swim click is a priced walk, not a refusal. An off-plan drift
+  over a lake bed (a server push, a click drift) recovers through the
+  plain stuck ladder: the walk re-plans from the wet standing cell,
+  the fresh plan owns the segment - the dedicated shore escape
+  machinery retired with the grid (the 2026-09-20 dump round proved
+  it harmful: the escape clicked at 40000 43776 -3776 four times, a
+  target the grid raster itself calls over water, and burned the trip
+  into "aborted, the water escape could not leave the water"). The
+  standing water check stays for the frame measurement (a swimming
+  character measures no vintage shift, see click_frame.go) and the
+  capsule mirrors the server water clamp (the 700 unit swim moves).
+  An abort of a walk machinery that runs during
   the deleveling aborts the deleveling itself (abortTownTrip
   delegates to abortDelevel): the plain trip end left the delevel
   state armed without a cooldown and the next tick restarted the walk
-  into the same blocker. One release valve exists for the geodata
-  raster artifacts on a planned route (the village plaza cells
-  without a modeled floor resolve to the lake layer below them, every
-  straight line over the plaza center fails the dry raster while the
-  points stand dry): when the re-path budget exhausts without an
-  escape on the trip, the plan is trusted for the rest of the
-  segment and walks over the server routing (wetPlanTrusted; the
-  standing water check and the shore escape stay armed, and a next
-  budget exhaustion after an escape ends the trip for real). The
+  into the same blocker. The
   dump and the map carry the whole segment - origin, every waypoint
   with the passed markers, the TARGET marker on the current waypoint
   and the destination - for exactly this class of debugging (see
   docs/webui.md).
-- Path layer selection: the trip segments navigate with
-  pathfind.Engine.FindPathApproachDry (through the Navigator's
-  FindPathApproachDryAvoiding - the dry search with the session's
-  frozen corridor bans) and the segment approach radius: the merchant
+- Path layer selection: the trip segments navigate through the
+  Navigator's mesh corridor search (FindPathApproach /
+  FindPathApproachAvoiding with the session's frozen corridor bans)
+  and the segment approach radius: the merchant
   stops and the returns use the wide trip ring (200 units, under the
   interaction distance): the walk ends on the deck ring around the
   merchant, which handles the C1 shop interiors (the geodata holds no
@@ -774,15 +764,16 @@ The short form:
   in the 3D distance). The teacher stops search the close ring
   instead (npcApproachOffset, 150 units) with the wide ring as the
   fallback: the character walks right up to the training npc - the
-  geodata search is the one that knows the walkable ring cells (the
+  mesh search is the one that knows the walkable ring cells (the
   trainer hall interior carries its floor along the hall rows, the
   straight line offset ring lands on the roof-only bands between
   them), and the tight segments complete their route end with the pass
-  radius instead of the wide trip slack. The water is a wall for the
-  search, so the walks cross the village ramps instead of swimming
-  the lake under the floating island (the 2026-09-09 fix; regression
+  radius instead of the wide trip slack. The water prices at the swim
+  rate in the search, so the walks cross the village ramps whenever
+  the swim is the slower walk (the priced round; regression
   tests `TestFindPathToShopDeck`, the synthetic water tests of
-  `search_test.go` and the dry search tests of `dry_search_test.go`).
+  `search_test.go` and the priced swim tests of
+  `priced_search_test.go`).
   approachMerchant also
   gives up targeting when the merchant stands more than the interaction
   distance above or below the character. The teacher approach

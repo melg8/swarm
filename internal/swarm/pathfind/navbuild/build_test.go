@@ -136,11 +136,6 @@ func TestBuildRegionQueries(t *testing.T) {
     }
     require.True(t, wet, "the swim route must reach the water")
 
-    // The escape from the water climbs the shore.
-    escape, err := mesh.WaterEscape(worldPos(15, 18, -3784))
-    require.NoError(t, err)
-    require.True(t, escape.Found)
-
     // The stacked disambiguation: the deck over the water.
     mesh = writeAndLoad(t, build.Tile)
     ref, pos, ok := mesh.FindNearestPoly(worldPos(15, 18, -3504))

@@ -279,7 +279,7 @@ func escapeClaimRange(
 // returns the walk to the normal clicks (the WASD along the route
 // contract).
 func escapeSnapshotClaims(
-    t *testing.T, loop *Loop, game *fakeGame,
+    t *testing.T, _ *Loop, game *fakeGame,
     snap escapeSnapshot, index int, claimFrom, claimTo int,
 ) {
     t.Helper()
@@ -292,21 +292,6 @@ func escapeSnapshotClaims(
         require.LessOrEqual(t, dist, waypointCorridor,
             "escape %d claim %d sits %.0f off the planned route - "+
                 "the escape marched something else", index, i, dist)
-    }
-    // The water guard of the step ladder the escape built: every
-    // claimed step's line stays dry.
-    prev := snap.origin
-    for i, step := range snap.steps {
-        to := pathfind.Vec3{
-            X: float64(step[0]), Y: float64(step[1]),
-            Z: float64(step[2]),
-        }
-        crossed, err := loop.navigator.WaterCrossed(prev, to)
-        require.NoError(t, err)
-        require.False(t, crossed,
-            "escape %d step %d never crosses water: the step %v",
-            index, i, step)
-        prev = to
     }
 }
 

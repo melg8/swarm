@@ -24,9 +24,8 @@ nearest polygon resolution (the column containment first - the
 polygon whose rect covers the query x/y wins with the closest surface
 z, the exact mirror of the grid engine's column + ClosestLayer node
 binding; the pure 3D window nearest answers only when no polygon
-covers the x/y), the A* corridor search with the water area pricing,
-the funnel string
-pulling and the water escape. No C++ anywhere: the Recast build
+covers the x/y), the A* corridor search with the water area pricing
+and the funnel string pulling. No C++ anywhere: the Recast build
 pipeline is replaced by the sheet decomposition the research round
 proved.
 
@@ -212,13 +211,16 @@ bot budget comfortably; the Detour-parity optimization (the flat
 tile array, the per-tile poly index) is future headroom, not a
 blocker.
 
-The `Route`/`WaterEscape` contracts mirror the grid engine's
+The `Route` contract mirrors the grid engine's
 `FindPathApproach` family: the stacked-layer
 disambiguation test (the same x/y, the deck vs the water under it -
-the closest surface z inside the column decides), the priced swim
-route to a water target, and the
-priced water escape all pass on the real mesh
-(`navbuild/real_test.go`). The endpoint binding of the round of
+the closest surface z inside the column decides) and the priced swim
+route to a water target pass on the real mesh
+(`navbuild/real_test.go`). The water escape query the grid era
+carried retired with the priced round: the mesh plans out of every
+standing cell, wet included - the swim is a priced slowdown, and the
+world water reality tests pin the trader routes from the dump's lake
+bed cells. The endpoint binding of the round of
 2026-09-20 (the guard stairs round) mirrors the grid node resolution
 exactly: the polygon containing the query x/y binds first - the pure
 3D nearest bound a sealed decorative platform two cells aside when
@@ -575,7 +577,7 @@ engine answered.
 
 - **The route queries serve from the mesh**: FindPathApproach, both
   avoiding forms (the frozen corridor bans of the session convert
-  into mesh ban disks), FindPath and FindWaterEscape run the corridor
+  into mesh ban disks) and FindPath run the corridor
   search with the approach radius goal (the polygon-granularity form
   of the grid nodeReached) and answer the funnel waypoints as the
   pathfind.Result contract of the seam.

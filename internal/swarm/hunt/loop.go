@@ -374,7 +374,6 @@ type Loop struct {
     wpIndex       int
     segmentDest   pathfind.Vec3
     segmentStart  pathfind.Vec3
-    waterEscape   bool
     // segmentFrameOffset is the measured z frame offset of the current
     // segment plan (see click_frame.go): the difference between the
     // server vouched standing z and the mesh frame height of the same
@@ -910,7 +909,6 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         wpIndex:            0,
         segmentDest:        pathfind.Vec3{X: 0, Y: 0, Z: 0},
         segmentStart:       pathfind.Vec3{X: 0, Y: 0, Z: 0},
-        waterEscape:        false,
         segmentFrameOffset: 0,
         moveAt:             time.Time{},
         moveStartAt:        time.Time{},
@@ -1562,7 +1560,6 @@ func (l *Loop) recoverFromDeath() {
         l.noteDelevelDeath()
         l.waypoints = nil
         l.segmentStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
-        l.waterEscape = false
     } else {
         if l.autonomous {
             l.phase = phaseEngage

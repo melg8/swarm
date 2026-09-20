@@ -783,7 +783,7 @@ func (m *Mesh) confinedRoute(q *hierQuery, clusters []clusterKey,
     }
     allow := newConfinedSet(clusters)
     result := m.astar(q.state,
-        astarGoal{target: q.endRef, escape: false, approach: q.approach},
+        astarGoal{target: q.endRef, approach: q.approach},
         q.startRef, q.startPos, q.endPos, q.filter, noAvoid(),
         maxConfinedNodes, allow)
     if result.corridor == nil {
@@ -1009,7 +1009,7 @@ func (m *Mesh) hopCorridor(q *hierQuery, fromRef PolyRef, fromPos Pos,
 func (m *Mesh) runHop(q *hierQuery, fromRef PolyRef, fromPos Pos,
     toRef PolyRef, toPos Pos, last bool,
 ) *hopSegment {
-    goal := astarGoal{target: toRef, escape: false, approach: 0}
+    goal := astarGoal{target: toRef, approach: 0}
     if last {
         goal.approach = q.approach
     }
@@ -1172,7 +1172,7 @@ func (m *Mesh) contestFlat(q *hierQuery, chain coarseResult,
     }
     length := routeLengthOf(route)
     result := m.astar(q.state,
-        astarGoal{target: q.endRef, escape: false, approach: q.approach},
+        astarGoal{target: q.endRef, approach: q.approach},
         q.startRef, q.startPos, q.endPos, q.filter, noAvoid(),
         maxQueryNodes, nil)
     if result.reached && len(result.corridor) > 0 {

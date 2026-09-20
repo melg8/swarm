@@ -136,22 +136,6 @@ func TestCursorEscapeRouteStepsCapKeepsThePocketRecovery(t *testing.T) {
         "the capped ladder ends at the route cap, walked %.0f", total)
 }
 
-// TestCursorEscapeRouteStepsStopAtTheWetStride pins the water guard
-// of the claims: a stride whose line crosses water ends the ladder -
-// a claim never names a wet cell, the shore route owns the crossing.
-func TestCursorEscapeRouteStepsStopAtTheWetStride(t *testing.T) {
-    loop := NewLoop(&fakeGame{}, newTestBot())
-    loop.SetNavigator(&fakeNavigator{wetLine: true})
-    loop.waypoints = []pathfind.Vec3{
-        {X: 1000, Y: 0, Z: -3000},
-    }
-    loop.wpIndex = 0
-
-    steps, _ := loop.cursorEscapeRouteSteps(0, 0, -3000)
-    require.Empty(t, steps,
-        "a wet stride must end the route ladder at once")
-}
-
 // TestCursorEscapeRouteStepsNilWithoutPlan pins the fallback
 // contract: without a plan (no navigator, no waypoints, an exhausted
 // cursor) the route ladder answers nil and the straight line ladder

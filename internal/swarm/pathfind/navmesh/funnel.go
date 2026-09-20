@@ -21,32 +21,6 @@ type funnelWp struct {
     portal int32
 }
 
-// straightPath turns a polygon corridor into walk waypoints through
-// the funnel algorithm of dtNavMeshQuery::findStraightPath: the
-// portals of the corridor (the open spans of the shared edges) narrow
-// a left/right cone from the start until it inverts, every inversion
-// appends the funnel apex as a turning point. The waypoints never
-// leave the corridor polygons and only cross shared edges inside
-// their open portal spans - the NSWE wall fidelity of the mesh.
-// The clearance radius pulls the span ends a wall abuts inward
-// (shrunkPortalSpan) so a turning waypoint keeps the character
-// capsule away from the walls the span end sits on; the span ends
-// the open ground continues past keep their extent - the strip
-// joints of the merged mesh stay open portals and the open terrain
-// walks straight.
-//
-// The corridor must be a connected polygon chain (the A* answer). The
-// start and end positions snap onto the corridor surface like
-// closestPointOnPolyBoundary does in Detour: the end of a partial
-// corridor projects onto its last polygon, which is exactly the
-// closest-reachable-point semantics of the dry searches.
-func (m *Mesh) straightPath(corridor []PolyRef, startPos, endPos Pos,
-    clearance float64,
-) []Pos {
-    return funnelPositions(m.straightPathWps(corridor, startPos, endPos,
-        clearance))
-}
-
 // funnelPositions strips the funnel waypoints down to their positions.
 func funnelPositions(wps []funnelWp) []Pos {
     positions := make([]Pos, len(wps))

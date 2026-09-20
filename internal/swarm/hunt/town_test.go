@@ -40,10 +40,6 @@ type fakeNavigator struct {
     // the water escape tests arm it to drop the character into a
     // lake.
     overWater bool
-    // wetLine marks the WaterCrossed answer as wet: the click guard
-    // tests arm it to refuse the clicks, every other walk stays dry
-    // by default (the zero value answers a dry line).
-    wetLine bool
     // refuseClicks makes the server click validation port refuse
     // every line: the follower reaction tests (the shorten, the hop
     // and the re-path) arm it.
@@ -56,16 +52,11 @@ type fakeNavigator struct {
     // validation port about (the shorten loop and the hop targeting
     // checks pin their geometry here).
     validatedClicks []pathfind.Vec3
-    // escapeRoute overrides the waypoints of the water escape search.
-    escapeRoute []pathfind.Vec3
     // avoidRoute overrides the waypoints of the avoiding approach
     // search (the frozen segment recovery re-plan); avoiding records
     // the avoid areas the loop passed.
     avoidRoute []pathfind.Vec3
     avoiding   [][]pathfind.AvoidArea
-    // escapeErr makes the water escape search fail hard.
-    escapeErr   bool
-    escapeCalls int
     // route overrides the planned waypoints of a successful search
     // (the blind reposition tests pin the segment following on a detour).
     route []pathfind.Vec3
@@ -254,16 +245,6 @@ func (f *fakeNavigator) OverWater(_, _ float64, _ int16) bool {
     return f.overWater
 }
 
-// WaterCrossed answers the configured water raster: the water guard
-// tests arm the wet flag to make the follower refuse the clicks.
-func (f *fakeNavigator) WaterCrossed(_, _ pathfind.Vec3) (bool, error) {
-    if f.heightErr {
-        return false, errors.New("no geodata")
-    }
-
-    return f.wetLine, nil
-}
-
 // ValidateClick answers the configured server click validation: the
 // default accepts every line (the port is a pure mirror, the fake
 // trusts the plan), the validateHook overrides the answers for the
@@ -280,39 +261,6 @@ func (f *fakeNavigator) ValidateClick(
     }
 
     return to, true
-}
-
-// FindWaterEscape answers the configured shore escape.
-func (f *fakeNavigator) FindWaterEscape(
-    _ pathfind.Vec3,
-) (*pathfind.Result, error) {
-    f.escapeCalls++
-    if f.escapeErr {
-        return nil, errors.New("no geodata")
-    }
-    if f.escapeRoute != nil {
-        return &pathfind.Result{
-            Found:     true,
-            Aborted:   false,
-            Waypoints: f.escapeRoute,
-            RawPath:   f.escapeRoute,
-            Duration:  0,
-            Explored:  0,
-            OpenLeft:  0,
-            Length:    0,
-        }, nil
-    }
-
-    return &pathfind.Result{
-        Found:     false,
-        Aborted:   false,
-        Waypoints: nil,
-        RawPath:   nil,
-        Duration:  0,
-        Explored:  0,
-        OpenLeft:  0,
-        Length:    0,
-    }, nil
 }
 
 // herbielPos is the spawn point of the Elven village trader Herbiel,

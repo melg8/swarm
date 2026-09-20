@@ -97,8 +97,7 @@ func newAvoidCtx(areas []AvoidCircle, start Pos) avoidCtx {
     return ctx
 }
 
-// noAvoid is the avoid context of the searches without bans (the
-// water escape).
+// noAvoid is the avoid context of the searches without bans.
 func noAvoid() avoidCtx {
     return avoidCtx{
         areas:     nil,

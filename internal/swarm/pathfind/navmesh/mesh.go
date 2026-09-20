@@ -122,11 +122,10 @@ func NewMesh(dir string) *Mesh {
         inflight: make(map[RegionKey]*tileCall),
         states: sync.Pool{New: func() any {
             state := &queryState{
-                nodes:  nil,
-                open:   nil,
-                best:   0,
-                bestH:  0,
-                escape: false,
+                nodes: nil,
+                open:  nil,
+                best:  0,
+                bestH: 0,
             }
             state.index.init(0)
 

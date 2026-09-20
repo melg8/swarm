@@ -82,9 +82,10 @@ to the island over the water. The results
   "you cannot get there dry" the hunt loop needs (the current engine
   implements it as `FindPathApproachDry` returning not found).
 - **The water escape is an ordinary query**: from the water under
-  the bridge back onto the deck with the water priced 8x - the
-  `FindWaterEscape` breadth first flood of the current engine
-  becomes a plain findPath with an area cost.
+  the bridge back onto the deck with the water priced 8x - a plain
+  findPath with an area cost. The dedicated escape query retired with
+  the priced round: the ordinary priced search plans out of the wet
+  standing cell directly, no shore pre-pass exists.
 - **The line of sight survives**: the raycast from the island center
   toward the mainland hits the cliff edge and reports the wall
   normal - the `LineOfSight`/`DryLine` equivalents keep their
@@ -260,7 +261,7 @@ mesh), and removes the last C++ dependency of the round.
 |---|---|
 | `waterCostMultiplier` 3x per underwater cell | water polys carry a swim area cost (the same 3x, per area not per step) |
 | `FindPathApproachDry` walling the water | a filter that excludes the swim areas; unreachable targets answer the partial path with the closest dry point |
-| `FindWaterEscape` breadth first flood | an ordinary findPath with a high water area cost |
+| `FindWaterEscape` breadth first flood | retired with the priced round - the ordinary priced findPath plans out of the wet cell |
 | `segmentDry` smoothing rule (the ford regression) | the funnel never leaves the poly corridor; water segments stay water segments |
 | layer poisoning fix (`nodeKey` = cell + height) | stacked layers are separate polygons by construction |
 | the 1M expansion cap and its aborts | the corridor is hundreds of polys; world routes stop costing millions of nodes |

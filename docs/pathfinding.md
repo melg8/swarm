@@ -62,20 +62,17 @@ paid to route around (the 2026-09-10 elven lake regression,
 `TestSmoothedLegsStayDry`). Segments that start or end in the water are
 exempt: they belong to the swim escape below.
 
-The engine answers three water queries besides the searches:
+The engine answers one water query besides the searches:
 `OverWater(x, y, refZ)` tells whether the walkable surface under a
 position lies below the water level (the layer closest to the
 reference z decides, so a swimmer above a lake bed reports over water
-while a character on the deck above the same cell does not);
-`DryLine(start, end)` verifies that the straight segment between two
-world points is a clean dry walk (walkable and never below the water
-level - the town walker checks every click line with it before sending
-the move request, because the server walks characters into water
-without any hesitation); `FindWaterEscape(start)` plans the way out of
-the water for a position standing over a lake or sea bed: a breadth
-first flood over the walkable surface (the same canStep rules) that
-stops on the first node above the water level - the nearest shore. A
-start already on dry ground answers Found=false.
+while a character on the deck above the same cell does not). The
+frame measurement arms on it (a swimming character measures no
+vintage shift) and the capsule mirrors the server water clamp on it
+(the 700 unit swim moves). The wet click raster and the water escape
+the grid era also carried retired with the priced mesh round: the
+plans price the crossings at the swim rate and the follower walks
+them - the water is walkable, the slowdown honest.
 
 ## Deliberate deviations from the original
 

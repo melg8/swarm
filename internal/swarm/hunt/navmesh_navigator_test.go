@@ -131,19 +131,17 @@ func TestNavmeshNavigatorServesMeshRoutes(t *testing.T) {
         1e-9)
     require.Greater(t, result.Length, 3000.0)
 
-    // The water escape of a start standing on the water polygon also
-    // serves from the mesh.
+    // The route answers fully from the mesh: a start standing on the
+    // water polygon plans the priced swim onward (the escape-less
+    // priced round - no shore search exists on the navigator).
     waterStart := pathfind.Vec3{
         X: 32768 + 240*16, Y: 32768 + 264*16, Z: -80,
     }
-    escape, err := navigator.FindWaterEscape(waterStart)
+    onward, err := navigator.FindPathApproach(waterStart, end, 150)
     require.NoError(t, err)
-    require.NotNil(t, escape)
-    require.True(t, escape.Found)
-    require.NotEmpty(t, escape.Waypoints)
-    // The escape ends ashore: the final waypoint stands above the
-    // water level of the synthetic world (-80 is the water bed).
-    require.Greater(t, escape.Waypoints[len(escape.Waypoints)-1].Z, -80.0)
+    require.NotNil(t, onward)
+    require.True(t, onward.Found,
+        "the mesh plans from the water polygon the same way")
 }
 
 // TestNavmeshNavigatorMissingTileErrors pins the mesh only rule: a
@@ -161,8 +159,6 @@ func TestNavmeshNavigatorMissingTileErrors(t *testing.T) {
     _, err := navigator.FindPathApproach(start, end, 150)
     require.Error(t, err)
     _, err = navigator.FindPath(start, end)
-    require.Error(t, err)
-    _, err = navigator.FindWaterEscape(start)
     require.Error(t, err)
 }
 
@@ -296,8 +292,8 @@ func TestNavmeshNavigatorHardPair(t *testing.T) {
 // TestNavmeshNavigatorValidationStaysOnEngine pins the validation
 // layer contract on the real geodata: with the mesh present, every
 // validation answer of the hybrid is the engine answer - the click
-// guard, the water rasters and the deck heights never consult the
-// mesh.
+// guard, the standing water check and the deck heights never consult
+// the mesh.
 func TestNavmeshNavigatorValidationStaysOnEngine(t *testing.T) {
     hybrid, engine := realNavmeshNavigator(t)
 
@@ -308,11 +304,6 @@ func TestNavmeshNavigatorValidationStaysOnEngine(t *testing.T) {
     engineValidated, engineOK := engine.ValidateClick(village, water)
     require.Equal(t, engineOK, ok)
     require.Equal(t, engineValidated, validated)
-
-    crossed, err := hybrid.WaterCrossed(village, water)
-    engineCrossed, engineErr := engine.WaterCrossed(village, water)
-    require.Equal(t, engineErr, err)
-    require.Equal(t, engineCrossed, crossed)
 
     height, err := hybrid.ClosestHeight(45768, 49848, -3056)
     engineHeight, engineErr := engine.ClosestHeight(45768, 49848, -3056)

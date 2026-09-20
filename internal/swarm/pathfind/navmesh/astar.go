@@ -42,12 +42,11 @@ const (
 // node tracking. One Route call takes a state from the mesh pool,
 // resets and returns it.
 type queryState struct {
-    nodes  []astarNode
-    index  refIndex
-    open   []uint32
-    best   uint32
-    bestH  float64
-    escape bool
+    nodes []astarNode
+    index refIndex
+    open  []uint32
+    best  uint32
+    bestH float64
     // zones is the bucket index of the filter water zone cuboids,
     // built once per search for the zone-aware swim pricing (nil
     // without the zone table).
@@ -249,13 +248,12 @@ func hashRef(v uint64) uint64 {
 }
 
 // reset empties the state for reuse.
-func (s *queryState) reset(escape bool) {
+func (s *queryState) reset() {
     s.nodes = s.nodes[:0]
     s.index.reset()
     s.open = s.open[:0]
     s.best = 0
     s.bestH = math.MaxFloat64
-    s.escape = escape
     s.zones = nil
 }
 
@@ -413,13 +411,11 @@ func emptyResult() astarResult {
 }
 
 // astarGoal selects the stop condition of the corridor search: the
-// ordinary search stops at one target polygon, the water escape stops
-// at the first ground polygon. The approach radius widens the
-// ordinary goal: the search also stops on the first polygon whose
-// closest surface point lies within the radius of the end position.
+// search stops at one target polygon. The approach radius widens the
+// goal: the search also stops on the first polygon whose closest
+// surface point lies within the radius of the end position.
 type astarGoal struct {
     target PolyRef
-    escape bool
     // approach is the 3D radius of the FindPathApproach goal (the
     // merchant interaction distance of the town trips); zero keeps
     // the exact target contract.
@@ -427,12 +423,8 @@ type astarGoal struct {
 }
 
 // reached reports whether a settled polygon satisfies the goal.
-func (g astarGoal) reached(poly *Poly, ref PolyRef) bool {
-    if g.target != 0 {
-        return ref == g.target
-    }
-
-    return g.escape && poly != nil && poly.Area == AreaGround
+func (g astarGoal) reached(_ *Poly, ref PolyRef) bool {
+    return ref == g.target
 }
 
 // approachReached reports whether a settled polygon already
@@ -471,14 +463,11 @@ func (m *Mesh) astar(
     endPos Pos, filter Filter, avoid avoidCtx, budget int,
     allow *confinedSet,
 ) astarResult {
-    state.reset(goal.escape)
+    state.reset()
     if len(filter.WaterZones) > 0 {
         state.zones = newZoneIndex(filter.WaterZones)
     }
     startH := dist3(startPos, endPos)
-    if goal.escape {
-        startH = 0
-    }
     startTile, startPoly := m.polyOfRef(startRef)
     if startTile == nil {
         return emptyResult()
@@ -504,14 +493,7 @@ func (m *Mesh) astar(
             goal.approachReached(node.tile, node.poly, endPos) {
             result.corridor = state.corridorOf(idx)
             result.reached = true
-            // The ordinary search ends at the requested position; the
-            // escape ends at the crossing into the first dry polygon
-            // (the entry position of the reached node).
-            if goal.escape {
-                result.end = node.pos
-            } else {
-                result.end = endPos
-            }
+            result.end = endPos
 
             return result
         }
@@ -597,9 +579,6 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
             g *= avoidGrazedMultiplier
         }
         h := dist3(mid, endPos)
-        if state.escape {
-            h = 0
-        }
         relax(state, idx, targetRef, targetTile, targetPoly, mid, g, h)
     }
 }

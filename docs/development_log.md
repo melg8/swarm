@@ -7727,3 +7727,68 @@ for the re-pick line).
 - Follow ups: the camera still snaps once when the new bot sits far
   from the old one - the honest switch feedback; a glide would need a
   camera interpolation layer, out of scope for the flash fix.
+
+## Round 101: the water guard retires - the mesh plans out of every standing cell (2026-09-20)
+
+- date, scope: 2026-09-20, the removal of the grid era water guard
+  subsystems (`internal/swarm/hunt/town.go`, `user.go`,
+  `navmesh_navigator.go`, `internal/swarm/pathfind/engine.go`,
+  `search.go`, `internal/swarm/pathfind/navmesh/query.go`,
+  `astar.go`, `funnel.go`).
+- Problem statement: the owner directive - the water guard systems
+  (the shore escape machinery, the wet claim guards of the cursor key
+  escape, the grid `FindWaterEscape`/`WaterCrossed`/mesh
+  `WaterEscape` queries) were built for the grid navigation whose
+  search walled the water; the mesh prices the water instead and the
+  owner belief "the search answers correctly from any point" needed
+  tests confirming or refuting it BEFORE the removal. The field
+  evidence (the 2026-09-20 dump, build 6b61f5b, bot test3): the sell
+  trip to the trader Unoren drifted over the elven lake bed, the
+  water escape armed four times, clicked at 40000 43776 -3776 and
+  burned the trip into "aborted, the water escape could not leave
+  the water" - the bot walked back to farming.
+- Reproduction: the new navmesh world water reality tests
+  (`world_water_reality_test.go`) on the real elven pack. The belief
+  verdict: CONFIRMED - `RouteApproach` from all four wet cells of the
+  dump answers a full found route to the trader (not partial, not
+  pocket, one wet waypoint - the own bed cell - and a dry tail within
+  the 250 interaction distance), and the whole farm spot -> trader
+  trip plans as one found route (41 waypoints, 2 priced wet
+  waypoints). The escape machinery verdict: REFUTED - the mesh
+  `WaterEscape` from the same wet cell returned exactly the dump's
+  target 40000 43776 -3776 and the grid `OverWater` raster calls
+  that target over water: the escape planned walks to shores that
+  are not shores, the exact field failure.
+- Root cause analysis: the escape search's "first dry polygon" and
+  the raster's "surface below WaterLevel" disagree on the shallow
+  shelf cells around the lake (a bed at -3776 vs the -3780 surface),
+  and the walk-out budget of `walkWaterEscape` burned one re-path per
+  escape plan completion - a character the arrival slack kept a wet
+  cell short of the waterline exhausted the budget without moving a
+  plan forward. The machinery was redundant (the mesh re-plans from
+  wet cells - the priced swim at the 2.3 run/swim ratio competes with
+  the land detour on honest travel time) and actively harmful (its
+  targets can be wet, its abort retired the whole trip).
+- Fix: the belief tests landed first, then the removal. Hunt: the
+  `Navigator` interface drops `WaterCrossed` and `FindWaterEscape`
+  (`OverWater` stays - the frame measurement and the capsule water
+  clamp arm on it), `walkTownWaypoints` loses the OverWater branch
+  (the escape arming and the shore re-plan), `walkWaterEscape`,
+  `planWaterEscape`, `stuckWaterEscape` and the wet stride checks of
+  the cursor key escape claims (`escapeStepWet`) are deleted, the
+  claims follow the priced plan as planned, `selfZForEscape` renames
+  to the honest `stuckSelfZ`. Pathfind: `Engine.FindWaterEscape`,
+  `Engine.WaterCrossed` and the `search.runEscape`/`escape` BFS flood
+  are deleted (`dryLine` stays internal for the segment smoothing
+  dry gate). Navmesh: `Mesh.WaterEscape` and the 8x escape water cost
+  are deleted, the dead `escape` goal branch of the corridor A* and
+  the unused `straightPath` wrapper with it. The priced swim tests of
+  the hunt package pin the survivor contract: the planned swim keeps
+  walking (no escape arms for a priced crossing) and a wet standing
+  character recovers through the plain stuck re-plan ladder.
+- Verification: go build, golangci-lint run 0 issues on the touched
+  packages, gofmt-spaces clean, go test on hunt, pathfind, navbuild,
+  navmesh, navmesh/prototype, acceptance - all ok.
+- Follow ups: none. The standing water check (`OverWater`) serves the
+  frame measurement and the server swim clamp mirror; the water
+  pricing lives in the mesh filter (the C1 zone data).

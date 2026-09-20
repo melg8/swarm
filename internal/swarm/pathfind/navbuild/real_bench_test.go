@@ -110,19 +110,6 @@ func BenchmarkRealTileDecode(b *testing.B) {
     }
 }
 
-// BenchmarkRealWaterEscape measures the escape query.
-func BenchmarkRealWaterEscape(b *testing.B) {
-    _, mesh := realBenchMesh(b)
-    under := navmesh.Pos{X: 44920, Y: 50792, Z: -3928}
-    b.ResetTimer()
-    for range b.N {
-        route, err := mesh.WaterEscape(under)
-        if err != nil || !route.Found {
-            b.Fatalf("escape failed: %v", err)
-        }
-    }
-}
-
 // The build timing sanity: the full-region build must stay in the
 // seconds range (the pack-wide build budget of the offline cmd).
 func TestRealBuildTimeBudget(t *testing.T) {

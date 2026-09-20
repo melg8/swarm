@@ -221,8 +221,8 @@ func driveTownWalkTick(
 // the character off the refusing ground claim by claim, and the
 // server routed clicks resume from the escaped ground - the walk
 // reaches the hunting zone, the two minute contract of the report
-// holds. The claimed steps never name a wet cell: the water guard
-// holds for the claims exactly the way it holds for the clicks.
+// holds. The claims follow the plan the mesh priced, wet strides
+// included.
 func TestReproCursorKeyEscapeWalksOutOfTheRefusingCell(t *testing.T) {
     loop, game, bot, sim, sink := cursorEscapeDumpLoop(t, true)
 
@@ -279,23 +279,6 @@ func TestReproCursorKeyEscapeWalksOutOfTheRefusingCell(t *testing.T) {
     require.NotContains(t, sink.String(),
         "the cursor key escape made no progress",
         "the server follows the claims of this model")
-    // The water guard holds for the claimed steps: every claim line
-    // from the standing cell to the claimed placement stays dry.
-    prev := pathfind.Vec3{
-        X: float64(refusalDumpX), Y: float64(refusalDumpY),
-        Z: float64(refusalDumpZ),
-    }
-    for _, claim := range game.claims {
-        to := pathfind.Vec3{
-            X: float64(claim[0]), Y: float64(claim[1]),
-            Z: float64(claim[2]),
-        }
-        crossed, err := loop.navigator.WaterCrossed(prev, to)
-        require.NoError(t, err)
-        require.False(t, crossed,
-            "a claimed step never crosses water: the claim %v", claim)
-        prev = to
-    }
 }
 
 // TestReproCursorKeyEscapeAbortsWhenTheServerIgnoresTheClaims pins

@@ -121,24 +121,6 @@ func (n navmeshNavigator) FindPath(
         n.clearedFilter(navmesh.DefaultFilter()))
 }
 
-// FindWaterEscape plans the way out of the water through the mesh
-// escape search (the 8x priced flood to the first dry polygon).
-func (n navmeshNavigator) FindWaterEscape(
-    start pathfind.Vec3,
-) (*pathfind.Result, error) {
-    began := time.Now()
-    route, err := n.mesh.WaterEscape(meshPos(start))
-    if err != nil {
-        return nil, err
-    }
-    if result := n.meshResult(route, began); result != nil {
-        return result, nil
-    }
-
-    return &pathfind.Result{Found: false,
-        Duration: time.Since(began)}, nil
-}
-
 // ClosestHeight resolves the destination deck height with the grid
 // engine: the layer resolution is the engine's own semantics (the
 // deck the server itself picks), the mesh has no equivalent contract.
@@ -158,13 +140,6 @@ func (n navmeshNavigator) LineOfSight(
 // OverWater answers the geodata water surface check with the engine.
 func (n navmeshNavigator) OverWater(x, y float64, refZ int16) bool {
     return n.engine.OverWater(x, y, refZ)
-}
-
-// WaterCrossed answers the geodata water raster with the engine.
-func (n navmeshNavigator) WaterCrossed(
-    start, end pathfind.Vec3,
-) (bool, error) {
-    return n.engine.WaterCrossed(start, end)
 }
 
 // ValidateClick mirrors the server move validation with the engine:

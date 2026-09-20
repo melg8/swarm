@@ -220,7 +220,7 @@ func TestHierarchyVersusFlat21x19(t *testing.T) {
         // The flat search under the production budget.
         began = time.Now()
         flat := mesh.astar(state,
-            astarGoal{target: endRef, escape: false, approach: 0},
+            astarGoal{target: endRef, approach: 0},
             startRef, startPos, endPos, DefaultFilter(), noAvoid(),
             maxQueryNodes, nil)
         flatTime := time.Since(began)
@@ -235,7 +235,7 @@ func TestHierarchyVersusFlat21x19(t *testing.T) {
         if cold != nil && cold.Found {
             began = time.Now()
             uncapped := mesh.astar(state,
-                astarGoal{target: endRef, escape: false, approach: 0},
+                astarGoal{target: endRef, approach: 0},
                 startRef, startPos, endPos, DefaultFilter(),
                 noAvoid(), 1<<20, nil)
             uncappedTime := time.Since(began)

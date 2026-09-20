@@ -340,43 +340,6 @@ type AvoidArea struct {
     Radius float64
 }
 
-// FindWaterEscape plans the way out of the water for a position whose
-// geodata surface lies below the C1 water level: the walk to the
-// nearest shore cell standing above the water surface. The hunt loop
-// arms it when the character stands over a lake or sea bed (the
-// town trip stuck under the elven village plateau swam there) - the
-// ordinary destination searches are meaningless until the character
-// is back ashore, because the server refuses move requests from a
-// floating character onto decks the water has no walkable connection
-// to. A start already on dry ground answers Found=false without an
-// error: no escape is needed.
-func (e *Engine) FindWaterEscape(start Vec3) (*Result, error) {
-    search := newSearch(e, e.maxPass)
-
-    return search.runEscape(start)
-}
-
-// WaterCrossed reports whether the straight line between two world
-// positions crosses cells whose resolved surface lies below the
-// water level. The cursor key escape claims need exactly this - a
-// claim never names a wet cell (the claims stream the positions the
-// server follows without any click validation, so they stay on the
-// verified ground), while the planned clicks may swim whenever the
-// plan prices the crossing as the faster walk.
-func (e *Engine) WaterCrossed(start, end Vec3) (bool, error) {
-    search := newSearch(e, e.maxPass)
-    from, err := search.nodeAtWorld(start)
-    if err != nil {
-        return false, err
-    }
-    to, err := search.nodeAtWorld(end)
-    if err != nil {
-        return false, err
-    }
-
-    return !search.dryLine(from, to), nil
-}
-
 // OverWater reports whether the walkable surface under a world
 // position lies below the C1 water level: the character stands (or
 // swims) over a lake or sea bed. The layer is the one closest to the

@@ -7,7 +7,7 @@
 // of rectangle polygons built offline from the l2j geodata by
 // internal/swarm/pathfind/navbuild, loaded lazily by the Mesh and
 // answered by the Query (the nearest polygon resolution, the A*
-// corridor search, the funnel string pulling and the water escape).
+// corridor search, the funnel string pulling).
 //
 // The tile carries the walkable surfaces as rectangle polygons: the
 // region local cell bounds, the four exact corner heights of the

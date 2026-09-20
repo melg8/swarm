@@ -233,7 +233,6 @@ func (l *Loop) startDelevel() {
     l.delevelCounted = false
     l.waypoints = nil
     l.segmentStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
-    l.waterEscape = false
     l.phase = phaseDelevel
     l.logf("Hunt: level %d is too high for level %d mobs (the level "+
         "gap collapsed the drops), deleveling to %d at the town "+
@@ -438,7 +437,6 @@ func (l *Loop) fightDelevelGuard(now time.Time) {
         }
         l.waypoints = nil
         l.segmentStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
-        l.waterEscape = false
 
         return
     }

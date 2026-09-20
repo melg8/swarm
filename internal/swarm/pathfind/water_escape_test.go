@@ -13,12 +13,12 @@ import (
 // The water round of 2026-09-10 and the priced round of 2026-09-19:
 // the town trip to the trader Ariel once entered the elven village
 // lake and stood paralyzed under the plateau cliff (the water zone of
-// the C1 server covers everything below -3780). The defenses of this
-// round: the smoothing keeps the segments the search priced (a chord over
-// water between dry points never folds), the escape search finds the
-// nearest shore for a position standing in a lake, and the plans
-// price every crossing at the swim rate - the water is walkable, the
-// slowdown honest.
+// the C1 server covers everything below -3780). The priced form that
+// survived every later round: the plans price every crossing at the
+// swim rate - the water is walkable, the slowdown honest. The escape
+// machinery and the wet click raster of the grid era retired with the
+// mesh round (the mesh plans out of every standing cell, the swim
+// priced - see the navmesh world water reality tests).
 
 // shoreLand is the dry test land height (above the C1 water surface).
 const shoreLand = int16(-3770)
@@ -65,124 +65,10 @@ func TestPricedRouteKeepsTheShorePivots(t *testing.T) {
     // Every smoothed segment is a clean dry walk: the follower may click
     // straight along each segment without entering the water.
     for i := 1; i < len(result.Waypoints); i++ {
-        crossed, err := engine.WaterCrossed(
-            result.Waypoints[i-1], result.Waypoints[i])
-        require.NoError(t, err)
-        require.False(t, crossed, "the segment %d must stay dry", i-1)
+        require.False(t, lineWet(engine, result.Waypoints[i-1],
+            result.Waypoints[i]),
+            "the segment %d must stay dry", i-1)
     }
-}
-
-// TestFindWaterEscape verifies the escape search on a lake with one
-// gradual ramp: the flood finds the nearest dry cell through the
-// ramp and the smoothed escape path ends above the water level.
-func TestFindWaterEscape(t *testing.T) {
-    spec := &regionSpec{}
-    spec.setFlat(shoreLand)
-    // The lake bed, walled off from the land by the 80 unit shore
-    // cliff everywhere except the east ramp.
-    for x := 200; x <= 600; x++ {
-        for y := 200; y <= 600; y++ {
-            spec.setCell(x, y, Layer{Height: -3850, NSWE: nsweAll})
-        }
-    }
-    // The east ramp: three cells climbing 32 units each onto the land.
-    for i, height := range []int16{-3818, -3786, -3754} {
-        spec.setCell(601+i, 400, Layer{Height: height, NSWE: nsweAll})
-    }
-    engine := newTestEngine(t, spec)
-
-    result, err := engine.FindWaterEscape(
-        worldOf(400, 400, -3850))
-    require.NoError(t, err)
-    require.True(t, result.Found, "the ramp connects the lake to the land")
-    require.NotEmpty(t, result.Waypoints)
-    last := result.Waypoints[len(result.Waypoints)-1]
-    require.GreaterOrEqual(t, last.Z, float64(WaterLevel),
-        "the escape must end on dry ground")
-    // The raw path walks the ramp gradually: every step stays within
-    // the passable height (the escape shares the canStep rules).
-    for i := 1; i < len(result.RawPath); i++ {
-        delta := result.RawPath[i].Z - result.RawPath[i-1].Z
-        require.LessOrEqual(t, delta, float64(DefaultMaxPassableHeight),
-            "the escape step %d must stay climbable", i)
-        require.GreaterOrEqual(t, delta, -float64(DefaultMaxPassableHeight),
-            "the escape step %d must stay droppable", i)
-    }
-}
-
-// TestFindWaterEscapeSealedLake verifies the escape on a lake whose
-// whole shore is a cliff: no walkable connection exists, the flood
-// exhausts the bed and the search reports no escape.
-func TestFindWaterEscapeSealedLake(t *testing.T) {
-    spec := &regionSpec{}
-    spec.setFlat(shoreLand)
-    for x := 200; x <= 600; x++ {
-        for y := 200; y <= 600; y++ {
-            spec.setCell(x, y, Layer{Height: -3850, NSWE: nsweAll})
-        }
-    }
-    engine := newTestEngine(t, spec)
-
-    result, err := engine.FindWaterEscape(worldOf(400, 400, -3850))
-    require.NoError(t, err)
-    require.False(t, result.Found,
-        "the cliff shore leaves no walkable escape")
-}
-
-// TestFindWaterEscapeDryStart documents the dry start contract: a
-// position standing above the water level needs no escape and the
-// search answers found=false without an error.
-func TestFindWaterEscapeDryStart(t *testing.T) {
-    spec := &regionSpec{}
-    spec.setFlat(shoreLand)
-    engine := newTestEngine(t, spec)
-
-    result, err := engine.FindWaterEscape(worldOf(400, 400, shoreLand))
-    require.NoError(t, err)
-    require.False(t, result.Found)
-}
-
-// TestWaterCrossedSplitsWaterFromHeightSteps pins the water-only
-// raster of the engine: a line across a real channel trips it, a line
-// that merely climbs a tall dry step (the village deck ramps) does
-// not - terrain is not water, whatever the walkability of the line.
-func TestWaterCrossedSplitsWaterFromHeightSteps(t *testing.T) {
-    // The channel engine of the smoothing test: water between the
-    // dry shores.
-    channel := &regionSpec{}
-    channel.setFlat(shoreLand)
-    for x := 300; x <= 500; x++ {
-        for y := 500; y <= 900; y++ {
-            channel.setCell(x, y, Layer{Height: shoreBed, NSWE: nsweAll})
-        }
-    }
-    channelEngine := newTestEngine(t, channel)
-
-    across := worldOf(200, 700, shoreLand)
-    beyond := worldOf(600, 700, shoreLand)
-    crossed, err := channelEngine.WaterCrossed(across, beyond)
-    require.NoError(t, err)
-    require.True(t, crossed,
-        "the line across the channel crosses water")
-
-    // The ramp engine: a dry step too tall for the line of sight
-    // (the deck ramps of the elven village, ~190 units against the
-    // passable 30), no water anywhere.
-    ramp := &regionSpec{}
-    ramp.setFlat(shoreLand)
-    for x := 400; x <= 600; x++ {
-        for y := 500; y <= 900; y++ {
-            ramp.setCell(x, y, Layer{Height: shoreLand + 190, NSWE: nsweAll})
-        }
-    }
-    rampEngine := newTestEngine(t, ramp)
-
-    below := worldOf(200, 700, shoreLand)
-    above := worldOf(700, 700, shoreLand+190)
-    crossed, err = rampEngine.WaterCrossed(below, above)
-    require.NoError(t, err)
-    require.False(t, crossed,
-        "the tall dry step is terrain, not water")
 }
 
 // TestOverWater verifies the over water query: the layer closest to
@@ -209,14 +95,14 @@ func TestOverWater(t *testing.T) {
         "the flat dry land is never water")
 }
 
-// TestElvenLakeStuckEscape replays the reported stuck case against
-// the real geodata pack: the character swam into the elven village
-// lake and stood below the plateau cliff at 47136 46564 -3738. The
-// escape search must find the nearest shore from there, the town
-// route from the hunting grounds must stay dry segment by segment, and the
-// over water query must separate the lake position from the village
-// deck position.
-func TestElvenLakeStuckEscape(t *testing.T) {
+// TestElvenLakeStandsOverWater replays the reported stuck case
+// against the real geodata pack: the character swam into the elven
+// village lake and stood below the plateau cliff at 47136 46564
+// -3738. The over water query separates the lake position from the
+// village deck position, and the town route from the hunting grounds
+// to the trader Ariel answers found - the priced swim crosses cost
+// what they cost, the walk exists.
+func TestElvenLakeStandsOverWater(t *testing.T) {
     engine := townTestEngine(t)
 
     stuck := Vec3{X: 47136, Y: 46564, Z: -3738}
@@ -227,17 +113,6 @@ func TestElvenLakeStuckEscape(t *testing.T) {
     // The village plateau does not.
     require.False(t, engine.OverWater(45480, 46680, -2992),
         "the village deck is dry land")
-
-    // The escape finds a shore.
-    escape, err := engine.FindWaterEscape(stuck)
-    require.NoError(t, err)
-    require.True(t, escape.Found, "the elven lake has walkable shores")
-    require.NotEmpty(t, escape.Waypoints)
-    last := escape.Waypoints[len(escape.Waypoints)-1]
-    require.GreaterOrEqual(t, last.Z, float64(WaterLevel),
-        "the escape ends on dry ground, not in the lake")
-    require.False(t, engine.OverWater(last.X, last.Y, int16(last.Z)),
-        "the escape target itself is ashore")
 
     // The town trip from the hunting spot to the trader Ariel prices
     // every crossing at the swim rate: the lake segments the plan carries

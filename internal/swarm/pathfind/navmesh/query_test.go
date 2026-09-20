@@ -202,24 +202,6 @@ func TestRoutePricedCrossesTheWater(t *testing.T) {
     require.InDelta(t, 32768+264*16, last.Y, 1e-6)
 }
 
-// TestWaterEscape pins the escape contract: the way out of the water
-// is the ordinary priced search to the first dry polygon, ending at
-// the shore crossing; a dry start needs no escape.
-func TestWaterEscape(t *testing.T) {
-    mesh := NewMesh(writeTiles(t, corridorWorld()))
-    route, err := mesh.WaterEscape(worldPos(240, 264, -80))
-    require.NoError(t, err)
-    require.True(t, route.Found)
-    require.Len(t, route.Corridor, 2)
-    last := route.Waypoints[len(route.Waypoints)-1]
-    require.InDelta(t, 32768+208*16, last.Y, 1e-6)
-
-    // A dry start answers Found=false without an error.
-    route, err = mesh.WaterEscape(worldPos(88, 88, 0))
-    require.NoError(t, err)
-    require.False(t, route.Found)
-}
-
 // TestRouteIsolatedSurface pins the unreachable destination: the
 // floating deck has no links, the route answers the closest-reachable
 // partial corridor (never a found route).
