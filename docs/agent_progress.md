@@ -11,7 +11,43 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
-## Active task (status: in progress): the review backlog fixes round (2026-09-20)
+## Active task (status: in progress): the farm readiness frame round (2026-09-20)
+
+Started: 2026-09-20. Branch: `feature/new-pathfind-alternative`,
+commits as melg8. Other agents push to the same branch - rebase
+before every push. The owner report: the level 15 farm readiness
+bot bought at the jewelry shop and froze on the walk to the next
+merchant - stepping one step away from the plan origin, returning,
+repeating, then giving the merchant up (the plan repro link named
+the origin 44584 46944 -2920 and the recovery ban at the same
+point).
+
+### Goal
+
+The bot completes the farm readiness town trip (and the level 15
+acceptance behind it) without the porch freeze: the walk plans,
+the arrival tests, the escape claims and the return destinations
+measure in one frame.
+
+### Progress
+
+- Landed (commit 5c863f4): the three frame fixes of the development
+  log Round 104 - the anchored waypoint arrival (the pinned cursor
+  of the plan's own start), the server frame escape claims (the
+  underground claims the server corrected away), the destination
+  deck resolution in both return paths (the "no navmesh under the
+  position" return failures). The dead waypointDistance retired.
+  task navmesh:test-tiles builds the six test tiles; the live
+  repro lives in tools/repro_jewel_stuck.sh.
+- Next: re-run the live farm readiness acceptance on the fixed
+  build; watch the porch leg (the escape should still arm for the
+  server refusals, but the ladder must never burn without a walk
+  attempt) and the trip return (the resolved deck). If the leg
+  still refuses every click, the next suspect is the server side
+  geodata vintage at the shop quarter - the varied aim ladder owns
+  it, the mesh cannot name the walls it does not have.
+
+## Completed: the review backlog fixes round (2026-09-20)
 
 Started: 2026-09-20. Branch: `feature/new-pathfind-alternative`,
 commits as melg8. Other agents push to the same branch - rebase

@@ -8034,3 +8034,89 @@ go build, go vet, golangci-lint run on the touched packages 0 issues
 clean, go test ./... 28 packages ok zero failures. The live
 acceptance run of the delevel scenario stays for the next session
 with the stack up (the sandbox stack was down at the round time).
+
+## Round 104: the walk plans measure in one frame - the arrival tests, the escape claims and the return destinations ride the server frame (2026-09-20)
+
+- date, scope: 2026-09-20, the walk followers and the return goals
+  (`internal/swarm/hunt/town.go`, `user.go`, `loop_los.go`,
+  `quest_trip.go`, `loop_movement.go`, `Taskfile.yml`,
+  `tools/repro_jewel_stuck.sh`).
+- Problem statement: the owner report - the level 15 farm readiness
+  bot bought at the jewelry shop and froze on the walk to the next
+  merchant: stepping one step away from the plan origin, returning,
+  repeating, then giving the merchant up and building a short route
+  toward the farm zone. The plan repro link named the plan origin
+  44584 46944 **-2920** (the live server z) and the recovery ban
+  avoid=44584,46944,48 at the same point - the character standing on
+  a deck the geodata pack models at -2984, 64 units lower (the
+  vintage shift the click frame transport of Round 85 exists for).
+- Root cause: the frame duality the transport introduced never
+  reached the distance measurements, the escape claims and the
+  return destinations. Three frame-blind restrictions, each
+  answered:
+  - The waypoint arrival test (`waypointArrived`) measured the raw
+    3D distance to the pack z waypoints. On the shifted deck every
+    waypoint measured at least 64 units away - 14 units past the 50
+    unit pass radius - so the follower cursor never advanced off the
+    plan's own start: the arrival test can never fire on a vintage
+    shift. The self click of the pinned cursor (refused offline by
+    the click validation, never sent) burned the re-path budget,
+    the corridor ban (the reported avoid circle at the plan origin -
+    `banFrozenCorridor` bans the AIMED waypoint, which was the
+    standing cell) and the escape ladder without a single walk
+    attempt. The fix: `waypointDistanceAnchored` - the waypoint z
+    rides the segment's frame offset before the 3D distance; the
+    deck edge protection stays (a whole deck drop still measures its
+    true gap). The user walk follower rides its own measured offset,
+    the blind LOS follower keeps the zero offset, the quest walk
+    arrival anchors with the offset it already measured.
+  - The cursor key escape claims (`cursorEscapeRouteSteps`)
+    interpolated the raw pack z: on the shifted deck every claim
+    placed the character 64 units under its own ground, the server
+    corrected the placement back and the escape walked the character
+    nowhere - the step away, snap back cycle of the report. The fix:
+    the waypoint z anchors into the server frame BEFORE the
+    interpolation (a mid segment blend of the two frames would drift
+    by half the shift) and the planless fallback anchors its aim z
+    the same way.
+  - The trip return (`startReturnSegment`) and the zone return goal
+    (`zoneReturnGoal`, the farm spot branch) rode the raw remembered
+    z: the farm spot remembered as the zone center x/y with the
+    standing z of the village deck aimed the mesh search at a
+    destination whose deck lies hundreds of units lower - the mesh
+    binds the destination polygon inside the nearest window of the
+    destination z (query.go nearestHalfZ 600), missed it and
+    answered the honest "no navmesh under the position" forever
+    (the live run: "no walkable path back to the farm spot", then
+    "no route to 36000 46765" on every retry - the strange short
+    route family of the report). The fix: `resolveDestinationDeck`
+    resolves the deck under the destination x/y through the
+    navigator (the ClosestHeight semantics `zoneReturnDestination`
+    already applied) in both return paths; a lookup failure keeps
+    the remembered z.
+- The dead `waypointDistance` retires (no caller left). The grid era
+  restriction class: raw z comparisons between two frames that only
+  agreed before the mesh plans started resolving the standing cell
+  onto the pack surface.
+- Tooling: `task navmesh:test-tiles` builds only the six mesh tiles
+  the farm readiness acceptance walks (20_18..21_20, ~19 s against
+  the ~4.5 minute full pack) - the owner directive: generate only
+  the tiles the test needs. `tools/repro_jewel_stuck.sh` reproduces
+  the reported round live: the level 15 wallet at the reported porch
+  position, the trip must cross the reported leg.
+- Tests: `TestWaypointArrivedAnchorsTheFrameOffset` (the pinned
+  cursor regression: the +64 shift arrival fires only anchored, the
+  deck drop stays unarrived), `TestCursorEscapeClaimsRideServerFrame`
+  (the route ladder and the planless fallback claim the server frame
+  z), `TestTripReturnResolvesDestinationDeck` (the return resolves
+  the deck once, the failed lookup keeps the remembered z); the
+  frame transport pins re-geometry'd (the 141 unit bend of the old
+  pins landed exactly on the 150 radius once the shift left the
+  distance), the trip fixture answers the destination deck lookup.
+- Verification: go build, go vet, golangci-lint 0 issues,
+  gofmt-spaces clean, the full hunt suite green.
+- Follow ups: none. The porch leg still answers server refusals the
+  mesh cannot name (the server side geodata vintage at the shop
+  quarter) - the varied aim ladder and the escape own them; the
+  ladder must never burn without a walk attempt now that the cursor
+  cannot pin on the plan's own start.
