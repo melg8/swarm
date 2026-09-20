@@ -162,6 +162,27 @@ func (l *Loop) delevelCooldownOver() bool {
         time.Since(l.delevelEnd) >= delevelCooldown
 }
 
+// delevelTriggerMedian returns the zone mob level the delevel trigger
+// measures against: the live median of the leash when it reads
+// anything (the living pack), the static median of the anchored cell
+// otherwise (the respawn window, the fresh knownlist - the designed
+// mix of the ground, see delevelWanted). Both readers of the
+// deleveling use it: the trigger gate and the target computation -
+// a trigger that fired on the static median must never compute its
+// target from the empty live read (the target would clamp to the
+// Lucky floor instead of the ground's real gap).
+func (l *Loop) delevelTriggerMedian() int32 {
+    median := l.tracker.MedianZoneMobLevel(l.targetZone())
+    if median > 0 {
+        return median
+    }
+    if !l.onHeldGround() {
+        return 0
+    }
+
+    return l.anchoredCellMedian()
+}
+
 // delevelWanted reports whether the character outleveled the hunting
 // ground: the median level of the living attackable npcs inside the
 // zone trails the character level by the trigger difference. The
@@ -171,7 +192,19 @@ func (l *Loop) delevelCooldownOver() bool {
 // trigger lower while its higher species are down - the guard deaths
 // must not answer that; the 2026-09-12 building entry acceptance
 // round de-leveled a healthy level 15 on the Kaboo Orc Fighter SW
-// respawn window whose static median is 9).
+// respawn window whose static median is 9). The flicker cuts the
+// other way too: a spot whose living mobs all sit inside the respawn
+// window (or whose pack stands outside the leash after the random
+// spawns) reads an empty live median while the ground itself stays as
+// outleveled as ever - the deleveling then waits for a random tick
+// that catches a living mob, and the engage farms the spot's respawn
+// waves one kill at a time in the meantime (the 2026-09-20 delevel
+// acceptance report: the mobs on the spot pulled the farming first).
+// When the live read is empty, the static median of the anchored cell
+// decides - the designed mix of the ground does not flicker. The
+// static answer only stands where the live one would: the character
+// holds the ground the median belongs to, so a return walk or a trip
+// detour past an outleveled ground never starts a deleveling for it.
 func (l *Loop) delevelWanted() bool {
     if l.navigator == nil || !l.delevelCooldownOver() {
         return false
@@ -182,7 +215,16 @@ func (l *Loop) delevelWanted() bool {
     }
     median := l.tracker.MedianZoneMobLevel(l.targetZone())
     if median <= 0 {
-        return false
+        if !l.onHeldGround() {
+            return false
+        }
+        median = l.anchoredCellMedian()
+        if median <= 0 {
+            return false
+        }
+
+        return level-median >= delevelTriggerDiff &&
+            level >= delevelMinLevel
     }
     if level-median < delevelTriggerDiff {
         return false
@@ -210,7 +252,13 @@ func (l *Loop) anchoredCellMedian() int32 {
 // startDelevel begins the deleveling: the target level is computed from
 // the median zone mob level and the walk to the nearest guard starts.
 func (l *Loop) startDelevel() {
-    median := l.tracker.MedianZoneMobLevel(l.targetZone())
+    median := l.delevelTriggerMedian()
+    if median <= 0 {
+        // The trigger and the median read race a knownlist that can
+        // still empty between them: the target is undefined without
+        // a median, the next tick re-triggers with a fresh read.
+        return
+    }
     target := median + delevelTargetGap
     if target < luckyProtectLevel {
         // The Lucky newbie protection absorbs the death exp penalty
@@ -231,6 +279,13 @@ func (l *Loop) startDelevel() {
     l.delevelLevel = l.tracker.SelfLevel()
     l.delevelFree = 0
     l.delevelCounted = false
+    // The engage leftovers die with the phase switch: a selected mob
+    // or a pending pickup of the farming the deleveling preempted
+    // never leaks into the guard walk (the fight machinery owns its
+    // own provocation target).
+    l.target = 0
+    l.lootID = 0
+    l.clearBlindRecovery()
     l.waypoints = nil
     l.segmentStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
     l.phase = phaseDelevel

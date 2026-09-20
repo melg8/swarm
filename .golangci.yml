@@ -201,7 +201,7 @@ linters:
           - funlen
           - gocognit
           - maintidx
-      - path: (cmd/navmesh-export|tools/repro_gamepath|tools/repro_rawpath|scripts/(geo_diag|geo_repair|tailcheck))\.go$|^(cmd/navmesh-export|tools/repro_gamepath|tools/repro_rawpath|scripts/(geo_diag|geo_repair|tailcheck))/
+      - path: (cmd/navmesh-export|cmd/cornerprobe|tools/repro_gamepath|tools/repro_rawpath|scripts/(geo_diag|geo_repair|tailcheck))\.go$|^(cmd/navmesh-export|cmd/cornerprobe|tools/repro_gamepath|tools/repro_rawpath|scripts/(geo_diag|geo_repair|tailcheck))/
         linters:
           # The navmesh export driver, the gamepath and rawpath
           # replay probes and the geodata scratch tools share the

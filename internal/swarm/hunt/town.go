@@ -2343,6 +2343,9 @@ func (l *Loop) clickServerValidated(
     if l.shortenClickSegment(selfX, selfY, selfZ, moveX, moveY, moveZ, from) {
         return true
     }
+    if l.clickForwardJump(selfX, selfY, selfZ, moveX, moveY, moveZ, now) {
+        return true
+    }
     if l.clickEscapeHop(selfX, selfY, selfZ, moveX, moveY, moveZ) {
         return true
     }
@@ -2372,6 +2375,72 @@ func (l *Loop) clickServerValidated(
         // stuck path carries - the ladder owns it (see
         // stuckTownWalk).
         l.abortFrozenTrip("re-path failed")
+    }
+
+    return false
+}
+
+// clickForwardJump answers a refused click with the first later plan
+// waypoint whose straight line the server transport validates from
+// the standing cell: the corner turn band. The destination
+// correction of the previous leg stops the character 8..50 units
+// short of the turn pivot (the click transport cannot reach the
+// funnel pivot over the corner approach cells), the pass radius
+// counts the turn reached, and the turn chord from the stopped
+// position cuts the corner - the server collapses it, the shorten
+// ladder halves into the same corner and the back hop walks the
+// character away from the corner it wants to round (the re-approach
+// lands in the same band - the ping pong). A FARTHER waypoint's
+// chord clears the corner at a wider angle (the real pack probe of
+// the 2026-09-20 delevel round: from the stuck band at 40968 53400
+// the turn wp and every forward sample along the outgoing leg refuse
+// while wp+2 validates and the pivot neighborhood ring answers 33 of
+// 36). The cursor jumps onto the validated waypoint and the move
+// pointers carry its corrected destination - the same jump the stuck
+// handler runs after its window, moved to click time: the 15 s stuck
+// window never opens for a corner the scan answers, and the re-path
+// ladder (whose deterministic re-plan reproduces the identical route
+// and whose frozen corridor ban then seals the corner ground for the
+// rest of the session) never burns. It reports whether the pointers
+// carry a validated jump target.
+func (l *Loop) clickForwardJump(
+    selfX, selfY, selfZ int32,
+    moveX, moveY, moveZ *float64, now time.Time,
+) bool {
+    if l.navigator == nil || l.wpIndex >= len(l.waypoints) {
+        return false
+    }
+    from := pathfind.Vec3{
+        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
+    }
+    for next := l.wpIndex + 1; next < len(l.waypoints); next++ {
+        wp := l.waypoints[next]
+        to := pathfind.Vec3{
+            X: wp.X, Y: wp.Y,
+            Z: anchorZToServerFrame(wp.Z, l.segmentFrameOffset),
+        }
+        corrected, ok := l.navigator.ValidateClick(from, to)
+        if !ok {
+            continue
+        }
+        // The jump must move the character a real step: a validated
+        // waypoint whose correction lands on the standing cell (the
+        // click transport refuses the whole chord but the collapse
+        // check passes on a rounding edge) would click the walker's
+        // own position - the server cancels it and the stick stays.
+        // One geodata cell is the honest step floor.
+        if math.Hypot(corrected.X-from.X, corrected.Y-from.Y) <
+            extendMarchStep {
+            continue
+        }
+        l.wpIndex = next
+        l.moveAt = now
+        l.logger.Printf("Hunt: the turn click is walled, jumping the "+
+            "cursor to the waypoint %d of %d whose line validates",
+            next, len(l.waypoints))
+        *moveX, *moveY, *moveZ = corrected.X, corrected.Y, corrected.Z
+
+        return true
     }
 
     return false

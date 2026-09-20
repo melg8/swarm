@@ -2009,3 +2009,46 @@ sells from the customer cells).
   pacing) rides the server windows now: the shopping list batches
   and the ~40 lessons of the level 15 queue pace at the round trip
   speed instead of the 11 s / 5-6 s stalls.
+### Progress (2026-09-20, the delevel priority round)
+
+- the owner report on the delevel acceptance: the mobs of the spawn
+  spot pull the farming first under a random coincidence of
+  circumstances; sometimes the bot goes shopping for new equipment
+  instead of deleveling; sticking on the way to the eastern guard -
+  the systemic ask: eliminate the sticking on corners and turns.
+- the farming first root causes: the delevel check ran before the
+  cell pick (a nil leash reads an empty live median while the same
+  tick's engage farmed), and the trigger required a non zero LIVE
+  median that flickers with the respawn windows (two mobs, 15-20 s
+  respawn - most ticks read empty). The fix: the first cell pick
+  moved ahead of the gates and the empty live read falls back to the
+  static median of the anchored cell (onHeldGround gated, the same
+  delevelTriggerMedian feeds the target computation, startDelevel
+  clears the engage leftovers).
+- the shopping first root cause: maybeStartTownTrip ran before the
+  delevel check. The fix: the deleveling outranks the town trips -
+  the check moved ahead of handleTownTrip in the tick.
+- the corner stick mechanism (cmd/cornerprobe on the real pack): the
+  destination correction stops the character 8..50 units short of
+  the funnel pivot, the pass radius counts the turn reached, the
+  next chord cuts the corner and collapses (the anti corner cut),
+  the shorten ladder halves into the same corner, the back hop
+  ping-pongs the band, and the re-path ladder reproduced the
+  identical route and sealed the corner with a session long corridor
+  ban. The fix: clickForwardJump - the first later plan waypoint
+  whose line the server transport validates from the stuck cell; the
+  cursor jumps and one walk rounds the corner before the stuck
+  window opens.
+- the tests: TestDelevelOutranksTheEngageOnTheSpawnSpot,
+  TestDelevelTriggersOnStaticMedianWhileSpotEmpty,
+  TestDelevelOutranksTheTownTrip, TestCornerTurnBandJumpsTheCursor
+  Forward, TestCornerWalkRoundsTheTurnWithoutRepath,
+  TestCornerTurnJumpScanSendsNothingWhenNothingValidates,
+  TestCornerTurnJumpCarriesTheValidatedTarget.
+
+### Verification
+
+go build, go vet, golangci-lint run on the touched packages 0 issues,
+gofmt-spaces clean, go test ./... 28 packages ok zero failures. The
+live acceptance run of the delevel scenario stays for the next
+session with the stack up.

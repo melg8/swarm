@@ -1474,6 +1474,34 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
     // undroppable Squire's pieces leave the bag through the destroy
     // request as soon as their replacement is worn.
     l.maybeDestroyReplacedStarters()
+    // The first cell pick serves every gate below it: the delevel
+    // trigger reads the held ground's median (a nil leash reads an
+    // empty live zone), the trip zone gate reads the patrol square.
+    // A fresh session picks the cell before the delevel check runs,
+    // so the outleveled spawn spot starts the guard walk on the very
+    // first tick instead of losing the race to the engage (the 2026-
+    // 09-20 delevel acceptance report: the mobs of the spot pulled
+    // the farming first while the cell pick lagged a tick). The
+    // rotation economy keeps its own place between the fights.
+    if l.cell != nil && l.cell.picked < 0 {
+        l.cellEvaluate(time.Now())
+    }
+    // The deleveling outranks the town trips and the hunt: the guard
+    // deaths are the point of the phase - a shopping detour of a
+    // character that plans to die buys nothing, and the mobs of the
+    // outleveled spot pay no drops worth the walk delay (the level
+    // gap collapsed them). The check runs ahead of the trip start,
+    // so a full bag or a shopping plan never walks the character to
+    // the shops instead of the guards (the 2026-09-20 report: the
+    // fresh level 15 wallet shopped while the ground waited for the
+    // deleveling).
+    if l.delevelWanted() {
+        l.startDelevel()
+        l.tickDelevel()
+        l.publishWalkPlan()
+
+        return
+    }
     if l.handleTownTrip() {
         return
     }
@@ -1484,13 +1512,6 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
     // merchant refuses is still better sold at the next shop than
     // destroyed on the way.
     l.cleanupInventory()
-    if l.delevelWanted() {
-        l.startDelevel()
-        l.tickDelevel()
-        l.publishWalkPlan()
-
-        return
-    }
     l.maybeSwitchZone()
     if l.phase == phaseEngage {
         l.engage()

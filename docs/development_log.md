@@ -7920,3 +7920,117 @@ for the re-pick line).
   packages), the real pack reproductions green.
 - Follow ups: none. The webserver viewer needs no change - the plan
   repro links carry whatever radius the segment searched with.
+
+## Round 104: the delevel priority round - the spawn spot delevels first, the corner band jumps forward (2026-09-20)
+
+Scope: the owner report on the delevel acceptance scenario - "исправь
+аксептанс тест на deleveling - во-первых сейчас при случайном
+стечении обстоятельств мобы на споте приводят к тому что бот сначала
+начинает их фармить, во-вторых иногда бот вместо делевелинга бежит за
+покупками нового эквипа. в третьих было замечено застревание при
+движении от точки у дерева к восточному гварду, исследуй и устрани
+системно проблему застревания на углах и поворотах." Three asks: the
+mobs of the spawn spot never win a farming detour before the
+deleveling, the shopping plans never outrank the guard deaths, and
+the corner/turn sticking gets a systemic answer.
+
+### The farming first diagnosis (issue 1)
+
+Two gates delayed the deleveling while the engage farmed. (a) The
+tick order: the delevel check ran BEFORE maybeSwitchZone, so a fresh
+session had no held cell yet - targetZone() returned nil,
+MedianZoneMobLevel answered 0 and delevelWanted() stayed false while
+the same tick's engage picked the nearest visible mob (the cell pick
+happened later in the tick, the farming won the race). (b) The live
+median flicker: delevelWanted required a NON ZERO live read, and the
+dryad ground holds two mobs with a 15-20 s respawn - whenever the
+living pack sat inside the respawn window (or wandered the leash
+edge), the read went empty and the trigger waited for a random tick
+that catches a living mob while the engage farmed the respawn waves.
+
+The fix: the first cell pick moved ahead of the gates (cellEvaluate
+runs once when picked < 0 - the rotation economy keeps its place
+between the fights), and the empty live read falls back to the
+STATIC median of the anchored cell (delevelTriggerMedian) - the
+designed mix of the ground does not flicker. The static answer only
+stands where the live one would: the character holds the ground
+(onHeldGround), so a return walk or a trip detour past an outleveled
+ground never starts a deleveling for it. startDelevel reads the same
+delevelTriggerMedian (a static-fired trigger must not compute its
+target from the empty live read) and clears the engage leftovers
+(target, lootID, blind recovery).
+
+### The shopping first diagnosis (issue 2)
+
+maybeStartTownTrip ran BEFORE the delevel check in the tick: a full
+bag, a shopping plan or the gear debt started a town trip while the
+deleveling waited. The fix: the delevel check moved ahead of
+handleTownTrip - the guard deaths are the point of the phase, a
+shopping detour of a character that plans to die buys nothing. The
+mid-trip preemption stays impossible for the stable trigger (the
+static disagreement blocks the live-only flicker, the trips start
+only when the delevel is silent).
+
+### The corner stick diagnosis (issue 3, cmd/cornerprobe)
+
+The scratch probe planned the delevel guard walks the way the
+navigator plans them and validated every turn the way the server
+movement validates the follower clicks (the grid ValidateClick port,
+the Bresenham raster with the anti corner cut). Findings on the real
+pack: the dryad -> Starden walk refuses the turn chord at exactly 8
+units short of the turn pivot 40968 53392 (1 of 33 arrival samples),
+the dryad -> Kendell and village -> Kendell walks refuse at the 16
+unit bands. The mechanism chain: the destination correction of a leg
+click stops the character short of the funnel pivot (the click
+transport cannot reach the pivot over the corner approach cells),
+the pass radius (50) counts the turn reached - correct - and the
+next leg's chord from the stopped position cuts the corner: the
+server collapses it, the shorten ladder halves into the same corner,
+and the back hop walks the character AWAY from the corner it wants
+to round (the re-approach lands in the same band - the ping pong).
+The old ladder then burned the re-path budget (the deterministic
+planner reproduced the identical route) and the frozen corridor ban
+sealed the corner ground for the rest of the session. The stick.
+
+The fix: clickForwardJump - the first later plan waypoint whose
+straight line the server transport validates from the stuck cell.
+From the audited band the turn wp and every forward sample along the
+outgoing leg refuse while wp+2's chord clears the corner at a wider
+angle and validates (the pivot neighborhood ring answers 33 of 36 -
+the corner is roundable, the plan just holds no click that delivers
+it). The cursor jumps onto the validated waypoint, the move pointers
+carry its corrected destination, the walk rounds the corner in one
+click - before the stuck window opens, before the re-path ladder
+reproduces the frozen route, before the ban seals innocent ground.
+The jump runs after the shorten rung and before the back hop (the
+back hop's re-approach ping-pongs the band), and its candidates must
+move the character a real step (one geodata cell) - a correction
+that lands on the standing cell would click the walker's own cell.
+
+### The tests
+
+- delevel_priority_test.go: TestDelevelOutranksTheEngageOnTheSpawnSpot
+  (the first tick starts the deleveling, zero attack requests, the
+  guard segment walk), TestDelevelTriggersOnStaticMedianWhileSpotEmpty
+  (the empty live read falls back to the static median, the target is
+  the median 8 + 5), TestDelevelOutranksTheTownTrip (a 45 slot bag
+  never starts the trip, the only walk is the guard segment).
+- corner_turn_repro_test.go (the real pack, the live mesh plan):
+  TestCornerTurnBandJumpsTheCursorForward (the scene scans the guard
+  routes for its own refusal band, the cursor jumps, no re-path, no
+  ban), TestCornerWalkRoundsTheTurnWithoutRepath (the honest
+  correction transport walks the fragment through the corner with
+  the re-path budget untouched), TestCornerTurnJumpScanSendsNothing
+  WhenNothingValidates (the honesty guard), TestCornerTurnJumpCarries
+  TheValidatedTarget (the pointer contract).
+- The int position lesson: the click answers flip on the sub-unit
+  raster edges - the scene validates from the INT positions the
+  tracker holds (the server broadcasts integer coordinates).
+
+### Verification
+
+go build, go vet, golangci-lint run on the touched packages 0 issues
+(v2.13.2; the pathbench findings predate the round), gofmt-spaces
+clean, go test ./... 28 packages ok zero failures. The live
+acceptance run of the delevel scenario stays for the next session
+with the stack up (the sandbox stack was down at the round time).
