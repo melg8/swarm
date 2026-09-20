@@ -55,3 +55,8 @@ runs/.coverage-current.txt
 # itself is not a baseline)
 runs/race_full.log
 pathfind-rs/target/
+
+# The fleet profile artifacts (the binary pprof dumps and the journal
+# files the 40 bot instrument writes; the report lands in the commit
+# message and the docs instead).
+runs/fleetprofile/

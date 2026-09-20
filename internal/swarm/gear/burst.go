@@ -85,8 +85,12 @@ func BurstUpgrade(profile Profile, equipment Equipment) []PlannedEquip {
 
             continue
         }
-        before := cloneEquipment(sim)
-        written := applyExpectedAction(&sim, action)
+        // The write set computes purely BEFORE the simulation mutates:
+        // the conflict check needs no rollback clone, the per action
+        // copy of the whole working set was the second allocation
+        // source of the fleet profile (the 40 bot run held it at ten
+        // percent of all allocated bytes).
+        written := expectedWriteSlots(sim, action)
         conflict := false
         for _, slot := range written {
             if locked[slot] {
@@ -100,7 +104,6 @@ func BurstUpgrade(profile Profile, equipment Equipment) []PlannedEquip {
             // the slots this step needs: the pair swap refill, the
             // one-piece drop follow up. The step waits for the real
             // confirmation on the next tick.
-            sim = before
             flight[action.ObjectID] = true
             removeSimItem(&sim, action.ObjectID)
 
@@ -114,9 +117,40 @@ func BurstUpgrade(profile Profile, equipment Equipment) []PlannedEquip {
             EquipAction: action,
             Slots:       written,
         })
+        applyExpectedAction(&sim, action, written)
     }
 
     return planned
+}
+
+// expectedWriteSlots computes the paperdoll slots the server write
+// set of the action touches without mutating the working set: the
+// same rules applyExpectedAction lands (see equipWriteSlots), read
+// ahead of time so the burst conflict check needs no rollback copy.
+func expectedWriteSlots(
+    equipment Equipment, action EquipAction,
+) []Slot {
+    for i := range equipment.Items {
+        if equipment.Items[i].ObjectID != action.ObjectID {
+            continue
+        }
+        stats, ok := npcdata.ItemGearStats(equipment.Items[i].ItemID)
+        if !ok {
+            return nil
+        }
+        slots := SlotsForBodyPart(stats.BodyPart)
+        if len(slots) == 0 {
+            return nil
+        }
+        if !action.Equip {
+            // The freeing unequip of a pair swap: the piece comes off.
+            return []Slot{action.Slot}
+        }
+
+        return equipWriteSlots(equipment, stats, action.Slot)
+    }
+
+    return nil
 }
 
 // ServerWriteSlots reports the paperdoll slots the server writes when
@@ -151,39 +185,28 @@ func ServerWriteSlots(equipment Equipment, objectID int32) []Slot {
 // applyExpectedAction mirrors the server effect of one use item
 // request on the working set copy: the equipped flags and the slot
 // table land in the state the tracker will show once the flip arrives
-// (equipWriteSlots owns the write rules). Returns the written slots.
-func applyExpectedAction(equipment *Equipment, action EquipAction) []Slot {
+// (equipWriteSlots owns the write rules). The written slots arrive
+// precomputed by expectedWriteSlots - the burst loop checks the
+// conflict on them before mutating.
+func applyExpectedAction(
+    equipment *Equipment, action EquipAction, written []Slot,
+) {
     for i := range equipment.Items {
         if equipment.Items[i].ObjectID != action.ObjectID {
             continue
         }
-        item := equipment.Items[i]
-        stats, ok := npcdata.ItemGearStats(item.ItemID)
-        if !ok {
-            return nil
-        }
-        slots := SlotsForBodyPart(stats.BodyPart)
-        if len(slots) == 0 {
-            return nil
-        }
-        written := make([]Slot, 0, 2)
         if !action.Equip {
             // The freeing unequip of a pair swap: the piece comes off.
             equipment.Items[i].Equipped = false
-            written = append(written, action.Slot)
             equipment.Slots[action.Slot] = 0
 
-            return written
+            return
         }
         equipment.Items[i].Equipped = true
-        written = append(written, equipWriteSlots(*equipment, stats,
-            action.Slot)...)
-        setWrittenSlots(equipment, item.ObjectID, written)
+        setWrittenSlots(equipment, equipment.Items[i].ObjectID, written)
 
-        return written
+        return
     }
-
-    return nil
 }
 
 // equipWriteSlots computes the slots the server write set of an equip

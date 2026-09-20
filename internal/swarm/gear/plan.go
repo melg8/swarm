@@ -5,8 +5,9 @@
 package gear
 
 import (
-    "sort"
+    "slices"
     "strconv"
+    "sync"
 
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
@@ -35,15 +36,76 @@ type EquipAction struct {
 // nextPlanCandidate is the internal best action accumulator.
 type nextPlanCandidate struct {
     action EquipAction
-    found  bool
+    // The reason inputs of the winning offer: the text shape and the
+    // paperdoll entries the text names beside the candidate. The
+    // reason string builds once for the winner in describeUpgrade -
+    // building it per offered candidate allocated two item
+    // descriptions and a concatenation for every offer that lost the
+    // better() race.
+    kind      planKind
+    candidate ScoredItem
+    current   ScoredItem
+    slot      Slot
+    found     bool
 }
+
+// planKind names the text shape of the winning action's reason.
+type planKind uint8
+
+const (
+    planKindEmpty planKind = iota
+    planKindSwap
+    planKindPairFree
+    planKindTwoHand
+    planKindShield
+    planKindOnePiece
+    planKindLegsOverOnePiece
+)
 
 // better replaces the accumulator when the gain strictly improves
 // (the candidate iteration order breaks ties deterministically).
-func (c *nextPlanCandidate) better(action EquipAction) {
+func (c *nextPlanCandidate) better(
+    action EquipAction, kind planKind,
+    candidate ScoredItem, current ScoredItem, slot Slot,
+) {
     if !c.found || action.Gain > c.action.Gain {
         c.action = action
+        c.kind = kind
+        c.candidate = candidate
+        c.current = current
+        c.slot = slot
         c.found = true
+    }
+}
+
+// describeUpgrade renders the reason of the winning action: the same
+// text shapes the eager per candidate reasons used to carry (the
+// test pins read them), built once per planner call.
+func describeUpgrade(best nextPlanCandidate) string {
+    switch best.kind {
+    case planKindEmpty:
+        return "equipping " + describeItem(best.candidate) +
+            " into the empty " + best.slot.String() + " slot"
+    case planKindSwap:
+        return "swapping the " + best.slot.String() + " " +
+            describeItem(best.current) + " for the better " +
+            describeItem(best.candidate)
+    case planKindPairFree:
+        return "removing the weaker " + describeItem(best.current) +
+            " from the " + best.slot.String() + " slot for the better " +
+            describeItem(best.candidate)
+    case planKindTwoHand:
+        return "swapping to the two hand " + describeItem(best.candidate)
+    case planKindShield:
+        return "equipping the shield " + describeItem(best.candidate)
+    case planKindOnePiece:
+        return "equipping the one-piece " + describeItem(best.candidate) +
+            " over the chest and legs family"
+    case planKindLegsOverOnePiece:
+        return "equipping legs " + describeItem(best.candidate) +
+            " over the one-piece " + describeItem(best.current)
+    default:
+        return ""
     }
 }
 
@@ -80,7 +142,10 @@ func NextUpgrade(
     profile Profile, equipment Equipment,
 ) (EquipAction, bool) {
     paperdoll := equipment.Paperdoll(profile)
-    candidates := scoreUnequipped(profile, equipment)
+    buffer := scoredItemPool.Get().(*[]ScoredItem)
+    candidates := appendScoredUnequipped(
+        profile, equipment, (*buffer)[:0])
+    defer scoredItemPool.Put(buffer)
     var best nextPlanCandidate
     for _, candidate := range candidates {
         slots := SlotsForBodyPart(candidate.Stats.BodyPart)
@@ -100,17 +165,57 @@ func NextUpgrade(
             planSimple(&best, paperdoll, candidate, slots)
         }
     }
+    if best.found {
+        // The reason text builds once for the winning action: the
+        // eager per candidate strings were pure waste - every offer
+        // that lost the better() race allocated two item descriptions
+        // and a concatenation the planner threw away (the 40 bot
+        // fleet profile held them at 3.6 percent of all allocated
+        // bytes).
+        best.action.Reason = describeUpgrade(best)
+    }
 
     return best.action, best.found
 }
 
+// emptyScoredItem is the no entry sentinel of the reason inputs (the
+// text shapes that name no paperdoll entry beside the candidate).
+var emptyScoredItem ScoredItem
+
+// scoredItemPool recycles the candidate slices of the planner scans:
+// the equip planner re-scores the whole inventory once per planner
+// call and the burst loop calls the planner once per collected
+// action, so a fresh slice per call was the dominant allocation
+// source of the fleet (the 40 bot run held it at over half of all
+// allocated bytes).
+var scoredItemPool = sync.Pool{
+    New: func() any {
+        buf := make([]ScoredItem, 0, 64)
+
+        return &buf
+    },
+}
+
 // scoreUnequipped lists the unequipped inventory items the profile
 // can use with their scores, the highest score first (the object id
-// breaks ties so the plan is deterministic).
+// breaks ties so the plan is deterministic). The one-shot form of
+// appendScoredUnequipped: the planner's own hot path uses the pooled
+// buffer (see NextUpgrade).
 func scoreUnequipped(
     profile Profile, equipment Equipment,
 ) []ScoredItem {
-    candidates := make([]ScoredItem, 0, len(equipment.Items))
+    return appendScoredUnequipped(
+        profile, equipment, make([]ScoredItem, 0, len(equipment.Items)))
+}
+
+// appendScoredUnequipped appends the scored unequipped inventory
+// items of the profile to the given buffer and sorts it, the highest
+// score first (the object id breaks ties so the plan is
+// deterministic). The buffer form exists so the burst loop can
+// recycle the backing array across its planner calls.
+func appendScoredUnequipped(
+    profile Profile, equipment Equipment, candidates []ScoredItem,
+) []ScoredItem {
     for _, item := range equipment.Items {
         if item.Equipped {
             continue
@@ -130,12 +235,25 @@ func scoreUnequipped(
             Slot:  slotInvalid,
         })
     }
-    sort.Slice(candidates, func(i int, j int) bool {
-        if candidates[i].Score != candidates[j].Score {
-            return candidates[i].Score > candidates[j].Score
-        }
+    // slices.SortFunc over sort.Slice: the generic sort needs no
+    // reflection swapper, the planner scan ran the reflectlite
+    // allocation on every call of the fleet profile.
+    slices.SortFunc(candidates, func(i, j ScoredItem) int {
+        if i.Score != j.Score {
+            if i.Score > j.Score {
+                return -1
+            }
 
-        return candidates[i].Item.ObjectID < candidates[j].Item.ObjectID
+            return 1
+        }
+        switch {
+        case i.Item.ObjectID < j.Item.ObjectID:
+            return -1
+        case i.Item.ObjectID > j.Item.ObjectID:
+            return 1
+        default:
+            return 0
+        }
     })
 
     return candidates
@@ -163,27 +281,24 @@ func planSimple(
     slot := slots[0]
     current := paperdoll[slot]
     if current.Item.ObjectID == 0 {
+        //nolint:exhaustruct_v5 // the reason builds on the winner
         best.better(EquipAction{
             ObjectID: candidate.Item.ObjectID,
             Equip:    true,
             Slot:     slot,
             Gain:     candidate.Score,
-            Reason: "equipping " + describeItem(candidate) +
-                " into the empty " + slot.String() + " slot",
-        })
+        }, planKindEmpty, candidate, emptyScoredItem, slot)
 
         return
     }
     if candidate.Score > current.Score {
+        //nolint:exhaustruct_v5 // the reason builds on the winner
         best.better(EquipAction{
             ObjectID: candidate.Item.ObjectID,
             Equip:    true,
             Slot:     slot,
             Gain:     candidate.Score - current.Score,
-            Reason: "swapping the " + slot.String() + " " +
-                describeItem(current) + " for the better " +
-                describeItem(candidate),
-        })
+        }, planKindSwap, candidate, current, slot)
     }
 }
 
@@ -201,14 +316,13 @@ func planPair(
         if firstEntry.Item.ObjectID != 0 {
             empty = second
         }
+        //nolint:exhaustruct_v5 // the reason builds on the winner
         best.better(EquipAction{
             ObjectID: candidate.Item.ObjectID,
             Equip:    true,
             Slot:     empty,
             Gain:     candidate.Score,
-            Reason: "equipping " + describeItem(candidate) +
-                " into the empty " + empty.String() + " slot",
-        })
+        }, planKindEmpty, candidate, emptyScoredItem, empty)
 
         return
     }
@@ -217,15 +331,13 @@ func planPair(
         worse, worseSlot = secondEntry, second
     }
     if candidate.Score > worse.Score {
+        //nolint:exhaustruct_v5 // the reason builds on the winner
         best.better(EquipAction{
             ObjectID: worse.Item.ObjectID,
             Equip:    false,
             Slot:     worseSlot,
             Gain:     candidate.Score - worse.Score,
-            Reason: "removing the weaker " + describeItem(worse) +
-                " from the " + worseSlot.String() +
-                " slot for the better " + describeItem(candidate),
-        })
+        }, planKindPairFree, candidate, worse, worseSlot)
     }
 }
 
@@ -247,13 +359,13 @@ func planTwoHandWeapon(
         gain -= shield.Score
     }
     if gain > 0 {
+        //nolint:exhaustruct_v5 // the reason builds on the winner
         best.better(EquipAction{
             ObjectID: candidate.Item.ObjectID,
             Equip:    true,
             Slot:     SlotRHand,
             Gain:     gain,
-            Reason:   "swapping to the two hand " + describeItem(candidate),
-        })
+        }, planKindTwoHand, candidate, emptyScoredItem, SlotRHand)
     }
 }
 
@@ -275,13 +387,13 @@ func planShield(
         gain -= weapon.Score
     }
     if gain > 0 {
+        //nolint:exhaustruct_v5 // the reason builds on the winner
         best.better(EquipAction{
             ObjectID: candidate.Item.ObjectID,
             Equip:    true,
             Slot:     SlotLHand,
             Gain:     gain,
-            Reason:   "equipping the shield " + describeItem(candidate),
-        })
+        }, planKindShield, candidate, emptyScoredItem, SlotLHand)
     }
 }
 
@@ -296,14 +408,13 @@ func planOnePiece(
     legs := paperdoll[SlotLegs]
     family := chest.Score + legs.Score
     if candidate.Score > family {
+        //nolint:exhaustruct_v5 // the reason builds on the winner
         best.better(EquipAction{
             ObjectID: candidate.Item.ObjectID,
             Equip:    true,
             Slot:     SlotChest,
             Gain:     candidate.Score - family,
-            Reason: "equipping the one-piece " + describeItem(candidate) +
-                " over the chest and legs family",
-        })
+        }, planKindOnePiece, candidate, emptyScoredItem, SlotChest)
     }
 }
 
@@ -343,14 +454,13 @@ func planLegs(
         gain += current.Score
     }
     if gain > 0 {
+        //nolint:exhaustruct_v5 // the reason builds on the winner
         best.better(EquipAction{
             ObjectID: candidate.Item.ObjectID,
             Equip:    true,
             Slot:     SlotLegs,
             Gain:     gain,
-            Reason: "equipping legs " + describeItem(candidate) +
-                " over the one-piece " + describeItem(chest),
-        })
+        }, planKindLegsOverOnePiece, candidate, chest, SlotLegs)
     }
 }
 
