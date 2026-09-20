@@ -43,6 +43,14 @@ first and mirroring the operational digest here.
   and a leftover must be killed before starting a twin (a port
   conflict means the previous instance is still running).
 
+## Language (owner instruction, mandatory)
+
+- Reason and answer in English always, whatever language the owner
+  prompt arrives in - no other language in the replies, not even
+  when quoting the prompt verbatim (translate the quote).
+- The code, the comments, the commit messages and every other
+  produced text in the repository are English always.
+
 ## Repo conventions
 
 - Commits carry the melg8 authorship, all work lands on the branch

@@ -93,6 +93,20 @@ keep their probe scripts under `/home/z/my-project/scripts/`.
   a smaller bot count, a shorter window) and record the cycle time
   in the docs so the next agent does not re-measure blindly.
 
+## Language (owner instruction, 2026-09-20, mandatory)
+
+- Reason and answer in English **always**, whatever language the
+  owner prompt arrives in (the prompts mix Russian and English; the
+  internal reasoning and the owner facing replies stay English
+  regardless - no Russian or any other language in the answers, not
+  even when quoting the owner message verbatim: translate the quote).
+- The code and the comments are English **always**: every identifier,
+  comment, log string, test name, commit message, doc file and work
+  log entry written in this repository is English. The code
+  conventions section below enforces the comment part through the
+  lint gate; this rule covers every produced text the gate does not
+  see (the commit bodies, the docs prose, the replies).
+
 ## Tech stack at a glance (read this first)
 
 - **Language**: Go 1.24 (deployed by `tools/swarm_fast_deploy.sh`).
