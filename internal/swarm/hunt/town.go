@@ -1468,20 +1468,27 @@ func (l *Loop) armTownWalkSegment(
     return true
 }
 
-// waypointDistance measures the distance from the character to a
-// planned waypoint in full 3D. The arrival and skip decisions of the
-// waypoint followers must use it: a 2D-only radius once marked a deck
-// edge drop waypoint as reached - 80 units away horizontally but 920
-// units below the character - and the follower jumped straight to the
-// segment beyond the drop the character never walked, straight into the
-// city railing. The geodata waypoints carry the real layer height,
-// so the z axis is exact for them.
-func waypointDistance(
-    wp pathfind.Vec3, selfX, selfY, selfZ int32,
+// waypointDistanceAnchored measures the character to waypoint distance
+// with the waypoint height anchored into the server frame (see
+// click_frame.go): the plan's own start waypoint resolved onto the
+// standing cell and its pack height carries the vintage shift the
+// frame offset measured, so the raw 3D distance to a waypoint the
+// character stands ON is the shift alone. The jewelry shop porch of
+// the farm readiness round (2026-09-20) measured 64 units on a plan
+// whose every waypoint rode the shifted deck - 14 units past the
+// intermediate pass radius - the cursor never advanced off the plan's
+// own start and the self click of the pinned cursor burned the whole
+// recovery ladder without a single walk attempt. The anchoring keeps
+// the deck edge protection the 3D distance exists for: a waypoint a
+// whole deck below the character still measures its true gap, the
+// shift (tens to a few hundred units) explains only the vintage
+// disagreement.
+func waypointDistanceAnchored(
+    wp pathfind.Vec3, selfX, selfY, selfZ int32, frameOffset float64,
 ) float64 {
     dx := wp.X - float64(selfX)
     dy := wp.Y - float64(selfY)
-    dz := wp.Z - float64(selfZ)
+    dz := anchorZToServerFrame(wp.Z, frameOffset) - float64(selfZ)
 
     return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }
@@ -1495,18 +1502,20 @@ func waypointDistance(
 // may stop the character slightly short of the click). The tight ring
 // segments (the teach stop close approach) pass their own tight final
 // radius: the wide slack would end the walk a whole ring short of the
-// teacher.
+// teacher. The frame offset anchors the waypoint height into the
+// server frame first (see waypointDistanceAnchored): the arrival test
+// of the plan's own start must not measure the vintage shift.
 func waypointArrived(
     waypoints []pathfind.Vec3, index int, selfX, selfY, selfZ int32,
-    finalArrive float64,
+    frameOffset, finalArrive float64,
 ) bool {
     radius := waypointPassDist
     if index == len(waypoints)-1 {
         radius = finalArrive
     }
 
-    return waypointDistance(waypoints[index], selfX, selfY, selfZ) <=
-        radius
+    return waypointDistanceAnchored(waypoints[index], selfX, selfY,
+        selfZ, frameOffset) <= radius
 }
 
 // finalArriveRadius answers the arrival radius of the final waypoint
@@ -1680,7 +1689,12 @@ func (l *Loop) beginCursorKeyEscape(
         // The planless fallback: the straight ladder toward the aim,
         // pocket sized. A far aim is clamped to the pocket radius
         // along its line - the escape walks the first stretch toward
-        // the target and the re-plans of the settle own the rest.
+        // the target and the re-plans of the settle own the rest. The
+        // aim z rides the frame offset first: the interpolation holds
+        // only between two z of one frame, and the raw waypoint z is
+        // the pack frame (see cursorEscapeRouteSteps).
+        aimZ = int32(math.Round(
+            anchorZToServerFrame(float64(aimZ), l.segmentFrameOffset)))
         dx := float64(aimX - selfX)
         dy := float64(aimY - selfY)
         if dist := math.Hypot(dx, dy); dist > cursorEscapeRouteMax {
@@ -1733,7 +1747,14 @@ func (l *Loop) beginCursorKeyEscape(
 // every segment of the route in order, so the ladder bends where the
 // plan bends: an obstacle the straight chord would push the
 // character through (the tree on the plaza, the railing corner) is
-// walked around the way the planner drew it. The route length caps
+// walked around the way the planner drew it. Every step z rides the
+// segment's frame offset into the server frame (see click_frame.go):
+// the claims name the placement the server owns, and a raw pack z
+// would place the character below its own ground on every shifted
+// cell - the server correction snaps it back and the escape walks
+// the character nowhere (the farm readiness round of 2026-09-20:
+// the porch claims rode the pack z 64 units under the live ground).
+// The route length caps
 // at cursorEscapeRouteMax so one escape stays a pocket recovery -
 // the claims never walk the character across the whole map. It
 // returns the steps with their waypoint map (the route waypoint
@@ -1752,10 +1773,17 @@ func (l *Loop) cursorEscapeRouteSteps(
     budget := cursorEscapeRouteMax
     for i := l.wpIndex; i < len(l.waypoints); i++ {
         wp := l.waypoints[i]
+        // The waypoint z anchors into the server frame BEFORE the
+        // interpolation: the march interpolates between the character
+        // z (the server frame) and the waypoint z, and a raw pack
+        // waypoint z would blend the two frames mid segment - the
+        // claimed stride then drifts below the live ground by half
+        // the shift before the end of the first stretch.
+        wpZ := anchorZToServerFrame(wp.Z, l.segmentFrameOffset)
         ox, oy, oz := px, py, pz
         dx := wp.X - ox
         dy := wp.Y - oy
-        dz := wp.Z - oz
+        dz := wpZ - oz
         dist := math.Hypot(dx, dy)
         stride := cursorEscapeStep
         for stride < dist && budget > 0 {
@@ -1791,10 +1819,10 @@ func (l *Loop) cursorEscapeRouteSteps(
             steps = append(steps, [3]int32{
                 int32(math.Round(wp.X)),
                 int32(math.Round(wp.Y)),
-                int32(math.Round(wp.Z)),
+                int32(math.Round(wpZ)),
             })
             wpMap = append(wpMap, i)
-            px, py, pz = wp.X, wp.Y, wp.Z
+            px, py, pz = wp.X, wp.Y, wpZ
             budget -= cursorEscapeStep
         }
     }
@@ -2008,7 +2036,7 @@ func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
     for l.wpIndex < len(l.waypoints) {
         arrived := waypointArrived(
             l.waypoints, l.wpIndex, selfX, selfY, selfZ,
-            l.finalArriveRadius())
+            l.segmentFrameOffset, l.finalArriveRadius())
         passed := !arrived && l.wpIndex+1 < len(l.waypoints) &&
             waypointPassed(l.waypoints[l.wpIndex],
                 l.waypoints[l.wpIndex+1], selfX, selfY)
@@ -2495,7 +2523,14 @@ func (l *Loop) clickEscapeHop(
     }
     for j := l.wpIndex - 1; j >= 0; j-- {
         wp := l.waypoints[j]
-        dist := waypointDistance(wp, selfX, selfY, selfZ)
+        // The anchored distance: on a shifted deck the raw 3D
+        // distance to a bend the character stands on measures the
+        // shift alone, past the pass radius - the hop scan would
+        // break on the first candidate and never hop (the same
+        // frame duality the arrival test answered, see
+        // waypointDistanceAnchored).
+        dist := waypointDistanceAnchored(wp, selfX, selfY, selfZ,
+            l.segmentFrameOffset)
         if dist > waypointPassDist {
             // Deeper waypoints stand farther back along the
             // route: walking to them retraces the route
@@ -3671,6 +3706,20 @@ func (l *Loop) engagesOnZoneEntry() bool {
 // - the delevel abort and the return segment of the 2026-09-12 01:50 dump
 // died back to back from the same cell in one second, leaving the
 // character to the direct zone segments and the permanent freeze.
+// startReturnSegment plans the walk back to the spot the trip left
+// (the farm spot, the zone center it fell back to). The destination z
+// resolves onto the deck the destination actually sits on before the
+// search: the remembered spot z is the character's own standing z of
+// another area, and a plan remembered on the village deck rides a
+// zone center x/y whose deck lies hundreds of units lower - the mesh
+// search binds the destination polygon inside the nearest window of
+// the destination z (query.go nearestHalfZ), misses it by hundreds of
+// units and answers the honest "no navmesh under the position"
+// forever (the farm readiness round of 2026-09-20: every return of
+// the trip aborted on exactly that error while the same query with
+// the resolved deck answered 27 waypoints). The resolution mirrors
+// the zone return goal (zoneReturnDestination); a lookup failure
+// keeps the remembered z - the same-deck case it answers correctly.
 func (l *Loop) startReturnSegment() {
     l.phase = phaseTownReturn
     l.repathX, l.repathY = 0, 0
@@ -3682,6 +3731,7 @@ func (l *Loop) startReturnSegment() {
         // mid trip): return to the new center instead.
         destX, destY = zone.CX, zone.CY
     }
+    destZ = l.resolveDestinationDeck(destX, destY, destZ)
     dest := pathfind.Vec3{
         X: float64(destX),
         Y: float64(destY),

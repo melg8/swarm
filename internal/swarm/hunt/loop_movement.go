@@ -343,10 +343,35 @@ func (l *Loop) returnToZone() {
     }
 }
 
+// resolveDestinationDeck resolves the deck the destination x/y sits
+// on through the navigator (the closest layer to the reference z -
+// the same semantics the zone return center applies). A destination
+// z remembered on another deck (the standing z of the village riding
+// a farm zone x/y) misses the mesh search's nearest window by
+// hundreds of units and the search answers the honest "no navmesh
+// under the position" forever - the deck under the x/y is the honest
+// search goal. A lookup failure keeps the reference z: the same-deck
+// case it answers correctly.
+func (l *Loop) resolveDestinationDeck(x, y, z int32) int32 {
+    if l.navigator == nil {
+        return z
+    }
+    if height, err := l.navigator.ClosestHeight(
+        float64(x), float64(y), int16(z)); err == nil {
+        return int32(height)
+    }
+
+    return z
+}
+
 // zoneReturnGoal builds the search goal of the zone return: the
 // remembered farm spot when it lies inside the zone (the walk home
 // returns to the ground the hunt left), the square center's resolved
-// deck position otherwise (see zoneReturnDestination).
+// deck position otherwise (see zoneReturnDestination). The remembered
+// spot z resolves onto the spot's own deck first (see
+// resolveDestinationDeck): a spot remembered as the zone center x/y
+// with the standing z of another deck would strand the return search
+// on the mesh's nearest window.
 func (l *Loop) zoneReturnGoal(
     zone *state.Zone, selfZ int32,
 ) pathfind.Vec3 {
@@ -355,7 +380,8 @@ func (l *Loop) zoneReturnGoal(
             return pathfind.Vec3{
                 X: float64(l.farmX),
                 Y: float64(l.farmY),
-                Z: float64(l.farmZ),
+                Z: float64(l.resolveDestinationDeck(
+                    l.farmX, l.farmY, l.farmZ)),
             }
         }
     }

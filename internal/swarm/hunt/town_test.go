@@ -27,6 +27,13 @@ type fakeNavigator struct {
     // (zero: the lookup fails and the self height stays).
     height    int16
     heightErr bool
+    // closestCalls records the ClosestHeight queries (the destination
+    // deck resolution contract of the trip return, see
+    // startReturnSegment).
+    closestCalls int
+    closestX     float64
+    closestY     float64
+    closestRefZ  int16
     // blind marks the LineOfSight answer as blocked for every
     // queried line (the blind engage recovery asks it per candidate
     // standing point): the default answers a clear line - the
@@ -221,8 +228,11 @@ func (f *fakeNavigator) FindPath(
     return f.result(start, end)
 }
 
-// ClosestHeight answers the configured zone deck height.
-func (f *fakeNavigator) ClosestHeight(_, _ float64, _ int16) (int16, error) {
+// ClosestHeight answers the configured zone deck height and records
+// the query: the trip return resolution pins the lookup contract.
+func (f *fakeNavigator) ClosestHeight(x, y float64, refZ int16) (int16, error) {
+    f.closestX, f.closestY, f.closestRefZ = x, y, refZ
+    f.closestCalls++
     if f.heightErr {
         return 0, errors.New("no geodata")
     }
@@ -336,6 +346,11 @@ func newTripLoop() (*Loop, *fakeGame, *state.Bot, *fakeNavigator) {
     bot := newTestBot()
     game := &fakeGame{}
     nav := &fakeNavigator{found: true}
+    // The destination deck resolution of the trip return leg (see
+    // startReturnSegment) asks the navigator for the deck under the
+    // farm spot: the honest answer is the farm deck itself, the same
+    // height the spot was remembered with.
+    nav.height = -3500
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
     loop.lastHit = time.Now().Add(-time.Minute)

@@ -175,7 +175,7 @@ func TestUserWalkClickRidesTheServerFrameTransport(t *testing.T) {
     loop, game, bot, nav := newTripLoop()
     nav.route = []pathfind.Vec3{
         {X: 46000, Y: 51000, Z: -3000},
-        {X: 46100, Y: 51100, Z: -3050},
+        {X: 46200, Y: 51100, Z: -3050},
     }
     moveSelfTo(bot, 46000, 51000, -2600)
 
@@ -184,13 +184,17 @@ func TestUserWalkClickRidesTheServerFrameTransport(t *testing.T) {
         0.001, "the manual plan measures the same standing pair")
 
     // The cursor rides the second waypoint: the first one sits under
-    // the character (its z gap above the server z keeps the 3D
-    // arrival quiet) and the click of the pin aims the bend ahead.
+    // the character and the anchored arrival of the transport now
+    // counts it as reached at once (the plan start IS the standing
+    // cell - the pinned cursor of the raw 3D test is the porch bug
+    // the frame tests answer, see farm_readiness_frame_test.go). The
+    // click of the pin aims the bend ahead, 200 units out so the
+    // wide arrival radius stays clear.
     loop.userWpIndex = 1
     loop.userStart = time.Now()
     loop.followUserWaypoints(time.Now(), 46000, 51000, -2600)
 
-    require.Equal(t, [][3]int32{{46100, 51100, -2650}}, game.walks,
+    require.Equal(t, [][3]int32{{46200, 51100, -2650}}, game.walks,
         "the manual click rides the measured shift")
 }
 
@@ -203,9 +207,14 @@ func TestQuestWaypointClickRidesTheServerFrameTransport(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     moveSelfTo(bot, 46000, 51000, -2600)
 
+    // The bend stands 200 units out: the anchored arrival of the
+    // transport keeps the wide radius clear and the pin's click
+    // fires (the 141 unit geometry of the old pin landed exactly on
+    // the 150 radius once the anchored z removed the 50 unit
+    // residual from the distance).
     waypoints := []pathfind.Vec3{
         {X: 46000, Y: 51000, Z: -3000},
-        {X: 46100, Y: 51100, Z: -3050},
+        {X: 46200, Y: 51100, Z: -3050},
     }
     done := make(chan struct{})
     go func() {
@@ -221,6 +230,6 @@ func TestQuestWaypointClickRidesTheServerFrameTransport(t *testing.T) {
     // follower's first click).
     <-done
 
-    require.Equal(t, [][3]int32{{46100, 51100, -2650}}, game.walks,
+    require.Equal(t, [][3]int32{{46200, 51100, -2650}}, game.walks,
         "the quest segment click rides the measured shift")
 }

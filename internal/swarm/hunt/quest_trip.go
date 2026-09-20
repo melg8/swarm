@@ -459,7 +459,13 @@ func (l *Loop) followWaypoint(
         if index == len(waypoints)-1 {
             radius = questArriveRadius
         }
-        if waypointDistance(wp, selfX, selfY, selfZ) <= radius {
+        // The anchored distance: the quest walk measures its own frame
+        // offset (the segment start above) and the arrival test must
+        // not measure the vintage shift of a shifted standing cell -
+        // the same pinning the town follower answered (see
+        // waypointDistanceAnchored).
+        if waypointDistanceAnchored(wp, selfX, selfY, selfZ,
+            frameOffset) <= radius {
             return true
         }
         moving := selfX != lastX || selfY != lastY

@@ -150,6 +150,12 @@ tasks:
     cmds:
       - bash tools/prepush.sh
 
+  navmesh:test-tiles:
+    desc: Builds only the six mesh tiles the farm readiness acceptance walks (20_18..21_20 - the elven village, the shop quarter, the Spore Fungus road); the full pack build takes ~4.5 minutes and ~1.9 GB, the test subset ~19 s and ~160 MB
+    aliases: [nmtest]
+    cmds:
+      - go run ./cmd/navmesh-build -geodata data/geodata -regions 20_18,20_19,20_20,21_18,21_19,21_20 -out data/navmesh
+
   progress:
     desc: Regenerates PROGRESS.md from the live sources (the ladder, the metrics, the commits)
     aliases: [pr]
