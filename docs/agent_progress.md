@@ -13,29 +13,41 @@ check the archive when the recent context references an older task.
 
 ## Active task (status: in progress): the farm readiness frame round (2026-09-20)
 
-Round 105 landed (commit 1762d1c): the acceptance ping pong of the
-walk to the teacher answered - the passed aim never walks the
-character back (the backward aim hold across the marched bends) and
-the march counts its own ground (the destination progress term of
-the stuck gate, corridor gated). The live acceptance farm readiness
-PASSED end to end on the built binary: all six checks, 714 s, zero
-backward walks.
+Round 106 landed (commits 471abc6, c922461, 290b763): the follower
+keeps one oracle end to end - the advance gate obeys the same
+server click transport the clicks obey (the anchored, capped,
+delivery-tested port verdict), the sub-floor aim discipline is
+immediate (the round 57 freeze family is structurally eliminated)
+and the corridor ban system is REMOVED (the plaza round proved it
+a session poisoning amplifier: one 48 unit ban disk sealed
+1311910 reachable polygons down to 2, and the verdict that armed
+it was never a server freeze - the server moved the character on
+every click). The escape claims own the genuine silent freeze
+family alone; the escape march re-anchors onto the character's
+ground. The micro acceptance scenario joined the webui list head:
+plaza-herbiel - the character wakes ON the report's plaza cell and
+the trip walks the ping pong leg to Herbiel.
+
+Round 105 landed earlier (commit 1762d1c): the passed aim never
+walks the character back and the march counts its own ground; the
+live acceptance farm readiness passed end to end on the built
+binary: all six checks, 714 s, zero backward walks. The Round 105
+restrictions ride the armed branch of the merged aim switch.
 
 Started: 2026-09-20. Branch: `feature/new-pathfind-alternative`,
 commits as melg8. Other agents push to the same branch - rebase
-before every push. The owner report: the level 15 farm readiness
-bot bought at the jewelry shop and froze on the walk to the next
-merchant - stepping one step away from the plan origin, returning,
-repeating, then giving the merchant up (the plan repro link named
-the origin 44584 46944 -2920 and the recovery ban at the same
-point).
+before every push. The owner report: the farm readiness walk to
+Herbiel ping ponged between two points 63 units apart (nine
+alternating MoveToLocation clicks, the server accepting every
+one), the corridor ban at 44584 46944 then sealed the session.
 
 ### Goal
 
 The bot completes the farm readiness town trip (and the level 15
-acceptance behind it) without the porch freeze: the walk plans,
-the arrival tests, the escape claims and the return destinations
-measure in one frame.
+acceptance behind it) without the ping pong and without any
+recovery layer poisoning the session: the walk plans, the arrival
+tests, the escape claims and the return destinations measure in
+one frame and the follower answers through one movement oracle.
 
 ### Progress
 

@@ -8213,3 +8213,135 @@ completed in 714 s.
 Follow ups: none. The eye of the round: a recovery ladder is only
 as honest as its progress signal - the march the ladder armed was
 the cure, and the detector that armed it was starving it.
+
+## Round 106: the follower keeps one oracle - the advance gate obeys the click transport, the corridor ban era ends (2026-09-20)
+
+Scope: the owner ping pong report of the farm readiness round - the
+walk to the grocery trader Herbiel alternated MoveToLocation clicks
+between the plaza cell 44584 46944 (the Unoren customer stand the
+character traded at) and the first route sample 63 units out, nine
+cycles while the server accepted and delivered every one of them,
+then the frozen trip verdict banned the plaza for the session and
+every later route search answered from the sealed plaza (the
+partial to 44295 46944, then no path at all - the character stood
+on walkable ground with no route to anywhere for the rest of the
+run). The owner directive: find the cause, reproduce, fix it
+systemically - and if the corridor freeze system only interferes,
+remove it.
+
+The mechanism (reproduced offline against the real pack and the
+real mesh tiles, hunt/plaza_pingpong_repro_test.go): the follower
+advance gate (segmentAdvanceClear) asked the grid engine's
+symmetric line of sight - the A* node rule, a step must climb no
+more than the passable height up AND down and both cells' walls
+stay open in both directions - while the clicks the follower sends
+obey the asymmetric server rule (the GeoEngine.getValidLocation
+port: the climb limit with its layer step-over, the free drops,
+the source wall plus the anti corner cut). On ordinary terrain -
+a terrace drop, a one sided wall - the two disagree: the cursor
+pinned on the plan's own start waypoint whose click the server
+walked fine, the short click extension escaped ~63 units out and
+the pinned cursor clicked the character right back. The same
+disagreement pinned the round 57 dump from the other side (the
+cursor kept re-clicking the 22 unit first waypoint the server's
+rescue threshold silently canceled while the far segments of the
+very plan validated fine) and fed the 16:02/17:18 spawn pocket
+rounds their "freeze that lived inside the bot".
+
+The corridor ban amplified every misfire into a session long
+poisoning: the ping pong's zero net progress tripped the frozen
+trip verdict, the ban sealed the walled waypoint for the session -
+and the mesh ban walls every polygon whose rectangle touches the
+disk, so the one 368x32 plaza sheet covering the whole shop
+quarter (plus every strip grazing it) went from 1311910 reachable
+polygons to 2. The verdict that armed it was never a server freeze
+at all: the server moved the character on every click.
+
+The fix (systemic, the follower keeps one oracle end to end):
+
+- segmentAdvanceClear gates through the server click transport -
+  the same port the click it would send passes: the waypoint
+  anchored into the server frame, the distance capped at the move
+  request limit, the port verdict plus the delivery test (the
+  correction of the line lands within the waypoint pass radius of
+  the asked target). A click that stops a hundred units short (the
+  terrace lip of the round 57 route, the hall wall of the round 56
+  aisle approach) has not delivered the waypoint - the cursor
+  keeps the skipped-from waypoint targeted and the character walks
+  the plan's bends in the order the planner drew them.
+
+- The sub-floor aim discipline is immediate: a target under the
+  server rescue floor never leaves the bot (the findPath branch of
+  the server only takes a collapsed click over the threshold, a
+  shorter one is silently canceled), the aim re-aims at the
+  forward route samples before any click goes out - no stuck
+  verdict needed. The round 57 freeze family is structurally
+  eliminated: the walk never sends a click under the threshold.
+
+- The corridor ban system is REMOVED (banFrozenCorridor, the
+  frozen area list, the widening ladder, the ban plumbing of every
+  search and the rung one detour re-plan). Its genuine family - a
+  server that silently walls ground the pack models open - is
+  owned by the cursor key escape: the claims transport walks the
+  character along the planned route through the refusing ground,
+  the settle returns the walk to the routed clicks and the escape
+  budget bounds itself. The escape is the sole freeze recovery
+  now; the refusal family keeps the varied aims; the re-path
+  budget and the trip cooldown keep their places.
+
+- The escape march re-anchors onto the character's ground: the
+  plan cursor can sit ahead of the walked ground (the forward jump
+  bets a far waypoint's chord, the skip chain runs ahead), so the
+  claims march the ROUTE from the first waypoint the character's
+  ground still owes (escapeMarchStart) and the arm pulls the
+  cursor back onto it - the claims walk the planner's own geometry
+  from wherever the character stands, never the chord to the
+  jumped waypoint.
+
+- The reproServer sim answers through the same oracle the follower
+  validates with (the port-exact getValidLocation model): the old
+  conservative symmetric stepping stalled on terrain the real
+  server walks - the happy path reproductions needed their
+  recovery only because the sim disagreed with the port.
+
+- The Round 105 restrictions stay (the backward aim hold, the
+  destination progress term) and ride the armed branch of the
+  merged aim switch: with the cursor never pinning on walkable
+  ground they hold the march the extension still walks, a belt
+  under the suspenders of the honest gate.
+
+The reproductions: hunt/plaza_pingpong_repro_test.go pins the whole
+report contract on the real pack - the character at the plaza cell
+walks the planned route to the Herbiel stand neighborhood, no click
+ever aims back into the plaza cell it left, no frozen corridor ban
+seals a search (the system is gone); the advance gate oracle is
+pinned directly (the grid sight line refuses the first leg while
+the click transport accepts it - the exact line of the report).
+The affected era tests were adapted to the new contracts: the
+walled approach standoff recovers through the escape claims
+(walled_approach_repro_test.go, renamed from the corridor widening
+round whose subject is gone), the building entry escape walks the
+aisle through the claims, the round 57 walk never sends a
+sub-threshold click (zero re-paths, zero refusals), the spawn
+pocket reproductions model the server side refusal (the freeze
+that lived inside the bot is fixed), the railing models key the
+click transport instead of the sight oracle. The micro acceptance
+scenario joined the webui list (acceptance/plaza_herbiel.go): the
+character wakes ON the plaza cell of the report in the farm
+readiness start state, the weapon run trip walks the very legs of
+the report and the pass contract pins the observable halves - the
+plaza left, the corridor crossed, the Herbiel interaction distance
+reached.
+
+Verification: go build, go vet, golangci-lint run 0 issues
+(v2.13.2), gofmt-spaces clean, go test -count=1 ./... 30 packages
+ok zero failures, the race detector green on the hunt and
+acceptance packages.
+
+Follow ups: none. The eye of the round: a follower with two
+oracles is two followers - the gate that refuses what the click
+proves walks the character into a ladder of recoveries for a
+freeze that never was, and every recovery layer armed on the false
+signal poisons the next honest question (the ban sealed the plaza
+the server was happily walking). One oracle end to end, and the
+recovery ladder only answers what the one oracle cannot see.
