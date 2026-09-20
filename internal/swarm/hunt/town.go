@@ -1509,7 +1509,7 @@ func zeroCursorEscape() cursorEscapeState {
 // the aim without a plan, one run-speed step per second - the aim
 // clamped into the pocket radius, so a far target can never pull a
 // straight march out of the planless escape (the owner rule of the
-// 2026-09-19 round: НИКОГДА не идти напрямую). It reports whether
+// 2026-09-19 round: NEVER walk the direct line). It reports whether
 // the escape armed; a server that ignores the claims burns the
 // attempts (see driveCursorKeyEscape) and the caller keeps its
 // honest abort.
@@ -2996,7 +2996,7 @@ func (l *Loop) abortFrozenTrip(reason string) {
 //     where it bends, and the settle returns the walk to the normal
 //     routed clicks on the same plan (the owner contract of the
 //     2026-09-19 round: wasd along the route, the normal mode at the
-//     point, НИКОГДА не идти напрямую - the rung never replaces the
+//     point, NEVER walk the direct line - the rung never replaces the
 //     plan with a straight line to the far target). The re-arm
 //     repeats while the trip's escape attempts last; a spent budget
 //     falls back to the plain trip abort with its cooldown.

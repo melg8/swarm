@@ -89,7 +89,7 @@ func BenchmarkInitPacket_WriteTo(b *testing.B) {
         BlowfishKey:     blowfishKey,
     }
 
-    // Создаем буфер для записи ОДИН РАЗ, вне цикла
+    // the write buffer is built ONCE, outside the loop
     packetSize := 4 + 4 + len(rsaKey) + 4*4 + len(blowfishKey)
     packetData := make([]byte, packetSize)
 
@@ -97,7 +97,7 @@ func BenchmarkInitPacket_WriteTo(b *testing.B) {
     b.ReportAllocs()
 
     for range b.N {
-        // Переиспользуем тот же самый буфер на каждой итерации
+        // the same buffer serves every iteration
         _, err := initPacket.WriteTo(packetData)
         if err != nil {
             b.Fatal(err)

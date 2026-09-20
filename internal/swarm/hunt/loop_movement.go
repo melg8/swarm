@@ -242,8 +242,9 @@ func (l *Loop) adoptOutZoneFight(now time.Time) bool {
 
 // holdZoneReturn parks the budget-burned return: the walk holds
 // instead of marching the direct segments toward the zone (the owner rule
-// of the 2026-09-19 round: ТОЛЬКО идти по маршрутам и НИКОГДА не идти
-// напрямую). One fresh planning cycle arms per backoff window - the
+// of the 2026-09-19 round: ONLY walk the planned routes and NEVER
+// walk the direct line). One fresh planning cycle arms per backoff
+// window - the
 // counter resets with the paced log line, so the next returnToZone
 // retries the planner while the session's frozen corridor bans
 // (widened by every failed trip) keep reshaping the routes it may
@@ -326,7 +327,7 @@ func (l *Loop) returnToZone() {
         // The planner owns no route to the zone at all (both searches
         // failed): the return holds instead of marching the direct
         // segments toward the zone (the owner rule of the 2026-09-19
-        // round: НИКОГДА не идти напрямую). The paced line explains
+        // round: NEVER walk the direct line). The paced line explains
         // the standing hunter in the state dump; the next returnToZone
         // re-plans (a failed trip's bans may have reshaped the answer
         // by then).

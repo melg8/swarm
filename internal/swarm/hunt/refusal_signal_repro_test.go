@@ -60,8 +60,8 @@ import (
 // evidence never bans a corridor (escalateFrozenSegment), and the frozen
 // ladder hands the segment to the cursor key escape along the planned
 // route - the direct server routed walk those rungs used to arm is
-// eliminated (the owner rule of the 2026-09-19 round: НИКОГДА не
-// идти напрямую - see direct_walk_elimination_repro_test.go).
+// eliminated (the owner rule of the 2026-09-19 round: NEVER walk
+// the direct line - see direct_walk_elimination_repro_test.go).
 const (
     // refusalDumpX/Y/Z is the reported stuck position (the dump of
     // 2026-09-14 10:18, the village center stand of unittest3).

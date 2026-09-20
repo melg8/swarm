@@ -24,9 +24,10 @@ import (
 // 42748 51232 (18 claimed steps)"), but the owner met two new
 // defects on the way:
 //
-//   - "прошел несколько точек по wasd - при этом они не отметились
-//     как пройденные и потом перейдя в обычный режим вернулся назад
-//     к предыдущим точкам": the claims walked the character across
+//   - "walked several waypoints on wasd - they were not marked as
+//     passed, and after switching back to the normal mode the walk
+//     returned to the earlier waypoints": the claims walked the
+//     character across
 //     the route's first waypoints, the plan cursor stayed behind
 //     (the escape never touched it), and the resumed clicks walked
 //     the character BACK - the dump's own fingerprint: the settle at
@@ -36,8 +37,8 @@ import (
 //     segments of 8.3s, 5.0s, 10.7s spent walking BACK to the waypoints
 //     the escape had already covered. Two minutes of the trip burned
 //     on the walked prefix.
-//   - "webui при ходьбе wasd - не корректно отображается направление
-//     персонажа (не по ходу движения)": the claimed steps carried a
+//   - "webui during the wasd walk shows the character direction
+//     wrong (not along the movement)": the claimed steps carried a
 //     mirrored heading (cursorEscapeHeading fed atan2 the swapped
 //     arguments), and the server echo of every claim carried the arm
 //     heading instead of the claim facing - the web UI showed a

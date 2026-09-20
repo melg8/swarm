@@ -27,10 +27,11 @@ import (
 // the server routed walk that aborted on "the server refused the
 // routed walk clicks" - never moving a single cell. The user then
 // proved the refusal server side with the OFFICIAL CLIENT: from that
-// exact point the client's own ground clicks die too ("из этой точки
-// даже через клиент не двигается") - only the ARROW KEYS moved the
-// character, and after the arrow walk the clicks worked again
-// ("удалось только движение по стрелкам - после этого отлипло").
+// exact point the client's own ground clicks die too ("even through
+// the client nothing moves from this point") - only the ARROW KEYS
+// moved the character, and after the arrow walk the clicks worked
+// again ("only the arrow key movement worked - after that it came
+// loose").
 //
 // The Mobius source explains both halves of the user's observation:
 //
@@ -302,7 +303,8 @@ func TestReproCursorKeyEscapeWalksOutOfTheRefusingCell(t *testing.T) {
 // clicks AND drops the movement mode 0 requests silently (the
 // keyboard movement disabled) freezes every movement channel - the
 // exact situation the user met with the official client before the
-// arrows worked ("из этой точки даже через клиент не двигается").
+// arrows worked ("even through the client nothing moves from this
+// point").
 // The escape burns its attempts against the ignoring server, the
 // corridor bans stay off (the refusal evidence owns the verdict) and
 // the trips abort with the honest reason - the character never moves

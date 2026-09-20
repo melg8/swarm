@@ -1,488 +1,503 @@
-# webui modernization proposal (на аппрув)
+# webui modernization proposal (awaiting approval)
 
 SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
 
 SPDX-License-Identifier: MIT
 
-Предложения по обновлению веб-интерфейса swarm: читаемость,
-современный вид, эргономика. Документ создан для аппрува: каждая
-позиция пронумерована, в конце — чек-лист. До аппрува в интерфейс
-ничего не вносится.
+Proposals for the swarm web interface refresh: readability, a modern
+look, ergonomics. The document was written for approval: every item
+is numbered, the checklist sits at the end. Nothing lands in the
+interface before the approval.
 
-## 1. Как проводился анализ
+## 1. How the analysis was done
 
-- Живые скриншоты всех режимов на 1440×900 (Mobius stack + bot `-hunt`):
-  bot light/dark, открытый view-dropdown, вкладка Log, shop flyout,
-  zone-панель, pathfind test (8081), fight showcase v1 (8082),
-  fight gallery (8083). Скриншоты: `/home/z/my-project/download/audit/`.
-- Полный проход `style.css` (2169 строк), `index.html` (377),
-  UI-логики `app.js`/`map.js`/`main.js`.
-- Замеры геометрии (light, bot): header 1440×34, sidebar 200×840,
-  toolbar 1240×37, map 1240×803, HUD 252×253 (сверху слева),
-  gear 254×395 (сверху справа), zone 254×30 (снизу справа, свёрнута),
-  chat 416×150 (снизу слева), footer 1440×26.
-- Независимое VLM-ревью скриншотов (senior UI/UX critique).
+- Live screenshots of every mode at 1440×900 (the Mobius stack + the
+  bot `-hunt`): bot light/dark, the open view dropdown, the Log tab,
+  the shop flyout, the zone panel, the pathfind test (8081), the
+  fight showcase v1 (8082), the fight gallery (8083). Screenshots:
+  `/home/z/my-project/download/audit/`.
+- A full pass of `style.css` (2169 lines), `index.html` (377),
+  the UI logic of `app.js`/`map.js`/`main.js`.
+- Geometry measurements (light, bot): header 1440×34, sidebar
+  200×840, toolbar 1240×37, map 1240×803, HUD 252×253 (top left),
+  gear 254×395 (top right), zone 254×30 (bottom right, collapsed),
+  chat 416×150 (bottom left), footer 1440×26.
+- An independent VLM review of the screenshots (senior UI/UX
+  critique).
 
-## 2. Что уже хорошо (не трогаем)
+## 2. What already works (untouched)
 
-- Компактный хедер 34px, одна строка тулбара 37px, footer 26px —
-  вертикальный бюджет карты уже выжат (прошлые раунды).
-- Единая палитра HP/MP/XP «классического L2 C1» — осознанный стиль.
-- Тема переключается и сохраняется в localStorage.
-- Live-индикатор с glow, пульсация bot-status, caret-повороты,
-  slide-in flyout у shop queue — ростки «живого» UI уже есть.
-- Вся вёрстка vanilla CSS/JS без сборки — так и оставляем:
-  каждое предложение реализуется без новых зависимостей.
+- The compact 34px header, one 37px toolbar row, the 26px footer -
+  the vertical budget of the map is already squeezed (the past
+  rounds).
+- The unified HP/MP/XP palette of the "classic L2 C1" - a deliberate
+  style.
+- The theme switches and persists in the localStorage.
+- The live indicator with the glow, the bot-status pulse, the caret
+  turns, the slide-in flyout of the shop queue - the sprouts of the
+  "live" UI are already there.
+- All the layout is vanilla CSS/JS without a build - it stays that
+  way: every proposal lands without new dependencies.
 
-## 3. Диагноз
+## 3. The diagnosis
 
-| Ось | Главная проблема |
+| Axis | The main problem |
 | --- | --- |
-| Читаемость | 91 из 103 деклараций `font-size` ≤ 12px, минимум 8px; лог-строки без ритма; XP-бар почти невидим в light; в dark тени выключены (`--shadow: none`) — панели сливаются с фоном |
-| Современность | Жёсткие 1px рамки, radius 4–6px, «капсульный» ALL-CAPS микротекст 10px с letter-spacing 2px, текстовые глифы (◐ ▾ ◂) вместо иконок, 5 transition на весь CSS, 10 насыщенных activity-цветов |
-| Эргономика | Панели не двигаются и не сворачиваются (кроме zone/shop), ни одного :focus-visible (кроме 2 инпутов), нет горячих клавиш, компас N перекрыт zone-панелью, инвентарь всегда показывает 4 пустых ряда, нет media queries, лог без фильтров-чипов и паузы |
+| Readability | 91 of 103 `font-size` declarations are ≤ 12px, the minimum 8px; the log lines have no rhythm; the XP bar is almost invisible in light; in dark the shadows are off (`--shadow: none`) - the panels merge with the background |
+| Modern look | The rigid 1px borders, the 4-6px radius, the "capsule" ALL-CAPS 10px micro text with the 2px letter spacing, the text glyphs (◐ ▾ ◂) instead of the icons, 5 transitions on the whole CSS, 10 saturated activity colors |
+| Ergonomics | The panels do not move and do not collapse (zone/shop excepted), not a single :focus-visible (2 inputs excepted), no hotkeys, the compass N is covered by the zone panel, the inventory always shows 4 empty rows, no media queries, the log has no filter chips and no pause |
 
-Плавающие панели при открытом shop flyout перекрывают 508px из 1240px
-ширины карты (41%): HUD 252 слева + gear 254 и shop 240+14 справа.
+The floating panels with the shop flyout open cover 508px of the
+1240px map width (41%): HUD 252 left + gear 254 and shop 240+14
+right.
 
-## 4. Фаза A — читаемость
+## 4. Phase A - readability
 
-### A1. Поднять базовый масштаб типографики
+### A1. Raise the base typography scale
 
-Проблема: body 13px; надписи 8px (slot-label), 8.5px (icon-badge,
-shop-buying-chip), 9px (shop-meta, shop-missing, shop-key), 9.5px
-(drop-hint). На 1440×900-десктопе это «прищурный» режим; VLM-ревью
-обеих тем назвало это micro-font syndrome.
+Problem: body 13px; the labels 8px (slot-label), 8.5px
+(icon-badge, shop-buying-chip), 9px (shop-meta, shop-missing,
+shop-key), 9.5px (drop-hint). On a 1440×900 desktop this is the
+squint mode; the VLM review of both themes named it the micro-font
+syndrome.
 
-Предложение: body 13 → 14px; жёсткий минимум 10px для любого
-читаемого текста (бейджи и счётчики — 10px, micro-подписи — 10.5px);
-числовые бейджи допускают 10px mono.
+Proposal: body 13 → 14px; a hard 10px minimum for every readable
+text (the badges and the counters - 10px, the micro captions -
+10.5px); the numeric badges allow a 10px mono.
 
-Эффект: интерфейс читается с расстояния, меньше «инженерного
-дешевого» вида.
-Объём: S. Риск: фиксированные ширины панелей (HUD 252, gear 254,
-shop 240) — перепроверить переносимость строк, возможны +6–10px
-ширины. Файлы: style.css (+ точечные правки repro-проверок).
+Effect: the interface reads from a distance, less of the cheap
+engineering look.
+Size: S. Risk: the fixed panel widths (HUD 252, gear 254, shop 240)
+- recheck the line wrapping, a +6-10px width is possible. Files:
+style.css (+ the spot edits of the repro checks).
 
-### A2. Вертикальный ритм и плотность строк
+### A2. The vertical rhythm and the line density
 
-Проблема: log-строки — padding 2.5px, line-height дефолтный;
-kv-строки HUD — 2px; легенда и подписи без воздуха. VLM: «wall of
-text», строку лога легко потерять глазами.
+Problem: the log lines - padding 2.5px, the default line-height;
+the HUD kv lines - 2px; the legend and the captions have no air.
+VLM: a "wall of text", a log line is easy to lose with the eyes.
 
-Предложение: body line-height 1.45; лог — padding 3.5–4px по
-вертикали + line-height 1.5; kv — padding 3px; чуть увеличить
-внутренние отступы панелей (10/12 → 12/14px).
+Proposal: body line-height 1.45; the log - 3.5-4px vertical padding
++ line-height 1.5; kv - 3px padding; the inner panel paddings grow a
+bit (10/12 → 12/14px).
 
-Эффект: сканирование лога и статов без потери строки.
-Объём: S. Риск: высоты списков (chat 150px, shop 112px max-height)
-— пересчитать видимую ёмкость.
+Effect: the log and the stats scan without losing a line.
+Size: S. Risk: the list heights (chat 150px, shop 112px max-height)
+- recount the visible capacity.
 
-### A3. Микро-заголовки панелей
+### A3. The panel micro headers
 
-Проблема: sidebar-title / shop-head / drop-head / gear-key —
-10px ALL-CAPS с letter-spacing 2px. Размытые «капсульные» подписи —
-визуальный маркер утилит 2000-х.
+Problem: sidebar-title / shop-head / drop-head / gear-key - 10px
+ALL-CAPS with the 2px letter spacing. The blurry "capsule" captions
+are the visual marker of the 2000s utilities.
 
-Предложение: 10.5–11px, letter-spacing 0.8–1px, цвет text-dim,
-normal-case semibold для длинных заголовков (Equipment, Hunting
-zones, Shop queue), CAPS оставить только для 1–2-словных
+Proposal: 10.5-11px, letter-spacing 0.8-1px, the text-dim color, a
+normal-case semibold for the long headers (Equipment, Hunting
+zones, Shop queue), the CAPS stays only for the 1-2 word ones
 (EQUIPMENT → Equipment).
 
-Эффект: современный тон при той же плотности.
-Объём: S. Риск: нет.
+Effect: a modern tone at the same density.
+Size: S. Risk: none.
 
-### A4. XP-бар: читаемость светлого серебра
+### A4. The XP bar: the readable light silver
 
-Проблема: XP-градиент (#f4f4f4 → #9096a0) на белой панели почти
-невидим — VLM отметил обе vitals-панели как contrast failure.
+Problem: the XP gradient (#f4f4f4 → #9096a0) on the white panel is
+almost invisible - the VLM flagged both vitals panels as a contrast
+failure.
 
-Предложение: не меняя классическую палитру — тёмная подложка
-трека (bg-panel-2 затемнить локально) + 1px внутренняя обводка
-заполнения; в dark теме трек чуть светлее фона. Опционально:
-тонкая насечка 25/50/75%.
+Proposal: without touching the classic palette - a dark track
+backdrop (bg-panel-2 darkened locally) + a 1px inner stroke of the
+fill; in the dark theme the track is a bit lighter than the
+background. Optional: a fine 25/50/75% notching.
 
-Эффект: третья вита читается так же, как HP/MP.
-Объём: S. Риск: нет.
+Effect: the third vital reads as well as HP/MP.
+Size: S. Risk: none.
 
-### A5. Тёмная тема: слои и глубина
+### A5. The dark theme: the layers and the depth
 
-Проблема: `html[data-theme="dark"] { --shadow: none }` — все
-панели одной плоскости, сливаются с фоном карты.
+Problem: `html[data-theme="dark"] { --shadow: none }` - all the
+panels of one flat plane, they merge with the map background.
 
-Предложение: вернуть мягкую тень (0 1px 2px + 0 8px 24px
-rgba(0,0,0,0.4)), border чуть светлее (—#2a303c → #333a47),
-bg-panel поднять на ступень (#171b22 → #1a1f27).
+Proposal: bring back a soft shadow (0 1px 2px + 0 8px 24px
+rgba(0,0,0,0.4)), the border a bit lighter (-#2a303c → #333a47),
+bg-panel one step up (#171b22 → #1a1f27).
 
-Эффект: dark перестаёт быть «плоской грязью», панель «отрывается»
-от карты.
-Объём: S. Риск: нет.
+Effect: dark stops being a "flat mud", a panel "detaches" from the
+map.
+Size: S. Risk: none.
 
-### A6. Лог: сканируемость строк
+### A6. The log: the line scannability
 
-Проблема: одинаковая плотность всех строк; зелёный цвет spawn
-доминирует и обесценивает семантику; timestamps одной секунды
-повторяются десятками.
+Problem: the same density of every line; the green of the spawn
+dominates and cheapens the semantics; the timestamps of one second
+repeat by the dozens.
 
-Предложение: zebra-striping (нечётные строки bg-panel-2 50%);
-timestamp оставить dim, но убрать повторы одинаковых секунд
-(пустое место на месте повторов — smart timestamps); зелёный
-зарезервировать за loot/level-up, spawn перекрасить в нейтральный
+Proposal: zebra-striping (the odd lines bg-panel-2 50%); the
+timestamp stays dim but the repeats of the same second go away (an
+empty space instead of the repeats - smart timestamps); the green
+is reserved for loot/level-up, the spawn recolors into the neutral
 text.
 
-Эффект: глаз держит строку; важные события выпрыгивают.
-Объём: S-M (smart timestamps — правка log.js).
-Риск: тесты log-рендера могут ожидать текущие классы.
+Effect: the eye holds the line; the important events jump out.
+Size: S-M (smart timestamps - a log.js edit).
+Risk: the log render tests may expect the current classes.
 
-### A7. Табличные цифры
+### A7. The tabular figures
 
-Проблема: числа, меняющиеся в рантайме (footer, map-scale,
-map-objects, hud-значения), прыгают по ширине.
+Problem: the numbers that change at runtime (footer, map-scale,
+map-objects, the hud values) jump in width.
 
-Предложение: `font-variant-numeric: tabular-nums` на все
-числовые ячейки (vital-text уже mono — добавить к kv b, foot-item,
+Proposal: `font-variant-numeric: tabular-nums` on every numeric
+cell (vital-text is already mono - add it to kv b, foot-item,
 map-scale, map-objects, shop-val).
 
-Эффект: цифры не «дышат» при обновлении раз в секунду.
-Объём: S. Риск: нет.
+Effect: the figures do not "breathe" on the once a second refresh.
+Size: S. Risk: none.
 
-## 5. Фаза B — современный вид
+## 5. Phase B - the modern look
 
-### B1. Хром панелей
+### B1. The panel chrome
 
-Проблема: жёсткие 1px border, radius 4–6px, одинарная тень 1px —
-«windows 98 chrome» по VLM.
+Problem: the rigid 1px borders, the 4-6px radius, the single 1px
+shadow - "windows 98 chrome" per the VLM.
 
-Предложение: плавающим панелям (HUD, gear, zone, chat, shop,
-drop-dialog, view-menu-pop, item-tooltip) — radius 8–10px,
-border-soft, двухслойная тень (0 1px 2px rgba(20,30,45,0.10),
-0 10px 28px rgba(20,30,45,0.16)); инлайн-элементам (кнопки, чипы,
-ячейки) radius 6px.
+Proposal: the floating panels (HUD, gear, zone, chat, shop,
+drop-dialog, view-menu-pop, item-tooltip) - radius 8-10px,
+border-soft, a two layer shadow (0 1px 2px rgba(20,30,45,0.10),
+0 10px 28px rgba(20,30,45,0.16)); the inline elements (the buttons,
+the chips, the cells) radius 6px.
 
-Эффект: самый дешёвый и самый заметный шаг к «современности».
-Объём: S. Риск: нет.
+Effect: the cheapest and the most visible step toward the modern
+look.
+Size: S. Risk: none.
 
-### B2. Опциональное «стекло» для оверлеев карты
+### B2. The optional "glass" for the map overlays
 
-Проблема: непрозрачные панели глухо перекрывают карту.
+Problem: the opaque panels cover the map dead.
 
-Предложение: для плавающих панелей поверх canvas — полупрозрачный
-фон (rgba панельного цвета 0.82–0.88) + `backdrop-filter: blur(10px)`
-под `@supports (backdrop-filter: blur(2px))`, деградация в текущий
-вид. Управление одной CSS-переменной --glass (off — точный
-текущий вид), чтобы откатить одним словом.
+Proposal: for the floating panels over the canvas - a translucent
+backdrop (an rgba of the panel color 0.82-0.88) +
+`backdrop-filter: blur(10px)` under
+`@supports (backdrop-filter: blur(2px))`, the degradation to the
+current look. One CSS variable --glass controls it (off - the exact
+current look), so one word rolls it back.
 
-Эффект: карта читается сквозь панели, «modern MMO overlay».
-Объём: M. Риск: перерисовка canvas под blur может стоить FPS на
-слабых машинах — потому выключаемо; проверить в живой сессии.
+Effect: the map reads through the panels, a "modern MMO overlay".
+Size: M. Risk: the canvas repaint under the blur may cost FPS on the
+weak machines - hence switchable; verify in a live session.
 
-### B3. Микро-моушн
+### B3. The micro motion
 
-Проблема: 5 transition на весь CSS; hover меняет только цвет —
-интерфейс «статичен».
+Problem: 5 transitions on the whole CSS; the hover changes only the
+color - the interface is "static".
 
-Предложение: единый токен `--t-fast: 140ms ease`; hover-переходы
-(bg/color/border) на .btn, .tab, .check, .zone-item, .shop-item,
-.fight-colhead, .bot-item; появление view-menu-pop — fade+scale
-0.98→1 (transform-origin: top left) 120ms; shop flyout уже
-анимирован — оставить. Без bounce/parallax.
+Proposal: one token `--t-fast: 140ms ease`; the hover transitions
+(bg/color/border) on .btn, .tab, .check, .zone-item, .shop-item,
+.fight-colhead, .bot-item; the view-menu-pop appearance - fade+scale
+0.98→1 (transform-origin: top left) 120ms; the shop flyout is
+already animated - keep it. No bounce/parallax.
 
-Эффект: «живой» отклик без риска.
+Effect: a "live" response without the risk.
 
-Объём: S-M. Риск: prefers-reduced-motion — уважить через media
-query.
+Size: S-M. Risk: prefers-reduced-motion - respect it through a
+media query.
 
-### B4. Тонкие скроллбары глобально
+### B4. The thin scrollbars globally
 
-Проблема: кастомные тонкие скроллбары есть только в shop/inv/
-fight — в остальном системные.
+Problem: the custom thin scrollbars live only in shop/inv/fight -
+the rest are the system ones.
 
-Предложение: `scrollbar-width: thin` + webkit-правила на все
-списки (bot-list, zone-list, chat-list, log-list, pf-list),
-единый thumb var(--border) radius 3px.
+Proposal: `scrollbar-width: thin` + the webkit rules on every list
+(bot-list, zone-list, chat-list, log-list, pf-list), one thumb
+var(--border) radius 3px.
 
-Эффект: целостность. Объём: S. Риск: нет.
+Effect: the integrity. Size: S. Risk: none.
 
-### B5. Активный таб
+### B5. The active tab
 
-Проблема: активный таб отличается только текстом и фоном.
+Problem: the active tab differs only by the text and the backdrop.
 
-Предложение: 2px underline-индикатор акцентом с 150ms-анимацией
-(псевдоэлемент ::after), bg hover оставить.
+Proposal: a 2px accent underline indicator with a 150ms animation
+(the ::after pseudo element), the hover bg stays.
 
-Эффект: классический современный паттерн навигации.
-Объём: S. Риск: нет.
+Effect: the classic modern navigation pattern.
+Size: S. Risk: none.
 
-### B6. SVG-иконки вместо текстовых глифов
+### B6. The SVG icons instead of the text glyphs
 
-Проблема: тема-кнопка «◐», каретки ▾/◂/▸, компас «N» — текстовые
-глифы рендерятся по-разному в системах, мылят на ретине; в UI уже
-есть 2 SVG (copy, trash) — смешение стилей.
+Problem: the theme button "◐", the carets ▾/◂/▸, the compass "N" -
+the text glyphs render differently across the systems, they smear
+on the retina; the UI already has 2 SVGs (copy, trash) - a style
+mix.
 
-Предложение: единый набор inline-SVG со stroke 1.75px:
-theme-toggle (sun/moon), view-menu-caret, shop-tab-chev,
-zone-panel-chev, compass N (стрелка с N). Размер 12–16px,
-currentColor.
+Proposal: one inline-SVG set with a 1.75px stroke: theme-toggle
+(sun/moon), view-menu-caret, shop-tab-chev, zone-panel-chev, compass
+N (an arrow with the N). The size 12-16px, currentColor.
 
-Эффект: чёткость на hidpi, единый язык иконок.
-Объём: M (мелкая, но кропотливая правка index.html + CSS).
-Риск: low.
+Effect: the crispness on hidpi, one icon language.
+Size: M (a small but fiddly index.html + CSS edit).
+Risk: low.
 
-### B7. Activity-цвета: меньше кричащих
+### B7. The activity colors: fewer screaming ones
 
-Проблема: 10 насыщенных цветов (kind-*) одновременно красят текст,
-рамку и точку бота; радуга утомляет и выглядит дёшево.
+Problem: 10 saturated colors (kind-*) paint the text, the border and
+the bot dot at once; the rainbow tires and looks cheap.
 
-Предложение: текст — нейтральный text/text-dim; цвет остаётся у
-точки и левой полоски (border-left), оттенки приглушить на ~15%
-насыщенности; в status-баннере карты — тот же принцип (текст
-нейтральный, точка цветная).
+Proposal: the text - the neutral text/text-dim; the color stays with
+the dot and the left bar (border-left), the tints muted by ~15%
+saturation; the map status banner - the same principle (a neutral
+text, a colored dot).
 
-Эффект: спокойный профессиональный тон, семантика сохранена.
-Объём: S. Риск: привыкание — но цвета остаются на точках.
+Effect: a calm professional tone, the semantics kept.
+Size: S. Risk: the habit - but the colors remain on the dots.
 
-### B8. Чипы состояний
+### B8. The state chips
 
-Проблема: chip-combat/chip-rest/chip-level — рамочные, разного
-размера; shop-buying-chip 8.5px.
+Problem: chip-combat/chip-rest/chip-level - framed, of different
+sizes; shop-buying-chip 8.5px.
 
-Предложение: единая метрика чипа (10px, radius 4px, padding 1px
-6px); критичным состояниям (combat) — tinted-фон (12% цвета) вместо
-чисто рамочного; shop-buying — filled акцентом.
+Proposal: one chip metric (10px, radius 4px, padding 1px 6px); the
+critical states (combat) - a tinted backdrop (12% of the color)
+instead of the pure frame; shop-buying - filled with the accent.
 
-Эффект: статусы видно периферийным зрением.
-Объём: S. Риск: нет.
+Effect: the statuses are visible by the peripheral vision.
+Size: S. Risk: none.
 
-## 6. Фаза C — эргономика
+## 6. Phase C - ergonomics
 
-### C1. Горячие клавиши
+### C1. The hotkeys
 
-Проблема: горячих клавиш нет (кроме Esc/Enter в диалогах). Постоянные
-операции требуют мыши: переключение табов, follow, view-слои.
+Problem: no hotkeys (Esc/Enter in the dialogs excepted). The constant
+operations demand the mouse: the tab switch, the follow, the view
+layers.
 
-Предложение: `M`/`L` — табы Map/Log (или 1/2), `F` — follow,
-`V` — view menu, `T` — тема. Активны только когда фокус не в
-текстовом инпуте (log-filter, drop-count). Подсказки: в title
-элементов и короткая строка в футере (например, `M map · L log ·
-F follow · V view · T theme` — dim mono, как текущие foot-item).
+Proposal: `M`/`L` - the Map/Log tabs (or 1/2), `F` - follow, `V` -
+the view menu, `T` - the theme. Active only when the focus is not in
+a text input (log-filter, drop-count). The hints: in the title of
+the elements and a short footer line (for example, `M map · L log ·
+F follow · V view · T theme` - dim mono, like the current
+foot-item).
 
-Эффект: скорость оператора; «серьёзный инструмент» ощущается.
-Объём: S-M. Риск: конфликт с будущими инпутами — держать
-исключение по фокусу.
+Effect: the operator speed; the "serious tool" feel lands.
+Size: S-M. Risk: a conflict with the future inputs - keep the focus
+exception.
 
-### C2. Фокус с клавиатуры
+### C2. The keyboard focus
 
-Проблема: `:focus` есть только у 2 текстовых инпутов; табы,
-кнопки, чекбоксы, пункты view-меню не показывают фокус —
-клавиатурная навигация невозможна.
+Problem: `:focus` exists only on the 2 text inputs; the tabs, the
+buttons, the checkboxes, the view menu items show no focus - the
+keyboard navigation is impossible.
 
-Предложение: глобальное `:focus-visible { outline: 2px solid
-var(--accent); outline-offset: 2px; }` + тонкая правка вида
-outline у инпутов (border-accent уже есть).
+Proposal: a global `:focus-visible { outline: 2px solid
+var(--accent); outline-offset: 2px; }` + a thin edit of the input
+outline look (the border-accent already exists).
 
-Эффект: доступность, «modern toolkit»-уровень.
-Объём: S. Риск: нет.
+Effect: the accessibility, the "modern toolkit" level.
+Size: S. Risk: none.
 
-### C3. Компас N перекрыт zone-панелью
+### C3. The compass N is covered by the zone panel
 
-Проблема: map-rose (bottom 10, right 12) и zone-panel (bottom 12,
-right 12) сидят в одном углу — панель перекрывает компас.
+Problem: map-rose (bottom 10, right 12) and zone-panel (bottom 12,
+right 12) sit in one corner - the panel covers the compass.
 
-Предложение: перенести компас к левому нижнему углу карты (над
-chat? нет — в chat-box левый нижний) — лучше top-right под
-gear-панелью (top 10, right 278) или left-top под HUD (top 284,
-left 12). Самый спокойный вариант: right top, y под gear.
+Proposal: move the compass to the map's left bottom corner (above
+the chat? no - into the chat-box left bottom) - better the top-right
+under the gear panel (top 10, right 278) or the left-top under the
+HUD (top 284, left 12). The calmest option: right top, below the
+gear.
 
-Эффект: ориентация карты всегда видна. Объём: S. Риск: нет.
+Effect: the map orientation is always visible. Size: S. Risk: none.
 
-### C4. Плавающие панели: перетаскивание и сворачивание
+### C4. The floating panels: the drag and the collapse
 
-Проблема: HUD, gear, chat прибиты к углам гвоздями; свёрнуть
-нельзя (паттерн сворачивания есть только у zone). При открытом
-shop flyout перекрыто 41% ширины карты.
+Problem: HUD, gear, chat are nailed to the corners; nothing
+collapses (the collapse pattern exists only in zone). With the shop
+flyout open 41% of the map width is covered.
 
-Предложение: единый паттерн «panel head»: хедер панели
-перетаскивается (pointer events, ограничение границами map-wrap),
-кнопка сворачивания (та же chevron-иконка, что у zone);
-позиции/состояния в localStorage (как swarm.theme). HUD получает
-тонкий хедер-ряд (имя бота уже есть — тянуть за него), gear —
-хедер EQUIPMENT, chat — узкую полоску-хедер.
+Proposal: one "panel head" pattern: the panel header drags (pointer
+events, clamped to the map-wrap bounds), a collapse button (the same
+chevron icon as zone); the positions/the states in the localStorage
+(like swarm.theme). HUD gets a thin header row (the bot name is
+already there - drag by it), gear - an EQUIPMENT header, chat - a
+narrow header strip.
 
-Эффект: главный эргономический выигрыш — пользователь сам решает,
-что где стоит и что скрыто; плотная карта освобождается за
-секунды.
-Объём: M-L. Риск: драг поверх canvas должен не мешать pan-жестам
-карты (start только на хедере); localStorage-ключи versioned.
+Effect: the main ergonomic win - the operator decides what sits
+where and what is hidden; the dense map frees up in seconds.
+Size: M-L. Risk: the drag over the canvas must not fight the map pan
+gestures (start on the header only); the localStorage keys are
+versioned.
 
-### C5. Chat: сворачивание и бейдж новых
+### C5. The chat: the collapse and the new badge
 
-Проблема: чат 416×150 всегда перекрывает карту; свернуть нельзя.
+Problem: the chat 416×150 covers the map all the time; no collapse.
 
-Предложение: кнопка minimize в хедере чата (C4 даёт общий
-паттерн) + бейдж «N new» на свёрнутой полоске, сбрасывается при
-разворачивании.
+Proposal: a minimize button in the chat header (C4 gives the common
+pattern) + an "N new" badge on the collapsed strip, reset on the
+expand.
 
-Эффект: карта свободнее; события не теряются.
-Объём: M (вместе с C4 дёшево). Риск: нет.
+Effect: a freer map; the events are not lost.
+Size: M (cheap together with C4). Risk: none.
 
-### C6. Инвентарь: адаптивная высота
+### C6. The inventory: the adaptive height
 
-Проблема: inv-grid всегда 153px (4 ряда) — при пустой сумке
-огромная пустота в gear-панели (VLM: «massive void»).
+Problem: inv-grid is always 153px (4 rows) - with an empty bag a
+huge void sits in the gear panel (VLM: a "massive void").
 
-Предложение: grid-auto-rows + max-height 153px, фактическая
-высота = ряды по числу предметов (min 1 ряд видимый, «empty»
-подпись при 0); footer (adena/weight/trash) прижимается.
+Proposal: grid-auto-rows + max-height 153px, the actual height =
+the rows of the item count (min 1 visible row, an "empty" caption at
+0); the footer (adena/weight/trash) presses up.
 
-Эффект: панель выглядит «по размеру данных».
-Объём: S-M. Риск: перерасчёт позиции shop flyout-высоты —
-проверить.
+Effect: the panel looks "sized to the data".
+Size: S-M. Risk: the shop flyout height position recount -
+verify.
 
-### C7. Легенда: сворачиваемая секция
+### C7. The legend: a collapsible section
 
-Проблема: 8 строк легенды + плотная заметка всегда занимают низ
-сайдбара.
+Problem: the 8 legend rows + the dense note always occupy the
+sidebar bottom.
 
-Предложение: легенда сворачивается (по образцу zone-panel):
-заголовок LEGEND + chevron, свёрнуто по умолчанию, примечание
-(«tick = look direction…») — в tooltip заголовка.
+Proposal: the legend collapses (modeled after zone-panel): a LEGEND
+header + chevron, collapsed by default, the note ("tick = look
+direction…") - into the header tooltip.
 
-Эффект: -150px постоянного шума в сайдбаре; справка по требованию.
-Объём: S. Риск: новички должны найти легенду — chevron-заголовок
-достаточно заметен.
+Effect: -150px of the standing noise in the sidebar; the reference
+on demand.
+Size: S. Risk: the newcomers must find the legend - a chevron header
+is visible enough.
 
-### C8. Правый край тулбара: телеметрия капсулами
+### C8. The toolbar right edge: the telemetry as capsules
 
-Проблема: map-scale и map-objects — dim mono текст «1:0.12 ·
-25 objects · 10,333 units» без структуры; VLM: «afterthought».
+Problem: map-scale and map-objects - a dim mono text "1:0.12 ·
+25 objects · 10,333 units" without structure; VLM: an
+"afterthought".
 
-Предложение: две-три компактные капсулы (mono 10.5px, чип-стиль с
-border-soft): `1:0.12`, `25 obj`, `10.3k units` + tooltip с
-расшифровкой; числа tabular-nums (A7).
+Proposal: two-three compact capsules (mono 10.5px, a chip style with
+border-soft): `1:0.12`, `25 obj`, `10.3k units` + a tooltip with the
+breakdown; the numbers tabular-nums (A7).
 
-Эффект: телеметрия выглядит спроектированной, а не подставленной.
-Объём: S. Риск: ширина тулбара — следить за переносом на 1280px.
+Effect: the telemetry looks designed, not tacked on.
+Size: S. Risk: the toolbar width - watch the wrap at 1280px.
 
-### C9. Responsive-поведение
+### C9. The responsive behavior
 
-Проблема: media queries нет вообще; body overflow: hidden. Ниже
-~1200px плавающие панели и сайдбар начинают конфликтовать.
+Problem: no media queries at all; body overflow: hidden. Below
+~1200px the floating panels and the sidebar start to fight.
 
-Предложение: 2 точки: <1280px — sidebar 200 → 176px, шрифты
-панелей -0.5px; <1024px — сайдбар прячется в icon-rail (28px
-полоска с точками ботов, hover-разворот) — карта получает
-пространство. HUD/gear остаются угловыми. Тест на 1024×768 и
-1440×900.
+Proposal: 2 points: <1280px - sidebar 200 → 176px, the panel fonts
+-0.5px; <1024px - the sidebar hides into an icon rail (a 28px strip
+with the bot dots, a hover expand) - the map gets the space. HUD/
+gear stay in the corners. Test at 1024×768 and 1440×900.
 
-Эффект: UI живёт на ноутбучных экранах и половинных окнах.
-Объём: M. Риск: средний — аккуратные проверки в живой сессии.
+Effect: the UI lives on the laptop screens and the half windows.
+Size: M. Risk: medium - careful checks in a live session.
 
-### C10. Empty-состояния
+### C10. The empty states
 
-Проблема: без выбранного бота панели показывают ряды «—»; лог
-пуст до первого события.
+Problem: with no bot selected the panels show the "—" rows; the log
+is empty until the first event.
 
-Предложение: явные placeholder-состояния: HUD — «select a bot»;
-лог — «waiting for events…»; обе — dim, по центру зоны, исчезают
-при данных.
+Proposal: explicit placeholder states: HUD - "select a bot"; the log
+- "waiting for events…"; both - dim, centered in the zone, gone once
+the data arrives.
 
-Эффект: интерфейс не выглядит «сломанным» на старте.
-Объём: S-M. Риск: нет.
+Effect: the interface does not look "broken" at the start.
+Size: S-M. Risk: none.
 
-### C11. Follow → switch-тумблер
+### C11. Follow → a switch toggle
 
-Проблема: follow — важнейший переключатель, спрятан как чекбокс
-12px.
+Problem: follow - the most used switch, hidden as a 12px checkbox.
 
-Предложение: CSS-only switch (34×18px, knob 14px, transition
-140ms) на тот же input; подпись «follow» остаётся.
+Proposal: a CSS-only switch (34×18px, knob 14px, transition 140ms)
+on the same input; the "follow" label stays.
 
-Эффект: частая операция заметнее и попадается мышью быстрее.
-Объём: S. Риск: малый.
+Effect: the frequent operation is more visible and the mouse lands
+faster.
+Size: S. Risk: low.
 
-### C12. Item tooltip: задержка и появление
+### C12. The item tooltip: the delay and the appearance
 
-Проблема: тултип вспыхивает мгновенно при проходе мыши по
-инвентарю — мерцает.
+Problem: the tooltip flashes instantly as the mouse crosses the
+inventory - it flickers.
 
-Предложение: задержка 100мс + fade-in 120ms; исчезновение без
-задержки. Позиционирование не трогаем (left-anchor уже сделан).
+Proposal: a 100ms delay + a 120ms fade-in; the disappearance without
+a delay. The positioning stays untouched (the left-anchor is already
+done).
 
-Эффект: спокойный, «дорогой» ховер. Объём: S. Риск: нет.
+Effect: a calm, "expensive" hover. Size: S. Risk: none.
 
-## 7. Мелочи dev-режимов
+## 7. The dev mode odds and ends
 
-- G1. FIGHT FX VARIANTS: блок описания на русском внутри
-  англоязычного UI — привести к одному языку (предлагаю английский:
-  «Every variant plays the same fight in one tick: the hero hits,
-  takes a hit, lands a crit and takes a crit — four enemy
-  positions vertically, the ideas horizontally.»). Объём: S.
-- G2. Pathfind: статы поиска (search time, nodes…) поднять
-  11 → 12px, значения полужирные; mono-блок geodata-path —
-  word-break уже есть. Объём: S.
+- G1. FIGHT FX VARIANTS: the description block is in Russian inside
+  the English UI - unify the language (English proposed: "Every
+  variant plays the same fight in one tick: the hero hits, takes a
+  hit, lands a crit and takes a crit - four enemy positions
+  vertically, the ideas horizontally."). Size: S.
+- G2. Pathfind: raise the search stats (search time, nodes…) 11 →
+  12px, the values bold; the geodata-path mono block - the
+  word-break is already there. Size: S.
 
-## 8. Что сознательно НЕ меняем
+## 8. What we deliberately do NOT change
 
-- Классическую палитру HP/MP/XP L2 C1 — осознанный стиль проекта
-  (A4 правит только видимость трека, не цвета).
-- Компактный вертикальный бюджет: хедер 34px, тулбар 37px, футер
-  26px — не раздаются.
-- Плотный «панель-инструмент» характер и информативность: не
-  прячем телеметрию в аккордеоны beyond C7/C4.
-- Vanilla CSS/JS без сборки и зависимостей — все предложения
-  реализуются в текущем стеке.
-- Canvas-рендер карты (метки, аггро-зоны, тайлы) — отдельная
-  тема, вне этого документа.
-- Русский язык fight-описания сохраняет смысл при переводе (G1).
+- The classic HP/MP/XP palette of L2 C1 - the deliberate style of
+  the project (A4 fixes only the track visibility, not the colors).
+- The compact vertical budget: the 34px header, the 37px toolbar,
+  the 26px footer - not given away.
+- The dense "panel tool" character and the informativeness: the
+  telemetry does not hide into the accordions beyond C7/C4.
+- The vanilla CSS/JS without a build and the dependencies - every
+  proposal lands in the current stack.
+- The canvas map render (the markers, the aggro zones, the tiles) -
+  a separate topic, outside this document.
+- The Russian fight description keeps its meaning through the
+  translation (G1).
 
-## 9. Порядок внедрения
+## 9. The landing order
 
-| Волна | Состав | Ощущаемый результат |
+| Wave | The composition | The felt result |
 | --- | --- | --- |
-| 1. Полировка (≈1 день) | A1–A5, A7, B1, B4, B5, C2, C3 | Интерфейс визуально «молодеет» без изменения структуры: шрифт, тени, рамки, фокус |
-| 2. Живость и порядок (≈1–2 дня) | A6, B3, B6–B8, C1, C7, C8, C10, C11, C12, G1, G2 | Моушн, иконки, горячие клавиши, empty-состояния, спокойная палитра статусов |
-| 3. Свобода оператора (≈2–3 дня) | B2, C4, C5, C6, C9 | Перетаскиваемые/сворачиваемые панели, стекло, adaptive-раскладка |
+| 1. The polish (≈1 day) | A1-A5, A7, B1, B4, B5, C2, C3 | The interface visually "gets younger" without a structure change: the font, the shadows, the borders, the focus |
+| 2. The liveliness and the order (≈1-2 days) | A6, B3, B6-B8, C1, C7, C8, C10, C11, C12, G1, G2 | The motion, the icons, the hotkeys, the empty states, the calm status palette |
+| 3. The operator freedom (≈2-3 days) | B2, C4, C5, C6, C9 | The draggable/collapsible panels, the glass, the adaptive layout |
 
-Каждая волна — отдельные атомарные коммиты (по одному пункту на
-коммит, как принято в ветке), с обновлением затронутых
-repro-проверок (`tools/repro_*.js`), живой верификацией через
-agent-browser (геометрия, отсутствие console errors) и VLM-скрин
-ревью, как в прошлых раундах.
+Every wave is separate atomic commits (one item per commit, as the
+branch convention goes), with the touched repro checks updated
+(`tools/repro_*.js`), the live verification through the
+agent-browser (the geometry, no console errors) and a VLM screenshot
+review, like the past rounds.
 
-## 10. Чек-лист аппрува
+## 10. The approval checklist
 
-Отметь пункты к внедрению (или напиши «все волны 1-2, из 3 только
-C4»):
+Mark the items to land (or write "all the waves 1-2, from 3 only
+C4"):
 
-| ID | Суть | Волна | Объём |
+| ID | The gist | Wave | Size |
 | --- | --- | --- | --- |
-| A1 | базовый шрифт 13→14px, минимум 10px | 1 | S |
-| A2 | вертикальный ритм, воздух строк | 1 | S |
-| A3 | микро-заголовки без тяжёлых CAPS | 1 | S |
-| A4 | XP-бар видимым | 1 | S |
-| A5 | тёмная тема: тени и глубина | 1 | S |
-| A6 | лог: zebra, умные таймстемпы, семантика цветов | 2 | S-M |
-| A7 | tabular-nums цифры | 1 | S |
-| B1 | хром панелей: radius, тени | 1 | S |
-| B2 | стеклянные оверлеи (opt-in) | 3 | M |
-| B3 | микро-моушн | 2 | S-M |
-| B4 | тонкие скроллбары везде | 1 | S |
-| B5 | underline-индикатор активного таба | 1 | S |
-| B6 | SVG-иконки | 2 | M |
-| B7 | приглушённые activity-цвета | 2 | S |
-| B8 | единые чипы состояний | 2 | S |
-| C1 | горячие клавиши | 2 | S-M |
+| A1 | the base font 13→14px, the 10px minimum | 1 | S |
+| A2 | the vertical rhythm, the line air | 1 | S |
+| A3 | the micro headers without the heavy CAPS | 1 | S |
+| A4 | the XP bar visible | 1 | S |
+| A5 | the dark theme: the shadows and the depth | 1 | S |
+| A6 | the log: zebra, smart timestamps, the color semantics | 2 | S-M |
+| A7 | the tabular-nums figures | 1 | S |
+| B1 | the panel chrome: radius, shadows | 1 | S |
+| B2 | the glass overlays (opt-in) | 3 | M |
+| B3 | the micro motion | 2 | S-M |
+| B4 | the thin scrollbars everywhere | 1 | S |
+| B5 | the active tab underline indicator | 1 | S |
+| B6 | the SVG icons | 2 | M |
+| B7 | the muted activity colors | 2 | S |
+| B8 | the unified state chips | 2 | S |
+| C1 | the hotkeys | 2 | S-M |
 | C2 | :focus-visible | 1 | S |
-| C3 | компас из-под zone-панели | 1 | S |
-| C4 | панели: drag + collapse | 3 | M-L |
-| C5 | chat: minimize + бейдж новых | 3 | M |
-| C6 | инвентарь по размеру данных | 3 | S-M |
-| C7 | легенда сворачивается | 2 | S |
-| C8 | телеметрия тулбара капсулами | 2 | S |
+| C3 | the compass out of the zone panel shadow | 1 | S |
+| C4 | the panels: drag + collapse | 3 | M-L |
+| C5 | the chat: minimize + the new badge | 3 | M |
+| C6 | the inventory sized to the data | 3 | S-M |
+| C7 | the legend collapses | 2 | S |
+| C8 | the toolbar telemetry as capsules | 2 | S |
 | C9 | responsive: 1280/1024 | 3 | M |
-| C10 | empty-состояния | 2 | S-M |
+| C10 | the empty states | 2 | S-M |
 | C11 | follow → switch | 2 | S |
-| C12 | tooltip: задержка + fade | 2 | S |
-| G1 | язык fight-описания | 2 | S |
-| G2 | pathfind статы крупнее | 2 | S |
-
+| C12 | the tooltip: delay + fade | 2 | S |
+| G1 | the fight description language | 2 | S |
+| G2 | the pathfind stats larger | 2 | S |

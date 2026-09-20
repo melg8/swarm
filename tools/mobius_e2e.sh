@@ -39,10 +39,10 @@ mkdir -p "${LOGS_DIR}"
 
 log "Building the swarm bot"
 cd "${SWARM_ROOT}"
-# Идентичность сборки: её печатают стартовая строка лога бота и
-# state dump веб-интерфейса, так что дамп точно говорит, из какого
-# кода он получен. В не-git checkout значения пусты - коммит всё
-# равно несёт Go buildinfo.
+# The build identity: the bot log opening line and the webui state
+# dump print it, so a dump tells exactly which code it came from.
+# In a non-git checkout the values stay empty - the commit carries
+# the Go buildinfo anyway.
 SWARM_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 if [ "${SWARM_BRANCH}" = "HEAD" ]; then
     SWARM_BRANCH=""

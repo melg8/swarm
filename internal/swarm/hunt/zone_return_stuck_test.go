@@ -132,7 +132,7 @@ func TestZoneReturnPlansThroughThePricedSearch(t *testing.T) {
 // TestZoneReturnDryFailureHoldsTheReturn pins the no-route rule: when
 // the priced search fails, the zone return HOLDS instead of marching
 // the direct segments toward the zone center (the owner rule of the
-// 2026-09-19 round: НИКОГДА не идти напрямую - the paced log names the
+// 2026-09-19 round: NEVER walk the direct line - the paced log names the
 // standing return).
 func TestZoneReturnDryFailureHoldsTheReturn(t *testing.T) {
     loop, game, bot, nav := newTripLoop()

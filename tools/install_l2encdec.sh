@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # ============================================================================
-# install_l2encdec.sh — сборка open-l2encdec (CLI l2encdec) в ~/opt.
+# install_l2encdec.sh - builds open-l2encdec (the l2encdec CLI) into
+# ~/opt.
 #
-# Используется для (пере)шифрования l2.ini клиента C1 (data/client/l2.ini).
-# Источник: https://github.com/ritsuwastaken/open-l2encdec (MIT), коммит
-# запинен ниже. Зависимости (mbedtls, miniz, blowfish) подтягиваются самим
-# CMake через FetchContent. Требует gcc/g++, make и CMake >= 3.14: без root
-# CMake можно поставить из deb.debian.org (apt-get download + dpkg -x в
-# ~/opt/cmake-root), см. комментарии в функции ensure_cmake.
+# Used to (re)encrypt the C1 client l2.ini (data/client/l2.ini).
+# Source: https://github.com/ritsuwastaken/open-l2encdec (MIT), the
+# commit is pinned below. The dependencies (mbedtls, miniz, blowfish)
+# come through the CMake FetchContent. Needs gcc/g++, make and
+# CMake >= 3.14: without root the CMake installs from deb.debian.org
+# (apt-get download + dpkg -x into ~/opt/cmake-root), see the
+# ensure_cmake comments.
 #
-# Идемпотентен: готовый бинарник в $PREFIX/bin/l2encdec пропускает сборку.
+# Idempotent: a ready binary in $PREFIX/bin/l2encdec skips the build.
 # ============================================================================
 set -euo pipefail
 
@@ -20,17 +22,17 @@ BINARY="$PREFIX/bin/l2encdec"
 LD_LIBRARY_PATH_CMAKE="${HOME}/opt/cmake-root/usr/lib/x86_64-linux-gnu"
 
 if [ -x "${BINARY}" ]; then
-    echo "l2encdec уже собран: ${BINARY}"
+    echo "l2encdec already built: ${BINARY}"
     exit 0
 fi
 
-# --- CMake: системный или распакованный из deb в ~/opt/cmake-root --------
+# --- CMake: the system one or unpacked from the deb into ~/opt/cmake-root -
 if ! command -v cmake >/dev/null 2>&1; then
     if [ -x "$HOME/opt/cmake-root/usr/bin/cmake" ]; then
         export PATH="$HOME/opt/cmake-root/usr/bin:$PATH"
         export LD_LIBRARY_PATH="${LD_LIBRARY_PATH_CMAKE}:${LD_LIBRARY_PATH:-}"
     else
-        echo "CMake не найден. Установите его или выполните:"
+        echo "CMake not found. Install it or run:"
         echo "  apt-get download cmake cmake-data libjsoncpp26 libuv1 librhash1 libzstd1"
         echo "  mkdir -p ~/opt/cmake-root"
         echo "  for d in *.deb; do dpkg -x \"\$d\" ~/opt/cmake-root/; done"
@@ -38,13 +40,13 @@ if ! command -v cmake >/dev/null 2>&1; then
     fi
 fi
 
-# --- Исходники ------------------------------------------------------------
+# --- Sources --------------------------------------------------------------
 if [ ! -d "${SRC_DIR}/.git" ]; then
     git clone --depth 1 https://github.com/ritsuwastaken/open-l2encdec.git \
         "${SRC_DIR}"
 fi
 
-# --- Сборка ---------------------------------------------------------------
+# --- Build ----------------------------------------------------------------
 BUILD_DIR="${SRC_DIR}/build"
 mkdir -p "${BUILD_DIR}"
 cmake -S "${SRC_DIR}" -B "${BUILD_DIR}" \
@@ -55,4 +57,4 @@ cmake --build "${BUILD_DIR}" --target l2encdec_cli -j"$(nproc)"
 
 mkdir -p "${PREFIX}/bin"
 cp "${BUILD_DIR}/cli/l2encdec" "${BINARY}"
-echo "ГОТОВО: ${BINARY}"
+echo "DONE: ${BINARY}"

@@ -1010,8 +1010,9 @@ concurrently - rebase before every push.
 
 ### Goal
 
-The owner report ("Выясни почему не совпал маршрут у бота в реальном
-мире и при построении через веб", the 2026-09-19 14:26 temp11 dump):
+The owner report ("find out why the bot route does not match in
+the real world and when built through the web", the 2026-09-19
+14:26 temp11 dump):
 the bot walked its planned 17 waypoint dry zone return from the elven
 village plaza to the hunting square center, the pathfind link opened
 the 3D viewer at the same from/to pair, and the drawn route had
@@ -1164,7 +1165,8 @@ three independent defects, all fixed in one round:
 
 ### Progress (2026-09-19, the red unit tests and the coverage lift round)
 
-- The owner report ("исправь тесты чтоб все проходили") verified
+- The owner report ("fix the tests so that everything passes")
+  verified
   against the full gate surface: build, vet, the full uncapped lint
   and the plain `go test ./...` (28 packages, `-count=1`) were green
   already - the red tests live in the race slice and in the
@@ -1234,10 +1236,10 @@ concurrently - rebase before every push.
 
 ### Goal
 
-The owner directive ("в коде кажется остались устаревшие способы - не
-должно сохраняться filter=swim - бот должен рассчитывать путь и через
-водные объекты, просто с корректными замедлениями - в воде плыть
-медленней чем бежать"): the dry/swim filter dichotomy is the
+The owner directive ("the code seems to keep the outdated ways -
+the filter=swim must not survive - the bot must plan the path
+through the water objects too, just with the correct slowdowns -
+in water it swims slower than it runs"): the dry/swim filter dichotomy is the
 outdated way. One search remains - the water is a price (the
 run/swim ratio 2.3), never a wall - and the walker walks the wet
 segments the plan carries.
@@ -1622,3 +1624,33 @@ item not forbidden from the sale sells to any merchant.
   known merchants, the exact join, the freeze filter, the end to end
   re-selection round, the region sets). The docs: hunting.md shop
   section, development_log.md Round 98.
+### Progress (2026-09-20, the naming audit round)
+
+- the owner asked for a broader naming audit after the leg->segment
+  round. The survey: the identifier vocabulary of the movement and
+  the pathfind packages (the word frequency scan), the misspelling
+  patterns, the Cyrillic scan of every text file. The vocabulary
+  verdict: the house metaphors (segment, strand as a verb, deck,
+  terrace, rung/ladder, claims, blind pass) are coherent idiomatic
+  English - no renames owed. No misspellings found (the retrun hits
+  are the requireTruncatedPrefixesError false positive).
+- the real systematic problem: the Russian remnants. Translated to
+  English: the owner rule quotes in the hunt comments and the repro
+  tests (NEVER walk the direct line, ONLY walk the planned routes),
+  the task brief quote of proxy/transformer.go, the packet parser
+  comments and the bench/struct test messages of
+  from_auth_server/init*.go, the webui fight.js variant notes and
+  the index.html fight gallery captions, the deploy scripts
+  (swarm_fast_deploy.sh, mobius_fast_deploy.sh, mobius_e2e.sh,
+  proxy_e2e.sh, install_l2encdec.sh - the headers, the step messages
+  and the diagnostics) and docs/webui_modernization_proposal.md in
+  full (488 lines, awaiting approval, now English end to end).
+- the deliberate keeps: the Cyrillic string literals "Эльф"/"тест"
+  in the packet tests are the multibyte encoding fixtures (the tests
+  cover the non-ASCII rune handling), and the dated journals
+  (docs/development_log.md, docs/agent_progress_archive.md) keep
+  their historical record.
+- verification: go build, go vet, task lint 0 issues, task fmt:check
+  clean, bash -n on every touched script, go test -count=1 ./... 28
+  packages ok. No behavior change: the translations touch the
+  comments, the diagnostic strings, the webui captions and the docs.

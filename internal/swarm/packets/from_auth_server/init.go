@@ -104,7 +104,7 @@ func (p *InitPacket) ToBytes(writer *packet.Writer) error {
 }
 
 func (p *InitPacket) WriteTo(dest []byte) (int, error) {
-    requiredSize := 4 + 4 + 128 + 4*4 // Размер без ключа Blowfish
+    requiredSize := 4 + 4 + 128 + 4*4 // the size without the Blowfish key
     if p.BlowfishKey != nil {
         requiredSize += len(p.BlowfishKey)
     }
@@ -116,14 +116,14 @@ func (p *InitPacket) WriteTo(dest []byte) (int, error) {
 
     offset := 0
 
-    // Записываем int32 напрямую в слайс
+    // the int32 lands straight into the slice
     binary.LittleEndian.PutUint32(dest[offset:], uint32(p.SessionID))
     offset += 4
 
     binary.LittleEndian.PutUint32(dest[offset:], uint32(p.ProtocolVersion))
     offset += 4
 
-    // Копируем данные ключа. Это не вызывает аллокаций.
+    // The key data copies over; the copy allocates nothing.
     copy(dest[offset:], p.RsaPublicKey)
     offset += len(p.RsaPublicKey)
 

@@ -147,7 +147,7 @@ func TestPocketRefusalArmsTheCursorEscapeAtOnce(t *testing.T) {
 
 // TestDirectSegmentSilentHopsArmTheEscape was the direct segment fast path
 // pin; the direct server routed walk is eliminated (the owner rule of
-// the 2026-09-19 16:02 round: НИКОГДА не идти напрямую - see
+// the 2026-09-19 16:02 round: NEVER walk the direct line - see
 // direct_walk_elimination_repro_test.go). The never-burn-the-window
 // contract lives on in the follower path: the move start watchdog
 // forces the stuck verdict per dead click (the first test of this

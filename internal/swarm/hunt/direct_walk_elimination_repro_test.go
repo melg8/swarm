@@ -23,9 +23,10 @@ import (
 
 // The reproduction of the 2026-09-19 16:02 state dump report (build
 // 07ccb0e, bot unittest1, phase townReturn): the character spawned at the
-// village cell 43032 50408 -2992 and NEVER moved - "не исправил либо
-// не залил? опять прямая линия до зоны - ее НЕ должно быть, ТОЛЬКО
-// идти по маршрутам и НИКОГДА не идти напрямую".
+// village cell 43032 50408 -2992 and NEVER moved - "not fixed or
+// not pushed? again a straight line to the zone - it must NOT
+// exist, ONLY walk the planned routes and NEVER walk the direct
+// line".
 //
 // The dump's own numbers pin the mechanism:
 //
@@ -53,8 +54,9 @@ import (
 // port refuses every direction from the spawn cell but south - the
 // mesh/grid pocket the session froze in.
 //
-// The contract the owner pinned (verbatim): ТОЛЬКО идти по маршрутам
-// и НИКОГДА не идти напрямую - the walk plan is ALWAYS a real route,
+// The contract the owner pinned (translated): ONLY walk the planned
+// routes and NEVER walk the direct line - the walk plan is ALWAYS
+// a real route,
 // the direct server routed walk does not exist, and when the walk
 // does not move toward the current point the cursor key escape arms
 // ALONG THE ROUTE (the claims follow the planner's bends) and at the
@@ -362,7 +364,7 @@ func TestReproRefusedSpawnLadderArmsTheEscapeWithoutServerAnswers(
 // answer) the escape arms over the straight ladder toward the aim -
 // and the aim is CLAMPED to the pocket radius, so a far target can
 // never pull a straight march out of the planless escape (the owner
-// rule: НИКОГДА не идти напрямую).
+// rule: NEVER walk the direct line).
 func TestCursorEscapePlanlessAimStaysPocketSized(t *testing.T) {
     loop := NewLoop(&fakeGame{}, newTestBot())
     loop.SetNavigator(&fakeNavigator{})

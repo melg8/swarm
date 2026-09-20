@@ -12,8 +12,8 @@ package proxy
 // by what the proxy actually sends, never by what the other side sent.
 //
 // This is the seam for the future server packet spoofing used for
-// debugging (the task brief: "swarm может подменять часть пакетов от
-// сервера в целях отладки"). The current implementation is the
+// debugging (the task brief: "swarm may substitute part of the
+// server packets for debugging"). The current implementation is the
 // transparent passthrough of the MITM mode: packets transit unchanged.
 type Transformer interface {
     // ServerToClient transforms a server packet on its way to the
