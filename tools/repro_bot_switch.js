@@ -21,6 +21,12 @@ SPDX-License-Identifier: MIT
 //   as "the circles are missing" next to it);
 // - the fleet kill marks survive the reset (they belong to the whole
 //   deployment, not to one bot);
+// - the switch gap keeps the static world on the canvas and the
+//   camera on the last known position (the white flash bug: the old
+//   reset cleared the whole canvas and the follow camera collapsed
+//   to the world origin until the new stream's first snapshot landed,
+//   so every sidebar click flashed the map white - even between two
+//   bots of the same grid where nothing else would change);
 // - the first snapshot of the new bot repaints normally.
 //
 // Usage: node tools/repro_bot_switch.js [--map <map.js>] [--verbose]
@@ -263,11 +269,23 @@ function runScenario(mapFile) {
         MapView.killMarks.length === 1,
         "the fleet layer must stay across the switches");
 
+    // The switch gap: the camera holds the last known position instead
+    // of collapsing to the world origin (the follow camera reads this
+    // anchor while the new stream reconnects).
+    const anchor = MapView.charPos();
+    check(results, "the switch gap holds the last camera anchor",
+        anchor.x === WORLD.self.x && anchor.y === WORLD.self.y,
+        "the gap camera drifted to " + JSON.stringify(anchor));
+
     // The redraw after the reset paints nothing of the old bot.
     record.arcs.length = 0;
     record.texts.length = 0;
     record.fills = 0;
+    const strokesBeforeGap = record.strokes;
     MapView.draw();
+    check(results, "the switch gap paints the static world",
+        record.strokes > strokesBeforeGap,
+        "the gap frame stroked nothing - a blank (white) canvas");
     check(results, "the reset map paints no stale spot circles",
         record.arcs.filter(
             (arc) => Math.abs(arc[2] - spotRadius) < 2).length === 0,
@@ -286,6 +304,13 @@ function runScenario(mapFile) {
     check(results, "the new bot repaints its own spot circle",
         otherArcs.length > 0,
         "no spot circle at " + JSON.stringify(otherSpot));
+
+    // The anchor follows the new bot from its first snapshot on: the
+    // next switch (before any snapshot) would hold THIS position.
+    const nextAnchor = MapView.charPos();
+    check(results, "the new bot becomes the camera anchor",
+        nextAnchor.x === WORLD.other.x && nextAnchor.y === WORLD.other.y,
+        "the anchor stayed at " + JSON.stringify(nextAnchor));
 
     return results;
 }

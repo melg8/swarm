@@ -7681,3 +7681,49 @@ for the re-pick line).
 - Follow ups: the pocket escape remains the designed answer for the
   genuinely sealed starts; the Detour-parity flat tile optimization
   stays future headroom.
+
+## Round 100: the bot switch holds the world - the map gap paints the static background (2026-09-20)
+
+- date, scope: 2026-09-20, the webui map bot switch
+  (`internal/swarm/webserver/web/map.js`, the `paint`/`resetBot`/
+  `charPos`/`bgKey`/`drawZone` chain).
+- Problem statement: the owner report - clicking from one bot to
+  another in the sidebar flashed the whole map white for a moment,
+  even when both bots sit on the same grid and the view would not
+  change at all.
+- Root cause analysis: `selectBot` drops the observed bot state via
+  `MapView.resetBot` (the deliberate contract - a stale frame reads
+  as wrong data) and `paint` answered the snapshotless gap with a
+  bare `ctx.clearRect`: the bot independent static world (the imagery,
+  the grid, the loaded zone frame) vanished with the bot layers, the
+  page background shone through until the new SSE stream delivered
+  its first snapshot. The follow camera (the checkbox defaults on)
+  compounded it - `charPos` returned the world origin without a
+  snapshot, so the view collapsed to (0, 0) for the reconnect window
+  and jumped back on the first snapshot. Two visible discontinuities
+  per click, both loudest on the same grid switch where the correct
+  behavior is zero movement.
+- Fix: the camera anchor `lastChar` rides every snapshot (a zero
+  position leaves the previous anchor - the same no data rule the
+  runtime advance and the zone frame follow) and `resetBot` captures
+  the outgoing interpolated position before the drop. The gap frame
+  of `paint` draws the bot independent layers: the background cache
+  blit (the key survives - `bgKey` reads the held anchor for the
+  region, so the raster the previous frames built is reused, not
+  re-rendered around a "region x"), or the direct tiles plus grid
+  fallback, plus the zone frame and the fleet kill ring; the fresh
+  boot without any anchor keeps the blank frame it always had.
+  `charPos` returns the held anchor during the gap and for
+  positionless snapshots.
+- Reproduction: the new checks of `tools/repro_bot_switch.js` - the
+  pre fix map.js answers "the gap camera drifted to {x:0, y:0}" and
+  "the gap frame stroked nothing - a blank (white) canvas", the post
+  fix map.js holds the anchor and strokes the static world while the
+  stale layer checks (no spot circles, no unit fills) keep passing.
+- Verification: the bot switch, map render, zone hover, movement,
+  hud, gear, stats and fight ui harnesses answer all pass on the
+  fixed tree; `go build ./...` and `go vet ./...` stay clean (the web
+  assets embed unchanged for the compiler).
+- Follow ups: the camera still snaps once when the new bot sits far
+  from the old one - the honest switch feedback; a glide would need a
+  camera interpolation layer, out of scope for the flash fix.

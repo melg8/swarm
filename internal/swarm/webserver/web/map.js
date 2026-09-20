@@ -25,6 +25,14 @@ const MapView = {
   drag: null,
   hover: null,
   lastSnap: null,
+  // The last known world position of the observed character. The
+  // observed bot state drops on a bot switch (resetBot), but the
+  // camera and the static world must not: the anchor holds the view
+  // in place while the new event stream reconnects, so a switch
+  // paints the same map area it painted before instead of collapsing
+  // to the world origin behind a cleared (white) canvas. The first
+  // snapshot with a real position overwrites it.
+  lastChar: null,
   clockOffsetMs: 0,
   clockSamples: [],
   runtime: new Map(),
@@ -367,6 +375,14 @@ const MapView = {
       }
       this.clockOffsetMs = Math.max(...this.clockSamples);
     }
+    // The camera anchor rides every snapshot: a zero position (a
+    // pre-world session that publishes no character yet) leaves the
+    // previous anchor in place, the same "no data" rule the runtime
+    // advance and the zone frame follow.
+    const character = snapshot.character;
+    if (character && character.x) {
+      this.lastChar = { x: character.x, y: character.y };
+    }
     const alive = new Set(["self"]);
     for (const obj of snapshot.objects || []) {
       alive.add(obj.objectId);
@@ -401,9 +417,18 @@ const MapView = {
   // resetBot drops the observed bot state ahead of the first snapshot
   // of a bot switch: the map must not keep painting the previous
   // bot's world (its zones, its objects, its walk line) under the new
-  // bot's HUD while the event stream reconnects. The fleet wide kill
+  // bot's HUD while the event stream reconnects. The static world (the
+  // imagery, the grid, the zone frame) keeps painting through the gap
+  // (see paint) and the camera holds the last known character position
+  // instead of collapsing to the world origin. The fleet wide kill
   // marks stay - they belong to the whole deployment, not to one bot.
   resetBot() {
+    if (this.lastSnap) {
+      // The interpolated drawn position is the exact point the camera
+      // follows this frame: the freshest anchor the outgoing bot has.
+      const pos = this.charPos();
+      this.lastChar = { x: pos.x, y: pos.y };
+    }
     this.lastSnap = null;
     this.huntKey = "";
     this.runtime.clear();
@@ -1178,7 +1203,27 @@ const MapView = {
     const rect = this.view;
     const pathfind = this.pathfindEnabled();
     if (!this.lastSnap && !pathfind) {
-      ctx.clearRect(0, 0, rect.width, rect.height);
+      // The bot switch gap: the observed bot state is dropped but the
+      // canvas must not go blank - a cleared frame read as a full white
+      // flash on every sidebar click, loudest when both bots share the
+      // same grid and nothing else would change at all. The bot
+      // independent layers paint on: the imagery (the cached blit or
+      // the direct tiles), the grid, the zone frame of the held
+      // position and the fleet kill ring. Without a camera anchor yet
+      // (a fresh boot before the very first snapshot) the blank frame
+      // stays the honest boot state.
+      if (!this.lastChar) {
+        ctx.clearRect(0, 0, rect.width, rect.height);
+
+        return;
+      }
+      if (!this.blitBackground(ctx, rect)) {
+        ctx.clearRect(0, 0, rect.width, rect.height);
+        this.drawMapBackground(ctx, rect);
+        this.drawGrid(ctx, rect);
+        this.drawZone(ctx, rect);
+      }
+      this.drawKillMarks(ctx, rect);
 
       return;
     }
@@ -1289,9 +1334,13 @@ const MapView = {
   // loaded zone region of the character, the geodata mode, the layer
   // toggles and the canvas geometry. A camera move alone does NOT
   // change the key: the cache is world anchored, so the camera pans
-  // inside it until the slack box runs out.
+  // inside it until the slack box runs out. The region reads the held
+  // camera anchor (lastChar) and not the live snapshot, so the bot
+  // switch gap keeps the same key - the first frame after the switch
+  // blits the raster the previous frames built instead of re-rastering
+  // the world around a "region x" that no frame ever painted.
   bgKey(rect, dpr) {
-    const c = this.lastSnap && this.lastSnap.character;
+    const c = this.lastChar;
     const region = c && c.x
       ? Math.floor(c.x / this.regionSize) + "_"
         + Math.floor(c.y / this.regionSize)
@@ -2555,10 +2604,13 @@ const MapView = {
   },
 
   // drawZone outlines the loaded 3x3 region block around the character:
-  // the server only spawns and updates objects inside this square.
+  // the server only spawns and updates objects inside this square. The
+  // position comes from the held camera anchor, so the frame also draws
+  // through the bot switch gap (paint paints the static world there)
+  // instead of flickering off for the reconnect window.
   drawZone(ctx, rect) {
     if (!document.getElementById("show-zone").checked) { return; }
-    const c = this.lastSnap.character;
+    const c = this.lastChar;
     if (!c || !c.x) { return; }
     const region = this.regionSize;
     const baseX = Math.floor(c.x / region) - 1;
@@ -3712,11 +3764,19 @@ const MapView = {
   },
 
   charPos() {
-    if (!this.lastSnap) { return { x: 0, y: 0 }; }
+    if (!this.lastSnap) {
+      // The bot switch gap: hold the last known character position so
+      // the follow camera keeps framing the same map area while the
+      // new event stream connects (the origin jump read as a white
+      // flash on every sidebar click).
+      return this.lastChar || { x: 0, y: 0 };
+    }
     const rt = this.runtime.get("self");
     if (rt) { return { x: rt.drawX, y: rt.drawY }; }
+    const c = this.lastSnap.character;
+    if (!c || !c.x) { return this.lastChar || { x: 0, y: 0 }; }
 
-    return { x: this.lastSnap.character.x, y: this.lastSnap.character.y };
+    return { x: c.x, y: c.y };
   },
 
   followEnabled() {

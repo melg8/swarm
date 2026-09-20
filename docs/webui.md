@@ -198,6 +198,21 @@ colors from the same variables).
   list - the crosses live in the map layer, so they survive the bot
   switches of the view (the per zone kill centroid of the observed bot
   alone did not). The `kills` toolbar checkbox hides the layer.
+- Bot switch gap: clicking another bot in the sidebar drops the
+  observed bot state (its objects, its zones, its walk line, its
+  combat effects) ahead of the new event stream (`MapView.resetBot`),
+  but the canvas must not go blank during the reconnect window: the
+  imagery blits from the world anchored background cache (the cache
+  key survives the gap - the region reads the held camera anchor
+  `lastChar`, not the dropped snapshot), the grid, the loaded zone
+  frame and the fleet kill ring repaint, and the follow camera holds
+  the last known character position until the first snapshot of the
+  new bot replaces it. The old behavior cleared the whole canvas and
+  collapsed the camera to the world origin, so every sidebar click
+  flashed the map white for the stream reconnect - loudest between two
+  bots of the same grid where nothing else would change at all. A
+  fresh boot before the very first snapshot keeps the blank frame
+  (there is no anchor to hold yet).
 
 ## Movement interpolation (map.js projectTickwise)
 
@@ -1088,4 +1103,6 @@ no bundler, no network dependency; every dynamic text lands through
 - `tools/repro_bot_switch.js` for the observed bot switch: the map
   resets the previous bot's world (snapshot, runtime objects, social
   masks, combat effects) ahead of the new stream, keeps the fleet
-  kill marks and repaints the new bot's zones on its first snapshot.
+  kill marks, paints the static world through the switch gap with the
+  camera held on the last known position (the white flash fix) and
+  repaints the new bot's zones on its first snapshot.
